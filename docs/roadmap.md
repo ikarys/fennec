@@ -83,3 +83,16 @@ advisory `flock`s: they die with the process, no stale state.
 Not yet: yielding to other clients of the model server (the current server
 answers 404 on `/metrics`, so its load is not visible); yielding to the
 user at the keyboard; preempting a distillation already sent.
+
+**P7 recipes v0** done: when the latest run on the same goal (after
+normalisation) in the same project landed, its winning tool calls are replayed
+as an attempt of their own, before any model. Pass → no model call. Fail →
+the models run as usual. A rejected or failed latest run retires the recipe;
+a trajectory whose written files were elided by context bounding is not
+replayed.
+Live: from_roman reverted, same task again → the recipe replayed 7 steps,
+`cargo test` passed, 0.3 s and no model call (71 s with the model).
+Limits: exact goal match only; write_file replays old contents, so recipes
+pay off for command-shaped tasks (regenerate, bump, migrate) and for redoing
+work that was undone, less for edits on moved code (the checks catch it).
+Not yet: matching by intent; parametrised recipes.

@@ -12,7 +12,7 @@ use crate::provider::Model;
 use crate::review;
 use crate::rules::{self, HARNESS_DIR, Kind, Rule};
 use crate::world::{World, Worlds, git};
-use crate::{schedule, sleep};
+use crate::{recipe, schedule, sleep};
 
 const VERIFY_TIMEOUT_SECS: u32 = 900;
 
@@ -106,26 +106,19 @@ pub fn solve(
         context: &context,
         max_steps,
     };
-    // Forks are sequential: concurrent `git worktree add` contend for locks.
-    let forked: Vec<World> = models
-        .iter()
-        .map(|_| worlds.fork(&project.to_string_lossy()))
-        .collect::<io::Result<_>>()?;
-    let mut attempts: Vec<Value> = std::thread::scope(|s| {
-        let handles: Vec<_> = forked
-            .iter()
-            .zip(models)
-            .map(|(world, model)| s.spawn(move || attempt(worlds, world, *model, brief)))
-            .collect();
-        handles
-            .into_iter()
-            .zip(&forked)
-            .map(|(h, world)| match h.join() {
-                Ok(record) => record,
-                Err(_) => json!({"world": world.id, "passed": false, "reason": "attempt panicked"}),
-            })
-            .collect()
-    });
+    // A recorded way to this goal is tried first, alone: if it passes, no
+    // model is called.
+    let (mut forked, mut attempts) = (Vec::new(), Vec::new());
+    if let Some(recipe) = recipe::find(worlds, &project, &task.goal)? {
+        let (f, a) = attempts_for(worlds, &project, &[&recipe], brief)?;
+        forked = f;
+        attempts = a;
+    }
+    if !attempts.iter().any(|a| a["passed"] == true) {
+        let (f, a) = attempts_for(worlds, &project, models, brief)?;
+        forked.extend(f);
+        attempts.extend(a);
+    }
 
     // Selection by the verifier: among passing worlds, the smallest change.
     let winner = attempts
@@ -172,6 +165,36 @@ pub fn solve(
         serde_json::to_string_pretty(&record).map_err(io::Error::other)?,
     )?;
     Ok(record)
+}
+
+/// One attempt per model, in parallel, each in a fresh world.
+fn attempts_for(
+    worlds: &Worlds,
+    project: &Path,
+    models: &[&dyn Model],
+    brief: &Brief,
+) -> io::Result<(Vec<World>, Vec<Value>)> {
+    // Forks are sequential: concurrent `git worktree add` contend for locks.
+    let forked: Vec<World> = models
+        .iter()
+        .map(|_| worlds.fork(&project.to_string_lossy()))
+        .collect::<io::Result<_>>()?;
+    let attempts = std::thread::scope(|s| {
+        let handles: Vec<_> = forked
+            .iter()
+            .zip(models)
+            .map(|(world, model)| s.spawn(move || attempt(worlds, world, *model, brief)))
+            .collect();
+        handles
+            .into_iter()
+            .zip(&forked)
+            .map(|(h, world)| match h.join() {
+                Ok(record) => record,
+                Err(_) => json!({"world": world.id, "passed": false, "reason": "attempt panicked"}),
+            })
+            .collect()
+    });
+    Ok((forked, attempts))
 }
 
 /// What every attempt of a run is given.
