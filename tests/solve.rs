@@ -437,11 +437,70 @@ fn sleep_proposes_know_how_that_a_human_keeps() {
         ["checks run with `sh check.sh`"]
     );
 
+    // A new goal: the landed one would be replayed without the model.
+    let mut next = task(&[]);
+    next.goal = "Write 43 into the file `answer`.".to_string();
     let spy = Spy(Mutex::new(String::new()));
-    solve(&f.worlds, &f.project, &task(&[]), &[&spy], 10).unwrap();
+    solve(&f.worlds, &f.project, &next, &[&spy], 10).unwrap();
     let system = spy.0.lock().unwrap().clone();
     assert!(
         system.contains("Know-how kept for this project:\n  - checks run with `sh check.sh`"),
         "{system}"
     );
+}
+
+fn commit_file(f: &Fixture, path: &str, content: &str) {
+    std::fs::write(f.project.join(path), content).unwrap();
+    git(f, &["add", "-A"]);
+    git(
+        f,
+        &[
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "-qm",
+            path,
+        ],
+    );
+}
+
+#[test]
+fn a_landed_goal_comes_back_as_a_replay_without_the_model() {
+    let f = fixture("recipe");
+    let first = Script::new("first", &[write("answer", "42\n"), done()]);
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&first], 10).unwrap();
+    land(&f.worlds, record["winner"].as_str().unwrap()).unwrap();
+    commit_file(&f, "answer", "0\n");
+
+    // Same goal again: the recipe passes, the model is never called.
+    let mute = Script::new("mute", &[]);
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&mute], 10).unwrap();
+    let attempts = record["attempts"].as_array().unwrap();
+    assert_eq!(attempts.len(), 1, "{record:#}");
+    assert!(
+        attempts[0]["model"]
+            .as_str()
+            .unwrap()
+            .starts_with("recipe:")
+    );
+    land(&f.worlds, record["winner"].as_str().unwrap()).unwrap();
+
+    // The project moved on: the replay fails its checks and the model runs.
+    commit_file(&f, "check.sh", "grep -qx 43 answer\n");
+    let fresh = Script::new("fresh", &[write("answer", "43\n"), done()]);
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&fresh], 10).unwrap();
+    let attempts = record["attempts"].as_array().unwrap();
+    assert_eq!(attempts.len(), 2, "{record:#}");
+    assert_eq!(attempts[0]["passed"], false);
+    assert_eq!(record["winner"], attempts[1]["world"]);
+    assert_eq!(f.worlds.list().unwrap().len(), 1);
+
+    // A rejected latest run retires the recipe.
+    review::reject(&f.worlds, record["winner"].as_str().unwrap(), None).unwrap();
+    let again = Script::new("again", &[write("answer", "43\n"), done()]);
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&again], 10).unwrap();
+    assert_eq!(record["attempts"].as_array().unwrap().len(), 1);
+    assert_eq!(record["attempts"][0]["model"], "again");
 }

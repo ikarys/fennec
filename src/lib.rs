@@ -1,5 +1,6 @@
 pub mod agent;
 pub mod provider;
+pub mod recipe;
 pub mod review;
 pub mod rules;
 pub mod schedule;

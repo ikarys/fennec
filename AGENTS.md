@@ -13,6 +13,7 @@ binding): `~/workspace/training/iatraining/notes/agent-architecture-reflexion.md
 ```
 src/world.rs     worlds: fork, sandbox (bubblewrap), diff, commit, rollback, drop
 src/provider.rs  `Model` trait + OpenAI-compatible client
+src/recipe.rs    replay a landed run's tool calls when the same goal returns
 src/agent.rs     tool loop; every tool runs inside the sandbox
 src/solve.rs     task → N worlds → verify → select → land (rebase + re-verify)
 src/rules.rs     project rules (`.fennec-os/rules.json` at HEAD), glob matching
