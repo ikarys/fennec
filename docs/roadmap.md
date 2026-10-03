@@ -198,3 +198,15 @@ system prompt, and the server's prefix cache, stay the same across attempts.
 Live: not exercised yet. On a task with hidden protected tests, the first
 attempt read them and passed in 11 s; forcing a failure would only test a
 fake lesson.
+
+**Fewer turns: tried and dropped.** Recorded runs open with two to four
+turns of `ls` and `cat`, so the agent was given the tracked files and the
+contents of the named and smallest files up front (16 KB budget). Measured
+on `is_roman`, three runs each: turns fell from 8 to 5.3 on average, wall
+time rose from 9.4 s to 16.7 s. Read turns cost 0.3 to 0.6 s each: little
+output, and the input is prefilled fast and cached. With the whole file in
+view, the agent rewrote it with `write_file` (2,000 to 3,000 output tokens,
+12 s in one turn) instead of appending 250 tokens, and reasoned twice as
+much. The cost is output tokens, decoded at about 165 tok/s, not turns.
+In passing attempts, about 40 % of output tokens are reasoning and 13 % are
+`write_file` contents; the rest are commands, arguments and summaries.
