@@ -22,6 +22,9 @@ pub struct Task {
     pub verify: Vec<String>,
     /// Paths the agent must not change, so it cannot pass by editing the checks.
     pub protect: Vec<String>,
+    /// The world attempts fork from (an accepted spec); `None` is the
+    /// project's HEAD. Set by the harness, never read from a task file.
+    pub base: Option<String>,
 }
 
 impl Task {
@@ -41,6 +44,7 @@ impl Task {
             goal: v["goal"].as_str().unwrap_or("").to_string(),
             verify: strings("verify"),
             protect: strings("protect"),
+            base: None,
         };
         if task.goal.is_empty() {
             return Err(io::Error::other("task has no goal"));
@@ -106,16 +110,20 @@ pub fn solve(
         context: &context,
         max_steps,
     };
+    let source = match &task.base {
+        Some(world) => world.clone(),
+        None => project.to_string_lossy().to_string(),
+    };
     // A recorded way to this goal is tried first, alone: if it passes, no
     // model is called.
     let (mut forked, mut attempts) = (Vec::new(), Vec::new());
     if let Some(recipe) = recipe::find(worlds, &project, &task.goal)? {
-        let (f, a) = attempts_for(worlds, &project, &[&recipe], brief)?;
+        let (f, a) = attempts_for(worlds, &source, &[&recipe], brief)?;
         forked = f;
         attempts = a;
     }
     if !attempts.iter().any(|a| a["passed"] == true) {
-        let (f, a) = attempts_for(worlds, &project, models, brief)?;
+        let (f, a) = attempts_for(worlds, &source, models, brief)?;
         forked.extend(f);
         attempts.extend(a);
     }
@@ -146,6 +154,7 @@ pub fn solve(
     let record = json!({
         "project": project.display().to_string(),
         "goal": task.goal,
+        "spec": task.base,
         "verify": task.verify,
         "protect": task.protect,
         "winner": winner,
@@ -170,14 +179,14 @@ pub fn solve(
 /// One attempt per model, in parallel, each in a fresh world.
 fn attempts_for(
     worlds: &Worlds,
-    project: &Path,
+    source: &str,
     models: &[&dyn Model],
     brief: &Brief,
 ) -> io::Result<(Vec<World>, Vec<Value>)> {
     // Forks are sequential: concurrent `git worktree add` contend for locks.
     let forked: Vec<World> = models
         .iter()
-        .map(|_| worlds.fork(&project.to_string_lossy()))
+        .map(|_| worlds.fork(source))
         .collect::<io::Result<_>>()?;
     let attempts = std::thread::scope(|s| {
         let handles: Vec<_> = forked
@@ -294,7 +303,7 @@ fn blocking_commands(rules: &[Rule]) -> Vec<&str> {
 
 /// Runs the rules' commands in the world's sandbox. Returns their results
 /// and, if a blocking one failed, the reason.
-fn verify(
+pub(crate) fn verify(
     worlds: &Worlds,
     world: &World,
     rules: &[Rule],

@@ -96,3 +96,18 @@ Limits: exact goal match only; write_file replays old contents, so recipes
 pay off for command-shaped tasks (regenerate, bump, migrate) and for redoing
 work that was undone, less for edits on moved code (the checks catch it).
 Not yet: matching by intent; parametrised recipes.
+
+**P7 intent compiler v0** done (not yet verified live: the model server was
+unreachable): `spec <project> <request>` runs an agent that writes acceptance
+tests only and ends with `goal:` and `verify:` lines. The harness then checks
+what it can decide: a goal and a command were given, files were written, none
+under `.fennec-os` or a forbidden path, and the commands **fail** now (tests
+that already pass do not test the request). A valid spec keeps its world for
+the human: `spec show`, `spec accept` (the attempts fork from the spec's world,
+its files are protected, its commands are the verify), `spec reject` with a
+correction that reaches the next compile of the same request.
+Limits: "fails" means any non-zero exit, so tests that do not compile pass
+the check; the human reading the diff is the guard. The spec agent may write
+non-test files; protecting them then blocks the implementation.
+Not yet: clarifying questions before writing; recipes matched through the
+compiled goal; a review surface richer than the CLI (no TUI: decision open).

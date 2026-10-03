@@ -3,7 +3,7 @@ use std::process::ExitCode;
 use fennec_os::provider::{Model, OpenAi};
 use fennec_os::solve::{Task, land, solve};
 use fennec_os::world::Worlds;
-use fennec_os::{review, rules, sleep};
+use fennec_os::{review, rules, sleep, spec};
 
 const USAGE: &str = "usage: fennec-os <command>
   fork <project-path|world-id>   new world from the source's last commit
@@ -15,6 +15,12 @@ const USAGE: &str = "usage: fennec-os <command>
   list                           list worlds
   solve <project> <task.json> [--attempts N] [--steps N]
                                  N agents in N worlds; keeps the smallest passing diff
+  spec <project> <request> [--steps N]
+                                 compile a request into acceptance tests + a task
+  spec list | show <id>          specs waiting on you, one spec's goal and tests
+  spec accept <id> [--attempts N] [--steps N]
+                                 validate the spec and solve it from its tests
+  spec reject <id> [correction]  discard it; the correction goes to the next compile
   land <world-id>                fast-forward the project onto a world that passed
   queue                          runs waiting on you
   show <run-id>                  a run's verdicts and winning diff
@@ -57,47 +63,76 @@ fn run(args: &[String]) -> std::io::Result<ExitCode> {
         "drop" if args.len() == 2 => worlds.drop(worlds.open(arg(1))?)?,
         "list" if args.len() == 1 => worlds.list()?.iter().for_each(|id| println!("{id}")),
         "solve" if args.len() >= 3 => {
-            let flag = |name: &str, default: usize| -> std::io::Result<usize> {
-                match args.iter().position(|a| a == name) {
-                    None => Ok(default),
-                    Some(i) => arg(i + 1)
-                        .parse()
-                        .map_err(|_| std::io::Error::other(format!("{name} needs a number"))),
-                }
-            };
             let task = Task::from_json(&std::fs::read_to_string(arg(2))?)?;
-            let variants = OpenAi::variants_from_env(flag("--attempts", 1)?.max(1))?;
+            let variants = OpenAi::variants_from_env(flag(args, "--attempts", 1)?.max(1))?;
             let models: Vec<&dyn Model> = variants.iter().map(|m| m as &dyn Model).collect();
             let record = solve(
                 &worlds,
                 std::path::Path::new(arg(1)),
                 &task,
                 &models,
-                flag("--steps", 40)?,
+                flag(args, "--steps", 40)?,
             )?;
-            for a in record["attempts"].as_array().into_iter().flatten() {
-                println!(
-                    "{}  {:<24} {}  {} lines  {}",
-                    a["world"].as_str().unwrap_or("?"),
-                    a["model"].as_str().unwrap_or("?"),
-                    if a["passed"] == true { "PASS" } else { "FAIL" },
-                    a["changed_lines"],
-                    a["reason"].as_str().unwrap_or(""),
-                );
+            return Ok(print_run(&worlds, &record));
+        }
+        "spec" if args.len() >= 3 && arg(1) == "accept" => {
+            let variants = OpenAi::variants_from_env(flag(args, "--attempts", 1)?.max(1))?;
+            let models: Vec<&dyn Model> = variants.iter().map(|m| m as &dyn Model).collect();
+            let record = spec::accept(&worlds, arg(2), &models, flag(args, "--steps", 40)?)?;
+            return Ok(print_run(&worlds, &record));
+        }
+        "spec" if (args.len() == 3 || args.len() == 4) && arg(1) == "reject" => {
+            spec::reject(&worlds, arg(2), args.get(3).map(String::as_str))?
+        }
+        "spec" if args.len() == 3 && arg(1) == "show" => {
+            let s = spec::load(&worlds, arg(2))?;
+            println!(
+                "request: {}
+status: {}  {}
+
+goal: {}",
+                s["request"].as_str().unwrap_or(""),
+                s["status"].as_str().unwrap_or("?"),
+                s["reason"].as_str().unwrap_or(""),
+                s["goal"].as_str().unwrap_or("")
+            );
+            for v in s["verify"].as_array().into_iter().flatten() {
+                println!("verify: {}", v.as_str().unwrap_or(""));
             }
-            match record["winner"].as_str() {
-                Some(id) => println!(
-                    "winner {id}\n  review: git -C {} diff HEAD world/{id}\n  land:   fennec-os land {id}",
-                    arg(1)
-                ),
-                None => {
+            println!("\n{}", s["diff"].as_str().unwrap_or(""));
+        }
+        "spec" if args.len() == 2 && arg(1) == "list" => {
+            for (id, s) in spec::specs(&worlds)? {
+                if s["status"] == "proposed" {
                     println!(
-                        "no attempt passed; records in {}/runs",
-                        worlds.root.display()
+                        "{id}  {}",
+                        s["request"]
+                            .as_str()
+                            .unwrap_or("")
+                            .lines()
+                            .next()
+                            .unwrap_or("")
                     );
-                    return Ok(ExitCode::FAILURE);
                 }
             }
+        }
+        "spec" if args.len() >= 3 => {
+            let model = OpenAi::variants_from_env(1)?.remove(0);
+            let s = spec::compile(
+                &worlds,
+                std::path::Path::new(arg(1)),
+                arg(2),
+                &model,
+                flag(args, "--steps", 40)?,
+            )?;
+            let id = s["world"].as_str().unwrap_or("?");
+            if s["status"] != "proposed" {
+                println!("spec {id} invalid: {}", s["reason"].as_str().unwrap_or(""));
+                return Ok(ExitCode::FAILURE);
+            }
+            println!(
+                "spec {id}\n  read:   fennec-os spec show {id}\n  build:  fennec-os spec accept {id} [--attempts N]\n  refuse: fennec-os spec reject {id} [correction]"
+            );
         }
         "land" if args.len() == 2 => println!("{}", land(&worlds, arg(1))?),
         "queue" if args.len() == 1 => {
@@ -204,4 +239,43 @@ fn run(args: &[String]) -> std::io::Result<ExitCode> {
         }
     }
     Ok(ExitCode::SUCCESS)
+}
+
+fn flag(args: &[String], name: &str, default: usize) -> std::io::Result<usize> {
+    match args.iter().position(|a| a == name) {
+        None => Ok(default),
+        Some(i) => args
+            .get(i + 1)
+            .and_then(|v| v.parse().ok())
+            .ok_or_else(|| std::io::Error::other(format!("{name} needs a number"))),
+    }
+}
+
+fn print_run(worlds: &Worlds, record: &serde_json::Value) -> ExitCode {
+    for a in record["attempts"].as_array().into_iter().flatten() {
+        println!(
+            "{}  {:<24} {}  {} lines  {}",
+            a["world"].as_str().unwrap_or("?"),
+            a["model"].as_str().unwrap_or("?"),
+            if a["passed"] == true { "PASS" } else { "FAIL" },
+            a["changed_lines"],
+            a["reason"].as_str().unwrap_or(""),
+        );
+    }
+    match record["winner"].as_str() {
+        Some(id) => {
+            println!(
+                "winner {id}\n  review: git -C {} diff HEAD world/{id}\n  land:   fennec-os land {id}",
+                record["project"].as_str().unwrap_or("?")
+            );
+            ExitCode::SUCCESS
+        }
+        None => {
+            println!(
+                "no attempt passed; records in {}/runs",
+                worlds.root.display()
+            );
+            ExitCode::FAILURE
+        }
+    }
 }
