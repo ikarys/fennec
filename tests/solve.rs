@@ -110,7 +110,7 @@ fn fixture(name: &str) -> Fixture {
 }
 
 #[test]
-fn the_smallest_passing_world_wins_and_lands() {
+fn attempts_run_in_turn_and_the_first_pass_lands() {
     let f = fixture("solve");
     let wrong = Script::new("wrong", &[write("answer", "41\n"), done()]);
     let noisy = Script::new(
@@ -118,15 +118,17 @@ fn the_smallest_passing_world_wins_and_lands() {
         &[write("answer", "42\n"), write("notes", "a\nb\nc\n"), done()],
     );
     let tight = Script::new("tight", &[write("answer", "42\n"), done()]);
-    let models: Vec<&dyn Model> = vec![&wrong, &noisy, &tight];
+    let models: Vec<&dyn Model> = vec![&wrong, &tight, &noisy];
 
     let record = solve(&f.worlds, &f.project, &task(&[]), &models, 10).unwrap();
     let attempts = record["attempts"].as_array().unwrap();
+    // The third model is never called: the second passed.
     let passed: Vec<bool> = attempts.iter().map(|a| a["passed"] == true).collect();
-    assert_eq!(passed, [false, true, true], "{record:#}");
+    assert_eq!(passed, [false, true], "{record:#}");
+    assert_eq!(noisy.replies.lock().unwrap().len(), 3);
     assert_eq!(attempts[0]["reason"], "verify failed");
     let winner = record["winner"].as_str().unwrap().to_string();
-    assert_eq!(winner, attempts[2]["world"]);
+    assert_eq!(winner, attempts[1]["world"]);
     // Losers are gone; only the winner waits for landing.
     assert_eq!(f.worlds.list().unwrap(), vec![winner.clone()]);
 
@@ -172,6 +174,8 @@ fn a_model_that_stops_answering_is_a_failed_attempt() {
     let record = solve(&f.worlds, &f.project, &task(&[]), &[&mute], 10).unwrap();
     assert_eq!(record["attempts"][0]["reason"], "script exhausted");
     assert_eq!(record["winner"], Value::Null);
+    // The turns before the failure stay, for the profile.
+    assert_eq!(record["attempts"][0]["turns"].as_array().unwrap().len(), 2);
 }
 
 #[test]
@@ -280,7 +284,7 @@ fn project_rules_judge_every_attempt() {
         &f.worlds,
         &f.project,
         &task(&[]),
-        &[&bare, &paired, &cheat],
+        &[&bare, &cheat, &paired],
         10,
     )
     .unwrap();
@@ -289,20 +293,20 @@ fn project_rules_judge_every_attempt() {
         a[0]["reason"],
         "rule r1 violated: changed answer but nothing under notes"
     );
-    assert_eq!(a[1]["passed"], true, "{:#}", a[1]);
+    assert_eq!(
+        a[1]["reason"],
+        "rule harness-dir violated: changed .fennec-os/rules.json"
+    );
+    assert_eq!(a[2]["passed"], true, "{:#}", a[2]);
     // A failing `warn` rule is evidence, not a verdict.
     assert!(
-        a[1]["checks"]
+        a[2]["checks"]
             .as_array()
             .unwrap()
             .iter()
             .any(|c| c["rule"] == "r2" && c["exit"] == 1)
     );
-    assert_eq!(
-        a[2]["reason"],
-        "rule harness-dir violated: changed .fennec-os/rules.json"
-    );
-    assert_eq!(record["winner"], a[1]["world"]);
+    assert_eq!(record["winner"], a[2]["world"]);
 }
 
 #[test]
@@ -656,46 +660,27 @@ fn a_prose_summary_gets_one_turn_to_take_the_form() {
     assert_eq!(s["verify"], json!(["sh spec.sh"]));
 }
 
-/// A model that takes its time, like a 27B model on a busy GPU.
-struct Slow(Script);
-
-impl Model for Slow {
-    fn chat(&self, messages: &[Value], tools: &Value) -> io::Result<Value> {
-        std::thread::sleep(std::time::Duration::from_millis(300));
-        self.0.chat(messages, tools)
-    }
-    fn label(&self) -> String {
-        self.0.label()
-    }
-}
-
 #[test]
-fn the_first_pass_stops_the_attempts_still_running() {
-    let f = fixture("first");
-    let steps: Vec<_> = (0..20).map(|i| write("notes", &format!("{i}\n"))).collect();
-    let slow = Slow(Script::new("slow", &steps));
+fn every_turn_is_timed_for_the_profile() {
+    let f = fixture("profile");
     let fast = Script::new("fast", &[write("answer", "42\n"), done()]);
     fast.replies.lock().unwrap()[0]["usage"] = json!({"prompt_tokens": 900, "completion_tokens": 40,
                "prompt_tokens_details": {"cached_tokens": 800}});
-    let record = solve(&f.worlds, &f.project, &task(&[]), &[&slow, &fast], 40).unwrap();
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&fast], 40).unwrap();
     let attempts = record["attempts"].as_array().unwrap();
-    assert_eq!(attempts[0]["reason"], "stopped: another attempt passed");
-    assert_eq!(record["winner"], attempts[1]["world"]);
 
-    // Profiling: a stopped attempt keeps its turns; usage feeds the profile
-    // and is never sent back to the model.
-    assert!(!attempts[0]["turns"].as_array().unwrap().is_empty());
-    let turns = attempts[1]["turns"].as_array().unwrap();
+    // Usage feeds the profile and is never sent back to the model.
+    let turns = attempts[0]["turns"].as_array().unwrap();
     assert_eq!(turns.len(), 2);
     assert_eq!(turns[0]["tools"][0]["name"], "write_file");
     assert!(turns[0]["tools"][0]["ms"].is_u64());
-    assert!(attempts[1]["checks"][0]["ms"].is_u64());
+    assert!(attempts[0]["checks"][0]["ms"].is_u64());
     assert!(
-        !attempts[1]["messages"]
+        !attempts[0]["messages"]
             .to_string()
             .contains("prompt_tokens")
     );
-    let p = review::profile(&attempts[1]);
+    let p = review::profile(&attempts[0]);
     assert_eq!(p["prompt_tokens"], 900);
     assert_eq!(p["cached_tokens"], 800);
     assert_eq!(p["turns"], 2);

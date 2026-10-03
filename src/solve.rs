@@ -1,11 +1,9 @@
-//! A task end to end: N worlds forked from the project, one agent in each,
-//! a verdict read from exit codes, the smallest passing diff kept. After the
-//! first pass, the attempts still running get as long again, then stop.
+//! A task end to end: up to N worlds forked from the project, one agent in
+//! each, tried in turn until one passes; the verdict is read from exit codes.
 
 use std::io;
 use std::path::Path;
 use std::process::Stdio;
-use std::sync::OnceLock;
 use std::time::Instant;
 
 use serde_json::{Value, json};
@@ -60,7 +58,7 @@ impl Task {
     }
 }
 
-/// Runs one attempt per model, in parallel. Keeps the winner's world (if any)
+/// Runs one attempt per model in turn, until one passes. Keeps its world
 /// for `land`, drops the others, and returns the run record, also saved
 /// under `<root>/runs/`.
 pub fn solve(
@@ -131,12 +129,10 @@ pub fn solve(
         attempts.extend(a);
     }
 
-    // Selection by the verifier: among passing worlds that finished, the
-    // smallest change.
+    // The verifier chose: attempts stop at the first pass.
     let winner = attempts
         .iter()
-        .filter(|a| a["passed"] == true)
-        .min_by_key(|a| a["changed_lines"].as_u64().unwrap_or(u64::MAX))
+        .find(|a| a["passed"] == true)
         .and_then(|a| a["world"].as_str())
         .map(str::to_string);
     for (world, record) in forked.into_iter().zip(&mut attempts) {
@@ -176,72 +172,31 @@ pub fn solve(
     Ok(record)
 }
 
-/// One attempt per model, in parallel, each in a fresh world.
+/// One attempt per model, one after the other, each in a fresh world forked
+/// when it starts; the first pass ends the run. On a server that decodes
+/// speculatively, attempts running at once split its speed (measured: 165
+/// tok/s alone, 90 each for two), so a later attempt runs only if the
+/// earlier ones failed.
+// ponytail: sequential only; a server that batches for free would want
+// parallel attempts back, behind a flag, once one is in use.
 fn attempts_for(
     worlds: &Worlds,
     source: &str,
     models: &[&dyn Model],
     brief: &Brief,
 ) -> io::Result<(Vec<World>, Vec<Value>)> {
-    // Forks are sequential: concurrent `git worktree add` contend for locks.
-    let forked: Vec<World> = models
-        .iter()
-        .map(|_| worlds.fork(source))
-        .collect::<io::Result<_>>()?;
-    let start = Instant::now();
-    let deadline = &OnceLock::new();
-    let attempts = std::thread::scope(|s| {
-        let handles: Vec<_> = forked
-            .iter()
-            .zip(models)
-            .map(|(world, model)| {
-                s.spawn(move || {
-                    let model = Stoppable {
-                        model: *model,
-                        deadline,
-                    };
-                    let record = attempt(worlds, world, &model, brief);
-                    if record["passed"] == true {
-                        // Others get as long again as this pass took.
-                        let _ = deadline.set(Instant::now() + start.elapsed());
-                    }
-                    record
-                })
-            })
-            .collect();
-        handles
-            .into_iter()
-            .zip(&forked)
-            .map(|(h, world)| match h.join() {
-                Ok(record) => record,
-                Err(_) => json!({"world": world.id, "passed": false, "reason": "attempt panicked"}),
-            })
-            .collect()
-    });
-    Ok((forked, attempts))
-}
-
-/// An attempt's model once another attempt has passed: the run has its
-/// answer, and on one shared GPU a straggler only slows the rest down. It
-/// gets as long again as the first pass took, so attempts of similar speed
-/// are still compared by their diffs.
-// ponytail: checked between turns; a turn already sent runs to its end.
-struct Stoppable<'a> {
-    model: &'a dyn Model,
-    deadline: &'a OnceLock<Instant>,
-}
-
-impl Model for Stoppable<'_> {
-    fn chat(&self, messages: &[Value], tools: &Value) -> io::Result<Value> {
-        if self.deadline.get().is_some_and(|d| Instant::now() > *d) {
-            return Err(io::Error::other("stopped: another attempt passed"));
+    let (mut forked, mut attempts) = (Vec::new(), Vec::new());
+    for model in models {
+        let world = worlds.fork(source)?;
+        let record = attempt(worlds, &world, *model, brief);
+        let passed = record["passed"] == true;
+        forked.push(world);
+        attempts.push(record);
+        if passed {
+            break;
         }
-        self.model.chat(messages, tools)
     }
-
-    fn label(&self) -> String {
-        self.model.label()
-    }
+    Ok((forked, attempts))
 }
 
 /// What every attempt of a run is given.
