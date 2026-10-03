@@ -120,7 +120,8 @@ impl Worlds {
 
     pub fn open(&self, id: &str) -> io::Result<World> {
         let path = self.root.join("worlds").join(id);
-        if id.is_empty() || id.contains('/') || !path.is_dir() {
+        // Ids are hex; anything else (`..` included) would name another dir.
+        if id.is_empty() || !id.chars().all(|c| c.is_ascii_alphanumeric()) || !path.is_dir() {
             return Err(io::Error::other(format!("no world {id}")));
         }
         Ok(World {

@@ -3,7 +3,7 @@ use std::process::ExitCode;
 use fennec_os::provider::{Model, OpenAi};
 use fennec_os::solve::{Task, land, solve};
 use fennec_os::world::Worlds;
-use fennec_os::{review, rules, sleep, spec};
+use fennec_os::{review, rules, serve, sleep, spec};
 
 const USAGE: &str = "usage: fennec-os <command>
   fork <project-path|world-id>   new world from the source's last commit
@@ -30,6 +30,7 @@ const USAGE: &str = "usage: fennec-os <command>
   sleep                          distil landed runs into candidate know-how
   notes                          candidates waiting on you
   keep <k-id> | dismiss <k-id>   add a candidate to <project>/.fennec-os/knowhow.md, or not
+  serve [--port N]               the review page on 127.0.0.1 (specs, runs, know-how)
 
 task.json: {\"goal\": \"...\", \"verify\": [\"cmd\"], \"protect\": [\"path\"]}
 model env: FENNEC_OS_BASE_URL, FENNEC_OS_MODELS (comma-separated), FENNEC_OS_API_KEY";
@@ -223,6 +224,13 @@ goal: {}",
             println!("added to {}; commit it to take effect", path.display());
         }
         "dismiss" if args.len() == 2 => sleep::dismiss(&worlds, arg(1))?,
+        "serve" if args.len() == 1 || (args.len() == 3 && arg(1) == "--port") => {
+            let port = u16::try_from(flag(args, "--port", 0)?).map_err(std::io::Error::other)?;
+            let listener = std::net::TcpListener::bind(("127.0.0.1", port))?;
+            let token = serve::token()?;
+            println!("http://{}/?t={token}", listener.local_addr()?);
+            serve::serve(worlds, listener, &token)?;
+        }
         "promote" if args.len() == 3 || (args.len() == 5 && arg(3) == "--origin") => {
             let rule: serde_json::Value =
                 serde_json::from_str(arg(2)).map_err(std::io::Error::other)?;

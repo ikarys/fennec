@@ -272,6 +272,47 @@ pub fn accept(
     Ok(record)
 }
 
+const ASK: &str = "You wrote the acceptance tests below for the request below. A human reviewing \
+them asks you a question. Answer briefly and precisely. You cannot change files here: if a \
+change is needed, say what the human should write as a correction.";
+
+/// A question to the compiler about a spec. The answer is advice: it changes
+/// nothing; a change goes through `reject` with a correction. Returns it.
+pub fn ask(worlds: &Worlds, id: &str, question: &str, model: &dyn Model) -> io::Result<String> {
+    let spec = load(worlds, id)?;
+    let text = |k: &str| spec[k].as_str().unwrap_or("").to_string();
+    let verify: Vec<&str> = spec["verify"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .collect();
+    // ponytail: the diff is cut at 40k chars; huge specs need excerpts.
+    let diff: String = text("diff").chars().take(40_000).collect();
+    let mut messages = vec![json!({"role": "system", "content": format!(
+        "{ASK}\n\nRequest:\n{}\n\ngoal: {}\nverify: {}\n\nTests:\n{diff}",
+        text("request"), text("goal"), verify.join("\nverify: ")
+    )})];
+    for turn in spec["thread"].as_array().into_iter().flatten() {
+        messages.push(json!({"role": "user", "content": turn["question"]}));
+        messages.push(json!({"role": "assistant", "content": turn["answer"]}));
+    }
+    messages.push(json!({"role": "user", "content": question}));
+    let reply = model.chat(&messages, &json!([]))?;
+    let content = reply["content"].as_str().unwrap_or("");
+    let answer = content.rsplit("</think>").next().unwrap_or(content).trim();
+    // Reloaded: the spec may have been decided while the model answered.
+    let mut spec = load(worlds, id)?;
+    if !spec["thread"].is_array() {
+        spec["thread"] = json!([]);
+    }
+    if let Some(thread) = spec["thread"].as_array_mut() {
+        thread.push(json!({"question": question, "answer": answer}));
+    }
+    save(worlds, id, &spec)?;
+    Ok(answer.to_string())
+}
+
 pub fn reject(worlds: &Worlds, id: &str, correction: Option<&str>) -> io::Result<()> {
     let mut spec = load(worlds, id)?;
     if let Ok(world) = worlds.open(id) {
