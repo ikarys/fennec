@@ -186,10 +186,20 @@ fn attempts_for(
     brief: &Brief,
 ) -> io::Result<(Vec<World>, Vec<Value>)> {
     let (mut forked, mut attempts) = (Vec::new(), Vec::new());
+    let mut lessons = String::new();
     for model in models {
         let world = worlds.fork(source)?;
-        let record = attempt(worlds, &world, *model, brief);
+        let record = attempt(worlds, &world, *model, brief, &lessons);
         let passed = record["passed"] == true;
+        if !passed {
+            if lessons.is_empty() {
+                lessons.push_str(
+                    "Earlier attempts at this task failed. You start again from a fresh \
+                     copy of the project: their changes are gone, what they learnt is not.\n",
+                );
+            }
+            lessons.push_str(&lesson(&record));
+        }
         forked.push(world);
         attempts.push(record);
         if passed {
@@ -197,6 +207,40 @@ fn attempts_for(
         }
     }
     Ok((forked, attempts))
+}
+
+/// What a failed attempt teaches the next one, from the harness's own
+/// findings, not the agent's account: why it failed, what it touched, what
+/// the failing checks printed.
+fn lesson(record: &Value) -> String {
+    let mut text = format!(
+        "- It failed: {}\n",
+        record["reason"].as_str().unwrap_or("no reason recorded")
+    );
+    let files: Vec<&str> = record["diff"]
+        .as_str()
+        .unwrap_or("")
+        .lines()
+        .filter_map(|l| l.strip_prefix("+++ b/"))
+        .collect();
+    if !files.is_empty() {
+        text.push_str(&format!("  It changed: {}\n", files.join(", ")));
+    }
+    for c in record["checks"].as_array().into_iter().flatten() {
+        if c["block"] != true || c["exit"] == 0 {
+            continue;
+        }
+        let output = c["output"].as_str().unwrap_or("");
+        let lines: Vec<&str> = output.lines().collect();
+        let tail = lines[lines.len().saturating_sub(20)..].join("\n    ");
+        text.push_str(&format!(
+            "  `{}` exited {}; end of its output:\n    {tail}\n",
+            c["command"].as_str().unwrap_or(""),
+            c["exit"]
+        ));
+    }
+    // ponytail: cut at 3000 chars per attempt; a sidekick could summarise.
+    text.chars().take(3000).collect()
 }
 
 /// What every attempt of a run is given.
@@ -209,14 +253,22 @@ struct Brief<'a> {
 }
 
 /// Never fails: any error becomes a failed attempt in the record.
-fn attempt(worlds: &Worlds, world: &World, model: &dyn Model, brief: &Brief) -> Value {
+/// `lessons` is what earlier failed attempts of the run teach; empty for the
+/// first.
+fn attempt(
+    worlds: &Worlds,
+    world: &World,
+    model: &dyn Model,
+    brief: &Brief,
+    lessons: &str,
+) -> Value {
     let started = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| d.as_millis() as u64);
     let clock = Instant::now();
     let mut record = json!({"world": world.id, "model": model.label(), "passed": false,
                             "started_ms": started});
-    if let Err(e) = attempt_inner(worlds, world, model, brief, &mut record) {
+    if let Err(e) = attempt_inner(worlds, world, model, brief, lessons, &mut record) {
         record["reason"] = json!(e.to_string());
     }
     record["ms"] = json!(clock.elapsed().as_millis() as u64);
@@ -228,6 +280,7 @@ fn attempt_inner(
     world: &World,
     model: &dyn Model,
     brief: &Brief,
+    lessons: &str,
     record: &mut Value,
 ) -> io::Result<()> {
     let Brief {
@@ -242,9 +295,13 @@ fn attempt_inner(
         .filter(|r| r.block)
         .map(Rule::describe)
         .collect();
-    let outcome = agent::run(
-        worlds, world, model, &task.goal, &criteria, context, max_steps,
-    )?;
+    // In the goal message, not the system prompt: the system prompt stays
+    // the same across attempts and keeps the server's prefix cache.
+    let goal = match lessons {
+        "" => task.goal.clone(),
+        _ => format!("{}\n\n{lessons}", task.goal),
+    };
+    let outcome = agent::run(worlds, world, model, &goal, &criteria, context, max_steps)?;
     record["steps"] = json!(outcome.steps);
     record["summary"] = json!(outcome.summary);
     record["messages"] = json!(outcome.messages);

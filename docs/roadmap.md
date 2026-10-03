@@ -187,5 +187,14 @@ stragglers and smallest-diff selection are gone with the parallelism.
 Live, same `is_roman` task: 7 s and one attempt, against 17 s for two
 parallel attempts; output floor 202 tok/s against 51 to 59.
 Not yet: parallel attempts behind a flag for a server that batches for
-free; a failed attempt's reason passed to the next one; reading the
-server's `requests.jsonl` to split model time into queue, prefill, decode.
+free; reading the server's `requests.jsonl` to split model time into queue,
+prefill, decode.
+
+**Lessons between attempts** done: a failed attempt's lesson goes to the
+next one: the harness's reason, the files it changed, and the tail of each
+failing blocking check's output; not the agent's own account. Each attempt
+still starts from a fresh world. The lessons go in the goal message, so the
+system prompt, and the server's prefix cache, stay the same across attempts.
+Live: not exercised yet. On a task with hidden protected tests, the first
+attempt read them and passed in 11 s; forcing a failure would only test a
+fake lesson.

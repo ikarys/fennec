@@ -345,7 +345,11 @@ struct Spy(Mutex<String>);
 
 impl Model for Spy {
     fn chat(&self, messages: &[Value], _tools: &Value) -> io::Result<Value> {
-        *self.0.lock().unwrap() = messages[0]["content"].as_str().unwrap().to_string();
+        *self.0.lock().unwrap() = messages
+            .iter()
+            .filter_map(|m| m["content"].as_str())
+            .collect::<Vec<_>>()
+            .join("\n");
         let (tool, args) = done();
         Ok(
             json!({"tool_calls": [{"id": "c", "function": {"name": tool, "arguments": args.to_string()}}]}),
@@ -689,4 +693,23 @@ fn every_turn_is_timed_for_the_profile() {
         .map(|k| p[k].as_u64().unwrap())
         .sum::<u64>();
     assert_eq!(parts, p["wall_ms"].as_u64().unwrap());
+}
+
+#[test]
+fn a_failed_attempt_teaches_the_next_one() {
+    let f = fixture("lesson");
+    let wrong = Script::new("wrong", &[write("answer", "41\n"), done()]);
+    let spy = Spy(Mutex::new(String::new()));
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&wrong, &spy], 10).unwrap();
+    assert_eq!(record["attempts"].as_array().unwrap().len(), 2);
+    let seen = spy.0.lock().unwrap();
+    assert!(
+        seen.contains("Earlier attempts at this task failed."),
+        "{seen}"
+    );
+    assert!(seen.contains("- It failed: verify failed\n  It changed: answer\n"));
+    assert!(seen.contains("`sh check.sh` exited 1"));
+    // Told in the goal: the system prompt stays the first attempt's.
+    let system = seen.split("Write 42").next().unwrap();
+    assert!(!system.contains("Earlier attempts"));
 }
