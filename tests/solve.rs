@@ -675,8 +675,33 @@ fn the_first_pass_stops_the_attempts_still_running() {
     let steps: Vec<_> = (0..20).map(|i| write("notes", &format!("{i}\n"))).collect();
     let slow = Slow(Script::new("slow", &steps));
     let fast = Script::new("fast", &[write("answer", "42\n"), done()]);
+    fast.replies.lock().unwrap()[0]["usage"] = json!({"prompt_tokens": 900, "completion_tokens": 40,
+               "prompt_tokens_details": {"cached_tokens": 800}});
     let record = solve(&f.worlds, &f.project, &task(&[]), &[&slow, &fast], 40).unwrap();
     let attempts = record["attempts"].as_array().unwrap();
     assert_eq!(attempts[0]["reason"], "stopped: another attempt passed");
     assert_eq!(record["winner"], attempts[1]["world"]);
+
+    // Profiling: a stopped attempt keeps its turns; usage feeds the profile
+    // and is never sent back to the model.
+    assert!(!attempts[0]["turns"].as_array().unwrap().is_empty());
+    let turns = attempts[1]["turns"].as_array().unwrap();
+    assert_eq!(turns.len(), 2);
+    assert_eq!(turns[0]["tools"][0]["name"], "write_file");
+    assert!(turns[0]["tools"][0]["ms"].is_u64());
+    assert!(attempts[1]["checks"][0]["ms"].is_u64());
+    assert!(
+        !attempts[1]["messages"]
+            .to_string()
+            .contains("prompt_tokens")
+    );
+    let p = review::profile(&attempts[1]);
+    assert_eq!(p["prompt_tokens"], 900);
+    assert_eq!(p["cached_tokens"], 800);
+    assert_eq!(p["turns"], 2);
+    let parts = ["model_ms", "tool_ms", "verify_ms", "harness_ms"]
+        .iter()
+        .map(|k| p[k].as_u64().unwrap())
+        .sum::<u64>();
+    assert_eq!(parts, p["wall_ms"].as_u64().unwrap());
 }

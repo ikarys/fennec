@@ -231,6 +231,10 @@ fn check(
     let base = worlds.git(world, &["rev-parse", "HEAD"])?;
     let outcome = agent::run(worlds, world, model, brief, criteria, context, max_steps)?;
     spec["steps"] = json!(outcome.steps);
+    spec["turns"] = json!(outcome.turns);
+    if let Some(e) = outcome.error {
+        return Err(io::Error::other(e));
+    }
     let summary = outcome.summary.clone().unwrap_or_default();
     // Kept so the human sees what the model said when parsing finds nothing.
     spec["summary"] = json!(summary);

@@ -432,6 +432,10 @@ impl Server {
                 esc(str_of(&a["reason"])),
                 esc(str_of(&a["summary"]))
             ));
+            body.push_str(&format!(
+                "<p class=\"dim\">{}</p>",
+                esc(&review::profile_line(&review::profile(a)))
+            ));
             body.push_str(&checks_html(&a["checks"]));
             for v in a["violations"].as_array().into_iter().flatten() {
                 body.push_str(&format!(

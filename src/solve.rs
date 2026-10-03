@@ -255,10 +255,16 @@ struct Brief<'a> {
 
 /// Never fails: any error becomes a failed attempt in the record.
 fn attempt(worlds: &Worlds, world: &World, model: &dyn Model, brief: &Brief) -> Value {
-    let mut record = json!({"world": world.id, "model": model.label(), "passed": false});
+    let started = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_millis() as u64);
+    let clock = Instant::now();
+    let mut record = json!({"world": world.id, "model": model.label(), "passed": false,
+                            "started_ms": started});
     if let Err(e) = attempt_inner(worlds, world, model, brief, &mut record) {
         record["reason"] = json!(e.to_string());
     }
+    record["ms"] = json!(clock.elapsed().as_millis() as u64);
     record
 }
 
@@ -287,6 +293,10 @@ fn attempt_inner(
     record["steps"] = json!(outcome.steps);
     record["summary"] = json!(outcome.summary);
     record["messages"] = json!(outcome.messages);
+    record["turns"] = json!(outcome.turns);
+    if let Some(e) = outcome.error {
+        return Err(io::Error::other(e));
+    }
 
     let title: String = task
         .goal
@@ -368,10 +378,12 @@ pub(crate) fn verify(
             "-c".to_string(),
             command.clone(),
         ];
+        let ran = Instant::now();
         let out = worlds
             .sandbox_command(world, &argv)?
             .stdin(Stdio::null())
             .output()?;
+        let ms = ran.elapsed().as_millis() as u64;
         let code = out.status.code().unwrap_or(-1);
         all_pass &= code == 0 || !rule.block;
         let output = format!(
@@ -381,7 +393,7 @@ pub(crate) fn verify(
         );
         let lines: Vec<&str> = output.lines().collect();
         let tail = lines[lines.len().saturating_sub(40)..].join("\n");
-        checks.push(json!({"rule": rule.id, "block": rule.block, "command": command, "exit": code, "output": tail}));
+        checks.push(json!({"rule": rule.id, "block": rule.block, "command": command, "exit": code, "ms": ms, "output": tail}));
     }
     // What lands must be exactly what was checked.
     if !worlds.git(world, &["status", "--porcelain"])?.is_empty() {

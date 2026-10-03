@@ -24,6 +24,7 @@ const USAGE: &str = "usage: fennec-os <command>
   land <world-id>                fast-forward the project onto a world that passed
   queue                          runs waiting on you
   show <run-id>                  a run's verdicts and winning diff
+  profile <run-id|spec-id>       where each attempt's time went, turn by turn
   reject <run-id> [correction]   discard a run; corrections said twice become rules
   promote <project> <rule-json> [--origin <run-id>]
                                  add a rule to <project>/.fennec-os/rules.json
@@ -184,6 +185,62 @@ goal: {}",
                 }
                 if Some(a["world"].as_str()) == Some(r["winner"].as_str()) {
                     println!("{}", a["diff"].as_str().unwrap_or(""));
+                }
+            }
+        }
+        "profile" if args.len() == 2 => {
+            // A spec is profiled like a run of one attempt.
+            let attempts = match review::load(&worlds, arg(1)) {
+                Ok(run) => run["attempts"].as_array().cloned().unwrap_or_default(),
+                Err(_) => vec![spec::load(&worlds, arg(1))?],
+            };
+            for a in &attempts {
+                let verdict = match a["passed"].as_bool() {
+                    Some(true) => "PASS",
+                    Some(false) => "FAIL",
+                    None => a["status"].as_str().unwrap_or("?"),
+                };
+                println!(
+                    "{} {} {verdict}\n  {}",
+                    a["world"].as_str().unwrap_or("?"),
+                    a["model"].as_str().unwrap_or("?"),
+                    review::profile_line(&review::profile(a))
+                );
+                println!("  turn      at   model      in     out  think  tools");
+                for t in a["turns"].as_array().into_iter().flatten() {
+                    let secs = |v: &serde_json::Value| v.as_u64().unwrap_or(0) as f64 / 1000.0;
+                    let tools: Vec<String> = t["tools"]
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .map(|x| {
+                            format!(
+                                "{} {:.1}s",
+                                x["name"].as_str().unwrap_or("?"),
+                                secs(&x["ms"])
+                            )
+                        })
+                        .collect();
+                    println!(
+                        "  {:>4} {:>6.1}s {:>6.1}s {:>7} {:>7} {:>6}  {}",
+                        t["step"],
+                        secs(&t["at_ms"]),
+                        secs(&t["model_ms"]),
+                        t["usage"]["prompt_tokens"].as_u64().unwrap_or(0),
+                        t["usage"]["completion_tokens"].as_u64().unwrap_or(0),
+                        t["usage"]["completion_tokens_details"]["reasoning_tokens"]
+                            .as_u64()
+                            .unwrap_or(0),
+                        tools.join(", ")
+                    );
+                }
+                for c in a["checks"].as_array().into_iter().flatten() {
+                    println!(
+                        "  verify {:.1}s exit {}  {}",
+                        c["ms"].as_u64().unwrap_or(0) as f64 / 1000.0,
+                        c["exit"],
+                        c["command"].as_str().unwrap_or("")
+                    );
                 }
             }
         }
