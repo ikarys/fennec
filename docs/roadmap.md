@@ -172,3 +172,20 @@ pay a full model turn. Reasoning was a quarter of the output tokens, and
 78 % of the prompt was served from the prefix cache. Output speed floor:
 51 to 59 tok/s with two agents sharing the GPU. The lever is the number of
 turns, not the tools or the harness.
+
+**P2 revised: attempts run in turn.** Measured on this server (ninfer,
+speculative decoding `dflash2`): one request decodes at 165 tok/s; two
+decoding at once get 90 to 98 each, about 188 together. Speculative decoding
+already uses the compute a single request leaves free, so parallel attempts
+split the speed instead of sharing spare capacity, and attempts of one run
+start together and decode together: the worst case. Several agents on
+different projects overlap far less (the server's log shows 176 to 203
+tok/s per request under its usual load), which is why they feel fast.
+`solve` now runs attempts one after the other, forks each world when its
+attempt starts, and stops at the first pass; the grace deadline for
+stragglers and smallest-diff selection are gone with the parallelism.
+Live, same `is_roman` task: 7 s and one attempt, against 17 s for two
+parallel attempts; output floor 202 tok/s against 51 to 59.
+Not yet: parallel attempts behind a flag for a server that batches for
+free; a failed attempt's reason passed to the next one; reading the
+server's `requests.jsonl` to split model time into queue, prefill, decode.

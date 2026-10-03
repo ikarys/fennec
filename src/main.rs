@@ -14,7 +14,7 @@ const USAGE: &str = "usage: fennec-os <command>
   drop <world-id>                delete the world and its branch
   list                           list worlds
   solve <project> <task.json> [--attempts N] [--steps N]
-                                 N agents in N worlds; keeps the smallest passing diff
+                                 up to N agents, one world each, in turn until one passes
   spec <project> <request> [--steps N]
                                  compile a request into acceptance tests + a task
   spec list | show <id>          specs waiting on you, one spec's goal and tests
