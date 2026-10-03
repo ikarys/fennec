@@ -1,9 +1,12 @@
 //! A task end to end: N worlds forked from the project, one agent in each,
-//! a verdict read from exit codes, the smallest passing diff kept.
+//! a verdict read from exit codes, the smallest passing diff kept. After the
+//! first pass, the attempts still running get as long again, then stop.
 
 use std::io;
 use std::path::Path;
 use std::process::Stdio;
+use std::sync::OnceLock;
+use std::time::Instant;
 
 use serde_json::{Value, json};
 
@@ -128,7 +131,8 @@ pub fn solve(
         attempts.extend(a);
     }
 
-    // Selection by the verifier: among passing worlds, the smallest change.
+    // Selection by the verifier: among passing worlds that finished, the
+    // smallest change.
     let winner = attempts
         .iter()
         .filter(|a| a["passed"] == true)
@@ -161,18 +165,14 @@ pub fn solve(
         "status": if winner.is_some() { "ready" } else { "failed" },
         "attempts": attempts,
     });
-    let runs = worlds.root.join("runs");
-    std::fs::create_dir_all(&runs)?;
+    std::fs::create_dir_all(worlds.root.join("runs"))?;
     let name = winner.clone().unwrap_or_else(|| {
         record["attempts"][0]["world"]
             .as_str()
             .unwrap_or("run")
             .to_string()
     });
-    std::fs::write(
-        runs.join(format!("{name}.json")),
-        serde_json::to_string_pretty(&record).map_err(io::Error::other)?,
-    )?;
+    review::save(worlds, &name, &record)?;
     Ok(record)
 }
 
@@ -188,11 +188,26 @@ fn attempts_for(
         .iter()
         .map(|_| worlds.fork(source))
         .collect::<io::Result<_>>()?;
+    let start = Instant::now();
+    let deadline = &OnceLock::new();
     let attempts = std::thread::scope(|s| {
         let handles: Vec<_> = forked
             .iter()
             .zip(models)
-            .map(|(world, model)| s.spawn(move || attempt(worlds, world, *model, brief)))
+            .map(|(world, model)| {
+                s.spawn(move || {
+                    let model = Stoppable {
+                        model: *model,
+                        deadline,
+                    };
+                    let record = attempt(worlds, world, &model, brief);
+                    if record["passed"] == true {
+                        // Others get as long again as this pass took.
+                        let _ = deadline.set(Instant::now() + start.elapsed());
+                    }
+                    record
+                })
+            })
             .collect();
         handles
             .into_iter()
@@ -204,6 +219,29 @@ fn attempts_for(
             .collect()
     });
     Ok((forked, attempts))
+}
+
+/// An attempt's model once another attempt has passed: the run has its
+/// answer, and on one shared GPU a straggler only slows the rest down. It
+/// gets as long again as the first pass took, so attempts of similar speed
+/// are still compared by their diffs.
+// ponytail: checked between turns; a turn already sent runs to its end.
+struct Stoppable<'a> {
+    model: &'a dyn Model,
+    deadline: &'a OnceLock<Instant>,
+}
+
+impl Model for Stoppable<'_> {
+    fn chat(&self, messages: &[Value], tools: &Value) -> io::Result<Value> {
+        if self.deadline.get().is_some_and(|d| Instant::now() > *d) {
+            return Err(io::Error::other("stopped: another attempt passed"));
+        }
+        self.model.chat(messages, tools)
+    }
+
+    fn label(&self) -> String {
+        self.model.label()
+    }
 }
 
 /// What every attempt of a run is given.
@@ -250,7 +288,14 @@ fn attempt_inner(
     record["summary"] = json!(outcome.summary);
     record["messages"] = json!(outcome.messages);
 
-    let title = task.goal.lines().next().unwrap_or("task");
+    let title: String = task
+        .goal
+        .lines()
+        .next()
+        .unwrap_or("task")
+        .chars()
+        .take(72)
+        .collect();
     let commit = worlds.commit(world, &format!("fennec-os: {title}"))?;
     let diff = worlds.git(world, &["diff", &base, &commit])?;
     record["commit"] = json!(commit);

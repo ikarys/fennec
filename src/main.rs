@@ -28,6 +28,7 @@ const USAGE: &str = "usage: fennec-os <command>
   promote <project> <rule-json> [--origin <run-id>]
                                  add a rule to <project>/.fennec-os/rules.json
   sleep                          distil landed runs into candidate know-how
+  spar <project> [--steps N]     hunt one defect, proven by a failing test; a spec to validate
   notes                          candidates waiting on you
   keep <k-id> | dismiss <k-id>   add a candidate to <project>/.fennec-os/knowhow.md, or not
   serve [--port N]               the review page on 127.0.0.1 (specs, runs, know-how)
@@ -200,6 +201,24 @@ goal: {}",
                     arg(1)
                 );
             }
+        }
+        "spar" if args.len() == 2 || (args.len() == 4 && arg(2) == "--steps") => {
+            let model = OpenAi::variants_from_env(1)?.remove(0);
+            let s = spec::spar(
+                &worlds,
+                std::path::Path::new(arg(1)),
+                &model,
+                flag(args, "--steps", 40)?,
+            )?;
+            let id = s["world"].as_str().unwrap_or("?");
+            if s["status"] != "proposed" {
+                println!("no finding ({id}): {}", s["reason"].as_str().unwrap_or(""));
+                return Ok(ExitCode::FAILURE);
+            }
+            println!(
+                "finding {id}: {}\n  read: fennec-os spec show {id}",
+                s["request"].as_str().unwrap_or("")
+            );
         }
         "sleep" if args.len() == 1 => {
             let model = OpenAi::variants_from_env(1)?.remove(0);

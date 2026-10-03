@@ -589,3 +589,94 @@ fn a_request_compiles_to_failing_tests_that_the_solution_must_pass() {
     assert!(f.worlds.list().unwrap().is_empty());
     assert_eq!(spec::load(&f.worlds, &id).unwrap()["status"], "accepted");
 }
+
+#[test]
+fn sparring_proposes_only_findings_proven_by_a_new_failing_test() {
+    let f = fixture("spar");
+    let finding =
+        "goal: check.sh fails when `answer` is missing; spar.sh must pass.\nverify: sh spar.sh";
+
+    // Failing by breaking what was there is not a finding.
+    let vandal = Script::new(
+        "vandal",
+        &[
+            write("check.sh", "false\n"),
+            write("spar.sh", "false\n"),
+            finish(finding),
+        ],
+    );
+    let s = spec::spar(&f.worlds, &f.project, &vandal, 10).unwrap();
+    assert_eq!(
+        s["reason"], "tests go in new files; check.sh already existed",
+        "{s:#}"
+    );
+    assert!(f.worlds.list().unwrap().is_empty());
+
+    // A failing test, added: a spec to validate, like a compiled request.
+    let finder = Script::new(
+        "finder",
+        &[write("spar.sh", "test -f answer\n"), finish(finding)],
+    );
+    let s = spec::spar(&f.worlds, &f.project, &finder, 10).unwrap();
+    assert_eq!(s["status"], "proposed", "{s:#}");
+    assert_eq!(s["origin"], "spar");
+    assert_eq!(
+        s["request"],
+        "spar: check.sh fails when `answer` is missing; spar.sh must pass."
+    );
+    let id = s["world"].as_str().unwrap();
+    spec::reject(&f.worlds, id, Some("a missing answer is meant to fail")).unwrap();
+
+    // The next round knows what was found and what the human said.
+    let spy = Spy(Mutex::new(String::new()));
+    spec::spar(&f.worlds, &f.project, &spy, 10).unwrap();
+    assert!(spy.0.lock().unwrap().contains(
+        "do not report them again:\n  - check.sh fails when `answer` is missing; spar.sh must pass. (rejected: a missing answer is meant to fail)"
+    ));
+}
+
+#[test]
+fn a_prose_summary_gets_one_turn_to_take_the_form() {
+    let f = fixture("reformat");
+    let prose = Script::new(
+        "prose",
+        &[
+            write("spec.sh", "grep -qx 42 answer\n"),
+            finish("I wrote good tests."),
+        ],
+    );
+    prose
+        .replies
+        .lock()
+        .unwrap()
+        .push_back(json!({"role": "assistant", "content": SPEC}));
+    let s = spec::compile(&f.worlds, &f.project, "answer should say 42", &prose, 10).unwrap();
+    assert_eq!(s["status"], "proposed", "{s:#}");
+    assert_eq!(s["summary"], "I wrote good tests.");
+    assert_eq!(s["verify"], json!(["sh spec.sh"]));
+}
+
+/// A model that takes its time, like a 27B model on a busy GPU.
+struct Slow(Script);
+
+impl Model for Slow {
+    fn chat(&self, messages: &[Value], tools: &Value) -> io::Result<Value> {
+        std::thread::sleep(std::time::Duration::from_millis(300));
+        self.0.chat(messages, tools)
+    }
+    fn label(&self) -> String {
+        self.0.label()
+    }
+}
+
+#[test]
+fn the_first_pass_stops_the_attempts_still_running() {
+    let f = fixture("first");
+    let steps: Vec<_> = (0..20).map(|i| write("notes", &format!("{i}\n"))).collect();
+    let slow = Slow(Script::new("slow", &steps));
+    let fast = Script::new("fast", &[write("answer", "42\n"), done()]);
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&slow, &fast], 40).unwrap();
+    let attempts = record["attempts"].as_array().unwrap();
+    assert_eq!(attempts[0]["reason"], "stopped: another attempt passed");
+    assert_eq!(record["winner"], attempts[1]["world"]);
+}
