@@ -174,3 +174,76 @@ pub fn agenda(worlds: &Worlds, project: &str, limit: usize) -> io::Result<Vec<St
     let skip = items.len().saturating_sub(limit);
     Ok(items.split_off(skip))
 }
+
+/// Where an attempt's time went, from its timed turns and checks. Anything
+/// left of the wall time is the harness itself (fork, commit, diff, rules).
+/// `out_tok_per_s` divides output tokens by model time, which includes
+/// prefill and queueing: a floor on decode speed, not the decode speed.
+pub fn profile(attempt: &Value) -> Value {
+    let turns: Vec<&Value> = attempt["turns"].as_array().into_iter().flatten().collect();
+    let num = |v: &Value| v.as_u64().unwrap_or(0);
+    let model_ms: u64 = turns.iter().map(|t| num(&t["model_ms"])).sum();
+    let tool_ms: u64 = turns
+        .iter()
+        .flat_map(|t| t["tools"].as_array().into_iter().flatten())
+        .map(|t| num(&t["ms"]))
+        .sum();
+    let verify_ms: u64 = attempt["checks"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|c| num(&c["ms"]))
+        .sum();
+    let usage = |k: &str| -> u64 { turns.iter().map(|t| num(&t["usage"][k])).sum() };
+    let cached: u64 = turns
+        .iter()
+        .map(|t| num(&t["usage"]["prompt_tokens_details"]["cached_tokens"]))
+        .sum();
+    let reasoning: u64 = turns
+        .iter()
+        .map(|t| num(&t["usage"]["completion_tokens_details"]["reasoning_tokens"]))
+        .sum();
+    let (input, output) = (usage("prompt_tokens"), usage("completion_tokens"));
+    let wall_ms = attempt["ms"].as_u64();
+    json!({
+        "wall_ms": wall_ms,
+        "model_ms": model_ms,
+        "tool_ms": tool_ms,
+        "verify_ms": verify_ms,
+        "harness_ms": wall_ms.map(|w| w.saturating_sub(model_ms + tool_ms + verify_ms)),
+        "turns": turns.len(),
+        "prompt_tokens": input,
+        "cached_tokens": cached,
+        "completion_tokens": output,
+        "reasoning_tokens": reasoning,
+        "out_tok_per_s": (model_ms > 0).then(|| output * 1000 / model_ms),
+    })
+}
+
+/// One line for humans: `wall 84.0s = model 70.1s + tools 6.2s + ...`.
+pub fn profile_line(p: &Value) -> String {
+    let s = |k: &str| format!("{:.2}s", p[k].as_u64().unwrap_or(0) as f64 / 1000.0);
+    let wall = match p["wall_ms"].as_u64() {
+        Some(_) => format!("wall {} = ", s("wall_ms")),
+        None => String::new(),
+    };
+    let harness = match p["harness_ms"].as_u64() {
+        Some(_) => format!(" + harness {}", s("harness_ms")),
+        None => String::new(),
+    };
+    let speed = match p["out_tok_per_s"].as_u64() {
+        Some(t) => format!("  ≥{t} tok/s"),
+        None => String::new(),
+    };
+    format!(
+        "{wall}model {} + tools {} + verify {}{harness}  {} turns  in {} (cached {}) out {} (reasoning {}){speed}",
+        s("model_ms"),
+        s("tool_ms"),
+        s("verify_ms"),
+        p["turns"],
+        p["prompt_tokens"],
+        p["cached_tokens"],
+        p["completion_tokens"],
+        p["reasoning_tokens"],
+    )
+}

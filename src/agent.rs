@@ -4,6 +4,7 @@
 
 use std::io::{self, Write};
 use std::process::Stdio;
+use std::time::Instant;
 
 use serde_json::{Value, json};
 
@@ -22,6 +23,12 @@ pub struct Outcome {
     pub summary: Option<String>,
     pub steps: usize,
     pub messages: Vec<Value>,
+    /// One entry per turn, for profiling: when it started, how long the
+    /// model took and what the server says it cost, how long each tool took.
+    pub turns: Vec<Value>,
+    /// Why the loop ended early (the model failed or was stopped). The turns
+    /// before it are kept: a stopped attempt shows where its time went too.
+    pub error: Option<String>,
 }
 
 pub fn run(
@@ -51,21 +58,46 @@ pub fn run(
         json!({"role": "system", "content": system}),
         json!({"role": "user", "content": goal}),
     ];
+    let start = Instant::now();
+    let mut turns = Vec::new();
+    let ms = |since: Instant| since.elapsed().as_millis() as u64;
     for step in 1..=max_steps {
         bound(&mut messages);
-        let mut reply = model.chat(&messages, &tools)?;
-        // Reasoning is the model's scratch space; sending it back costs prefill.
+        let at = start.elapsed().as_millis() as u64;
+        let asked = Instant::now();
+        let chat = model.chat(&messages, &tools);
+        let mut turn = json!({"step": step, "at_ms": at, "model_ms": ms(asked)});
+        let mut reply = match chat {
+            Ok(reply) => reply,
+            Err(e) => {
+                turns.push(turn);
+                return Ok(Outcome {
+                    summary: None,
+                    steps: step,
+                    messages,
+                    turns,
+                    error: Some(e.to_string()),
+                });
+            }
+        };
+        // Reasoning is the model's scratch space; sending it back costs
+        // prefill. Usage is for the profile, not the conversation.
         if let Some(obj) = reply.as_object_mut() {
             obj.remove("reasoning_content");
             obj.remove("reasoning");
+            if let Some(usage) = obj.remove("usage") {
+                turn["usage"] = usage;
+            }
         }
         reply["role"] = json!("assistant");
         let calls = reply["tool_calls"].as_array().cloned().unwrap_or_default();
         messages.push(reply);
         if calls.is_empty() {
+            turns.push(turn);
             messages.push(json!({"role": "user", "content": "Use a tool, or call `done`."}));
             continue;
         }
+        let mut tool_times = Vec::new();
         for call in calls {
             let name = call["function"]["name"].as_str().unwrap_or("");
             let args: Value = call["function"]["arguments"]
@@ -73,27 +105,37 @@ pub fn run(
                 .and_then(|a| serde_json::from_str(a).ok())
                 .unwrap_or(Value::Null);
             if name == "done" {
+                turn["tools"] = json!(tool_times);
+                turns.push(turn);
                 return Ok(Outcome {
                     summary: args["summary"].as_str().map(str::to_string),
                     steps: step,
                     messages,
+                    turns,
+                    error: None,
                 });
             }
+            let ran = Instant::now();
             let result = match execute(worlds, world, name, &args) {
                 Ok(out) => out,
                 Err(e) => format!("error: {e}"),
             };
+            tool_times.push(json!({"name": name, "ms": ms(ran)}));
             messages.push(json!({
                 "role": "tool",
                 "tool_call_id": call["id"],
                 "content": truncate(&result),
             }));
         }
+        turn["tools"] = json!(tool_times);
+        turns.push(turn);
     }
     Ok(Outcome {
         summary: None,
         steps: max_steps,
         messages,
+        turns,
+        error: None,
     })
 }
 

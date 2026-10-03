@@ -158,3 +158,17 @@ What it found and changed:
   Run, spec and candidate records are now written aside and renamed.
 - The compiler answered a question about its tests in 3 s, correctly, and
   said it could not change files itself.
+
+**Profiling v0** done: every agent turn is timed (start offset, model time,
+each tool's time) with the server's token usage (prompt, cached, output,
+reasoning); every check is timed; every attempt has its wall time and start.
+A stopped or failed attempt keeps its turns. `profile <run|spec>` splits
+the wall time into model, tools, verify and harness, with a table per turn;
+the review page shows the split per attempt.
+First live profile (`is_roman`, 2 attempts, both passed in 17 s): the model
+is 97 % of the wall time; tools 2 %, verify and harness under 1 %. Turns
+cost 1 to 5 s each; most are reads (`cat`, `ls`) that run in 10 ms and still
+pay a full model turn. Reasoning was a quarter of the output tokens, and
+78 % of the prompt was served from the prefix cache. Output speed floor:
+51 to 59 tok/s with two agents sharing the GPU. The lever is the number of
+turns, not the tools or the harness.
