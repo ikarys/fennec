@@ -111,3 +111,18 @@ the check; the human reading the diff is the guard. The spec agent may write
 non-test files; protecting them then blocks the implementation.
 Not yet: clarifying questions before writing; recipes matched through the
 compiled goal; a review surface richer than the CLI (no TUI: decision open).
+
+**Review surface v0** done: `serve` prints a loopback URL carrying a secret
+for this start; opening it sets a `SameSite=Strict` cookie. The page lists
+specs to validate, runs waiting, know-how candidates, and takes a new request.
+A spec page shows request, goal, verify, checks and tests, and offers: ask
+the compiler a question (advice only, stored as a thread on the spec), accept
+and solve, reject, reject and recompile with the correction. A run page shows
+attempts, checks, rule violations and the winning diff, with land and reject.
+Every decision runs as a job in a self-refreshing frame, so a form being
+typed is never wiped. Guards: loopback bind, Host check (DNS rebinding),
+cookie on every request, CSP without any script, all output escaped: a diff
+is written by an agent and must not act through the page. Stdlib HTTP, no
+new dependency. `Worlds::open` now refuses non-hex ids (`..` named the store).
+Not yet: promoting a rule from the page (the CLI hint is shown); questions on
+runs; streaming an agent's steps while it works; jobs survive only the process.
