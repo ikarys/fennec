@@ -3,7 +3,8 @@
 //! it down once (`rules::promote`).
 
 use std::io::{self, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use serde_json::{Value, json};
 
@@ -24,7 +25,17 @@ pub fn load(worlds: &Worlds, id: &str) -> io::Result<Value> {
 
 pub(crate) fn save(worlds: &Worlds, id: &str, record: &Value) -> io::Result<()> {
     let text = serde_json::to_string_pretty(record).map_err(io::Error::other)?;
-    std::fs::write(run_path(worlds, id)?, text)
+    write_atomic(&run_path(worlds, id)?, &text)
+}
+
+/// Readers (the review page) load records while jobs save them: written
+/// aside then renamed, a record is seen whole, old or new, never half.
+pub(crate) fn write_atomic(path: &Path, text: &str) -> io::Result<()> {
+    static SEQ: AtomicU64 = AtomicU64::new(0);
+    let n = SEQ.fetch_add(1, Ordering::Relaxed);
+    let tmp = path.with_extension(format!("tmp{}-{n}", std::process::id()));
+    std::fs::write(&tmp, text)?;
+    std::fs::rename(&tmp, path)
 }
 
 /// Marks a run; a run without a record (a hand-made world) is left alone.

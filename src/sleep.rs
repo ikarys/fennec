@@ -47,7 +47,7 @@ pub fn candidates(worlds: &Worlds) -> io::Result<Vec<Value>> {
 
 fn save_candidates(worlds: &Worlds, all: &[Value]) -> io::Result<()> {
     let text = serde_json::to_string_pretty(all).map_err(io::Error::other)?;
-    std::fs::write(candidates_path(worlds), text)
+    review::write_atomic(&candidates_path(worlds), &text)
 }
 
 /// Distils every landed run not yet distilled. Returns the new candidates.

@@ -10,19 +10,30 @@ use serde_json::{Value, json};
 
 use crate::agent;
 use crate::provider::Model;
-use crate::review::normalise;
+use crate::review::{self, normalise};
 use crate::rules::{self, HARNESS_DIR, Kind, Rule};
 use crate::solve::{self, Task};
 use crate::world::{World, Worlds};
 use crate::{schedule, sleep};
 
 const BRIEF: &str = "Turn the request below into acceptance tests, before anyone implements it. \
-Read the project first and follow its test conventions. Write tests only: no implementation, \
-no stubs outside test files. Cover the edge cases the request implies; where it is ambiguous, \
+Read the project first and follow its test conventions. Write tests only, in new files: they are \
+protected whole once accepted, so the implementation must stay free to edit every existing file \
+(in Rust, an integration test under `tests/`). No implementation, no stubs. Cover the edge cases the request implies; where it is ambiguous, \
 pick the reading a careful maintainer would and say so in the goal. \
 When finished, call `done` with a summary in exactly this form:\n\
 goal: <the request restated precisely for an implementer, naming the tests that must pass>\n\
 verify: <a shell command that runs the new tests; one line per command>\n\nRequest:\n";
+
+const SPAR: &str = "You are a sparring partner for this project: find one real defect, a behaviour \
+that contradicts its documentation, its names or the plain intent of its code (invalid input, \
+edge cases, overflow, off-by-one, lost errors). Read the code first. Then prove the defect with \
+one new test that fails now, in a new file, following the project's test conventions; do not \
+change existing files. A style issue or a missing feature is not a defect. If you find \
+no real defect, call `done` with the summary `none` and write nothing. Otherwise call `done` with \
+a summary in exactly this form:\n\
+goal: <the defect and the expected behaviour, for whoever fixes it, naming the failing test>\n\
+verify: <a shell command that runs the new test; one line per command>";
 
 fn spec_path(worlds: &Worlds, id: &str) -> io::Result<PathBuf> {
     if id.is_empty() || id.contains('/') {
@@ -40,7 +51,7 @@ pub fn load(worlds: &Worlds, id: &str) -> io::Result<Value> {
 fn save(worlds: &Worlds, id: &str, spec: &Value) -> io::Result<()> {
     std::fs::create_dir_all(worlds.root.join("specs"))?;
     let text = serde_json::to_string_pretty(spec).map_err(io::Error::other)?;
-    std::fs::write(spec_path(worlds, id)?, text)
+    review::write_atomic(&spec_path(worlds, id)?, &text)
 }
 
 /// Every spec, oldest first.
@@ -75,14 +86,6 @@ pub fn compile(
     let project = std::fs::canonicalize(project)?;
     let _turn = schedule::interactive(worlds)?;
     let name = project.display().to_string();
-    let mut context = String::new();
-    let knowhow = sleep::knowhow(&project)?;
-    if !knowhow.is_empty() {
-        context.push_str("\n\nKnow-how kept for this project:\n");
-        knowhow
-            .iter()
-            .for_each(|k| context.push_str(&format!("  - {k}\n")));
-    }
     // Corrections to earlier specs of the same request.
     let key = normalise(request);
     let corrections: Vec<String> = specs(worlds)?
@@ -93,15 +96,102 @@ pub fn compile(
         })
         .filter_map(|(_, s)| s["correction"].as_str().map(str::to_string))
         .collect();
+    let mut context = String::new();
     if !corrections.is_empty() {
         context.push_str("\n\nEarlier specs for this request were rejected with:\n");
         corrections
             .iter()
             .for_each(|c| context.push_str(&format!("  - {c}\n")));
     }
+    let brief = format!("{BRIEF}{request}");
+    write_spec(
+        worlds, &project, &brief, request, "request", &context, model, max_steps,
+    )
+}
+
+/// Sparring: background work that hunts for one defect and proves it with a
+/// failing test. A finding is a spec like any other: its test is a new file,
+/// so it cannot fail by breaking what was there.
+pub fn spar(
+    worlds: &Worlds,
+    project: &Path,
+    model: &dyn Model,
+    max_steps: usize,
+) -> io::Result<Value> {
+    let project = std::fs::canonicalize(project)?;
+    let name = project.display().to_string();
+    // Earlier findings, whatever the human decided, are not proposed again.
+    let earlier: Vec<String> = specs(worlds)?
+        .into_iter()
+        // An invalid finding never reached the human: a sound one may come back.
+        .filter(|(_, s)| {
+            s["project"] == name.as_str() && s["origin"] == "spar" && s["status"] != "invalid"
+        })
+        .filter_map(|(_, s)| {
+            let goal = first_line(s["goal"].as_str()?);
+            if goal.is_empty() {
+                return None;
+            }
+            Some(match (s["status"].as_str(), s["correction"].as_str()) {
+                (_, Some(c)) => format!("{goal} (rejected: {c})"),
+                (Some(status), None) => format!("{goal} ({status})"),
+                _ => return None,
+            })
+        })
+        .collect();
+    let mut context = String::new();
+    if !earlier.is_empty() {
+        context.push_str("\n\nEarlier findings on this project; do not report them again:\n");
+        // ponytail: the latest 20 only; a long history needs a summary.
+        earlier[earlier.len().saturating_sub(20)..]
+            .iter()
+            .for_each(|f| context.push_str(&format!("  - {f}\n")));
+    }
+    let model = schedule::Background { worlds, model };
+    schedule::yield_to_interactive(worlds)?;
+    let mut spec = write_spec(
+        worlds, &project, SPAR, "spar", "spar", &context, &model, max_steps,
+    )?;
+    if let Some(goal) = spec["goal"].as_str().filter(|g| !g.is_empty()) {
+        spec["request"] = json!(format!("spar: {}", first_line(goal)));
+    } else if spec["summary"]
+        .as_str()
+        .is_some_and(|s| s.trim().eq_ignore_ascii_case("none"))
+    {
+        spec["reason"] = json!("no defect found");
+    }
+    save(worlds, spec["world"].as_str().unwrap_or("spec"), &spec)?;
+    Ok(spec)
+}
+
+/// An agent writes tests in a fresh world; the harness checks them. A valid
+/// spec keeps its world (status `proposed`) for the human; an invalid one is
+/// dropped.
+#[allow(clippy::too_many_arguments)]
+fn write_spec(
+    worlds: &Worlds,
+    project: &Path,
+    brief: &str,
+    request: &str,
+    origin: &str,
+    extra: &str,
+    model: &dyn Model,
+    max_steps: usize,
+) -> io::Result<Value> {
+    let name = project.display().to_string();
+    let mut context = String::new();
+    let knowhow = sleep::knowhow(project)?;
+    if !knowhow.is_empty() {
+        context.push_str("\n\nKnow-how kept for this project:\n");
+        knowhow
+            .iter()
+            .for_each(|k| context.push_str(&format!("  - {k}\n")));
+    }
+    context.push_str(extra);
     let criteria = [
-        "tests only: the request itself stays unimplemented".to_string(),
-        "the `verify` commands fail now and pass once the request is implemented".to_string(),
+        "tests only, in new files: existing files stay untouched".to_string(),
+        "the behaviour the tests describe stays unimplemented".to_string(),
+        "the `verify` commands fail now and pass once the behaviour is implemented".to_string(),
         format!("do not change {HARNESS_DIR}"),
     ];
 
@@ -109,12 +199,13 @@ pub fn compile(
     let mut spec = json!({
         "project": name,
         "request": request,
+        "origin": origin,
         "world": world.id,
         "model": model.label(),
         "status": "invalid",
     });
     if let Err(e) = check(
-        worlds, &world, &project, request, model, &criteria, &context, max_steps, &mut spec,
+        worlds, &world, project, brief, model, &criteria, &context, max_steps, &mut spec,
     ) {
         spec["reason"] = json!(e.to_string());
     }
@@ -130,7 +221,7 @@ fn check(
     worlds: &Worlds,
     world: &World,
     project: &Path,
-    request: &str,
+    brief: &str,
     model: &dyn Model,
     criteria: &[String],
     context: &str,
@@ -138,31 +229,49 @@ fn check(
     spec: &mut Value,
 ) -> io::Result<()> {
     let base = worlds.git(world, &["rev-parse", "HEAD"])?;
-    let outcome = agent::run(
-        worlds,
-        world,
-        model,
-        &format!("{BRIEF}{request}"),
-        criteria,
-        context,
-        max_steps,
-    )?;
+    let outcome = agent::run(worlds, world, model, brief, criteria, context, max_steps)?;
     spec["steps"] = json!(outcome.steps);
-    let summary = outcome.summary.unwrap_or_default();
-    let (goal, verify) = parse(&summary);
+    let summary = outcome.summary.clone().unwrap_or_default();
+    // Kept so the human sees what the model said when parsing finds nothing.
+    spec["summary"] = json!(summary);
+    let (mut goal, mut verify) = parse(&summary);
+    // `none` is a sparring answer, not a format slip: asking again would
+    // invite a made-up finding.
+    let none = summary.trim().eq_ignore_ascii_case("none");
+    if (goal.is_empty() || verify.is_empty())
+        && outcome.summary.is_some()
+        && !none
+        && let Ok(again) = reformat(model, outcome.messages)
+    {
+        (goal, verify) = parse(&again);
+        spec["reformatted"] = json!(again);
+    }
     spec["goal"] = json!(goal);
     spec["verify"] = json!(verify);
 
-    let commit = worlds.commit(world, &format!("fennec-os spec: {}", first_line(request)))?;
+    let title = first_line(spec["request"].as_str().unwrap_or("")).to_string();
+    let commit = worlds.commit(world, &format!("fennec-os spec: {title}"))?;
     spec["diff"] = json!(worlds.git(world, &["diff", &base, &commit])?);
     let changed = worlds.git(world, &["diff", "--name-only", &base, &commit])?;
     let changed: Vec<&str> = changed.lines().collect();
     spec["protect"] = json!(changed);
+    let added = worlds.git(
+        world,
+        &["diff", "--name-only", "--diff-filter=A", &base, &commit],
+    )?;
+    let added: Vec<&str> = added.lines().collect();
 
     let reason = if goal.is_empty() || verify.is_empty() {
-        Some("the summary has no `goal:` or no `verify:` line".to_string())
+        let said: String = summary.chars().take(300).collect();
+        Some(format!(
+            "the summary has no `goal:` or no `verify:` line; it said: {said}"
+        ))
     } else if changed.is_empty() {
         Some("no test was written".to_string())
+    } else if let Some(file) = changed.iter().find(|f| !added.contains(f)) {
+        // Tests are protected whole; tests mixed into a file the
+        // implementation needs would make every attempt fail.
+        Some(format!("tests go in new files; {file} already existed"))
     } else {
         // Path rules only: the others judge implementations, not tests.
         let mut forbidden = vec![Rule {
@@ -210,26 +319,79 @@ fn first_line(s: &str) -> &str {
     s.lines().next().unwrap_or("")
 }
 
-/// `goal:` starts the goal, which runs until the first `verify:` line.
+/// Models often end with prose. One more turn, without tools, asks for the
+/// form; whatever comes back is still parsed and checked by the harness.
+fn reformat(model: &dyn Model, mut messages: Vec<Value>) -> io::Result<String> {
+    let done = messages
+        .last()
+        .and_then(|m| m["tool_calls"].as_array())
+        .and_then(|calls| calls.iter().find(|c| c["function"]["name"] == "done"))
+        .map(|c| c["id"].clone())
+        .unwrap_or(json!("done"));
+    messages.push(json!({"role": "tool", "tool_call_id": done,
+        "content": "Not accepted: the summary needs `goal:` and `verify:` lines."}));
+    messages.push(json!({"role": "user", "content": FORM}));
+    let reply = model.chat(&messages, &json!([]))?;
+    let content = reply["content"].as_str().unwrap_or("");
+    Ok(content
+        .rsplit("</think>")
+        .next()
+        .unwrap_or(content)
+        .trim()
+        .to_string())
+}
+
+const FORM: &str = "Reply with only these lines, nothing else:\n\
+goal: <what must be implemented or fixed, precisely, naming the tests that must pass>\n\
+verify: <a shell command that runs the new tests; one line per command>";
+
+/// `goal:` starts the goal, which runs until the first `verify:` line. A
+/// `verify:` with nothing after it takes the next lines as commands, up to a
+/// blank line; code fences are dropped.
 fn parse(summary: &str) -> (String, Vec<String>) {
     let mut goal = Vec::new();
     let mut verify = Vec::new();
-    let mut in_goal = false;
+    let (mut in_goal, mut in_verify) = (false, false);
     for line in summary.lines() {
         let trimmed = line.trim();
-        if let Some(cmd) = trimmed.strip_prefix("verify:") {
+        if let Some(cmd) = key(trimmed, "verify") {
             in_goal = false;
-            if !cmd.trim().is_empty() {
-                verify.push(cmd.trim().trim_matches('`').to_string());
+            in_verify = cmd.is_empty();
+            if !cmd.is_empty() {
+                verify.push(cmd.trim_matches('`').to_string());
             }
-        } else if let Some(g) = trimmed.strip_prefix("goal:") {
-            in_goal = true;
-            goal.push(g.trim());
+        } else if let Some(g) = key(trimmed, "goal") {
+            (in_goal, in_verify) = (true, false);
+            goal.push(g);
+        } else if in_verify {
+            if trimmed.is_empty() && !verify.is_empty() {
+                in_verify = false;
+            } else if !trimmed.is_empty() && !trimmed.starts_with("```") {
+                verify.push(
+                    trimmed
+                        .trim_start_matches("$ ")
+                        .trim_matches('`')
+                        .to_string(),
+                );
+            }
         } else if in_goal {
             goal.push(trimmed);
         }
     }
     (goal.join("\n").trim().to_string(), verify)
+}
+
+/// The value after `name:`, however a model dresses the key up:
+/// `goal: x`, `Goal: x`, `**goal:** x`, `- **verify**: x`.
+fn key<'a>(line: &'a str, name: &str) -> Option<&'a str> {
+    let line = line.trim_start_matches(['-', '*', '#', '>', ' ']);
+    if !line.get(..name.len())?.eq_ignore_ascii_case(name) {
+        return None;
+    }
+    let rest = line[name.len()..]
+        .trim_start_matches('*')
+        .strip_prefix(':')?;
+    Some(rest.trim_start_matches('*').trim())
 }
 
 /// The human validates the spec: its tests become the task's protected
@@ -336,5 +498,11 @@ mod tests {
         );
         assert_eq!(goal, "add `f`\nthat doubles.");
         assert_eq!(verify, ["cargo test -q", "sh t.sh"]);
+
+        let (goal, verify) = parse(
+            "**Goal:** add `f`.\n\n- **Verify**:\n```sh\n$ cargo test\nsh t.sh\n```\n\nDone.",
+        );
+        assert_eq!(goal, "add `f`.");
+        assert_eq!(verify, ["cargo test", "sh t.sh"]);
     }
 }

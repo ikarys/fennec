@@ -73,8 +73,19 @@ The whole `.fennec-os/` dir is forbidden to runs. Dismissed candidates are
 never proposed again (exact match after normalisation).
 Live: one run gave 3 candidates in 8 s; 2 kept (the working test command, a
 parsing pitfall), 1 dismissed (restated a rule already injected).
-Not yet: adversarial agent proposing rules; telling the distiller what is
-already known.
+Not yet: telling the distiller what is already known.
+
+**P5 sparring v0** done: `spar <project>` runs a background agent that hunts
+one defect and proves it with a failing test in a new file. A finding is a
+spec (`origin: spar`): same harness checks, same review page, accept to have
+it fixed, reject with a reason. Earlier findings and their verdicts go into
+the next round so nothing is reported twice. Its model yields to interactive
+work before every turn, not only at the start.
+Live: started during a 27-minute solve, it waited the whole time without
+touching the GPU, then took 10 turns (about 30 s) and answered `none` on a
+correct `to_roman`; honest, not yet a finding.
+Not yet: findings turned into rules rather than tests; a nightly schedule
+(cron calls `spar`).
 
 **P6 v0** done (fennec-os's own load only): `solve` holds a shared lock on
 `<store>/interactive.lock` for its whole run; `sleep` takes the exclusive lock
@@ -97,8 +108,7 @@ pay off for command-shaped tasks (regenerate, bump, migrate) and for redoing
 work that was undone, less for edits on moved code (the checks catch it).
 Not yet: matching by intent; parametrised recipes.
 
-**P7 intent compiler v0** done (not yet verified live: the model server was
-unreachable): `spec <project> <request>` runs an agent that writes acceptance
+**P7 intent compiler v0** done: `spec <project> <request>` runs an agent that writes acceptance
 tests only and ends with `goal:` and `verify:` lines. The harness then checks
 what it can decide: a goal and a command were given, files were written, none
 under `.fennec-os` or a forbidden path, and the commands **fail** now (tests
@@ -126,3 +136,25 @@ is written by an agent and must not act through the page. Stdlib HTTP, no
 new dependency. `Worlds::open` now refuses non-hex ids (`..` named the store).
 Not yet: promoting a rule from the page (the CLI hint is shown); questions on
 runs; streaming an agent's steps while it works; jobs survive only the process.
+
+**Live pass, 2026-10-03** (qwen3.8-27b, the full loop through the review
+page: request, spec, question, reject and recompile, accept, solve, land).
+What it found and changed:
+- Rust keeps unit tests in the file they test. Protecting the spec's files
+  then forbade the implementation: 3 attempts, 27 minutes, all failed on
+  `changed src/lib.rs`. Spec tests now go in new files (checked by the
+  harness), which are protected whole. With that: 2 attempts, both passed,
+  84 s, landed. The "only add" check for sparring became redundant: removed.
+- qwen ended 3 of 5 specs with prose instead of `goal:`/`verify:`. The
+  harness now asks once more for the form, without tools, and still parses
+  and checks the answer; the raw summary is kept. The parser also accepts
+  `**Goal:**`, `- verify:` and commands on the following lines.
+- `solve` waited for its slowest attempt. After the first pass, the others
+  now get as long again as it took, then stop at their next turn.
+- On one GPU already at 99 % with one model, N attempts are not "the wall
+  time of one": they share decode speed. Two attempts is the right default
+  on this hardware.
+- Records were written in place; the page could read a half-written one.
+  Run, spec and candidate records are now written aside and renamed.
+- The compiler answered a question about its tests in 3 s, correctly, and
+  said it could not change files itself.
