@@ -6,4 +6,5 @@ pub mod rules;
 pub mod schedule;
 pub mod sleep;
 pub mod solve;
+pub mod spec;
 pub mod world;

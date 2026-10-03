@@ -11,7 +11,7 @@ use std::sync::Mutex;
 use common::Fixture;
 use fennec_os::provider::Model;
 use fennec_os::solve::{Task, land, solve};
-use fennec_os::{review, rules, sleep};
+use fennec_os::{review, rules, sleep, spec};
 use serde_json::{Value, json};
 
 struct Script {
@@ -86,6 +86,7 @@ fn task(protect: &[&str]) -> Task {
         goal: "Write 42 into the file `answer`.".to_string(),
         verify: vec!["sh check.sh".to_string()],
         protect: protect.iter().map(|p| p.to_string()).collect(),
+        base: None,
     }
 }
 
@@ -503,4 +504,88 @@ fn a_landed_goal_comes_back_as_a_replay_without_the_model() {
     let record = solve(&f.worlds, &f.project, &task(&[]), &[&again], 10).unwrap();
     assert_eq!(record["attempts"].as_array().unwrap().len(), 1);
     assert_eq!(record["attempts"][0]["model"], "again");
+}
+
+fn finish(summary: &str) -> (&'static str, Value) {
+    ("done", json!({"summary": summary}))
+}
+
+const SPEC: &str = "goal: Write 42 into `answer`; spec.sh must pass.\nverify: sh spec.sh";
+
+#[test]
+fn a_request_compiles_to_failing_tests_that_the_solution_must_pass() {
+    let f = fixture("spec");
+    let request = "answer should say 42";
+
+    // Checked by the harness, not by the human: tests that already pass, and
+    // tests in the harness dir, are not a spec.
+    let lazy = Script::new("lazy", &[write("spec.sh", "true\n"), finish(SPEC)]);
+    let s = spec::compile(&f.worlds, &f.project, request, &lazy, 10).unwrap();
+    assert_eq!(
+        s["reason"],
+        "the tests already pass: they do not test the request"
+    );
+    let sly = Script::new(
+        "sly",
+        &[write(".fennec-os/spec.sh", "false\n"), finish(SPEC)],
+    );
+    let s = spec::compile(&f.worlds, &f.project, request, &sly, 10).unwrap();
+    assert!(
+        s["reason"]
+            .as_str()
+            .unwrap()
+            .starts_with("rule harness-dir"),
+        "{s:#}"
+    );
+    assert!(f.worlds.list().unwrap().is_empty());
+
+    // A rejected spec's correction reaches the next compile.
+    let vague = Script::new(
+        "vague",
+        &[write("spec.sh", "test -s answer\n"), finish(SPEC)],
+    );
+    let s = spec::compile(&f.worlds, &f.project, request, &vague, 10).unwrap();
+    assert_eq!(s["status"], "proposed", "{s:#}");
+    spec::reject(
+        &f.worlds,
+        s["world"].as_str().unwrap(),
+        Some("check the exact value"),
+    )
+    .unwrap();
+    let spy = Spy(Mutex::new(String::new()));
+    spec::compile(&f.worlds, &f.project, request, &spy, 10).unwrap();
+    assert!(
+        spy.0
+            .lock()
+            .unwrap()
+            .contains("rejected with:\n  - check the exact value")
+    );
+
+    let good = Script::new(
+        "good",
+        &[write("spec.sh", "grep -qx 42 answer\n"), finish(SPEC)],
+    );
+    let s = spec::compile(&f.worlds, &f.project, request, &good, 10).unwrap();
+    assert_eq!(s["status"], "proposed", "{s:#}");
+    assert_eq!(s["protect"], json!(["spec.sh"]));
+    assert_eq!(s["verify"], json!(["sh spec.sh"]));
+    let id = s["world"].as_str().unwrap().to_string();
+
+    // Accepted: attempts start from the tests and may not edit them.
+    let cheat = Script::new("cheat", &[write("spec.sh", "true\n"), done()]);
+    let honest = Script::new("honest", &[write("answer", "42\n"), done()]);
+    let record = spec::accept(&f.worlds, &id, &[&cheat, &honest], 10).unwrap();
+    let attempts = record["attempts"].as_array().unwrap();
+    assert_eq!(
+        attempts[0]["reason"],
+        "rule task.protect violated: changed spec.sh"
+    );
+    assert_eq!(record["winner"], attempts[1]["world"]);
+    assert_eq!(record["spec"], json!(id));
+    assert_eq!(attempts[1]["changed_lines"], 1);
+
+    land(&f.worlds, record["winner"].as_str().unwrap()).unwrap();
+    assert!(f.project.join("spec.sh").exists());
+    assert!(f.worlds.list().unwrap().is_empty());
+    assert_eq!(spec::load(&f.worlds, &id).unwrap()["status"], "accepted");
 }
