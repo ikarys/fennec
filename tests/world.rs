@@ -213,3 +213,25 @@ fn a_grant_lets_a_world_write_a_host_path_until_the_human_decides() {
     assert!(grant::paths(&f.worlds, &w.id).unwrap().is_empty());
     f.worlds.drop(w).unwrap();
 }
+
+#[test]
+fn pending_grants_are_listed_and_a_killed_give_is_cleared() {
+    let f = Fixture::new("grant-pending");
+    let w = f.worlds.fork(&f.project.to_string_lossy()).unwrap();
+    let conf = f.worlds.home.join("conf");
+    std::fs::create_dir_all(&conf).unwrap();
+    assert_eq!(grant::summary(&f.worlds).unwrap(), None);
+
+    // What a `give` killed after its backup, before its record, leaves behind.
+    let stale = f.worlds.root.join("grants").join(&w.id);
+    std::fs::create_dir_all(stale.join("0")).unwrap();
+    assert_eq!(grant::summary(&f.worlds).unwrap(), None);
+    grant::give(&f.worlds, &w, std::slice::from_ref(&conf)).unwrap();
+
+    let list = grant::list(&f.worlds).unwrap();
+    assert!(list.starts_with(&w.id) && list.contains("conf"), "{list}");
+    let summary = grant::summary(&f.worlds).unwrap().unwrap();
+    assert!(summary.starts_with("1 grant(s)"), "{summary}");
+    grant::keep(&f.worlds, &w).unwrap();
+    assert_eq!(grant::summary(&f.worlds).unwrap(), None);
+}
