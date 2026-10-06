@@ -11,7 +11,7 @@ use std::sync::Mutex;
 use common::Fixture;
 use fennec_os::provider::Model;
 use fennec_os::solve::{Task, land, solve};
-use fennec_os::{review, rules, sleep, spec};
+use fennec_os::{grant, review, rules, sleep, spec};
 use serde_json::{Value, json};
 
 struct Script {
@@ -87,6 +87,7 @@ fn task(protect: &[&str]) -> Task {
         verify: vec!["sh check.sh".to_string()],
         protect: protect.iter().map(|p| p.to_string()).collect(),
         base: None,
+        grant: Vec::new(),
     }
 }
 
@@ -588,4 +589,79 @@ fn a_request_compiles_to_failing_tests_that_the_solution_must_pass() {
     assert!(f.project.join("spec.sh").exists());
     assert!(f.worlds.list().unwrap().is_empty());
     assert_eq!(spec::load(&f.worlds, &id).unwrap()["status"], "accepted");
+}
+
+/// A host config file, a task that edits it, and a check that reads it.
+fn host_task(f: &Fixture) -> (std::path::PathBuf, Task) {
+    let conf = f.worlds.home.join("conf");
+    std::fs::create_dir_all(&conf).unwrap();
+    std::fs::write(conf.join("app.cfg"), "v1\n").unwrap();
+    let task = Task {
+        goal: "Set the app config to v2.".to_string(),
+        verify: vec![format!("grep -qx v2 {}/app.cfg", conf.display())],
+        protect: Vec::new(),
+        base: None,
+        grant: vec![conf.clone()],
+    };
+    (conf, task)
+}
+
+#[test]
+fn a_granted_run_edits_the_host_until_the_human_decides() {
+    let f = fixture("solve-grant");
+    let (conf, task) = host_task(&f);
+    let cfg = || std::fs::read_to_string(conf.join("app.cfg")).unwrap();
+    let path = format!("{}/app.cfg", conf.display());
+
+    let good = Script::new("good", &[write(&path, "v2\n"), done()]);
+    let record = solve(&f.worlds, &f.project, &task, &[&good], 10).unwrap();
+    assert_eq!(record["status"], "ready", "{record:#}");
+    assert_eq!(record["grant"], json!([conf.display().to_string()]));
+    // The host changed and waits for the human; the winner's world waits too.
+    assert_eq!(cfg(), "v2\n");
+    let winner = record["winner"].as_str().unwrap();
+    assert!(
+        grant::diff(&f.worlds, &f.worlds.open(winner).unwrap())
+            .unwrap()
+            .contains("+v2")
+    );
+    grant::revert(&f.worlds, &f.worlds.open(winner).unwrap()).unwrap();
+    assert_eq!(cfg(), "v1\n");
+    f.worlds.drop(f.worlds.open(winner).unwrap()).unwrap();
+}
+
+#[test]
+fn a_failed_granted_run_leaves_the_host_as_it_found_it() {
+    let f = fixture("solve-grant-fail");
+    let (conf, task) = host_task(&f);
+    let path = format!("{}/app.cfg", conf.display());
+
+    let bad = Script::new("bad", &[write(&path, "v3\n"), done()]);
+    let record = solve(&f.worlds, &f.project, &task, &[&bad], 10).unwrap();
+    assert_eq!(record["status"], "failed", "{record:#}");
+    assert_eq!(
+        std::fs::read_to_string(conf.join("app.cfg")).unwrap(),
+        "v1\n"
+    );
+    assert!(f.worlds.list().unwrap().is_empty());
+    assert!(
+        !f.worlds
+            .root
+            .join("grants")
+            .read_dir()
+            .unwrap()
+            .any(|_| true)
+    );
+}
+
+#[test]
+fn a_grant_refuses_parallel_attempts_and_bad_paths() {
+    let f = fixture("solve-grant-refuse");
+    let (_, mut task) = host_task(&f);
+    let (a, b) = (Script::new("a", &[done()]), Script::new("b", &[done()]));
+    assert!(solve(&f.worlds, &f.project, &task, &[&a, &b], 10).is_err());
+
+    task.grant = vec![f.worlds.home.clone()];
+    assert!(solve(&f.worlds, &f.project, &task, &[&a], 10).is_err());
+    assert!(f.worlds.list().unwrap().is_empty());
 }

@@ -257,6 +257,7 @@ pub fn accept(
         verify: strings("verify"),
         protect: strings("protect"),
         base: Some(id.to_string()),
+        grant: Vec::new(),
     };
     let project = PathBuf::from(spec["project"].as_str().unwrap_or(""));
     let record = solve::solve(worlds, &project, &task, models, max_steps)?;
