@@ -54,9 +54,14 @@ Btrfs); `grant diff` shows what changed, `grant keep` deletes the backup,
 `grant revert` restores it. Paths must be inside the home, never the home or
 the store; one grant per world; a world with a grant cannot be dropped.
 Limits: a config file the agent edits runs later *outside* the sandbox, so the
-diff must be read before `keep`. Not yet: the agent loop does not use it
-(`solve` forks N worlds, which cannot share one host path); sockets and
-commands (Hyprland, D-Bus); irreversible effects; an expiry.
+diff must be read before `keep`. Not yet: sockets and commands (Hyprland,
+D-Bus); irreversible effects; an expiry.
+`solve <project> task.json --grant <path>` (repeatable) gives the one attempt
+those paths: exactly one model, no recipe replay, the paths are named in the
+agent's prompt. Pass → the host stays changed and the world waits for
+`grant diff`, then `grant keep` or `grant revert`. Fail → the harness reverts
+the host itself. The verdict is still the task's `verify` commands, which see
+the host paths; host changes are not judged by `protect` or path rules.
 
 **P3** done: project rules (`forbidden_path`, `paired_change`,
 `standing_command`; `block` or `warn`) read from `.fennec-os/rules.json` at the

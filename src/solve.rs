@@ -2,12 +2,13 @@
 //! a verdict read from exit codes, the smallest passing diff kept.
 
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 
 use serde_json::{Value, json};
 
 use crate::agent;
+use crate::grant;
 use crate::provider::Model;
 use crate::review;
 use crate::rules::{self, HARNESS_DIR, Kind, Rule};
@@ -25,6 +26,9 @@ pub struct Task {
     /// The world attempts fork from (an accepted spec); `None` is the
     /// project's HEAD. Set by the harness, never read from a task file.
     pub base: Option<String>,
+    /// Host paths the human lets the one attempt write, backed up first.
+    /// Set by the harness from the command line, never read from a task file.
+    pub grant: Vec<PathBuf>,
 }
 
 impl Task {
@@ -45,6 +49,7 @@ impl Task {
             verify: strings("verify"),
             protect: strings("protect"),
             base: None,
+            grant: Vec::new(),
         };
         if task.goal.is_empty() {
             return Err(io::Error::other("task has no goal"));
@@ -67,6 +72,10 @@ pub fn solve(
     models: &[&dyn Model],
     max_steps: usize,
 ) -> io::Result<Value> {
+    // Parallel attempts would write the same host paths.
+    if !task.grant.is_empty() && models.len() != 1 {
+        return Err(io::Error::other("a grant needs exactly one attempt"));
+    }
     let project = std::fs::canonicalize(project)?;
     let _turn = schedule::interactive(worlds)?;
     // Everything an attempt is judged on, as rules: the harness files
@@ -115,9 +124,13 @@ pub fn solve(
         None => project.to_string_lossy().to_string(),
     };
     // A recorded way to this goal is tried first, alone: if it passes, no
-    // model is called.
+    // model is called. Never with a grant: a replay must not write host paths.
     let (mut forked, mut attempts) = (Vec::new(), Vec::new());
-    if let Some(recipe) = recipe::find(worlds, &project, &task.goal)? {
+    let recipe = match task.grant.is_empty() {
+        true => recipe::find(worlds, &project, &task.goal)?,
+        false => None,
+    };
+    if let Some(recipe) = recipe {
         let (f, a) = attempts_for(worlds, &source, &[&recipe], brief)?;
         forked = f;
         attempts = a;
@@ -147,6 +160,11 @@ pub fn solve(
             });
             std::fs::write(marker.join(&world.id), verdict.to_string())?;
         } else {
+            // A failed attempt leaves the host as it found it. The winner's
+            // grant stays until the human keeps or reverts it.
+            if !grant::paths(worlds, &world.id)?.is_empty() {
+                grant::revert(worlds, &world)?;
+            }
             worlds.drop(world)?;
         }
     }
@@ -157,6 +175,7 @@ pub fn solve(
         "spec": task.base,
         "verify": task.verify,
         "protect": task.protect,
+        "grant": task.grant,
         "winner": winner,
         "status": if winner.is_some() { "ready" } else { "failed" },
         "attempts": attempts,
@@ -188,6 +207,17 @@ fn attempts_for(
         .iter()
         .map(|_| worlds.fork(source))
         .collect::<io::Result<_>>()?;
+    // One world: `solve` refuses a grant with several attempts.
+    let granted = forked
+        .iter()
+        .try_for_each(|w| match brief.task.grant.is_empty() {
+            true => Ok(()),
+            false => grant::give(worlds, w, &brief.task.grant),
+        });
+    if let Err(e) = granted {
+        forked.into_iter().try_for_each(|w| worlds.drop(w))?;
+        return Err(e);
+    }
     let attempts = std::thread::scope(|s| {
         let handles: Vec<_> = forked
             .iter()
@@ -237,6 +267,15 @@ fn attempt_inner(
         context,
         max_steps,
     } = *brief;
+    let mut context = context.to_string();
+    let granted = grant::paths(worlds, &world.id)?;
+    if !granted.is_empty() {
+        context.push_str("\n\nHost paths you may edit with absolute paths (backed up; the human reviews the diff):\n");
+        granted
+            .iter()
+            .for_each(|p| context.push_str(&format!("  - {}\n", p.display())));
+        record["grant"] = json!(granted);
+    }
     let base = worlds.git(world, &["rev-parse", "HEAD"])?;
     let criteria: Vec<String> = rules
         .iter()
@@ -244,7 +283,7 @@ fn attempt_inner(
         .map(Rule::describe)
         .collect();
     let outcome = agent::run(
-        worlds, world, model, &task.goal, &criteria, context, max_steps,
+        worlds, world, model, &task.goal, &criteria, &context, max_steps,
     )?;
     record["steps"] = json!(outcome.steps);
     record["summary"] = json!(outcome.summary);

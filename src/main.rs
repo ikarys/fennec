@@ -76,7 +76,12 @@ fn run(args: &[String]) -> std::io::Result<ExitCode> {
         }
         "list" if args.len() == 1 => worlds.list()?.iter().for_each(|id| println!("{id}")),
         "solve" if args.len() >= 3 => {
-            let task = Task::from_json(&std::fs::read_to_string(arg(2))?)?;
+            let mut task = Task::from_json(&std::fs::read_to_string(arg(2))?)?;
+            task.grant = args
+                .windows(2)
+                .filter(|w| w[0] == "--grant")
+                .map(|w| w[1].clone().into())
+                .collect();
             let variants = OpenAi::variants_from_env(flag(args, "--attempts", 1)?.max(1))?;
             let models: Vec<&dyn Model> = variants.iter().map(|m| m as &dyn Model).collect();
             let record = solve(

@@ -36,6 +36,7 @@ cargo clippy --all-targets  # must be clean
 cargo fmt --all
 fennec-os fork <project> && fennec-os run <id> -- <cmd>
 fennec-os solve <project> task.json --attempts 3 && fennec-os land <id>
+fennec-os solve <project> task.json --grant <host path>   # one attempt; then grant diff|keep|revert <id>
 ```
 
 Env: `FENNEC_OS_HOME` (store, default `~/.local/share/fennec-os`),
