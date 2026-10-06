@@ -48,6 +48,9 @@ fn main() -> ExitCode {
 fn run(args: &[String]) -> std::io::Result<ExitCode> {
     let worlds = Worlds::from_env()?;
     let arg = |i: usize| args.get(i).map(String::as_str).unwrap_or("");
+    if let (true, Ok(Some(reminder))) = (arg(0) != "grant", grant::summary(&worlds)) {
+        eprintln!("fennec-os: {reminder}");
+    }
     match arg(0) {
         "fork" if args.len() == 2 => println!("{}", worlds.fork(arg(1))?.id),
         "run" if args.len() > 3 && arg(2) == "--" => {
@@ -65,6 +68,8 @@ fn run(args: &[String]) -> std::io::Result<ExitCode> {
             let paths: Vec<_> = args[3..].iter().map(std::path::PathBuf::from).collect();
             grant::give(&worlds, &worlds.open(arg(2))?, &paths)?
         }
+        "grant" if args.len() == 2 && arg(1) == "list" => print!("{}", grant::list(&worlds)?),
+        "grant" if args.len() == 2 && arg(1) == "remind" => grant::remind(&worlds)?,
         "grant" if args.len() == 3 && arg(1) == "diff" => {
             print!("{}", grant::diff(&worlds, &worlds.open(arg(2))?)?)
         }

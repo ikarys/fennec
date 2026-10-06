@@ -6,6 +6,7 @@
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::Duration;
 
 use crate::world::{World, Worlds};
 
@@ -29,10 +30,14 @@ pub fn give(worlds: &Worlds, world: &World, paths: &[PathBuf]) -> io::Result<()>
         return Err(io::Error::other("grant what? give at least one path"));
     }
     let d = dir(worlds, world);
-    if d.exists() {
+    if d.join("paths.json").exists() {
         return Err(io::Error::other(
             "this world already has a grant: keep or revert it first",
         ));
+    }
+    // A directory without a record is what a killed `give` leaves behind.
+    if d.exists() {
+        std::fs::remove_dir_all(&d)?;
     }
     let home = std::fs::canonicalize(&worlds.home)?;
     let store = std::fs::canonicalize(&worlds.root)?;
@@ -67,6 +72,72 @@ pub fn give(worlds: &Worlds, world: &World, paths: &[PathBuf]) -> io::Result<()>
         let _ = std::fs::remove_dir_all(&d);
     }
     record
+}
+
+/// Grants waiting for a decision: world id, paths, age; oldest first.
+pub fn pending(worlds: &Worlds) -> io::Result<Vec<(String, Vec<PathBuf>, Duration)>> {
+    let Ok(entries) = std::fs::read_dir(worlds.root.join("grants")) else {
+        return Ok(Vec::new());
+    };
+    let mut out = Vec::new();
+    for e in entries.filter_map(|e| e.ok()) {
+        let id = e.file_name().to_string_lossy().into_owned();
+        let Ok(record) = std::fs::metadata(e.path().join("paths.json")) else {
+            continue; // incomplete: the next `give` clears it
+        };
+        let age = record.modified().ok().and_then(|m| m.elapsed().ok());
+        out.push((id.clone(), paths(worlds, &id)?, age.unwrap_or_default()));
+    }
+    out.sort_by_key(|g| std::cmp::Reverse(g.2));
+    Ok(out)
+}
+
+fn age(d: Duration) -> String {
+    match d.as_secs() {
+        s if s >= 86_400 => format!("{}d", s / 86_400),
+        s if s >= 3_600 => format!("{}h", s / 3_600),
+        s => format!("{}min", s / 60),
+    }
+}
+
+/// One line per pending grant, for `grant list`.
+pub fn list(worlds: &Worlds) -> io::Result<String> {
+    Ok(pending(worlds)?
+        .iter()
+        .map(|(id, paths, d)| {
+            let paths: Vec<_> = paths.iter().map(|p| p.display().to_string()).collect();
+            format!("{id}  {}  {}\n", age(*d), paths.join(", "))
+        })
+        .collect())
+}
+
+/// The reminder: `None` when nothing waits.
+pub fn summary(worlds: &Worlds) -> io::Result<Option<String>> {
+    let pending = pending(worlds)?;
+    Ok(pending.first().map(|(_, _, oldest)| {
+        format!(
+            "{} grant(s) waiting for keep or revert, oldest {}: fennec-os grant list",
+            pending.len(),
+            age(*oldest)
+        )
+    }))
+}
+
+/// Desktop notification through `notify-send` when it exists, else stderr.
+/// Decides nothing: the human keeps or reverts.
+pub fn remind(worlds: &Worlds) -> io::Result<()> {
+    let Some(text) = summary(worlds)? else {
+        return Ok(());
+    };
+    let body = format!("{text}\n{}", list(worlds)?);
+    let sent = Command::new("notify-send")
+        .args(["fennec-os", &body])
+        .status()
+        .is_ok_and(|s| s.success());
+    if !sent {
+        eprintln!("{body}");
+    }
+    Ok(())
 }
 
 /// What the world changed since the grant, as a unified diff.

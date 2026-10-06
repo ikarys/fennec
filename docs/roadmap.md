@@ -56,6 +56,10 @@ the store; one grant per world; a world with a grant cannot be dropped.
 Limits: a config file the agent edits runs later *outside* the sandbox, so the
 diff must be read before `keep`. Not yet: sockets and commands (Hyprland,
 D-Bus); irreversible effects; an expiry.
+Pending grants are surfaced, never decided: `grant list`, a one-line reminder
+on stderr from any command, `grant remind` for a desktop notification (timer
+in `docs/grant-reminder.md`). A `give` killed before its record is cleared by
+the next `give`.
 `solve <project> task.json --grant <path>` (repeatable) gives the one attempt
 those paths: exactly one model, no recipe replay, the paths are named in the
 agent's prompt. Pass → the host stays changed and the world waits for
