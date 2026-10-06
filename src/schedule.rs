@@ -57,6 +57,7 @@ mod tests {
             root: dir.clone(),
             home: dir.clone(),
             ro_paths: Vec::new(),
+            memory_mb: None,
         };
         assert!(!yield_to_interactive(&worlds).unwrap());
         let a = interactive(&worlds).unwrap();

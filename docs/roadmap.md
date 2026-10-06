@@ -43,8 +43,20 @@ Security: the harness used to read the world's `.git` file (agent-writable)
 to decide what to mount read-write, so an agent could get any host git store
 mounted (reproduced: a hook planted in another repository). Git dirs now come
 from harness metadata, the admin dir is read-only, hooks are off.
+Memory: every sandboxed command runs under `ulimit -v` (default 8 GiB,
+`FENNEC_OS_MEMORY_MB`); virtual memory only, no CPU, pid or disk caps.
 Not yet: prompt diversity;
 cgroup limits; network-needing builds (deps must be in the local cache).
+
+**Grant v0** done (files only): `grant give <world> <path>...` binds host paths
+read-write in that world's sandbox after backing them up (`cp -a`, reflink on
+Btrfs); `grant diff` shows what changed, `grant keep` deletes the backup,
+`grant revert` restores it. Paths must be inside the home, never the home or
+the store; one grant per world; a world with a grant cannot be dropped.
+Limits: a config file the agent edits runs later *outside* the sandbox, so the
+diff must be read before `keep`. Not yet: the agent loop does not use it
+(`solve` forks N worlds, which cannot share one host path); sockets and
+commands (Hyprland, D-Bus); irreversible effects; an expiry.
 
 **P3** done: project rules (`forbidden_path`, `paired_change`,
 `standing_command`; `block` or `warn`) read from `.fennec-os/rules.json` at the

@@ -3,7 +3,7 @@ use std::process::ExitCode;
 use fennec_os::provider::{Model, OpenAi};
 use fennec_os::solve::{Task, land, solve};
 use fennec_os::world::Worlds;
-use fennec_os::{review, rules, sleep, spec};
+use fennec_os::{grant, review, rules, sleep, spec};
 
 const USAGE: &str = "usage: fennec-os <command>
   fork <project-path|world-id>   new world from the source's last commit
@@ -61,6 +61,19 @@ fn run(args: &[String]) -> std::io::Result<ExitCode> {
         }
         "rollback" if args.len() == 2 => worlds.rollback(&worlds.open(arg(1))?)?,
         "drop" if args.len() == 2 => worlds.drop(worlds.open(arg(1))?)?,
+        "grant" if args.len() >= 3 && arg(1) == "give" => {
+            let paths: Vec<_> = args[3..].iter().map(std::path::PathBuf::from).collect();
+            grant::give(&worlds, &worlds.open(arg(2))?, &paths)?
+        }
+        "grant" if args.len() == 3 && arg(1) == "diff" => {
+            print!("{}", grant::diff(&worlds, &worlds.open(arg(2))?)?)
+        }
+        "grant" if args.len() == 3 && arg(1) == "keep" => {
+            grant::keep(&worlds, &worlds.open(arg(2))?)?
+        }
+        "grant" if args.len() == 3 && arg(1) == "revert" => {
+            grant::revert(&worlds, &worlds.open(arg(2))?)?
+        }
         "list" if args.len() == 1 => worlds.list()?.iter().for_each(|id| println!("{id}")),
         "solve" if args.len() >= 3 => {
             let task = Task::from_json(&std::fs::read_to_string(arg(2))?)?;

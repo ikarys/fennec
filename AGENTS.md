@@ -12,6 +12,7 @@ binding): `~/workspace/training/iatraining/notes/agent-architecture-reflexion.md
 
 ```
 src/world.rs     worlds: fork, sandbox (bubblewrap), diff, commit, rollback, drop
+src/grant.rs     human-issued grant: a world writes named host paths, backed up until keep/revert
 src/provider.rs  `Model` trait + OpenAI-compatible client
 src/recipe.rs    replay a landed run's tool calls when the same goal returns
 src/agent.rs     tool loop; every tool runs inside the sandbox
@@ -39,13 +40,15 @@ fennec-os solve <project> task.json --attempts 3 && fennec-os land <id>
 
 Env: `FENNEC_OS_HOME` (store, default `~/.local/share/fennec-os`),
 `FENNEC_OS_RO` (paths re-exposed read-only inside the hidden home),
+`FENNEC_OS_MEMORY_MB` (address-space cap per sandboxed command, default 8192, 0 = none),
 `FENNEC_OS_BASE_URL`, `FENNEC_OS_MODELS` (comma-separated), `FENNEC_OS_API_KEY`.
 
 ## Non-negotiable rules
 
 1. **Nothing leaves a world except through the harness.** The sandbox has no
    network, a hidden home, a private /tmp, and a read-only view of the
-   project's git store. Never widen a default.
+   project's git store. Never widen a default. The one exception is a
+   `grant` issued by the human (files inside the home only, backed up first).
 2. **The agent never commits.** Checkpoints and landing are harness operations.
    The harness never takes a path or setting from a world's files (`.git`
    included): git dirs come from `<store>/meta/`, hooks are always off.
