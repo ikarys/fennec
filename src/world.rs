@@ -31,6 +31,8 @@ pub struct Worlds {
     pub home: PathBuf,
     /// Re-exposed read-only inside the hidden home (toolchains).
     pub ro_paths: Vec<PathBuf>,
+    /// Address-space cap per sandboxed command, in MiB; `None` is unlimited.
+    pub memory_mb: Option<u64>,
 }
 
 pub struct World {
@@ -40,7 +42,8 @@ pub struct World {
 
 impl Worlds {
     /// `FENNEC_OS_HOME` (default `~/.local/share/fennec-os`) and
-    /// `FENNEC_OS_RO` (colon-separated, default the usual toolchain dirs).
+    /// `FENNEC_OS_RO` (colon-separated, default the usual toolchain dirs) and
+    /// `FENNEC_OS_MEMORY_MB` (default 8192, `0` for no cap).
     pub fn from_env() -> io::Result<Self> {
         let home = PathBuf::from(
             std::env::var_os("HOME").ok_or_else(|| io::Error::other("HOME is not set"))?,
@@ -55,10 +58,15 @@ impl Worlds {
                 .map(|p| home.join(p))
                 .collect(),
         };
+        let memory_mb = match std::env::var("FENNEC_OS_MEMORY_MB") {
+            Ok(v) => Some(v.parse::<u64>().map_err(io::Error::other)?).filter(|&m| m > 0),
+            Err(_) => Some(8192),
+        };
         Ok(Self {
             root,
             home,
             ro_paths,
+            memory_mb,
         })
     }
 
@@ -157,6 +165,10 @@ impl Worlds {
         for p in self.ro_paths.iter().filter(|p| p.exists()) {
             cmd.arg("--ro-bind").arg(p).arg(p);
         }
+        // Granted host paths: read-write, after the hidden home they sit in.
+        for p in crate::grant::paths(self, &world.id)? {
+            cmd.arg("--bind").arg(&p).arg(&p);
+        }
         // Order matters: later mounts land on top of earlier ones. The
         // worktree's admin dir lives inside the store and stays read-only too:
         // its `commondir` file and config steer every harness git call.
@@ -169,8 +181,18 @@ impl Worlds {
             .args(["--unshare-all", "--die-with-parent", "--new-session"])
             .arg("--chdir")
             .arg(&world.path)
-            .arg("--")
-            .args(argv);
+            .arg("--");
+        // The cap is set inside the sandbox, so it binds the command and
+        // everything it spawns. Virtual memory, not RSS: the only limit a
+        // plain `ulimit` gives; generous so runtimes that reserve address
+        // space (Go, V8) still start.
+        match self.memory_mb {
+            Some(mb) => cmd
+                .args(["sh", "-c", r#"ulimit -v "$0" && exec "$@""#])
+                .arg((mb * 1024).to_string())
+                .args(argv),
+            None => cmd.args(argv),
+        };
         Ok(cmd)
     }
 
@@ -211,6 +233,11 @@ impl Worlds {
     }
 
     pub fn drop(&self, world: World) -> io::Result<()> {
+        if !crate::grant::paths(self, &world.id)?.is_empty() {
+            return Err(io::Error::other(
+                "this world has a grant: keep or revert it before dropping the world",
+            ));
+        }
         let common = self.common_dir(&world)?;
         let git_dir = format!("--git-dir={}", common.display());
         // Delete the files ourselves rather than trust `worktree remove` with a

@@ -6,6 +6,7 @@ use std::path::Path;
 use std::process::Command;
 
 use common::Fixture;
+use fennec_os::grant;
 
 #[test]
 fn rollback_restores_the_last_checkpoint() {
@@ -150,4 +151,65 @@ fn the_agent_can_still_read_git_history() {
         )
         .0
     );
+}
+
+#[test]
+fn a_command_runs_under_the_memory_cap() {
+    let mut f = Fixture::new("memory-cap");
+    let w = f.worlds.fork(&f.project.to_string_lossy()).unwrap();
+    f.worlds.memory_mb = Some(64);
+    assert_eq!(f.sh(&w, "ulimit -v"), (true, "65536".to_string()));
+    // Arguments still reach the command intact.
+    assert_eq!(f.sh(&w, "echo \"$0\""), (true, "sh".to_string()));
+    f.worlds.memory_mb = None;
+    assert_eq!(f.sh(&w, "ulimit -v"), (true, "unlimited".to_string()));
+}
+
+#[test]
+fn a_grant_lets_a_world_write_a_host_path_until_the_human_decides() {
+    let f = Fixture::new("grant");
+    let w = f.worlds.fork(&f.project.to_string_lossy()).unwrap();
+    let conf = f.worlds.home.join("conf");
+    std::fs::create_dir_all(&conf).unwrap();
+    std::fs::write(conf.join("app.cfg"), "v1\n").unwrap();
+    let cfg = || std::fs::read_to_string(conf.join("app.cfg")).unwrap();
+
+    // Without a grant the host path is not even there.
+    assert!(!f.sh(&w, &format!("echo x > {}/app.cfg", conf.display())).0);
+    assert_eq!(cfg(), "v1\n");
+
+    // The home, the store and paths outside the home are refused.
+    for bad in [&f.worlds.home, &f.worlds.root, &f.dir] {
+        assert!(grant::give(&f.worlds, &w, std::slice::from_ref(bad)).is_err());
+    }
+    grant::give(&f.worlds, &w, std::slice::from_ref(&conf)).unwrap();
+    assert!(grant::give(&f.worlds, &w, std::slice::from_ref(&conf)).is_err());
+    assert!(
+        f.sh(
+            &w,
+            &format!("echo v2 > {0}/app.cfg && echo n > {0}/new", conf.display())
+        )
+        .0
+    );
+    assert_eq!(cfg(), "v2\n");
+    let diff = grant::diff(&f.worlds, &w).unwrap();
+    assert!(
+        diff.contains("-v1") && diff.contains("+v2") && diff.contains("new"),
+        "{diff}"
+    );
+    // A world with a grant is not dropped behind the human's back.
+    assert!(f.worlds.drop(f.worlds.open(&w.id).unwrap()).is_err());
+
+    grant::revert(&f.worlds, &w).unwrap();
+    assert_eq!(cfg(), "v1\n");
+    assert!(!conf.join("new").exists());
+    // The grant is over: the path is out of reach again.
+    assert!(!f.sh(&w, &format!("echo x > {}/app.cfg", conf.display())).0);
+
+    grant::give(&f.worlds, &w, std::slice::from_ref(&conf)).unwrap();
+    assert!(f.sh(&w, &format!("echo v3 > {}/app.cfg", conf.display())).0);
+    grant::keep(&f.worlds, &w).unwrap();
+    assert_eq!(cfg(), "v3\n");
+    assert!(grant::paths(&f.worlds, &w.id).unwrap().is_empty());
+    f.worlds.drop(w).unwrap();
 }

@@ -50,6 +50,7 @@ impl Fixture {
             root: dir.join("store"),
             home,
             ro_paths: Vec::new(),
+            memory_mb: Some(8192),
         };
         Self {
             dir,
