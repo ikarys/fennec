@@ -6,6 +6,7 @@
 use std::io;
 use std::path::Path;
 
+use fennec_os::proof;
 use fennec_os::provider::{Model, OpenAi};
 use fennec_os::spec;
 use fennec_os::world::Worlds;
@@ -107,7 +108,32 @@ fn solve_now(store: &Store, id: &str) -> io::Result<()> {
         &models,
         MAX_STEPS,
     )?;
-    store.update(id, |r| apply_run(r, &record))
+    store.update(id, |r| apply_run(r, &record))?;
+    let Some(run) = record["winner"].as_str() else {
+        return Ok(());
+    };
+    // Tests passing is not "ready": the product is tried first.
+    store.update(id, |r| r["status"] = json!("proving"))?;
+    let proof = proof::gather(&worlds, run, &variants[0])?;
+    store.update(id, |r| apply_proof(r, &proof))
+}
+
+fn apply_proof(request: &mut Value, proof: &Value) {
+    request["proof"] = proof.clone();
+    let failed = proof["tries"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .find(|t| t["exit"] != 0);
+    if let Some(t) = failed {
+        request["status"] = json!("failed");
+        request["reason"] = json!(format!(
+            "les tests passent, mais l'essai a échoué : {}",
+            t["command"].as_str().unwrap_or("")
+        ));
+    } else {
+        request["status"] = json!("ready");
+    }
 }
 
 fn apply_run(request: &mut Value, record: &Value) {
@@ -128,7 +154,10 @@ fn apply_run(request: &mut Value, record: &Value) {
 /// instead of showing it in progress forever.
 pub fn recover(store: &Store) -> io::Result<()> {
     for (id, r) in store.requests()? {
-        if matches!(r["status"].as_str(), Some("framing" | "running")) {
+        if matches!(
+            r["status"].as_str(),
+            Some("framing" | "running" | "proving")
+        ) {
             store.update(&id, |r| {
                 r["status"] = json!("failed");
                 r["reason"] = json!("interrompu : fennec a été arrêté pendant le travail");
@@ -158,5 +187,18 @@ mod tests {
             (r["status"].as_str(), r["run"].as_str()),
             (Some("ready"), Some("w1"))
         );
+    }
+
+    #[test]
+    fn one_failed_try_fails_the_request() {
+        let mut r = json!({"status": "proving"});
+        apply_proof(
+            &mut r,
+            &json!({"tries": [{"command": "a", "exit": 0}, {"command": "b", "exit": 1}]}),
+        );
+        assert_eq!(r["status"], "failed");
+        assert!(r["reason"].as_str().unwrap().ends_with(": b"));
+        apply_proof(&mut r, &json!({"tries": [{"command": "a", "exit": 0}]}));
+        assert_eq!(r["status"], "ready");
     }
 }

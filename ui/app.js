@@ -34,6 +34,15 @@ function card(item) {
     for (const command of item.checks) checks.append(Object.assign(document.createElement("code"), { textContent: command }));
     el.append(checks);
   }
+  if (item.proof?.length) {
+    const proof = document.createElement("details");
+    proof.append(Object.assign(document.createElement("summary"), { textContent: "Preuve" }));
+    for (const t of item.proof) {
+      proof.append(Object.assign(document.createElement("code"), { textContent: `$ ${t.command}  → ${t.exit}` }));
+      proof.append(Object.assign(document.createElement("pre"), { textContent: t.output }));
+    }
+    el.append(proof);
+  }
   if (item.ask) el.append(answerForm(item.id));
   return el;
 }

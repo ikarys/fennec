@@ -148,13 +148,29 @@ fn classify(requests: &[(String, Value)], runs: &[Value], projects: &[String]) -
                 mine.push(c);
             }
             Some("running") => running.push(card("fennec travaille")),
-            // The tests passed; the product itself was not tried yet.
+            Some("proving") => running.push(card("fennec essaie le produit")),
             Some("ready") => {
-                let mut c = card("non vérifié : produit pas encore essayé");
+                let unverified = r["proof"]["unverified"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|u| u.as_str().map(|u| format!("non vérifié : {u}")));
+                // A run that predates the proof was never tried: say so.
+                let first = match r["proof"]["tries"].as_array().map_or(0, Vec::len) {
+                    0 => "non vérifié : produit pas encore essayé".to_string(),
+                    n => format!("Prouvé par {n} essai(s)"),
+                };
+                let lines: Vec<String> = std::iter::once(first).chain(unverified).collect();
+                let mut c = card(&lines.join("\n"));
                 c["checks"] = r["verify"].clone();
+                c["proof"] = r["proof"]["tries"].clone();
                 ready.push(c);
             }
-            Some("failed") => failed.push(card(r["reason"].as_str().unwrap_or("raison inconnue"))),
+            Some("failed") => {
+                let mut c = card(r["reason"].as_str().unwrap_or("raison inconnue"));
+                c["proof"] = r["proof"]["tries"].clone();
+                failed.push(c);
+            }
             _ => {}
         }
     }
@@ -201,6 +217,10 @@ mod tests {
                 "2".to_string(),
                 json!({"project": "/p/a", "text": "y", "status": "question", "done_when": "Q", "spec": "s1"}),
             ),
+            (
+                "3".to_string(),
+                json!({"project": "/p/a", "text": "z", "status": "ready"}),
+            ),
         ];
         let runs = [
             json!({"project": "/p/b", "goal": "g1", "status": "ready"}),
@@ -212,9 +232,13 @@ mod tests {
         assert_eq!(v["running"][0]["title"], "x");
         assert_eq!(v["mine"][0]["detail"], "Terminé quand : Q");
         assert_eq!(v["mine"][0]["id"], "2");
-        assert_eq!(v["ready"][0]["project"], "b");
+        assert_eq!(
+            v["ready"][0]["detail"],
+            "non vérifié : produit pas encore essayé"
+        );
+        assert_eq!(v["ready"][1]["project"], "b");
         assert!(
-            v["ready"][0]["detail"]
+            v["ready"][1]["detail"]
                 .as_str()
                 .unwrap()
                 .starts_with("non vérifié")
@@ -225,7 +249,7 @@ mod tests {
             .map(|k| v[*k].as_array().unwrap().len())
             .sum::<usize>();
         assert_eq!(
-            shown, 4,
+            shown, 5,
             "landed runs and runs owned by a request are not shown"
         );
         assert_eq!(v["projects"][0]["name"], "a");
