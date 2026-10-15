@@ -106,6 +106,8 @@ pub fn solve(
             .iter()
             .for_each(|k| context.push_str(&format!("  - {k}\n")));
     }
+    let said = rules::said(&project)?;
+    context.push_str(&rules::brief(&said));
     let history = review::agenda(worlds, &project.display().to_string(), 12)?;
     if !history.is_empty() {
         context.push_str("\n\nThis project's history, from earlier runs, oldest first:\n");
@@ -116,6 +118,7 @@ pub fn solve(
     let brief = &Brief {
         task,
         rules,
+        said: &said,
         context: &context,
         max_steps,
     };
@@ -240,7 +243,9 @@ fn attempts_for(
 struct Brief<'a> {
     task: &'a Task,
     rules: &'a [Rule],
-    /// Know-how and history, appended to the system prompt.
+    /// Rules said in words, numbered in `context` as given.
+    said: &'a [rules::Said],
+    /// Know-how, rules and history, appended to the system prompt.
     context: &'a str,
     max_steps: usize,
 }
@@ -264,6 +269,7 @@ fn attempt_inner(
     let Brief {
         task,
         rules,
+        said,
         context,
         max_steps,
     } = *brief;
@@ -286,6 +292,7 @@ fn attempt_inner(
         worlds, world, model, &task.goal, &criteria, &context, max_steps,
     )?;
     record["steps"] = json!(outcome.steps);
+    record["rules"] = json!(rules::used(outcome.summary.as_deref().unwrap_or(""), said));
     record["summary"] = json!(outcome.summary);
     record["messages"] = json!(outcome.messages);
     record["stuck"] = json!(outcome.stuck);
