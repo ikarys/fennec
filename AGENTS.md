@@ -11,7 +11,9 @@ Scenarios: `../lead-scenarios.md`. Inventory and decisions: `../inventory.md`.
 ## Layout
 
 ```
-src/main.rs   `fennec` binary: serves the web UI
+src/main.rs   `fennec` binary: std HTTP server, routes, folder browser
+src/state.rs  requests and projects in files; the single view (four columns)
+ui/           index.html + app.js, embedded in the binary
 ```
 
 ## Build, test, run
@@ -21,7 +23,11 @@ cargo build
 cargo test
 cargo clippy --all-targets  # must be clean
 cargo fmt --all
+fennec                      # http://127.0.0.1:7777
 ```
+
+Env: `FENNEC_LEAD_HOME` (default `~/.local/share/fennec-lead`), `FENNEC_LEAD_ADDR`
+(default `127.0.0.1:7777`), plus fennec-os's `FENNEC_OS_*`.
 
 ## Non-negotiable rules
 

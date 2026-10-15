@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fennec</title>
+<style>
+  :root { --bg: #f6f5f2; --card: #fff; --text: #1d1d1b; --muted: #6b6a66; --line: #e2e0da;
+          --accent: #c4622d; --mine: #c4622d; --ready: #2f7d4f; --running: #4a6fa5; --failed: #a33a3a; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #171716; --card: #222220; --text: #ecebe7; --muted: #9a988f; --line: #33322f;
+            --accent: #e08050; --mine: #e08050; --ready: #5fb383; --running: #7d9ccc; --failed: #d46a6a; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1200px; margin: 0 auto; padding: 24px 16px 48px; }
+  header { display: flex; align-items: baseline; gap: 16px; margin-bottom: 20px; }
+  h1 { font-size: 20px; margin: 0; letter-spacing: .02em; }
+  .muted { color: var(--muted); }
+  form { display: grid; grid-template-columns: 200px 1fr auto; gap: 8px; margin-bottom: 28px; }
+  select, textarea, button, input { font: inherit; color: inherit; background: var(--card);
+         border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  textarea { resize: vertical; min-height: 42px; }
+  button { cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.link { border: none; background: none; color: var(--accent); padding: 0; }
+  .board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  section h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; margin: 0 0 10px;
+               display: flex; gap: 8px; align-items: center; }
+  section h2 .count { color: var(--muted); font-weight: 400; }
+  section h2::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+  .card { background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--c);
+          border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+  .card .project { font-size: 12px; color: var(--muted); }
+  .card .title { margin: 2px 0 4px; overflow-wrap: anywhere; }
+  .card .detail { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+  .empty { font-size: 13px; color: var(--muted); padding: 4px 0; }
+  .error { color: var(--failed); margin: -18px 0 18px; min-height: 1em; }
+  dialog { background: var(--card); color: var(--text); border: 1px solid var(--line); border-radius: 10px;
+           width: min(560px, calc(100vw - 32px)); padding: 16px; }
+  dialog ul { list-style: none; padding: 0; margin: 10px 0; max-height: 50vh; overflow: auto; }
+  dialog li button { width: 100%; text-align: left; border: none; border-radius: 6px; }
+  dialog li button:hover { background: var(--bg); }
+  .repo { color: var(--ready); font-size: 12px; margin-left: 6px; }
+  .row { display: flex; gap: 8px; justify-content: flex-end; }
+  @media (max-width: 800px) {
+    form { grid-template-columns: 1fr; }
+    .board { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>fennec</h1>
+    <button class="link" id="add-project">+ projet</button>
+  </header>
+
+  <form id="new-request">
+    <select id="project" aria-label="Projet" required></select>
+    <textarea id="text" aria-label="Demande" placeholder="Ce que tu veux…" required></textarea>
+    <button class="primary">Demander</button>
+  </form>
+  <p class="error" id="error" role="alert"></p>
+
+  <div class="board">
+    <section style="--c: var(--mine)"><h2>À moi <span class="count" id="n-mine"></span></h2><div id="mine"></div></section>
+    <section style="--c: var(--ready)"><h2>Prêt <span class="count" id="n-ready"></span></h2><div id="ready"></div></section>
+    <section style="--c: var(--running)"><h2>En cours <span class="count" id="n-running"></span></h2><div id="running"></div></section>
+    <section style="--c: var(--failed)"><h2>Échoué <span class="count" id="n-failed"></span></h2><div id="failed"></div></section>
+  </div>
+</main>
+
+<dialog id="picker">
+  <strong>Choisir un projet</strong>
+  <div class="muted" id="picker-path"></div>
+  <ul id="picker-list"></ul>
+  <div class="row">
+    <button type="button" id="picker-cancel">Annuler</button>
+    <button type="button" class="primary" id="picker-choose">Ajouter ce dossier</button>
+  </div>
+</dialog>
+
+<script src="/app.js"></script>
+</body>
+</html>

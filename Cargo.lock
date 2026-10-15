@@ -80,6 +80,7 @@ name = "fennec-lead"
 version = "0.1.0"
 dependencies = [
  "fennec-os",
+ "serde_json",
 ]
 
 [[package]]

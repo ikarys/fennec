@@ -9,3 +9,4 @@ path = "src/main.rs"
 
 [dependencies]
 fennec-os = { path = "../fennec-os" }
+serde_json = "1.0.151"
