@@ -131,6 +131,23 @@ fn apply_proof(request: &mut Value, proof: &Value) {
             "les tests passent, mais l'essai a échoué : {}",
             t["command"].as_str().unwrap_or("")
         ));
+    } else if let Some(s) = proof["shots"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .find(|s| s["ok"] != true)
+    {
+        request["status"] = json!("failed");
+        request["reason"] = json!(format!(
+            "les tests passent, mais la page {} ne s'affiche pas : {}",
+            s["url"].as_str().unwrap_or(""),
+            s["reason"].as_str().unwrap_or("")
+        ));
+    } else if proof["passed"] == false {
+        // Rule 3: tests alone do not make a request ready.
+        request["status"] = json!("failed");
+        request["reason"] =
+            json!("les tests passent, mais fennec n'a pas su essayer le produit : aucune preuve");
     } else {
         request["status"] = json!("ready");
     }
@@ -200,5 +217,16 @@ mod tests {
         assert!(r["reason"].as_str().unwrap().ends_with(": b"));
         apply_proof(&mut r, &json!({"tries": [{"command": "a", "exit": 0}]}));
         assert_eq!(r["status"], "ready");
+        apply_proof(&mut r, &json!({"tries": [], "passed": false}));
+        assert_eq!(r["status"], "failed");
+        let blank = json!({"tries": [], "shots": [{"url": "u", "ok": false, "reason": "no text"}]});
+        apply_proof(&mut r, &blank);
+        assert_eq!(r["status"], "failed");
+        assert!(
+            r["reason"]
+                .as_str()
+                .unwrap()
+                .ends_with("u ne s'affiche pas : no text")
+        );
     }
 }

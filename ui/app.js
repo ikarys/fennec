@@ -43,6 +43,14 @@ function card(item) {
     }
     el.append(proof);
   }
+  for (const s of item.shots ?? []) {
+    if (!s.file) continue;
+    // Visible without a click: the screenshot is the proof a human reads first.
+    const link = Object.assign(document.createElement("a"), { href: `/shots/${s.file}`, target: "_blank", className: "shot" });
+    link.append(Object.assign(document.createElement("img"), { src: `/shots/${s.file}`, alt: `Capture de ${s.url}`, loading: "lazy" }));
+    link.append(Object.assign(document.createElement("small"), { textContent: s.url }));
+    el.append(link);
+  }
   if (item.ask) el.append(answerForm(item.id));
   return el;
 }

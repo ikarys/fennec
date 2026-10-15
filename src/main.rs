@@ -115,6 +115,10 @@ fn handle(mut stream: TcpStream, port: u16) -> io::Result<()> {
             "text/javascript; charset=utf-8",
             APP.as_bytes().to_vec(),
         ),
+        ("GET", path) if path.starts_with("/shots/") => match shot(&path[7..]) {
+            Ok(png) => ("200 OK", "image/png", png),
+            Err(_) => ("404 Not Found", "text/plain", b"not found".to_vec()),
+        },
         (method, path) if path.starts_with("/api/") => {
             let (status, value) = match api(method, path, &req.body) {
                 Ok(v) => ("200 OK", v),
@@ -125,6 +129,24 @@ fn handle(mut stream: TcpStream, port: u16) -> io::Result<()> {
         _ => ("404 Not Found", "text/plain", b"not found".to_vec()),
     };
     respond(&mut stream, status, kind, &body)
+}
+
+/// A proof screenshot. The name comes from the page: `<hex>-<digit>.png`
+/// only, so it cannot leave the proofs directory.
+fn shot(file: &str) -> io::Result<Vec<u8>> {
+    let valid = file
+        .strip_suffix(".png")
+        .and_then(|f| f.split_once('-'))
+        .is_some_and(|(id, n)| {
+            !id.is_empty()
+                && id.bytes().all(|b| b.is_ascii_hexdigit())
+                && n.len() == 1
+                && n.as_bytes()[0].is_ascii_digit()
+        });
+    if !valid {
+        return Err(io::Error::other("bad name"));
+    }
+    std::fs::read(Worlds::from_env()?.root.join("proofs").join(file))
 }
 
 fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {

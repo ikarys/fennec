@@ -156,19 +156,24 @@ fn classify(requests: &[(String, Value)], runs: &[Value], projects: &[String]) -
                     .flatten()
                     .filter_map(|u| u.as_str().map(|u| format!("non vérifié : {u}")));
                 // A run that predates the proof was never tried: say so.
-                let first = match r["proof"]["tries"].as_array().map_or(0, Vec::len) {
-                    0 => "non vérifié : produit pas encore essayé".to_string(),
-                    n => format!("Prouvé par {n} essai(s)"),
+                let count = |k: &str| r["proof"][k].as_array().map_or(0, Vec::len);
+                let first = match (count("tries"), count("shots")) {
+                    (0, 0) => "non vérifié : produit pas encore essayé".to_string(),
+                    (n, 0) => format!("Prouvé par {n} essai(s)"),
+                    (0, s) => format!("Prouvé par {s} capture(s) d'écran"),
+                    (n, s) => format!("Prouvé par {n} essai(s) et {s} capture(s) d'écran"),
                 };
                 let lines: Vec<String> = std::iter::once(first).chain(unverified).collect();
                 let mut c = card(&lines.join("\n"));
                 c["checks"] = r["verify"].clone();
                 c["proof"] = r["proof"]["tries"].clone();
+                c["shots"] = r["proof"]["shots"].clone();
                 ready.push(c);
             }
             Some("failed") => {
                 let mut c = card(r["reason"].as_str().unwrap_or("raison inconnue"));
                 c["proof"] = r["proof"]["tries"].clone();
+                c["shots"] = r["proof"]["shots"].clone();
                 failed.push(c);
             }
             _ => {}
