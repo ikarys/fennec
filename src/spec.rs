@@ -10,7 +10,7 @@ use serde_json::{Value, json};
 
 use crate::agent;
 use crate::provider::Model;
-use crate::review::normalise;
+use crate::review::{self, normalise};
 use crate::rules::{self, HARNESS_DIR, Kind, Rule};
 use crate::solve::{self, Task};
 use crate::world::{World, Worlds};
@@ -306,6 +306,38 @@ pub fn accept(
     models: &[&dyn Model],
     max_steps: usize,
 ) -> io::Result<Value> {
+    solve_spec(worlds, id, "", models, max_steps)
+}
+
+/// Solves a spec again after its run failed, possibly after it was called a
+/// winner (its product failed the proof): that run is dropped, and attempts
+/// start from the tests again, told why the last one failed.
+pub fn retry(
+    worlds: &Worlds,
+    id: &str,
+    why: &str,
+    models: &[&dyn Model],
+    max_steps: usize,
+) -> io::Result<Value> {
+    let mut spec = load(worlds, id)?;
+    if spec["status"] == "accepted" {
+        if let Some(run) = spec["run"].as_str() {
+            review::reject(worlds, run, None)?;
+        }
+        spec["status"] = json!("proposed");
+        save(worlds, id, &spec)?;
+    }
+    let why = format!("\n\nAn earlier solution failed: {why}\nDo not repeat it.");
+    solve_spec(worlds, id, &why, models, max_steps)
+}
+
+fn solve_spec(
+    worlds: &Worlds,
+    id: &str,
+    why: &str,
+    models: &[&dyn Model],
+    max_steps: usize,
+) -> io::Result<Value> {
     let mut spec = load(worlds, id)?;
     if spec["status"] != "proposed" {
         return Err(io::Error::other(format!("spec {id} is {}", spec["status"])));
@@ -321,7 +353,7 @@ pub fn accept(
     let answers = spec["answers"].as_array().cloned().unwrap_or_default();
     let task = Task {
         goal: format!(
-            "{}{}",
+            "{}{}{why}",
             spec["goal"].as_str().unwrap_or(""),
             answered(&answers)
         ),
@@ -334,10 +366,11 @@ pub fn accept(
     let record = solve::solve(worlds, &project, &task, models, max_steps)?;
     spec["status"] = json!("accepted");
     spec["run"] = record["winner"].clone();
-    // The winner carries the tests; without one, the spec stays to retry.
-    if record["winner"].is_string() {
-        worlds.drop(worlds.open(id)?)?;
-    } else {
+    // The spec's world stays until the run lands (`solve::land`): a winner
+    // whose product fails later is retried from the tests.
+    // ponytail: a run never landed nor retried keeps its spec world; a sweep
+    // can drop them once requests can be closed.
+    if !record["winner"].is_string() {
         spec["status"] = json!("proposed");
     }
     save(worlds, id, &spec)?;

@@ -642,6 +642,26 @@ fn a_request_compiles_to_failing_tests_that_the_solution_must_pass() {
     assert_eq!(record["spec"], json!(id));
     assert_eq!(attempts[1]["changed_lines"], 1);
 
+    // The winner's product failed later: retried from the tests, told why.
+    let first = record["winner"].as_str().unwrap().to_string();
+    let spy = Spy(Mutex::new(String::new()));
+    let again = spec::retry(&f.worlds, &id, "the page renders no text", &[&spy], 10).unwrap();
+    assert!(
+        again["goal"]
+            .as_str()
+            .unwrap()
+            .ends_with("An earlier solution failed: the page renders no text\nDo not repeat it."),
+        "{again:#}"
+    );
+    assert_eq!(
+        review::load(&f.worlds, &first).unwrap()["status"],
+        "rejected"
+    );
+    assert!(f.worlds.open(&first).is_err());
+    let honest = Script::new("honest", &[write("answer", "42\n"), done()]);
+    let record = spec::retry(&f.worlds, &id, "x", &[&honest], 10).unwrap();
+    assert!(record["winner"].is_string(), "{record:#}");
+
     land(&f.worlds, record["winner"].as_str().unwrap()).unwrap();
     assert!(f.project.join("spec.sh").exists());
     assert!(f.worlds.list().unwrap().is_empty());

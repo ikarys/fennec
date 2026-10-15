@@ -455,6 +455,12 @@ pub fn land(worlds: &Worlds, id: &str) -> io::Result<String> {
     git(project, &["merge", "-q", "--ff-only", &commit])?;
     let _ = std::fs::remove_file(&marker);
     worlds.drop(world)?;
+    // The spec's world is kept for a retry until its run lands.
+    if let Some(spec) = review::load(worlds, id)?["spec"].as_str()
+        && let Ok(tests) = worlds.open(spec)
+    {
+        worlds.drop(tests)?;
+    }
     review::set_status(worlds, id, "landed")?;
     Ok(commit)
 }
