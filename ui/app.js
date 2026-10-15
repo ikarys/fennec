@@ -55,6 +55,7 @@ function card(item) {
   if (item.reply) el.append(replyForm(item.id));
   if (item.rule) el.append(ruleForm(item.id));
   if (item.retry) el.append(retryForm(item.id));
+  if (item.land !== undefined) el.append(landForm(item.id, item.land));
   return el;
 }
 
@@ -125,6 +126,32 @@ function ruleForm(id) {
     };
     row.append(button);
   }
+  form.append(row, error);
+  return form;
+}
+
+// The work becomes one commit on the project's current branch, named here
+// so the human sees where it goes before clicking.
+function landForm(id, branch) {
+  const form = document.createElement("form");
+  form.className = "answer";
+  const error = Object.assign(document.createElement("div"), { className: "error" });
+  const button = Object.assign(document.createElement("button"), {
+    type: "submit", className: "primary",
+    textContent: branch ? `Intégrer dans ${branch}` : "Intégrer",
+  });
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    error.textContent = "";
+    try {
+      await api("/api/land", { id });
+      refresh(true);
+    } catch (err) {
+      error.textContent = err.message;
+    }
+  };
+  const row = Object.assign(document.createElement("div"), { className: "row" });
+  row.append(button);
   form.append(row, error);
   return form;
 }

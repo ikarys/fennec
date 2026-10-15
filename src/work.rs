@@ -8,7 +8,7 @@ use std::path::Path;
 
 use fennec_os::provider::{Model, OpenAi};
 use fennec_os::world::Worlds;
-use fennec_os::{proof, rules, spec};
+use fennec_os::{proof, rules, solve, spec};
 use serde_json::{Value, json};
 
 use crate::state::Store;
@@ -330,6 +330,47 @@ fn apply_run(request: &mut Value, record: &Value) {
     }
 }
 
+/// "Intégrer" on a ready request: its work becomes one commit on the
+/// project's current branch, with a message the model writes from the
+/// project's conventions. A landing that fails leaves the request ready,
+/// with the reason, since the work itself still holds.
+pub fn land(store: &Store, id: &str) -> io::Result<()> {
+    let request = store.load(id)?;
+    if request["status"] != "ready" || !request["run"].is_string() {
+        return Err(io::Error::other("cette demande n'est pas prête à intégrer"));
+    }
+    store.update(id, |r| {
+        r["status"] = json!("landing");
+        if let Some(m) = r.as_object_mut() {
+            m.remove("land_error");
+        }
+    })?;
+    spawn(id.to_string(), land_now);
+    Ok(())
+}
+
+fn land_now(store: &Store, id: &str) -> io::Result<()> {
+    let request = store.load(id)?;
+    let run = request["run"].as_str().unwrap_or("");
+    let worlds = Worlds::from_env()?;
+    let landed = OpenAi::variants_from_env(1).and_then(|mut m| {
+        // No message from the model: the goal's first line will do.
+        let message = solve::message(&worlds, run, &m.remove(0)).ok().flatten();
+        solve::land(&worlds, run, message.as_deref()).map(|c| (c, message))
+    });
+    store.update(id, |r| match landed {
+        Ok((commit, message)) => {
+            r["status"] = json!("landed");
+            r["commit"] = json!(commit);
+            r["message"] = json!(message);
+        }
+        Err(e) => {
+            r["status"] = json!("ready");
+            r["land_error"] = json!(e.to_string());
+        }
+    })
+}
+
 /// Work that was running when the server stopped will not resume: say so
 /// instead of showing it in progress forever.
 pub fn recover(store: &Store) -> io::Result<()> {
@@ -341,6 +382,11 @@ pub fn recover(store: &Store) -> io::Result<()> {
             store.update(&id, |r| {
                 r["status"] = json!("failed");
                 r["reason"] = json!("interrompu : fennec a été arrêté pendant le travail");
+            })?;
+        } else if r["status"] == "landing" {
+            store.update(&id, |r| {
+                r["status"] = json!("ready");
+                r["land_error"] = json!("interrompu : fennec a été arrêté pendant l'intégration");
             })?;
         }
     }
