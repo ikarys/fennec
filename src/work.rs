@@ -6,10 +6,9 @@
 use std::io;
 use std::path::Path;
 
-use fennec_os::proof;
 use fennec_os::provider::{Model, OpenAi};
-use fennec_os::spec;
 use fennec_os::world::Worlds;
+use fennec_os::{proof, rules, spec};
 use serde_json::{Value, json};
 
 use crate::state::Store;
@@ -47,6 +46,7 @@ fn frame_now(store: &Store, id: &str) -> io::Result<()> {
     let request = store.load(id)?;
     let worlds = Worlds::from_env()?;
     let model = OpenAi::variants_from_env(1)?.remove(0);
+    offer_rule(store, id, &request, &model)?;
     let s = spec::compile(
         &worlds,
         Path::new(request["project"].as_str().unwrap_or("")),
@@ -56,6 +56,7 @@ fn frame_now(store: &Store, id: &str) -> io::Result<()> {
     )?;
     store.update(id, |r| {
         r["spec"] = s["world"].clone();
+        r["rules"] = s["rules"].clone();
         if s["status"] == "proposed" {
             r["status"] = json!("question");
             r["done_when"] = s["goal"].clone();
@@ -93,10 +94,59 @@ pub fn answer(store: &Store, id: &str, accept: bool, correction: &str) -> io::Re
             request["spec"].as_str().unwrap_or(""),
             Some(correction),
         )?;
-        store.update(id, |r| r["status"] = json!("framing"))?;
+        store.update(id, |r| {
+            r["status"] = json!("framing");
+            r["heard"] = json!(correction);
+        })?;
         frame(id.to_string());
     }
     Ok(())
+}
+
+/// What the human just said (a correction, an answer) may hold beyond this
+/// request: if the model thinks so, it is offered as a rule in "À moi". The
+/// human decides; a model error only means no offer.
+fn offer_rule(store: &Store, id: &str, request: &Value, model: &dyn Model) -> io::Result<()> {
+    let Some(heard) = request["heard"].as_str() else {
+        return Ok(());
+    };
+    let project = Path::new(request["project"].as_str().unwrap_or(""));
+    let known = rules::said(project).unwrap_or_default();
+    let offer = rules::propose(model, request["text"].as_str().unwrap_or(""), heard)
+        .ok()
+        .flatten()
+        .filter(|rule| !known.iter().any(|k| &k.text == rule));
+    store.update(id, |r| {
+        if let Some(m) = r.as_object_mut() {
+            m.remove("heard");
+        }
+        if let Some(rule) = offer {
+            r["offer"] = json!({"rule": rule, "heard": heard});
+        }
+    })
+}
+
+/// The human's one word on an offered rule: `user` (every project),
+/// `project`, or `no`.
+pub fn rule(store: &Store, id: &str, scope: &str) -> io::Result<()> {
+    let request = store.load(id)?;
+    let Some(text) = request["offer"]["rule"].as_str() else {
+        return Err(io::Error::other("aucune règle proposée"));
+    };
+    match scope {
+        "user" | "project" => rules::say(
+            Path::new(request["project"].as_str().unwrap_or("")),
+            scope,
+            text,
+        )?,
+        "no" => {}
+        _ => return Err(io::Error::other("choix inconnu")),
+    }
+    store.update(id, |r| {
+        if let Some(m) = r.as_object_mut() {
+            m.remove("offer");
+        }
+    })
 }
 
 /// A stopped agent's question goes to the human instead of a failure.
@@ -127,10 +177,16 @@ pub fn reply(store: &Store, id: &str, text: &str) -> io::Result<()> {
     // ponytail: the step restarts from scratch with the answer; resuming the
     // stopped conversation would save its steps.
     if request["stage"] == "framing" {
-        store.update(id, |r| r["status"] = json!("framing"))?;
+        store.update(id, |r| {
+            r["status"] = json!("framing");
+            r["heard"] = json!(text);
+        })?;
         frame(id.to_string());
     } else {
-        store.update(id, |r| r["status"] = json!("running"))?;
+        store.update(id, |r| {
+            r["status"] = json!("running");
+            r["heard"] = json!(text);
+        })?;
         spawn(id.to_string(), solve_now);
     }
     Ok(())
@@ -140,6 +196,7 @@ fn solve_now(store: &Store, id: &str) -> io::Result<()> {
     let request = store.load(id)?;
     let worlds = Worlds::from_env()?;
     let variants = OpenAi::variants_from_env(attempts())?;
+    offer_rule(store, id, &request, &variants[0])?;
     let models: Vec<&dyn Model> = variants.iter().map(|m| m as &dyn Model).collect();
     let record = spec::accept(
         &worlds,
@@ -193,6 +250,23 @@ fn apply_proof(request: &mut Value, proof: &Value) {
 }
 
 fn apply_run(request: &mut Value, record: &Value) {
+    // The rules each step says it applied: framing's, then the solution's.
+    let mut used: Vec<Value> = request["rules"].as_array().cloned().unwrap_or_default();
+    let solving = record["attempts"]
+        .as_array()
+        .and_then(|a| {
+            a.iter().find(|t| {
+                (record["winner"].is_string() && t["world"] == record["winner"])
+                    || t["question"].is_string()
+            })
+        })
+        .and_then(|t| t["rules"].as_array());
+    for rule in solving.into_iter().flatten() {
+        if !used.contains(rule) {
+            used.push(rule.clone());
+        }
+    }
+    request["rules"] = json!(used);
     if record["winner"].is_string() {
         request["status"] = json!("ready");
         request["run"] = record["winner"].clone();
@@ -248,6 +322,40 @@ mod tests {
         assert_eq!(r["stage"], "solving");
         assert_eq!(r["question"], "Which port?");
         assert_eq!(r["reason"], "stuck: x");
+    }
+
+    #[test]
+    fn rules_used_while_framing_and_solving_are_kept_once() {
+        let mut r = json!({"status": "running", "rules": ["use uv"]});
+        apply_run(
+            &mut r,
+            &json!({"winner": "w2", "attempts": [{"world": "w1", "rules": ["x"]}, {"world": "w2", "rules": ["use uv", "short output"]}]}),
+        );
+        assert_eq!(r["rules"], json!(["use uv", "short output"]));
+    }
+
+    #[test]
+    fn a_confirmed_rule_is_written_where_other_tools_read_it() {
+        let root = std::env::temp_dir().join(format!("fennec-lead-rule-{}", std::process::id()));
+        let project = root.join("p");
+        std::fs::create_dir_all(root.join("requests")).unwrap();
+        std::fs::create_dir_all(&project).unwrap();
+        let store = Store { root: root.clone() };
+        let id = "ab";
+        std::fs::write(
+            root.join("requests/ab.json"),
+            json!({"project": project, "text": "t", "status": "ready", "offer": {"rule": "use uv", "heard": "non, uv"}}).to_string(),
+        )
+        .unwrap();
+        assert!(rule(&store, id, "maybe").is_err());
+        rule(&store, id, "project").unwrap();
+        assert_eq!(
+            std::fs::read_to_string(project.join("AGENTS.md")).unwrap(),
+            "## Rules\n\n- use uv\n"
+        );
+        assert!(store.load(id).unwrap().get("offer").is_none());
+        assert!(rule(&store, id, "no").is_err(), "an offer is answered once");
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

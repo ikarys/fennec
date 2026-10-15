@@ -138,11 +138,31 @@ fn classify(requests: &[(String, Value)], runs: &[Value], projects: &[String]) -
     let (mut mine, mut ready, mut running, mut failed) = (vec![], vec![], vec![], vec![]);
     for (id, r) in requests {
         let card = |detail: &str| json!({"id": id, "project": name(r["project"].as_str().unwrap_or("")), "title": r["text"], "detail": detail});
+        // Scenario 4: what the human said may become a rule, at one word.
+        if let Some(rule) = r["offer"]["rule"].as_str() {
+            let mut c = card(&format!(
+                "Règle proposée : {rule}\n(d'après ce que tu as dit : « {} »)",
+                r["offer"]["heard"].as_str().unwrap_or("")
+            ));
+            c["rule"] = json!(true);
+            mine.push(c);
+        }
+        let applied = r["rules"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|u| u.as_str().map(|u| format!("Règle appliquée : {u}")));
+        let with_rules = |first: String| -> String {
+            std::iter::once(first)
+                .chain(applied.clone())
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
         match r["status"].as_str() {
             Some("framing") => running.push(card("fennec prépare « terminé quand »")),
             Some("question") => {
                 let done_when = r["done_when"].as_str().unwrap_or("");
-                let mut c = card(&format!("Terminé quand : {done_when}"));
+                let mut c = card(&with_rules(format!("Terminé quand : {done_when}")));
                 c["checks"] = r["verify"].clone();
                 c["ask"] = json!(true);
                 mine.push(c);
@@ -172,7 +192,9 @@ fn classify(requests: &[(String, Value)], runs: &[Value], projects: &[String]) -
                     (0, s) => format!("Prouvé par {s} capture(s) d'écran"),
                     (n, s) => format!("Prouvé par {n} essai(s) et {s} capture(s) d'écran"),
                 };
-                let lines: Vec<String> = std::iter::once(first).chain(unverified).collect();
+                let lines: Vec<String> = std::iter::once(with_rules(first))
+                    .chain(unverified)
+                    .collect();
                 let mut c = card(&lines.join("\n"));
                 c["checks"] = r["verify"].clone();
                 c["proof"] = r["proof"]["tries"].clone();
@@ -233,7 +255,7 @@ mod tests {
             ),
             (
                 "3".to_string(),
-                json!({"project": "/p/a", "text": "z", "status": "ready"}),
+                json!({"project": "/p/a", "text": "z", "status": "ready", "rules": ["use uv"], "offer": {"rule": "never touch develop", "heard": "pas develop !"}}),
             ),
             (
                 "4".to_string(),
@@ -251,13 +273,18 @@ mod tests {
         assert_eq!(v["mine"][0]["detail"], "Terminé quand : Q");
         assert_eq!(v["mine"][0]["id"], "2");
         assert_eq!(
-            v["mine"][1]["detail"],
+            v["mine"][2]["detail"],
             "Question : Q?\n(fennec s'est arrêté : stuck)"
         );
-        assert_eq!(v["mine"][1]["reply"], true);
+        assert_eq!(v["mine"][2]["reply"], true);
+        assert_eq!(
+            v["mine"][1]["detail"],
+            "Règle proposée : never touch develop\n(d'après ce que tu as dit : « pas develop ! »)"
+        );
+        assert_eq!(v["mine"][1]["rule"], true);
         assert_eq!(
             v["ready"][0]["detail"],
-            "non vérifié : produit pas encore essayé"
+            "non vérifié : produit pas encore essayé\nRègle appliquée : use uv"
         );
         assert_eq!(v["ready"][1]["project"], "b");
         assert!(
@@ -272,7 +299,7 @@ mod tests {
             .map(|k| v[*k].as_array().unwrap().len())
             .sum::<usize>();
         assert_eq!(
-            shown, 6,
+            shown, 7,
             "landed runs and runs owned by a request are not shown"
         );
         assert_eq!(v["projects"][0]["name"], "a");

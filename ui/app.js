@@ -53,6 +53,7 @@ function card(item) {
   }
   if (item.ask) el.append(answerForm(item.id));
   if (item.reply) el.append(replyForm(item.id));
+  if (item.rule) el.append(ruleForm(item.id));
   return el;
 }
 
@@ -101,6 +102,29 @@ function replyForm(id) {
   const row = Object.assign(document.createElement("div"), { className: "row" });
   row.append(send);
   form.append(text, row, error);
+  return form;
+}
+
+// An offered rule: one click says where it holds, or that it does not.
+function ruleForm(id) {
+  const form = document.createElement("form");
+  form.className = "answer";
+  const error = Object.assign(document.createElement("div"), { className: "error" });
+  const row = Object.assign(document.createElement("div"), { className: "row" });
+  for (const [scope, label, primary] of [["no", "Non"], ["project", "Pour ce projet"], ["user", "Pour moi (tous projets)", true]]) {
+    const button = Object.assign(document.createElement("button"), { type: "button", textContent: label, className: primary ? "primary" : "" });
+    button.onclick = async () => {
+      error.textContent = "";
+      try {
+        await api("/api/rule", { id, scope });
+        refresh(true);
+      } catch (e) {
+        error.textContent = e.message;
+      }
+    };
+    row.append(button);
+  }
+  form.append(row, error);
   return form;
 }
 

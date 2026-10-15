@@ -172,6 +172,11 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
             work::reply(&store, &field(&v, "id"), &field(&v, "text"))?;
             Ok(json!({}))
         }
+        ("POST", "/api/rule") => {
+            let v = input()?;
+            work::rule(&store, &field(&v, "id"), &field(&v, "scope"))?;
+            Ok(json!({}))
+        }
         ("POST", "/api/projects") => {
             store.add_project(&field(&input()?, "path"))?;
             Ok(json!({}))
