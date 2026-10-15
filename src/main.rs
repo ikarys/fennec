@@ -157,7 +157,7 @@ goal: {}",
                 "spec {id}\n  read:   fennec-os spec show {id}\n  build:  fennec-os spec accept {id} [--attempts N]\n  refuse: fennec-os spec reject {id} [correction]"
             );
         }
-        "land" if args.len() == 2 => println!("{}", land(&worlds, arg(1))?),
+        "land" if args.len() == 2 => println!("{}", land(&worlds, arg(1), None)?),
         "queue" if args.len() == 1 => {
             for (id, r) in review::queue(&worlds)? {
                 let goal = r["goal"]

@@ -131,14 +131,21 @@ fn the_smallest_passing_world_wins_and_lands() {
     // Losers are gone; only the winner waits for landing.
     assert_eq!(f.worlds.list().unwrap(), vec![winner.clone()]);
 
-    let commit = land(&f.worlds, &winner).unwrap();
+    let before = git(&f, &["rev-parse", "HEAD"]);
+    let commit = land(&f.worlds, &winner, Some("feat: write the answer")).unwrap();
     assert_eq!(git(&f, &["rev-parse", "HEAD"]), commit);
+    // One commit, the human's, without the harness's checkpoints.
+    assert_eq!(git(&f, &["rev-parse", "HEAD~1"]), before);
+    assert_eq!(
+        git(&f, &["log", "-1", "--format=%an <%ae> %cn|%s"]),
+        "Human <human@example.com> Human|feat: write the answer"
+    );
     assert_eq!(
         std::fs::read_to_string(f.project.join("answer")).unwrap(),
         "42\n"
     );
     assert!(f.worlds.list().unwrap().is_empty());
-    assert!(land(&f.worlds, &winner).is_err());
+    assert!(land(&f.worlds, &winner, None).is_err());
 }
 
 #[test]
@@ -162,7 +169,7 @@ fn a_world_touched_after_its_verdict_cannot_land() {
     let id = record["winner"].as_str().unwrap();
     let world = f.worlds.open(id).unwrap();
     assert!(f.sh(&world, "echo sneaky > extra").0);
-    assert!(land(&f.worlds, id).is_err());
+    assert!(land(&f.worlds, id, None).is_err());
     assert!(!f.project.join("answer").exists());
 }
 
@@ -224,7 +231,7 @@ fn a_world_rebases_and_reverifies_when_the_project_moved() {
     );
     let moved = git(&f, &["rev-parse", "HEAD"]);
 
-    let commit = land(&f.worlds, id).unwrap();
+    let commit = land(&f.worlds, id, None).unwrap();
     assert_ne!(commit, record["attempts"][0]["commit"]);
     assert_eq!(git(&f, &["rev-parse", "HEAD~1"]), moved);
     assert_eq!(
@@ -256,10 +263,10 @@ fn a_rebase_that_breaks_the_checks_does_not_land() {
     );
     let head = git(&f, &["rev-parse", "HEAD"]);
 
-    let err = land(&f.worlds, id).unwrap_err().to_string();
+    let err = land(&f.worlds, id, None).unwrap_err().to_string();
     assert!(err.contains("verify failed after rebase"), "{err}");
     assert_eq!(git(&f, &["rev-parse", "HEAD"]), head);
-    assert!(land(&f.worlds, id).is_err());
+    assert!(land(&f.worlds, id, None).is_err());
 }
 
 fn commit_rules(f: &Fixture, rules: Value) {
@@ -384,7 +391,7 @@ fn a_new_run_starts_from_the_project_history() {
     let f = fixture("agenda");
     let tight = Script::new("tight", &[write("answer", "42\n"), done()]);
     let first = solve(&f.worlds, &f.project, &task(&[]), &[&tight], 10).unwrap();
-    land(&f.worlds, first["winner"].as_str().unwrap()).unwrap();
+    land(&f.worlds, first["winner"].as_str().unwrap(), None).unwrap();
     let again = Script::new(
         "again",
         &[write("answer", "42\n"), write("x", "1\n"), done()],
@@ -429,7 +436,7 @@ fn sleep_proposes_know_how_that_a_human_keeps() {
     let f = fixture("sleep");
     let tight = Script::new("tight", &[write("answer", "42\n"), done()]);
     let run = solve(&f.worlds, &f.project, &task(&[]), &[&tight], 10).unwrap();
-    land(&f.worlds, run["winner"].as_str().unwrap()).unwrap();
+    land(&f.worlds, run["winner"].as_str().unwrap(), None).unwrap();
 
     let new = sleep::sleep(&f.worlds, &Distiller).unwrap();
     let texts: Vec<&str> = new.iter().map(|c| c["text"].as_str().unwrap()).collect();
@@ -499,7 +506,7 @@ fn a_landed_goal_comes_back_as_a_replay_without_the_model() {
     let f = fixture("recipe");
     let first = Script::new("first", &[write("answer", "42\n"), done()]);
     let record = solve(&f.worlds, &f.project, &task(&[]), &[&first], 10).unwrap();
-    land(&f.worlds, record["winner"].as_str().unwrap()).unwrap();
+    land(&f.worlds, record["winner"].as_str().unwrap(), None).unwrap();
     commit_file(&f, "answer", "0\n");
 
     // Same goal again: the recipe passes, the model is never called.
@@ -513,7 +520,7 @@ fn a_landed_goal_comes_back_as_a_replay_without_the_model() {
             .unwrap()
             .starts_with("recipe:")
     );
-    land(&f.worlds, record["winner"].as_str().unwrap()).unwrap();
+    land(&f.worlds, record["winner"].as_str().unwrap(), None).unwrap();
 
     // The project moved on: the replay fails its checks and the model runs.
     commit_file(&f, "check.sh", "grep -qx 43 answer\n");
@@ -662,7 +669,7 @@ fn a_request_compiles_to_failing_tests_that_the_solution_must_pass() {
     let record = spec::retry(&f.worlds, &id, "x", &[&honest], 10).unwrap();
     assert!(record["winner"].is_string(), "{record:#}");
 
-    land(&f.worlds, record["winner"].as_str().unwrap()).unwrap();
+    land(&f.worlds, record["winner"].as_str().unwrap(), None).unwrap();
     assert!(f.project.join("spec.sh").exists());
     assert!(f.worlds.list().unwrap().is_empty());
     assert_eq!(spec::load(&f.worlds, &id).unwrap()["status"], "accepted");

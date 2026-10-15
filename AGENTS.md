@@ -16,7 +16,7 @@ src/grant.rs     human-issued grant: a world writes named host paths, backed up 
 src/provider.rs  `Model` trait + OpenAI-compatible client
 src/recipe.rs    replay a landed run's tool calls when the same goal returns
 src/agent.rs     tool loop; every tool runs inside the sandbox; loops, idle runs and hung commands are stopped
-src/solve.rs     task → N worlds → verify → select → land (rebase + re-verify)
+src/solve.rs     task → N worlds → verify → select → land (rebase + re-verify, one commit by the human)
 src/spec.rs      request → acceptance tests + task (intent compiler), human-validated; retry from the tests
 src/proof.rs     a ready run used as its user would: model proposes tries and pages, harness runs and screenshots them
 src/rules.rs     project rules (`.fennec-os/rules.json` at HEAD), glob matching; rules said in words
