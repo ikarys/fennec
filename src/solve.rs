@@ -398,10 +398,60 @@ pub(crate) fn verify(
     Ok((checks, (!all_pass).then_some("verify failed")))
 }
 
-/// Lands a world that passed onto the project, then drops the world. If the
-/// project moved since the fork, the world is rebased and verified again:
-/// a rebased tree is a new tree. Refuses a world changed since its verdict.
-pub fn land(worlds: &Worlds, id: &str) -> io::Result<String> {
+const MESSAGE: &str = "Write the git commit message for the change below, the way this \
+project writes them: follow its conventions and rules and the style of its recent subjects. \
+Reply with the message only, no fences, no commentary.";
+
+/// A commit message for landing run `id`, written by the model from the
+/// project's conventions; `None` when the model gives nothing usable, so the
+/// caller falls back to the goal.
+pub fn message(worlds: &Worlds, id: &str, model: &dyn Model) -> io::Result<Option<String>> {
+    let record = review::load(worlds, id)?;
+    let project = Path::new(record["project"].as_str().unwrap_or(""));
+    let diff: String = record["attempts"]
+        .as_array()
+        .and_then(|a| a.iter().find(|t| t["world"] == id))
+        .and_then(|t| t["diff"].as_str())
+        .unwrap_or("")
+        .chars()
+        .take(8000)
+        .collect();
+    let agents: String = std::fs::read_to_string(project.join("AGENTS.md"))
+        .unwrap_or_default()
+        .chars()
+        .take(6000)
+        .collect();
+    let said: Vec<String> = rules::said(project)?.into_iter().map(|s| s.text).collect();
+    let recent = git(project, &["log", "-10", "--format=%s"]).unwrap_or_default();
+    let request = format!(
+        "Project conventions (AGENTS.md):\n{agents}\n\nRules:\n{}\n\nRecent subjects:\n{recent}\n\nGoal:\n{}\n\nChange:\n{diff}",
+        said.join("\n"),
+        record["goal"].as_str().unwrap_or("")
+    );
+    let messages = [
+        json!({"role": "system", "content": MESSAGE}),
+        json!({"role": "user", "content": request}),
+    ];
+    let reply = model.chat(&messages, &json!([]))?;
+    let content = reply["content"].as_str().unwrap_or("");
+    let text = content
+        .rsplit("</think>")
+        .next()
+        .unwrap_or(content)
+        .trim()
+        .trim_start_matches("```")
+        .trim_end_matches("```")
+        .trim();
+    Ok((!text.is_empty()).then(|| text.to_string()))
+}
+
+/// Lands a world that passed onto the project as one commit, then drops the
+/// world. If the project moved since the fork, the world is rebased and
+/// verified again: a rebased tree is a new tree. Refuses a world changed
+/// since its verdict. The commit is the human's: the project's own git
+/// identity, `message` or else the goal's first line; the harness's
+/// checkpoints stay behind.
+pub fn land(worlds: &Worlds, id: &str, message: Option<&str>) -> io::Result<String> {
     let world = worlds.open(id)?;
     let marker = worlds.root.join("passed").join(id);
     let text = std::fs::read_to_string(&marker)
@@ -452,7 +502,32 @@ pub fn land(worlds: &Worlds, id: &str) -> io::Result<String> {
             )));
         }
     }
-    git(project, &["merge", "-q", "--ff-only", &commit])?;
+    let goal = review::load(worlds, id)?["goal"]
+        .as_str()
+        .unwrap_or("")
+        .lines()
+        .next()
+        .unwrap_or("")
+        .to_string();
+    let message = message
+        .map(str::trim)
+        .filter(|m| !m.is_empty())
+        .unwrap_or(&goal);
+    // commit-tree, not commit: no hook runs, the project's worktree is not
+    // touched until the fast-forward below.
+    let squashed = git(
+        project,
+        &[
+            "commit-tree",
+            &format!("{commit}^{{tree}}"),
+            "-p",
+            &head,
+            "-m",
+            message,
+        ],
+    )?;
+    git(project, &["merge", "-q", "--ff-only", &squashed])?;
+    let commit = squashed;
     let _ = std::fs::remove_file(&marker);
     worlds.drop(world)?;
     // The spec's world is kept for a retry until its run lands.

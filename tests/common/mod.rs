@@ -24,6 +24,9 @@ impl Fixture {
         std::fs::write(project.join("README"), "hello\n").unwrap();
         for args in [
             &["init", "-q", "-b", "main"][..],
+            // The human's identity: landed work is theirs.
+            &["config", "user.name", "Human"],
+            &["config", "user.email", "human@example.com"],
             &["add", "-A"],
             &[
                 "-c",
