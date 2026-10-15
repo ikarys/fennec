@@ -148,6 +148,7 @@ fn check(
         max_steps,
     )?;
     spec["steps"] = json!(outcome.steps);
+    spec["stuck"] = json!(outcome.stuck);
     let summary = outcome.summary.unwrap_or_default();
     spec["summary"] = json!(summary);
 
@@ -166,10 +167,8 @@ fn check(
     spec["goal"] = json!(goal);
     spec["verify"] = json!(verify);
 
-    let reason = if changed.is_empty() && outcome.steps >= max_steps {
-        Some(format!(
-            "stopped after {max_steps} steps without writing a test"
-        ))
+    let reason = if let (true, Some(why)) = (changed.is_empty(), &outcome.stuck) {
+        Some(format!("{why}; no test was written"))
     } else if changed.is_empty() {
         Some("no test was written".to_string())
     } else if goal.is_empty() || verify.is_empty() {

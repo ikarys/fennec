@@ -176,6 +176,32 @@ fn a_model_that_stops_answering_is_a_failed_attempt() {
 }
 
 #[test]
+fn a_model_in_a_loop_is_told_then_stopped() {
+    let f = fixture("loop");
+    let same = ("shell", json!({"command": "cat check.sh"}));
+    let looping = Script::new("loop", &vec![same; 6]);
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&looping], 20).unwrap();
+    let attempt = &record["attempts"][0];
+    let reason = attempt["reason"].as_str().unwrap();
+    assert!(
+        reason.starts_with("stuck: the same call gave the same result 5 times"),
+        "{reason}"
+    );
+    assert!(reason.contains("`cat check.sh`"), "{reason}");
+    let told = attempt["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|m| {
+            m["content"]
+                .as_str()
+                .is_some_and(|c| c.contains("Try a different approach"))
+        })
+        .count();
+    assert_eq!(told, 1, "the model is told once before being stopped");
+}
+
+#[test]
 fn a_world_rebases_and_reverifies_when_the_project_moved() {
     let f = fixture("rebase");
     let tight = Script::new("tight", &[write("answer", "42\n"), done()]);

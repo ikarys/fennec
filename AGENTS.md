@@ -15,7 +15,7 @@ src/world.rs     worlds: fork, sandbox (bubblewrap), diff, commit, rollback, dro
 src/grant.rs     human-issued grant: a world writes named host paths, backed up until keep/revert
 src/provider.rs  `Model` trait + OpenAI-compatible client
 src/recipe.rs    replay a landed run's tool calls when the same goal returns
-src/agent.rs     tool loop; every tool runs inside the sandbox
+src/agent.rs     tool loop; every tool runs inside the sandbox; loops, idle runs and hung commands are stopped
 src/solve.rs     task → N worlds → verify → select → land (rebase + re-verify)
 src/spec.rs      request → acceptance tests + task (intent compiler), human-validated
 src/proof.rs     a ready run used as its user would: model proposes tries and pages, harness runs and screenshots them
