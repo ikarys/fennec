@@ -288,6 +288,7 @@ fn attempt_inner(
     record["steps"] = json!(outcome.steps);
     record["summary"] = json!(outcome.summary);
     record["messages"] = json!(outcome.messages);
+    record["stuck"] = json!(outcome.stuck);
 
     let title = task.goal.lines().next().unwrap_or("task");
     let commit = worlds.commit(world, &format!("fennec-os: {title}"))?;
@@ -323,7 +324,12 @@ fn attempt_inner(
     let (checks, failure) = verify(worlds, world, rules)?;
     record["checks"] = json!(checks);
     if let Some(reason) = failure {
-        record["reason"] = json!(reason);
+        // A stopped agent's failure is explained by why it was stopped. Work
+        // that passes anyway is kept: the verdict is the checks, not the stop.
+        record["reason"] = json!(match &outcome.stuck {
+            Some(why) => format!("{why}; then {reason}"),
+            None => reason.to_string(),
+        });
         return Ok(());
     }
     record["passed"] = json!(true);

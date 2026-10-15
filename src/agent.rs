@@ -16,12 +16,71 @@ const COMMAND_TIMEOUT_SECS: u32 = 300;
 const CONTEXT_BUDGET: usize = 48_000;
 /// The latest messages are never elided: the model is acting on them.
 const KEEP_RECENT: usize = 6;
+/// The same call with the same result this many times in a row is a loop:
+/// the model is told once, then stopped.
+const REPEAT_NUDGE: usize = 3;
+const REPEAT_STOP: usize = 5;
+/// Steps that change no file in the world: told once, then stopped.
+const IDLE_NUDGE: usize = 15;
+const IDLE_STOP: usize = 25;
+/// A command killed by its timeout costs minutes; a second one ends the run.
+const TIMEOUT_STOP: usize = 2;
 
 pub struct Outcome {
     /// The agent's own account; never used as a verdict.
     pub summary: Option<String>,
     pub steps: usize,
     pub messages: Vec<Value>,
+    /// Why the harness stopped the agent before it called `done`.
+    pub stuck: Option<String>,
+}
+
+/// Watches the loop for the three ways a run gets stuck. Pure bookkeeping:
+/// each method says whether to nudge (`Some(false)`) or stop (`Some(true)`).
+#[derive(Default)]
+struct Watch {
+    last_call: String,
+    repeats: usize,
+    files: String,
+    idle: usize,
+    timeouts: usize,
+    nudged_repeat: bool,
+    nudged_idle: bool,
+}
+
+impl Watch {
+    fn call(&mut self, call: &str, result: &str) -> Option<bool> {
+        let key = format!("{call}\n{result}");
+        if key == self.last_call {
+            self.repeats += 1;
+        } else {
+            (self.last_call, self.repeats) = (key, 1);
+        }
+        if self.repeats >= REPEAT_STOP {
+            Some(true)
+        } else if self.repeats >= REPEAT_NUDGE && !self.nudged_repeat {
+            self.nudged_repeat = true;
+            Some(false)
+        } else {
+            None
+        }
+    }
+
+    fn step(&mut self, files: String) -> Option<bool> {
+        if files == self.files {
+            self.idle += 1;
+        } else {
+            (self.files, self.idle, self.nudged_idle) = (files, 0, false);
+        }
+        if self.idle >= IDLE_STOP {
+            Some(true)
+        } else if self.idle >= IDLE_NUDGE && !self.nudged_idle {
+            self.nudged_idle = true;
+            Some(false)
+        } else {
+            None
+        }
+    }
 }
 
 pub fn run(
@@ -51,6 +110,19 @@ pub fn run(
         json!({"role": "system", "content": system}),
         json!({"role": "user", "content": goal}),
     ];
+    // The starting state counts as "no change yet".
+    let mut watch = Watch {
+        files: worlds.git(world, &["status", "--porcelain"])?,
+        ..Watch::default()
+    };
+    let stop = |messages: Vec<Value>, step, why: String| {
+        Ok(Outcome {
+            summary: None,
+            steps: step,
+            messages,
+            stuck: Some(why),
+        })
+    };
     for step in 1..=max_steps {
         bound(&mut messages);
         let mut reply = model.chat(&messages, &tools)?;
@@ -77,21 +149,67 @@ pub fn run(
                     summary: args["summary"].as_str().map(str::to_string),
                     steps: step,
                     messages,
+                    stuck: None,
                 });
             }
-            let result = match execute(worlds, world, name, &args) {
+            let mut result = match execute(worlds, world, name, &args) {
                 Ok(out) => out,
                 Err(e) => format!("error: {e}"),
             };
+            let shown = format!("{name} {}", short(&args));
+            // `timeout` exits 124 (TERM) or 137 (KILL after the grace period).
+            if name == "shell"
+                && (result.starts_with("exit 124\n") || result.starts_with("exit 137\n"))
+            {
+                watch.timeouts += 1;
+                if watch.timeouts >= TIMEOUT_STOP {
+                    return stop(
+                        messages,
+                        step,
+                        format!(
+                            "stuck: a second command hung and was killed after {COMMAND_TIMEOUT_SECS} s: {shown}"
+                        ),
+                    );
+                }
+                result = format!(
+                    "timed out after {COMMAND_TIMEOUT_SECS} s and was killed. Do not run it again as is: \
+                     bound it (smaller input, `timeout`, no watch mode, no prompt) or do without it.\n{result}"
+                );
+            }
+            let repeated = watch.call(&call["function"]["arguments"].to_string(), &result);
             messages.push(json!({
                 "role": "tool",
                 "tool_call_id": call["id"],
                 "content": truncate(&result),
             }));
+            match repeated {
+                Some(true) => {
+                    return stop(messages, step, format!("stuck: the same call gave the same result {REPEAT_STOP} times in a row: {shown}"));
+                }
+                Some(false) => messages.push(json!({"role": "user", "content": format!(
+                    "You have made this exact call {REPEAT_NUDGE} times with the same result: {shown}. \
+                     Repeating it will not change anything. Try a different approach, or call `done` \
+                     and say what blocks you."
+                )})),
+                None => {}
+            }
+        }
+        match watch.step(worlds.git(world, &["status", "--porcelain"])?) {
+            Some(true) => {
+                return stop(messages, step, format!("stuck: no file changed in {IDLE_STOP} steps"));
+            }
+            Some(false) => messages.push(json!({"role": "user", "content": format!(
+                "{IDLE_NUDGE} steps without changing any file. Stop exploring: make the change now, \
+                 or call `done` and say what blocks you."
+            )})),
+            None => {}
         }
     }
     Ok(Outcome {
         summary: None,
+        stuck: Some(format!(
+            "stopped after {max_steps} steps without calling `done`"
+        )),
         steps: max_steps,
         messages,
     })
@@ -159,6 +277,19 @@ fn execute(worlds: &Worlds, world: &World, name: &str, args: &Value) -> io::Resu
 /// Keeps the conversation under budget by eliding old tool output and old
 /// file contents, oldest first. It cuts down to half the budget at once: each
 /// cut changes the prefix and costs a fresh prefill, so cuts must be rare.
+/// A call in one line for a reason the human reads.
+fn short(args: &Value) -> String {
+    let text = args["command"]
+        .as_str()
+        .or(args["path"].as_str())
+        .map_or_else(|| args.to_string(), str::to_string);
+    let line = text.lines().next().unwrap_or("");
+    match line.char_indices().nth(120) {
+        Some((i, _)) => format!("`{}…`", &line[..i]),
+        None => format!("`{line}`"),
+    }
+}
+
 fn bound(messages: &mut [Value]) {
     let size = |m: &Value| m.to_string().len();
     let mut total: usize = messages.iter().map(size).sum();
@@ -256,6 +387,28 @@ fn tools() -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn idle_steps_nudge_once_then_stop() {
+        let mut w = Watch::default();
+        let verdicts: Vec<_> = (0..IDLE_STOP).map(|_| w.step(String::new())).collect();
+        assert_eq!(verdicts[IDLE_NUDGE - 1], Some(false));
+        assert_eq!(verdicts.iter().filter(|v| **v == Some(false)).count(), 1);
+        assert_eq!(verdicts[IDLE_STOP - 1], Some(true));
+        // A changed file resets the count.
+        let mut w = Watch::default();
+        (0..IDLE_STOP - 1).for_each(|_| _ = w.step(String::new()));
+        assert_eq!(w.step(" M a".into()), None);
+        assert_eq!(w.idle, 0);
+    }
+
+    #[test]
+    fn a_different_result_is_not_a_repeat() {
+        let mut w = Watch::default();
+        for n in 0..REPEAT_STOP {
+            assert_eq!(w.call("cargo test", &format!("exit 1 failure {n}")), None);
+        }
+    }
 
     #[test]
     fn bound_elides_old_output_and_keeps_the_frame() {
