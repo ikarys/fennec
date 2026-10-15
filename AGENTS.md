@@ -13,7 +13,7 @@ Scenarios: `../lead-scenarios.md`. Inventory and decisions: `../inventory.md`.
 ```
 src/main.rs   `fennec` binary: std HTTP server, routes, folder browser
 src/state.rs  requests and projects in files; the single view (four columns)
-src/work.rs   request life in the background: fennec-os spec, answer, solve; rule offers
+src/work.rs   request life in the background: fennec-os spec, answer, solve, retry; rule offers
 ui/           index.html + app.js, embedded in the binary
 ```
 

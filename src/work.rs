@@ -198,13 +198,17 @@ fn solve_now(store: &Store, id: &str) -> io::Result<()> {
     let variants = OpenAi::variants_from_env(attempts())?;
     offer_rule(store, id, &request, &variants[0])?;
     let models: Vec<&dyn Model> = variants.iter().map(|m| m as &dyn Model).collect();
-    let record = spec::accept(
-        &worlds,
-        request["spec"].as_str().unwrap_or(""),
-        &models,
-        MAX_STEPS,
-    )?;
-    store.update(id, |r| apply_run(r, &record))?;
+    let spec_id = request["spec"].as_str().unwrap_or("");
+    let record = match request["retry"].as_str() {
+        Some(why) => spec::retry(&worlds, spec_id, why, &models, MAX_STEPS)?,
+        None => spec::accept(&worlds, spec_id, &models, MAX_STEPS)?,
+    };
+    store.update(id, |r| {
+        if let Some(m) = r.as_object_mut() {
+            m.remove("retry");
+        }
+        apply_run(r, &record)
+    })?;
     let Some(run) = record["winner"].as_str() else {
         return Ok(());
     };
@@ -212,6 +216,42 @@ fn solve_now(store: &Store, id: &str) -> io::Result<()> {
     store.update(id, |r| r["status"] = json!("proving"))?;
     let proof = proof::gather(&worlds, run, &variants[0])?;
     store.update(id, |r| apply_proof(r, &proof))
+}
+
+/// "Réessayer" on a failed request: solved again from its validated tests
+/// when there are some, told why the last try failed; framed again when it
+/// failed before "done when" was validated.
+pub fn retry(store: &Store, id: &str) -> io::Result<()> {
+    let request = store.load(id)?;
+    if request["status"] != "failed" {
+        return Err(io::Error::other("cette demande n'a pas échoué"));
+    }
+    let validated = match request["spec"].as_str() {
+        Some(s) => matches!(
+            spec::load(&Worlds::from_env()?, s)?["status"].as_str(),
+            Some("proposed" | "accepted")
+        ),
+        None => false,
+    };
+    let why = request["reason"].as_str().unwrap_or("").to_string();
+    store.update(id, |r| {
+        if let Some(m) = r.as_object_mut() {
+            m.remove("proof");
+            m.remove("reason");
+        }
+        if validated {
+            r["status"] = json!("running");
+            r["retry"] = json!(why);
+        } else {
+            r["status"] = json!("framing");
+        }
+    })?;
+    if validated {
+        spawn(id.to_string(), solve_now);
+    } else {
+        frame(id.to_string());
+    }
+    Ok(())
 }
 
 fn apply_proof(request: &mut Value, proof: &Value) {

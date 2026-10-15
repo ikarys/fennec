@@ -54,6 +54,7 @@ function card(item) {
   if (item.ask) el.append(answerForm(item.id));
   if (item.reply) el.append(replyForm(item.id));
   if (item.rule) el.append(ruleForm(item.id));
+  if (item.retry) el.append(retryForm(item.id));
   return el;
 }
 
@@ -124,6 +125,28 @@ function ruleForm(id) {
     };
     row.append(button);
   }
+  form.append(row, error);
+  return form;
+}
+
+// A failed request starts again; fennec is told why the last try failed.
+function retryForm(id) {
+  const form = document.createElement("form");
+  form.className = "answer";
+  const error = Object.assign(document.createElement("div"), { className: "error" });
+  const button = Object.assign(document.createElement("button"), { type: "submit", className: "primary", textContent: "Réessayer" });
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    error.textContent = "";
+    try {
+      await api("/api/retry", { id });
+      refresh(true);
+    } catch (err) {
+      error.textContent = err.message;
+    }
+  };
+  const row = Object.assign(document.createElement("div"), { className: "row" });
+  row.append(button);
   form.append(row, error);
   return form;
 }

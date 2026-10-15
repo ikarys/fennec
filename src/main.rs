@@ -172,6 +172,10 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
             work::reply(&store, &field(&v, "id"), &field(&v, "text"))?;
             Ok(json!({}))
         }
+        ("POST", "/api/retry") => {
+            work::retry(&store, &field(&input()?, "id"))?;
+            Ok(json!({}))
+        }
         ("POST", "/api/rule") => {
             let v = input()?;
             work::rule(&store, &field(&v, "id"), &field(&v, "scope"))?;

@@ -205,6 +205,7 @@ fn classify(requests: &[(String, Value)], runs: &[Value], projects: &[String]) -
                 let mut c = card(r["reason"].as_str().unwrap_or("raison inconnue"));
                 c["proof"] = r["proof"]["tries"].clone();
                 c["shots"] = r["proof"]["shots"].clone();
+                c["retry"] = json!(true);
                 failed.push(c);
             }
             _ => {}
@@ -294,6 +295,10 @@ mod tests {
                 .starts_with("non vérifié")
         );
         assert_eq!(v["failed"][0]["detail"], "timeout");
+        assert!(
+            v["failed"][0].get("retry").is_none(),
+            "a bare run has no request to retry"
+        );
         let shown = ["mine", "ready", "running", "failed"]
             .iter()
             .map(|k| v[*k].as_array().unwrap().len())
