@@ -6,6 +6,7 @@
 //! written down as unverified, never left out.
 
 use std::io;
+use std::process::Stdio;
 
 use serde_json::{Value, json};
 
@@ -13,10 +14,11 @@ use crate::provider::Model;
 use crate::review;
 use crate::rules::{Kind, Rule};
 use crate::solve;
-use crate::world::Worlds;
+use crate::world::{World, Worlds};
 
 /// More tries make the proof longer to read, not stronger.
 const MAX_TRIES: usize = 5;
+const MAX_SHOTS: usize = 3;
 
 const BRIEF: &str = "A change was made to a project and its tests pass. Show that it works \
 the way its user would see it: run the program or command, call the new code from a short \
@@ -24,13 +26,44 @@ script, start the server and query it. Do not run the test suite. The commands r
 project root in a sandbox without network; anything you start must stop on its own (use \
 `timeout`). Each command must print what a user would look at, and exit 0 only if the \
 product behaves as the goal says (catch an expected error and print it). \
+If the project has a web interface the change shows in, also say how to start it and which \
+pages to capture: the harness starts it, opens each page in a real browser and takes a \
+screenshot, so never imitate a browser or a DOM in a try: when the change only shows in \
+the web interface, give serve and shot lines and no try. Keep each command short. \
 Reply in exactly this form, nothing else:\n\
 try: <one shell command>   (one line per command, at most 5)\n\
-unverified: <what these commands cannot show, e.g. a graphical interface>   (one line per item, \
-omit if none)";
+serve: <shell command that starts the web interface and keeps running>   (omit if none)\n\
+shot: <page URL on 127.0.0.1, port included>   (one line per page, at most 3, only with serve)\n\
+unverified: <what these cannot show>   (one line per item, omit if none)";
+
+/// Starts the product with the memory cap, waits for its port, then captures
+/// the page with the browser outside the cap (V8 reserves more address space
+/// than any sane cap). The PNG goes to stdout, the page's visible text length
+/// and any error to stderr. Arguments: serve, url, port, cap in KiB (0 = none).
+const SHOT_SCRIPT: &str = r#"
+serve="$1"; url="$2"; port="$3"; cap="$4"; browser="${FENNEC_OS_BROWSER:-chromium}"
+( if [ "$cap" -gt 0 ]; then ulimit -v "$cap"; fi; exec sh -c "$serve" ) >/tmp/serve.log 2>&1 &
+up() { (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null; }
+for _ in $(seq 60); do up && break; sleep 0.5; done
+if ! up; then echo "nothing listens on port $port after 30 s; server output:" >&2; tail -20 /tmp/serve.log >&2; exit 2; fi
+b() { timeout 60 "$browser" --headless=new --no-sandbox --disable-gpu --hide-scrollbars --window-size=1280,800 --virtual-time-budget=5000 "$@" 2>/dev/null; }
+b --screenshot=/tmp/shot.png "$url" >/dev/null && [ -s /tmp/shot.png ] || { echo "the browser could not capture $url" >&2; exit 3; }
+text=$(b --dump-dom "$url" | tr '\n' ' ' | sed -e 's/<script[^>]*>[^<]*<\/script>//g' -e 's/<style[^>]*>[^<]*<\/style>//g' -e 's/<[^>]*>//g' | tr -d '[:space:]' | wc -c)
+echo "text=$text" >&2
+cat /tmp/shot.png
+"#;
+
+#[derive(Debug, Default, PartialEq)]
+struct Plan {
+    tries: Vec<String>,
+    serve: Option<String>,
+    shots: Vec<String>,
+    unverified: Vec<String>,
+}
 
 /// Gathers the proof for the run `id` (its winner's world) and saves it in
-/// the run record. Returns `{"tries": [...], "unverified": [...], "passed": bool}`.
+/// the run record. Screenshots are kept under `<root>/proofs/`. Returns
+/// `{"tries": [...], "shots": [...], "unverified": [...], "passed": bool}`.
 pub fn gather(worlds: &Worlds, id: &str, model: &dyn Model) -> io::Result<Value> {
     let mut record = review::load(worlds, id)?;
     let world = worlds.open(id)?;
@@ -40,8 +73,9 @@ pub fn gather(worlds: &Worlds, id: &str, model: &dyn Model) -> io::Result<Value>
         .and_then(|t| t["diff"].as_str())
         .unwrap_or("");
     let request = format!(
-        "Goal:\n{}\n\nChange:\n{diff}",
-        record["goal"].as_str().unwrap_or("")
+        "Goal:\n{}\n\nChange:\n{diff}\n\nREADME:\n{}",
+        record["goal"].as_str().unwrap_or(""),
+        readme(worlds, &world)?
     );
     let messages = [
         json!({"role": "system", "content": BRIEF}),
@@ -50,9 +84,10 @@ pub fn gather(worlds: &Worlds, id: &str, model: &dyn Model) -> io::Result<Value>
     let reply = model.chat(&messages, &json!([]))?;
     let content = reply["content"].as_str().unwrap_or("");
     // Some servers leave the reasoning inline.
-    let (tries, mut unverified) = parse(content.rsplit("</think>").next().unwrap_or(content));
+    let mut plan = parse(content.rsplit("</think>").next().unwrap_or(content));
 
-    let rules: Vec<Rule> = tries
+    let rules: Vec<Rule> = plan
+        .tries
         .iter()
         .map(|c| Rule {
             id: "proof.try".to_string(),
@@ -63,50 +98,170 @@ pub fn gather(worlds: &Worlds, id: &str, model: &dyn Model) -> io::Result<Value>
     // A try may write files: the world is rolled back below rather than the
     // proof failed, so the second half of verify's answer is not used.
     let (checks, _) = solve::verify(worlds, &world, &rules)?;
-    // What lands must stay what the tests checked.
     worlds.rollback(&world)?;
-    if tries.is_empty() {
-        unverified.push("aucun essai proposé".to_string());
+    let mut shots = Vec::new();
+    if let Some(serve) = &plan.serve {
+        for (n, url) in plan.shots.iter().enumerate() {
+            shots.push(shoot(worlds, &world, serve, url, &format!("{id}-{n}.png"))?);
+            worlds.rollback(&world)?;
+        }
+        if !shots.is_empty() {
+            plan.unverified
+                .push("interactions (click, typing, drag): only the display is captured".into());
+        }
     }
-    let passed = !tries.is_empty() && checks.iter().all(|c| c["exit"] == 0);
-    let proof = json!({"tries": checks, "unverified": unverified, "passed": passed});
+    if checks.is_empty() && shots.is_empty() {
+        plan.unverified.push(if content.trim().is_empty() {
+            // Reasoning models can spend the whole budget thinking.
+            "no try proposed: the model's reply was empty or cut off".to_string()
+        } else {
+            "no try proposed".to_string()
+        });
+    }
+    let passed = !(checks.is_empty() && shots.is_empty())
+        && checks.iter().all(|c| c["exit"] == 0)
+        && shots.iter().all(|s| s["ok"] == true);
+    let proof =
+        json!({"tries": checks, "shots": shots, "unverified": plan.unverified, "passed": passed});
     record["proof"] = proof.clone();
     review::save(worlds, id, &record)?;
     Ok(proof)
 }
 
-fn parse(reply: &str) -> (Vec<String>, Vec<String>) {
-    let (mut tries, mut unverified) = (Vec::new(), Vec::new());
+/// How the project says it is run. Read inside the sandbox, like everything
+/// taken from a world.
+fn readme(worlds: &Worlds, world: &World) -> io::Result<String> {
+    let argv = ["sh", "-c", "head -c 3000 README* readme* 2>/dev/null"].map(String::from);
+    let out = worlds
+        .sandbox_command(world, &argv)?
+        .stdin(Stdio::null())
+        .output()?;
+    let text = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    Ok(if text.is_empty() {
+        "(none)".to_string()
+    } else {
+        text
+    })
+}
+
+/// One screenshot. The PNG comes back through the sandbox's stdout: the
+/// harness never reads a file in the world, so a symlink there leads nowhere.
+fn shoot(worlds: &Worlds, world: &World, serve: &str, url: &str, file: &str) -> io::Result<Value> {
+    let mut shot = json!({"url": url, "ok": false});
+    let Some(port) = local_port(url) else {
+        shot["reason"] = json!("not a page on 127.0.0.1 or localhost");
+        return Ok(shot);
+    };
+    // The cap is applied by the script to the server only.
+    let browser_free = Worlds {
+        root: worlds.root.clone(),
+        home: worlds.home.clone(),
+        ro_paths: worlds.ro_paths.clone(),
+        memory_mb: None,
+    };
+    let cap = worlds.memory_mb.map_or(0, |mb| mb * 1024);
+    let argv: Vec<String> = [
+        "timeout",
+        "-k",
+        "5",
+        "150",
+        "bash",
+        "-c",
+        SHOT_SCRIPT,
+        "shot",
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .chain([
+        serve.to_string(),
+        url.to_string(),
+        port.to_string(),
+        cap.to_string(),
+    ])
+    .collect();
+    let out = browser_free
+        .sandbox_command(world, &argv)?
+        .stdin(Stdio::null())
+        .output()?;
+    let log = String::from_utf8_lossy(&out.stderr);
+    let text = log
+        .lines()
+        .find_map(|l| l.strip_prefix("text="))
+        .and_then(|n| n.trim().parse::<usize>().ok());
+    if !out.status.success() || !out.stdout.starts_with(b"\x89PNG") {
+        let tail: Vec<&str> = log.lines().collect();
+        shot["reason"] = json!(tail[tail.len().saturating_sub(20)..].join("\n"));
+        return Ok(shot);
+    }
+    let dir = worlds.root.join("proofs");
+    std::fs::create_dir_all(&dir)?;
+    std::fs::write(dir.join(file), &out.stdout)?;
+    shot["file"] = json!(file);
+    // An empty page is the classic broken UI that still "passes".
+    // ponytail: visible text only; a canvas-only page would need pixel checks.
+    if text == Some(0) {
+        shot["reason"] = json!("the page renders no text");
+    } else {
+        shot["ok"] = json!(true);
+    }
+    Ok(shot)
+}
+
+/// The port of a page on this machine; the sandbox reaches nothing else.
+fn local_port(url: &str) -> Option<u16> {
+    let rest = url.strip_prefix("http://")?;
+    let host = rest.split('/').next()?;
+    let (name, port) = host.rsplit_once(':').unwrap_or((host, "80"));
+    matches!(name, "127.0.0.1" | "localhost")
+        .then(|| port.parse().ok())
+        .flatten()
+}
+
+fn parse(reply: &str) -> Plan {
+    let mut plan = Plan::default();
     for line in reply.lines() {
         let line = line.trim().trim_start_matches("- ");
         let clean = |s: &str| s.trim().trim_matches('`').trim().to_string();
-        if let Some(cmd) = line.strip_prefix("try:") {
-            let cmd = clean(cmd);
-            if !cmd.is_empty() && tries.len() < MAX_TRIES {
-                tries.push(cmd);
-            }
-        } else if let Some(what) = line.strip_prefix("unverified:") {
-            let what = clean(what);
-            if !what.is_empty() && !what.eq_ignore_ascii_case("none") {
-                unverified.push(what);
-            }
+        let Some((key, value)) = line.split_once(':') else {
+            continue;
+        };
+        let value = clean(value);
+        if value.is_empty() {
+            continue;
+        }
+        match key.trim() {
+            "try" if plan.tries.len() < MAX_TRIES => plan.tries.push(value),
+            "serve" => plan.serve = Some(value),
+            "shot" if plan.shots.len() < MAX_SHOTS => plan.shots.push(value),
+            "unverified" if !value.eq_ignore_ascii_case("none") => plan.unverified.push(value),
+            _ => {}
         }
     }
-    (tries, unverified)
+    plan
 }
 
 #[cfg(test)]
 mod tests {
-    use super::parse;
+    use super::{local_port, parse};
 
     #[test]
     fn reply_parsing() {
-        let (tries, unverified) = parse(
-            "Sure.\ntry: `python3 -c 'print(1)'`\n- try: ./run.sh\nunverified: the GUI\nunverified: none\n",
+        let plan = parse(
+            "Sure.\ntry: `python3 -c 'print(1)'`\n- try: ./run.sh\nserve: `python3 -m http.server 8000`\nshot: http://127.0.0.1:8000/\nunverified: the GUI\nunverified: none\n",
         );
-        assert_eq!(tries, ["python3 -c 'print(1)'", "./run.sh"]);
-        assert_eq!(unverified, ["the GUI"]);
+        assert_eq!(plan.tries, ["python3 -c 'print(1)'", "./run.sh"]);
+        assert_eq!(plan.serve.as_deref(), Some("python3 -m http.server 8000"));
+        assert_eq!(plan.shots, ["http://127.0.0.1:8000/"]);
+        assert_eq!(plan.unverified, ["the GUI"]);
         let many = "try: a\n".repeat(9);
-        assert_eq!(parse(&many).0.len(), 5);
+        assert_eq!(parse(&many).tries.len(), 5);
+    }
+
+    #[test]
+    fn only_local_pages_are_shot() {
+        assert_eq!(local_port("http://127.0.0.1:8000/x"), Some(8000));
+        assert_eq!(local_port("http://localhost/"), Some(80));
+        assert_eq!(local_port("http://example.com:8000/"), None);
+        assert_eq!(local_port("https://127.0.0.1:8000/"), None);
     }
 }
