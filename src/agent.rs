@@ -33,6 +33,9 @@ pub struct Outcome {
     pub messages: Vec<Value>,
     /// Why the harness stopped the agent before it called `done`.
     pub stuck: Option<String>,
+    /// When stopped: the one question whose answer, in the model's view,
+    /// would unblock it. `None` when it has none.
+    pub question: Option<String>,
 }
 
 /// Watches the loop for the three ways a run gets stuck. Pure bookkeeping:
@@ -119,6 +122,7 @@ pub fn run(
         Ok(Outcome {
             summary: None,
             steps: step,
+            question: ask(model, goal, &messages, &why),
             messages,
             stuck: Some(why),
         })
@@ -150,6 +154,7 @@ pub fn run(
                     steps: step,
                     messages,
                     stuck: None,
+                    question: None,
                 });
             }
             let mut result = match execute(worlds, world, name, &args) {
@@ -163,6 +168,7 @@ pub fn run(
             {
                 watch.timeouts += 1;
                 if watch.timeouts >= TIMEOUT_STOP {
+                    messages.push(json!({"role": "tool", "tool_call_id": call["id"], "content": truncate(&result)}));
                     return stop(
                         messages,
                         step,
@@ -205,14 +211,56 @@ pub fn run(
             None => {}
         }
     }
-    Ok(Outcome {
-        summary: None,
-        stuck: Some(format!(
-            "stopped after {max_steps} steps without calling `done`"
-        )),
-        steps: max_steps,
+    stop(
         messages,
-    })
+        max_steps,
+        format!("stopped after {max_steps} steps without calling `done`"),
+    )
+}
+
+/// Asks a stopped model for the one question a human could answer. It gets
+/// the goal and the end of its own work as plain text, not the tool history:
+/// a stop can come between a call and its result.
+fn ask(model: &dyn Model, goal: &str, messages: &[Value], why: &str) -> Option<String> {
+    let recent: Vec<String> = messages
+        .iter()
+        .rev()
+        .take(8)
+        .rev()
+        .map(|m| {
+            let text = m["content"]
+                .as_str()
+                .map_or_else(|| m["tool_calls"].to_string(), str::to_string);
+            let cut: String = text.chars().take(1500).collect();
+            format!("[{}] {cut}", m["role"].as_str().unwrap_or(""))
+        })
+        .collect();
+    let prompt = format!(
+        "You were working on this goal:\n{goal}\n\nThe end of your work:\n{}\n\n\
+         The harness stopped you: {why}.\n\
+         A human who knows the project, but has not read your work, can answer one question. \
+         If an answer would unblock you (a choice only they can make, a missing fact, a command \
+         or tool that hangs), ask it with the context needed to answer it in one line. \
+         Reply in exactly this form, nothing else:\nquestion: <your question, or none>",
+        recent.join("\n")
+    );
+    let reply = model
+        .chat(&[json!({"role": "user", "content": prompt})], &json!([]))
+        .ok()?;
+    let content = reply["content"].as_str()?;
+    // Some servers leave the reasoning inline.
+    let content = content.rsplit("</think>").next().unwrap_or(content);
+    parse_question(content)
+}
+
+fn parse_question(reply: &str) -> Option<String> {
+    let q = reply
+        .lines()
+        .find_map(|l| l.trim().strip_prefix("question:"))?
+        .trim()
+        .trim_matches('`')
+        .trim();
+    (!q.is_empty() && !q.trim_end_matches('.').eq_ignore_ascii_case("none")).then(|| q.to_string())
 }
 
 fn execute(worlds: &Worlds, world: &World, name: &str, args: &Value) -> io::Result<String> {
@@ -387,6 +435,16 @@ fn tools() -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn question_parsing() {
+        assert_eq!(
+            parse_question("Hmm.\nquestion: `Which port?`").as_deref(),
+            Some("Which port?")
+        );
+        assert_eq!(parse_question("question: none."), None);
+        assert_eq!(parse_question("I am stuck."), None);
+    }
 
     #[test]
     fn idle_steps_nudge_once_then_stop() {
