@@ -18,7 +18,7 @@ src/recipe.rs    replay a landed run's tool calls when the same goal returns
 src/agent.rs     tool loop; every tool runs inside the sandbox
 src/solve.rs     task → N worlds → verify → select → land (rebase + re-verify)
 src/spec.rs      request → acceptance tests + task (intent compiler), human-validated
-src/proof.rs     a ready run used as its user would: model proposes tries, harness runs them
+src/proof.rs     a ready run used as its user would: model proposes tries and pages, harness runs and screenshots them
 src/rules.rs     project rules (`.fennec-os/rules.json` at HEAD), glob matching
 src/review.rs    review queue, rejections, corrections said twice, agenda
 src/sleep.rs     landed runs → candidate know-how (`.fennec-os/knowhow.md`)
@@ -43,7 +43,8 @@ fennec-os solve <project> task.json --grant <host path>   # one attempt; then gr
 Env: `FENNEC_OS_HOME` (store, default `~/.local/share/fennec-os`),
 `FENNEC_OS_RO` (paths re-exposed read-only inside the hidden home),
 `FENNEC_OS_MEMORY_MB` (address-space cap per sandboxed command, default 8192, 0 = none),
-`FENNEC_OS_BASE_URL`, `FENNEC_OS_MODELS` (comma-separated), `FENNEC_OS_API_KEY`.
+`FENNEC_OS_BASE_URL`, `FENNEC_OS_MODELS` (comma-separated), `FENNEC_OS_API_KEY`,
+`FENNEC_OS_BROWSER` (headless browser for proof screenshots, default `chromium`).
 
 ## Non-negotiable rules
 
