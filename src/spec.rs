@@ -108,6 +108,8 @@ pub fn compile(
         .flat_map(|(_, s)| s["answers"].as_array().cloned().unwrap_or_default())
         .collect();
     context.push_str(&answered(&answers));
+    let said = rules::said(&project)?;
+    context.push_str(&rules::brief(&said));
     let criteria = [
         "tests only: the request itself stays unimplemented".to_string(),
         "the `verify` commands fail now and pass once the request is implemented".to_string(),
@@ -127,6 +129,7 @@ pub fn compile(
     ) {
         spec["reason"] = json!(e.to_string());
     }
+    spec["rules"] = json!(rules::used(spec["summary"].as_str().unwrap_or(""), &said));
     if spec["status"] != "proposed" {
         worlds.drop(world)?;
     }
@@ -269,7 +272,9 @@ fn parse(summary: &str) -> (String, Vec<String>) {
     });
     for line in lines {
         let trimmed = line.trim();
-        if let Some(cmd) = trimmed.strip_prefix("verify:") {
+        if trimmed.starts_with("rules:") {
+            (in_goal, in_verify) = (false, false);
+        } else if let Some(cmd) = trimmed.strip_prefix("verify:") {
             in_goal = false;
             let cmd = cmd.trim().trim_matches('`');
             in_verify = cmd.is_empty();

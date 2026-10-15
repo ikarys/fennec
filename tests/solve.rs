@@ -722,3 +722,35 @@ fn a_grant_refuses_parallel_attempts_and_bad_paths() {
     assert!(solve(&f.worlds, &f.project, &task, &[&a], 10).is_err());
     assert!(f.worlds.list().unwrap().is_empty());
 }
+
+#[test]
+fn a_rule_said_once_reaches_every_agent_which_reports_using_it() {
+    let f = fixture("said");
+    // Uncommitted on purpose: a confirmed rule applies to the next run.
+    rules::say(&f.project, "project", "use uv, never .venv").unwrap();
+    rules::say(&f.project, "project", "use uv, never .venv").unwrap();
+    let agents = std::fs::read_to_string(f.project.join("AGENTS.md")).unwrap();
+    assert_eq!(agents, "## Rules\n\n- use uv, never .venv\n");
+
+    let spy = Spy(Mutex::new(String::new()));
+    solve(&f.worlds, &f.project, &task(&[]), &[&spy], 10).unwrap();
+    let system = spy.0.lock().unwrap().clone();
+    // The user's own rules come first; find this one's number.
+    let n = system
+        .lines()
+        .find_map(|l| l.trim().strip_suffix(". use uv, never .venv"))
+        .unwrap_or_else(|| panic!("{system}"));
+
+    let tight = Script::new(
+        "tight",
+        &[
+            write("answer", "42\n"),
+            finish(&format!("wrote it\nrules: {n}")),
+        ],
+    );
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&tight], 10).unwrap();
+    assert_eq!(
+        record["attempts"][0]["rules"],
+        json!(["use uv, never .venv"])
+    );
+}
