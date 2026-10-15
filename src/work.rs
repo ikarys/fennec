@@ -60,6 +60,8 @@ fn frame_now(store: &Store, id: &str) -> io::Result<()> {
             r["status"] = json!("question");
             r["done_when"] = s["goal"].clone();
             r["verify"] = s["verify"].clone();
+        } else if let Some(q) = s["question"].as_str() {
+            block(r, "framing", q, s["reason"].as_str().unwrap_or(""));
         } else {
             r["status"] = json!("failed");
             r["reason"] = json!(format!(
@@ -93,6 +95,43 @@ pub fn answer(store: &Store, id: &str, accept: bool, correction: &str) -> io::Re
         )?;
         store.update(id, |r| r["status"] = json!("framing"))?;
         frame(id.to_string());
+    }
+    Ok(())
+}
+
+/// A stopped agent's question goes to the human instead of a failure.
+fn block(request: &mut Value, stage: &str, question: &str, why: &str) {
+    request["status"] = json!("blocked");
+    request["stage"] = json!(stage);
+    request["question"] = json!(question);
+    request["reason"] = json!(why);
+}
+
+/// The human's answer to a blocked request: recorded in fennec-os, then the
+/// stopped step starts again with it.
+pub fn reply(store: &Store, id: &str, text: &str) -> io::Result<()> {
+    let request = store.load(id)?;
+    if request["status"] != "blocked" {
+        return Err(io::Error::other("cette demande n'attend pas de réponse"));
+    }
+    let text = text.trim();
+    if text.is_empty() {
+        return Err(io::Error::other("réponse vide"));
+    }
+    spec::answer(
+        &Worlds::from_env()?,
+        request["spec"].as_str().unwrap_or(""),
+        request["question"].as_str().unwrap_or(""),
+        text,
+    )?;
+    // ponytail: the step restarts from scratch with the answer; resuming the
+    // stopped conversation would save its steps.
+    if request["stage"] == "framing" {
+        store.update(id, |r| r["status"] = json!("framing"))?;
+        frame(id.to_string());
+    } else {
+        store.update(id, |r| r["status"] = json!("running"))?;
+        spawn(id.to_string(), solve_now);
     }
     Ok(())
 }
@@ -157,6 +196,16 @@ fn apply_run(request: &mut Value, record: &Value) {
     if record["winner"].is_string() {
         request["status"] = json!("ready");
         request["run"] = record["winner"].clone();
+    } else if let Some(t) = record["attempts"]
+        .as_array()
+        .and_then(|a| a.iter().find(|t| t["question"].is_string()))
+    {
+        block(
+            request,
+            "solving",
+            t["question"].as_str().unwrap_or(""),
+            t["reason"].as_str().unwrap_or(""),
+        );
     } else {
         request["status"] = json!("failed");
         request["reason"] = record["attempts"]
@@ -187,6 +236,19 @@ pub fn recover(store: &Store) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_stopped_attempt_with_a_question_asks_the_human() {
+        let mut r = json!({"status": "running"});
+        apply_run(
+            &mut r,
+            &json!({"winner": null, "attempts": [{"reason": "tests fail"}, {"reason": "stuck: x", "question": "Which port?"}]}),
+        );
+        assert_eq!(r["status"], "blocked");
+        assert_eq!(r["stage"], "solving");
+        assert_eq!(r["question"], "Which port?");
+        assert_eq!(r["reason"], "stuck: x");
+    }
 
     #[test]
     fn a_run_without_winner_fails_with_its_first_reason() {

@@ -147,6 +147,15 @@ fn classify(requests: &[(String, Value)], runs: &[Value], projects: &[String]) -
                 c["ask"] = json!(true);
                 mine.push(c);
             }
+            Some("blocked") => {
+                let mut c = card(&format!(
+                    "Question : {}\n(fennec s'est arrêté : {})",
+                    r["question"].as_str().unwrap_or(""),
+                    r["reason"].as_str().unwrap_or("")
+                ));
+                c["reply"] = json!(true);
+                mine.push(c);
+            }
             Some("running") => running.push(card("fennec travaille")),
             Some("proving") => running.push(card("fennec essaie le produit")),
             Some("ready") => {
@@ -226,6 +235,10 @@ mod tests {
                 "3".to_string(),
                 json!({"project": "/p/a", "text": "z", "status": "ready"}),
             ),
+            (
+                "4".to_string(),
+                json!({"project": "/p/a", "text": "w", "status": "blocked", "question": "Q?", "reason": "stuck"}),
+            ),
         ];
         let runs = [
             json!({"project": "/p/b", "goal": "g1", "status": "ready"}),
@@ -237,6 +250,11 @@ mod tests {
         assert_eq!(v["running"][0]["title"], "x");
         assert_eq!(v["mine"][0]["detail"], "Terminé quand : Q");
         assert_eq!(v["mine"][0]["id"], "2");
+        assert_eq!(
+            v["mine"][1]["detail"],
+            "Question : Q?\n(fennec s'est arrêté : stuck)"
+        );
+        assert_eq!(v["mine"][1]["reply"], true);
         assert_eq!(
             v["ready"][0]["detail"],
             "non vérifié : produit pas encore essayé"
@@ -254,7 +272,7 @@ mod tests {
             .map(|k| v[*k].as_array().unwrap().len())
             .sum::<usize>();
         assert_eq!(
-            shown, 5,
+            shown, 6,
             "landed runs and runs owned by a request are not shown"
         );
         assert_eq!(v["projects"][0]["name"], "a");

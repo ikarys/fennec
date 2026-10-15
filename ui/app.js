@@ -52,6 +52,7 @@ function card(item) {
     el.append(link);
   }
   if (item.ask) el.append(answerForm(item.id));
+  if (item.reply) el.append(replyForm(item.id));
   return el;
 }
 
@@ -77,6 +78,29 @@ function answerForm(id) {
   const row = Object.assign(document.createElement("div"), { className: "row" });
   row.append(fix, validate);
   form.append(correction, row, error);
+  return form;
+}
+
+// A stopped request's question: the answer restarts the work with it.
+function replyForm(id) {
+  const form = document.createElement("form");
+  form.className = "answer";
+  const text = Object.assign(document.createElement("textarea"), { placeholder: "Ta réponse" });
+  const error = Object.assign(document.createElement("div"), { className: "error" });
+  const send = Object.assign(document.createElement("button"), { type: "submit", className: "primary", textContent: "Répondre" });
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    error.textContent = "";
+    try {
+      await api("/api/reply", { id, text: text.value });
+      refresh(true);
+    } catch (err) {
+      error.textContent = err.message;
+    }
+  };
+  const row = Object.assign(document.createElement("div"), { className: "row" });
+  row.append(send);
+  form.append(text, row, error);
   return form;
 }
 

@@ -167,6 +167,11 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
             work::answer(&store, &field(&v, "id"), accept, &field(&v, "correction"))?;
             Ok(json!({}))
         }
+        ("POST", "/api/reply") => {
+            let v = input()?;
+            work::reply(&store, &field(&v, "id"), &field(&v, "text"))?;
+            Ok(json!({}))
+        }
         ("POST", "/api/projects") => {
             store.add_project(&field(&input()?, "path"))?;
             Ok(json!({}))
