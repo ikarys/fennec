@@ -4,6 +4,7 @@
 //! to pull an async runtime into a synchronous codebase.
 
 mod state;
+mod work;
 
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -36,6 +37,7 @@ fn main() {
 }
 
 fn serve(addr: &str) -> io::Result<()> {
+    work::recover(&Store::from_env()?)?;
     let listener = TcpListener::bind(addr)?;
     let port = listener.local_addr()?.port();
     println!("fennec : http://127.0.0.1:{port}");
@@ -134,7 +136,14 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
         ("POST", "/api/requests") => {
             let v = input()?;
             let id = store.add_request(&field(&v, "project"), &field(&v, "text"))?;
+            work::frame(id.clone());
             Ok(json!({"id": id}))
+        }
+        ("POST", "/api/answer") => {
+            let v = input()?;
+            let accept = v["accept"].as_bool().unwrap_or(false);
+            work::answer(&store, &field(&v, "id"), accept, &field(&v, "correction"))?;
+            Ok(json!({}))
         }
         ("POST", "/api/projects") => {
             store.add_project(&field(&input()?, "path"))?;

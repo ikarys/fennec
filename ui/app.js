@@ -28,7 +28,39 @@ function card(item) {
     line.textContent = item[key] ?? "";
     el.append(line);
   }
+  if (item.checks?.length) {
+    const checks = document.createElement("details");
+    checks.append(Object.assign(document.createElement("summary"), { textContent: "Tests" }));
+    for (const command of item.checks) checks.append(Object.assign(document.createElement("code"), { textContent: command }));
+    el.append(checks);
+  }
+  if (item.ask) el.append(answerForm(item.id));
   return el;
+}
+
+// The one answer a request needs: validate "done when", or say what is wrong.
+function answerForm(id) {
+  const form = document.createElement("form");
+  form.className = "answer";
+  const correction = Object.assign(document.createElement("textarea"), { placeholder: "Ce qui ne va pas (pour corriger)" });
+  const error = Object.assign(document.createElement("div"), { className: "error" });
+  const send = (accept) => async () => {
+    error.textContent = "";
+    try {
+      await api("/api/answer", { id, accept, correction: correction.value });
+      refresh(true);
+    } catch (e) {
+      error.textContent = e.message;
+    }
+  };
+  const validate = Object.assign(document.createElement("button"), { type: "button", className: "primary", textContent: "Valider" });
+  const fix = Object.assign(document.createElement("button"), { type: "button", textContent: "Corriger" });
+  validate.onclick = send(true);
+  fix.onclick = send(false);
+  const row = Object.assign(document.createElement("div"), { className: "row" });
+  row.append(fix, validate);
+  form.append(correction, row, error);
+  return form;
 }
 
 function renderProjects(projects) {
@@ -39,9 +71,16 @@ function renderProjects(projects) {
   if (projects.some((p) => p.path === current)) select.value = current;
 }
 
-async function refresh() {
+let shown = "";
+async function refresh(force) {
+  // Never wipe what the human is typing in a card.
+  if (!force && document.activeElement?.closest(".board")) return;
   try {
     const view = await api("/api/view");
+    const json = JSON.stringify(view);
+    if (!force && json === shown) return;
+    shown = json;
+    $("error").textContent = "";
     for (const [key, empty] of Object.entries(COLUMNS)) {
       const items = view[key];
       $(key).replaceChildren(...(items.length ? items.map(card) : [Object.assign(
@@ -60,7 +99,7 @@ $("new-request").addEventListener("submit", async (event) => {
   try {
     await api("/api/requests", { project: $("project").value, text: $("text").value });
     $("text").value = "";
-    refresh();
+    refresh(true);
   } catch (e) {
     $("error").textContent = e.message;
   }
@@ -95,7 +134,7 @@ $("picker-choose").onclick = async () => {
   try {
     await api("/api/projects", { path: pickerPath });
     $("picker").close();
-    refresh();
+    refresh(true);
   } catch (e) {
     $("picker-path").textContent = e.message;
   }

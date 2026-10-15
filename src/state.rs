@@ -63,26 +63,45 @@ impl Store {
             .as_nanos();
         // Same width hex timestamps, as in fennec-os: lexical order is time order.
         let id = format!("{nanos:032x}");
-        let record = json!({"project": project, "text": text.trim(), "status": "new"});
-        write_json(
-            &self.root.join("requests").join(format!("{id}.json")),
-            &record,
-        )?;
+        let record = json!({"project": project, "text": text.trim(), "status": "framing"});
+        write_json(&self.request_path(&id)?, &record)?;
         Ok(id)
     }
 
-    fn requests(&self) -> io::Result<Vec<Value>> {
-        let mut entries: Vec<PathBuf> = std::fs::read_dir(self.root.join("requests"))?
-            .filter_map(|e| e.ok().map(|e| e.path()))
-            .filter(|p| p.extension().is_some_and(|x| x == "json"))
-            .collect();
-        entries.sort();
-        entries
-            .iter()
-            .map(|p| {
-                let text = std::fs::read_to_string(p)?;
-                serde_json::from_str(&text).map_err(io::Error::other)
+    fn request_path(&self, id: &str) -> io::Result<PathBuf> {
+        // Ids come from the page: hex only, so none can name another file.
+        if id.is_empty() || !id.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return Err(io::Error::other("demande inconnue"));
+        }
+        Ok(self.root.join("requests").join(format!("{id}.json")))
+    }
+
+    pub fn load(&self, id: &str) -> io::Result<Value> {
+        let text = std::fs::read_to_string(self.request_path(id)?)
+            .map_err(|_| io::Error::other("demande inconnue"))?;
+        serde_json::from_str(&text).map_err(io::Error::other)
+    }
+
+    pub fn update(&self, id: &str, change: impl FnOnce(&mut Value)) -> io::Result<()> {
+        let mut record = self.load(id)?;
+        change(&mut record);
+        write_json(&self.request_path(id)?, &record)
+    }
+
+    /// Every request, oldest first.
+    pub fn requests(&self) -> io::Result<Vec<(String, Value)>> {
+        let mut ids: Vec<String> = std::fs::read_dir(self.root.join("requests"))?
+            .filter_map(|e| e.ok())
+            .filter_map(|e| {
+                e.file_name()
+                    .to_str()?
+                    .strip_suffix(".json")
+                    .map(str::to_string)
             })
+            .collect();
+        ids.sort();
+        ids.into_iter()
+            .map(|id| self.load(&id).map(|r| (id, r)))
             .collect()
     }
 
@@ -115,17 +134,37 @@ fn name(project: &str) -> &str {
 
 /// Sorts requests and fennec-os runs into the four columns. Pure, so the
 /// mapping from internal states to what the human sees is tested here.
-fn classify(requests: &[Value], runs: &[Value], projects: &[String]) -> Value {
+fn classify(requests: &[(String, Value)], runs: &[Value], projects: &[String]) -> Value {
     let (mut mine, mut ready, mut running, mut failed) = (vec![], vec![], vec![], vec![]);
-    for r in requests {
-        let card = |detail: &str| json!({"project": name(r["project"].as_str().unwrap_or("")), "title": r["text"], "detail": detail});
+    for (id, r) in requests {
+        let card = |detail: &str| json!({"id": id, "project": name(r["project"].as_str().unwrap_or("")), "title": r["text"], "detail": detail});
         match r["status"].as_str() {
-            Some("new") => running.push(card("en attente de cadrage")),
-            Some("question") => mine.push(card(r["question"].as_str().unwrap_or(""))),
+            Some("framing") => running.push(card("fennec prépare « terminé quand »")),
+            Some("question") => {
+                let done_when = r["done_when"].as_str().unwrap_or("");
+                let mut c = card(&format!("Terminé quand : {done_when}"));
+                c["checks"] = r["verify"].clone();
+                c["ask"] = json!(true);
+                mine.push(c);
+            }
+            Some("running") => running.push(card("fennec travaille")),
+            // The tests passed; the product itself was not tried yet.
+            Some("ready") => {
+                let mut c = card("non vérifié : produit pas encore essayé");
+                c["checks"] = r["verify"].clone();
+                ready.push(c);
+            }
+            Some("failed") => failed.push(card(r["reason"].as_str().unwrap_or("raison inconnue"))),
             _ => {}
         }
     }
-    for r in runs {
+    // A request's run is shown through the request, not a second time.
+    let owned: Vec<&Value> = requests
+        .iter()
+        .map(|(_, r)| &r["spec"])
+        .filter(|s| s.is_string())
+        .collect();
+    for r in runs.iter().filter(|r| !owned.contains(&&r["spec"])) {
         let card = |detail: &str| json!({"project": name(r["project"].as_str().unwrap_or("")), "title": r["goal"], "detail": detail});
         match r["status"].as_str() {
             // fennec-os proves commands pass, not that the product works.
@@ -154,17 +193,25 @@ mod tests {
     #[test]
     fn internal_states_land_in_the_right_column() {
         let requests = [
-            json!({"project": "/p/a", "text": "x", "status": "new"}),
-            json!({"project": "/p/a", "text": "y", "status": "question", "question": "Q ?"}),
+            (
+                "1".to_string(),
+                json!({"project": "/p/a", "text": "x", "status": "framing"}),
+            ),
+            (
+                "2".to_string(),
+                json!({"project": "/p/a", "text": "y", "status": "question", "done_when": "Q", "spec": "s1"}),
+            ),
         ];
         let runs = [
             json!({"project": "/p/b", "goal": "g1", "status": "ready"}),
             json!({"project": "/p/b", "goal": "g2", "status": "failed", "attempts": [{"passed": false}, {"reason": "timeout"}]}),
             json!({"project": "/p/b", "goal": "g3", "status": "landed"}),
+            json!({"project": "/p/a", "goal": "g4", "status": "ready", "spec": "s1"}),
         ];
         let v = classify(&requests, &runs, &["/p/a".into()]);
         assert_eq!(v["running"][0]["title"], "x");
-        assert_eq!(v["mine"][0]["detail"], "Q ?");
+        assert_eq!(v["mine"][0]["detail"], "Terminé quand : Q");
+        assert_eq!(v["mine"][0]["id"], "2");
         assert_eq!(v["ready"][0]["project"], "b");
         assert!(
             v["ready"][0]["detail"]
@@ -177,7 +224,10 @@ mod tests {
             .iter()
             .map(|k| v[*k].as_array().unwrap().len())
             .sum::<usize>();
-        assert_eq!(shown, 4, "landed runs are not shown");
+        assert_eq!(
+            shown, 4,
+            "landed runs and runs owned by a request are not shown"
+        );
         assert_eq!(v["projects"][0]["name"], "a");
     }
 }

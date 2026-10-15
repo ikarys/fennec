@@ -13,6 +13,7 @@ Scenarios: `../lead-scenarios.md`. Inventory and decisions: `../inventory.md`.
 ```
 src/main.rs   `fennec` binary: std HTTP server, routes, folder browser
 src/state.rs  requests and projects in files; the single view (four columns)
+src/work.rs   request life in the background: fennec-os spec, answer, solve
 ui/           index.html + app.js, embedded in the binary
 ```
 
@@ -27,7 +28,8 @@ fennec                      # http://127.0.0.1:7777
 ```
 
 Env: `FENNEC_LEAD_HOME` (default `~/.local/share/fennec-lead`), `FENNEC_LEAD_ADDR`
-(default `127.0.0.1:7777`), plus fennec-os's `FENNEC_OS_*`.
+(default `127.0.0.1:7777`), `FENNEC_LEAD_ATTEMPTS` (default 1), plus fennec-os's
+`FENNEC_OS_*` (model endpoint and names are required to frame a request).
 
 ## Non-negotiable rules
 
