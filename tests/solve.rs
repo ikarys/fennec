@@ -588,6 +588,37 @@ fn a_request_compiles_to_failing_tests_that_the_solution_must_pass() {
             .contains("rejected with:\n  - check the exact value")
     );
 
+    // A stopped compile asks a question; the answer reaches the next one.
+    let lost = Script::new("lost", &vec![("shell", json!({"command": "ls"})); 5]);
+    lost.replies
+        .lock()
+        .unwrap()
+        .push_back(json!({"content": "question: Which file holds the answer?"}));
+    let s = spec::compile(&f.worlds, &f.project, request, &lost, 10).unwrap();
+    assert_eq!(s["status"], "invalid", "{s:#}");
+    assert_eq!(s["question"], "Which file holds the answer?");
+    assert!(
+        s["reason"]
+            .as_str()
+            .unwrap()
+            .starts_with("stuck: the same call")
+    );
+    spec::answer(
+        &f.worlds,
+        s["world"].as_str().unwrap(),
+        "Which file holds the answer?",
+        "the file `answer`",
+    )
+    .unwrap();
+    let spy = Spy(Mutex::new(String::new()));
+    spec::compile(&f.worlds, &f.project, request, &spy, 10).unwrap();
+    assert!(
+        spy.0
+            .lock()
+            .unwrap()
+            .contains("Q: Which file holds the answer?\n    A: the file `answer`")
+    );
+
     let good = Script::new(
         "good",
         &[write("spec.sh", "grep -qx 42 answer\n"), finish(SPEC)],

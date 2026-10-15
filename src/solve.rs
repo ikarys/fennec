@@ -289,6 +289,7 @@ fn attempt_inner(
     record["summary"] = json!(outcome.summary);
     record["messages"] = json!(outcome.messages);
     record["stuck"] = json!(outcome.stuck);
+    record["question"] = json!(outcome.question);
 
     let title = task.goal.lines().next().unwrap_or("task");
     let commit = worlds.commit(world, &format!("fennec-os: {title}"))?;

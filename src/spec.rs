@@ -99,6 +99,15 @@ pub fn compile(
             .iter()
             .for_each(|c| context.push_str(&format!("  - {c}\n")));
     }
+    let answers: Vec<Value> = specs(worlds)?
+        .into_iter()
+        .filter(|(_, s)| {
+            s["project"] == name.as_str()
+                && s["request"].as_str().map(normalise) == Some(key.clone())
+        })
+        .flat_map(|(_, s)| s["answers"].as_array().cloned().unwrap_or_default())
+        .collect();
+    context.push_str(&answered(&answers));
     let criteria = [
         "tests only: the request itself stays unimplemented".to_string(),
         "the `verify` commands fail now and pass once the request is implemented".to_string(),
@@ -149,6 +158,7 @@ fn check(
     )?;
     spec["steps"] = json!(outcome.steps);
     spec["stuck"] = json!(outcome.stuck);
+    spec["question"] = json!(outcome.question);
     let summary = outcome.summary.unwrap_or_default();
     spec["summary"] = json!(summary);
 
@@ -303,8 +313,13 @@ pub fn accept(
             .filter_map(|s| s.as_str().map(str::to_string))
             .collect()
     };
+    let answers = spec["answers"].as_array().cloned().unwrap_or_default();
     let task = Task {
-        goal: spec["goal"].as_str().unwrap_or("").to_string(),
+        goal: format!(
+            "{}{}",
+            spec["goal"].as_str().unwrap_or(""),
+            answered(&answers)
+        ),
         verify: strings("verify"),
         protect: strings("protect"),
         base: Some(id.to_string()),
@@ -322,6 +337,34 @@ pub fn accept(
     }
     save(worlds, id, &spec)?;
     Ok(record)
+}
+
+/// Records the human's answer to a question a stopped agent asked. The next
+/// compile of the same request, or the next attempt on this spec, reads it.
+pub fn answer(worlds: &Worlds, id: &str, question: &str, answer: &str) -> io::Result<()> {
+    let mut spec = load(worlds, id)?;
+    let entry = json!({"question": question, "answer": answer});
+    match spec["answers"].as_array_mut() {
+        Some(list) => list.push(entry),
+        None => spec["answers"] = json!([entry]),
+    }
+    save(worlds, id, &spec)
+}
+
+fn answered(answers: &[Value]) -> String {
+    if answers.is_empty() {
+        return String::new();
+    }
+    let mut text =
+        "\n\nAn earlier attempt was stopped and asked the human; their answers:\n".to_string();
+    for a in answers {
+        text.push_str(&format!(
+            "  - Q: {}\n    A: {}\n",
+            a["question"].as_str().unwrap_or(""),
+            a["answer"].as_str().unwrap_or("")
+        ));
+    }
+    text
 }
 
 pub fn reject(worlds: &Worlds, id: &str, correction: Option<&str>) -> io::Result<()> {
