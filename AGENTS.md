@@ -18,6 +18,7 @@ src/recipe.rs    replay a landed run's tool calls when the same goal returns
 src/agent.rs     tool loop; every tool runs inside the sandbox
 src/solve.rs     task → N worlds → verify → select → land (rebase + re-verify)
 src/spec.rs      request → acceptance tests + task (intent compiler), human-validated
+src/proof.rs     a ready run used as its user would: model proposes tries, harness runs them
 src/rules.rs     project rules (`.fennec-os/rules.json` at HEAD), glob matching
 src/review.rs    review queue, rejections, corrections said twice, agenda
 src/sleep.rs     landed runs → candidate know-how (`.fennec-os/knowhow.md`)
