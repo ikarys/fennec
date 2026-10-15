@@ -149,9 +149,7 @@ fn check(
     )?;
     spec["steps"] = json!(outcome.steps);
     let summary = outcome.summary.unwrap_or_default();
-    let (goal, verify) = parse(&summary);
-    spec["goal"] = json!(goal);
-    spec["verify"] = json!(verify);
+    spec["summary"] = json!(summary);
 
     let commit = worlds.commit(world, &format!("fennec-os spec: {}", first_line(request)))?;
     spec["diff"] = json!(worlds.git(world, &["diff", &base, &commit])?);
@@ -159,10 +157,23 @@ fn check(
     let changed: Vec<&str> = changed.lines().collect();
     spec["protect"] = json!(changed);
 
-    let reason = if goal.is_empty() || verify.is_empty() {
-        Some("the summary has no `goal:` or no `verify:` line".to_string())
+    let (mut goal, mut verify) = parse(&summary);
+    if (goal.is_empty() || verify.is_empty()) && !changed.is_empty() {
+        // The tests are written; only the summary missed the form. One more
+        // question costs far less than writing the tests again.
+        (goal, verify) = reformat(model, request, &summary, &changed)?;
+    }
+    spec["goal"] = json!(goal);
+    spec["verify"] = json!(verify);
+
+    let reason = if changed.is_empty() && outcome.steps >= max_steps {
+        Some(format!(
+            "stopped after {max_steps} steps without writing a test"
+        ))
     } else if changed.is_empty() {
         Some("no test was written".to_string())
+    } else if goal.is_empty() || verify.is_empty() {
+        Some("the summary has no `goal:` or no `verify:` line".to_string())
     } else {
         // Path rules only: the others judge implementations, not tests.
         let mut forbidden = vec![Rule {
@@ -204,6 +215,32 @@ fn check(
     // compile passes this check; the human reading the diff catches it.
     spec["status"] = json!("proposed");
     Ok(())
+}
+
+/// Asks the model to restate a summary that does not follow the form. The
+/// commands it names are still run below: a wrong one fails the spec there.
+fn reformat(
+    model: &dyn Model,
+    request: &str,
+    summary: &str,
+    changed: &[&str],
+) -> io::Result<(String, Vec<String>)> {
+    let ask = format!(
+        "Request:\n{request}\n\nTest files written:\n{}\n\nSummary of the work:\n{}\n\n\
+         Reply in exactly this form, nothing else:\n\
+         goal: <the request restated precisely for an implementer, naming the tests that must pass>\n\
+         verify: <a shell command that runs the new tests; one line per command>",
+        changed.join("\n"),
+        if summary.trim().is_empty() {
+            "(none)"
+        } else {
+            summary
+        }
+    );
+    let reply = model.chat(&[json!({"role": "user", "content": ask})], &json!([]))?;
+    let content = reply["content"].as_str().unwrap_or("");
+    // Some servers leave the reasoning inline.
+    Ok(parse(content.rsplit("</think>").next().unwrap_or(content)))
 }
 
 fn first_line(s: &str) -> &str {
@@ -302,7 +339,34 @@ pub fn reject(worlds: &Worlds, id: &str, correction: Option<&str>) -> io::Result
 
 #[cfg(test)]
 mod tests {
-    use super::parse;
+    use super::{parse, reformat};
+    use crate::provider::Model;
+    use serde_json::{Value, json};
+    use std::io;
+
+    struct Fixed(&'static str);
+    impl Model for Fixed {
+        fn chat(&self, _: &[Value], _: &Value) -> io::Result<Value> {
+            Ok(json!({"content": self.0}))
+        }
+        fn label(&self) -> String {
+            "fixed".into()
+        }
+    }
+
+    #[test]
+    fn a_summary_off_the_form_is_reformatted() {
+        let model = Fixed("<think>hmm</think>goal: count items\nverify: node --test test/");
+        let (goal, verify) = reformat(
+            &model,
+            "count",
+            "I wrote tests in test/app.test.js.",
+            &["test/app.test.js"],
+        )
+        .unwrap();
+        assert_eq!(goal, "count items");
+        assert_eq!(verify, ["node --test test/"]);
+    }
 
     #[test]
     fn summary_parsing() {
