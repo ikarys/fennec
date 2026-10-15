@@ -210,23 +210,38 @@ fn first_line(s: &str) -> &str {
     s.lines().next().unwrap_or("")
 }
 
-/// `goal:` starts the goal, which runs until the first `verify:` line.
+/// `goal:` starts the goal, which runs until the first `verify:`. A local
+/// model does not keep the format exactly: `verify:` may close the goal's
+/// line, and its commands may follow on the next lines, fenced or bulleted.
 fn parse(summary: &str) -> (String, Vec<String>) {
     let mut goal = Vec::new();
     let mut verify = Vec::new();
-    let mut in_goal = false;
-    for line in summary.lines() {
+    let (mut in_goal, mut in_verify) = (false, false);
+    let lines = summary.lines().flat_map(|line| match line.find("verify:") {
+        Some(i) if i > 0 && !line[..i].trim().is_empty() => vec![&line[..i], &line[i..]],
+        _ => vec![line],
+    });
+    for line in lines {
         let trimmed = line.trim();
         if let Some(cmd) = trimmed.strip_prefix("verify:") {
             in_goal = false;
-            if !cmd.trim().is_empty() {
-                verify.push(cmd.trim().trim_matches('`').to_string());
+            let cmd = cmd.trim().trim_matches('`');
+            in_verify = cmd.is_empty();
+            if !cmd.is_empty() {
+                verify.push(cmd.to_string());
             }
         } else if let Some(g) = trimmed.strip_prefix("goal:") {
-            in_goal = true;
+            (in_goal, in_verify) = (true, false);
             goal.push(g.trim());
         } else if in_goal {
             goal.push(trimmed);
+        } else if in_verify {
+            let cmd = trimmed.trim_start_matches("- ").trim_matches('`');
+            if trimmed.is_empty() && !verify.is_empty() {
+                in_verify = false;
+            } else if !cmd.is_empty() && !trimmed.starts_with("```") {
+                verify.push(cmd.to_string());
+            }
         }
     }
     (goal.join("\n").trim().to_string(), verify)
@@ -296,5 +311,11 @@ mod tests {
         );
         assert_eq!(goal, "add `f`\nthat doubles.");
         assert_eq!(verify, ["cargo test -q", "sh t.sh"]);
+        // Seen live with qwen3.8-27b: `verify:` at the end of the goal line.
+        let (goal, verify) = parse("goal: add divide. verify: python3 -m unittest test_calc -v");
+        assert_eq!(goal, "add divide.");
+        assert_eq!(verify, ["python3 -m unittest test_calc -v"]);
+        let (_, verify) = parse("goal: g\nverify:\n```\npython3 -m unittest\n```\n\nDone.");
+        assert_eq!(verify, ["python3 -m unittest"]);
     }
 }
