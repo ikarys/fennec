@@ -11,7 +11,7 @@ use std::sync::Mutex;
 use common::Fixture;
 use fennec_os::provider::Model;
 use fennec_os::solve::{Task, land, plan, push, solve};
-use fennec_os::{grant, review, rules, sleep, spec};
+use fennec_os::{grant, proof, review, rules, sleep, spec};
 use serde_json::{Value, json};
 
 struct Script {
@@ -192,6 +192,47 @@ fn a_run_lands_on_the_branch_the_rules_ask_for_and_is_pushed() {
         .output()
         .unwrap();
     assert_eq!(String::from_utf8_lossy(&pushed.stdout).trim(), commit);
+}
+
+#[test]
+fn a_proof_clicks_like_a_user_and_fails_on_what_the_page_does_not_show() {
+    if Command::new("chromium").arg("--version").output().is_err() {
+        return; // no browser on this machine: nothing to drive
+    }
+    let f = fixture("clicks");
+    let page = "<!doctype html><ul><li onclick=\"this.style.textDecoration='line-through'\">pain</li></ul>";
+    let model = Script::new(
+        "page",
+        &[write("answer", "42\n"), write("index.html", page), done()],
+    );
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&model], 10).unwrap();
+    let winner = record["winner"].as_str().unwrap().to_string();
+    let serve = "serve: python3 -m http.server 8765\nshot: http://127.0.0.1:8765/\n";
+
+    model
+        .replies
+        .lock()
+        .unwrap()
+        .push_back(json!({"content": format!("{serve}act: click `pain`\n")}));
+    let shown = proof::gather(&f.worlds, &winner, Some("pain se barre"), &model).unwrap();
+    let shot = &shown["shots"][0];
+    assert_eq!(shot["ok"], true, "{shot}");
+    assert!(shot["before"].is_string() && shot["file"].is_string());
+    assert_eq!(shown["passed"], true);
+
+    model
+        .replies
+        .lock()
+        .unwrap()
+        .push_back(json!({"content": format!("{serve}act: click beurre\n")}));
+    let missing = proof::gather(&f.worlds, &winner, None, &model).unwrap();
+    let shot = &missing["shots"][0];
+    assert_eq!(shot["ok"], false);
+    assert!(
+        shot["reason"].as_str().unwrap().contains("« beurre »"),
+        "{shot}"
+    );
+    assert_eq!(missing["passed"], false);
 }
 
 #[test]
