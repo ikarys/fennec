@@ -5,61 +5,76 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>fennec</title>
 <style>
-  :root { --bg: #f6f5f2; --card: #fff; --text: #1d1d1b; --muted: #6b6a66; --line: #e2e0da;
-          --accent: #c4622d; --mine: #c4622d; --ready: #2f7d4f; --running: #4a6fa5; --failed: #a33a3a; }
+  :root { --bg: #f6f5f2; --card: #fff; --text: #1d1d1b; --muted: #6b6a66; --line: #e2e0da; --soft: #efede8;
+          --accent: #c4622d; --ok: #2f7d4f; --warn: #9a6a12; --bad: #a33a3a; --info: #4a6fa5; }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #171716; --card: #222220; --text: #ecebe7; --muted: #9a988f; --line: #33322f;
-            --accent: #e08050; --mine: #e08050; --ready: #5fb383; --running: #7d9ccc; --failed: #d46a6a; }
+    :root { --bg: #171716; --card: #222220; --text: #ecebe7; --muted: #9a988f; --line: #33322f; --soft: #2b2a28;
+            --accent: #e08050; --ok: #5fb383; --warn: #d9a441; --bad: #d46a6a; --info: #7d9ccc; }
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text);
-         font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  main { max-width: 1200px; margin: 0 auto; padding: 24px 16px 48px; }
-  header { display: flex; align-items: baseline; gap: 16px; margin-bottom: 20px; }
-  h1 { font-size: 20px; margin: 0; letter-spacing: .02em; }
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 24px 16px 64px; }
+  header { display: flex; align-items: baseline; gap: 16px; margin-bottom: 16px; }
+  h1 { font-size: 20px; margin: 0; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+       margin: 32px 0 10px; font-weight: 600; }
   .muted { color: var(--muted); }
-  #new-request { display: grid; grid-template-columns: 200px 1fr auto; gap: 8px; margin-bottom: 28px; }
   select, textarea, button, input { font: inherit; color: inherit; background: var(--card);
-         border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
-  textarea { resize: vertical; min-height: 42px; }
+         border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; }
+  textarea { resize: vertical; min-height: 44px; width: 100%; }
   button { cursor: pointer; }
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
   button.link { border: none; background: none; color: var(--accent); padding: 0; }
-  .board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
-  section h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; margin: 0 0 10px;
-               display: flex; gap: 8px; align-items: center; }
-  section h2 .count { color: var(--muted); font-weight: 400; }
-  section h2::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
-  .card { background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--c);
-          border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
-  .card .project { font-size: 12px; color: var(--muted); }
-  .card .title { margin: 2px 0 4px; overflow-wrap: anywhere; }
-  .card .detail { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
-  .card details { margin-top: 6px; font-size: 13px; }
-  .card summary { cursor: pointer; color: var(--muted); }
-  .card code { display: block; font: 12px ui-monospace, monospace; padding: 2px 0; overflow-wrap: anywhere; }
-  .card .detail { white-space: pre-line; }
-  .steps { display: block; margin-top: 6px; font-family: monospace; }
-  .shot { display: block; margin-top: 8px; color: var(--muted); text-decoration: none; }
+  button.quiet { border: none; background: none; color: var(--muted); padding: 8px 4px; font-size: 13px; }
+  #new-request { display: grid; grid-template-columns: 180px 1fr auto; gap: 8px; }
+  .error { color: var(--bad); font-size: 13px; min-height: 0; margin: 4px 0 0; }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px;
+          margin-bottom: 12px; }
+  .meta { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); }
+  .tag { font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--c); }
+  .title { font-size: 16px; margin: 4px 0 10px; overflow-wrap: anywhere; }
+  /* The one thing to read before deciding. */
+  .focus { background: var(--soft); border-radius: 8px; padding: 10px 12px; overflow-wrap: anywhere; }
+  .focus .label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 2px; }
+  .warn { color: var(--warn); font-size: 14px; margin: 8px 0 0; padding-left: 18px; }
+  .bad { color: var(--bad); font-size: 14px; margin-top: 8px; overflow-wrap: anywhere; }
+  .shots { display: flex; gap: 10px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+  .shot { flex: 1 1 260px; color: var(--muted); text-decoration: none; font-size: 12px; min-width: 0; }
   /* Top-left corner at real size: a whole page shrunk to a card is unreadable. */
-  .shot img { display: block; width: 100%; height: 200px; object-fit: none; object-position: left top;
-              background: #fff; border: 1px solid var(--line); border-radius: 6px; }
-  .card pre { font: 12px ui-monospace, monospace; background: var(--bg); border-radius: 6px; padding: 6px 8px;
-              margin: 2px 0 8px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 240px; overflow: auto; }
-  .answer { display: grid; gap: 6px; margin-top: 10px; }
-  .answer .error { margin: 0; min-height: 0; font-size: 13px; }
-  .empty { font-size: 13px; color: var(--muted); padding: 4px 0; }
-  .error { color: var(--failed); margin: -18px 0 18px; min-height: 1em; }
+  .shot img { display: block; width: 100%; height: 220px; object-fit: none; object-position: left top;
+              background: #fff; border: 1px solid var(--line); border-radius: 6px; margin-bottom: 2px; }
+  .arrow { color: var(--muted); font-size: 20px; }
+  .steps { flex-basis: 100%; font: 12px ui-monospace, monospace; color: var(--muted); }
+  .actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+  .actions .spacer { flex: 1; }
+  .reply { margin-top: 10px; }
+  details { margin-top: 10px; font-size: 13px; color: var(--muted); }
+  summary { cursor: pointer; }
+  details code, details pre { display: block; font: 12px ui-monospace, monospace; overflow-wrap: anywhere;
+              white-space: pre-wrap; margin: 4px 0; }
+  details pre { background: var(--soft); border-radius: 6px; padding: 6px 8px; max-height: 240px; overflow: auto; }
+  details p { margin: 6px 0; }
+  .empty { color: var(--muted); padding: 12px 0; }
+  .line { display: flex; gap: 10px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--line);
+          font-size: 14px; overflow-wrap: anywhere; }
+  .line .what { flex: 1; min-width: 0; }
+  .line .state { color: var(--muted); font-size: 13px; white-space: nowrap; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--info); flex: none; align-self: center;
+         animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .3; } }
   dialog { background: var(--card); color: var(--text); border: 1px solid var(--line); border-radius: 10px;
-           width: min(560px, calc(100vw - 32px)); padding: 16px; }
-  dialog ul { list-style: none; padding: 0; margin: 10px 0; max-height: 50vh; overflow: auto; }
+           width: min(600px, calc(100vw - 32px)); padding: 16px; }
+  dialog form.go { display: flex; gap: 8px; margin: 10px 0; }
+  dialog form.go input { flex: 1; min-width: 0; }
+  dialog ul { list-style: none; padding: 0; margin: 10px 0; max-height: 45vh; overflow: auto; }
   dialog li button { width: 100%; text-align: left; border: none; border-radius: 6px; }
   dialog li button:hover { background: var(--bg); }
-  .repo { color: var(--ready); font-size: 12px; margin-left: 6px; }
+  .repo { color: var(--ok); font-size: 12px; margin-left: 6px; }
   .row { display: flex; gap: 8px; justify-content: flex-end; }
-  @media (max-width: 800px) {
+  @media (max-width: 700px) {
     #new-request { grid-template-columns: 1fr; }
-    .board { grid-template-columns: 1fr; }
   }
 </style>
 </head>
@@ -77,16 +92,22 @@
   </form>
   <p class="error" id="error" role="alert"></p>
 
-  <div class="board">
-    <section style="--c: var(--mine)"><h2>À moi <span class="count" id="n-mine"></span></h2><div id="mine"></div></section>
-    <section style="--c: var(--ready)"><h2>Prêt <span class="count" id="n-ready"></span></h2><div id="ready"></div></section>
-    <section style="--c: var(--running)"><h2>En cours <span class="count" id="n-running"></span></h2><div id="running"></div></section>
-    <section style="--c: var(--failed)"><h2>Échoué <span class="count" id="n-failed"></span></h2><div id="failed"></div></section>
-  </div>
+  <h2>À toi <span id="n-todo"></span></h2>
+  <div id="todo"></div>
+
+  <h2>fennec travaille</h2>
+  <div id="running"></div>
+
+  <h2>Intégré récemment</h2>
+  <div id="landed"></div>
 </main>
 
 <dialog id="picker">
   <strong>Choisir un projet</strong>
+  <form class="go" id="picker-go">
+    <input id="picker-input" aria-label="Chemin du dossier" placeholder="Colle un chemin, ou parcours ci-dessous">
+    <button type="submit">Aller</button>
+  </form>
   <div class="muted" id="picker-path"></div>
   <ul id="picker-list"></ul>
   <div class="row">

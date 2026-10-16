@@ -6,7 +6,6 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use fennec_os::world::Worlds;
 use serde_json::{Value, json};
 
 pub struct Store {
@@ -106,10 +105,10 @@ impl Store {
     }
 
     /// The single view: every project, sorted by what needs the human.
-    pub fn view(&self, worlds: &Worlds) -> io::Result<Value> {
-        let runs = fennec_os::review::runs(worlds)?;
-        let runs = runs.into_iter().map(|(_, r)| r).collect::<Vec<_>>();
-        Ok(classify(&self.requests()?, &runs, &self.projects()?))
+    /// Runs fennec-os made outside a request are not shown: nothing here
+    /// could act on them.
+    pub fn view(&self) -> io::Result<Value> {
+        Ok(classify(&self.requests()?, &self.projects()?))
     }
 }
 
@@ -132,78 +131,54 @@ fn name(project: &str) -> &str {
         .unwrap_or(project)
 }
 
-/// Sorts requests and fennec-os runs into the four columns. Pure, so the
-/// mapping from internal states to what the human sees is tested here.
-fn classify(requests: &[(String, Value)], runs: &[Value], projects: &[String]) -> Value {
-    let (mut mine, mut ready, mut running, mut failed) = (vec![], vec![], vec![], vec![]);
+/// Sorts requests into what needs the human, what fennec is doing, and what
+/// was landed. Pure, so the mapping from internal states to what the human
+/// sees is tested here. Each card carries fields, not prose: the page decides
+/// what is shown at once and what waits behind "details".
+fn classify(requests: &[(String, Value)], projects: &[String]) -> Value {
+    let (mut todo, mut running, mut landed) = (vec![], vec![], vec![]);
     for (id, r) in requests {
-        let card = |detail: &str| json!({"id": id, "project": name(r["project"].as_str().unwrap_or("")), "title": r["text"], "detail": detail});
+        let card = |kind: &str| {
+            json!({"id": id, "kind": kind, "project": name(r["project"].as_str().unwrap_or("")),
+                   "title": r["text"], "rules": r["rules"], "checks": r["verify"]})
+        };
         // Scenario 4: what the human said may become a rule, at one word.
         if let Some(rule) = r["offer"]["rule"].as_str() {
-            let mut c = card(&format!(
-                "Règle proposée : {rule}\n(d'après ce que tu as dit : « {} »)",
-                r["offer"]["heard"].as_str().unwrap_or("")
-            ));
-            c["rule"] = json!(true);
-            mine.push(c);
+            let mut c = card("rule");
+            c["rule"] = json!(rule);
+            c["heard"] = r["offer"]["heard"].clone();
+            todo.push((0, c));
         }
-        let applied = r["rules"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .filter_map(|u| u.as_str().map(|u| format!("Règle appliquée : {u}")));
-        let with_rules = |first: String| -> String {
-            std::iter::once(first)
-                .chain(applied.clone())
-                .collect::<Vec<_>>()
-                .join("\n")
-        };
         match r["status"].as_str() {
-            Some("framing") => running.push(card("fennec prépare « terminé quand »")),
+            Some("framing") => {
+                running.push(card_step(card("running"), "prépare « terminé quand »"))
+            }
+            Some("running") => running.push(card_step(card("running"), "travaille")),
+            Some("proving") => running.push(card_step(card("running"), "essaie le produit")),
+            Some("landing") => running.push(card_step(card("running"), "intègre")),
             Some("question") => {
-                let done_when = r["done_when"].as_str().unwrap_or("");
-                let mut c = card(&with_rules(format!("Terminé quand : {done_when}")));
-                c["checks"] = r["verify"].clone();
-                c["ask"] = json!(true);
-                mine.push(c);
+                let mut c = card("validate");
+                c["done_when"] = r["done_when"].clone();
+                todo.push((0, c));
             }
             Some("blocked") => {
-                let mut c = card(&format!(
-                    "Question : {}\n(fennec s'est arrêté : {})",
-                    r["question"].as_str().unwrap_or(""),
-                    r["reason"].as_str().unwrap_or("")
-                ));
-                c["reply"] = json!(true);
-                mine.push(c);
+                let mut c = card("blocked");
+                c["question"] = r["question"].clone();
+                c["reason"] = r["reason"].clone();
+                todo.push((0, c));
             }
-            Some("running") => running.push(card("fennec travaille")),
-            Some("proving") => running.push(card("fennec essaie le produit")),
-            Some("landing") => running.push(card("fennec intègre le travail au projet")),
             Some("ready") => {
-                let unverified = r["proof"]["unverified"]
-                    .as_array()
-                    .into_iter()
-                    .flatten()
-                    .filter_map(|u| u.as_str().map(|u| format!("non vérifié : {u}")));
-                // A run that predates the proof was never tried: say so.
-                let count = |k: &str| r["proof"][k].as_array().map_or(0, Vec::len);
-                let first = match (count("tries"), count("shots")) {
-                    (0, 0) => "non vérifié : produit pas encore essayé".to_string(),
-                    (n, 0) => format!("Prouvé par {n} essai(s)"),
-                    (0, s) => format!("Prouvé par {s} capture(s) d'écran"),
-                    (n, s) => format!("Prouvé par {n} essai(s) et {s} capture(s) d'écran"),
-                };
-                let land_error = r["land_error"]
-                    .as_str()
-                    .map(|e| format!("intégration interrompue : {e}"));
-                let lines: Vec<String> = std::iter::once(with_rules(first))
-                    .chain(unverified)
-                    .chain(land_error)
-                    .collect();
-                let mut c = card(&lines.join("\n"));
-                c["checks"] = r["verify"].clone();
-                c["proof"] = r["proof"]["tries"].clone();
+                let mut c = card("ready");
+                c["done_when"] = r["done_when"].clone();
+                c["unverified"] = r["proof"]["unverified"].clone();
+                c["tries"] = r["proof"]["tries"].clone();
                 c["shots"] = r["proof"]["shots"].clone();
+                c["land_error"] = r["land_error"].clone();
+                // A run that predates the proof was never tried: say so.
+                c["untried"] = json!(
+                    r["proof"]["tries"].as_array().is_none_or(Vec::is_empty)
+                        && r["proof"]["shots"].as_array().is_none_or(Vec::is_empty)
+                );
                 if r["run"].is_string() {
                     // Without a target, the click only prepares one.
                     let t = &r["target"];
@@ -214,44 +189,40 @@ fn classify(requests: &[(String, Value)], runs: &[Value], projects: &[String]) -
                         "committed": r["commit"].is_string(),
                     });
                 }
-                ready.push(c);
+                todo.push((1, c));
             }
             Some("failed") => {
-                let mut c = card(r["reason"].as_str().unwrap_or("raison inconnue"));
-                c["proof"] = r["proof"]["tries"].clone();
+                let mut c = card("failed");
+                c["reason"] = r["reason"].clone();
+                c["tries"] = r["proof"]["tries"].clone();
                 c["shots"] = r["proof"]["shots"].clone();
-                c["retry"] = json!(true);
-                failed.push(c);
+                todo.push((2, c));
+            }
+            Some("landed") => {
+                let mut c = card("landed");
+                c["branch"] = r["target"]["branch"].clone();
+                c["remote"] = r["target"]["remote"].clone();
+                c["commit"] = r["commit"].clone();
+                landed.push(c);
             }
             _ => {}
         }
     }
-    // A request's run is shown through the request, not a second time.
-    let owned: Vec<&Value> = requests
-        .iter()
-        .map(|(_, r)| &r["spec"])
-        .filter(|s| s.is_string())
-        .collect();
-    for r in runs.iter().filter(|r| !owned.contains(&&r["spec"])) {
-        let card = |detail: &str| json!({"project": name(r["project"].as_str().unwrap_or("")), "title": r["goal"], "detail": detail});
-        match r["status"].as_str() {
-            // fennec-os proves commands pass, not that the product works.
-            Some("ready") => ready.push(card("non vérifié : produit pas encore essayé")),
-            Some("failed") => {
-                let why = r["attempts"]
-                    .as_array()
-                    .and_then(|a| a.iter().find_map(|t| t["reason"].as_str()))
-                    .unwrap_or("raison inconnue");
-                failed.push(card(why));
-            }
-            _ => {}
-        }
-    }
+    // Answers unblock fennec, so they come first; then results, then failures.
+    todo.sort_by_key(|(rank, _)| *rank);
+    let todo: Vec<Value> = todo.into_iter().map(|(_, c)| c).collect();
+    landed.reverse();
+    landed.truncate(5);
     let projects: Vec<Value> = projects
         .iter()
         .map(|p| json!({"path": p, "name": name(p)}))
         .collect();
-    json!({"mine": mine, "ready": ready, "running": running, "failed": failed, "projects": projects})
+    json!({"todo": todo, "running": running, "landed": landed, "projects": projects})
+}
+
+fn card_step(mut card: Value, step: &str) -> Value {
+    card["step"] = json!(step);
+    card
 }
 
 #[cfg(test)]
@@ -259,7 +230,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn internal_states_land_in_the_right_column() {
+    fn what_needs_the_human_comes_first_answers_before_results() {
         let requests = [
             (
                 "1".to_string(),
@@ -267,66 +238,41 @@ mod tests {
             ),
             (
                 "2".to_string(),
-                json!({"project": "/p/a", "text": "y", "status": "question", "done_when": "Q", "spec": "s1"}),
-            ),
-            (
-                "3".to_string(),
                 json!({"project": "/p/a", "text": "z", "status": "ready", "run": "r1", "land_error": "conflit", "rules": ["use uv"], "offer": {"rule": "never touch develop", "heard": "pas develop !"}}),
             ),
             (
+                "3".to_string(),
+                json!({"project": "/p/a", "text": "y", "status": "question", "done_when": "Q"}),
+            ),
+            (
                 "4".to_string(),
-                json!({"project": "/p/a", "text": "w", "status": "blocked", "question": "Q?", "reason": "stuck"}),
+                json!({"project": "/p/a", "text": "f", "status": "failed", "reason": "timeout"}),
+            ),
+            (
+                "5".to_string(),
+                json!({"project": "/p/a", "text": "l", "status": "landed", "commit": "c1", "target": {"branch": "feat/l", "remote": "origin"}}),
+            ),
+            (
+                "6".to_string(),
+                json!({"project": "/p/a", "text": "d", "status": "dropped"}),
             ),
         ];
-        let runs = [
-            json!({"project": "/p/b", "goal": "g1", "status": "ready"}),
-            json!({"project": "/p/b", "goal": "g2", "status": "failed", "attempts": [{"passed": false}, {"reason": "timeout"}]}),
-            json!({"project": "/p/b", "goal": "g3", "status": "landed"}),
-            json!({"project": "/p/a", "goal": "g4", "status": "ready", "spec": "s1"}),
-        ];
-        let v = classify(&requests, &runs, &["/p/a".into()]);
-        assert_eq!(v["running"][0]["title"], "x");
-        assert_eq!(v["mine"][0]["detail"], "Terminé quand : Q");
-        assert_eq!(v["mine"][0]["id"], "2");
-        assert_eq!(
-            v["mine"][2]["detail"],
-            "Question : Q?\n(fennec s'est arrêté : stuck)"
-        );
-        assert_eq!(v["mine"][2]["reply"], true);
-        assert_eq!(
-            v["mine"][1]["detail"],
-            "Règle proposée : never touch develop\n(d'après ce que tu as dit : « pas develop ! »)"
-        );
-        assert_eq!(v["mine"][1]["rule"], true);
-        assert_eq!(
-            v["ready"][0]["detail"],
-            "non vérifié : produit pas encore essayé\nRègle appliquée : use uv\nintégration interrompue : conflit"
-        );
-        assert_eq!(v["ready"][0]["land"]["branch"], Value::Null);
-        assert!(
-            v["ready"][1].get("land").is_none(),
-            "a bare run is landed by fennec-os"
-        );
-        assert_eq!(v["ready"][1]["project"], "b");
-        assert!(
-            v["ready"][1]["detail"]
-                .as_str()
-                .unwrap()
-                .starts_with("non vérifié")
-        );
-        assert_eq!(v["failed"][0]["detail"], "timeout");
-        assert!(
-            v["failed"][0].get("retry").is_none(),
-            "a bare run has no request to retry"
-        );
-        let shown = ["mine", "ready", "running", "failed"]
+        let v = classify(&requests, &["/p/a".into()]);
+        let kinds: Vec<&str> = v["todo"]
+            .as_array()
+            .unwrap()
             .iter()
-            .map(|k| v[*k].as_array().unwrap().len())
-            .sum::<usize>();
-        assert_eq!(
-            shown, 7,
-            "landed runs and runs owned by a request are not shown"
-        );
+            .map(|c| c["kind"].as_str().unwrap())
+            .collect();
+        assert_eq!(kinds, ["rule", "validate", "ready", "failed"]);
+        assert_eq!(v["todo"][1]["done_when"], "Q");
+        let ready = &v["todo"][2];
+        assert_eq!(ready["untried"], true);
+        assert_eq!(ready["land_error"], "conflit");
+        assert_eq!(ready["rules"][0], "use uv");
+        assert_eq!(ready["land"]["branch"], Value::Null);
+        assert_eq!(v["running"][0]["step"], "prépare « terminé quand »");
+        assert_eq!(v["landed"][0]["branch"], "feat/l");
         assert_eq!(v["projects"][0]["name"], "a");
     }
 }

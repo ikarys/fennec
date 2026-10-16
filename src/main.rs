@@ -155,7 +155,7 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
     let input = || -> io::Result<Value> { serde_json::from_slice(body).map_err(io::Error::other) };
     let field = |v: &Value, k: &str| v[k].as_str().map(str::to_string).unwrap_or_default();
     match (method, path) {
-        ("GET", "/api/view") => store.view(&Worlds::from_env()?),
+        ("GET", "/api/view") => store.view(),
         ("POST", "/api/requests") => {
             let v = input()?;
             let id = store.add_request(&field(&v, "project"), &field(&v, "text"))?;
@@ -184,6 +184,10 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
         ("POST", "/api/rule") => {
             let v = input()?;
             work::rule(&store, &field(&v, "id"), &field(&v, "scope"))?;
+            Ok(json!({}))
+        }
+        ("POST", "/api/drop") => {
+            work::drop(&store, &field(&input()?, "id"))?;
             Ok(json!({}))
         }
         ("POST", "/api/projects") => {

@@ -351,6 +351,23 @@ fn apply_run(request: &mut Value, record: &Value) {
 /// shown on the card, with the message shown there, then that branch is
 /// pushed. Without a branch on the card yet, the click only decides it. A landing that fails leaves the request ready, with the reason;
 /// once committed, a new click only retries the push.
+/// The human gives up on a request. Only one waiting for them: work in
+/// progress would write its result over the decision.
+pub fn drop(store: &Store, id: &str) -> io::Result<()> {
+    let status = store.load(id)?["status"].as_str().unwrap_or("").to_string();
+    if !matches!(status.as_str(), "question" | "blocked" | "ready" | "failed") {
+        return Err(io::Error::other(
+            "fennec travaille encore sur cette demande",
+        ));
+    }
+    store.update(id, |r| {
+        r["status"] = json!("dropped");
+        if let Some(m) = r.as_object_mut() {
+            m.remove("offer");
+        }
+    })
+}
+
 pub fn land(store: &Store, id: &str) -> io::Result<()> {
     let request = store.load(id)?;
     if request["status"] != "ready" || !request["run"].is_string() {
