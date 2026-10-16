@@ -398,16 +398,35 @@ pub(crate) fn verify(
     Ok((checks, (!all_pass).then_some("verify failed")))
 }
 
-const MESSAGE: &str = "Write the git commit message for the change below, the way this \
-project writes them: follow its conventions and rules and the style of its recent subjects. \
-Reply with the message only, no fences, no commentary.";
+const PLAN: &str = "Decide how the change below lands in this project, the way this project \
+does it: follow its conventions and rules (branch naming, protected branches, commit style) and \
+the style of its recent subjects. First line: `branch: <name>`, the branch the commit goes on; \
+`branch: current` when the rules say nothing about branches. Then a blank line, then the commit \
+message. No fences, no commentary.";
 
-/// A commit message for landing run `id`, written by the model from the
-/// project's conventions; `None` when the model gives nothing usable, so the
-/// caller falls back to the goal.
-pub fn message(worlds: &Worlds, id: &str, model: &dyn Model) -> io::Result<Option<String>> {
+/// Where and how a run lands: shown to the human before they click.
+pub struct Landing {
+    /// The branch the commit goes on; the project's current one by default.
+    pub branch: String,
+    /// `None` when the model gives nothing usable: the goal's first line.
+    pub message: Option<String>,
+    /// The remote the branch is pushed to; `None` when the project has none.
+    pub remote: Option<String>,
+}
+
+/// The branch and commit message for landing run `id`, written by the model
+/// from the project's conventions. The harness only checks the branch is a
+/// valid name; whether it is the right one is the human's call on screen.
+pub fn plan(worlds: &Worlds, id: &str, model: &dyn Model) -> io::Result<Landing> {
     let record = review::load(worlds, id)?;
     let project = Path::new(record["project"].as_str().unwrap_or(""));
+    let current = git(project, &["branch", "--show-current"])?;
+    let remotes = git(project, &["remote"])?;
+    let remote = remotes
+        .lines()
+        .find(|r| *r == "origin")
+        .or_else(|| remotes.lines().next())
+        .map(str::to_string);
     let diff: String = record["attempts"]
         .as_array()
         .and_then(|a| a.iter().find(|t| t["world"] == id))
@@ -423,26 +442,64 @@ pub fn message(worlds: &Worlds, id: &str, model: &dyn Model) -> io::Result<Optio
         .collect();
     let said: Vec<String> = rules::said(project)?.into_iter().map(|s| s.text).collect();
     let recent = git(project, &["log", "-10", "--format=%s"]).unwrap_or_default();
+    let branches = git(project, &["branch", "--format=%(refname:short)"]).unwrap_or_default();
     let request = format!(
-        "Project conventions (AGENTS.md):\n{agents}\n\nRules:\n{}\n\nRecent subjects:\n{recent}\n\nGoal:\n{}\n\nChange:\n{diff}",
+        "Project conventions (AGENTS.md):\n{agents}\n\nRules:\n{}\n\nCurrent branch: {current}\nBranches:\n{branches}\n\nRecent subjects:\n{recent}\n\nGoal:\n{}\n\nChange:\n{diff}",
         said.join("\n"),
         record["goal"].as_str().unwrap_or("")
     );
     let messages = [
-        json!({"role": "system", "content": MESSAGE}),
+        json!({"role": "system", "content": PLAN}),
         json!({"role": "user", "content": request}),
     ];
     let reply = model.chat(&messages, &json!([]))?;
     let content = reply["content"].as_str().unwrap_or("");
-    let text = content
-        .rsplit("</think>")
-        .next()
-        .unwrap_or(content)
+    let (branch, message) = parse_plan(content.rsplit("</think>").next().unwrap_or(content));
+    let branch = branch
+        .filter(|b| git(project, &["check-ref-format", "--branch", b]).is_ok())
+        .unwrap_or(current);
+    Ok(Landing {
+        branch,
+        message,
+        remote,
+    })
+}
+
+fn parse_plan(reply: &str) -> (Option<String>, Option<String>) {
+    let text = reply
         .trim()
         .trim_start_matches("```")
         .trim_end_matches("```")
         .trim();
-    Ok((!text.is_empty()).then(|| text.to_string()))
+    let (first, rest) = text.split_once('\n').unwrap_or((text, ""));
+    let Some(branch) = first.trim().strip_prefix("branch:") else {
+        return (None, (!text.is_empty()).then(|| text.to_string()));
+    };
+    let branch = branch.trim().trim_matches('`');
+    let branch = (!branch.is_empty() && branch != "current").then(|| branch.to_string());
+    let message = rest.trim();
+    (branch, (!message.is_empty()).then(|| message.to_string()))
+}
+
+/// Pushes `branch` to `remote` with the human's own credentials. Never
+/// prompts: a push that needs a password fails with git's reason instead
+/// of hanging in the background.
+pub fn push(project: &Path, remote: &str, branch: &str) -> io::Result<()> {
+    let out = std::process::Command::new("git")
+        .arg("-C")
+        .arg(project)
+        .args(["-c", "core.hooksPath=/dev/null", "push", "--quiet", remote])
+        .arg(format!("refs/heads/{branch}:refs/heads/{branch}"))
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .env("GIT_SSH_COMMAND", "ssh -o BatchMode=yes")
+        .output()?;
+    if !out.status.success() {
+        return Err(io::Error::other(format!(
+            "git push {remote} {branch}: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        )));
+    }
+    Ok(())
 }
 
 /// Lands a world that passed onto the project as one commit, then drops the
@@ -450,8 +507,14 @@ pub fn message(worlds: &Worlds, id: &str, model: &dyn Model) -> io::Result<Optio
 /// verified again: a rebased tree is a new tree. Refuses a world changed
 /// since its verdict. The commit is the human's: the project's own git
 /// identity, `message` or else the goal's first line; the harness's
-/// checkpoints stay behind.
-pub fn land(worlds: &Worlds, id: &str, message: Option<&str>) -> io::Result<String> {
+/// checkpoints stay behind. On `branch` other than the current one, the
+/// commit goes on a new branch and the human's worktree is left alone.
+pub fn land(
+    worlds: &Worlds,
+    id: &str,
+    branch: Option<&str>,
+    message: Option<&str>,
+) -> io::Result<String> {
     let world = worlds.open(id)?;
     let marker = worlds.root.join("passed").join(id);
     let text = std::fs::read_to_string(&marker)
@@ -526,7 +589,17 @@ pub fn land(worlds: &Worlds, id: &str, message: Option<&str>) -> io::Result<Stri
             message,
         ],
     )?;
-    git(project, &["merge", "-q", "--ff-only", &squashed])?;
+    let current = git(project, &["branch", "--show-current"])?;
+    match branch.filter(|b| *b != current) {
+        None => {
+            git(project, &["merge", "-q", "--ff-only", &squashed])?;
+        }
+        // `git branch` without -f refuses an existing branch: the commit was
+        // verified on the current branch's tree, not on that one.
+        Some(b) => {
+            git(project, &["branch", "--", b, &squashed])?;
+        }
+    }
     let commit = squashed;
     let _ = std::fs::remove_file(&marker);
     worlds.drop(world)?;
