@@ -40,13 +40,14 @@
   .focus .label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 2px; }
   .warn { color: var(--warn); font-size: 14px; margin: 8px 0 0; padding-left: 18px; }
   .bad { color: var(--bad); font-size: 14px; margin-top: 8px; overflow-wrap: anywhere; }
-  .shots { display: flex; gap: 10px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
-  .shot { flex: 1 1 260px; color: var(--muted); text-decoration: none; font-size: 12px; min-width: 0; }
-  /* Top-left corner at real size: a whole page shrunk to a card is unreadable. */
-  .shot img { display: block; width: 100%; height: 220px; object-fit: none; object-position: left top;
-              background: #fff; border: 1px solid var(--line); border-radius: 6px; margin-bottom: 2px; }
-  .arrow { color: var(--muted); font-size: 20px; }
-  .steps { flex-basis: 100%; font: 12px ui-monospace, monospace; color: var(--muted); }
+  .shots { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+  .shot { color: var(--muted); text-decoration: none; font-size: 12px; }
+  /* The whole width of the page, scaled to the card: a corner at real size hid
+     most of what the proof showed. Long pages are cut at the bottom. */
+  .shot img { display: block; width: 100%; height: auto; max-height: 520px; object-fit: cover;
+              object-position: left top; background: #fff; border: 1px solid var(--line);
+              border-radius: 6px; margin-bottom: 2px; }
+  .steps { font: 12px ui-monospace, monospace; color: var(--muted); }
   .actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; margin-top: 12px; flex-wrap: wrap; }
   .actions .spacer { flex: 1; }
   .reply { margin-top: 10px; }

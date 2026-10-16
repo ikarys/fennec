@@ -75,8 +75,9 @@ function shots(item) {
       return link;
     };
     if (s.before) {
-      row.append(capture(s.before, "Avant"), el("span", { className: "arrow", textContent: "→" }), capture(s.file, "Après"));
-      row.append(el("div", { className: "steps", textContent: "Fait par fennec : " + (s.steps ?? []).join(" → ") }));
+      row.append(capture(s.before, "Avant"),
+        el("div", { className: "steps", textContent: "↓ Fait par fennec : " + (s.steps ?? []).join(" → ") }),
+        capture(s.file, "Après"));
     } else {
       row.append(capture(s.file, "Capture"));
     }
