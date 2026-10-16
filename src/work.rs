@@ -59,7 +59,7 @@ fn frame_now(store: &Store, id: &str) -> io::Result<()> {
         r["rules"] = s["rules"].clone();
         if s["status"] == "proposed" {
             r["status"] = json!("question");
-            r["done_when"] = s["goal"].clone();
+            r["done_when"] = s["done_when"].clone();
             r["verify"] = s["verify"].clone();
         } else if let Some(q) = s["question"].as_str() {
             block(r, "framing", q, s["reason"].as_str().unwrap_or(""));
