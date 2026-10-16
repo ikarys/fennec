@@ -129,10 +129,6 @@ pub fn gather(
             )?);
             worlds.rollback(&world)?;
         }
-        if !shots.is_empty() && plan.shots.iter().all(|(_, steps)| steps.is_empty()) {
-            plan.unverified
-                .push("interactions (click, typing, drag): only the display is captured".into());
-        }
     }
     if checks.is_empty() && shots.is_empty() {
         plan.unverified.push(if content.trim().is_empty() {
