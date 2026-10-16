@@ -18,7 +18,7 @@ src/recipe.rs    replay a landed run's tool calls when the same goal returns
 src/agent.rs     tool loop; every tool runs inside the sandbox; loops, idle runs and hung commands are stopped
 src/solve.rs     task → N worlds → verify → select → land (rebase + re-verify, one commit by the human) on the branch the rules ask for → push
 src/spec.rs      request → acceptance tests + task (intent compiler), human-validated; retry from the tests
-src/proof.rs     a ready run used as its user would: model proposes tries and pages, harness runs and screenshots them
+src/proof.rs     a ready run used as its user would: model proposes tries, pages and clicks/typing; harness runs them, captures before/after (proof.py)
 src/rules.rs     project rules (`.fennec-os/rules.json` at HEAD), glob matching; rules said in words
                  (`~/.config/fennec/rules.md`, AGENTS.md `## Rules`): proposed, written once, given to agents
 src/review.rs    review queue, rejections, corrections said twice, agenda
