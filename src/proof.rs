@@ -41,7 +41,8 @@ serve: <shell command that starts the web interface and keeps running>   (omit i
 shot: <page URL on 127.0.0.1, port included>   (one line per page, at most 3, only with serve)\n\
 act: click <text the user sees on what they click> | type <field's placeholder or label> => \
 <text> | key <Enter, Tab, Escape or Backspace>   (after its shot line, at most 10 per page)\n\
-unverified: <what these cannot show>   (one line per item, omit if none)";
+unverified: <what these cannot show, for the person: in the language of the Done when \
+(or the goal), product terms, no file or tag names>   (one line per item, omit if none)";
 
 /// Drives the browser inside the sandbox; stdlib Python, see the file.
 const DRIVER: &str = include_str!("proof.py");
