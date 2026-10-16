@@ -214,7 +214,8 @@ fn solve_now(store: &Store, id: &str) -> io::Result<()> {
     };
     // Tests passing is not "ready": the product is tried first.
     store.update(id, |r| r["status"] = json!("proving"))?;
-    let proof = proof::gather(&worlds, run, &variants[0])?;
+    let done_when = store.load(id)?["done_when"].as_str().map(str::to_string);
+    let proof = proof::gather(&worlds, run, done_when.as_deref(), &variants[0])?;
     // Where it will land is decided before "ready", so the card never shows
     // a branch the click would not use.
     let mut probe = store.load(id)?;

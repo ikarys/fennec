@@ -195,7 +195,7 @@ fn classify(requests: &[(String, Value)], runs: &[Value], projects: &[String]) -
                 };
                 let land_error = r["land_error"]
                     .as_str()
-                    .map(|e| format!("intégration impossible : {e}"));
+                    .map(|e| format!("intégration interrompue : {e}"));
                 let lines: Vec<String> = std::iter::once(with_rules(first))
                     .chain(unverified)
                     .chain(land_error)
@@ -300,7 +300,7 @@ mod tests {
         assert_eq!(v["mine"][1]["rule"], true);
         assert_eq!(
             v["ready"][0]["detail"],
-            "non vérifié : produit pas encore essayé\nRègle appliquée : use uv\nintégration impossible : conflit"
+            "non vérifié : produit pas encore essayé\nRègle appliquée : use uv\nintégration interrompue : conflit"
         );
         assert_eq!(v["ready"][0]["land"]["branch"], Value::Null);
         assert!(
