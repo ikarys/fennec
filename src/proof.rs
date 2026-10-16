@@ -32,7 +32,10 @@ screenshot, so never imitate a browser or a DOM in a try: when the change only s
 the web interface, give serve and shot lines and no try. When the change shows only after \
 the user does something on the page, follow its shot line with act lines doing it, in \
 order: the harness does them with a real mouse and keyboard and captures the page before \
-and after. Keep each command short. Reply in exactly this form, nothing else:\n\
+and after. When a \"Done when\" is given, it is what the person validated: show every \
+action and result it names (each click it describes is an act, a click that undoes \
+another is an act too), and give an unverified line for each one you cannot show. \
+Keep each command short. Reply in exactly this form, nothing else:\n\
 try: <one shell command>   (one line per command, at most 5)\n\
 serve: <shell command that starts the web interface and keeps running>   (omit if none)\n\
 shot: <page URL on 127.0.0.1, port included>   (one line per page, at most 3, only with serve)\n\
@@ -70,7 +73,13 @@ struct Plan {
 /// Gathers the proof for the run `id` (its winner's world) and saves it in
 /// the run record. Screenshots are kept under `<root>/proofs/`. Returns
 /// `{"tries": [...], "shots": [...], "unverified": [...], "passed": bool}`.
-pub fn gather(worlds: &Worlds, id: &str, model: &dyn Model) -> io::Result<Value> {
+/// `done_when` is what the human validated: the proof must show all of it.
+pub fn gather(
+    worlds: &Worlds,
+    id: &str,
+    done_when: Option<&str>,
+    model: &dyn Model,
+) -> io::Result<Value> {
     let mut record = review::load(worlds, id)?;
     let world = worlds.open(id)?;
     let diff = record["attempts"]
@@ -78,8 +87,9 @@ pub fn gather(worlds: &Worlds, id: &str, model: &dyn Model) -> io::Result<Value>
         .and_then(|a| a.iter().find(|t| t["world"] == id))
         .and_then(|t| t["diff"].as_str())
         .unwrap_or("");
+    let done = done_when.map_or_else(String::new, |d| format!("Done when:\n{d}\n\n"));
     let request = format!(
-        "Goal:\n{}\n\nChange:\n{diff}\n\nREADME:\n{}",
+        "{done}Goal:\n{}\n\nChange:\n{diff}\n\nREADME:\n{}",
         record["goal"].as_str().unwrap_or(""),
         readme(worlds, &world)?
     );
