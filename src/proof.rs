@@ -29,35 +29,41 @@ product behaves as the goal says (catch an expected error and print it). \
 If the project has a web interface the change shows in, also say how to start it and which \
 pages to capture: the harness starts it, opens each page in a real browser and takes a \
 screenshot, so never imitate a browser or a DOM in a try: when the change only shows in \
-the web interface, give serve and shot lines and no try. Keep each command short. \
-Reply in exactly this form, nothing else:\n\
+the web interface, give serve and shot lines and no try. When the change shows only after \
+the user does something on the page, follow its shot line with act lines doing it, in \
+order: the harness does them with a real mouse and keyboard and captures the page before \
+and after. Keep each command short. Reply in exactly this form, nothing else:\n\
 try: <one shell command>   (one line per command, at most 5)\n\
 serve: <shell command that starts the web interface and keeps running>   (omit if none)\n\
 shot: <page URL on 127.0.0.1, port included>   (one line per page, at most 3, only with serve)\n\
+act: click <text the user sees on what they click> | type <field's placeholder or label> => \
+<text> | key <Enter, Tab, Escape or Backspace>   (after its shot line, at most 10 per page)\n\
 unverified: <what these cannot show>   (one line per item, omit if none)";
 
-/// Starts the product with the memory cap, waits for its port, then captures
+/// Drives the browser inside the sandbox; stdlib Python, see the file.
+const DRIVER: &str = include_str!("proof.py");
+const MAX_STEPS: usize = 10;
+
+/// Starts the product with the memory cap, waits for its port, then uses
 /// the page with the browser outside the cap (V8 reserves more address space
-/// than any sane cap). The PNG goes to stdout, the page's visible text length
-/// and any error to stderr. Arguments: serve, url, port, cap in KiB (0 = none).
+/// than any sane cap). The driver writes the PNGs to stdout and what it saw
+/// to stderr. Arguments: serve, url, port, cap in KiB (0 = none), driver,
+/// steps as JSON.
 const SHOT_SCRIPT: &str = r#"
-serve="$1"; url="$2"; port="$3"; cap="$4"; browser="${FENNEC_OS_BROWSER:-chromium}"
+serve="$1"; url="$2"; port="$3"; cap="$4"
 ( if [ "$cap" -gt 0 ]; then ulimit -v "$cap"; fi; exec sh -c "$serve" ) >/tmp/serve.log 2>&1 &
 up() { (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null; }
 for _ in $(seq 60); do up && break; sleep 0.5; done
 if ! up; then echo "nothing listens on port $port after 30 s; server output:" >&2; tail -20 /tmp/serve.log >&2; exit 2; fi
-b() { timeout 60 "$browser" --headless=new --no-sandbox --disable-gpu --hide-scrollbars --window-size=1280,800 --virtual-time-budget=5000 "$@" 2>/dev/null; }
-b --screenshot=/tmp/shot.png "$url" >/dev/null && [ -s /tmp/shot.png ] || { echo "the browser could not capture $url" >&2; exit 3; }
-text=$(b --dump-dom "$url" | tr '\n' ' ' | sed -e 's/<script[^>]*>[^<]*<\/script>//g' -e 's/<style[^>]*>[^<]*<\/style>//g' -e 's/<[^>]*>//g' | tr -d '[:space:]' | wc -c)
-echo "text=$text" >&2
-cat /tmp/shot.png
+exec timeout 90 python3 -I -c "$5" "$url" "$6"
 "#;
 
 #[derive(Debug, Default, PartialEq)]
 struct Plan {
     tries: Vec<String>,
     serve: Option<String>,
-    shots: Vec<String>,
+    /// Each page with the steps done on it before the capture.
+    shots: Vec<(String, Vec<String>)>,
     unverified: Vec<String>,
 }
 
@@ -101,11 +107,18 @@ pub fn gather(worlds: &Worlds, id: &str, model: &dyn Model) -> io::Result<Value>
     worlds.rollback(&world)?;
     let mut shots = Vec::new();
     if let Some(serve) = &plan.serve {
-        for (n, url) in plan.shots.iter().enumerate() {
-            shots.push(shoot(worlds, &world, serve, url, &format!("{id}-{n}.png"))?);
+        for (n, (url, steps)) in plan.shots.iter().enumerate() {
+            shots.push(shoot(
+                worlds,
+                &world,
+                serve,
+                url,
+                steps,
+                &format!("{id}-{n}"),
+            )?);
             worlds.rollback(&world)?;
         }
-        if !shots.is_empty() {
+        if !shots.is_empty() && plan.shots.iter().all(|(_, steps)| steps.is_empty()) {
             plan.unverified
                 .push("interactions (click, typing, drag): only the display is captured".into());
         }
@@ -144,10 +157,19 @@ fn readme(worlds: &Worlds, world: &World) -> io::Result<String> {
     })
 }
 
-/// One screenshot. The PNG comes back through the sandbox's stdout: the
-/// harness never reads a file in the world, so a symlink there leads nowhere.
-fn shoot(worlds: &Worlds, world: &World, serve: &str, url: &str, file: &str) -> io::Result<Value> {
-    let mut shot = json!({"url": url, "ok": false});
+/// One page used and captured: `<name>.png`, and `<name>-before.png` when
+/// steps were done on it. The PNGs come back through the sandbox's stdout:
+/// the harness never reads a file in the world, so a symlink there leads
+/// nowhere. A step that finds nothing to act on fails the shot.
+fn shoot(
+    worlds: &Worlds,
+    world: &World,
+    serve: &str,
+    url: &str,
+    steps: &[String],
+    name: &str,
+) -> io::Result<Value> {
+    let mut shot = json!({"url": url, "steps": steps, "ok": false});
     let Some(port) = local_port(url) else {
         shot["reason"] = json!("not a page on 127.0.0.1 or localhost");
         return Ok(shot);
@@ -177,6 +199,8 @@ fn shoot(worlds: &Worlds, world: &World, serve: &str, url: &str, file: &str) -> 
         url.to_string(),
         port.to_string(),
         cap.to_string(),
+        DRIVER.to_string(),
+        json!(steps).to_string(),
     ])
     .collect();
     let out = browser_free
@@ -184,22 +208,42 @@ fn shoot(worlds: &Worlds, world: &World, serve: &str, url: &str, file: &str) -> 
         .stdin(Stdio::null())
         .output()?;
     let log = String::from_utf8_lossy(&out.stderr);
-    let text = log
+    let seen: Value = log
         .lines()
-        .find_map(|l| l.strip_prefix("text="))
-        .and_then(|n| n.trim().parse::<usize>().ok());
-    if !out.status.success() || !out.stdout.starts_with(b"\x89PNG") {
-        let tail: Vec<&str> = log.lines().collect();
-        shot["reason"] = json!(tail[tail.len().saturating_sub(20)..].join("\n"));
+        .find_map(|l| l.strip_prefix("proof="))
+        .and_then(|j| serde_json::from_str(j).ok())
+        .unwrap_or(Value::Null);
+    let sizes: Vec<usize> = seen["sizes"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|n| n.as_u64().map(|n| n as usize))
+        .collect();
+    if !out.status.success() || sizes.is_empty() || sizes.iter().sum::<usize>() != out.stdout.len()
+    {
+        shot["reason"] = json!(seen["error"].as_str().map_or_else(
+            || {
+                let tail: Vec<&str> = log.lines().collect();
+                tail[tail.len().saturating_sub(20)..].join("\n")
+            },
+            str::to_string
+        ));
         return Ok(shot);
     }
     let dir = worlds.root.join("proofs");
     std::fs::create_dir_all(&dir)?;
-    std::fs::write(dir.join(file), &out.stdout)?;
-    shot["file"] = json!(file);
+    let (before, after) = out
+        .stdout
+        .split_at(out.stdout.len() - sizes[sizes.len() - 1]);
+    if !before.is_empty() {
+        std::fs::write(dir.join(format!("{name}-before.png")), before)?;
+        shot["before"] = json!(format!("{name}-before.png"));
+    }
+    std::fs::write(dir.join(format!("{name}.png")), after)?;
+    shot["file"] = json!(format!("{name}.png"));
     // An empty page is the classic broken UI that still "passes".
     // ponytail: visible text only; a canvas-only page would need pixel checks.
-    if text == Some(0) {
+    if seen["text"] == 0 {
         shot["reason"] = json!("the page renders no text");
     } else {
         shot["ok"] = json!(true);
@@ -232,7 +276,15 @@ fn parse(reply: &str) -> Plan {
         match key.trim() {
             "try" if plan.tries.len() < MAX_TRIES => plan.tries.push(value),
             "serve" => plan.serve = Some(value),
-            "shot" if plan.shots.len() < MAX_SHOTS => plan.shots.push(value),
+            "shot" if plan.shots.len() < MAX_SHOTS => plan.shots.push((value, Vec::new())),
+            "act" => {
+                if let Some((_, steps)) = plan.shots.last_mut()
+                    && steps.len() < MAX_STEPS
+                {
+                    // Models quote what they aim at: `click `Save``.
+                    steps.push(value.replace('`', ""));
+                }
+            }
             "unverified" if !value.eq_ignore_ascii_case("none") => plan.unverified.push(value),
             _ => {}
         }
@@ -251,10 +303,30 @@ mod tests {
         );
         assert_eq!(plan.tries, ["python3 -c 'print(1)'", "./run.sh"]);
         assert_eq!(plan.serve.as_deref(), Some("python3 -m http.server 8000"));
-        assert_eq!(plan.shots, ["http://127.0.0.1:8000/"]);
+        assert_eq!(plan.shots, [("http://127.0.0.1:8000/".to_string(), vec![])]);
         assert_eq!(plan.unverified, ["the GUI"]);
         let many = "try: a\n".repeat(9);
         assert_eq!(parse(&many).tries.len(), 5);
+    }
+
+    #[test]
+    fn steps_belong_to_the_page_before_them() {
+        let plan = parse(
+            "act: click orphan\nshot: http://127.0.0.1:8000/\nact: click `pain`\nact: type Nouvel article => lait\nshot: http://127.0.0.1:8000/b\n",
+        );
+        assert_eq!(
+            plan.shots,
+            [
+                (
+                    "http://127.0.0.1:8000/".to_string(),
+                    vec![
+                        "click pain".to_string(),
+                        "type Nouvel article => lait".to_string()
+                    ]
+                ),
+                ("http://127.0.0.1:8000/b".to_string(), vec![])
+            ]
+        );
     }
 
     #[test]
