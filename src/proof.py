@@ -71,8 +71,15 @@ def settle():
     time.sleep(0.5)
 
 
+# Down to the lowest visible element: a short page shot at window height is
+# mostly blank, and shrunk into a card its content becomes unreadable.
+BOTTOM = """Math.min(innerHeight, Math.ceil(Math.max(40, ...[...document.body.querySelectorAll('*')]
+  .map(e => e.getBoundingClientRect()).filter(b => b.width && b.height).map(b => b.bottom))) + 16)"""
+
+
 def shot():
-    return base64.b64decode(cdp("Page.captureScreenshot", format="png")["data"])
+    clip = {"x": 0, "y": 0, "width": js("innerWidth"), "height": js(BOTTOM), "scale": 1}
+    return base64.b64decode(cdp("Page.captureScreenshot", format="png", clip=clip)["data"])
 
 
 # The element a user would aim at: a visible one showing the text (the
