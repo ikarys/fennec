@@ -21,6 +21,7 @@ Read the project first and follow its test conventions. Write tests only: no imp
 no stubs outside test files. Cover the edge cases the request implies; where it is ambiguous, \
 pick the reading a careful maintainer would and say so in the goal. \
 When finished, call `done` with a summary in exactly this form:\n\
+done_when: <what the person using the product will see or be able to do once it is done, in one or two sentences, in the request's language; product terms only, no file, tag, function or test names; it describes what your tests check, not what the request says: where you chose a reading, it states that reading>\n\
 goal: <the request restated precisely for an implementer, naming the tests that must pass>\n\
 verify: <a shell command that runs the new tests; one line per command>\n\nRequest:\n";
 
@@ -171,14 +172,18 @@ fn check(
     let changed: Vec<&str> = changed.lines().collect();
     spec["protect"] = json!(changed);
 
-    let (mut goal, mut verify) = parse(&summary);
+    let mut form = summary.clone();
+    let (mut goal, mut verify) = parse(&form);
     if (goal.is_empty() || verify.is_empty()) && !changed.is_empty() {
         // The tests are written; only the summary missed the form. One more
         // question costs far less than writing the tests again.
-        (goal, verify) = reformat(model, request, &summary, &changed)?;
+        form = reformat(model, request, &summary, &changed)?;
+        (goal, verify) = parse(&form);
     }
     spec["goal"] = json!(goal);
     spec["verify"] = json!(verify);
+    // What the human validates; the goal stays for the implementer.
+    spec["done_when"] = json!(done_when(&form).unwrap_or(&goal));
 
     let reason = if let (true, Some(why)) = (changed.is_empty(), &outcome.stuck) {
         Some(format!("{why}; no test was written"))
@@ -236,10 +241,11 @@ fn reformat(
     request: &str,
     summary: &str,
     changed: &[&str],
-) -> io::Result<(String, Vec<String>)> {
+) -> io::Result<String> {
     let ask = format!(
         "Request:\n{request}\n\nTest files written:\n{}\n\nSummary of the work:\n{}\n\n\
          Reply in exactly this form, nothing else:\n\
+         done_when: <what the person using the product will see or be able to do once it is done, in one or two sentences, in the request's language; product terms only, no file, tag, function or test names; it describes what your tests check, not what the request says: where you chose a reading, it states that reading>\n\
          goal: <the request restated precisely for an implementer, naming the tests that must pass>\n\
          verify: <a shell command that runs the new tests; one line per command>",
         changed.join("\n"),
@@ -252,7 +258,20 @@ fn reformat(
     let reply = model.chat(&[json!({"role": "user", "content": ask})], &json!([]))?;
     let content = reply["content"].as_str().unwrap_or("");
     // Some servers leave the reasoning inline.
-    Ok(parse(content.rsplit("</think>").next().unwrap_or(content)))
+    Ok(content
+        .rsplit("</think>")
+        .next()
+        .unwrap_or(content)
+        .to_string())
+}
+
+/// The one `done_when:` line, if the model wrote it.
+fn done_when(summary: &str) -> Option<&str> {
+    summary
+        .lines()
+        .find_map(|l| l.trim().strip_prefix("done_when:"))
+        .map(str::trim)
+        .filter(|d| !d.is_empty())
 }
 
 fn first_line(s: &str) -> &str {
@@ -272,7 +291,7 @@ fn parse(summary: &str) -> (String, Vec<String>) {
     });
     for line in lines {
         let trimmed = line.trim();
-        if trimmed.starts_with("rules:") {
+        if trimmed.starts_with("rules:") || trimmed.starts_with("done_when:") {
             (in_goal, in_verify) = (false, false);
         } else if let Some(cmd) = trimmed.strip_prefix("verify:") {
             in_goal = false;
@@ -419,7 +438,7 @@ pub fn reject(worlds: &Worlds, id: &str, correction: Option<&str>) -> io::Result
 
 #[cfg(test)]
 mod tests {
-    use super::{parse, reformat};
+    use super::{done_when, parse, reformat};
     use crate::provider::Model;
     use serde_json::{Value, json};
     use std::io;
@@ -437,15 +456,25 @@ mod tests {
     #[test]
     fn a_summary_off_the_form_is_reformatted() {
         let model = Fixed("<think>hmm</think>goal: count items\nverify: node --test test/");
-        let (goal, verify) = reformat(
+        let text = reformat(
             &model,
             "count",
             "I wrote tests in test/app.test.js.",
             &["test/app.test.js"],
         )
         .unwrap();
+        let (goal, verify) = parse(&text);
         assert_eq!(goal, "count items");
         assert_eq!(verify, ["node --test test/"]);
+    }
+
+    #[test]
+    fn done_when_is_for_the_human_and_stays_out_of_the_goal() {
+        let summary =
+            "goal: add `count()`\ndone_when: la liste affiche « 3 articles »\nverify: sh t.sh";
+        assert_eq!(parse(summary).0, "add `count()`");
+        assert_eq!(done_when(summary), Some("la liste affiche « 3 articles »"));
+        assert_eq!(done_when("goal: g\ndone_when:  \n"), None);
     }
 
     #[test]
