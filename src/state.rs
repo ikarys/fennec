@@ -109,20 +109,7 @@ impl Store {
     pub fn view(&self, worlds: &Worlds) -> io::Result<Value> {
         let runs = fennec_os::review::runs(worlds)?;
         let runs = runs.into_iter().map(|(_, r)| r).collect::<Vec<_>>();
-        // The branch a landing goes to, shown before the human clicks.
-        let projects: Vec<(String, String)> = self
-            .projects()?
-            .into_iter()
-            .map(|p| {
-                let branch = std::process::Command::new("git")
-                    .args(["-C", &p, "branch", "--show-current"])
-                    .output()
-                    .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
-                    .unwrap_or_default();
-                (p, branch)
-            })
-            .collect();
-        Ok(classify(&self.requests()?, &runs, &projects))
+        Ok(classify(&self.requests()?, &runs, &self.projects()?))
     }
 }
 
@@ -147,14 +134,7 @@ fn name(project: &str) -> &str {
 
 /// Sorts requests and fennec-os runs into the four columns. Pure, so the
 /// mapping from internal states to what the human sees is tested here.
-fn classify(requests: &[(String, Value)], runs: &[Value], projects: &[(String, String)]) -> Value {
-    let branch = |project: &Value| {
-        projects
-            .iter()
-            .find(|(p, _)| project == p.as_str())
-            .map_or("", |(_, b)| b.as_str())
-            .to_string()
-    };
+fn classify(requests: &[(String, Value)], runs: &[Value], projects: &[String]) -> Value {
     let (mut mine, mut ready, mut running, mut failed) = (vec![], vec![], vec![], vec![]);
     for (id, r) in requests {
         let card = |detail: &str| json!({"id": id, "project": name(r["project"].as_str().unwrap_or("")), "title": r["text"], "detail": detail});
@@ -225,7 +205,14 @@ fn classify(requests: &[(String, Value)], runs: &[Value], projects: &[(String, S
                 c["proof"] = r["proof"]["tries"].clone();
                 c["shots"] = r["proof"]["shots"].clone();
                 if r["run"].is_string() {
-                    c["land"] = json!(branch(&r["project"]));
+                    // Without a target, the click only prepares one.
+                    let t = &r["target"];
+                    c["land"] = json!({
+                        "branch": t["branch"],
+                        "remote": t["remote"],
+                        "message": t["message"],
+                        "committed": r["commit"].is_string(),
+                    });
                 }
                 ready.push(c);
             }
@@ -262,7 +249,7 @@ fn classify(requests: &[(String, Value)], runs: &[Value], projects: &[(String, S
     }
     let projects: Vec<Value> = projects
         .iter()
-        .map(|(p, _)| json!({"path": p, "name": name(p)}))
+        .map(|p| json!({"path": p, "name": name(p)}))
         .collect();
     json!({"mine": mine, "ready": ready, "running": running, "failed": failed, "projects": projects})
 }
@@ -297,7 +284,7 @@ mod tests {
             json!({"project": "/p/b", "goal": "g3", "status": "landed"}),
             json!({"project": "/p/a", "goal": "g4", "status": "ready", "spec": "s1"}),
         ];
-        let v = classify(&requests, &runs, &[("/p/a".into(), "main".into())]);
+        let v = classify(&requests, &runs, &["/p/a".into()]);
         assert_eq!(v["running"][0]["title"], "x");
         assert_eq!(v["mine"][0]["detail"], "Terminé quand : Q");
         assert_eq!(v["mine"][0]["id"], "2");
@@ -315,7 +302,7 @@ mod tests {
             v["ready"][0]["detail"],
             "non vérifié : produit pas encore essayé\nRègle appliquée : use uv\nintégration impossible : conflit"
         );
-        assert_eq!(v["ready"][0]["land"], "main");
+        assert_eq!(v["ready"][0]["land"]["branch"], Value::Null);
         assert!(
             v["ready"][1].get("land").is_none(),
             "a bare run is landed by fennec-os"

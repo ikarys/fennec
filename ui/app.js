@@ -132,14 +132,22 @@ function ruleForm(id) {
 
 // The work becomes one commit on the project's current branch, named here
 // so the human sees where it goes before clicking.
-function landForm(id, branch) {
+// The branch and remote are on the button: the human sees where it goes
+// before it goes there.
+function landForm(id, { branch, remote, message, committed }) {
   const form = document.createElement("form");
   form.className = "answer";
   const error = Object.assign(document.createElement("div"), { className: "error" });
   const button = Object.assign(document.createElement("button"), {
     type: "submit", className: "primary",
-    textContent: branch ? `Intégrer dans ${branch}` : "Intégrer",
+    textContent: !branch ? "Préparer l'intégration"
+      : committed ? `Pousser ${branch} vers ${remote}`
+      : remote ? `Intégrer dans ${branch} et pousser vers ${remote}`
+      : `Intégrer dans ${branch}`,
   });
+  if (message && !committed) {
+    form.append(Object.assign(document.createElement("div"), { className: "detail", textContent: `Commit : ${message}` }));
+  }
   form.onsubmit = async (e) => {
     e.preventDefault();
     error.textContent = "";

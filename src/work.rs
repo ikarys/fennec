@@ -215,7 +215,23 @@ fn solve_now(store: &Store, id: &str) -> io::Result<()> {
     // Tests passing is not "ready": the product is tried first.
     store.update(id, |r| r["status"] = json!("proving"))?;
     let proof = proof::gather(&worlds, run, &variants[0])?;
-    store.update(id, |r| apply_proof(r, &proof))
+    // Where it will land is decided before "ready", so the card never shows
+    // a branch the click would not use.
+    let mut probe = store.load(id)?;
+    apply_proof(&mut probe, &proof);
+    let target = (probe["status"] == "ready")
+        .then(|| solve::plan(&worlds, run, &variants[0]).ok())
+        .flatten();
+    store.update(id, |r| {
+        apply_proof(r, &proof);
+        if let Some(t) = &target {
+            r["target"] = target_json(t);
+        }
+    })
+}
+
+fn target_json(t: &solve::Landing) -> Value {
+    json!({"branch": t.branch, "message": t.message, "remote": t.remote})
 }
 
 /// "Réessayer" on a failed request: solved again from its validated tests
@@ -330,10 +346,10 @@ fn apply_run(request: &mut Value, record: &Value) {
     }
 }
 
-/// "Intégrer" on a ready request: its work becomes one commit on the
-/// project's current branch, with a message the model writes from the
-/// project's conventions. A landing that fails leaves the request ready,
-/// with the reason, since the work itself still holds.
+/// "Intégrer" on a ready request: its work becomes one commit on the branch
+/// shown on the card, with the message shown there, then that branch is
+/// pushed. Without a branch on the card yet, the click only decides it. A landing that fails leaves the request ready, with the reason;
+/// once committed, a new click only retries the push.
 pub fn land(store: &Store, id: &str) -> io::Result<()> {
     let request = store.load(id)?;
     if request["status"] != "ready" || !request["run"].is_string() {
@@ -352,22 +368,49 @@ pub fn land(store: &Store, id: &str) -> io::Result<()> {
 fn land_now(store: &Store, id: &str) -> io::Result<()> {
     let request = store.load(id)?;
     let run = request["run"].as_str().unwrap_or("");
+    let project = Path::new(request["project"].as_str().unwrap_or(""));
     let worlds = Worlds::from_env()?;
-    let landed = OpenAi::variants_from_env(1).and_then(|mut m| {
-        // No message from the model: the goal's first line will do.
-        let message = solve::message(&worlds, run, &m.remove(0)).ok().flatten();
-        solve::land(&worlds, run, message.as_deref()).map(|c| (c, message))
-    });
-    store.update(id, |r| match landed {
-        Ok((commit, message)) => {
-            r["status"] = json!("landed");
-            r["commit"] = json!(commit);
-            r["message"] = json!(message);
+    let target = request["target"].clone();
+    if !target["branch"].is_string() {
+        // Nothing lands where the human has not seen it: this click only
+        // decides the branch and message, shown for the next one.
+        return match OpenAi::variants_from_env(1)
+            .and_then(|mut m| solve::plan(&worlds, run, &m.remove(0)))
+        {
+            Ok(t) => store.update(id, |r| {
+                r["status"] = json!("ready");
+                r["target"] = target_json(&t);
+            }),
+            Err(e) => fail_landing(store, id, e),
+        };
+    }
+    let branch = target["branch"].as_str().unwrap_or("");
+    if !request["commit"].is_string() {
+        match solve::land(
+            &worlds,
+            run,
+            Some(branch).filter(|b| !b.is_empty()),
+            target["message"].as_str(),
+        ) {
+            Ok(commit) => store.update(id, |r| r["commit"] = json!(commit))?,
+            Err(e) => return fail_landing(store, id, e),
         }
-        Err(e) => {
+    }
+    if let Some(remote) = target["remote"].as_str()
+        && let Err(e) = solve::push(project, remote, branch)
+    {
+        return store.update(id, |r| {
             r["status"] = json!("ready");
-            r["land_error"] = json!(e.to_string());
-        }
+            r["land_error"] = json!(format!("le commit est fait, mais pas poussé : {e}"));
+        });
+    }
+    store.update(id, |r| r["status"] = json!("landed"))
+}
+
+fn fail_landing(store: &Store, id: &str, e: io::Error) -> io::Result<()> {
+    store.update(id, |r| {
+        r["status"] = json!("ready");
+        r["land_error"] = json!(e.to_string());
     })
 }
 
