@@ -136,6 +136,7 @@ fn handle(mut stream: TcpStream, port: u16) -> io::Result<()> {
 fn shot(file: &str) -> io::Result<Vec<u8>> {
     let valid = file
         .strip_suffix(".png")
+        .map(|f| f.strip_suffix("-before").unwrap_or(f))
         .and_then(|f| f.split_once('-'))
         .is_some_and(|(id, n)| {
             !id.is_empty()

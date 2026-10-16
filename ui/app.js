@@ -46,10 +46,19 @@ function card(item) {
   for (const s of item.shots ?? []) {
     if (!s.file) continue;
     // Visible without a click: the screenshot is the proof a human reads first.
-    const link = Object.assign(document.createElement("a"), { href: `/shots/${s.file}`, target: "_blank", className: "shot" });
-    link.append(Object.assign(document.createElement("img"), { src: `/shots/${s.file}`, alt: `Capture de ${s.url}`, loading: "lazy" }));
-    link.append(Object.assign(document.createElement("small"), { textContent: s.url }));
-    el.append(link);
+    const capture = (file, label) => {
+      const link = Object.assign(document.createElement("a"), { href: `/shots/${file}`, target: "_blank", className: "shot" });
+      link.append(Object.assign(document.createElement("img"), { src: `/shots/${file}`, alt: `${label} ${s.url}`, loading: "lazy" }));
+      link.append(Object.assign(document.createElement("small"), { textContent: `${label} — ${s.url}` }));
+      return link;
+    };
+    if (s.before) {
+      el.append(capture(s.before, "Avant"));
+      el.append(Object.assign(document.createElement("small"), { className: "steps", textContent: (s.steps ?? []).join(" → ") }));
+      el.append(capture(s.file, "Après"));
+    } else {
+      el.append(capture(s.file, "Capture"));
+    }
   }
   if (item.ask) el.append(answerForm(item.id));
   if (item.reply) el.append(replyForm(item.id));
