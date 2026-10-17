@@ -26,6 +26,24 @@ fn rollback_restores_the_last_checkpoint() {
 }
 
 #[test]
+fn running_python_leaves_no_bytecode_in_the_work() {
+    let f = Fixture::new("bytecode");
+    let w = f.worlds.fork(&f.project.to_string_lossy()).unwrap();
+    assert!(
+        f.sh(
+            &w,
+            "mkdir -p pkg && echo 'X = 1' > pkg/m.py && python3 -c 'import pkg.m'"
+        )
+        .0
+    );
+    let diff = f.worlds.diff(&w).unwrap();
+    assert!(
+        diff.contains("pkg/m.py") && !diff.contains("__pycache__"),
+        "{diff}"
+    );
+}
+
+#[test]
 fn the_sandbox_cannot_reach_out() {
     let f = Fixture::new("isolation");
     let w = f.worlds.fork(&f.project.to_string_lossy()).unwrap();
