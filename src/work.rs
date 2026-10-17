@@ -57,19 +57,36 @@ fn say_in(request: &mut Value, who: &str, text: &str) {
     }
 }
 
+/// Each step the request went through, pointing at what fennec-os keeps of
+/// it; `journal` turns these into what the human reads.
+fn note(request: &mut Value, step: Value) {
+    if !request["journal"].is_array() {
+        request["journal"] = json!([]);
+    }
+    if let Some(j) = request["journal"].as_array_mut() {
+        j.push(step);
+    }
+}
+
 fn talk_now(store: &Store, id: &str) -> io::Result<()> {
     let request = store.load(id)?;
     let model = OpenAi::variants_from_env(1)?.remove(0);
     offer_rule(store, id, &request, &model)?;
     let thread = request["thread"].as_array().cloned().unwrap_or_default();
     let project = Path::new(request["project"].as_str().unwrap_or(""));
-    match spec::discuss(project, &thread, &model)? {
+    let (said, exchange) = spec::discuss(project, &thread, &model)?;
+    // ponytail: each turn keeps the whole exchange, the thread resent included;
+    // a long conversation could keep only the reply.
+    let step = json!({"stage": "talk", "exchange": exchange});
+    match said {
         spec::Discussed::Reply(text) => store.update(id, |r| {
+            note(r, step);
             say_in(r, "fennec", &text);
             r["status"] = json!("talk");
         }),
         spec::Discussed::Brief(brief) => {
             store.update(id, |r| {
+                note(r, step);
                 r["brief"] = json!(brief);
                 r["status"] = json!("framing");
             })?;
@@ -163,6 +180,7 @@ fn frame_now(store: &Store, id: &str) -> io::Result<()> {
         MAX_STEPS,
     )?;
     store.update(id, |r| {
+        note(r, json!({"stage": "frame", "spec": s["world"]}));
         r["spec"] = s["world"].clone();
         r["rules"] = s["rules"].clone();
         r["team"] = json!([]);
@@ -323,6 +341,7 @@ fn solve_now(store: &Store, id: &str) -> io::Result<()> {
         if let Some(m) = r.as_object_mut() {
             m.remove("retry");
         }
+        note(r, json!({"stage": "solve", "run": record["id"]}));
         apply_run(r, &record);
         // The acceptance tests land in the same commit: they are part of what fennec did.
         if let Some(files) = r["files"].as_array_mut() {
@@ -412,6 +431,10 @@ fn add_team(request: &mut Value, names: &Value) {
 
 fn apply_proof(request: &mut Value, proof: &Value) {
     request["proof"] = proof.clone();
+    // The exchange is read from the run record, by the journal.
+    if let Some(p) = request["proof"].as_object_mut() {
+        p.remove("exchange");
+    }
     add_team(request, &proof["team"]);
     let failed = proof["tries"]
         .as_array()
@@ -592,6 +615,68 @@ pub fn changes(store: &Store, id: &str) -> io::Result<Value> {
     )
 }
 
+/// Every step of a request, in order, with what was sent to the model and
+/// what came back, and what it cost.
+pub fn journal(store: &Store, id: &str) -> io::Result<Value> {
+    let request = store.load(id)?;
+    let worlds = Worlds::from_env()?;
+    let mut entries = request["journal"].as_array().cloned().unwrap_or_default();
+    // A request from before the journal: what it still points to.
+    if entries.is_empty() {
+        if let Some(s) = request["spec"].as_str() {
+            entries.push(json!({"stage": "frame", "spec": s}));
+        }
+        if let Some(r) = request["run"].as_str() {
+            entries.push(json!({"stage": "solve", "run": r}));
+        }
+    }
+    let mut steps = Vec::new();
+    for e in &entries {
+        match e["stage"].as_str() {
+            Some("talk") => steps.push(step("Discussion", &e["exchange"])),
+            Some("frame") => {
+                if let Ok(s) = spec::load(&worlds, e["spec"].as_str().unwrap_or("")) {
+                    steps.push(step("Cadrage : terminé quand et tests", &s));
+                }
+            }
+            Some("solve") => {
+                let Ok(r) = review::load(&worlds, e["run"].as_str().unwrap_or("")) else {
+                    continue;
+                };
+                for (n, a) in r["attempts"].as_array().into_iter().flatten().enumerate() {
+                    let mut s = step(&format!("Travail, essai {}", n + 1), a);
+                    s["passed"] = a["passed"].clone();
+                    steps.push(s);
+                }
+                if !r["proof"]["exchange"].is_null() {
+                    steps.push(step("Preuve", &r["proof"]["exchange"]));
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(json!(steps))
+}
+
+fn step(name: &str, from: &Value) -> Value {
+    json!({"name": name, "model": from["model"], "messages": from["messages"],
+           "cost": cost(&from["turns"])})
+}
+
+/// Tokens and model time summed over the turns of one step.
+fn cost(turns: &Value) -> Value {
+    let turns: Vec<&Value> = turns.as_array().into_iter().flatten().collect();
+    let sum =
+        |f: fn(&Value) -> &Value| -> u64 { turns.iter().map(|t| f(t).as_u64().unwrap_or(0)).sum() };
+    json!({
+        "turns": turns.len(),
+        "sent": sum(|t| &t["usage"]["prompt_tokens"]),
+        "received": sum(|t| &t["usage"]["completion_tokens"]),
+        "thinking": sum(|t| &t["usage"]["completion_tokens_details"]["reasoning_tokens"]),
+        "ms": sum(|t| &t["model_ms"]),
+    })
+}
+
 pub fn land(store: &Store, id: &str) -> io::Result<()> {
     let request = store.load(id)?;
     if request["status"] != "ready" || !request["run"].is_string() {
@@ -753,6 +838,21 @@ mod tests {
         );
         assert_eq!(r["summary"], "Ajouté bonjour.py");
         assert_eq!(r["files"], json!(["bonjour.py", "tests/t.py"]));
+    }
+
+    #[test]
+    fn a_step_costs_the_sum_of_its_turns() {
+        let turns = json!([
+            {"model_ms": 400, "usage": {"prompt_tokens": 1000, "completion_tokens": 60,
+             "completion_tokens_details": {"reasoning_tokens": 20}}},
+            {"model_ms": 100, "usage": {"prompt_tokens": 1100, "completion_tokens": 5}},
+            {"model_ms": 50, "usage": null}
+        ]);
+        assert_eq!(
+            cost(&turns),
+            json!({"turns": 3, "sent": 2100, "received": 65, "thinking": 20, "ms": 550})
+        );
+        assert_eq!(cost(&Value::Null)["turns"], 0);
     }
 
     #[test]
