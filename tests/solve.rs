@@ -1276,3 +1276,26 @@ fn a_failed_change_gives_the_folder_back_to_the_ready_work() {
     git(&f, &["checkout", "-q", "main"]);
     assert!(f.worlds.commit(&w, "x").is_err());
 }
+
+#[test]
+fn a_direct_request_is_solved_from_the_project_and_lands() {
+    let f = here("here-direct");
+    let s = spec::direct(&f.worlds, &f.project, "answer 42").unwrap();
+    let id = s["world"].as_str().unwrap().to_string();
+    let honest = Script::new("honest", &[write("answer", "42\n"), done()]);
+    let record = spec::accept(&f.worlds, &id, &[&honest], 10).unwrap();
+    let run = record["winner"].as_str().unwrap().to_string();
+    // No tests first: nothing protected, the attempt forked from the project.
+    assert_eq!(record["protect"], json!([]));
+    assert!(record["spec"].is_null(), "{record:#}");
+    assert_eq!(
+        git(&f, &["branch", "--show-current"]),
+        format!("world/{run}")
+    );
+    land(&f.worlds, &run, None, None).unwrap();
+    assert_eq!(git(&f, &["branch", "--show-current"]), "main");
+    assert_eq!(
+        std::fs::read_to_string(f.project.join("answer")).unwrap(),
+        "42\n"
+    );
+}

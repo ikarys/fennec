@@ -18,7 +18,7 @@ src/provider.rs  `Model` trait + OpenAI-compatible client; `ask` (one question),
 src/recipe.rs    replay a landed run's tool calls when the same goal returns
 src/agent.rs     tool loop; every tool runs inside the sandbox; loops, idle runs and hung commands are stopped
 src/solve.rs     task → worlds in turn until one passes verify → land (rebase + re-verify, one commit by the human) on the branch the rules ask for → push
-src/spec.rs      request → conversation (`discuss`) → acceptance tests + task (intent compiler), human-validated; retry from the tests; amend a ready run from its work; sparring findings
+src/spec.rs      request → conversation (`discuss`) → `direct` work (no tests first, proof decides) or acceptance tests + task (`compile`, CLI and sparring); retry from the tests; amend a ready run from its work; sparring findings
 src/proof.rs     a ready run used as its user would: model proposes tries, pages and clicks/typing; harness runs them, captures before/after (proof.py)
 src/rules.rs     project rules (`.fennec-os/rules.json` at HEAD), glob matching; rules said in words
                  (`~/.config/fennec/rules.md`, AGENTS.md `## Rules`): proposed, written once, given to agents
