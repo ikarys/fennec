@@ -91,7 +91,13 @@ team is what was missing. fennec-os stages already behave like roles:
    replaces a built-in one of the same name. A project picks its team and
    removes roles in `.fennec-os/team.json`; default team `dev`. With no
    background stage yet, maintainer and DevOps act at `solve`, DevSecOps at
-   `prove`. The "Équipe" screen is next.
+   `prove`.
+   **"Équipe" screen done (2026-10-17)**: a dialog for the selected project:
+   pick the team, tick roles in or out, add a catalogue role (copied to the
+   project's `.fennec-os/team/`, where it can be edited). Each change is
+   saved at once. A role added to the project stays when the team changes.
+   Not yet: creating or editing a team or a role's brief from the UI (files
+   only for now), team display names (folder names are shown: `etudes`).
 3. Then extension points, one at a time, each proven useful before the next:
    model per role, tools and veto (DevSecOps first), background stage
    (maintainer/DevOps).

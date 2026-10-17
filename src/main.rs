@@ -10,6 +10,7 @@ use std::io::{self, BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::Path;
 
+use fennec_os::team;
 use fennec_os::world::Worlds;
 use serde_json::{Value, json};
 
@@ -195,12 +196,63 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
             Ok(json!({}))
         }
         ("POST", "/api/folders") => folders(&field(&input()?, "path")),
+        ("POST", "/api/team") => team_view(&project(&store, &field(&input()?, "project"))?),
+        ("POST", "/api/team/choose") => {
+            let v = input()?;
+            let remove: Vec<String> = v["remove"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|k| k.as_str().map(str::to_string))
+                .collect();
+            let path = project(&store, &field(&v, "project"))?;
+            team::choose(&path, &field(&v, "team"), &remove)?;
+            team_view(&path)
+        }
+        ("POST", "/api/team/add") => {
+            let v = input()?;
+            let path = project(&store, &field(&v, "project"))?;
+            team::add(&path, &field(&v, "role"))?;
+            team_view(&path)
+        }
         _ => Err(io::Error::other("unknown route")),
     }
 }
 
 /// One level of the folder browser used to pick a project in a few clicks:
 /// the browser cannot hand a page an absolute path, so the server lists them.
+/// Team files are written only into a project the human added: the page
+/// names a path, and that path must be one of theirs.
+fn project(store: &Store, path: &str) -> io::Result<std::path::PathBuf> {
+    if !store.projects()?.iter().any(|p| p == path) {
+        return Err(io::Error::other("projet inconnu"));
+    }
+    Ok(path.into())
+}
+
+/// A project's team for the "Équipe" dialog: the teams to pick from, the
+/// roles of the one picked (left-out ones flagged), and the catalogue roles
+/// not in it yet.
+fn team_view(path: &Path) -> io::Result<Value> {
+    let setup = team::setup(path)?;
+    let role = |r: &team::Role| json!({"key": r.key, "name": r.name, "stage": r.stage});
+    let roles: Vec<Value> = setup
+        .roles
+        .iter()
+        .map(|r| {
+            let mut v = role(r);
+            v["out"] = json!(setup.remove.contains(&r.key));
+            v
+        })
+        .collect();
+    let catalog: Vec<Value> = team::catalog()?
+        .iter()
+        .filter(|c| !setup.roles.iter().any(|r| r.key == c.key))
+        .map(role)
+        .collect();
+    Ok(json!({"teams": team::teams()?, "team": setup.team, "roles": roles, "catalog": catalog}))
+}
+
 fn folders(path: &str) -> io::Result<Value> {
     let path = if path.is_empty() {
         std::env::var_os("HOME")
