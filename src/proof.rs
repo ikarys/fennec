@@ -117,18 +117,10 @@ pub fn gather(
         json!({"role": "system", "content": format!("{BRIEF}{roles}")}),
         json!({"role": "user", "content": request}),
     ];
-    let mut reply = model.chat(&messages, &json!([]))?;
     // A model can spend the whole reply reasoning (seen: 8192 tokens of
-    // thinking, no answer); a second turn without reasoning still plans.
-    if reply["content"]
-        .as_str()
-        .is_none_or(|c| c.trim().is_empty())
-    {
-        reply = model.chat_quick(&messages, &json!([]))?;
-    }
-    let content = reply["content"].as_str().unwrap_or("");
-    // Some servers leave the reasoning inline.
-    let mut plan = parse(content.rsplit("</think>").next().unwrap_or(content));
+    // thinking, no answer); `ask` then plans again without.
+    let (content, exchange) = crate::provider::ask(model, &messages)?;
+    let mut plan = parse(&content);
 
     let command = |c: &String| Rule {
         id: "proof.try".to_string(),
@@ -183,7 +175,8 @@ pub fn gather(
             .iter()
             .all(|c| c["exit"] == 0 || c["missing"] == true);
     let proof = json!({"tries": checks, "shots": shots, "unverified": plan.unverified,
-                       "checks": role_checks, "passed": passed, "team": team});
+                       "checks": role_checks, "passed": passed, "team": team,
+                       "exchange": exchange});
     record["proof"] = proof.clone();
     review::save(worlds, id, &record)?;
     Ok(proof)

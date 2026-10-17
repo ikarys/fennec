@@ -255,6 +255,7 @@ fn check(
     spec["stuck"] = json!(outcome.stuck);
     spec["question"] = json!(outcome.question);
     spec["turns"] = json!(outcome.turns);
+    spec["messages"] = json!(outcome.messages);
     if let Some(e) = outcome.error {
         return Err(io::Error::other(e));
     }
@@ -626,8 +627,13 @@ pub enum Discussed {
 }
 
 /// `thread`: `{"who": "human" | "fennec", "text"}` in order. One model call,
-/// no world: the conversation must answer in seconds, not minutes.
-pub fn discuss(project: &Path, thread: &[Value], model: &dyn Model) -> io::Result<Discussed> {
+/// no world: the conversation must answer in seconds, not minutes. The
+/// exchange comes back too, as `provider::ask` records it.
+pub fn discuss(
+    project: &Path,
+    thread: &[Value],
+    model: &dyn Model,
+) -> io::Result<(Discussed, Value)> {
     // What the model knows of the project: its files and README, enough to
     // ask about this project rather than a generic one.
     // ponytail: 200 files and 3 kB of README; a big project needs a summary.
@@ -655,16 +661,7 @@ pub fn discuss(project: &Path, thread: &[Value], model: &dyn Model) -> io::Resul
         };
         messages.push(json!({"role": role, "content": turn["text"]}));
     }
-    let mut reply = model.chat(&messages, &json!([]))?;
-    // As in the proof: a turn spent reasoning is asked again without.
-    if reply["content"]
-        .as_str()
-        .is_none_or(|c| c.rsplit("</think>").next().unwrap_or(c).trim().is_empty())
-    {
-        reply = model.chat_quick(&messages, &json!([]))?;
-    }
-    let content = reply["content"].as_str().unwrap_or("");
-    let content = content.rsplit("</think>").next().unwrap_or(content).trim();
+    let (content, exchange) = crate::provider::ask(model, &messages)?;
     if content.is_empty() {
         return Err(io::Error::other("the model gave no answer"));
     }
@@ -673,10 +670,11 @@ pub fn discuss(project: &Path, thread: &[Value], model: &dyn Model) -> io::Resul
         .find_map(|l| l.trim().trim_matches('`').strip_prefix("brief:"))
         .map(|b| b.trim().trim_matches('`').trim().to_string())
         .filter(|b| !b.is_empty());
-    Ok(match brief {
+    let said = match brief {
         Some(b) => Discussed::Brief(b),
-        None => Discussed::Reply(content.to_string()),
-    })
+        None => Discussed::Reply(content),
+    };
+    Ok((said, exchange))
 }
 
 pub fn reject(worlds: &Worlds, id: &str, correction: Option<&str>) -> io::Result<()> {
@@ -713,13 +711,19 @@ mod tests {
         use super::{Discussed, discuss};
         let empty = std::env::temp_dir();
         let thread = [json!({"who": "human", "text": "un test"})];
+        let (said, exchange) = discuss(
+            &empty,
+            &thread,
+            &Fixed("<think>vague</think>Tu veux tester quoi ? A) un script B) une page"),
+        )
+        .unwrap();
+        // What was sent and what came back, reasoning included, for the human.
+        let messages = exchange["messages"].as_array().unwrap();
+        assert_eq!(messages[1]["content"], "un test");
+        assert!(messages[2]["content"].as_str().unwrap().contains("vague"));
+        assert_eq!(exchange["turns"].as_array().unwrap().len(), 1);
         assert_eq!(
-            discuss(
-                &empty,
-                &thread,
-                &Fixed("<think>vague</think>Tu veux tester quoi ? A) un script B) une page")
-            )
-            .unwrap(),
+            said,
             Discussed::Reply("Tu veux tester quoi ? A) un script B) une page".into())
         );
         assert_eq!(
@@ -728,7 +732,8 @@ mod tests {
                 &thread,
                 &Fixed("OK.\n`brief: un script bonjour.py qui affiche Bonjour`")
             )
-            .unwrap(),
+            .unwrap()
+            .0,
             Discussed::Brief("un script bonjour.py qui affiche Bonjour".into())
         );
         assert!(discuss(&empty, &thread, &Fixed("<think>only this</think>")).is_err());
