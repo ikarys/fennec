@@ -224,7 +224,8 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
                 .filter(|v| std::env::var_os(v).is_some())
                 .collect();
             Ok(json!({"base_url": s.base_url, "models": s.models,
-                      "has_key": s.api_key.is_some(), "env": env}))
+                      "has_key": s.api_key.is_some(), "env": env,
+                      "max_tokens": s.max_tokens}))
         }
         ("POST", "/api/settings/served") => {
             let v = input()?;
@@ -258,10 +259,14 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
                 .flatten()
                 .filter_map(|m| m.as_str().map(str::to_string))
                 .collect();
+            let max_tokens = v["max_tokens"].as_u64().ok_or_else(|| {
+                io::Error::other("le nombre de tokens doit être un entier positif")
+            })?;
             Settings {
                 base_url,
                 models,
                 api_key,
+                max_tokens,
             }
             .save()?;
             Ok(json!({}))
