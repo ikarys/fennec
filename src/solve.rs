@@ -580,8 +580,8 @@ pub fn push(project: &Path, remote: &str, branch: &str) -> io::Result<()> {
 
 /// Lands a world that passed onto the project as one commit, then drops the
 /// world. If the project moved since the fork, the world is rebased and
-/// verified again: a rebased tree is a new tree. Refuses a world changed
-/// since its verdict. The commit is the human's: the project's own git
+/// verified again: a rebased tree is a new tree. A world the human edited
+/// since its verdict is verified again too, and lands with their edits. The commit is the human's: the project's own git
 /// identity, `message` or else the goal's first line; the harness's
 /// checkpoints stay behind. On `branch` other than the current one, the
 /// commit goes on a new branch and the human's worktree is left alone.
@@ -605,22 +605,35 @@ pub fn land(
             marker.display()
         )));
     };
-    if worlds.git(&world, &["rev-parse", "HEAD"])? != commit
-        || !worlds.git(&world, &["status", "--porcelain"])?.is_empty()
-    {
-        return Err(io::Error::other(format!(
-            "world {id} changed since it passed"
-        )));
+    // The human may have edited the work in their editor: it lands too, once
+    // its checks pass again on the edited tree.
+    let edited = worlds.git(&world, &["rev-parse", "HEAD"])? != commit
+        || !worlds.git(&world, &["status", "--porcelain"])?.is_empty();
+    if edited {
+        let now = worlds.commit(&world, "human edits")?;
+        if worlds
+            .git(&world, &["merge-base", "--is-ancestor", &commit, &now])
+            .is_err()
+        {
+            return Err(io::Error::other(format!(
+                "world {id} changed since it passed and no longer holds its work"
+            )));
+        }
+        commit = now;
     }
     let head = git(project, &["rev-parse", "HEAD"])?;
-    if git(project, &["merge-base", "--is-ancestor", &head, &commit]).is_err() {
-        // The verdict no longer holds for any tree but the old one.
+    let moved = git(project, &["merge-base", "--is-ancestor", &head, &commit]).is_err();
+    if moved {
+        // The verdict no longer holds for any tree but the old one. Edits
+        // alone keep it: the human may fix what broke the checks and retry.
         std::fs::remove_file(&marker)?;
         commit = worlds.rebase(&world, &head).map_err(|e| {
             io::Error::other(format!(
                 "{e}\nworld {id} conflicts with the project; solve again"
             ))
         })?;
+    }
+    if moved || edited {
         let commands: Vec<Rule> = verdict["verify"]
             .as_array()
             .into_iter()
@@ -634,9 +647,12 @@ pub fn land(
             .collect();
         let (checks, failure) = verify(worlds, &world, &commands)?;
         if let Some(reason) = failure {
-            review::set_status(worlds, id, "failed")?;
+            if moved {
+                review::set_status(worlds, id, "failed")?;
+            }
+            let after = if moved { "after rebase" } else { "after edits" };
             return Err(io::Error::other(format!(
-                "world {id} {reason} after rebase onto {head}: {}",
+                "world {id} {reason} {after} onto {head}: {}",
                 serde_json::to_string_pretty(&checks).unwrap_or_default()
             )));
         }
