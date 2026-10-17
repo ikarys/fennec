@@ -253,6 +253,7 @@ fn classify(requests: &[(String, Value)], projects: &[String]) -> Value {
                 c["role_checks"] = r["proof"]["checks"].clone();
                 c["shots"] = r["proof"]["shots"].clone();
                 c["land_error"] = r["land_error"].clone();
+                c["amend_error"] = r["amend_error"].clone();
                 c["summary"] = r["summary"].clone();
                 c["files"] = r["files"].clone();
                 // A run that predates the proof was never tried: say so.

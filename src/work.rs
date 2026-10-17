@@ -353,17 +353,42 @@ fn solve_now(store: &Store, id: &str) -> io::Result<()> {
         .collect::<io::Result<_>>()?;
     let models: Vec<&dyn Model> = live.iter().map(|m| m as &dyn Model).collect();
     let spec_id = request["spec"].as_str().unwrap_or("");
-    let record = match request["retry"].as_str() {
-        Some(why) => spec::retry(&worlds, spec_id, why, &models, MAX_STEPS)?,
-        None => spec::accept(&worlds, spec_id, &models, MAX_STEPS)?,
+    let amend = request["amend"].as_str();
+    let record = match (amend, request["retry"].as_str()) {
+        (Some(change), _) => spec::amend(&worlds, spec_id, change, &models, MAX_STEPS)?,
+        (None, Some(why)) => spec::retry(&worlds, spec_id, why, &models, MAX_STEPS)?,
+        (None, None) => spec::accept(&worlds, spec_id, &models, MAX_STEPS)?,
     };
     let tests = spec::load(&worlds, spec_id)?;
+    if amend.is_some() && !record["winner"].is_string() {
+        // The change did not pass: the ready work is still there, untouched.
+        return store.update(id, |r| {
+            if let Some(m) = r.as_object_mut() {
+                m.remove("amend");
+            }
+            note(r, json!({"stage": "solve", "run": record["id"]}));
+            r["status"] = json!("ready");
+            r["amend_error"] = json!(failure(&record));
+        });
+    }
     store.update(id, |r| {
+        let before = r["files"].clone();
         if let Some(m) = r.as_object_mut() {
             m.remove("retry");
+            m.remove("amend");
         }
         note(r, json!({"stage": "solve", "run": record["id"]}));
         apply_run(r, &record);
+        // A correction starts from the ready work: its files are still part of it.
+        if amend.is_some() {
+            let mut files = before.as_array().cloned().unwrap_or_default();
+            for f in r["files"].as_array().into_iter().flatten() {
+                if !files.contains(f) {
+                    files.push(f.clone());
+                }
+            }
+            r["files"] = json!(files);
+        }
         // The acceptance tests land in the same commit: they are part of what fennec did.
         if let Some(files) = r["files"].as_array_mut() {
             for t in changed_files(tests["diff"].as_str().unwrap_or(""))
@@ -561,12 +586,42 @@ fn apply_run(request: &mut Value, record: &Value) {
         );
     } else {
         request["status"] = json!("failed");
-        request["reason"] = record["attempts"]
-            .as_array()
-            .and_then(|a| a.iter().find_map(|t| t["reason"].as_str()))
-            .map(|why| json!(why))
-            .unwrap_or(json!("aucune tentative n'a passé les tests"));
+        request["reason"] = json!(failure(record));
     }
+}
+
+/// Why a run has no winner: its first attempt's reason.
+fn failure(record: &Value) -> String {
+    record["attempts"]
+        .as_array()
+        .and_then(|a| a.iter().find_map(|t| t["reason"].as_str()))
+        .unwrap_or("aucune tentative n'a passé les tests")
+        .to_string()
+}
+
+/// "Corriger" on a ready request: the human tried it and asks for a change.
+/// fennec starts from the ready work, not from scratch, then proves it again.
+pub fn amend(store: &Store, id: &str, text: &str) -> io::Result<()> {
+    let request = store.load(id)?;
+    if request["status"] != "ready" || request["commit"].is_string() {
+        return Err(io::Error::other("cette demande n'attend pas ta décision"));
+    }
+    let text = text.trim();
+    if text.is_empty() {
+        return Err(io::Error::other("dis ce qui ne va pas"));
+    }
+    store.update(id, |r| {
+        say_in(r, "human", text);
+        r["status"] = json!("running");
+        r["amend"] = json!(text);
+        r["heard"] = json!(text);
+        if let Some(m) = r.as_object_mut() {
+            m.remove("amend_error");
+            m.remove("land_error");
+        }
+    })?;
+    spawn(id.to_string(), solve_now);
+    Ok(())
 }
 
 /// "Intégrer" on a ready request: its work becomes one commit on the branch
@@ -865,6 +920,11 @@ mod tests {
         pass(&store, &id).unwrap();
         assert_eq!(store.load(&id).unwrap()["status"], "passed");
         resume(&store, &id).unwrap();
+        assert_eq!(store.load(&id).unwrap()["status"], "ready");
+        // A correction needs words, and a ready request not yet committed.
+        assert!(amend(&store, &id, "  ").is_err());
+        store.update(&id, |r| r["commit"] = json!("c1")).unwrap();
+        assert!(amend(&store, &id, "plus haut").is_err());
         assert_eq!(store.load(&id).unwrap()["status"], "ready");
         std::fs::remove_dir_all(tmp).unwrap();
     }

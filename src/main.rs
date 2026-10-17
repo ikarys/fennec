@@ -192,6 +192,11 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
             work::pass(&store, &field(&input()?, "id"))?;
             Ok(json!({}))
         }
+        ("POST", "/api/amend") => {
+            let input = input()?;
+            work::amend(&store, &field(&input, "id"), &field(&input, "text"))?;
+            Ok(json!({}))
+        }
         ("POST", "/api/resume") => {
             work::resume(&store, &field(&input()?, "id"))?;
             Ok(json!({}))

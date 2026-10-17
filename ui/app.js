@@ -346,6 +346,10 @@ function card(item) {
       action("Pour tous mes projets", "/api/rule", { id: item.id, scope: "user" }, { primary: true }));
   } else if (item.kind === "ready") {
     if (item.done_when) add(focus("Terminé quand", item.done_when));
+    // "Ready" reads as "done": say where the work is until the commit.
+    add(el("div", { className: "muted", textContent: item.land
+      ? `Ton dossier n'a pas encore changé : le travail attend à part. « ${landLabel(item.land)} » l'y met.`
+      : "Ton dossier n'a pas encore changé : le travail attend à part, jusqu'au commit." }));
     add(...work(item), shots(item));
     // Commands leave no picture: their proof would otherwise hide behind "Détails".
     const tried = item.tries?.length ?? 0;
@@ -359,10 +363,19 @@ function card(item) {
         el("ul", { className: "warn" }, ...warns.map((w) => el("li", {}, ...rich(w)))));
     }
     if (item.land_error) add(el("div", { className: "bad", textContent: "Commit interrompu : " + firstLine(item.land_error) }));
-    // Three ways out, none forced: look, set aside, or commit.
+    if (item.amend_error) add(el("div", { className: "bad", textContent: "Correction non aboutie, le travail est resté tel quel : " + firstLine(item.amend_error) }));
+    // Ways out, none forced: look, set aside, ask for a change, or commit.
+    const change = el("textarea", { placeholder: "Ce qu'il faut changer", ariaLabel: "Ce qu'il faut changer", hidden: true });
+    const fix = el("button", { type: "button", textContent: "Corriger" });
+    fix.onclick = () => {
+      change.hidden = false;
+      change.focus();
+      fix.replaceWith(action("Envoyer la correction", "/api/amend", () => ({ id: item.id, text: change.value })));
+    };
+    add(el("div", { className: "reply" }, change));
     actions.append(dropButton(item.id), el("span", { className: "spacer" }),
       changesButton(item, () => node.querySelector(".changes-slot")),
-      action("Passer", "/api/pass", { id: item.id }));
+      action("Passer", "/api/pass", { id: item.id }), fix);
     if (item.land) actions.append(action(landLabel(item.land), "/api/land", { id: item.id }, { primary: true }));
   } else if (item.kind === "failed") {
     add(el("div", { className: "bad", textContent: explain(item.reason) || "raison inconnue" }), shots(item));
