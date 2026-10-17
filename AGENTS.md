@@ -29,7 +29,7 @@ fennec                      # http://127.0.0.1:7777
 
 Env: `FENNEC_LEAD_HOME` (default `~/.local/share/fennec-lead`), `FENNEC_LEAD_ADDR`
 (default `127.0.0.1:7777`), `FENNEC_LEAD_ATTEMPTS` (default 1), plus fennec-os's
-`FENNEC_OS_*` (model endpoint and names are required to frame a request).
+`FENNEC_OS_*` (`FENNEC_OS_BASE_URL` is the model server; without `FENNEC_OS_MODELS`, the models it lists are used).
 
 ## Non-negotiable rules
 
