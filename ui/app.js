@@ -654,6 +654,7 @@ $("open-settings").onclick = async () => {
     const s = await api("/api/settings", {});
     chosen = s.models;
     $("settings-url").value = s.base_url;
+    $("settings-tokens").value = s.max_tokens;
     $("settings-key").value = "";
     $("settings-key").placeholder = s.has_key ? "enregistrée (laisse vide pour la garder)" : "";
     $("settings-env").hidden = !s.env.length;
@@ -678,7 +679,8 @@ $("settings-form").onsubmit = async (e) => {
   // Models the server did not list (it was down) are kept as they were.
   const models = boxes.length ? boxes.filter((b) => b.checked).map((b) => b.value) : chosen;
   try {
-    await api("/api/settings/save", { base_url: $("settings-url").value, api_key: $("settings-key").value, models });
+    await api("/api/settings/save", { base_url: $("settings-url").value, api_key: $("settings-key").value, models,
+      max_tokens: Number($("settings-tokens").value) });
     $("settings").close();
   } catch (err) {
     $("settings-error").textContent = err.message;
