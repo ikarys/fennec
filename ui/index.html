@@ -40,7 +40,7 @@
   /* The one thing to read before deciding. */
   .focus { background: var(--soft); border-radius: 8px; padding: 10px 12px; overflow-wrap: anywhere; }
   .focus .label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 2px; }
-  .focus code { font: 13px ui-monospace, monospace; background: var(--card); border-radius: 4px; padding: 0 4px; }
+  .focus code, .warn code { font: 13px ui-monospace, monospace; background: var(--card); border-radius: 4px; padding: 0 4px; }
   .proved { color: var(--ok); font-size: 14px; margin-top: 10px; }
   .warn { color: var(--warn); font-size: 14px; margin: 8px 0 0; padding-left: 18px; }
   .bad { color: var(--bad); font-size: 14px; margin-top: 8px; overflow-wrap: anywhere; }
@@ -130,6 +130,8 @@
     <select id="role-stage" aria-label="Étape"></select>
     <textarea id="role-brief" aria-label="Ce que fait ce rôle" rows="6"
       placeholder="Ce que ce rôle exige, en une poignée de phrases" required></textarea>
+    <textarea id="role-checks" aria-label="Commandes lancées à chaque preuve" rows="2"
+      placeholder="Commandes lancées à chaque preuve, une par ligne : si l'une échoue, ce n'est pas prêt"></textarea>
     <div class="row"><button type="button" id="role-cancel">Annuler</button>
       <button class="primary">Enregistrer le rôle</button></div>
   </form>

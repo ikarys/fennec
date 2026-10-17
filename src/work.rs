@@ -293,11 +293,24 @@ fn apply_proof(request: &mut Value, proof: &Value) {
         .into_iter()
         .flatten()
         .find(|t| t["exit"] != 0);
+    // A role's check is its veto; a tool not installed is only unverified.
+    let vetoed = proof["checks"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .find(|c| c["exit"] != 0 && c["missing"] != true);
     if let Some(t) = failed {
         request["status"] = json!("failed");
         request["reason"] = json!(format!(
             "les tests passent, mais l'essai a échoué : {}",
             t["command"].as_str().unwrap_or("")
+        ));
+    } else if let Some(c) = vetoed {
+        request["status"] = json!("failed");
+        request["reason"] = json!(format!(
+            "les tests passent, mais {} bloque : `{}` a échoué",
+            c["role"].as_str().unwrap_or(""),
+            c["command"].as_str().unwrap_or("")
         ));
     } else if let Some(s) = proof["shots"]
         .as_array()
@@ -575,5 +588,16 @@ mod tests {
                 .unwrap()
                 .ends_with("u ne s'affiche pas : no text")
         );
+        let check = |exit: i32, missing: bool| {
+            json!({"tries": [{"command": "a", "exit": 0}], "passed": missing,
+                   "checks": [{"role": "Sec", "command": "audit", "exit": exit, "missing": missing}]})
+        };
+        apply_proof(&mut r, &check(1, false));
+        assert_eq!(
+            r["reason"],
+            "les tests passent, mais Sec bloque : `audit` a échoué"
+        );
+        apply_proof(&mut r, &check(127, true));
+        assert_eq!(r["status"], "ready", "a missing tool is not a veto");
     }
 }

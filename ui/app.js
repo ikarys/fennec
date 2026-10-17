@@ -120,6 +120,10 @@ function details(item) {
   for (const t of item.tries ?? []) {
     box.append(el("code", { textContent: `$ ${t.command}  → ${t.exit}` }), el("pre", { textContent: t.output }));
   }
+  for (const t of item.role_checks ?? []) {
+    box.append(el("code", { textContent: `${t.role} : $ ${t.command}  → ${t.missing ? "pas installé" : t.exit}` }),
+      el("pre", { textContent: t.output }));
+  }
   return box.children.length > 1 ? box : null;
 }
 
@@ -174,7 +178,7 @@ function card(item) {
     const warns = (item.untried ? ["le produit n'a pas encore été essayé"] : []).concat(item.unverified ?? []);
     if (warns.length) {
       add(el("div", { className: "muted", style: "margin-top:10px", textContent: "Non vérifié — à regarder toi-même :" }),
-        el("ul", { className: "warn" }, ...warns.map((w) => el("li", { textContent: w }))));
+        el("ul", { className: "warn" }, ...warns.map((w) => el("li", {}, ...rich(w)))));
     }
     if (item.land_error) add(el("div", { className: "bad", textContent: "Intégration interrompue : " + firstLine(item.land_error) }));
     actions.append(dropButton(item.id), el("span", { className: "spacer" }));
@@ -342,14 +346,20 @@ function editRole(r) {
   $("role-stage").value = r?.stage ?? "solve";
   // Role files wrap their lines; the box shows each paragraph as one.
   $("role-brief").value = (r?.brief ?? "").replace(/([^\n])\n(?!\n)/g, "$1 ");
+  $("role-checks").value = (r?.checks ?? []).join("\n");
+  showChecks();
   $("team-role").hidden = false;
   $("role-name").focus();
 }
+// Only a proof runs a role's commands, so only a proof role has them.
+const showChecks = () => ($("role-checks").hidden = $("role-stage").value !== "prove");
+$("role-stage").onchange = showChecks;
 $("role-new").onclick = () => editRole(null);
 $("role-cancel").onclick = () => ($("team-role").hidden = true);
 $("team-role").onsubmit = async (e) => {
   e.preventDefault();
-  const body = { key: editing, name: $("role-name").value, stage: $("role-stage").value, brief: $("role-brief").value };
+  const checks = $("role-stage").value === "prove" ? $("role-checks").value.split("\n").filter((c) => c.trim()) : [];
+  const body = { key: editing, name: $("role-name").value, stage: $("role-stage").value, brief: $("role-brief").value, checks };
   if (await teamCall("/api/team/role", body)) $("team-role").hidden = true;
 };
 $("team-save-open").onclick = () => {

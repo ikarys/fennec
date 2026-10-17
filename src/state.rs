@@ -131,6 +131,22 @@ fn name(project: &str) -> &str {
         .unwrap_or(project)
 }
 
+/// What the proof could not show: the model's lines, then each role check
+/// whose tool this machine lacks (rule 3: said, not left out).
+fn unverified(proof: &Value) -> Value {
+    let mut lines: Vec<Value> = proof["unverified"].as_array().cloned().unwrap_or_default();
+    for c in proof["checks"].as_array().into_iter().flatten() {
+        if c["missing"] == true {
+            lines.push(json!(format!(
+                "{} n'a pas pu lancer `{}` : l'outil n'est pas installé",
+                c["role"].as_str().unwrap_or(""),
+                c["command"].as_str().unwrap_or("")
+            )));
+        }
+    }
+    json!(lines)
+}
+
 /// Sorts requests into what needs the human, what fennec is doing, and what
 /// was landed. Pure, so the mapping from internal states to what the human
 /// sees is tested here. Each card carries fields, not prose: the page decides
@@ -170,8 +186,9 @@ fn classify(requests: &[(String, Value)], projects: &[String]) -> Value {
             Some("ready") => {
                 let mut c = card("ready");
                 c["done_when"] = r["done_when"].clone();
-                c["unverified"] = r["proof"]["unverified"].clone();
+                c["unverified"] = unverified(&r["proof"]);
                 c["tries"] = r["proof"]["tries"].clone();
+                c["role_checks"] = r["proof"]["checks"].clone();
                 c["shots"] = r["proof"]["shots"].clone();
                 c["land_error"] = r["land_error"].clone();
                 // A run that predates the proof was never tried: say so.
@@ -195,6 +212,7 @@ fn classify(requests: &[(String, Value)], projects: &[String]) -> Value {
                 let mut c = card("failed");
                 c["reason"] = r["reason"].clone();
                 c["tries"] = r["proof"]["tries"].clone();
+                c["role_checks"] = r["proof"]["checks"].clone();
                 c["shots"] = r["proof"]["shots"].clone();
                 todo.push((2, c));
             }
@@ -228,6 +246,20 @@ fn card_step(mut card: Value, step: &str) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_tool_a_role_could_not_run_is_said_unverified() {
+        let proof = json!({"unverified": ["le GUI"], "checks": [
+            {"role": "DevSecOps", "command": "gitleaks detect", "exit": 127, "missing": true},
+            {"role": "DevSecOps", "command": "ok", "exit": 0, "missing": false}]});
+        assert_eq!(
+            unverified(&proof),
+            json!([
+                "le GUI",
+                "DevSecOps n'a pas pu lancer `gitleaks detect` : l'outil n'est pas installé"
+            ])
+        );
+    }
 
     #[test]
     fn what_needs_the_human_comes_first_answers_before_results() {
