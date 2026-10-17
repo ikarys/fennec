@@ -637,6 +637,19 @@ pub fn drop(store: &Store, id: &str) -> io::Result<()> {
             "fennec travaille encore sur cette demande",
         ));
     }
+    // Its work goes too: in the project folder, the folder comes back.
+    let request = store.load(id)?;
+    let worlds = Worlds::from_env()?;
+    if let Some(run) = request["run"].as_str()
+        && worlds.open(run).is_ok()
+    {
+        review::reject(&worlds, run, None)?;
+    }
+    if let Some(s) = request["spec"].as_str()
+        && worlds.open(s).is_ok()
+    {
+        spec::reject(&worlds, s, None)?;
+    }
     store.update(id, |r| {
         r["status"] = json!("dropped");
         if let Some(m) = r.as_object_mut() {

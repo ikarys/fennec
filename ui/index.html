@@ -230,6 +230,12 @@
   </form>
   <div class="muted" id="picker-path"></div>
   <ul id="picker-list"></ul>
+  <label>Où fennec travaille
+    <select id="picker-place" aria-label="Où fennec travaille">
+      <option value="here">Dans ce dossier : tu vois le travail en direct</option>
+      <option value="apart">Dans un dossier à part, à côté : ce dossier ne change qu'au commit</option>
+    </select>
+  </label>
   <div class="row">
     <button type="button" id="picker-cancel">Annuler</button>
     <button type="button" class="primary" id="picker-choose">Ajouter ce dossier</button>

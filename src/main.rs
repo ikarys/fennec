@@ -218,7 +218,8 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
             Ok(json!({}))
         }
         ("POST", "/api/projects") => {
-            store.add_project(&field(&input()?, "path"))?;
+            let input = input()?;
+            store.add_project(&field(&input, "path"), &field(&input, "place"))?;
             Ok(json!({}))
         }
         ("POST", "/api/folders") => folders(&field(&input()?, "path")),
