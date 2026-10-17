@@ -162,7 +162,14 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
         ("GET", "/api/view") => store.view(),
         ("POST", "/api/requests") => {
             let v = input()?;
-            let id = store.add_request(&field(&v, "project"), &field(&v, "text"))?;
+            // Role keys this request does without, among its project's team.
+            let off: Vec<String> = v["off"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|k| k.as_str().map(str::to_string))
+                .collect();
+            let id = store.add_request(&field(&v, "project"), &field(&v, "text"), &off)?;
             work::talk(id.clone());
             Ok(json!({"id": id}))
         }

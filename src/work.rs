@@ -29,7 +29,19 @@ fn attempts() -> usize {
 fn spawn(id: String, step: fn(&Store, &str) -> io::Result<()>) {
     std::thread::spawn(move || {
         let Ok(store) = Store::from_env() else { return };
-        if let Err(e) = step(&store, &id) {
+        // The roles the human left out of this request stay out of every step.
+        let off: Vec<String> = store
+            .load(&id)
+            .map(|r| {
+                r["off"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|k| k.as_str().map(str::to_string))
+                    .collect()
+            })
+            .unwrap_or_default();
+        if let Err(e) = fennec_os::team::skipping(&off, || step(&store, &id)) {
             let _ = store.update(&id, |r| {
                 r["status"] = json!("failed");
                 r["reason"] = json!(e.to_string());

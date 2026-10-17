@@ -51,7 +51,7 @@ impl Store {
         Ok(())
     }
 
-    pub fn add_request(&self, project: &str, text: &str) -> io::Result<String> {
+    pub fn add_request(&self, project: &str, text: &str, off: &[String]) -> io::Result<String> {
         if !self.projects()?.iter().any(|p| p == project) {
             return Err(io::Error::other("projet inconnu"));
         }
@@ -65,7 +65,7 @@ impl Store {
         // Same width hex timestamps, as in fennec-os: lexical order is time order.
         let id = format!("{nanos:032x}");
         // Every request opens a conversation; a clear one ends at its first turn.
-        let record = json!({"project": project, "text": text.trim(), "status": "thinking",
+        let record = json!({"project": project, "text": text.trim(), "status": "thinking", "off": off,
                             "thread": [{"who": "human", "text": text.trim()}]});
         write_json(&self.request_path(&id)?, &record)?;
         Ok(id)
