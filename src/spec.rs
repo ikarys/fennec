@@ -475,6 +475,27 @@ fn key<'a>(line: &'a str, name: &str) -> Option<&'a str> {
     Some(rest.trim_start_matches('*').trim())
 }
 
+/// A request taken as it is, with no tests written first: a spec with no
+/// world and no checks of its own, whose attempts fork from the project.
+/// Its verdict is the project's rules and the proof of the product
+/// (`proof::gather`); test-first is a rule the human writes, not a stage.
+pub fn direct(worlds: &Worlds, project: &Path, request: &str) -> io::Result<Value> {
+    let project = std::fs::canonicalize(project)?;
+    let id = crate::world::new_id();
+    let spec = json!({
+        "project": project.display().to_string(),
+        "request": request,
+        "origin": "direct",
+        "world": id,
+        "goal": request,
+        "verify": [],
+        "protect": [],
+        "status": "proposed",
+    });
+    save(worlds, &id, &spec)?;
+    Ok(spec)
+}
+
 /// The human validates the spec: its tests become the task's protected
 /// checks and the attempts fork from its world. Returns the run record.
 pub fn accept(
@@ -592,7 +613,8 @@ fn run_spec(
         ),
         verify: strings("verify"),
         protect: strings("protect"),
-        base: Some(base.to_string()),
+        // A direct spec has no world of its own: it starts from the project.
+        base: (spec["origin"] != "direct" || base != spec["world"]).then(|| base.to_string()),
         grant: Vec::new(),
     };
     let project = PathBuf::from(spec["project"].as_str().unwrap_or(""));
@@ -669,16 +691,18 @@ pub fn ask(worlds: &Worlds, id: &str, question: &str, model: &dyn Model) -> io::
 }
 
 const DISCUSS: &str = "You help a person shape a request for a team of AI developers, before \
-any work starts. Talk with them in their language, briefly, like a colleague. When the request \
-leaves open what to build, how it should behave or how to tell it is done, say in one or two \
-sentences what you understood, then ask only the questions that matter, each with concrete \
-options; never invent the product. Once it is clear enough to write acceptance tests, a \
-clear first message included, reply with exactly one line and nothing else:\n\
+any work starts. Talk with them in their language, briefly, like a colleague. Most requests are \
+clear enough: if a careful developer could build a sound version of it, it is clear. Ask only \
+when you could not start at all (what kind of thing to build is open), in one or two sentences \
+of what you understood and the one or two questions that matter, with concrete options; never \
+invent the product. Layout, style, update rate, file names and other details are the \
+developer's to settle, not questions. Once it is clear, a clear first message included, reply \
+with exactly one line and nothing else:\n\
 `brief: <the whole request restated precisely, with everything agreed in this conversation, \
 in their language>`";
 
-/// One turn of shaping a request before tests are written: either a message
-/// for the human, or the brief `compile` will take.
+/// One turn of shaping a request before work starts: either a message for
+/// the human, or the brief the work takes.
 #[derive(Debug, PartialEq)]
 pub enum Discussed {
     Reply(String),

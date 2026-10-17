@@ -483,7 +483,7 @@ pub(crate) fn git(dir: &Path, args: &[&str]) -> io::Result<String> {
 /// is the last id in lexical order. Wall time can step back (an NTP or WSL
 /// host resync) and two forks can share a microsecond, so within a process
 /// each id is strictly above the one before.
-fn new_id() -> String {
+pub(crate) fn new_id() -> String {
     static LAST: AtomicU64 = AtomicU64::new(0);
     let t = SystemTime::now()
         .duration_since(UNIX_EPOCH)
