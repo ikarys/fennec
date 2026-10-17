@@ -22,6 +22,10 @@ Read the project first and follow its test conventions. Write tests only, in new
 protected whole once accepted, so the implementation must stay free to edit every existing file \
 (in Rust, an integration test under `tests/`). No implementation, no stubs. Cover the edge cases the request implies; where it is ambiguous, \
 pick the reading a careful maintainer would and say so in the goal. \
+A careful maintainer does not invent the product: when the request does not say what to build \
+or change, or the project is empty and the request leaves open what kind of program it is \
+(language, command line or web page), write nothing and call `done` with the summary \
+`question: <the one question whose answer lets you write the tests, in the request's language>`. \
 When finished, call `done` with a summary in exactly this form:\n\
 done_when: <what the person using the product will see or be able to do once it is done, in one or two sentences, in the request's language; product terms only, no file, tag, function or test names; it describes what your tests check, not what the request says: where you chose a reading, it states that reading>\n\
 goal: <the request restated precisely for an implementer, naming the tests that must pass>\n\
@@ -257,6 +261,13 @@ fn check(
     let summary = outcome.summary.unwrap_or_default();
     // Kept so the human sees what the model said when parsing finds nothing.
     spec["summary"] = json!(summary);
+    // A request too vague to test: the question goes to the human, whose
+    // answer reaches the next framing.
+    if spec["question"].is_null()
+        && let Some(q) = agent::parse_question(&summary)
+    {
+        spec["question"] = json!(q);
+    }
 
     let title = first_line(spec["request"].as_str().unwrap_or("")).to_string();
     let commit = worlds.commit(world, &format!("fennec-os spec: {title}"))?;
@@ -286,6 +297,8 @@ fn check(
 
     let reason = if let (true, Some(why)) = (changed.is_empty(), &outcome.stuck) {
         Some(format!("{why}; no test was written"))
+    } else if changed.is_empty() && spec["question"].is_string() {
+        Some("asks before writing tests".to_string())
     } else if changed.is_empty() {
         Some("no test was written".to_string())
     } else if goal.is_empty() || verify.is_empty() {

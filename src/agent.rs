@@ -325,7 +325,7 @@ fn ask(model: &dyn Model, goal: &str, messages: &[Value], why: &str) -> Option<S
     parse_question(content)
 }
 
-fn parse_question(reply: &str) -> Option<String> {
+pub(crate) fn parse_question(reply: &str) -> Option<String> {
     let q = reply
         .lines()
         .find_map(|l| l.trim().strip_prefix("question:"))?

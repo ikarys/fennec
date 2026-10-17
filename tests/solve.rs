@@ -785,6 +785,12 @@ fn a_request_compiles_to_failing_tests_that_the_solution_must_pass() {
             .contains("Q: Which file holds the answer?\n    A: the file `answer`")
     );
 
+    // A request too vague to test is asked about, not invented.
+    let wary = Script::new("wary", &[finish("question: What should it do?")]);
+    let s = spec::compile(&f.worlds, &f.project, "ceci est un test", &wary, 10).unwrap();
+    assert_eq!(s["question"], "What should it do?", "{s:#}");
+    assert_eq!(s["reason"], "asks before writing tests");
+
     let good = Script::new(
         "good",
         &[write("spec.sh", "grep -qx 42 answer\n"), finish(SPEC)],
