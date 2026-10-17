@@ -14,7 +14,7 @@ not binding): `docs/history/`; synthesis note in the `iatraining` repo,
 ```
 src/world.rs     worlds: fork, sandbox (bubblewrap), diff, commit, rollback, drop
 src/grant.rs     human-issued grant: a world writes named host paths, backed up until keep/revert
-src/provider.rs  `Model` trait + OpenAI-compatible client
+src/provider.rs  `Model` trait + OpenAI-compatible client; `ask` (one question), `Live` (the exchange so far, in a file)
 src/recipe.rs    replay a landed run's tool calls when the same goal returns
 src/agent.rs     tool loop; every tool runs inside the sandbox; loops, idle runs and hung commands are stopped
 src/solve.rs     task → worlds in turn until one passes verify → land (rebase + re-verify, one commit by the human) on the branch the rules ask for → push
