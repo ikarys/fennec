@@ -201,6 +201,35 @@ function journalButton(item, where) {
   });
 }
 
+// Work under way: it opens on its journal, which follows the model as it answers.
+function underway(item) {
+  const slot = el("div");
+  const box = el("details", { className: "past" }, el("summary", {}, line(item, item.step, true)), slot);
+  box.dataset.key = "run-" + item.id;
+  box.ontoggle = () => follow(item.id, box, slot);
+  return box;
+}
+
+async function follow(id, box, slot) {
+  let last = "";
+  while (box.open && box.isConnected) {
+    try {
+      const steps = await api("/api/journal", { id });
+      const json = JSON.stringify(steps);
+      if (json !== last) {
+        last = json;
+        // What the human opened stays open as new messages come in.
+        const opened = [...slot.querySelectorAll("details")].map((d) => d.open);
+        slot.replaceChildren(...steps.map(stepView));
+        slot.querySelectorAll("details").forEach((d, i) => { d.open = opened[i] ?? false; });
+      }
+    } catch (e) {
+      slot.replaceChildren(el("div", { className: "bad", textContent: e.message }));
+    }
+    await new Promise((done) => setTimeout(done, 3000));
+  }
+}
+
 const number = (n) => (n ?? 0).toLocaleString("fr-FR");
 
 function duration(ms) {
@@ -220,7 +249,9 @@ function stepView(step) {
     el("div", { className: "step-name", textContent: step.name + verdict }),
     el("div", { className: "muted", textContent: cost }),
     ...(messages.length ? messages.map(messageView)
-      : [el("div", { className: "muted", textContent: "Les messages de cette étape n'ont pas été gardés (demande ancienne)." })]));
+      : [el("div", { className: "muted", textContent: step.live
+        ? "fennec attend la première réponse du modèle…"
+        : "Les messages de cette étape n'ont pas été gardés (demande ancienne)." })]));
 }
 
 const who = { system: "Consigne", user: "Envoyé au modèle", assistant: "Modèle", tool: "Résultat d'outil" };
@@ -408,12 +439,12 @@ async function refresh(force) {
     $("error").textContent = "";
     const open = new Set([...document.querySelectorAll("details[open]")].map((d) => d.dataset.key));
     fill($("todo"), view.todo.map(card), "Rien ne t'attend.");
-    for (const d of document.querySelectorAll("details")) d.open = open.has(d.dataset.key);
     $("n-todo").textContent = view.todo.length ? `· ${view.todo.length}` : "";
     // Seen from another tab: what waits for the human, in the tab's title.
     document.title = view.todo.length ? `(${view.todo.length}) fennec` : "fennec";
-    fill($("running"), view.running.map((r) => line(r, r.step, true)), "Rien en cours.");
+    fill($("running"), view.running.map(underway), "Rien en cours.");
     fill($("history"), view.history.map(past), "Rien de terminé pour l'instant.");
+    for (const d of document.querySelectorAll("details")) d.open = open.has(d.dataset.key);
     // How it works, while nothing is under way: the page alone must explain itself.
     $("how").hidden = view.todo.length + view.running.length > 0;
     renderProjects(view.projects);

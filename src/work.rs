@@ -6,7 +6,7 @@
 use std::io;
 use std::path::Path;
 
-use fennec_os::provider::{Model, OpenAi};
+use fennec_os::provider::{Live, Model, OpenAi};
 use fennec_os::world::Worlds;
 use fennec_os::{proof, review, rules, solve, spec};
 use serde_json::{Value, json};
@@ -169,6 +169,7 @@ fn frame_now(store: &Store, id: &str) -> io::Result<()> {
     let worlds = Worlds::from_env()?;
     let model = OpenAi::variants_from_env(1)?.remove(0);
     offer_rule(store, id, &request, &model)?;
+    let model = Live::new(&model, store.live_path(id)?);
     let s = spec::compile(
         &worlds,
         Path::new(request["project"].as_str().unwrap_or("")),
@@ -330,7 +331,11 @@ fn solve_now(store: &Store, id: &str) -> io::Result<()> {
     let worlds = Worlds::from_env()?;
     let variants = OpenAi::variants_from_env(attempts())?;
     offer_rule(store, id, &request, &variants[0])?;
-    let models: Vec<&dyn Model> = variants.iter().map(|m| m as &dyn Model).collect();
+    let live: Vec<Live> = variants
+        .iter()
+        .map(|m| Ok(Live::new(m, store.live_path(id)?)))
+        .collect::<io::Result<_>>()?;
+    let models: Vec<&dyn Model> = live.iter().map(|m| m as &dyn Model).collect();
     let spec_id = request["spec"].as_str().unwrap_or("");
     let record = match request["retry"].as_str() {
         Some(why) => spec::retry(&worlds, spec_id, why, &models, MAX_STEPS)?,
@@ -361,7 +366,8 @@ fn solve_now(store: &Store, id: &str) -> io::Result<()> {
     // Tests passing is not "ready": the product is tried first.
     store.update(id, |r| r["status"] = json!("proving"))?;
     let done_when = store.load(id)?["done_when"].as_str().map(str::to_string);
-    let proof = proof::gather(&worlds, run, done_when.as_deref(), &variants[0])?;
+    let watched = Live::new(&variants[0], store.live_path(id)?);
+    let proof = proof::gather(&worlds, run, done_when.as_deref(), &watched)?;
     // Where it will land is decided before "ready", so the card never shows
     // a branch the click would not use.
     let mut probe = store.load(id)?;
@@ -654,6 +660,24 @@ pub fn journal(store: &Store, id: &str) -> io::Result<Value> {
             }
             _ => {}
         }
+    }
+    // The step under way, as far as it has gone.
+    let under_way = match request["status"].as_str() {
+        Some("framing") => Some("Cadrage : terminé quand et tests (en cours)"),
+        Some("running") => Some("Travail (en cours)"),
+        Some("proving") => Some("Preuve (en cours)"),
+        _ => None,
+    };
+    if let Some(name) = under_way {
+        let now = std::fs::read_to_string(store.live_path(id)?)
+            .ok()
+            .and_then(|t| serde_json::from_str::<Value>(&t).ok());
+        let mut s = match &now {
+            Some(now) => step(name, now),
+            None => json!({"name": name, "messages": [], "cost": cost(&Value::Null)}),
+        };
+        s["live"] = json!(true);
+        steps.push(s);
     }
     Ok(json!(steps))
 }

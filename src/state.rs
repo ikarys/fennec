@@ -105,6 +105,14 @@ impl Store {
         Ok(self.root.join("requests").join(format!("{id}.json")))
     }
 
+    /// The exchange of the step under way, rewritten after every model call.
+    pub fn live_path(&self, id: &str) -> io::Result<PathBuf> {
+        self.request_path(id)?;
+        let dir = self.root.join("live");
+        std::fs::create_dir_all(&dir)?;
+        Ok(dir.join(format!("{id}.json")))
+    }
+
     pub fn load(&self, id: &str) -> io::Result<Value> {
         let text = std::fs::read_to_string(self.request_path(id)?)
             .map_err(|_| io::Error::other("demande inconnue"))?;
