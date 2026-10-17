@@ -1,7 +1,7 @@
 //! The model behind an agent: any OpenAI-compatible chat endpoint.
 
 use std::io;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 
@@ -16,6 +16,40 @@ pub trait Model: Sync {
     }
     /// Names the variant in run records.
     fn label(&self) -> String;
+}
+
+/// One question without tools, asked again without reasoning when the reply
+/// holds no answer (seen: a whole budget spent thinking). Returns the answer,
+/// reasoning stripped, and the exchange recorded the way an agent's is
+/// (`{"model", "messages", "turns"}`), so the human can read what was said.
+pub fn ask(model: &dyn Model, messages: &[Value]) -> io::Result<(String, Value)> {
+    let (mut said, mut turns, mut answer) = (messages.to_vec(), Vec::new(), String::new());
+    for think in [true, false] {
+        let asked = Instant::now();
+        let mut reply = match think {
+            true => model.chat(messages, &json!([]))?,
+            false => model.chat_quick(messages, &json!([]))?,
+        };
+        let usage = reply.as_object_mut().and_then(|m| m.remove("usage"));
+        turns.push(json!({"model_ms": asked.elapsed().as_millis() as u64,
+                          "think": think, "usage": usage}));
+        let content = reply["content"].as_str().unwrap_or("");
+        // Some servers leave the reasoning inline.
+        answer = content
+            .rsplit("</think>")
+            .next()
+            .unwrap_or("")
+            .trim()
+            .to_string();
+        said.push(reply);
+        if !answer.is_empty() {
+            break;
+        }
+    }
+    Ok((
+        answer,
+        json!({"model": model.label(), "messages": said, "turns": turns}),
+    ))
 }
 
 pub struct OpenAi {

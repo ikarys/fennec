@@ -175,7 +175,7 @@ pub fn solve(
         }
     }
 
-    let record = json!({
+    let mut record = json!({
         "project": project.display().to_string(),
         "goal": task.goal,
         "spec": task.base,
@@ -194,6 +194,8 @@ pub fn solve(
             .unwrap_or("run")
             .to_string()
     });
+    // The name it is kept under, for whoever shows it later.
+    record["id"] = json!(name);
     review::save(worlds, &name, &record)?;
     Ok(record)
 }
