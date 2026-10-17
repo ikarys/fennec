@@ -205,19 +205,39 @@ impl Worlds {
 
     /// Everything that changed since the last checkpoint, untracked files included.
     pub fn diff(&self, world: &World) -> io::Result<String> {
-        self.git(world, &["add", "-A"])?;
+        self.stage(world)?;
         self.git(world, &["diff", "--cached", "HEAD"])
     }
 
     /// Checkpoint the world. Returns the commit; a world with no change keeps its HEAD.
     pub fn commit(&self, world: &World, message: &str) -> io::Result<String> {
-        self.git(world, &["add", "-A"])?;
+        self.stage(world)?;
         if !self.git(world, &["status", "--porcelain"])?.is_empty() {
             let mut args = COMMITTER.to_vec();
             args.extend(["commit", "-q", "-m", message]);
             self.git(world, &args)?;
         }
         self.git(world, &["rev-parse", "HEAD"])
+    }
+
+    /// Every file in the world is the work, but what a build writes is not:
+    /// a project without a .gitignore would land `target/` or `node_modules/`.
+    /// ponytail: a fixed list of tool outputs; a project that tracks one of
+    /// these dirs on purpose cannot change it through fennec.
+    fn stage(&self, world: &World) -> io::Result<String> {
+        self.git(
+            world,
+            &[
+                "add",
+                "-A",
+                "--",
+                ".",
+                ":(exclude,glob)**/target/**",
+                ":(exclude,glob)**/node_modules/**",
+                ":(exclude,glob)**/__pycache__/**",
+                ":(exclude,glob)**/.venv/**",
+            ],
+        )
     }
 
     /// Back to the last checkpoint, exactly: ignored files go too.
