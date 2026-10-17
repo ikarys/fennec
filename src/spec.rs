@@ -3,6 +3,7 @@
 //! harness checks what it can decide: tests were written, they fail now, and
 //! they touch nothing the harness or the project rules forbid.
 
+use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -273,6 +274,16 @@ fn check(
         spec["question"] = json!(q);
     }
 
+    // An empty new file is a leftover of the framer probing the project (a
+    // `touch index.html` to see the tests pass), never a test: kept, it would
+    // be protected and forbid the implementation its own file.
+    let untracked = worlds.git(world, &["ls-files", "--others", "--exclude-standard"])?;
+    for file in untracked.lines() {
+        let path = world.path.join(file);
+        if fs::metadata(&path).is_ok_and(|m| m.is_file() && m.len() == 0) {
+            fs::remove_file(&path)?;
+        }
+    }
     let title = first_line(spec["request"].as_str().unwrap_or("")).to_string();
     let commit = worlds.commit(world, &format!("fennec-os spec: {title}"))?;
     spec["diff"] = json!(worlds.git(world, &["diff", &base, &commit])?);
