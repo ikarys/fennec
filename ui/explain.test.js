@@ -17,6 +17,10 @@ assert.match(
   explain("no model: none is set and http://x:1/v1/models did not answer (timeout: global)"),
   /aucun modèle à http:\/\/x:1\/v1 \(le serveur ne répond pas à temps\)/,
 );
+assert.match(
+  explain("git rev-parse --path-format=absolute --git-common-dir: fatal: not a git repository (or any parent up to mount point /)"),
+  /n'est plus un dépôt git/,
+);
 // A test's own output is not the server's.
 assert.equal(explain("tests failed: case ... timeout: 5s"), "tests failed: case ... timeout: 5s");
 console.log("ok");
