@@ -28,8 +28,9 @@ fennec                      # http://127.0.0.1:7777
 ```
 
 Env: `FENNEC_LEAD_HOME` (default `~/.local/share/fennec-lead`), `FENNEC_LEAD_ADDR`
-(default `127.0.0.1:7777`), `FENNEC_LEAD_ATTEMPTS` (default 1), plus fennec-os's
-`FENNEC_OS_*` (`FENNEC_OS_BASE_URL` is the model server; without `FENNEC_OS_MODELS`, the models it lists are used).
+(default `127.0.0.1:7777`), `FENNEC_LEAD_ATTEMPTS` (default 1). The model server and
+models are set in "Réglages" (`~/.config/fennec/model.json`); fennec-os's `FENNEC_OS_*`
+variables override them.
 
 ## Non-negotiable rules
 
@@ -38,6 +39,8 @@ Env: `FENNEC_LEAD_HOME` (default `~/.local/share/fennec-lead`), `FENNEC_LEAD_ADD
 2. **Seven words on screen**: project, request, done when, proof, question, rule,
    team (made of roles; added 2026-10-17, see `docs/design/team.md`). Internal
    concepts (world, run, grant, permissions, limits, stage keys) never reach the UI.
+   One exception, outside the work itself: the "Réglages" dialog names the model
+   server and its models, since choosing them is the human's setup.
 3. **Nothing is "ready" without proof.** What could not be proven is shown as
    "not verified: X".
 4. **Execution logic goes in fennec-os**, not here. This repository stays thin.

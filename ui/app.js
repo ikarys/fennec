@@ -404,3 +404,59 @@ $("team-close").onclick = () => $("team").close();
 
 refresh();
 setInterval(refresh, 3000);
+
+// Where the model is. Ticking none means every model the server serves.
+let chosen = [];
+let asked = 0;
+async function listModels() {
+  // A slow answer for an address since replaced must not overwrite the new one.
+  const ask = ++asked;
+  $("settings-status").textContent = "Je demande au serveur…";
+  $("settings-models").replaceChildren();
+  try {
+    const { models } = await api("/api/settings/served", { base_url: $("settings-url").value, api_key: $("settings-key").value });
+    if (ask !== asked) return;
+    $("settings-status").textContent = models.length
+      ? "Coche les modèles à utiliser ; aucun coché : tous ceux du serveur."
+      : "Le serveur répond mais ne sert aucun modèle.";
+    $("settings-models").replaceChildren(...models.map((m) =>
+      el("li", {}, el("input", { type: "checkbox", value: m, checked: chosen.includes(m), ariaLabel: m }), m)));
+  } catch (e) {
+    if (ask === asked) $("settings-status").textContent = e.message;
+  }
+}
+$("open-settings").onclick = async () => {
+  try {
+    const s = await api("/api/settings", {});
+    chosen = s.models;
+    $("settings-url").value = s.base_url;
+    $("settings-key").value = "";
+    $("settings-key").placeholder = s.has_key ? "enregistrée (laisse vide pour la garder)" : "";
+    $("settings-env").hidden = !s.env.length;
+    $("settings-env").textContent = `Au lancement, ${s.env.join(", ")} passe avant ces réglages.`;
+    $("settings-error").textContent = "";
+    $("settings").showModal();
+    listModels();
+  } catch (e) {
+    $("error").textContent = e.message;
+  }
+};
+$("settings-test").onclick = () => {
+  // An empty list (server down, or still asking) says nothing about the choice.
+  const boxes = [...document.querySelectorAll("#settings-models input")];
+  if (boxes.length) chosen = boxes.filter((b) => b.checked).map((b) => b.value);
+  listModels();
+};
+$("settings-cancel").onclick = () => $("settings").close();
+$("settings-form").onsubmit = async (e) => {
+  e.preventDefault();
+  const boxes = [...document.querySelectorAll("#settings-models input")];
+  // Models the server did not list (it was down) are kept as they were.
+  const models = boxes.length ? boxes.filter((b) => b.checked).map((b) => b.value) : chosen;
+  try {
+    await api("/api/settings/save", { base_url: $("settings-url").value, api_key: $("settings-key").value, models });
+    $("settings").close();
+  } catch (err) {
+    $("settings-error").textContent = err.message;
+  }
+};

@@ -86,6 +86,10 @@
   #team-roles .out button { color: var(--muted); text-decoration: line-through; }
   #team-role { display: grid; gap: 8px; margin: 10px 0; }
   .row .spacer { flex: 1; }
+  .field { display: grid; gap: 4px; margin: 12px 0 4px; font-size: 14px; }
+  .field .go { display: flex; gap: 8px; }
+  .field .go input { flex: 1; min-width: 0; }
+  #settings-models li { display: flex; gap: 8px; align-items: center; padding: 2px 4px; }
   @media (max-width: 700px) {
     #new-request { grid-template-columns: 1fr; }
   }
@@ -97,6 +101,7 @@
     <h1>fennec</h1>
     <button class="link" id="add-project">+ projet</button>
     <button class="link" id="open-team">Équipe</button>
+    <button class="link" id="open-settings">Réglages</button>
   </header>
 
   <form id="new-request">
@@ -147,6 +152,26 @@
     <span class="spacer"></span>
     <button type="button" id="team-close">Fermer</button>
   </div>
+</dialog>
+<dialog id="settings">
+  <strong>Réglages</strong>
+  <form id="settings-form">
+    <label class="field">Serveur du modèle
+      <span class="go"><input id="settings-url" required placeholder="http://localhost:8000/v1">
+        <button type="button" id="settings-test">Tester</button></span>
+    </label>
+    <div class="muted" id="settings-status"></div>
+    <ul id="settings-models"></ul>
+    <label class="field">Clé d'accès (facultative)
+      <input id="settings-key" type="password" autocomplete="off">
+    </label>
+    <p class="muted" id="settings-env" hidden></p>
+    <p class="error" id="settings-error" role="alert"></p>
+    <div class="row">
+      <button type="button" id="settings-cancel">Annuler</button>
+      <button class="primary">Enregistrer</button>
+    </div>
+  </form>
 </dialog>
 <dialog id="picker">
   <strong>Choisir un projet</strong>
