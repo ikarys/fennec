@@ -102,6 +102,7 @@ function explain(reason) {
 function shots(item) {
   const row = el("div", { className: "shots" });
   for (const s of item.shots ?? []) {
+    if (s.missing) continue; // said in "non vérifié"
     if (!s.file) {
       row.append(el("div", { className: "bad", textContent: `Page ${s.url} : ${firstLine(s.reason)}` }));
       continue;
