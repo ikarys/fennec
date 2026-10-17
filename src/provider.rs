@@ -47,8 +47,16 @@ impl OpenAi {
     pub fn variants_from_env(attempts: usize) -> io::Result<Vec<Self>> {
         let base = std::env::var("FENNEC_OS_BASE_URL")
             .unwrap_or_else(|_| "http://localhost:8000/v1".to_string());
-        let models = std::env::var("FENNEC_OS_MODELS")
-            .map_err(|_| io::Error::other("FENNEC_OS_MODELS is not set"))?;
+        // Unset: the models the server says it serves, so a local server
+        // that serves one model needs no configuration but its address.
+        let models = match std::env::var("FENNEC_OS_MODELS") {
+            Ok(m) => m,
+            Err(_) => served(&base).map_err(|e| {
+                io::Error::other(format!(
+                    "no model: FENNEC_OS_MODELS is not set and {base}/models did not answer ({e})"
+                ))
+            })?,
+        };
         let models: Vec<&str> = models
             .split(',')
             .map(str::trim)
@@ -69,6 +77,26 @@ impl OpenAi {
             })
             .collect())
     }
+}
+
+/// The model ids an OpenAI-compatible server lists, comma-separated.
+fn served(base: &str) -> io::Result<String> {
+    let agent: ureq::Agent = ureq::Agent::config_builder()
+        .timeout_global(Some(Duration::from_secs(10)))
+        .build()
+        .into();
+    let mut resp = agent
+        .get(format!("{}/models", base.trim_end_matches('/')))
+        .call()
+        .map_err(io::Error::other)?;
+    let list: Value = resp.body_mut().read_json().map_err(io::Error::other)?;
+    let ids: Vec<&str> = list["data"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|m| m["id"].as_str())
+        .collect();
+    Ok(ids.join(","))
 }
 
 impl OpenAi {
@@ -119,5 +147,36 @@ impl Model for OpenAi {
 
     fn label(&self) -> String {
         format!("{}@{}", self.model, self.temperature)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::{Read, Write};
+
+    #[test]
+    fn the_server_names_its_models_when_none_is_set() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let base = format!("http://{}/v1", listener.local_addr().unwrap());
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut request = [0u8; 1024];
+            let n = stream.read(&mut request).unwrap();
+            assert!(String::from_utf8_lossy(&request[..n]).starts_with("GET /v1/models "));
+            let body = r#"{"data":[{"id":"qwen3.8-27b"},{"id":"small"}]}"#;
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                body.len()
+            )
+            .unwrap();
+        });
+        assert_eq!(served(&base).unwrap(), "qwen3.8-27b,small");
+        server.join().unwrap();
+        let closed = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let gone = format!("http://{}/v1", closed.local_addr().unwrap());
+        drop(closed);
+        assert!(served(&gone).is_err(), "nothing listens");
     }
 }
