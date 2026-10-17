@@ -10,6 +10,7 @@ use std::io::{self, BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::Path;
 
+use fennec_os::provider::{self, Settings};
 use fennec_os::team;
 use fennec_os::world::Worlds;
 use serde_json::{Value, json};
@@ -196,6 +197,56 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
             Ok(json!({}))
         }
         ("POST", "/api/folders") => folders(&field(&input()?, "path")),
+        // The key never goes back to the page: only whether one is saved.
+        ("POST", "/api/settings") => {
+            let s = Settings::saved()?;
+            let env: Vec<&str> = provider::ENV
+                .into_iter()
+                .filter(|v| std::env::var_os(v).is_some())
+                .collect();
+            Ok(json!({"base_url": s.base_url, "models": s.models,
+                      "has_key": s.api_key.is_some(), "env": env}))
+        }
+        ("POST", "/api/settings/served") => {
+            let v = input()?;
+            let key = v["api_key"]
+                .as_str()
+                .filter(|k| !k.is_empty())
+                .map(str::to_string)
+                .or(Settings::saved()?.api_key);
+            let models = provider::served(&field(&v, "base_url"), key.as_deref())
+                .map_err(|e| io::Error::other(format!("le serveur ne répond pas : {e}")))?;
+            Ok(json!({"models": models}))
+        }
+        ("POST", "/api/settings/save") => {
+            let v = input()?;
+            let base_url = field(&v, "base_url").trim().to_string();
+            if !base_url.starts_with("http://") && !base_url.starts_with("https://") {
+                return Err(io::Error::other(
+                    "l'adresse doit commencer par http:// ou https://",
+                ));
+            }
+            // ponytail: an empty key field keeps the saved key; no way to
+            // remove it from the page yet, edit model.json if needed.
+            let api_key = v["api_key"]
+                .as_str()
+                .filter(|k| !k.is_empty())
+                .map(str::to_string)
+                .or(Settings::saved()?.api_key);
+            let models = v["models"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|m| m.as_str().map(str::to_string))
+                .collect();
+            Settings {
+                base_url,
+                models,
+                api_key,
+            }
+            .save()?;
+            Ok(json!({}))
+        }
         ("POST", "/api/team") => team_view(&project(&store, &field(&input()?, "project"))?),
         ("POST", "/api/team/choose") => {
             let v = input()?;
