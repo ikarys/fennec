@@ -295,6 +295,7 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
                     .flatten()
                     .filter_map(|c| c.as_str().map(str::to_string))
                     .collect::<Vec<_>>(),
+                &field(&v, "model"),
             )?;
             team_view(&path)
         }
@@ -332,7 +333,7 @@ fn team_view(path: &Path) -> io::Result<Value> {
     let setup = team::setup(path)?;
     let role = |r: &team::Role| {
         json!({"key": r.key, "name": r.name, "stage": r.stage, "brief": r.brief,
-                                    "checks": r.checks})
+                                    "checks": r.checks, "model": r.model})
     };
     let roles: Vec<Value> = setup
         .roles
