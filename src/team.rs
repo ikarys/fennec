@@ -5,9 +5,14 @@
 //! ---
 //! name: QA
 //! stage: prove
+//! check: gitleaks detect --no-git
 //! ---
 //! What this role cares about, in the agent's language.
 //! ```
+//!
+//! `check` lines (prove roles only, one command each) are the role's veto:
+//! the harness runs them on every proof and a failure blocks "ready". The
+//! brief only asks; a check decides, by exit code.
 //!
 //! A team is a named set of roles, because different work needs different
 //! people: software is not a study. The human's teams are folders,
@@ -91,6 +96,8 @@ pub struct Role {
     pub name: String,
     pub stage: String,
     pub brief: String,
+    /// Commands run at every proof; see the module doc.
+    pub checks: Vec<String>,
 }
 
 /// Every built-in role.
@@ -217,6 +224,7 @@ pub fn save_role(
     name: &str,
     stage: &str,
     brief: &str,
+    checks: &[String],
 ) -> io::Result<String> {
     let (name, brief) = (name.trim(), brief.trim());
     if name.is_empty() || brief.is_empty() {
@@ -235,11 +243,20 @@ pub fn save_role(
             k
         }
     };
+    // Each check is one front matter line.
+    if checks.iter().any(|c| c.contains(['\n', '\r'])) {
+        return Err(io::Error::other("a check is one line"));
+    }
     let role = Role {
         key: key.clone(),
         name: name.to_string(),
         stage: stage.to_string(),
         brief: brief.to_string(),
+        checks: checks
+            .iter()
+            .map(|c| c.trim().to_string())
+            .filter(|c| !c.is_empty())
+            .collect(),
     };
     // Checked as any role file is, before it is written.
     parse(&key, &to_md(&role))?;
@@ -280,8 +297,9 @@ pub fn save_team(project: &Path, name: &str) -> io::Result<()> {
 }
 
 fn to_md(r: &Role) -> String {
+    let checks: String = r.checks.iter().map(|c| format!("check: {c}\n")).collect();
     format!(
-        "---\nname: {}\nstage: {}\n---\n{}\n",
+        "---\nname: {}\nstage: {}\n{checks}---\n{}\n",
         r.name, r.stage, r.brief
     )
 }
@@ -372,6 +390,15 @@ pub fn brief(project: &Path, stage: &str) -> io::Result<(String, Vec<String>)> {
     Ok((text, roles.into_iter().map(|r| r.name).collect()))
 }
 
+/// The commands the project's prove roles run on every proof:
+/// `(role name, command)`.
+pub fn checks(project: &Path) -> io::Result<Vec<(String, String)>> {
+    Ok(members(project)?
+        .into_iter()
+        .flat_map(|r| r.checks.into_iter().map(move |c| (r.name.clone(), c)))
+        .collect())
+}
+
 /// `(file name without .md, content)` for each `.md` file, or `None` when the
 /// directory does not exist.
 fn read_dir(dir: &Path) -> io::Result<Option<Vec<(String, String)>>> {
@@ -415,11 +442,22 @@ fn parse(key: &str, text: &str) -> io::Result<Role> {
             STAGES.join(", ")
         )));
     }
+    let checks: Vec<String> = head
+        .lines()
+        .filter_map(|l| l.strip_prefix("check:"))
+        .map(|c| c.trim().to_string())
+        .filter(|c| !c.is_empty())
+        .collect();
+    // Only a proof runs them: elsewhere they would be a veto that never acts.
+    if !checks.is_empty() && stage != "prove" {
+        return Err(bad("only a `prove` role can have `check` lines"));
+    }
     Ok(Role {
         key: key.to_string(),
         name: field("name").unwrap_or_else(|| key.to_string()),
         stage,
         brief: body.trim().to_string(),
+        checks,
     })
 }
 
@@ -474,6 +512,12 @@ mod tests {
             "{e}"
         );
         assert!(parse("dev", "no front matter").is_err());
+        let sec =
+            "---\nname: Sec\nstage: prove\ncheck: gitleaks detect\ncheck: bandit -r .\n---\nx";
+        let r = parse("sec", sec).unwrap();
+        assert_eq!(r.checks, ["gitleaks detect", "bandit -r ."]);
+        assert_eq!(parse("sec", &to_md(&r)).unwrap(), r, "written as read");
+        assert!(parse("dev", "---\nstage: solve\ncheck: x\n---\nx").is_err());
     }
 
     #[test]
@@ -574,7 +618,15 @@ mod tests {
         std::fs::create_dir_all(&project).unwrap();
         super::choose(&project, "Développement", &[]).unwrap();
 
-        save_role(&project, Some("qa"), "QA web", "prove", "Click everything.").unwrap();
+        save_role(
+            &project,
+            Some("qa"),
+            "QA web",
+            "prove",
+            "Click everything.",
+            &[],
+        )
+        .unwrap();
         let qa = members(&project)
             .unwrap()
             .into_iter()
@@ -591,22 +643,31 @@ mod tests {
             "Spécialiste données",
             "solve",
             "Check the data.",
+            &[],
         )
         .unwrap();
         assert_eq!(key, "specialiste-donnees");
         assert!(
-            save_role(&project, None, "Spécialiste données", "solve", "x").is_err(),
+            save_role(&project, None, "Spécialiste données", "solve", "x", &[]).is_err(),
             "taken"
         );
-        assert!(save_role(&project, Some("nobody"), "x", "solve", "x").is_err());
+        assert!(save_role(&project, Some("nobody"), "x", "solve", "x", &[]).is_err());
         assert!(
-            save_role(&project, None, "Ops", "deploy", "x").is_err(),
+            save_role(&project, None, "Ops", "deploy", "x", &[]).is_err(),
             "unknown stage"
         );
         assert!(
-            save_role(&project, None, "Ops", "solve", " ").is_err(),
+            save_role(&project, None, "Ops", "solve", " ", &[]).is_err(),
             "empty brief"
         );
+        let veto = ["gitleaks detect".to_string()];
+        save_role(&project, Some("qa"), "QA", "prove", "Try.", &veto).unwrap();
+        assert_eq!(
+            checks(&project).unwrap(),
+            [("QA".to_string(), veto[0].clone())]
+        );
+        let two = ["a\nb".to_string()];
+        assert!(save_role(&project, Some("qa"), "QA", "prove", "Try.", &two).is_err());
         assert_eq!(slug("  Dev -- Senior! "), "dev-senior");
         std::fs::remove_dir_all(project).unwrap();
     }

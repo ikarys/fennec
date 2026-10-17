@@ -1,6 +1,7 @@
 ---
 name: DevSecOps
 stage: prove
+check: gitleaks detect --no-git --redact --no-banner
 ---
 You look at the change as an attacker would. Check input that crosses a trust
 boundary, paths built from input, commands built from strings, secrets in code
