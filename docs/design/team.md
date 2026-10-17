@@ -96,8 +96,12 @@ team is what was missing. fennec-os stages already behave like roles:
    pick the team, tick roles in or out, add a catalogue role (copied to the
    project's `.fennec-os/team/`, where it can be edited). Each change is
    saved at once. A role added to the project stays when the team changes.
-   Not yet: creating or editing a team or a role's brief from the UI (files
-   only for now), team display names (folder names are shown: `etudes`).
+   Then (same day): a role is edited or written from scratch in the dialog
+   (saved in the project); "Enregistrer comme équipe…" turns the project's
+   working roles into a team of the user's own; built-in teams are named
+   as shown (Développement, Études); a team that cannot be found opens with
+   a way to pick another. "Team" is the seventh word on screen (AGENTS.md
+   rule 2).
 3. Then extension points, one at a time, each proven useful before the next:
    model per role, tools and veto (DevSecOps first), background stage
    (maintainer/DevOps).
@@ -106,7 +110,6 @@ team is what was missing. fennec-os stages already behave like roles:
 
 - ⚡ The Fennec post-mortem: "too big while the core loop did not work".
   Nine roles at once would repeat it; hence three first.
-- ⚡ Vocabulary: adds a seventh word ("équipe" / "rôle") to the six-word rule.
-  To be confirmed by the user.
+- ✅ Vocabulary: "équipe" became the seventh word on screen (2026-10-17).
 - ⚡ Persona prompts without tools or veto would be theatre; each role must
   change an outcome that can be measured.

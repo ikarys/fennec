@@ -35,8 +35,9 @@ Env: `FENNEC_LEAD_HOME` (default `~/.local/share/fennec-lead`), `FENNEC_LEAD_ADD
 
 1. **Every human interaction goes through the web UI.** No CLI or TUI surface
    for the user; `fennec-os`'s CLI is a debug tool only.
-2. **Six words on screen**: project, request, done when, proof, question, rule.
-   Internal concepts (world, run, grant, permissions, limits) never reach the UI.
+2. **Seven words on screen**: project, request, done when, proof, question, rule,
+   team (made of roles; added 2026-10-17, see `docs/design/team.md`). Internal
+   concepts (world, run, grant, permissions, limits, stage keys) never reach the UI.
 3. **Nothing is "ready" without proof.** What could not be proven is shown as
    "not verified: X".
 4. **Execution logic goes in fennec-os**, not here. This repository stays thin.

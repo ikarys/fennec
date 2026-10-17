@@ -55,11 +55,29 @@ const TAGS = {
 };
 
 function focus(label, text) {
-  return el("div", { className: "focus" }, el("span", { className: "label", textContent: label }), text);
+  return el("div", { className: "focus" }, el("span", { className: "label", textContent: label }), ...rich(text));
+}
+
+// `command` spans as code, the rest as plain text: models write Markdown.
+function rich(text) {
+  return (text ?? "").split("`").map((part, i) => (i % 2 ? el("code", { textContent: part }) : part));
 }
 
 function firstLine(text) {
   return (text ?? "").split("\n").find((l) => l.trim()) ?? "";
+}
+
+// fennec-os reports rule breaks in its own words; the card says what happened.
+// The raw reason stays behind "Détails".
+function explain(reason) {
+  const line = firstLine(reason);
+  let m = line.match(/^rule task\.protect violated: changed (.+)$/);
+  if (m) return `fennec a modifié un test validé (${m[1]}), ce qui lui est interdit`;
+  m = line.match(/^rule \S+ violated: changed (\S+) but nothing under (\S+)$/);
+  if (m) return `${m[1]} a changé sans changement dans ${m[2]}, comme les règles du projet l'exigent`;
+  m = line.match(/^rule \S+ violated: changed (.+)$/);
+  if (m) return `fennec a modifié ${m[1]}, que les règles du projet protègent`;
+  return line;
 }
 
 function shots(item) {
@@ -147,6 +165,12 @@ function card(item) {
   } else if (item.kind === "ready") {
     if (item.done_when) add(focus("Terminé quand", item.done_when));
     add(shots(item));
+    // Commands leave no picture: their proof would otherwise hide behind "Détails".
+    const tried = item.tries?.length ?? 0;
+    if (tried) {
+      add(el("div", { className: "proved",
+        textContent: `✓ fennec l'a essayé : ${tried} essai${tried > 1 ? "s" : ""} réussi${tried > 1 ? "s" : ""} (voir Détails)` }));
+    }
     const warns = (item.untried ? ["le produit n'a pas encore été essayé"] : []).concat(item.unverified ?? []);
     if (warns.length) {
       add(el("div", { className: "muted", style: "margin-top:10px", textContent: "Non vérifié — à regarder toi-même :" }),
@@ -156,7 +180,7 @@ function card(item) {
     actions.append(dropButton(item.id), el("span", { className: "spacer" }));
     if (item.land) actions.append(action(landLabel(item.land), "/api/land", { id: item.id }, { primary: true }));
   } else if (item.kind === "failed") {
-    add(el("div", { className: "bad", textContent: firstLine(item.reason) || "raison inconnue" }), shots(item));
+    add(el("div", { className: "bad", textContent: explain(item.reason) || "raison inconnue" }), shots(item));
     actions.append(dropButton(item.id), el("span", { className: "spacer" }),
       action("Réessayer", "/api/retry", { id: item.id }, { primary: true }));
   }
@@ -181,7 +205,7 @@ function renderProjects(projects) {
   const current = select.value;
   // With several projects, none is preselected: a silent default sends a
   // request to the wrong project.
-  const prompt = projects.length ? "Quel projet ?" : "Ajoute un projet d'abord";
+  const prompt = projects.length ? "Quel projet ?" : "Aucun projet";
   const none = projects.length === 1 ? [] : [new Option(prompt, "")];
   select.replaceChildren(...none, ...projects.map((p) => new Option(p.name, p.path)));
   if (projects.some((p) => p.path === current)) select.value = current;
@@ -257,6 +281,8 @@ $("picker-choose").onclick = async () => {
     // A project just added is the one the next request is for.
     $("project").append(new Option("", pickerPath));
     $("project").value = pickerPath;
+    // Closing hands focus back to "+ projet": typing would then reopen it.
+    $("text").focus();
     refresh(true);
   } catch (e) {
     $("picker-path").textContent = e.message;
