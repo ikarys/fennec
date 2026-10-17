@@ -36,10 +36,11 @@ function action(label, path, body, { primary = false, quiet = false } = {}) {
 }
 
 // Giving up is one more click than doing: the first click only asks.
-function dropButton(id) {
-  const button = el("button", { type: "button", className: "quiet", textContent: "Abandonner" });
+// Once there is work, giving up undoes it: the label says so.
+function dropButton(id, undo = false) {
+  const button = el("button", { type: "button", className: "quiet", textContent: undo ? "Annuler le travail" : "Abandonner" });
   button.onclick = () => {
-    const sure = action("Confirmer l'abandon", "/api/drop", { id }, { quiet: true });
+    const sure = action(undo ? "Confirmer : tout annuler" : "Confirmer l'abandon", "/api/drop", { id }, { quiet: true });
     sure.style.color = "var(--bad)";
     button.replaceWith(sure);
   };
@@ -145,6 +146,14 @@ function details(item) {
   if (item.land?.message) box.append(el("p", { textContent: `Message du commit : ${item.land.message}` }));
   if (item.team?.length) box.append(el("p", { textContent: `Équipe : ${item.team.join(", ")}` }));
   for (const rule of item.rules ?? []) box.append(el("p", { textContent: `Règle suivie : ${rule}` }));
+  // What each step and each model cost.
+  for (const [key, label] of [["stages", "Étape"], ["models", "Modèle"]]) {
+    for (const [name, c] of Object.entries(item.stats?.[key] ?? {}).sort(([a], [b]) => stageRank(a) - stageRank(b))) {
+      box.append(el("p", { textContent: `${label} ${name} : ` + [duration(c.ms ?? 0), `${c.turns} appel${c.turns > 1 ? "s" : ""}`,
+        `${number(c.sent)} tokens envoyés (${percent(c.cached, c.sent)} % en cache)`,
+        `${number(c.received)} générés` + (c.thinking ? ` dont ${number(c.thinking)} de réflexion` : ""), speed(c)].filter(Boolean).join(" · ") }));
+    }
+  }
   if (item.checks?.length) {
     box.append(el("p", { textContent: "Tests :" }));
     for (const c of item.checks) box.append(el("code", { textContent: c }));
@@ -252,7 +261,29 @@ async function follow(id, box, slot) {
   }
 }
 
+// Steps in the order they run; the server keeps them sorted by name.
+const stageRank = (name) => ["Discussion", "Cadrage", "Démarrage", "Travail", "Preuve"].findIndex((s) => name.startsWith(s)) >>> 0;
 const number = (n) => (n ?? 0).toLocaleString("fr-FR");
+const compact = (n) => (n ?? 0).toLocaleString("fr-FR", { notation: "compact", maximumFractionDigits: 1 });
+const percent = (part, whole) => (whole ? Math.round((100 * part) / whole) : 0);
+// Tokens out per second of model time; that time includes reading the prompt.
+const tps = (c) => (c.ms ? Math.round((c.received * 1000) / c.ms) : 0);
+const speed = (c) => (c.ms && c.received ? `≈ ${tps(c)} tokens/s` : "");
+
+// How the work was kept safe, and what it cost: under the work, small.
+function facts(item) {
+  const s = item.stats;
+  if (!s?.turns) return [];
+  const undone = s.failed_attempts
+    ? ` · ${s.failed_attempts} essai${s.failed_attempts > 1 ? "s" : ""} raté${s.failed_attempts > 1 ? "s" : ""}, annulé${s.failed_attempts > 1 ? "s" : ""} sans trace`
+    : "";
+  const cost = [`${duration(s.ms)} de modèle`, `${s.turns} appel${s.turns > 1 ? "s" : ""}`,
+    `${compact(s.sent)} tokens envoyés, ${percent(s.cached, s.sent)} % en cache`,
+    `${compact(s.received)} générés`, speed(s)].filter(Boolean).join(" · ");
+  return [el("div", { className: "facts" },
+    el("div", { textContent: "Isolé : sans réseau, sans accès à ton dossier personnel, historique git en lecture seule" + undone }),
+    el("div", { textContent: "Coût : " + cost }))];
+}
 
 function duration(ms) {
   const s = Math.round(ms / 1000);
@@ -262,9 +293,9 @@ function duration(ms) {
 function stepView(step) {
   const c = step.cost;
   const cost = [step.model, `${c.turns} appel${c.turns > 1 ? "s" : ""} au modèle`,
-    `${number(c.sent)} tokens envoyés`,
+    `${number(c.sent)} tokens envoyés` + (c.cached ? ` (dont ${number(c.cached)} en cache)` : ""),
     `${number(c.received)} reçus` + (c.thinking ? ` (dont ${number(c.thinking)} de réflexion)` : ""),
-    duration(c.ms)].filter(Boolean).join(" · ");
+    duration(c.ms), speed(c)].filter(Boolean).join(" · ");
   const verdict = step.passed === true ? " ✓" : step.passed === false ? " ✗" : "";
   const messages = step.messages ?? [];
   return el("div", { className: "step" },
@@ -366,9 +397,9 @@ function card(item) {
     // "Ready" reads as "done": say where the work is until the commit.
     const commit = item.land ? `« ${landLabel(item.land)} »` : "le commit";
     add(el("div", { className: "muted", textContent: item.here
-      ? `Le travail est dans ton dossier, sur une branche de travail. ${commit} le met sur ta branche ; « Abandonner » rend ton dossier comme avant.`
+      ? `Le travail est dans ton dossier, sur une branche de travail. ${commit} le met sur ta branche ; « Annuler le travail » rend ton dossier comme avant.`
       : `Ton dossier n'a pas encore changé : le travail attend à part. ${commit} l'y met.` }));
-    add(...work(item), shots(item));
+    add(...work(item), shots(item), ...facts(item));
     // Commands leave no picture: their proof would otherwise hide behind "Détails".
     const tried = item.tries?.length ?? 0;
     if (tried) {
@@ -391,14 +422,14 @@ function card(item) {
       fix.replaceWith(action("Envoyer la correction", "/api/amend", () => ({ id: item.id, text: change.value })));
     };
     add(el("div", { className: "reply" }, change));
-    actions.append(dropButton(item.id), el("span", { className: "spacer" }),
+    actions.append(dropButton(item.id, true), el("span", { className: "spacer" }),
       changesButton(item, () => node.querySelector(".changes-slot")),
       codeButton(item, () => node.querySelector(".changes-slot")),
       action("Passer", "/api/pass", { id: item.id }), fix);
     if (item.land) actions.append(action(landLabel(item.land), "/api/land", { id: item.id }, { primary: true }));
   } else if (item.kind === "failed") {
-    add(el("div", { className: "bad", textContent: explain(item.reason) || "raison inconnue" }), shots(item));
-    actions.append(dropButton(item.id), el("span", { className: "spacer" }),
+    add(el("div", { className: "bad", textContent: explain(item.reason) || "raison inconnue" }), shots(item), ...facts(item));
+    actions.append(dropButton(item.id, true), el("span", { className: "spacer" }),
       action("Réessayer", "/api/retry", { id: item.id }, { primary: true }));
   }
   // What was said to the model so far, on every card with a choice to make.
@@ -408,9 +439,12 @@ function card(item) {
 }
 
 function line(item, state, dot) {
+  const s = item.stats;
   return el("div", { className: "line" }, dot ? el("span", { className: "dot" }) : null,
     el("span", { className: "muted", textContent: item.project }),
     el("span", { className: "what", textContent: item.title.length > 120 ? item.title.slice(0, 120) + "…" : item.title }),
+    s?.turns ? el("span", { className: "state cost", title: "temps de modèle · tokens envoyés · générés",
+      textContent: `${duration(s.ms)} · ${compact(s.sent)} ↑ · ${compact(s.received)} ↓` }) : null,
     el("span", { className: "state", textContent: state }));
 }
 
@@ -431,6 +465,7 @@ function past(item) {
   }
   const s = shots(item);
   if (s) box.append(s);
+  box.append(...facts(item));
   const more = details(item);
   if (more) box.append(more);
   const slot = el("div");
@@ -721,3 +756,50 @@ $("settings-form").onsubmit = async (e) => {
     $("settings-error").textContent = err.message;
   }
 };
+
+// Stats: what every request cost, per model and per project, and where
+// fennec works in each project, which can be changed here.
+const PLACES = { here: "Dans le dossier", apart: "À part, à côté" };
+const cell = (text, className = "") => el("td", { textContent: text, className });
+
+async function showStats() {
+  const v = await api("/api/stats");
+  const a = v.all;
+  const tile = (value, label) => el("div", { className: "tile" }, el("b", { textContent: value }), el("span", { textContent: label }));
+  $("stats-tiles").replaceChildren(
+    tile(number(a.requests), "demandes"),
+    tile(duration(a.ms ?? 0), "de modèle"),
+    tile(compact(a.sent), `tokens envoyés · ${percent(a.cached, a.sent)} % en cache`),
+    tile(compact(a.received), `tokens générés · ${speed(a) || "—"}`));
+  const fastest = Math.max(1, ...v.models.map(tps));
+  $("stats-models").replaceChildren(...v.models.map((m) => el("tr", {},
+    el("th", { textContent: m.name }), cell(number(m.turns)), cell(compact(m.sent)),
+    el("td", {}, el("span", { className: "bar", style: `--p:${percent(m.cached, m.sent)}%` }), `${percent(m.cached, m.sent)} %`),
+    cell(compact(m.received)),
+    el("td", {}, el("span", { className: "bar", style: `--p:${percent(tps(m), fastest)}%` }), m.ms ? `${tps(m)}/s` : "—"),
+    cell(duration(m.ms ?? 0)))));
+  $("stats-stages").replaceChildren(...v.stages.sort((x, y) => stageRank(x.name) - stageRank(y.name)).map((t) => el("tr", {},
+    el("th", { textContent: t.name }), cell(number(t.turns)), cell(duration(t.ms ?? 0)),
+    cell(`${percent(t.ms, a.ms)} %`), cell(compact(t.sent)), cell(compact(t.received)), cell(t.ms ? `${tps(t)}/s` : "—"))));
+  $("stats-projects").replaceChildren(...v.projects.map((p) => {
+    const place = el("select", { ariaLabel: `Où fennec travaille dans ${p.name}` },
+      ...Object.entries(PLACES).map(([k, label]) => new Option(label, k)));
+    if (!PLACES[p.place]) place.append(new Option(p.place, p.place));
+    place.value = p.place;
+    place.onchange = async () => {
+      $("stats-error").textContent = "";
+      try {
+        await api("/api/projects", { path: p.path, place: place.value });
+      } catch (e) {
+        $("stats-error").textContent = e.message;
+        place.value = p.place;
+      }
+    };
+    return el("tr", {}, el("th", { textContent: p.name, title: p.path }), el("td", {}, place),
+      cell(number(p.requests)), cell(number(p.landed)), cell(number(p.failed), p.failed ? "bad" : ""),
+      cell(number(p.failed_attempts)), cell(duration(p.ms ?? 0)), cell(compact(p.sent)));
+  }));
+  $("stats").showModal();
+}
+$("open-stats").onclick = () => showStats().catch((e) => ($("error").textContent = e.message));
+$("stats-close").onclick = () => $("stats").close();

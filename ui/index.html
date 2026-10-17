@@ -122,8 +122,25 @@
   .field .go { display: flex; gap: 8px; }
   .field .go input { flex: 1; min-width: 0; }
   #settings-models li { display: flex; gap: 8px; align-items: center; padding: 2px 4px; }
+  .facts { font-size: 12px; color: var(--muted); margin-top: 10px; display: grid; gap: 2px; }
+  dialog#stats { width: min(900px, calc(100vw - 32px)); }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 12px 0; }
+  .tile { background: var(--soft); border-radius: 8px; padding: 10px 12px; display: grid; }
+  .tile b { font-size: 20px; }
+  .tile span { font-size: 12px; color: var(--muted); }
+  .scroll { overflow-x: auto; }
+  #stats table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  #stats th, #stats td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  #stats thead th { font-weight: 600; color: var(--muted); font-size: 12px; }
+  #stats tbody th { font-weight: 500; }
+  #stats td.bad { color: var(--bad); }
+  #stats select { padding: 2px 6px; }
+  h3 { font-size: 13px; margin: 16px 0 4px; }
+  .bar { display: inline-block; width: 44px; height: 6px; border-radius: 3px; margin-right: 6px; vertical-align: middle;
+         background: linear-gradient(90deg, var(--info) var(--p), var(--line) var(--p)); }
   @media (max-width: 700px) {
     #new-request { grid-template-columns: 1fr; }
+    .line .cost { display: none; }
   }
 </style>
 </head>
@@ -133,6 +150,7 @@
     <h1>fennec</h1>
     <button class="link" id="add-project">+ projet</button>
     <button class="link" id="open-team">Équipe</button>
+    <button class="link" id="open-stats">Stats</button>
     <button class="link" id="open-settings">Réglages</button>
   </header>
 
@@ -198,6 +216,29 @@
     <span class="spacer"></span>
     <button type="button" id="team-close">Fermer</button>
   </div>
+</dialog>
+<dialog id="stats">
+  <strong>Stats</strong>
+  <div class="tiles" id="stats-tiles"></div>
+  <h3>Par modèle</h3>
+  <div class="scroll"><table>
+    <thead><tr><th>Modèle</th><th>Appels</th><th>Envoyés</th><th>En cache</th><th>Générés</th><th>Vitesse</th><th>Temps</th></tr></thead>
+    <tbody id="stats-models"></tbody>
+  </table></div>
+  <h3>Par étape : où passe le temps</h3>
+  <div class="scroll"><table>
+    <thead><tr><th>Étape</th><th>Appels</th><th>Temps</th><th>Part</th><th>Envoyés</th><th>Générés</th><th>Vitesse</th></tr></thead>
+    <tbody id="stats-stages"></tbody>
+  </table></div>
+  <h3>Par projet</h3>
+  <div class="scroll"><table>
+    <thead><tr><th>Projet</th><th>Où fennec travaille</th><th>Demandes</th><th>Commits</th><th>Échecs</th><th>Essais annulés</th><th>Temps</th><th>Envoyés</th></tr></thead>
+    <tbody id="stats-projects"></tbody>
+  </table></div>
+  <p class="muted">« Dans le dossier » : tu vois le travail en direct, sur une branche de travail. « À part » : ton dossier ne change qu'au commit. Le changement vaut pour les prochaines demandes.
+    Isolement de chaque travail : sans réseau, sans accès à ton dossier personnel, historique git en lecture seule, mémoire plafonnée ; un essai raté est annulé sans trace.</p>
+  <p class="error" id="stats-error" role="alert"></p>
+  <div class="row"><button type="button" id="stats-close">Fermer</button></div>
 </dialog>
 <dialog id="settings">
   <strong>Réglages</strong>
