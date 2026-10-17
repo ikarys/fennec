@@ -75,6 +75,12 @@
   .diff .del { color: var(--bad); }
   .diff .hunk { color: var(--info); }
   .diff .file { display: block; font-weight: 600; color: var(--text); margin-top: 8px; }
+  .step { margin-top: 12px; font-size: 13px; }
+  .step-name { font-weight: 600; font-size: 14px; }
+  details.message { margin-top: 4px; color: var(--text); }
+  details.message > summary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+  details.message pre { max-height: 420px; }
+  details.message pre.thought { color: var(--muted); font-style: italic; }
   .thread { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
   .said { background: var(--soft); border-radius: 8px; padding: 8px 12px; max-width: 85%; overflow-wrap: anywhere;
           white-space: pre-wrap; font-size: 14px; }

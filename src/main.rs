@@ -197,6 +197,7 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
             Ok(json!({}))
         }
         ("POST", "/api/changes") => work::changes(&store, &field(&input()?, "id")),
+        ("POST", "/api/journal") => work::journal(&store, &field(&input()?, "id")),
         ("POST", "/api/retry") => {
             work::retry(&store, &field(&input()?, "id"))?;
             Ok(json!({}))

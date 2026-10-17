@@ -158,31 +158,83 @@ function work(item) {
   return nodes;
 }
 
-// The exact change, on demand: one button that opens it under the card.
-function changesButton(item, where) {
-  const button = el("button", { type: "button", textContent: "Voir les changements" });
+// Something read on demand: one button that opens it under the card, and closes it.
+function opener(label, hide, where, load) {
+  const button = el("button", { type: "button", textContent: label });
   let box = null;
   button.onclick = async () => {
     if (box) {
       box.remove();
       box = null;
-      button.textContent = "Voir les changements";
+      button.textContent = label;
       return;
     }
-    box = el("div", { className: "changes" }, el("div", { className: "muted", textContent: "Je charge les changements…" }));
+    box = el("div", { className: "changes" }, el("div", { className: "muted", textContent: "Je charge…" }));
     where().append(box);
-    button.textContent = "Masquer les changements";
+    button.textContent = hide;
     try {
-      const c = await api("/api/changes", { id: item.id });
-      const nodes = item.summary || !c.summary ? [] : [focus("Ce que fennec a fait", c.summary)];
-      nodes.push(diffView(c.diff));
-      if (c.cut) nodes.push(el("div", { className: "muted", textContent: "Coupé : le reste est trop long pour la page, regarde-le dans le projet." }));
-      box.replaceChildren(...nodes);
+      box.replaceChildren(...await load());
     } catch (e) {
       box.replaceChildren(el("div", { className: "bad", textContent: e.message }));
     }
   };
   return button;
+}
+
+// The exact change.
+function changesButton(item, where) {
+  return opener("Voir les changements", "Masquer les changements", where, async () => {
+    const c = await api("/api/changes", { id: item.id });
+    const nodes = item.summary || !c.summary ? [] : [focus("Ce que fennec a fait", c.summary)];
+    nodes.push(diffView(c.diff));
+    if (c.cut) nodes.push(el("div", { className: "muted", textContent: "Coupé : le reste est trop long pour la page, regarde-le dans le projet." }));
+    return nodes;
+  });
+}
+
+// Every step, with what was sent to the model, what came back, and what it cost.
+function journalButton(item, where) {
+  return opener("Journal", "Masquer le journal", where, async () => {
+    const steps = await api("/api/journal", { id: item.id });
+    if (!steps.length) return [el("div", { className: "muted", textContent: "Aucune étape gardée pour cette demande." })];
+    return steps.map(stepView);
+  });
+}
+
+const number = (n) => (n ?? 0).toLocaleString("fr-FR");
+
+function duration(ms) {
+  const s = Math.round(ms / 1000);
+  return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${s % 60} s`;
+}
+
+function stepView(step) {
+  const c = step.cost;
+  const cost = [step.model, `${c.turns} appel${c.turns > 1 ? "s" : ""} au modèle`,
+    `${number(c.sent)} tokens envoyés`,
+    `${number(c.received)} reçus` + (c.thinking ? ` (dont ${number(c.thinking)} de réflexion)` : ""),
+    duration(c.ms)].filter(Boolean).join(" · ");
+  const verdict = step.passed === true ? " ✓" : step.passed === false ? " ✗" : "";
+  const messages = step.messages ?? [];
+  return el("div", { className: "step" },
+    el("div", { className: "step-name", textContent: step.name + verdict }),
+    el("div", { className: "muted", textContent: cost }),
+    ...(messages.length ? messages.map(messageView)
+      : [el("div", { className: "muted", textContent: "Les messages de cette étape n'ont pas été gardés (demande ancienne)." })]));
+}
+
+const who = { system: "Consigne", user: "Envoyé au modèle", assistant: "Modèle", tool: "Résultat d'outil" };
+
+function messageView(m) {
+  const text = typeof m.content === "string" ? m.content : m.content == null ? "" : JSON.stringify(m.content, null, 1);
+  const calls = (m.tool_calls ?? []).map((t) => `→ ${t.function?.name} ${t.function?.arguments ?? ""}`);
+  const thought = m.reasoning_content ?? m.reasoning;
+  const head = (text || calls.join(" ") || thought || "").replace(/\s+/g, " ").slice(0, 110);
+  return el("details", { className: "message" },
+    el("summary", {}, el("b", { textContent: who[m.role] ?? m.role }), " ", head),
+    thought ? el("pre", { className: "thought", textContent: "Réflexion :\n" + thought }) : null,
+    text ? el("pre", { textContent: text }) : null,
+    calls.length ? el("pre", { textContent: calls.join("\n") }) : null);
 }
 
 function diffView(diff) {
@@ -281,6 +333,8 @@ function card(item) {
     actions.append(dropButton(item.id), el("span", { className: "spacer" }),
       action("Réessayer", "/api/retry", { id: item.id }, { primary: true }));
   }
+  // What was said to the model so far, on every card with a choice to make.
+  actions.querySelector(".spacer")?.after(journalButton(item, () => node.querySelector(".changes-slot")));
   add(el("div", { className: "changes-slot" }), details(item), actions, el("div", { className: "error", role: "alert" }));
   return node;
 }
@@ -313,6 +367,7 @@ function past(item) {
   if (more) box.append(more);
   const slot = el("div");
   const actions = el("div", { className: "actions" });
+  actions.append(journalButton(item, () => slot));
   if (item.changed) actions.append(changesButton(item, () => slot));
   if (item.kind === "passed") actions.append(action("Reprendre", "/api/resume", { id: item.id }, { primary: true }));
   box.append(slot, el("div", { className: "past-actions" }, actions, el("div", { className: "error", role: "alert" })));

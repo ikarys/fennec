@@ -13,7 +13,7 @@ Scenarios: `../lead-scenarios.md`. Inventory and decisions: `../inventory.md`.
 ```
 src/main.rs   `fennec` binary: std HTTP server, routes, folder browser
 src/state.rs  requests and projects in files; the single view (what needs you, running, landed)
-src/work.rs   request life in the background: conversation, fennec-os spec, solve, retry; commit, pass or drop; rule offers
+src/work.rs   request life in the background: conversation, fennec-os spec, solve, retry; commit, pass or drop; rule offers; journal of every step
 ui/           index.html + app.js, embedded in the binary
 ```
 
@@ -41,7 +41,9 @@ variables override them.
    team (made of roles; added 2026-10-17, see `docs/design/team.md`). Internal
    concepts (world, run, grant, permissions, limits, stage keys) never reach the UI.
    One exception, outside the work itself: the "Réglages" dialog names the model
-   server and its models, since choosing them is the human's setup.
+   server and its models, since choosing them is the human's setup. A second, asked
+   for by the human: a request's "Journal" shows each step's exchange with the model
+   as it was (messages, tool calls, tokens), since that is what they want to audit.
 3. **Nothing is "ready" without proof.** What could not be proven is shown as
    "not verified: X".
 4. **Execution logic goes in fennec-os**, not here. This repository stays thin.
