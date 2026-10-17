@@ -35,39 +35,10 @@ impl Store {
     }
 
     /// Adds a git repository; adding it twice is not an error. An empty
-    /// folder becomes a new project: fennec works from commits, so it gets a
-    /// repository and an empty first commit. A folder with files and no
-    /// repository is refused: committing someone's files is their call.
+    /// folder becomes a new project; see [`start`].
     pub fn add_project(&self, path: &str) -> io::Result<()> {
         let path = std::fs::canonicalize(path)?;
-        if !is_repository(&path) {
-            if !is_empty(&path)? {
-                return Err(io::Error::other(
-                    "ce dossier contient des fichiers mais n'est pas un dépôt git",
-                ));
-            }
-            for args in [
-                &["init", "-q"][..],
-                &[
-                    "commit",
-                    "-q",
-                    "--allow-empty",
-                    "-m",
-                    "chore: start project",
-                ],
-            ] {
-                let out = std::process::Command::new("git")
-                    .arg("-C")
-                    .arg(&path)
-                    .args(args)
-                    .output()?;
-                if !out.status.success() {
-                    return Err(io::Error::other(
-                        String::from_utf8_lossy(&out.stderr).trim().to_string(),
-                    ));
-                }
-            }
-        }
+        start(&path)?;
         let path = path.display().to_string();
         let mut projects = self.projects()?;
         if !projects.contains(&path) {
@@ -160,6 +131,44 @@ fn write_json(path: &Path, value: &Value) -> io::Result<()> {
 
 pub fn is_empty(path: &Path) -> io::Result<bool> {
     Ok(std::fs::read_dir(path)?.next().is_none())
+}
+
+/// fennec works from commits: a project gets a repository if it has none
+/// (an empty folder; a folder with files is refused, committing someone's
+/// files is their call) and an empty first commit if it has none (a `git init`
+/// by hand). The commit is made from the empty tree, so what the human has
+/// staged stays staged and nothing of theirs is committed.
+pub fn start(path: &Path) -> io::Result<()> {
+    let git = |args: &[&str]| -> io::Result<String> {
+        let out = std::process::Command::new("git")
+            .arg("-C")
+            .arg(path)
+            .args(args)
+            // Never a parent folder's repository (a home can be one).
+            .env("GIT_CEILING_DIRECTORIES", path.parent().unwrap_or(path))
+            .stdin(std::process::Stdio::null())
+            .output()?;
+        if !out.status.success() {
+            return Err(io::Error::other(
+                String::from_utf8_lossy(&out.stderr).trim().to_string(),
+            ));
+        }
+        Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
+    };
+    if !is_repository(path) {
+        if !is_empty(path)? {
+            return Err(io::Error::other(
+                "ce dossier contient des fichiers mais n'est pas un dépôt git",
+            ));
+        }
+        git(&["init", "-q"])?;
+    }
+    if git(&["rev-parse", "-q", "--verify", "HEAD"]).is_err() {
+        let tree = git(&["mktree"])?;
+        let commit = git(&["commit-tree", &tree, "-m", "chore: start project"])?;
+        git(&["update-ref", "HEAD", &commit])?;
+    }
+    Ok(())
 }
 
 pub fn is_repository(path: &Path) -> bool {
@@ -331,9 +340,38 @@ mod tests {
             .output()
             .unwrap();
         assert!(head.status.success(), "a first commit to fork from");
+        // A repository made by hand, with no commit yet and a file staged.
+        let bare = tmp.join("bare");
+        std::fs::create_dir_all(&bare).unwrap();
+        let git = |args: &[&str]| {
+            let out = std::process::Command::new("git")
+                .arg("-C")
+                .arg(&bare)
+                .args(args)
+                .output()
+                .unwrap();
+            String::from_utf8_lossy(&out.stdout).trim().to_string()
+        };
+        git(&["init", "-q"]);
+        std::fs::write(bare.join("staged.txt"), "mine").unwrap();
+        git(&["add", "staged.txt"]);
+        store.add_project(bare.to_str().unwrap()).unwrap();
+        assert_eq!(git(&["log", "--format=%s"]), "chore: start project");
+        assert_eq!(
+            git(&["ls-tree", "-r", "--name-only", "HEAD"]),
+            "",
+            "nothing of theirs committed"
+        );
+        assert_eq!(
+            git(&["diff", "--cached", "--name-only"]),
+            "staged.txt",
+            "still staged"
+        );
+        start(&bare).unwrap();
+        assert_eq!(git(&["rev-list", "--count", "HEAD"]), "1", "only once");
         assert!(store.add_project(loose.to_str().unwrap()).is_err());
         assert!(!is_repository(&loose));
-        assert_eq!(store.projects().unwrap().len(), 1);
+        assert_eq!(store.projects().unwrap().len(), 2);
         std::fs::remove_dir_all(tmp).unwrap();
     }
 
