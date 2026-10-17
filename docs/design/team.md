@@ -105,6 +105,16 @@ team is what was missing. fennec-os stages already behave like roles:
 3. Then extension points, one at a time, each proven useful before the next:
    model per role, tools and veto (DevSecOps first), background stage
    (maintainer/DevOps).
+   **Tools and veto done (2026-10-17)**: a `prove` role lists commands as
+   `check:` lines (edited in the dialog, one per line). The harness runs them
+   on every proof, beside the model's tries: a failure blocks "ready" ("X
+   bloque : `cmd` a échoué"), a tool the machine lacks (exit 127) is shown
+   as not verified. They do not count as trying the product. The catalogue's
+   DevSecOps runs `gitleaks detect --no-git`. First trial: after a veto
+   (`test -f SECURITY.md`), the retry wrote a SECURITY.md, since the reason
+   becomes the next attempt's lesson; the first role that changed an outcome.
+   Not yet: tools that need the network (cargo audit, pip-audit) cannot run
+   in the sandbox.
 
 ## Risks
 
@@ -112,4 +122,4 @@ team is what was missing. fennec-os stages already behave like roles:
   Nine roles at once would repeat it; hence three first.
 - ✅ Vocabulary: "équipe" became the seventh word on screen (2026-10-17).
 - ⚡ Persona prompts without tools or veto would be theatre; each role must
-  change an outcome that can be measured.
+  change an outcome that can be measured. Checks are the first answer.

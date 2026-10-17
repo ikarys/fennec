@@ -219,6 +219,12 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
                 &field(&v, "name"),
                 &field(&v, "stage"),
                 &field(&v, "brief"),
+                &v["checks"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|c| c.as_str().map(str::to_string))
+                    .collect::<Vec<_>>(),
             )?;
             team_view(&path)
         }
@@ -254,8 +260,10 @@ fn project(store: &Store, path: &str) -> io::Result<std::path::PathBuf> {
 /// not in it yet.
 fn team_view(path: &Path) -> io::Result<Value> {
     let setup = team::setup(path)?;
-    let role =
-        |r: &team::Role| json!({"key": r.key, "name": r.name, "stage": r.stage, "brief": r.brief});
+    let role = |r: &team::Role| {
+        json!({"key": r.key, "name": r.name, "stage": r.stage, "brief": r.brief,
+                                    "checks": r.checks})
+    };
     let roles: Vec<Value> = setup
         .roles
         .iter()
