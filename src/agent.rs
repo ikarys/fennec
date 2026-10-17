@@ -499,7 +499,7 @@ fn tools() -> Value {
         tool(
             "done",
             "Finish the task.",
-            json!({"summary": string("what you changed and why")})
+            json!({"summary": string("what you changed and why, for the person who asked, in their language")})
         ),
     ])
 }

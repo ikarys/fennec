@@ -44,6 +44,30 @@ fn running_python_leaves_no_bytecode_in_the_work() {
 }
 
 #[test]
+fn build_output_is_not_the_work() {
+    let f = Fixture::new("build-output");
+    let w = f.worlds.fork(&f.project.to_string_lossy()).unwrap();
+    assert!(
+        f.sh(
+            &w,
+            "mkdir -p target/debug node_modules/x && echo o > target/debug/a.o && echo j > node_modules/x/i.js && echo s > src.rs"
+        )
+        .0
+    );
+    let diff = f.worlds.diff(&w).unwrap();
+    assert!(
+        diff.contains("src.rs") && !diff.contains("target/") && !diff.contains("node_modules"),
+        "{diff}"
+    );
+    f.worlds.commit(&w, "work").unwrap();
+    let files = f.worlds.git(&w, &["ls-files"]).unwrap();
+    assert!(
+        !files.contains("target/") && files.contains("src.rs"),
+        "{files}"
+    );
+}
+
+#[test]
 fn the_sandbox_cannot_reach_out() {
     let f = Fixture::new("isolation");
     let w = f.worlds.fork(&f.project.to_string_lossy()).unwrap();
