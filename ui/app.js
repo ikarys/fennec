@@ -75,6 +75,8 @@ function explain(reason) {
   if (m) return `fennec a modifié un test validé (${m[1]}), ce qui lui est interdit`;
   m = line.match(/^rule \S+ violated: changed (\S+) but nothing under (\S+)$/);
   if (m) return `${m[1]} a changé sans changement dans ${m[2]}, comme les règles du projet l'exigent`;
+  m = line.match(/^no model: .* and (\S+)\/models did not answer/);
+  if (m) return `fennec ne joint aucun modèle à ${m[1]} : démarre-le avec FENNEC_OS_BASE_URL=<adresse du serveur du modèle>, puis réessaie`;
   m = line.match(/^rule \S+ violated: changed (.+)$/);
   if (m) return `fennec a modifié ${m[1]}, que les règles du projet protègent`;
   return line;
@@ -258,8 +260,11 @@ let pickerPath = "";
 async function browse(path) {
   const data = await api("/api/folders", { path });
   pickerPath = data.path;
-  $("picker-path").textContent = data.path + (data.repo ? " · dépôt git" : "");
-  $("picker-choose").disabled = !data.repo;
+  // An empty folder starts a new project; files without git are not ours to commit.
+  $("picker-path").textContent = data.path + (data.repo ? " · dépôt git"
+    : data.empty ? " · dossier vide" : " · pas un dépôt git : choisis un dépôt ou un dossier vide");
+  $("picker-choose").disabled = !data.repo && !data.empty;
+  $("picker-choose").textContent = data.repo || !data.empty ? "Ajouter ce dossier" : "Créer le projet ici";
   const entries = (data.parent ? [{ name: "..", path: data.parent }] : []).concat(data.children);
   $("picker-list").replaceChildren(...entries.map((entry) => {
     const button = el("button", { type: "button", textContent: entry.name });

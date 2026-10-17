@@ -304,7 +304,8 @@ fn folders(path: &str) -> io::Result<Value> {
     children.sort_by(|a, b| a["name"].as_str().cmp(&b["name"].as_str()));
     let parent = path.parent().map(Path::display).map(|d| d.to_string());
     Ok(
-        json!({"path": path.display().to_string(), "parent": parent, "repo": state::is_repository(&path), "children": children}),
+        json!({"path": path.display().to_string(), "parent": parent, "repo": state::is_repository(&path),
+               "empty": state::is_empty(&path)?, "children": children}),
     )
 }
 

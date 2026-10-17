@@ -34,11 +34,39 @@ impl Store {
         }
     }
 
-    /// Adds a git repository; adding it twice is not an error.
+    /// Adds a git repository; adding it twice is not an error. An empty
+    /// folder becomes a new project: fennec works from commits, so it gets a
+    /// repository and an empty first commit. A folder with files and no
+    /// repository is refused: committing someone's files is their call.
     pub fn add_project(&self, path: &str) -> io::Result<()> {
         let path = std::fs::canonicalize(path)?;
         if !is_repository(&path) {
-            return Err(io::Error::other("ce dossier n'est pas un dépôt git"));
+            if !is_empty(&path)? {
+                return Err(io::Error::other(
+                    "ce dossier contient des fichiers mais n'est pas un dépôt git",
+                ));
+            }
+            for args in [
+                &["init", "-q"][..],
+                &[
+                    "commit",
+                    "-q",
+                    "--allow-empty",
+                    "-m",
+                    "chore: start project",
+                ],
+            ] {
+                let out = std::process::Command::new("git")
+                    .arg("-C")
+                    .arg(&path)
+                    .args(args)
+                    .output()?;
+                if !out.status.success() {
+                    return Err(io::Error::other(
+                        String::from_utf8_lossy(&out.stderr).trim().to_string(),
+                    ));
+                }
+            }
         }
         let path = path.display().to_string();
         let mut projects = self.projects()?;
@@ -118,6 +146,10 @@ fn write_json(path: &Path, value: &Value) -> io::Result<()> {
     let tmp = path.with_extension("tmp");
     std::fs::write(&tmp, text)?;
     std::fs::rename(tmp, path)
+}
+
+pub fn is_empty(path: &Path) -> io::Result<bool> {
+    Ok(std::fs::read_dir(path)?.next().is_none())
 }
 
 pub fn is_repository(path: &Path) -> bool {
@@ -246,6 +278,30 @@ fn card_step(mut card: Value, step: &str) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_empty_folder_becomes_a_project_and_loose_files_are_refused() {
+        let tmp = std::env::temp_dir().join(format!("fennec-lead-new-{}", std::process::id()));
+        let (new, loose) = (tmp.join("new"), tmp.join("loose"));
+        std::fs::create_dir_all(&new).unwrap();
+        std::fs::create_dir_all(&loose).unwrap();
+        std::fs::write(loose.join("notes.txt"), "mine").unwrap();
+        let store = Store {
+            root: tmp.join("home"),
+        };
+        std::fs::create_dir_all(&store.root).unwrap();
+        store.add_project(new.to_str().unwrap()).unwrap();
+        assert!(is_repository(&new));
+        let head = std::process::Command::new("git")
+            .args(["-C", new.to_str().unwrap(), "rev-parse", "HEAD"])
+            .output()
+            .unwrap();
+        assert!(head.status.success(), "a first commit to fork from");
+        assert!(store.add_project(loose.to_str().unwrap()).is_err());
+        assert!(!is_repository(&loose));
+        assert_eq!(store.projects().unwrap().len(), 1);
+        std::fs::remove_dir_all(tmp).unwrap();
+    }
 
     #[test]
     fn a_tool_a_role_could_not_run_is_said_unverified() {
