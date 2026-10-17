@@ -122,6 +122,10 @@ pub fn run(
     ];
     let start = Instant::now();
     let mut turns = Vec::new();
+    // EXPERIMENT: FENNEC_OS_THINK=always|adaptive|never, to be measured and
+    // removed.
+    let policy = std::env::var("FENNEC_OS_THINK").unwrap_or_else(|_| "always".to_string());
+    let mut think = true;
     let ms = |since: Instant| since.elapsed().as_millis() as u64;
     // The starting state counts as "no change yet".
     let mut watch = Watch {
@@ -143,8 +147,18 @@ pub fn run(
         bound(&mut messages);
         let at = start.elapsed().as_millis() as u64;
         let asked = Instant::now();
-        let chat = model.chat(&messages, &tools);
-        let mut turn = json!({"step": step, "at_ms": at, "model_ms": ms(asked)});
+        let think_now = match policy.as_str() {
+            "never" => false,
+            "adaptive" => think,
+            _ => true,
+        };
+        let chat = if think_now {
+            model.chat(&messages, &tools)
+        } else {
+            model.chat_quick(&messages, &tools)
+        };
+        let mut turn =
+            json!({"step": step, "at_ms": at, "model_ms": ms(asked), "think": think_now});
         let mut reply = match chat {
             Ok(reply) => reply,
             Err(e) => {
@@ -173,11 +187,14 @@ pub fn run(
         let calls = reply["tool_calls"].as_array().cloned().unwrap_or_default();
         messages.push(reply);
         if calls.is_empty() {
+            think = true;
             turns.push(turn);
             messages.push(json!({"role": "user", "content": "Use a tool, or call `done`."}));
             continue;
         }
         let mut tool_times = Vec::new();
+        // Routine unless something went wrong: then the next turn reasons.
+        think = false;
         for call in calls {
             let name = call["function"]["name"].as_str().unwrap_or("");
             let args: Value = call["function"]["arguments"]
@@ -203,6 +220,11 @@ pub fn run(
                 Err(e) => format!("error: {e}"),
             };
             tool_times.push(json!({"name": name, "ms": ms(ran)}));
+            if result.starts_with("error:")
+                || (result.starts_with("exit ") && !result.starts_with("exit 0\n"))
+            {
+                think = true;
+            }
             let shown = format!("{name} {}", short(&args));
             // `timeout` exits 124 (TERM) or 137 (KILL after the grace period).
             if name == "shell"

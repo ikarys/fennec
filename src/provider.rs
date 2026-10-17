@@ -9,6 +9,11 @@ use serde_json::{Value, json};
 pub trait Model: Sync {
     /// Returns the assistant message (`content`, `tool_calls`).
     fn chat(&self, messages: &[Value], tools: &Value) -> io::Result<Value>;
+    /// A turn without the model's reasoning, for turns that need none. A
+    /// model that cannot skip it reasons anyway.
+    fn chat_quick(&self, messages: &[Value], tools: &Value) -> io::Result<Value> {
+        self.chat(messages, tools)
+    }
     /// Names the variant in run records.
     fn label(&self) -> String;
 }
@@ -66,13 +71,18 @@ impl OpenAi {
     }
 }
 
-impl Model for OpenAi {
-    fn chat(&self, messages: &[Value], tools: &Value) -> io::Result<Value> {
+impl OpenAi {
+    fn send(&self, messages: &[Value], tools: &Value, think: bool) -> io::Result<Value> {
         let mut body = json!({
             "model": self.model,
             "messages": messages,
             "temperature": self.temperature,
         });
+        // The chat-template switch Qwen-style models read (vLLM, sglang,
+        // ninfer); servers without it ignore unknown keys.
+        if !think {
+            body["chat_template_kwargs"] = json!({"enable_thinking": false});
+        }
         // Some servers reject an empty tool list.
         if tools.as_array().is_some_and(|t| !t.is_empty()) {
             body["tools"] = tools.clone();
@@ -95,6 +105,16 @@ impl Model for OpenAi {
                 Ok(message)
             }
         }
+    }
+}
+
+impl Model for OpenAi {
+    fn chat(&self, messages: &[Value], tools: &Value) -> io::Result<Value> {
+        self.send(messages, tools, true)
+    }
+
+    fn chat_quick(&self, messages: &[Value], tools: &Value) -> io::Result<Value> {
+        self.send(messages, tools, false)
     }
 
     fn label(&self) -> String {
