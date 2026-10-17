@@ -353,15 +353,21 @@ fn editing_a_protected_check_fails_even_if_it_passes() {
 }
 
 #[test]
-fn a_world_touched_after_its_verdict_cannot_land() {
+fn a_world_edited_after_its_verdict_lands_only_if_its_checks_pass_again() {
     let f = fixture("tamper");
     let tight = Script::new("tight", &[write("answer", "42\n"), done()]);
     let record = solve(&f.worlds, &f.project, &task(&[]), &[&tight], 10).unwrap();
     let id = record["winner"].as_str().unwrap();
     let world = f.worlds.open(id).unwrap();
-    assert!(f.sh(&world, "echo sneaky > extra").0);
+    // The human edits the work in their editor and breaks it: refused.
+    std::fs::write(world.path.join("answer"), "41\n").unwrap();
     assert!(land(&f.worlds, id, None, None).is_err());
     assert!(!f.project.join("answer").exists());
+    // Fixed, with a file of their own: it lands, their file included.
+    std::fs::write(world.path.join("answer"), "42\n").unwrap();
+    std::fs::write(world.path.join("extra"), "mine\n").unwrap();
+    land(&f.worlds, id, None, None).unwrap();
+    assert!(f.project.join("extra").exists() && f.project.join("answer").exists());
 }
 
 #[test]
