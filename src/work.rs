@@ -662,6 +662,34 @@ pub fn resume(store: &Store, id: &str) -> io::Result<()> {
     store.update(id, |r| r["status"] = json!("ready"))
 }
 
+/// "Ouvrir le code": the ready work is a real folder, opened in the human's
+/// editor. They may edit it; the commit runs its checks again
+/// (`solve::land`).
+pub fn open(store: &Store, id: &str) -> io::Result<Value> {
+    let request = store.load(id)?;
+    let run = request["run"]
+        .as_str()
+        .filter(|_| request["status"] == "ready")
+        .ok_or_else(|| io::Error::other("cette demande n'a pas de travail prêt"))?;
+    let folder = Worlds::from_env()?.open(run)?.path;
+    // ponytail: VS Code only (`code`, which WSL hands to Windows); another
+    // editor would be a setting.
+    let opened = match std::process::Command::new("code")
+        .arg(&folder)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+    {
+        Ok(mut child) => {
+            std::thread::spawn(move || child.wait());
+            true
+        }
+        Err(_) => false,
+    };
+    Ok(json!({"folder": folder, "opened": opened}))
+}
+
 /// What fennec changed for a request, read from its run: asked for when the
 /// human opens it, since a diff is too large for every refresh of the page.
 pub fn changes(store: &Store, id: &str) -> io::Result<Value> {
@@ -833,9 +861,15 @@ fn land_now(store: &Store, id: &str) -> io::Result<()> {
 }
 
 fn fail_landing(store: &Store, id: &str, e: io::Error) -> io::Result<()> {
+    let mut why = e.to_string();
+    if why.contains(" after edits onto ") {
+        why = format!(
+            "tes modifications font échouer les tests : corrige-les dans le dossier du code, puis refais le commit\n{why}"
+        );
+    }
     store.update(id, |r| {
         r["status"] = json!("ready");
-        r["land_error"] = json!(e.to_string());
+        r["land_error"] = json!(why);
     })
 }
 

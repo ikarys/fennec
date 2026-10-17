@@ -197,6 +197,16 @@ function changesButton(item, where) {
   });
 }
 
+// The ready work is a real folder: opened in the editor, its path shown to copy.
+function codeButton(item, where) {
+  return opener("Ouvrir le code", "Masquer le dossier", where, async () => {
+    const c = await api("/api/open", { id: item.id });
+    return [el("div", { className: "muted", textContent: (c.opened ? "Ouvert dans VS Code. " : "VS Code introuvable : ouvre ce dossier dans ton éditeur. ")
+        + "Tu peux y modifier le code : au commit, fennec refait les tests avant de mettre le tout dans ton dossier." }),
+      el("pre", { textContent: c.folder })];
+  });
+}
+
 // Every step, with what was sent to the model, what came back, and what it cost.
 function journalButton(item, where) {
   return opener("Journal", "Masquer le journal", where, async () => {
@@ -375,6 +385,7 @@ function card(item) {
     add(el("div", { className: "reply" }, change));
     actions.append(dropButton(item.id), el("span", { className: "spacer" }),
       changesButton(item, () => node.querySelector(".changes-slot")),
+      codeButton(item, () => node.querySelector(".changes-slot")),
       action("Passer", "/api/pass", { id: item.id }), fix);
     if (item.land) actions.append(action(landLabel(item.land), "/api/land", { id: item.id }, { primary: true }));
   } else if (item.kind === "failed") {
