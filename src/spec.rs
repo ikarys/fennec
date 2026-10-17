@@ -13,6 +13,7 @@ use crate::provider::Model;
 use crate::review::{self, normalise};
 use crate::rules::{self, HARNESS_DIR, Kind, Rule};
 use crate::solve::{self, Task};
+use crate::team;
 use crate::world::{World, Worlds};
 use crate::{schedule, sleep};
 
@@ -200,6 +201,8 @@ fn write_spec(
     context.push_str(extra);
     let said = rules::said(project)?;
     context.push_str(&rules::brief(&said));
+    let (roles, team) = team::brief(project, "frame")?;
+    context.push_str(&roles);
     let criteria = [
         "tests only, in new files: existing files stay untouched".to_string(),
         "the behaviour the tests describe stays unimplemented".to_string(),
@@ -214,6 +217,7 @@ fn write_spec(
         "origin": origin,
         "world": world.id,
         "model": model.label(),
+        "team": team,
         "status": "invalid",
     });
     if let Err(e) = check(

@@ -135,8 +135,9 @@ pub struct Said {
     pub text: String,
 }
 
-/// `$XDG_CONFIG_HOME/fennec/rules.md`, default `~/.config/fennec/rules.md`.
-pub fn user_file() -> io::Result<PathBuf> {
+/// `$XDG_CONFIG_HOME/fennec`, default `~/.config/fennec`: what the human
+/// configures for every project.
+pub fn config_dir() -> io::Result<PathBuf> {
     let config = match std::env::var_os("XDG_CONFIG_HOME") {
         Some(v) if !v.is_empty() => PathBuf::from(v),
         _ => PathBuf::from(
@@ -144,7 +145,12 @@ pub fn user_file() -> io::Result<PathBuf> {
         )
         .join(".config"),
     };
-    Ok(config.join("fennec/rules.md"))
+    Ok(config.join("fennec"))
+}
+
+/// `$XDG_CONFIG_HOME/fennec/rules.md`, default `~/.config/fennec/rules.md`.
+pub fn user_file() -> io::Result<PathBuf> {
+    Ok(config_dir()?.join("rules.md"))
 }
 
 const SECTION: &str = "## Rules";

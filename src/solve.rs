@@ -13,6 +13,7 @@ use crate::grant;
 use crate::provider::Model;
 use crate::review;
 use crate::rules::{self, HARNESS_DIR, Kind, Rule};
+use crate::team;
 use crate::world::{World, Worlds, git};
 use crate::{recipe, schedule, sleep};
 
@@ -109,6 +110,8 @@ pub fn solve(
     }
     let said = rules::said(&project)?;
     context.push_str(&rules::brief(&said));
+    let (roles, team) = team::brief(&project, "solve")?;
+    context.push_str(&roles);
     let history = review::agenda(worlds, &project.display().to_string(), 12)?;
     if !history.is_empty() {
         context.push_str("\n\nThis project's history, from earlier runs, oldest first:\n");
@@ -179,6 +182,7 @@ pub fn solve(
         "verify": task.verify,
         "protect": task.protect,
         "grant": task.grant,
+        "team": team,
         "winner": winner,
         "status": if winner.is_some() { "ready" } else { "failed" },
         "attempts": attempts,

@@ -22,6 +22,8 @@ src/spec.rs      request → acceptance tests + task (intent compiler), human-va
 src/proof.rs     a ready run used as its user would: model proposes tries, pages and clicks/typing; harness runs them, captures before/after (proof.py)
 src/rules.rs     project rules (`.fennec-os/rules.json` at HEAD), glob matching; rules said in words
                  (`~/.config/fennec/rules.md`, AGENTS.md `## Rules`): proposed, written once, given to agents
+src/team.rs      roles that brief the agent per stage (frame, solve, prove): `~/.config/fennec/team/*.md`
+                 or the built-in `team/`, extended per project in `.fennec-os/team/`
 src/review.rs    review queue, rejections, corrections said twice, agenda
 src/sleep.rs     landed runs → candidate know-how (`.fennec-os/knowhow.md`)
 src/schedule.rs  background work (sleep) waits while interactive work (solve) runs

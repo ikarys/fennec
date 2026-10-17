@@ -10,4 +10,5 @@ pub mod serve;
 pub mod sleep;
 pub mod solve;
 pub mod spec;
+pub mod team;
 pub mod world;
