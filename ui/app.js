@@ -93,6 +93,7 @@ function details(item) {
   if (item.reason) box.append(el("pre", { textContent: item.reason }));
   if (item.land_error) box.append(el("pre", { textContent: item.land_error }));
   if (item.land?.message) box.append(el("p", { textContent: `Message du commit : ${item.land.message}` }));
+  if (item.team?.length) box.append(el("p", { textContent: `Équipe : ${item.team.join(", ")}` }));
   for (const rule of item.rules ?? []) box.append(el("p", { textContent: `Règle suivie : ${rule}` }));
   if (item.checks?.length) {
     box.append(el("p", { textContent: "Tests :" }));

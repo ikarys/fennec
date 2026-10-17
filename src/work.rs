@@ -57,6 +57,8 @@ fn frame_now(store: &Store, id: &str) -> io::Result<()> {
     store.update(id, |r| {
         r["spec"] = s["world"].clone();
         r["rules"] = s["rules"].clone();
+        r["team"] = json!([]);
+        add_team(r, &s["team"]);
         if s["status"] == "proposed" {
             r["status"] = json!("question");
             r["done_when"] = s["done_when"].clone();
@@ -271,8 +273,21 @@ pub fn retry(store: &Store, id: &str) -> io::Result<()> {
     Ok(())
 }
 
+/// The roles that worked on a request, each named once, in the order they
+/// came in: framing, solving, proving.
+fn add_team(request: &mut Value, names: &Value) {
+    let mut team: Vec<Value> = request["team"].as_array().cloned().unwrap_or_default();
+    for name in names.as_array().into_iter().flatten() {
+        if !team.contains(name) {
+            team.push(name.clone());
+        }
+    }
+    request["team"] = json!(team);
+}
+
 fn apply_proof(request: &mut Value, proof: &Value) {
     request["proof"] = proof.clone();
+    add_team(request, &proof["team"]);
     let failed = proof["tries"]
         .as_array()
         .into_iter()
@@ -324,6 +339,7 @@ fn apply_run(request: &mut Value, record: &Value) {
         }
     }
     request["rules"] = json!(used);
+    add_team(request, &record["team"]);
     if record["winner"].is_string() {
         request["status"] = json!("ready");
         request["run"] = record["winner"].clone();
@@ -479,6 +495,20 @@ mod tests {
             &json!({"winner": "w2", "attempts": [{"world": "w1", "rules": ["x"]}, {"world": "w2", "rules": ["use uv", "short output"]}]}),
         );
         assert_eq!(r["rules"], json!(["use uv", "short output"]));
+    }
+
+    #[test]
+    fn each_role_that_worked_is_named_once() {
+        let mut r = json!({"status": "running", "team": ["Chef de projet"]});
+        apply_run(
+            &mut r,
+            &json!({"winner": "w1", "team": ["Dev senior"], "attempts": []}),
+        );
+        apply_proof(
+            &mut r,
+            &json!({"tries": [{"command": "a", "exit": 0}], "team": ["QA", "Dev senior"]}),
+        );
+        assert_eq!(r["team"], json!(["Chef de projet", "Dev senior", "QA"]));
     }
 
     #[test]
