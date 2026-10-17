@@ -140,7 +140,7 @@ fn classify(requests: &[(String, Value)], projects: &[String]) -> Value {
     for (id, r) in requests {
         let card = |kind: &str| {
             json!({"id": id, "kind": kind, "project": name(r["project"].as_str().unwrap_or("")),
-                   "title": r["text"], "rules": r["rules"], "checks": r["verify"]})
+                   "title": r["text"], "rules": r["rules"], "checks": r["verify"], "team": r["team"]})
         };
         // Scenario 4: what the human said may become a rule, at one word.
         if let Some(rule) = r["offer"]["rule"].as_str() {
