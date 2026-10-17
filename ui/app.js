@@ -95,6 +95,13 @@ function explain(reason) {
   if (/not a git repository/.test(line)) {
     return "le dossier du projet n'est plus un dépôt git (son .git a disparu) : ajoute-le de nouveau avec « + projet », puis réessaie";
   }
+  if (/the project folder has uncommitted changes/.test(line)) {
+    return "ton dossier a des changements non commités : fennec y travaille et doit pouvoir annuler un essai raté sans toucher aux tiens. Commit-les ou mets-les de côté (git stash), puis réessaie";
+  }
+  if (/the project folder already holds work in progress/.test(line)) {
+    return "ton dossier contient déjà le travail d'une autre demande : commit-la, ou abandonne-la, puis réessaie";
+  }
+  if (/the project folder is on no branch/.test(line)) return "ton dossier n'est sur aucune branche git : fais un checkout d'une branche, puis réessaie";
   m = line.match(/^no model: .* and (\S+)\/models did not answer/);
   const down = unreachable(line);
   if (m) return `fennec ne joint aucun modèle à ${m[1]}${down ? ` (${down})` : ""} : vérifie les Réglages, puis réessaie`;
@@ -357,9 +364,10 @@ function card(item) {
   } else if (item.kind === "ready") {
     if (item.done_when) add(focus("Terminé quand", item.done_when));
     // "Ready" reads as "done": say where the work is until the commit.
-    add(el("div", { className: "muted", textContent: item.land
-      ? `Ton dossier n'a pas encore changé : le travail attend à part. « ${landLabel(item.land)} » l'y met.`
-      : "Ton dossier n'a pas encore changé : le travail attend à part, jusqu'au commit." }));
+    const commit = item.land ? `« ${landLabel(item.land)} »` : "le commit";
+    add(el("div", { className: "muted", textContent: item.here
+      ? `Le travail est dans ton dossier, sur une branche de travail. ${commit} le met sur ta branche ; « Abandonner » rend ton dossier comme avant.`
+      : `Ton dossier n'a pas encore changé : le travail attend à part. ${commit} l'y met.` }));
     add(...work(item), shots(item));
     // Commands leave no picture: their proof would otherwise hide behind "Détails".
     const tried = item.tries?.length ?? 0;
@@ -524,7 +532,7 @@ $("picker-go").onsubmit = (e) => {
 $("picker-cancel").onclick = () => $("picker").close();
 $("picker-choose").onclick = async () => {
   try {
-    await api("/api/projects", { path: pickerPath });
+    await api("/api/projects", { path: pickerPath, place: $("picker-place").value });
     $("picker").close();
     // A project just added is the one the next request is for.
     $("project").append(new Option("", pickerPath));

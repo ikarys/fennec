@@ -36,9 +36,12 @@ impl Store {
 
     /// Adds a git repository; adding it twice is not an error. An empty
     /// folder becomes a new project; see [`start`].
-    pub fn add_project(&self, path: &str) -> io::Result<()> {
+    /// Adds a project, or changes where fennec works in one already added:
+    /// `here` (the folder itself) or `apart`.
+    pub fn add_project(&self, path: &str, place: &str) -> io::Result<()> {
         let path = std::fs::canonicalize(path)?;
         start(&path)?;
+        fennec_os::world::choose_place(&path, place)?;
         let path = path.display().to_string();
         let mut projects = self.projects()?;
         if !projects.contains(&path) {
@@ -171,6 +174,18 @@ pub fn start(path: &Path) -> io::Result<()> {
     Ok(())
 }
 
+/// Whether a request's ready work sits in the project folder itself.
+fn in_folder(request: &Value) -> bool {
+    let worlds = fennec_os::world::Worlds::from_env();
+    let world = request["run"]
+        .as_str()
+        .and_then(|run| worlds.ok()?.open(run).ok());
+    let canonical = |p: &Path| std::fs::canonicalize(p).ok();
+    world.is_some_and(|w| {
+        canonical(&w.path) == canonical(Path::new(request["project"].as_str().unwrap_or("")))
+    })
+}
+
 pub fn is_repository(path: &Path) -> bool {
     path.join(".git").exists()
 }
@@ -253,6 +268,7 @@ fn classify(requests: &[(String, Value)], projects: &[String]) -> Value {
                 c["role_checks"] = r["proof"]["checks"].clone();
                 c["shots"] = r["proof"]["shots"].clone();
                 c["land_error"] = r["land_error"].clone();
+                c["here"] = json!(in_folder(r));
                 c["amend_error"] = r["amend_error"].clone();
                 c["summary"] = r["summary"].clone();
                 c["files"] = r["files"].clone();
@@ -334,7 +350,9 @@ mod tests {
             root: tmp.join("home"),
         };
         std::fs::create_dir_all(&store.root).unwrap();
-        store.add_project(new.to_str().unwrap()).unwrap();
+        store.add_project(new.to_str().unwrap(), "here").unwrap();
+        // Where fennec works is the human's choice, among two.
+        assert!(store.add_project(new.to_str().unwrap(), "nowhere").is_err());
         assert!(is_repository(&new));
         let head = std::process::Command::new("git")
             .args(["-C", new.to_str().unwrap(), "rev-parse", "HEAD"])
@@ -356,7 +374,7 @@ mod tests {
         git(&["init", "-q"]);
         std::fs::write(bare.join("staged.txt"), "mine").unwrap();
         git(&["add", "staged.txt"]);
-        store.add_project(bare.to_str().unwrap()).unwrap();
+        store.add_project(bare.to_str().unwrap(), "here").unwrap();
         assert_eq!(git(&["log", "--format=%s"]), "chore: start project");
         assert_eq!(
             git(&["ls-tree", "-r", "--name-only", "HEAD"]),
@@ -370,7 +388,7 @@ mod tests {
         );
         start(&bare).unwrap();
         assert_eq!(git(&["rev-list", "--count", "HEAD"]), "1", "only once");
-        assert!(store.add_project(loose.to_str().unwrap()).is_err());
+        assert!(store.add_project(loose.to_str().unwrap(), "here").is_err());
         assert!(!is_repository(&loose));
         assert_eq!(store.projects().unwrap().len(), 2);
         std::fs::remove_dir_all(tmp).unwrap();
