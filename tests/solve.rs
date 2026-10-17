@@ -253,6 +253,55 @@ fn a_proof_whose_reasoning_eats_the_reply_is_asked_again() {
 }
 
 #[test]
+fn a_role_check_vetoes_the_proof_and_a_missing_tool_is_only_unverified() {
+    let f = fixture("veto");
+    let model = Script::new("veto", &[write("answer", "42\n"), done()]);
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&model], 10).unwrap();
+    let winner = record["winner"].as_str().unwrap().to_string();
+    let team = f.project.join(".fennec-os/team");
+    std::fs::create_dir_all(&team).unwrap();
+    let role = |checks: &str| {
+        let text = format!("---\nname: Sec\nstage: prove\n{checks}---\nAudit.\n");
+        std::fs::write(team.join("sec.md"), text).unwrap();
+    };
+    let prove = || {
+        let reply = json!({"content": "try: grep -qx 42 answer\n"});
+        model.replies.lock().unwrap().push_back(reply);
+        proof::gather(&f.worlds, &winner, None, &model).unwrap()
+    };
+
+    role("check: grep -q 42 answer\ncheck: no-such-tool-xyz\ncheck: test -e secrets\n");
+    let vetoed = prove();
+    assert_eq!(vetoed["passed"], false, "{vetoed}");
+    let checks = vetoed["checks"].as_array().unwrap();
+    let exits: Vec<(&Value, &Value, &Value)> = checks
+        .iter()
+        .map(|c| (&c["role"], &c["exit"], &c["missing"]))
+        .collect();
+    assert_eq!(
+        exits,
+        [
+            (&json!("Sec"), &json!(0), &json!(false)),
+            (&json!("Sec"), &json!(127), &json!(true)),
+            (&json!("Sec"), &json!(1), &json!(false)),
+        ]
+    );
+
+    role("check: no-such-tool-xyz\n");
+    assert_eq!(prove()["passed"], true, "a missing tool does not block");
+
+    // The role's checks alone are not a try of the product.
+    role("check: true\n");
+    model
+        .replies
+        .lock()
+        .unwrap()
+        .push_back(json!({"content": "unverified: everything\n"}));
+    let alone = proof::gather(&f.worlds, &winner, None, &model).unwrap();
+    assert_eq!(alone["passed"], false, "{alone}");
+}
+
+#[test]
 fn editing_a_protected_check_fails_even_if_it_passes() {
     let f = fixture("protect");
     let cheat = Script::new("cheat", &[write("check.sh", "exit 0\n"), done()]);

@@ -107,7 +107,8 @@ pub fn gather(
             .take(80)
             .collect::<String>()
     );
-    let (roles, team) = team::brief(Path::new(record["project"].as_str().unwrap_or("")), "prove")?;
+    let project = Path::new(record["project"].as_str().unwrap_or(""));
+    let (roles, team) = team::brief(project, "prove")?;
     let messages = [
         json!({"role": "system", "content": format!("{BRIEF}{roles}")}),
         json!({"role": "user", "content": request}),
@@ -125,19 +126,27 @@ pub fn gather(
     // Some servers leave the reasoning inline.
     let mut plan = parse(content.rsplit("</think>").next().unwrap_or(content));
 
-    let rules: Vec<Rule> = plan
-        .tries
-        .iter()
-        .map(|c| Rule {
-            id: "proof.try".to_string(),
-            kind: Kind::StandingCommand(c.clone()),
-            block: true,
-        })
-        .collect();
+    let command = |c: &String| Rule {
+        id: "proof.try".to_string(),
+        kind: Kind::StandingCommand(c.clone()),
+        block: true,
+    };
+    let rules: Vec<Rule> = plan.tries.iter().map(command).collect();
     // A try may write files: the world is rolled back below rather than the
     // proof failed, so the second half of verify's answer is not used.
     let (checks, _) = solve::verify(worlds, &world, &rules)?;
     worlds.rollback(&world)?;
+    // The roles' own checks: chosen by the human, not the model, so they
+    // do not count as trying the product, but any failure is a veto. A tool
+    // the machine does not have (exit 127) is not verified, not a failure.
+    let vetoes = team::checks(project)?;
+    let veto_rules: Vec<Rule> = vetoes.iter().map(|(_, c)| command(c)).collect();
+    let (mut role_checks, _) = solve::verify(worlds, &world, &veto_rules)?;
+    worlds.rollback(&world)?;
+    for (check, (role, _)) in role_checks.iter_mut().zip(&vetoes) {
+        check["role"] = json!(role);
+        check["missing"] = json!(check["exit"] == 127);
+    }
     let mut shots = Vec::new();
     if let Some(serve) = &plan.serve {
         for (n, (url, steps)) in plan.shots.iter().enumerate() {
@@ -162,9 +171,12 @@ pub fn gather(
     }
     let passed = !(checks.is_empty() && shots.is_empty())
         && checks.iter().all(|c| c["exit"] == 0)
-        && shots.iter().all(|s| s["ok"] == true);
+        && shots.iter().all(|s| s["ok"] == true)
+        && role_checks
+            .iter()
+            .all(|c| c["exit"] == 0 || c["missing"] == true);
     let proof = json!({"tries": checks, "shots": shots, "unverified": plan.unverified,
-                       "passed": passed, "team": team});
+                       "checks": role_checks, "passed": passed, "team": team});
     record["proof"] = proof.clone();
     review::save(worlds, id, &record)?;
     Ok(proof)
