@@ -41,37 +41,36 @@ impl OpenAi {
         }
     }
 
-    /// One variant per (model, temperature) pair the run asks for.
-    /// `FENNEC_OS_BASE_URL` (default `http://localhost:8000/v1`),
-    /// `FENNEC_OS_MODELS` (comma-separated), `FENNEC_OS_API_KEY`.
+    /// One variant per (model, temperature) pair the run asks for, from
+    /// [`Settings::current`].
     pub fn variants_from_env(attempts: usize) -> io::Result<Vec<Self>> {
-        let base = std::env::var("FENNEC_OS_BASE_URL")
-            .unwrap_or_else(|_| "http://localhost:8000/v1".to_string());
-        // Unset: the models the server says it serves, so a local server
-        // that serves one model needs no configuration but its address.
-        let models = match std::env::var("FENNEC_OS_MODELS") {
-            Ok(m) => m,
-            Err(_) => served(&base).map_err(|e| {
+        let Settings {
+            base_url: base,
+            models,
+            api_key: key,
+        } = Settings::current()?;
+        // None chosen: the models the server says it serves, so a local
+        // server that serves one model needs no configuration but its address.
+        let models = if models.is_empty() {
+            served(&base, key.as_deref()).map_err(|e| {
                 io::Error::other(format!(
-                    "no model: FENNEC_OS_MODELS is not set and {base}/models did not answer ({e})"
+                    "no model: none is set and {base}/models did not answer ({e})"
                 ))
-            })?,
+            })?
+        } else {
+            models
         };
-        let models: Vec<&str> = models
-            .split(',')
-            .map(str::trim)
-            .filter(|m| !m.is_empty())
-            .collect();
         if models.is_empty() {
-            return Err(io::Error::other("FENNEC_OS_MODELS is empty"));
+            return Err(io::Error::other(format!(
+                "no model: {base}/models lists none"
+            )));
         }
-        let key = std::env::var("FENNEC_OS_API_KEY").ok();
         // Diversity knob: the same model at different temperatures explores
         // different paths; several models add a second axis.
         const TEMPERATURES: [f64; 4] = [0.3, 0.8, 0.5, 1.0];
         Ok((0..attempts)
             .map(|i| {
-                let model = models[i % models.len()];
+                let model = &models[i % models.len()];
                 let temperature = TEMPERATURES[(i / models.len()) % TEMPERATURES.len()];
                 Self::new(&base, model, key.clone(), temperature)
             })
@@ -79,24 +78,115 @@ impl OpenAi {
     }
 }
 
-/// The model ids an OpenAI-compatible server lists, comma-separated.
-fn served(base: &str) -> io::Result<String> {
+/// Where the model is: the human's settings file
+/// (`~/.config/fennec/model.json`, written from the web UI), each field
+/// overridden by its environment variable (`FENNEC_OS_BASE_URL`,
+/// `FENNEC_OS_MODELS` comma-separated, `FENNEC_OS_API_KEY`).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Settings {
+    pub base_url: String,
+    /// Empty: every model the server lists.
+    pub models: Vec<String>,
+    pub api_key: Option<String>,
+}
+
+pub const DEFAULT_BASE_URL: &str = "http://localhost:8000/v1";
+/// The variables that win over the file, for the UI to say so.
+pub const ENV: [&str; 3] = [
+    "FENNEC_OS_BASE_URL",
+    "FENNEC_OS_MODELS",
+    "FENNEC_OS_API_KEY",
+];
+
+impl Settings {
+    fn path() -> io::Result<std::path::PathBuf> {
+        Ok(crate::rules::config_dir()?.join("model.json"))
+    }
+
+    /// The file alone, as the human wrote it.
+    pub fn saved() -> io::Result<Self> {
+        let v: Value = match std::fs::read_to_string(Self::path()?) {
+            Ok(t) => serde_json::from_str(&t).map_err(io::Error::other)?,
+            Err(e) if e.kind() == io::ErrorKind::NotFound => Value::Null,
+            Err(e) => return Err(e),
+        };
+        Ok(Self {
+            base_url: v["base_url"]
+                .as_str()
+                .filter(|b| !b.is_empty())
+                .unwrap_or(DEFAULT_BASE_URL)
+                .to_string(),
+            models: v["models"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|m| m.as_str().map(str::to_string))
+                .collect(),
+            api_key: v["api_key"]
+                .as_str()
+                .filter(|k| !k.is_empty())
+                .map(str::to_string),
+        })
+    }
+
+    /// What a run uses: the file, then the environment on top.
+    pub fn current() -> io::Result<Self> {
+        let mut s = Self::saved()?;
+        if let Ok(b) = std::env::var("FENNEC_OS_BASE_URL") {
+            s.base_url = b;
+        }
+        if let Ok(m) = std::env::var("FENNEC_OS_MODELS") {
+            s.models = m
+                .split(',')
+                .map(str::trim)
+                .filter(|m| !m.is_empty())
+                .map(str::to_string)
+                .collect();
+        }
+        if let Ok(k) = std::env::var("FENNEC_OS_API_KEY") {
+            s.api_key = Some(k);
+        }
+        Ok(s)
+    }
+
+    /// Readable by its owner only: it may hold a key.
+    pub fn save(&self) -> io::Result<()> {
+        use std::os::unix::fs::OpenOptionsExt;
+        let path = Self::path()?;
+        std::fs::create_dir_all(path.parent().unwrap_or(&path))?;
+        let json =
+            json!({"base_url": self.base_url, "models": self.models, "api_key": self.api_key});
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(&path)?;
+        std::io::Write::write_all(
+            &mut file,
+            (serde_json::to_string_pretty(&json).map_err(io::Error::other)? + "\n").as_bytes(),
+        )
+    }
+}
+
+/// The model ids an OpenAI-compatible server lists.
+pub fn served(base: &str, key: Option<&str>) -> io::Result<Vec<String>> {
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .timeout_global(Some(Duration::from_secs(10)))
         .build()
         .into();
-    let mut resp = agent
-        .get(format!("{}/models", base.trim_end_matches('/')))
-        .call()
-        .map_err(io::Error::other)?;
+    let mut req = agent.get(format!("{}/models", base.trim_end_matches('/')));
+    if let Some(key) = key {
+        req = req.header("Authorization", &format!("Bearer {key}"));
+    }
+    let mut resp = req.call().map_err(io::Error::other)?;
     let list: Value = resp.body_mut().read_json().map_err(io::Error::other)?;
-    let ids: Vec<&str> = list["data"]
+    Ok(list["data"]
         .as_array()
         .into_iter()
         .flatten()
-        .filter_map(|m| m["id"].as_str())
-        .collect();
-    Ok(ids.join(","))
+        .filter_map(|m| m["id"].as_str().map(str::to_string))
+        .collect())
 }
 
 impl OpenAi {
@@ -172,11 +262,11 @@ mod tests {
             )
             .unwrap();
         });
-        assert_eq!(served(&base).unwrap(), "qwen3.8-27b,small");
+        assert_eq!(served(&base, None).unwrap(), ["qwen3.8-27b", "small"]);
         server.join().unwrap();
         let closed = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let gone = format!("http://{}/v1", closed.local_addr().unwrap());
         drop(closed);
-        assert!(served(&gone).is_err(), "nothing listens");
+        assert!(served(&gone, None).is_err(), "nothing listens");
     }
 }
