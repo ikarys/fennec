@@ -14,7 +14,7 @@
 //! `~/.config/fennec/teams/<team>/*.md`; built-in teams are lists of roles
 //! from the built-in catalogue, and a folder of the same name replaces one.
 //! A project picks its team in `.fennec-os/team.json`
-//! (`{"team": "etudes", "remove": ["qa"]}`, default team `dev`) and adds or
+//! (`{"team": "Études", "remove": ["qa"]}`, default team `Développement`) and adds or
 //! overrides roles by file name in `.fennec-os/team/*.md`. Read from the
 //! working tree, like rules said in words: these are the human's files.
 
@@ -29,7 +29,7 @@ use crate::rules::{self, HARNESS_DIR};
 pub const STAGES: [&str; 3] = ["frame", "solve", "prove"];
 
 /// The team of a project that has not picked one: small on purpose.
-pub const DEFAULT_TEAM: &str = "dev";
+pub const DEFAULT_TEAM: &str = "Développement";
 
 /// Every built-in role, in or out of a built-in team: what the human picks
 /// from to build their own.
@@ -67,9 +67,12 @@ const CATALOG: [(&str, &str); 14] = [
 
 /// Built-in teams, by catalogue key. Each covers every stage.
 const TEAMS: [(&str, &[&str]); 2] = [
-    ("dev", &["project-manager", "senior-developer", "qa"]),
     (
-        "etudes",
+        "Développement",
+        &["project-manager", "senior-developer", "qa"],
+    ),
+    (
+        "Études",
         &[
             "research-lead",
             "researcher",
@@ -119,18 +122,24 @@ pub fn teams() -> io::Result<Vec<String>> {
 
 /// A project's team as the human sets it up: the team picked, the roles it
 /// leaves out, and every role before any is left out (so a left-out role can
-/// be shown, and taken back).
+/// be shown, and taken back). A team that cannot be found (deleted, or named
+/// by a project cloned from someone else) is reported in `missing` instead of
+/// failing, so the human can pick another; the work itself still fails.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Setup {
     pub team: String,
     pub remove: Vec<String>,
     pub roles: Vec<Role>,
+    pub missing: Option<String>,
 }
 
 pub fn setup(project: &Path) -> io::Result<Setup> {
     let harness = project.join(HARNESS_DIR);
     let (team, remove) = choice(&harness)?;
-    let mut files = team_files(&team)?;
+    let (mut files, missing) = match team_files(&team) {
+        Ok(files) => (files, None),
+        Err(e) => (Vec::new(), Some(e.to_string())),
+    };
     for (key, text) in read_dir(&harness.join("team"))?.unwrap_or_default() {
         files.retain(|(k, _)| *k != key);
         files.push((key, text));
@@ -144,12 +153,21 @@ pub fn setup(project: &Path) -> io::Result<Setup> {
         team,
         remove,
         roles,
+        missing,
     })
 }
 
 /// The roles that work on a project, sorted by file name.
 pub fn members(project: &Path) -> io::Result<Vec<Role>> {
-    let Setup { remove, roles, .. } = setup(project)?;
+    let Setup {
+        remove,
+        roles,
+        missing,
+        ..
+    } = setup(project)?;
+    if let Some(why) = missing {
+        return Err(io::Error::other(why));
+    }
     Ok(roles
         .into_iter()
         .filter(|r| !remove.contains(&r.key))
@@ -189,6 +207,106 @@ pub fn add(project: &Path, key: &str) -> io::Result<()> {
         choose(project, &team, &remove)?;
     }
     Ok(())
+}
+
+/// The human writes a role for a project: an edit of role `key`, or a new
+/// role when `key` is `None` (its key is made from the name). Returns the key.
+pub fn save_role(
+    project: &Path,
+    key: Option<&str>,
+    name: &str,
+    stage: &str,
+    brief: &str,
+) -> io::Result<String> {
+    let (name, brief) = (name.trim(), brief.trim());
+    if name.is_empty() || brief.is_empty() {
+        return Err(io::Error::other("a role needs a name and a brief"));
+    }
+    let key = match key {
+        Some(k) if setup(project)?.roles.iter().any(|r| r.key == k) => k.to_string(),
+        Some(k) => return Err(io::Error::other(format!("unknown role `{k}`"))),
+        None => {
+            let k = slug(name);
+            if k.is_empty() || setup(project)?.roles.iter().any(|r| r.key == k) {
+                return Err(io::Error::other(format!(
+                    "a role named `{name}` exists already"
+                )));
+            }
+            k
+        }
+    };
+    let role = Role {
+        key: key.clone(),
+        name: name.to_string(),
+        stage: stage.to_string(),
+        brief: brief.to_string(),
+    };
+    // Checked as any role file is, before it is written.
+    parse(&key, &to_md(&role))?;
+    let dir = project.join(HARNESS_DIR).join("team");
+    std::fs::create_dir_all(&dir)?;
+    std::fs::write(dir.join(format!("{key}.md")), to_md(&role))?;
+    Ok(key)
+}
+
+/// The project's working roles become team `name` of the human's own, for
+/// every project, and the project switches to it. Its role files, now in
+/// the team, leave the project. An existing team is never overwritten.
+pub fn save_team(project: &Path, name: &str) -> io::Result<()> {
+    let name = name.trim();
+    if !valid_name(name) {
+        return Err(io::Error::other(format!("invalid team name `{name}`")));
+    }
+    if teams()?.iter().any(|t| t == name) {
+        return Err(io::Error::other(format!("team `{name}` exists already")));
+    }
+    let roles = members(project)?;
+    let dir = rules::config_dir()?.join("teams").join(name);
+    std::fs::create_dir_all(&dir)?;
+    for r in &roles {
+        std::fs::write(dir.join(format!("{}.md", r.key)), to_md(r))?;
+    }
+    choose(project, name, &[])?;
+    for r in &roles {
+        let file = project
+            .join(HARNESS_DIR)
+            .join("team")
+            .join(format!("{}.md", r.key));
+        if file.exists() {
+            std::fs::remove_file(file)?;
+        }
+    }
+    Ok(())
+}
+
+fn to_md(r: &Role) -> String {
+    format!(
+        "---\nname: {}\nstage: {}\n---\n{}\n",
+        r.name, r.stage, r.brief
+    )
+}
+
+/// A file name from a role's name: `Spécialiste UX` → `specialiste-ux`.
+fn slug(name: &str) -> String {
+    let folded: String = name
+        .to_lowercase()
+        .chars()
+        .map(|c| match c {
+            'à' | 'â' | 'ä' => 'a',
+            'é' | 'è' | 'ê' | 'ë' => 'e',
+            'î' | 'ï' => 'i',
+            'ô' | 'ö' => 'o',
+            'ù' | 'û' | 'ü' => 'u',
+            'ç' => 'c',
+            c if c.is_ascii_alphanumeric() => c,
+            _ => '-',
+        })
+        .collect();
+    folded
+        .split('-')
+        .filter(|p| !p.is_empty())
+        .collect::<Vec<_>>()
+        .join("-")
 }
 
 /// The project's team and the roles it leaves out, from `team.json`.
@@ -335,7 +453,7 @@ mod tests {
         }
         let e = team_files("nope-no-such-team").unwrap_err().to_string();
         assert!(
-            e.contains("unknown team") && e.contains("dev") && e.contains("etudes"),
+            e.contains("unknown team") && e.contains("Développement") && e.contains("Études"),
             "{e}"
         );
     }
@@ -386,7 +504,7 @@ mod tests {
         // Another team, minus one of its roles; project roles still apply.
         let choose =
             |json: &str| std::fs::write(project.join(HARNESS_DIR).join("team.json"), json).unwrap();
-        choose(r#"{"team": "etudes", "remove": ["writer"]}"#);
+        choose(r#"{"team": "Études", "remove": ["writer"]}"#);
         let keys: Vec<String> = members(&project)
             .unwrap()
             .into_iter()
@@ -401,6 +519,15 @@ mod tests {
         );
         choose(r#"{"team": "../../etc"}"#);
         assert!(members(&project).is_err());
+        // The work fails, but the setup still opens so the human can repair it.
+        choose(r#"{"team": "gone"}"#);
+        assert!(members(&project).is_err());
+        let s = setup(&project).unwrap();
+        assert!(s.missing.unwrap().contains("unknown team `gone`"));
+        assert!(
+            s.roles.iter().any(|r| r.key == "devsecops"),
+            "project roles still shown"
+        );
         std::fs::remove_dir_all(project).unwrap();
     }
 
@@ -414,11 +541,11 @@ mod tests {
             "nothing written on error"
         );
 
-        super::choose(&project, "etudes", &["writer".to_string()]).unwrap();
+        super::choose(&project, "Études", &["writer".to_string()]).unwrap();
         let s = setup(&project).unwrap();
         assert_eq!(
             (s.team.as_str(), s.remove.clone()),
-            ("etudes", vec!["writer".to_string()])
+            ("Études", vec!["writer".to_string()])
         );
         assert!(
             s.roles.iter().any(|r| r.key == "writer"),
@@ -436,6 +563,51 @@ mod tests {
             .collect();
         assert!(keys.contains(&"writer".to_string()) && keys.contains(&"devsecops".to_string()));
         assert!(project.join(HARNESS_DIR).join("team/devsecops.md").exists());
+        std::fs::remove_dir_all(project).unwrap();
+    }
+
+    // ponytail: save_team writes the real ~/.config/fennec/teams, so it is
+    // checked through the UI against an isolated XDG_CONFIG_HOME, not here.
+    #[test]
+    fn the_human_edits_a_role_and_writes_a_new_one() {
+        let project = std::env::temp_dir().join(format!("fennec-os-role-{}", std::process::id()));
+        std::fs::create_dir_all(&project).unwrap();
+        super::choose(&project, "Développement", &[]).unwrap();
+
+        save_role(&project, Some("qa"), "QA web", "prove", "Click everything.").unwrap();
+        let qa = members(&project)
+            .unwrap()
+            .into_iter()
+            .find(|r| r.key == "qa")
+            .unwrap();
+        assert_eq!(
+            (qa.name.as_str(), qa.brief.as_str()),
+            ("QA web", "Click everything.")
+        );
+
+        let key = save_role(
+            &project,
+            None,
+            "Spécialiste données",
+            "solve",
+            "Check the data.",
+        )
+        .unwrap();
+        assert_eq!(key, "specialiste-donnees");
+        assert!(
+            save_role(&project, None, "Spécialiste données", "solve", "x").is_err(),
+            "taken"
+        );
+        assert!(save_role(&project, Some("nobody"), "x", "solve", "x").is_err());
+        assert!(
+            save_role(&project, None, "Ops", "deploy", "x").is_err(),
+            "unknown stage"
+        );
+        assert!(
+            save_role(&project, None, "Ops", "solve", " ").is_err(),
+            "empty brief"
+        );
+        assert_eq!(slug("  Dev -- Senior! "), "dev-senior");
         std::fs::remove_dir_all(project).unwrap();
     }
 }

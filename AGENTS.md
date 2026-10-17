@@ -23,7 +23,7 @@ src/proof.rs     a ready run used as its user would: model proposes tries, pages
 src/rules.rs     project rules (`.fennec-os/rules.json` at HEAD), glob matching; rules said in words
                  (`~/.config/fennec/rules.md`, AGENTS.md `## Rules`): proposed, written once, given to agents
 src/team.rs      named teams of roles that brief the agent per stage (frame, solve, prove):
-                 `~/.config/fennec/teams/<team>/*.md` or built-in teams (`dev`, `etudes`) drawn
+                 `~/.config/fennec/teams/<team>/*.md` or built-in teams (`Développement`, `Études`) drawn
                  from `catalog/`; a project picks one in `.fennec-os/team.json`, overrides in `.fennec-os/team/`
 src/review.rs    review queue, rejections, corrections said twice, agenda
 src/sleep.rs     landed runs → candidate know-how (`.fennec-os/knowhow.md`)
