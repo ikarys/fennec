@@ -173,9 +173,12 @@ pub fn gather(
             "no try proposed".to_string()
         });
     }
-    let passed = !(checks.is_empty() && shots.is_empty())
+    // A page this machine has no browser to look at is unverified, not
+    // failed; it proves nothing either, so something else must.
+    let seen: Vec<&Value> = shots.iter().filter(|s| s["missing"] != true).collect();
+    let passed = !(checks.is_empty() && seen.is_empty())
         && checks.iter().all(|c| c["exit"] == 0)
-        && shots.iter().all(|s| s["ok"] == true)
+        && seen.iter().all(|s| s["ok"] == true)
         && role_checks
             .iter()
             .all(|c| c["exit"] == 0 || c["missing"] == true);
@@ -264,6 +267,11 @@ fn shoot(
         .flatten()
         .filter_map(|n| n.as_u64().map(|n| n as usize))
         .collect();
+    if seen["missing"] == true {
+        shot["missing"] = json!(true);
+        shot["reason"] = json!("no browser");
+        return Ok(shot);
+    }
     if !out.status.success() || sizes.is_empty() || sizes.iter().sum::<usize>() != out.stdout.len()
     {
         shot["reason"] = json!(seen["error"].as_str().map_or_else(
