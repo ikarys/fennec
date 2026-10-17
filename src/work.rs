@@ -750,10 +750,16 @@ pub fn journal(store: &Store, id: &str) -> io::Result<Value> {
     let mut steps = Vec::new();
     for e in &entries {
         match e["stage"].as_str() {
-            Some("talk") => steps.push(step("Discussion", &e["exchange"])),
+            Some("talk") => steps.push(roles(
+                step("Discussion", &e["exchange"]),
+                &e["exchange"]["team"],
+            )),
             Some("frame") => {
                 if let Ok(s) = spec::load(&worlds, e["spec"].as_str().unwrap_or("")) {
-                    steps.push(step("Cadrage : terminé quand et tests", &s));
+                    steps.push(roles(
+                        step("Cadrage : terminé quand et tests", &s),
+                        &s["team"],
+                    ));
                 }
             }
             Some("solve") => {
@@ -761,12 +767,15 @@ pub fn journal(store: &Store, id: &str) -> io::Result<Value> {
                     continue;
                 };
                 for (n, a) in r["attempts"].as_array().into_iter().flatten().enumerate() {
-                    let mut s = step(&format!("Travail, essai {}", n + 1), a);
+                    let mut s = roles(step(&format!("Travail, essai {}", n + 1), a), &r["team"]);
                     s["passed"] = a["passed"].clone();
                     steps.push(s);
                 }
                 if !r["proof"]["exchange"].is_null() {
-                    steps.push(step("Preuve", &r["proof"]["exchange"]));
+                    let mut s = roles(step("Preuve", &r["proof"]["exchange"]), &r["proof"]["team"]);
+                    // A prove role also acts on its own: its commands, run by fennec.
+                    s["checks"] = r["proof"]["checks"].clone();
+                    steps.push(s);
                 }
             }
             _ => {}
@@ -793,6 +802,32 @@ pub fn journal(store: &Store, id: &str) -> io::Result<Value> {
     Ok(json!(steps))
 }
 
+/// The roles that took part in a step, each with what it told the model, as
+/// it was sent: read back from the step's system message.
+/// ponytail: a brief ends at its first blank line, as the catalogue's do; a
+/// role written in several paragraphs shows its first one.
+fn roles(mut step: Value, team: &Value) -> Value {
+    let system = step["messages"][0]["content"]
+        .as_str()
+        .unwrap_or("")
+        .to_string();
+    let roles: Vec<Value> = team
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(|name| {
+            let head = format!("As {name} on the team:\n");
+            let brief = system
+                .split_once(&head)
+                .map(|(_, rest)| rest.split("\n\n").next().unwrap_or("").trim().to_string());
+            json!({"name": name, "brief": brief})
+        })
+        .collect();
+    step["roles"] = json!(roles);
+    step
+}
+
 fn step(name: &str, from: &Value) -> Value {
     json!({"name": name, "model": from["model"], "messages": from["messages"],
            "cost": cost(&from["turns"])})
@@ -813,6 +848,7 @@ fn cost(turns: &Value) -> Value {
     })
 }
 
+const STATS_VERSION: u64 = 2;
 const COUNTS: [&str; 6] = ["turns", "sent", "cached", "received", "thinking", "ms"];
 
 /// A request's cost summed over its finished steps, in all and per model,
@@ -826,7 +862,8 @@ pub fn stats(store: &Store, id: &str) -> io::Result<Value> {
 }
 
 fn totals(steps: &[Value]) -> Value {
-    let mut all = json!({"failed_attempts": 0, "models": {}, "stages": {}});
+    // `v`: stats kept by an older fennec are computed again (see `overview`).
+    let mut all = json!({"v": STATS_VERSION, "failed_attempts": 0, "models": {}, "stages": {}});
     let add = |into: &mut Value, cost: &Value| {
         for k in COUNTS {
             into[k] = json!(into[k].as_u64().unwrap_or(0) + cost[k].as_u64().unwrap_or(0));
@@ -850,6 +887,17 @@ fn totals(steps: &[Value]) -> Value {
             all["stages"][stage] = json!({});
         }
         add(&mut all["stages"][stage], &s["cost"]);
+        for r in s["roles"].as_array().into_iter().flatten() {
+            let list = &mut all["stages"][stage]["roles"];
+            if !list.as_array().is_some_and(|l| l.contains(&r["name"])) {
+                if !list.is_array() {
+                    *list = json!([]);
+                }
+                list.as_array_mut()
+                    .into_iter()
+                    .for_each(|l| l.push(r["name"].clone()));
+            }
+        }
         if s["passed"] == false {
             all["failed_attempts"] = json!(all["failed_attempts"].as_u64().unwrap_or(0) + 1);
         }
@@ -869,7 +917,7 @@ pub fn overview(store: &Store) -> io::Result<Value> {
             Some("ready" | "failed" | "landed" | "passed" | "dropped")
         );
         if settled
-            && r["stats"]["stages"].is_null()
+            && r["stats"]["v"] != STATS_VERSION
             && (r["spec"].is_string() || r["journal"].is_array())
         {
             r["stats"] = stats(store, id)?;
@@ -1155,6 +1203,21 @@ mod tests {
         );
         assert_eq!(p["ms"], 3000);
         assert_eq!(v["models"].as_array().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn a_step_names_its_roles_with_what_they_told_the_model() {
+        let s = json!({"messages": [{"role": "system", "content":
+            "Do it.\n\nAs QA on the team:\nTry it.\nTwice.\n\nAs Dev on the team:\nKeep it small.\n\nHistory: x"}]});
+        let s = roles(s, &json!(["QA", "Dev", "Gone"]));
+        assert_eq!(
+            s["roles"][0],
+            json!({"name": "QA", "brief": "Try it.\nTwice."})
+        );
+        assert_eq!(s["roles"][1]["brief"], "Keep it small.");
+        assert_eq!(s["roles"][2]["brief"], Value::Null);
+        let t = totals(&[s.clone(), s]);
+        assert_eq!(t["stages"]["?"]["roles"], json!(["QA", "Dev", "Gone"]));
     }
 
     #[test]
