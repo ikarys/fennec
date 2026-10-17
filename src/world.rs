@@ -190,12 +190,14 @@ impl Worlds {
             .arg(&world.path)
             .arg("--");
         // The cap is set inside the sandbox, so it binds the command and
-        // everything it spawns. Virtual memory, not RSS: the only limit a
-        // plain `ulimit` gives; generous so runtimes that reserve address
-        // space (Go, V8) still start.
+        // everything it spawns. The data limit, not `-v`: since Linux 4.7 it
+        // counts private writable memory only, so a runaway allocation stops
+        // while address space merely reserved (Chromium needs over 64 GiB,
+        // Go, V8) does not count.
+        // ponytail: per process, not per tree; a cgroup if many processes add up.
         match self.memory_mb {
             Some(mb) => cmd
-                .args(["sh", "-c", r#"ulimit -v "$0" && exec "$@""#])
+                .args(["sh", "-c", r#"ulimit -d "$0" && exec "$@""#])
                 .arg((mb * 1024).to_string())
                 .args(argv),
             None => cmd.args(argv),

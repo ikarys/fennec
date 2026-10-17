@@ -43,8 +43,9 @@ Security: the harness used to read the world's `.git` file (agent-writable)
 to decide what to mount read-write, so an agent could get any host git store
 mounted (reproduced: a hook planted in another repository). Git dirs now come
 from harness metadata, the admin dir is read-only, hooks are off.
-Memory: every sandboxed command runs under `ulimit -v` (default 8 GiB,
-`FENNEC_OS_MEMORY_MB`); virtual memory only, no CPU, pid or disk caps.
+Memory: every sandboxed command runs under `ulimit -d` (default 8 GiB,
+`FENNEC_OS_MEMORY_MB`); writable memory per process only (`-v` killed
+Chromium, which reserves over 64 GiB), no CPU, pid or disk caps.
 Not yet: prompt diversity;
 cgroup limits; network-needing builds (deps must be in the local cache).
 

@@ -213,11 +213,17 @@ fn a_command_runs_under_the_memory_cap() {
     let mut f = Fixture::new("memory-cap");
     let w = f.worlds.fork(&f.project.to_string_lossy()).unwrap();
     f.worlds.memory_mb = Some(64);
-    assert_eq!(f.sh(&w, "ulimit -v"), (true, "65536".to_string()));
+    assert_eq!(f.sh(&w, "ulimit -d"), (true, "65536".to_string()));
     // Arguments still reach the command intact.
     assert_eq!(f.sh(&w, "echo \"$0\""), (true, "sh".to_string()));
+    // A runaway allocation stops; reserved address space (a private,
+    // inaccessible mapping, as browsers make) does not count.
+    assert!(!f.sh(&w, "python3 -c 'bytearray(256 << 20)'").0);
+    let reserve =
+        "python3 -c 'import mmap; mmap.mmap(-1, 1 << 36, flags=mmap.MAP_PRIVATE, prot=0)'";
+    assert!(f.sh(&w, reserve).0);
     f.worlds.memory_mb = None;
-    assert_eq!(f.sh(&w, "ulimit -v"), (true, "unlimited".to_string()));
+    assert_eq!(f.sh(&w, "ulimit -d"), (true, "unlimited".to_string()));
 }
 
 #[test]

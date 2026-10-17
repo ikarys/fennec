@@ -54,18 +54,16 @@ unverified: <what these cannot show, for the person: in the language of the Done
 const DRIVER: &str = include_str!("proof.py");
 const MAX_STEPS: usize = 10;
 
-/// Starts the product with the memory cap, waits for its port, then uses
-/// the page with the browser outside the cap (V8 reserves more address space
-/// than any sane cap). The driver writes the PNGs to stdout and what it saw
-/// to stderr. Arguments: serve, url, port, cap in KiB (0 = none), driver,
-/// steps as JSON.
+/// Starts the product, waits for its port, then uses the page with the
+/// browser. The driver writes the PNGs to stdout and what it saw to stderr.
+/// Arguments: serve, url, port, driver, steps as JSON.
 const SHOT_SCRIPT: &str = r#"
-serve="$1"; url="$2"; port="$3"; cap="$4"
-( if [ "$cap" -gt 0 ]; then ulimit -v "$cap"; fi; exec sh -c "$serve" ) >/tmp/serve.log 2>&1 &
+serve="$1"; url="$2"; port="$3"
+( exec sh -c "$serve" ) >/tmp/serve.log 2>&1 &
 up() { (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null; }
 for _ in $(seq 60); do up && break; sleep 0.5; done
 if ! up; then echo "nothing listens on port $port after 30 s; server output:" >&2; tail -20 /tmp/serve.log >&2; exit 2; fi
-exec timeout 90 python3 -I -c "$5" "$url" "$6"
+exec timeout 90 python3 -I -c "$4" "$url" "$5"
 "#;
 
 #[derive(Debug, Default, PartialEq)]
@@ -215,14 +213,6 @@ fn shoot(
         shot["reason"] = json!("not a page on 127.0.0.1 or localhost");
         return Ok(shot);
     };
-    // The cap is applied by the script to the server only.
-    let browser_free = Worlds {
-        root: worlds.root.clone(),
-        home: worlds.home.clone(),
-        ro_paths: worlds.ro_paths.clone(),
-        memory_mb: None,
-    };
-    let cap = worlds.memory_mb.map_or(0, |mb| mb * 1024);
     let argv: Vec<String> = [
         "timeout",
         "-k",
@@ -239,12 +229,11 @@ fn shoot(
         serve.to_string(),
         url.to_string(),
         port.to_string(),
-        cap.to_string(),
         DRIVER.to_string(),
         json!(steps).to_string(),
     ])
     .collect();
-    let out = browser_free
+    let out = worlds
         .sandbox_command(world, &argv)?
         .stdin(Stdio::null())
         .output()?;
