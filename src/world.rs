@@ -12,6 +12,7 @@
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Hooks would run project code on the host over files the agent wrote.
@@ -284,9 +285,31 @@ pub(crate) fn git(dir: &Path, args: &[&str]) -> io::Result<String> {
     Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
+/// Time-ordered ids: runs are named after their world, and "the latest run"
+/// is the last id in lexical order. Wall time can step back (an NTP or WSL
+/// host resync) and two forks can share a microsecond, so within a process
+/// each id is strictly above the one before.
 fn new_id() -> String {
+    static LAST: AtomicU64 = AtomicU64::new(0);
     let t = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default();
-    format!("{:x}{:05x}", t.as_secs(), t.subsec_micros())
+    let now = t.as_secs() * 1_000_000 + u64::from(t.subsec_micros());
+    let prev = LAST
+        .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |p| Some(now.max(p + 1)))
+        .unwrap_or_default();
+    let id = now.max(prev + 1);
+    format!("{:x}{:05x}", id / 1_000_000, id % 1_000_000)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn ids_only_grow_even_within_one_microsecond() {
+        let ids: Vec<String> = (0..10_000).map(|_| super::new_id()).collect();
+        assert!(
+            ids.windows(2)
+                .all(|w| w[0] < w[1] && w[0].len() == w[1].len())
+        );
+    }
 }
