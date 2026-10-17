@@ -26,6 +26,7 @@ src/team.rs      named teams of roles that brief the agent per stage (frame, sol
                  `~/.config/fennec/teams/<team>/*.md` or built-in teams (`Développement`, `Études`) drawn
                  from `catalog/`; a project picks one in `.fennec-os/team.json`, overrides in `.fennec-os/team/`
                  a `prove` role's `check:` lines run on every proof: a failure is a veto
+                 a role's `model:` is the model its stage runs on instead of the settings'
 src/review.rs    review queue, rejections, corrections said twice, agenda
 src/sleep.rs     landed runs → candidate know-how (`.fennec-os/knowhow.md`)
 src/schedule.rs  background work (sleep) waits while interactive work (solve) runs

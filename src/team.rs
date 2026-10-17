@@ -6,6 +6,7 @@
 //! name: QA
 //! stage: prove
 //! check: gitleaks detect --no-git
+//! model: qwen3.8-27b
 //! ---
 //! What this role cares about, in the agent's language.
 //! ```
@@ -13,6 +14,10 @@
 //! `check` lines (prove roles only, one command each) are the role's veto:
 //! the harness runs them on every proof and a failure blocks "ready". The
 //! brief only asks; a check decides, by exit code.
+//!
+//! `model` (optional) is the model the stage runs on when this role is in
+//! it, instead of the one set in the settings: a cheap model to frame, a
+//! strong one to solve.
 //!
 //! A team is a named set of roles, because different work needs different
 //! people: software is not a study. The human's teams are folders,
@@ -98,6 +103,8 @@ pub struct Role {
     pub brief: String,
     /// Commands run at every proof; see the module doc.
     pub checks: Vec<String>,
+    /// The model this role's stage runs on; see the module doc.
+    pub model: Option<String>,
 }
 
 /// Every built-in role.
@@ -225,6 +232,7 @@ pub fn save_role(
     stage: &str,
     brief: &str,
     checks: &[String],
+    model: &str,
 ) -> io::Result<String> {
     let (name, brief) = (name.trim(), brief.trim());
     if name.is_empty() || brief.is_empty() {
@@ -247,6 +255,9 @@ pub fn save_role(
     if checks.iter().any(|c| c.contains(['\n', '\r'])) {
         return Err(io::Error::other("a check is one line"));
     }
+    if model.contains(['\n', '\r']) {
+        return Err(io::Error::other("a model is one line"));
+    }
     let role = Role {
         key: key.clone(),
         name: name.to_string(),
@@ -257,6 +268,7 @@ pub fn save_role(
             .map(|c| c.trim().to_string())
             .filter(|c| !c.is_empty())
             .collect(),
+        model: Some(model.trim().to_string()).filter(|m| !m.is_empty()),
     };
     // Checked as any role file is, before it is written.
     parse(&key, &to_md(&role))?;
@@ -298,8 +310,13 @@ pub fn save_team(project: &Path, name: &str) -> io::Result<()> {
 
 fn to_md(r: &Role) -> String {
     let checks: String = r.checks.iter().map(|c| format!("check: {c}\n")).collect();
+    let model = r
+        .model
+        .as_ref()
+        .map(|m| format!("model: {m}\n"))
+        .unwrap_or_default();
     format!(
-        "---\nname: {}\nstage: {}\n{checks}---\n{}\n",
+        "---\nname: {}\nstage: {}\n{model}{checks}---\n{}\n",
         r.name, r.stage, r.brief
     )
 }
@@ -390,6 +407,16 @@ pub fn brief(project: &Path, stage: &str) -> io::Result<(String, Vec<String>)> {
     Ok((text, roles.into_iter().map(|r| r.name).collect()))
 }
 
+/// The model `stage` runs on, when one of its roles names one.
+/// ponytail: two roles of one stage naming different models: the first by
+/// file name wins; say so in the dialog if teams start doing it.
+pub fn model(project: &Path, stage: &str) -> io::Result<Option<String>> {
+    Ok(members(project)?
+        .into_iter()
+        .filter(|r| r.stage == stage)
+        .find_map(|r| r.model))
+}
+
 /// The commands the project's prove roles run on every proof:
 /// `(role name, command)`.
 pub fn checks(project: &Path) -> io::Result<Vec<(String, String)>> {
@@ -458,6 +485,7 @@ fn parse(key: &str, text: &str) -> io::Result<Role> {
         stage,
         brief: body.trim().to_string(),
         checks,
+        model: field("model"),
     })
 }
 
@@ -514,8 +542,10 @@ mod tests {
         assert!(parse("dev", "no front matter").is_err());
         let sec =
             "---\nname: Sec\nstage: prove\ncheck: gitleaks detect\ncheck: bandit -r .\n---\nx";
-        let r = parse("sec", sec).unwrap();
+        let mut r = parse("sec", sec).unwrap();
         assert_eq!(r.checks, ["gitleaks detect", "bandit -r ."]);
+        assert_eq!(parse("sec", &to_md(&r)).unwrap(), r, "written as read");
+        r.model = Some("small".into());
         assert_eq!(parse("sec", &to_md(&r)).unwrap(), r, "written as read");
         assert!(parse("dev", "---\nstage: solve\ncheck: x\n---\nx").is_err());
     }
@@ -625,6 +655,7 @@ mod tests {
             "prove",
             "Click everything.",
             &[],
+            "",
         )
         .unwrap();
         let qa = members(&project)
@@ -644,30 +675,53 @@ mod tests {
             "solve",
             "Check the data.",
             &[],
+            "",
         )
         .unwrap();
         assert_eq!(key, "specialiste-donnees");
         assert!(
-            save_role(&project, None, "Spécialiste données", "solve", "x", &[]).is_err(),
+            save_role(&project, None, "Spécialiste données", "solve", "x", &[], "").is_err(),
             "taken"
         );
-        assert!(save_role(&project, Some("nobody"), "x", "solve", "x", &[]).is_err());
+        assert!(save_role(&project, Some("nobody"), "x", "solve", "x", &[], "").is_err());
         assert!(
-            save_role(&project, None, "Ops", "deploy", "x", &[]).is_err(),
+            save_role(&project, None, "Ops", "deploy", "x", &[], "").is_err(),
             "unknown stage"
         );
         assert!(
-            save_role(&project, None, "Ops", "solve", " ", &[]).is_err(),
+            save_role(&project, None, "Ops", "solve", " ", &[], "").is_err(),
             "empty brief"
         );
         let veto = ["gitleaks detect".to_string()];
-        save_role(&project, Some("qa"), "QA", "prove", "Try.", &veto).unwrap();
+        save_role(&project, Some("qa"), "QA", "prove", "Try.", &veto, "").unwrap();
         assert_eq!(
             checks(&project).unwrap(),
             [("QA".to_string(), veto[0].clone())]
         );
         let two = ["a\nb".to_string()];
-        assert!(save_role(&project, Some("qa"), "QA", "prove", "Try.", &two).is_err());
+        assert!(save_role(&project, Some("qa"), "QA", "prove", "Try.", &two, "").is_err());
+        assert_eq!(
+            model(&project, "solve").unwrap(),
+            None,
+            "the settings' model"
+        );
+        save_role(
+            &project,
+            Some("specialiste-donnees"),
+            "Données",
+            "solve",
+            "x",
+            &[],
+            " big ",
+        )
+        .unwrap();
+        assert_eq!(model(&project, "solve").unwrap().as_deref(), Some("big"));
+        assert_eq!(
+            model(&project, "frame").unwrap(),
+            None,
+            "another stage keeps its own"
+        );
+        assert!(save_role(&project, Some("qa"), "QA", "prove", "x", &[], "a\nb").is_err());
         assert_eq!(slug("  Dev -- Senior! "), "dev-senior");
         std::fs::remove_dir_all(project).unwrap();
     }

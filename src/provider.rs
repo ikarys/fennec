@@ -138,6 +138,8 @@ impl OpenAi {
         // Local models on shared hardware can take minutes for one turn.
         let config = ureq::Agent::config_builder()
             .timeout_global(Some(Duration::from_secs(900)))
+            // An error status is read below: its body says why.
+            .http_status_as_error(false)
             .build();
         Self {
             base_url: base_url.trim_end_matches('/').to_string(),
@@ -319,6 +321,18 @@ impl OpenAi {
             req = req.header("Authorization", &format!("Bearer {key}"));
         }
         let mut resp = req.send_json(&body).map_err(io::Error::other)?;
+        let status = resp.status().as_u16();
+        if status >= 400 {
+            // The server says why (an unknown model, a context too long);
+            // ureq's own error would keep the status alone.
+            let text = resp.body_mut().read_to_string().unwrap_or_default();
+            let why = serde_json::from_str::<Value>(&text)
+                .ok()
+                .and_then(|v| v["error"]["message"].as_str().map(str::to_string))
+                .unwrap_or(text);
+            let why: String = why.chars().take(300).collect();
+            return Err(io::Error::other(format!("http status: {status}: {why}")));
+        }
         let mut reply: Value = resp.body_mut().read_json().map_err(io::Error::other)?;
         match reply["choices"][0]["message"].take() {
             Value::Null => Err(io::Error::other(format!("no message in reply: {reply}"))),
