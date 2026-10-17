@@ -22,6 +22,7 @@ ui/           index.html + app.js, embedded in the binary
 ```bash
 cargo build
 cargo test
+node ui/explain.test.js    # UI wording of failure reasons
 cargo clippy --all-targets  # must be clean
 cargo fmt --all
 fennec                      # http://127.0.0.1:7777
