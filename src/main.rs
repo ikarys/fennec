@@ -201,6 +201,7 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
             work::resume(&store, &field(&input()?, "id"))?;
             Ok(json!({}))
         }
+        ("POST", "/api/open") => work::open(&store, &field(&input()?, "id")),
         ("POST", "/api/changes") => work::changes(&store, &field(&input()?, "id")),
         ("POST", "/api/journal") => work::journal(&store, &field(&input()?, "id")),
         ("POST", "/api/retry") => {
