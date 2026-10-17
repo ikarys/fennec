@@ -83,6 +83,15 @@ team is what was missing. fennec-os stages already behave like roles:
    role changes outcomes.
 2. Make it everyone's: catalogue of role templates (the nine profiles),
    "Équipe" screen in fennec-lead, per-project removal.
+   **Storage done (2026-10-17)**: `fennec-os/catalog/` holds 14 roles (the
+   nine dev profiles plus five study roles). Built-in teams `dev` (project
+   manager, senior developer, QA) and `etudes` (research lead, researcher,
+   writer, critical reviewer, sources specialist) are lists of catalogue
+   keys. `~/.config/fennec/teams/<team>/` holds the human's teams and
+   replaces a built-in one of the same name. A project picks its team and
+   removes roles in `.fennec-os/team.json`; default team `dev`. With no
+   background stage yet, maintainer and DevOps act at `solve`, DevSecOps at
+   `prove`. The "Équipe" screen is next.
 3. Then extension points, one at a time, each proven useful before the next:
    model per role, tools and veto (DevSecOps first), background stage
    (maintainer/DevOps).
