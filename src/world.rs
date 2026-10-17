@@ -8,6 +8,14 @@
 //! The world's files, `.git` included, are written by the agent, so the
 //! harness never takes a path or a setting from them: it locates the git
 //! store from its own metadata and runs git with hooks disabled.
+//!
+//! Where a project's worlds go is the human's choice, in the project's own
+//! git config (`fennec.workspace`): unset or `here`, the project folder
+//! itself, so the work happens where they look; `apart`, a folder next to the
+//! project (`<name>-fennec/`); or a directory of their choosing. A world in
+//! the folder is its branch checked out there: the folder must be clean to
+//! start, holds one world at a time, and goes back to its branch when the
+//! world is dropped or lands.
 
 use std::io;
 use std::path::{Path, PathBuf};
@@ -73,22 +81,49 @@ impl Worlds {
 
     /// Fork a project (any git directory) or an existing world, from its last commit.
     pub fn fork(&self, source: &str) -> io::Result<World> {
-        let (common, rev) = match self.open(source) {
-            Ok(world) => (self.common_dir(&world)?, format!("world/{}", world.id)),
+        let (common, rev, place) = match self.open(source) {
+            Ok(world) => {
+                let (common, _, home) = self.meta(&world.id)?;
+                let place = match home {
+                    // Dropped, the child gives the folder back to its parent.
+                    Some(home) => {
+                        Place::Here(world.path.clone(), home, format!("world/{}", world.id))
+                    }
+                    None => Place::Apart(self.root.join("worlds")),
+                };
+                (common, format!("world/{}", world.id), place)
+            }
             Err(_) => {
                 let project = Path::new(source);
                 let common = git(
                     project,
                     &["rev-parse", "--path-format=absolute", "--git-common-dir"],
                 )?;
-                (PathBuf::from(common), git(project, &["rev-parse", "HEAD"])?)
+                let place = place(project)?;
+                (
+                    PathBuf::from(common),
+                    git(project, &["rev-parse", "HEAD"])?,
+                    place,
+                )
             }
         };
         let id = new_id();
-        let path = self.root.join("worlds").join(&id);
         let meta = self.root.join("meta");
         std::fs::create_dir_all(&meta)?;
-        std::fs::create_dir_all(path.parent().unwrap_or(&self.root))?;
+        let dir = match place {
+            Place::Here(folder, home, back) => {
+                // The folder's own work tree: the branch is checked out where the
+                // human looks. From a world, local changes (their edits) carry over.
+                let branch = format!("world/{id}");
+                git(&folder, &["checkout", "-q", "-b", &branch, &rev])?;
+                let record = format!("{}\n{}\n{home}\n{back}", common.display(), folder.display());
+                std::fs::write(meta.join(&id), record)?;
+                return Ok(World { id, path: folder });
+            }
+            Place::Apart(dir) => dir,
+        };
+        let path = dir.join(&id);
+        std::fs::create_dir_all(&dir)?;
         let mut args = vec![
             "--git-dir".to_string(),
             common.to_string_lossy().into_owned(),
@@ -106,20 +141,74 @@ impl Worlds {
                 "unexpected worktree admin dir for {id}"
             )));
         }
-        std::fs::write(meta.join(&id), common.to_string_lossy().as_bytes())?;
+        std::fs::write(
+            meta.join(&id),
+            format!("{}\n{}", common.display(), path.display()),
+        )?;
         Ok(World { id, path })
     }
 
-    /// The project's git store, from harness metadata, never from the world.
+    /// From harness metadata, never from the world: the project's git store,
+    /// the world's folder (absent in old records: under the store), and for
+    /// a world in the project folder, the branch that folder came from.
+    fn meta(&self, id: &str) -> io::Result<(PathBuf, Option<PathBuf>, Option<String>)> {
+        Ok(self.meta_all(id)?.0)
+    }
+
+    /// `meta`, and for a world in the project folder, the branch the folder
+    /// goes back to when the world is dropped: the project's, or the world
+    /// it was forked from.
+    #[allow(clippy::type_complexity)]
+    fn meta_all(
+        &self,
+        id: &str,
+    ) -> io::Result<((PathBuf, Option<PathBuf>, Option<String>), Option<String>)> {
+        let text = std::fs::read_to_string(self.root.join("meta").join(id))
+            .map_err(|e| io::Error::other(format!("no metadata for world {id}: {e}")))?;
+        let mut lines = text.lines();
+        let common = PathBuf::from(lines.next().unwrap_or("").trim());
+        let path = lines.next().map(PathBuf::from);
+        let home = lines.next().map(str::to_string);
+        let back = lines.next().map(str::to_string).or(home.clone());
+        Ok(((common, path, home), back))
+    }
+
     fn common_dir(&self, world: &World) -> io::Result<PathBuf> {
-        let text = std::fs::read_to_string(self.root.join("meta").join(&world.id))
-            .map_err(|e| io::Error::other(format!("no metadata for world {}: {e}", world.id)))?;
-        Ok(PathBuf::from(text.trim()))
+        Ok(self.meta(&world.id)?.0)
+    }
+
+    /// The branch a world in the project folder came from; `None` for a
+    /// world apart.
+    pub fn home(&self, world: &World) -> io::Result<Option<String>> {
+        Ok(self.meta(&world.id)?.2)
+    }
+
+    /// A world in the project folder is there only while its branch is
+    /// checked out: anything else in the folder is not this world.
+    fn present(&self, world: &World) -> io::Result<()> {
+        if self.home(world)?.is_some()
+            && git(&world.path, &["branch", "--show-current"])? != format!("world/{}", world.id)
+        {
+            return Err(io::Error::other(format!(
+                "the project folder no longer holds world {}",
+                world.id
+            )));
+        }
+        Ok(())
     }
 
     /// git on the world's worktree, with paths from harness metadata.
     pub fn git(&self, world: &World, args: &[&str]) -> io::Result<String> {
-        let admin = self.common_dir(world)?.join("worktrees").join(&world.id);
+        let common = self.common_dir(world)?;
+        // A world in the project folder is the store's main work tree, and
+        // only while its branch is checked out there: never the human's.
+        let admin = match self.home(world)? {
+            Some(_) => {
+                self.present(world)?;
+                common
+            }
+            None => common.join("worktrees").join(&world.id),
+        };
         let git_dir = format!("--git-dir={}", admin.display());
         let work_tree = format!("--work-tree={}", world.path.display());
         let mut all = vec![git_dir.as_str(), work_tree.as_str()];
@@ -128,9 +217,15 @@ impl Worlds {
     }
 
     pub fn open(&self, id: &str) -> io::Result<World> {
-        let path = self.root.join("worlds").join(id);
-        // Ids are hex; anything else (`..` included) would name another dir.
-        if id.is_empty() || !id.chars().all(|c| c.is_ascii_alphanumeric()) || !path.is_dir() {
+        // Ids are hex; anything else (`..` included) would name another file.
+        if id.is_empty() || !id.chars().all(|c| c.is_ascii_alphanumeric()) {
+            return Err(io::Error::other(format!("no world {id}")));
+        }
+        let path = match self.meta(id) {
+            Ok((_, Some(path), _)) => path,
+            _ => self.root.join("worlds").join(id),
+        };
+        if !path.is_dir() {
             return Err(io::Error::other(format!("no world {id}")));
         }
         Ok(World {
@@ -140,7 +235,7 @@ impl Worlds {
     }
 
     pub fn list(&self) -> io::Result<Vec<String>> {
-        let Ok(entries) = std::fs::read_dir(self.root.join("worlds")) else {
+        let Ok(entries) = std::fs::read_dir(self.root.join("meta")) else {
             return Ok(Vec::new());
         };
         let mut ids: Vec<String> = entries
@@ -171,15 +266,16 @@ impl Worlds {
         for p in crate::grant::paths(self, &world.id)? {
             cmd.arg("--bind").arg(&p).arg(&p);
         }
-        // Order matters: later mounts land on top of earlier ones. The
-        // worktree's admin dir lives inside the store and stays read-only too:
-        // its `commondir` file and config steer every harness git call.
-        cmd.arg("--ro-bind")
-            .arg(&common)
-            .arg(&common)
-            .arg("--bind")
+        // Order matters: later mounts land on top of earlier ones. The store
+        // comes last: a world in the project folder holds it (`.git`), and
+        // the worktree's admin dir lives inside it; read-only either way, as
+        // its config steers every harness git call.
+        cmd.arg("--bind")
             .arg(&world.path)
             .arg(&world.path)
+            .arg("--ro-bind")
+            .arg(&common)
+            .arg(&common)
             .args(["--unshare-all", "--die-with-parent", "--new-session"])
             // Every file in the world is the work: a bytecode cache written
             // by running the tests would fail a protected path, or land.
@@ -242,10 +338,16 @@ impl Worlds {
         )
     }
 
-    /// Back to the last checkpoint, exactly: ignored files go too.
+    /// Back to the last checkpoint, exactly: ignored files go too, except in
+    /// the project folder, where they are the human's (`.env`, `.venv`).
     pub fn rollback(&self, world: &World) -> io::Result<()> {
         self.git(world, &["reset", "-q", "--hard", "HEAD"])?;
-        self.git(world, &["clean", "-q", "-fdx"])?;
+        let clean = if self.home(world)?.is_some() {
+            "-fd"
+        } else {
+            "-fdx"
+        };
+        self.git(world, &["clean", "-q", clean])?;
         Ok(())
     }
 
@@ -267,8 +369,20 @@ impl Worlds {
                 "this world has a grant: keep or revert it before dropping the world",
             ));
         }
-        let common = self.common_dir(&world)?;
+        let ((common, _, home), back) = self.meta_all(&world.id)?;
         let git_dir = format!("--git-dir={}", common.display());
+        let branch = format!("world/{}", world.id);
+        if let (Some(_), Some(back)) = (home, back) {
+            // The folder goes back to its branch, unless it already left this
+            // world (landed, or another world of the same request took over).
+            if git(&world.path, &["branch", "--show-current"])? == branch {
+                self.rollback(&world)?;
+                git(&world.path, &["checkout", "-q", &back])?;
+            }
+            git(&world.path, &["branch", "-q", "-D", &branch])?;
+            std::fs::remove_file(self.root.join("meta").join(&world.id))?;
+            return Ok(());
+        }
         // Delete the files ourselves rather than trust `worktree remove` with a
         // `.git` file the agent may have rewritten; prune then forgets the admin dir.
         // `remove_dir_all` does not follow symlinks.
@@ -286,6 +400,63 @@ impl Worlds {
         )?;
         std::fs::remove_file(self.root.join("meta").join(&world.id))?;
         Ok(())
+    }
+}
+
+enum Place {
+    /// The project folder, the branch it is on, and the one to go back to.
+    Here(PathBuf, String, String),
+    /// A directory where each world gets its own folder.
+    Apart(PathBuf),
+}
+
+/// The human's choice of where `project`'s worlds go: `here` or `apart`.
+pub fn choose_place(project: &Path, place: &str) -> io::Result<()> {
+    if !matches!(place, "here" | "apart") {
+        return Err(io::Error::other(format!("unknown place {place}")));
+    }
+    git(project, &["config", "fennec.workspace", place]).map(drop)
+}
+
+/// Where a new world of `project` goes; see the module doc.
+fn place(project: &Path) -> io::Result<Place> {
+    let chosen = git(project, &["config", "--get", "fennec.workspace"]).unwrap_or_default();
+    match chosen.as_str() {
+        "" | "here" => {
+            let home = git(project, &["branch", "--show-current"])?;
+            if let Some(id) = home.strip_prefix("world/") {
+                return Err(io::Error::other(format!(
+                    "the project folder already holds work in progress (world {id})"
+                )));
+            }
+            if home.is_empty() {
+                return Err(io::Error::other(
+                    "the project folder is on no branch (detached HEAD)",
+                ));
+            }
+            // A failed attempt is undone by going back to the last commit:
+            // nothing of the human's may be in the way.
+            if !git(project, &["status", "--porcelain"])?.is_empty() {
+                return Err(io::Error::other(
+                    "the project folder has uncommitted changes",
+                ));
+            }
+            Ok(Place::Here(project.to_path_buf(), home.clone(), home))
+        }
+        "apart" => {
+            let project = std::fs::canonicalize(project)?;
+            let name = project
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            Ok(Place::Apart(
+                project
+                    .parent()
+                    .unwrap_or(&project)
+                    .join(format!("{name}-fennec")),
+            ))
+        }
+        dir => Ok(Place::Apart(PathBuf::from(dir))),
     }
 }
 

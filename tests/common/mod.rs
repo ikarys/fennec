@@ -50,8 +50,21 @@ impl Fixture {
                     .success()
             );
         }
+        // Worlds apart, in the store, unless a test asks for the folder.
+        let store = dir.join("store");
+        let apart = store.join("worlds");
+        assert!(
+            Command::new("git")
+                .arg("-C")
+                .arg(&project)
+                .args(["config", "fennec.workspace"])
+                .arg(&apart)
+                .status()
+                .unwrap()
+                .success()
+        );
         let worlds = Worlds {
-            root: dir.join("store"),
+            root: store,
             home,
             ro_paths: Vec::new(),
             memory_mb: Some(8192),

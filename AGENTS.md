@@ -60,8 +60,13 @@ Env: `FENNEC_OS_HOME` (store, default `~/.local/share/fennec-os`),
 
 Tests never call a real model: `tests/solve.rs` implements `Model` with
 scripted fakes (`Script`, `Spy`, `Distiller`), and `tests/common` builds a
-temp git project, fake home and world store. Store layout: `worlds/<id>` is a
-git worktree on branch `world/<id>`; `meta/<id>` records its git dir.
+temp git project, fake home and world store. Where a world lives is the
+project's `git config fennec.workspace`: unset or `here` = the project folder
+itself, checked out on branch `world/<id>` (one at a time, clean folder
+required, landing moves the human's branch and checks it out again); `apart`
+= a git worktree under `<parent>/<name>-fennec/`; anything else = that path.
+`meta/<id>` records the git dir, the world's path, the project folder and the
+branch to give back.
 
 ## Non-negotiable rules
 
