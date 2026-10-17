@@ -230,6 +230,7 @@ goal: {}",
                     review::profile_line(&review::profile(a))
                 );
                 println!("  turn      at   model      in     out  think  tools");
+                // `-` marks a turn the model was asked to take without reasoning.
                 for t in a["turns"].as_array().into_iter().flatten() {
                     let secs = |v: &serde_json::Value| v.as_u64().unwrap_or(0) as f64 / 1000.0;
                     let tools: Vec<String> = t["tools"]
@@ -245,8 +246,9 @@ goal: {}",
                         })
                         .collect();
                     println!(
-                        "  {:>4} {:>6.1}s {:>6.1}s {:>7} {:>7} {:>6}  {}",
+                        "  {:>4}{} {:>6.1}s {:>6.1}s {:>7} {:>7} {:>6}  {}",
                         t["step"],
+                        if t["think"] == false { "-" } else { " " },
                         secs(&t["at_ms"]),
                         secs(&t["model_ms"]),
                         t["usage"]["prompt_tokens"].as_u64().unwrap_or(0),

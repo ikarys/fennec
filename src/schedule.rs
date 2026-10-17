@@ -60,6 +60,11 @@ impl Model for Background<'_> {
         self.model.chat(messages, tools)
     }
 
+    fn chat_quick(&self, messages: &[Value], tools: &Value) -> io::Result<Value> {
+        yield_to_interactive(self.worlds)?;
+        self.model.chat_quick(messages, tools)
+    }
+
     fn label(&self) -> String {
         self.model.label()
     }
