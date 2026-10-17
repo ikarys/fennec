@@ -798,10 +798,16 @@ fn a_request_compiles_to_failing_tests_that_the_solution_must_pass() {
     // A rejected spec's correction reaches the next compile.
     let vague = Script::new(
         "vague",
-        &[write("spec.sh", "test -s answer\n"), finish(SPEC)],
+        &[
+            write("spec.sh", "test -s answer\n"),
+            write("probe.html", ""),
+            finish(SPEC),
+        ],
     );
     let s = spec::compile(&f.worlds, &f.project, request, &vague, 10).unwrap();
     assert_eq!(s["status"], "proposed", "{s:#}");
+    // An empty file left by the framer is not a test to protect.
+    assert_eq!(s["protect"], json!(["spec.sh"]), "{s:#}");
     spec::reject(
         &f.worlds,
         s["world"].as_str().unwrap(),
