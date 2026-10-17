@@ -734,8 +734,10 @@ pub fn discuss(
     } else {
         format!("Project files:\n{}\n\nREADME:\n{readme}", files.join("\n"))
     };
+    // The roles that shaped requests before work starts speak here now.
+    let (roles, team) = team::brief(project, "frame")?;
     let mut messages =
-        vec![json!({"role": "system", "content": format!("{DISCUSS}\n\n{context}")})];
+        vec![json!({"role": "system", "content": format!("{DISCUSS}\n\n{context}{roles}")})];
     for turn in thread {
         let role = if turn["who"] == "human" {
             "user"
@@ -744,7 +746,8 @@ pub fn discuss(
         };
         messages.push(json!({"role": role, "content": turn["text"]}));
     }
-    let (content, exchange) = crate::provider::ask(model, &messages)?;
+    let (content, mut exchange) = crate::provider::ask(model, &messages)?;
+    exchange["team"] = json!(team);
     if content.is_empty() {
         return Err(io::Error::other("the model gave no answer"));
     }
@@ -805,6 +808,11 @@ mod tests {
         assert_eq!(messages[1]["content"], "un test");
         assert!(messages[2]["content"].as_str().unwrap().contains("vague"));
         assert_eq!(exchange["turns"].as_array().unwrap().len(), 1);
+        // The framing roles are briefed into the conversation, and named.
+        let system = messages[0]["content"].as_str().unwrap();
+        for name in exchange["team"].as_array().unwrap() {
+            assert!(system.contains(&format!("As {} on the team", name.as_str().unwrap())));
+        }
         assert_eq!(
             said,
             Discussed::Reply("Tu veux tester quoi ? A) un script B) une page".into())

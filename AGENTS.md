@@ -22,7 +22,7 @@ src/spec.rs      request → conversation (`discuss`) → `direct` work (no test
 src/proof.rs     a ready run used as its user would: model proposes tries, pages and clicks/typing; harness runs them, captures before/after (proof.py)
 src/rules.rs     project rules (`.fennec-os/rules.json` at HEAD), glob matching; rules said in words
                  (`~/.config/fennec/rules.md`, AGENTS.md `## Rules`): proposed, written once, given to agents
-src/team.rs      named teams of roles that brief the agent per stage (frame, solve, prove):
+src/team.rs      named teams of roles that brief the agent per stage (frame = the conversation and `compile`, solve, prove):
                  `~/.config/fennec/teams/<team>/*.md` or built-in teams (`Développement`, `Études`) drawn
                  from `catalog/`; a project picks one in `.fennec-os/team.json`, overrides in `.fennec-os/team/`
                  a `prove` role's `check:` lines run on every proof: a failure is a veto
