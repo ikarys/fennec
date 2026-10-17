@@ -3,7 +3,7 @@ use std::process::ExitCode;
 use fennec_os::provider::{Model, OpenAi};
 use fennec_os::solve::{Task, land, solve};
 use fennec_os::world::Worlds;
-use fennec_os::{grant, review, rules, sleep, spec};
+use fennec_os::{grant, review, rules, serve, sleep, spec};
 
 const USAGE: &str = "usage: fennec-os <command>
   fork <project-path|world-id>   new world from the source's last commit
@@ -14,7 +14,7 @@ const USAGE: &str = "usage: fennec-os <command>
   drop <world-id>                delete the world and its branch
   list                           list worlds
   solve <project> <task.json> [--attempts N] [--steps N]
-                                 N agents in N worlds; keeps the smallest passing diff
+                                 up to N agents, one world each, in turn until one passes
   spec <project> <request> [--steps N]
                                  compile a request into acceptance tests + a task
   spec list | show <id>          specs waiting on you, one spec's goal and tests
@@ -24,12 +24,15 @@ const USAGE: &str = "usage: fennec-os <command>
   land <world-id>                fast-forward the project onto a world that passed
   queue                          runs waiting on you
   show <run-id>                  a run's verdicts and winning diff
+  profile <run-id|spec-id>       where each attempt's time went, turn by turn
   reject <run-id> [correction]   discard a run; corrections said twice become rules
   promote <project> <rule-json> [--origin <run-id>]
                                  add a rule to <project>/.fennec-os/rules.json
   sleep                          distil landed runs into candidate know-how
+  spar <project> [--steps N]     hunt one defect, proven by a failing test; a spec to validate
   notes                          candidates waiting on you
   keep <k-id> | dismiss <k-id>   add a candidate to <project>/.fennec-os/knowhow.md, or not
+  serve [--port N]               the review page on 127.0.0.1 (specs, runs, know-how)
 
 task.json: {\"goal\": \"...\", \"verify\": [\"cmd\"], \"protect\": [\"path\"]}
 model env: FENNEC_OS_BASE_URL, FENNEC_OS_MODELS (comma-separated), FENNEC_OS_API_KEY";
@@ -208,6 +211,62 @@ goal: {}",
                 }
             }
         }
+        "profile" if args.len() == 2 => {
+            // A spec is profiled like a run of one attempt.
+            let attempts = match review::load(&worlds, arg(1)) {
+                Ok(run) => run["attempts"].as_array().cloned().unwrap_or_default(),
+                Err(_) => vec![spec::load(&worlds, arg(1))?],
+            };
+            for a in &attempts {
+                let verdict = match a["passed"].as_bool() {
+                    Some(true) => "PASS",
+                    Some(false) => "FAIL",
+                    None => a["status"].as_str().unwrap_or("?"),
+                };
+                println!(
+                    "{} {} {verdict}\n  {}",
+                    a["world"].as_str().unwrap_or("?"),
+                    a["model"].as_str().unwrap_or("?"),
+                    review::profile_line(&review::profile(a))
+                );
+                println!("  turn      at   model      in     out  think  tools");
+                for t in a["turns"].as_array().into_iter().flatten() {
+                    let secs = |v: &serde_json::Value| v.as_u64().unwrap_or(0) as f64 / 1000.0;
+                    let tools: Vec<String> = t["tools"]
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .map(|x| {
+                            format!(
+                                "{} {:.1}s",
+                                x["name"].as_str().unwrap_or("?"),
+                                secs(&x["ms"])
+                            )
+                        })
+                        .collect();
+                    println!(
+                        "  {:>4} {:>6.1}s {:>6.1}s {:>7} {:>7} {:>6}  {}",
+                        t["step"],
+                        secs(&t["at_ms"]),
+                        secs(&t["model_ms"]),
+                        t["usage"]["prompt_tokens"].as_u64().unwrap_or(0),
+                        t["usage"]["completion_tokens"].as_u64().unwrap_or(0),
+                        t["usage"]["completion_tokens_details"]["reasoning_tokens"]
+                            .as_u64()
+                            .unwrap_or(0),
+                        tools.join(", ")
+                    );
+                }
+                for c in a["checks"].as_array().into_iter().flatten() {
+                    println!(
+                        "  verify {:.1}s exit {}  {}",
+                        c["ms"].as_u64().unwrap_or(0) as f64 / 1000.0,
+                        c["exit"],
+                        c["command"].as_str().unwrap_or("")
+                    );
+                }
+            }
+        }
         "reject" if args.len() == 2 || args.len() == 3 => {
             let correction = args.get(2).map(String::as_str);
             let count = review::reject(&worlds, arg(1), correction)?;
@@ -222,6 +281,24 @@ goal: {}",
                     arg(1)
                 );
             }
+        }
+        "spar" if args.len() == 2 || (args.len() == 4 && arg(2) == "--steps") => {
+            let model = OpenAi::variants_from_env(1)?.remove(0);
+            let s = spec::spar(
+                &worlds,
+                std::path::Path::new(arg(1)),
+                &model,
+                flag(args, "--steps", 40)?,
+            )?;
+            let id = s["world"].as_str().unwrap_or("?");
+            if s["status"] != "proposed" {
+                println!("no finding ({id}): {}", s["reason"].as_str().unwrap_or(""));
+                return Ok(ExitCode::FAILURE);
+            }
+            println!(
+                "finding {id}: {}\n  read: fennec-os spec show {id}",
+                s["request"].as_str().unwrap_or("")
+            );
         }
         "sleep" if args.len() == 1 => {
             let model = OpenAi::variants_from_env(1)?.remove(0);
@@ -246,6 +323,13 @@ goal: {}",
             println!("added to {}; commit it to take effect", path.display());
         }
         "dismiss" if args.len() == 2 => sleep::dismiss(&worlds, arg(1))?,
+        "serve" if args.len() == 1 || (args.len() == 3 && arg(1) == "--port") => {
+            let port = u16::try_from(flag(args, "--port", 0)?).map_err(std::io::Error::other)?;
+            let listener = std::net::TcpListener::bind(("127.0.0.1", port))?;
+            let token = serve::token()?;
+            println!("http://{}/?t={token}", listener.local_addr()?);
+            serve::serve(worlds, listener, &token)?;
+        }
         "promote" if args.len() == 3 || (args.len() == 5 && arg(3) == "--origin") => {
             let rule: serde_json::Value =
                 serde_json::from_str(arg(2)).map_err(std::io::Error::other)?;

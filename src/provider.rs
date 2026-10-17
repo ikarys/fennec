@@ -87,7 +87,13 @@ impl Model for OpenAi {
         let mut reply: Value = resp.body_mut().read_json().map_err(io::Error::other)?;
         match reply["choices"][0]["message"].take() {
             Value::Null => Err(io::Error::other(format!("no message in reply: {reply}"))),
-            message => Ok(message),
+            mut message => {
+                // Token counts, for the profile; the agent takes them out.
+                if !reply["usage"].is_null() {
+                    message["usage"] = reply["usage"].take();
+                }
+                Ok(message)
+            }
         }
     }
 

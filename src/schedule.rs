@@ -9,6 +9,9 @@
 use std::fs::{File, TryLockError};
 use std::io;
 
+use serde_json::Value;
+
+use crate::provider::Model;
 use crate::world::Worlds;
 
 fn lock_file(worlds: &Worlds) -> io::Result<File> {
@@ -42,6 +45,24 @@ pub fn yield_to_interactive(worlds: &Worlds) -> io::Result<bool> {
     }
     // The exclusive lock is released when `file` drops: background work
     // checks again before each model call, it does not hold the line.
+}
+
+/// A background agent's model: it yields before every turn, not only at the
+/// start, since an agent runs many turns.
+pub struct Background<'a> {
+    pub worlds: &'a Worlds,
+    pub model: &'a dyn Model,
+}
+
+impl Model for Background<'_> {
+    fn chat(&self, messages: &[Value], tools: &Value) -> io::Result<Value> {
+        yield_to_interactive(self.worlds)?;
+        self.model.chat(messages, tools)
+    }
+
+    fn label(&self) -> String {
+        self.model.label()
+    }
 }
 
 #[cfg(test)]
