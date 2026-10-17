@@ -608,6 +608,77 @@ pub fn ask(worlds: &Worlds, id: &str, question: &str, model: &dyn Model) -> io::
     Ok(answer.to_string())
 }
 
+const DISCUSS: &str = "You help a person shape a request for a team of AI developers, before \
+any work starts. Talk with them in their language, briefly, like a colleague. When the request \
+leaves open what to build, how it should behave or how to tell it is done, say in one or two \
+sentences what you understood, then ask only the questions that matter, each with concrete \
+options; never invent the product. Once it is clear enough to write acceptance tests, a \
+clear first message included, reply with exactly one line and nothing else:\n\
+`brief: <the whole request restated precisely, with everything agreed in this conversation, \
+in their language>`";
+
+/// One turn of shaping a request before tests are written: either a message
+/// for the human, or the brief `compile` will take.
+#[derive(Debug, PartialEq)]
+pub enum Discussed {
+    Reply(String),
+    Brief(String),
+}
+
+/// `thread`: `{"who": "human" | "fennec", "text"}` in order. One model call,
+/// no world: the conversation must answer in seconds, not minutes.
+pub fn discuss(project: &Path, thread: &[Value], model: &dyn Model) -> io::Result<Discussed> {
+    // What the model knows of the project: its files and README, enough to
+    // ask about this project rather than a generic one.
+    // ponytail: 200 files and 3 kB of README; a big project needs a summary.
+    let files = crate::world::git(project, &["ls-files"]).unwrap_or_default();
+    let files: Vec<&str> = files.lines().take(200).collect();
+    let readme: String = ["README.md", "README", "AGENTS.md"]
+        .iter()
+        .find_map(|f| std::fs::read_to_string(project.join(f)).ok())
+        .unwrap_or_default()
+        .chars()
+        .take(3000)
+        .collect();
+    let context = if files.is_empty() {
+        "The project is empty.".to_string()
+    } else {
+        format!("Project files:\n{}\n\nREADME:\n{readme}", files.join("\n"))
+    };
+    let mut messages =
+        vec![json!({"role": "system", "content": format!("{DISCUSS}\n\n{context}")})];
+    for turn in thread {
+        let role = if turn["who"] == "human" {
+            "user"
+        } else {
+            "assistant"
+        };
+        messages.push(json!({"role": role, "content": turn["text"]}));
+    }
+    let mut reply = model.chat(&messages, &json!([]))?;
+    // As in the proof: a turn spent reasoning is asked again without.
+    if reply["content"]
+        .as_str()
+        .is_none_or(|c| c.rsplit("</think>").next().unwrap_or(c).trim().is_empty())
+    {
+        reply = model.chat_quick(&messages, &json!([]))?;
+    }
+    let content = reply["content"].as_str().unwrap_or("");
+    let content = content.rsplit("</think>").next().unwrap_or(content).trim();
+    if content.is_empty() {
+        return Err(io::Error::other("the model gave no answer"));
+    }
+    let brief = content
+        .lines()
+        .find_map(|l| l.trim().trim_matches('`').strip_prefix("brief:"))
+        .map(|b| b.trim().trim_matches('`').trim().to_string())
+        .filter(|b| !b.is_empty());
+    Ok(match brief {
+        Some(b) => Discussed::Brief(b),
+        None => Discussed::Reply(content.to_string()),
+    })
+}
+
 pub fn reject(worlds: &Worlds, id: &str, correction: Option<&str>) -> io::Result<()> {
     let mut spec = load(worlds, id)?;
     if let Ok(world) = worlds.open(id) {
@@ -635,6 +706,32 @@ mod tests {
         fn label(&self) -> String {
             "fixed".into()
         }
+    }
+
+    #[test]
+    fn a_discussion_ends_on_a_brief() {
+        use super::{Discussed, discuss};
+        let empty = std::env::temp_dir();
+        let thread = [json!({"who": "human", "text": "un test"})];
+        assert_eq!(
+            discuss(
+                &empty,
+                &thread,
+                &Fixed("<think>vague</think>Tu veux tester quoi ? A) un script B) une page")
+            )
+            .unwrap(),
+            Discussed::Reply("Tu veux tester quoi ? A) un script B) une page".into())
+        );
+        assert_eq!(
+            discuss(
+                &empty,
+                &thread,
+                &Fixed("OK.\n`brief: un script bonjour.py qui affiche Bonjour`")
+            )
+            .unwrap(),
+            Discussed::Brief("un script bonjour.py qui affiche Bonjour".into())
+        );
+        assert!(discuss(&empty, &thread, &Fixed("<think>only this</think>")).is_err());
     }
 
     #[test]

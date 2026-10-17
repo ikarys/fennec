@@ -290,7 +290,8 @@ pub fn used(summary: &str, said: &[Said]) -> Vec<String> {
 
 const PROPOSE: &str = "A human corrected an AI developer. Decide whether the correction states \
 a lasting preference that would hold for other tasks too (a tool to use or avoid, an identity, \
-a branch never to touch, a style), or only fixes this task. If it holds beyond the task, reply \
+a branch never to touch, a style), or only fixes this task. What the product should do (a \
+feature, a default, a behaviour, a screen) only fixes this task. If it holds beyond the task, reply \
 with one line: `rule: <the preference as a short imperative rule, in the human's language>`. \
 Otherwise reply `rule: none`.";
 
