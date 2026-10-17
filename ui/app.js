@@ -92,6 +92,9 @@ function explain(reason) {
   if (m) return `fennec a modifié un test validé (${m[1]}), ce qui lui est interdit`;
   m = line.match(/^rule \S+ violated: changed (\S+) but nothing under (\S+)$/);
   if (m) return `${m[1]} a changé sans changement dans ${m[2]}, comme les règles du projet l'exigent`;
+  if (/not a git repository/.test(line)) {
+    return "le dossier du projet n'est plus un dépôt git (son .git a disparu) : ajoute-le de nouveau avec « + projet », puis réessaie";
+  }
   m = line.match(/^no model: .* and (\S+)\/models did not answer/);
   const down = unreachable(line);
   if (m) return `fennec ne joint aucun modèle à ${m[1]}${down ? ` (${down})` : ""} : vérifie les Réglages, puis réessaie`;
