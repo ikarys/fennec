@@ -169,6 +169,14 @@ fn name(project: &str) -> &str {
 /// whose tool this machine lacks (rule 3: said, not left out).
 fn unverified(proof: &Value) -> Value {
     let mut lines: Vec<Value> = proof["unverified"].as_array().cloned().unwrap_or_default();
+    for s in proof["shots"].as_array().into_iter().flatten() {
+        if s["missing"] == true {
+            lines.push(json!(format!(
+                "fennec n'a pas pu regarder {} : aucun navigateur n'est installé",
+                s["url"].as_str().unwrap_or("la page")
+            )));
+        }
+    }
     for c in proof["checks"].as_array().into_iter().flatten() {
         if c["missing"] == true {
             lines.push(json!(format!(
@@ -323,13 +331,14 @@ mod tests {
 
     #[test]
     fn a_tool_a_role_could_not_run_is_said_unverified() {
-        let proof = json!({"unverified": ["le GUI"], "checks": [
+        let proof = json!({"unverified": ["le GUI"], "shots": [{"url": "http://127.0.0.1:8000/", "missing": true}], "checks": [
             {"role": "DevSecOps", "command": "gitleaks detect", "exit": 127, "missing": true},
             {"role": "DevSecOps", "command": "ok", "exit": 0, "missing": false}]});
         assert_eq!(
             unverified(&proof),
             json!([
                 "le GUI",
+                "fennec n'a pas pu regarder http://127.0.0.1:8000/ : aucun navigateur n'est installé",
                 "DevSecOps n'a pas pu lancer `gitleaks detect` : l'outil n'est pas installé"
             ])
         );

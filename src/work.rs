@@ -429,7 +429,7 @@ fn apply_proof(request: &mut Value, proof: &Value) {
         .as_array()
         .into_iter()
         .flatten()
-        .find(|s| s["ok"] != true)
+        .find(|s| s["ok"] != true && s["missing"] != true)
     {
         request["status"] = json!("failed");
         request["reason"] = json!(format!(
@@ -439,9 +439,15 @@ fn apply_proof(request: &mut Value, proof: &Value) {
         ));
     } else if proof["passed"] == false {
         // Rule 3: tests alone do not make a request ready.
+        let blind = proof["shots"]
+            .as_array()
+            .is_some_and(|s| s.iter().any(|s| s["missing"] == true));
         request["status"] = json!("failed");
-        request["reason"] =
-            json!("les tests passent, mais fennec n'a pas su essayer le produit : aucune preuve");
+        request["reason"] = json!(if blind {
+            "les tests passent, mais fennec n'a pas pu regarder la page : aucun navigateur n'est installé (chromium)"
+        } else {
+            "les tests passent, mais fennec n'a pas su essayer le produit : aucune preuve"
+        });
     } else {
         request["status"] = json!("ready");
     }
