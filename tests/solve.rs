@@ -1149,3 +1149,124 @@ fn a_failed_attempt_teaches_the_next_one() {
     let system = seen.split("Write 42").next().unwrap();
     assert!(!system.contains("Earlier attempts"));
 }
+
+/// The project folder as the world: the human's default.
+fn here(name: &str) -> Fixture {
+    let f = fixture(name);
+    git(&f, &["config", "--unset", "fennec.workspace"]);
+    f
+}
+
+#[test]
+fn work_in_the_project_folder_is_seen_there_and_lands_on_its_branch() {
+    let f = here("here");
+    let project = f.project.to_string_lossy().to_string();
+    std::fs::write(f.project.join(".gitignore"), ".env\n").unwrap();
+    git(&f, &["add", "-A"]);
+    git(&f, &["commit", "-qm", "ignore .env"]);
+    std::fs::write(f.project.join(".env"), "KEY=1\n").unwrap();
+    // A failed attempt is undone by going back: nothing of the human's may be in the way.
+    std::fs::write(f.project.join("draft"), "x\n").unwrap();
+    let Err(e) = f.worlds.fork(&project) else {
+        panic!("forked a dirty folder");
+    };
+    assert!(e.to_string().contains("uncommitted changes"), "{e}");
+    std::fs::remove_file(f.project.join("draft")).unwrap();
+
+    let wrong = Script::new(
+        "wrong",
+        &[write("answer", "41\n"), write("junk", "j\n"), done()],
+    );
+    let right = Script::new("right", &[write("answer", "42\n"), done()]);
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&wrong, &right], 10).unwrap();
+    let id = record["winner"].as_str().unwrap().to_string();
+    // The work is in the folder; the failed attempt left nothing, the human's file stayed.
+    assert_eq!(
+        git(&f, &["branch", "--show-current"]),
+        format!("world/{id}")
+    );
+    assert_eq!(
+        std::fs::read_to_string(f.project.join("answer")).unwrap(),
+        "42\n"
+    );
+    assert!(!f.project.join("junk").exists());
+    assert!(f.project.join(".env").exists());
+    // One world at a time, and the agent cannot write the store from inside.
+    assert!(f.worlds.fork(&project).is_err());
+    let w = f.worlds.open(&id).unwrap();
+    assert!(!f.sh(&w, "touch .git/x").0);
+    assert!(f.sh(&w, "touch made && rm made").0);
+
+    // The human edits in place; it all lands on their branch, the folder back on it.
+    std::fs::write(f.project.join("mine"), "m\n").unwrap();
+    land(&f.worlds, &id, None, None).unwrap();
+    assert_eq!(git(&f, &["branch", "--show-current"]), "main");
+    assert_eq!(git(&f, &["status", "--porcelain"]), "");
+    let files = git(&f, &["ls-files"]);
+    assert!(
+        files.contains("mine") && files.contains("answer"),
+        "{files}"
+    );
+    assert_eq!(git(&f, &["branch", "--list", "world/*"]), "");
+    assert!(f.worlds.list().unwrap().is_empty());
+}
+
+#[test]
+fn a_request_is_framed_solved_and_landed_in_the_project_folder() {
+    let f = here("here-spec");
+    let good = Script::new(
+        "good",
+        &[write("spec.sh", "grep -qx 42 answer\n"), finish(SPEC)],
+    );
+    let s = spec::compile(&f.worlds, &f.project, "answer 42", &good, 10).unwrap();
+    assert_eq!(s["status"], "proposed", "{s:#}");
+    let id = s["world"].as_str().unwrap().to_string();
+    // The tests wait in the folder for the human to validate.
+    assert!(f.project.join("spec.sh").exists());
+    let honest = Script::new("honest", &[write("answer", "42\n"), done()]);
+    let record = spec::accept(&f.worlds, &id, &[&honest], 10).unwrap();
+    let run = record["winner"].as_str().unwrap().to_string();
+    assert_eq!(
+        git(&f, &["branch", "--show-current"]),
+        format!("world/{run}")
+    );
+    land(&f.worlds, &run, None, None).unwrap();
+    assert_eq!(git(&f, &["branch", "--show-current"]), "main");
+    assert!(f.project.join("spec.sh").exists() && f.project.join("answer").exists());
+    assert_eq!(git(&f, &["branch", "--list", "world/*"]), "");
+    assert_eq!(git(&f, &["log", "--format=%s"]).lines().count(), 3);
+}
+
+#[test]
+fn a_failed_change_gives_the_folder_back_to_the_ready_work() {
+    let f = here("here-amend");
+    let good = Script::new(
+        "good",
+        &[write("spec.sh", "grep -qx 42 answer\n"), finish(SPEC)],
+    );
+    let s = spec::compile(&f.worlds, &f.project, "answer 42", &good, 10).unwrap();
+    let id = s["world"].as_str().unwrap().to_string();
+    let honest = Script::new("honest", &[write("answer", "42\n"), done()]);
+    let run = spec::accept(&f.worlds, &id, &[&honest], 10).unwrap()["winner"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let broken = Script::new("broken", &[write("answer", "41\n"), done()]);
+    let failed = spec::amend(&f.worlds, &id, "x", &[&broken], 10).unwrap();
+    assert!(failed["winner"].is_null());
+    // Back on the ready work, not on the human's branch: it still lands.
+    assert_eq!(
+        git(&f, &["branch", "--show-current"]),
+        format!("world/{run}")
+    );
+    assert_eq!(
+        std::fs::read_to_string(f.project.join("answer")).unwrap(),
+        "42\n"
+    );
+    land(&f.worlds, &run, None, None).unwrap();
+    assert_eq!(git(&f, &["branch", "--show-current"]), "main");
+    // A world whose branch left the folder is never written through.
+    let w = f.worlds.fork(&f.project.to_string_lossy()).unwrap();
+    git(&f, &["checkout", "-q", "main"]);
+    assert!(f.worlds.commit(&w, "x").is_err());
+}

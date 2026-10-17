@@ -154,9 +154,15 @@ pub fn solve(
         .find(|a| a["passed"] == true)
         .and_then(|a| a["world"].as_str())
         .map(str::to_string);
-    for (world, record) in forked.into_iter().zip(&mut attempts) {
+    // Only the winner is left (attempts stop at the first pass); its grant
+    // stays until the human keeps or reverts it.
+    for world in forked {
         if Some(&world.id) == winner.as_ref() {
-            let commit = record["commit"].as_str().unwrap_or("");
+            let commit = attempts
+                .iter()
+                .find(|a| a["world"] == world.id.as_str())
+                .and_then(|a| a["commit"].as_str())
+                .unwrap_or("");
             let marker = worlds.root.join("passed");
             std::fs::create_dir_all(&marker)?;
             let verdict = json!({
@@ -165,13 +171,6 @@ pub fn solve(
                 "verify": blocking_commands(rules),
             });
             std::fs::write(marker.join(&world.id), verdict.to_string())?;
-        } else {
-            // A failed attempt leaves the host as it found it. The winner's
-            // grant stays until the human keeps or reverts it.
-            if !grant::paths(worlds, &world.id)?.is_empty() {
-                grant::revert(worlds, &world)?;
-            }
-            worlds.drop(world)?;
         }
     }
 
@@ -234,8 +233,16 @@ fn attempts_for(
                 );
             }
             lessons.push_str(&lesson(&record));
+            // Gone before the next attempt forks: in the project folder, the
+            // next one needs the folder back. A failed attempt leaves the
+            // host as it found it.
+            if !grant::paths(worlds, &world.id)?.is_empty() {
+                grant::revert(worlds, &world)?;
+            }
+            worlds.drop(world)?;
+        } else {
+            forked.push(world);
         }
-        forked.push(world);
         attempts.push(record);
         if passed {
             break;
@@ -491,7 +498,7 @@ pub struct Landing {
 pub fn plan(worlds: &Worlds, id: &str, model: &dyn Model) -> io::Result<Landing> {
     let record = review::load(worlds, id)?;
     let project = Path::new(record["project"].as_str().unwrap_or(""));
-    let current = git(project, &["branch", "--show-current"])?;
+    let current = current_branch(worlds, id, project)?;
     let remotes = git(project, &["remote"])?;
     let remote = remotes
         .lines()
@@ -550,6 +557,15 @@ fn parse_plan(reply: &str) -> (Option<String>, Option<String>) {
     let branch = (!branch.is_empty() && branch != "current").then(|| branch.to_string());
     let message = rest.trim();
     (branch, (!message.is_empty()).then(|| message.to_string()))
+}
+
+/// The project's branch: for work in the project folder, the one the folder
+/// was on before, not the world's.
+fn current_branch(worlds: &Worlds, id: &str, project: &Path) -> io::Result<String> {
+    match worlds.open(id).and_then(|w| worlds.home(&w)) {
+        Ok(Some(home)) => Ok(home),
+        _ => git(project, &["branch", "--show-current"]),
+    }
 }
 
 /// Pushes `branch` to `remote` with the human's own credentials. Never
@@ -621,7 +637,9 @@ pub fn land(
         }
         commit = now;
     }
-    let head = git(project, &["rev-parse", "HEAD"])?;
+    let home = worlds.home(&world)?;
+    let current = current_branch(worlds, id, project)?;
+    let head = git(project, &["rev-parse", &format!("refs/heads/{current}")])?;
     let moved = git(project, &["merge-base", "--is-ancestor", &head, &commit]).is_err();
     if moved {
         // The verdict no longer holds for any tree but the old one. Edits
@@ -681,8 +699,14 @@ pub fn land(
             message,
         ],
     )?;
-    let current = git(project, &["branch", "--show-current"])?;
     match branch.filter(|b| *b != current) {
+        // The folder holds the world: its files are the commit's already, so
+        // the branch moves to it and the folder goes back on that branch.
+        None if home.is_some() => {
+            let target = format!("refs/heads/{current}");
+            git(project, &["update-ref", &target, &squashed, &head])?;
+            git(project, &["symbolic-ref", "HEAD", &target])?;
+        }
         None => {
             git(project, &["merge", "-q", "--ff-only", &squashed])?;
         }
