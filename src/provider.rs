@@ -52,6 +52,79 @@ pub fn ask(model: &dyn Model, messages: &[Value]) -> io::Result<(String, Value)>
     ))
 }
 
+/// A model that writes the exchange so far to a file after every call, in
+/// the shape [`ask`] and agents record it, so a human can follow a step while
+/// it runs instead of only once it ends.
+pub struct Live<'a> {
+    inner: &'a dyn Model,
+    path: std::path::PathBuf,
+    turns: std::sync::Mutex<Vec<Value>>,
+}
+
+impl<'a> Live<'a> {
+    /// Starts empty: a file left by the previous step is not this one.
+    pub fn new(inner: &'a dyn Model, path: std::path::PathBuf) -> Self {
+        let _ = std::fs::remove_file(&path);
+        Self {
+            inner,
+            path,
+            turns: Default::default(),
+        }
+    }
+
+    fn record(
+        &self,
+        messages: &[Value],
+        reply: io::Result<Value>,
+        think: bool,
+        asked: Instant,
+    ) -> io::Result<Value> {
+        let mut reply = reply?;
+        let mut turns = self.turns.lock().unwrap_or_else(|e| e.into_inner());
+        // A conversation of two messages is a new one: another attempt, or a
+        // stopped agent asked for its question.
+        if messages.len() <= 2 {
+            turns.clear();
+        }
+        let usage = reply.as_object_mut().and_then(|m| m.remove("usage"));
+        turns.push(json!({"model_ms": asked.elapsed().as_millis() as u64,
+                          "think": think, "usage": usage.clone()}));
+        let mut said = messages.to_vec();
+        said.push(reply.clone());
+        let now = json!({"model": self.inner.label(), "messages": said, "turns": *turns});
+        // Watching is best effort: a write that fails never stops the work.
+        let tmp = self.path.with_extension("tmp");
+        if std::fs::write(&tmp, now.to_string()).is_ok() {
+            let _ = std::fs::rename(&tmp, &self.path);
+        }
+        if let (Some(m), Some(u)) = (reply.as_object_mut(), usage) {
+            m.insert("usage".into(), u);
+        }
+        Ok(reply)
+    }
+}
+
+impl Model for Live<'_> {
+    fn chat(&self, messages: &[Value], tools: &Value) -> io::Result<Value> {
+        let asked = Instant::now();
+        self.record(messages, self.inner.chat(messages, tools), true, asked)
+    }
+
+    fn chat_quick(&self, messages: &[Value], tools: &Value) -> io::Result<Value> {
+        let asked = Instant::now();
+        self.record(
+            messages,
+            self.inner.chat_quick(messages, tools),
+            false,
+            asked,
+        )
+    }
+
+    fn label(&self) -> String {
+        self.inner.label()
+    }
+}
+
 pub struct OpenAi {
     pub base_url: String,
     pub model: String,
@@ -278,6 +351,54 @@ impl Model for OpenAi {
 mod tests {
     use super::*;
     use std::io::{Read, Write};
+
+    struct Echo;
+    impl Model for Echo {
+        fn chat(&self, messages: &[Value], _: &Value) -> io::Result<Value> {
+            Ok(
+                json!({"role": "assistant", "content": format!("{} seen", messages.len()),
+                      "usage": {"prompt_tokens": 10}}),
+            )
+        }
+        fn label(&self) -> String {
+            "echo".into()
+        }
+    }
+
+    #[test]
+    fn a_live_model_shows_the_exchange_so_far() {
+        let path = std::env::temp_dir().join(format!("fennec-live-{}.json", std::process::id()));
+        std::fs::write(&path, "left by the previous step").unwrap();
+        let live = Live::new(&Echo, path.clone());
+        assert!(!path.exists(), "a new step starts empty");
+        let read =
+            || -> Value { serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap() };
+        let two = [json!({"role": "system"}), json!({"role": "user"})];
+        let reply = live.chat(&two, &json!([])).unwrap();
+        assert_eq!(
+            reply["usage"]["prompt_tokens"], 10,
+            "the caller still gets the usage"
+        );
+        let three = [two[0].clone(), two[1].clone(), reply];
+        live.chat_quick(&three, &json!([])).unwrap();
+        let now = read();
+        assert_eq!(now["model"], "echo");
+        assert_eq!(now["messages"].as_array().unwrap().len(), 4);
+        assert_eq!(now["messages"][3]["content"], "3 seen");
+        assert!(
+            now["messages"][3]["usage"].is_null(),
+            "usage is for the cost, not the messages"
+        );
+        assert_eq!(now["turns"].as_array().unwrap().len(), 2);
+        assert_eq!(now["turns"][1]["think"], false);
+        live.chat(&two, &json!([])).unwrap();
+        assert_eq!(
+            read()["turns"].as_array().unwrap().len(),
+            1,
+            "a new conversation starts over"
+        );
+        std::fs::remove_file(&path).unwrap();
+    }
 
     #[test]
     fn the_server_names_its_models_when_none_is_set() {
