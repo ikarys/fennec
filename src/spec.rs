@@ -497,6 +497,39 @@ pub fn retry(
     solve_spec(worlds, id, &why, models, max_steps)
 }
 
+/// The human tried a ready run and asks for a change: attempts start from
+/// that run's work, not from the tests. A winner replaces the run, which is
+/// rejected with the correction (so one said twice is offered as a rule);
+/// without one, the run stays ready as it was.
+pub fn amend(
+    worlds: &Worlds,
+    id: &str,
+    correction: &str,
+    models: &[&dyn Model],
+    max_steps: usize,
+) -> io::Result<Value> {
+    let mut spec = load(worlds, id)?;
+    let Some(run) = spec["run"].as_str().map(str::to_string) else {
+        return Err(io::Error::other(format!("spec {id} has no ready run")));
+    };
+    let ask = format!(
+        "\n\nA solution already passed and is in your world: start from it. \
+         The human tried it and asks for this change:\n{correction}\n\
+         Make that change and keep the rest."
+    );
+    let mut record = run_spec(worlds, &spec, &ask, &run, models, max_steps)?;
+    // Forked from the run, but still this spec's: landing drops its world.
+    record["spec"] = json!(id);
+    let name = record["id"].as_str().unwrap_or("run").to_string();
+    review::save(worlds, &name, &record)?;
+    if let Some(winner) = record["winner"].as_str() {
+        review::reject(worlds, &run, Some(correction))?;
+        spec["run"] = json!(winner);
+        save(worlds, id, &spec)?;
+    }
+    Ok(record)
+}
+
 fn solve_spec(
     worlds: &Worlds,
     id: &str,
@@ -508,6 +541,29 @@ fn solve_spec(
     if spec["status"] != "proposed" {
         return Err(io::Error::other(format!("spec {id} is {}", spec["status"])));
     }
+    let record = run_spec(worlds, &spec, why, id, models, max_steps)?;
+    spec["status"] = json!("accepted");
+    spec["run"] = record["winner"].clone();
+    // The spec's world stays until the run lands (`solve::land`): a winner
+    // whose product fails later is retried from the tests.
+    // ponytail: a run never landed nor retried keeps its spec world; a sweep
+    // can drop them once requests can be closed.
+    if !record["winner"].is_string() {
+        spec["status"] = json!("proposed");
+    }
+    save(worlds, id, &spec)?;
+    Ok(record)
+}
+
+/// The spec's tests as a task whose attempts fork from `base`.
+fn run_spec(
+    worlds: &Worlds,
+    spec: &Value,
+    why: &str,
+    base: &str,
+    models: &[&dyn Model],
+    max_steps: usize,
+) -> io::Result<Value> {
     let strings = |k: &str| -> Vec<String> {
         spec[k]
             .as_array()
@@ -525,22 +581,11 @@ fn solve_spec(
         ),
         verify: strings("verify"),
         protect: strings("protect"),
-        base: Some(id.to_string()),
+        base: Some(base.to_string()),
         grant: Vec::new(),
     };
     let project = PathBuf::from(spec["project"].as_str().unwrap_or(""));
-    let record = solve::solve(worlds, &project, &task, models, max_steps)?;
-    spec["status"] = json!("accepted");
-    spec["run"] = record["winner"].clone();
-    // The spec's world stays until the run lands (`solve::land`): a winner
-    // whose product fails later is retried from the tests.
-    // ponytail: a run never landed nor retried keeps its spec world; a sweep
-    // can drop them once requests can be closed.
-    if !record["winner"].is_string() {
-        spec["status"] = json!("proposed");
-    }
-    save(worlds, id, &spec)?;
-    Ok(record)
+    solve::solve(worlds, &project, &task, models, max_steps)
 }
 
 /// Records the human's answer to a question a stopped agent asked. The next

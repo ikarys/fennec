@@ -79,7 +79,12 @@ const CATALOG: [(&str, &str); 14] = [
 const TEAMS: [(&str, &[&str]); 2] = [
     (
         "Développement",
-        &["project-manager", "senior-developer", "qa"],
+        &[
+            "project-manager",
+            "senior-developer",
+            "frontend-designer",
+            "qa",
+        ],
     ),
     (
         "Études",

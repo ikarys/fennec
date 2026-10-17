@@ -891,7 +891,31 @@ fn a_request_compiles_to_failing_tests_that_the_solution_must_pass() {
     let record = spec::retry(&f.worlds, &id, "x", &[&honest], 10).unwrap();
     assert!(record["winner"].is_string(), "{record:#}");
 
-    land(&f.worlds, record["winner"].as_str().unwrap(), None, None).unwrap();
+    // The human asks for a change on the ready run: a failed change leaves it
+    // ready; a passing one starts from its work and replaces it.
+    let ready = record["winner"].as_str().unwrap().to_string();
+    let broken = Script::new("broken", &[write("answer", "41\n"), done()]);
+    let failed = spec::amend(&f.worlds, &id, "add a note", &[&broken], 10).unwrap();
+    assert!(failed["winner"].is_null(), "{failed:#}");
+    assert!(f.worlds.open(&ready).is_ok());
+    assert_eq!(spec::load(&f.worlds, &id).unwrap()["run"], json!(ready));
+    // It writes only the note: `answer` is already there, from the ready run.
+    let noter = Script::new("noter", &[write("note", "hi\n"), done()]);
+    let record = spec::amend(&f.worlds, &id, "add a note", &[&noter], 10).unwrap();
+    assert!(
+        record["goal"].as_str().unwrap().contains("add a note"),
+        "{record:#}"
+    );
+    let amended = record["winner"].as_str().unwrap().to_string();
+    assert_eq!(record["spec"], json!(id));
+    assert_eq!(
+        review::load(&f.worlds, &ready).unwrap()["status"],
+        "rejected"
+    );
+    assert_eq!(spec::load(&f.worlds, &id).unwrap()["run"], json!(amended));
+
+    land(&f.worlds, &amended, None, None).unwrap();
+    assert!(f.project.join("note").exists() && f.project.join("answer").exists());
     assert!(f.project.join("spec.sh").exists());
     assert!(f.worlds.list().unwrap().is_empty());
     assert_eq!(spec::load(&f.worlds, &id).unwrap()["status"], "accepted");
