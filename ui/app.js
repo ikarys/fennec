@@ -149,7 +149,8 @@ function details(item) {
   // What each step and each model cost.
   for (const [key, label] of [["stages", "Étape"], ["models", "Modèle"]]) {
     for (const [name, c] of Object.entries(item.stats?.[key] ?? {}).sort(([a], [b]) => stageRank(a) - stageRank(b))) {
-      box.append(el("p", { textContent: `${label} ${name} : ` + [duration(c.ms ?? 0), `${c.turns} appel${c.turns > 1 ? "s" : ""}`,
+      const by = c.roles?.length ? ` (${c.roles.join(", ")})` : "";
+      box.append(el("p", { textContent: `${label} ${name}${by} : ` + [duration(c.ms ?? 0), `${c.turns} appel${c.turns > 1 ? "s" : ""}`,
         `${number(c.sent)} tokens envoyés (${percent(c.cached, c.sent)} % en cache)`,
         `${number(c.received)} générés` + (c.thinking ? ` dont ${number(c.thinking)} de réflexion` : ""), speed(c)].filter(Boolean).join(" · ") }));
     }
@@ -301,10 +302,31 @@ function stepView(step) {
   return el("div", { className: "step" },
     el("div", { className: "step-name", textContent: step.name + verdict }),
     el("div", { className: "muted", textContent: cost }),
+    ...rolesView(step),
     ...(messages.length ? messages.map(messageView)
       : [el("div", { className: "muted", textContent: step.live
         ? "fennec attend la première réponse du modèle…"
         : "Les messages de cette étape n'ont pas été gardés (demande ancienne)." })]));
+}
+
+// Who of the team took part: what each role told the model, and what it ran itself.
+function rolesView(step) {
+  if (!step.roles) return [];
+  if (!step.roles.length) return [el("div", { className: "muted", textContent: "Aucun rôle de l'équipe à cette étape." })];
+  const nodes = [el("div", { className: "roles", textContent: "Rôles : " + step.roles.map((r) => r.name).join(", ") })];
+  for (const r of step.roles) {
+    if (r.brief) {
+      nodes.push(el("details", { className: "message" }, el("summary", {}, el("b", { textContent: r.name }), " : sa consigne au modèle"),
+        el("pre", { textContent: r.brief })));
+    }
+  }
+  for (const c of step.checks ?? []) {
+    const result = c.missing ? "pas installé, non vérifié" : c.exit === 0 ? "✓ réussi" : `✗ échoué (code ${c.exit}) : bloque`;
+    nodes.push(el("details", { className: "message" },
+      el("summary", {}, el("b", { textContent: c.role }), ` a lancé « ${c.command} » → ${result}`),
+      el("pre", { textContent: c.output || "(aucune sortie)" })));
+  }
+  return nodes;
 }
 
 const who = { system: "Consigne", user: "Envoyé au modèle", assistant: "Modèle", tool: "Résultat d'outil" };
