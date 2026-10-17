@@ -9,31 +9,75 @@
 //! What this role cares about, in the agent's language.
 //! ```
 //!
-//! The user's team is `~/.config/fennec/team/*.md`; when that directory does
-//! not exist, the built-in team below is used. A project adds or overrides
-//! roles by file name in `.fennec-os/team/*.md`. Read from the working tree,
-//! like rules said in words: both are the human's files.
+//! A team is a named set of roles, because different work needs different
+//! people: software is not a study. The human's teams are folders,
+//! `~/.config/fennec/teams/<team>/*.md`; built-in teams are lists of roles
+//! from the built-in catalogue, and a folder of the same name replaces one.
+//! A project picks its team in `.fennec-os/team.json`
+//! (`{"team": "etudes", "remove": ["qa"]}`, default team `dev`) and adds or
+//! overrides roles by file name in `.fennec-os/team/*.md`. Read from the
+//! working tree, like rules said in words: these are the human's files.
 
 use std::io;
 use std::path::Path;
+
+use serde_json::Value;
 
 use crate::rules::{self, HARNESS_DIR};
 
 /// Where a role speaks: framing "done when", solving, proving.
 pub const STAGES: [&str; 3] = ["frame", "solve", "prove"];
 
-/// The team used until the human writes their own: copy these files to
-/// `~/.config/fennec/team/` to change it.
-const BUILT_IN: [(&str, &str); 3] = [
+/// The team of a project that has not picked one: small on purpose.
+pub const DEFAULT_TEAM: &str = "dev";
+
+/// Every built-in role, in or out of a built-in team: what the human picks
+/// from to build their own.
+const CATALOG: [(&str, &str); 14] = [
+    ("architect", include_str!("../catalog/architect.md")),
+    (
+        "critical-reviewer",
+        include_str!("../catalog/critical-reviewer.md"),
+    ),
+    ("devops", include_str!("../catalog/devops.md")),
+    ("devsecops", include_str!("../catalog/devsecops.md")),
+    (
+        "frontend-designer",
+        include_str!("../catalog/frontend-designer.md"),
+    ),
+    ("maintainer", include_str!("../catalog/maintainer.md")),
     (
         "project-manager",
-        include_str!("../team/project-manager.md"),
+        include_str!("../catalog/project-manager.md"),
     ),
+    ("qa", include_str!("../catalog/qa.md")),
+    ("research-lead", include_str!("../catalog/research-lead.md")),
+    ("researcher", include_str!("../catalog/researcher.md")),
     (
         "senior-developer",
-        include_str!("../team/senior-developer.md"),
+        include_str!("../catalog/senior-developer.md"),
     ),
-    ("qa", include_str!("../team/qa.md")),
+    (
+        "sources-specialist",
+        include_str!("../catalog/sources-specialist.md"),
+    ),
+    ("ux-specialist", include_str!("../catalog/ux-specialist.md")),
+    ("writer", include_str!("../catalog/writer.md")),
+];
+
+/// Built-in teams, by catalogue key. Each covers every stage.
+const TEAMS: [(&str, &[&str]); 2] = [
+    ("dev", &["project-manager", "senior-developer", "qa"]),
+    (
+        "etudes",
+        &[
+            "research-lead",
+            "researcher",
+            "writer",
+            "critical-reviewer",
+            "sources-specialist",
+        ],
+    ),
 ];
 
 #[derive(Debug, Clone, PartialEq)]
@@ -46,22 +90,94 @@ pub struct Role {
     pub brief: String,
 }
 
+/// Every built-in role.
+pub fn catalog() -> io::Result<Vec<Role>> {
+    CATALOG.iter().map(|(key, text)| parse(key, text)).collect()
+}
+
+/// The teams a project can pick: the human's folders, then the built-in
+/// teams they do not replace.
+pub fn teams() -> io::Result<Vec<String>> {
+    let mut names: Vec<String> = match std::fs::read_dir(rules::config_dir()?.join("teams")) {
+        Ok(entries) => entries
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().is_dir())
+            .filter_map(|e| e.file_name().to_str().map(str::to_string))
+            .filter(|n| valid_name(n))
+            .collect(),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => Vec::new(),
+        Err(e) => return Err(e),
+    };
+    names.sort();
+    for (name, _) in TEAMS {
+        if !names.iter().any(|n| n == name) {
+            names.push(name.to_string());
+        }
+    }
+    Ok(names)
+}
+
 /// The whole team for a project, sorted by file name.
 pub fn members(project: &Path) -> io::Result<Vec<Role>> {
-    let user = rules::config_dir()?.join("team");
-    let mut team = match read_dir(&user)? {
-        Some(files) => files,
-        None => BUILT_IN
-            .iter()
-            .map(|(key, text)| (key.to_string(), text.to_string()))
-            .collect(),
-    };
-    for (key, text) in read_dir(&project.join(HARNESS_DIR).join("team"))?.unwrap_or_default() {
+    let harness = project.join(HARNESS_DIR);
+    let (name, remove) = choice(&harness)?;
+    let mut team = team_files(&name)?;
+    for (key, text) in read_dir(&harness.join("team"))?.unwrap_or_default() {
         team.retain(|(k, _)| *k != key);
         team.push((key, text));
     }
+    team.retain(|(k, _)| !remove.contains(k));
     team.sort();
     team.iter().map(|(key, text)| parse(key, text)).collect()
+}
+
+/// The project's team and the roles it leaves out, from `team.json`.
+fn choice(harness: &Path) -> io::Result<(String, Vec<String>)> {
+    let path = harness.join("team.json");
+    let text = match std::fs::read_to_string(&path) {
+        Ok(t) => t,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => {
+            return Ok((DEFAULT_TEAM.to_string(), Vec::new()));
+        }
+        Err(e) => return Err(e),
+    };
+    let v: Value = serde_json::from_str(&text)
+        .map_err(|e| io::Error::other(format!("{}: {e}", path.display())))?;
+    let name = v["team"].as_str().unwrap_or(DEFAULT_TEAM).to_string();
+    let remove = v["remove"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|k| k.as_str().map(str::to_string))
+        .collect();
+    Ok((name, remove))
+}
+
+/// A team name is one folder under `teams/`: the project's file names it,
+/// and a cloned project must not point fennec at another directory.
+fn valid_name(name: &str) -> bool {
+    !name.is_empty() && !name.starts_with('.') && !name.contains(['/', '\\'])
+}
+
+/// The role files of team `name`: the human's folder, else the built-in team.
+fn team_files(name: &str) -> io::Result<Vec<(String, String)>> {
+    if !valid_name(name) {
+        return Err(io::Error::other(format!("invalid team name `{name}`")));
+    }
+    if let Some(files) = read_dir(&rules::config_dir()?.join("teams").join(name))? {
+        return Ok(files);
+    }
+    let Some((_, keys)) = TEAMS.iter().find(|(n, _)| *n == name) else {
+        return Err(io::Error::other(format!(
+            "unknown team `{name}`; known: {}",
+            teams()?.join(", ")
+        )));
+    };
+    Ok(CATALOG
+        .iter()
+        .filter(|(key, _)| keys.contains(key))
+        .map(|(key, text)| (key.to_string(), text.to_string()))
+        .collect())
 }
 
 /// What the roles of `stage` add to the agent's context, and their names
@@ -134,11 +250,34 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_built_in_team_covers_every_stage() {
-        let team: Vec<Role> = BUILT_IN.iter().map(|(k, t)| parse(k, t).unwrap()).collect();
-        for stage in STAGES {
-            assert!(team.iter().any(|r| r.stage == stage), "{stage}");
+    fn every_built_in_team_covers_every_stage_from_the_catalogue() {
+        let catalog = catalog().unwrap();
+        for (name, keys) in TEAMS {
+            let team: Vec<&Role> = catalog
+                .iter()
+                .filter(|r| keys.contains(&r.key.as_str()))
+                .collect();
+            assert_eq!(
+                team.len(),
+                keys.len(),
+                "{name}: a key is not in the catalogue"
+            );
+            for stage in STAGES {
+                assert!(team.iter().any(|r| r.stage == stage), "{name}: {stage}");
+            }
         }
+    }
+
+    #[test]
+    fn a_team_name_cannot_leave_the_teams_folder() {
+        for bad in ["", "..", "../x", ".hidden", "a/b"] {
+            assert!(team_files(bad).is_err(), "{bad}");
+        }
+        let e = team_files("nope-no-such-team").unwrap_err().to_string();
+        assert!(
+            e.contains("unknown team") && e.contains("dev") && e.contains("etudes"),
+            "{e}"
+        );
     }
 
     #[test]
@@ -175,14 +314,33 @@ mod tests {
         )
         .unwrap();
         std::fs::write(dir.join("notes.txt"), "not a role").unwrap();
-        // ponytail: reads the real ~/.config/fennec/team when it exists, as the
-        // other tests read the real rules.md; only project files are asserted.
+        // ponytail: reads the real ~/.config/fennec/teams when it exists, as
+        // the other tests read the real rules.md; only project files are asserted.
         let team = members(&project).unwrap();
         assert_eq!(team.iter().filter(|r| r.key == "qa").count(), 1);
         assert_eq!(team.iter().find(|r| r.key == "qa").unwrap().name, "QA web");
         let (text, names) = brief(&project, "solve").unwrap();
         assert!(names.contains(&"DevSecOps".to_string()));
         assert!(text.contains("As DevSecOps on the team:\nAudit."));
+
+        // Another team, minus one of its roles; project roles still apply.
+        let choose =
+            |json: &str| std::fs::write(project.join(HARNESS_DIR).join("team.json"), json).unwrap();
+        choose(r#"{"team": "etudes", "remove": ["writer"]}"#);
+        let keys: Vec<String> = members(&project)
+            .unwrap()
+            .into_iter()
+            .map(|r| r.key)
+            .collect();
+        assert!(
+            keys.contains(&"researcher".to_string()) && keys.contains(&"devsecops".to_string())
+        );
+        assert!(
+            !keys.contains(&"writer".to_string())
+                && !keys.contains(&"senior-developer".to_string())
+        );
+        choose(r#"{"team": "../../etc"}"#);
+        assert!(members(&project).is_err());
         std::fs::remove_dir_all(project).unwrap();
     }
 }
