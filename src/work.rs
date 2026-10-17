@@ -178,6 +178,7 @@ fn frame_now(store: &Store, id: &str) -> io::Result<()> {
     let request = store.load(id)?;
     let worlds = Worlds::from_env()?;
     let project = Path::new(request["project"].as_str().unwrap_or(""));
+    crate::state::start(project)?;
     let model = staffed(OpenAi::variants_from_env(1)?.remove(0), project, "frame")?;
     offer_rule(store, id, &request, &model)?;
     let model = Live::new(&model, store.live_path(id)?);
