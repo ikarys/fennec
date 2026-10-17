@@ -41,7 +41,8 @@ variables override them.
    team (made of roles; added 2026-10-17, see `docs/design/team.md`). Internal
    concepts (world, run, grant, permissions, limits, stage keys) never reach the UI.
    One exception, outside the work itself: the "Réglages" dialog names the model
-   server and its models, since choosing them is the human's setup. A second, asked
+   server and its models, since choosing them is the human's setup; the "Équipe"
+   dialog may name the model a role runs on, for the same reason. A second, asked
    for by the human: a request's "Journal" shows each step's exchange with the model
    as it was (messages, tool calls, tokens), since that is what they want to audit.
 3. **Nothing is "ready" without proof.** What could not be proven is shown as

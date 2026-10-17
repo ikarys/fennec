@@ -68,12 +68,22 @@ fn note(request: &mut Value, step: Value) {
     }
 }
 
+/// The model a stage runs on: the one a role of the stage names, else the
+/// settings' (temperature kept, so attempts still differ).
+fn staffed(mut model: OpenAi, project: &Path, stage: &str) -> io::Result<OpenAi> {
+    if let Some(m) = fennec_os::team::model(project, stage)? {
+        model.model = m;
+    }
+    Ok(model)
+}
+
 fn talk_now(store: &Store, id: &str) -> io::Result<()> {
     let request = store.load(id)?;
-    let model = OpenAi::variants_from_env(1)?.remove(0);
+    let project = Path::new(request["project"].as_str().unwrap_or(""));
+    // The conversation is framing's first part: it runs on framing's model.
+    let model = staffed(OpenAi::variants_from_env(1)?.remove(0), project, "frame")?;
     offer_rule(store, id, &request, &model)?;
     let thread = request["thread"].as_array().cloned().unwrap_or_default();
-    let project = Path::new(request["project"].as_str().unwrap_or(""));
     let (said, exchange) = spec::discuss(project, &thread, &model)?;
     // ponytail: each turn keeps the whole exchange, the thread resent included;
     // a long conversation could keep only the reply.
@@ -167,12 +177,13 @@ fn transcript(request: &Value) -> String {
 fn frame_now(store: &Store, id: &str) -> io::Result<()> {
     let request = store.load(id)?;
     let worlds = Worlds::from_env()?;
-    let model = OpenAi::variants_from_env(1)?.remove(0);
+    let project = Path::new(request["project"].as_str().unwrap_or(""));
+    let model = staffed(OpenAi::variants_from_env(1)?.remove(0), project, "frame")?;
     offer_rule(store, id, &request, &model)?;
     let model = Live::new(&model, store.live_path(id)?);
     let s = spec::compile(
         &worlds,
-        Path::new(request["project"].as_str().unwrap_or("")),
+        project,
         request["brief"]
             .as_str()
             .or(request["text"].as_str())
@@ -329,7 +340,11 @@ pub fn reply(store: &Store, id: &str, text: &str) -> io::Result<()> {
 fn solve_now(store: &Store, id: &str) -> io::Result<()> {
     let request = store.load(id)?;
     let worlds = Worlds::from_env()?;
-    let variants = OpenAi::variants_from_env(attempts())?;
+    let project = Path::new(request["project"].as_str().unwrap_or(""));
+    let variants = OpenAi::variants_from_env(attempts())?
+        .into_iter()
+        .map(|m| staffed(m, project, "solve"))
+        .collect::<io::Result<Vec<_>>>()?;
     offer_rule(store, id, &request, &variants[0])?;
     let live: Vec<Live> = variants
         .iter()
@@ -366,7 +381,8 @@ fn solve_now(store: &Store, id: &str) -> io::Result<()> {
     // Tests passing is not "ready": the product is tried first.
     store.update(id, |r| r["status"] = json!("proving"))?;
     let done_when = store.load(id)?["done_when"].as_str().map(str::to_string);
-    let watched = Live::new(&variants[0], store.live_path(id)?);
+    let prover = staffed(OpenAi::variants_from_env(1)?.remove(0), project, "prove")?;
+    let watched = Live::new(&prover, store.live_path(id)?);
     let proof = proof::gather(&worlds, run, done_when.as_deref(), &watched)?;
     // Where it will land is decided before "ready", so the card never shows
     // a branch the click would not use.

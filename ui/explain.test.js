@@ -9,6 +9,9 @@ assert.match(explain("timeout: global"), /pas à temps/);
 assert.match(explain("io: Connection refused (os error 111)"), /rien ne répond/);
 assert.match(explain("http status: 401"), /refuse la clé/);
 assert.match(explain("http status: 500"), /erreur 500/);
+assert.match(explain("http status: 404"), /ne connaît pas cette adresse/);
+assert.match(explain("http status: 404: model 'big' not found"), /ne sert pas le modèle « big »/);
+assert.match(explain("http status: 500: out of memory"), /erreur 500/);
 assert.match(explain("host not found"), /n'existe pas/);
 assert.match(
   explain("no model: none is set and http://x:1/v1/models did not answer (timeout: global)"),

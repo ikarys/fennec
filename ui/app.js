@@ -73,8 +73,10 @@ function firstLine(text) {
 // The model server's errors (ureq's wording), in the human's words.
 function unreachable(line) {
   // Anchored: a test's output that mentions a timeout is not the server's.
-  const m = line.match(/(?:^|\()(timeout|http status|io|host not found|connection failed|bad uri)(?::? ?(\S*))/);
+  const m = line.match(/(?:^|\()(timeout|http status|io|host not found|connection failed|bad uri)(?::? ?([^\s:]*))/);
   if (!m) return null;
+  const model = line.match(/model '([^']+)' not found/);
+  if (model) return `le serveur ne sert pas le modèle « ${model[1]} » (choisi dans Équipe ou dans les Réglages)`;
   if (m[1] === "timeout") return "le serveur ne répond pas à temps";
   if (m[1] === "http status") return m[2] === "401" || m[2] === "403" ? "le serveur refuse la clé"
     : m[2] === "404" ? "le serveur ne connaît pas cette adresse (elle finit souvent par /v1)"
@@ -536,7 +538,7 @@ function renderTeam(view) {
     const name = el("button", { type: "button", textContent: r.name, title: "Modifier ce rôle" });
     name.onclick = () => editRole(r);
     return el("li", { className: r.out ? "out" : "" }, box, name,
-      el("span", { className: "muted", textContent: STAGES[r.stage] ?? r.stage }));
+      el("span", { className: "muted", textContent: [STAGES[r.stage] ?? r.stage, r.model].filter(Boolean).join(" · ") }));
   }));
   $("team-catalog").replaceChildren(new Option("Ajouter un rôle…", ""),
     ...view.catalog.map((r) => new Option(`${r.name} — ${STAGES[r.stage] ?? r.stage}`, r.key)));
@@ -555,8 +557,20 @@ async function teamCall(path, body) {
 // One form for a role edited or written from scratch; saved in the project.
 let editing = null;
 $("role-stage").replaceChildren(...Object.entries(STAGES).map(([k, label]) => new Option(label, k)));
-function editRole(r) {
+async function editRole(r) {
   editing = r?.key ?? null;
+  // The models the server serves; the role's own stays listed if it no longer does.
+  const fallback = new Option("Modèle : celui des Réglages", "");
+  $("role-model").replaceChildren(fallback);
+  let served = [];
+  try {
+    const s = await api("/api/settings", {});
+    served = (await api("/api/settings/served", { base_url: s.base_url, api_key: "" })).models;
+  } catch {
+    // The server does not answer: the role keeps what it has.
+  }
+  for (const m of new Set([...served, r?.model].filter(Boolean))) $("role-model").append(new Option(`Modèle : ${m}`, m));
+  $("role-model").value = r?.model ?? "";
   $("role-name").value = r?.name ?? "";
   $("role-stage").value = r?.stage ?? "solve";
   // Role files wrap their lines; the box shows each paragraph as one.
@@ -574,7 +588,7 @@ $("role-cancel").onclick = () => ($("team-role").hidden = true);
 $("team-role").onsubmit = async (e) => {
   e.preventDefault();
   const checks = $("role-stage").value === "prove" ? $("role-checks").value.split("\n").filter((c) => c.trim()) : [];
-  const body = { key: editing, name: $("role-name").value, stage: $("role-stage").value, brief: $("role-brief").value, checks };
+  const body = { key: editing, name: $("role-name").value, stage: $("role-stage").value, brief: $("role-brief").value, checks, model: $("role-model").value };
   if (await teamCall("/api/team/role", body)) $("team-role").hidden = true;
 };
 $("team-save-open").onclick = () => {
