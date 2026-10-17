@@ -40,6 +40,8 @@ fn main() {
 
 fn serve(addr: &str) -> io::Result<()> {
     work::recover(&Store::from_env()?)?;
+    // Requests from before stats were kept get theirs, once, off the way.
+    std::thread::spawn(|| Store::from_env().map(|s| work::overview(&s)));
     let listener = TcpListener::bind(addr)?;
     let port = listener.local_addr()?.port();
     println!("fennec : http://127.0.0.1:{port}");
@@ -204,6 +206,7 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
         ("POST", "/api/open") => work::open(&store, &field(&input()?, "id")),
         ("POST", "/api/changes") => work::changes(&store, &field(&input()?, "id")),
         ("POST", "/api/journal") => work::journal(&store, &field(&input()?, "id")),
+        ("GET", "/api/stats") => work::overview(&store),
         ("POST", "/api/retry") => {
             work::retry(&store, &field(&input()?, "id"))?;
             Ok(json!({}))

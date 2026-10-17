@@ -35,6 +35,11 @@ fn spawn(id: String, step: fn(&Store, &str) -> io::Result<()>) {
                 r["reason"] = json!(e.to_string());
             });
         }
+        // What the step cost, kept for the card and "Stats": the journal
+        // reads every record, too slow for each refresh of the page.
+        if let Ok(s) = stats(&store, &id) {
+            let _ = store.update(&id, |r| r["stats"] = s);
+        }
     });
 }
 
@@ -801,10 +806,140 @@ fn cost(turns: &Value) -> Value {
     json!({
         "turns": turns.len(),
         "sent": sum(|t| &t["usage"]["prompt_tokens"]),
+        "cached": sum(|t| &t["usage"]["prompt_tokens_details"]["cached_tokens"]),
         "received": sum(|t| &t["usage"]["completion_tokens"]),
         "thinking": sum(|t| &t["usage"]["completion_tokens_details"]["reasoning_tokens"]),
         "ms": sum(|t| &t["model_ms"]),
     })
+}
+
+const COUNTS: [&str; 6] = ["turns", "sent", "cached", "received", "thinking", "ms"];
+
+/// A request's cost summed over its finished steps, in all and per model,
+/// and how many attempts failed (each one undone).
+pub fn stats(store: &Store, id: &str) -> io::Result<Value> {
+    Ok(totals(
+        journal(store, id)?
+            .as_array()
+            .map_or(&[][..], Vec::as_slice),
+    ))
+}
+
+fn totals(steps: &[Value]) -> Value {
+    let mut all = json!({"failed_attempts": 0, "models": {}, "stages": {}});
+    let add = |into: &mut Value, cost: &Value| {
+        for k in COUNTS {
+            into[k] = json!(into[k].as_u64().unwrap_or(0) + cost[k].as_u64().unwrap_or(0));
+        }
+    };
+    for s in steps.iter().filter(|s| s["live"] != true) {
+        add(&mut all, &s["cost"]);
+        let model = s["model"].as_str().unwrap_or("?");
+        if all["models"][model].is_null() {
+            all["models"][model] = json!({});
+        }
+        add(&mut all["models"][model], &s["cost"]);
+        // "Travail, essai 2" counts as "Travail".
+        let stage = s["name"]
+            .as_str()
+            .unwrap_or("?")
+            .split(',')
+            .next()
+            .unwrap_or("?");
+        if all["stages"][stage].is_null() {
+            all["stages"][stage] = json!({});
+        }
+        add(&mut all["stages"][stage], &s["cost"]);
+        if s["passed"] == false {
+            all["failed_attempts"] = json!(all["failed_attempts"].as_u64().unwrap_or(0) + 1);
+        }
+    }
+    all
+}
+
+/// "Stats": every request's cost summed per project and per model, with where
+/// fennec works in each project. A request from before stats were kept gets
+/// them now, once.
+pub fn overview(store: &Store) -> io::Result<Value> {
+    let mut requests = store.requests()?;
+    for (id, r) in &mut requests {
+        // Settled requests only: one under way is written by its own step.
+        let settled = matches!(
+            r["status"].as_str(),
+            Some("ready" | "failed" | "landed" | "passed" | "dropped")
+        );
+        if settled
+            && r["stats"]["stages"].is_null()
+            && (r["spec"].is_string() || r["journal"].is_array())
+        {
+            r["stats"] = stats(store, id)?;
+            store.update(id, |saved| saved["stats"] = r["stats"].clone())?;
+        }
+    }
+    let places = store
+        .projects()?
+        .into_iter()
+        .map(|p| {
+            let place = fennec_os::world::workspace(Path::new(&p));
+            (p, place)
+        })
+        .collect::<Vec<_>>();
+    Ok(summarize(&requests, &places))
+}
+
+fn summarize(requests: &[(String, Value)], places: &[(String, String)]) -> Value {
+    let mut projects: Vec<Value> = places
+        .iter()
+        .map(|(path, place)| {
+            let name = Path::new(path)
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or(path);
+            json!({"path": path, "name": name, "place": place,
+                   "requests": 0, "landed": 0, "failed": 0, "failed_attempts": 0})
+        })
+        .collect();
+    let (mut models, mut stages) = (json!({}), json!({}));
+    let mut all = json!({"requests": 0});
+    let bump = |v: &mut Value, k: &str, n: u64| v[k] = json!(v[k].as_u64().unwrap_or(0) + n);
+    for (_, r) in requests {
+        let s = &r["stats"];
+        bump(&mut all, "requests", 1);
+        for k in COUNTS {
+            bump(&mut all, k, s[k].as_u64().unwrap_or(0));
+        }
+        if let Some(p) = projects.iter_mut().find(|p| p["path"] == r["project"]) {
+            bump(p, "requests", 1);
+            bump(p, "landed", u64::from(r["status"] == "landed"));
+            bump(p, "failed", u64::from(r["status"] == "failed"));
+            bump(
+                p,
+                "failed_attempts",
+                s["failed_attempts"].as_u64().unwrap_or(0),
+            );
+            for k in COUNTS {
+                bump(p, k, s[k].as_u64().unwrap_or(0));
+            }
+        }
+        for (key, into) in [("models", &mut models), ("stages", &mut stages)] {
+            for (name, cost) in s[key].as_object().into_iter().flatten() {
+                if into[name].is_null() {
+                    into[name] = json!({"name": name});
+                }
+                for k in COUNTS {
+                    bump(&mut into[name], k, cost[k].as_u64().unwrap_or(0));
+                }
+            }
+        }
+    }
+    let list = |v: Value| -> Vec<Value> {
+        v.as_object()
+            .into_iter()
+            .flatten()
+            .map(|(_, m)| m.clone())
+            .collect()
+    };
+    json!({"all": all, "projects": projects, "models": list(models), "stages": list(stages)})
 }
 
 pub fn land(store: &Store, id: &str) -> io::Result<()> {
@@ -983,16 +1118,57 @@ mod tests {
     }
 
     #[test]
+    fn stats_sum_finished_steps_per_model_and_per_project() {
+        let cost = |n: u64| json!({"turns": 1, "sent": n, "cached": n / 2, "received": 10, "thinking": 0, "ms": 1000});
+        let steps = [
+            json!({"name": "Discussion", "model": "a", "cost": cost(100)}),
+            json!({"name": "Travail, essai 1", "model": "b", "cost": cost(200), "passed": false}),
+            json!({"name": "Travail, essai 2", "model": "b", "cost": cost(300), "passed": true}),
+            json!({"model": "b", "cost": cost(999), "live": true}),
+        ];
+        let s = totals(&steps);
+        assert_eq!(s["sent"], 600);
+        assert_eq!(s["cached"], 300);
+        assert_eq!(s["failed_attempts"], 1);
+        assert_eq!(s["models"]["b"]["sent"], 500);
+        assert_eq!(s["stages"]["Travail"]["turns"], 2);
+        let requests = [
+            (
+                "1".to_string(),
+                json!({"project": "/p", "status": "landed", "stats": s}),
+            ),
+            (
+                "2".to_string(),
+                json!({"project": "/p", "status": "failed"}),
+            ),
+        ];
+        let v = summarize(&requests, &[("/p".to_string(), "apart".to_string())]);
+        assert_eq!(v["all"]["requests"], 2);
+        let p = &v["projects"][0];
+        assert_eq!(
+            (
+                p["place"].as_str(),
+                p["landed"].as_u64(),
+                p["failed"].as_u64()
+            ),
+            (Some("apart"), Some(1), Some(1))
+        );
+        assert_eq!(p["ms"], 3000);
+        assert_eq!(v["models"].as_array().unwrap().len(), 2);
+    }
+
+    #[test]
     fn a_step_costs_the_sum_of_its_turns() {
         let turns = json!([
             {"model_ms": 400, "usage": {"prompt_tokens": 1000, "completion_tokens": 60,
              "completion_tokens_details": {"reasoning_tokens": 20}}},
-            {"model_ms": 100, "usage": {"prompt_tokens": 1100, "completion_tokens": 5}},
+            {"model_ms": 100, "usage": {"prompt_tokens": 1100, "completion_tokens": 5,
+             "prompt_tokens_details": {"cached_tokens": 1000}}},
             {"model_ms": 50, "usage": null}
         ]);
         assert_eq!(
             cost(&turns),
-            json!({"turns": 3, "sent": 2100, "received": 65, "thinking": 20, "ms": 550})
+            json!({"turns": 3, "sent": 2100, "cached": 1000, "received": 65, "thinking": 20, "ms": 550})
         );
         assert_eq!(cost(&Value::Null)["turns"], 0);
     }

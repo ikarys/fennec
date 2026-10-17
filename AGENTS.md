@@ -15,7 +15,7 @@ Scenarios: `../lead-scenarios.md`. Inventory and decisions: `../inventory.md`.
 ```
 src/main.rs   `fennec` binary: std HTTP server, routes, folder browser
 src/state.rs  requests and projects in files; the single view (what needs you, running, landed)
-src/work.rs   request life in the background: conversation, direct work (fennec-os `spec::direct`), proof, retry; correct, commit, pass or drop; rule offers; journal of every step
+src/work.rs   request life in the background: stats per request and overall ("Stats"); conversation, direct work (fennec-os `spec::direct`), proof, retry; correct, commit, pass or drop; rule offers; journal of every step
 ui/           index.html + app.js, embedded in the binary
 ```
 
@@ -46,7 +46,11 @@ variables override them.
    server and its models, since choosing them is the human's setup; the "Équipe"
    dialog may name the model a role runs on, for the same reason. A second, asked
    for by the human: a request's "Journal" shows each step's exchange with the model
-   as it was (messages, tool calls, tokens), since that is what they want to audit.
+   as it was (messages, tool calls, tokens), since that is what they want to audit. A third, asked for
+   too (2026-10-18): how the work was kept safe and what it cost, in plain words
+   (isolated, without network, failed tries undone; model time, tokens, cache,
+   speed) on each card and in the "Stats" dialog, which also sets where fennec
+   works in each project ("Dans le dossier" or "À part").
 3. **Nothing is "ready" without proof.** What could not be proven is shown as
    "not verified: X".
 4. **Execution logic goes in fennec-os**, not here. This repository stays thin.
