@@ -176,6 +176,22 @@ pub fn setup(project: &Path) -> io::Result<Setup> {
     })
 }
 
+thread_local! {
+    static SKIPPED: std::cell::RefCell<Vec<String>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Runs `work` with the roles whose keys are `keys` left out of every stage:
+/// one request can do without a role (no QA for a one-line page) without
+/// changing the project's team.
+/// ponytail: per thread, which holds while a request's step runs on its own
+/// thread; work handed to another thread would see the whole team.
+pub fn skipping<T>(keys: &[String], work: impl FnOnce() -> T) -> T {
+    let before = SKIPPED.with(|s| s.replace(keys.to_vec()));
+    let out = work();
+    SKIPPED.with(|s| s.replace(before));
+    out
+}
+
 /// The roles that work on a project, sorted by file name.
 pub fn members(project: &Path) -> io::Result<Vec<Role>> {
     let Setup {
@@ -187,9 +203,10 @@ pub fn members(project: &Path) -> io::Result<Vec<Role>> {
     if let Some(why) = missing {
         return Err(io::Error::other(why));
     }
+    let skipped = SKIPPED.with(|s| s.borrow().clone());
     Ok(roles
         .into_iter()
-        .filter(|r| !remove.contains(&r.key))
+        .filter(|r| !remove.contains(&r.key) && !skipped.contains(&r.key))
         .collect())
 }
 
@@ -579,6 +596,17 @@ mod tests {
         let (text, names) = brief(&project, "solve").unwrap();
         assert!(names.contains(&"DevSecOps".to_string()));
         assert!(text.contains("As DevSecOps on the team:\nAudit."));
+        // One request without a role; the team is whole again after it.
+        let without = skipping(&["devsecops".to_string()], || {
+            brief(&project, "solve").unwrap()
+        });
+        assert!(!without.1.contains(&"DevSecOps".to_string()));
+        assert!(
+            brief(&project, "solve")
+                .unwrap()
+                .1
+                .contains(&"DevSecOps".to_string())
+        );
 
         // Another team, minus one of its roles; project roles still apply.
         let choose =
