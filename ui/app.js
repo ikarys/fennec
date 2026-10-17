@@ -69,6 +69,20 @@ function firstLine(text) {
 
 // fennec-os reports rule breaks in its own words; the card says what happened.
 // The raw reason stays behind "Détails".
+// The model server's errors (ureq's wording), in the human's words.
+function unreachable(line) {
+  // Anchored: a test's output that mentions a timeout is not the server's.
+  const m = line.match(/(?:^|\()(timeout|http status|io|host not found|connection failed|bad uri)(?::? ?(\S*))/);
+  if (!m) return null;
+  if (m[1] === "timeout") return "le serveur ne répond pas à temps";
+  if (m[1] === "http status") return m[2] === "401" || m[2] === "403" ? "le serveur refuse la clé"
+    : m[2] === "404" ? "le serveur ne connaît pas cette adresse (elle finit souvent par /v1)"
+    : `le serveur répond l'erreur ${m[2]}`;
+  if (m[1] === "host not found") return "cette adresse n'existe pas";
+  if (m[1] === "bad uri") return "cette adresse n'est pas valide";
+  return "rien ne répond à cette adresse";
+}
+
 function explain(reason) {
   const line = firstLine(reason);
   let m = line.match(/^rule task\.protect violated: changed (.+)$/);
@@ -76,7 +90,9 @@ function explain(reason) {
   m = line.match(/^rule \S+ violated: changed (\S+) but nothing under (\S+)$/);
   if (m) return `${m[1]} a changé sans changement dans ${m[2]}, comme les règles du projet l'exigent`;
   m = line.match(/^no model: .* and (\S+)\/models did not answer/);
-  if (m) return `fennec ne joint aucun modèle à ${m[1]} : démarre-le avec FENNEC_OS_BASE_URL=<adresse du serveur du modèle>, puis réessaie`;
+  const down = unreachable(line);
+  if (m) return `fennec ne joint aucun modèle à ${m[1]}${down ? ` (${down})` : ""} : vérifie les Réglages, puis réessaie`;
+  if (down) return `fennec ne joint pas son modèle : ${down}. Vérifie les Réglages, puis réessaie`;
   m = line.match(/^rule \S+ violated: changed (.+)$/);
   if (m) return `fennec a modifié ${m[1]}, que les règles du projet protègent`;
   return line;
@@ -422,7 +438,7 @@ async function listModels() {
     $("settings-models").replaceChildren(...models.map((m) =>
       el("li", {}, el("input", { type: "checkbox", value: m, checked: chosen.includes(m), ariaLabel: m }), m)));
   } catch (e) {
-    if (ask === asked) $("settings-status").textContent = e.message;
+    if (ask === asked) $("settings-status").textContent = unreachable(e.message) ?? e.message;
   }
 }
 $("open-settings").onclick = async () => {

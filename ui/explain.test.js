@@ -1,0 +1,19 @@
+// node ui/explain.test.js — checks reasons are put in the human's words.
+const assert = require("assert");
+const src = require("fs").readFileSync(__dirname + "/app.js", "utf8");
+const firstLine = (s) => (s ?? "").split("\n")[0];
+const grab = (name) => src.match(new RegExp(`function ${name}[\\s\\S]*?\\n}\\n`))[0];
+eval(grab("unreachable") + grab("explain"));
+
+assert.match(explain("timeout: global"), /pas à temps/);
+assert.match(explain("io: Connection refused (os error 111)"), /rien ne répond/);
+assert.match(explain("http status: 401"), /refuse la clé/);
+assert.match(explain("http status: 500"), /erreur 500/);
+assert.match(explain("host not found"), /n'existe pas/);
+assert.match(
+  explain("no model: none is set and http://x:1/v1/models did not answer (timeout: global)"),
+  /aucun modèle à http:\/\/x:1\/v1 \(le serveur ne répond pas à temps\)/,
+);
+// A test's own output is not the server's.
+assert.equal(explain("tests failed: case ... timeout: 5s"), "tests failed: case ... timeout: 5s");
+console.log("ok");

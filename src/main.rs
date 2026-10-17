@@ -214,8 +214,8 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
                 .filter(|k| !k.is_empty())
                 .map(str::to_string)
                 .or(Settings::saved()?.api_key);
-            let models = provider::served(&field(&v, "base_url"), key.as_deref())
-                .map_err(|e| io::Error::other(format!("le serveur ne répond pas : {e}")))?;
+            // The page puts ureq's wording in French.
+            let models = provider::served(&field(&v, "base_url"), key.as_deref())?;
             Ok(json!({"models": models}))
         }
         ("POST", "/api/settings/save") => {
