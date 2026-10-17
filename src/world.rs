@@ -418,6 +418,14 @@ pub fn choose_place(project: &Path, place: &str) -> io::Result<()> {
     git(project, &["config", "fennec.workspace", place]).map(drop)
 }
 
+/// Where `project`'s worlds go: `here`, `apart`, or a path.
+pub fn workspace(project: &Path) -> String {
+    match git(project, &["config", "--get", "fennec.workspace"]) {
+        Ok(chosen) if !chosen.is_empty() => chosen,
+        _ => "here".to_string(),
+    }
+}
+
 /// Where a new world of `project` goes; see the module doc.
 fn place(project: &Path) -> io::Result<Place> {
     let chosen = git(project, &["config", "--get", "fennec.workspace"]).unwrap_or_default();
