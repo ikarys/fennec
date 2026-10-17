@@ -8,7 +8,7 @@ use std::path::Path;
 
 use fennec_os::provider::{Model, OpenAi};
 use fennec_os::world::Worlds;
-use fennec_os::{proof, rules, solve, spec};
+use fennec_os::{proof, review, rules, solve, spec};
 use serde_json::{Value, json};
 
 use crate::state::Store;
@@ -42,6 +42,111 @@ pub fn frame(id: String) {
     spawn(id, frame_now);
 }
 
+/// One turn of the conversation that shapes a request: fennec answers the
+/// human, or, once the request is clear, frames it.
+pub fn talk(id: String) {
+    spawn(id, talk_now);
+}
+
+fn say_in(request: &mut Value, who: &str, text: &str) {
+    if !request["thread"].is_array() {
+        request["thread"] = json!([]);
+    }
+    if let Some(t) = request["thread"].as_array_mut() {
+        t.push(json!({"who": who, "text": text}));
+    }
+}
+
+fn talk_now(store: &Store, id: &str) -> io::Result<()> {
+    let request = store.load(id)?;
+    let model = OpenAi::variants_from_env(1)?.remove(0);
+    offer_rule(store, id, &request, &model)?;
+    let thread = request["thread"].as_array().cloned().unwrap_or_default();
+    let project = Path::new(request["project"].as_str().unwrap_or(""));
+    match spec::discuss(project, &thread, &model)? {
+        spec::Discussed::Reply(text) => store.update(id, |r| {
+            say_in(r, "fennec", &text);
+            r["status"] = json!("talk");
+        }),
+        spec::Discussed::Brief(brief) => {
+            store.update(id, |r| {
+                r["brief"] = json!(brief);
+                r["status"] = json!("framing");
+            })?;
+            frame_now(store, id)
+        }
+    }
+}
+
+/// The human speaks in the conversation: an answer, a precision, or a
+/// correction of the proposed "done when", which is then dropped.
+pub fn say(store: &Store, id: &str, text: &str) -> io::Result<()> {
+    let request = store.load(id)?;
+    let open = match request["status"].as_str() {
+        Some("talk" | "question") => true,
+        Some("blocked") => request["stage"] == "framing",
+        _ => false,
+    };
+    if !open {
+        return Err(io::Error::other("cette demande n'attend pas de réponse"));
+    }
+    let text = text.trim();
+    if text.is_empty() {
+        return Err(io::Error::other("message vide"));
+    }
+    if request["status"] == "question" {
+        spec::reject(
+            &Worlds::from_env()?,
+            request["spec"].as_str().unwrap_or(""),
+            Some(text),
+        )?;
+    }
+    store.update(id, |r| {
+        say_in(r, "human", text);
+        r["status"] = json!("thinking");
+        r["heard"] = json!(text);
+        if let Some(m) = r.as_object_mut() {
+            m.remove("done_when");
+            m.remove("brief");
+        }
+    })?;
+    talk(id.to_string());
+    Ok(())
+}
+
+/// "Cadrer maintenant": the human finds it clear enough; the whole
+/// conversation becomes the brief.
+pub fn frame_anyway(store: &Store, id: &str) -> io::Result<()> {
+    let request = store.load(id)?;
+    if request["status"] != "talk" {
+        return Err(io::Error::other("cette demande n'est pas en discussion"));
+    }
+    let brief = transcript(&request);
+    store.update(id, |r| {
+        r["brief"] = json!(brief);
+        r["status"] = json!("framing");
+    })?;
+    frame(id.to_string());
+    Ok(())
+}
+
+fn transcript(request: &Value) -> String {
+    let mut text = request["text"].as_str().unwrap_or("").to_string();
+    let thread = request["thread"].as_array().cloned().unwrap_or_default();
+    if thread.len() > 1 {
+        text.push_str("\n\nAgreed in conversation:\n");
+        for t in &thread[1..] {
+            let who = if t["who"] == "human" {
+                "human"
+            } else {
+                "fennec"
+            };
+            text.push_str(&format!("- {who}: {}\n", t["text"].as_str().unwrap_or("")));
+        }
+    }
+    text
+}
+
 fn frame_now(store: &Store, id: &str) -> io::Result<()> {
     let request = store.load(id)?;
     let worlds = Worlds::from_env()?;
@@ -50,7 +155,10 @@ fn frame_now(store: &Store, id: &str) -> io::Result<()> {
     let s = spec::compile(
         &worlds,
         Path::new(request["project"].as_str().unwrap_or("")),
-        request["text"].as_str().unwrap_or(""),
+        request["brief"]
+            .as_str()
+            .or(request["text"].as_str())
+            .unwrap_or(""),
         &model,
         MAX_STEPS,
     )?;
@@ -64,7 +172,9 @@ fn frame_now(store: &Store, id: &str) -> io::Result<()> {
             r["done_when"] = s["done_when"].clone();
             r["verify"] = s["verify"].clone();
         } else if let Some(q) = s["question"].as_str() {
-            block(r, "framing", q, s["reason"].as_str().unwrap_or(""));
+            // Back to the conversation: the human answers where they talk.
+            say_in(r, "fennec", q);
+            r["status"] = json!("talk");
         } else {
             r["status"] = json!("failed");
             r["reason"] = json!(format!(
@@ -153,6 +263,8 @@ pub fn rule(store: &Store, id: &str, scope: &str) -> io::Result<()> {
 
 /// A stopped agent's question goes to the human instead of a failure.
 fn block(request: &mut Value, stage: &str, question: &str, why: &str) {
+    // In the conversation too: the whole story reads in one place.
+    say_in(request, "fennec", question);
     request["status"] = json!("blocked");
     request["stage"] = json!(stage);
     request["question"] = json!(question);
@@ -176,6 +288,7 @@ pub fn reply(store: &Store, id: &str, text: &str) -> io::Result<()> {
         request["question"].as_str().unwrap_or(""),
         text,
     )?;
+    store.update(id, |r| say_in(r, "human", text))?;
     // ponytail: the step restarts from scratch with the answer; resuming the
     // stopped conversation would save its steps.
     if request["stage"] == "framing" {
@@ -334,6 +447,14 @@ fn apply_proof(request: &mut Value, proof: &Value) {
     }
 }
 
+/// The paths a diff touches, in order.
+fn changed_files(diff: &str) -> Vec<&str> {
+    diff.lines()
+        .filter_map(|l| l.strip_prefix("diff --git a/"))
+        .filter_map(|l| l.split(" b/").next())
+        .collect()
+}
+
 fn apply_run(request: &mut Value, record: &Value) {
     // The rules each step says it applied: framing's, then the solution's.
     let mut used: Vec<Value> = request["rules"].as_array().cloned().unwrap_or_default();
@@ -356,6 +477,14 @@ fn apply_run(request: &mut Value, record: &Value) {
     if record["winner"].is_string() {
         request["status"] = json!("ready");
         request["run"] = record["winner"].clone();
+        // What fennec did, kept with the request: the run record is internal.
+        if let Some(t) = record["attempts"]
+            .as_array()
+            .and_then(|a| a.iter().find(|t| t["world"] == record["winner"]))
+        {
+            request["summary"] = t["summary"].clone();
+            request["files"] = json!(changed_files(t["diff"].as_str().unwrap_or("")));
+        }
     } else if let Some(t) = record["attempts"]
         .as_array()
         .and_then(|a| a.iter().find(|t| t["question"].is_string()))
@@ -397,10 +526,52 @@ pub fn drop(store: &Store, id: &str) -> io::Result<()> {
     })
 }
 
+/// "Passer": the work is set aside, the project untouched. The world stays,
+/// so the human can come back to it and commit later.
+pub fn pass(store: &Store, id: &str) -> io::Result<()> {
+    if store.load(id)?["status"] != "ready" {
+        return Err(io::Error::other("cette demande n'attend pas ta décision"));
+    }
+    store.update(id, |r| r["status"] = json!("passed"))
+}
+
+/// Back from the history to the human's decisions.
+pub fn resume(store: &Store, id: &str) -> io::Result<()> {
+    if store.load(id)?["status"] != "passed" {
+        return Err(io::Error::other("cette demande n'a pas été mise de côté"));
+    }
+    store.update(id, |r| r["status"] = json!("ready"))
+}
+
+/// What fennec changed for a request, read from its run: asked for when the
+/// human opens it, since a diff is too large for every refresh of the page.
+pub fn changes(store: &Store, id: &str) -> io::Result<Value> {
+    let request = store.load(id)?;
+    let run = request["run"]
+        .as_str()
+        .ok_or_else(|| io::Error::other("fennec n'a rien changé pour cette demande"))?;
+    let record = review::load(&Worlds::from_env()?, run)?;
+    let attempt = record["attempts"]
+        .as_array()
+        .and_then(|a| a.iter().find(|t| t["world"] == record["winner"]))
+        .cloned()
+        .unwrap_or_default();
+    let diff = attempt["diff"].as_str().unwrap_or("");
+    // ponytail: a cut at 300 kB; a huge change is read in the project.
+    const MAX: usize = 300_000;
+    let cut = diff.len() > MAX;
+    let shown = &diff[..diff.floor_char_boundary(MAX.min(diff.len()))];
+    Ok(
+        json!({"summary": attempt["summary"], "files": changed_files(diff), "diff": shown, "cut": cut}),
+    )
+}
+
 pub fn land(store: &Store, id: &str) -> io::Result<()> {
     let request = store.load(id)?;
     if request["status"] != "ready" || !request["run"].is_string() {
-        return Err(io::Error::other("cette demande n'est pas prête à intégrer"));
+        return Err(io::Error::other(
+            "cette demande n'est pas prête pour un commit",
+        ));
     }
     store.update(id, |r| {
         r["status"] = json!("landing");
@@ -467,7 +638,7 @@ pub fn recover(store: &Store) -> io::Result<()> {
     for (id, r) in store.requests()? {
         if matches!(
             r["status"].as_str(),
-            Some("framing" | "running" | "proving")
+            Some("thinking" | "framing" | "running" | "proving")
         ) {
             store.update(&id, |r| {
                 r["status"] = json!("failed");
@@ -476,7 +647,7 @@ pub fn recover(store: &Store) -> io::Result<()> {
         } else if r["status"] == "landing" {
             store.update(&id, |r| {
                 r["status"] = json!("ready");
-                r["land_error"] = json!("interrompu : fennec a été arrêté pendant l'intégration");
+                r["land_error"] = json!("interrompu : fennec a été arrêté pendant le commit");
             })?;
         }
     }
@@ -498,6 +669,10 @@ mod tests {
         assert_eq!(r["stage"], "solving");
         assert_eq!(r["question"], "Which port?");
         assert_eq!(r["reason"], "stuck: x");
+        assert_eq!(
+            r["thread"],
+            json!([{"who": "fennec", "text": "Which port?"}])
+        );
     }
 
     #[test]
@@ -508,6 +683,50 @@ mod tests {
             &json!({"winner": "w2", "attempts": [{"world": "w1", "rules": ["x"]}, {"world": "w2", "rules": ["use uv", "short output"]}]}),
         );
         assert_eq!(r["rules"], json!(["use uv", "short output"]));
+    }
+
+    #[test]
+    fn the_conversation_becomes_the_brief() {
+        let r = json!({"text": "un test", "thread": [
+            {"who": "human", "text": "un test"},
+            {"who": "fennec", "text": "Un script ou une page ?"},
+            {"who": "human", "text": "un script python"}]});
+        assert_eq!(
+            transcript(&r),
+            "un test\n\nAgreed in conversation:\n- fennec: Un script ou une page ?\n- human: un script python\n"
+        );
+        assert_eq!(
+            transcript(&json!({"text": "x", "thread": [{"who": "human", "text": "x"}]})),
+            "x"
+        );
+    }
+
+    #[test]
+    fn passing_sets_the_work_aside_until_resumed() {
+        let tmp = std::env::temp_dir().join(format!("fennec-lead-pass-{}", std::process::id()));
+        let store = Store { root: tmp.clone() };
+        std::fs::create_dir_all(tmp.join("requests")).unwrap();
+        let id = "1".to_string();
+        std::fs::write(tmp.join("requests/1.json"), r#"{"status": "running"}"#).unwrap();
+        assert!(pass(&store, &id).is_err(), "only a ready request");
+        store.update(&id, |r| r["status"] = json!("ready")).unwrap();
+        pass(&store, &id).unwrap();
+        assert_eq!(store.load(&id).unwrap()["status"], "passed");
+        resume(&store, &id).unwrap();
+        assert_eq!(store.load(&id).unwrap()["status"], "ready");
+        std::fs::remove_dir_all(tmp).unwrap();
+    }
+
+    #[test]
+    fn what_the_winner_did_is_kept_for_the_human() {
+        let mut r = json!({"status": "running"});
+        apply_run(
+            &mut r,
+            &json!({"winner": "w2", "attempts": [{"world": "w1", "summary": "lost"}, {"world": "w2", "summary": "Ajouté bonjour.py",
+                "diff": "diff --git a/bonjour.py b/bonjour.py\nnew file\ndiff --git a/tests/t.py b/tests/t.py\n+x\n"}]}),
+        );
+        assert_eq!(r["summary"], "Ajouté bonjour.py");
+        assert_eq!(r["files"], json!(["bonjour.py", "tests/t.py"]));
     }
 
     #[test]
