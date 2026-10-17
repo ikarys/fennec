@@ -332,7 +332,7 @@ function card(item) {
     const text = el("textarea", { placeholder: "Ta réponse", ariaLabel: "Ta réponse" });
     add(el("div", { className: "reply" }, text));
     actions.append(dropButton(item.id), el("span", { className: "spacer" }),
-      action("C'est clair, cadre-la", "/api/frame", { id: item.id }),
+      action("C'est clair, fais-le", "/api/frame", { id: item.id }),
       action("Répondre", "/api/say", () => ({ id: item.id, text: text.value }), { primary: true }));
   } else if (item.kind === "validate") {
     add(conversation(item), focus("Terminé quand", item.done_when));

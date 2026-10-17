@@ -243,9 +243,7 @@ fn classify(requests: &[(String, Value)], projects: &[String]) -> Value {
         match r["status"].as_str() {
             Some("thinking") => running.push(card_step(card("running"), "réfléchit à ta demande")),
             Some("talk") => todo.push((0, card("talk"))),
-            Some("framing") => {
-                running.push(card_step(card("running"), "prépare « terminé quand »"))
-            }
+            Some("framing") => running.push(card_step(card("running"), "se met au travail")),
             Some("running") => running.push(card_step(card("running"), "travaille")),
             Some("proving") => running.push(card_step(card("running"), "essaie le produit")),
             Some("landing") => running.push(card_step(card("running"), "fait le commit")),
@@ -451,7 +449,7 @@ mod tests {
         assert_eq!(ready["land_error"], "conflit");
         assert_eq!(ready["rules"][0], "use uv");
         assert_eq!(ready["land"]["branch"], Value::Null);
-        assert_eq!(v["running"][0]["step"], "prépare « terminé quand »");
+        assert_eq!(v["running"][0]["step"], "se met au travail");
         let history: Vec<&str> = v["history"]
             .as_array()
             .unwrap()
