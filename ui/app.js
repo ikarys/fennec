@@ -23,7 +23,7 @@ async function api(path, body) {
 function action(label, path, body, { primary = false, quiet = false } = {}) {
   const button = el("button", { type: "button", textContent: label, className: primary ? "primary" : quiet ? "quiet" : "" });
   button.onclick = async () => {
-    const error = button.closest(".card").querySelector(".error");
+    const error = button.closest(".card, .past-actions").querySelector(".error");
     error.textContent = "";
     try {
       await api(path, typeof body === "function" ? body() : body);
@@ -47,10 +47,11 @@ function dropButton(id) {
 }
 
 const TAGS = {
+  talk: ["Discussion", "var(--accent)"],
   validate: ["À valider", "var(--accent)"],
   blocked: ["Question", "var(--accent)"],
   rule: ["Règle ?", "var(--accent)"],
-  ready: ["Prêt à intégrer", "var(--ok)"],
+  ready: ["Prêt", "var(--ok)"],
   failed: ["Échoué", "var(--bad)"],
 };
 
@@ -145,10 +146,70 @@ function details(item) {
   return box.children.length > 1 ? box : null;
 }
 
+// What fennec did, in its words, and where: the work itself, not just its verdict.
+function work(item) {
+  const nodes = [];
+  if (item.summary) nodes.push(focus("Ce que fennec a fait", item.summary));
+  if (item.files?.length) {
+    nodes.push(el("div", { className: "files" }, "Fichiers : ",
+      ...item.files.flatMap((f, i) => [i ? ", " : "", el("code", { textContent: f })])));
+  }
+  return nodes;
+}
+
+// The exact change, on demand: one button that opens it under the card.
+function changesButton(item, where) {
+  const button = el("button", { type: "button", textContent: "Voir les changements" });
+  let box = null;
+  button.onclick = async () => {
+    if (box) {
+      box.remove();
+      box = null;
+      button.textContent = "Voir les changements";
+      return;
+    }
+    box = el("div", { className: "changes" }, el("div", { className: "muted", textContent: "Je charge les changements…" }));
+    where().append(box);
+    button.textContent = "Masquer les changements";
+    try {
+      const c = await api("/api/changes", { id: item.id });
+      const nodes = item.summary || !c.summary ? [] : [focus("Ce que fennec a fait", c.summary)];
+      nodes.push(diffView(c.diff));
+      if (c.cut) nodes.push(el("div", { className: "muted", textContent: "Coupé : le reste est trop long pour la page, regarde-le dans le projet." }));
+      box.replaceChildren(...nodes);
+    } catch (e) {
+      box.replaceChildren(el("div", { className: "bad", textContent: e.message }));
+    }
+  };
+  return button;
+}
+
+function diffView(diff) {
+  if (!diff) return el("div", { className: "muted", textContent: "Aucun changement." });
+  const pre = el("pre", { className: "diff" });
+  for (const l of diff.split("\n")) {
+    const kind = l.startsWith("diff --git") ? "file" : l.startsWith("+") && !l.startsWith("+++") ? "add"
+      : l.startsWith("-") && !l.startsWith("---") ? "del" : l.startsWith("@@") ? "hunk" : "";
+    if (/^(index |--- |\+\+\+ )/.test(l)) continue;
+    pre.append(el("span", { className: kind, textContent: kind === "file" ? l.replace(/^diff --git a\/(\S+) .*/, "$1") : l }), "\n");
+  }
+  return pre;
+}
+
+// The conversation that shaped the request, the human's words on the right.
+function conversation(item) {
+  // The opening message is the card's title already.
+  const said = (item.thread ?? []).filter((t, i) => i > 0 || t.who !== "human");
+  if (!said.length) return null;
+  return el("div", { className: "thread" }, ...said.map((t) =>
+    el("div", { className: t.who === "human" ? "said human" : "said" },
+      el("span", { className: "label", textContent: t.who === "human" ? "Toi" : "fennec" }), ...rich(t.text))));
+}
+
 function landLabel({ branch, remote, committed }) {
-  if (!branch) return "Préparer l'intégration";
+  if (!branch) return "Préparer le commit";
   if (committed) return `Pousser ${branch} vers ${remote}`;
-  return remote ? `Intégrer dans ${branch} et pousser vers ${remote}` : `Intégrer dans ${branch}`;
+  return remote ? `Commit dans ${branch} et pousser vers ${remote}` : `Commit dans ${branch}`;
 }
 
 function card(item) {
@@ -160,21 +221,31 @@ function card(item) {
   const actions = el("div", { className: "actions" });
   const add = (...nodes) => node.append(...nodes.filter(Boolean));
 
-  if (item.kind === "validate") {
-    add(focus("Terminé quand", item.done_when));
-    const correction = el("textarea", { placeholder: "Ce qui ne va pas", hidden: true });
+  if (item.kind === "talk") {
+    add(conversation(item));
+    const text = el("textarea", { placeholder: "Ta réponse", ariaLabel: "Ta réponse" });
+    add(el("div", { className: "reply" }, text));
+    actions.append(dropButton(item.id), el("span", { className: "spacer" }),
+      action("C'est clair, cadre-la", "/api/frame", { id: item.id }),
+      action("Répondre", "/api/say", () => ({ id: item.id, text: text.value }), { primary: true }));
+  } else if (item.kind === "validate") {
+    add(conversation(item), focus("Terminé quand", item.done_when));
+    const correction = el("textarea", { placeholder: "Ce qui ne va pas, ou une précision", hidden: true });
     const fix = el("button", { type: "button", textContent: "Corriger" });
     fix.onclick = () => {
       // Opening the field is the first click; sending is the second.
       correction.hidden = false;
       correction.focus();
-      fix.replaceWith(action("Envoyer la correction", "/api/answer", () => ({ id: item.id, accept: false, correction: correction.value })));
+      fix.replaceWith(action("Envoyer", "/api/say", () => ({ id: item.id, text: correction.value })));
     };
     add(el("div", { className: "reply" }, correction));
     actions.append(dropButton(item.id), el("span", { className: "spacer" }), fix,
       action("Valider", "/api/answer", { id: item.id, accept: true, correction: "" }, { primary: true }));
   } else if (item.kind === "blocked") {
-    add(focus("fennec demande", item.question));
+    // Requests from before the conversation have the question alone.
+    const last = item.thread?.at(-1);
+    add(...(last?.who === "fennec" && last.text === item.question
+      ? [conversation(item)] : [conversation(item), focus("fennec demande", item.question)]));
     const text = el("textarea", { placeholder: "Ta réponse", ariaLabel: "Ta réponse" });
     add(el("div", { className: "reply" }, text));
     actions.append(dropButton(item.id), el("span", { className: "spacer" }),
@@ -186,7 +257,7 @@ function card(item) {
       action("Pour tous mes projets", "/api/rule", { id: item.id, scope: "user" }, { primary: true }));
   } else if (item.kind === "ready") {
     if (item.done_when) add(focus("Terminé quand", item.done_when));
-    add(shots(item));
+    add(...work(item), shots(item));
     // Commands leave no picture: their proof would otherwise hide behind "Détails".
     const tried = item.tries?.length ?? 0;
     if (tried) {
@@ -198,15 +269,18 @@ function card(item) {
       add(el("div", { className: "muted", style: "margin-top:10px", textContent: "Non vérifié — à regarder toi-même :" }),
         el("ul", { className: "warn" }, ...warns.map((w) => el("li", {}, ...rich(w)))));
     }
-    if (item.land_error) add(el("div", { className: "bad", textContent: "Intégration interrompue : " + firstLine(item.land_error) }));
-    actions.append(dropButton(item.id), el("span", { className: "spacer" }));
+    if (item.land_error) add(el("div", { className: "bad", textContent: "Commit interrompu : " + firstLine(item.land_error) }));
+    // Three ways out, none forced: look, set aside, or commit.
+    actions.append(dropButton(item.id), el("span", { className: "spacer" }),
+      changesButton(item, () => node.querySelector(".changes-slot")),
+      action("Passer", "/api/pass", { id: item.id }));
     if (item.land) actions.append(action(landLabel(item.land), "/api/land", { id: item.id }, { primary: true }));
   } else if (item.kind === "failed") {
     add(el("div", { className: "bad", textContent: explain(item.reason) || "raison inconnue" }), shots(item));
     actions.append(dropButton(item.id), el("span", { className: "spacer" }),
       action("Réessayer", "/api/retry", { id: item.id }, { primary: true }));
   }
-  add(details(item), actions, el("div", { className: "error", role: "alert" }));
+  add(el("div", { className: "changes-slot" }), details(item), actions, el("div", { className: "error", role: "alert" }));
   return node;
 }
 
@@ -217,9 +291,38 @@ function line(item, state, dot) {
     el("span", { className: "state", textContent: state }));
 }
 
-function landedState(item) {
+// A finished request opens on what was asked, done and proven.
+function past(item) {
+  const box = el("details", { className: "past" },
+    el("summary", {}, line(item, pastState(item), false)));
+  box.dataset.key = "past-" + item.id;
+  const talk = conversation(item);
+  if (talk) box.append(talk);
+  if (item.done_when) box.append(focus("Terminé quand", item.done_when));
+  box.append(...work(item));
+  const tried = item.tries?.length ?? 0;
+  if (tried) box.append(el("div", { className: "proved", textContent: `✓ fennec l'a essayé : ${tried} essai${tried > 1 ? "s" : ""} réussi${tried > 1 ? "s" : ""}` }));
+  if (item.unverified?.length) {
+    box.append(el("div", { className: "muted", textContent: "Non vérifié :" }),
+      el("ul", { className: "warn" }, ...item.unverified.map((w) => el("li", {}, ...rich(w)))));
+  }
+  const s = shots(item);
+  if (s) box.append(s);
+  const more = details(item);
+  if (more) box.append(more);
+  const slot = el("div");
+  const actions = el("div", { className: "actions" });
+  if (item.changed) actions.append(changesButton(item, () => slot));
+  if (item.kind === "passed") actions.append(action("Reprendre", "/api/resume", { id: item.id }, { primary: true }));
+  box.append(slot, el("div", { className: "past-actions" }, actions, el("div", { className: "error", role: "alert" })));
+  return box;
+}
+
+function pastState(item) {
+  if (item.kind === "passed") return "mis de côté";
+  if (item.kind === "dropped") return "abandonné";
   const parts = [item.branch, item.remote && `poussé vers ${item.remote}`, item.commit?.slice(0, 7)];
-  return "✓ " + parts.filter(Boolean).join(" · ");
+  return "✓ commit " + parts.filter(Boolean).join(" · ");
 }
 
 function renderProjects(projects) {
@@ -251,8 +354,12 @@ async function refresh(force) {
     fill($("todo"), view.todo.map(card), "Rien ne t'attend.");
     for (const d of document.querySelectorAll("details")) d.open = open.has(d.dataset.key);
     $("n-todo").textContent = view.todo.length ? `· ${view.todo.length}` : "";
+    // Seen from another tab: what waits for the human, in the tab's title.
+    document.title = view.todo.length ? `(${view.todo.length}) fennec` : "fennec";
     fill($("running"), view.running.map((r) => line(r, r.step, true)), "Rien en cours.");
-    fill($("landed"), view.landed.map((r) => line(r, landedState(r), false)), "Rien d'intégré pour l'instant.");
+    fill($("history"), view.history.map(past), "Rien de terminé pour l'instant.");
+    // How it works, while nothing is under way: the page alone must explain itself.
+    $("how").hidden = view.todo.length + view.running.length > 0;
     renderProjects(view.projects);
   } catch (e) {
     $("error").textContent = "Serveur injoignable : " + e.message;

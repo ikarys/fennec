@@ -90,7 +90,9 @@ impl Store {
             .as_nanos();
         // Same width hex timestamps, as in fennec-os: lexical order is time order.
         let id = format!("{nanos:032x}");
-        let record = json!({"project": project, "text": text.trim(), "status": "framing"});
+        // Every request opens a conversation; a clear one ends at its first turn.
+        let record = json!({"project": project, "text": text.trim(), "status": "thinking",
+                            "thread": [{"who": "human", "text": text.trim()}]});
         write_json(&self.request_path(&id)?, &record)?;
         Ok(id)
     }
@@ -184,11 +186,12 @@ fn unverified(proof: &Value) -> Value {
 /// sees is tested here. Each card carries fields, not prose: the page decides
 /// what is shown at once and what waits behind "details".
 fn classify(requests: &[(String, Value)], projects: &[String]) -> Value {
-    let (mut todo, mut running, mut landed) = (vec![], vec![], vec![]);
+    let (mut todo, mut running, mut history) = (vec![], vec![], vec![]);
     for (id, r) in requests {
         let card = |kind: &str| {
             json!({"id": id, "kind": kind, "project": name(r["project"].as_str().unwrap_or("")),
-                   "title": r["text"], "rules": r["rules"], "checks": r["verify"], "team": r["team"]})
+                   "title": r["text"], "rules": r["rules"], "checks": r["verify"], "team": r["team"],
+                   "thread": r["thread"]})
         };
         // Scenario 4: what the human said may become a rule, at one word.
         if let Some(rule) = r["offer"]["rule"].as_str() {
@@ -198,12 +201,14 @@ fn classify(requests: &[(String, Value)], projects: &[String]) -> Value {
             todo.push((0, c));
         }
         match r["status"].as_str() {
+            Some("thinking") => running.push(card_step(card("running"), "réfléchit à ta demande")),
+            Some("talk") => todo.push((0, card("talk"))),
             Some("framing") => {
                 running.push(card_step(card("running"), "prépare « terminé quand »"))
             }
             Some("running") => running.push(card_step(card("running"), "travaille")),
             Some("proving") => running.push(card_step(card("running"), "essaie le produit")),
-            Some("landing") => running.push(card_step(card("running"), "intègre")),
+            Some("landing") => running.push(card_step(card("running"), "fait le commit")),
             Some("question") => {
                 let mut c = card("validate");
                 c["done_when"] = r["done_when"].clone();
@@ -223,6 +228,8 @@ fn classify(requests: &[(String, Value)], projects: &[String]) -> Value {
                 c["role_checks"] = r["proof"]["checks"].clone();
                 c["shots"] = r["proof"]["shots"].clone();
                 c["land_error"] = r["land_error"].clone();
+                c["summary"] = r["summary"].clone();
+                c["files"] = r["files"].clone();
                 // A run that predates the proof was never tried: say so.
                 c["untried"] = json!(
                     r["proof"]["tries"].as_array().is_none_or(Vec::is_empty)
@@ -248,12 +255,22 @@ fn classify(requests: &[(String, Value)], projects: &[String]) -> Value {
                 c["shots"] = r["proof"]["shots"].clone();
                 todo.push((2, c));
             }
-            Some("landed") => {
-                let mut c = card("landed");
+            // Finished one way or another: kept, so the human is never blind
+            // to what was asked, done and proven.
+            Some(outcome @ ("landed" | "passed" | "dropped")) => {
+                let mut c = card(outcome);
                 c["branch"] = r["target"]["branch"].clone();
                 c["remote"] = r["target"]["remote"].clone();
                 c["commit"] = r["commit"].clone();
-                landed.push(c);
+                c["changed"] = json!(r["run"].is_string());
+                for k in ["done_when", "summary", "files", "question", "reason"] {
+                    c[k] = r[k].clone();
+                }
+                c["tries"] = r["proof"]["tries"].clone();
+                c["role_checks"] = r["proof"]["checks"].clone();
+                c["shots"] = r["proof"]["shots"].clone();
+                c["unverified"] = unverified(&r["proof"]);
+                history.push(c);
             }
             _ => {}
         }
@@ -261,13 +278,14 @@ fn classify(requests: &[(String, Value)], projects: &[String]) -> Value {
     // Answers unblock fennec, so they come first; then results, then failures.
     todo.sort_by_key(|(rank, _)| *rank);
     let todo: Vec<Value> = todo.into_iter().map(|(_, c)| c).collect();
-    landed.reverse();
-    landed.truncate(5);
+    history.reverse();
+    // ponytail: the last 50; older requests stay on disk, unseen.
+    history.truncate(50);
     let projects: Vec<Value> = projects
         .iter()
         .map(|p| json!({"path": p, "name": name(p)}))
         .collect();
-    json!({"todo": todo, "running": running, "landed": landed, "projects": projects})
+    json!({"todo": todo, "running": running, "history": history, "projects": projects})
 }
 
 fn card_step(mut card: Value, step: &str) -> Value {
@@ -360,7 +378,14 @@ mod tests {
         assert_eq!(ready["rules"][0], "use uv");
         assert_eq!(ready["land"]["branch"], Value::Null);
         assert_eq!(v["running"][0]["step"], "prépare « terminé quand »");
-        assert_eq!(v["landed"][0]["branch"], "feat/l");
+        let history: Vec<&str> = v["history"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|c| c["kind"].as_str().unwrap())
+            .collect();
+        assert_eq!(history, ["dropped", "landed"], "newest first, none lost");
+        assert_eq!(v["history"][1]["branch"], "feat/l");
         assert_eq!(v["projects"][0]["name"], "a");
     }
 }

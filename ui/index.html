@@ -62,6 +62,32 @@
               white-space: pre-wrap; margin: 4px 0; }
   details pre { background: var(--soft); border-radius: 6px; padding: 6px 8px; max-height: 240px; overflow: auto; }
   details p { margin: 6px 0; }
+  details.past { margin: 0; font-size: 14px; color: inherit; }
+  details.past > summary { list-style: none; }
+  details.past > summary::-webkit-details-marker { display: none; }
+  details.past > summary .what::before { content: "▸ "; color: var(--muted); }
+  details.past[open] > summary .what::before { content: "▾ "; }
+  details.past[open] { padding-bottom: 12px; }
+  details.past .focus { margin-top: 8px; }
+  .diff { font: 12px/1.45 ui-monospace, monospace; background: var(--soft); border-radius: 6px; padding: 8px 10px;
+          max-height: 520px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; margin: 10px 0 0; }
+  .diff .add { color: var(--ok); }
+  .diff .del { color: var(--bad); }
+  .diff .hunk { color: var(--info); }
+  .diff .file { display: block; font-weight: 600; color: var(--text); margin-top: 8px; }
+  .thread { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+  .said { background: var(--soft); border-radius: 8px; padding: 8px 12px; max-width: 85%; overflow-wrap: anywhere;
+          white-space: pre-wrap; font-size: 14px; }
+  .said.human { align-self: flex-end; background: transparent; border: 1px solid var(--line); }
+  .said .label { display: block; font-size: 12px; color: var(--muted); }
+  .said code { font: 13px ui-monospace, monospace; }
+  .files { font-size: 13px; color: var(--muted); margin-top: 8px; overflow-wrap: anywhere; }
+  /* Inline here, though they sit inside a details box that blocks its code. */
+  details .focus code, details .files code, details .warn code, details .said code { display: inline; white-space: normal; margin: 0; }
+  .files code { font: 12px ui-monospace, monospace; }
+  #how { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px;
+         margin-top: 16px; font-size: 14px; }
+  #how ol { margin: 6px 0 0; padding-left: 20px; }
   .empty { color: var(--muted); padding: 12px 0; }
   .line { display: flex; gap: 10px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--line);
           font-size: 14px; overflow-wrap: anywhere; }
@@ -111,14 +137,27 @@
   </form>
   <p class="error" id="error" role="alert"></p>
 
+  <section id="how" hidden>
+    <strong>Comment ça marche</strong>
+    <ol>
+      <li>Choisis un projet : un dossier de ton disque (« + projet »).</li>
+      <li>Écris ta demande, comme à un collègue, puis « Demander ». Si elle est floue, fennec en discute avec toi.</li>
+      <li>Une fois clair, fennec répond par « terminé quand » : ce que tu pourras constater une fois fini. Valide-le ou corrige-le.</li>
+      <li>fennec travaille seul, puis essaie le résultat et t'en montre la preuve.</li>
+      <li>Tu regardes la preuve et les changements, puis tu choisis : commit, ou passer (le travail reste de côté).</li>
+      <li>Tout reste dans l'historique : clique une demande pour revoir ce qui a été demandé, fait et prouvé.</li>
+    </ol>
+    <p class="muted">L'équipe (« Équipe ») choisit les rôles qui travaillent sur le projet ; « Réglages » choisit le modèle.</p>
+  </section>
+
   <h2>À toi <span id="n-todo"></span></h2>
   <div id="todo"></div>
 
   <h2>fennec travaille</h2>
   <div id="running"></div>
 
-  <h2>Intégré récemment</h2>
-  <div id="landed"></div>
+  <h2>Historique</h2>
+  <div id="history"></div>
 </main>
 
 <dialog id="team">

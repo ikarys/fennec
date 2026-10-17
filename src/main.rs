@@ -161,7 +161,7 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
         ("POST", "/api/requests") => {
             let v = input()?;
             let id = store.add_request(&field(&v, "project"), &field(&v, "text"))?;
-            work::frame(id.clone());
+            work::talk(id.clone());
             Ok(json!({"id": id}))
         }
         ("POST", "/api/answer") => {
@@ -179,6 +179,24 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
             work::land(&store, &field(&input()?, "id"))?;
             Ok(json!({}))
         }
+        ("POST", "/api/say") => {
+            let v = input()?;
+            work::say(&store, &field(&v, "id"), &field(&v, "text"))?;
+            Ok(json!({}))
+        }
+        ("POST", "/api/frame") => {
+            work::frame_anyway(&store, &field(&input()?, "id"))?;
+            Ok(json!({}))
+        }
+        ("POST", "/api/pass") => {
+            work::pass(&store, &field(&input()?, "id"))?;
+            Ok(json!({}))
+        }
+        ("POST", "/api/resume") => {
+            work::resume(&store, &field(&input()?, "id"))?;
+            Ok(json!({}))
+        }
+        ("POST", "/api/changes") => work::changes(&store, &field(&input()?, "id")),
         ("POST", "/api/retry") => {
             work::retry(&store, &field(&input()?, "id"))?;
             Ok(json!({}))
