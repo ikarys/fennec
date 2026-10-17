@@ -180,6 +180,11 @@ impl Worlds {
             .arg(&world.path)
             .arg(&world.path)
             .args(["--unshare-all", "--die-with-parent", "--new-session"])
+            // Every file in the world is the work: a bytecode cache written
+            // by running the tests would fail a protected path, or land.
+            // ponytail: Python only; another tool's untracked cache needs its
+            // own switch, or the project's .gitignore.
+            .args(["--setenv", "PYTHONDONTWRITEBYTECODE", "1"])
             .arg("--chdir")
             .arg(&world.path)
             .arg("--");
