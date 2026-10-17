@@ -151,10 +151,22 @@ pub fn frame_anyway(store: &Store, id: &str) -> io::Result<()> {
     let brief = transcript(&request);
     store.update(id, |r| {
         r["brief"] = json!(brief);
+        r["done_when"] = json!(human_words(&request));
         r["status"] = json!("framing");
     })?;
     frame(id.to_string());
     Ok(())
+}
+
+/// What the human reads as "done when" when they started the work
+/// themselves: their own words, not fennec's.
+fn human_words(request: &Value) -> String {
+    let replies = request["thread"].as_array().into_iter().flatten().skip(1);
+    std::iter::once(&request["text"])
+        .chain(replies.filter(|t| t["who"] == "human").map(|t| &t["text"]))
+        .filter_map(Value::as_str)
+        .collect::<Vec<_>>()
+        .join(" — ")
 }
 
 fn transcript(request: &Value) -> String {
@@ -174,46 +186,27 @@ fn transcript(request: &Value) -> String {
     text
 }
 
+/// Once the request is clear, the work starts: no tests are written first
+/// (that is a rule the human may say, not a stage); the proof of the product
+/// is what makes it ready. "Done when" is the request as agreed.
 fn frame_now(store: &Store, id: &str) -> io::Result<()> {
     let request = store.load(id)?;
-    let worlds = Worlds::from_env()?;
     let project = Path::new(request["project"].as_str().unwrap_or(""));
     crate::state::start(project)?;
-    let model = staffed(OpenAi::variants_from_env(1)?.remove(0), project, "frame")?;
-    offer_rule(store, id, &request, &model)?;
-    let model = Live::new(&model, store.live_path(id)?);
-    let s = spec::compile(
-        &worlds,
-        project,
-        request["brief"]
-            .as_str()
-            .or(request["text"].as_str())
-            .unwrap_or(""),
-        &model,
-        MAX_STEPS,
-    )?;
+    let brief = request["brief"]
+        .as_str()
+        .or(request["text"].as_str())
+        .unwrap_or("")
+        .to_string();
+    let s = spec::direct(&Worlds::from_env()?, project, &brief)?;
     store.update(id, |r| {
-        note(r, json!({"stage": "frame", "spec": s["world"]}));
         r["spec"] = s["world"].clone();
-        r["rules"] = s["rules"].clone();
-        r["team"] = json!([]);
-        add_team(r, &s["team"]);
-        if s["status"] == "proposed" {
-            r["status"] = json!("question");
-            r["done_when"] = s["done_when"].clone();
-            r["verify"] = s["verify"].clone();
-        } else if let Some(q) = s["question"].as_str() {
-            // Back to the conversation: the human answers where they talk.
-            say_in(r, "fennec", q);
-            r["status"] = json!("talk");
-        } else {
-            r["status"] = json!("failed");
-            r["reason"] = json!(format!(
-                "« terminé quand » impossible à établir : {}",
-                s["reason"].as_str().unwrap_or("raison inconnue")
-            ));
+        if !r["done_when"].is_string() {
+            r["done_when"] = json!(brief);
         }
-    })
+        r["status"] = json!("running");
+    })?;
+    solve_now(store, id)
 }
 
 /// The human's one answer: validate starts the work, a correction re-frames.
@@ -498,13 +491,13 @@ fn apply_proof(request: &mut Value, proof: &Value) {
     if let Some(t) = failed {
         request["status"] = json!("failed");
         request["reason"] = json!(format!(
-            "les tests passent, mais l'essai a échoué : {}",
+            "le travail est fait, mais l'essai a échoué : {}",
             t["command"].as_str().unwrap_or("")
         ));
     } else if let Some(c) = vetoed {
         request["status"] = json!("failed");
         request["reason"] = json!(format!(
-            "les tests passent, mais {} bloque : `{}` a échoué",
+            "le travail est fait, mais {} bloque : `{}` a échoué",
             c["role"].as_str().unwrap_or(""),
             c["command"].as_str().unwrap_or("")
         ));
@@ -516,7 +509,7 @@ fn apply_proof(request: &mut Value, proof: &Value) {
     {
         request["status"] = json!("failed");
         request["reason"] = json!(format!(
-            "les tests passent, mais la page {} ne s'affiche pas : {}",
+            "le travail est fait, mais la page {} ne s'affiche pas : {}",
             s["url"].as_str().unwrap_or(""),
             s["reason"].as_str().unwrap_or("")
         ));
@@ -527,9 +520,9 @@ fn apply_proof(request: &mut Value, proof: &Value) {
             .is_some_and(|s| s.iter().any(|s| s["missing"] == true));
         request["status"] = json!("failed");
         request["reason"] = json!(if blind {
-            "les tests passent, mais fennec n'a pas pu regarder la page : aucun navigateur n'est installé (chromium)"
+            "le travail est fait, mais fennec n'a pas pu regarder la page : aucun navigateur n'est installé (chromium)"
         } else {
-            "les tests passent, mais fennec n'a pas su essayer le produit : aucune preuve"
+            "le travail est fait, mais fennec n'a pas su essayer le produit : aucune preuve"
         });
     } else {
         request["status"] = json!("ready");
@@ -595,7 +588,7 @@ fn failure(record: &Value) -> String {
     record["attempts"]
         .as_array()
         .and_then(|a| a.iter().find_map(|t| t["reason"].as_str()))
-        .unwrap_or("aucune tentative n'a passé les tests")
+        .unwrap_or("aucune tentative n'a abouti")
         .to_string()
 }
 
@@ -776,7 +769,7 @@ pub fn journal(store: &Store, id: &str) -> io::Result<Value> {
     }
     // The step under way, as far as it has gone.
     let under_way = match request["status"].as_str() {
-        Some("framing") => Some("Cadrage : terminé quand et tests (en cours)"),
+        Some("framing") => Some("Démarrage (en cours)"),
         Some("running") => Some("Travail (en cours)"),
         Some("proving") => Some("Preuve (en cours)"),
         _ => None,
@@ -953,6 +946,7 @@ mod tests {
             transcript(&json!({"text": "x", "thread": [{"who": "human", "text": "x"}]})),
             "x"
         );
+        assert_eq!(human_words(&r), "un test — un script python");
     }
 
     #[test]
@@ -1088,7 +1082,7 @@ mod tests {
         apply_proof(&mut r, &check(1, false));
         assert_eq!(
             r["reason"],
-            "les tests passent, mais Sec bloque : `audit` a échoué"
+            "le travail est fait, mais Sec bloque : `audit` a échoué"
         );
         apply_proof(&mut r, &check(127, true));
         assert_eq!(r["status"], "ready", "a missing tool is not a veto");

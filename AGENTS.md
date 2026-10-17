@@ -3,8 +3,10 @@
 ## What this repository is
 
 The lead layer of fennec: a developer leads one or several projects the way
-they would lead a team. They state a request, validate "done when" once, leave,
-and come back to a single view of what needs them. Execution lives in
+they would lead a team. They state a request (fennec asks only when it could not
+start at all), leave, and come back to a single view of what needs them. No tests
+are written before the code by default: test-first is a rule the human says, and
+what makes a request ready is the proof of the product. Execution lives in
 `../fennec-os` (library); this repository only adds the human surface.
 Scenarios: `../lead-scenarios.md`. Inventory and decisions: `../inventory.md`.
 
@@ -13,7 +15,7 @@ Scenarios: `../lead-scenarios.md`. Inventory and decisions: `../inventory.md`.
 ```
 src/main.rs   `fennec` binary: std HTTP server, routes, folder browser
 src/state.rs  requests and projects in files; the single view (what needs you, running, landed)
-src/work.rs   request life in the background: conversation, fennec-os spec, solve, retry; correct, commit, pass or drop; rule offers; journal of every step
+src/work.rs   request life in the background: conversation, direct work (fennec-os `spec::direct`), proof, retry; correct, commit, pass or drop; rule offers; journal of every step
 ui/           index.html + app.js, embedded in the binary
 ```
 
