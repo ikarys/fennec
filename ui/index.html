@@ -12,6 +12,8 @@
             --accent: #e08050; --ok: #5fb383; --warn: #d9a441; --bad: #d46a6a; --info: #7d9ccc; }
   }
   * { box-sizing: border-box; }
+  /* A display rule on an element would otherwise beat its hidden attribute. */
+  [hidden] { display: none !important; }
   body { margin: 0; background: var(--bg); color: var(--text);
          font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
   main { max-width: 980px; margin: 0 auto; padding: 24px 16px 64px; }
@@ -76,8 +78,11 @@
   .row { display: flex; gap: 8px; justify-content: flex-end; }
   .team-pick { display: flex; gap: 8px; align-items: center; margin: 12px 0 4px; font-size: 14px; }
   .team-pick select, #team-catalog { flex: 1; min-width: 0; }
-  #team-roles label { display: flex; gap: 10px; align-items: baseline; padding: 6px 4px; cursor: pointer; }
-  #team-roles .out { color: var(--muted); text-decoration: line-through; }
+  #team-roles li { display: flex; gap: 10px; align-items: baseline; padding: 4px; }
+  #team-roles li button { width: auto; padding: 2px 4px; color: inherit; }
+  #team-roles .out button { color: var(--muted); text-decoration: line-through; }
+  #team-role { display: grid; gap: 8px; margin: 10px 0; }
+  .row .spacer { flex: 1; }
   @media (max-width: 700px) {
     #new-request { grid-template-columns: 1fr; }
   }
@@ -118,8 +123,25 @@
     <select id="team-catalog" aria-label="Rôle à ajouter"></select>
     <button>Ajouter</button>
   </form>
+  <form id="team-role" hidden>
+    <input id="role-name" aria-label="Nom du rôle" placeholder="Nom du rôle" required>
+    <select id="role-stage" aria-label="Étape"></select>
+    <textarea id="role-brief" aria-label="Ce que fait ce rôle" rows="6"
+      placeholder="Ce que ce rôle exige, en une poignée de phrases" required></textarea>
+    <div class="row"><button type="button" id="role-cancel">Annuler</button>
+      <button class="primary">Enregistrer le rôle</button></div>
+  </form>
+  <form class="go" id="team-save" hidden>
+    <input id="team-new-name" aria-label="Nom de la nouvelle équipe" placeholder="Nom de la nouvelle équipe" required>
+    <button class="primary">Enregistrer</button>
+  </form>
   <p class="error" id="team-error" role="alert"></p>
-  <div class="row"><button type="button" id="team-close">Fermer</button></div>
+  <div class="row">
+    <button type="button" class="quiet" id="role-new">+ nouveau rôle</button>
+    <button type="button" class="quiet" id="team-save-open">Enregistrer comme équipe…</button>
+    <span class="spacer"></span>
+    <button type="button" id="team-close">Fermer</button>
+  </div>
 </dialog>
 <dialog id="picker">
   <strong>Choisir un projet</strong>

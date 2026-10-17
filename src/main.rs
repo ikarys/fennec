@@ -209,6 +209,25 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
             team::choose(&path, &field(&v, "team"), &remove)?;
             team_view(&path)
         }
+        ("POST", "/api/team/role") => {
+            let v = input()?;
+            let path = project(&store, &field(&v, "project"))?;
+            let key = v["key"].as_str().filter(|k| !k.is_empty());
+            team::save_role(
+                &path,
+                key,
+                &field(&v, "name"),
+                &field(&v, "stage"),
+                &field(&v, "brief"),
+            )?;
+            team_view(&path)
+        }
+        ("POST", "/api/team/save") => {
+            let v = input()?;
+            let path = project(&store, &field(&v, "project"))?;
+            team::save_team(&path, &field(&v, "name"))?;
+            team_view(&path)
+        }
         ("POST", "/api/team/add") => {
             let v = input()?;
             let path = project(&store, &field(&v, "project"))?;
@@ -235,7 +254,8 @@ fn project(store: &Store, path: &str) -> io::Result<std::path::PathBuf> {
 /// not in it yet.
 fn team_view(path: &Path) -> io::Result<Value> {
     let setup = team::setup(path)?;
-    let role = |r: &team::Role| json!({"key": r.key, "name": r.name, "stage": r.stage});
+    let role =
+        |r: &team::Role| json!({"key": r.key, "name": r.name, "stage": r.stage, "brief": r.brief});
     let roles: Vec<Value> = setup
         .roles
         .iter()
@@ -250,7 +270,10 @@ fn team_view(path: &Path) -> io::Result<Value> {
         .filter(|c| !setup.roles.iter().any(|r| r.key == c.key))
         .map(role)
         .collect();
-    Ok(json!({"teams": team::teams()?, "team": setup.team, "roles": roles, "catalog": catalog}))
+    Ok(
+        json!({"teams": team::teams()?, "team": setup.team, "roles": roles, "catalog": catalog,
+              "missing": setup.missing.is_some()}),
+    )
 }
 
 fn folders(path: &str) -> io::Result<Value> {
