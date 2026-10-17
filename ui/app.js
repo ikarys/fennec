@@ -144,16 +144,23 @@ function details(item) {
   if (item.reason) box.append(el("pre", { textContent: item.reason }));
   if (item.land_error) box.append(el("pre", { textContent: item.land_error }));
   if (item.land?.message) box.append(el("p", { textContent: `Message du commit : ${item.land.message}` }));
-  if (item.team?.length) box.append(el("p", { textContent: `Équipe : ${item.team.join(", ")}` }));
+  // Without stats (an old request), the team that worked on it at least.
+  if (item.team?.length && !item.stats?.stages) box.append(el("p", { textContent: `Équipe : ${item.team.join(", ")}` }));
   for (const rule of item.rules ?? []) box.append(el("p", { textContent: `Règle suivie : ${rule}` }));
-  // What each step and each model cost.
+  // What each step and each model cost, as a table.
   for (const [key, label] of [["stages", "Étape"], ["models", "Modèle"]]) {
-    for (const [name, c] of Object.entries(item.stats?.[key] ?? {}).sort(([a], [b]) => stageRank(a) - stageRank(b))) {
-      const by = c.roles?.length ? ` (${c.roles.join(", ")})` : "";
-      box.append(el("p", { textContent: `${label} ${name}${by} : ` + [duration(c.ms ?? 0), `${c.turns} appel${c.turns > 1 ? "s" : ""}`,
-        `${number(c.sent)} tokens envoyés (${percent(c.cached, c.sent)} % en cache)`,
-        `${number(c.received)} générés` + (c.thinking ? ` dont ${number(c.thinking)} de réflexion` : ""), speed(c)].filter(Boolean).join(" · ") }));
-    }
+    const rows = Object.entries(item.stats?.[key] ?? {}).sort(([a], [b]) => stageRank(a) - stageRank(b));
+    if (!rows.length) continue;
+    box.append(el("div", { className: "scroll" }, el("table", { className: "grid" },
+      el("thead", {}, el("tr", {}, ...[label, key === "stages" ? "Rôles" : "", "Temps", "Appels", "Envoyés", "Cache", "Générés", "Vitesse"]
+        .map((h) => el("th", { textContent: h })))),
+      el("tbody", {}, ...rows.map(([name, c]) => el("tr", {},
+        el("th", {}, key === "stages" ? el("span", { className: `dotc ${stageOf(name)}` }) : null, key === "stages" ? stageName(name) : name),
+        el("td", {}, ...(c.roles ?? []).map((r) => roleTag(r, stageOf(name)))),
+        el("td", { textContent: duration(c.ms ?? 0) }), el("td", { textContent: number(c.turns) }),
+        el("td", { textContent: compact(c.sent) }),
+        el("td", {}, el("span", { className: "meter", style: `--p:${percent(c.cached, c.sent)}%` }), `${percent(c.cached, c.sent)} %`),
+        el("td", { textContent: compact(c.received) }), el("td", { textContent: c.ms ? `${tps(c)}/s` : "—" })))))));
   }
   if (item.checks?.length) {
     box.append(el("p", { textContent: "Tests :" }));
@@ -275,16 +282,49 @@ const speed = (c) => (c.ms && c.received ? `≈ ${tps(c)} tokens/s` : "");
 function facts(item) {
   const s = item.stats;
   if (!s?.turns) return [];
-  const undone = s.failed_attempts
-    ? ` · ${s.failed_attempts} essai${s.failed_attempts > 1 ? "s" : ""} raté${s.failed_attempts > 1 ? "s" : ""}, annulé${s.failed_attempts > 1 ? "s" : ""} sans trace`
-    : "";
-  const cost = [`${duration(s.ms)} de modèle`, `${s.turns} appel${s.turns > 1 ? "s" : ""}`,
-    `${compact(s.sent)} tokens envoyés, ${percent(s.cached, s.sent)} % en cache`,
-    `${compact(s.received)} générés`, speed(s)].filter(Boolean).join(" · ");
-  return [el("div", { className: "facts" },
-    el("div", { textContent: "Isolé : sans réseau, sans accès à ton dossier personnel, historique git en lecture seule" + undone }),
-    el("div", { textContent: "Coût : " + cost }))];
+  const n = s.failed_attempts;
+  const safe = el("div", { className: "pills", title: "Chaque essai tourne isolé ; un essai raté est annulé sans trace" },
+    pill("🔒", "sans réseau"), pill("🏠", "ton dossier personnel caché"), pill("📖", "git en lecture seule"),
+    n ? pill("↺", `${n} essai${n > 1 ? "s" : ""} raté${n > 1 ? "s" : ""} annulé${n > 1 ? "s" : ""}`, "warn") : null);
+  return [el("div", { className: "facts" }, metrics(s), timeline(s), safe)];
 }
+
+function pill(icon, text, tone = "") {
+  return el("span", { className: `pill ${tone}` }, el("span", { className: "icon", textContent: icon, ariaHidden: "true" }), text);
+}
+
+// Model time, tokens in and out, cache and speed: a figure each, not a sentence.
+function metrics(c) {
+  const cache = percent(c.cached, c.sent);
+  return el("div", { className: "metrics" },
+    metric("Temps de modèle", duration(c.ms ?? 0)),
+    metric("Appels", number(c.turns)),
+    metric("Envoyés", compact(c.sent), el("span", { className: "meter", style: `--p:${cache}%`, title: `${cache} % en cache` }),
+      el("small", { textContent: `${cache} % cache` })),
+    metric("Générés", compact(c.received), c.thinking ? el("small", { textContent: `${percent(c.thinking, c.received)} % réflexion` }) : null),
+    metric("Vitesse", c.ms ? `${tps(c)}` : "—", el("small", { textContent: "tokens/s" })));
+}
+
+function metric(label, value, ...extra) {
+  return el("span", { className: "metric" }, el("small", { textContent: label }), el("b", { textContent: value }), ...extra);
+}
+
+// Where the time went, one coloured segment per step, with the roles of each.
+function timeline(s) {
+  const stages = Object.entries(s.stages ?? {}).sort(([a], [b]) => stageRank(a) - stageRank(b));
+  if (!stages.length) return null;
+  const total = stages.reduce((t, [, c]) => t + (c.ms ?? 0), 0) || 1;
+  const bar = el("div", { className: "timeline" }, ...stages.map(([name, c]) =>
+    el("span", { className: `seg ${stageOf(name)}`, style: `flex:${Math.max(c.ms ?? 0, total / 40)}`,
+      title: `${stageName(name)} : ${duration(c.ms ?? 0)}`, textContent: `${stageName(name)} ${duration(c.ms ?? 0)}` })));
+  const who = el("div", { className: "who" }, ...stages.flatMap(([name, c]) =>
+    (c.roles ?? []).map((r) => roleTag(r, stageOf(name)))));
+  return el("div", {}, bar, who.children.length ? who : null);
+}
+
+const stageOf = (name) => (name.startsWith("Travail") ? "solve" : name.startsWith("Preuve") ? "prove" : "frame");
+const stageName = (name) => (name.startsWith("Cadrage") ? "Tests d'abord" : name);
+const roleTag = (name, stage) => el("span", { className: `rtag ${stage}`, textContent: name });
 
 function duration(ms) {
   const s = Math.round(ms / 1000);
@@ -293,15 +333,12 @@ function duration(ms) {
 
 function stepView(step) {
   const c = step.cost;
-  const cost = [step.model, `${c.turns} appel${c.turns > 1 ? "s" : ""} au modèle`,
-    `${number(c.sent)} tokens envoyés` + (c.cached ? ` (dont ${number(c.cached)} en cache)` : ""),
-    `${number(c.received)} reçus` + (c.thinking ? ` (dont ${number(c.thinking)} de réflexion)` : ""),
-    duration(c.ms), speed(c)].filter(Boolean).join(" · ");
   const verdict = step.passed === true ? " ✓" : step.passed === false ? " ✗" : "";
   const messages = step.messages ?? [];
   return el("div", { className: "step" },
-    el("div", { className: "step-name", textContent: step.name + verdict }),
-    el("div", { className: "muted", textContent: cost }),
+    el("div", { className: "step-name" }, el("span", { className: `dotc ${stageOf(step.name)}` }), step.name + verdict,
+      step.model ? el("span", { className: "model", textContent: step.model }) : null),
+    metrics(c),
     ...rolesView(step),
     ...(messages.length ? messages.map(messageView)
       : [el("div", { className: "muted", textContent: step.live
@@ -313,7 +350,7 @@ function stepView(step) {
 function rolesView(step) {
   if (!step.roles) return [];
   if (!step.roles.length) return [el("div", { className: "muted", textContent: "Aucun rôle de l'équipe à cette étape." })];
-  const nodes = [el("div", { className: "roles", textContent: "Rôles : " + step.roles.map((r) => r.name).join(", ") })];
+  const nodes = [el("div", { className: "who" }, ...step.roles.map((r) => roleTag(r.name, stageOf(step.name))))];
   for (const r of step.roles) {
     if (r.brief) {
       nodes.push(el("details", { className: "message" }, el("summary", {}, el("b", { textContent: r.name }), " : sa consigne au modèle"),
@@ -465,8 +502,9 @@ function line(item, state, dot) {
   return el("div", { className: "line" }, dot ? el("span", { className: "dot" }) : null,
     el("span", { className: "muted", textContent: item.project }),
     el("span", { className: "what", textContent: item.title.length > 120 ? item.title.slice(0, 120) + "…" : item.title }),
-    s?.turns ? el("span", { className: "state cost", title: "temps de modèle · tokens envoyés · générés",
-      textContent: `${duration(s.ms)} · ${compact(s.sent)} ↑ · ${compact(s.received)} ↓` }) : null,
+    s?.turns ? el("span", { className: "state cost", title: "temps de modèle · tokens envoyés · générés" },
+      el("span", { className: "mini", textContent: `⏱ ${duration(s.ms)}` }), el("span", { className: "mini", textContent: `↑ ${compact(s.sent)}` }),
+      el("span", { className: "mini", textContent: `↓ ${compact(s.received)}` })) : null,
     el("span", { className: "state", textContent: state }));
 }
 
@@ -515,6 +553,7 @@ function renderProjects(projects) {
   const none = projects.length === 1 ? [] : [new Option(prompt, "")];
   select.replaceChildren(...none, ...projects.map((p) => new Option(p.name, p.path)));
   if (projects.some((p) => p.path === current)) select.value = current;
+  if (select.value !== current) showChips();
 }
 
 const fill = (box, nodes, empty) =>
@@ -551,7 +590,8 @@ $("new-request").addEventListener("submit", async (event) => {
   event.preventDefault();
   $("error").textContent = "";
   try {
-    await api("/api/requests", { project: $("project").value, text: $("text").value });
+    const off = [...document.querySelectorAll("#chips button[aria-pressed=false]")].map((b) => b.dataset.key);
+    await api("/api/requests", { project: $("project").value, text: $("text").value, off });
     $("text").value = "";
     refresh(true);
   } catch (e) {
@@ -825,3 +865,26 @@ async function showStats() {
 }
 $("open-stats").onclick = () => showStats().catch((e) => ($("error").textContent = e.message));
 $("stats-close").onclick = () => $("stats").close();
+
+// The project's roles, as chips under the request: one click leaves a role
+// out of this request only (no QA for a one-line page). The team stays as is.
+async function showChips() {
+  const project = $("project").value;
+  if (!project) return $("chips").replaceChildren();
+  try {
+    const v = await api("/api/team", { project });
+    const roles = v.roles.filter((r) => !r.out);
+    $("chips").replaceChildren(el("span", { className: "muted", textContent: "Équipe pour cette demande :" }),
+      ...roles.map((r) => {
+        const chip = el("button", { type: "button", className: `rtag ${r.stage} chip`, textContent: r.name,
+          title: "Clique pour faire sans ce rôle sur cette demande" });
+        chip.dataset.key = r.key;
+        chip.setAttribute("aria-pressed", "true");
+        chip.onclick = () => chip.setAttribute("aria-pressed", chip.getAttribute("aria-pressed") === "true" ? "false" : "true");
+        return chip;
+      }));
+  } catch {
+    $("chips").replaceChildren();
+  }
+}
+$("project").addEventListener("change", showChips);

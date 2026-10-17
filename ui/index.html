@@ -123,7 +123,40 @@
   .field .go { display: flex; gap: 8px; }
   .field .go input { flex: 1; min-width: 0; }
   #settings-models li { display: flex; gap: 8px; align-items: center; padding: 2px 4px; }
-  .facts { font-size: 12px; color: var(--muted); margin-top: 10px; display: grid; gap: 2px; }
+  :root { --frame: var(--accent); --solve: var(--info); --prove: var(--ok); }
+  .facts { margin-top: 12px; display: grid; gap: 8px; }
+  .metrics { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .metric { display: inline-grid; grid-auto-flow: row; background: var(--soft); border-radius: 8px; padding: 4px 10px;
+            min-width: 84px; line-height: 1.25; }
+  .metric small { font-size: 11px; color: var(--muted); }
+  .metric b { font-size: 15px; font-variant-numeric: tabular-nums; color: var(--text); }
+  .meter { display: block; width: 100%; height: 4px; border-radius: 2px; margin: 2px 0;
+           background: linear-gradient(90deg, var(--ok) var(--p), var(--line) var(--p)); }
+  .timeline { display: flex; gap: 2px; height: 22px; border-radius: 6px; overflow: hidden; font-size: 11px; }
+  .seg { display: flex; align-items: center; padding: 0 6px; color: #fff; white-space: nowrap; overflow: hidden; min-width: 4px; }
+  .seg.frame, .dotc.frame { background: var(--frame); }
+  .seg.solve, .dotc.solve { background: var(--solve); }
+  .seg.prove, .dotc.prove { background: var(--prove); }
+  .who { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+  .rtag { display: inline-block; font-size: 12px; line-height: 1.4; padding: 1px 8px; border-radius: 999px; font-weight: 500;
+          border: 1px solid; margin-right: 2px; }
+  .rtag.frame { color: var(--frame); border-color: var(--frame); }
+  .rtag.solve { color: var(--solve); border-color: var(--solve); }
+  .rtag.prove { color: var(--prove); border-color: var(--prove); }
+  .rtag.chip { cursor: pointer; background: transparent; }
+  .rtag.chip[aria-pressed=false] { color: var(--muted); border-color: var(--line); text-decoration: line-through; }
+  #chips { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; }
+  .pills { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pill { font-size: 12px; color: var(--muted); background: var(--soft); border-radius: 999px; padding: 2px 10px; }
+  .pill .icon { margin-right: 4px; }
+  .pill.warn { color: var(--warn); }
+  .dotc { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+  .step-name .model { font-weight: 400; font-size: 12px; color: var(--muted); margin-left: 8px; }
+  .mini { display: inline-block; background: var(--soft); border-radius: 999px; padding: 0 7px; margin-left: 4px; font-size: 12px; }
+  table.grid { border-collapse: collapse; font-size: 12px; margin: 6px 0; width: 100%; }
+  table.grid th, table.grid td { text-align: left; padding: 3px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  table.grid thead th { color: var(--muted); font-weight: 600; }
+  table.grid .meter { display: inline-block; width: 40px; vertical-align: middle; margin-right: 6px; }
   dialog#stats { width: min(900px, calc(100vw - 32px)); }
   .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 12px 0; }
   .tile { background: var(--soft); border-radius: 8px; padding: 10px 12px; display: grid; }
@@ -159,6 +192,7 @@
     <select id="project" aria-label="Projet" required></select>
     <textarea id="text" aria-label="Demande" placeholder="Ce que tu veux…" required></textarea>
     <button class="primary">Demander</button>
+    <div id="chips"></div>
   </form>
   <p class="error" id="error" role="alert"></p>
 
