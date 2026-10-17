@@ -318,11 +318,23 @@ fn solve_now(store: &Store, id: &str) -> io::Result<()> {
         Some(why) => spec::retry(&worlds, spec_id, why, &models, MAX_STEPS)?,
         None => spec::accept(&worlds, spec_id, &models, MAX_STEPS)?,
     };
+    let tests = spec::load(&worlds, spec_id)?;
     store.update(id, |r| {
         if let Some(m) = r.as_object_mut() {
             m.remove("retry");
         }
-        apply_run(r, &record)
+        apply_run(r, &record);
+        // The acceptance tests land in the same commit: they are part of what fennec did.
+        if let Some(files) = r["files"].as_array_mut() {
+            for t in changed_files(tests["diff"].as_str().unwrap_or(""))
+                .into_iter()
+                .rev()
+            {
+                if !files.contains(&json!(t)) {
+                    files.insert(0, json!(t));
+                }
+            }
+        }
     })?;
     let Some(run) = record["winner"].as_str() else {
         return Ok(());
@@ -562,7 +574,15 @@ pub fn changes(store: &Store, id: &str) -> io::Result<Value> {
         .and_then(|a| a.iter().find(|t| t["world"] == record["winner"]))
         .cloned()
         .unwrap_or_default();
-    let diff = attempt["diff"].as_str().unwrap_or("");
+    // The acceptance tests come first: they land in the same commit.
+    let tests = match request["spec"].as_str() {
+        Some(s) => spec::load(&Worlds::from_env()?, s)?["diff"]
+            .as_str()
+            .unwrap_or("")
+            .to_string(),
+        None => String::new(),
+    };
+    let diff = &[tests.as_str(), attempt["diff"].as_str().unwrap_or("")].join("\n");
     // ponytail: a cut at 300 kB; a huge change is read in the project.
     const MAX: usize = 300_000;
     let cut = diff.len() > MAX;
