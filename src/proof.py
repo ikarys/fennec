@@ -19,12 +19,17 @@ def pipe_fds():
     os.set_inheritable(4, True)
 
 
-browser = subprocess.Popen(
-    [os.environ.get("FENNEC_OS_BROWSER", "chromium"), "--headless=new", "--no-sandbox",
-     "--disable-gpu", "--hide-scrollbars", "--window-size=1280,800",
-     "--remote-debugging-pipe", "--user-data-dir=/tmp/proof-browser", "about:blank"],
-    stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-    preexec_fn=pipe_fds, close_fds=False)
+try:
+    browser = subprocess.Popen(
+        [os.environ.get("FENNEC_OS_BROWSER", "chromium"), "--headless=new", "--no-sandbox",
+         "--disable-gpu", "--hide-scrollbars", "--window-size=1280,800",
+         "--remote-debugging-pipe", "--user-data-dir=/tmp/proof-browser", "about:blank"],
+        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        preexec_fn=pipe_fds, close_fds=False)
+except FileNotFoundError:
+    # Not the page's fault: this machine cannot look at it.
+    print('proof={"error": "no browser", "missing": true}', file=sys.stderr)
+    sys.exit(1)
 os.close(to_browser)
 os.close(from_browser)
 out = os.fdopen(browser_in, "wb")

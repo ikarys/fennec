@@ -238,6 +238,44 @@ fn a_proof_clicks_like_a_user_and_fails_on_what_the_page_does_not_show() {
 }
 
 #[test]
+fn a_page_without_a_browser_to_look_at_is_unverified_not_failed() {
+    if Command::new("chromium").arg("--version").output().is_ok() {
+        return; // this machine can look: the test above covers it
+    }
+    let f = fixture("nobrowser");
+    let model = Script::new(
+        "nobrowser",
+        &[
+            write("answer", "42\n"),
+            write("index.html", "<p>ok</p>"),
+            done(),
+        ],
+    );
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&model], 10).unwrap();
+    let winner = record["winner"].as_str().unwrap().to_string();
+    let page = "serve: python3 -m http.server 8766\nshot: http://127.0.0.1:8766/\n";
+    let prove = |reply: String| {
+        model
+            .replies
+            .lock()
+            .unwrap()
+            .push_back(json!({"content": reply}));
+        proof::gather(&f.worlds, &winner, None, &model).unwrap()
+    };
+    let shown = prove(format!("{page}try: grep -qx 42 answer\n"));
+    assert_eq!(shown["shots"][0]["missing"], true, "{shown}");
+    assert_eq!(
+        shown["passed"], true,
+        "the try proves it; the page is unverified"
+    );
+    assert_eq!(
+        prove(page.to_string())["passed"],
+        false,
+        "a page unseen proves nothing"
+    );
+}
+
+#[test]
 fn a_proof_whose_reasoning_eats_the_reply_is_asked_again() {
     let f = fixture("rethink");
     let model = Script::new("think", &[write("answer", "42\n"), done()]);
