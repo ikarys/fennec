@@ -365,6 +365,25 @@ fn a_world_touched_after_its_verdict_cannot_land() {
 }
 
 #[test]
+fn a_blank_reply_is_asked_again_without_reasoning() {
+    let f = fixture("blank");
+    let model = Script::new("blank", &[write("answer", "42\n"), done()]);
+    // Between the two steps, a reply whose reasoning ate the whole budget.
+    let mut replies = model.replies.lock().unwrap();
+    replies.insert(1, json!({"content": "", "reasoning_content": "on and on"}));
+    drop(replies);
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&model], 10).unwrap();
+    assert!(record["winner"].is_string(), "{record}");
+    let think: Vec<Value> = record["attempts"][0]["turns"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| t["think"].clone())
+        .collect();
+    assert_eq!(think, [json!(true), json!(true), json!(false)]);
+}
+
+#[test]
 fn a_model_that_stops_answering_is_a_failed_attempt() {
     let f = fixture("exhausted");
     let mute = Script::new("mute", &[write("answer", "42\n")]);

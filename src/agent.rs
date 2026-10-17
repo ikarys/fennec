@@ -126,6 +126,10 @@ pub fn run(
     // removed.
     let policy = std::env::var("FENNEC_OS_THINK").unwrap_or_else(|_| "always".to_string());
     let mut think = true;
+    // A reply with nothing in it: the model spent its whole budget reasoning.
+    // Asked again the same way it does it again (seen: four times in six),
+    // so the next turn goes without reasoning, whatever the policy.
+    let mut blank = false;
     let ms = |since: Instant| since.elapsed().as_millis() as u64;
     // The starting state counts as "no change yet".
     let mut watch = Watch {
@@ -147,11 +151,12 @@ pub fn run(
         bound(&mut messages);
         let at = start.elapsed().as_millis() as u64;
         let asked = Instant::now();
-        let think_now = match policy.as_str() {
-            "never" => false,
-            "adaptive" => think,
-            _ => true,
-        };
+        let think_now = !blank
+            && match policy.as_str() {
+                "never" => false,
+                "adaptive" => think,
+                _ => true,
+            };
         let chat = if think_now {
             model.chat(&messages, &tools)
         } else {
@@ -184,6 +189,10 @@ pub fn run(
             }
         }
         reply["role"] = json!("assistant");
+        blank = reply["tool_calls"].as_array().is_none_or(|c| c.is_empty())
+            && reply["content"]
+                .as_str()
+                .is_none_or(|c| c.trim().is_empty());
         let calls = reply["tool_calls"].as_array().cloned().unwrap_or_default();
         messages.push(reply);
         if calls.is_empty() {

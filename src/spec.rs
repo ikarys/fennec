@@ -26,6 +26,9 @@ A careful maintainer does not invent the product: when the request does not say 
 or change, or the project is empty and the request leaves open what kind of program it is \
 (language, command line or web page), write nothing and call `done` with the summary \
 `question: <the one question whose answer lets you write the tests, in the request's language>`. \
+Only the product is a question: where a file goes, its name, and how the tests reach it are yours \
+to decide. Something the request asks for that is not the project's kind (a web page in a library) \
+is a new file at the root, which the tests read or run as the project's tests can. \
 When finished, call `done` with a summary in exactly this form:\n\
 done_when: <what the person using the product will see or be able to do once it is done, in one or two sentences, in the request's language; product terms only, no file, tag, function or test names; it describes what your tests check, not what the request says: where you chose a reading, it states that reading>\n\
 goal: <the request restated precisely for an implementer, naming the tests that must pass>\n\
