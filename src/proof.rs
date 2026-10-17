@@ -6,6 +6,7 @@
 //! written down as unverified, never left out.
 
 use std::io;
+use std::path::Path;
 use std::process::Stdio;
 
 use serde_json::{Value, json};
@@ -14,6 +15,7 @@ use crate::provider::Model;
 use crate::review;
 use crate::rules::{Kind, Rule};
 use crate::solve;
+use crate::team;
 use crate::world::{World, Worlds};
 
 /// More tries make the proof longer to read, not stronger.
@@ -94,8 +96,9 @@ pub fn gather(
         record["goal"].as_str().unwrap_or(""),
         readme(worlds, &world)?
     );
+    let (roles, team) = team::brief(Path::new(record["project"].as_str().unwrap_or("")), "prove")?;
     let messages = [
-        json!({"role": "system", "content": BRIEF}),
+        json!({"role": "system", "content": format!("{BRIEF}{roles}")}),
         json!({"role": "user", "content": request}),
     ];
     let reply = model.chat(&messages, &json!([]))?;
@@ -141,8 +144,8 @@ pub fn gather(
     let passed = !(checks.is_empty() && shots.is_empty())
         && checks.iter().all(|c| c["exit"] == 0)
         && shots.iter().all(|s| s["ok"] == true);
-    let proof =
-        json!({"tries": checks, "shots": shots, "unverified": plan.unverified, "passed": passed});
+    let proof = json!({"tries": checks, "shots": shots, "unverified": plan.unverified,
+                       "passed": passed, "team": team});
     record["proof"] = proof.clone();
     review::save(worlds, id, &record)?;
     Ok(proof)
