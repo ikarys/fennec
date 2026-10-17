@@ -238,6 +238,21 @@ fn a_proof_clicks_like_a_user_and_fails_on_what_the_page_does_not_show() {
 }
 
 #[test]
+fn a_proof_whose_reasoning_eats_the_reply_is_asked_again() {
+    let f = fixture("rethink");
+    let model = Script::new("think", &[write("answer", "42\n"), done()]);
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&model], 10).unwrap();
+    let winner = record["winner"].as_str().unwrap().to_string();
+    let mut replies = model.replies.lock().unwrap();
+    replies.push_back(json!({"content": "", "reasoning_content": "on and on"}));
+    replies.push_back(json!({"content": "try: grep -qx 42 answer\n"}));
+    drop(replies);
+    let shown = proof::gather(&f.worlds, &winner, None, &model).unwrap();
+    assert_eq!(shown["passed"], true, "{shown}");
+    assert!(model.replies.lock().unwrap().is_empty());
+}
+
+#[test]
 fn editing_a_protected_check_fails_even_if_it_passes() {
     let f = fixture("protect");
     let cheat = Script::new("cheat", &[write("check.sh", "exit 0\n"), done()]);

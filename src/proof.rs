@@ -91,17 +91,36 @@ pub fn gather(
         .and_then(|t| t["diff"].as_str())
         .unwrap_or("");
     let done = done_when.map_or_else(String::new, |d| format!("Done when:\n{d}\n\n"));
+    // The reminder comes last: the brief alone, in English, was not enough to
+    // keep unverified lines out of English for a French Done when.
     let request = format!(
-        "{done}Goal:\n{}\n\nChange:\n{diff}\n\nREADME:\n{}",
+        "{done}Goal:\n{}\n\nChange:\n{diff}\n\nREADME:\n{}\n\n\
+         The person reads only the language of «{}»: write each unverified line in it, \
+         not in the language of this message.",
         record["goal"].as_str().unwrap_or(""),
-        readme(worlds, &world)?
+        readme(worlds, &world)?,
+        // Their own words name the language better than any example would:
+        // a French example leaked into English proofs.
+        done_when
+            .unwrap_or(record["goal"].as_str().unwrap_or(""))
+            .chars()
+            .take(80)
+            .collect::<String>()
     );
     let (roles, team) = team::brief(Path::new(record["project"].as_str().unwrap_or("")), "prove")?;
     let messages = [
         json!({"role": "system", "content": format!("{BRIEF}{roles}")}),
         json!({"role": "user", "content": request}),
     ];
-    let reply = model.chat(&messages, &json!([]))?;
+    let mut reply = model.chat(&messages, &json!([]))?;
+    // A model can spend the whole reply reasoning (seen: 8192 tokens of
+    // thinking, no answer); a second turn without reasoning still plans.
+    if reply["content"]
+        .as_str()
+        .is_none_or(|c| c.trim().is_empty())
+    {
+        reply = model.chat_quick(&messages, &json!([]))?;
+    }
     let content = reply["content"].as_str().unwrap_or("");
     // Some servers leave the reasoning inline.
     let mut plan = parse(content.rsplit("</think>").next().unwrap_or(content));
