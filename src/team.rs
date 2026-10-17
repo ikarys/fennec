@@ -117,18 +117,78 @@ pub fn teams() -> io::Result<Vec<String>> {
     Ok(names)
 }
 
-/// The whole team for a project, sorted by file name.
-pub fn members(project: &Path) -> io::Result<Vec<Role>> {
+/// A project's team as the human sets it up: the team picked, the roles it
+/// leaves out, and every role before any is left out (so a left-out role can
+/// be shown, and taken back).
+#[derive(Debug, Clone, PartialEq)]
+pub struct Setup {
+    pub team: String,
+    pub remove: Vec<String>,
+    pub roles: Vec<Role>,
+}
+
+pub fn setup(project: &Path) -> io::Result<Setup> {
     let harness = project.join(HARNESS_DIR);
-    let (name, remove) = choice(&harness)?;
-    let mut team = team_files(&name)?;
+    let (team, remove) = choice(&harness)?;
+    let mut files = team_files(&team)?;
     for (key, text) in read_dir(&harness.join("team"))?.unwrap_or_default() {
-        team.retain(|(k, _)| *k != key);
-        team.push((key, text));
+        files.retain(|(k, _)| *k != key);
+        files.push((key, text));
     }
-    team.retain(|(k, _)| !remove.contains(k));
-    team.sort();
-    team.iter().map(|(key, text)| parse(key, text)).collect()
+    files.sort();
+    let roles = files
+        .iter()
+        .map(|(key, text)| parse(key, text))
+        .collect::<io::Result<_>>()?;
+    Ok(Setup {
+        team,
+        remove,
+        roles,
+    })
+}
+
+/// The roles that work on a project, sorted by file name.
+pub fn members(project: &Path) -> io::Result<Vec<Role>> {
+    let Setup { remove, roles, .. } = setup(project)?;
+    Ok(roles
+        .into_iter()
+        .filter(|r| !remove.contains(&r.key))
+        .collect())
+}
+
+/// The human picks a project's team and the roles it leaves out. An unknown
+/// team fails before anything is written. The file is left uncommitted, like
+/// a rule written to AGENTS.md.
+pub fn choose(project: &Path, team: &str, remove: &[String]) -> io::Result<()> {
+    team_files(team)?;
+    let harness = project.join(HARNESS_DIR);
+    std::fs::create_dir_all(&harness)?;
+    let json = serde_json::json!({"team": team, "remove": remove});
+    std::fs::write(
+        harness.join("team.json"),
+        serde_json::to_string_pretty(&json).map_err(io::Error::other)? + "\n",
+    )
+}
+
+/// A catalogue role joins a project's team as a file of its own, which the
+/// human can then edit. A role left out before is taken back.
+pub fn add(project: &Path, key: &str) -> io::Result<()> {
+    let Some((_, text)) = CATALOG.iter().find(|(k, _)| *k == key) else {
+        return Err(io::Error::other(format!("unknown role `{key}`")));
+    };
+    let harness = project.join(HARNESS_DIR);
+    let dir = harness.join("team");
+    std::fs::create_dir_all(&dir)?;
+    let path = dir.join(format!("{key}.md"));
+    if !path.exists() {
+        std::fs::write(path, text)?;
+    }
+    let (team, mut remove) = choice(&harness)?;
+    if remove.iter().any(|k| k == key) {
+        remove.retain(|k| k != key);
+        choose(project, &team, &remove)?;
+    }
+    Ok(())
 }
 
 /// The project's team and the roles it leaves out, from `team.json`.
@@ -341,6 +401,41 @@ mod tests {
         );
         choose(r#"{"team": "../../etc"}"#);
         assert!(members(&project).is_err());
+        std::fs::remove_dir_all(project).unwrap();
+    }
+
+    #[test]
+    fn the_human_picks_a_team_leaves_a_role_out_and_takes_it_back() {
+        let project = std::env::temp_dir().join(format!("fennec-os-choose-{}", std::process::id()));
+        std::fs::create_dir_all(&project).unwrap();
+        assert!(super::choose(&project, "no-such-team", &[]).is_err());
+        assert!(
+            !project.join(HARNESS_DIR).exists(),
+            "nothing written on error"
+        );
+
+        super::choose(&project, "etudes", &["writer".to_string()]).unwrap();
+        let s = setup(&project).unwrap();
+        assert_eq!(
+            (s.team.as_str(), s.remove.clone()),
+            ("etudes", vec!["writer".to_string()])
+        );
+        assert!(
+            s.roles.iter().any(|r| r.key == "writer"),
+            "shown, though left out"
+        );
+        assert!(!members(&project).unwrap().iter().any(|r| r.key == "writer"));
+
+        add(&project, "writer").unwrap();
+        add(&project, "devsecops").unwrap();
+        assert!(add(&project, "nobody").is_err());
+        let keys: Vec<String> = members(&project)
+            .unwrap()
+            .into_iter()
+            .map(|r| r.key)
+            .collect();
+        assert!(keys.contains(&"writer".to_string()) && keys.contains(&"devsecops".to_string()));
+        assert!(project.join(HARNESS_DIR).join("team/devsecops.md").exists());
         std::fs::remove_dir_all(project).unwrap();
     }
 }
