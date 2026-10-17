@@ -53,7 +53,8 @@ fennec-os serve [--port N]  # prints a one-time URL; the review page
 Env: `FENNEC_OS_HOME` (store, default `~/.local/share/fennec-os`),
 `FENNEC_OS_RO` (paths re-exposed read-only inside the hidden home),
 `FENNEC_OS_MEMORY_MB` (address-space cap per sandboxed command, default 8192, 0 = none),
-`FENNEC_OS_BASE_URL`, `FENNEC_OS_MODELS` (comma-separated; default: what the server lists), `FENNEC_OS_API_KEY`
+`FENNEC_OS_BASE_URL`, `FENNEC_OS_MODELS` (comma-separated; default: what the server lists), `FENNEC_OS_API_KEY`,
+`FENNEC_OS_MAX_TOKENS` (a reply's budget, reasoning included; default 32768, 0 = the server's)
 (each overrides `~/.config/fennec/model.json`, which fennec-lead's settings write),
 `FENNEC_OS_BROWSER` (headless browser for proof screenshots, default `chromium`).
 

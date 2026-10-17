@@ -130,6 +130,8 @@ pub struct OpenAi {
     pub model: String,
     pub api_key: Option<String>,
     pub temperature: f64,
+    /// See [`Settings::max_tokens`].
+    pub max_tokens: u64,
     agent: ureq::Agent,
 }
 
@@ -146,6 +148,7 @@ impl OpenAi {
             model: model.to_string(),
             api_key,
             temperature,
+            max_tokens: DEFAULT_MAX_TOKENS,
             agent: ureq::Agent::new_with_config(config),
         }
     }
@@ -157,6 +160,7 @@ impl OpenAi {
             base_url: base,
             models,
             api_key: key,
+            max_tokens,
         } = Settings::current()?;
         // None chosen: the models the server says it serves, so a local
         // server that serves one model needs no configuration but its address.
@@ -181,7 +185,10 @@ impl OpenAi {
             .map(|i| {
                 let model = &models[i % models.len()];
                 let temperature = TEMPERATURES[(i / models.len()) % TEMPERATURES.len()];
-                Self::new(&base, model, key.clone(), temperature)
+                Self {
+                    max_tokens,
+                    ..Self::new(&base, model, key.clone(), temperature)
+                }
             })
             .collect())
     }
@@ -190,21 +197,27 @@ impl OpenAi {
 /// Where the model is: the human's settings file
 /// (`~/.config/fennec/model.json`, written from the web UI), each field
 /// overridden by its environment variable (`FENNEC_OS_BASE_URL`,
-/// `FENNEC_OS_MODELS` comma-separated, `FENNEC_OS_API_KEY`).
+/// `FENNEC_OS_MODELS` comma-separated, `FENNEC_OS_API_KEY`, `FENNEC_OS_MAX_TOKENS`).
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Settings {
     pub base_url: String,
     /// Empty: every model the server lists.
     pub models: Vec<String>,
     pub api_key: Option<String>,
+    /// A reply's budget, reasoning included; 0 leaves it to the server.
+    /// Servers default low (ninfer: 8192), and a reasoning model can spend
+    /// all of it thinking and answer nothing.
+    pub max_tokens: u64,
 }
 
+pub const DEFAULT_MAX_TOKENS: u64 = 32_768;
 pub const DEFAULT_BASE_URL: &str = "http://localhost:8000/v1";
 /// The variables that win over the file, for the UI to say so.
-pub const ENV: [&str; 3] = [
+pub const ENV: [&str; 4] = [
     "FENNEC_OS_BASE_URL",
     "FENNEC_OS_MODELS",
     "FENNEC_OS_API_KEY",
+    "FENNEC_OS_MAX_TOKENS",
 ];
 
 impl Settings {
@@ -235,6 +248,7 @@ impl Settings {
                 .as_str()
                 .filter(|k| !k.is_empty())
                 .map(str::to_string),
+            max_tokens: v["max_tokens"].as_u64().unwrap_or(DEFAULT_MAX_TOKENS),
         })
     }
 
@@ -255,6 +269,12 @@ impl Settings {
         if let Ok(k) = std::env::var("FENNEC_OS_API_KEY") {
             s.api_key = Some(k);
         }
+        if let Some(n) = std::env::var("FENNEC_OS_MAX_TOKENS")
+            .ok()
+            .and_then(|n| n.parse().ok())
+        {
+            s.max_tokens = n;
+        }
         Ok(s)
     }
 
@@ -263,8 +283,8 @@ impl Settings {
         use std::os::unix::fs::OpenOptionsExt;
         let path = Self::path()?;
         std::fs::create_dir_all(path.parent().unwrap_or(&path))?;
-        let json =
-            json!({"base_url": self.base_url, "models": self.models, "api_key": self.api_key});
+        let json = json!({"base_url": self.base_url, "models": self.models, "api_key": self.api_key,
+                   "max_tokens": self.max_tokens});
         let mut file = std::fs::OpenOptions::new()
             .write(true)
             .create(true)
@@ -305,6 +325,9 @@ impl OpenAi {
             "messages": messages,
             "temperature": self.temperature,
         });
+        if self.max_tokens > 0 {
+            body["max_tokens"] = json!(self.max_tokens);
+        }
         // The chat-template switch Qwen-style models read (vLLM, sglang,
         // ninfer); servers without it ignore unknown keys.
         if !think {
