@@ -7,6 +7,7 @@ use fennec_os::world::{World, Worlds};
 
 pub struct Fixture {
     pub dir: PathBuf,
+    #[allow(dead_code)]
     pub project: PathBuf,
     pub worlds: Worlds,
 }

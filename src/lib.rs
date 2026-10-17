@@ -6,6 +6,7 @@ pub mod recipe;
 pub mod review;
 pub mod rules;
 pub mod schedule;
+pub mod serve;
 pub mod sleep;
 pub mod solve;
 pub mod spec;

@@ -111,7 +111,7 @@ fn fixture(name: &str) -> Fixture {
 }
 
 #[test]
-fn the_smallest_passing_world_wins_and_lands() {
+fn attempts_run_in_turn_and_the_first_pass_lands() {
     let f = fixture("solve");
     let wrong = Script::new("wrong", &[write("answer", "41\n"), done()]);
     let noisy = Script::new(
@@ -119,15 +119,17 @@ fn the_smallest_passing_world_wins_and_lands() {
         &[write("answer", "42\n"), write("notes", "a\nb\nc\n"), done()],
     );
     let tight = Script::new("tight", &[write("answer", "42\n"), done()]);
-    let models: Vec<&dyn Model> = vec![&wrong, &noisy, &tight];
+    let models: Vec<&dyn Model> = vec![&wrong, &tight, &noisy];
 
     let record = solve(&f.worlds, &f.project, &task(&[]), &models, 10).unwrap();
     let attempts = record["attempts"].as_array().unwrap();
+    // The third model is never called: the second passed.
     let passed: Vec<bool> = attempts.iter().map(|a| a["passed"] == true).collect();
-    assert_eq!(passed, [false, true, true], "{record:#}");
+    assert_eq!(passed, [false, true], "{record:#}");
+    assert_eq!(noisy.replies.lock().unwrap().len(), 3);
     assert_eq!(attempts[0]["reason"], "verify failed");
     let winner = record["winner"].as_str().unwrap().to_string();
-    assert_eq!(winner, attempts[2]["world"]);
+    assert_eq!(winner, attempts[1]["world"]);
     // Losers are gone; only the winner waits for landing.
     assert_eq!(f.worlds.list().unwrap(), vec![winner.clone()]);
 
@@ -267,6 +269,8 @@ fn a_model_that_stops_answering_is_a_failed_attempt() {
     let record = solve(&f.worlds, &f.project, &task(&[]), &[&mute], 10).unwrap();
     assert_eq!(record["attempts"][0]["reason"], "script exhausted");
     assert_eq!(record["winner"], Value::Null);
+    // The turns before the failure stay, for the profile.
+    assert_eq!(record["attempts"][0]["turns"].as_array().unwrap().len(), 2);
 }
 
 #[test]
@@ -401,7 +405,7 @@ fn project_rules_judge_every_attempt() {
         &f.worlds,
         &f.project,
         &task(&[]),
-        &[&bare, &paired, &cheat],
+        &[&bare, &cheat, &paired],
         10,
     )
     .unwrap();
@@ -410,20 +414,20 @@ fn project_rules_judge_every_attempt() {
         a[0]["reason"],
         "rule r1 violated: changed answer but nothing under notes"
     );
-    assert_eq!(a[1]["passed"], true, "{:#}", a[1]);
+    assert_eq!(
+        a[1]["reason"],
+        "rule harness-dir violated: changed .fennec-os/rules.json"
+    );
+    assert_eq!(a[2]["passed"], true, "{:#}", a[2]);
     // A failing `warn` rule is evidence, not a verdict.
     assert!(
-        a[1]["checks"]
+        a[2]["checks"]
             .as_array()
             .unwrap()
             .iter()
             .any(|c| c["rule"] == "r2" && c["exit"] == 1)
     );
-    assert_eq!(
-        a[2]["reason"],
-        "rule harness-dir violated: changed .fennec-os/rules.json"
-    );
-    assert_eq!(record["winner"], a[1]["world"]);
+    assert_eq!(record["winner"], a[2]["world"]);
 }
 
 #[test]
@@ -462,7 +466,11 @@ struct Spy(Mutex<String>);
 
 impl Model for Spy {
     fn chat(&self, messages: &[Value], _tools: &Value) -> io::Result<Value> {
-        *self.0.lock().unwrap() = messages[0]["content"].as_str().unwrap().to_string();
+        *self.0.lock().unwrap() = messages
+            .iter()
+            .filter_map(|m| m["content"].as_str())
+            .collect::<Vec<_>>()
+            .join("\n");
         let (tool, args) = done();
         Ok(
             json!({"tool_calls": [{"id": "c", "function": {"name": tool, "arguments": args.to_string()}}]}),
@@ -867,4 +875,120 @@ fn a_rule_said_once_reaches_every_agent_which_reports_using_it() {
         record["attempts"][0]["rules"],
         json!(["use uv, never .venv"])
     );
+}
+
+#[test]
+fn sparring_proposes_only_findings_proven_by_a_new_failing_test() {
+    let f = fixture("spar");
+    let finding =
+        "goal: check.sh fails when `answer` is missing; spar.sh must pass.\nverify: sh spar.sh";
+
+    // Failing by breaking what was there is not a finding.
+    let vandal = Script::new(
+        "vandal",
+        &[
+            write("check.sh", "false\n"),
+            write("spar.sh", "false\n"),
+            finish(finding),
+        ],
+    );
+    let s = spec::spar(&f.worlds, &f.project, &vandal, 10).unwrap();
+    assert_eq!(
+        s["reason"], "tests go in new files; check.sh already existed",
+        "{s:#}"
+    );
+    assert!(f.worlds.list().unwrap().is_empty());
+
+    // A failing test, added: a spec to validate, like a compiled request.
+    let finder = Script::new(
+        "finder",
+        &[write("spar.sh", "test -f answer\n"), finish(finding)],
+    );
+    let s = spec::spar(&f.worlds, &f.project, &finder, 10).unwrap();
+    assert_eq!(s["status"], "proposed", "{s:#}");
+    assert_eq!(s["origin"], "spar");
+    assert_eq!(
+        s["request"],
+        "spar: check.sh fails when `answer` is missing; spar.sh must pass."
+    );
+    let id = s["world"].as_str().unwrap();
+    spec::reject(&f.worlds, id, Some("a missing answer is meant to fail")).unwrap();
+
+    // The next round knows what was found and what the human said.
+    let spy = Spy(Mutex::new(String::new()));
+    spec::spar(&f.worlds, &f.project, &spy, 10).unwrap();
+    assert!(spy.0.lock().unwrap().contains(
+        "do not report them again:\n  - check.sh fails when `answer` is missing; spar.sh must pass. (rejected: a missing answer is meant to fail)"
+    ));
+}
+
+#[test]
+fn a_prose_summary_gets_one_turn_to_take_the_form() {
+    let f = fixture("reformat");
+    let prose = Script::new(
+        "prose",
+        &[
+            write("spec.sh", "grep -qx 42 answer\n"),
+            finish("I wrote good tests."),
+        ],
+    );
+    prose
+        .replies
+        .lock()
+        .unwrap()
+        .push_back(json!({"role": "assistant", "content": SPEC}));
+    let s = spec::compile(&f.worlds, &f.project, "answer should say 42", &prose, 10).unwrap();
+    assert_eq!(s["status"], "proposed", "{s:#}");
+    assert_eq!(s["summary"], "I wrote good tests.");
+    assert_eq!(s["verify"], json!(["sh spec.sh"]));
+}
+
+#[test]
+fn every_turn_is_timed_for_the_profile() {
+    let f = fixture("profile");
+    let fast = Script::new("fast", &[write("answer", "42\n"), done()]);
+    fast.replies.lock().unwrap()[0]["usage"] = json!({"prompt_tokens": 900, "completion_tokens": 40,
+               "prompt_tokens_details": {"cached_tokens": 800}});
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&fast], 40).unwrap();
+    let attempts = record["attempts"].as_array().unwrap();
+
+    // Usage feeds the profile and is never sent back to the model.
+    let turns = attempts[0]["turns"].as_array().unwrap();
+    assert_eq!(turns.len(), 2);
+    assert_eq!(turns[0]["tools"][0]["name"], "write_file");
+    assert!(turns[0]["tools"][0]["ms"].is_u64());
+    assert!(attempts[0]["checks"][0]["ms"].is_u64());
+    assert!(
+        !attempts[0]["messages"]
+            .to_string()
+            .contains("prompt_tokens")
+    );
+    let p = review::profile(&attempts[0]);
+    assert_eq!(p["prompt_tokens"], 900);
+    assert_eq!(p["cached_tokens"], 800);
+    assert_eq!(p["turns"], 2);
+    let parts = ["model_ms", "tool_ms", "verify_ms", "harness_ms"]
+        .iter()
+        .map(|k| p[k].as_u64().unwrap())
+        .sum::<u64>();
+    assert_eq!(parts, p["wall_ms"].as_u64().unwrap());
+}
+
+#[test]
+fn a_failed_attempt_teaches_the_next_one() {
+    let f = fixture("lesson");
+    let wrong = Script::new("wrong", &[write("answer", "41\n"), done()]);
+    let spy = Spy(Mutex::new(String::new()));
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&wrong, &spy], 10).unwrap();
+    assert_eq!(record["attempts"].as_array().unwrap().len(), 2);
+    let seen = spy.0.lock().unwrap();
+    assert!(
+        seen.contains("Earlier attempts at this task failed."),
+        "{seen}"
+    );
+    assert!(seen.contains("- It failed: verify failed\n  It changed: answer\n"));
+    assert!(seen.contains("`sh check.sh` exited 1"));
+    // Told in the goal: the system prompt stays the first attempt's.
+    let system = seen.split("Write 42").next().unwrap();
+    assert!(!system.contains("Earlier attempts"));
 }

@@ -1,9 +1,10 @@
-//! A task end to end: N worlds forked from the project, one agent in each,
-//! a verdict read from exit codes, the smallest passing diff kept.
+//! A task end to end: up to N worlds forked from the project, one agent in
+//! each, tried in turn until one passes; the verdict is read from exit codes.
 
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
+use std::time::Instant;
 
 use serde_json::{Value, json};
 
@@ -62,7 +63,7 @@ impl Task {
     }
 }
 
-/// Runs one attempt per model, in parallel. Keeps the winner's world (if any)
+/// Runs one attempt per model in turn, until one passes. Keeps its world
 /// for `land`, drops the others, and returns the run record, also saved
 /// under `<root>/runs/`.
 pub fn solve(
@@ -144,11 +145,10 @@ pub fn solve(
         attempts.extend(a);
     }
 
-    // Selection by the verifier: among passing worlds, the smallest change.
+    // The verifier chose: attempts stop at the first pass.
     let winner = attempts
         .iter()
-        .filter(|a| a["passed"] == true)
-        .min_by_key(|a| a["changed_lines"].as_u64().unwrap_or(u64::MAX))
+        .find(|a| a["passed"] == true)
         .and_then(|a| a["world"].as_str())
         .map(str::to_string);
     for (world, record) in forked.into_iter().zip(&mut attempts) {
@@ -183,60 +183,93 @@ pub fn solve(
         "status": if winner.is_some() { "ready" } else { "failed" },
         "attempts": attempts,
     });
-    let runs = worlds.root.join("runs");
-    std::fs::create_dir_all(&runs)?;
+    std::fs::create_dir_all(worlds.root.join("runs"))?;
     let name = winner.clone().unwrap_or_else(|| {
         record["attempts"][0]["world"]
             .as_str()
             .unwrap_or("run")
             .to_string()
     });
-    std::fs::write(
-        runs.join(format!("{name}.json")),
-        serde_json::to_string_pretty(&record).map_err(io::Error::other)?,
-    )?;
+    review::save(worlds, &name, &record)?;
     Ok(record)
 }
 
-/// One attempt per model, in parallel, each in a fresh world.
+/// One attempt per model, one after the other, each in a fresh world forked
+/// when it starts; the first pass ends the run. On a server that decodes
+/// speculatively, attempts running at once split its speed (measured: 165
+/// tok/s alone, 90 each for two), so a later attempt runs only if the
+/// earlier ones failed.
+// ponytail: sequential only; a server that batches for free would want
+// parallel attempts back, behind a flag, once one is in use.
 fn attempts_for(
     worlds: &Worlds,
     source: &str,
     models: &[&dyn Model],
     brief: &Brief,
 ) -> io::Result<(Vec<World>, Vec<Value>)> {
-    // Forks are sequential: concurrent `git worktree add` contend for locks.
-    let forked: Vec<World> = models
-        .iter()
-        .map(|_| worlds.fork(source))
-        .collect::<io::Result<_>>()?;
-    // One world: `solve` refuses a grant with several attempts.
-    let granted = forked
-        .iter()
-        .try_for_each(|w| match brief.task.grant.is_empty() {
-            true => Ok(()),
-            false => grant::give(worlds, w, &brief.task.grant),
-        });
-    if let Err(e) = granted {
-        forked.into_iter().try_for_each(|w| worlds.drop(w))?;
-        return Err(e);
+    let (mut forked, mut attempts) = (Vec::new(), Vec::new());
+    let mut lessons = String::new();
+    for model in models {
+        let world = worlds.fork(source)?;
+        // One world: `solve` refuses a grant with several attempts.
+        if !brief.task.grant.is_empty()
+            && let Err(e) = grant::give(worlds, &world, &brief.task.grant)
+        {
+            worlds.drop(world)?;
+            return Err(e);
+        }
+        let record = attempt(worlds, &world, *model, brief, &lessons);
+        let passed = record["passed"] == true;
+        if !passed {
+            if lessons.is_empty() {
+                lessons.push_str(
+                    "Earlier attempts at this task failed. You start again from a fresh \
+                     copy of the project: their changes are gone, what they learnt is not.\n",
+                );
+            }
+            lessons.push_str(&lesson(&record));
+        }
+        forked.push(world);
+        attempts.push(record);
+        if passed {
+            break;
+        }
     }
-    let attempts = std::thread::scope(|s| {
-        let handles: Vec<_> = forked
-            .iter()
-            .zip(models)
-            .map(|(world, model)| s.spawn(move || attempt(worlds, world, *model, brief)))
-            .collect();
-        handles
-            .into_iter()
-            .zip(&forked)
-            .map(|(h, world)| match h.join() {
-                Ok(record) => record,
-                Err(_) => json!({"world": world.id, "passed": false, "reason": "attempt panicked"}),
-            })
-            .collect()
-    });
     Ok((forked, attempts))
+}
+
+/// What a failed attempt teaches the next one, from the harness's own
+/// findings, not the agent's account: why it failed, what it touched, what
+/// the failing checks printed.
+fn lesson(record: &Value) -> String {
+    let mut text = format!(
+        "- It failed: {}\n",
+        record["reason"].as_str().unwrap_or("no reason recorded")
+    );
+    let files: Vec<&str> = record["diff"]
+        .as_str()
+        .unwrap_or("")
+        .lines()
+        .filter_map(|l| l.strip_prefix("+++ b/"))
+        .collect();
+    if !files.is_empty() {
+        text.push_str(&format!("  It changed: {}\n", files.join(", ")));
+    }
+    for c in record["checks"].as_array().into_iter().flatten() {
+        if c["block"] != true || c["exit"] == 0 {
+            continue;
+        }
+        let output = c["output"].as_str().unwrap_or("");
+        let lines: Vec<&str> = output.lines().collect();
+        let tail = lines[lines.len().saturating_sub(20)..].join("\n    ");
+        text.push_str(&format!(
+            "  `{}` exited {}; end of its output:\n    {tail}\n",
+            c["command"].as_str().unwrap_or(""),
+            c["exit"]
+        ));
+    }
+    // ponytail: cut at 3000 chars per attempt; a sidekick could summarise.
+    text.chars().take(3000).collect()
 }
 
 /// What every attempt of a run is given.
@@ -251,11 +284,25 @@ struct Brief<'a> {
 }
 
 /// Never fails: any error becomes a failed attempt in the record.
-fn attempt(worlds: &Worlds, world: &World, model: &dyn Model, brief: &Brief) -> Value {
-    let mut record = json!({"world": world.id, "model": model.label(), "passed": false});
-    if let Err(e) = attempt_inner(worlds, world, model, brief, &mut record) {
+/// `lessons` is what earlier failed attempts of the run teach; empty for the
+/// first.
+fn attempt(
+    worlds: &Worlds,
+    world: &World,
+    model: &dyn Model,
+    brief: &Brief,
+    lessons: &str,
+) -> Value {
+    let started = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_millis() as u64);
+    let clock = Instant::now();
+    let mut record = json!({"world": world.id, "model": model.label(), "passed": false,
+                            "started_ms": started});
+    if let Err(e) = attempt_inner(worlds, world, model, brief, lessons, &mut record) {
         record["reason"] = json!(e.to_string());
     }
+    record["ms"] = json!(clock.elapsed().as_millis() as u64);
     record
 }
 
@@ -264,6 +311,7 @@ fn attempt_inner(
     world: &World,
     model: &dyn Model,
     brief: &Brief,
+    lessons: &str,
     record: &mut Value,
 ) -> io::Result<()> {
     let Brief {
@@ -288,17 +336,32 @@ fn attempt_inner(
         .filter(|r| r.block)
         .map(Rule::describe)
         .collect();
-    let outcome = agent::run(
-        worlds, world, model, &task.goal, &criteria, &context, max_steps,
-    )?;
+    // In the goal message, not the system prompt: the system prompt stays
+    // the same across attempts and keeps the server's prefix cache.
+    let goal = match lessons {
+        "" => task.goal.clone(),
+        _ => format!("{}\n\n{lessons}", task.goal),
+    };
+    let outcome = agent::run(worlds, world, model, &goal, &criteria, &context, max_steps)?;
     record["steps"] = json!(outcome.steps);
     record["rules"] = json!(rules::used(outcome.summary.as_deref().unwrap_or(""), said));
     record["summary"] = json!(outcome.summary);
     record["messages"] = json!(outcome.messages);
     record["stuck"] = json!(outcome.stuck);
     record["question"] = json!(outcome.question);
+    record["turns"] = json!(outcome.turns);
+    if let Some(e) = outcome.error {
+        return Err(io::Error::other(e));
+    }
 
-    let title = task.goal.lines().next().unwrap_or("task");
+    let title: String = task
+        .goal
+        .lines()
+        .next()
+        .unwrap_or("task")
+        .chars()
+        .take(72)
+        .collect();
     let commit = worlds.commit(world, &format!("fennec-os: {title}"))?;
     let diff = worlds.git(world, &["diff", &base, &commit])?;
     record["commit"] = json!(commit);
@@ -376,10 +439,12 @@ pub(crate) fn verify(
             "-c".to_string(),
             command.clone(),
         ];
+        let ran = Instant::now();
         let out = worlds
             .sandbox_command(world, &argv)?
             .stdin(Stdio::null())
             .output()?;
+        let ms = ran.elapsed().as_millis() as u64;
         let code = out.status.code().unwrap_or(-1);
         all_pass &= code == 0 || !rule.block;
         let output = format!(
@@ -389,7 +454,7 @@ pub(crate) fn verify(
         );
         let lines: Vec<&str> = output.lines().collect();
         let tail = lines[lines.len().saturating_sub(40)..].join("\n");
-        checks.push(json!({"rule": rule.id, "block": rule.block, "command": command, "exit": code, "output": tail}));
+        checks.push(json!({"rule": rule.id, "block": rule.block, "command": command, "exit": code, "ms": ms, "output": tail}));
     }
     // What lands must be exactly what was checked.
     if !worlds.git(world, &["status", "--porcelain"])?.is_empty() {
