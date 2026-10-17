@@ -24,10 +24,14 @@ const MAX_SHOTS: usize = 3;
 
 const BRIEF: &str = "A change was made to a project and its tests pass. Show that it works \
 the way its user would see it: run the program or command, call the new code from a short \
-script, start the server and query it. Do not run the test suite. The commands run from the \
+script, start the server and query it. Do not run the test suite: it already passed, so \
+never list it as unverified either. The commands run from the \
 project root in a sandbox without network; anything you start must stop on its own (use \
 `timeout`). Each command must print what a user would look at, and exit 0 only if the \
-product behaves as the goal says (catch an expected error and print it). \
+product behaves as the goal says. When the product is meant to fail (a bad argument, a \
+usage line, no argument at all), write the try as `! <command>`: it passes only if the \
+command fails. Never end a try with `; echo`, `|| true` or anything else that makes it \
+exit 0 whatever the product did. \
 If the project has a web interface the change shows in, also say how to start it and which \
 pages to capture: the harness starts it, opens each page in a real browser and takes a \
 screenshot, so never imitate a browser or a DOM in a try: when the change only shows in \
