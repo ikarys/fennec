@@ -74,6 +74,10 @@
   dialog li button:hover { background: var(--bg); }
   .repo { color: var(--ok); font-size: 12px; margin-left: 6px; }
   .row { display: flex; gap: 8px; justify-content: flex-end; }
+  .team-pick { display: flex; gap: 8px; align-items: center; margin: 12px 0 4px; font-size: 14px; }
+  .team-pick select, #team-catalog { flex: 1; min-width: 0; }
+  #team-roles label { display: flex; gap: 10px; align-items: baseline; padding: 6px 4px; cursor: pointer; }
+  #team-roles .out { color: var(--muted); text-decoration: line-through; }
   @media (max-width: 700px) {
     #new-request { grid-template-columns: 1fr; }
   }
@@ -84,6 +88,7 @@
   <header>
     <h1>fennec</h1>
     <button class="link" id="add-project">+ projet</button>
+    <button class="link" id="open-team">Équipe</button>
   </header>
 
   <form id="new-request">
@@ -103,6 +108,19 @@
   <div id="landed"></div>
 </main>
 
+<dialog id="team">
+  <strong id="team-title">Équipe</strong>
+  <label class="team-pick">Équipe du projet
+    <select id="team-name"></select>
+  </label>
+  <ul id="team-roles"></ul>
+  <form class="go" id="team-add">
+    <select id="team-catalog" aria-label="Rôle à ajouter"></select>
+    <button>Ajouter</button>
+  </form>
+  <p class="error" id="team-error" role="alert"></p>
+  <div class="row"><button type="button" id="team-close">Fermer</button></div>
+</dialog>
 <dialog id="picker">
   <strong>Choisir un projet</strong>
   <form class="go" id="picker-go">

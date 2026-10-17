@@ -263,5 +263,63 @@ $("picker-choose").onclick = async () => {
   }
 };
 
+// The team of the project chosen above: which team, which of its roles
+// work, and roles to add from the catalogue. Each change is saved at once.
+const STAGES = { frame: "cadrage", solve: "réalisation", prove: "preuve" };
+const order = Object.keys(STAGES);
+const byStage = (a, b) => order.indexOf(a.stage) - order.indexOf(b.stage);
+let team = null;
+
+function renderTeam(view) {
+  view.roles.sort(byStage);
+  view.catalog.sort(byStage);
+  team = view;
+  $("team-error").textContent = "";
+  $("team-name").replaceChildren(...view.teams.map((t) => new Option(t, t)));
+  $("team-name").value = view.team;
+  $("team-roles").replaceChildren(...view.roles.map((r) => {
+    const box = el("input", { type: "checkbox", checked: !r.out });
+    box.onchange = () => {
+      const remove = team.roles.filter((x) => x.key === r.key ? !box.checked : x.out).map((x) => x.key);
+      teamCall("/api/team/choose", { team: team.team, remove });
+    };
+    return el("li", {}, el("label", { className: r.out ? "out" : "" }, box,
+      el("span", { className: "what", textContent: r.name }),
+      el("span", { className: "muted", textContent: STAGES[r.stage] ?? r.stage })));
+  }));
+  $("team-catalog").replaceChildren(new Option("Ajouter un rôle…", ""),
+    ...view.catalog.map((r) => new Option(`${r.name} — ${STAGES[r.stage] ?? r.stage}`, r.key)));
+}
+
+async function teamCall(path, body) {
+  try {
+    renderTeam(await api(path, { project: $("project").value, ...body }));
+  } catch (e) {
+    $("team-error").textContent = e.message;
+  }
+}
+
+$("open-team").onclick = async () => {
+  const project = $("project").value;
+  if (!project) {
+    $("error").textContent = "Choisis d'abord le projet dont tu veux voir l'équipe.";
+    return;
+  }
+  $("team-title").textContent = `Équipe — ${$("project").selectedOptions[0].textContent}`;
+  try {
+    renderTeam(await api("/api/team", { project }));
+    $("team").showModal();
+  } catch (e) {
+    $("error").textContent = e.message;
+  }
+};
+// Another team starts whole: what was left out belonged to the old one.
+$("team-name").onchange = () => teamCall("/api/team/choose", { team: $("team-name").value, remove: [] });
+$("team-add").onsubmit = (e) => {
+  e.preventDefault();
+  if ($("team-catalog").value) teamCall("/api/team/add", { role: $("team-catalog").value });
+};
+$("team-close").onclick = () => $("team").close();
+
 refresh();
 setInterval(refresh, 3000);
