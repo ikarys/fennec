@@ -274,18 +274,24 @@ function renderTeam(view) {
   view.roles.sort(byStage);
   view.catalog.sort(byStage);
   team = view;
-  $("team-error").textContent = "";
-  $("team-name").replaceChildren(...view.teams.map((t) => new Option(t, t)));
+  // A team named by the project but not found here: say so, and let the
+  // human pick one, since fennec cannot work on the project until then.
+  $("team-error").textContent = view.missing
+    ? `L'équipe « ${view.team} » est introuvable ici : choisis-en une pour que fennec puisse travailler.`
+    : "";
+  const missing = view.missing ? [new Option(`${view.team} (introuvable)`, view.team)] : [];
+  $("team-name").replaceChildren(...missing, ...view.teams.map((t) => new Option(t, t)));
   $("team-name").value = view.team;
   $("team-roles").replaceChildren(...view.roles.map((r) => {
-    const box = el("input", { type: "checkbox", checked: !r.out });
+    const box = el("input", { type: "checkbox", checked: !r.out, ariaLabel: r.name });
     box.onchange = () => {
       const remove = team.roles.filter((x) => x.key === r.key ? !box.checked : x.out).map((x) => x.key);
       teamCall("/api/team/choose", { team: team.team, remove });
     };
-    return el("li", {}, el("label", { className: r.out ? "out" : "" }, box,
-      el("span", { className: "what", textContent: r.name }),
-      el("span", { className: "muted", textContent: STAGES[r.stage] ?? r.stage })));
+    const name = el("button", { type: "button", textContent: r.name, title: "Modifier ce rôle" });
+    name.onclick = () => editRole(r);
+    return el("li", { className: r.out ? "out" : "" }, box, name,
+      el("span", { className: "muted", textContent: STAGES[r.stage] ?? r.stage }));
   }));
   $("team-catalog").replaceChildren(new Option("Ajouter un rôle…", ""),
     ...view.catalog.map((r) => new Option(`${r.name} — ${STAGES[r.stage] ?? r.stage}`, r.key)));
@@ -294,10 +300,43 @@ function renderTeam(view) {
 async function teamCall(path, body) {
   try {
     renderTeam(await api(path, { project: $("project").value, ...body }));
+    return true;
   } catch (e) {
     $("team-error").textContent = e.message;
+    return false;
   }
 }
+
+// One form for a role edited or written from scratch; saved in the project.
+let editing = null;
+$("role-stage").replaceChildren(...Object.entries(STAGES).map(([k, label]) => new Option(label, k)));
+function editRole(r) {
+  editing = r?.key ?? null;
+  $("role-name").value = r?.name ?? "";
+  $("role-stage").value = r?.stage ?? "solve";
+  // Role files wrap their lines; the box shows each paragraph as one.
+  $("role-brief").value = (r?.brief ?? "").replace(/([^\n])\n(?!\n)/g, "$1 ");
+  $("team-role").hidden = false;
+  $("role-name").focus();
+}
+$("role-new").onclick = () => editRole(null);
+$("role-cancel").onclick = () => ($("team-role").hidden = true);
+$("team-role").onsubmit = async (e) => {
+  e.preventDefault();
+  const body = { key: editing, name: $("role-name").value, stage: $("role-stage").value, brief: $("role-brief").value };
+  if (await teamCall("/api/team/role", body)) $("team-role").hidden = true;
+};
+$("team-save-open").onclick = () => {
+  $("team-save").hidden = false;
+  $("team-new-name").focus();
+};
+$("team-save").onsubmit = async (e) => {
+  e.preventDefault();
+  if (await teamCall("/api/team/save", { name: $("team-new-name").value })) {
+    $("team-save").hidden = true;
+    $("team-new-name").value = "";
+  }
+};
 
 $("open-team").onclick = async () => {
   const project = $("project").value;
@@ -308,6 +347,7 @@ $("open-team").onclick = async () => {
   $("team-title").textContent = `Équipe — ${$("project").selectedOptions[0].textContent}`;
   try {
     renderTeam(await api("/api/team", { project }));
+    $("team-role").hidden = $("team-save").hidden = true;
     $("team").showModal();
   } catch (e) {
     $("error").textContent = e.message;
