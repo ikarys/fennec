@@ -26,6 +26,19 @@ fn rollback_restores_the_last_checkpoint() {
 }
 
 #[test]
+fn a_folder_inside_a_repository_is_not_that_repository() {
+    let f = Fixture::new("ceiling");
+    // A project whose `.git` is gone, inside a folder that is a repository.
+    let inner = f.project.join("inner");
+    std::fs::create_dir(&inner).unwrap();
+    let Err(e) = f.worlds.fork(&inner.to_string_lossy()) else {
+        panic!("forked the parent repository");
+    };
+    let e = e.to_string();
+    assert!(e.contains("not a git repository"), "{e}");
+}
+
+#[test]
 fn running_python_leaves_no_bytecode_in_the_work() {
     let f = Fixture::new("bytecode");
     let w = f.worlds.fork(&f.project.to_string_lossy()).unwrap();

@@ -288,13 +288,14 @@ impl Worlds {
 }
 
 /// Every harness git call: hooks off, whatever the repository says.
+/// A project is its own repository: git must not walk up to a parent's (seen:
+/// a project whose `.git` was deleted, inside a home that is a repository).
 pub(crate) fn git(dir: &Path, args: &[&str]) -> io::Result<String> {
-    let out = Command::new("git")
-        .arg("-C")
-        .arg(dir)
-        .args(NO_HOOKS)
-        .args(args)
-        .output()?;
+    let mut cmd = Command::new("git");
+    if let Some(parent) = dir.parent().filter(|p| p.is_absolute()) {
+        cmd.env("GIT_CEILING_DIRECTORIES", parent);
+    }
+    let out = cmd.arg("-C").arg(dir).args(NO_HOOKS).args(args).output()?;
     if !out.status.success() {
         return Err(io::Error::other(format!(
             "git {}: {}",

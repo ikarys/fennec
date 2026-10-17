@@ -561,6 +561,11 @@ pub fn push(project: &Path, remote: &str, branch: &str) -> io::Result<()> {
         .arg(project)
         .args(["-c", "core.hooksPath=/dev/null", "push", "--quiet", remote])
         .arg(format!("refs/heads/{branch}:refs/heads/{branch}"))
+        // As every harness git call: never a parent folder's repository.
+        .env(
+            "GIT_CEILING_DIRECTORIES",
+            project.parent().unwrap_or(Path::new("")),
+        )
         .env("GIT_TERMINAL_PROMPT", "0")
         .env("GIT_SSH_COMMAND", "ssh -o BatchMode=yes")
         .output()?;
