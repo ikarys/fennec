@@ -113,6 +113,10 @@ team is what was missing. fennec-os stages already behave like roles:
    DevSecOps runs `gitleaks detect --no-git`. First trial: after a veto
    (`test -f SECURITY.md`), the retry wrote a SECURITY.md, since the reason
    becomes the next attempt's lesson; the first role that changed an outcome.
+   **Model per role done (2026-10-17)**: a role's `model:` line (picked in the
+   dialog from what the server serves) is the model its stage runs on; the
+   conversation runs on framing's. Two roles of one stage naming different
+   models: the first by file name wins. The journal names the model of each step.
    Not yet: tools that need the network (cargo audit, pip-audit) cannot run
    in the sandbox.
 
