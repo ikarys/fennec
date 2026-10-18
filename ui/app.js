@@ -590,6 +590,7 @@ function renderProjects(projects) {
 // address so a reload or a bookmark comes back to it.
 function focusOn(path) {
   document.body.classList.toggle("focused", !!path);
+  if (path !== paged) showPage(path).catch((e) => ($("page-error").textContent = e.message));
   history.replaceState(null, "", path ? "#" + encodeURIComponent(path) : location.pathname);
 }
 const mine = (items) => {
@@ -631,8 +632,10 @@ async function refresh(force) {
     tick();
     fill($("history"), mine(view.history).map(past), "Rien de terminé pour l'instant.");
     for (const d of document.querySelectorAll("details")) d.open = open.has(d.dataset.key);
-    // How it works, while nothing is under way: the page alone must explain itself.
-    $("how").hidden = view.todo.length + view.running.length > 0;
+    // How it works, until the first request: the page alone must explain itself.
+    $("how").hidden = view.todo.length + view.running.length + view.history.length > 0;
+    // Its figures move as its requests do.
+    if (paged && !force) showPage(paged).catch(() => {});
   } catch (e) {
     $("error").textContent = "Serveur injoignable : " + e.message;
   }
@@ -918,6 +921,45 @@ async function showStats() {
   }));
   $("stats").showModal();
 }
+// One project's page, above its requests: read when it is chosen, not at each refresh.
+let paged = "";
+async function showPage(path) {
+  paged = path;
+  $("page").hidden = !path;
+  if (!path) return;
+  $("page-error").textContent = "";
+  $("page-name").textContent = path.split("/").pop();
+  $("page-path").textContent = path;
+  const [stats, rules] = await Promise.all([api("/api/stats"), api("/api/rules", { project: path })]);
+  if (paged !== path) return;
+  const p = stats.projects.find((x) => x.path === path) ?? {};
+  const tile = (value, label, tone = "") => el("div", { className: `tile ${tone}` }, el("b", { textContent: value }), el("span", { textContent: label }));
+  $("page-tiles").replaceChildren(
+    tile(number(p.requests), "demandes"), tile(number(p.landed), "commitées"),
+    tile(number(p.failed), "échouées", p.failed ? "bad" : ""),
+    tile(number(p.failed_attempts), "essais ratés annulés"),
+    tile(duration(p.ms ?? 0), "de modèle"), tile(compact(p.sent), "tokens envoyés"));
+  const place = $("page-place");
+  place.replaceChildren(...Object.entries(PLACES).map(([k, label]) => new Option(label, k)));
+  if (p.place && !PLACES[p.place]) place.append(new Option(p.place, p.place));
+  place.value = p.place ?? "here";
+  place.onchange = () => api("/api/projects", { path, place: place.value })
+    .catch((e) => { $("page-error").textContent = e.message; place.value = p.place; });
+  const box = $("page-rules");
+  box.querySelector("summary").textContent = rules.length ? `Règles suivies (${rules.length})` : "Aucune règle pour l'instant";
+  box.querySelector("ul").replaceChildren(...rules.map((r) => el("li", {}, ...rich(r.text),
+    el("span", { className: "muted", textContent: r.scope === "user" ? " — tous tes projets" : " — ce projet" }))));
+}
+$("page-team").onclick = () => $("open-team").click();
+$("page-open").onclick = async () => {
+  try {
+    const c = await api("/api/open-project", { project: paged });
+    $("page-error").textContent = c.opened ? "" : `VS Code introuvable : ouvre ${c.folder} dans ton éditeur.`;
+  } catch (e) {
+    $("page-error").textContent = e.message;
+  }
+};
+
 $("open-stats").onclick = () => showStats().catch((e) => ($("error").textContent = e.message));
 $("stats-close").onclick = () => $("stats").close();
 

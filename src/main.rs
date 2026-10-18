@@ -288,6 +288,19 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
             .save()?;
             Ok(json!({}))
         }
+        ("POST", "/api/rules") => {
+            let path = project(&store, &field(&input()?, "project"))?;
+            let said = fennec_os::rules::said(&path)?;
+            Ok(json!(
+                said.iter()
+                    .map(|s| json!({"scope": s.scope, "text": s.text}))
+                    .collect::<Vec<_>>()
+            ))
+        }
+        ("POST", "/api/open-project") => {
+            let path = project(&store, &field(&input()?, "project"))?;
+            Ok(json!({"folder": path, "opened": work::editor(&path)}))
+        }
         ("POST", "/api/team") => team_view(&project(&store, &field(&input()?, "project"))?),
         ("POST", "/api/team/choose") => {
             let v = input()?;
