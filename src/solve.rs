@@ -15,7 +15,7 @@ use crate::review;
 use crate::rules::{self, HARNESS_DIR, Kind, Rule};
 use crate::team;
 use crate::world::{World, Worlds, git};
-use crate::{recipe, schedule, sleep};
+use crate::{recipe, schedule, skill, sleep};
 
 const VERIFY_TIMEOUT_SECS: u32 = 900;
 
@@ -112,6 +112,8 @@ pub fn solve(
     context.push_str(&rules::brief(&said));
     let (roles, team) = team::brief(&project, "solve")?;
     context.push_str(&roles);
+    let skills = skill::chosen(&project)?;
+    context.push_str(&skill::brief(&skills));
     let history = review::agenda(worlds, &project.display().to_string(), 12)?;
     if !history.is_empty() {
         context.push_str("\n\nThis project's history, from earlier runs, oldest first:\n");
@@ -124,6 +126,7 @@ pub fn solve(
         rules,
         said: &said,
         context: &context,
+        skills: &skills,
         max_steps,
     };
     let source = match &task.base {
@@ -216,6 +219,7 @@ fn attempts_for(
     let mut lessons = String::new();
     for model in models {
         let world = worlds.fork(source)?;
+        skill::give(worlds, &world, brief.skills)?;
         // One world: `solve` refuses a grant with several attempts.
         if !brief.task.grant.is_empty()
             && let Err(e) = grant::give(worlds, &world, &brief.task.grant)
@@ -293,6 +297,8 @@ struct Brief<'a> {
     said: &'a [rules::Said],
     /// Know-how, rules and history, appended to the system prompt.
     context: &'a str,
+    /// Mounted in each attempt's sandbox; listed in `context`.
+    skills: &'a [skill::Skill],
     max_steps: usize,
 }
 
@@ -333,6 +339,7 @@ fn attempt_inner(
         said,
         context,
         max_steps,
+        ..
     } = *brief;
     let mut context = context.to_string();
     let granted = grant::paths(worlds, &world.id)?;
@@ -359,6 +366,7 @@ fn attempt_inner(
     record["steps"] = json!(outcome.steps);
     record["rules"] = json!(rules::used(outcome.summary.as_deref().unwrap_or(""), said));
     record["summary"] = json!(outcome.summary);
+    record["skills"] = json!(skill::used(&outcome.messages));
     record["messages"] = json!(outcome.messages);
     record["stuck"] = json!(outcome.stuck);
     record["question"] = json!(outcome.question);
