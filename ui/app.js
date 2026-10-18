@@ -611,9 +611,18 @@ function pastState(item) {
   return "✓ commit " + parts.filter(Boolean).join(" · ");
 }
 
+// The address names the project and the request read in full:
+// "#<project>/<request>", either part may be empty.
+const where = () => {
+  const [path = "", id = ""] = location.hash.slice(1).split("/");
+  return { path: decodeURIComponent(path), id };
+};
+const hashOf = (path, id) => "#" + encodeURIComponent(path) + (id ? "/" + id : "");
+let picked = where().id;
+
 function renderProjects(projects) {
   const select = $("project");
-  const current = select.value || decodeURIComponent(location.hash.slice(1));
+  const current = select.value || where().path;
   // With several projects, none is preselected: a silent default sends a
   // request to the wrong project.
   // The empty choice is also the view of every project at once.
@@ -653,7 +662,7 @@ function renderSide(view) {
 function focusOn(path) {
   document.body.classList.toggle("focused", !!path);
   if (path !== paged) showPage(path).catch((e) => ($("page-error").textContent = e.message));
-  history.replaceState(null, "", path ? "#" + encodeURIComponent(path) : location.pathname);
+  history.replaceState(null, "", path || picked ? hashOf(path, picked) : location.pathname);
 }
 const mine = (items) => {
   const path = $("project").value;
@@ -672,7 +681,7 @@ setInterval(tick, 1000);
 let shown = "";
 async function refresh(force) {
   // Never wipe what the human is typing or reading in a card.
-  const busy = document.activeElement?.closest("#todo") || [...document.querySelectorAll("#todo textarea")].some((t) => t.value);
+  const busy = document.activeElement?.closest("#detail") || [...document.querySelectorAll("#detail textarea")].some((t) => t.value);
   if (!force && busy) return;
   try {
     const view = await api("/api/view");
@@ -683,18 +692,24 @@ async function refresh(force) {
     renderProjects(view.projects);
     renderSide(view);
     const todo = mine(view.todo), running = mine(view.running);
-    const open = new Set([...document.querySelectorAll("details[open]")].map((d) => d.dataset.key));
-    fill($("todo"), todo.map(card), "Rien ne t'attend.");
+    const row = (item, node) => {
+      const a = el("a", { className: "row", href: hashOf($("project").value, item.id) }, node);
+      a.setAttribute("aria-current", String(item.id === picked));
+      return a;
+    };
+    fill($("todo"), todo.map((i) => row(i, line(i, TAGS[i.kind][0]))), "Rien ne t'attend.");
     $("n-todo").textContent = todo.length ? `· ${todo.length}` : "";
     // Seen from another tab: what waits for the human, in the tab's title.
     const others = view.todo.length - todo.length;
     $("n-others").textContent = others ? `${others} autre${others > 1 ? "s" : ""} t'attend${others > 1 ? "ent" : ""} ailleurs` : "";
-    const where = $("project").selectedOptions[0]?.value ? $("project").selectedOptions[0].text : "fennec";
-    document.title = todo.length ? `(${todo.length}) ${where}` : where;
-    fill($("running"), running.map(underway), "Rien en cours.");
+    const name = $("project").selectedOptions[0]?.value ? $("project").selectedOptions[0].text : "fennec";
+    document.title = todo.length ? `(${todo.length}) ${name}` : name;
+    fill($("running"), running.map((i) => row(i, line(i, i.step, true))), "Rien en cours.");
+    const history = mine(view.history);
+    fill($("history"), history.map((i) => row(i, line(i, pastState(i), false))), "Rien de terminé pour l'instant.");
+    showDetail(todo.map((i) => [i, "todo"]).concat(running.map((i) => [i, "run"]), history.map((i) => [i, "past"]))
+      .find(([i]) => i.id === picked));
     tick();
-    fill($("history"), mine(view.history).map(past), "Rien de terminé pour l'instant.");
-    for (const d of document.querySelectorAll("details")) d.open = open.has(d.dataset.key);
     // How it works, until the first request: the page alone must explain itself.
     $("how").hidden = view.todo.length + view.running.length + view.history.length > 0;
     // Its figures move as its requests do.
@@ -704,14 +719,52 @@ async function refresh(force) {
   }
 }
 
+// The right pane: the chosen request in full, or else the project's page.
+// Drawn again only when the request changed, so what the human opened in it stays open.
+let detailed = "";
+function showDetail(found) {
+  document.body.classList.toggle("picked", !!found);
+  $("page").hidden = !!found || !paged;
+  $("hint").hidden = !!found || !!paged;
+  if (!found) {
+    detailed = "";
+    return $("pick").replaceChildren();
+  }
+  const [item, kind] = found;
+  // Under way, its figures move at each call: the journal would restart with them.
+  const key = kind + (kind === "run" ? item.id + item.step : JSON.stringify(item));
+  if (key === detailed) return;
+  detailed = key;
+  const node = kind === "todo" ? card(item) : kind === "run" ? underway(item) : past(item);
+  if (node.tagName === "DETAILS") node.open = true;
+  const facts = [...node.querySelectorAll(".facts")];
+  $("pick").replaceChildren(facts.length
+    ? el("div", { className: "split" }, node, el("aside", {}, el("h2", { textContent: "Coût et isolement" }), ...facts))
+    : node);
+}
+
+window.addEventListener("hashchange", () => {
+  const w = where();
+  picked = w.id;
+  if (w.path !== $("project").value && [...$("project").options].some((o) => o.value === w.path)) {
+    $("project").value = w.path;
+    showChips();
+    focusOn(w.path);
+  }
+  $("detail").scrollTop = 0;
+  refresh(true);
+});
+$("back").onclick = () => (location.hash = hashOf($("project").value, ""));
+
 $("new-request").addEventListener("submit", async (event) => {
   event.preventDefault();
   $("error").textContent = "";
   try {
     const off = [...document.querySelectorAll("#chips button[aria-pressed=false]")].map((b) => b.dataset.key);
-    await api("/api/requests", { project: $("project").value, text: $("text").value, off });
+    const made = await api("/api/requests", { project: $("project").value, text: $("text").value, off });
     $("text").value = "";
-    refresh(true);
+    // What was just asked is what the human watches next.
+    location.hash = hashOf($("project").value, made.id);
   } catch (e) {
     $("error").textContent = e.message;
   }
@@ -988,7 +1041,6 @@ async function showStats() {
 let paged = "";
 async function showPage(path) {
   paged = path;
-  $("page").hidden = !path;
   if (!path) return;
   $("page-error").textContent = "";
   $("page-name").textContent = path.split("/").pop();
@@ -1075,6 +1127,7 @@ $("n-others").onclick = () => {
   $("project").dispatchEvent(new Event("change"));
 };
 $("project").addEventListener("change", () => {
+  picked = "";
   showChips();
   focusOn($("project").value);
   refresh(true);
