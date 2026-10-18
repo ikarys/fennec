@@ -194,7 +194,8 @@ fn section(text: &str) -> String {
 }
 
 /// Writes a rule down once, for `user` or `project`. Saying it again is a
-/// no-op. The project's AGENTS.md is left uncommitted for the human.
+/// no-op. The project's AGENTS.md is committed only where worlds would wait
+/// for it (`world::keep`).
 pub fn say(project: &Path, scope: &str, text: &str) -> io::Result<()> {
     let text = text.trim().replace('\n', " ");
     if text.is_empty() {
@@ -220,7 +221,46 @@ pub fn say(project: &Path, scope: &str, text: &str) -> io::Result<()> {
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir)?;
     }
-    std::fs::write(&path, new)
+    std::fs::write(&path, new)?;
+    if scope == "project" {
+        crate::world::keep(project, "AGENTS.md", "docs: add a rule for fennec")?;
+    }
+    Ok(())
+}
+
+/// Takes a rule back: its line goes, the rest of the file stays as written.
+/// In the project's AGENTS.md only the `## Rules` section is touched.
+pub fn unsay(project: &Path, scope: &str, text: &str) -> io::Result<()> {
+    let path = match scope {
+        "user" => user_file()?,
+        "project" => project.join("AGENTS.md"),
+        _ => return Err(io::Error::other(format!("unknown scope {scope}"))),
+    };
+    let old = match std::fs::read_to_string(&path) {
+        Ok(old) => old,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(e) => return Err(e),
+    };
+    std::fs::write(&path, remove_line(&old, text.trim(), scope == "project"))?;
+    if scope == "project" {
+        crate::world::keep(project, "AGENTS.md", "docs: drop a rule for fennec")?;
+    }
+    Ok(())
+}
+
+fn remove_line(doc: &str, rule: &str, in_section: bool) -> String {
+    let mut inside = !in_section;
+    let mut out = String::new();
+    for line in doc.split_inclusive('\n') {
+        if in_section && line.starts_with("## ") {
+            inside = line.trim_end() == SECTION;
+        }
+        if inside && line.strip_prefix("- ").is_some_and(|l| l.trim() == rule) {
+            continue;
+        }
+        out.push_str(line);
+    }
+    out
 }
 
 fn add_to_section(doc: &str, rule: &str) -> String {
@@ -366,6 +406,16 @@ mod tests {
             add_to_section("## Rules\n## Style\n", "b"),
             "## Rules\n\n- b\n## Style\n"
         );
+    }
+
+    #[test]
+    fn a_rule_taken_back_leaves_the_rest() {
+        let doc = "# P\n\n- a\n\n## Rules\n\n- a\n- b\n\n## Style\n\n- a\n";
+        assert_eq!(
+            remove_line(doc, "a", true),
+            "# P\n\n- a\n\n## Rules\n\n- b\n\n## Style\n\n- a\n"
+        );
+        assert_eq!(remove_line("- a\n- b", "b", false), "- a\n");
     }
 
     #[test]

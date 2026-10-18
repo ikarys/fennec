@@ -21,7 +21,8 @@ src/solve.rs     task → worlds in turn until one passes verify → land (rebas
 src/spec.rs      request → conversation (`discuss`) → `direct` work (no tests first, proof decides) or acceptance tests + task (`compile`, CLI and sparring); retry from the tests; amend a ready run from its work; sparring findings
 src/proof.rs     a ready run used as its user would: model proposes tries, pages and clicks/typing; harness runs them, captures before/after (proof.py)
 src/rules.rs     project rules (`.fennec-os/rules.json` at HEAD), glob matching; rules said in words
-                 (`~/.config/fennec/rules.md`, AGENTS.md `## Rules`): proposed, written once, given to agents
+                 (`~/.config/fennec/rules.md`, AGENTS.md `## Rules`): proposed, written once or taken back, given to agents;
+                 AGENTS.md is committed alone where worlds go in the folder (`world::keep`), so it never holds it
 src/team.rs      named teams of roles that brief the agent per stage (frame = the conversation and `compile`, solve, prove):
                  `~/.config/fennec/teams/<team>/*.md` or built-in teams (`Développement`, `Études`) drawn
                  from `catalog/`; a project picks one in `.fennec-os/team.json`, overrides in `.fennec-os/team/`

@@ -1164,6 +1164,27 @@ fn here(name: &str) -> Fixture {
 }
 
 #[test]
+fn a_rule_said_in_the_folder_does_not_hold_it() {
+    let f = here("here-rule");
+    std::fs::write(f.project.join("notes"), "mine\n").unwrap();
+    rules::say(&f.project, "project", "use uv").unwrap();
+    // AGENTS.md alone is committed; the human's own change stays theirs.
+    assert_eq!(git(&f, &["status", "--porcelain"]), "?? notes");
+    assert_eq!(
+        git(&f, &["log", "-1", "--format=%s"]),
+        "docs: add a rule for fennec"
+    );
+    rules::unsay(&f.project, "project", "use uv").unwrap();
+    assert_eq!(git(&f, &["status", "--porcelain"]), "?? notes");
+    assert!(
+        rules::said(&f.project)
+            .unwrap()
+            .iter()
+            .all(|s| s.text != "use uv")
+    );
+}
+
+#[test]
 fn work_in_the_project_folder_is_seen_there_and_lands_on_its_branch() {
     let f = here("here");
     let project = f.project.to_string_lossy().to_string();
