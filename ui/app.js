@@ -878,6 +878,18 @@ async function browse(path) {
   }));
 }
 
+// A new project often has no folder yet: made here, then opened, empty.
+$("picker-new").onsubmit = async (e) => {
+  e.preventDefault();
+  try {
+    const data = await api("/api/folders", { path: pickerPath, create: $("picker-new-name").value });
+    $("picker-new-name").value = "";
+    await browse(data.path);
+  } catch (err) {
+    $("picker-path").textContent = err.message;
+  }
+};
+
 $("add-project").onclick = async () => {
   // Next to the projects already there: new ones usually sit beside them.
   const last = $("project").value || [...$("project").options].at(-1)?.value || "";
