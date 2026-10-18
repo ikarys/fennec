@@ -22,8 +22,9 @@ async function api(path, body) {
 // A button that calls the server and shows its error next to the card's actions.
 function action(label, path, body, { primary = false, quiet = false } = {}) {
   const button = el("button", { type: "button", textContent: label, className: primary ? "primary" : quiet ? "quiet" : "" });
+  iconize(button);
   button.onclick = async () => {
-    const error = button.closest(".card, .past-actions").querySelector(".error");
+    const error = errorOf(button);
     error.textContent = "";
     try {
       await api(path, typeof body === "function" ? body() : body);
@@ -34,6 +35,9 @@ function action(label, path, body, { primary = false, quiet = false } = {}) {
   };
   return button;
 }
+
+// Where a button's failure is said: next to the buttons, wherever they sit.
+const errorOf = (button) => button.closest(".decide, .card, .past-actions").querySelector(".error");
 
 // Giving up is one more click than doing: the first click only asks.
 // Once there is work, giving up undoes it: the label says so.
@@ -235,13 +239,14 @@ function opener(label, hide, where, load) {
 
 // The exact change.
 function changesButton(item, where) {
-  return opener("Voir les changements", "Masquer les changements", where, async () => {
-    const c = await api("/api/changes", { id: item.id });
-    const nodes = item.summary || !c.summary ? [] : [focus("Ce que fennec a fait", c.summary)];
-    nodes.push(diffView(c.diff));
-    if (c.cut) nodes.push(el("div", { className: "muted", textContent: "Coupé : le reste est trop long pour la page, regarde-le dans le projet." }));
-    return nodes;
-  });
+  return opener("Voir les changements", "Masquer les changements", where, () => changes(item));
+}
+async function changes(item) {
+  const c = await api("/api/changes", { id: item.id });
+  const nodes = item.summary || !c.summary ? [] : [focus("Ce que fennec a fait", c.summary)];
+  nodes.push(diffView(c.diff));
+  if (c.cut) nodes.push(el("div", { className: "muted", textContent: "Coupé : le reste est trop long pour la page, regarde-le dans le projet." }));
+  return nodes;
 }
 
 // The ready work is a real folder: opened in the editor, its path shown to copy.
@@ -256,7 +261,8 @@ function codeButton(item, where) {
 
 // A web product is tried in the human's own browser, started as the proof started it.
 // The tab opens on the click itself: one opened after the answer would be blocked.
-function pageButton(item, error) {
+function pageButton(item) {
+  const error = () => errorOf(button);
   const button = el("button", { type: "button", textContent: "Ouvrir la page" });
   button.onclick = async () => {
     const tab = window.open("", "_blank");
@@ -280,11 +286,12 @@ function pageButton(item, error) {
 
 // Every step, with what was sent to the model, what came back, and what it cost.
 function journalButton(item, where) {
-  return opener("Journal", "Masquer le journal", where, async () => {
-    const steps = await api("/api/journal", { id: item.id });
-    if (!steps.length) return [el("div", { className: "muted", textContent: "Aucune étape gardée pour cette demande." })];
-    return steps.map(stepView);
-  });
+  return opener("Journal", "Masquer le journal", where, () => journal(item));
+}
+async function journal(item) {
+  const steps = await api("/api/journal", { id: item.id });
+  if (!steps.length) return [el("div", { className: "muted", textContent: "Aucune étape gardée pour cette demande." })];
+  return steps.map(stepView);
 }
 
 // Work under way: it opens on its journal, which follows the model as it answers.
@@ -528,7 +535,7 @@ function card(item) {
       fix.replaceWith(action("Envoyer la correction", "/api/amend", () => ({ id: item.id, text: change.value })));
     };
     if (item.land) actions.append(action(landLabel(item.land), "/api/land", { id: item.id }, { primary: true }));
-    if (item.page) actions.append(pageButton(item, () => node.querySelector(".error")));
+    if (item.page) actions.append(pageButton(item));
     actions.append(changesButton(item, () => node.querySelector(".changes-slot")),
       codeButton(item, () => node.querySelector(".changes-slot")), fix,
       action("Passer", "/api/pass", { id: item.id }), el("span", { className: "spacer" }), dropButton(item.id, true));
@@ -737,10 +744,88 @@ function showDetail(found) {
   detailed = key;
   const node = kind === "todo" ? card(item) : kind === "run" ? underway(item) : past(item);
   if (node.tagName === "DETAILS") node.open = true;
+  const decide = decision(node, item, kind);
+  const main = decide ? tabbed(node, item) : node;
+  // A committed request has nothing left to decide: tabs, but no panel.
+  const panel = decide?.querySelector("button") ? decide : null;
   const facts = [...node.querySelectorAll(".facts")];
-  $("pick").replaceChildren(facts.length
-    ? el("div", { className: "split" }, node, el("aside", {}, el("h2", { textContent: "Coût et isolement" }), ...facts))
-    : node);
+  $("pick").replaceChildren(panel || facts.length
+    ? el("div", { className: "split" }, main, el("aside", {}, panel,
+      facts.length ? el("h2", { textContent: "Coût et isolement" }) : null, ...facts))
+    : main);
+}
+
+// Lucide-style strokes (24 × 24), drawn by CSS as a mask in the button's colour.
+const ICONS = {
+  commit: '<circle cx="12" cy="12" r="3"/><path d="M3 12h6M15 12h6"/>',
+  page: '<path d="M15 3h6v6M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+  diff: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M9 10h6M12 7v6M9 17h6"/>',
+  code: '<path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/>',
+  fix: '<path d="M21.2 6.8a2.8 2.8 0 0 0-4-4L3.8 16.2a2 2 0 0 0-.5.8L2 21.4a.5.5 0 0 0 .6.6l4.4-1.3a2 2 0 0 0 .8-.5z"/>',
+  pass: '<rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8M10 12h4"/>',
+  journal: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+  undo: '<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>',
+  resume: '<path d="M6 3l14 9-14 9z"/>',
+  retry: '<path d="M3 12a9 9 0 0 1 15.7-6L21 8M21 3v5h-5M21 12a9 9 0 0 1-15.7 6L3 16M8 16H3v5"/>',
+};
+const ICON_OF = [[/^(Commit|Pousser|Préparer)/, "commit"], [/^Ouvrir la page/, "page"], [/changements/, "diff"],
+  [/^Ouvrir le code/, "code"], [/^Corriger|^Envoyer/, "fix"], [/^Passer/, "pass"], [/^Journal/, "journal"],
+  [/^Annuler le travail|^Abandonner/, "undo"], [/^Reprendre/, "resume"], [/^Réessayer/, "retry"]];
+function iconize(button) {
+  const name = ICON_OF.find(([re]) => re.test(button.textContent))?.[1];
+  if (!name) return;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]}</svg>`;
+  button.style.setProperty("--icon", `url("data:image/svg+xml,${encodeURIComponent(svg)}")`);
+  button.classList.add("icon");
+}
+
+// What was asked, done and proven first; the exact change, the exchange with
+// the model and the rest behind tabs above it, loaded when opened.
+let tabNow = "Résumé";
+function tabbed(node, item) {
+  const more = [...node.querySelectorAll("details")].find((d) => d.firstChild?.textContent === "Détails");
+  more?.remove();
+  const panes = [["Résumé", async () => [node]], ["Changements", () => changes(item)], ["Journal", () => journal(item)]];
+  if (more) panes.push(["Détails", async () => [...more.childNodes].slice(1)]);
+  const panel = el("div", { className: "tab-panel" });
+  const shown = new Map();
+  const bar = el("div", { className: "tabs", role: "tablist" });
+  const open = async (name) => {
+    tabNow = name;
+    bar.querySelectorAll("button").forEach((b) => b.setAttribute("aria-selected", String(b.textContent === name)));
+    if (!shown.has(name)) {
+      shown.set(name, el("div", {}, el("div", { className: "muted", textContent: "Je charge…" })));
+      const box = shown.get(name);
+      panes.find(([n]) => n === name)[1]().then((nodes) => box.replaceChildren(...nodes))
+        .catch((e) => box.replaceChildren(el("div", { className: "bad", textContent: e.message })));
+    }
+    panel.replaceChildren(shown.get(name));
+  };
+  bar.append(...panes.map(([name]) => {
+    const b = el("button", { type: "button", role: "tab", textContent: name });
+    b.onclick = () => open(name);
+    return b;
+  }));
+  open(panes.some(([n]) => n === tabNow) ? tabNow : "Résumé");
+  return el("div", {}, bar, panel);
+}
+
+// What the human decides on a request, taken out of its card: on the right,
+// above what it cost, the main button first. A conversation keeps its
+// buttons under what was said.
+function decision(node, item, kind) {
+  if (kind === "run" || (kind === "todo" && !["ready", "failed"].includes(item.kind))) return null;
+  const parts = kind === "past" ? [node.querySelector(".past-actions")]
+    : [":scope > .reply", ":scope > .actions", ":scope > .error"].map((q) => node.querySelector(q));
+  const box = el("div", { className: "decide" }, ...parts.filter(Boolean));
+  // These two are tabs over the request now.
+  box.querySelectorAll("button").forEach((b) => /changements|^Journal/.test(b.textContent) && b.remove());
+  // The correction is written where "Corriger" was clicked.
+  const fix = [...box.querySelectorAll("button")].find((b) => b.textContent === "Corriger");
+  const reply = box.querySelector(":scope > .reply");
+  if (fix && reply) fix.before(reply);
+  box.querySelectorAll("button").forEach(iconize);
+  return box;
 }
 
 window.addEventListener("hashchange", () => {
