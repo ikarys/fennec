@@ -520,7 +520,14 @@ pub fn plan(worlds: &Worlds, id: &str, model: &dyn Model) -> io::Result<Landing>
         .collect();
     let said: Vec<String> = rules::said(project)?.into_iter().map(|s| s.text).collect();
     let recent = git(project, &["log", "-10", "--format=%s"]).unwrap_or_default();
-    let branches = git(project, &["branch", "--format=%(refname:short)"]).unwrap_or_default();
+    // A world's branch is fennec's scaffolding, never a place to land: shown
+    // to the model, it was picked as the target (UX test 2026-10-18).
+    let branches: String = git(project, &["branch", "--format=%(refname:short)"])
+        .unwrap_or_default()
+        .lines()
+        .filter(|b| !b.starts_with("world/"))
+        .map(|b| format!("{b}\n"))
+        .collect();
     let request = format!(
         "Project conventions (AGENTS.md):\n{agents}\n\nRules:\n{}\n\nCurrent branch: {current}\nBranches:\n{branches}\n\nRecent subjects:\n{recent}\n\nGoal:\n{}\n\nChange:\n{diff}",
         said.join("\n"),
@@ -534,6 +541,7 @@ pub fn plan(worlds: &Worlds, id: &str, model: &dyn Model) -> io::Result<Landing>
     let content = reply["content"].as_str().unwrap_or("");
     let (branch, message) = parse_plan(content.rsplit("</think>").next().unwrap_or(content));
     let branch = branch
+        .filter(|b| !b.starts_with("world/"))
         .filter(|b| git(project, &["check-ref-format", "--branch", b]).is_ok())
         .unwrap_or(current);
     Ok(Landing {
