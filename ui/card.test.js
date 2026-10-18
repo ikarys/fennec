@@ -39,6 +39,8 @@ eval(src.match(/const el = \(tag, props = \{\}, \.\.\.children\) => \{[\s\S]*?\n
   // card's collaborators, stubbed: they only shape the structure under test.
   + `
   const conversation = () => null;
+  const thumbs = () => null;
+  const attach = () => ({ node: new Node("div"), value: () => "" });
   const focus = () => new Node("div");
   const dropButton = () => new Node("button");
   const action = () => new Node("button");
@@ -64,6 +66,6 @@ assert.ok(!ready.children.some((c) => (c.className || "").includes("meta")), "pl
 
 // A later request: its title is the editable field, kept in the card.
 const later = card({ id: "l", title: "plus tard", kind: "later", project: "p" });
-assert.ok(later.children.some((c) => (c.className || "").includes("later-text")), "le titre de « plus tard » reste éditable");
+assert.ok(later.querySelector(".later-text"), "le titre de « plus tard » reste éditable");
 
 console.log("OK");

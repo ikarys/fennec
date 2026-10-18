@@ -237,6 +237,18 @@
   .actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; margin-top: 12px; flex-wrap: wrap; }
   .actions .spacer { flex: 1; }
   .reply { margin-top: 10px; }
+  /* Images joined to what the human writes, and shown back in the thread. */
+  .attach { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px; min-width: 0; }
+  .reply:has(> textarea[hidden]) .attach { display: none; }
+  .thumbs { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+  .attach .thumbs { margin: 0; }
+  .thumb img { display: block; height: 64px; max-width: 160px; object-fit: cover; border: 1px solid var(--line);
+               border-radius: 6px; background: var(--soft); }
+  .said .thumb img { height: 96px; max-width: 240px; }
+  .thumb-wrap { position: relative; }
+  .thumb-wrap .drop { position: absolute; top: -6px; right: -6px; padding: 2px; border-radius: 50%;
+                      background: var(--card); border: 1px solid var(--line); }
+  .thumb-wrap .drop::before { width: 12px; height: 12px; }
   details { margin-top: 10px; font-size: 13px; color: var(--muted); }
   summary { cursor: pointer; }
   details code, details pre { display: block; font: 12px ui-monospace, monospace; overflow-wrap: anywhere;
@@ -256,13 +268,40 @@
   .diff .del { color: var(--bad); }
   .diff .hunk { color: var(--info); }
   .diff .file { display: block; font-weight: 600; color: var(--text); margin-top: 8px; }
-  .step { margin-top: 12px; font-size: 13px; }
-  .step-name { font-weight: 600; font-size: 14px; }
+  /* A step of the journal: its own box, the stage colour on the left edge. */
+  .step { margin-top: 12px; font-size: 13px; border: 1px solid var(--line); border-left: 3px solid var(--frame);
+          border-radius: 8px; padding: 8px 12px 10px; background: var(--card); }
+  .step.talk { border-left-color: var(--talk); }
+  .step.solve { border-left-color: var(--solve); }
+  .step.prove { border-left-color: var(--prove); }
+  .step-name { font-weight: 600; font-size: 14px; display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 8px;
+               padding-bottom: 6px; margin-bottom: 4px; border-bottom: 1px solid var(--line); }
+  .step-name .spacer { flex: 1; }
+  .step-name .cost { font-weight: 400; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
   .roles { font-size: 13px; color: var(--text); margin-top: 2px; }
-  details.message { margin-top: 4px; color: var(--text); }
-  details.message > summary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+  /* One line per message: who in a fixed column, then the start of what was said. */
+  details.message { margin: 0; color: var(--text); border-radius: 6px; }
+  details.message > summary { display: flex; gap: 8px; align-items: baseline; padding: 3px 6px; border-radius: 6px;
+                              list-style: none; color: var(--muted); }
+  details.message > summary::-webkit-details-marker { display: none; }
+  details.message > summary::before { content: "▸"; flex: none; transition: transform .15s; }
+  details.message[open] > summary::before { transform: rotate(90deg); }
+  details.message > summary:hover { background: var(--soft); }
+  details.message > summary b { flex: none; width: 9.5em; font-weight: 600; color: var(--text);
+                               white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  details.message > summary .head { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  details.message.assistant > summary b { color: var(--accent); }
+  details.message.user > summary b { color: var(--info); }
+  details.message.tool > summary b, details.message.system > summary b { color: var(--muted); font-weight: 500; }
+  details.message.call > summary .head, details.message.tool > summary .head { font: 12px ui-monospace, monospace; }
+  details.message.tool { margin-left: 1.2em; }
+  details.message > pre { margin: 2px 0 6px 1.2em; }
   details.message pre { max-height: 420px; }
-  details.message pre.thought { color: var(--muted); font-style: italic; }
+  details.message pre.thought { color: var(--muted); border-left: 3px solid var(--warn); }
+  details.message pre.thought::before { content: "Réflexion"; display: block; font: 600 11px system-ui, sans-serif;
+                                        text-transform: uppercase; letter-spacing: .06em; color: var(--warn); margin-bottom: 4px; }
+  details.message > summary .thinks { flex: none; color: var(--warn); align-self: center; }
+  details.message > summary .thinks::before { width: 13px; height: 13px; }
   .thread { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
   .said { background: var(--soft); border-radius: 8px; padding: 8px 12px; max-width: 85%; min-width: 0;
           overflow-wrap: anywhere; white-space: pre-wrap; font-size: 14px; }
@@ -298,6 +337,7 @@
   .line .state { color: var(--muted); font-size: 13px; white-space: nowrap; }
   .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--info); flex: none; align-self: center;
          animation: pulse 1.6s ease-in-out infinite; }
+  .dot.idle { animation: none; opacity: .45; }
   @keyframes pulse { 50% { opacity: .3; } }
   dialog { background: var(--card); color: var(--text); border: 1px solid var(--line); border-radius: 10px;
            width: min(600px, calc(100vw - 32px)); padding: 16px; }
@@ -363,7 +403,7 @@
   .pill .icon { margin-right: 4px; }
   .pill.warn { color: var(--warn); }
   .dotc { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
-  .step-name .model { font-weight: 400; font-size: 12px; color: var(--muted); margin-left: 8px; }
+  .step-name .model { font-weight: 400; font-size: 12px; color: var(--muted); }
   .mini { display: inline-block; background: var(--soft); border-radius: 999px; padding: 0 7px; margin-left: 4px; font-size: 12px; }
   table.grid { border-collapse: collapse; font-size: 12px; margin: 6px 0; width: 100%; }
   table.grid th, table.grid td { text-align: left; padding: 3px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }

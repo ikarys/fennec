@@ -32,6 +32,7 @@ assert.deepEqual(statusOf({ kind: "dropped" }, "past"), ["abandonné", "bad"]);
 assert.deepEqual(statusOf({ kind: "passed" }, "past"), ["mis de côté", "warn"]);
 assert.deepEqual(statusOf({ kind: "landed", branch: "main", commit: "abc1234" }, "past"), ["✓ commit main · abc1234", "ok"]);
 assert.deepEqual(statusOf({}, "run"), ["en cours", "info"]);
+assert.deepEqual(statusOf({ waiting: true }, "run"), ["en attente", "muted"], "en file, pas en cours");
 
 // The head: the title in whole, the coloured pill beside it.
 const item = { id: "x", title: "rend l'interface plus jolie", kind: "passed", stats: { turns: 1, ms: 1000, sent: 10, received: 5 } };
