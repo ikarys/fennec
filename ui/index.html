@@ -17,7 +17,7 @@
   body { margin: 0; background: var(--bg); color: var(--text);
          font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
   /* Projects on the left, always in view; the chosen one's page on the right. */
-  .app { display: grid; grid-template-columns: 230px minmax(0, 1fr); min-height: 100vh; }
+  .app { display: grid; grid-template-columns: 210px minmax(0, 1fr); min-height: 100vh; }
   #side { position: sticky; top: 0; height: 100vh; overflow: auto; display: flex; flex-direction: column; gap: 2px;
           padding: 20px 12px; border-right: 1px solid var(--line); background: var(--card); }
   #side h1 { margin: 0 8px 14px; }
@@ -33,16 +33,52 @@
                  margin: 14px 8px 4px; }
   #side .spacer { flex: 1; }
   #side .link { text-align: left; padding: 6px 8px; }
-  main { padding: 24px 24px 64px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px;
-         align-content: start; }
-  .flow { max-width: 980px; width: 100%; }
-  @media (min-width: 1250px) {
-    body.focused main { grid-template-columns: minmax(0, 1fr) 360px; }
-    body.focused #page { position: sticky; top: 24px; max-height: calc(100vh - 48px); overflow: auto; }
+  /* Three panes, each scrolled on its own, like a mail client: projects, the
+     requests of the chosen one, and the request (or the project's page) read in full. */
+  .app { height: 100vh; }
+  main { display: grid; grid-template-columns: 370px minmax(0, 1fr); min-height: 0; height: 100vh; }
+  #list { overflow: auto; padding: 20px 16px 48px; border-right: 1px solid var(--line); }
+  #detail { overflow: auto; padding: 20px 24px 48px; }
+  #detail { container-type: inline-size; }
+  #detail > * { max-width: 1240px; }
+  /* A request read in full: what to read and decide on the left, what it cost
+     and how it was kept safe on the right, once there is room for both. */
+  .split { display: grid; gap: 20px; }
+  /* Packed from the left, decision first: a spacer only leaves holes once they wrap. */
+  #detail .actions { justify-content: flex-start; }
+  #detail .actions .spacer { display: none; }
+  .split > aside h2 { margin: 4px 0 8px; }
+  .split > aside .facts { margin-top: 0; }
+  .split > aside .metrics { display: grid; grid-template-columns: 1fr 1fr; }
+  .split > aside .timeline { flex-direction: column; height: auto; gap: 3px; background: none; }
+  .split > aside .seg { flex: none !important; padding: 3px 8px; border-radius: 4px; }
+  .split > aside .pills { flex-direction: column; align-items: flex-start; }
+  @container (min-width: 740px) {
+    .split { grid-template-columns: minmax(0, 1fr) 260px; }
+    .split > aside { position: sticky; top: 0; align-self: start; }
   }
-  /* Above the requests while the screen is wide enough to show both; on a
-     phone the request field comes first. */
-  @media (min-width: 761px) and (max-width: 1249px) { #page { order: -1; } }
+  #back { display: none; margin-bottom: 10px; }
+  #hint { color: var(--muted); padding: 40px 0; text-align: center; }
+  #list h2 { margin: 24px 0 6px; }
+  #list .cost, #detail summary .cost { display: none; }
+  /* In the narrow list, the state goes under the title. */
+  #list .line { flex-wrap: wrap; row-gap: 0; }
+  #list .line .state { flex-basis: 100%; order: 3; white-space: normal; text-align: left; font-size: 12px; }
+  a.row { display: block; color: inherit; text-decoration: none; border-radius: 6px; padding: 0 8px; margin: 0 -8px; }
+  a.row:hover { background: var(--soft); }
+  a.row[aria-current=true] { background: var(--soft); box-shadow: inset 3px 0 0 var(--accent); }
+  a.row .line { border-bottom: none; }
+  a.row .tag { font-size: 11px; }
+  #detail details.past > summary { font-size: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+  /* Narrower: the list, or the request chosen in it, with a way back. */
+  @media (max-width: 1099px) {
+    .app, main { height: auto; }
+    main { display: block; }
+    #list, #detail { overflow: visible; border-right: none; }
+    body.picked #list { display: none; }
+    body.picked #back { display: inline-block; }
+    body:not(.picked) #hint { display: none; }
+  }
   h1 { font-size: 20px; margin: 0; }
   h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
        margin: 32px 0 10px; font-weight: 600; }
@@ -55,10 +91,10 @@
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
   button.link { border: none; background: none; color: var(--accent); padding: 0; }
   button.quiet { border: none; background: none; color: var(--muted); padding: 8px 4px; font-size: 13px; }
-  #new-request { display: grid; grid-template-columns: 180px 1fr auto; gap: 8px; }
+  #new-request { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+  #project { grid-column: 1 / -1; }
   /* The left list already says which project: the request goes there. */
   body.focused #project { display: none; }
-  body.focused #new-request { grid-template-columns: 1fr auto; }
   .error { color: var(--bad); font-size: 13px; min-height: 0; margin: 4px 0 0; }
 
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px;
@@ -70,7 +106,6 @@
   .focus { background: var(--soft); border-radius: 8px; padding: 10px 12px; overflow-wrap: anywhere; }
   .focus p, .focus ul { margin: 2px 0; }
   .focus ul { padding-left: 20px; }
-  #running .line .state { white-space: normal; text-align: right; }
   .focus .label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 2px; }
   .focus code, .warn code { font: 13px ui-monospace, monospace; background: var(--card); border-radius: 4px; padding: 0 4px; }
   .proved { color: var(--ok); font-size: 14px; margin-top: 10px; }
@@ -192,7 +227,7 @@
   table.grid thead th { color: var(--muted); font-weight: 600; }
   table.grid .meter { display: inline-block; width: 40px; vertical-align: middle; margin-right: 6px; }
   dialog#stats { width: min(900px, calc(100vw - 32px)); }
-  #page { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; background: var(--card); align-self: start; }
+  #page { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; background: var(--card); }
   .page-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
   .page-head strong { font-size: 18px; }
   .page-head .spacer { flex: 1; }
@@ -224,8 +259,7 @@
     #side ul { display: flex; flex-wrap: wrap; }
     #side .item { width: auto; }
     #side .label, #side .spacer { display: none; }
-    main { padding: 16px; }
-    #new-request { grid-template-columns: 1fr; }
+    #list, #detail { padding: 16px; }
     .line .cost { display: none; }
   }
 </style>
@@ -244,7 +278,7 @@
   <button class="link" id="open-settings">Réglages</button>
 </nav>
 <main>
-  <div class="flow">
+  <section id="list" aria-label="Demandes">
   <form id="new-request">
     <select id="project" aria-label="Projet" required></select>
     <textarea id="text" aria-label="Demande" placeholder="Ce que tu veux…" required></textarea>
@@ -275,7 +309,11 @@
 
   <h2>Historique</h2>
   <div id="history"></div>
-  </div>
+  </section>
+  <section id="detail">
+  <button type="button" class="link" id="back">← Demandes</button>
+  <div id="pick"></div>
+  <p id="hint" hidden>Choisis une demande à gauche pour la lire en entier, ou un projet pour voir sa page.</p>
   <!-- The chosen project's own page: what it cost, how it is worked on, its rules. -->
   <aside id="page" hidden>
     <div class="page-head"><strong id="page-name"></strong> <span class="muted" id="page-path"></span>
@@ -284,7 +322,7 @@
       <button type="button" id="page-open">Ouvrir le dossier</button></div>
     <div class="tiles" id="page-tiles"></div>
     <label class="muted">Où fennec travaille <select id="page-place"></select></label>
-    <details id="page-rules"><summary></summary><ul></ul>
+    <details id="page-rules" open><summary></summary><ul></ul>
       <form id="rule-form" class="rule-form">
         <input id="rule-text" aria-label="Nouvelle règle" placeholder="Une règle, par ex. « commits en anglais, format Conventional Commits »" required>
         <select id="rule-scope" aria-label="Pour"><option value="project">Pour ce projet</option><option value="user">Pour tous mes projets</option></select>
@@ -293,6 +331,7 @@
       <p class="muted">fennec la donne à toute l'équipe à chaque demande. Tu peux aussi la dire en corrigeant une demande : fennec propose de la garder.</p></details>
     <p class="error" id="page-error" role="alert"></p>
   </aside>
+  </section>
 </main>
 </div>
 
