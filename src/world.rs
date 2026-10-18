@@ -49,6 +49,27 @@ pub struct World {
     pub path: PathBuf,
 }
 
+/// The folders a Cargo project's `path = "..."` dependencies point to, outside it.
+/// ponytail: the top Cargo.toml only, resolved from `dir`; a world kept apart
+/// from the project folder does not find `../x`, read the project's own then.
+fn path_deps(dir: &Path) -> Vec<PathBuf> {
+    let Ok(dir) = std::fs::canonicalize(dir) else {
+        return Vec::new();
+    };
+    let Ok(text) = std::fs::read_to_string(dir.join("Cargo.toml")) else {
+        return Vec::new();
+    };
+    text.split("path")
+        .skip(1)
+        .filter_map(|rest| {
+            let rest = rest.trim_start().strip_prefix('=')?.trim_start();
+            let rest = rest.strip_prefix('"')?;
+            std::fs::canonicalize(dir.join(&rest[..rest.find('"')?])).ok()
+        })
+        .filter(|p| p.is_dir() && !p.starts_with(&dir))
+        .collect()
+}
+
 impl Worlds {
     /// `FENNEC_OS_HOME` (default `~/.local/share/fennec-os`) and
     /// `FENNEC_OS_RO` (colon-separated, default the usual toolchain dirs) and
@@ -322,6 +343,11 @@ impl Worlds {
             .arg(&self.home);
         for p in self.ro_paths.iter().filter(|p| p.exists()) {
             cmd.arg("--ro-bind").arg(p).arg(p);
+        }
+        // A Cargo path dependency in the hidden home: without it the project
+        // cannot build, so QA could not even start it.
+        for p in path_deps(dir) {
+            cmd.arg("--ro-bind").arg(&p).arg(&p);
         }
         for (rw, from, to) in mounts {
             cmd.arg(if *rw { "--bind" } else { "--ro-bind" })
@@ -629,6 +655,23 @@ pub(crate) fn new_id() -> String {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_cargo_path_dependency_outside_the_project_is_found() {
+        let root = std::env::temp_dir().join(format!("fennec-os-deps-{}", std::process::id()));
+        let (app, lib) = (root.join("app"), root.join("lib"));
+        std::fs::create_dir_all(app.join("inner")).unwrap();
+        std::fs::create_dir_all(&lib).unwrap();
+        std::fs::write(
+            app.join("Cargo.toml"),
+            "[dependencies]\nlib = { path = \"../lib\" }\ninner = { path=\"inner\" }\ngone = { path = \"../gone\" }\n",
+        )
+        .unwrap();
+        let found = super::path_deps(&app);
+        let lib = std::fs::canonicalize(&lib).unwrap();
+        std::fs::remove_dir_all(&root).unwrap();
+        assert_eq!(found, vec![lib]);
+    }
+
     #[test]
     fn ids_only_grow_even_within_one_microsecond() {
         let ids: Vec<String> = (0..10_000).map(|_| super::new_id()).collect();

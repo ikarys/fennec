@@ -304,10 +304,16 @@ fn swap_port(serve: &str, old: u16, new: u16) -> Option<String> {
     found.then_some(out)
 }
 
-/// How the project says it is run. Read inside the sandbox, like everything
-/// taken from a world.
+/// How the project says it is run: its README, then AGENTS.md, where a
+/// project without a README says it (QA served a file listing instead).
+/// Read inside the sandbox, like everything taken from a world.
 fn readme(worlds: &Worlds, world: &World) -> io::Result<String> {
-    let argv = ["sh", "-c", "head -c 3000 README* readme* 2>/dev/null"].map(String::from);
+    let argv = [
+        "sh",
+        "-c",
+        "cat README* readme* AGENTS.md 2>/dev/null | head -c 6000",
+    ]
+    .map(String::from);
     let out = worlds
         .sandbox_command(world, &argv)?
         .stdin(Stdio::null())
