@@ -621,8 +621,31 @@ function renderProjects(projects) {
   const none = projects.length === 1 ? [] : [new Option(prompt, "")];
   select.replaceChildren(...none, ...projects.map((p) => new Option(p.name, p.path)));
   if (projects.some((p) => p.path === current)) select.value = current;
-  if (select.value !== current) showChips();
+  // On load too: the address already names the project.
+  if (select.value !== current || !$("chips").childElementCount) showChips();
   focusOn(select.value);
+}
+
+// Every project in view on the left: what waits for the human in each, and
+// whether fennec works on it. A click is the same as choosing it above.
+function renderSide(view) {
+  const pick = (path) => {
+    $("project").value = path;
+    $("project").dispatchEvent(new Event("change"));
+  };
+  const entry = (button, path, items) => {
+    const n = items.filter((i) => !path || i.path === path).length;
+    button.setAttribute("aria-current", String($("project").value === path));
+    button.onclick = () => pick(path);
+    button.querySelectorAll(".count, .dot").forEach((e) => e.remove());
+    if (path && view.running.some((i) => i.path === path)) button.append(el("span", { className: "dot", title: "fennec y travaille" }));
+    if (n) button.append(el("span", { className: "count", title: "t'attend", textContent: n }));
+    return button;
+  };
+  entry($("side-all"), "", view.todo);
+  $("side-all").parentElement.hidden = view.projects.length < 2;
+  $("side-projects").replaceChildren(...view.projects.map((p) => el("li", {},
+    entry(el("button", { type: "button", className: "item", title: p.path }, el("span", { className: "name", textContent: p.name })), p.path, view.todo))));
 }
 
 // The chosen project is the one on screen: its requests only, kept in the
@@ -658,6 +681,7 @@ async function refresh(force) {
     shown = json;
     $("error").textContent = "";
     renderProjects(view.projects);
+    renderSide(view);
     const todo = mine(view.todo), running = mine(view.running);
     const open = new Set([...document.querySelectorAll("details[open]")].map((d) => d.dataset.key));
     fill($("todo"), todo.map(card), "Rien ne t'attend.");

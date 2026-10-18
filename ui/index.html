@@ -16,8 +16,33 @@
   [hidden] { display: none !important; }
   body { margin: 0; background: var(--bg); color: var(--text);
          font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  main { max-width: 980px; margin: 0 auto; padding: 24px 16px 64px; }
-  header { display: flex; align-items: baseline; gap: 16px; margin-bottom: 16px; }
+  /* Projects on the left, always in view; the chosen one's page on the right. */
+  .app { display: grid; grid-template-columns: 230px minmax(0, 1fr); min-height: 100vh; }
+  #side { position: sticky; top: 0; height: 100vh; overflow: auto; display: flex; flex-direction: column; gap: 2px;
+          padding: 20px 12px; border-right: 1px solid var(--line); background: var(--card); }
+  #side h1 { margin: 0 8px 14px; }
+  #side ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 2px; }
+  #side .item { width: 100%; display: flex; gap: 8px; align-items: center; text-align: left; border: none;
+                background: none; border-radius: 6px; padding: 6px 8px; }
+  #side .item:hover { background: var(--soft); }
+  #side .item[aria-current=true] { background: var(--soft); font-weight: 600; }
+  #side .item .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #side .count { background: var(--accent); color: #fff; border-radius: 999px; font-size: 11px; font-weight: 600;
+                 padding: 0 7px; }
+  #side .label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+                 margin: 14px 8px 4px; }
+  #side .spacer { flex: 1; }
+  #side .link { text-align: left; padding: 6px 8px; }
+  main { padding: 24px 24px 64px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px;
+         align-content: start; }
+  .flow { max-width: 980px; width: 100%; }
+  @media (min-width: 1250px) {
+    body.focused main { grid-template-columns: minmax(0, 1fr) 360px; }
+    body.focused #page { position: sticky; top: 24px; max-height: calc(100vh - 48px); overflow: auto; }
+  }
+  /* Above the requests while the screen is wide enough to show both; on a
+     phone the request field comes first. */
+  @media (min-width: 761px) and (max-width: 1249px) { #page { order: -1; } }
   h1 { font-size: 20px; margin: 0; }
   h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
        margin: 32px 0 10px; font-weight: 600; }
@@ -31,6 +56,9 @@
   button.link { border: none; background: none; color: var(--accent); padding: 0; }
   button.quiet { border: none; background: none; color: var(--muted); padding: 8px 4px; font-size: 13px; }
   #new-request { display: grid; grid-template-columns: 180px 1fr auto; gap: 8px; }
+  /* The left list already says which project: the request goes there. */
+  body.focused #project { display: none; }
+  body.focused #new-request { grid-template-columns: 1fr auto; }
   .error { color: var(--bad); font-size: 13px; min-height: 0; margin: 4px 0 0; }
 
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px;
@@ -164,7 +192,7 @@
   table.grid thead th { color: var(--muted); font-weight: 600; }
   table.grid .meter { display: inline-block; width: 40px; vertical-align: middle; margin-right: 6px; }
   dialog#stats { width: min(900px, calc(100vw - 32px)); }
-  #page { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin: 12px 0 8px; }
+  #page { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; background: var(--card); align-self: start; }
   .page-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
   .page-head strong { font-size: 18px; }
   .page-head .spacer { flex: 1; }
@@ -188,22 +216,35 @@
   h3 { font-size: 13px; margin: 16px 0 4px; }
   .bar { display: inline-block; width: 44px; height: 6px; border-radius: 3px; margin-right: 6px; vertical-align: middle;
          background: linear-gradient(90deg, var(--info) var(--p), var(--line) var(--p)); }
-  @media (max-width: 700px) {
+  @media (max-width: 760px) {
+    .app { display: block; }
+    #side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center;
+            border-right: none; border-bottom: 1px solid var(--line); padding: 10px 16px; }
+    #side h1 { margin: 0 8px 0 0; }
+    #side ul { display: flex; flex-wrap: wrap; }
+    #side .item { width: auto; }
+    #side .label, #side .spacer { display: none; }
+    main { padding: 16px; }
     #new-request { grid-template-columns: 1fr; }
     .line .cost { display: none; }
   }
 </style>
 </head>
 <body>
+<div class="app">
+<nav id="side" aria-label="Projets">
+  <h1>fennec</h1>
+  <ul><li><button type="button" class="item" id="side-all"><span class="name">Tous les projets</span></button></li></ul>
+  <div class="label">Projets</div>
+  <ul id="side-projects"></ul>
+  <button class="link" id="add-project">+ projet</button>
+  <span class="spacer"></span>
+  <button class="link" id="open-team">Équipe</button>
+  <button class="link" id="open-stats">Stats</button>
+  <button class="link" id="open-settings">Réglages</button>
+</nav>
 <main>
-  <header>
-    <h1>fennec</h1>
-    <button class="link" id="add-project">+ projet</button>
-    <button class="link" id="open-team">Équipe</button>
-    <button class="link" id="open-stats">Stats</button>
-    <button class="link" id="open-settings">Réglages</button>
-  </header>
-
+  <div class="flow">
   <form id="new-request">
     <select id="project" aria-label="Projet" required></select>
     <textarea id="text" aria-label="Demande" placeholder="Ce que tu veux…" required></textarea>
@@ -212,23 +253,6 @@
   </form>
   <p class="error" id="error" role="alert"></p>
 
-  <!-- The chosen project's own page: what it cost, how it is worked on, its rules. -->
-  <section id="page" hidden>
-    <div class="page-head"><strong id="page-name"></strong> <span class="muted" id="page-path"></span>
-      <span class="spacer"></span>
-      <button type="button" id="page-team">Équipe</button>
-      <button type="button" id="page-open">Ouvrir le dossier</button></div>
-    <div class="tiles" id="page-tiles"></div>
-    <label class="muted">Où fennec travaille <select id="page-place"></select></label>
-    <details id="page-rules"><summary></summary><ul></ul>
-      <form id="rule-form" class="rule-form">
-        <input id="rule-text" aria-label="Nouvelle règle" placeholder="Une règle, par ex. « commits en anglais, format Conventional Commits »" required>
-        <select id="rule-scope" aria-label="Pour"><option value="project">Pour ce projet</option><option value="user">Pour tous mes projets</option></select>
-        <button>Ajouter</button>
-      </form>
-      <p class="muted">fennec la donne à toute l'équipe à chaque demande. Tu peux aussi la dire en corrigeant une demande : fennec propose de la garder.</p></details>
-    <p class="error" id="page-error" role="alert"></p>
-  </section>
 
   <section id="how" hidden>
     <strong>Comment ça marche</strong>
@@ -251,7 +275,26 @@
 
   <h2>Historique</h2>
   <div id="history"></div>
+  </div>
+  <!-- The chosen project's own page: what it cost, how it is worked on, its rules. -->
+  <aside id="page" hidden>
+    <div class="page-head"><strong id="page-name"></strong> <span class="muted" id="page-path"></span>
+      <span class="spacer"></span>
+      <button type="button" id="page-team">Équipe</button>
+      <button type="button" id="page-open">Ouvrir le dossier</button></div>
+    <div class="tiles" id="page-tiles"></div>
+    <label class="muted">Où fennec travaille <select id="page-place"></select></label>
+    <details id="page-rules"><summary></summary><ul></ul>
+      <form id="rule-form" class="rule-form">
+        <input id="rule-text" aria-label="Nouvelle règle" placeholder="Une règle, par ex. « commits en anglais, format Conventional Commits »" required>
+        <select id="rule-scope" aria-label="Pour"><option value="project">Pour ce projet</option><option value="user">Pour tous mes projets</option></select>
+        <button>Ajouter</button>
+      </form>
+      <p class="muted">fennec la donne à toute l'équipe à chaque demande. Tu peux aussi la dire en corrigeant une demande : fennec propose de la garder.</p></details>
+    <p class="error" id="page-error" role="alert"></p>
+  </aside>
 </main>
+</div>
 
 <dialog id="team">
   <strong id="team-title">Équipe</strong>
