@@ -289,7 +289,15 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
             Ok(json!({}))
         }
         ("POST", "/api/rules") => {
-            let path = project(&store, &field(&input()?, "project"))?;
+            // Read, or first add or take back one rule said on the project page.
+            let v = input()?;
+            let path = project(&store, &field(&v, "project"))?;
+            let (scope, text) = (field(&v, "scope"), field(&v, "text"));
+            match field(&v, "change").as_str() {
+                "add" => fennec_os::rules::say(&path, &scope, &text)?,
+                "remove" => fennec_os::rules::unsay(&path, &scope, &text)?,
+                _ => {}
+            }
             let said = fennec_os::rules::said(&path)?;
             Ok(json!(
                 said.iter()

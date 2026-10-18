@@ -955,11 +955,34 @@ async function showPage(path) {
   place.value = p.place ?? "here";
   place.onchange = () => api("/api/projects", { path, place: place.value })
     .catch((e) => { $("page-error").textContent = e.message; place.value = p.place; });
+  showRules(path, rules);
+}
+
+function showRules(path, rules) {
   const box = $("page-rules");
   box.querySelector("summary").textContent = rules.length ? `Règles suivies (${rules.length})` : "Aucune règle pour l'instant";
-  box.querySelector("ul").replaceChildren(...rules.map((r) => el("li", {}, ...rich(r.text),
-    el("span", { className: "muted", textContent: r.scope === "user" ? " — tous tes projets" : " — ce projet" }))));
+  box.querySelector("ul").replaceChildren(...rules.map((r) => {
+    const remove = el("button", { type: "button", className: "quiet", textContent: "Retirer" });
+    remove.onclick = () => changeRules(path, { change: "remove", scope: r.scope, text: r.text });
+    return el("li", {}, ...rich(r.text),
+      el("span", { className: "muted", textContent: r.scope === "user" ? " — tous tes projets" : " — ce projet" }), remove);
+  }));
 }
+
+async function changeRules(path, change) {
+  try {
+    showRules(path, await api("/api/rules", { project: path, ...change }));
+    $("page-error").textContent = "";
+    return true;
+  } catch (e) {
+    $("page-error").textContent = explain(e.message);
+    return false;
+  }
+}
+$("rule-form").onsubmit = async (e) => {
+  e.preventDefault();
+  if (await changeRules(paged, { change: "add", scope: $("rule-scope").value, text: $("rule-text").value })) $("rule-text").value = "";
+};
 $("page-team").onclick = () => $("open-team").click();
 $("page-open").onclick = async () => {
   try {
