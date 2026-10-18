@@ -328,6 +328,17 @@ pub fn used(summary: &str, said: &[Said]) -> Vec<String> {
     used
 }
 
+/// The summary as the person reads it: the `rules:` line is for `used`.
+pub fn shown(summary: &str) -> String {
+    summary
+        .lines()
+        .filter(|l| !l.trim().trim_matches('`').starts_with("rules:"))
+        .collect::<Vec<_>>()
+        .join("\n")
+        .trim_end()
+        .to_string()
+}
+
 const PROPOSE: &str = "A human corrected an AI developer. Decide whether the correction states \
 a lasting preference that would hold for other tasks too (a tool to use or avoid, an identity, \
 a branch never to touch, a style), or only fixes this task. What the product should do (a \
@@ -431,6 +442,7 @@ mod tests {
             },
         ];
         let summary = "goal: x\nverify: y\nrules: 2, 9, 2";
+        assert_eq!(super::shown(summary), "goal: x\nverify: y");
         assert_eq!(used(summary, &said), ["never touch develop"]);
         assert!(used("done", &said).is_empty());
         assert!(brief(&said).contains("  2. never touch develop"));

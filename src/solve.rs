@@ -365,7 +365,7 @@ fn attempt_inner(
     let outcome = agent::run(worlds, world, model, &goal, &criteria, &context, max_steps)?;
     record["steps"] = json!(outcome.steps);
     record["rules"] = json!(rules::used(outcome.summary.as_deref().unwrap_or(""), said));
-    record["summary"] = json!(outcome.summary);
+    record["summary"] = json!(outcome.summary.as_deref().map(rules::shown));
     record["skills"] = json!(skill::used(&outcome.messages));
     record["messages"] = json!(outcome.messages);
     record["stuck"] = json!(outcome.stuck);
