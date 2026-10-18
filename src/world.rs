@@ -426,27 +426,53 @@ pub fn workspace(project: &Path) -> String {
     }
 }
 
+/// What keeps a new world out of a project whose worlds go in the folder itself.
+pub enum Held {
+    /// The world the folder is checked out on.
+    World(String),
+    /// The human's uncommitted changes: a failed attempt is undone by going
+    /// back to the last commit, so nothing of theirs may be in the way.
+    Changes,
+}
+
+/// Whether a new world must wait for `project`'s folder; never for worlds
+/// that go apart.
+pub fn held(project: &Path) -> io::Result<Option<Held>> {
+    if !matches!(workspace(project).as_str(), "here") {
+        return Ok(None);
+    }
+    let home = git(project, &["branch", "--show-current"])?;
+    if let Some(id) = home.strip_prefix("world/") {
+        return Ok(Some(Held::World(id.to_string())));
+    }
+    if !git(project, &["status", "--porcelain"])?.is_empty() {
+        return Ok(Some(Held::Changes));
+    }
+    Ok(None)
+}
+
 /// Where a new world of `project` goes; see the module doc.
 fn place(project: &Path) -> io::Result<Place> {
     let chosen = git(project, &["config", "--get", "fennec.workspace"]).unwrap_or_default();
     match chosen.as_str() {
         "" | "here" => {
-            let home = git(project, &["branch", "--show-current"])?;
-            if let Some(id) = home.strip_prefix("world/") {
-                return Err(io::Error::other(format!(
-                    "the project folder already holds work in progress (world {id})"
-                )));
+            match held(project)? {
+                Some(Held::World(id)) => {
+                    return Err(io::Error::other(format!(
+                        "the project folder already holds work in progress (world {id})"
+                    )));
+                }
+                Some(Held::Changes) => {
+                    return Err(io::Error::other(
+                        "the project folder has uncommitted changes",
+                    ));
+                }
+                None => {}
             }
+            let home = git(project, &["branch", "--show-current"])?;
             if home.is_empty() {
                 return Err(io::Error::other(
                     "the project folder is on no branch (detached HEAD)",
-                ));
-            }
-            // A failed attempt is undone by going back to the last commit:
-            // nothing of the human's may be in the way.
-            if !git(project, &["status", "--porcelain"])?.is_empty() {
-                return Err(io::Error::other(
-                    "the project folder has uncommitted changes",
                 ));
             }
             Ok(Place::Here(project.to_path_buf(), home.clone(), home))
