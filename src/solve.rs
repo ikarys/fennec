@@ -480,7 +480,9 @@ const PLAN: &str = "Decide how the change below lands in this project, the way t
 does it: follow its conventions and rules (branch naming, protected branches, commit style) and \
 the style of its recent subjects. First line: `branch: <name>`, the branch the commit goes on; \
 `branch: current` when the rules say nothing about branches. Then a blank line, then the commit \
-message. No fences, no commentary.";
+message. The message covers the whole Change: when the goal ends with a change the human \
+asked for on a first solution, that change is one part of it, not the subject. No fences, no \
+commentary.";
 
 /// Where and how a run lands: shown to the human before they click.
 pub struct Landing {
