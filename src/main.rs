@@ -297,6 +297,32 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
             .save()?;
             Ok(json!({}))
         }
+        ("POST", "/api/skills") => {
+            // The machine's skills, the project's chosen first; or first
+            // choose one or take it back.
+            let v = input()?;
+            let path = project(&store, &field(&v, "project"))?;
+            let name = field(&v, "name");
+            if !name.is_empty() {
+                fennec_os::skill::choose(&path, &name, v["on"] == true)?;
+            }
+            let chosen: Vec<String> = fennec_os::skill::chosen(&path)?
+                .into_iter()
+                .map(|s| s.name)
+                .collect();
+            let home = std::env::var("HOME").unwrap_or_default();
+            let mut all: Vec<Value> = fennec_os::skill::catalog(&path)?
+                .into_iter()
+                .map(|s| {
+                    let from = s.dir.display().to_string();
+                    json!({"name": s.name, "description": s.description,
+                           "chosen": chosen.contains(&s.name),
+                           "from": from.replacen(&home, "~", 1)})
+                })
+                .collect();
+            all.sort_by_key(|s| s["chosen"] != true);
+            Ok(json!(all))
+        }
         ("POST", "/api/rules") => {
             // Read, or first add or take back one rule said on the project page.
             let v = input()?;

@@ -295,6 +295,7 @@ fn classify(requests: &[(String, Value)], projects: &[String]) -> Value {
                 c["amend_error"] = r["amend_error"].clone();
                 c["summary"] = r["summary"].clone();
                 c["files"] = r["files"].clone();
+                c["skills"] = r["skills"].clone();
                 // A run that predates the proof was never tried: say so.
                 c["untried"] = json!(
                     r["proof"]["tries"].as_array().is_none_or(Vec::is_empty)
@@ -328,7 +329,14 @@ fn classify(requests: &[(String, Value)], projects: &[String]) -> Value {
                 c["remote"] = r["target"]["remote"].clone();
                 c["commit"] = r["commit"].clone();
                 c["changed"] = json!(r["run"].is_string());
-                for k in ["done_when", "summary", "files", "question", "reason"] {
+                for k in [
+                    "done_when",
+                    "summary",
+                    "files",
+                    "skills",
+                    "question",
+                    "reason",
+                ] {
                     c[k] = r[k].clone();
                 }
                 c["tries"] = r["proof"]["tries"].clone();

@@ -264,6 +264,12 @@
   .rule-form { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 4px; }
   .rule-form input { flex: 1; min-width: 220px; }
   #page-rules li button { margin-left: 8px; padding: 0 8px; font-size: 13px; }
+  #page-skills ul { list-style: none; padding: 0; margin: 6px 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  #page-skills li { display: flex; gap: 10px; align-items: baseline; padding: 4px 8px; border-radius: 6px; background: var(--soft); }
+  #page-skills li .what { flex: 1; min-width: 0; font-size: 13px; color: var(--muted); overflow: hidden;
+                          text-overflow: ellipsis; white-space: nowrap; }
+  #page-skills li button { padding: 0 8px; font-size: 13px; }
+  #skill-search { width: 100%; margin-top: 6px; }
   .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 12px 0; }
   .tile { background: var(--soft); border-radius: 8px; padding: 10px 12px; display: grid; }
   .tile b { font-size: 20px; }
@@ -357,6 +363,12 @@
         <button>Ajouter</button>
       </form>
       <p class="muted">fennec la donne à toute l'équipe à chaque demande. Tu peux aussi la dire en corrigeant une demande : fennec propose de la garder.</p></details>
+    <details id="page-skills" open><summary></summary>
+      <ul id="skills-chosen"></ul>
+      <input id="skill-search" type="search" aria-label="Chercher un skill" placeholder="Chercher parmi les skills de ta machine…">
+      <ul id="skills-all"></ul>
+      <p class="muted">L'équipe voit le nom et le but de chaque skill choisi, et le lit quand la demande en a besoin.
+        Ils viennent de ~/.claude/skills et de tes plugins, de ~/.config/fennec/skills ou du dossier .claude/skills du projet.</p></details>
     <p class="error" id="page-error" role="alert"></p>
   </aside>
   </section>
