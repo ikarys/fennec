@@ -14,8 +14,13 @@ pub struct Fixture {
 
 impl Fixture {
     pub fn new(name: &str) -> Self {
-        let dir =
-            std::env::temp_dir().join(format!("fennec-os-test-{name}-{}", std::process::id()));
+        Self::new_in(name, &std::env::temp_dir())
+    }
+
+    /// `new`, rooted in `root`: some tests need a home the sandbox does not
+    /// hide (its /tmp and friends are private tmpfs).
+    pub fn new_in(name: &str, root: &std::path::Path) -> Self {
+        let dir = root.join(format!("fennec-os-test-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let project = dir.join("project");
         let home = dir.join("home");
