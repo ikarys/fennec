@@ -357,7 +357,8 @@ fn execute(worlds: &Worlds, world: &World, name: &str, args: &Value) -> io::Resu
                 "-k".to_string(),
                 "5".to_string(),
                 COMMAND_TIMEOUT_SECS.to_string(),
-                "sh".to_string(),
+                // The same shell as the checks that judge the work (`solve::verify`).
+                "bash".to_string(),
                 "-c".to_string(),
                 arg("command")?.to_string(),
             ];
