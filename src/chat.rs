@@ -3,7 +3,7 @@
 //! commands and writes in that folder directly, in the same sandbox as a
 //! world's (no network, hidden home, private /tmp), and its turn ends when
 //! it answers without a tool call. Chats live in `<store>/chats/<id>.json`:
-//! the folder, the chosen skills, the messages without the system prompt,
+//! the folder, the messages without the system prompt,
 //! and one entry per model call for the cost.
 
 use std::io;
@@ -28,7 +28,7 @@ network and hides their home except this folder. Your turn ends when you reply w
 call: that reply is what they read.";
 
 /// Every write of a chat file goes through this lock: the turn running in
-/// the background and the page (stop, skills) change the same file.
+/// the background and the page (stop) change the same file.
 /// ponytail: one process; a second fennec on the same store would race.
 static LOCK: Mutex<()> = Mutex::new(());
 
@@ -86,7 +86,8 @@ fn unopenable(worlds: &Worlds, dir: &Path) -> Option<String> {
 }
 
 /// A new chat over `folder`: strictly inside the home, as a grant, and never
-/// over the store. It starts with the skills the folder's project chose.
+/// over the store. Skills come from the person's global list, read at each
+/// turn; the chat keeps none of its own.
 pub fn start(worlds: &Worlds, folder: &Path) -> io::Result<Value> {
     let folder = std::fs::canonicalize(folder)?;
     if !folder.is_dir() {
@@ -98,13 +99,9 @@ pub fn start(worlds: &Worlds, folder: &Path) -> io::Result<Value> {
     if let Some(why) = unopenable(worlds, &folder) {
         return Err(io::Error::other(why));
     }
-    let skills: Vec<String> = skill::chosen(Some(&folder))?
-        .into_iter()
-        .map(|s| s.name)
-        .collect();
     let id = crate::world::new_id();
     let chat = json!({"id": id, "folder": folder.display().to_string(), "created": now(),
-                      "status": "idle", "skills": skills, "grants": [],
+                      "status": "idle", "grants": [],
                       "messages": [], "turns": []});
     save(worlds, &id, &chat)?;
     Ok(chat)
@@ -112,6 +109,15 @@ pub fn start(worlds: &Worlds, folder: &Path) -> io::Result<Value> {
 
 /// Every chat, the latest first, without its messages.
 pub fn list(worlds: &Worlds) -> io::Result<Vec<Value>> {
+    listed(worlds, false)
+}
+
+/// The archived ones, the latest first: hidden from the list, kept on disk.
+pub fn list_archived(worlds: &Worlds) -> io::Result<Vec<Value>> {
+    listed(worlds, true)
+}
+
+fn listed(worlds: &Worlds, archived: bool) -> io::Result<Vec<Value>> {
     let Ok(entries) = std::fs::read_dir(worlds.root.join("chats")) else {
         return Ok(Vec::new());
     };
@@ -129,11 +135,31 @@ pub fn list(worlds: &Worlds) -> io::Result<Vec<Value>> {
     Ok(ids
         .iter()
         .filter_map(|id| load(worlds, id).ok())
+        // A chat without the key is a legacy one: not archived.
+        .filter(|c| c["archived"].as_bool().unwrap_or(false) == archived)
         .map(|c| {
             json!({"id": c["id"], "folder": c["folder"], "status": c["status"],
                    "title": title(&c), "since": c["since"]})
         })
         .collect())
+}
+
+/// Out of the list, or back in it: the exchange stays on disk either way.
+pub fn archive(worlds: &Worlds, id: &str, on: bool) -> io::Result<Value> {
+    update(worlds, id, |c| c["archived"] = json!(on))
+}
+
+/// Gone for good. A turn under way would rewrite the file from under it, so
+/// it is refused while the chat thinks or waits; stop it first.
+pub fn forget(worlds: &Worlds, id: &str) -> io::Result<()> {
+    let chat = load(worlds, id)?;
+    if chat["status"] == "thinking" || chat["status"] == "waiting" {
+        return Err(io::Error::other(
+            "la discussion est en cours : arrête-la d'abord",
+        ));
+    }
+    let _held = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    std::fs::remove_file(path(worlds, id)?)
 }
 
 /// The chat's name: its first message, cut.
@@ -150,18 +176,6 @@ pub fn title(chat: &Value) -> String {
         Some((i, _)) => format!("{}…", &line[..i]),
         None => line.to_string(),
     }
-}
-
-/// Adds or takes back a skill for this chat's next turns.
-pub fn choose(worlds: &Worlds, id: &str, name: &str, on: bool) -> io::Result<Value> {
-    update(worlds, id, |c| {
-        let mut names: Vec<Value> = c["skills"].as_array().cloned().unwrap_or_default();
-        names.retain(|n| n != name);
-        if on {
-            names.push(json!(name));
-        }
-        c["skills"] = json!(names);
-    })
 }
 
 /// Asks the turn under way to end after its current call.
@@ -273,9 +287,13 @@ fn push_grant(c: &mut Value, dir: &str) {
 }
 
 /// A turn that was running when fennec stopped will not resume: it goes back
-/// to idle with the reason, so the person can speak again.
+/// to idle with the reason, so the person can speak again. Archived chats
+/// are recovered too: hidden from the list, their turn must not freeze.
 pub fn recover(worlds: &Worlds) -> io::Result<()> {
-    for c in list(worlds)? {
+    for c in listed(worlds, false)?
+        .into_iter()
+        .chain(listed(worlds, true)?)
+    {
         if c["status"] == "thinking" || c["status"] == "waiting" {
             update(worlds, c["id"].as_str().unwrap_or(""), |c| {
                 c["status"] = json!("idle");
@@ -339,16 +357,7 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
         if chat["stop"] == true {
             return Ok(());
         }
-        let names: Vec<&str> = chat["skills"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .filter_map(Value::as_str)
-            .collect();
-        let skills: Vec<skill::Skill> = skill::catalog(Some(&folder))?
-            .into_iter()
-            .filter(|s| names.contains(&s.name.as_str()))
-            .collect();
+        let skills: Vec<skill::Skill> = skill::chosen(Some(&folder))?;
         let mounts: Vec<(String, PathBuf)> = skills
             .iter()
             .map(|s| (s.name.clone(), s.dir.clone()))
@@ -365,12 +374,10 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
         };
         let mut record = json!({"at": now(), "model_ms": asked.elapsed().as_millis() as u64,
                                 "think": !blank});
-        if let Some(obj) = reply.as_object_mut() {
-            obj.remove("reasoning_content");
-            obj.remove("reasoning");
-            if let Some(usage) = obj.remove("usage") {
-                record["usage"] = usage;
-            }
+        if let Some(obj) = reply.as_object_mut()
+            && let Some(usage) = obj.remove("usage")
+        {
+            record["usage"] = usage;
         }
         reply["role"] = json!("assistant");
         let calls = reply["tool_calls"].as_array().cloned().unwrap_or_default();
@@ -524,6 +531,46 @@ mod tests {
         assert_eq!(c["status"], "idle");
         assert_eq!(c["stop"], false);
         assert_eq!(c["error"], "no model: the server did not answer");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn an_archived_chat_leaves_the_list_and_comes_back() {
+        let dir = std::env::temp_dir().join(format!("fennec-os-chat-arch-{}", std::process::id()));
+        let folder = dir.join("proj");
+        std::fs::create_dir_all(&folder).unwrap();
+        let w = worlds(&dir);
+        let chat = start(&w, &folder).unwrap();
+        let id = chat["id"].as_str().unwrap().to_string();
+        assert_eq!(list(&w).unwrap().len(), 1);
+        archive(&w, &id, true).unwrap();
+        assert!(list(&w).unwrap().is_empty());
+        assert_eq!(list_archived(&w).unwrap().len(), 1);
+        // The exchange is untouched by archiving.
+        assert_eq!(load(&w, &id).unwrap()["archived"], true);
+        archive(&w, &id, false).unwrap();
+        assert_eq!(list(&w).unwrap().len(), 1);
+        assert!(list_archived(&w).unwrap().is_empty());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_chat_is_forgotten_only_when_its_turn_is_done() {
+        let dir =
+            std::env::temp_dir().join(format!("fennec-os-chat-forget-{}", std::process::id()));
+        let folder = dir.join("proj");
+        std::fs::create_dir_all(&folder).unwrap();
+        let w = worlds(&dir);
+        let chat = start(&w, &folder).unwrap();
+        let id = chat["id"].as_str().unwrap().to_string();
+        say(&w, &id, "bonjour").unwrap();
+        assert_eq!(load(&w, &id).unwrap()["status"], "thinking");
+        let err = forget(&w, &id).unwrap_err().to_string();
+        assert!(err.contains("en cours"), "{err}");
+        fail(&w, &id, "no model").unwrap();
+        forget(&w, &id).unwrap();
+        assert!(load(&w, &id).is_err());
+        assert!(list(&w).unwrap().is_empty());
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

@@ -322,7 +322,7 @@ impl OpenAi {
     fn send(&self, messages: &[Value], tools: &Value, think: bool) -> io::Result<Value> {
         let mut body = json!({
             "model": self.model,
-            "messages": messages,
+            "messages": outgoing(messages),
             "temperature": self.temperature,
         });
         if self.max_tokens > 0 {
@@ -368,6 +368,91 @@ impl OpenAi {
             }
         }
     }
+}
+
+/// Reasoning is the model's scratch space, kept in the exchange for the human
+/// to read; sending it back costs prefill. Images the human attached go as
+/// images (see [`image_line`]).
+fn outgoing(messages: &[Value]) -> Vec<Value> {
+    messages
+        .iter()
+        .map(|m| {
+            let mut m = m.clone();
+            if let Some(o) = m.as_object_mut() {
+                o.remove("reasoning_content");
+                o.remove("reasoning");
+            }
+            with_images(&mut m);
+            m
+        })
+        .collect()
+}
+
+/// A human's message carries an image as a line of its own,
+/// `![image](file:///…/<16 hex>.png)`, written by fennec-lead's upload. The
+/// file is read at send time, so the exchange on file keeps the line, not
+/// megabytes. Only the human's messages: a line the model writes stays text.
+fn with_images(m: &mut Value) {
+    if m["role"] != "user" {
+        return;
+    }
+    let Some(text) = m["content"].as_str() else {
+        return;
+    };
+    let (mut words, mut images) = (Vec::new(), Vec::new());
+    for line in text.lines() {
+        match image_line(line) {
+            Some(url) => images.push(json!({"type": "image_url", "image_url": {"url": url}})),
+            None => words.push(line),
+        }
+    }
+    if images.is_empty() {
+        return;
+    }
+    images.insert(0, json!({"type": "text", "text": words.join("\n").trim()}));
+    m["content"] = json!(images);
+}
+
+/// The image a line names, as a data URL; `None` if it names none, or one
+/// that is not an upload (any image on disk could otherwise be sent).
+fn image_line(line: &str) -> Option<String> {
+    let path = line
+        .trim()
+        .strip_prefix("![image](file://")?
+        .strip_suffix(')')?;
+    let file = std::path::Path::new(path);
+    let stem = file.file_stem()?.to_str()?;
+    if stem.len() != 16 || !stem.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return None;
+    }
+    let kind = match file.extension()?.to_str()? {
+        "png" => "png",
+        "jpg" | "jpeg" => "jpeg",
+        "gif" => "gif",
+        "webp" => "webp",
+        _ => return None,
+    };
+    let bytes = std::fs::read(file).ok()?;
+    Some(format!("data:image/{kind};base64,{}", base64(&bytes)))
+}
+
+fn base64(bytes: &[u8]) -> String {
+    const ABC: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
+    for chunk in bytes.chunks(3) {
+        let n = chunk
+            .iter()
+            .enumerate()
+            .fold(0u32, |n, (i, b)| n | (*b as u32) << (16 - 8 * i));
+        for i in 0..4 {
+            out.push(if i <= chunk.len() {
+                ABC[(n >> (18 - 6 * i) & 63) as usize] as char
+            } else {
+                '='
+            });
+        }
+    }
+    out
 }
 
 impl Model for OpenAi {
@@ -435,6 +520,43 @@ mod tests {
             "a new conversation starts over"
         );
         std::fs::remove_file(&path).unwrap();
+    }
+
+    #[test]
+    fn reasoning_is_kept_but_never_sent_back() {
+        let said = [
+            json!({"role": "assistant", "content": "ok", "reasoning_content": "hmm", "reasoning": "hmm"}),
+        ];
+        let sent = outgoing(&said);
+        assert_eq!(sent[0], json!({"role": "assistant", "content": "ok"}));
+        assert_eq!(said[0]["reasoning_content"], "hmm");
+    }
+
+    #[test]
+    fn an_uploaded_image_goes_as_an_image() {
+        assert_eq!(base64(b"Ma"), "TWE=");
+        assert_eq!(base64(b"Man"), "TWFu");
+        assert_eq!(base64(b"M"), "TQ==");
+        let file = std::env::temp_dir().join("00112233aabbccdd.png");
+        std::fs::write(&file, b"Man").unwrap();
+        let line = format!("![image](file://{})", file.display());
+        let said = [
+            json!({"role": "user", "content": format!("vois\n{line}")}),
+            json!({"role": "assistant", "content": line}),
+            json!({"role": "user", "content": "![image](file:///etc/passwd.png)"}),
+        ];
+        let sent = outgoing(&said);
+        assert_eq!(
+            sent[0]["content"],
+            json!([{"type": "text", "text": "vois"},
+                   {"type": "image_url", "image_url": {"url": "data:image/png;base64,TWFu"}}])
+        );
+        assert!(
+            sent[1]["content"].is_string(),
+            "the model's lines stay text"
+        );
+        assert!(sent[2]["content"].is_string(), "only uploads are read");
+        std::fs::remove_file(file).unwrap();
     }
 
     #[test]

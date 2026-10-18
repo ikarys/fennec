@@ -45,11 +45,13 @@ impl Script {
 
 impl Model for Script {
     fn chat(&self, messages: &[Value], _tools: &Value) -> io::Result<Value> {
-        // The harness must not send the model's reasoning back.
+        // Reasoning stays in the exchange for the journal; the provider
+        // leaves it out of what it sends (`provider::outgoing`).
         assert!(
             messages
                 .iter()
-                .all(|m| m.get("reasoning_content").is_none())
+                .filter(|m| m["role"] == "assistant")
+                .all(|m| m["reasoning_content"].is_string())
         );
         self.replies
             .lock()

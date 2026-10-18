@@ -179,14 +179,12 @@ pub fn run(
                 });
             }
         };
-        // Reasoning is the model's scratch space; sending it back costs
-        // prefill. Usage is for the profile, not the conversation.
-        if let Some(obj) = reply.as_object_mut() {
-            obj.remove("reasoning_content");
-            obj.remove("reasoning");
-            if let Some(usage) = obj.remove("usage") {
-                turn["usage"] = usage;
-            }
+        // Usage is for the profile, not the conversation. Reasoning stays for
+        // the journal; the provider leaves it out of what goes back.
+        if let Some(obj) = reply.as_object_mut()
+            && let Some(usage) = obj.remove("usage")
+        {
+            turn["usage"] = usage;
         }
         reply["role"] = json!("assistant");
         blank = reply["tool_calls"].as_array().is_none_or(|c| c.is_empty())
@@ -424,7 +422,15 @@ fn short(args: &Value) -> String {
 }
 
 pub(crate) fn bound(messages: &mut [Value]) {
-    let size = |m: &Value| m.to_string().len();
+    // Reasoning is kept for the journal but never sent: it costs no context.
+    let size = |m: &Value| {
+        let kept: usize = ["reasoning_content", "reasoning"]
+            .iter()
+            .filter_map(|k| m[*k].as_str())
+            .map(str::len)
+            .sum();
+        m.to_string().len().saturating_sub(kept)
+    };
     let mut total: usize = messages.iter().map(size).sum();
     let end = messages.len().saturating_sub(KEEP_RECENT);
     if total <= CONTEXT_BUDGET || end <= 2 {
