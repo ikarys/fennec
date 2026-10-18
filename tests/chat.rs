@@ -368,3 +368,55 @@ fn a_turn_cut_by_a_restart_lets_the_person_speak_again() {
     assert!(c["error"].as_str().unwrap().contains("interrompu"));
     chat::say(&f.worlds, &id, "encore").unwrap();
 }
+
+#[test]
+fn a_folder_taken_back_between_two_calls_of_one_reply_closes_for_the_second() {
+    let f = Fixture::new_in("chat-ungrant-calls", &var_tmp());
+    let folder = f.worlds.home.join("notes");
+    std::fs::create_dir_all(&folder).unwrap();
+    let other = f.worlds.home.join("other");
+    let third = f.worlds.home.join("third");
+    for d in [&other, &third] {
+        std::fs::create_dir_all(d).unwrap();
+        std::fs::write(d.join("o.txt"), "omega\n").unwrap();
+    }
+    let c = chat::start(&f.worlds, &folder).unwrap();
+    let id = c["id"].as_str().unwrap().to_string();
+    // A first turn opens `other`.
+    chat::say(&f.worlds, &id, "lis ../other/o.txt").unwrap();
+    let model = Replies(Mutex::new(VecDeque::from([
+        call("c0", "shell", json!({"command": "cat ../other/o.txt"})),
+        json!({"content": "ok."}),
+    ])));
+    let (w, tid) = (twin(&f), id.clone());
+    let t = std::thread::spawn(move || chat::answer(&w, &tid, &model, 10));
+    until_waiting(&f, &id);
+    chat::decide(&f.worlds, &id, true).unwrap();
+    t.join().unwrap().unwrap();
+    // One reply, two calls: the first asks for `third`; while it waits, the
+    // person takes `other` back, so the second call asks again.
+    chat::say(&f.worlds, &id, "lis third, ecris other").unwrap();
+    let mut two = call("c1", "shell", json!({"command": "cat ../third/o.txt"}));
+    two["tool_calls"].as_array_mut().unwrap().push(
+        call(
+            "c2",
+            "write_file",
+            json!({"path": "../other/n.txt", "content": "x\n"}),
+        )["tool_calls"][0]
+            .clone(),
+    );
+    let model = Replies(Mutex::new(VecDeque::from([two, json!({"content": "ok."})])));
+    let (w, tid) = (twin(&f), id.clone());
+    let t = std::thread::spawn(move || chat::answer(&w, &tid, &model, 10));
+    until_waiting(&f, &id);
+    chat::ungrant(&f.worlds, &id, &other.display().to_string()).unwrap();
+    chat::decide(&f.worlds, &id, true).unwrap();
+    let pending = until_waiting(&f, &id);
+    assert_eq!(pending["pending"]["directory"], other.display().to_string());
+    chat::decide(&f.worlds, &id, false).unwrap();
+    t.join().unwrap().unwrap();
+    assert!(
+        !other.join("n.txt").exists(),
+        "a folder taken back stays closed"
+    );
+}

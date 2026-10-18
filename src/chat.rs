@@ -395,19 +395,13 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
             reply["content"] = json!(text);
         }
         let mut said = vec![reply];
-        // Folders the person opened for this chat, read once the model has
-        // replied: one taken back meanwhile closes before its calls run.
-        let mut grants: Vec<PathBuf> = load(worlds, id)?["grants"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .filter_map(Value::as_str)
-            .map(PathBuf::from)
-            .collect();
         let mut stuck = None;
         let mut times = Vec::new();
         for call in &calls {
             let name = call["function"]["name"].as_str().unwrap_or("");
+            // Folders the person opened for this chat, read again before each
+            // call: one taken back meanwhile is closed for it.
+            let mut grants = grants(worlds, id)?;
             let args: Value = call["function"]["arguments"]
                 .as_str()
                 .and_then(|a| serde_json::from_str(a).ok())
@@ -480,6 +474,17 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
     Err(io::Error::other(format!(
         "stopped after {max_steps} steps without an answer"
     )))
+}
+
+/// The folders the person opened for chat `id`; a granted call runs read-write.
+fn grants(worlds: &Worlds, id: &str) -> io::Result<Vec<PathBuf>> {
+    Ok(load(worlds, id)?["grants"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(PathBuf::from)
+        .collect())
 }
 
 fn push(list: &mut Value, item: Value) {
