@@ -505,10 +505,23 @@ pub fn plan(worlds: &Worlds, id: &str, model: &dyn Model) -> io::Result<Landing>
         .find(|r| *r == "origin")
         .or_else(|| remotes.lines().next())
         .map(str::to_string);
-    let diff: String = record["attempts"]
-        .as_array()
-        .and_then(|a| a.iter().find(|t| t["world"] == id))
-        .and_then(|t| t["diff"].as_str())
+    // Everything the commit will carry, from where it left the human's
+    // branch: an amended run's own diff holds only the correction, and the
+    // message then named that alone (UX test 2026-10-18).
+    let passed = std::fs::read_to_string(worlds.root.join("passed").join(id))
+        .ok()
+        .and_then(|t| serde_json::from_str::<Value>(&t).ok())
+        .and_then(|v| v["commit"].as_str().map(str::to_string));
+    let whole =
+        passed.and_then(|c| git(project, &["diff", &format!("{current}...{c}"), "--"]).ok());
+    let diff: String = whole
+        .as_deref()
+        .or_else(|| {
+            record["attempts"]
+                .as_array()
+                .and_then(|a| a.iter().find(|t| t["world"] == id))
+                .and_then(|t| t["diff"].as_str())
+        })
         .unwrap_or("")
         .chars()
         .take(8000)

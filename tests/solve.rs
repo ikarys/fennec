@@ -925,6 +925,11 @@ fn a_request_compiles_to_failing_tests_that_the_solution_must_pass() {
         "rejected"
     );
     assert_eq!(spec::load(&f.worlds, &id).unwrap()["run"], json!(amended));
+    // The commit message is written from all it carries, not the correction alone.
+    let spy = Spy(Mutex::new(String::new()));
+    let _ = plan(&f.worlds, &amended, &spy);
+    let asked = spy.0.lock().unwrap().clone();
+    assert!(asked.contains("+42") && asked.contains("+hi"), "{asked}");
 
     land(&f.worlds, &amended, None, None).unwrap();
     assert!(f.project.join("note").exists() && f.project.join("answer").exists());
