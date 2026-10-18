@@ -112,7 +112,7 @@ pub fn solve(
     context.push_str(&rules::brief(&said));
     let (roles, team) = team::brief(&project, "solve")?;
     context.push_str(&roles);
-    let skills = skill::chosen(&project)?;
+    let skills = skill::chosen(Some(&project))?;
     context.push_str(&skill::brief(&skills));
     let history = review::agenda(worlds, &project.display().to_string(), 12)?;
     if !history.is_empty() {

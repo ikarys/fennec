@@ -1,6 +1,7 @@
 pub mod agent;
 pub mod chat;
 pub mod grant;
+pub mod outside;
 pub mod proof;
 pub mod provider;
 pub mod recipe;

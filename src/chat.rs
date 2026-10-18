@@ -9,11 +9,12 @@
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde_json::{Value, json};
 
 use crate::agent;
+use crate::outside;
 use crate::provider::Model;
 use crate::skill;
 use crate::world::Worlds;
@@ -85,13 +86,14 @@ pub fn start(worlds: &Worlds, folder: &Path) -> io::Result<Value> {
             folder.display()
         )));
     }
-    let skills: Vec<String> = skill::chosen(&folder)?
+    let skills: Vec<String> = skill::chosen(Some(&folder))?
         .into_iter()
         .map(|s| s.name)
         .collect();
     let id = crate::world::new_id();
     let chat = json!({"id": id, "folder": folder.display().to_string(), "created": now(),
-                      "status": "idle", "skills": skills, "messages": [], "turns": []});
+                      "status": "idle", "skills": skills, "grants": [],
+                      "messages": [], "turns": []});
     save(worlds, &id, &chat)?;
     Ok(chat)
 }
@@ -163,7 +165,7 @@ pub fn say(worlds: &Worlds, id: &str, text: &str) -> io::Result<()> {
     }
     let mut busy = false;
     update(worlds, id, |c| {
-        busy = c["status"] == "thinking";
+        busy = c["status"] == "thinking" || c["status"] == "waiting";
         if busy {
             return;
         }
@@ -189,11 +191,103 @@ pub fn answer(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) ->
     update(worlds, id, |c| {
         c["status"] = json!("idle");
         c["stop"] = json!(false);
+        c["pending"] = Value::Null;
+        c["decision"] = Value::Null;
         if let Err(e) = &ran {
             c["error"] = json!(e.to_string());
         }
     })?;
     Ok(())
+}
+
+/// The turn never started: its settings gave no model. Say so, as [`answer`]
+/// does when its turn fails, so the page does not stay on "répond…".
+pub fn fail(worlds: &Worlds, id: &str, why: &str) -> io::Result<()> {
+    update(worlds, id, |c| {
+        c["status"] = json!("idle");
+        c["stop"] = json!(false);
+        c["error"] = json!(why);
+    })
+    .map(drop)
+}
+
+/// The person's answer to the pending question: `true` opens the folder for
+/// the whole chat (a grant), `false` covers this call only, so the next
+/// attempt asks again.
+pub fn decide(worlds: &Worlds, id: &str, allow: bool) -> io::Result<()> {
+    let mut answered = false;
+    update(worlds, id, |c| {
+        if c["status"] != "waiting" {
+            return;
+        }
+        answered = true;
+        c["status"] = json!("thinking");
+        c["decision"] = json!(allow);
+        if allow {
+            let dir = c["pending"]["directory"].as_str().map(String::from);
+            if let Some(d) = dir {
+                push_grant(c, &d);
+            }
+        }
+        c["pending"] = Value::Null;
+    })?;
+    if !answered {
+        return Err(io::Error::other("fennec n'attend plus de réponse"));
+    }
+    Ok(())
+}
+
+/// Takes back a folder the person had opened for this chat.
+pub fn ungrant(worlds: &Worlds, id: &str, dir: &str) -> io::Result<()> {
+    update(worlds, id, |c| {
+        if let Some(l) = c["grants"].as_array_mut() {
+            l.retain(|g| *g != json!(dir));
+        }
+    })
+    .map(drop)
+}
+
+/// Records `dir` among the chat's grants, once.
+fn push_grant(c: &mut Value, dir: &str) {
+    if !c["grants"].is_array() {
+        c["grants"] = json!([]);
+    }
+    let Some(l) = c["grants"].as_array_mut() else {
+        return;
+    };
+    if !l.iter().any(|g| *g == json!(dir)) {
+        l.push(json!(dir));
+    }
+}
+
+/// Shows the question on the page and waits for the person's decision, the
+/// chat file being what the page writes. `None` when a stop asked for the
+/// turn to end.
+fn ask(
+    worlds: &Worlds,
+    id: &str,
+    tool: &str,
+    path: &Path,
+    directory: &Path,
+) -> io::Result<Option<bool>> {
+    update(worlds, id, |c| {
+        c["status"] = json!("waiting");
+        c["pending"] = json!({"tool": tool, "path": path.display().to_string(),
+                              "directory": directory.display().to_string()});
+    })?;
+    loop {
+        std::thread::sleep(Duration::from_millis(250));
+        let c = load(worlds, id)?;
+        if c["stop"] == true {
+            update(worlds, id, |c| c["pending"] = Value::Null)?;
+            return Ok(None);
+        }
+        if c["decision"].is_boolean() {
+            let allow = c["decision"] == true;
+            update(worlds, id, |c| c["decision"] = Value::Null)?;
+            return Ok(Some(allow));
+        }
+    }
 }
 
 fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::Result<()> {
@@ -210,6 +304,15 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
     // Blank: the model spent its whole budget reasoning; the next call goes
     // without reasoning, as in `agent::run`.
     let mut blank = false;
+    // Folders the person opened for this chat; a granted call runs read-write.
+    let mut grants: Vec<PathBuf> = load(worlds, id)?["grants"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|v| v.as_str().map(str::to_string))
+        .map(PathBuf::from)
+        .collect();
     for _ in 0..max_steps {
         // Skills are read again at each call: the person may change them.
         let chat = load(worlds, id)?;
@@ -222,7 +325,7 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
             .flatten()
             .filter_map(Value::as_str)
             .collect();
-        let skills: Vec<skill::Skill> = skill::catalog(&folder)?
+        let skills: Vec<skill::Skill> = skill::catalog(Some(&folder))?
             .into_iter()
             .filter(|s| names.contains(&s.name.as_str()))
             .collect();
@@ -281,7 +384,35 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
                 .and_then(|a| serde_json::from_str(a).ok())
                 .unwrap_or(Value::Null);
             let started = Instant::now();
-            let sandbox = |argv: &[String]| worlds.sandbox_folder(&folder, &mounts, argv);
+            // A literal path outside the folder the person chose: ask before
+            // the call touches it; opening a folder stays open for the chat.
+            if let Some(p) = outside::outside(&folder, &worlds.home, &worlds.ro_paths, name, &args)
+                .into_iter()
+                .find(|p| !grants.iter().any(|g| outside::covers(g, p)))
+            {
+                let directory = outside::grant_dir(&p);
+                match ask(worlds, id, name, &p, &directory)? {
+                    Some(true) => {
+                        grants.push(directory.clone());
+                        update(worlds, id, |c| {
+                            push_grant(c, &directory.to_string_lossy());
+                        })?;
+                    }
+                    Some(false) => {
+                        times.push(
+                            json!({"name": name, "ms": started.elapsed().as_millis() as u64}),
+                        );
+                        said.push(json!({"role": "tool", "tool_call_id": call["id"],
+                        "content": format!(
+                            "the person refused access to {}; it is untouched, do not retry it",
+                            directory.display()
+                        )}));
+                        continue;
+                    }
+                    None => return Ok(()),
+                }
+            }
+            let sandbox = |argv: &[String]| worlds.sandbox_folder(&folder, &mounts, &grants, argv);
             let result =
                 agent::execute(&sandbox, name, &args).unwrap_or_else(|e| format!("error: {e}"));
             times.push(json!({"name": name, "ms": started.elapsed().as_millis() as u64}));
@@ -320,5 +451,37 @@ fn push(list: &mut Value, item: Value) {
     }
     if let Some(l) = list.as_array_mut() {
         l.push(item);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn worlds(dir: &std::path::Path) -> Worlds {
+        Worlds {
+            root: dir.join("store"),
+            home: dir.to_path_buf(),
+            ro_paths: Vec::new(),
+            memory_mb: None,
+        }
+    }
+
+    #[test]
+    fn a_turn_that_never_started_says_so_and_moves_on() {
+        let dir = std::env::temp_dir().join(format!("fennec-os-chat-{}", std::process::id()));
+        let folder = dir.join("proj");
+        std::fs::create_dir_all(&folder).unwrap();
+        let w = worlds(&dir);
+        let chat = start(&w, &folder).unwrap();
+        let id = chat["id"].as_str().unwrap().to_string();
+        say(&w, &id, "bonjour").unwrap();
+        assert_eq!(load(&w, &id).unwrap()["status"], "thinking");
+        fail(&w, &id, "no model: the server did not answer").unwrap();
+        let c = load(&w, &id).unwrap();
+        assert_eq!(c["status"], "idle");
+        assert_eq!(c["stop"], false);
+        assert_eq!(c["error"], "no model: the server did not answer");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

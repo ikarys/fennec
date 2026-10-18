@@ -14,6 +14,10 @@ use fennec_os::solve::{Task, land, plan, push, solve};
 use fennec_os::{grant, proof, review, rules, skill, sleep, spec};
 use serde_json::{Value, json};
 
+/// The global skill list reads process-wide variables; the one test that
+/// moves it holds the lock.
+static ENV: Mutex<()> = Mutex::new(());
+
 struct Script {
     name: &'static str,
     replies: Mutex<VecDeque<Value>>,
@@ -153,6 +157,11 @@ fn attempts_run_in_turn_and_the_first_pass_lands() {
 #[test]
 fn a_chosen_skill_is_listed_mounted_read_only_and_traced() {
     let f = fixture("skill");
+    // The global choice lives outside the project: give it a home of its own.
+    let _env = ENV.lock().unwrap_or_else(|e| e.into_inner());
+    unsafe {
+        std::env::set_var("XDG_CONFIG_HOME", f.dir.join("config"));
+    }
     let dir = f.project.join(".claude/skills/answer");
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(
@@ -160,11 +169,11 @@ fn a_chosen_skill_is_listed_mounted_read_only_and_traced() {
         "---\nname: answer\ndescription: How this person answers.\n---\nAlways 42.\n",
     )
     .unwrap();
-    assert_eq!(skill::catalog(&f.project).unwrap()[0].name, "answer");
-    assert!(skill::chosen(&f.project).unwrap().is_empty());
-    skill::choose(&f.project, "answer", true).unwrap();
-    skill::choose(&f.project, "answer", true).unwrap();
-    assert_eq!(skill::chosen(&f.project).unwrap().len(), 1);
+    assert_eq!(skill::catalog(Some(&f.project)).unwrap()[0].name, "answer");
+    assert!(skill::chosen(Some(&f.project)).unwrap().is_empty());
+    skill::choose("answer", true).unwrap();
+    skill::choose("answer", true).unwrap();
+    assert_eq!(skill::chosen(Some(&f.project)).unwrap().len(), 1);
 
     let reader = Script::new(
         "reader",
@@ -188,8 +197,8 @@ fn a_chosen_skill_is_listed_mounted_read_only_and_traced() {
     );
     assert_eq!(attempt["skills"], json!(["answer"]), "{attempt:#}");
 
-    skill::choose(&f.project, "answer", false).unwrap();
-    assert!(skill::chosen(&f.project).unwrap().is_empty());
+    skill::choose("answer", false).unwrap();
+    assert!(skill::chosen(Some(&f.project)).unwrap().is_empty());
 }
 
 #[test]

@@ -276,15 +276,20 @@ impl Worlds {
     }
 
     /// The command that runs `argv` in a sandbox over a folder of the
-    /// human's that is no world: the same isolation, `dir` read-write and
-    /// `skills` read-only. Only for a folder they chose (`chat`).
+    /// human's that is no world: the same isolation, `dir` read-write,
+    /// `grants` — host folders the human opened for the chat — read-write,
+    /// and `skills` read-only. Only for a folder they chose (`chat`).
     pub fn sandbox_folder(
         &self,
         dir: &Path,
         skills: &[(String, PathBuf)],
+        grants: &[PathBuf],
         argv: &[String],
     ) -> io::Result<Command> {
         let mut mounts = self.skill_mounts(skills);
+        for g in grants {
+            mounts.push((true, g.clone(), g.clone()));
+        }
         mounts.push((true, dir.to_path_buf(), dir.to_path_buf()));
         self.jail(dir, &mounts, false, argv)
     }

@@ -17,6 +17,7 @@ src/grant.rs     human-issued grant: a world writes named host paths, backed up 
 src/provider.rs  `Model` trait + OpenAI-compatible client; `ask` (one question), `Live` (the exchange so far, in a file)
 src/recipe.rs    replay a landed run's tool calls when the same goal returns
 src/chat.rs      a plain conversation in a folder the person chose (git or not): same sandbox, folder read-write, skills; no world
+src/outside.rs   the literal host paths a chat tool call names outside its folder: the chat asks, an opened folder stays read-write
 src/agent.rs     tool loop; every tool runs inside the sandbox; loops, idle runs and hung commands are stopped
 src/solve.rs     task → worlds in turn until one passes verify → land (rebase + re-verify, one commit by the human) on the branch the rules ask for → push
 src/spec.rs      request → conversation (`discuss`) → `direct` work (no tests first, proof decides) or acceptance tests + task (`compile`, CLI and sparring); retry from the tests; amend a ready run from its work; sparring findings
@@ -31,8 +32,9 @@ src/team.rs      named teams of roles that brief the agent per stage (frame = th
                  a `prove` role's `check:` lines run on every proof: a failure is a veto
                  a role's `model:` is the model its stage runs on instead of the settings'
 src/skill.rs     skills (Agent Skills folders, `SKILL.md`) read where the person keeps them (~/.config/fennec/skills,
-                 ~/.claude/skills and plugins, the project's .claude/skills); chosen per project (`git config
-                 fennec.skill`); listed to the agent, mounted read-only at ~/.skills/<name>, traced from the reads
+                 ~/.claude/skills and plugins, the project's .claude/skills); enabled once for every project
+                 (`~/.config/fennec/skills.json`, the old `git config fennec.skill` migrated); listed to the agent,
+                 mounted read-only at ~/.skills/<name>, traced from the reads
 src/review.rs    review queue, rejections, corrections said twice, agenda
 src/sleep.rs     landed runs → candidate know-how (`.fennec-os/knowhow.md`)
 src/schedule.rs  background work (sleep) waits while interactive work (solve) runs
