@@ -1073,7 +1073,7 @@ async function refresh(force) {
       return a;
     };
     fill($("todo"), todo.map((i) => row(i, line(i, TAGS[i.kind][0]))), "Rien ne t'attend.");
-    $("n-todo").textContent = todo.length ? `· ${todo.length}` : "";
+    $("n-todo").textContent = todo.length || "";
     // Seen from another tab: what waits for the human, in the tab's title.
     const others = view.todo.length - todo.length;
     $("n-others").textContent = others ? `${others} autre${others > 1 ? "s" : ""} t'attend${others > 1 ? "ent" : ""} ailleurs` : "";
@@ -1083,7 +1083,7 @@ async function refresh(force) {
     // The backlog: only there when it holds something.
     const later = mine(view.later ?? []);
     $("later-box").hidden = !later.length;
-    $("n-later").textContent = later.length ? `· ${later.length}` : "";
+    $("n-later").textContent = later.length || "";
     fill($("later"), later.map((i) => row(i, line(i, "à lancer"))), "");
     const history = mine(view.history);
     fill($("history"), history.map((i) => row(i, line(i, pastState(i), false))), "Rien de terminé pour l'instant.");
@@ -1162,17 +1162,34 @@ const ICONS = {
   trash: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>',
   save: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/>',
   retry: '<path d="M3 12a9 9 0 0 1 15.7-6L21 8M21 3v5h-5M21 12a9 9 0 0 1-15.7 6L3 16M8 16H3v5"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  close: '<path d="M18 6 6 18M6 6l12 12"/>',
+  send: '<path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/>',
+  clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  chat: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+  team: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>',
+  stats: '<path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-3"/>',
+  gear: '<path d="M12.2 2h-.4a2 2 0 0 0-2 2v.2a2 2 0 0 1-1 1.7l-.4.3a2 2 0 0 1-2 0l-.2-.1a2 2 0 0 0-2.7.7l-.2.4a2 2 0 0 0 .7 2.7l.2.1a2 2 0 0 1 1 1.7v.5a2 2 0 0 1-1 1.7l-.2.1a2 2 0 0 0-.7 2.7l.2.4a2 2 0 0 0 2.7.7l.2-.1a2 2 0 0 1 2 0l.4.3a2 2 0 0 1 1 1.7v.2a2 2 0 0 0 2 2h.4a2 2 0 0 0 2-2v-.2a2 2 0 0 1 1-1.7l.4-.3a2 2 0 0 1 2 0l.2.1a2 2 0 0 0 2.7-.7l.2-.4a2 2 0 0 0-.7-2.7l-.2-.1a2 2 0 0 1-1-1.7v-.5a2 2 0 0 1 1-1.7l.2-.1a2 2 0 0 0 .7-2.7l-.2-.4a2 2 0 0 0-2.7-.7l-.2.1a2 2 0 0 1-2 0l-.4-.3a2 2 0 0 1-1-1.7V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
+  folder: '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9l-.8-1.2A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/>',
+  inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1z"/>',
+  work: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+  history: '<path d="M3 12a9 9 0 1 0 9-9 9.8 9.8 0 0 0-6.7 2.7L3 8"/><path d="M3 3v5h5M12 7v5l4 2"/>',
+  shield: '<path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.7 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z"/>',
+  rule: '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
 };
 const ICON_OF = [[/^(Commit|Pousser|Préparer)/, "commit"], [/^Ouvrir la page/, "page"], [/changements/, "diff"],
   [/^Ouvrir le code/, "code"], [/^Corriger|^Envoyer/, "fix"], [/^Passer/, "pass"], [/^Journal/, "journal"],
   [/^Annuler le travail|^Abandonner/, "undo"], [/^Reprendre|^Lancer/, "resume"], [/^Supprimer/, "trash"], [/^Enregistrer le texte/, "save"], [/^Réessayer/, "retry"]];
 function iconize(button) {
   const name = ICON_OF.find(([re]) => re.test(button.textContent))?.[1];
-  if (!name) return;
+  if (name) setIcon(button, name);
+}
+function setIcon(button, name) {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]}</svg>`;
   button.style.setProperty("--icon", `url("data:image/svg+xml,${encodeURIComponent(svg)}")`);
-  button.classList.add("icon");
+  button.classList.add("ic");
 }
+document.querySelectorAll("[data-icon]").forEach((node) => setIcon(node, node.dataset.icon));
 
 // What was asked, done and proven first; the exact change, the exchange with
 // the model and the rest behind tabs above it, loaded when opened.
@@ -1236,30 +1253,39 @@ window.addEventListener("hashchange", () => {
 });
 $("back").onclick = () => (location.hash = hashOf($("project").value, ""));
 
+function compose() {
+  $("compose-error").textContent = "";
+  $("compose").showModal();
+  $("text").focus();
+}
+$("compose-open").onclick = compose;
+$("compose-close").onclick = () => $("compose").close();
+
 // Written now, worked on later: kept in the project's backlog, nothing starts.
 $("later-add").onclick = async () => {
-  $("error").textContent = "";
+  $("compose-error").textContent = "";
   try {
     await api("/api/requests", { project: $("project").value, text: $("text").value, later: true });
     $("text").value = "";
-    $("text").focus();
+    $("compose").close();
     refresh(true);
   } catch (e) {
-    $("error").textContent = e.message;
+    $("compose-error").textContent = e.message;
   }
 };
 
 $("new-request").addEventListener("submit", async (event) => {
   event.preventDefault();
-  $("error").textContent = "";
+  $("compose-error").textContent = "";
   try {
     const off = [...document.querySelectorAll("#chips button[aria-pressed=false]")].map((b) => b.dataset.key);
     const made = await api("/api/requests", { project: $("project").value, text: $("text").value, off });
     $("text").value = "";
+    $("compose").close();
     // What was just asked is what the human watches next.
     location.hash = hashOf($("project").value, made.id);
   } catch (e) {
-    $("error").textContent = e.message;
+    $("compose-error").textContent = e.message;
   }
 });
 
@@ -1342,9 +1368,9 @@ $("picker-choose").onclick = async () => {
     // A project just added is the one the next request is for.
     $("project").append(new Option("", pickerPath));
     $("project").value = pickerPath;
-    // Closing hands focus back to "+ projet": typing would then reopen it.
-    $("text").focus();
+    // A new project is there to be asked something.
     refresh(true);
+    compose();
   } catch (e) {
     $("picker-path").textContent = e.message;
   }
@@ -1646,9 +1672,10 @@ $("skill-search").oninput = drawSkillList;
 
 function showRules(path, rules) {
   const box = $("page-rules");
-  box.querySelector("summary").textContent = rules.length ? `Règles suivies (${rules.length})` : "Aucune règle pour l'instant";
+  box.querySelector(".summary").textContent = rules.length ? `Règles suivies (${rules.length})` : "Aucune règle pour l'instant";
   box.querySelector("ul").replaceChildren(...rules.map((r) => {
-    const remove = el("button", { type: "button", className: "quiet", textContent: "Retirer" });
+    const remove = el("button", { type: "button", className: "quiet", ariaLabel: "Retirer la règle", title: "Retirer la règle" });
+    setIcon(remove, "close");
     remove.onclick = () => changeRules(path, { change: "remove", scope: r.scope, text: r.text });
     return el("li", {}, ...rich(r.text),
       el("span", { className: "muted", textContent: r.scope === "user" ? " — tous tes projets" : " — ce projet" }), remove);
