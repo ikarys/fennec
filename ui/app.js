@@ -57,6 +57,7 @@ const TAGS = {
   blocked: ["Question", "var(--accent)"],
   rule: ["Règle ?", "var(--accent)"],
   ready: ["Prêt", "var(--ok)"],
+  later: ["Plus tard", "var(--muted)"],
   failed: ["Échoué", "var(--bad)"],
 };
 
@@ -543,6 +544,13 @@ function card(item) {
       action("Passer", "/api/pass", { id: item.id }), el("span", { className: "spacer" }), dropButton(item.id, true));
     add(el("div", { className: "reply" }, change), actions, el("div", { className: "error", role: "alert" }),
       el("div", { className: "changes-slot" }), doneWhen(item), ...work(item), shots(item), ...facts(item));
+  } else if (item.kind === "later") {
+    // Kept, not started: said again if need be, then launched.
+    const text = el("textarea", { className: "later-text", defaultValue: item.title, ariaLabel: "La demande" });
+    node.querySelector(".title").replaceWith(text);
+    actions.append(action("Lancer", "/api/launch", { id: item.id }, { primary: true }),
+      action("Enregistrer le texte", "/api/rewrite", () => ({ id: item.id, text: text.value })),
+      action("Supprimer", "/api/forget", { id: item.id }, { quiet: true }));
   } else if (item.kind === "failed") {
     add(el("div", { className: "bad", textContent: explain(item.reason) || "raison inconnue" }), shots(item), ...facts(item));
     actions.append(dropButton(item.id, true), el("span", { className: "spacer" }),
@@ -692,7 +700,7 @@ async function refresh(force) {
   // Never wipe what the human is typing in the request read in full; the
   // rest keeps up. (Holding the whole page whenever focus sat in that pane
   // froze it after a mere click on a tab.)
-  const typing = !force && ([...document.querySelectorAll("#detail textarea, #detail input")].some((t) => t.value)
+  const typing = !force && ([...document.querySelectorAll("#detail textarea, #detail input")].some((t) => t.value !== t.defaultValue)
     || document.activeElement?.matches("#detail textarea, #detail input"));
   try {
     const view = await api("/api/view");
@@ -717,9 +725,14 @@ async function refresh(force) {
     const name = $("project").selectedOptions[0]?.value ? $("project").selectedOptions[0].text : "fennec";
     document.title = todo.length ? `(${todo.length}) ${name}` : name;
     fill($("running"), running.map((i) => row(i, line(i, i.step, true))), "Rien en cours.");
+    // The backlog: only there when it holds something.
+    const later = mine(view.later ?? []);
+    $("later-box").hidden = !later.length;
+    $("n-later").textContent = later.length ? `· ${later.length}` : "";
+    fill($("later"), later.map((i) => row(i, line(i, "à lancer"))), "");
     const history = mine(view.history);
     fill($("history"), history.map((i) => row(i, line(i, pastState(i), false))), "Rien de terminé pour l'instant.");
-    if (!typing) showDetail(todo.map((i) => [i, "todo"]).concat(running.map((i) => [i, "run"]), history.map((i) => [i, "past"]))
+    if (!typing) showDetail(todo.map((i) => [i, "todo"]).concat(later.map((i) => [i, "todo"]), running.map((i) => [i, "run"]), history.map((i) => [i, "past"]))
       .find(([i]) => i.id === picked));
     tick();
     // How it works, until the first request: the page alone must explain itself.
@@ -750,7 +763,8 @@ function showDetail(found) {
   const node = kind === "todo" ? card(item) : kind === "run" ? underway(item) : past(item);
   if (node.tagName === "DETAILS") node.open = true;
   const decide = decision(node, item, kind);
-  const main = decide ? tabbed(node, item) : node;
+  // Nothing done yet on a request for later: no tabs to read.
+  const main = decide && item.kind !== "later" ? tabbed(node, item) : node;
   // A committed request has nothing left to decide: tabs, but no panel.
   const panel = decide?.querySelector("button") ? decide : null;
   const facts = [...node.querySelectorAll(".facts")];
@@ -771,11 +785,13 @@ const ICONS = {
   journal: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
   undo: '<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>',
   resume: '<path d="M6 3l14 9-14 9z"/>',
+  trash: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>',
+  save: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/>',
   retry: '<path d="M3 12a9 9 0 0 1 15.7-6L21 8M21 3v5h-5M21 12a9 9 0 0 1-15.7 6L3 16M8 16H3v5"/>',
 };
 const ICON_OF = [[/^(Commit|Pousser|Préparer)/, "commit"], [/^Ouvrir la page/, "page"], [/changements/, "diff"],
   [/^Ouvrir le code/, "code"], [/^Corriger|^Envoyer/, "fix"], [/^Passer/, "pass"], [/^Journal/, "journal"],
-  [/^Annuler le travail|^Abandonner/, "undo"], [/^Reprendre/, "resume"], [/^Réessayer/, "retry"]];
+  [/^Annuler le travail|^Abandonner/, "undo"], [/^Reprendre|^Lancer/, "resume"], [/^Supprimer/, "trash"], [/^Enregistrer le texte/, "save"], [/^Réessayer/, "retry"]];
 function iconize(button) {
   const name = ICON_OF.find(([re]) => re.test(button.textContent))?.[1];
   if (!name) return;
@@ -819,7 +835,7 @@ function tabbed(node, item) {
 // above what it cost, the main button first. A conversation keeps its
 // buttons under what was said.
 function decision(node, item, kind) {
-  if (kind === "run" || (kind === "todo" && !["ready", "failed"].includes(item.kind))) return null;
+  if (kind === "run" || (kind === "todo" && !["ready", "failed", "later"].includes(item.kind))) return null;
   const parts = kind === "past" ? [node.querySelector(".past-actions")]
     : [":scope > .reply", ":scope > .actions", ":scope > .error"].map((q) => node.querySelector(q));
   const box = el("div", { className: "decide" }, ...parts.filter(Boolean));
@@ -845,6 +861,19 @@ window.addEventListener("hashchange", () => {
   refresh(true);
 });
 $("back").onclick = () => (location.hash = hashOf($("project").value, ""));
+
+// Written now, worked on later: kept in the project's backlog, nothing starts.
+$("later-add").onclick = async () => {
+  $("error").textContent = "";
+  try {
+    await api("/api/requests", { project: $("project").value, text: $("text").value, later: true });
+    $("text").value = "";
+    $("text").focus();
+    refresh(true);
+  } catch (e) {
+    $("error").textContent = e.message;
+  }
+};
 
 $("new-request").addEventListener("submit", async (event) => {
   event.preventDefault();
