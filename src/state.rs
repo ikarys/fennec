@@ -229,7 +229,7 @@ fn classify(requests: &[(String, Value)], projects: &[String]) -> Value {
     let (mut todo, mut running, mut history) = (vec![], vec![], vec![]);
     for (id, r) in requests {
         let card = |kind: &str| {
-            json!({"id": id, "kind": kind, "project": name(r["project"].as_str().unwrap_or("")),
+            json!({"id": id, "kind": kind, "project": name(r["project"].as_str().unwrap_or("")), "path": r["project"],
                    "title": r["text"], "rules": r["rules"], "checks": r["verify"], "team": r["team"],
                    "thread": r["thread"], "stats": r["stats"]})
         };
