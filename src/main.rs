@@ -396,9 +396,11 @@ fn folders(path: &str) -> io::Result<Value> {
         .collect();
     children.sort_by(|a, b| a["name"].as_str().cmp(&b["name"].as_str()));
     let parent = path.parent().map(Path::display).map(|d| d.to_string());
+    // The home folder is often a git repo (dotfiles), never a project.
+    let home = std::env::var_os("HOME").is_some_and(|h| Path::new(&h) == path);
     Ok(
         json!({"path": path.display().to_string(), "parent": parent, "repo": state::is_repository(&path),
-               "empty": state::is_empty(&path)?, "children": children}),
+               "empty": state::is_empty(&path)?, "home": home, "children": children}),
     )
 }
 
