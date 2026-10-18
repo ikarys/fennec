@@ -69,6 +69,29 @@ Rust 2024, rustfmt defaults, clippy clean. UI: plain JS, no build step, served
 by the binary. English for code, comments and docs; French for UI text.
 Comments explain *why*.
 
+## UI design
+
+What the human expects without having to ask; apply it on every UI change.
+
+- **The list shows what waits, runs and landed — nothing else.** Writing
+  something (a request, a project) opens on demand in a dialog that closes once
+  done; a form never sits open on the dashboard. Team, Stats and Réglages are
+  pages named by the address, not dialogs: dialogs are only for short input.
+- **Each part of a page is visibly its own**: a box or a separated block with
+  an icon heading and a count; what waits for the human stands out (accent).
+  Empty states are one small muted line.
+- **Icons instead of words** on buttons and menus whenever the meaning stays
+  clear (Lucide strokes in `ICONS`, `data-icon="name"` in HTML, `setIcon` in
+  JS). An icon-only button carries `aria-label` and `title`. Words stay on the
+  main action and wherever an icon alone would be a guess.
+- **Mail-client layout**: projects on the left, requests in the middle, the
+  chosen request or page on the right; the decision buttons on the right above
+  the cost, the rest behind tabs.
+- Works in light and dark (tokens on `:root`) and at phone width.
+- **Check before saying done**: screenshot the change (Playwright, headless
+  Chromium) at desktop width in dark and light, and at phone width, against a
+  copy of `FENNEC_LEAD_HOME` on a spare port — never the live instance.
+
 ## Commit format
 
 Conventional Commits, imperative mood (`feat:`, `fix:`, `docs:`, `refactor:`,
