@@ -119,6 +119,9 @@
   button.link { border: none; background: none; color: var(--accent); padding: 0; }
   button.quiet { border: none; background: none; color: var(--muted); padding: 8px 4px; font-size: 13px; }
   #new-request { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+  #text { grid-row: span 2; }
+  #later-add { font-size: 13px; padding: 4px 10px; }
+  .later-text { width: 100%; min-height: 90px; margin: 4px 0 0; }
   #project { grid-column: 1 / -1; }
   /* The left list already says which project: the request goes there. */
   body.focused #project { display: none; }
@@ -322,6 +325,7 @@
     <select id="project" aria-label="Projet" required></select>
     <textarea id="text" aria-label="Demande" placeholder="Ce que tu veux…" required></textarea>
     <button class="primary">Demander</button>
+    <button type="button" id="later-add" title="Garder la demande sans la lancer">Pour plus tard</button>
     <div id="chips"></div>
   </form>
   <p class="error" id="error" role="alert"></p>
@@ -342,6 +346,9 @@
 
   <h2>À toi <span id="n-todo"></span> <button class="link" id="n-others" type="button"></button></h2>
   <div id="todo"></div>
+
+  <div id="later-box" hidden><h2>Plus tard <span id="n-later"></span></h2>
+  <div id="later"></div></div>
 
   <h2>fennec travaille</h2>
   <div id="running"></div>

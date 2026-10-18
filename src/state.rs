@@ -51,7 +51,14 @@ impl Store {
         Ok(())
     }
 
-    pub fn add_request(&self, project: &str, text: &str, off: &[String]) -> io::Result<String> {
+    /// A new request; `later` keeps it in the backlog, nothing started.
+    pub fn add_request(
+        &self,
+        project: &str,
+        text: &str,
+        off: &[String],
+        later: bool,
+    ) -> io::Result<String> {
         if !self.projects()?.iter().any(|p| p == project) {
             return Err(io::Error::other("projet inconnu"));
         }
@@ -65,10 +72,42 @@ impl Store {
         // Same width hex timestamps, as in fennec-os: lexical order is time order.
         let id = format!("{nanos:032x}");
         // Every request opens a conversation; a clear one ends at its first turn.
-        let record = json!({"project": project, "text": text.trim(), "status": "thinking", "off": off,
+        let status = if later { "later" } else { "thinking" };
+        let record = json!({"project": project, "text": text.trim(), "status": status, "off": off,
                             "since": nanos / 1_000_000_000, "thread": [{"who": "human", "text": text.trim()}]});
         write_json(&self.request_path(&id)?, &record)?;
         Ok(id)
+    }
+
+    /// A request from the backlog, worked on now; the caller starts the work.
+    pub fn launch(&self, id: &str) -> io::Result<()> {
+        self.later(id)?;
+        self.update(id, |r| r["status"] = json!("thinking"))
+    }
+
+    /// The backlog's text, said again before it starts.
+    pub fn rewrite(&self, id: &str, text: &str) -> io::Result<()> {
+        self.later(id)?;
+        if text.trim().is_empty() {
+            return Err(io::Error::other("demande vide"));
+        }
+        self.update(id, |r| {
+            r["text"] = json!(text.trim());
+            r["thread"] = json!([{"who": "human", "text": text.trim()}]);
+        })
+    }
+
+    /// Out of the backlog for good: nothing was done, nothing to keep.
+    pub fn forget(&self, id: &str) -> io::Result<()> {
+        self.later(id)?;
+        std::fs::remove_file(self.request_path(id)?)
+    }
+
+    fn later(&self, id: &str) -> io::Result<()> {
+        if self.load(id)?["status"] != "later" {
+            return Err(io::Error::other("cette demande n'est plus pour plus tard"));
+        }
+        Ok(())
     }
 
     fn request_path(&self, id: &str) -> io::Result<PathBuf> {
@@ -240,7 +279,7 @@ fn unverified(proof: &Value) -> Value {
 /// sees is tested here. Each card carries fields, not prose: the page decides
 /// what is shown at once and what waits behind "details".
 fn classify(requests: &[(String, Value)], projects: &[String]) -> Value {
-    let (mut todo, mut running, mut history) = (vec![], vec![], vec![]);
+    let (mut todo, mut running, mut history, mut later) = (vec![], vec![], vec![], vec![]);
     for (id, r) in requests {
         let card = |kind: &str| {
             json!({"id": id, "kind": kind, "project": name(r["project"].as_str().unwrap_or("")), "path": r["project"],
@@ -255,6 +294,7 @@ fn classify(requests: &[(String, Value)], projects: &[String]) -> Value {
             todo.push((0, c));
         }
         match r["status"].as_str() {
+            Some("later") => later.push(card("later")),
             Some("thinking") => running.push(card_step(card("running"), "réfléchit à ta demande")),
             Some("talk") => todo.push((0, card("talk"))),
             Some("framing") => running.push(card_step(card("running"), "se met au travail")),
@@ -358,7 +398,7 @@ fn classify(requests: &[(String, Value)], projects: &[String]) -> Value {
         .iter()
         .map(|p| json!({"path": p, "name": name(p)}))
         .collect();
-    json!({"todo": todo, "running": running, "history": history, "projects": projects})
+    json!({"todo": todo, "running": running, "history": history, "later": later, "projects": projects})
 }
 
 fn card_step(mut card: Value, step: &str) -> Value {
@@ -423,6 +463,43 @@ mod tests {
         assert!(!is_repository(&loose));
         assert_eq!(store.projects().unwrap().len(), 2);
         std::fs::remove_dir_all(tmp).unwrap();
+    }
+
+    #[test]
+    fn a_request_kept_for_later_waits_until_launched_or_forgotten() {
+        let tmp = std::env::temp_dir().join(format!("fennec-lead-later-{}", std::process::id()));
+        let project = tmp.join("p");
+        std::fs::create_dir_all(&project).unwrap();
+        let store = Store {
+            root: tmp.join("home"),
+        };
+        std::fs::create_dir_all(store.root.join("requests")).unwrap();
+        store
+            .add_project(project.to_str().unwrap(), "here")
+            .unwrap();
+        let p = store.projects().unwrap()[0].clone();
+        let a = store.add_request(&p, "dark mode", &[], true).unwrap();
+        let b = store.add_request(&p, "export", &[], true).unwrap();
+        let view = store.view().unwrap();
+        assert_eq!(view["later"].as_array().unwrap().len(), 2);
+        assert!(view["running"].as_array().unwrap().is_empty());
+
+        store.rewrite(&a, "  dark mode, auto  ").unwrap();
+        assert_eq!(store.load(&a).unwrap()["text"], "dark mode, auto");
+        assert!(store.rewrite(&a, " ").is_err());
+        store.launch(&a).unwrap();
+        assert_eq!(store.load(&a).unwrap()["status"], "thinking");
+        // Started, it is no longer the backlog's to change.
+        assert!(store.rewrite(&a, "x").is_err() && store.forget(&a).is_err());
+        store.forget(&b).unwrap();
+        assert!(store.load(&b).is_err());
+        assert!(
+            store.view().unwrap()["later"]
+                .as_array()
+                .unwrap()
+                .is_empty()
+        );
+        std::fs::remove_dir_all(&tmp).unwrap();
     }
 
     #[test]

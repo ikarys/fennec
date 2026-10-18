@@ -169,9 +169,28 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
                 .flatten()
                 .filter_map(|k| k.as_str().map(str::to_string))
                 .collect();
-            let id = store.add_request(&field(&v, "project"), &field(&v, "text"), &off)?;
-            work::talk(id.clone());
+            let later = v["later"] == true;
+            let id = store.add_request(&field(&v, "project"), &field(&v, "text"), &off, later)?;
+            if !later {
+                work::talk(id.clone());
+            }
             Ok(json!({"id": id}))
+        }
+        // The backlog: a request kept for later, started, reworded or forgotten.
+        ("POST", "/api/launch") => {
+            let id = field(&input()?, "id");
+            store.launch(&id)?;
+            work::talk(id);
+            Ok(json!({}))
+        }
+        ("POST", "/api/rewrite") => {
+            let v = input()?;
+            store.rewrite(&field(&v, "id"), &field(&v, "text"))?;
+            Ok(json!({}))
+        }
+        ("POST", "/api/forget") => {
+            store.forget(&field(&input()?, "id"))?;
+            Ok(json!({}))
         }
         ("POST", "/api/answer") => {
             let v = input()?;
