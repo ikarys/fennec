@@ -8,7 +8,7 @@ const el = (tag, props = {}, ...children) => {
   node.append = (...cs) => node.children.push(...cs.filter(keep));
   return node;
 };
-eval(grab("inline") + grab("md"));
+eval(grab("isImage") + grab("inline") + grab("md"));
 
 const tags = (blocks) => blocks.map((b) => b.tag);
 const deep = (x, tag) => {

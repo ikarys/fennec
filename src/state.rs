@@ -155,6 +155,47 @@ impl Store {
     }
 
     /// A request from the backlog, worked on now; the caller starts the work.
+    /// An image the human attached, kept under `images/` and named after its
+    /// content. The text carries it as a line of its own, which fennec-os
+    /// sends to the model as an image (`provider::with_images`).
+    pub fn save_image(&self, data_url: &str) -> io::Result<String> {
+        let (head, data) = data_url
+            .split_once(";base64,")
+            .ok_or_else(|| io::Error::other("image illisible"))?;
+        let ext = match head.strip_prefix("data:image/") {
+            Some("png") => "png",
+            Some("jpeg") => "jpg",
+            Some("gif") => "gif",
+            Some("webp") => "webp",
+            _ => {
+                return Err(io::Error::other(
+                    "image en png, jpeg, gif ou webp seulement",
+                ));
+            }
+        };
+        let bytes = unbase64(data).ok_or_else(|| io::Error::other("image illisible"))?;
+        let mut hash = std::hash::DefaultHasher::new();
+        std::hash::Hash::hash(&bytes, &mut hash);
+        let dir = self.root.join("images");
+        std::fs::create_dir_all(&dir)?;
+        let path = dir.join(format!("{:016x}.{ext}", std::hash::Hasher::finish(&hash)));
+        std::fs::write(&path, &bytes)?;
+        Ok(format!("![image](file://{})", path.display()))
+    }
+
+    /// An attached image, by the name `save_image` gave it.
+    pub fn image(&self, name: &str) -> io::Result<Vec<u8>> {
+        let valid = name.split_once('.').is_some_and(|(stem, ext)| {
+            stem.len() == 16
+                && stem.bytes().all(|b| b.is_ascii_hexdigit())
+                && ["png", "jpg", "gif", "webp"].contains(&ext)
+        });
+        if !valid {
+            return Err(io::Error::other("bad name"));
+        }
+        std::fs::read(self.root.join("images").join(name))
+    }
+
     pub fn launch(&self, id: &str) -> io::Result<()> {
         self.later(id)?;
         self.update(id, |r| r["status"] = json!("thinking"))
@@ -269,6 +310,42 @@ impl Store {
     pub fn view(&self) -> io::Result<Value> {
         Ok(classify(&self.requests()?, &self.projects_all()?))
     }
+}
+
+/// The lines of a text that attach an image (see `Store::save_image`).
+pub fn image_lines(text: &str) -> impl Iterator<Item = &str> {
+    text.lines()
+        .filter(|l| l.trim().starts_with("![image](file://"))
+}
+
+/// What the human wrote, without its image lines: a title.
+fn words(text: &str) -> String {
+    text.lines()
+        .filter(|l| !l.trim().starts_with("![image](file://"))
+        .collect::<Vec<_>>()
+        .join("\n")
+        .trim()
+        .to_string()
+}
+
+fn unbase64(text: &str) -> Option<Vec<u8>> {
+    let text = text.trim_end_matches('=').as_bytes();
+    let value = |c: u8| match c {
+        b'A'..=b'Z' => Some(c - b'A'),
+        b'a'..=b'z' => Some(c - b'a' + 26),
+        b'0'..=b'9' => Some(c - b'0' + 52),
+        b'+' => Some(62),
+        b'/' => Some(63),
+        _ => None,
+    };
+    let mut out = Vec::with_capacity(text.len() * 3 / 4);
+    for chunk in text.chunks(4) {
+        let n = chunk.iter().enumerate().try_fold(0u32, |n, (i, c)| {
+            Some(n | (value(*c)? as u32) << (18 - 6 * i))
+        })?;
+        out.extend_from_slice(&n.to_be_bytes()[1..chunk.len()]);
+    }
+    Some(out)
 }
 
 fn write_json(path: &Path, value: &Value) -> io::Result<()> {
@@ -412,7 +489,8 @@ fn classify(requests: &[(String, Value)], projects_all: &[Value]) -> Value {
         }
         let card = |kind: &str| {
             json!({"id": id, "kind": kind, "project": name(r["project"].as_str().unwrap_or("")), "path": r["project"],
-                   "title": r["text"], "rules": r["rules"], "checks": r["verify"], "team": r["team"],
+                   "title": words(r["text"].as_str().unwrap_or("")),
+                   "images": image_lines(r["text"].as_str().unwrap_or("")).collect::<Vec<_>>(), "rules": r["rules"], "checks": r["verify"], "team": r["team"],
                    "thread": r["thread"], "stats": r["stats"], "since": r["since"]})
         };
         // Scenario 4: what the human said may become a rule, at one word.
@@ -441,7 +519,10 @@ fn classify(requests: &[(String, Value)], projects_all: &[Value]) -> Value {
                     _ => "attend son tour : le dossier a des changements pas encore commités"
                         .to_string(),
                 };
-                running.push(card_step(card("running"), &step))
+                // Queued, not working: the UI reads it as idle, not active.
+                let mut c = card_step(card("running"), &step);
+                c["waiting"] = json!(true);
+                running.push(c)
             }
             Some("running") => running.push(card_step(card("running"), "travaille")),
             Some("proving") => running.push(card_step(card("running"), "essaie le produit")),
@@ -558,6 +639,23 @@ fn card_step(mut card: Value, step: &str) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_attached_image_is_kept_and_named_by_a_line() {
+        let root = std::env::temp_dir().join(format!("fennec-lead-image-{}", std::process::id()));
+        let store = Store { root: root.clone() };
+        assert_eq!(unbase64("TWFu").unwrap(), b"Man");
+        assert_eq!(unbase64("TWE=").unwrap(), b"Ma");
+        let line = store.save_image("data:image/png;base64,TWFu").unwrap();
+        let name = line.rsplit('/').next().unwrap().trim_end_matches(')');
+        assert_eq!(store.image(name).unwrap(), b"Man");
+        assert!(store.image("../requests.png").is_err());
+        assert!(store.save_image("data:text/html;base64,TWFu").is_err());
+        let text = format!("vois ça\n{line}");
+        assert_eq!(words(&text), "vois ça");
+        assert_eq!(image_lines(&text).collect::<Vec<_>>(), [line.as_str()]);
+        std::fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn an_empty_folder_becomes_a_project_and_loose_files_are_refused() {

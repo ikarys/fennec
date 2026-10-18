@@ -160,6 +160,17 @@ fn talk_now(store: &Store, id: &str) -> io::Result<()> {
             r["status"] = json!("talk");
         }),
         spec::Discussed::Brief(brief) => {
+            // The model restates the request in words: the images the human
+            // attached go with them, for the work to see.
+            let images: Vec<&str> = thread
+                .iter()
+                .filter(|t| t["who"] == "human")
+                .flat_map(|t| crate::state::image_lines(t["text"].as_str().unwrap_or("")))
+                .collect();
+            let brief = std::iter::once(brief.as_str())
+                .chain(images)
+                .collect::<Vec<_>>()
+                .join("\n");
             store.update(id, |r| {
                 note(r, step);
                 r["brief"] = json!(brief);

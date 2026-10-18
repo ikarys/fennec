@@ -19,8 +19,9 @@ use state::Store;
 
 const INDEX: &str = include_str!("../ui/index.html");
 const APP: &str = include_str!("../ui/app.js");
-/// A request body larger than this is refused: the UI never sends one.
-const MAX_BODY: usize = 64 * 1024;
+/// A request body larger than this is refused: an attached image, in
+/// base64, is the largest the UI sends.
+const MAX_BODY: usize = 16 * 1024 * 1024;
 
 struct Request {
     method: String,
@@ -132,6 +133,20 @@ fn handle(mut stream: TcpStream, port: u16) -> io::Result<()> {
             Ok(png) => ("200 OK", "image/png", png),
             Err(_) => ("404 Not Found", "text/plain", b"not found".to_vec()),
         },
+        ("GET", path) if path.starts_with("/images/") => {
+            match Store::from_env().and_then(|s| s.image(&path[8..])) {
+                Ok(bytes) => {
+                    let kind = match path.rsplit('.').next() {
+                        Some("jpg") => "image/jpeg",
+                        Some("gif") => "image/gif",
+                        Some("webp") => "image/webp",
+                        _ => "image/png",
+                    };
+                    ("200 OK", kind, bytes)
+                }
+                Err(_) => ("404 Not Found", "text/plain", b"not found".to_vec()),
+            }
+        }
         (method, path) if path.starts_with("/api/") => {
             let (status, value) = match api(method, path, &req.body) {
                 Ok(v) => ("200 OK", v),
@@ -169,6 +184,7 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
     let field = |v: &Value, k: &str| v[k].as_str().map(str::to_string).unwrap_or_default();
     match (method, path) {
         ("GET", "/api/view") => store.view(),
+        ("POST", "/api/image") => Ok(json!({"line": store.save_image(&field(&input()?, "data"))?})),
         ("POST", "/api/requests") => {
             let v = input()?;
             // Role keys this request does without, among its project's team.

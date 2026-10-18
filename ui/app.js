@@ -212,6 +212,9 @@ function focus(label, text) {
 
 // `command` spans as code, **words** in bold, the rest as plain text.
 function rich(text) {
+  const lines = (text ?? "").split("\n");
+  const images = lines.filter(isImage);
+  if (images.length) return [...rich(lines.filter((l) => !isImage(l)).join("\n").trim()), thumbs(images)];
   return (text ?? "").split("`").flatMap((part, i) => (i % 2 ? [el("code", { textContent: part })]
     : part.split("**").map((p, j) => (j % 2 ? el("b", { textContent: p }) : p))));
 }
@@ -238,10 +241,77 @@ function inline(text) {
   return out;
 }
 
+// An image the human attached is a line of its own in what they wrote; the
+// server sends it to the model as an image and serves it back here.
+function isImage(line) {
+  return /^\s*!\[image\]\(file:\/\/.+\)\s*$/.test(line);
+}
+const imageUrl = (line) => "/images/" + line.trim().slice(0, -1).split("/").pop();
+function thumbs(lines, remove) {
+  if (!lines?.length) return null;
+  return el("div", { className: "thumbs" }, ...lines.map((l) => {
+    const link = el("a", { href: imageUrl(l), target: "_blank", rel: "noreferrer", className: "thumb" },
+      el("img", { src: imageUrl(l), alt: "image jointe", loading: "lazy" }));
+    if (!remove) return link;
+    const x = el("button", { type: "button", className: "quiet drop", ariaLabel: "Retirer l'image", title: "Retirer l'image" });
+    setIcon(x, "close");
+    x.onclick = () => remove(l);
+    return el("span", { className: "thumb-wrap" }, link, x);
+  }));
+}
+// What the human wrote, with the images they joined: picked, pasted or
+// dropped. The field keeps their words only; value() adds the image lines.
+function attach(text, start = []) {
+  let lines = [...start];
+  const strip = el("span", { className: "thumbs-slot" });
+  const error = el("span", { className: "bad" });
+  const show = () => strip.replaceChildren(thumbs(lines, (l) => { lines = lines.filter((x) => x !== l); show(); }) ?? "");
+  const add = async (files) => {
+    error.textContent = "";
+    for (const f of files.filter((f) => f.type.startsWith("image/"))) {
+      try {
+        const data = await new Promise((done, fail) => {
+          const r = new FileReader();
+          r.onload = () => done(r.result);
+          r.onerror = () => fail(r.error);
+          r.readAsDataURL(f);
+        });
+        const { line } = await api("/api/image", { data });
+        if (!lines.includes(line)) lines.push(line);
+      } catch (e) {
+        error.textContent = e.message;
+      }
+    }
+    show();
+  };
+  text.addEventListener("paste", (e) => {
+    const files = [...e.clipboardData.files];
+    if (files.some((f) => f.type.startsWith("image/"))) { e.preventDefault(); add(files); }
+  });
+  text.addEventListener("dragover", (e) => e.preventDefault());
+  text.addEventListener("drop", (e) => {
+    if (e.dataTransfer.files.length) { e.preventDefault(); add([...e.dataTransfer.files]); }
+  });
+  const pick = el("input", { type: "file", accept: "image/png,image/jpeg,image/gif,image/webp", multiple: true, hidden: true });
+  pick.onchange = () => { add([...pick.files]); pick.value = ""; };
+  const button = el("button", { type: "button", className: "quiet", ariaLabel: "Joindre une image",
+    title: "Joindre une image — ou colle-la, ou glisse-la dans le texte" });
+  setIcon(button, "image");
+  button.onclick = () => pick.click();
+  show();
+  return {
+    node: el("div", { className: "attach" }, button, pick, strip, error),
+    value: () => [text.value.trim(), ...lines].filter(Boolean).join("\n"),
+    clear: () => { text.value = ""; lines = []; show(); },
+  };
+}
+
 // Models write Markdown: its lines become headings, lists, tables and code,
 // not one block of raw symbols.
 function md(text) {
-  const lines = (text ?? "").split("\n");
+  const all = (text ?? "").split("\n");
+  if (all.some(isImage)) return [...md(all.filter((l) => !isImage(l)).join("\n")), thumbs(all.filter(isImage))];
+  const lines = all;
   const blocks = [];
   const lists = [];
   const cells = (line) => line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
@@ -539,8 +609,11 @@ function underway(item) {
   // step under way and how long it has run.
   let elapsed = null;
   if (item.since) {
-    elapsed = el("span", { className: "elapsed" });
-    elapsed.dataset.since = item.since;
+    // Queued, not working: no ticking figure, one age at each redraw.
+    elapsed = item.waiting
+      ? el("span", { textContent: "depuis " + duration(Date.now() - item.since * 1000) })
+      : el("span", { className: "elapsed" });
+    if (!item.waiting) elapsed.dataset.since = item.since;
   }
   const box = el("details", { className: "past" },
     el("summary", {}, el("span", { className: "dot" }),
@@ -654,13 +727,20 @@ function duration(ms) {
 }
 
 function stepView(step) {
-  const c = step.cost;
+  const c = step.cost ?? {};
   const verdict = step.passed === true ? " ✓" : step.passed === false ? " ✗" : "";
   const messages = step.messages ?? [];
-  return el("div", { className: "step" },
-    el("div", { className: "step-name" }, el("span", { className: `dotc ${stageOf(step.name)}` }), step.name + verdict,
-      step.model ? el("span", { className: "model", textContent: step.model }) : null),
-    metrics(c),
+  // One line of cost in the head: the full figures sit on the Stats tab and
+  // tiles per step made the journal a wall of boxes.
+  const cost = c.turns ? el("span", { className: "cost",
+    title: `${number(c.turns)} appel${c.turns > 1 ? "s" : ""} · ${percent(c.cached, c.sent)} % en cache${c.thinking ? ` · ${percent(c.thinking, c.received)} % réflexion` : ""}`,
+    textContent: [`⏱ ${duration(c.ms ?? 0)}`, `↑ ${compact(c.sent)}`, `↓ ${compact(c.received)}`, speed(c)].filter(Boolean).join(" · ") }) : null;
+  return el("section", { className: `step ${stageOf(step.name)}` },
+    el("div", { className: "step-name" }, el("span", { className: `dotc ${stageOf(step.name)}` }),
+      el("span", { textContent: step.name + verdict }),
+      step.model ? el("span", { className: "model", textContent: step.model }) : null,
+      messages.length ? el("span", { className: "model", textContent: `${messages.length} message${messages.length > 1 ? "s" : ""}` }) : null,
+      el("span", { className: "spacer" }), cost),
     ...rolesView(step),
     ...(messages.length ? messages.map(messageView)
       : [el("div", { className: "muted", textContent: step.live
@@ -671,35 +751,54 @@ function stepView(step) {
 // Who of the team took part: what each role told the model, and what it ran itself.
 function rolesView(step) {
   if (!step.roles) return [];
-  if (!step.roles.length) return [el("div", { className: "muted", textContent: "Aucun rôle de l'équipe à cette étape." })];
+  if (!step.roles.length) return [];
   const nodes = [el("div", { className: "who" }, ...step.roles.map((r) => roleTag(r.name, stageOf(step.name), r.brief)))];
   for (const r of step.roles) {
     if (r.brief) {
-      nodes.push(el("details", { className: "message" }, el("summary", {}, el("b", { textContent: r.name }), " : sa consigne au modèle"),
+      nodes.push(el("details", { className: "message" }, el("summary", {}, el("b", { textContent: r.name }), el("span", { className: "head", textContent: "sa consigne au modèle" })),
         el("pre", { textContent: r.brief })));
     }
   }
   for (const c of step.checks ?? []) {
     const result = c.missing ? "pas installé, non vérifié" : c.exit === 0 ? "✓ réussi" : `✗ échoué (code ${c.exit}) : bloque`;
     nodes.push(el("details", { className: "message" },
-      el("summary", {}, el("b", { textContent: c.role }), ` a lancé « ${c.command} » → ${result}`),
+      el("summary", {}, el("b", { textContent: c.role }), el("span", { className: "head", textContent: `a lancé « ${c.command} » → ${result}` })),
       el("pre", { textContent: c.output || "(aucune sortie)" })));
   }
   return nodes;
 }
 
-const who = { system: "Consigne", user: "Envoyé au modèle", assistant: "Modèle", tool: "Résultat d'outil" };
+const who = { system: "Consigne", user: "Envoyé", assistant: "Modèle", tool: "Résultat d'outil" };
+
+// What the model thought before it answered: where a made-up fact shows first.
+function thinks() {
+  const mark = el("span", { className: "thinks", title: "Le modèle a réfléchi avant de répondre : ouvre pour lire sa réflexion.", ariaLabel: "réflexion" });
+  setIcon(mark, "think");
+  return mark;
+}
+
+// A shell call reads as the command it runs, not as its JSON.
+function callText(t) {
+  const args = t.function?.arguments ?? "";
+  try {
+    const a = JSON.parse(args);
+    if (typeof a?.command === "string" && Object.keys(a).length === 1) return `$ ${a.command}`;
+  } catch { /* not JSON: shown as it came */ }
+  return `${t.function?.name ?? "outil"} ${args}`;
+}
 
 function messageView(m) {
   const text = typeof m.content === "string" ? m.content : m.content == null ? "" : JSON.stringify(m.content, null, 1);
-  const calls = (m.tool_calls ?? []).map((t) => `→ ${t.function?.name} ${t.function?.arguments ?? ""}`);
+  const calls = (m.tool_calls ?? []).map(callText);
   const thought = m.reasoning_content ?? m.reasoning;
-  const head = (text || calls.join(" ") || thought || "").replace(/\s+/g, " ").slice(0, 110);
-  return el("details", { className: "message" },
-    el("summary", {}, el("b", { textContent: who[m.role] ?? m.role }), " ", head),
-    thought ? el("pre", { className: "thought", textContent: "Réflexion :\n" + thought }) : null,
+  const head = (calls.join(" ; ") || text || thought || "").replace(/\s+/g, " ").slice(0, 160);
+  return el("details", { className: `message ${m.role}${calls.length ? " call" : ""}` },
+    el("summary", {}, el("b", { textContent: who[m.role] ?? m.role }), thought ? thinks() : null,
+      el("span", { className: "head", textContent: head })),
+    thought ? el("pre", { className: "thought", textContent: thought }) : null,
     text ? el("pre", { textContent: text }) : null,
-    calls.length ? el("pre", { textContent: calls.join("\n") }) : null);
+    m.role === "user" ? thumbs(text.split("\n").filter(isImage)) : null,
+    calls.length ? el("pre", { className: "calls", textContent: calls.join("\n") }) : null);
 }
 
 function diffView(diff) {
@@ -734,17 +833,18 @@ function card(item) {
   // The head above the tabs says the title and the status; the card repeats
   // the title only where it is the field to edit: a request for later.
   const node = el("div", { className: "card" },
-    item.kind === "later" ? el("div", { className: "title", textContent: item.title }) : null);
+    item.kind === "later" ? el("div", { className: "title", textContent: item.title }) : thumbs(item.images));
   const actions = el("div", { className: "actions" });
   const add = (...nodes) => node.append(...nodes.filter(Boolean));
 
   if (item.kind === "talk") {
     add(conversation(item));
     const text = el("textarea", { placeholder: "Ta réponse", ariaLabel: "Ta réponse" });
-    add(el("div", { className: "reply" }, text));
+    const images = attach(text);
+    add(el("div", { className: "reply" }, text, images.node));
     actions.append(dropButton(item.id), el("span", { className: "spacer" }),
       action("C'est clair, fais-le", "/api/frame", { id: item.id }),
-      action("Répondre", "/api/say", () => ({ id: item.id, text: text.value }), { primary: true }));
+      action("Répondre", "/api/say", () => ({ id: item.id, text: images.value() }), { primary: true }));
   } else if (item.kind === "validate") {
     add(conversation(item), focus("Terminé quand", item.done_when));
     const correction = el("textarea", { placeholder: "Ce qui ne va pas, ou une précision", hidden: true });
@@ -753,9 +853,10 @@ function card(item) {
       // Opening the field is the first click; sending is the second.
       correction.hidden = false;
       correction.focus();
-      fix.replaceWith(action("Envoyer", "/api/say", () => ({ id: item.id, text: correction.value })));
+      fix.replaceWith(action("Envoyer", "/api/say", () => ({ id: item.id, text: images.value() })));
     };
-    add(el("div", { className: "reply" }, correction));
+    const images = attach(correction);
+    add(el("div", { className: "reply" }, correction, images.node));
     actions.append(dropButton(item.id), el("span", { className: "spacer" }), fix,
       action("Valider", "/api/answer", { id: item.id, accept: true, correction: "" }, { primary: true }));
   } else if (item.kind === "blocked") {
@@ -764,9 +865,10 @@ function card(item) {
     add(...(last?.who === "fennec" && last.text === item.question
       ? [conversation(item)] : [conversation(item), focus("fennec demande", item.question)]));
     const text = el("textarea", { placeholder: "Ta réponse", ariaLabel: "Ta réponse" });
-    add(el("div", { className: "reply" }, text));
+    const images = attach(text);
+    add(el("div", { className: "reply" }, text, images.node));
     actions.append(dropButton(item.id), el("span", { className: "spacer" }),
-      action("Répondre", "/api/reply", () => ({ id: item.id, text: text.value }), { primary: true }));
+      action("Répondre", "/api/reply", () => ({ id: item.id, text: images.value() }), { primary: true }));
   } else if (item.kind === "rule") {
     add(focus("Règle proposée", item.rule), el("div", { className: "muted", textContent: `D'après ce que tu as dit : « ${item.heard ?? ""} »` }));
     actions.append(action("Non", "/api/rule", { id: item.id, scope: "no" }),
@@ -799,21 +901,23 @@ function card(item) {
     fix.onclick = () => {
       change.hidden = false;
       change.focus();
-      fix.replaceWith(action("Envoyer la correction", "/api/amend", () => ({ id: item.id, text: change.value })));
+      fix.replaceWith(action("Envoyer la correction", "/api/amend", () => ({ id: item.id, text: images.value() })));
     };
+    const images = attach(change);
     if (item.land) actions.append(action(landLabel(item.land), "/api/land", { id: item.id }, { primary: true }));
     if (item.page) actions.append(pageButton(item));
     actions.append(changesButton(item, () => node.querySelector(".changes-slot")),
       codeButton(item, () => node.querySelector(".changes-slot")), fix,
       action("Passer", "/api/pass", { id: item.id }), el("span", { className: "spacer" }), dropButton(item.id, true));
-    add(el("div", { className: "reply" }, change), actions, el("div", { className: "error", role: "alert" }),
+    add(el("div", { className: "reply" }, change, images.node), actions, el("div", { className: "error", role: "alert" }),
       el("div", { className: "changes-slot" }), doneWhen(item), ...work(item), shots(item), ...facts(item));
   } else if (item.kind === "later") {
     // Kept, not started: said again if need be, then launched.
     const text = el("textarea", { className: "later-text", defaultValue: item.title, ariaLabel: "La demande" });
-    node.querySelector(".title").replaceWith(text);
+    const images = attach(text, item.images);
+    node.querySelector(".title").replaceWith(el("div", { className: "reply" }, text, images.node));
     actions.append(action("Lancer", "/api/launch", { id: item.id }, { primary: true }),
-      action("Enregistrer le texte", "/api/rewrite", () => ({ id: item.id, text: text.value })),
+      action("Enregistrer le texte", "/api/rewrite", () => ({ id: item.id, text: images.value() })),
       action("Supprimer", "/api/forget", { id: item.id }, { quiet: true }));
   } else if (item.kind === "failed") {
     add(el("div", { className: "bad", textContent: explain(item.reason) || "raison inconnue" }), shots(item), ...facts(item));
@@ -842,9 +946,12 @@ function line(item, state, dot) {
     : state ? el("span", { className: "state", textContent: state }) : null;
   // Under way, the figures are the last finished step's: how long it has run says more.
   if (dot && item.since) {
-    const elapsed = el("span", { className: "elapsed" });
-    elapsed.dataset.since = item.since;
-    return el("div", { className: "line" }, el("span", { className: "dot" }),
+    // Queued, not working: a static age, redrawn with the list, no tick.
+    const elapsed = item.waiting
+      ? el("span", { textContent: "depuis " + duration(Date.now() - item.since * 1000) })
+      : el("span", { className: "elapsed" });
+    if (!item.waiting) elapsed.dataset.since = item.since;
+    return el("div", { className: "line" }, el("span", { className: item.waiting ? "dot idle" : "dot" }),
       el("span", { className: "muted proj", textContent: item.project }),
       el("span", { className: "what", textContent: item.title.length > 120 ? item.title.slice(0, 120) + "…" : item.title }),
       el("span", { className: "state" }, stateNode, stateNode ? " · " : null, elapsed));
@@ -901,7 +1008,7 @@ function pastState(item) {
 // Where a request stands, in one coloured word: the list says it per row in
 // the muted, the page says it in a pill the human sees at a glance.
 function statusOf(item, kind) {
-  if (kind === "run") return ["en cours", "info"];
+  if (kind === "run") return item.waiting ? ["en attente", "muted"] : ["en cours", "info"];
   if (kind === "past") {
     if (item.kind === "passed") return ["mis de côté", "warn"];
     if (item.kind === "dropped") return ["abandonné", "bad"];
@@ -1266,13 +1373,14 @@ function toolCall(t, result) {
 
 function chatComposer(id) {
   const text = el("textarea", { placeholder: "Ton message", ariaLabel: "Ton message" });
+  const images = attach(text);
   const stop = el("button", { type: "button", className: "quiet", textContent: "Arrêter", hidden: true });
   const send = el("button", { type: "button", className: "primary", textContent: "Envoyer" });
   const say = async () => {
-    if (!text.value.trim()) return;
+    if (!images.value().trim()) return;
     try {
-      await api("/api/chat/say", { id, text: text.value });
-      text.value = "";
+      await api("/api/chat/say", { id, text: images.value() });
+      images.clear();
       text.focus();
     } catch (e) {
       $("chat-error").textContent = e.message;
@@ -1286,7 +1394,7 @@ function chatComposer(id) {
     catch (e) { $("chat-error").textContent = e.message; }
   };
   return { node: el("div", { className: "chat-composer" }, text,
-    el("div", { className: "chat-actions" }, stop, el("span", { className: "spacer" }), send)),
+    el("div", { className: "chat-actions" }, images.node, stop, el("span", { className: "spacer" }), send)),
     send, stop, text };
 }
 
@@ -1449,7 +1557,10 @@ function showDetail(found) {
   }
   const [item, kind] = found;
   // Under way, its figures move at each call: the journal would restart with them.
-  const key = kind + (kind === "run" ? item.id + item.step : JSON.stringify(item));
+  // A queued request only ages: one redraw a minute keeps its "depuis" honest.
+  const key = kind + (kind === "run"
+    ? item.id + item.step + (item.waiting ? String(Math.floor(Date.now() / 60000)) : "")
+    : JSON.stringify(item));
   if (key === detailed) return;
   detailed = key;
   const node = kind === "todo" ? card(item) : kind === "run" ? underway(item) : past(item);
@@ -1475,6 +1586,8 @@ const ICONS = {
   code: '<path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/>',
   fix: '<path d="M21.2 6.8a2.8 2.8 0 0 0-4-4L3.8 16.2a2 2 0 0 0-.5.8L2 21.4a.5.5 0 0 0 .6.6l4.4-1.3a2 2 0 0 0 .8-.5z"/>',
   pass: '<rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8M10 12h4"/>',
+  image: '<rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
+  think: '<path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6M10 22h4"/>',
   journal: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
   undo: '<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>',
   resume: '<path d="M6 3l14 9-14 9z"/>',
@@ -1580,14 +1693,16 @@ function compose() {
   $("text").focus();
 }
 $("compose-open").onclick = compose;
+const composed = attach($("text"));
+$("text").after(composed.node);
 $("compose-close").onclick = () => $("compose").close();
 
 // Written now, worked on later: kept in the project's backlog, nothing starts.
 $("later-add").onclick = async () => {
   $("compose-error").textContent = "";
   try {
-    await api("/api/requests", { project: $("project").value, text: $("text").value, later: true });
-    $("text").value = "";
+    await api("/api/requests", { project: $("project").value, text: composed.value(), later: true });
+    composed.clear();
     $("compose").close();
     refresh(true);
   } catch (e) {
@@ -1600,8 +1715,8 @@ $("new-request").addEventListener("submit", async (event) => {
   $("compose-error").textContent = "";
   try {
     const off = [...document.querySelectorAll("#chips button[aria-pressed=false]")].map((b) => b.dataset.key);
-    const made = await api("/api/requests", { project: $("project").value, text: $("text").value, off });
-    $("text").value = "";
+    const made = await api("/api/requests", { project: $("project").value, text: composed.value(), off });
+    composed.clear();
     $("compose").close();
     // What was just asked is what the human watches next.
     location.hash = hashOf($("project").value, made.id);
