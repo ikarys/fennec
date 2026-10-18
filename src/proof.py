@@ -99,7 +99,9 @@ FIND = """(([what, field]) => {
   }
   if (!el) {
     const all = [...document.body.querySelectorAll("*")].filter(seen);
-    const exact = all.filter(e => e.innerText && e.innerText.trim() === what);
+    // An icon-only button is named by its aria-label or title.
+    const exact = all.filter(e => (e.innerText && e.innerText.trim() === what)
+      || e.getAttribute("aria-label") === what || e.title === what);
     const near = all.filter(e => e.innerText && e.innerText.includes(what));
     const pick = list => list.find(e => !list.some(o => o !== e && e.contains(o)));
     el = pick(exact) || pick(near);
