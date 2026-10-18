@@ -49,8 +49,9 @@ variables override them.
    as it was (messages, tool calls, tokens), since that is what they want to audit. A third, asked for
    too (2026-10-18): how the work was kept safe and what it cost, in plain words
    (isolated, without network, failed tries undone; model time, tokens, cache,
-   speed) on each card and in the "Stats" dialog, which also sets where fennec
-   works in each project ("Dans le dossier" or "À part").
+   speed) on each card, in the "Stats" dialog and on the project page, which
+   also sets where fennec works ("Dans le dossier" or "À part") and lists the
+   rules followed, to add or take back.
 3. **Nothing is "ready" without proof.** What could not be proven is shown as
    "not verified: X".
 4. **Execution logic goes in fennec-os**, not here. This repository stays thin.

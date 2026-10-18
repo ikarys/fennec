@@ -171,6 +171,9 @@
   #page .tiles { margin: 10px 0; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
   #page details { margin-top: 8px; }
   #page summary { cursor: pointer; }
+  .rule-form { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 4px; }
+  .rule-form input { flex: 1; min-width: 220px; }
+  #page-rules li button { margin-left: 8px; padding: 0 8px; font-size: 13px; }
   .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 12px 0; }
   .tile { background: var(--soft); border-radius: 8px; padding: 10px 12px; display: grid; }
   .tile b { font-size: 20px; }
@@ -218,7 +221,12 @@
     <div class="tiles" id="page-tiles"></div>
     <label class="muted">Où fennec travaille <select id="page-place"></select></label>
     <details id="page-rules"><summary></summary><ul></ul>
-      <p class="muted">Dis une règle en corrigeant une demande : fennec propose de la garder.</p></details>
+      <form id="rule-form" class="rule-form">
+        <input id="rule-text" aria-label="Nouvelle règle" placeholder="Une règle, par ex. « commits en anglais, format Conventional Commits »" required>
+        <select id="rule-scope" aria-label="Pour"><option value="project">Pour ce projet</option><option value="user">Pour tous mes projets</option></select>
+        <button>Ajouter</button>
+      </form>
+      <p class="muted">fennec la donne à toute l'équipe à chaque demande. Tu peux aussi la dire en corrigeant une demande : fennec propose de la garder.</p></details>
     <p class="error" id="page-error" role="alert"></p>
   </section>
 

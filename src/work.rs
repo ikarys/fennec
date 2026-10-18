@@ -762,7 +762,7 @@ pub fn editor(folder: &Path) -> bool {
     // ponytail: VS Code only (`code`, which WSL hands to Windows); another
     // editor would be a setting.
     match std::process::Command::new("code")
-        .arg(&folder)
+        .arg(folder)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
