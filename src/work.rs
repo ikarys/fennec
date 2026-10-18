@@ -738,7 +738,10 @@ pub fn amend(store: &Store, id: &str, text: &str) -> io::Result<()> {
 /// progress would write its result over the decision.
 pub fn drop(store: &Store, id: &str) -> io::Result<()> {
     let status = store.load(id)?["status"].as_str().unwrap_or("").to_string();
-    if !matches!(status.as_str(), "question" | "blocked" | "ready" | "failed") {
+    if !matches!(
+        status.as_str(),
+        "talk" | "question" | "blocked" | "ready" | "failed"
+    ) {
         return Err(io::Error::other(
             "fennec travaille encore sur cette demande",
         ));
