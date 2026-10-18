@@ -151,6 +151,16 @@ fn attempts_run_in_turn_and_the_first_pass_lands() {
 }
 
 #[test]
+fn checks_run_in_bash_as_models_write_them() {
+    let f = fixture("bash");
+    let tight = Script::new("tight", &[write("answer", "42\n"), done()]);
+    let mut t = task(&[]);
+    t.verify = vec!["diff <(printf '42\\n') answer && [[ -s answer ]]".to_string()];
+    let record = solve(&f.worlds, &f.project, &t, &[&tight], 10).unwrap();
+    assert!(record["winner"].is_string(), "{record:#}");
+}
+
+#[test]
 fn a_run_lands_on_the_branch_the_rules_ask_for_and_is_pushed() {
     let f = fixture("branch");
     let remote = f.project.with_file_name("remote.git");

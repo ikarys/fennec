@@ -448,7 +448,10 @@ pub(crate) fn verify(
             "-k".to_string(),
             "5".to_string(),
             VERIFY_TIMEOUT_SECS.to_string(),
-            "sh".to_string(),
+            // Models write bash (`<(...)`, `[[`): under dash a right product
+            // failed its proof (UX test 2026-10-18). ponytail: bash assumed
+            // on the machine; `sh` where it is missing.
+            "bash".to_string(),
             "-c".to_string(),
             command.clone(),
         ];
