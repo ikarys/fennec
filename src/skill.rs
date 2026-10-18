@@ -98,8 +98,13 @@ fn front_matter(text: &str) -> (Option<String>, Option<String>) {
                 .map(|l| l.trim())
                 .collect::<Vec<_>>()
                 .join(" ")
+        } else if let Some(q) = first.strip_prefix('"').and_then(|f| f.strip_suffix('"')) {
+            // YAML double quotes escape their own quote and backslash.
+            q.replace("\\\"", "\"").replace("\\\\", "\\")
+        } else if let Some(q) = first.strip_prefix('\'').and_then(|f| f.strip_suffix('\'')) {
+            q.replace("''", "'")
         } else {
-            first.trim_matches(['"', '\'']).to_string()
+            first.to_string()
         };
         Some(text.trim().to_string()).filter(|t| !t.is_empty())
     };
@@ -216,6 +221,10 @@ mod tests {
             (n.as_deref(), d.as_deref()),
             (Some("x"), Some("Two lines."))
         );
+        let (_, d) = front_matter("---\nname: b\ndescription: \"the \\\"own\\\" one\"\n---\n");
+        assert_eq!(d.as_deref(), Some("the \"own\" one"));
+        let (_, d) = front_matter("---\nname: c\ndescription: 'it''s'\n---\n");
+        assert_eq!(d.as_deref(), Some("it's"));
         assert_eq!(front_matter("no front matter"), (None, None));
     }
 
