@@ -25,9 +25,27 @@ fn attempts() -> usize {
         .max(1)
 }
 
+/// A request the human asked to stop: the worker sees it at its checkpoints
+/// and the request ends failed. Cleared when the worker's thread ends, so a
+/// later "Réessayer" of the same id starts clean.
+static STOPS: std::sync::Mutex<std::vec::Vec<String>> = std::sync::Mutex::new(Vec::new());
+
+const STOPPED: &str = "arrêté : tu as demandé d'arrêter";
+
+struct Stopped(String);
+
+impl Drop for Stopped {
+    fn drop(&mut self) {
+        if let Ok(mut s) = STOPS.lock() {
+            s.retain(|x| x != &self.0);
+        }
+    }
+}
+
 /// Runs `step` in the background; an error fails the request with its reason.
 fn spawn(id: String, step: fn(&Store, &str) -> io::Result<()>) {
     std::thread::spawn(move || {
+        let _stopped = Stopped(id.clone());
         let Ok(store) = Store::from_env() else { return };
         // The roles the human left out of this request stay out of every step.
         let off: Vec<String> = store
@@ -45,6 +63,13 @@ fn spawn(id: String, step: fn(&Store, &str) -> io::Result<()>) {
             let _ = store.update(&id, |r| {
                 r["status"] = json!("failed");
                 r["reason"] = json!(e.to_string());
+            });
+        }
+        // A stopped request ends failed, whatever the step wrote last.
+        if STOPS.lock().is_ok_and(|s| s.iter().any(|x| x == &id)) {
+            let _ = store.update(&id, |r| {
+                r["status"] = json!("failed");
+                r["reason"] = json!(STOPPED);
             });
         }
         // What the step cost, kept for the card and "Stats": the journal
@@ -374,6 +399,7 @@ pub fn reply(store: &Store, id: &str, text: &str) -> io::Result<()> {
 /// both see it free. Held while the work runs; by then the folder says it.
 static TAKEN: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
 
+#[derive(Debug)]
 struct Taken(String);
 
 impl Drop for Taken {
@@ -390,6 +416,9 @@ impl Drop for Taken {
 fn wait_turn(store: &Store, id: &str, project: &str) -> io::Result<Taken> {
     let mine = store.load(id)?["run"].as_str().map(str::to_string);
     loop {
+        if STOPS.lock().is_ok_and(|s| s.iter().any(|x| x == id)) {
+            return Err(io::Error::other(STOPPED));
+        }
         let held = match world::held(Path::new(project))? {
             // Its own last try still holds the folder: retrying drops it.
             Some(world::Held::World(w)) if Some(&w) == mine.as_ref() => None,
@@ -734,6 +763,39 @@ pub fn amend(store: &Store, id: &str, text: &str) -> io::Result<()> {
 /// shown on the card, with the message shown there, then that branch is
 /// pushed. Without a branch on the card yet, the click only decides it. A landing that fails leaves the request ready, with the reason;
 /// once committed, a new click only retries the push.
+/// "Arrêter" on a request under way: it fails with the reason, the worker
+/// ends at its next checkpoint, and the folder it held comes back. A
+/// stopped request can be retried, unlike a dropped one.
+pub fn stop(store: &Store, id: &str) -> io::Result<()> {
+    let request = store.load(id)?;
+    if !matches!(
+        request["status"].as_str(),
+        Some("thinking" | "framing" | "waiting" | "running" | "proving" | "landing")
+    ) {
+        return Err(io::Error::other(
+            "fennec ne travaille plus sur cette demande",
+        ));
+    }
+    if let Ok(mut s) = STOPS.lock() {
+        s.push(id.to_string());
+    }
+    // Its work goes too: in the project folder, the folder comes back.
+    let worlds = Worlds::from_env()?;
+    if let Some(run) = request["run"].as_str()
+        && worlds.open(run).is_ok()
+    {
+        review::reject(&worlds, run, None)?;
+    }
+    store.update(id, |r| {
+        r["status"] = json!("failed");
+        r["reason"] = json!(STOPPED);
+        if let Some(m) = r.as_object_mut() {
+            m.remove("behind");
+            m.remove("land_error");
+        }
+    })
+}
+
 /// The human gives up on a request. Only one waiting for them: work in
 /// progress would write its result over the decision.
 pub fn drop(store: &Store, id: &str) -> io::Result<()> {
@@ -1037,6 +1099,8 @@ fn totals(steps: &[Value]) -> Value {
 /// them now, once.
 pub fn overview(store: &Store) -> io::Result<Value> {
     let mut requests = store.requests()?;
+    // Out of the lists, out of the figures: an archived request is not shown.
+    requests.retain(|(_, r)| r["archived"] != true);
     for (id, r) in &mut requests {
         // Settled requests only: one under way is written by its own step.
         let settled = matches!(
@@ -1378,6 +1442,67 @@ mod tests {
             &json!({"tries": [{"command": "a", "exit": 0}], "team": ["QA", "Dev senior"]}),
         );
         assert_eq!(r["team"], json!(["Chef de projet", "Dev senior", "QA"]));
+    }
+
+    #[test]
+    fn a_stopped_request_fails_and_the_stop_is_said_once() {
+        let tmp = std::env::temp_dir().join(format!("fennec-lead-stop-{}", std::process::id()));
+        let store = Store { root: tmp.clone() };
+        std::fs::create_dir_all(tmp.join("requests")).unwrap();
+        let id = "a1";
+        std::fs::write(
+            tmp.join("requests/a1.json"),
+            r#"{"status": "waiting", "behind": "« x »"}"#,
+        )
+        .unwrap();
+        stop(&store, id).unwrap();
+        let r = store.load(id).unwrap();
+        assert_eq!(r["status"], "failed");
+        assert_eq!(r["reason"], "arrêté : tu as demandé d'arrêter");
+        assert!(r.get("behind").is_none());
+        // Stopped: not worked on anymore, so no second stop, and recover leaves it.
+        assert!(stop(&store, id).is_err());
+        recover(&store).unwrap();
+        assert_eq!(store.load(id).unwrap()["status"], "failed");
+        std::fs::remove_dir_all(tmp).unwrap();
+    }
+
+    #[test]
+    fn a_request_not_worked_on_cannot_be_stopped() {
+        let tmp = std::env::temp_dir().join(format!("fennec-lead-stop2-{}", std::process::id()));
+        let store = Store { root: tmp.clone() };
+        std::fs::create_dir_all(tmp.join("requests")).unwrap();
+        for (id, status) in [("b1", "later"), ("b2", "ready"), ("b3", "landed")] {
+            std::fs::write(
+                tmp.join(format!("requests/{id}.json")),
+                format!(r#"{{"status": "{status}"}}"#),
+            )
+            .unwrap();
+            let err = stop(&store, id).unwrap_err().to_string();
+            assert!(err.contains("ne travaille plus"), "{id}: {err}");
+        }
+        std::fs::remove_dir_all(tmp).unwrap();
+    }
+
+    #[test]
+    fn a_stopped_worker_leaves_the_queue() {
+        let tmp = std::env::temp_dir().join(format!("fennec-lead-stop3-{}", std::process::id()));
+        let store = Store {
+            root: tmp.join("home"),
+        };
+        std::fs::create_dir_all(store.root.join("requests")).unwrap();
+        let project = tmp.join("p");
+        std::fs::create_dir_all(&project).unwrap();
+        std::fs::write(
+            store.root.join("requests/c3.json"),
+            r#"{"status": "waiting"}"#,
+        )
+        .unwrap();
+        stop(&store, "c3").unwrap();
+        // The worker's next checkpoint leaves the queue with the stop's reason.
+        let err = wait_turn(&store, "c3", project.to_str().unwrap()).unwrap_err();
+        assert_eq!(err.to_string(), "arrêté : tu as demandé d'arrêter");
+        std::fs::remove_dir_all(tmp).unwrap();
     }
 
     #[test]

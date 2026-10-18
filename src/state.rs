@@ -26,9 +26,34 @@ impl Store {
         Ok(Self { root })
     }
 
+    /// The projects in view: the archived ones are out of the way.
     pub fn projects(&self) -> io::Result<Vec<String>> {
+        Ok(self
+            .projects_all()?
+            .into_iter()
+            .filter(|p| p["archived"] != true)
+            .map(|p| p["path"].as_str().unwrap_or_default().to_string())
+            .collect())
+    }
+
+    /// Every project, archived or not. `projects.json` used to be a plain
+    /// list of paths: those entries read as not archived.
+    pub fn projects_all(&self) -> io::Result<Vec<Value>> {
         match std::fs::read_to_string(self.root.join("projects.json")) {
-            Ok(text) => serde_json::from_str(&text).map_err(io::Error::other),
+            Ok(text) => {
+                let v: Value = serde_json::from_str(&text).map_err(io::Error::other)?;
+                Ok(v.as_array()
+                    .map(|items| {
+                        items
+                            .iter()
+                            .map(|p| match p {
+                                Value::String(path) => json!({"path": path, "archived": false}),
+                                other => other.clone(),
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default())
+            }
             Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(Vec::new()),
             Err(e) => Err(e),
         }
@@ -43,12 +68,62 @@ impl Store {
         start(&path)?;
         fennec_os::world::choose_place(&path, place)?;
         let path = path.display().to_string();
-        let mut projects = self.projects()?;
-        if !projects.contains(&path) {
-            projects.push(path);
-            write_json(&self.root.join("projects.json"), &json!(projects))?;
+        let mut all = self.projects_all()?;
+        if !all.iter().any(|p| p["path"] == path) {
+            all.push(json!({"path": path, "archived": false}));
+            write_json(&self.root.join("projects.json"), &json!(all))?;
         }
         Ok(())
+    }
+
+    /// Out of view, or back: the folder and its requests are untouched, only
+    /// the list the page reads moves. A project fennec works on stays put.
+    pub fn set_project_archived(&self, path: &str, on: bool) -> io::Result<()> {
+        let mut all = self.projects_all()?;
+        let Some(p) = all.iter_mut().find(|p| p["path"] == path) else {
+            return Err(io::Error::other("projet inconnu"));
+        };
+        if on
+            && self
+                .requests()?
+                .iter()
+                .any(|(_, r)| r["project"] == path && is_working(r))
+        {
+            return Err(io::Error::other("fennec travaille encore sur ce projet"));
+        }
+        p["archived"] = json!(on);
+        write_json(&self.root.join("projects.json"), &json!(all))
+    }
+
+    /// Unregistered from fennec; the folder, its git and its team files stay.
+    /// Its requests are its own: none may be left behind.
+    pub fn remove_project(&self, path: &str) -> io::Result<()> {
+        let mut all = self.projects_all()?;
+        if !all.iter().any(|p| p["path"] == path) {
+            return Err(io::Error::other("projet inconnu"));
+        }
+        if self.requests()?.iter().any(|(_, r)| r["project"] == path) {
+            return Err(io::Error::other(
+                "ce projet a des demandes : supprime-les d'abord",
+            ));
+        }
+        all.retain(|p| p["path"] != path);
+        write_json(&self.root.join("projects.json"), &json!(all))
+    }
+
+    /// A finished request, out of the lists; it comes back when asked. A
+    /// running one is not hidden: fennec would work in the dark.
+    pub fn archive_request(&self, id: &str, on: bool) -> io::Result<()> {
+        let request = self.load(id)?;
+        match request["status"].as_str() {
+            Some("later" | "landed" | "passed" | "dropped") => {}
+            _ => {
+                return Err(io::Error::other(
+                    "fennec travaille encore sur cette demande",
+                ));
+            }
+        }
+        self.update(id, |r| r["archived"] = json!(on))
     }
 
     /// A new request; `later` keeps it in the backlog, nothing started.
@@ -97,9 +172,34 @@ impl Store {
         })
     }
 
-    /// Out of the backlog for good: nothing was done, nothing to keep.
+    /// Out of the backlog for good: nothing was done, nothing to keep. A
+    /// finished request goes the same way; a passed one had kept its work
+    /// for the commit, so that goes too.
     pub fn forget(&self, id: &str) -> io::Result<()> {
-        self.later(id)?;
+        let request = self.load(id)?;
+        match request["status"].as_str() {
+            Some("later") => {}
+            Some("landed" | "passed" | "dropped") => {
+                let worlds = fennec_os::world::Worlds::from_env()?;
+                if let Some(run) = request["run"].as_str()
+                    && worlds.open(run).is_ok()
+                {
+                    fennec_os::review::reject(&worlds, run, None)?;
+                }
+                if let Some(s) = request["spec"].as_str()
+                    && worlds.open(s).is_ok()
+                {
+                    fennec_os::spec::reject(&worlds, s, None)?;
+                }
+            }
+            _ => {
+                return Err(io::Error::other(
+                    "fennec travaille encore sur cette demande",
+                ));
+            }
+        }
+        // The step's exchange too: a forgotten request leaves no trace.
+        let _ = std::fs::remove_file(self.root.join("live").join(format!("{id}.json")));
         std::fs::remove_file(self.request_path(id)?)
     }
 
@@ -167,7 +267,7 @@ impl Store {
     /// Runs fennec-os made outside a request are not shown: nothing here
     /// could act on them.
     pub fn view(&self) -> io::Result<Value> {
-        Ok(classify(&self.requests()?, &self.projects()?))
+        Ok(classify(&self.requests()?, &self.projects_all()?))
     }
 }
 
@@ -219,6 +319,14 @@ pub fn start(path: &Path) -> io::Result<()> {
         git(&["update-ref", "HEAD", &commit])?;
     }
     Ok(())
+}
+
+/// A step fennec is in right now: the project may not be taken out of view.
+fn is_working(request: &Value) -> bool {
+    matches!(
+        request["status"].as_str(),
+        Some("thinking" | "framing" | "waiting" | "running" | "proving" | "landing")
+    )
 }
 
 /// Whether a request's ready work sits in the project folder itself.
@@ -278,9 +386,30 @@ fn unverified(proof: &Value) -> Value {
 /// was landed. Pure, so the mapping from internal states to what the human
 /// sees is tested here. Each card carries fields, not prose: the page decides
 /// what is shown at once and what waits behind "details".
-fn classify(requests: &[(String, Value)], projects: &[String]) -> Value {
-    let (mut todo, mut running, mut history, mut later) = (vec![], vec![], vec![], vec![]);
+fn classify(requests: &[(String, Value)], projects_all: &[Value]) -> Value {
+    let projects: Vec<String> = projects_all
+        .iter()
+        .filter(|p| p["archived"] != true)
+        .map(|p| p["path"].as_str().unwrap_or_default().to_string())
+        .collect();
+    // Only a registered project's archiving hides its requests; a request
+    // from an unregistered folder is shown as before.
+    let hidden: Vec<String> = projects_all
+        .iter()
+        .filter(|p| p["archived"] == true)
+        .map(|p| p["path"].as_str().unwrap_or_default().to_string())
+        .collect();
+    let (mut todo, mut running, mut history, mut later, mut archived) =
+        (vec![], vec![], vec![], vec![], vec![]);
     for (id, r) in requests {
+        // An archived project's requests are out of view with it; they come
+        // back when the project does.
+        if hidden
+            .iter()
+            .any(|p| *p == r["project"].as_str().unwrap_or(""))
+        {
+            continue;
+        }
         let card = |kind: &str| {
             json!({"id": id, "kind": kind, "project": name(r["project"].as_str().unwrap_or("")), "path": r["project"],
                    "title": r["text"], "rules": r["rules"], "checks": r["verify"], "team": r["team"],
@@ -294,7 +423,13 @@ fn classify(requests: &[(String, Value)], projects: &[String]) -> Value {
             todo.push((0, c));
         }
         match r["status"].as_str() {
-            Some("later") => later.push(card("later")),
+            Some("later") => {
+                if r["archived"] == true {
+                    archived.push(card("later"));
+                } else {
+                    later.push(card("later"));
+                }
+            }
             Some("thinking") => running.push(card_step(card("running"), "réfléchit à ta demande")),
             Some("talk") => todo.push((0, card("talk"))),
             Some("framing") => running.push(card_step(card("running"), "se met au travail")),
@@ -383,7 +518,11 @@ fn classify(requests: &[(String, Value)], projects: &[String]) -> Value {
                 c["role_checks"] = r["proof"]["checks"].clone();
                 c["shots"] = r["proof"]["shots"].clone();
                 c["unverified"] = unverified(&r["proof"]);
-                history.push(c);
+                if r["archived"] == true {
+                    archived.push(c);
+                } else {
+                    history.push(c);
+                }
             }
             _ => {}
         }
@@ -394,11 +533,21 @@ fn classify(requests: &[(String, Value)], projects: &[String]) -> Value {
     history.reverse();
     // ponytail: the last 50; older requests stay on disk, unseen.
     history.truncate(50);
+    archived.reverse();
     let projects: Vec<Value> = projects
         .iter()
         .map(|p| json!({"path": p, "name": name(p)}))
         .collect();
-    json!({"todo": todo, "running": running, "history": history, "later": later, "projects": projects})
+    let projects_archived: Vec<Value> = projects_all
+        .iter()
+        .filter(|p| p["archived"] == true)
+        .map(|p| {
+            let path = p["path"].as_str().unwrap_or_default();
+            json!({"path": path, "name": name(path)})
+        })
+        .collect();
+    json!({"todo": todo, "running": running, "history": history, "later": later,
+           "archived": archived, "projects": projects, "projectsArchived": projects_archived})
 }
 
 fn card_step(mut card: Value, step: &str) -> Value {
@@ -503,6 +652,35 @@ mod tests {
     }
 
     #[test]
+    fn a_finished_request_can_be_forgotten_a_running_one_cannot() {
+        let tmp = std::env::temp_dir().join(format!("fennec-lead-forget-{}", std::process::id()));
+        let project = tmp.join("p");
+        std::fs::create_dir_all(&project).unwrap();
+        let store = Store {
+            root: tmp.join("home"),
+        };
+        std::fs::create_dir_all(store.root.join("requests")).unwrap();
+        store
+            .add_project(project.to_str().unwrap(), "here")
+            .unwrap();
+        let p = store.projects().unwrap()[0].clone();
+        let landed = store.add_request(&p, "dark mode", &[], true).unwrap();
+        let running = store.add_request(&p, "export", &[], true).unwrap();
+        store
+            .update(&landed, |r| r["status"] = json!("landed"))
+            .unwrap();
+        store
+            .update(&running, |r| r["status"] = json!("thinking"))
+            .unwrap();
+        // Work in progress is not forgotten: it would write its result over the decision.
+        assert!(store.forget(&running).is_err());
+        store.forget(&landed).unwrap();
+        assert!(store.load(&landed).is_err());
+        assert_eq!(store.load(&running).unwrap()["status"], "thinking");
+        std::fs::remove_dir_all(&tmp).unwrap();
+    }
+
+    #[test]
     fn a_tool_a_role_could_not_run_is_said_unverified() {
         let proof = json!({"unverified": ["le GUI"], "shots": [{"url": "http://127.0.0.1:8000/", "missing": true}, {"url": "http://x/", "unchanged": true}], "checks": [
             {"role": "DevSecOps", "command": "gitleaks detect", "exit": 127, "missing": true},
@@ -546,7 +724,7 @@ mod tests {
                 json!({"project": "/p/a", "text": "d", "status": "dropped"}),
             ),
         ];
-        let v = classify(&requests, &["/p/a".into()]);
+        let v = classify(&requests, &[json!({"path": "/p/a", "archived": false})]);
         let kinds: Vec<&str> = v["todo"]
             .as_array()
             .unwrap()
@@ -592,5 +770,132 @@ mod tests {
                 .unwrap()
                 .contains("pas encore commités")
         );
+    }
+
+    #[test]
+    fn an_archived_project_hides_its_requests_and_comes_back() {
+        let tmp = std::env::temp_dir().join(format!("fennec-lead-parch-{}", std::process::id()));
+        let project = tmp.join("p");
+        std::fs::create_dir_all(&project).unwrap();
+        let store = Store {
+            root: tmp.join("home"),
+        };
+        std::fs::create_dir_all(store.root.join("requests")).unwrap();
+        store
+            .add_project(project.to_str().unwrap(), "here")
+            .unwrap();
+        let p = store.projects().unwrap()[0].clone();
+        let a = store.add_request(&p, "dark mode", &[], true).unwrap();
+        store.update(&a, |r| r["status"] = json!("landed")).unwrap();
+        assert_eq!(
+            store.view().unwrap()["history"].as_array().unwrap().len(),
+            1
+        );
+        store.set_project_archived(&p, true).unwrap();
+        assert!(store.projects().unwrap().is_empty());
+        assert_eq!(store.projects_all().unwrap().len(), 1);
+        let v = store.view().unwrap();
+        assert!(v["history"].as_array().unwrap().is_empty());
+        assert!(v["later"].as_array().unwrap().is_empty());
+        assert_eq!(v["projectsArchived"][0]["name"], "p");
+        store.set_project_archived(&p, false).unwrap();
+        assert_eq!(store.projects().unwrap(), vec![p]);
+        assert_eq!(
+            store.view().unwrap()["history"].as_array().unwrap().len(),
+            1
+        );
+        std::fs::remove_dir_all(tmp).unwrap();
+    }
+
+    #[test]
+    fn a_project_is_removed_only_when_it_has_no_requests() {
+        let tmp = std::env::temp_dir().join(format!("fennec-lead-prem-{}", std::process::id()));
+        let project = tmp.join("p");
+        std::fs::create_dir_all(&project).unwrap();
+        let store = Store {
+            root: tmp.join("home"),
+        };
+        std::fs::create_dir_all(store.root.join("requests")).unwrap();
+        store
+            .add_project(project.to_str().unwrap(), "here")
+            .unwrap();
+        let p = store.projects().unwrap()[0].clone();
+        // With a request, even a forgotten one, the project is not removed.
+        let a = store.add_request(&p, "dark mode", &[], true).unwrap();
+        let err = store.remove_project(&p).unwrap_err().to_string();
+        assert!(err.contains("demandes"), "{err}");
+        store.forget(&a).unwrap();
+        store.remove_project(&p).unwrap();
+        assert!(store.projects_all().unwrap().is_empty());
+        // The folder stays a repository: untouched, only unregistered.
+        assert!(is_repository(&project));
+        assert!(store.remove_project("/inconnu").is_err());
+        std::fs::remove_dir_all(tmp).unwrap();
+    }
+
+    #[test]
+    fn a_working_project_cannot_be_archived() {
+        let tmp = std::env::temp_dir().join(format!("fennec-lead-pwork-{}", std::process::id()));
+        let project = tmp.join("p");
+        std::fs::create_dir_all(&project).unwrap();
+        let store = Store {
+            root: tmp.join("home"),
+        };
+        std::fs::create_dir_all(store.root.join("requests")).unwrap();
+        store
+            .add_project(project.to_str().unwrap(), "here")
+            .unwrap();
+        let p = store.projects().unwrap()[0].clone();
+        let a = store.add_request(&p, "dark mode", &[], false).unwrap();
+        assert_eq!(store.load(&a).unwrap()["status"], "thinking");
+        let err = store
+            .set_project_archived(&p, true)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("travaille"), "{err}");
+        assert_eq!(store.projects().unwrap(), vec![p]);
+        std::fs::remove_dir_all(tmp).unwrap();
+    }
+
+    #[test]
+    fn an_archived_request_leaves_the_lists_and_comes_back() {
+        let tmp = std::env::temp_dir().join(format!("fennec-lead-rarch-{}", std::process::id()));
+        let project = tmp.join("p");
+        std::fs::create_dir_all(&project).unwrap();
+        let store = Store {
+            root: tmp.join("home"),
+        };
+        std::fs::create_dir_all(store.root.join("requests")).unwrap();
+        store
+            .add_project(project.to_str().unwrap(), "here")
+            .unwrap();
+        let p = store.projects().unwrap()[0].clone();
+        let a = store.add_request(&p, "dark mode", &[], true).unwrap();
+        let b = store.add_request(&p, "export", &[], true).unwrap();
+        store.update(&a, |r| r["status"] = json!("landed")).unwrap();
+        store
+            .update(&b, |r| r["status"] = json!("thinking"))
+            .unwrap();
+        // A running request is not archived: fennec would work in the dark.
+        assert!(store.archive_request(&b, true).is_err());
+        store.archive_request(&a, true).unwrap();
+        let v = store.view().unwrap();
+        assert!(v["history"].as_array().unwrap().is_empty());
+        let arch = v["archived"].as_array().unwrap();
+        assert_eq!(arch.len(), 1);
+        assert_eq!(arch[0]["kind"], "landed");
+        assert_eq!(arch[0]["id"], a);
+        store.archive_request(&a, false).unwrap();
+        assert_eq!(
+            store.view().unwrap()["history"].as_array().unwrap().len(),
+            1
+        );
+        assert!(
+            store.view().unwrap()["archived"]
+                .as_array()
+                .unwrap()
+                .is_empty()
+        );
+        std::fs::remove_dir_all(tmp).unwrap();
     }
 }

@@ -18,8 +18,11 @@
          font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
   /* Projects on the left, always in view; the chosen one's page on the right. */
   .app { display: grid; grid-template-columns: 210px minmax(0, 1fr); min-height: 100vh; }
-  #side { position: sticky; top: 0; height: 100vh; overflow: auto; display: flex; flex-direction: column; gap: 2px;
+  #side { position: sticky; top: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column; gap: 2px;
           padding: 20px 12px; border-right: 1px solid var(--line); background: var(--card); }
+  /* The middle is what scrolls; the header above and the tools below never
+     leave the screen, no matter how short the window is. */
+  #side .mid { overflow: auto; flex: 1; min-height: 0; }
   #side h1 { margin: 0 8px 14px; }
   #side ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 2px; }
   #side .item { width: 100%; display: flex; gap: 8px; align-items: center; text-align: left; border: none;
@@ -33,6 +36,22 @@
                  margin: 14px 8px 4px; display: flex; align-items: center; justify-content: space-between; }
   #side .label button { color: var(--muted); padding: 2px; }
   #side .label button:hover { color: var(--text); }
+  /* A project's two exits, on its right: shown on the project, or on focus. */
+  #side .project { display: flex; align-items: center; gap: 2px; }
+  #side .project > .item { flex: 1; min-width: 0; }
+  #side .project .icon { border: none; background: none; color: var(--muted); padding: 4px; border-radius: 5px;
+                         opacity: 0; flex: none; }
+  #side .project:hover .icon, #side .project:focus-within .icon { opacity: 1; }
+  #side .project .icon:hover { color: var(--text); background: var(--soft); }
+  #side .project .quiet { border: none; background: none; color: var(--bad); padding: 4px 2px; font-size: 12px; }
+  #side-archived { list-style: none; padding: 0; margin: 0 0 0 8px; display: grid; gap: 2px; }
+  #side-archived li { display: flex; align-items: center; gap: 2px; padding: 2px; }
+  #side-archived .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                         font-size: 13px; color: var(--muted); }
+  #side-archived .icon { border: none; background: none; color: var(--muted); padding: 4px; border-radius: 5px; }
+  #side-archived .icon:hover { color: var(--text); background: var(--soft); }
+  #side-archived .quiet { border: none; background: none; color: var(--bad); padding: 4px 2px; font-size: 12px; }
+  #side-error { margin: 4px 8px; }
   /* Team, figures and settings: one row of icons, named on hover. */
   #side .tools { display: flex; gap: 4px; border-top: 1px solid var(--line); padding-top: 10px; }
   #side .tools button { flex: 1; justify-content: center; color: var(--muted); padding: 8px; border-radius: 6px; }
@@ -43,10 +62,19 @@
   #side .link[aria-current=true] { background: var(--soft); font-weight: 600; }
   /* Three panes, each scrolled on its own, like a mail client: projects, the
      requests of the chosen one, and the request (or the project's page) read in full. */
-  .app { height: 100vh; }
-  main { display: grid; grid-template-columns: 370px minmax(0, 1fr); min-height: 0; height: 100vh; }
-  #list { overflow: auto; padding: 20px 16px 48px; border-right: 1px solid var(--line); }
-  #detail { overflow: auto; padding: 20px 24px 48px; }
+  /* Explicit minmax(0, 1fr) rows: an auto row grows to its content in Firefox,
+     which pushed the panes (and the side's tools) below the window. */
+  /* The window itself never scrolls on a wide screen, only the three panes:
+     sized on the real window (100%), not 100vh, which a root scrollbar or a
+     zoom rounding can make taller than what is visible. */
+  html, body { height: 100%; }
+  body { overflow: hidden; }
+  .app { height: 100%; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+  #side { height: 100%; }
+  main { display: grid; grid-template-columns: 370px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr);
+         min-height: 0; min-width: 0; height: 100%; }
+  #list { overflow: auto; min-height: 0; padding: 16px 14px 40px; border-right: 1px solid var(--line); }
+  #detail { overflow: auto; min-height: 0; padding: 16px 20px 40px; }
   #detail { container-type: inline-size; }
   #detail > * { max-width: 1240px; }
   /* A request read in full: what to read and decide on the left, what it cost
@@ -68,27 +96,44 @@
     .split { grid-template-columns: minmax(0, 1fr) 280px; }
     .split > aside { display: block; position: sticky; top: 0; align-self: start; }
   }
+  /* The request read in full: its title in whole and where it stands, above
+     what it holds; the list says the same per row, this says it once. */
+  .req-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; margin-bottom: 12px; }
+  .req-head strong { font-size: 16px; overflow-wrap: anywhere; }
+  .req-head .muted { font-size: 12px; }
+  .status { font-size: 12px; font-weight: 600; padding: 1px 9px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
+  .status.bad { color: var(--bad); border-color: var(--bad); }
+  .status.ok { color: var(--ok); border-color: var(--ok); }
+  .status.warn { color: var(--warn); border-color: var(--warn); }
+  .status.accent { color: var(--accent); border-color: var(--accent); }
+  .status.muted { color: var(--muted); border-color: var(--line); }
+  .status.info { color: var(--info); border-color: var(--info); }
   .tabs { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
-  .tabs button { border: none; border-radius: 0; background: none; color: var(--muted); padding: 8px 14px;
+  .tabs button { border: none; border-radius: 0; background: none; color: var(--muted); padding: 5px 12px; font-size: 13px;
                  border-bottom: 2px solid transparent; margin-bottom: -1px; }
   .tabs button:hover { color: var(--text); }
   .tabs button[aria-selected=true] { color: var(--text); font-weight: 600; border-bottom-color: var(--accent); }
+  .switch { position: relative; width: 34px; height: 20px; border: none; border-radius: 10px;
+            background: var(--line); cursor: pointer; flex: none; padding: 0; transition: background .15s; }
+  .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+                   border-radius: 50%; background: var(--card); transition: transform .15s; }
+  .switch[aria-checked=true] { background: var(--ok); }
+  .switch[aria-checked=true]::after { transform: translateX(14px); }
   .tab-panel table.grid { font-size: 13px; }
-  .decide { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px;
-            margin-bottom: 18px; }
+  .decide { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px;
+            margin-bottom: 14px; }
   .decide .actions { display: flex; flex-direction: column; align-items: stretch; gap: 6px; margin: 0; }
-  .decide .actions button { display: flex; align-items: center; gap: 10px; text-align: left; padding: 8px 12px;
-            font-size: 14px; border-color: transparent; background: var(--soft); }
+  .decide .actions button { display: flex; align-items: center; gap: 10px; text-align: left; padding: 5px 10px;
+            border-color: transparent; background: var(--soft); }
   .decide .actions button:hover:not(:disabled) { border-color: var(--line); background: var(--bg); }
-  .decide .actions button.primary { justify-content: center; padding: 11px 12px; font-size: 15px; margin-bottom: 4px;
-            background: var(--accent); border-color: var(--accent); }
+  .decide .actions button.primary { justify-content: center; margin-bottom: 4px; }
   .decide .actions button.primary:hover { filter: brightness(1.08); background: var(--accent); }
   .decide .actions button.quiet { background: none; color: var(--bad); justify-content: center; margin-top: 4px; }
   /* An icon drawn in the element's own colour; alone, the button is square. */
   .ic { display: inline-flex; align-items: center; gap: 7px; }
   .ic::before { content: ""; flex: none; width: 17px; height: 17px; background: currentColor;
             -webkit-mask: var(--icon) center / contain no-repeat; mask: var(--icon) center / contain no-repeat; }
-  button.ic:empty { padding: 8px; }
+  button.ic:empty { padding: 5px; }
   h2.ic::before, h3.ic::before { width: 15px; height: 15px; }
   .decide .actions .primary { order: -1; }
   .decide .actions .quiet { order: 99; }
@@ -99,10 +144,17 @@
   #back { display: none; margin-bottom: 10px; }
   /* A discussion owns the page; the way back to the demandes stays visible. */
   body.chats #back { display: inline-block; }
+  /* Which project is on screen: the focused rows hide it, the list says it.
+     The detail repeats it only where the list is gone (narrow, request open). */
+  #list-head, #detail-head { gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  #list-head { display: flex; margin-bottom: 12px; }
+  #detail-head { display: none; }
+  #list-head strong, #detail-head strong { font-size: 15px; }
+  #list-head .muted, #detail-head .muted { font-size: 12px; }
   #hint { color: var(--muted); padding: 40px 0; text-align: center; }
-  #compose-open { width: 100%; justify-content: center; padding: 10px 12px; margin-bottom: 4px; }
+  #compose-open { width: 100%; justify-content: center; padding: 6px 12px; margin-bottom: 4px; }
   /* Each part of the list in its own box: what waits for the human stands out. */
-  #list .box { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px 6px;
+  #list .box { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px 4px;
                margin-top: 14px; }
   #list .box h2 { margin: 0 0 4px; display: flex; gap: 8px; align-items: center; }
   #list .box .count { text-transform: none; letter-spacing: 0; }
@@ -111,8 +163,8 @@
   #n-others { margin-left: auto; }
   #list .cost, #detail summary .cost { display: none; }
   /* In the narrow list, the state goes under the title. */
-  #list .line { flex-wrap: wrap; row-gap: 0; }
-  #list .line .state { flex-basis: 100%; order: 3; white-space: normal; text-align: left; font-size: 12px; }
+  #reqs .line { flex-wrap: wrap; row-gap: 0; }
+  #reqs .line .state { flex-basis: 100%; order: 3; white-space: normal; text-align: left; font-size: 12px; }
   a.row { display: block; color: inherit; text-decoration: none; border-radius: 6px; padding: 0 8px; margin: 0 -8px; }
   a.row:hover { background: var(--soft); }
   a.row[aria-current=true] { background: var(--soft); box-shadow: inset 3px 0 0 var(--accent); }
@@ -121,25 +173,35 @@
   #detail details.past > summary { font-size: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
   /* Narrower: the list, or the request chosen in it, with a way back. */
   @media (max-width: 1099px) {
+    body { overflow: visible; }
     .app, main { height: auto; }
+    .app { min-height: 100vh; }
+    #side { height: 100vh; }
     main { display: block; }
     #list, #detail { overflow: visible; border-right: none; }
     body.picked #list { display: none; }
     body.picked #back { display: inline-block; }
+    body.picked #detail-head { display: flex; margin-bottom: 12px; }
     body:not(.picked) #hint { display: none; }
   }
   h1 { font-size: 20px; margin: 0; }
   h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
-       margin: 32px 0 10px; font-weight: 600; }
+       margin: 24px 0 8px; font-weight: 600; }
   .muted { color: var(--muted); }
-  select, textarea, button, input { font: inherit; color: inherit; background: var(--card);
-         border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; }
+  /* The compact control family, on the first fennec's spec: small padding,
+     small face, and a primary set apart by accent text and hairline, never a
+     bright solid block. */
+  select, textarea, button, input { font-size: 13px; color: inherit; background: var(--card);
+         border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; }
   textarea { resize: vertical; min-height: 44px; width: 100%; }
   button { cursor: pointer; }
   button:disabled { opacity: .45; cursor: not-allowed; }
-  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.primary { background: var(--card); border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+                   color: var(--accent); font-weight: 600; }
+  button.primary:hover { background: color-mix(in srgb, var(--accent) 10%, transparent);
+                         border-color: var(--accent); }
   button.link { border: none; background: none; color: var(--accent); padding: 0; }
-  button.quiet { border: none; background: none; color: var(--muted); padding: 8px 4px; font-size: 13px; }
+  button.quiet { border: none; background: none; color: var(--muted); padding: 4px; }
   #compose { width: min(640px, calc(100vw - 32px)); }
   #new-request { display: grid; gap: 10px; }
   #new-request .head { align-items: center; }
@@ -150,13 +212,13 @@
   body.focused #project { display: none; }
   .error { color: var(--bad); font-size: 13px; min-height: 0; margin: 4px 0 0; }
 
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px;
-          margin-bottom: 12px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px;
+          margin-bottom: 10px; }
   .meta { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); }
   .tag { font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--c); }
   .title { font-size: 16px; margin: 4px 0 10px; overflow-wrap: anywhere; }
   /* The one thing to read before deciding. */
-  .focus { background: var(--soft); border-radius: 8px; padding: 10px 12px; overflow-wrap: anywhere; }
+  .focus { background: var(--soft); border-radius: 6px; padding: 8px 10px; overflow-wrap: anywhere; }
   .focus p, .focus ul { margin: 2px 0; }
   .focus ul { padding-left: 20px; }
   .focus .label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 2px; }
@@ -181,13 +243,13 @@
               white-space: pre-wrap; margin: 4px 0; }
   details pre { background: var(--soft); border-radius: 6px; padding: 6px 8px; max-height: 240px; overflow: auto; }
   details p { margin: 6px 0; }
-  details.past { margin: 0; font-size: 14px; color: inherit; }
+  .past { margin: 0; font-size: 14px; color: inherit; }
   details.past > summary { list-style: none; }
   details.past > summary::-webkit-details-marker { display: none; }
   details.past > summary .what::before { content: "▸ "; color: var(--muted); }
   details.past[open] > summary .what::before { content: "▾ "; }
   details.past[open] { padding-bottom: 12px; }
-  details.past .focus { margin-top: 8px; }
+  .past .focus { margin-top: 8px; }
   .diff { font: 12px/1.45 ui-monospace, monospace; background: var(--soft); border-radius: 6px; padding: 8px 10px;
           max-height: 520px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; margin: 10px 0 0; }
   .diff .add { color: var(--ok); }
@@ -202,13 +264,15 @@
   details.message pre { max-height: 420px; }
   details.message pre.thought { color: var(--muted); font-style: italic; }
   .thread { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
-  .said { background: var(--soft); border-radius: 8px; padding: 8px 12px; max-width: 85%; overflow-wrap: anywhere;
-          white-space: pre-wrap; font-size: 14px; }
+  .said { background: var(--soft); border-radius: 8px; padding: 8px 12px; max-width: 85%; min-width: 0;
+          overflow-wrap: anywhere; white-space: pre-wrap; font-size: 14px; }
   .said.human { align-self: flex-end; background: transparent; border: 1px solid var(--line); }
   .said .label { display: block; font-size: 12px; color: var(--muted); }
   .said code { font: 13px ui-monospace, monospace; }
   /* Markdown the model writes in a discussion. */
   .said p, .said ul, .said ol, .said pre, .said table, .said blockquote { margin: 6px 0; }
+  .said table.grid { display: block; overflow-x: auto; max-width: 100%; }
+  .said pre { overflow-x: auto; }
   .said li { margin: 2px 0; }
   .said ul, .said ol { padding-left: 20px; }
   .said h1 { font-size: 16px; margin: 10px 0 4px; }
@@ -255,8 +319,21 @@
   .field .go { display: flex; gap: 8px; }
   .field .go input { flex: 1; min-width: 0; }
   #settings-models li { display: flex; gap: 8px; align-items: center; padding: 2px 4px; }
-  :root { --frame: var(--accent); --solve: var(--info); --prove: var(--ok); }
+  /* The theme picker: one tile per theme, its palette as a preview. */
+  #theme-picker { list-style: none; padding: 0; margin: 10px 0 18px; display: grid;
+                  grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .theme { display: grid; gap: 6px; padding: 8px; border: 1px solid var(--line); border-radius: 8px;
+           background: none; cursor: pointer; text-align: left; }
+  .theme:hover { background: var(--soft); }
+  .theme[aria-pressed=true] { border-color: var(--accent); }
+  .theme .preview { display: flex; height: 26px; border-radius: 4px; overflow: hidden; border: 1px solid var(--line); }
+  .theme .preview .bg { flex: 1; }
+  .theme .preview .accent { width: 18px; }
+  .theme .name { font-size: 13px; }
+  #font-scale { width: 90px; }
+  :root { --talk: var(--warn); --frame: var(--accent); --solve: var(--info); --prove: var(--ok); }
   .facts { margin-top: 12px; display: grid; gap: 8px; }
+  .facts h3 { margin: 0; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
   .metrics { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
   .metric { display: inline-grid; grid-auto-flow: row; background: var(--soft); border-radius: 8px; padding: 4px 10px;
             min-width: 84px; line-height: 1.25; }
@@ -266,12 +343,14 @@
            background: linear-gradient(90deg, var(--ok) var(--p), var(--line) var(--p)); }
   .timeline { display: flex; gap: 2px; height: 22px; border-radius: 6px; overflow: hidden; font-size: 11px; }
   .seg { display: flex; align-items: center; padding: 0 6px; color: #fff; white-space: nowrap; overflow: hidden; min-width: 4px; }
+  .seg.talk, .dotc.talk { background: var(--talk); }
   .seg.frame, .dotc.frame { background: var(--frame); }
   .seg.solve, .dotc.solve { background: var(--solve); }
   .seg.prove, .dotc.prove { background: var(--prove); }
   .who { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
   .rtag { display: inline-block; font-size: 12px; line-height: 1.4; padding: 1px 8px; border-radius: 999px; font-weight: 500;
           border: 1px solid; margin-right: 2px; }
+  .rtag.talk { color: var(--talk); border-color: var(--talk); }
   .rtag.frame { color: var(--frame); border-color: var(--frame); }
   .rtag.solve { color: var(--solve); border-color: var(--solve); }
   .rtag.prove { color: var(--prove); border-color: var(--prove); }
@@ -342,8 +421,42 @@
   .bar { display: inline-block; width: 44px; height: 6px; border-radius: 3px; margin-right: 6px; vertical-align: middle;
          background: linear-gradient(90deg, var(--info) var(--p), var(--line) var(--p)); }
   body.chats #reqs { display: none; }
+  /* A page owns the width: the list pane is empty there, so it goes away and
+     the grid collapses to one column. */
+  body.paged #list { display: none; }
+  body.paged main { grid-template-columns: minmax(0, 1fr); }
   #chats { margin-bottom: 12px; }
   #new-chat { width: 100%; }
+  /* The discussions of one folder sit under its name, a project marked.
+     The name is a button: a click unfolds the folder's discussions. */
+  .chat-group { margin-top: 6px; }
+  .chat-group-head { display: flex; gap: 8px; align-items: center; padding: 6px 8px; margin: 0 0 2px;
+                     border: none; background: none; border-radius: 6px; text-align: left; }
+  .chat-group-head:hover { background: var(--soft); }
+  .chat-group-head::before { transition: transform .12s; transform: rotate(-90deg); }
+  .chat-group-head[aria-expanded=true]::before { transform: none; }
+  .chat-group-head .what { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                           font-size: 13px; font-weight: 600; }
+  .chat-group-head .tag { font-size: 10px; }
+  .chat-group-head .count { margin-left: auto; background: none; padding: 0; border-radius: 0;
+                            font-size: 12px; font-weight: 500; color: var(--muted);
+                            font-variant-numeric: tabular-nums; }
+  .chat-group-body { border-left: 2px solid var(--line); margin-left: 14px; padding-left: 10px; }
+  .chat-archived { margin-top: 14px; }
+  /* A list row's own actions, on its right: shown on the row, or when it
+     holds focus; an error, if any, takes their place. */
+  .row-wrap { position: relative; }
+  .row-actions { position: absolute; right: 4px; top: 3px; display: flex; gap: 2px; align-items: center;
+                opacity: 0; pointer-events: none; }
+  .row-wrap:hover .row-actions, .row-wrap:focus-within .row-actions { opacity: 1; pointer-events: auto; }
+  .row-actions .icon { border: none; background: var(--card); color: var(--muted); padding: 4px; border-radius: 5px; }
+  .row-actions .icon:hover { color: var(--text); background: var(--soft); }
+  .row-actions .quiet { border: none; background: none; color: var(--bad); padding: 4px; font-size: 12px; }
+  .row-actions .error { display: none; font-size: 11px; }
+  .row-actions .error:not(:empty) { display: block; }
+  /* The stop on the work under way: below its line, above the journal. */
+  .run-actions { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .run-actions .error { margin: 0; }
   .chat .thinking { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px;
                     padding: 2px 0 6px; }
   .chat .ask { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 2px 0 6px;
@@ -381,10 +494,15 @@
 <div class="app">
 <nav id="side" aria-label="Projets">
   <h1>fennec</h1>
-  <ul><li><button type="button" class="item" id="side-all"><span class="name">Tous les projets</span></button></li></ul>
-  <div class="label"><span>Projets</span> <button class="link" id="add-project" data-icon="plus" aria-label="Ajouter un projet" title="Ajouter un projet"></button></div>
-  <ul id="side-projects"></ul>
-  <button class="link" id="side-chats" data-icon="chat">Discussions</button>
+  <div class="mid">
+    <ul><li><button type="button" class="item" id="side-all"><span class="name">Tous les projets</span></button></li></ul>
+    <div class="label"><span>Projets</span> <button class="link" id="add-project" data-icon="plus" aria-label="Ajouter un projet" title="Ajouter un projet"></button></div>
+    <ul id="side-projects"></ul>
+    <div class="label" id="side-archived-label" hidden><span>Archivés</span></div>
+    <ul id="side-archived"></ul>
+    <p class="error" id="side-error" role="alert"></p>
+    <button class="link" id="side-chats" data-icon="chat">Discussions</button>
+  </div>
   <span class="spacer"></span>
   <div class="tools">
     <button class="link" id="open-team" data-icon="team" aria-label="Équipe" title="Équipe"></button>
@@ -394,11 +512,12 @@
 </nav>
 <main>
   <section id="list" aria-label="Demandes">
+  <div id="list-head" hidden><strong id="list-head-name"></strong> <span class="muted" id="list-head-path"></span></div>
   <div id="chats" hidden>
     <button type="button" class="primary" id="new-chat" data-icon="plus">Nouvelle discussion</button>
     <h2>Discussions</h2>
     <div id="chat-list"></div>
-    <p class="muted">fennec lit, écrit et lance des commandes dans le dossier que tu choisis, git ou pas : sans réseau, ton dossier personnel caché. Les skills et le coût de la discussion sont à droite.</p>
+    <p class="muted">fennec lit, écrit et lance des commandes dans le dossier que tu choisis, git ou pas : sans réseau, ton dossier personnel caché. Le coût de la discussion est à droite.</p>
   </div>
   <div id="reqs">
   <button type="button" class="primary" id="compose-open" data-icon="plus">Nouvelle demande</button>
@@ -430,9 +549,13 @@
 
   <div class="box"><h2 data-icon="history">Historique</h2>
   <div id="history"></div></div>
+
+  <div class="box" id="archived-box" hidden><h2 data-icon="inbox">Archivées <span class="count" id="n-archived"></span></h2>
+  <div id="archived"></div></div>
   </div>
   </section>
   <section id="detail">
+  <div id="detail-head" hidden><strong id="detail-head-name"></strong> <span class="muted" id="detail-head-path"></span></div>
   <button type="button" class="link" id="back">← Demandes</button>
   <div id="pick"></div>
   <p id="hint" hidden>Choisis une demande à gauche pour la lire en entier, ou un projet pour voir sa page.</p>
@@ -514,32 +637,46 @@
   </section>
   <section id="settings" hidden>
     <div class="page-head"><strong>Réglages</strong></div>
-    <form id="settings-form">
-      <label class="field">Serveur du modèle
-        <span class="go"><input id="settings-url" required placeholder="http://localhost:8000/v1">
-          <button type="button" id="settings-test">Tester</button></span>
+    <div class="tabs" role="tablist" id="settings-tabs">
+      <button type="button" role="tab" aria-selected="true" data-panel="settings-general">Général</button>
+      <button type="button" role="tab" aria-selected="false" data-panel="settings-appearance">Apparence</button>
+      <button type="button" role="tab" aria-selected="false" data-panel="settings-skills">Skills</button>
+    </div>
+    <div id="settings-general">
+      <form id="settings-form">
+        <label class="field">Serveur du modèle
+          <span class="go"><input id="settings-url" required placeholder="http://localhost:8000/v1">
+            <button type="button" id="settings-test">Tester</button></span>
+        </label>
+        <div class="muted" id="settings-status"></div>
+        <ul id="settings-models"></ul>
+        <label class="field">Tokens par réponse, réflexion comprise (0 : la valeur du serveur)
+          <input id="settings-tokens" type="number" min="0" step="1024" required>
+        </label>
+        <label class="field">Clé d'accès (facultative)
+          <input id="settings-key" type="password" autocomplete="off">
+        </label>
+        <p class="muted" id="settings-env" hidden></p>
+        <p class="error" id="settings-error" role="alert"></p>
+        <div class="row">
+          <button type="button" id="settings-cancel">Annuler</button>
+          <button class="primary">Enregistrer</button>
+        </div>
+      </form>
+    </div>
+    <div id="settings-appearance" hidden>
+      <ul id="theme-picker"></ul>
+      <label class="field">Taille des textes
+        <input id="font-scale" type="number" min="12" max="21" step="1" required>
       </label>
-      <div class="muted" id="settings-status"></div>
-      <ul id="settings-models"></ul>
-      <label class="field">Tokens par réponse, réflexion comprise (0 : la valeur du serveur)
-        <input id="settings-tokens" type="number" min="0" step="1024" required>
-      </label>
-      <label class="field">Clé d'accès (facultative)
-        <input id="settings-key" type="password" autocomplete="off">
-      </label>
-      <p class="muted" id="settings-env" hidden></p>
-      <p class="error" id="settings-error" role="alert"></p>
-      <div class="row">
-        <button type="button" id="settings-cancel">Annuler</button>
-        <button class="primary">Enregistrer</button>
-      </div>
-    </form>
-    <h3>Skills</h3>
-    <p class="muted">Ils s'appliquent à tous tes projets : l'équipe voit le nom et le but de chaque skill activé, et le lit quand la demande en a besoin.
-      Ils viennent de ~/.claude/skills et de tes plugins, de ~/.config/fennec/skills ou du dossier .claude/skills d'un projet.</p>
-    <input id="skill-search" type="search" aria-label="Chercher un skill" placeholder="Chercher parmi les skills de ta machine…">
-    <ul id="skills-list"></ul>
-    <p class="error" id="skills-error" role="alert"></p>
+    </div>
+    <div id="settings-skills" hidden>
+      <p class="muted">Ils s'appliquent à tous tes projets : l'équipe voit le nom et le but de chaque skill activé, et le lit quand la demande en a besoin.
+        Ils viennent de ~/.claude/skills et de tes plugins, de ~/.config/fennec/skills ou du dossier .claude/skills d'un projet.</p>
+      <input id="skill-search" type="search" aria-label="Chercher un skill" placeholder="Chercher parmi les skills de ta machine…">
+      <ul id="skills-list"></ul>
+      <p class="error" id="skills-error" role="alert"></p>
+    </div>
   </section>
   </section>
 </main>

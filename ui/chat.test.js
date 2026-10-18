@@ -43,7 +43,6 @@ const base = {
   id: "abc1234567890",
   project: true,
   folder: "/home/tony/workspace/games/incr-ia",
-  skills: [],
   grants: [],
   stats: null,
   messages: [
