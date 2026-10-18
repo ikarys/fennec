@@ -20,7 +20,7 @@ const KEEP_RECENT: usize = 6;
 /// The same call with the same result this many times in a row is a loop:
 /// the model is told once, then stopped.
 const REPEAT_NUDGE: usize = 3;
-const REPEAT_STOP: usize = 5;
+pub(crate) const REPEAT_STOP: usize = 5;
 /// Steps that change no file in the world: told once, then stopped.
 const IDLE_NUDGE: usize = 15;
 const IDLE_STOP: usize = 25;
@@ -48,7 +48,7 @@ pub struct Outcome {
 /// Watches the loop for the three ways a run gets stuck. Pure bookkeeping:
 /// each method says whether to nudge (`Some(false)`) or stop (`Some(true)`).
 #[derive(Default)]
-struct Watch {
+pub(crate) struct Watch {
     last_call: String,
     repeats: usize,
     files: String,
@@ -59,7 +59,7 @@ struct Watch {
 }
 
 impl Watch {
-    fn call(&mut self, call: &str, result: &str) -> Option<bool> {
+    pub(crate) fn call(&mut self, call: &str, result: &str) -> Option<bool> {
         let key = format!("{call}\n{result}");
         if key == self.last_call {
             self.repeats += 1;
@@ -224,7 +224,8 @@ pub fn run(
                 });
             }
             let ran = Instant::now();
-            let mut result = match execute(worlds, world, name, &args) {
+            let sandbox = |argv: &[String]| worlds.sandbox_command(world, argv);
+            let mut result = match execute(&sandbox, name, &args) {
                 Ok(out) => out,
                 Err(e) => format!("error: {e}"),
             };
@@ -344,7 +345,13 @@ pub(crate) fn parse_question(reply: &str) -> Option<String> {
     (!q.is_empty() && !q.trim_end_matches('.').eq_ignore_ascii_case("none")).then(|| q.to_string())
 }
 
-fn execute(worlds: &Worlds, world: &World, name: &str, args: &Value) -> io::Result<String> {
+/// Runs one tool call; `sandbox` builds the command that runs inside the
+/// sandbox (a world's, or a chat's folder).
+pub(crate) fn execute(
+    sandbox: &dyn Fn(&[String]) -> io::Result<std::process::Command>,
+    name: &str,
+    args: &Value,
+) -> io::Result<String> {
     let arg = |k: &str| {
         args[k]
             .as_str()
@@ -362,10 +369,7 @@ fn execute(worlds: &Worlds, world: &World, name: &str, args: &Value) -> io::Resu
                 "-c".to_string(),
                 arg("command")?.to_string(),
             ];
-            let out = worlds
-                .sandbox_command(world, &argv)?
-                .stdin(Stdio::null())
-                .output()?;
+            let out = sandbox(&argv)?.stdin(Stdio::null()).output()?;
             Ok(format!(
                 "exit {}\n{}{}",
                 out.status.code().unwrap_or(-1),
@@ -382,8 +386,7 @@ fn execute(worlds: &Worlds, world: &World, name: &str, args: &Value) -> io::Resu
                 arg("path")?.to_string(),
             ];
             let content = arg("content")?;
-            let mut child = worlds
-                .sandbox_command(world, &argv)?
+            let mut child = sandbox(&argv)?
                 .stdin(Stdio::piped())
                 .stdout(Stdio::null())
                 .stderr(Stdio::piped())
@@ -420,7 +423,7 @@ fn short(args: &Value) -> String {
     }
 }
 
-fn bound(messages: &mut [Value]) {
+pub(crate) fn bound(messages: &mut [Value]) {
     let size = |m: &Value| m.to_string().len();
     let mut total: usize = messages.iter().map(size).sum();
     let end = messages.len().saturating_sub(KEEP_RECENT);
@@ -466,7 +469,7 @@ fn elide(m: &mut Value) {
 }
 
 /// Keep the head and the tail: errors usually sit at the end.
-fn truncate(s: &str) -> String {
+pub(crate) fn truncate(s: &str) -> String {
     if s.len() <= OUTPUT_LIMIT {
         return s.to_string();
     }
@@ -486,7 +489,7 @@ fn truncate(s: &str) -> String {
     )
 }
 
-fn tools() -> Value {
+pub(crate) fn tools() -> Value {
     let tool = |name: &str, description: &str, params: Value| {
         json!({"type": "function", "function": {
             "name": name, "description": description,
