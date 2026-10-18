@@ -121,6 +121,10 @@ function explain(reason) {
   if (/the project folder already holds work in progress/.test(line)) {
     return "ton dossier contient déjà le travail d'une autre demande : commit-la, ou abandonne-la, puis réessaie";
   }
+  m = line.match(/^port (\d+) is already taken/);
+  if (m) return `le port ${m[1]} est déjà pris sur ta machine : arrête ce qui l'occupe, puis rouvre la page`;
+  m = line.match(/^nothing listens on port (\d+) after 30 s/);
+  if (m) return `la page n'a pas démarré : rien n'écoute sur le port ${m[1]} après 30 s`;
   if (/the project folder is on no branch/.test(line)) return "ton dossier n'est sur aucune branche git : fais un checkout d'une branche, puis réessaie";
   m = line.match(/^no model: .* and (\S+)\/models did not answer/);
   const down = unreachable(line);
@@ -248,6 +252,30 @@ function codeButton(item, where) {
         + "Tu peux y modifier le code : au commit, fennec refait les tests avant de mettre le tout dans ton dossier." }),
       el("pre", { textContent: c.folder })];
   });
+}
+
+// A web product is tried in the human's own browser, started as the proof started it.
+// The tab opens on the click itself: one opened after the answer would be blocked.
+function pageButton(item, error) {
+  const button = el("button", { type: "button", textContent: "Ouvrir la page" });
+  button.onclick = async () => {
+    const tab = window.open("", "_blank");
+    button.disabled = true;
+    button.textContent = "Je lance la page…";
+    try {
+      const c = await api("/api/page", { id: item.id });
+      if (tab) tab.location = c.url;
+      else window.location.assign(c.url);
+      error().textContent = "";
+    } catch (e) {
+      tab?.close();
+      error().textContent = explain(e.message);
+    } finally {
+      button.disabled = false;
+      button.textContent = "Ouvrir la page";
+    }
+  };
+  return button;
 }
 
 // Every step, with what was sent to the model, what came back, and what it cost.
@@ -500,6 +528,7 @@ function card(item) {
       fix.replaceWith(action("Envoyer la correction", "/api/amend", () => ({ id: item.id, text: change.value })));
     };
     if (item.land) actions.append(action(landLabel(item.land), "/api/land", { id: item.id }, { primary: true }));
+    if (item.page) actions.append(pageButton(item, () => node.querySelector(".error")));
     actions.append(changesButton(item, () => node.querySelector(".changes-slot")),
       codeButton(item, () => node.querySelector(".changes-slot")), fix,
       action("Passer", "/api/pass", { id: item.id }), el("span", { className: "spacer" }), dropButton(item.id, true));

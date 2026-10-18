@@ -211,6 +211,7 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
             Ok(json!({}))
         }
         ("POST", "/api/open") => work::open(&store, &field(&input()?, "id")),
+        ("POST", "/api/page") => work::page(&store, &field(&input()?, "id")),
         ("POST", "/api/changes") => work::changes(&store, &field(&input()?, "id")),
         ("POST", "/api/journal") => work::journal(&store, &field(&input()?, "id")),
         ("GET", "/api/stats") => work::overview(&store),

@@ -291,6 +291,7 @@ fn classify(requests: &[(String, Value)], projects: &[String]) -> Value {
                 c["shots"] = r["proof"]["shots"].clone();
                 c["land_error"] = r["land_error"].clone();
                 c["here"] = json!(in_folder(r));
+                c["page"] = json!(r["proof"]["serve"].is_string());
                 c["amend_error"] = r["amend_error"].clone();
                 c["summary"] = r["summary"].clone();
                 c["files"] = r["files"].clone();
