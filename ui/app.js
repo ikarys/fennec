@@ -78,6 +78,19 @@ function saveTheme(id) {
 
 applyTheme();
 
+// Les barres latérales se ferment une fois, restent fermées : comme le thème,
+// une préférence d'affichage gardée en localStorage.
+const SIDE_KEY = "fennec.side";
+const FACTS_KEY = "fennec.facts";
+const pref = (key) => { try { return localStorage.getItem(key); } catch { return null; } };
+const setPref = (key, value) => {
+  try { value ? localStorage.setItem(key, value) : localStorage.removeItem(key); } catch { /* pour cette session */ }
+};
+const setSide = (off) => { document.body.classList.toggle("side-off", off); setPref(SIDE_KEY, off ? "off" : null); };
+const setFacts = (off) => { document.body.classList.toggle("facts-off", off); setPref(FACTS_KEY, off ? "off" : null); };
+if (pref(SIDE_KEY)) document.body.classList.add("side-off");
+if (pref(FACTS_KEY)) document.body.classList.add("facts-off");
+
 // The interface's scale, chosen in the settings: a zoom on the document root,
 // so fonts and spacing grow together and no box overflows. A display-only
 // preference kept in localStorage, like the theme.
@@ -603,7 +616,13 @@ function underway(item) {
     sure.style.color = "var(--bad)";
     stop.replaceWith(sure);
   };
-  const bar = el("div", { className: "past-actions run-actions" }, stop,
+  const bar = el("div", { className: "past-actions run-actions" },
+    // Queued or mid-commit with its worker dead: "Réessayer" starts it
+    // over; "Arrêter" stays the way out.
+    ...(!item.alive && (item.waiting || item.step === "fait le commit")
+      ? [action("Réessayer", "/api/retry", { id: item.id }, { primary: true })]
+      : []),
+    stop,
     el("div", { className: "error", role: "alert" }));
   // The head above says the title; the fold says only what moved since: the
   // step under way and how long it has run.
@@ -1029,6 +1048,15 @@ function reqHead(item, kind) {
     const s = item.stats;
     head.append(el("span", { className: "muted", textContent: `⏱ ${duration(s.ms)} · ↑ ${compact(s.sent)} · ↓ ${compact(s.received)}` }));
   }
+  // The right bar (decisions and figures) folds away: the icon stays in the head.
+  const facts = el("button", { type: "button", className: "link", id: "toggle-facts" });
+  setIcon(facts, "panelRight");
+  const paint = () => facts.setAttribute("aria-label",
+    facts.setAttribute("title", document.body.classList.contains("facts-off")
+      ? "Afficher le coût" : "Masquer le coût"));
+  paint();
+  facts.onclick = () => { setFacts(!document.body.classList.contains("facts-off")); paint(); };
+  head.append(facts);
   return head;
 }
 
@@ -1571,11 +1599,15 @@ function showDetail(found) {
   // A committed request has nothing left to decide: tabs, but no panel.
   const panel = decide?.querySelector("button") ? decide : null;
   const facts = [...node.querySelectorAll(".facts")];
+  // The right bar always exists on a request page, so it can be closed:
+  // without figures yet, it says so instead of disappearing.
+  const cost = facts.length ? facts : [el("div", { className: "facts" },
+    el("p", { className: "muted", textContent: "Pas encore de mesure : les chiffres apparaîtront dès que fennec travaillera." }))];
   chatBox = null;
-  $("pick").replaceChildren(reqHead(item, kind), panel || facts.length
-    ? el("div", { className: "split" }, main, el("aside", {}, panel,
-      facts.length ? el("h2", { textContent: "Coût et isolement" }) : null, ...facts))
-    : main);
+  $("pick").replaceChildren(reqHead(item, kind),
+    el("div", { className: "split" }, main, el("aside", {}, panel,
+      el("h2", { textContent: "Coût et isolement" }), ...cost)));
+  $("toggle-facts").hidden = false;
 }
 
 // Lucide-style strokes (24 × 24), drawn by CSS as a mask in the button's colour.
@@ -1596,6 +1628,8 @@ const ICONS = {
   save: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/>',
   retry: '<path d="M3 12a9 9 0 0 1 15.7-6L21 8M21 3v5h-5M21 12a9 9 0 0 1-15.7 6L3 16M8 16H3v5"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
+  panelLeft: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/>',
+  panelRight: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/>',
   close: '<path d="M18 6 6 18M6 6l12 12"/>',
   send: '<path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/>',
   clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
@@ -1785,6 +1819,9 @@ $("new-chat").onclick = () => openPicker("chat", "Nouvelle discussion", "");
 $("side-chats").onclick = () => {
   location.hash === "#chat" ? refresh(true) : (location.hash = "#chat");
 };
+// The left bar folds to the edge: its icon reopens it from the top of the list.
+$("close-side").onclick = () => setSide(true);
+$("open-side").onclick = $("open-side-2").onclick = () => setSide(false);
 $("picker-go").onsubmit = (e) => {
   e.preventDefault();
   browse($("picker-input").value.trim()).catch(() => ($("picker-path").textContent = "Dossier introuvable : " + $("picker-input").value));
