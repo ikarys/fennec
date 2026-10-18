@@ -655,6 +655,7 @@ fn apply_run(request: &mut Value, record: &Value) {
         {
             request["summary"] = t["summary"].clone();
             request["files"] = json!(changed_files(t["diff"].as_str().unwrap_or("")));
+            request["skills"] = t["skills"].clone();
         }
     } else if let Some(t) = record["attempts"]
         .as_array()

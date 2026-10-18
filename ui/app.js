@@ -211,6 +211,8 @@ function work(item) {
     nodes.push(el("div", { className: "files" }, "Fichiers : ",
       ...item.files.flatMap((f, i) => [i ? ", " : "", el("code", { textContent: f })])));
   }
+  // Which of the project's skills the work read: the Journal shows where.
+  if (item.skills?.length) nodes.push(el("div", { className: "files" }, "Skills utilisés : ", item.skills.join(", ")));
   return nodes;
 }
 
@@ -1161,7 +1163,36 @@ async function showPage(path) {
   place.onchange = () => api("/api/projects", { path, place: place.value })
     .catch((e) => { $("page-error").textContent = e.message; place.value = p.place; });
   showRules(path, rules);
+  showSkills(path, await api("/api/skills", { project: path }));
 }
+
+// The skills this project's work may use, among those on the machine.
+let skills = [];
+function showSkills(path, list) {
+  skills = list;
+  const chosen = list.filter((s) => s.chosen);
+  const box = $("page-skills");
+  box.querySelector("summary").textContent = chosen.length ? `Skills (${chosen.length})` : "Skills : aucun choisi";
+  const entry = (s, label, on) => {
+    const b = el("button", { type: "button", textContent: label });
+    b.onclick = async () => {
+      try {
+        showSkills(path, await api("/api/skills", { project: path, name: s.name, on }));
+      } catch (e) {
+        $("page-error").textContent = e.message;
+      }
+    };
+    return el("li", { title: `${s.description}\n${s.from}` }, el("strong", { textContent: s.name }),
+      el("span", { className: "what", textContent: s.description }), b);
+  };
+  $("skills-chosen").replaceChildren(...chosen.map((s) => entry(s, "Retirer", false)));
+  const q = $("skill-search").value.trim().toLowerCase();
+  const rest = list.filter((s) => !s.chosen && (!q || (s.name + " " + s.description).toLowerCase().includes(q)));
+  $("skills-all").replaceChildren(...rest.slice(0, 8).map((s) => entry(s, "Ajouter", true)),
+    ...(rest.length > 8 ? [el("li", { className: "muted", textContent: `et ${rest.length - 8} autres : cherche par nom ou par but` })] : []),
+    ...(list.length ? [] : [el("li", { className: "muted", textContent: "Aucun skill sur cette machine." })]));
+}
+$("skill-search").oninput = () => showSkills(paged, skills);
 
 function showRules(path, rules) {
   const box = $("page-rules");

@@ -51,7 +51,9 @@ variables override them.
    (isolated, without network, failed tries undone; model time, tokens, cache,
    speed) on each card, in the "Stats" dialog and on the project page, which
    also sets where fennec works ("Dans le dossier" or "À part") and lists the
-   rules followed, to add or take back.
+   rules followed, to add or take back. A fourth, asked for too (2026-10-18):
+   "Skills", the person's own word for the Agent Skills they keep, chosen on the
+   project page and named on a request when its work read one.
 3. **Nothing is "ready" without proof.** What could not be proven is shown as
    "not verified: X".
 4. **Execution logic goes in fennec-os**, not here. This repository stays thin.
