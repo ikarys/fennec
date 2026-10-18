@@ -40,6 +40,7 @@ fn main() {
 
 fn serve(addr: &str) -> io::Result<()> {
     work::recover(&Store::from_env()?)?;
+    fennec_os::chat::recover(&Worlds::from_env()?)?;
     // The old per-project skill choice moves to the global list, once.
     {
         let store = Store::from_env()?;
