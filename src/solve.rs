@@ -519,7 +519,9 @@ pub fn plan(worlds: &Worlds, id: &str, model: &dyn Model) -> io::Result<Landing>
         .take(6000)
         .collect();
     let said: Vec<String> = rules::said(project)?.into_iter().map(|s| s.text).collect();
-    let recent = git(project, &["log", "-10", "--format=%s"]).unwrap_or_default();
+    // From the human's branch: in the folder itself, HEAD is the world's
+    // checkpoint ("fennec-os: …"), whose style the model then copied.
+    let recent = git(project, &["log", "-10", "--format=%s", &current, "--"]).unwrap_or_default();
     // A world's branch is fennec's scaffolding, never a place to land: shown
     // to the model, it was picked as the target (UX test 2026-10-18).
     let branches: String = git(project, &["branch", "--format=%(refname:short)"])

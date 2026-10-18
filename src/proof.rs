@@ -273,6 +273,9 @@ fn shoot(
     if !before.is_empty() {
         std::fs::write(dir.join(format!("{name}-before.png")), before)?;
         shot["before"] = json!(format!("{name}-before.png"));
+        // Steps that change nothing on screen show nothing of the work
+        // (UX test 2026-10-18: a task added then deleted, "ready" in green).
+        shot["unchanged"] = json!(before == after);
     }
     std::fs::write(dir.join(format!("{name}.png")), after)?;
     shot["file"] = json!(format!("{name}.png"));
