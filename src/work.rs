@@ -205,7 +205,7 @@ fn transcript(request: &Value) -> String {
 
 /// Once the request is clear, the work starts: no tests are written first
 /// (that is a rule the human may say, not a stage); the proof of the product
-/// is what makes it ready. "Done when" is the request as agreed.
+/// is what makes it ready.
 fn frame_now(store: &Store, id: &str) -> io::Result<()> {
     let request = store.load(id)?;
     let project = Path::new(request["project"].as_str().unwrap_or(""));
@@ -216,11 +216,10 @@ fn frame_now(store: &Store, id: &str) -> io::Result<()> {
         .unwrap_or("")
         .to_string();
     let s = spec::direct(&Worlds::from_env()?, project, &brief)?;
+    // "Done when" stays unset: the request already says it, and the human
+    // would read it twice. The proof falls back to the brief.
     store.update(id, |r| {
         r["spec"] = s["world"].clone();
-        if !r["done_when"].is_string() {
-            r["done_when"] = json!(brief);
-        }
         r["status"] = json!("running");
     })?;
     solve_now(store, id)
@@ -485,7 +484,11 @@ fn solve_now(store: &Store, id: &str) -> io::Result<()> {
     };
     // Tests passing is not "ready": the product is tried first.
     store.update(id, |r| r["status"] = json!("proving"))?;
-    let done_when = store.load(id)?["done_when"].as_str().map(str::to_string);
+    let r = store.load(id)?;
+    let done_when = [&r["done_when"], &r["brief"], &r["text"]]
+        .into_iter()
+        .find_map(Value::as_str)
+        .map(str::to_string);
     let prover = staffed(OpenAi::variants_from_env(1)?.remove(0), project, "prove")?;
     let watched = Live::new(&prover, store.live_path(id)?);
     let proof = proof::gather(&worlds, run, done_when.as_deref(), &watched)?;
