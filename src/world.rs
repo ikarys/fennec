@@ -451,6 +451,32 @@ pub fn held(project: &Path) -> io::Result<Option<Held>> {
     Ok(None)
 }
 
+/// A file the human changed through fennec (a rule in AGENTS.md) would hold
+/// the folder until they commit it: where worlds go in the folder itself, it
+/// is committed alone on their branch. Never on a world's branch, whose work
+/// it would join.
+pub fn keep(project: &Path, file: &str, message: &str) -> io::Result<()> {
+    if workspace(project) != "here" {
+        return Ok(());
+    }
+    // Not a repository yet: no world can hold it either.
+    let Ok(branch) = git(project, &["branch", "--show-current"]) else {
+        return Ok(());
+    };
+    // ponytail: during work in the folder the file stays uncommitted there
+    // and joins that work, or goes with a failed attempt; commit it on the
+    // human's branch with plumbing if that bites.
+    if branch.is_empty() || branch.starts_with("world/") {
+        return Ok(());
+    }
+    if git(project, &["status", "--porcelain", "--", file])?.is_empty() {
+        return Ok(());
+    }
+    git(project, &["add", "--", file])?;
+    git(project, &["commit", "-q", "-m", message, "--", file])?;
+    Ok(())
+}
+
 /// Where a new world of `project` goes; see the module doc.
 fn place(project: &Path) -> io::Result<Place> {
     let chosen = git(project, &["config", "--get", "fennec.workspace"]).unwrap_or_default();
