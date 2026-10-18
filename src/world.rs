@@ -259,10 +259,56 @@ impl Worlds {
     }
 
     fn sandboxed(&self, world: &World, argv: &[String], net: bool) -> io::Result<Command> {
+        let common = self.common_dir(world)?;
+        // Granted host paths: read-write, after the hidden home they sit in.
+        let mut mounts: Vec<(bool, PathBuf, PathBuf)> = crate::grant::paths(self, &world.id)?
+            .into_iter()
+            .map(|p| (true, p.clone(), p))
+            .collect();
+        mounts.extend(self.skill_mounts(&crate::skill::mounted(self, &world.id)));
+        // Order matters: later mounts land on top of earlier ones. The store
+        // comes last: a world in the project folder holds it (`.git`), and
+        // the worktree's admin dir lives inside it; read-only either way, as
+        // its config steers every harness git call.
+        mounts.push((true, world.path.clone(), world.path.clone()));
+        mounts.push((false, common.clone(), common));
+        self.jail(&world.path, &mounts, net, argv)
+    }
+
+    /// The command that runs `argv` in a sandbox over a folder of the
+    /// human's that is no world: the same isolation, `dir` read-write and
+    /// `skills` read-only. Only for a folder they chose (`chat`).
+    pub fn sandbox_folder(
+        &self,
+        dir: &Path,
+        skills: &[(String, PathBuf)],
+        argv: &[String],
+    ) -> io::Result<Command> {
+        let mut mounts = self.skill_mounts(skills);
+        mounts.push((true, dir.to_path_buf(), dir.to_path_buf()));
+        self.jail(dir, &mounts, false, argv)
+    }
+
+    /// Skills, read-only, where the brief says they are.
+    fn skill_mounts(&self, skills: &[(String, PathBuf)]) -> Vec<(bool, PathBuf, PathBuf)> {
+        skills
+            .iter()
+            .filter(|(name, dir)| !name.contains('/') && dir.is_dir())
+            .map(|(name, dir)| (false, dir.clone(), self.home.join(".skills").join(name)))
+            .collect()
+    }
+
+    /// bwrap over `mounts` (read-write?, host path, sandbox path), in order.
+    fn jail(
+        &self,
+        dir: &Path,
+        mounts: &[(bool, PathBuf, PathBuf)],
+        net: bool,
+        argv: &[String],
+    ) -> io::Result<Command> {
         if argv.is_empty() {
             return Err(io::Error::other("nothing to run"));
         }
-        let common = self.common_dir(world)?;
         let mut cmd = Command::new("bwrap");
         // /run holds the session bus and daemon sockets: a path to the host
         // that no network namespace closes.
@@ -272,29 +318,12 @@ impl Worlds {
         for p in self.ro_paths.iter().filter(|p| p.exists()) {
             cmd.arg("--ro-bind").arg(p).arg(p);
         }
-        // Granted host paths: read-write, after the hidden home they sit in.
-        for p in crate::grant::paths(self, &world.id)? {
-            cmd.arg("--bind").arg(&p).arg(&p);
+        for (rw, from, to) in mounts {
+            cmd.arg(if *rw { "--bind" } else { "--ro-bind" })
+                .arg(from)
+                .arg(to);
         }
-        // The project's skills, read-only, where the brief says they are.
-        for (name, dir) in crate::skill::mounted(self, &world.id) {
-            if !name.contains('/') && dir.is_dir() {
-                cmd.arg("--ro-bind")
-                    .arg(&dir)
-                    .arg(self.home.join(".skills").join(name));
-            }
-        }
-        // Order matters: later mounts land on top of earlier ones. The store
-        // comes last: a world in the project folder holds it (`.git`), and
-        // the worktree's admin dir lives inside it; read-only either way, as
-        // its config steers every harness git call.
-        cmd.arg("--bind")
-            .arg(&world.path)
-            .arg(&world.path)
-            .arg("--ro-bind")
-            .arg(&common)
-            .arg(&common)
-            .args(["--unshare-all", "--die-with-parent", "--new-session"])
+        cmd.args(["--unshare-all", "--die-with-parent", "--new-session"])
             .args(if net { &["--share-net"][..] } else { &[] })
             // Every file in the world is the work: a bytecode cache written
             // by running the tests would fail a protected path, or land.
@@ -306,7 +335,7 @@ impl Worlds {
             .arg("HOME")
             .arg(&self.home)
             .arg("--chdir")
-            .arg(&world.path)
+            .arg(dir)
             .arg("--");
         // The cap is set inside the sandbox, so it binds the command and
         // everything it spawns. The data limit, not `-v`: since Linux 4.7 it
