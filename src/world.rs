@@ -276,6 +276,14 @@ impl Worlds {
         for p in crate::grant::paths(self, &world.id)? {
             cmd.arg("--bind").arg(&p).arg(&p);
         }
+        // The project's skills, read-only, where the brief says they are.
+        for (name, dir) in crate::skill::mounted(self, &world.id) {
+            if !name.contains('/') && dir.is_dir() {
+                cmd.arg("--ro-bind")
+                    .arg(&dir)
+                    .arg(self.home.join(".skills").join(name));
+            }
+        }
         // Order matters: later mounts land on top of earlier ones. The store
         // comes last: a world in the project folder holds it (`.git`), and
         // the worktree's admin dir lives inside it; read-only either way, as
@@ -293,6 +301,10 @@ impl Worlds {
             // ponytail: Python only; another tool's untracked cache needs its
             // own switch, or the project's .gitignore.
             .args(["--setenv", "PYTHONDONTWRITEBYTECODE", "1"])
+            // `~` is the hidden home, where skills are mounted.
+            .arg("--setenv")
+            .arg("HOME")
+            .arg(&self.home)
             .arg("--chdir")
             .arg(&world.path)
             .arg("--");
@@ -404,6 +416,7 @@ impl Worlds {
             }
             git(&world.path, &["branch", "-q", "-D", &branch])?;
             std::fs::remove_file(self.root.join("meta").join(&world.id))?;
+            let _ = std::fs::remove_file(self.root.join("skills").join(&world.id));
             return Ok(());
         }
         // Delete the files ourselves rather than trust `worktree remove` with a
@@ -422,6 +435,7 @@ impl Worlds {
             ],
         )?;
         std::fs::remove_file(self.root.join("meta").join(&world.id))?;
+        let _ = std::fs::remove_file(self.root.join("skills").join(&world.id));
         Ok(())
     }
 }

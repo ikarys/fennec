@@ -11,7 +11,7 @@ use std::sync::Mutex;
 use common::Fixture;
 use fennec_os::provider::Model;
 use fennec_os::solve::{Task, land, plan, push, solve};
-use fennec_os::{grant, proof, review, rules, sleep, spec};
+use fennec_os::{grant, proof, review, rules, skill, sleep, spec};
 use serde_json::{Value, json};
 
 struct Script {
@@ -148,6 +148,48 @@ fn attempts_run_in_turn_and_the_first_pass_lands() {
     );
     assert!(f.worlds.list().unwrap().is_empty());
     assert!(land(&f.worlds, &winner, None, None).is_err());
+}
+
+#[test]
+fn a_chosen_skill_is_listed_mounted_read_only_and_traced() {
+    let f = fixture("skill");
+    let dir = f.project.join(".claude/skills/answer");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("SKILL.md"),
+        "---\nname: answer\ndescription: How this person answers.\n---\nAlways 42.\n",
+    )
+    .unwrap();
+    assert_eq!(skill::catalog(&f.project).unwrap()[0].name, "answer");
+    assert!(skill::chosen(&f.project).unwrap().is_empty());
+    skill::choose(&f.project, "answer", true).unwrap();
+    skill::choose(&f.project, "answer", true).unwrap();
+    assert_eq!(skill::chosen(&f.project).unwrap().len(), 1);
+
+    let reader = Script::new(
+        "reader",
+        &[
+            (
+                "shell",
+                json!({"command": "cat ~/.skills/answer/SKILL.md && ! touch ~/.skills/answer/x"}),
+            ),
+            write("answer", "42\n"),
+            done(),
+        ],
+    );
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&reader], 10).unwrap();
+    let attempt = &record["attempts"][0];
+    let said = attempt["messages"].to_string();
+    assert!(said.contains("answer: How this person answers."), "{said}");
+    // Read inside the sandbox, and read-only: the touch failed, so exit 0.
+    assert!(
+        said.contains("exit 0") && said.contains("Always 42."),
+        "{said}"
+    );
+    assert_eq!(attempt["skills"], json!(["answer"]), "{attempt:#}");
+
+    skill::choose(&f.project, "answer", false).unwrap();
+    assert!(skill::chosen(&f.project).unwrap().is_empty());
 }
 
 #[test]

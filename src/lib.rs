@@ -7,6 +7,7 @@ pub mod review;
 pub mod rules;
 pub mod schedule;
 pub mod serve;
+pub mod skill;
 pub mod sleep;
 pub mod solve;
 pub mod spec;

@@ -29,6 +29,9 @@ src/team.rs      named teams of roles that brief the agent per stage (frame = th
                  from `catalog/`; a project picks one in `.fennec-os/team.json`, overrides in `.fennec-os/team/`
                  a `prove` role's `check:` lines run on every proof: a failure is a veto
                  a role's `model:` is the model its stage runs on instead of the settings'
+src/skill.rs     skills (Agent Skills folders, `SKILL.md`) read where the person keeps them (~/.config/fennec/skills,
+                 ~/.claude/skills and plugins, the project's .claude/skills); chosen per project (`git config
+                 fennec.skill`); listed to the agent, mounted read-only at ~/.skills/<name>, traced from the reads
 src/review.rs    review queue, rejections, corrections said twice, agenda
 src/sleep.rs     landed runs → candidate know-how (`.fennec-os/knowhow.md`)
 src/schedule.rs  background work (sleep) waits while interactive work (solve) runs
