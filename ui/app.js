@@ -71,20 +71,101 @@ function rich(text) {
     : part.split("**").map((p, j) => (j % 2 ? el("b", { textContent: p }) : p))));
 }
 
-// Models write Markdown: its lines become paragraphs and lists, not one block.
+// `**words**` in bold, `code` as code, [label](url) as a link, the rest plain.
+function inline(text) {
+  const out = [];
+  const rest = text ?? "";
+  const re = /(`[^`\n]+`)|(\*\*[^*\n]+?\*\*)|(\[[^\]\n]*\]\([^)\s]+\))|(\*[^*\n]+\*)/g;
+  let last = 0;
+  let m;
+  while ((m = re.exec(rest))) {
+    if (m.index > last) out.push(rest.slice(last, m.index));
+    if (m[1]) out.push(el("code", { textContent: m[1].slice(1, -1) }));
+    else if (m[2]) out.push(el("b", {}, ...inline(m[2].slice(2, -2))));
+    else if (m[3]) {
+      const link = m[3].match(/^\[([^\]\n]*)\]\(([^)\s]+)\)$/);
+      out.push(el("a", { href: link[2], target: "_blank", rel: "noreferrer" }, ...inline(link[1])));
+    }
+    else out.push(el("i", {}, ...inline(m[4].slice(1, -1))));
+    last = m.index + m[0].length;
+  }
+  if (last < rest.length) out.push(rest.slice(last));
+  return out;
+}
+
+// Models write Markdown: its lines become headings, lists, tables and code,
+// not one block of raw symbols.
 function md(text) {
+  const lines = (text ?? "").split("\n");
   const blocks = [];
-  let list = null;
-  for (const raw of (text ?? "").split("\n")) {
-    const l = raw.trim();
-    const item = l.match(/^(?:[-*]|\d+[.)])\s+(.*)/);
-    if (item) {
-      if (!list) blocks.push((list = el("ul")));
-      list.append(el("li", {}, ...rich(item[1])));
+  const lists = [];
+  const cells = (line) => line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+  const separator = (l) => l.includes("-") && /^\s*\|?[\s:|-]+\|?\s*$/.test(l);
+  let i = 0;
+  while (i < lines.length) {
+    const l = lines[i];
+    const fence = l.match(/^\s*(`{3,}|~{3,})/);
+    if (fence) {
+      const close = fence[1][0].repeat(3);
+      const buf = [];
+      i++;
+      while (i < lines.length && !lines[i].trimStart().startsWith(close)) buf.push(lines[i++]);
+      i++;
+      blocks.push(el("pre", { textContent: buf.join("\n") }));
+      lists.length = 0;
       continue;
     }
-    list = null;
-    if (l) blocks.push(el("p", {}, ...rich(l.replace(/^#+\s*/, ""))));
+    const head = l.match(/^\s{0,3}(#{1,6})\s+(.*)$/);
+    if (head) {
+      blocks.push(el(`h${head[1].length}`, {}, ...inline(head[2].trim())));
+      lists.length = 0;
+      i++;
+      continue;
+    }
+    if (l.includes("|") && i + 1 < lines.length && separator(lines[i + 1])) {
+      const rows = [];
+      while (i < lines.length && lines[i].includes("|") && lines[i].trim()) rows.push(lines[i++]);
+      const [h, , ...body] = rows;
+      const table = el("table", { className: "grid" },
+        el("thead", {}, el("tr", {}, ...cells(h).map((c) => el("th", {}, ...inline(c))))));
+      if (body.length) table.append(el("tbody", {},
+        ...body.map((r) => el("tr", {}, ...cells(r).map((c) => el("td", {}, ...inline(c)))))));
+      blocks.push(table);
+      lists.length = 0;
+      continue;
+    }
+    const item = l.match(/^(\s*)(?:([-*+])|(\d+)[.)])\s+(.*)$/);
+    if (item) {
+      const indent = item[1].replace(/\t/g, "    ").length;
+      while (lists.length && lists.at(-1).indent > indent) lists.pop();
+      const top = lists.at(-1);
+      const li = el("li", {}, ...inline(item[4]));
+      if (top && top.indent === indent) {
+        top.node.append(li);
+        lists.push({ indent, node: top.node, li });
+      } else {
+        const node = el(item[3] ? "ol" : "ul");
+        node.append(li);
+        if (top) top.li.append(node); else blocks.push(node);
+        lists.push({ indent, node, li });
+      }
+      i++;
+      continue;
+    }
+    lists.length = 0;
+    if (/^\s*>/.test(l)) {
+      const buf = [];
+      while (i < lines.length && /^\s*>/.test(lines[i])) buf.push(lines[i++].replace(/^\s*> ?/, ""));
+      blocks.push(el("blockquote", {}, ...md(buf.join("\n"))));
+      continue;
+    }
+    if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(l)) {
+      blocks.push(el("hr"));
+      i++;
+      continue;
+    }
+    if (l.trim()) blocks.push(el("p", {}, ...inline(l)));
+    i++;
   }
   return blocks;
 }
@@ -629,10 +710,15 @@ function pastState(item) {
 }
 
 // The address names the project and the request read in full:
-// "#<project>/<request>", either part may be empty.
+// "#<project>/<request>", either part may be empty. The project is
+// percent-encoded, so only a raw slash ever names the request.
 const where = () => {
-  const [path = "", id = ""] = location.hash.slice(1).split("/");
-  return { path: decodeURIComponent(path), id };
+  const raw = location.hash.slice(1);
+  const i = raw.lastIndexOf("/");
+  return {
+    path: i < 0 ? decodeURIComponent(raw) : decodeURIComponent(raw.slice(0, i)),
+    id: i < 0 ? "" : raw.slice(i + 1),
+  };
 };
 const hashOf = (path, id) => "#" + encodeURIComponent(path) + (id ? "/" + id : "");
 let picked = where().id;
@@ -672,11 +758,17 @@ function renderSide(view) {
   $("side-all").parentElement.hidden = view.projects.length < 2;
   $("side-projects").replaceChildren(...view.projects.map((p) => el("li", {},
     entry(el("button", { type: "button", className: "item", title: p.path }, el("span", { className: "name", textContent: p.name })), p.path, view.todo))));
+  const page = PAGES.includes(where().path) ? where().path : "";
+  $("open-team").setAttribute("aria-current", String(page === "team"));
+  $("open-stats").setAttribute("aria-current", String(page === "stats"));
+  $("open-settings").setAttribute("aria-current", String(page === "settings"));
 }
 
 // The chosen project is the one on screen: its requests only, kept in the
 // address so a reload or a bookmark comes back to it.
 function focusOn(path) {
+  // A discussion or a page owns the address: the project's page must not take it back.
+  if (["chat", "team", "stats", "settings"].includes(where().path)) return;
   document.body.classList.toggle("focused", !!path);
   if (path !== paged) showPage(path).catch((e) => ($("page-error").textContent = e.message));
   history.replaceState(null, "", path || picked ? hashOf(path, picked) : location.pathname);
@@ -695,6 +787,249 @@ const tick = () => document.querySelectorAll(".elapsed").forEach((e) => {
 });
 setInterval(tick, 1000);
 
+// The discussion list, and the chosen one read in full: the chat file is the
+// exchange, so every refresh reads it again and redraws what moved.
+let chatBox = null;
+async function showChats() {
+  document.body.classList.add("chats", "picked");
+  $("chats").hidden = false;
+  $("page").hidden = true;
+  $("hint").hidden = true;
+  for (const name of PAGES) $(name).hidden = true;
+  $("side-chats").setAttribute("aria-current", "true");
+  let chats;
+  try {
+    chats = await api("/api/chats");
+  } catch (e) {
+    $("chat-list").replaceChildren(el("div", { className: "empty", textContent: e.message }));
+    return;
+  }
+  $("chat-list").replaceChildren(...(chats.length ? chats.map(chatRow)
+    : [el("div", { className: "empty", textContent: "Aucune discussion : « Nouvelle discussion » pour en démarrer." })]));
+  const id = where().id;
+  if (!id) {
+    chatBox = null;
+    detailed = "";
+    return $("pick").replaceChildren();
+  }
+  let c;
+  try {
+    c = await api("/api/chat", { id });
+  } catch (e) {
+    chatBox = null;
+    detailed = "";
+    return $("pick").replaceChildren(el("div", { className: "card" }, el("div", { className: "bad", textContent: explain(e.message) })));
+  }
+  if (where().id !== id) return; // the page moved on while reading
+  showChat(c);
+}
+
+function chatRow(c) {
+  const a = el("a", { className: "row", href: "#chat/" + c.id },
+    line({ id: c.id, project: c.folder.split("/").pop(), title: c.title, since: c.since },
+      c.status === "thinking" ? "répond…" : c.status === "waiting" ? "une question" : "prête",
+      c.status === "thinking"));
+  a.setAttribute("aria-current", String(c.id === where().id));
+  return a;
+}
+
+function showChat(c) {
+  const thinking = c.status === "thinking";
+  const fresh = !chatBox || chatBox.id !== c.id;
+  if (fresh) {
+    const composer = chatComposer(c.id);
+    const head = el("div", { className: "chat-head" });
+    const thread = el("div", { className: "thread" });
+    const aside = el("aside", { className: "chat-side" });
+    chatBox = { id: c.id, composer, head, thread, aside, asideKey: "" };
+    detailed = "";
+    $("pick").replaceChildren(el("div", { className: "split" },
+      el("div", { className: "card chat" }, head, thread, composer.node,
+        el("div", { className: "error", id: "chat-error", role: "alert" })),
+      aside));
+  }
+  const box = chatBox;
+  box.head.replaceChildren(
+    el("div", { className: "meta", style: `--c: ${c.project ? "var(--ok)" : "var(--muted)"}` },
+      el("span", { className: "tag", textContent: c.project ? "Projet" : "Dossier" }),
+      el("span", { className: "proj", textContent: c.folder })),
+    el("div", { className: "title", textContent: chatTitle(c) }));
+  // What was opened stays open as new messages come in; the page follows the
+  // turn to the bottom, unless the person scrolled up to read.
+  const detail = $("detail");
+  const follow = fresh || detail.scrollHeight - detail.scrollTop - detail.clientHeight < 80;
+  const opened = [...box.thread.querySelectorAll("details")].map((d) => d.open);
+  box.thread.replaceChildren(...chatThread(c));
+  if (thinking) box.thread.append(el("div", { className: "thinking" }, el("span", { className: "dot" }), "fennec répond…"));
+  // A turn that waits on the person is the last thing on screen: on top of
+  // the exchange, it would read as a turn that stopped answering.
+  if (c.status === "waiting" && c.pending) {
+    box.thread.append(chatQuestion(c));
+    box.thread.append(el("div", { className: "thinking" }, el("span", { className: "dot" }), "fennec attend ta réponse"));
+  }
+  if (c.error) box.thread.append(el("div", { className: "bad", textContent: explain(c.error) }));
+  box.thread.querySelectorAll("details").forEach((d, i) => { d.open = opened[i] ?? false; });
+  const busy = thinking || c.status === "waiting";
+  box.composer.send.disabled = busy;
+  box.composer.stop.hidden = !busy;
+  const asideKey = JSON.stringify([c.skills, c.stats, c.project, c.grants]);
+  if (box.asideKey !== asideKey) {
+    box.asideKey = asideKey;
+    box.aside.replaceChildren(...chatAside(c));
+  }
+  if (follow) detail.scrollTop = detail.scrollHeight;
+}
+
+// A call named a path outside the folder the person chose: fennec asks
+// before running it. "Ouvrir" opens that path's folder for the chat; the
+// refusal covers this call only.
+function chatQuestion(c) {
+  const p = c.pending ?? {};
+  const open = el("button", { type: "button", className: "primary", textContent: "Ouvrir le dossier" });
+  const refuse = el("button", { type: "button", className: "quiet", textContent: "Refuser" });
+  const decide = async (allow) => {
+    $("chat-error").textContent = "";
+    try {
+      await api("/api/chat/decide", { id: c.id, allow });
+    } catch (e) {
+      $("chat-error").textContent = e.message;
+    }
+  };
+  open.onclick = () => decide(true);
+  refuse.onclick = () => decide(false);
+  return el("div", { className: "ask" },
+    el("span", { className: "muted", textContent: "fennec demande" }),
+    el("code", { title: p.path, textContent: p.path }),
+    el("span", { className: "muted", title: p.directory, textContent: p.directory }),
+    open, refuse);
+}
+
+function chatTitle(c) {
+  const first = (c.messages ?? []).find((m) => m.role === "user")?.content;
+  if (!first) return "Nouvelle discussion";
+  const line = (first.split("\n").find((l) => l.trim()) ?? "").trim();
+  return line.length > 60 ? line.slice(0, 60) + "…" : line;
+}
+
+// The exchange: the human's words in bubbles, fennec's in Markdown, the tool
+// calls folded, each with what it brought back.
+function chatThread(c) {
+  const calls = new Map();
+  for (const m of c.messages ?? []) for (const t of m.tool_calls ?? []) calls.set(t.id, t);
+  const results = new Map();
+  for (const m of c.messages ?? []) if (m.role === "tool") results.set(m.tool_call_id, m.content);
+  const nodes = [];
+  for (const m of c.messages ?? []) {
+    if (m.role === "tool") continue;
+    if (m.role === "user") {
+      nodes.push(el("div", { className: "said human" },
+        el("span", { className: "label", textContent: "Toi" }), ...rich(m.content)));
+      continue;
+    }
+    const box = el("div", { className: "said" }, el("span", { className: "label", textContent: "fennec" }));
+    if (m.content) box.append(...md(m.content));
+    for (const t of m.tool_calls ?? []) box.append(toolCall(t, results.get(t.id)));
+    nodes.push(box);
+  }
+  return nodes.length ? nodes : [el("div", { className: "muted", textContent: "Écris ce qui t'intéresse : fennec lit le dossier et répond." })];
+}
+
+function toolCall(t, result) {
+  const args = t.function?.arguments ?? "";
+  const head = `→ ${t.function?.name ?? "?"} ${String(args).replace(/\s+/g, " ").slice(0, 110)}`;
+  return el("details", { className: "message" },
+    el("summary", {}, head),
+    args ? el("pre", { textContent: args }) : null,
+    el("pre", { textContent: result ?? "…" }));
+}
+
+function chatComposer(id) {
+  const text = el("textarea", { placeholder: "Ton message", ariaLabel: "Ton message" });
+  const stop = el("button", { type: "button", className: "quiet", textContent: "Arrêter", hidden: true });
+  const send = el("button", { type: "button", className: "primary", textContent: "Envoyer" });
+  const say = async () => {
+    if (!text.value.trim()) return;
+    try {
+      await api("/api/chat/say", { id, text: text.value });
+      text.value = "";
+      text.focus();
+    } catch (e) {
+      $("chat-error").textContent = e.message;
+    }
+  };
+  send.onclick = say;
+  text.onkeydown = (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); say(); } };
+  stop.onclick = async () => {
+    $("chat-error").textContent = "";
+    try { await api("/api/chat/stop", { id }); }
+    catch (e) { $("chat-error").textContent = e.message; }
+  };
+  return { node: el("div", { className: "chat-composer" }, text,
+    el("div", { className: "chat-actions" }, stop, el("span", { className: "spacer" }), send)),
+    send, stop, text };
+}
+
+function chatAside(c) {
+  const row = (s, on) => {
+    const b = el("button", { type: "button", textContent: on ? "Ajouter" : "Retirer" });
+    b.onclick = async () => {
+      $("chat-error").textContent = "";
+      try {
+        await api("/api/chat/skill", { id: c.id, name: s.name, on });
+        refresh(true);
+      } catch (e) {
+        $("chat-error").textContent = e.message;
+      }
+    };
+    return el("li", { title: `${s.description}\n${s.from}` },
+      el("span", { className: "what", title: s.description }, s.name), b);
+  };
+  const chosen = (c.skills ?? []).filter((s) => s.chosen);
+  const rest = (c.skills ?? []).filter((s) => !s.chosen);
+  const all = chosen.map((s) => row(s, false)).concat(rest.slice(0, 8).map((s) => row(s, true)));
+  const nodes = [el("h2", { textContent: "Skills" }),
+    all.length ? el("ul", {}, ...all) : el("p", { className: "muted", textContent: "Aucun skill sur cette machine." })];
+  // Folders the person opened for this chat: a refusal was not, an opening
+  // stays until taken back.
+  const grants = c.grants ?? [];
+  if (grants.length) {
+    const ul = el("ul");
+    for (const g of grants) {
+      const b = el("button", { type: "button", textContent: "Retirer" });
+      b.onclick = async () => {
+        $("chat-error").textContent = "";
+        try {
+          await api("/api/chat/grant", { id: c.id, directory: g });
+          refresh(true);
+        } catch (e) {
+          $("chat-error").textContent = e.message;
+        }
+      };
+      ul.append(el("li", {}, el("span", { className: "what", title: g }, g), b));
+    }
+    nodes.push(el("h2", { textContent: "Dossiers ouverts" }), ul);
+  }
+  if (c.stats?.turns) nodes.push(el("h2", { textContent: "Coût" }), metrics(c.stats));
+  const button = el("button", { type: "button", className: "convert",
+    textContent: c.project ? "En faire une demande" : "En faire un projet" });
+  button.onclick = async () => {
+    $("chat-error").textContent = "";
+    try {
+      if (c.project) {
+        // The exchange becomes the request's opening, kept in the backlog.
+        const made = await api("/api/chat/request", { id: c.id });
+        location.hash = hashOf(c.folder, made.id);
+      } else {
+        openPicker("project", "En faire un projet", c.folder);
+      }
+    } catch (e) {
+      $("chat-error").textContent = explain(e.message);
+    }
+  };
+  nodes.push(el("h2", { textContent: c.project ? "Demande" : "Projet" }), button);
+  return nodes;
+}
+
 let shown = "";
 async function refresh(force) {
   // Never wipe what the human is typing in the request read in full; the
@@ -705,10 +1040,30 @@ async function refresh(force) {
   try {
     const view = await api("/api/view");
     const json = JSON.stringify(view);
-    if (!force && json === shown) return;
+    const changed = force || json !== shown;
+    // A discussion takes over the page: its file moves under it, so it is
+    // read on every refresh, whatever the requests do.
+    if (where().path === "chat") {
+      if (changed) {
+        shown = typing ? "" : json;
+        renderProjects(view.projects);
+        renderSide(view);
+      }
+      showChats();
+      return;
+    }
+    if (!changed) {
+      document.body.classList.remove("chats");
+      $("chats").hidden = true;
+      $("side-chats").removeAttribute("aria-current");
+      return;
+    }
     // Held while typing: drawn once the field is left, even if nothing moves.
     shown = typing ? "" : json;
     $("error").textContent = "";
+    document.body.classList.remove("chats");
+    $("chats").hidden = true;
+    $("side-chats").removeAttribute("aria-current");
     renderProjects(view.projects);
     renderSide(view);
     const todo = mine(view.todo), running = mine(view.running);
@@ -744,15 +1099,33 @@ async function refresh(force) {
   }
 }
 
-// The right pane: the chosen request in full, or else the project's page.
-// Drawn again only when the request changed, so what the human opened in it stays open.
+// The right pane: the chosen request in full, a page the address names,
+// or else the project's page. Drawn again only when the request changed,
+// so what the human opened in it stays open.
+const PAGES = ["team", "stats", "settings"];
 let detailed = "";
+let shownPageKey = "";
 function showDetail(found) {
-  document.body.classList.toggle("picked", !!found);
-  $("page").hidden = !!found || !paged;
-  $("hint").hidden = !!found || !!paged;
+  const page = PAGES.includes(where().path) ? where().path : "";
+  document.body.classList.toggle("picked", !!found || !!page);
+  $("page").hidden = !!found || !!page || !paged;
+  $("hint").hidden = !!found || !!page || !!paged;
+  for (const name of PAGES) $(name).hidden = name !== page;
   if (!found) {
     detailed = "";
+    chatBox = null;
+    if (page) {
+      // A page stays drawn while its fields are filled: redraw only on entry.
+      const key = page + "|" + $("project").value;
+      if (key !== shownPageKey) {
+        shownPageKey = key;
+        if (page === "team") showTeamPage();
+        if (page === "stats") showStats().catch((e) => ($("stats-error").textContent = e.message));
+        if (page === "settings") showSettingsPage();
+      }
+      return $("pick").replaceChildren();
+    }
+    shownPageKey = "";
     return $("pick").replaceChildren();
   }
   const [item, kind] = found;
@@ -768,6 +1141,7 @@ function showDetail(found) {
   // A committed request has nothing left to decide: tabs, but no panel.
   const panel = decide?.querySelector("button") ? decide : null;
   const facts = [...node.querySelectorAll(".facts")];
+  chatBox = null;
   $("pick").replaceChildren(panel || facts.length
     ? el("div", { className: "split" }, main, el("aside", {}, panel,
       facts.length ? el("h2", { textContent: "Coût et isolement" }) : null, ...facts))
@@ -890,7 +1264,9 @@ $("new-request").addEventListener("submit", async (event) => {
 });
 
 // Folder picker: the server lists folders, since a page cannot read paths.
+// It adds a project, or starts a discussion in the chosen folder.
 let pickerPath = "";
+let pickerMode = "project";
 async function browse(path) {
   const data = await api("/api/folders", { path });
   pickerPath = data.path;
@@ -898,8 +1274,14 @@ async function browse(path) {
   $("picker-path").textContent = data.path + (data.home ? " · ton dossier personnel : choisis un dossier dedans"
     : data.repo ? " · dépôt git"
     : data.empty ? " · dossier vide" : " · pas un dépôt git : choisis un dépôt ou un dossier vide");
-  $("picker-choose").disabled = data.home || (!data.repo && !data.empty);
-  $("picker-choose").textContent = data.repo || !data.empty ? "Ajouter ce dossier" : "Créer le projet ici";
+  if (pickerMode === "chat") {
+    // A discussion works in any folder inside the home, git or not.
+    $("picker-choose").disabled = data.home;
+    $("picker-choose").textContent = "Discuter ici";
+  } else {
+    $("picker-choose").disabled = data.home || (!data.repo && !data.empty);
+    $("picker-choose").textContent = data.repo || !data.empty ? "Ajouter ce dossier" : "Créer le projet ici";
+  }
   const entries = (data.parent ? [{ name: "..", path: data.parent }] : []).concat(data.children);
   $("picker-list").replaceChildren(...entries.map((entry) => {
     const button = el("button", { type: "button", textContent: entry.name });
@@ -921,11 +1303,25 @@ $("picker-new").onsubmit = async (e) => {
   }
 };
 
-$("add-project").onclick = async () => {
+async function openPicker(mode, title, path) {
+  pickerMode = mode;
+  $("picker-title").textContent = title;
+  $("picker-place-wrap").hidden = mode !== "project";
+  try {
+    await browse(path ?? "");
+  } catch (e) {
+    $("picker-path").textContent = e.message;
+  }
+  $("picker").showModal();
+}
+$("add-project").onclick = () => {
   // Next to the projects already there: new ones usually sit beside them.
   const last = $("project").value || [...$("project").options].at(-1)?.value || "";
-  await browse(pickerPath || last.replace(/\/[^/]+$/, ""));
-  $("picker").showModal();
+  openPicker("project", "Ajouter un projet", pickerPath || last.replace(/\/[^/]+$/, ""));
+};
+$("new-chat").onclick = () => openPicker("chat", "Nouvelle discussion", "");
+$("side-chats").onclick = () => {
+  location.hash === "#chat" ? refresh(true) : (location.hash = "#chat");
 };
 $("picker-go").onsubmit = (e) => {
   e.preventDefault();
@@ -934,6 +1330,13 @@ $("picker-go").onsubmit = (e) => {
 $("picker-cancel").onclick = () => $("picker").close();
 $("picker-choose").onclick = async () => {
   try {
+    if (pickerMode === "chat") {
+      // A folder becomes a discussion: the address names it, the page follows.
+      const made = await api("/api/chats", { folder: pickerPath });
+      $("picker").close();
+      location.hash = "#chat/" + made.id;
+      return;
+    }
     await api("/api/projects", { path: pickerPath, place: $("picker-place").value });
     $("picker").close();
     // A project just added is the one the next request is for.
@@ -1040,20 +1443,31 @@ $("team-save").onsubmit = async (e) => {
   }
 };
 
-$("open-team").onclick = async () => {
+// The team of the chosen project, as a page the address names: #team.
+async function showTeamPage() {
+  $("team-role").hidden = $("team-save").hidden = true;
+  $("team-error").textContent = "";
   const project = $("project").value;
   if (!project) {
-    $("error").textContent = "Choisis d'abord le projet dont tu veux voir l'équipe.";
+    $("team-title").textContent = "Équipe";
+    $("team-body").hidden = true;
+    $("team-hint").hidden = false;
+    $("team-name").replaceChildren();
+    $("team-roles").replaceChildren();
+    $("team-catalog").replaceChildren();
     return;
   }
   $("team-title").textContent = `Équipe — ${$("project").selectedOptions[0].textContent}`;
+  $("team-body").hidden = false;
+  $("team-hint").hidden = true;
   try {
     renderTeam(await api("/api/team", { project }));
-    $("team-role").hidden = $("team-save").hidden = true;
-    $("team").showModal();
   } catch (e) {
-    $("error").textContent = e.message;
+    $("team-error").textContent = e.message;
   }
+}
+$("open-team").onclick = () => {
+  location.hash === "#team" ? refresh(true) : (location.hash = "#team");
 };
 // Another team starts whole: what was left out belonged to the old one.
 $("team-name").onchange = () => teamCall("/api/team/choose", { team: $("team-name").value, remove: [] });
@@ -1061,7 +1475,6 @@ $("team-add").onsubmit = (e) => {
   e.preventDefault();
   if ($("team-catalog").value) teamCall("/api/team/add", { role: $("team-catalog").value });
 };
-$("team-close").onclick = () => $("team").close();
 
 refresh();
 setInterval(refresh, 3000);
@@ -1086,7 +1499,7 @@ async function listModels() {
     if (ask === asked) $("settings-status").textContent = unreachable(e.message) ?? e.message;
   }
 }
-$("open-settings").onclick = async () => {
+async function showSettingsPage() {
   try {
     const s = await api("/api/settings", {});
     chosen = s.models;
@@ -1097,11 +1510,14 @@ $("open-settings").onclick = async () => {
     $("settings-env").hidden = !s.env.length;
     $("settings-env").textContent = `Au lancement, ${s.env.join(", ")} passe avant ces réglages.`;
     $("settings-error").textContent = "";
-    $("settings").showModal();
     listModels();
+    showSkillList();
   } catch (e) {
-    $("error").textContent = e.message;
+    $("settings-error").textContent = e.message;
   }
+}
+$("open-settings").onclick = () => {
+  location.hash === "#settings" ? refresh(true) : (location.hash = "#settings");
 };
 $("settings-test").onclick = () => {
   // An empty list (server down, or still asking) says nothing about the choice.
@@ -1109,7 +1525,7 @@ $("settings-test").onclick = () => {
   if (boxes.length) chosen = boxes.filter((b) => b.checked).map((b) => b.value);
   listModels();
 };
-$("settings-cancel").onclick = () => $("settings").close();
+$("settings-cancel").onclick = () => showSettingsPage();
 $("settings-form").onsubmit = async (e) => {
   e.preventDefault();
   const boxes = [...document.querySelectorAll("#settings-models input")];
@@ -1118,7 +1534,7 @@ $("settings-form").onsubmit = async (e) => {
   try {
     await api("/api/settings/save", { base_url: $("settings-url").value, api_key: $("settings-key").value, models,
       max_tokens: Number($("settings-tokens").value) });
-    $("settings").close();
+    $("settings-key").value = "";
   } catch (err) {
     $("settings-error").textContent = err.message;
   }
@@ -1166,7 +1582,6 @@ async function showStats() {
       cell(number(p.requests)), cell(number(p.landed)), cell(number(p.failed), p.failed ? "bad" : ""),
       cell(number(p.failed_attempts)), cell(duration(p.ms ?? 0)), cell(compact(p.sent)));
   }));
-  $("stats").showModal();
 }
 // One project's page, above its requests: read when it is chosen, not at each refresh.
 let paged = "";
@@ -1192,36 +1607,42 @@ async function showPage(path) {
   place.onchange = () => api("/api/projects", { path, place: place.value })
     .catch((e) => { $("page-error").textContent = e.message; place.value = p.place; });
   showRules(path, rules);
-  showSkills(path, await api("/api/skills", { project: path }));
 }
 
-// The skills this project's work may use, among those on the machine.
-let skills = [];
-function showSkills(path, list) {
-  skills = list;
-  const chosen = list.filter((s) => s.chosen);
-  const box = $("page-skills");
-  box.querySelector("summary").textContent = chosen.length ? `Skills (${chosen.length})` : "Skills : aucun choisi";
-  const entry = (s, label, on) => {
-    const b = el("button", { type: "button", textContent: label });
-    b.onclick = async () => {
-      try {
-        showSkills(path, await api("/api/skills", { project: path, name: s.name, on }));
-      } catch (e) {
-        $("page-error").textContent = e.message;
-      }
-    };
-    return el("li", { title: `${s.description}\n${s.from}` }, el("strong", { textContent: s.name }),
-      el("span", { className: "what", textContent: s.description }), b);
-  };
-  $("skills-chosen").replaceChildren(...chosen.map((s) => entry(s, "Retirer", false)));
-  const q = $("skill-search").value.trim().toLowerCase();
-  const rest = list.filter((s) => !s.chosen && (!q || (s.name + " " + s.description).toLowerCase().includes(q)));
-  $("skills-all").replaceChildren(...rest.slice(0, 8).map((s) => entry(s, "Ajouter", true)),
-    ...(rest.length > 8 ? [el("li", { className: "muted", textContent: `et ${rest.length - 8} autres : cherche par nom ou par but` })] : []),
-    ...(list.length ? [] : [el("li", { className: "muted", textContent: "Aucun skill sur cette machine." })]));
+// The skills of the machine, valid for every project: chosen from the
+// settings, the team sees the name and goal of each enabled skill and reads
+// it when the request needs it.
+let skillList = [];
+async function showSkillList() {
+  try {
+    skillList = await api("/api/skills", {});
+    drawSkillList();
+  } catch (e) {
+    $("skills-error").textContent = e.message;
+  }
 }
-$("skill-search").oninput = () => showSkills(paged, skills);
+function drawSkillList() {
+  $("skills-error").textContent = "";
+  const q = $("skill-search").value.trim().toLowerCase();
+  const list = skillList.filter((s) => !q || (s.name + " " + s.description).toLowerCase().includes(q));
+  $("skills-list").replaceChildren(
+    ...list.slice(0, 12).map((s) => {
+      const b = el("button", { type: "button", textContent: s.chosen ? "Retirer" : "Ajouter" });
+      b.onclick = async () => {
+        try {
+          skillList = await api("/api/skills", { name: s.name, on: !s.chosen });
+          drawSkillList();
+        } catch (e) {
+          $("skills-error").textContent = e.message;
+        }
+      };
+      return el("li", { title: `${s.description}\n${s.from}` }, el("strong", { textContent: s.name }),
+        el("span", { className: "what", textContent: s.description }), b);
+    }),
+    ...(list.length ? [] : [el("li", { className: "muted", textContent: skillList.length
+      ? "Aucun skill ne correspond à la recherche." : "Aucun skill sur cette machine." })]));
+}
+$("skill-search").oninput = drawSkillList;
 
 function showRules(path, rules) {
   const box = $("page-rules");
@@ -1258,8 +1679,9 @@ $("page-open").onclick = async () => {
   }
 };
 
-$("open-stats").onclick = () => showStats().catch((e) => ($("error").textContent = e.message));
-$("stats-close").onclick = () => $("stats").close();
+$("open-stats").onclick = () => {
+  location.hash === "#stats" ? refresh(true) : (location.hash = "#stats");
+};
 
 // The project's roles, as chips under the request: one click leaves a role
 // out of this request only (no QA for a one-line page). The team stays as is.
@@ -1287,6 +1709,12 @@ $("n-others").onclick = () => {
   $("project").dispatchEvent(new Event("change"));
 };
 $("project").addEventListener("change", () => {
+  // Choosing a project while a discussion is open takes its address back;
+  // the address doing it keeps the page honest.
+  if (where().path === "chat") {
+    location.hash = hashOf($("project").value, "");
+    return;
+  }
   picked = "";
   showChips();
   focusOn($("project").value);
