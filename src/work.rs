@@ -65,6 +65,29 @@ pub fn talk(id: String) {
     spawn(id, talk_now);
 }
 
+/// A discussion's turn: the settings' model, no team; the chat file keeps the
+/// exchange and each call's cost, the page follows it.
+pub fn chat(id: String) {
+    std::thread::spawn(move || {
+        let Ok(worlds) = Worlds::from_env() else {
+            return;
+        };
+        match OpenAi::variants_from_env(1) {
+            // No model to answer with: the turn never started, so say so and
+            // let the page move on, as a failed turn would.
+            Err(e) => {
+                let _ = fennec_os::chat::fail(&worlds, &id, &e.to_string());
+                eprintln!("fennec: la discussion {id} ne peut pas démarrer : {e}");
+            }
+            Ok(model) => {
+                if let Err(e) = fennec_os::chat::answer(&worlds, &id, &model[0], MAX_STEPS) {
+                    eprintln!("fennec: la discussion {id} s'arrête : {e}");
+                }
+            }
+        }
+    });
+}
+
 fn say_in(request: &mut Value, who: &str, text: &str) {
     if !request["thread"].is_array() {
         request["thread"] = json!([]);
@@ -934,8 +957,8 @@ fn step(name: &str, from: &Value) -> Value {
            "cost": cost(&from["turns"])})
 }
 
-/// Tokens and model time summed over the turns of one step.
-fn cost(turns: &Value) -> Value {
+/// Tokens and model time summed over a list of model calls.
+pub fn cost(turns: &Value) -> Value {
     let turns: Vec<&Value> = turns.as_array().into_iter().flatten().collect();
     let sum =
         |f: fn(&Value) -> &Value| -> u64 { turns.iter().map(|t| f(t).as_u64().unwrap_or(0)).sum() };

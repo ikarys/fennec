@@ -40,6 +40,14 @@ fn main() {
 
 fn serve(addr: &str) -> io::Result<()> {
     work::recover(&Store::from_env()?)?;
+    // The old per-project skill choice moves to the global list, once.
+    {
+        let store = Store::from_env()?;
+        let paths: Vec<std::path::PathBuf> =
+            store.projects()?.into_iter().map(Into::into).collect();
+        let projects: Vec<&Path> = paths.iter().map(|p| p.as_path()).collect();
+        fennec_os::skill::migrate(&projects)?;
+    }
     // Requests from before stats were kept get theirs, once, off the way.
     std::thread::spawn(|| Store::from_env().map(|s| work::overview(&s)));
     let listener = TcpListener::bind(addr)?;
@@ -317,20 +325,26 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
             Ok(json!({}))
         }
         ("POST", "/api/skills") => {
-            // The machine's skills, the project's chosen first; or first
-            // choose one or take it back.
+            // The machine's skills, the enabled ones first; or first enable
+            // one or take it back. A project, if named, only widens the
+            // catalogue with its own .claude/skills.
             let v = input()?;
-            let path = project(&store, &field(&v, "project"))?;
+            let p = field(&v, "project");
+            let path = if p.is_empty() {
+                None
+            } else {
+                Some(project(&store, &p)?)
+            };
             let name = field(&v, "name");
             if !name.is_empty() {
-                fennec_os::skill::choose(&path, &name, v["on"] == true)?;
+                fennec_os::skill::choose(&name, v["on"] == true)?;
             }
-            let chosen: Vec<String> = fennec_os::skill::chosen(&path)?
+            let chosen: Vec<String> = fennec_os::skill::chosen(path.as_deref())?
                 .into_iter()
                 .map(|s| s.name)
                 .collect();
             let home = std::env::var("HOME").unwrap_or_default();
-            let mut all: Vec<Value> = fennec_os::skill::catalog(&path)?
+            let mut all: Vec<Value> = fennec_os::skill::catalog(path.as_deref())?
                 .into_iter()
                 .map(|s| {
                     let from = s.dir.display().to_string();
@@ -341,6 +355,84 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
                 .collect();
             all.sort_by_key(|s| s["chosen"] != true);
             Ok(json!(all))
+        }
+        // Discussions: a plain conversation with an agent in a folder the
+        // person chose; the chat file is the exchange, the page follows it.
+        ("POST", "/api/chats") => {
+            let folder = field(&input()?, "folder");
+            let chat = fennec_os::chat::start(&Worlds::from_env()?, Path::new(&folder))?;
+            Ok(json!({"id": chat["id"]}))
+        }
+        ("GET", "/api/chats") => {
+            let projects = store.projects()?;
+            let list = fennec_os::chat::list(&Worlds::from_env()?)?;
+            Ok(json!(
+                list.into_iter()
+                    .map(|mut c| {
+                        c["project"] = json!(
+                            projects
+                                .iter()
+                                .any(|p| p == c["folder"].as_str().unwrap_or(""))
+                        );
+                        c
+                    })
+                    .collect::<Vec<_>>()
+            ))
+        }
+        ("POST", "/api/chat") => {
+            let chat = fennec_os::chat::load(&Worlds::from_env()?, &field(&input()?, "id"))?;
+            Ok(chat_view(&store, &chat))
+        }
+        ("POST", "/api/chat/say") => {
+            let v = input()?;
+            let (id, text) = (field(&v, "id"), field(&v, "text"));
+            fennec_os::chat::say(&Worlds::from_env()?, &id, &text)?;
+            work::chat(id);
+            Ok(json!({}))
+        }
+        ("POST", "/api/chat/stop") => {
+            fennec_os::chat::stop(&Worlds::from_env()?, &field(&input()?, "id"))?;
+            Ok(json!({}))
+        }
+        // The person's answer to a question the turn is waiting on: allow
+        // opens the folder for the chat, refuse covers the call only.
+        ("POST", "/api/chat/decide") => {
+            let v = input()?;
+            fennec_os::chat::decide(&Worlds::from_env()?, &field(&v, "id"), v["allow"] == true)?;
+            Ok(json!({}))
+        }
+        // A folder opened for the chat, taken back.
+        ("POST", "/api/chat/grant") => {
+            let v = input()?;
+            fennec_os::chat::ungrant(
+                &Worlds::from_env()?,
+                &field(&v, "id"),
+                &field(&v, "directory"),
+            )?;
+            Ok(json!({}))
+        }
+        ("POST", "/api/chat/skill") => {
+            let v = input()?;
+            fennec_os::chat::choose(
+                &Worlds::from_env()?,
+                &field(&v, "id"),
+                &field(&v, "name"),
+                v["on"] == true,
+            )?;
+            Ok(json!({}))
+        }
+        // The exchange becomes a request for the folder's project, kept in the
+        // backlog: the human launches it.
+        ("POST", "/api/chat/request") => {
+            let chat = fennec_os::chat::load(&Worlds::from_env()?, &field(&input()?, "id"))?;
+            let folder = chat["folder"].as_str().unwrap_or("");
+            let project = store
+                .projects()?
+                .into_iter()
+                .find(|p| p == folder)
+                .ok_or_else(|| io::Error::other("ce dossier n'est pas un projet"))?;
+            let id = store.add_request(&project, &transcript(&chat)?, &[], true)?;
+            Ok(json!({"id": id}))
         }
         ("POST", "/api/rules") => {
             // Read, or first add or take back one rule said on the project page.
@@ -423,6 +515,62 @@ fn project(store: &Store, path: &str) -> io::Result<std::path::PathBuf> {
     Ok(path.into())
 }
 
+/// What the page reads of a discussion: the chat file, the skills of its
+/// folder, its cost, and whether its folder is one of the human's projects.
+fn chat_view(store: &Store, chat: &Value) -> Value {
+    let folder = chat["folder"].as_str().unwrap_or("");
+    let mut v = chat.clone();
+    v["project"] = json!(
+        store
+            .projects()
+            .is_ok_and(|p| p.iter().any(|x| x == folder))
+    );
+    let names: Vec<String> = chat["skills"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(str::to_string)
+        .collect();
+    let home = std::env::var("HOME").unwrap_or_default();
+    let skills: Vec<Value> = fennec_os::skill::catalog(Some(Path::new(folder)))
+        .unwrap_or_default()
+        .into_iter()
+        .map(|s| {
+            json!({"name": s.name, "description": s.description,
+                   "chosen": names.contains(&s.name),
+                   "from": s.dir.display().to_string().replacen(&home, "~", 1)})
+        })
+        .collect();
+    v["skills"] = json!(skills);
+    v["stats"] = json!(work::cost(&chat["turns"]));
+    v
+}
+
+/// The exchange, in the human's words, as a request: who said what, no tools.
+fn transcript(chat: &Value) -> io::Result<String> {
+    let mut text = String::new();
+    for m in chat["messages"].as_array().cloned().unwrap_or_default() {
+        let content = m["content"].as_str().unwrap_or("").trim();
+        if content.is_empty() {
+            continue;
+        }
+        let who = match m["role"].as_str() {
+            Some("user") => "Toi",
+            Some("assistant") => "fennec",
+            _ => continue,
+        };
+        text.push_str(who);
+        text.push_str(" : ");
+        text.push_str(content);
+        text.push('\n');
+    }
+    if text.trim().is_empty() {
+        return Err(io::Error::other("aucun message à transformer en demande"));
+    }
+    Ok(text)
+}
+
 /// A project's team for the "Équipe" dialog: the teams to pick from, the
 /// roles of the one picked (left-out ones flagged), and the catalogue roles
 /// not in it yet.
@@ -503,4 +651,46 @@ fn respond(stream: &mut TcpStream, status: &str, kind: &str, body: &[u8]) -> io:
         body.len()
     )?;
     stream.write_all(body)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_exchange_becomes_the_request_that_was_said() {
+        let chat = json!({"messages": [
+            {"role": "user", "content": "regarde où on en est"},
+            {"role": "assistant", "content": "", "tool_calls": [
+                {"id": "1", "function": {"name": "shell", "arguments": "{}"}}]},
+            {"role": "tool", "tool_call_id": "1", "content": "…"},
+            {"role": "assistant", "content": "c'est à jour"},
+            {"role": "assistant", "content": ""}
+        ]});
+        assert_eq!(
+            transcript(&chat).unwrap(),
+            "Toi : regarde où on en est\nfennec : c'est à jour\n"
+        );
+    }
+
+    #[test]
+    fn a_chat_without_words_keeps_no_request() {
+        assert!(transcript(&json!({"messages": []})).is_err());
+        assert!(transcript(&json!({"messages": [{"role": "tool", "content": "…"}]})).is_err());
+    }
+
+    #[test]
+    fn a_chat_costs_what_its_calls_cost() {
+        let turns = json!([
+            {"model_ms": 400, "usage": {"prompt_tokens": 1000, "completion_tokens": 60,
+             "prompt_tokens_details": {"cached_tokens": 500}}},
+            {"model_ms": 100, "usage": {"prompt_tokens": 1100, "completion_tokens": 5}}
+        ]);
+        let s = work::cost(&turns);
+        assert_eq!(s["turns"], 2);
+        assert_eq!(s["ms"], 500);
+        assert_eq!(s["sent"], 2100);
+        assert_eq!(s["cached"], 500);
+        assert_eq!(s["received"], 65);
+    }
 }

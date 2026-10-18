@@ -33,6 +33,7 @@
                  margin: 14px 8px 4px; }
   #side .spacer { flex: 1; }
   #side .link { text-align: left; padding: 6px 8px; }
+  #side .link[aria-current=true] { background: var(--soft); font-weight: 600; }
   /* Three panes, each scrolled on its own, like a mail client: projects, the
      requests of the chosen one, and the request (or the project's page) read in full. */
   .app { height: 100vh; }
@@ -85,6 +86,8 @@
   .decide .error:not(:empty) { margin-top: 8px; }
   .decide .past-actions .actions { margin: 0; }
   #back { display: none; margin-bottom: 10px; }
+  /* A discussion owns the page; the way back to the demandes stays visible. */
+  body.chats #back { display: inline-block; }
   #hint { color: var(--muted); padding: 40px 0; text-align: center; }
   #list h2 { margin: 24px 0 6px; }
   #list .cost, #detail summary .cost { display: none; }
@@ -184,6 +187,16 @@
   .said.human { align-self: flex-end; background: transparent; border: 1px solid var(--line); }
   .said .label { display: block; font-size: 12px; color: var(--muted); }
   .said code { font: 13px ui-monospace, monospace; }
+  /* Markdown the model writes in a discussion. */
+  .said p, .said ul, .said ol, .said pre, .said table, .said blockquote { margin: 6px 0; }
+  .said li { margin: 2px 0; }
+  .said ul, .said ol { padding-left: 20px; }
+  .said h1 { font-size: 16px; margin: 10px 0 4px; }
+  .said h2 { margin: 10px 0 4px; }
+  .said h3, .said h4, .said h5, .said h6 { font-size: 14px; font-weight: 600; margin: 8px 0 4px; }
+  .said pre { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px;
+             font: 12px ui-monospace, monospace; overflow-x: auto; }
+  .said blockquote { margin-left: 0; border-left: 3px solid var(--line); padding-left: 10px; color: var(--muted); }
   .files { font-size: 13px; color: var(--muted); margin-top: 8px; overflow-wrap: anywhere; }
   /* Inline here, though they sit inside a details box that blocks its code. */
   details .focus code, details .files code, details .warn code, details .said code { display: inline; white-space: normal; margin: 0; }
@@ -206,9 +219,9 @@
            width: min(600px, calc(100vw - 32px)); padding: 16px; }
   dialog form.go { display: flex; gap: 8px; margin: 10px 0; }
   dialog form.go input { flex: 1; min-width: 0; }
-  dialog ul { list-style: none; padding: 0; margin: 10px 0; max-height: 45vh; overflow: auto; }
-  dialog li button { width: 100%; text-align: left; border: none; border-radius: 6px; }
-  dialog li button:hover { background: var(--bg); }
+  #picker-list { list-style: none; padding: 0; margin: 10px 0; max-height: 45vh; overflow: auto; }
+  #picker-list li button { width: 100%; text-align: left; border: none; border-radius: 6px; }
+  #picker-list li button:hover { background: var(--bg); }
   .repo { color: var(--ok); font-size: 12px; margin-left: 6px; }
   .row { display: flex; gap: 8px; justify-content: flex-end; }
   .team-pick { display: flex; gap: 8px; align-items: center; margin: 12px 0 4px; font-size: 14px; }
@@ -256,27 +269,32 @@
   table.grid th, table.grid td { text-align: left; padding: 3px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
   table.grid thead th { color: var(--muted); font-weight: 600; }
   table.grid .meter { display: inline-block; width: 40px; vertical-align: middle; margin-right: 6px; }
-  dialog#stats { width: min(900px, calc(100vw - 32px)); }
-  #page { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; background: var(--card); }
+  .scroll { overflow-x: auto; }
   .page-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
   .page-head strong { font-size: 18px; }
   .page-head .spacer { flex: 1; }
+  #page { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; background: var(--card); }
   #page .tiles { margin: 10px 0; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
   #page details { margin-top: 8px; }
   #page summary { cursor: pointer; }
   .rule-form { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 4px; }
   .rule-form input { flex: 1; min-width: 220px; }
   #page-rules li button { margin-left: 8px; padding: 0 8px; font-size: 13px; }
-  #page-skills ul { list-style: none; padding: 0; margin: 6px 0; }
-  /* A grid, and a description that wraps: one line that cannot break set the
-     row's width wider than the page in some browsers. */
-  #page-skills li { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 10px; align-items: center;
+  /* The global pages: the team, the figures, the settings — same place as
+     the project's page, the address names them. */
+  #detail > section { margin-top: 0; }
+  #detail > section .muted.hint { margin-top: 10px; }
+  form.go { display: flex; gap: 8px; margin: 10px 0; }
+  form.go input, form.go select { flex: 1; min-width: 0; }
+  #team ul, #settings ul { list-style: none; padding: 0; margin: 10px 0; }
+  #skills-list { margin-top: 6px; }
+  #skills-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 10px; align-items: center;
                     padding: 6px 8px; margin-bottom: 4px; border-radius: 6px; background: var(--soft); }
-  #page-skills li strong { overflow-wrap: anywhere; }
-  #page-skills li .what { grid-column: 1; font-size: 13px; color: var(--muted); overflow-wrap: anywhere;
+  #skills-list li strong { overflow-wrap: anywhere; }
+  #skills-list li .what { grid-column: 1; font-size: 13px; color: var(--muted); overflow-wrap: anywhere;
                           display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
                           overflow: hidden; }
-  #page-skills li button { grid-column: 2; grid-row: 1 / span 2; padding: 2px 10px; font-size: 13px; }
+  #skills-list li button { grid-column: 2; grid-row: 1 / span 2; padding: 2px 10px; font-size: 13px; }
   #skill-search { width: 100%; margin-top: 6px; }
   .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 12px 0; }
   .tile { background: var(--soft); border-radius: 8px; padding: 10px 12px; display: grid; }
@@ -292,6 +310,26 @@
   h3 { font-size: 13px; margin: 16px 0 4px; }
   .bar { display: inline-block; width: 44px; height: 6px; border-radius: 3px; margin-right: 6px; vertical-align: middle;
          background: linear-gradient(90deg, var(--info) var(--p), var(--line) var(--p)); }
+  body.chats #reqs { display: none; }
+  #chats { margin-bottom: 12px; }
+  #new-chat { width: 100%; }
+  .chat .thinking { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px;
+                    padding: 2px 0 6px; }
+  .chat .ask { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 2px 0 6px;
+               padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); }
+  .chat .ask code { font-size: 13px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chat .ask .muted { font-size: 12px; }
+  .chat .ask button { padding: 3px 10px; font-size: 13px; }
+  .chat-composer { margin-top: 10px; }
+  .chat-actions { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+  .chat-actions .spacer { flex: 1; }
+  .chat-side h2 { margin: 14px 0 6px; }
+  .chat-side ul { list-style: none; padding: 0; margin: 6px 0; }
+  .chat-side li { display: flex; gap: 8px; align-items: center; justify-content: space-between;
+                  padding: 4px 2px; font-size: 13px; }
+  .chat-side li .what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chat-side li button { padding: 2px 10px; font-size: 13px; flex: none; }
+  .chat-side .convert { width: 100%; }
   @media (max-width: 760px) {
     .app { display: block; }
     #side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center;
@@ -314,6 +352,7 @@
   <div class="label">Projets</div>
   <ul id="side-projects"></ul>
   <button class="link" id="add-project">+ projet</button>
+  <button class="link" id="side-chats">Discussions</button>
   <span class="spacer"></span>
   <button class="link" id="open-team">Équipe</button>
   <button class="link" id="open-stats">Stats</button>
@@ -321,6 +360,13 @@
 </nav>
 <main>
   <section id="list" aria-label="Demandes">
+  <div id="chats" hidden>
+    <button type="button" class="primary" id="new-chat">Nouvelle discussion</button>
+    <h2>Discussions</h2>
+    <div id="chat-list"></div>
+    <p class="muted">fennec lit, écrit et lance des commandes dans le dossier que tu choisis, git ou pas : sans réseau, ton dossier personnel caché. Les skills et le coût de la discussion sont à droite.</p>
+  </div>
+  <div id="reqs">
   <form id="new-request">
     <select id="project" aria-label="Projet" required></select>
     <textarea id="text" aria-label="Demande" placeholder="Ce que tu veux…" required></textarea>
@@ -355,6 +401,7 @@
 
   <h2>Historique</h2>
   <div id="history"></div>
+  </div>
   </section>
   <section id="detail">
   <button type="button" class="link" id="back">← Demandes</button>
@@ -375,99 +422,101 @@
         <button>Ajouter</button>
       </form>
       <p class="muted">fennec la donne à toute l'équipe à chaque demande. Tu peux aussi la dire en corrigeant une demande : fennec propose de la garder.</p></details>
-    <details id="page-skills" open><summary></summary>
-      <ul id="skills-chosen"></ul>
-      <input id="skill-search" type="search" aria-label="Chercher un skill" placeholder="Chercher parmi les skills de ta machine…">
-      <ul id="skills-all"></ul>
-      <p class="muted">L'équipe voit le nom et le but de chaque skill choisi, et le lit quand la demande en a besoin.
-        Ils viennent de ~/.claude/skills et de tes plugins, de ~/.config/fennec/skills ou du dossier .claude/skills du projet.</p></details>
     <p class="error" id="page-error" role="alert"></p>
   </aside>
+  <!-- The team, the figures and the settings: pages the address names,
+     not dialogs. -->
+  <section id="team" hidden>
+    <div class="page-head"><strong id="team-title">Équipe</strong></div>
+    <div id="team-body">
+    <label class="team-pick">Équipe du projet
+      <select id="team-name"></select>
+    </label>
+    <ul id="team-roles"></ul>
+    <form class="go" id="team-add">
+      <select id="team-catalog" aria-label="Rôle à ajouter"></select>
+      <button>Ajouter</button>
+    </form>
+    <form id="team-role" hidden>
+      <input id="role-name" aria-label="Nom du rôle" placeholder="Nom du rôle" required>
+      <select id="role-stage" aria-label="Étape"></select>
+      <select id="role-model" aria-label="Modèle"></select>
+      <textarea id="role-brief" aria-label="Ce que fait ce rôle" rows="6"
+        placeholder="Ce que ce rôle exige, en une poignée de phrases" required></textarea>
+      <textarea id="role-checks" aria-label="Commandes lancées à chaque preuve" rows="2"
+        placeholder="Commandes lancées à chaque preuve, une par ligne : si l'une échoue, ce n'est pas prêt"></textarea>
+      <div class="row"><button type="button" id="role-cancel">Annuler</button>
+        <button class="primary">Enregistrer le rôle</button></div>
+    </form>
+    <form class="go" id="team-save" hidden>
+      <input id="team-new-name" aria-label="Nom de la nouvelle équipe" placeholder="Nom de la nouvelle équipe" required>
+      <button class="primary">Enregistrer</button>
+    </form>
+    </div>
+    <p class="muted hint" id="team-hint" hidden>Choisis un projet à gauche pour gérer son équipe.</p>
+    <p class="error" id="team-error" role="alert"></p>
+    <div class="row">
+      <button type="button" class="quiet" id="role-new">+ nouveau rôle</button>
+      <button type="button" class="quiet" id="team-save-open">Enregistrer comme équipe…</button>
+    </div>
+  </section>
+  <section id="stats" hidden>
+    <div class="page-head"><strong>Stats</strong></div>
+    <div class="tiles" id="stats-tiles"></div>
+    <h3>Par modèle</h3>
+    <div class="scroll"><table>
+      <thead><tr><th>Modèle</th><th>Appels</th><th>Envoyés</th><th>En cache</th><th>Générés</th><th>Vitesse</th><th>Temps</th></tr></thead>
+      <tbody id="stats-models"></tbody>
+    </table></div>
+    <h3>Par étape : où passe le temps</h3>
+    <div class="scroll"><table>
+      <thead><tr><th>Étape</th><th>Appels</th><th>Temps</th><th>Part</th><th>Envoyés</th><th>Générés</th><th>Vitesse</th></tr></thead>
+      <tbody id="stats-stages"></tbody>
+    </table></div>
+    <h3>Par projet</h3>
+    <div class="scroll"><table>
+      <thead><tr><th>Projet</th><th>Où fennec travaille</th><th>Demandes</th><th>Commits</th><th>Échecs</th><th>Essais annulés</th><th>Temps</th><th>Envoyés</th></tr></thead>
+      <tbody id="stats-projects"></tbody>
+    </table></div>
+    <p class="muted">« Dans le dossier » : tu vois le travail en direct, sur une branche de travail. « À part » : ton dossier ne change qu'au commit. Le changement vaut pour les prochaines demandes.
+      Isolement de chaque travail : sans réseau, sans accès à ton dossier personnel, historique git en lecture seule, mémoire plafonnée ; un essai raté est annulé sans trace.</p>
+    <p class="error" id="stats-error" role="alert"></p>
+  </section>
+  <section id="settings" hidden>
+    <div class="page-head"><strong>Réglages</strong></div>
+    <form id="settings-form">
+      <label class="field">Serveur du modèle
+        <span class="go"><input id="settings-url" required placeholder="http://localhost:8000/v1">
+          <button type="button" id="settings-test">Tester</button></span>
+      </label>
+      <div class="muted" id="settings-status"></div>
+      <ul id="settings-models"></ul>
+      <label class="field">Tokens par réponse, réflexion comprise (0 : la valeur du serveur)
+        <input id="settings-tokens" type="number" min="0" step="1024" required>
+      </label>
+      <label class="field">Clé d'accès (facultative)
+        <input id="settings-key" type="password" autocomplete="off">
+      </label>
+      <p class="muted" id="settings-env" hidden></p>
+      <p class="error" id="settings-error" role="alert"></p>
+      <div class="row">
+        <button type="button" id="settings-cancel">Annuler</button>
+        <button class="primary">Enregistrer</button>
+      </div>
+    </form>
+    <h3>Skills</h3>
+    <p class="muted">Ils s'appliquent à tous tes projets : l'équipe voit le nom et le but de chaque skill activé, et le lit quand la demande en a besoin.
+      Ils viennent de ~/.claude/skills et de tes plugins, de ~/.config/fennec/skills ou du dossier .claude/skills d'un projet.</p>
+    <input id="skill-search" type="search" aria-label="Chercher un skill" placeholder="Chercher parmi les skills de ta machine…">
+    <ul id="skills-list"></ul>
+    <p class="error" id="skills-error" role="alert"></p>
+  </section>
   </section>
 </main>
 </div>
 
-<dialog id="team">
-  <strong id="team-title">Équipe</strong>
-  <label class="team-pick">Équipe du projet
-    <select id="team-name"></select>
-  </label>
-  <ul id="team-roles"></ul>
-  <form class="go" id="team-add">
-    <select id="team-catalog" aria-label="Rôle à ajouter"></select>
-    <button>Ajouter</button>
-  </form>
-  <form id="team-role" hidden>
-    <input id="role-name" aria-label="Nom du rôle" placeholder="Nom du rôle" required>
-    <select id="role-stage" aria-label="Étape"></select>
-    <select id="role-model" aria-label="Modèle"></select>
-    <textarea id="role-brief" aria-label="Ce que fait ce rôle" rows="6"
-      placeholder="Ce que ce rôle exige, en une poignée de phrases" required></textarea>
-    <textarea id="role-checks" aria-label="Commandes lancées à chaque preuve" rows="2"
-      placeholder="Commandes lancées à chaque preuve, une par ligne : si l'une échoue, ce n'est pas prêt"></textarea>
-    <div class="row"><button type="button" id="role-cancel">Annuler</button>
-      <button class="primary">Enregistrer le rôle</button></div>
-  </form>
-  <form class="go" id="team-save" hidden>
-    <input id="team-new-name" aria-label="Nom de la nouvelle équipe" placeholder="Nom de la nouvelle équipe" required>
-    <button class="primary">Enregistrer</button>
-  </form>
-  <p class="error" id="team-error" role="alert"></p>
-  <div class="row">
-    <button type="button" class="quiet" id="role-new">+ nouveau rôle</button>
-    <button type="button" class="quiet" id="team-save-open">Enregistrer comme équipe…</button>
-    <span class="spacer"></span>
-    <button type="button" id="team-close">Fermer</button>
-  </div>
-</dialog>
-<dialog id="stats">
-  <strong>Stats</strong>
-  <div class="tiles" id="stats-tiles"></div>
-  <h3>Par modèle</h3>
-  <div class="scroll"><table>
-    <thead><tr><th>Modèle</th><th>Appels</th><th>Envoyés</th><th>En cache</th><th>Générés</th><th>Vitesse</th><th>Temps</th></tr></thead>
-    <tbody id="stats-models"></tbody>
-  </table></div>
-  <h3>Par étape : où passe le temps</h3>
-  <div class="scroll"><table>
-    <thead><tr><th>Étape</th><th>Appels</th><th>Temps</th><th>Part</th><th>Envoyés</th><th>Générés</th><th>Vitesse</th></tr></thead>
-    <tbody id="stats-stages"></tbody>
-  </table></div>
-  <h3>Par projet</h3>
-  <div class="scroll"><table>
-    <thead><tr><th>Projet</th><th>Où fennec travaille</th><th>Demandes</th><th>Commits</th><th>Échecs</th><th>Essais annulés</th><th>Temps</th><th>Envoyés</th></tr></thead>
-    <tbody id="stats-projects"></tbody>
-  </table></div>
-  <p class="muted">« Dans le dossier » : tu vois le travail en direct, sur une branche de travail. « À part » : ton dossier ne change qu'au commit. Le changement vaut pour les prochaines demandes.
-    Isolement de chaque travail : sans réseau, sans accès à ton dossier personnel, historique git en lecture seule, mémoire plafonnée ; un essai raté est annulé sans trace.</p>
-  <p class="error" id="stats-error" role="alert"></p>
-  <div class="row"><button type="button" id="stats-close">Fermer</button></div>
-</dialog>
-<dialog id="settings">
-  <strong>Réglages</strong>
-  <form id="settings-form">
-    <label class="field">Serveur du modèle
-      <span class="go"><input id="settings-url" required placeholder="http://localhost:8000/v1">
-        <button type="button" id="settings-test">Tester</button></span>
-    </label>
-    <div class="muted" id="settings-status"></div>
-    <ul id="settings-models"></ul>
-    <label class="field">Tokens par réponse, réflexion comprise (0 : la valeur du serveur)
-      <input id="settings-tokens" type="number" min="0" step="1024" required>
-    </label>
-    <label class="field">Clé d'accès (facultative)
-      <input id="settings-key" type="password" autocomplete="off">
-    </label>
-    <p class="muted" id="settings-env" hidden></p>
-    <p class="error" id="settings-error" role="alert"></p>
-    <div class="row">
-      <button type="button" id="settings-cancel">Annuler</button>
-      <button class="primary">Enregistrer</button>
-    </div>
-  </form>
-</dialog>
 <dialog id="picker">
-  <strong>Ajouter un projet</strong>
+  <strong id="picker-title">Ajouter un projet</strong>
   <form class="go" id="picker-go">
     <input id="picker-input" aria-label="Chemin du dossier" placeholder="Colle un chemin, ou parcours ci-dessous">
     <button type="submit">Aller</button>
@@ -478,7 +527,7 @@
     <input id="picker-new-name" aria-label="Nouveau dossier" placeholder="Ou un nouveau dossier ici : son nom" required>
     <button>Créer le dossier</button>
   </form>
-  <label>Où fennec travaille
+  <label id="picker-place-wrap">Où fennec travaille
     <select id="picker-place" aria-label="Où fennec travaille">
       <option value="here">Dans ce dossier : tu vois le travail en direct</option>
       <option value="apart">Dans un dossier à part, à côté : ce dossier ne change qu'au commit</option>
