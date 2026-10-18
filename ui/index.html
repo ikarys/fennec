@@ -27,10 +27,17 @@
   #side .item:hover { background: var(--soft); }
   #side .item[aria-current=true] { background: var(--soft); font-weight: 600; }
   #side .item .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #side .count { background: var(--accent); color: #fff; border-radius: 999px; font-size: 11px; font-weight: 600;
+  .count { background: var(--accent); color: #fff; border-radius: 999px; font-size: 11px; font-weight: 600;
                  padding: 0 7px; }
   #side .label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
-                 margin: 14px 8px 4px; }
+                 margin: 14px 8px 4px; display: flex; align-items: center; justify-content: space-between; }
+  #side .label button { color: var(--muted); padding: 2px; }
+  #side .label button:hover { color: var(--text); }
+  /* Team, figures and settings: one row of icons, named on hover. */
+  #side .tools { display: flex; gap: 4px; border-top: 1px solid var(--line); padding-top: 10px; }
+  #side .tools button { flex: 1; justify-content: center; color: var(--muted); padding: 8px; border-radius: 6px; }
+  #side .tools button:hover, #side .tools button[aria-current=true] { color: var(--text); background: var(--soft); }
+  #side .link.ic { color: var(--text); }
   #side .spacer { flex: 1; }
   #side .link { text-align: left; padding: 6px 8px; }
   #side .link[aria-current=true] { background: var(--soft); font-weight: 600; }
@@ -77,8 +84,12 @@
             background: var(--accent); border-color: var(--accent); }
   .decide .actions button.primary:hover { filter: brightness(1.08); background: var(--accent); }
   .decide .actions button.quiet { background: none; color: var(--bad); justify-content: center; margin-top: 4px; }
-  .decide button.icon::before { content: ""; flex: none; width: 17px; height: 17px; background: currentColor;
+  /* An icon drawn in the element's own colour; alone, the button is square. */
+  .ic { display: inline-flex; align-items: center; gap: 7px; }
+  .ic::before { content: ""; flex: none; width: 17px; height: 17px; background: currentColor;
             -webkit-mask: var(--icon) center / contain no-repeat; mask: var(--icon) center / contain no-repeat; }
+  button.ic:empty { padding: 8px; }
+  h2.ic::before, h3.ic::before { width: 15px; height: 15px; }
   .decide .actions .primary { order: -1; }
   .decide .actions .quiet { order: 99; }
   .decide .reply { margin: 0 0 8px; }
@@ -89,7 +100,15 @@
   /* A discussion owns the page; the way back to the demandes stays visible. */
   body.chats #back { display: inline-block; }
   #hint { color: var(--muted); padding: 40px 0; text-align: center; }
-  #list h2 { margin: 24px 0 6px; }
+  #compose-open { width: 100%; justify-content: center; padding: 10px 12px; margin-bottom: 4px; }
+  /* Each part of the list in its own box: what waits for the human stands out. */
+  #list .box { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px 6px;
+               margin-top: 14px; }
+  #list .box h2 { margin: 0 0 4px; display: flex; gap: 8px; align-items: center; }
+  #list .box .count { text-transform: none; letter-spacing: 0; }
+  #list .box .empty { padding: 4px 0 8px; font-size: 13px; }
+  #todo-box:has(a.row) { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+  #n-others { margin-left: auto; }
   #list .cost, #detail summary .cost { display: none; }
   /* In the narrow list, the state goes under the title. */
   #list .line { flex-wrap: wrap; row-gap: 0; }
@@ -121,11 +140,12 @@
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
   button.link { border: none; background: none; color: var(--accent); padding: 0; }
   button.quiet { border: none; background: none; color: var(--muted); padding: 8px 4px; font-size: 13px; }
-  #new-request { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
-  #text { grid-row: span 2; }
-  #later-add { font-size: 13px; padding: 4px 10px; }
+  #compose { width: min(640px, calc(100vw - 32px)); }
+  #new-request { display: grid; gap: 10px; }
+  #new-request .head { align-items: center; }
+  #new-request .head strong { font-size: 16px; }
+  dialog::backdrop { background: rgb(0 0 0 / .45); }
   .later-text { width: 100%; min-height: 90px; margin: 4px 0 0; }
-  #project { grid-column: 1 / -1; }
   /* The left list already says which project: the request goes there. */
   body.focused #project { display: none; }
   .error { color: var(--bad); font-size: 13px; min-height: 0; margin: 4px 0 0; }
@@ -257,7 +277,8 @@
   .rtag.prove { color: var(--prove); border-color: var(--prove); }
   .rtag.chip { cursor: pointer; background: transparent; }
   .rtag.chip[aria-pressed=false] { color: var(--muted); border-color: var(--line); text-decoration: line-through; }
-  #chips { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; }
+  #chips:empty { display: none; }
+  #chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; }
   .pills { display: flex; flex-wrap: wrap; gap: 6px; }
   .pill { font-size: 12px; color: var(--muted); background: var(--soft); border-radius: 999px; padding: 2px 10px; }
   .pill .icon { margin-right: 4px; }
@@ -273,13 +294,22 @@
   .page-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
   .page-head strong { font-size: 18px; }
   .page-head .spacer { flex: 1; }
-  #page { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; background: var(--card); }
+  #page { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; background: var(--card); }
+  .page-head { align-items: center; }
+  .page-head button { color: var(--muted); }
+  .page-head button:hover { color: var(--text); background: var(--soft); }
+  /* The project's settings, one block each under its figures. */
+  #page .sub { border-top: 1px solid var(--line); padding-top: 4px; margin-top: 14px; }
+  #page .sub h3 { display: flex; gap: 8px; align-items: center; margin: 10px 0 8px; font-size: 13px;
+                  text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  #page-rules ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; }
+  #page-rules li { display: flex; gap: 6px; align-items: center; background: var(--soft); border-radius: 6px; padding: 4px 4px 4px 10px; }
+  #page-rules li .muted { flex: 1; font-size: 12px; }
+  .small { font-size: 12px; }
   #page .tiles { margin: 10px 0; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
-  #page details { margin-top: 8px; }
-  #page summary { cursor: pointer; }
   .rule-form { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 4px; }
   .rule-form input { flex: 1; min-width: 220px; }
-  #page-rules li button { margin-left: 8px; padding: 0 8px; font-size: 13px; }
+  #page-rules li button { padding: 4px; }
   /* The global pages: the team, the figures, the settings — same place as
      the project's page, the address names them. */
   #detail > section { margin-top: 0; }
@@ -297,7 +327,8 @@
   #skills-list li button { grid-column: 2; grid-row: 1 / span 2; padding: 2px 10px; font-size: 13px; }
   #skill-search { width: 100%; margin-top: 6px; }
   .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 12px 0; }
-  .tile { background: var(--soft); border-radius: 8px; padding: 10px 12px; display: grid; }
+  .tile { background: var(--soft); border-radius: 8px; padding: 10px 12px; display: grid; align-content: start; }
+  .tile.bad b { color: var(--bad); }
   .tile b { font-size: 20px; }
   .tile span { font-size: 12px; color: var(--muted); }
   .scroll { overflow-x: auto; }
@@ -337,7 +368,9 @@
     #side h1 { margin: 0 8px 0 0; }
     #side ul { display: flex; flex-wrap: wrap; }
     #side .item { width: auto; }
-    #side .label, #side .spacer { display: none; }
+    #side .label span, #side .spacer { display: none; }
+    #side .label { margin: 0; }
+    #side .tools { border-top: none; padding-top: 0; }
     #list, #detail { padding: 16px; }
     .tabs button { padding: 8px 7px; font-size: 14px; }
     .line .cost { display: none; }
@@ -349,31 +382,26 @@
 <nav id="side" aria-label="Projets">
   <h1>fennec</h1>
   <ul><li><button type="button" class="item" id="side-all"><span class="name">Tous les projets</span></button></li></ul>
-  <div class="label">Projets</div>
+  <div class="label"><span>Projets</span> <button class="link" id="add-project" data-icon="plus" aria-label="Ajouter un projet" title="Ajouter un projet"></button></div>
   <ul id="side-projects"></ul>
-  <button class="link" id="add-project">+ projet</button>
-  <button class="link" id="side-chats">Discussions</button>
+  <button class="link" id="side-chats" data-icon="chat">Discussions</button>
   <span class="spacer"></span>
-  <button class="link" id="open-team">Équipe</button>
-  <button class="link" id="open-stats">Stats</button>
-  <button class="link" id="open-settings">Réglages</button>
+  <div class="tools">
+    <button class="link" id="open-team" data-icon="team" aria-label="Équipe" title="Équipe"></button>
+    <button class="link" id="open-stats" data-icon="stats" aria-label="Stats" title="Stats"></button>
+    <button class="link" id="open-settings" data-icon="gear" aria-label="Réglages" title="Réglages"></button>
+  </div>
 </nav>
 <main>
   <section id="list" aria-label="Demandes">
   <div id="chats" hidden>
-    <button type="button" class="primary" id="new-chat">Nouvelle discussion</button>
+    <button type="button" class="primary" id="new-chat" data-icon="plus">Nouvelle discussion</button>
     <h2>Discussions</h2>
     <div id="chat-list"></div>
     <p class="muted">fennec lit, écrit et lance des commandes dans le dossier que tu choisis, git ou pas : sans réseau, ton dossier personnel caché. Les skills et le coût de la discussion sont à droite.</p>
   </div>
   <div id="reqs">
-  <form id="new-request">
-    <select id="project" aria-label="Projet" required></select>
-    <textarea id="text" aria-label="Demande" placeholder="Ce que tu veux…" required></textarea>
-    <button class="primary">Demander</button>
-    <button type="button" id="later-add" title="Garder la demande sans la lancer">Pour plus tard</button>
-    <div id="chips"></div>
-  </form>
+  <button type="button" class="primary" id="compose-open" data-icon="plus">Nouvelle demande</button>
   <p class="error" id="error" role="alert"></p>
 
 
@@ -390,17 +418,18 @@
     <p class="muted">L'équipe (« Équipe ») choisit les rôles qui travaillent sur le projet ; « Réglages » choisit le modèle.</p>
   </section>
 
-  <h2>À toi <span id="n-todo"></span> <button class="link" id="n-others" type="button"></button></h2>
-  <div id="todo"></div>
+  <div class="box" id="todo-box"><h2 data-icon="inbox">À toi <span class="count" id="n-todo"></span>
+    <button class="link" id="n-others" type="button"></button></h2>
+  <div id="todo"></div></div>
 
-  <div id="later-box" hidden><h2>Plus tard <span id="n-later"></span></h2>
+  <div class="box" id="later-box" hidden><h2 data-icon="clock">Plus tard <span class="count" id="n-later"></span></h2>
   <div id="later"></div></div>
 
-  <h2>fennec travaille</h2>
-  <div id="running"></div>
+  <div class="box"><h2 data-icon="work">fennec travaille</h2>
+  <div id="running"></div></div>
 
-  <h2>Historique</h2>
-  <div id="history"></div>
+  <div class="box"><h2 data-icon="history">Historique</h2>
+  <div id="history"></div></div>
   </div>
   </section>
   <section id="detail">
@@ -411,17 +440,18 @@
   <aside id="page" hidden>
     <div class="page-head"><strong id="page-name"></strong> <span class="muted" id="page-path"></span>
       <span class="spacer"></span>
-      <button type="button" id="page-team">Équipe</button>
-      <button type="button" id="page-open">Ouvrir le dossier</button></div>
+      <button type="button" id="page-team" data-icon="team" aria-label="Équipe" title="Équipe"></button>
+      <button type="button" id="page-open" data-icon="folder" aria-label="Ouvrir le dossier" title="Ouvrir le dossier"></button></div>
     <div class="tiles" id="page-tiles"></div>
-    <label class="muted">Où fennec travaille <select id="page-place"></select></label>
-    <details id="page-rules" open><summary></summary><ul></ul>
+    <div class="sub"><h3 data-icon="shield">Où fennec travaille</h3>
+      <select id="page-place" aria-label="Où fennec travaille"></select></div>
+    <div class="sub" id="page-rules"><h3 data-icon="rule"><span class="summary"></span></h3><ul></ul>
       <form id="rule-form" class="rule-form">
         <input id="rule-text" aria-label="Nouvelle règle" placeholder="Une règle, par ex. « commits en anglais, format Conventional Commits »" required>
         <select id="rule-scope" aria-label="Pour"><option value="project">Pour ce projet</option><option value="user">Pour tous mes projets</option></select>
-        <button>Ajouter</button>
+        <button data-icon="plus" aria-label="Ajouter la règle" title="Ajouter la règle"></button>
       </form>
-      <p class="muted">fennec la donne à toute l'équipe à chaque demande. Tu peux aussi la dire en corrigeant une demande : fennec propose de la garder.</p></details>
+      <p class="muted small">fennec la donne à toute l'équipe à chaque demande. Tu peux aussi la dire en corrigeant une demande : fennec propose de la garder.</p></div>
     <p class="error" id="page-error" role="alert"></p>
   </aside>
   <!-- The team, the figures and the settings: pages the address names,
@@ -514,6 +544,22 @@
   </section>
 </main>
 </div>
+
+<!-- Written on demand, not spread over the list: the list is for what waits. -->
+<dialog id="compose">
+  <form id="new-request">
+    <div class="row head"><strong>Nouvelle demande</strong><span class="spacer"></span>
+      <button type="button" class="quiet" id="compose-close" data-icon="close" aria-label="Fermer" title="Fermer"></button></div>
+    <select id="project" aria-label="Projet" required></select>
+    <textarea id="text" aria-label="Demande" placeholder="Ce que tu veux, comme à un collègue…" rows="6" required></textarea>
+    <div id="chips"></div>
+    <p class="error" id="compose-error" role="alert"></p>
+    <div class="row">
+      <button type="button" id="later-add" data-icon="clock" title="Garder la demande sans la lancer">Plus tard</button>
+      <button class="primary" data-icon="send">Demander</button>
+    </div>
+  </form>
+</dialog>
 
 <dialog id="picker">
   <strong id="picker-title">Ajouter un projet</strong>
