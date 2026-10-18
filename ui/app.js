@@ -412,7 +412,7 @@ function card(item) {
   const [tag, color] = TAGS[item.kind];
   const node = el("div", { className: "card" },
     el("div", { className: "meta", style: `--c: ${color}` },
-      el("span", { className: "tag", textContent: tag }), el("span", { textContent: item.project })),
+      el("span", { className: "tag", textContent: tag }), el("span", { className: "proj", textContent: item.project })),
     el("div", { className: "title", textContent: item.title.length > 200 ? item.title.slice(0, 200) + "…" : item.title }));
   const actions = el("div", { className: "actions" });
   const add = (...nodes) => node.append(...nodes.filter(Boolean));
@@ -500,7 +500,7 @@ function card(item) {
 function line(item, state, dot) {
   const s = item.stats;
   return el("div", { className: "line" }, dot ? el("span", { className: "dot" }) : null,
-    el("span", { className: "muted", textContent: item.project }),
+    el("span", { className: "muted proj", textContent: item.project }),
     el("span", { className: "what", textContent: item.title.length > 120 ? item.title.slice(0, 120) + "…" : item.title }),
     s?.turns ? el("span", { className: "state cost", title: "temps de modèle · tokens envoyés · générés" },
       el("span", { className: "mini", textContent: `⏱ ${duration(s.ms)}` }), el("span", { className: "mini", textContent: `↑ ${compact(s.sent)}` }),
@@ -546,15 +546,28 @@ function pastState(item) {
 
 function renderProjects(projects) {
   const select = $("project");
-  const current = select.value;
+  const current = select.value || decodeURIComponent(location.hash.slice(1));
   // With several projects, none is preselected: a silent default sends a
   // request to the wrong project.
-  const prompt = projects.length ? "Quel projet ?" : "Aucun projet";
+  // The empty choice is also the view of every project at once.
+  const prompt = projects.length ? "Tous les projets" : "Aucun projet";
   const none = projects.length === 1 ? [] : [new Option(prompt, "")];
   select.replaceChildren(...none, ...projects.map((p) => new Option(p.name, p.path)));
   if (projects.some((p) => p.path === current)) select.value = current;
   if (select.value !== current) showChips();
+  focusOn(select.value);
 }
+
+// The chosen project is the one on screen: its requests only, kept in the
+// address so a reload or a bookmark comes back to it.
+function focusOn(path) {
+  document.body.classList.toggle("focused", !!path);
+  history.replaceState(null, "", path ? "#" + encodeURIComponent(path) : location.pathname);
+}
+const mine = (items) => {
+  const path = $("project").value;
+  return path ? items.filter((i) => i.path === path) : items;
+};
 
 const fill = (box, nodes, empty) =>
   box.replaceChildren(...(nodes.length ? nodes : [el("div", { className: "empty", textContent: empty })]));
@@ -570,17 +583,21 @@ async function refresh(force) {
     if (!force && json === shown) return;
     shown = json;
     $("error").textContent = "";
+    renderProjects(view.projects);
+    const todo = mine(view.todo), running = mine(view.running);
     const open = new Set([...document.querySelectorAll("details[open]")].map((d) => d.dataset.key));
-    fill($("todo"), view.todo.map(card), "Rien ne t'attend.");
-    $("n-todo").textContent = view.todo.length ? `· ${view.todo.length}` : "";
+    fill($("todo"), todo.map(card), "Rien ne t'attend.");
+    $("n-todo").textContent = todo.length ? `· ${todo.length}` : "";
     // Seen from another tab: what waits for the human, in the tab's title.
-    document.title = view.todo.length ? `(${view.todo.length}) fennec` : "fennec";
-    fill($("running"), view.running.map(underway), "Rien en cours.");
-    fill($("history"), view.history.map(past), "Rien de terminé pour l'instant.");
+    const others = view.todo.length - todo.length;
+    $("n-others").textContent = others ? `${others} autre${others > 1 ? "s" : ""} t'attend${others > 1 ? "ent" : ""} ailleurs` : "";
+    const where = $("project").selectedOptions[0]?.value ? $("project").selectedOptions[0].text : "fennec";
+    document.title = todo.length ? `(${todo.length}) ${where}` : where;
+    fill($("running"), running.map(underway), "Rien en cours.");
+    fill($("history"), mine(view.history).map(past), "Rien de terminé pour l'instant.");
     for (const d of document.querySelectorAll("details")) d.open = open.has(d.dataset.key);
     // How it works, while nothing is under way: the page alone must explain itself.
     $("how").hidden = view.todo.length + view.running.length > 0;
-    renderProjects(view.projects);
   } catch (e) {
     $("error").textContent = "Serveur injoignable : " + e.message;
   }
@@ -887,4 +904,12 @@ async function showChips() {
     $("chips").replaceChildren();
   }
 }
-$("project").addEventListener("change", showChips);
+$("n-others").onclick = () => {
+  $("project").value = "";
+  $("project").dispatchEvent(new Event("change"));
+};
+$("project").addEventListener("change", () => {
+  showChips();
+  focusOn($("project").value);
+  refresh(true);
+});
