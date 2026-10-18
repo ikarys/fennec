@@ -249,6 +249,16 @@ impl Worlds {
     /// The command that runs `argv` inside the world's sandbox: read-only
     /// system, hidden home, private /tmp, no network, own pid namespace.
     pub fn sandbox_command(&self, world: &World, argv: &[String]) -> io::Result<Command> {
+        self.sandboxed(world, argv, false)
+    }
+
+    /// The same sandbox on the host's network: only for the product the
+    /// human asked to open in their own browser (`proof::page`).
+    pub fn sandbox_on_host_network(&self, world: &World, argv: &[String]) -> io::Result<Command> {
+        self.sandboxed(world, argv, true)
+    }
+
+    fn sandboxed(&self, world: &World, argv: &[String], net: bool) -> io::Result<Command> {
         if argv.is_empty() {
             return Err(io::Error::other("nothing to run"));
         }
@@ -277,6 +287,7 @@ impl Worlds {
             .arg(&common)
             .arg(&common)
             .args(["--unshare-all", "--die-with-parent", "--new-session"])
+            .args(if net { &["--share-net"][..] } else { &[] })
             // Every file in the world is the work: a bytecode cache written
             // by running the tests would fail a protected path, or land.
             // ponytail: Python only; another tool's untracked cache needs its

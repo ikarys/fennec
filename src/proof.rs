@@ -174,10 +174,134 @@ pub fn gather(
             .all(|c| c["exit"] == 0 || c["missing"] == true);
     let proof = json!({"tries": checks, "shots": shots, "unverified": plan.unverified,
                        "checks": role_checks, "passed": passed, "team": team,
-                       "exchange": exchange});
+                       "serve": plan.serve, "exchange": exchange});
     record["proof"] = proof.clone();
     review::save(worlds, id, &record)?;
     Ok(proof)
+}
+
+/// The thread that holds the page started by `page`: dropping this sender
+/// ends it, and the sandbox with it (`--die-with-parent` follows the thread
+/// that spawned bwrap; killing bwrap alone leaves the sandbox running).
+/// ponytail: one page at a time for the whole process (the proofs' servers
+/// tend to share a port); a map per run if several must stay open.
+static PAGE: std::sync::Mutex<Option<std::sync::mpsc::Sender<()>>> = std::sync::Mutex::new(None);
+
+/// The run's product started the way its proof started it, for the human to
+/// use in their own browser: the same sandbox, but on the host's network so
+/// the page can be reached. Returns the page once it answers. The server
+/// stops after 30 minutes, when another page starts, or with the caller.
+pub fn page(worlds: &Worlds, id: &str) -> io::Result<String> {
+    let record = review::load(worlds, id)?;
+    let serve = record["proof"]["serve"]
+        .as_str()
+        .ok_or_else(|| io::Error::other("the proof started no web interface"))?;
+    let url = record["proof"]["shots"][0]["url"]
+        .as_str()
+        .ok_or_else(|| io::Error::other("the proof captured no page"))?;
+    let port = local_port(url)
+        .ok_or_else(|| io::Error::other(format!("{url} is not a page on this machine")))?;
+    let world = worlds.open(id)?;
+    let mut page = PAGE.lock().unwrap_or_else(|e| e.into_inner());
+    if page.take().is_some() {
+        // The old thread sees the drop within its next half second.
+        std::thread::sleep(std::time::Duration::from_millis(700));
+    }
+    let up = |port| std::net::TcpStream::connect(("127.0.0.1", port)).is_ok();
+    // The proof ran in its own network, where every port was free; the
+    // human's machine has its own servers (seen: the model server on 8000).
+    let (mut serve, mut url) = (untimed(serve), url.to_string());
+    if up(port) {
+        let free = std::net::TcpListener::bind(("127.0.0.1", 0))?
+            .local_addr()?
+            .port();
+        serve = swap_port(&serve, port, free)
+            .ok_or_else(|| io::Error::other(format!("port {port} is already taken")))?;
+        url = url.replacen(&format!(":{port}"), &format!(":{free}"), 1);
+    }
+    let port = local_port(&url).unwrap_or(port);
+    let argv = ["timeout", "1800", "sh", "-c", &serve].map(String::from);
+    let mut command = worlds.sandbox_on_host_network(&world, &argv)?;
+    let dir = worlds.root.join("proofs");
+    std::fs::create_dir_all(&dir)?;
+    let log = dir.join(format!("{id}-page.log"));
+    command
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(std::fs::File::create(&log)?);
+    let (stop, stopped) = std::sync::mpsc::channel::<()>();
+    let (started, start) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let mut child = match command.spawn() {
+            Ok(c) => c,
+            Err(e) => return started.send(Err(e)),
+        };
+        let _ = started.send(Ok(()));
+        while stopped.recv_timeout(std::time::Duration::from_millis(500))
+            == Err(std::sync::mpsc::RecvTimeoutError::Timeout)
+            && child.try_wait().is_ok_and(|s| s.is_none())
+        {}
+        let _ = child.kill();
+        let _ = child.wait();
+        Ok(())
+    });
+    start.recv().map_err(io::Error::other)??;
+    for _ in 0..60 {
+        if up(port) {
+            *page = Some(stop);
+            return Ok(url);
+        }
+        std::thread::sleep(std::time::Duration::from_millis(500));
+    }
+    drop(stop);
+    let log = std::fs::read_to_string(&log).unwrap_or_default();
+    let tail: Vec<&str> = log.lines().collect();
+    Err(io::Error::other(format!(
+        "nothing listens on port {port} after 30 s: {}",
+        tail[tail.len().saturating_sub(5)..].join("\n")
+    )))
+}
+
+/// `serve` without the `timeout` the proof's brief asks for: the human's
+/// page would close under them; `page` sets its own.
+/// ponytail: a leading `timeout` only.
+fn untimed(serve: &str) -> String {
+    let mut words = serve.split_whitespace().peekable();
+    if words.peek() != Some(&"timeout") {
+        return serve.to_string();
+    }
+    words.next();
+    while let Some(w) = words.next_if(|w| w.starts_with('-')) {
+        if matches!(w, "-k" | "-s") {
+            words.next();
+        }
+    }
+    words.next();
+    words.collect::<Vec<_>>().join(" ")
+}
+
+/// `serve` with the port number `old` said as `new`, when it says it.
+/// ponytail: the number in the command only; a port written in the
+/// project's code stays taken.
+fn swap_port(serve: &str, old: u16, new: u16) -> Option<String> {
+    let old = old.to_string();
+    let mut out = String::new();
+    let mut found = false;
+    let mut rest = serve;
+    while let Some(at) = rest.find(&old) {
+        let before = rest[..at].chars().next_back();
+        let after = rest[at + old.len()..].chars().next();
+        out.push_str(&rest[..at]);
+        if before.is_some_and(|c| c.is_ascii_digit()) || after.is_some_and(|c| c.is_ascii_digit()) {
+            out.push_str(&old);
+        } else {
+            out.push_str(&new.to_string());
+            found = true;
+        }
+        rest = &rest[at + old.len()..];
+    }
+    out.push_str(rest);
+    found.then_some(out)
 }
 
 /// How the project says it is run. Read inside the sandbox, like everything
@@ -332,7 +456,30 @@ fn parse(reply: &str) -> Plan {
 
 #[cfg(test)]
 mod tests {
-    use super::{local_port, parse};
+    use super::{local_port, parse, swap_port, untimed};
+
+    #[test]
+    fn the_page_drops_the_proofs_timeout() {
+        assert_eq!(
+            untimed("timeout 30 python3 -m http.server 8000"),
+            "python3 -m http.server 8000"
+        );
+        assert_eq!(untimed("timeout -k 5 30s npm start"), "npm start");
+        assert_eq!(untimed("npm start"), "npm start");
+    }
+
+    #[test]
+    fn a_taken_port_is_swapped_where_the_command_says_it() {
+        assert_eq!(
+            swap_port("python3 -m http.server 8000 # 18000", 8000, 4242).as_deref(),
+            Some("python3 -m http.server 4242 # 18000")
+        );
+        assert_eq!(
+            swap_port("PORT=8000 node s.js --port=8000", 8000, 9).as_deref(),
+            Some("PORT=9 node s.js --port=9")
+        );
+        assert_eq!(swap_port("node server.js", 8000, 9), None);
+    }
 
     #[test]
     fn reply_parsing() {
