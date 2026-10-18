@@ -233,7 +233,15 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
             store.add_project(&field(&input, "path"), &field(&input, "place"))?;
             Ok(json!({}))
         }
-        ("POST", "/api/folders") => folders(&field(&input()?, "path")),
+        ("POST", "/api/folders") => {
+            let v = input()?;
+            let (path, name) = (field(&v, "path"), field(&v, "create"));
+            if name.is_empty() {
+                folders(&path)
+            } else {
+                folders(&new_folder(&path, &name)?)
+            }
+        }
         // The key never goes back to the page: only whether one is saved.
         ("POST", "/api/settings") => {
             let s = Settings::saved()?;
@@ -397,6 +405,23 @@ fn team_view(path: &Path) -> io::Result<Value> {
         json!({"teams": team::teams()?, "team": setup.team, "roles": roles, "catalog": catalog,
               "missing": setup.missing.is_some()}),
     )
+}
+
+/// A new project starts as a new folder: made here rather than in a terminal.
+/// One plain name, inside the folder shown.
+fn new_folder(parent: &str, name: &str) -> io::Result<String> {
+    let name = name.trim();
+    if name.is_empty() || name.starts_with('.') || name.contains(['/', '\\', '\0']) {
+        return Err(io::Error::other(
+            "un nom de dossier simple, sans / ni point au début",
+        ));
+    }
+    let path = std::fs::canonicalize(parent)?.join(name);
+    std::fs::create_dir(&path).map_err(|e| match e.kind() {
+        io::ErrorKind::AlreadyExists => io::Error::other(format!("{name} existe déjà ici")),
+        _ => e,
+    })?;
+    Ok(path.display().to_string())
 }
 
 fn folders(path: &str) -> io::Result<Value> {
