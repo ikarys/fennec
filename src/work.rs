@@ -790,6 +790,17 @@ pub fn open(store: &Store, id: &str) -> io::Result<Value> {
     Ok(json!({"folder": folder, "opened": opened}))
 }
 
+/// "Ouvrir la page": the ready work's product, started the way its proof
+/// started it, for the human's own browser.
+pub fn page(store: &Store, id: &str) -> io::Result<Value> {
+    let request = store.load(id)?;
+    let run = request["run"]
+        .as_str()
+        .filter(|_| request["status"] == "ready")
+        .ok_or_else(|| io::Error::other("cette demande n'a pas de travail prêt"))?;
+    Ok(json!({"url": proof::page(&Worlds::from_env()?, run)?}))
+}
+
 /// What fennec changed for a request, read from its run: asked for when the
 /// human opens it, since a diff is too large for every refresh of the page.
 pub fn changes(store: &Store, id: &str) -> io::Result<Value> {
