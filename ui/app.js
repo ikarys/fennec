@@ -19,6 +19,91 @@ async function api(path, body) {
   return data;
 }
 
+// The themes, chosen in the settings: Sable and Sable Clair, the CSS's own
+// dark and light palettes, Slate, the first fennec's palette, and Orange, the
+// v4 design's. Each theme is a single palette of this UI's eleven tokens,
+// carried on its own. A display-only preference kept in localStorage, applied
+// on the document root so every derived shade follows the chosen palette.
+const THEME_KEY = "fennec.theme";
+const SABLE_LIGHT = {
+  "--bg": "#f6f5f2", "--card": "#fff", "--text": "#1d1d1b", "--muted": "#6b6a66",
+  "--line": "#e2e0da", "--soft": "#efede8", "--accent": "#c4622d", "--ok": "#2f7d4f",
+  "--warn": "#9a6a12", "--bad": "#a33a3a", "--info": "#4a6fa5"
+};
+const SABLE_DARK = {
+  "--bg": "#171716", "--card": "#222220", "--text": "#ecebe7", "--muted": "#9a988f",
+  "--line": "#33322f", "--soft": "#2b2a28", "--accent": "#e08050", "--ok": "#5fb383",
+  "--warn": "#d9a441", "--bad": "#d46a6a", "--info": "#7d9ccc"
+};
+const THEMES = [
+  { id: "sable", name: "Fennec Sable", palette: SABLE_DARK },
+  { id: "sable-clair", name: "Fennec Sable Clair", palette: SABLE_LIGHT },
+  { id: "slate", name: "Fennec Slate", palette: {
+    "--bg": "#191d24", "--card": "#1f242d", "--text": "#dde2e9", "--muted": "#98a0ad",
+    "--line": "#353c49", "--soft": "#272d38", "--accent": "#e5a55c", "--ok": "#62b183",
+    "--warn": "#d5983f", "--bad": "#dd6b64", "--info": "#6fa0df" } },
+  { id: "orange", name: "Fennec Orange", palette: {
+    "--bg": "#0b0e14", "--card": "#10141c", "--text": "#e7eaf1", "--muted": "#79839a",
+    "--line": "#232b3a", "--soft": "#1b2230", "--accent": "#f0883e", "--ok": "#4cc38a",
+    "--warn": "#e0a83e", "--bad": "#e5534b", "--info": "#5aa9e6" } },
+];
+
+function isLight(hex) {
+  const value = hex.replace("#", "");
+  if (value.length !== 6) return false;
+  const channel = (at) => {
+    const srgb = parseInt(value.slice(at, at + 2), 16) / 255;
+    return srgb <= 0.04045 ? srgb / 12.92 : ((srgb + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4) > 0.18;
+}
+
+function applyTheme() {
+  const theme = THEMES.find((t) => t.id === loadTheme()) ?? THEMES[0];
+  const style = document.documentElement.style;
+  for (const token of Object.keys(theme.palette)) style.removeProperty(token);
+  for (const [token, value] of Object.entries(theme.palette)) style.setProperty(token, value);
+  style.colorScheme = isLight(theme.palette["--bg"]) ? "light" : "dark";
+}
+
+function loadTheme() {
+  let id;
+  try { id = localStorage.getItem(THEME_KEY); } catch { id = null; }
+  return THEMES.some((t) => t.id === id) ? id : THEMES[0].id;
+}
+
+function saveTheme(id) {
+  try { localStorage.setItem(THEME_KEY, id); } catch { /* the choice stays for this session */ }
+}
+
+applyTheme();
+
+// The interface's scale, chosen in the settings: a zoom on the document root,
+// so fonts and spacing grow together and no box overflows. A display-only
+// preference kept in localStorage, like the theme.
+const FONT_KEY = "fennec.fontscale";
+const FONT_BASE_PX = 15, FONT_MIN_PX = 12, FONT_MAX_PX = 21, FONT_STEP_PX = 1;
+
+function loadFontScale() {
+  let v;
+  try { v = parseFloat(localStorage.getItem(FONT_KEY)); } catch { v = NaN; }
+  if (v > 0 && v < 5) v *= FONT_BASE_PX;
+  if (!Number.isFinite(v) || v < FONT_MIN_PX || v > FONT_MAX_PX) v = FONT_BASE_PX;
+  return v;
+}
+
+function saveFontScale(v) {
+  try { localStorage.setItem(FONT_KEY, String(v)); } catch { /* stays for this session */ }
+}
+
+function applyFontScale() {
+  const v = loadFontScale();
+  document.documentElement.style.zoom = v / FONT_BASE_PX;
+  return v;
+}
+
+applyFontScale();
+
 // A button that calls the server and shows its error next to the card's actions.
 function action(label, path, body, { primary = false, quiet = false } = {}) {
   const button = el("button", { type: "button", textContent: label, className: primary ? "primary" : quiet ? "quiet" : "" });
@@ -50,6 +135,66 @@ function dropButton(id, undo = false) {
   };
   return button;
 }
+
+// Erasing a finished request is one more click than reading it: the first
+// click only asks.
+function forgetButton(id) {
+  const button = el("button", { type: "button", className: "quiet", textContent: "Supprimer", title: "Supprimer cette demande" });
+  button.onclick = () => {
+    const sure = action("Confirmer la suppression", "/api/forget", { id }, { quiet: true });
+    sure.style.color = "var(--bad)";
+    button.replaceWith(sure);
+  };
+  return button;
+}
+
+// A list row's own actions, on its right: archiving is one click, erasing
+// asks once before doing. An error, if any, is said with the buttons.
+function rowActions(id, { archive, forget, restore = false, stop } = {}) {
+  const error = el("div", { className: "error", role: "alert" });
+  const go = (path, body) => async () => {
+    error.textContent = "";
+    try {
+      await api(path, body);
+      refresh(true);
+    } catch (e) {
+      error.textContent = e.message;
+    }
+  };
+  const nodes = [];
+  // Stopping work under way is one more click than reading the line.
+  if (stop) {
+    const halt = el("button", { type: "button", className: "icon", ariaLabel: "Arrêter", title: "Arrêter" });
+    setIcon(halt, "stop");
+    halt.onclick = () => {
+      const sure = el("button", { type: "button", className: "quiet", textContent: "Sûr ?" });
+      sure.style.color = "var(--bad)";
+      sure.onclick = go(stop, { id });
+      halt.replaceWith(sure);
+    };
+    nodes.push(halt);
+  }
+  if (archive) {
+    const first = el("button", { type: "button", className: "icon",
+      ariaLabel: restore ? "Rétablir" : "Archiver", title: restore ? "Rétablir" : "Archiver" });
+    setIcon(first, restore ? "undo" : "inbox");
+    first.onclick = go(archive, { id, on: !restore });
+    nodes.push(first);
+  }
+  if (forget) {
+    const del = el("button", { type: "button", className: "icon", ariaLabel: "Supprimer", title: "Supprimer" });
+    setIcon(del, "trash");
+    del.onclick = () => {
+      const sure = el("button", { type: "button", className: "quiet", textContent: "Confirmer" });
+      sure.style.color = "var(--bad)";
+      sure.onclick = go(forget, { id });
+      del.replaceWith(sure);
+    };
+    nodes.push(del);
+  }
+  return el("div", { className: "row-actions" }, ...nodes, error);
+}
+const rowWrap = (link, actions) => el("div", { className: "row-wrap" }, link, actions);
 
 const TAGS = {
   talk: ["Discussion", "var(--accent)"],
@@ -378,10 +523,29 @@ async function journal(item) {
   return steps.map(stepView);
 }
 
-// Work under way: it opens on its journal, which follows the model as it answers.
+// Work under way: it opens on its journal, which follows the model as it
+// answers. The stop is there too: no action on what runs was the trap.
 function underway(item) {
   const slot = el("div");
-  const box = el("details", { className: "past" }, el("summary", {}, line(item, item.step, true)), slot);
+  const stop = el("button", { type: "button", className: "quiet", textContent: "Arrêter" });
+  stop.onclick = () => {
+    const sure = action("Confirmer l'arrêt", "/api/stop", { id: item.id }, { quiet: true });
+    sure.style.color = "var(--bad)";
+    stop.replaceWith(sure);
+  };
+  const bar = el("div", { className: "past-actions run-actions" }, stop,
+    el("div", { className: "error", role: "alert" }));
+  // The head above says the title; the fold says only what moved since: the
+  // step under way and how long it has run.
+  let elapsed = null;
+  if (item.since) {
+    elapsed = el("span", { className: "elapsed" });
+    elapsed.dataset.since = item.since;
+  }
+  const box = el("details", { className: "past" },
+    el("summary", {}, el("span", { className: "dot" }),
+      el("span", { className: "state" }, item.step, elapsed ? " · " : "", elapsed)),
+    bar, slot);
   box.dataset.key = "run-" + item.id;
   box.ontoggle = () => follow(item.id, box, slot);
   return box;
@@ -421,30 +585,47 @@ function facts(item) {
   const s = item.stats;
   if (!s?.turns) return [];
   const n = s.failed_attempts;
-  const safe = el("div", { className: "pills", title: "Chaque essai tourne isolé ; un essai raté est annulé sans trace" },
-    pill("🔒", "sans réseau"), pill("🏠", "ton dossier personnel caché"), pill("📖", "git en lecture seule"),
-    n ? pill("↺", `${n} essai${n > 1 ? "s" : ""} raté${n > 1 ? "s" : ""} annulé${n > 1 ? "s" : ""}`, "warn") : null);
-  return [el("div", { className: "facts" }, metrics(s), timeline(s), safe)];
+  const safe = el("div", { className: "pills" },
+    pill("🔒", "sans réseau", "", "L'essai n'a pas accès à Internet : il ne télécharge rien et n'appelle aucun service externe."),
+    pill("🏠", "ton dossier personnel caché", "", "Ton dossier personnel (~) est hors de portée : l'essai ne lit ni n'écrit que le projet."),
+    pill("📖", "git en lecture seule", "", "L'historique git du projet est visible, mais l'essai ne le modifie pas."),
+    n ? pill("↺", `${n} essai${n > 1 ? "s" : ""} raté${n > 1 ? "s" : ""} annulé${n > 1 ? "s" : ""}`, "warn",
+      "Ces essais ont échoué et sont annulés : aucune trace dans ton dossier.") : null);
+  const [bar, who] = timeline(s);
+  return [el("div", { className: "facts" },
+    metrics(s),
+    bar ? el("h3", { textContent: "Répartition du temps" }) : null, bar,
+    who ? el("h3", { textContent: "Équipe", title: "L'équipe du projet qui a travaillé sur cette demande : qui fait quoi se définit dans la page Équipe." }) : null, who,
+    el("h3", { textContent: "L'isolement" }), safe)];
 }
 
-function pill(icon, text, tone = "") {
-  return el("span", { className: `pill ${tone}` }, el("span", { className: "icon", textContent: icon, ariaHidden: "true" }), text);
+function pill(icon, text, tone = "", title = "") {
+  return el("span", { className: `pill ${tone}`, ...(title ? { title } : {}) },
+    el("span", { className: "icon", textContent: icon, ariaHidden: "true" }), text);
 }
 
 // Model time, tokens in and out, cache and speed: a figure each, not a sentence.
+const METRIC_TIP = {
+  "Temps de modèle": "Temps de génération du modèle, sans les outils ni les attentes.",
+  "Appels": "Nombre d'appels faits au modèle pour cette demande.",
+  "Envoyés": "Ce qui part vers le modèle : contexte, consignes, résultats d'outils.",
+  "Générés": "Ce que le modèle a produit : réponses, code, réflexion.",
+  "Vitesse": "Moyenne de tokens produits par seconde.",
+};
 function metrics(c) {
   const cache = percent(c.cached, c.sent);
   return el("div", { className: "metrics" },
     metric("Temps de modèle", duration(c.ms ?? 0)),
     metric("Appels", number(c.turns)),
-    metric("Envoyés", compact(c.sent), el("span", { className: "meter", style: `--p:${cache}%`, title: `${cache} % en cache` }),
+    metric("Envoyés", compact(c.sent), el("span", { className: "meter", style: `--p:${cache}%`, title: "Part des tokens envoyés déjà en cache : moins chers, plus vite." }),
       el("small", { textContent: `${cache} % cache` })),
-    metric("Générés", compact(c.received), c.thinking ? el("small", { textContent: `${percent(c.thinking, c.received)} % réflexion` }) : null),
+    metric("Générés", compact(c.received), c.thinking ? el("small", { textContent: `${percent(c.thinking, c.received)} % réflexion`, title: "Part des tokens générés qui est de la réflexion interne, pas de la réponse." }) : null),
     metric("Vitesse", c.ms ? `${tps(c)}` : "—", el("small", { textContent: "tokens/s" })));
 }
 
 function metric(label, value, ...extra) {
-  return el("span", { className: "metric" }, el("small", { textContent: label }), el("b", { textContent: value }), ...extra);
+  const tip = METRIC_TIP[label];
+  return el("span", { className: "metric", ...(tip ? { title: tip } : {}) }, el("small", { textContent: label }), el("b", { textContent: value }), ...extra);
 }
 
 // Where the time went, one coloured segment per step, with the roles of each.
@@ -454,15 +635,18 @@ function timeline(s) {
   const total = stages.reduce((t, [, c]) => t + (c.ms ?? 0), 0) || 1;
   const bar = el("div", { className: "timeline" }, ...stages.map(([name, c]) =>
     el("span", { className: `seg ${stageOf(name)}`, style: `flex:${Math.max(c.ms ?? 0, total / 40)}`,
-      title: `${stageName(name)} : ${duration(c.ms ?? 0)}`, textContent: `${stageName(name)} ${duration(c.ms ?? 0)}` })));
+      title: STAGE_TIP[stageOf(name)], textContent: `${stageName(name)} ${duration(c.ms ?? 0)}` })));
   const who = el("div", { className: "who" }, ...stages.flatMap(([name, c]) =>
     (c.roles ?? []).map((r) => roleTag(r, stageOf(name)))));
-  return el("div", {}, bar, who.children.length ? who : null);
+  return [bar, who.children.length ? who : null];
 }
 
-const stageOf = (name) => (name.startsWith("Travail") ? "solve" : name.startsWith("Preuve") ? "prove" : "frame");
+const stageOf = (name) => (name.startsWith("Discussion") ? "talk" : name.startsWith("Travail") ? "solve" : name.startsWith("Preuve") ? "prove" : "frame");
 const stageName = (name) => (name.startsWith("Cadrage") ? "Tests d'abord" : name);
-const roleTag = (name, stage) => el("span", { className: `rtag ${stage}`, textContent: name });
+// One short sentence per stage: what it is, for the bar's segments and the role chips.
+const STAGE_TIP = { talk: "Discussion de départ : ce que tu as demandé, et ce que l'équipe en a retenu.", frame: "Cadrage : les tests qui prouveront la fin et le périmètre, posés avant de coder.", solve: "Réalisation : le travail est écrit et exécuté, essai après essai.", prove: "Preuve : le résultat est vérifié avec les tests et les commandes du rôle." };
+// What a role chip is: its brief if the step keeps one, else the stage's job.
+const roleTag = (name, stage, brief) => el("span", { className: `rtag ${stage}`, textContent: name, title: brief ? brief.replace(/\s+/g, " ").trim().slice(0, 200) : STAGE_TIP[stage] });
 
 function duration(ms) {
   const s = Math.round(ms / 1000);
@@ -488,7 +672,7 @@ function stepView(step) {
 function rolesView(step) {
   if (!step.roles) return [];
   if (!step.roles.length) return [el("div", { className: "muted", textContent: "Aucun rôle de l'équipe à cette étape." })];
-  const nodes = [el("div", { className: "who" }, ...step.roles.map((r) => roleTag(r.name, stageOf(step.name))))];
+  const nodes = [el("div", { className: "who" }, ...step.roles.map((r) => roleTag(r.name, stageOf(step.name), r.brief)))];
   for (const r of step.roles) {
     if (r.brief) {
       nodes.push(el("details", { className: "message" }, el("summary", {}, el("b", { textContent: r.name }), " : sa consigne au modèle"),
@@ -547,11 +731,10 @@ function landLabel({ branch, remote, committed }) {
 }
 
 function card(item) {
-  const [tag, color] = TAGS[item.kind];
+  // The head above the tabs says the title and the status; the card repeats
+  // the title only where it is the field to edit: a request for later.
   const node = el("div", { className: "card" },
-    el("div", { className: "meta", style: `--c: ${color}` },
-      el("span", { className: "tag", textContent: tag }), el("span", { className: "proj", textContent: item.project })),
-    el("div", { className: "title", textContent: item.title.length > 200 ? item.title.slice(0, 200) + "…" : item.title }));
+    item.kind === "later" ? el("div", { className: "title", textContent: item.title }) : null);
   const actions = el("div", { className: "actions" });
   const add = (...nodes) => node.append(...nodes.filter(Boolean));
 
@@ -653,6 +836,10 @@ function doneWhen(item) {
 }
 
 function line(item, state, dot) {
+  // A state, when one is said: the requests say theirs, a discussion says none.
+  const stateNode = Array.isArray(state)
+    ? el("span", { className: "status " + state[1], textContent: state[0] })
+    : state ? el("span", { className: "state", textContent: state }) : null;
   // Under way, the figures are the last finished step's: how long it has run says more.
   if (dot && item.since) {
     const elapsed = el("span", { className: "elapsed" });
@@ -660,7 +847,7 @@ function line(item, state, dot) {
     return el("div", { className: "line" }, el("span", { className: "dot" }),
       el("span", { className: "muted proj", textContent: item.project }),
       el("span", { className: "what", textContent: item.title.length > 120 ? item.title.slice(0, 120) + "…" : item.title }),
-      el("span", { className: "state" }, state, " · ", elapsed));
+      el("span", { className: "state" }, stateNode, stateNode ? " · " : null, elapsed));
   }
   const s = item.stats;
   return el("div", { className: "line" }, dot ? el("span", { className: "dot" }) : null,
@@ -669,13 +856,14 @@ function line(item, state, dot) {
     s?.turns ? el("span", { className: "state cost", title: "temps de modèle · tokens envoyés · générés" },
       el("span", { className: "mini", textContent: `⏱ ${duration(s.ms)}` }), el("span", { className: "mini", textContent: `↑ ${compact(s.sent)}` }),
       el("span", { className: "mini", textContent: `↓ ${compact(s.received)}` })) : null,
-    el("span", { className: "state", textContent: state }));
+    stateNode);
 }
 
-// A finished request opens on what was asked, done and proven.
+// A finished request opens on what was asked, done and proven: read in full,
+// so no toggle in front of it — that fold was the list's, not the page's. The
+// title and where it stands are the head above; the box starts at the work.
 function past(item) {
-  const box = el("details", { className: "past" },
-    el("summary", {}, line(item, pastState(item), false)));
+  const box = el("div", { className: "past" });
   box.dataset.key = "past-" + item.id;
   const talk = conversation(item);
   if (talk) box.append(talk);
@@ -698,6 +886,7 @@ function past(item) {
   actions.append(journalButton(item, () => slot));
   if (item.changed) actions.append(changesButton(item, () => slot));
   if (item.kind === "passed") actions.append(action("Reprendre", "/api/resume", { id: item.id }, { primary: true }));
+  actions.append(action("Archiver", "/api/request/archive", { id: item.id }, { quiet: true }), forgetButton(item.id));
   box.append(slot, el("div", { className: "past-actions" }, actions, el("div", { className: "error", role: "alert" })));
   return box;
 }
@@ -707,6 +896,33 @@ function pastState(item) {
   if (item.kind === "dropped") return "abandonné";
   const parts = [item.branch, item.remote && `poussé vers ${item.remote}`, item.commit?.slice(0, 7)];
   return "✓ commit " + parts.filter(Boolean).join(" · ");
+}
+
+// Where a request stands, in one coloured word: the list says it per row in
+// the muted, the page says it in a pill the human sees at a glance.
+function statusOf(item, kind) {
+  if (kind === "run") return ["en cours", "info"];
+  if (kind === "past") {
+    if (item.kind === "passed") return ["mis de côté", "warn"];
+    if (item.kind === "dropped") return ["abandonné", "bad"];
+    return [pastState(item), "ok"];
+  }
+  const [label, color] = TAGS[item.kind];
+  return [label, color.replace("var(--", "").replace(")", "")];
+}
+
+// The request read in full: its title in whole and where it stands, above
+// what it holds. The title is not repeated in the card, the past or the run.
+function reqHead(item, kind) {
+  const [label, tone] = statusOf(item, kind);
+  const head = el("div", { className: "req-head" },
+    el("strong", { textContent: item.title }),
+    el("span", { className: `status ${tone}`, textContent: label }));
+  if (kind === "past" && item.stats?.turns) {
+    const s = item.stats;
+    head.append(el("span", { className: "muted", textContent: `⏱ ${duration(s.ms)} · ↑ ${compact(s.sent)} · ↓ ${compact(s.received)}` }));
+  }
+  return head;
 }
 
 // The address names the project and the request read in full:
@@ -756,19 +972,79 @@ function renderSide(view) {
   };
   entry($("side-all"), "", view.todo);
   $("side-all").parentElement.hidden = view.projects.length < 2;
-  $("side-projects").replaceChildren(...view.projects.map((p) => el("li", {},
-    entry(el("button", { type: "button", className: "item", title: p.path }, el("span", { className: "name", textContent: p.name })), p.path, view.todo))));
+  $("side-projects").replaceChildren(...view.projects.map((p) => projectEntry(p, entry, view.todo)));
+  // The archived projects, out of the select: brought back or erased there.
+  const archived = view.projectsArchived ?? [];
+  $("side-archived-label").hidden = !archived.length;
+  $("side-archived").replaceChildren(...archived.map(archivedProjectEntry));
   const page = PAGES.includes(where().path) ? where().path : "";
   $("open-team").setAttribute("aria-current", String(page === "team"));
   $("open-stats").setAttribute("aria-current", String(page === "stats"));
   $("open-settings").setAttribute("aria-current", String(page === "settings"));
 }
 
+// Which project is on screen: the focused rows no longer repeat it, so it is
+// said once, at the top of the pane that shows it.
+function sayProject(head) {
+  const path = $("project").value;
+  head.querySelector("strong").textContent = $("project").selectedOptions[0]?.text ?? path.split("/").pop();
+  head.querySelector(".muted").textContent = path;
+}
+function heads() {
+  const show = !!$("project").value && where().path !== "chat";
+  $("list-head").hidden = !show;
+  if (show) sayProject($("list-head"));
+}
+// The request read in full gets the head; the pages name themselves.
+function detailHead(found) {
+  const head = $("detail-head");
+  head.hidden = !(found && $("project").value);
+  if (!head.hidden) sayProject(head);
+}
+
+// A project's two exits in the list: archived (its requests go out of view
+// with it) or erased, which the server refuses while it holds a request.
+function sideCall(path, body) {
+  const error = $("side-error");
+  error.textContent = "";
+  api(path, body).then(() => refresh(true)).catch((e) => { error.textContent = e.message; });
+}
+function projectEntry(p, entry, todo) {
+  const button = el("button", { type: "button", className: "item", title: p.path },
+    el("span", { className: "name", textContent: p.name }));
+  const archive = el("button", { type: "button", className: "icon", ariaLabel: "Archiver le projet", title: "Archiver" });
+  setIcon(archive, "inbox");
+  archive.onclick = () => sideCall("/api/projects/archive", { path: p.path, on: true });
+  const del = el("button", { type: "button", className: "icon", ariaLabel: "Supprimer le projet", title: "Supprimer" });
+  setIcon(del, "trash");
+  del.onclick = () => {
+    const sure = el("button", { type: "button", className: "quiet", textContent: "Confirmer" });
+    sure.style.color = "var(--bad)";
+    sure.onclick = () => sideCall("/api/projects/remove", { path: p.path });
+    del.replaceWith(sure);
+  };
+  entry(button, p.path, todo);
+  return el("li", { className: "project" }, button, archive, del);
+}
+function archivedProjectEntry(p) {
+  const restore = el("button", { type: "button", className: "icon", ariaLabel: "Rétablir le projet", title: "Rétablir" });
+  setIcon(restore, "undo");
+  restore.onclick = () => sideCall("/api/projects/archive", { path: p.path, on: false });
+  const del = el("button", { type: "button", className: "icon", ariaLabel: "Supprimer le projet", title: "Supprimer" });
+  setIcon(del, "trash");
+  del.onclick = () => {
+    const sure = el("button", { type: "button", className: "quiet", textContent: "Confirmer" });
+    sure.style.color = "var(--bad)";
+    sure.onclick = () => sideCall("/api/projects/remove", { path: p.path });
+    del.replaceWith(sure);
+  };
+  return el("li", {}, el("span", { className: "name", title: p.path, textContent: p.name }), restore, del);
+}
+
 // The chosen project is the one on screen: its requests only, kept in the
 // address so a reload or a bookmark comes back to it.
 function focusOn(path) {
-  // A discussion or a page owns the address: the project's page must not take it back.
-  if (["chat", "team", "stats", "settings"].includes(where().path)) return;
+  if (owned(where().path)) return;
   document.body.classList.toggle("focused", !!path);
   if (path !== paged) showPage(path).catch((e) => ($("page-error").textContent = e.message));
   history.replaceState(null, "", path || picked ? hashOf(path, picked) : location.pathname);
@@ -790,6 +1066,9 @@ setInterval(tick, 1000);
 // The discussion list, and the chosen one read in full: the chat file is the
 // exchange, so every refresh reads it again and redraws what moved.
 let chatBox = null;
+// The list is redrawn on every refresh: a section the human unfolded must
+// stay unfolded, so the opened folders are remembered here.
+const chatOpen = new Set();
 async function showChats() {
   document.body.classList.add("chats", "picked");
   $("chats").hidden = false;
@@ -797,15 +1076,20 @@ async function showChats() {
   $("hint").hidden = true;
   for (const name of PAGES) $(name).hidden = true;
   $("side-chats").setAttribute("aria-current", "true");
-  let chats;
+  let chats, archived;
   try {
-    chats = await api("/api/chats");
+    [chats, archived] = await Promise.all([api("/api/chats"), api("/api/chats/archived")]);
   } catch (e) {
     $("chat-list").replaceChildren(el("div", { className: "empty", textContent: e.message }));
     return;
   }
-  $("chat-list").replaceChildren(...(chats.length ? chats.map(chatRow)
-    : [el("div", { className: "empty", textContent: "Aucune discussion : « Nouvelle discussion » pour en démarrer." })]));
+  const nodes = chats.length
+    ? chatGroups(chats)
+    : [el("div", { className: "empty", textContent: "Aucune discussion : « Nouvelle discussion » pour en démarrer." })];
+  // The archived discussions, out of the groups: brought back or erased there.
+  if (archived.length) nodes.push(el("div", { className: "chat-archived" },
+    el("h2", { textContent: "Archivées" }), ...archived.map((c) => chatRow(c, true, true))));
+  $("chat-list").replaceChildren(...nodes);
   const id = where().id;
   if (!id) {
     chatBox = null;
@@ -824,13 +1108,50 @@ async function showChats() {
   showChat(c);
 }
 
-function chatRow(c) {
+// A discussion of one folder: under its folder's name, the folder is not
+// repeated on the row; the row offers archiving and, one click more, erasing.
+function chatRow(c, grouped, restore = false) {
   const a = el("a", { className: "row", href: "#chat/" + c.id },
-    line({ id: c.id, project: c.folder.split("/").pop(), title: c.title, since: c.since },
-      c.status === "thinking" ? "répond…" : c.status === "waiting" ? "une question" : "prête",
+    line({ id: c.id, project: grouped ? "" : c.folder.split("/").pop(), title: c.title, since: c.since },
+      "",
       c.status === "thinking"));
   a.setAttribute("aria-current", String(c.id === where().id));
-  return a;
+  return rowWrap(a, rowActions(c.id, { archive: "/api/chat/archive", forget: "/api/chat/forget", restore }));
+}
+
+// One folder's discussions under its name, a project marked: folded at first,
+// the count says what is inside; a click unfolds.
+function chatGroup(folder, g) {
+  const open = chatOpen.has(folder);
+  const head = el("button", { type: "button", className: "chat-group-head", title: folder },
+    el("span", { className: "what", textContent: folder.split("/").pop() }),
+    g.project ? el("span", { className: "tag", style: "--c: var(--ok)", textContent: "projet" }) : null,
+    el("span", { className: "count", textContent: g.rows.length }));
+  head.setAttribute("aria-expanded", String(open));
+  setIcon(head, "chevron");
+  const body = el("div", { className: "chat-group-body", hidden: !open }, ...g.rows);
+  head.onclick = () => {
+    const now = body.hidden;
+    body.hidden = !now;
+    head.setAttribute("aria-expanded", String(now));
+    if (now) chatOpen.add(folder); else chatOpen.delete(folder);
+  };
+  return el("div", { className: "chat-group" }, head, body);
+}
+
+// The discussions of one folder under its name, a project marked; within a
+// folder, the most recent first; folders in the order of their names.
+function chatGroups(chats) {
+  const groups = new Map();
+  for (const c of chats) {
+    const g = groups.get(c.folder) ?? { project: c.project === true, rows: [] };
+    g.rows.push(chatRow(c, true));
+    groups.set(c.folder, g);
+  }
+  // By the name shown, not the path: two trees may hold a same-named folder.
+  return [...groups.entries()]
+    .sort(([a], [b]) => a.split("/").pop().localeCompare(b.split("/").pop()) || a.localeCompare(b))
+    .map(([folder, g]) => chatGroup(folder, g));
 }
 
 function showChat(c) {
@@ -872,7 +1193,7 @@ function showChat(c) {
   const busy = thinking || c.status === "waiting";
   box.composer.send.disabled = busy;
   box.composer.stop.hidden = !busy;
-  const asideKey = JSON.stringify([c.skills, c.stats, c.project, c.grants]);
+  const asideKey = JSON.stringify([c.stats, c.project, c.grants]);
   if (box.asideKey !== asideKey) {
     box.asideKey = asideKey;
     box.aside.replaceChildren(...chatAside(c));
@@ -970,25 +1291,7 @@ function chatComposer(id) {
 }
 
 function chatAside(c) {
-  const row = (s, on) => {
-    const b = el("button", { type: "button", textContent: on ? "Ajouter" : "Retirer" });
-    b.onclick = async () => {
-      $("chat-error").textContent = "";
-      try {
-        await api("/api/chat/skill", { id: c.id, name: s.name, on });
-        refresh(true);
-      } catch (e) {
-        $("chat-error").textContent = e.message;
-      }
-    };
-    return el("li", { title: `${s.description}\n${s.from}` },
-      el("span", { className: "what", title: s.description }, s.name), b);
-  };
-  const chosen = (c.skills ?? []).filter((s) => s.chosen);
-  const rest = (c.skills ?? []).filter((s) => !s.chosen);
-  const all = chosen.map((s) => row(s, false)).concat(rest.slice(0, 8).map((s) => row(s, true)));
-  const nodes = [el("h2", { textContent: "Skills" }),
-    all.length ? el("ul", {}, ...all) : el("p", { className: "muted", textContent: "Aucun skill sur cette machine." })];
+  const nodes = [];
   // Folders the person opened for this chat: a refusal was not, an opening
   // stays until taken back.
   const grants = c.grants ?? [];
@@ -1048,6 +1351,7 @@ async function refresh(force) {
         shown = typing ? "" : json;
         renderProjects(view.projects);
         renderSide(view);
+        heads();
       }
       showChats();
       return;
@@ -1066,11 +1370,12 @@ async function refresh(force) {
     $("side-chats").removeAttribute("aria-current");
     renderProjects(view.projects);
     renderSide(view);
+    heads();
     const todo = mine(view.todo), running = mine(view.running);
-    const row = (item, node) => {
+    const row = (item, node, actions) => {
       const a = el("a", { className: "row", href: hashOf($("project").value, item.id) }, node);
       a.setAttribute("aria-current", String(item.id === picked));
-      return a;
+      return actions ? rowWrap(a, actions) : a;
     };
     fill($("todo"), todo.map((i) => row(i, line(i, TAGS[i.kind][0]))), "Rien ne t'attend.");
     $("n-todo").textContent = todo.length || "";
@@ -1079,14 +1384,23 @@ async function refresh(force) {
     $("n-others").textContent = others ? `${others} autre${others > 1 ? "s" : ""} t'attend${others > 1 ? "ent" : ""} ailleurs` : "";
     const name = $("project").selectedOptions[0]?.value ? $("project").selectedOptions[0].text : "fennec";
     document.title = todo.length ? `(${todo.length}) ${name}` : name;
-    fill($("running"), running.map((i) => row(i, line(i, i.step, true))), "Rien en cours.");
+    fill($("running"), running.map((i) => row(i, line(i, i.step, true),
+      rowActions(i.id, { stop: "/api/stop" }))), "Rien en cours.");
     // The backlog: only there when it holds something.
     const later = mine(view.later ?? []);
     $("later-box").hidden = !later.length;
     $("n-later").textContent = later.length || "";
-    fill($("later"), later.map((i) => row(i, line(i, "à lancer"))), "");
+    fill($("later"), later.map((i) => row(i, line(i, "à lancer"),
+      rowActions(i.id, { archive: "/api/request/archive", forget: "/api/forget" }))), "");
     const history = mine(view.history);
-    fill($("history"), history.map((i) => row(i, line(i, pastState(i), false))), "Rien de terminé pour l'instant.");
+    fill($("history"), history.map((i) => row(i, line(i, pastState(i), false),
+      rowActions(i.id, { archive: "/api/request/archive", forget: "/api/forget" }))), "Rien de terminé pour l'instant.");
+    // The archived requests, out of the lists: brought back or erased there.
+    const archived = mine(view.archived ?? []);
+    $("archived-box").hidden = !archived.length;
+    $("n-archived").textContent = archived.length || "";
+    fill($("archived"), archived.map((i) => row(i, line(i, pastState(i), false),
+      rowActions(i.id, { archive: "/api/request/archive", forget: "/api/forget", restore: true }))), "");
     if (!typing) showDetail(todo.map((i) => [i, "todo"]).concat(later.map((i) => [i, "todo"]), running.map((i) => [i, "run"]), history.map((i) => [i, "past"]))
       .find(([i]) => i.id === picked));
     tick();
@@ -1103,11 +1417,16 @@ async function refresh(force) {
 // or else the project's page. Drawn again only when the request changed,
 // so what the human opened in it stays open.
 const PAGES = ["team", "stats", "settings"];
+// A discussion or a page owns the address: the project's page must not take
+// it back, and a project chosen from there sends the address to it.
+const owned = (path) => path === "chat" || PAGES.includes(path);
 let detailed = "";
 let shownPageKey = "";
 function showDetail(found) {
   const page = PAGES.includes(where().path) ? where().path : "";
+  detailHead(found);
   document.body.classList.toggle("picked", !!found || !!page);
+  document.body.classList.toggle("paged", !!page);
   $("page").hidden = !!found || !!page || !paged;
   $("hint").hidden = !!found || !!page || !!paged;
   for (const name of PAGES) $(name).hidden = name !== page;
@@ -1142,7 +1461,7 @@ function showDetail(found) {
   const panel = decide?.querySelector("button") ? decide : null;
   const facts = [...node.querySelectorAll(".facts")];
   chatBox = null;
-  $("pick").replaceChildren(panel || facts.length
+  $("pick").replaceChildren(reqHead(item, kind), panel || facts.length
     ? el("div", { className: "split" }, main, el("aside", {}, panel,
       facts.length ? el("h2", { textContent: "Coût et isolement" }) : null, ...facts))
     : main);
@@ -1160,6 +1479,7 @@ const ICONS = {
   undo: '<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>',
   resume: '<path d="M6 3l14 9-14 9z"/>',
   trash: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>',
+  stop: '<rect x="6" y="6" width="12" height="12" rx="2"/>',
   save: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/>',
   retry: '<path d="M3 12a9 9 0 0 1 15.7-6L21 8M21 3v5h-5M21 12a9 9 0 0 1-15.7 6L3 16M8 16H3v5"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
@@ -1176,10 +1496,11 @@ const ICONS = {
   history: '<path d="M3 12a9 9 0 1 0 9-9 9.8 9.8 0 0 0-6.7 2.7L3 8"/><path d="M3 3v5h5M12 7v5l4 2"/>',
   shield: '<path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.7 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z"/>',
   rule: '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+  chevron: '<path d="m6 9 6 6 6-6"/>',
 };
 const ICON_OF = [[/^(Commit|Pousser|Préparer)/, "commit"], [/^Ouvrir la page/, "page"], [/changements/, "diff"],
   [/^Ouvrir le code/, "code"], [/^Corriger|^Envoyer/, "fix"], [/^Passer/, "pass"], [/^Journal/, "journal"],
-  [/^Annuler le travail|^Abandonner/, "undo"], [/^Reprendre|^Lancer/, "resume"], [/^Supprimer/, "trash"], [/^Enregistrer le texte/, "save"], [/^Réessayer/, "retry"]];
+  [/^Annuler le travail|^Abandonner/, "undo"], [/^Reprendre|^Lancer/, "resume"], [/^Supprimer/, "trash"], [/^Enregistrer le texte/, "save"], [/^Réessayer/, "retry"], [/^Archiver/, "inbox"], [/^Arrêter/, "stop"]];
 function iconize(button) {
   const name = ICON_OF.find(([re]) => re.test(button.textContent))?.[1];
   if (name) setIcon(button, name);
@@ -1525,7 +1846,56 @@ async function listModels() {
     if (ask === asked) $("settings-status").textContent = unreachable(e.message) ?? e.message;
   }
 }
+// The theme picker: each choice applies at once; the form's submit is for
+// the model's settings only.
+function buildThemePicker() {
+  const themes = $("theme-picker");
+  themes.replaceChildren(...THEMES.map((t) => {
+    const b = el("button", { type: "button", className: "theme" });
+    b.setAttribute("aria-pressed", String(t.id === loadTheme()));
+    b.append(el("span", { className: "preview" },
+      el("span", { className: "bg", style: `background: ${t.palette["--bg"]}` }),
+      el("span", { className: "accent", style: `background: ${t.palette["--accent"]}` })),
+      el("span", { className: "name", textContent: t.name }));
+    b.onclick = () => {
+      saveTheme(t.id);
+      applyTheme();
+      themes.querySelectorAll(".theme").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    };
+    return b;
+  }));
+}
+
+// The font-scale slider: applies on every move, keeps the value for next time.
+function buildFontScale() {
+  const input = $("font-scale");
+  input.min = FONT_MIN_PX; input.max = FONT_MAX_PX; input.step = FONT_STEP_PX;
+  input.value = applyFontScale();
+  const set = (v) => {
+    document.documentElement.style.zoom = v / FONT_BASE_PX;
+    saveFontScale(v);
+  };
+  input.oninput = () => {
+    const v = Number(input.value);
+    if (v >= FONT_MIN_PX && v <= FONT_MAX_PX) set(v);
+  };
+  input.onblur = () => {
+    const v = Number(input.value);
+    input.value = Number.isFinite(v) ? Math.min(FONT_MAX_PX, Math.max(FONT_MIN_PX, v)) : FONT_BASE_PX;
+    set(Number(input.value));
+  };
+}
+
+// The three settings panels, one tab each: general, appearance, skills.
+document.querySelectorAll("#settings-tabs [role=tab]").forEach((b) => {
+  b.onclick = () => {
+    document.querySelectorAll("#settings-tabs [role=tab]").forEach((t) => t.setAttribute("aria-selected", String(t === b)));
+    ["settings-general", "settings-appearance", "settings-skills"].forEach((id) => $(id).hidden = id !== b.dataset.panel);
+  };
+});
 async function showSettingsPage() {
+  buildThemePicker();
+  buildFontScale();
   try {
     const s = await api("/api/settings", {});
     chosen = s.models;
@@ -1653,7 +2023,10 @@ function drawSkillList() {
   const list = skillList.filter((s) => !q || (s.name + " " + s.description).toLowerCase().includes(q));
   $("skills-list").replaceChildren(
     ...list.slice(0, 12).map((s) => {
-      const b = el("button", { type: "button", textContent: s.chosen ? "Retirer" : "Ajouter" });
+      const b = el("button", { type: "button", className: "switch" });
+      b.setAttribute("role", "switch");
+      b.setAttribute("aria-checked", String(s.chosen));
+      b.setAttribute("aria-label", `${s.chosen ? "Désactiver" : "Activer"} le skill ${s.name}`);
       b.onclick = async () => {
         try {
           skillList = await api("/api/skills", { name: s.name, on: !s.chosen });
@@ -1736,9 +2109,9 @@ $("n-others").onclick = () => {
   $("project").dispatchEvent(new Event("change"));
 };
 $("project").addEventListener("change", () => {
-  // Choosing a project while a discussion is open takes its address back;
-  // the address doing it keeps the page honest.
-  if (where().path === "chat") {
+  // Choosing a project while a discussion or a page is open takes its address
+  // back; the address doing it keeps the page honest.
+  if (owned(where().path)) {
     location.hash = hashOf($("project").value, "");
     return;
   }

@@ -201,6 +201,11 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
             store.forget(&field(&input()?, "id"))?;
             Ok(json!({}))
         }
+        ("POST", "/api/request/archive") => {
+            let v = input()?;
+            store.archive_request(&field(&v, "id"), v["on"] == true)?;
+            Ok(json!({}))
+        }
         ("POST", "/api/answer") => {
             let v = input()?;
             let accept = v["accept"].as_bool().unwrap_or(false);
@@ -256,9 +261,22 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
             work::drop(&store, &field(&input()?, "id"))?;
             Ok(json!({}))
         }
+        ("POST", "/api/stop") => {
+            work::stop(&store, &field(&input()?, "id"))?;
+            Ok(json!({}))
+        }
         ("POST", "/api/projects") => {
             let input = input()?;
             store.add_project(&field(&input, "path"), &field(&input, "place"))?;
+            Ok(json!({}))
+        }
+        ("POST", "/api/projects/archive") => {
+            let v = input()?;
+            store.set_project_archived(&field(&v, "path"), v["on"] == true)?;
+            Ok(json!({}))
+        }
+        ("POST", "/api/projects/remove") => {
+            store.remove_project(&field(&input()?, "path"))?;
             Ok(json!({}))
         }
         ("POST", "/api/folders") => {
@@ -364,22 +382,17 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
             let chat = fennec_os::chat::start(&Worlds::from_env()?, Path::new(&folder))?;
             Ok(json!({"id": chat["id"]}))
         }
-        ("GET", "/api/chats") => {
-            let projects = store.projects()?;
-            let list = fennec_os::chat::list(&Worlds::from_env()?)?;
-            Ok(json!(
-                list.into_iter()
-                    .map(|mut c| {
-                        c["project"] = json!(
-                            projects
-                                .iter()
-                                .any(|p| p == c["folder"].as_str().unwrap_or(""))
-                        );
-                        c
-                    })
-                    .collect::<Vec<_>>()
-            ))
+        ("POST", "/api/chat/archive") => {
+            let v = input()?;
+            fennec_os::chat::archive(&Worlds::from_env()?, &field(&v, "id"), v["on"] == true)?;
+            Ok(json!({}))
         }
+        ("POST", "/api/chat/forget") => {
+            fennec_os::chat::forget(&Worlds::from_env()?, &field(&input()?, "id"))?;
+            Ok(json!({}))
+        }
+        ("GET", "/api/chats") => chats_list(&store, false),
+        ("GET", "/api/chats/archived") => chats_list(&store, true),
         ("POST", "/api/chat") => {
             let chat = fennec_os::chat::load(&Worlds::from_env()?, &field(&input()?, "id"))?;
             Ok(chat_view(&store, &chat))
@@ -409,16 +422,6 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
                 &Worlds::from_env()?,
                 &field(&v, "id"),
                 &field(&v, "directory"),
-            )?;
-            Ok(json!({}))
-        }
-        ("POST", "/api/chat/skill") => {
-            let v = input()?;
-            fennec_os::chat::choose(
-                &Worlds::from_env()?,
-                &field(&v, "id"),
-                &field(&v, "name"),
-                v["on"] == true,
             )?;
             Ok(json!({}))
         }
@@ -516,8 +519,31 @@ fn project(store: &Store, path: &str) -> io::Result<std::path::PathBuf> {
     Ok(path.into())
 }
 
-/// What the page reads of a discussion: the chat file, the skills of its
-/// folder, its cost, and whether its folder is one of the human's projects.
+/// The discussion list, archived or not: each entry says whether its folder
+/// is one of the human's projects, so the page can mark it.
+fn chats_list(store: &Store, archived: bool) -> io::Result<Value> {
+    let projects = store.projects()?;
+    let list = if archived {
+        fennec_os::chat::list_archived(&Worlds::from_env()?)?
+    } else {
+        fennec_os::chat::list(&Worlds::from_env()?)?
+    };
+    Ok(json!(
+        list.into_iter()
+            .map(|mut c| {
+                c["project"] = json!(
+                    projects
+                        .iter()
+                        .any(|p| p == c["folder"].as_str().unwrap_or(""))
+                );
+                c
+            })
+            .collect::<Vec<_>>()
+    ))
+}
+
+/// What the page reads of a discussion: the chat file, its cost, and
+/// whether its folder is one of the human's projects.
 fn chat_view(store: &Store, chat: &Value) -> Value {
     let folder = chat["folder"].as_str().unwrap_or("");
     let mut v = chat.clone();
@@ -526,24 +552,6 @@ fn chat_view(store: &Store, chat: &Value) -> Value {
             .projects()
             .is_ok_and(|p| p.iter().any(|x| x == folder))
     );
-    let names: Vec<String> = chat["skills"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter_map(Value::as_str)
-        .map(str::to_string)
-        .collect();
-    let home = std::env::var("HOME").unwrap_or_default();
-    let skills: Vec<Value> = fennec_os::skill::catalog(Some(Path::new(folder)))
-        .unwrap_or_default()
-        .into_iter()
-        .map(|s| {
-            json!({"name": s.name, "description": s.description,
-                   "chosen": names.contains(&s.name),
-                   "from": s.dir.display().to_string().replacen(&home, "~", 1)})
-        })
-        .collect();
-    v["skills"] = json!(skills);
     v["stats"] = json!(work::cost(&chat["turns"]));
     v
 }
