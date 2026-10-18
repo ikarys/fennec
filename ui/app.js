@@ -687,14 +687,17 @@ setInterval(tick, 1000);
 
 let shown = "";
 async function refresh(force) {
-  // Never wipe what the human is typing or reading in a card.
-  const busy = document.activeElement?.closest("#detail") || [...document.querySelectorAll("#detail textarea")].some((t) => t.value);
-  if (!force && busy) return;
+  // Never wipe what the human is typing in the request read in full; the
+  // rest keeps up. (Holding the whole page whenever focus sat in that pane
+  // froze it after a mere click on a tab.)
+  const typing = !force && ([...document.querySelectorAll("#detail textarea, #detail input")].some((t) => t.value)
+    || document.activeElement?.matches("#detail textarea, #detail input"));
   try {
     const view = await api("/api/view");
     const json = JSON.stringify(view);
     if (!force && json === shown) return;
-    shown = json;
+    // Held while typing: drawn once the field is left, even if nothing moves.
+    shown = typing ? "" : json;
     $("error").textContent = "";
     renderProjects(view.projects);
     renderSide(view);
@@ -714,7 +717,7 @@ async function refresh(force) {
     fill($("running"), running.map((i) => row(i, line(i, i.step, true))), "Rien en cours.");
     const history = mine(view.history);
     fill($("history"), history.map((i) => row(i, line(i, pastState(i), false))), "Rien de terminé pour l'instant.");
-    showDetail(todo.map((i) => [i, "todo"]).concat(running.map((i) => [i, "run"]), history.map((i) => [i, "past"]))
+    if (!typing) showDetail(todo.map((i) => [i, "todo"]).concat(running.map((i) => [i, "run"]), history.map((i) => [i, "past"]))
       .find(([i]) => i.id === picked));
     tick();
     // How it works, until the first request: the page alone must explain itself.
