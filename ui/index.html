@@ -23,7 +23,15 @@
   /* The middle is what scrolls; the header above and the tools below never
      leave the screen, no matter how short the window is. */
   #side .mid { overflow: auto; flex: 1; min-height: 0; }
-  #side h1 { margin: 0 8px 14px; }
+  /* The left bar folds to the edge; its icon reopens it from the top of the list. */
+  #open-side, #open-side-2 { display: none; margin: 4px 0 10px; }
+  body.side-off .app { grid-template-columns: minmax(0, 1fr); }
+  body.side-off #side { display: none; }
+  body.side-off #open-side { display: inline-flex; }
+  /* The right bar (decisions and figures) folds away; its icon stays in the head. */
+  body.facts-off .split > aside { display: none; }
+  .side-top { display: flex; align-items: center; justify-content: space-between; margin: 0 8px 14px; }
+  .side-top h1 { margin: 0; }
   #side ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 2px; }
   #side .item { width: 100%; display: flex; gap: 8px; align-items: center; text-align: left; border: none;
                 background: none; border-radius: 6px; padding: 6px 8px; }
@@ -183,6 +191,9 @@
     body.picked #back { display: inline-block; }
     body.picked #detail-head { display: flex; margin-bottom: 12px; }
     body:not(.picked) #hint { display: none; }
+    /* The list hides when a request is picked: the open icon follows it to the detail. */
+    body.side-off #open-side { display: none; }
+    body.side-off.picked #open-side-2 { display: inline-flex; }
   }
   h1 { font-size: 20px; margin: 0; }
   h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
@@ -518,12 +529,15 @@
     .app { display: block; }
     #side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center;
             border-right: none; border-bottom: 1px solid var(--line); padding: 10px 16px; }
-    #side h1 { margin: 0 8px 0 0; }
+    #side .side-top { margin: 0 8px 0 0; }
     #side ul { display: flex; flex-wrap: wrap; }
     #side .item { width: auto; }
     #side .label span, #side .spacer { display: none; }
     #side .label { margin: 0; }
     #side .tools { border-top: none; padding-top: 0; }
+    /* The bar wraps instead of scrolling: nothing in it, Discussions
+       included, may disappear behind an invisible scrollbar. */
+    #side .mid { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; overflow: visible; }
     #list, #detail { padding: 16px; }
     .tabs button { padding: 8px 7px; font-size: 14px; }
     .line .cost { display: none; }
@@ -533,7 +547,10 @@
 <body>
 <div class="app">
 <nav id="side" aria-label="Projets">
-  <h1>fennec</h1>
+  <div class="side-top">
+    <h1>fennec</h1>
+    <button type="button" class="link" id="close-side" data-icon="panelLeft" aria-label="Fermer la barre des projets" title="Fermer la barre des projets"></button>
+  </div>
   <div class="mid">
     <ul><li><button type="button" class="item" id="side-all"><span class="name">Tous les projets</span></button></li></ul>
     <div class="label"><span>Projets</span> <button class="link" id="add-project" data-icon="plus" aria-label="Ajouter un projet" title="Ajouter un projet"></button></div>
@@ -552,6 +569,7 @@
 </nav>
 <main>
   <section id="list" aria-label="Demandes">
+  <button type="button" class="link" id="open-side" data-icon="panelLeft" aria-label="Ouvrir la barre des projets" title="Ouvrir la barre des projets"></button>
   <div id="list-head" hidden><strong id="list-head-name"></strong> <span class="muted" id="list-head-path"></span></div>
   <div id="chats" hidden>
     <button type="button" class="primary" id="new-chat" data-icon="plus">Nouvelle discussion</button>
@@ -595,6 +613,7 @@
   </div>
   </section>
   <section id="detail">
+  <button type="button" class="link" id="open-side-2" data-icon="panelLeft" aria-label="Ouvrir la barre des projets" title="Ouvrir la barre des projets"></button>
   <div id="detail-head" hidden><strong id="detail-head-name"></strong> <span class="muted" id="detail-head-path"></span></div>
   <button type="button" class="link" id="back">← Demandes</button>
   <div id="pick"></div>

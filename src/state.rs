@@ -615,6 +615,10 @@ fn classify(requests: &[(String, Value)], projects_all: &[Value]) -> Value {
     // ponytail: the last 50; older requests stay on disk, unseen.
     history.truncate(50);
     archived.reverse();
+    // Whether a worker still owns it: "Réessayer" is only for a dead one.
+    for c in &mut running {
+        c["alive"] = json!(crate::work::working(c["id"].as_str().unwrap_or("")));
+    }
     let projects: Vec<Value> = projects
         .iter()
         .map(|p| json!({"path": p, "name": name(p)}))

@@ -42,10 +42,38 @@ impl Drop for Stopped {
     }
 }
 
+/// The worker's thread lives here while it runs on a request: "Réessayer"
+/// refuses to start a second one on the same request.
+static WORKING: std::sync::Mutex<std::vec::Vec<String>> = std::sync::Mutex::new(Vec::new());
+
+struct Working(String);
+
+impl Working {
+    fn new(id: String) -> Self {
+        if let Ok(mut w) = WORKING.lock() {
+            w.push(id.clone());
+        }
+        Self(id)
+    }
+}
+
+impl Drop for Working {
+    fn drop(&mut self) {
+        if let Ok(mut w) = WORKING.lock() {
+            w.retain(|x| x != &self.0);
+        }
+    }
+}
+
+pub fn working(id: &str) -> bool {
+    WORKING.lock().is_ok_and(|w| w.iter().any(|x| x == id))
+}
+
 /// Runs `step` in the background; an error fails the request with its reason.
 fn spawn(id: String, step: fn(&Store, &str) -> io::Result<()>) {
     std::thread::spawn(move || {
         let _stopped = Stopped(id.clone());
+        let _working = Working::new(id.clone());
         let Ok(store) = Store::from_env() else { return };
         // The roles the human left out of this request stay out of every step.
         let off: Vec<String> = store
@@ -579,6 +607,21 @@ fn target_json(t: &solve::Landing) -> Value {
 /// failed before "done when" was validated.
 pub fn retry(store: &Store, id: &str) -> io::Result<()> {
     let request = store.load(id)?;
+    // A worker that is still alive owns the request; a dead one left it in
+    // place: the step starts over and sets the status again as it goes.
+    if matches!(request["status"].as_str(), Some("waiting" | "landing")) {
+        if working(id) {
+            return Err(io::Error::other("cette demande est déjà en cours"));
+        }
+        spawn(
+            id.to_string(),
+            match request["status"].as_str() {
+                Some("landing") => land_now,
+                _ => solve_now,
+            },
+        );
+        return Ok(());
+    }
     if request["status"] != "failed" {
         return Err(io::Error::other("cette demande n'a pas échoué"));
     }
@@ -1591,5 +1634,40 @@ mod tests {
         );
         apply_proof(&mut r, &check(127, true));
         assert_eq!(r["status"], "ready", "a missing tool is not a veto");
+    }
+
+    #[test]
+    fn a_worker_in_flight_is_not_retried_twice() {
+        let live = Working::new("d1".to_string());
+        assert!(working("d1"), "the worker says it is here");
+        assert!(!working("d2"), "and only for its own request");
+        std::mem::drop(live);
+        assert!(!working("d1"), "the guard clears when the worker ends");
+    }
+
+    #[test]
+    fn waiting_and_landing_are_retried_the_rest_not() {
+        let tmp = std::env::temp_dir().join(format!("fennec-lead-retry-{}", std::process::id()));
+        let store = Store { root: tmp.clone() };
+        std::fs::create_dir_all(tmp.join("requests")).unwrap();
+        for (id, status) in [
+            ("c1", "waiting"),
+            ("c2", "landing"),
+            ("c3", "ready"),
+            ("c4", "running"),
+        ] {
+            std::fs::write(
+                tmp.join(format!("requests/{id}.json")),
+                format!(r#"{{"status": "{status}"}}"#),
+            )
+            .unwrap();
+        }
+        // The stuck ones start over; the rest is left where it is.
+        retry(&store, "c1").unwrap();
+        retry(&store, "c2").unwrap();
+        assert!(retry(&store, "c3").is_err());
+        assert!(retry(&store, "c4").is_err());
+        assert!(retry(&store, "nope").is_err());
+        std::fs::remove_dir_all(tmp).unwrap();
     }
 }

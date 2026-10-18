@@ -11,14 +11,23 @@ class Node {
     this.dataset = {}; this.style = { setProperty() {} }; this.classList = { add() {} };
   }
   append(...cs) { this.children.push(...cs); }
+  setAttribute(k, v) { this[k] = v; }
 }
-global.document = { createElement: (t) => new Node(t) };
+global.document = {
+  createElement: (t) => new Node(t),
+  body: { classList: { contains: () => false } },
+};
 
 eval(src.match(/const el = \(tag, props = \{\}, \.\.\.children\) => \{[\s\S]*?\n\};/)[0]
   + src.match(/const TAGS = \{[\s\S]*?\n\};/)[0]
+  + src.match(/const ICONS = \{[\s\S]*?\n\};/)[0]
+  + src.match(/const ICON_OF = \[[\s\S]*?\];/)[0]
   + grab("pastState") + grab("duration") + arrow("compact")
-  + grab("statusOf") + grab("reqHead")
-  + "globalThis.statusOf = statusOf; globalThis.reqHead = reqHead;");
+  + grab("setIcon") + grab("statusOf") + grab("reqHead")
+  + grab("iconize") + arrow("errorOf") + grab("action") + src.match(/async function follow\([\s\S]*?\n\}\n/)[0] + grab("underway")
+  + "globalThis.statusOf = statusOf; globalThis.reqHead = reqHead; globalThis.underway = underway;");
+global.api = async () => [];
+global.refresh = () => {};
 
 // Every status, in every view, has a label and a tone.
 assert.deepEqual(statusOf({ kind: "talk" }, "todo"), ["Discussion", "accent"]);
@@ -43,9 +52,23 @@ assert.equal(head.children[1].className, "status warn", "le status coloré");
 assert.equal(head.children[1].textContent, "mis de côté");
 assert.ok(head.children[2].textContent.includes("⏱"), "le coût, pour le passé");
 
-// A running request: no cost, an "en cours" pill.
+// A running request: no cost, an "en cours" pill, the right bar's toggle.
 const run = reqHead({ id: "r", title: "t" }, "run");
 assert.equal(run.children[1].className, "status info");
-assert.equal(run.children.length, 2, "pas de coût sur ce qui tourne");
+assert.equal(run.children.length, 3, "pas de coût sur ce qui tourne");
+assert.equal(run.children[2].id, "toggle-facts", "le toggle de la barre de droite");
+
+// Work under way: "Arrêter" always; "Réessayer" only when the worker can be
+// dead — queued, or mid-commit.
+const barOf = (box) => box.children.find((n) => n.className === "past-actions run-actions");
+const busy = { id: "w", title: "t", kind: "run", step: "travaille", since: 1000 };
+assert.ok(barOf(underway(busy)).children.some((b) => b.textContent === "Arrêter"));
+assert.ok(!barOf(underway(busy)).children.some((b) => b.textContent === "Réessayer"), "rien à réessayer tant que ça tourne");
+assert.ok(barOf(underway({ ...busy, waiting: true, step: "attend son tour : le dossier a des changements pas encore commités" }))
+  .children.some((b) => b.textContent === "Réessayer"), "en attente : on peut réessayer");
+assert.ok(barOf(underway({ ...busy, step: "fait le commit" }))
+  .children.some((b) => b.textContent === "Réessayer"), "en train du commit : on peut réessayer");
+assert.ok(!barOf(underway({ ...busy, waiting: true, alive: true }))
+  .children.some((b) => b.textContent === "Réessayer"), "en attente, worker vivant : rien à réessayer");
 
 console.log("OK");
