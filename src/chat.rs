@@ -67,24 +67,36 @@ fn update(worlds: &Worlds, id: &str, change: impl FnOnce(&mut Value)) -> io::Res
     Ok(chat)
 }
 
+/// Why `dir` cannot be opened read-write, as a chat's folder or a grant:
+/// it must sit strictly inside the home and never over the store.
+fn unopenable(worlds: &Worlds, dir: &Path) -> Option<String> {
+    let home = std::fs::canonicalize(&worlds.home).unwrap_or(worlds.home.clone());
+    let store = std::fs::canonicalize(&worlds.root).unwrap_or(worlds.root.clone());
+    if !dir.starts_with(&home) || dir == home {
+        return Some(format!(
+            "{} is not a folder strictly inside {}",
+            dir.display(),
+            home.display()
+        ));
+    }
+    if dir.starts_with(&store) || store.starts_with(dir) {
+        return Some(format!("{} overlaps the world store", dir.display()));
+    }
+    None
+}
+
 /// A new chat over `folder`: strictly inside the home, as a grant, and never
 /// over the store. It starts with the skills the folder's project chose.
 pub fn start(worlds: &Worlds, folder: &Path) -> io::Result<Value> {
     let folder = std::fs::canonicalize(folder)?;
-    let home = std::fs::canonicalize(&worlds.home)?;
-    let store = std::fs::canonicalize(&worlds.root).unwrap_or(worlds.root.clone());
-    if !folder.is_dir() || !folder.starts_with(&home) || folder == home {
+    if !folder.is_dir() {
         return Err(io::Error::other(format!(
-            "{} is not a folder strictly inside {}",
-            folder.display(),
-            home.display()
-        )));
-    }
-    if folder.starts_with(&store) || store.starts_with(&folder) {
-        return Err(io::Error::other(format!(
-            "{} overlaps the world store",
+            "{} is not a folder",
             folder.display()
         )));
+    }
+    if let Some(why) = unopenable(worlds, &folder) {
+        return Err(io::Error::other(why));
     }
     let skills: Vec<String> = skill::chosen(Some(&folder))?
         .into_iter()
@@ -260,6 +272,23 @@ fn push_grant(c: &mut Value, dir: &str) {
     }
 }
 
+/// A turn that was running when fennec stopped will not resume: it goes back
+/// to idle with the reason, so the person can speak again.
+pub fn recover(worlds: &Worlds) -> io::Result<()> {
+    for c in list(worlds)? {
+        if c["status"] == "thinking" || c["status"] == "waiting" {
+            update(worlds, c["id"].as_str().unwrap_or(""), |c| {
+                c["status"] = json!("idle");
+                c["stop"] = json!(false);
+                c["pending"] = Value::Null;
+                c["decision"] = Value::Null;
+                c["error"] = json!("interrompu : fennec a été arrêté pendant la réponse");
+            })?;
+        }
+    }
+    Ok(())
+}
+
 /// Shows the question on the page and waits for the person's decision, the
 /// chat file being what the page writes. `None` when a stop asked for the
 /// turn to end.
@@ -304,15 +333,6 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
     // Blank: the model spent its whole budget reasoning; the next call goes
     // without reasoning, as in `agent::run`.
     let mut blank = false;
-    // Folders the person opened for this chat; a granted call runs read-write.
-    let mut grants: Vec<PathBuf> = load(worlds, id)?["grants"]
-        .as_array()
-        .cloned()
-        .unwrap_or_default()
-        .into_iter()
-        .filter_map(|v| v.as_str().map(str::to_string))
-        .map(PathBuf::from)
-        .collect();
     for _ in 0..max_steps {
         // Skills are read again at each call: the person may change them.
         let chat = load(worlds, id)?;
@@ -375,6 +395,15 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
             reply["content"] = json!(text);
         }
         let mut said = vec![reply];
+        // Folders the person opened for this chat, read once the model has
+        // replied: one taken back meanwhile closes before its calls run.
+        let mut grants: Vec<PathBuf> = load(worlds, id)?["grants"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .map(PathBuf::from)
+            .collect();
         let mut stuck = None;
         let mut times = Vec::new();
         for call in &calls {
@@ -391,6 +420,14 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
                 .find(|p| !grants.iter().any(|g| outside::covers(g, p)))
             {
                 let directory = outside::grant_dir(&p);
+                // The home itself, `/` or the store is never offered: one
+                // click there would undo the sandbox.
+                if let Some(why) = unopenable(worlds, &directory) {
+                    times.push(json!({"name": name, "ms": started.elapsed().as_millis() as u64}));
+                    said.push(json!({"role": "tool", "tool_call_id": call["id"],
+                        "content": format!("refused without asking: {why}; it is untouched")}));
+                    continue;
+                }
                 match ask(worlds, id, name, &p, &directory)? {
                     Some(true) => {
                         grants.push(directory.clone());

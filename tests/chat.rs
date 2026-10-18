@@ -250,3 +250,121 @@ fn a_stop_while_waiting_ends_the_turn_without_running_the_call() {
     assert!(c["grants"].as_array().unwrap().is_empty());
     assert!(!other.join("n.txt").exists(), "the stopped call never ran");
 }
+
+#[test]
+fn the_home_or_the_root_is_refused_without_asking() {
+    let f = Fixture::new_in("chat-home", &var_tmp());
+    let folder = f.worlds.home.join("notes");
+    std::fs::create_dir_all(&folder).unwrap();
+    let c = chat::start(&f.worlds, &folder).unwrap();
+    let id = c["id"].as_str().unwrap().to_string();
+    chat::say(&f.worlds, &id, "ecris ~/n.txt").unwrap();
+    let model = Replies(Mutex::new(VecDeque::from([
+        call(
+            "c0",
+            "write_file",
+            json!({"path": "~/n.txt", "content": "x\n"}),
+        ),
+        call("c1", "shell", json!({"command": "ls /"})),
+        json!({"content": "ok."}),
+    ])));
+    // No question to answer: the turn runs to its end on its own.
+    chat::answer(&twin(&f), &id, &model, 10).unwrap();
+    let c = chat::load(&f.worlds, &id).unwrap();
+    assert!(c["error"].is_null(), "{}", c["error"]);
+    assert!(c["grants"].as_array().unwrap().is_empty());
+    assert!(!f.worlds.home.join("n.txt").exists());
+    let refused: Vec<&str> = c["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|m| m["role"] == "tool")
+        .filter_map(|m| m["content"].as_str())
+        .collect();
+    assert_eq!(refused.len(), 2);
+    assert!(
+        refused.iter().all(|r| r.contains("refused without asking")),
+        "{refused:?}"
+    );
+}
+
+/// Replies in order, taking `dir` back from the chat before the second one,
+/// as the person would while the turn runs.
+struct UngrantMidTurn {
+    replies: Replies,
+    worlds: Worlds,
+    id: String,
+    dir: String,
+    calls: Mutex<usize>,
+}
+
+impl Model for UngrantMidTurn {
+    fn chat(&self, messages: &[Value], tools: &Value) -> io::Result<Value> {
+        let mut n = self.calls.lock().unwrap();
+        *n += 1;
+        if *n == 2 {
+            chat::ungrant(&self.worlds, &self.id, &self.dir)?;
+        }
+        self.replies.chat(messages, tools)
+    }
+    fn label(&self) -> String {
+        "ungrant".into()
+    }
+}
+
+#[test]
+fn a_folder_taken_back_closes_within_the_turn() {
+    let f = Fixture::new_in("chat-ungrant", &var_tmp());
+    let folder = f.worlds.home.join("notes");
+    std::fs::create_dir_all(&folder).unwrap();
+    let other = f.worlds.home.join("other");
+    std::fs::create_dir_all(&other).unwrap();
+    std::fs::write(other.join("o.txt"), "omega\n").unwrap();
+    let c = chat::start(&f.worlds, &folder).unwrap();
+    let id = c["id"].as_str().unwrap().to_string();
+    chat::say(&f.worlds, &id, "lis puis ecris").unwrap();
+    let model = UngrantMidTurn {
+        replies: Replies(Mutex::new(VecDeque::from([
+            call("c0", "shell", json!({"command": "cat ../other/o.txt"})),
+            call(
+                "c1",
+                "write_file",
+                json!({"path": "../other/n.txt", "content": "x\n"}),
+            ),
+            json!({"content": "ok."}),
+        ]))),
+        worlds: twin(&f),
+        id: id.clone(),
+        dir: other.display().to_string(),
+        calls: Mutex::new(0),
+    };
+    let w = twin(&f);
+    let tid = id.clone();
+    let t = std::thread::spawn(move || chat::answer(&w, &tid, &model, 10));
+    until_waiting(&f, &id);
+    chat::decide(&f.worlds, &id, true).unwrap();
+    // Taken back before the write: the turn asks again instead of writing.
+    until_waiting(&f, &id);
+    chat::decide(&f.worlds, &id, false).unwrap();
+    t.join().unwrap().unwrap();
+    assert!(
+        !other.join("n.txt").exists(),
+        "a folder taken back stays closed"
+    );
+}
+
+#[test]
+fn a_turn_cut_by_a_restart_lets_the_person_speak_again() {
+    let f = Fixture::new("chat-recover");
+    let folder = f.worlds.home.join("notes");
+    std::fs::create_dir_all(&folder).unwrap();
+    let c = chat::start(&f.worlds, &folder).unwrap();
+    let id = c["id"].as_str().unwrap().to_string();
+    chat::say(&f.worlds, &id, "bonjour").unwrap();
+    // fennec stops here; the next start recovers.
+    chat::recover(&f.worlds).unwrap();
+    let c = chat::load(&f.worlds, &id).unwrap();
+    assert_eq!(c["status"], "idle");
+    assert!(c["error"].as_str().unwrap().contains("interrompu"));
+    chat::say(&f.worlds, &id, "encore").unwrap();
+}
