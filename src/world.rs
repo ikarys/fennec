@@ -383,7 +383,19 @@ impl Worlds {
         let ((common, _, home), back) = self.meta_all(&world.id)?;
         let git_dir = format!("--git-dir={}", common.display());
         let branch = format!("world/{}", world.id);
-        if let (Some(_), Some(back)) = (home, back) {
+        if let (Some(home), Some(back)) = (home, back) {
+            // The world it was forked from may be gone: a correction that won
+            // replaced it, so the folder goes back to the human's branch.
+            let back = if git(
+                &world.path,
+                &["rev-parse", "-q", "--verify", &format!("refs/heads/{back}")],
+            )
+            .is_ok()
+            {
+                back
+            } else {
+                home
+            };
             // The folder goes back to its branch, unless it already left this
             // world (landed, or another world of the same request took over).
             if git(&world.path, &["branch", "--show-current"])? == branch {

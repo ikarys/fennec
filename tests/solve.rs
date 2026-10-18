@@ -1304,6 +1304,30 @@ fn a_failed_change_gives_the_folder_back_to_the_ready_work() {
 }
 
 #[test]
+fn a_change_that_won_gives_the_folder_back_to_the_human_when_dropped() {
+    let f = here("here-amend-drop");
+    let good = Script::new(
+        "good",
+        &[write("spec.sh", "grep -qx 42 answer\n"), finish(SPEC)],
+    );
+    let s = spec::compile(&f.worlds, &f.project, "answer 42", &good, 10).unwrap();
+    let id = s["world"].as_str().unwrap().to_string();
+    let honest = Script::new("honest", &[write("answer", "42\n"), done()]);
+    spec::accept(&f.worlds, &id, &[&honest], 10).unwrap();
+    let noter = Script::new("noter", &[write("note", "hi\n"), done()]);
+    let amended = spec::amend(&f.worlds, &id, "add a note", &[&noter], 10).unwrap()["winner"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    // The ready work it started from is gone: the folder goes to the human's branch.
+    review::reject(&f.worlds, &amended, None).unwrap();
+    spec::reject(&f.worlds, &id, None).unwrap();
+    assert_eq!(git(&f, &["branch", "--show-current"]), "main");
+    assert_eq!(git(&f, &["branch", "--list", "world/*"]), "");
+    assert!(!f.project.join("note").exists() && !f.project.join("answer").exists());
+}
+
+#[test]
 fn a_direct_request_is_solved_from_the_project_and_lands() {
     let f = here("here-direct");
     let s = spec::direct(&f.worlds, &f.project, "answer 42").unwrap();
