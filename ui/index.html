@@ -43,7 +43,7 @@
   #detail > * { max-width: 1240px; }
   /* A request read in full: what to read and decide on the left, what it cost
      and how it was kept safe on the right, once there is room for both. */
-  .split { display: grid; gap: 20px; }
+  .split { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
   /* Packed from the left, decision first: a spacer only leaves holes once they wrap. */
   #detail .actions { justify-content: flex-start; }
   #detail .actions .spacer { display: none; }
@@ -53,10 +53,37 @@
   .split > aside .timeline { flex-direction: column; height: auto; gap: 3px; background: none; }
   .split > aside .seg { flex: none !important; padding: 3px 8px; border-radius: 4px; }
   .split > aside .pills { flex-direction: column; align-items: flex-start; }
+  /* Narrow: the decision goes first, the figures after the request. */
+  .split > aside { display: contents; }
+  .split .decide { order: -1; }
   @container (min-width: 740px) {
-    .split { grid-template-columns: minmax(0, 1fr) 260px; }
-    .split > aside { position: sticky; top: 0; align-self: start; }
+    .split { grid-template-columns: minmax(0, 1fr) 280px; }
+    .split > aside { display: block; position: sticky; top: 0; align-self: start; }
   }
+  .tabs { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
+  .tabs button { border: none; border-radius: 0; background: none; color: var(--muted); padding: 8px 14px;
+                 border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tabs button:hover { color: var(--text); }
+  .tabs button[aria-selected=true] { color: var(--text); font-weight: 600; border-bottom-color: var(--accent); }
+  .tab-panel table.grid { font-size: 13px; }
+  .decide { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px;
+            margin-bottom: 18px; }
+  .decide .actions { display: flex; flex-direction: column; align-items: stretch; gap: 6px; margin: 0; }
+  .decide .actions button { display: flex; align-items: center; gap: 10px; text-align: left; padding: 8px 12px;
+            font-size: 14px; border-color: transparent; background: var(--soft); }
+  .decide .actions button:hover:not(:disabled) { border-color: var(--line); background: var(--bg); }
+  .decide .actions button.primary { justify-content: center; padding: 11px 12px; font-size: 15px; margin-bottom: 4px;
+            background: var(--accent); border-color: var(--accent); }
+  .decide .actions button.primary:hover { filter: brightness(1.08); background: var(--accent); }
+  .decide .actions button.quiet { background: none; color: var(--bad); justify-content: center; margin-top: 4px; }
+  .decide button.icon::before { content: ""; flex: none; width: 17px; height: 17px; background: currentColor;
+            -webkit-mask: var(--icon) center / contain no-repeat; mask: var(--icon) center / contain no-repeat; }
+  .decide .actions .primary { order: -1; }
+  .decide .actions .quiet { order: 99; }
+  .decide .reply { margin: 0 0 8px; }
+  .decide .reply:has(textarea[hidden]) { display: none; }
+  .decide .error:not(:empty) { margin-top: 8px; }
+  .decide .past-actions .actions { margin: 0; }
   #back { display: none; margin-bottom: 10px; }
   #hint { color: var(--muted); padding: 40px 0; text-align: center; }
   #list h2 { margin: 24px 0 6px; }
@@ -260,6 +287,7 @@
     #side .item { width: auto; }
     #side .label, #side .spacer { display: none; }
     #list, #detail { padding: 16px; }
+    .tabs button { padding: 8px 7px; font-size: 14px; }
     .line .cost { display: none; }
   }
 </style>
