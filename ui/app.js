@@ -57,12 +57,31 @@ const TAGS = {
 };
 
 function focus(label, text) {
-  return el("div", { className: "focus" }, el("span", { className: "label", textContent: label }), ...rich(text));
+  return el("div", { className: "focus" }, el("span", { className: "label", textContent: label }), ...md(text));
 }
 
-// `command` spans as code, the rest as plain text: models write Markdown.
+// `command` spans as code, **words** in bold, the rest as plain text.
 function rich(text) {
-  return (text ?? "").split("`").map((part, i) => (i % 2 ? el("code", { textContent: part }) : part));
+  return (text ?? "").split("`").flatMap((part, i) => (i % 2 ? [el("code", { textContent: part })]
+    : part.split("**").map((p, j) => (j % 2 ? el("b", { textContent: p }) : p))));
+}
+
+// Models write Markdown: its lines become paragraphs and lists, not one block.
+function md(text) {
+  const blocks = [];
+  let list = null;
+  for (const raw of (text ?? "").split("\n")) {
+    const l = raw.trim();
+    const item = l.match(/^(?:[-*]|\d+[.)])\s+(.*)/);
+    if (item) {
+      if (!list) blocks.push((list = el("ul")));
+      list.append(el("li", {}, ...rich(item[1])));
+      continue;
+    }
+    list = null;
+    if (l) blocks.push(el("p", {}, ...rich(l.replace(/^#+\s*/, ""))));
+  }
+  return blocks;
 }
 
 function firstLine(text) {
@@ -498,6 +517,15 @@ function card(item) {
 }
 
 function line(item, state, dot) {
+  // Under way, the figures are the last finished step's: how long it has run says more.
+  if (dot && item.since) {
+    const elapsed = el("span", { className: "elapsed" });
+    elapsed.dataset.since = item.since;
+    return el("div", { className: "line" }, el("span", { className: "dot" }),
+      el("span", { className: "muted proj", textContent: item.project }),
+      el("span", { className: "what", textContent: item.title.length > 120 ? item.title.slice(0, 120) + "…" : item.title }),
+      el("span", { className: "state" }, state, " · ", elapsed));
+  }
   const s = item.stats;
   return el("div", { className: "line" }, dot ? el("span", { className: "dot" }) : null,
     el("span", { className: "muted proj", textContent: item.project }),
@@ -572,6 +600,12 @@ const mine = (items) => {
 const fill = (box, nodes, empty) =>
   box.replaceChildren(...(nodes.length ? nodes : [el("div", { className: "empty", textContent: empty })]));
 
+// Each running line's time, ticking between refreshes.
+const tick = () => document.querySelectorAll(".elapsed").forEach((e) => {
+  e.textContent = duration(Date.now() - e.dataset.since * 1000);
+});
+setInterval(tick, 1000);
+
 let shown = "";
 async function refresh(force) {
   // Never wipe what the human is typing or reading in a card.
@@ -594,6 +628,7 @@ async function refresh(force) {
     const where = $("project").selectedOptions[0]?.value ? $("project").selectedOptions[0].text : "fennec";
     document.title = todo.length ? `(${todo.length}) ${where}` : where;
     fill($("running"), running.map(underway), "Rien en cours.");
+    tick();
     fill($("history"), mine(view.history).map(past), "Rien de terminé pour l'instant.");
     for (const d of document.querySelectorAll("details")) d.open = open.has(d.dataset.key);
     // How it works, while nothing is under way: the page alone must explain itself.
@@ -622,9 +657,10 @@ async function browse(path) {
   const data = await api("/api/folders", { path });
   pickerPath = data.path;
   // An empty folder starts a new project; files without git are not ours to commit.
-  $("picker-path").textContent = data.path + (data.repo ? " · dépôt git"
+  $("picker-path").textContent = data.path + (data.home ? " · ton dossier personnel : choisis un dossier dedans"
+    : data.repo ? " · dépôt git"
     : data.empty ? " · dossier vide" : " · pas un dépôt git : choisis un dépôt ou un dossier vide");
-  $("picker-choose").disabled = !data.repo && !data.empty;
+  $("picker-choose").disabled = data.home || (!data.repo && !data.empty);
   $("picker-choose").textContent = data.repo || !data.empty ? "Ajouter ce dossier" : "Créer le projet ici";
   const entries = (data.parent ? [{ name: "..", path: data.parent }] : []).concat(data.children);
   $("picker-list").replaceChildren(...entries.map((entry) => {
@@ -636,7 +672,9 @@ async function browse(path) {
 }
 
 $("add-project").onclick = async () => {
-  await browse(pickerPath);
+  // Next to the projects already there: new ones usually sit beside them.
+  const last = $("project").value || [...$("project").options].at(-1)?.value || "";
+  await browse(pickerPath || last.replace(/\/[^/]+$/, ""));
   $("picker").showModal();
 };
 $("picker-go").onsubmit = (e) => {

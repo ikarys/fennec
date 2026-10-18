@@ -66,7 +66,7 @@ impl Store {
         let id = format!("{nanos:032x}");
         // Every request opens a conversation; a clear one ends at its first turn.
         let record = json!({"project": project, "text": text.trim(), "status": "thinking", "off": off,
-                            "thread": [{"who": "human", "text": text.trim()}]});
+                            "since": nanos / 1_000_000_000, "thread": [{"who": "human", "text": text.trim()}]});
         write_json(&self.request_path(&id)?, &record)?;
         Ok(id)
     }
@@ -95,7 +95,15 @@ impl Store {
 
     pub fn update(&self, id: &str, change: impl FnOnce(&mut Value)) -> io::Result<()> {
         let mut record = self.load(id)?;
+        let was = record["status"].clone();
         change(&mut record);
+        // When the current step began: a running line says for how long.
+        if record["status"] != was {
+            let secs = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map_or(0, |d| d.as_secs());
+            record["since"] = json!(secs);
+        }
         write_json(&self.request_path(id)?, &record)
     }
 
@@ -208,6 +216,12 @@ fn unverified(proof: &Value) -> Value {
                 s["url"].as_str().unwrap_or("la page")
             )));
         }
+        if s["unchanged"] == true {
+            lines.push(json!(format!(
+                "rien n'a changé à l'écran sur {} entre avant et après : la capture ne montre pas le travail",
+                s["url"].as_str().unwrap_or("la page")
+            )));
+        }
     }
     for c in proof["checks"].as_array().into_iter().flatten() {
         if c["missing"] == true {
@@ -231,7 +245,7 @@ fn classify(requests: &[(String, Value)], projects: &[String]) -> Value {
         let card = |kind: &str| {
             json!({"id": id, "kind": kind, "project": name(r["project"].as_str().unwrap_or("")), "path": r["project"],
                    "title": r["text"], "rules": r["rules"], "checks": r["verify"], "team": r["team"],
-                   "thread": r["thread"], "stats": r["stats"]})
+                   "thread": r["thread"], "stats": r["stats"], "since": r["since"]})
         };
         // Scenario 4: what the human said may become a rule, at one word.
         if let Some(rule) = r["offer"]["rule"].as_str() {
@@ -404,7 +418,7 @@ mod tests {
 
     #[test]
     fn a_tool_a_role_could_not_run_is_said_unverified() {
-        let proof = json!({"unverified": ["le GUI"], "shots": [{"url": "http://127.0.0.1:8000/", "missing": true}], "checks": [
+        let proof = json!({"unverified": ["le GUI"], "shots": [{"url": "http://127.0.0.1:8000/", "missing": true}, {"url": "http://x/", "unchanged": true}], "checks": [
             {"role": "DevSecOps", "command": "gitleaks detect", "exit": 127, "missing": true},
             {"role": "DevSecOps", "command": "ok", "exit": 0, "missing": false}]});
         assert_eq!(
@@ -412,6 +426,7 @@ mod tests {
             json!([
                 "le GUI",
                 "fennec n'a pas pu regarder http://127.0.0.1:8000/ : aucun navigateur n'est installé",
+                "rien n'a changé à l'écran sur http://x/ entre avant et après : la capture ne montre pas le travail",
                 "DevSecOps n'a pas pu lancer `gitleaks detect` : l'outil n'est pas installé"
             ])
         );
