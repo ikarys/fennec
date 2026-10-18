@@ -471,15 +471,10 @@ function card(item) {
       action("Pour ce projet", "/api/rule", { id: item.id, scope: "project" }),
       action("Pour tous mes projets", "/api/rule", { id: item.id, scope: "user" }, { primary: true }));
   } else if (item.kind === "ready") {
-    if (item.done_when) add(focus("Terminé quand", item.done_when));
-    // "Ready" reads as "done": say where the work is until the commit.
-    const commit = item.land ? `« ${landLabel(item.land)} »` : "le commit";
-    add(el("div", { className: "muted", textContent: item.here
-      ? `Le travail est dans ton dossier, sur une branche de travail. ${commit} le met sur ta branche ; « Annuler le travail » rend ton dossier comme avant.`
-      : `Ton dossier n'a pas encore changé : le travail attend à part. ${commit} l'y met.` }));
-    add(...work(item), shots(item), ...facts(item));
-    // Commands leave no picture: their proof would otherwise hide behind "Détails".
+    // The decision first, without scrolling: what was proven, what was not,
+    // and the buttons. What fennec did and what it cost come under them.
     const tried = item.tries?.length ?? 0;
+    // Commands leave no picture: their proof would otherwise hide behind "Détails".
     if (tried) {
       add(el("div", { className: "proved",
         textContent: `✓ fennec l'a essayé : ${tried} essai${tried > 1 ? "s" : ""} réussi${tried > 1 ? "s" : ""} (voir Détails)` }));
@@ -491,7 +486,12 @@ function card(item) {
     }
     if (item.land_error) add(el("div", { className: "bad", textContent: "Commit interrompu : " + firstLine(item.land_error) }));
     if (item.amend_error) add(el("div", { className: "bad", textContent: "Correction non aboutie, le travail est resté tel quel : " + firstLine(item.amend_error) }));
-    // Ways out, none forced: look, set aside, ask for a change, or commit.
+    // "Ready" reads as "done": say where the work is until the commit.
+    const commit = item.land ? `« ${landLabel(item.land)} »` : "le commit";
+    add(el("div", { className: "muted", style: "margin-top:10px", textContent: item.here
+      ? `Le travail est dans ton dossier, sur une branche de travail. ${commit} le met sur ta branche ; « Annuler le travail » rend ton dossier comme avant.`
+      : `Ton dossier n'a pas encore changé : le travail attend à part. ${commit} l'y met.` }));
+    // Ways out, none forced: commit, look, ask for a change, set aside or undo.
     const change = el("textarea", { placeholder: "Ce qu'il faut changer", ariaLabel: "Ce qu'il faut changer", hidden: true });
     const fix = el("button", { type: "button", textContent: "Corriger" });
     fix.onclick = () => {
@@ -499,12 +499,12 @@ function card(item) {
       change.focus();
       fix.replaceWith(action("Envoyer la correction", "/api/amend", () => ({ id: item.id, text: change.value })));
     };
-    add(el("div", { className: "reply" }, change));
-    actions.append(dropButton(item.id, true), el("span", { className: "spacer" }),
-      changesButton(item, () => node.querySelector(".changes-slot")),
-      codeButton(item, () => node.querySelector(".changes-slot")),
-      action("Passer", "/api/pass", { id: item.id }), fix);
     if (item.land) actions.append(action(landLabel(item.land), "/api/land", { id: item.id }, { primary: true }));
+    actions.append(changesButton(item, () => node.querySelector(".changes-slot")),
+      codeButton(item, () => node.querySelector(".changes-slot")), fix,
+      action("Passer", "/api/pass", { id: item.id }), el("span", { className: "spacer" }), dropButton(item.id, true));
+    add(el("div", { className: "reply" }, change), actions, el("div", { className: "error", role: "alert" }),
+      el("div", { className: "changes-slot" }), doneWhen(item), ...work(item), shots(item), ...facts(item));
   } else if (item.kind === "failed") {
     add(el("div", { className: "bad", textContent: explain(item.reason) || "raison inconnue" }), shots(item), ...facts(item));
     actions.append(dropButton(item.id, true), el("span", { className: "spacer" }),
@@ -512,8 +512,17 @@ function card(item) {
   }
   // What was said to the model so far, on every card with a choice to make.
   actions.querySelector(".spacer")?.after(journalButton(item, () => node.querySelector(".changes-slot")));
-  add(el("div", { className: "changes-slot" }), details(item), actions, el("div", { className: "error", role: "alert" }));
+  // A ready card has its buttons at the top already.
+  if (node.contains(actions)) add(details(item));
+  else add(el("div", { className: "changes-slot" }), details(item), actions, el("div", { className: "error", role: "alert" }));
   return node;
+}
+
+// When the work started straight from the request, "done when" is the
+// request itself: the title says it already.
+function doneWhen(item) {
+  const same = (item.done_when ?? "").trim() === (item.title ?? "").trim();
+  return item.done_when && !same ? focus("Terminé quand", item.done_when) : null;
 }
 
 function line(item, state, dot) {
@@ -543,7 +552,8 @@ function past(item) {
   box.dataset.key = "past-" + item.id;
   const talk = conversation(item);
   if (talk) box.append(talk);
-  if (item.done_when) box.append(focus("Terminé quand", item.done_when));
+  const done = doneWhen(item);
+  if (done) box.append(done);
   box.append(...work(item));
   const tried = item.tries?.length ?? 0;
   if (tried) box.append(el("div", { className: "proved", textContent: `✓ fennec l'a essayé : ${tried} essai${tried > 1 ? "s" : ""} réussi${tried > 1 ? "s" : ""}` }));
