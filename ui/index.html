@@ -164,6 +164,13 @@
   table.grid thead th { color: var(--muted); font-weight: 600; }
   table.grid .meter { display: inline-block; width: 40px; vertical-align: middle; margin-right: 6px; }
   dialog#stats { width: min(900px, calc(100vw - 32px)); }
+  #page { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin: 12px 0 8px; }
+  .page-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .page-head strong { font-size: 18px; }
+  .page-head .spacer { flex: 1; }
+  #page .tiles { margin: 10px 0; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
+  #page details { margin-top: 8px; }
+  #page summary { cursor: pointer; }
   .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 12px 0; }
   .tile { background: var(--soft); border-radius: 8px; padding: 10px 12px; display: grid; }
   .tile b { font-size: 20px; }
@@ -201,6 +208,19 @@
     <div id="chips"></div>
   </form>
   <p class="error" id="error" role="alert"></p>
+
+  <!-- The chosen project's own page: what it cost, how it is worked on, its rules. -->
+  <section id="page" hidden>
+    <div class="page-head"><strong id="page-name"></strong> <span class="muted" id="page-path"></span>
+      <span class="spacer"></span>
+      <button type="button" id="page-team">Équipe</button>
+      <button type="button" id="page-open">Ouvrir le dossier</button></div>
+    <div class="tiles" id="page-tiles"></div>
+    <label class="muted">Où fennec travaille <select id="page-place"></select></label>
+    <details id="page-rules"><summary></summary><ul></ul>
+      <p class="muted">Dis une règle en corrigeant une demande : fennec propose de la garder.</p></details>
+    <p class="error" id="page-error" role="alert"></p>
+  </section>
 
   <section id="how" hidden>
     <strong>Comment ça marche</strong>
