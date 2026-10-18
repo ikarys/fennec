@@ -7,7 +7,7 @@ use std::io;
 use std::path::Path;
 
 use fennec_os::provider::{Live, Model, OpenAi};
-use fennec_os::world::Worlds;
+use fennec_os::world::{self, Worlds};
 use fennec_os::{proof, review, rules, solve, spec};
 use serde_json::{Value, json};
 
@@ -348,10 +348,79 @@ pub fn reply(store: &Store, id: &str, text: &str) -> io::Result<()> {
     Ok(())
 }
 
+/// Projects whose folder a request just took: two waiting requests must not
+/// both see it free. Held while the work runs; by then the folder says it.
+static TAKEN: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+
+struct Taken(String);
+
+impl Drop for Taken {
+    fn drop(&mut self) {
+        if let Ok(mut t) = TAKEN.lock() {
+            t.retain(|p| p != &self.0);
+        }
+    }
+}
+
+/// When fennec works in the project folder itself, one request at a time:
+/// the next one waits its turn ("waiting") instead of failing.
+/// ponytail: polls every 3 s and the first to look goes first, not the oldest.
+fn wait_turn(store: &Store, id: &str, project: &str) -> io::Result<Taken> {
+    let mine = store.load(id)?["run"].as_str().map(str::to_string);
+    loop {
+        let held = match world::held(Path::new(project))? {
+            // Its own last try still holds the folder: retrying drops it.
+            Some(world::Held::World(w)) if Some(&w) == mine.as_ref() => None,
+            Some(world::Held::World(w)) => Some(
+                store
+                    .requests()?
+                    .into_iter()
+                    .find(|(_, r)| r["run"] == w.as_str())
+                    .map(|(_, r)| format!("« {} »", r["text"].as_str().unwrap_or("")))
+                    .unwrap_or_else(|| "une autre demande".to_string()),
+            ),
+            Some(world::Held::Changes) => Some(String::new()),
+            None => None,
+        };
+        let mut taken = TAKEN.lock().map_err(|_| io::Error::other("lock"))?;
+        let behind = match held {
+            Some(by) => Some(by),
+            None if taken.iter().any(|p| p == project) => Some("une autre demande".to_string()),
+            None => {
+                taken.push(project.to_string());
+                if store.load(id)?["status"] == "waiting" {
+                    store.update(id, |r| {
+                        r["status"] = json!("running");
+                        if let Some(m) = r.as_object_mut() {
+                            m.remove("behind");
+                        }
+                    })?;
+                }
+                return Ok(Taken(project.to_string()));
+            }
+        };
+        std::mem::drop(taken);
+        store.update(id, |r| {
+            r["status"] = json!("waiting");
+            r["behind"] = json!(behind);
+        })?;
+        std::thread::sleep(std::time::Duration::from_secs(3));
+    }
+}
+
 fn solve_now(store: &Store, id: &str) -> io::Result<()> {
     let request = store.load(id)?;
     let worlds = Worlds::from_env()?;
     let project = Path::new(request["project"].as_str().unwrap_or(""));
+    // A correction works on the ready work, which already holds the folder.
+    let _turn = match request["amend"].is_string() {
+        true => None,
+        false => Some(wait_turn(
+            store,
+            id,
+            request["project"].as_str().unwrap_or(""),
+        )?),
+    };
     let variants = OpenAi::variants_from_env(attempts())?
         .into_iter()
         .map(|m| staffed(m, project, "solve"))
@@ -1086,6 +1155,9 @@ pub fn recover(store: &Store) -> io::Result<()> {
                 r["status"] = json!("failed");
                 r["reason"] = json!("interrompu : fennec a été arrêté pendant le travail");
             })?;
+        } else if r["status"] == "waiting" {
+            // Nothing started yet: it waits its turn again.
+            spawn(id, solve_now);
         } else if r["status"] == "landing" {
             store.update(&id, |r| {
                 r["status"] = json!("ready");

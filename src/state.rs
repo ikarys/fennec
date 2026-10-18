@@ -244,6 +244,16 @@ fn classify(requests: &[(String, Value)], projects: &[String]) -> Value {
             Some("thinking") => running.push(card_step(card("running"), "réfléchit à ta demande")),
             Some("talk") => todo.push((0, card("talk"))),
             Some("framing") => running.push(card_step(card("running"), "se met au travail")),
+            Some("waiting") => {
+                let step = match r["behind"].as_str() {
+                    Some(by) if !by.is_empty() => {
+                        format!("attend son tour : {by} occupe le dossier")
+                    }
+                    _ => "attend son tour : le dossier a des changements pas encore commités"
+                        .to_string(),
+                };
+                running.push(card_step(card("running"), &step))
+            }
             Some("running") => running.push(card_step(card("running"), "travaille")),
             Some("proving") => running.push(card_step(card("running"), "essaie le produit")),
             Some("landing") => running.push(card_step(card("running"), "fait le commit")),
@@ -459,5 +469,27 @@ mod tests {
         assert_eq!(history, ["dropped", "landed"], "newest first, none lost");
         assert_eq!(v["history"][1]["branch"], "feat/l");
         assert_eq!(v["projects"][0]["name"], "a");
+    }
+
+    #[test]
+    fn a_waiting_request_says_what_it_waits_for() {
+        let requests = vec![
+            (
+                "1".into(),
+                json!({"status": "waiting", "behind": "« filtres »"}),
+            ),
+            ("2".into(), json!({"status": "waiting", "behind": ""})),
+        ];
+        let v = classify(&requests, &[]);
+        assert_eq!(
+            v["running"][0]["step"],
+            "attend son tour : « filtres » occupe le dossier"
+        );
+        assert!(
+            v["running"][1]["step"]
+                .as_str()
+                .unwrap()
+                .contains("pas encore commités")
+        );
     }
 }
