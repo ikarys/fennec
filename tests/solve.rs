@@ -1036,6 +1036,31 @@ fn a_request_compiles_to_failing_tests_that_the_solution_must_pass() {
         "rejected"
     );
     assert_eq!(spec::load(&f.worlds, &id).unwrap()["run"], json!(amended));
+    // The proof failed on it: fixed from its work, told what failed, and the
+    // findings are no human correction.
+    let fixer = Script::new("fixer", &[write("note", "hi!\n"), done()]);
+    let record = spec::fix(
+        &f.worlds,
+        &id,
+        "`cat note` printed hi, not hi!",
+        &[&fixer],
+        10,
+    )
+    .unwrap();
+    assert!(
+        record["goal"]
+            .as_str()
+            .unwrap()
+            .contains("printed hi, not hi!")
+    );
+    let fixed = record["winner"].as_str().unwrap().to_string();
+    assert_eq!(
+        review::load(&f.worlds, &amended).unwrap()["status"],
+        "rejected"
+    );
+    assert!(review::load(&f.worlds, &amended).unwrap()["correction"].is_null());
+    assert_eq!(spec::load(&f.worlds, &id).unwrap()["run"], json!(fixed));
+    let amended = fixed;
     // The commit message is written from all it carries, not the correction alone.
     let spy = Spy(Mutex::new(String::new()));
     let _ = plan(&f.worlds, &amended, &spy);

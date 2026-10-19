@@ -540,22 +540,53 @@ pub fn amend(
     models: &[&dyn Model],
     max_steps: usize,
 ) -> io::Result<Value> {
-    let mut spec = load(worlds, id)?;
-    let Some(run) = spec["run"].as_str().map(str::to_string) else {
-        return Err(io::Error::other(format!("spec {id} has no ready run")));
-    };
     let ask = format!(
         "\n\nA solution already passed and is in your world: start from it. \
          The human tried it and asks for this change:\n{correction}\n\
          Make that change and keep the rest."
     );
-    let mut record = run_spec(worlds, &spec, &ask, &run, models, max_steps)?;
+    rework(worlds, id, &ask, Some(correction), models, max_steps)
+}
+
+/// The proof tried a ready run and it failed: attempts start from that run's
+/// work, told what failed, as `amend` does for the human. The findings are
+/// not the human's correction, so they never become a rule offer.
+pub fn fix(
+    worlds: &Worlds,
+    id: &str,
+    findings: &str,
+    models: &[&dyn Model],
+    max_steps: usize,
+) -> io::Result<Value> {
+    let ask = format!(
+        "\n\nA solution is in your world: start from it. It was then tried as \
+         its user would, and this failed:\n{findings}\n\
+         Find the cause and fix it, keep the rest. If what failed is the way it \
+         was tried (a command not installed here, a wrong path), make the \
+         product easy to try: a script or a README line that works here."
+    );
+    rework(worlds, id, &ask, None, models, max_steps)
+}
+
+fn rework(
+    worlds: &Worlds,
+    id: &str,
+    ask: &str,
+    correction: Option<&str>,
+    models: &[&dyn Model],
+    max_steps: usize,
+) -> io::Result<Value> {
+    let mut spec = load(worlds, id)?;
+    let Some(run) = spec["run"].as_str().map(str::to_string) else {
+        return Err(io::Error::other(format!("spec {id} has no ready run")));
+    };
+    let mut record = run_spec(worlds, &spec, ask, &run, models, max_steps)?;
     // Forked from the run, but still this spec's: landing drops its world.
     record["spec"] = json!(id);
     let name = record["id"].as_str().unwrap_or("run").to_string();
     review::save(worlds, &name, &record)?;
     if let Some(winner) = record["winner"].as_str() {
-        review::reject(worlds, &run, Some(correction))?;
+        review::reject(worlds, &run, correction)?;
         spec["run"] = json!(winner);
         save(worlds, id, &spec)?;
     }
