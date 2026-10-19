@@ -2,6 +2,10 @@
 
 ## What this repository is
 
+**fennec's purpose** (the human, 2026-10-19): an assistant to build things with
+AI **fast**, but **efficiently** and **safely**. Every feature is weighed against
+these three; one that serves none of them is not built.
+
 The lead layer of fennec: a developer leads one or several projects the way
 they would lead a team. They state a request (fennec asks only when it could not
 start at all), leave, and come back to a single view of what needs them. No tests
@@ -37,8 +41,12 @@ variables override them.
 
 ## Non-negotiable rules
 
-1. **Every human interaction goes through the web UI.** No CLI or TUI surface
-   for the user; `fennec-os`'s CLI is a debug tool only.
+1. **The web UI is the only complete surface.** No CLI or TUI surface for the
+   user; `fennec-os`'s CLI is a debug tool only. A plugin the human enabled may
+   relay outside it (changed 2026-10-19, asked by the human): a notification,
+   an answer to a question, or a decision already offered (validate, drop) —
+   from senders they allowed, written in the request's Journal. Nothing else:
+   no grant, rule, setting or wider access is ever given through a plugin.
 2. **Seven words on screen**: project, request, done when, proof, question, rule,
    team (made of roles; added 2026-10-17, see `docs/design/team.md`). Internal
    concepts (world, run, grant, permissions, limits, stage keys) never reach the UI.
@@ -56,7 +64,9 @@ variables override them.
    every project and named on a request when its work read one. A fifth, asked for
    too (2026-10-18): "discussion", the person's word for a plain conversation
    with fennec in a folder of their choosing (git or not); the page follows the
-   turn live, and the exchange can become a request.
+   turn live, and the exchange can become a request. A sixth, asked for too
+   (2026-10-19): "Fleet", the person's word for the one queue of tasks fennec
+   runs on its own, across projects (see `docs/design/factory.md`).
 3. **Nothing is "ready" without proof.** What could not be proven is shown as
    "not verified: X".
 4. **Execution logic goes in fennec-os**, not here. This repository stays thin.

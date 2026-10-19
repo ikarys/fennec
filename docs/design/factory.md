@@ -1,0 +1,169 @@
+# Factory, plugins, self-improvement
+
+Date: 2026-10-19. Status: design, nothing built. Asked by the human after a
+comparison with OpenFox (task board, Planner/Builder agents, plugins).
+
+Purpose test (AGENTS.md): **fast**, **efficient**, **safe**. Each part below
+says which it serves; a part that serves none is cut.
+
+## 1. The Fleet — fast, safe
+
+**Think in tasks, not projects.** The decision to run alone belongs to the
+task; the project stays a place (the folder), only a constraint.
+
+- Each task kept for later is either "Plus tard" (nothing starts, as today)
+  or "Dans la Fleet" (it starts on its own).
+- **One queue for every project**, ordered by task: the urgent task of any
+  project moves up.
+- The project only constrains: "Dans le dossier" runs one task at a time per
+  folder (already `wait_turn`, "attend son tour"), so the Fleet takes the next
+  task whose folder is free; "À part" lets several tasks of one project run.
+- **The Fleet page** (named by the address, like Team and Stats): run/pause
+  for everything (what runs finishes), the ordered queue (project as a tag,
+  state: being framed, waits for its folder, next), what runs now, optionally
+  how many tasks at once. Questions, offers, landed work, plugins and costs
+  stay where they are ("À moi", the list, Réglages, Stats).
+- No board, no columns, no project-level switch.
+
+Part of this already exists unsaid: a launched task waits its folder's turn.
+What is missing is that waiting made ordered, global, visible and
+controllable, and tasks entering it without starting at once.
+
+## 2. Plugins and hooks — fast (no need to watch), safe (you are reached)
+
+One mechanism: the Journal already records every step; each entry is an event.
+
+- `~/.config/fennec/plugins/<name>/` holds an executable and `plugin.json`
+  (events listened to). fennec runs it with the event as JSON on stdin, with a
+  timeout. A hook is a plugin listening to a step event ("before commit").
+- Events: started, question, landed, failed, not verified.
+  Default on: question, landed, failed.
+- No new Rust dependency: the plugin does its own HTTPS. A shipped example
+  calls Apprise (Teams, Discord, Telegram, Slack, ntfy...).
+- Enabled in Réglages, "Plugins" tab.
+
+## 3. Framing in the background — fast
+
+Tasks kept for later are framed (conversation, "done when") while waiting.
+They arrive ready, or with one question in "À moi".
+
+## 4. Inbound plugins: approval from a chat — fast, safe by limits
+
+Allowed by rule 1 (changed 2026-10-19). A long-running plugin (Telegram bot
+on long polling, Discord bot) calls fennec's local API with its own token.
+
+- Sender allow-list; anything else ignored.
+- Only decisions already offered: validate a proven request, drop, answer a
+  question. Never a grant, rule, setting or wider access.
+- Token per plugin, revocable in Réglages; every outside decision written in
+  the Journal ("validé via Telegram").
+
+## 5. Offers from measured needs — efficient
+
+Extends what exists (`review.rs` corrections said twice → rule, `sleep.rs`
+know-how, `offer_rule`). **Code counts, the model drafts, the human decides.**
+Signals come from Journals and Stats; each offer is a question in "À moi"
+with the number behind it; "Jamais" is remembered.
+
+| Measured signal | Offer |
+|---|---|
+| Repeated rejections in one area | a role from the catalogue |
+| A stage failing often or costly on its model | another model for that role |
+| Same instructions or know-how in 2+ projects | a skill |
+| A repeated correction a command can check | a QA `check:` rather than a rule |
+| Questions unanswered for hours | a notification plugin |
+| Many turns lost on compile errors | a build check after each edit |
+
+Runs in the background (`schedule`), like sleep.
+
+## 6. Stages added by a role — efficient, safe
+
+`STAGES` is fixed to frame, solve, prove. Let a role declare `stage: review`
+(after solve): its own agent pass. It cannot veto on opinion (the model never
+judges): it blocks through commands (`check:`, `cargo audit`, `semgrep`) or
+sends findings back to the builder for another try.
+
+## Not built
+
+- **Kanban board**: the single view covers it; dragging cards is managing,
+  not leading.
+- **LSP**: the agent already runs `cargo check` / `tsc` in its sandbox and the
+  proof runs the real build. Built only if offer 5 measures turns lost on
+  compile errors.
+- **"Agent" as a word**: roles and the team already are Planner/Builder/Verifier
+  (frame/solve/prove).
+
+## Plan
+
+Each step lands alone, tested, clippy clean, UI screenshotted (light and
+dark) when it shows. The status choke point is `Store::update`
+(`state.rs`): every status change goes through it, so events start there.
+
+**0. Docs** — commit rule 1, the purpose line, this file.
+
+**1. The Fleet** (fast, safe)
+- `state.rs`: a `later` task gets `fleet: true` and a `rank` (one order
+  across projects); `fleet.json` in the store holds run/pause and the
+  optional number at once. `Store::next_fleet()`: the first ranked task whose
+  folder is free (or set "À part").
+- `work.rs`: whenever a task leaves its folder (landed, dropped, passed,
+  failed), on start, and on unpause, `launch` what `next_fleet` gives, while
+  under the number at once. Pause stops launching only.
+- UI: "Dans la Fleet" / "Plus tard" on a task; `/fleet` page: run/pause, the
+  ordered queue (move up/down, take out), what runs now.
+- Done when: three Fleet tasks in two projects land in rank order with no
+  click, one per folder at a time; pause stops the next launch, not the
+  running one (tests with a scripted `Model`).
+
+**2. Plugins and hooks, outbound** (fast, safe)
+- New `fennec-os/src/plugin.rs`: read `~/.config/fennec/plugins/*/plugin.json`
+  (`run`, `events`), run the executable with the event JSON on stdin, 10 s
+  timeout, outside the request's thread; a failure goes to the Journal, never
+  blocks work. Execution logic, so fennec-os (lead rule 4). Plugins run on
+  the host with the person's rights, so they are read from
+  `~/.config/fennec/plugins/` only, never from a project or a world (os rule 2).
+- `state.rs`: `Store::update` compares status before/after and emits
+  `started`, `question`, `landed`, `failed`, `not_verified`.
+- Hooks: same plugin, step events (`before_land`); a hook's non-zero exit
+  stops the landing with "not verified: hook X".
+- `examples/plugins/apprise/`: shell script calling `apprise`.
+- UI: Réglages, "Plugins" tab: list, on/off, events per plugin.
+- Done when: a test plugin writing stdin to a file receives the five events of
+  one request's life; a failing `before_land` hook stops the landing.
+
+**3. Framing in the background** (fast)
+- `work.rs`: requests kept for later run `discuss` once the folder's
+  interactive work is idle (`schedule::yield_to_interactive`); the result
+  ("done when" or one question) is stored, status stays `later`.
+- UI: a framed backlog task shows its "done when"; a question goes to "À moi".
+- Done when: a task kept for later gets its "done when" without being
+  launched, and launching it skips the conversation.
+
+**4. Inbound plugins: approval from a chat** (fast, safe)
+- `main.rs`: per-plugin token (Réglages, revocable) accepted on `/api/land`,
+  `/api/drop`, `/api/answer` only; every other route refuses it.
+- `plugin.rs`: long-running plugins (`"serve": true`) started and stopped by
+  fennec; sender allow-list lives in the plugin's config, checked by fennec
+  from the `from` field the plugin passes.
+- Journal: "validé via <plugin> par <sender>".
+- `examples/plugins/telegram/`: long-polling bot, buttons Valider / Abandonner,
+  reply = answer.
+- Done when: a token can land a proven request and is refused on
+  `/api/settings`; a sender off the list is ignored.
+
+**5. Offers from measured needs** (efficient)
+- New `fennec-os/src/offer.rs`: counts from runs and Journals (rejections per
+  area, stage failures and cost per model, repeated instructions across
+  projects, repeated checkable corrections, unanswered questions, turns on
+  compile errors) → one offer per signal over a threshold; the model only
+  drafts the role, skill, check or plugin text.
+- Runs in the background like `sleep`; offers are questions in "À moi" with
+  their number; "Jamais" stored in `~/.config/fennec/offers.json`.
+- Done when: five scripted UI rejections produce the "Designer front" offer;
+  "Jamais" silences it.
+
+**6. Stages added by a role** (efficient, safe)
+- `team.rs`: `stage: review` allowed, run between solve and prove with its
+  own agent pass; its `check:` lines veto, its findings send the work back once.
+- Done when: a review role with a failing `check:` sends a ready run back to
+  solve.
