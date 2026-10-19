@@ -138,9 +138,10 @@
   .decide .actions button { display: flex; align-items: center; gap: 10px; text-align: left; padding: 5px 10px;
             border-color: transparent; background: var(--soft); }
   .decide .actions button:hover:not(:disabled) { border-color: var(--line); background: var(--bg); }
-  .decide .actions button.primary { justify-content: center; margin-bottom: 4px; }
+  .decide .actions button.primary { margin-bottom: 4px; }
   .decide .actions button.primary:hover { filter: brightness(1.08); background: var(--accent); }
-  .decide .actions button.quiet { background: none; color: var(--bad); justify-content: center; margin-top: 4px; }
+  .decide .actions button.quiet { color: var(--bad); margin-top: 4px; }
+  .decide .actions button.quiet:hover:not(:disabled) { background: color-mix(in srgb, var(--bad) 12%, transparent); }
   /* An icon drawn in the element's own colour; alone, the button is square. */
   .ic { display: inline-flex; align-items: center; gap: 7px; }
   .ic::before { content: ""; flex: none; width: 17px; height: 17px; background: currentColor;
