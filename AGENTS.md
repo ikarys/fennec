@@ -87,9 +87,9 @@ What the human expects without having to ask; apply it on every UI change.
 - **Mail-client layout**: projects on the left, requests in the middle, the
   chosen request or page on the right; the decision buttons on the right above
   the cost, the rest behind tabs.
-- Works in light and dark (tokens on `:root`) and at phone width.
+- Works in light and dark (tokens on `:root`); desktop only: fennec is for computers, phone width is not a target.
 - **Check before saying done**: screenshot the change (Playwright, headless
-  Chromium) at desktop width in dark and light, and at phone width, against a
+  Chromium) at desktop width in dark and light, against a
   copy of `FENNEC_LEAD_HOME` on a spare port — never the live instance.
 
 ## Commit format
