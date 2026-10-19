@@ -1,5 +1,5 @@
-// node ui/card.test.js — the card repeats the title only where it is the
-// field to edit (a request for later); every other kind gets it from the head.
+// node ui/card.test.js — the card never repeats the title, which the head
+// says; a request for later is edited only once "Éditer" is clicked.
 const assert = require("assert");
 const src = require("fs").readFileSync(__dirname + "/app.js", "utf8");
 const grab = (name) => src.match(new RegExp(`function ${name}\\([\\s\\S]*?\\n}\\n`))[0];
@@ -30,6 +30,8 @@ class Node {
   }
   contains() { return false; }
   after() {}
+  prepend(c) { c.parent = this; this.children.unshift(c); }
+  focus() {}
 }
 global.document = { createElement: (t) => new Node(t), getElementById: () => new Node("div") };
 
@@ -64,8 +66,11 @@ const ready = card({ id: "r", title: "une page", kind: "ready", project: "p" });
 assert.ok(!ready.children.some((c) => (c.className || "").includes("title")), "plus de .title sur une demande prête");
 assert.ok(!ready.children.some((c) => (c.className || "").includes("meta")), "plus de .meta : le status est dans l'en-tête");
 
-// A later request: its title is the editable field, kept in the card.
+// A later request: read, then edited once "Éditer" is clicked.
 const later = card({ id: "l", title: "plus tard", kind: "later", project: "p" });
-assert.ok(later.querySelector(".later-text"), "le titre de « plus tard » reste éditable");
+assert.ok(!later.querySelector(".later-text"), "pas de champ avant « Éditer »");
+const find = (n, f) => f(n) ? n : n.children?.map((c) => find(c, f)).find(Boolean);
+find(later, (n) => n.textContent === "Éditer").onclick();
+assert.ok(later.querySelector(".later-text"), "« Éditer » ouvre le champ");
 
 console.log("OK");
