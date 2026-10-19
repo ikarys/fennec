@@ -115,6 +115,7 @@
   .status { font-size: 12px; font-weight: 600; padding: 1px 9px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
   .status.bad { color: var(--bad); border-color: var(--bad); }
   .status.ok { color: var(--ok); border-color: var(--ok); }
+  .saved { color: var(--ok); align-self: center; }
   .status.warn { color: var(--warn); border-color: var(--warn); }
   .status.accent { color: var(--accent); border-color: var(--accent); }
   .status.muted { color: var(--muted); border-color: var(--line); }
@@ -189,7 +190,9 @@
     main { display: block; }
     #list, #detail { overflow: visible; border-right: none; }
     body.picked #list { display: none; }
-    body.picked #back { display: inline-block; }
+    /* Team, Stats and Réglages have no list to go back to: the bar leads away. */
+    body.picked:not(.paged) #back { display: inline-block; }
+    body.chats #back .to-reqs, body:not(.chats) #back .to-chats { display: none; }
     body.picked #detail-head { display: flex; margin-bottom: 12px; }
     body:not(.picked) #hint { display: none; }
     /* The list hides when a request is picked: the open icon follows it to the detail. */
@@ -656,7 +659,7 @@
   <section id="detail">
   <button type="button" class="link" id="open-side-2" data-icon="panelLeft" aria-label="Ouvrir la barre des projets" title="Ouvrir la barre des projets"></button>
   <div id="detail-head" hidden><strong id="detail-head-name"></strong> <span class="muted" id="detail-head-path"></span></div>
-  <button type="button" class="link" id="back">← Revenir aux demandes</button>
+  <button type="button" class="link" id="back">← Revenir aux <span class="to-reqs">demandes</span><span class="to-chats">discussions</span></button>
   <div id="pick"></div>
   <p id="hint" hidden>Choisis une demande à gauche pour la lire en entier, ou un projet pour voir sa page.</p>
   <!-- The chosen project's own page: what it cost, how it is worked on, its rules. -->
@@ -769,6 +772,7 @@
         <p class="muted" id="settings-env" hidden></p>
         <p class="error" id="settings-error" role="alert"></p>
         <div class="row">
+          <span class="saved" id="settings-saved" role="status"></span>
           <button type="button" id="settings-cancel">Annuler</button>
           <button class="primary">Enregistrer</button>
         </div>
