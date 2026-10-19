@@ -109,6 +109,11 @@ dark) when it shows. The status choke point is `Store::update`
   once (default 1). A task launched, forgotten or archived leaves the queue.
 - Every 3 s, when running and under the number at once, the first queued
   task starts (`work::talk`), apart. Stopping stops launching only.
+- "Après une réussite": wait for the human (default), or commit proven work
+  on the project's `fleet` branch, never the human's; the next Fleet task
+  starts from that branch, so it builds on what landed before, and the human
+  merges `fleet` when they choose. A commit on `fleet` that fails (conflict,
+  checks after the replay) counts as a failure for "Après un échec".
 - "Passer" on work in the folder parks it on its branch and gives the folder
   back; "Reprendre" brings it back (fennec-os `park` / `unpark`).
 - A failure of a task the Fleet started stops the Fleet by default ("Après

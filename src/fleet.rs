@@ -39,6 +39,11 @@ fn load(store: &Store) -> io::Result<Value> {
     if !v["on_fail"].is_string() {
         v["on_fail"] = json!("stop");
     }
+    // Proven work waits for the human by default; "branch" commits it on
+    // the project's `fleet` branch, where the next task starts from.
+    if !v["on_success"].is_string() {
+        v["on_success"] = json!("wait");
+    }
     Ok(v)
 }
 
@@ -92,13 +97,17 @@ pub fn place(store: &Store, id: &str, action: &str) -> io::Result<()> {
     save(store, &v)
 }
 
-/// Run or stop, how many tasks at once (1 to 10), and what a failure does
-/// (`stop` or `go on`).
+/// The branch the Fleet commits on, in each project, when told to.
+pub const BRANCH: &str = "fleet";
+
+/// Run or stop, how many tasks at once (1 to 10), what a failure does
+/// (`stop` or `go on`) and what proven work does (`wait` or `branch`).
 pub fn set(
     store: &Store,
     on: Option<bool>,
     at_once: Option<u64>,
     on_fail: Option<&str>,
+    on_success: Option<&str>,
 ) -> io::Result<()> {
     let mut v = load(store)?;
     if let Some(on) = on {
@@ -113,6 +122,12 @@ pub fn set(
             return Err(io::Error::other("réglage inconnu"));
         }
         v["on_fail"] = json!(f);
+    }
+    if let Some(f) = on_success {
+        if !matches!(f, "wait" | "branch") {
+            return Err(io::Error::other("réglage inconnu"));
+        }
+        v["on_success"] = json!(f);
     }
     if let Some(n) = at_once {
         v["at_once"] = json!(n.clamp(1, 10));
@@ -160,31 +175,59 @@ fn states(
         .collect()
 }
 
-/// One look: when running and a place is free, the first queued task
-/// starts. `start` begins its work (`work::talk`).
-pub fn tick(store: &Store, start: fn(String)) -> io::Result<()> {
+/// One look: when running, proven work meant for the `fleet` branch is
+/// committed there first (`land`, `work::land`), so the next task starts
+/// from it; else, when a place is free, the first queued task starts
+/// (`start`, `work::talk`). One step per look.
+pub fn tick(
+    store: &Store,
+    start: fn(String),
+    land: fn(&Store, &str) -> io::Result<()>,
+) -> io::Result<()> {
     let mut v = load(store)?;
     if v["on"] != true {
         return Ok(());
     }
     let requests = store.requests()?;
-    // A failure is seen once; it stops the Fleet unless told to go on.
+    // A failure is seen once; it stops the Fleet unless told to go on. A
+    // commit on the branch that failed (a conflict, a check) is one too.
     for (id, r) in &requests {
-        if r["fleet"] == true && r["status"] == "failed" && r["fleet_seen"] != true {
+        let failed = r["status"] == "failed"
+            || (r["fleet_land"] == true && r["status"] == "ready" && r["land_error"].is_string());
+        if r["fleet"] == true && failed && r["fleet_seen"] != true {
             store.update(id, |r| r["fleet_seen"] = json!(true))?;
             if v["on_fail"] == "stop" {
                 v["on"] = json!(false);
-                v["stopped"] = json!(format!("« {} » a échoué", short(r)));
+                v["stopped"] = json!(match r["status"].as_str() {
+                    Some("failed") => format!("« {} » a échoué", short(r)),
+                    _ => format!("« {} » n'a pas pu être commitée sur {BRANCH}", short(r)),
+                });
                 return save(store, &v);
             }
         }
+    }
+    if let Some((id, r)) = requests.iter().find(|(_, r)| {
+        r["fleet_branch"].is_string() && r["status"] == "ready" && r["fleet_land"] != true
+    }) {
+        let branch = r["fleet_branch"].clone();
+        store.update(id, |r| {
+            r["fleet_land"] = json!(true);
+            r["target"] = json!({"branch": branch});
+        })?;
+        return land(store, id);
     }
     let queue = queue(store)?;
     let at_once = v["at_once"].as_u64().unwrap_or(1) as usize;
     let states = states(&queue, &requests, at_once);
     if let Some(((id, _), _)) = queue.iter().zip(&states).find(|(_, s)| s.is_none()) {
         store.launch(id)?;
-        store.update(id, |r| r["fleet"] = json!(true))?;
+        let branch = (v["on_success"] == "branch").then_some(BRANCH);
+        store.update(id, |r| {
+            r["fleet"] = json!(true);
+            if let Some(b) = branch {
+                r["fleet_branch"] = json!(b);
+            }
+        })?;
         start(id.clone());
     }
     Ok(())
@@ -195,7 +238,9 @@ pub fn tick(store: &Store, start: fn(String)) -> io::Result<()> {
 pub fn watch() {
     std::thread::spawn(|| {
         loop {
-            if let Err(e) = Store::from_env().and_then(|s| tick(&s, crate::work::talk)) {
+            if let Err(e) =
+                Store::from_env().and_then(|s| tick(&s, crate::work::talk, crate::work::land))
+            {
                 eprintln!("fennec: la Fleet : {e}");
             }
             std::thread::sleep(std::time::Duration::from_secs(3));
@@ -255,6 +300,7 @@ pub fn view(store: &Store) -> io::Result<Value> {
         .map(|(id, r)| {
             let mut c = card(id, r);
             c["outcome"] = json!(match r["status"].as_str() {
+                Some("landed") if r["fleet_branch"].is_string() => "commité sur fleet",
                 Some("landed") => "commité",
                 Some("passed") => "mis de côté",
                 Some("dropped") => "abandonné",
@@ -272,7 +318,7 @@ pub fn view(store: &Store) -> io::Result<Value> {
         "failed": count(&["failed"]), "cost": cost,
     });
     Ok(
-        json!({"on": v["on"], "at_once": v["at_once"], "on_fail": v["on_fail"], "stopped": v["stopped"],
+        json!({"on": v["on"], "at_once": v["at_once"], "on_fail": v["on_fail"], "on_success": v["on_success"], "stopped": v["stopped"],
               "queue": queued, "working": working, "summary": summary, "recent": recent}),
     )
 }
@@ -323,35 +369,81 @@ mod tests {
         place(&store, &b, "add").unwrap();
         // The human moves b first; "kept" stays for later, out of the Fleet.
         place(&store, &b, "up").unwrap();
-        set(&store, None, Some(2), None).unwrap();
-        tick(&store, |_| {}).unwrap();
+        set(&store, None, Some(2), None, None).unwrap();
+        tick(&store, |_| {}, |_, _| Ok(())).unwrap();
         assert_eq!(store.load(&b).unwrap()["status"], "thinking");
         assert_eq!(store.load(&a).unwrap()["status"], "later");
-        set(&store, Some(false), None, None).unwrap();
-        tick(&store, |_| {}).unwrap();
+        set(&store, Some(false), None, None, None).unwrap();
+        tick(&store, |_| {}, |_, _| Ok(())).unwrap();
         assert_eq!(store.load(&a).unwrap()["status"], "later", "paused");
-        set(&store, Some(true), None, None).unwrap();
-        tick(&store, |_| {}).unwrap();
+        set(&store, Some(true), None, None, None).unwrap();
+        tick(&store, |_| {}, |_, _| Ok(())).unwrap();
         assert_eq!(store.load(&a).unwrap()["status"], "thinking");
         // Two work, two places: the queue is empty and "kept" never moved.
         assert!(queue(&store).unwrap().is_empty());
-        tick(&store, |_| {}).unwrap();
+        tick(&store, |_| {}, |_, _| Ok(())).unwrap();
         assert_eq!(store.load(&kept).unwrap()["status"], "later");
         assert!(place(&store, &a, "add").is_err(), "no longer for later");
         // A task the Fleet started fails: the Fleet stops and says why.
         place(&store, &kept, "add").unwrap();
         store.update(&a, |r| r["status"] = json!("failed")).unwrap();
         store.update(&b, |r| r["status"] = json!("landed")).unwrap();
-        tick(&store, |_| {}).unwrap();
+        tick(&store, |_| {}, |_, _| Ok(())).unwrap();
         assert_eq!(store.load(&kept).unwrap()["status"], "later", "stopped");
         let v = view(&store).unwrap();
         assert_eq!(v["on"], false);
         assert_eq!(v["stopped"], "« a » a échoué");
         assert_eq!(v["summary"]["landed"], 1);
         // Told to go on, the same failure, already seen, stops nothing.
-        set(&store, Some(true), None, Some("go on")).unwrap();
-        tick(&store, |_| {}).unwrap();
+        set(&store, Some(true), None, Some("go on"), None).unwrap();
+        tick(&store, |_| {}, |_, _| Ok(())).unwrap();
         assert_eq!(store.load(&kept).unwrap()["status"], "thinking");
+        std::fs::remove_dir_all(tmp).unwrap();
+    }
+    #[test]
+    fn on_the_branch_proven_work_is_committed_before_the_next_starts() {
+        let tmp =
+            std::env::temp_dir().join(format!("fennec-lead-fleet-branch-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        let store = Store {
+            root: tmp.join("home"),
+        };
+        std::fs::create_dir_all(store.root.join("requests")).unwrap();
+        let p = tmp.join("p");
+        std::fs::create_dir_all(&p).unwrap();
+        store.add_project(p.to_str().unwrap(), "apart").unwrap();
+        let p = std::fs::canonicalize(p).unwrap().display().to_string();
+        let a = store.add_request(&p, "a", &[], true).unwrap();
+        let b = store.add_request(&p, "b", &[], true).unwrap();
+        place(&store, &a, "add").unwrap();
+        place(&store, &b, "add").unwrap();
+        set(&store, None, Some(2), None, Some("branch")).unwrap();
+        assert!(set(&store, None, None, None, Some("main")).is_err());
+        let landing = |s: &Store, id: &str| s.update(id, |r| r["status"] = json!("landing"));
+        tick(&store, |_| {}, landing).unwrap();
+        assert_eq!(store.load(&a).unwrap()["fleet_branch"], BRANCH);
+        // Proven: the next look commits it rather than starting b.
+        store.update(&a, |r| r["status"] = json!("ready")).unwrap();
+        tick(&store, |_| {}, landing).unwrap();
+        let r = store.load(&a).unwrap();
+        assert_eq!(
+            (r["status"].as_str(), &r["target"]["branch"]),
+            (Some("landing"), &json!(BRANCH))
+        );
+        assert_eq!(store.load(&b).unwrap()["status"], "later");
+        // The commit failed (a conflict): the Fleet stops and says so.
+        store
+            .update(&a, |r| {
+                r["status"] = json!("ready");
+                r["land_error"] = json!("conflit");
+            })
+            .unwrap();
+        tick(&store, |_| {}, landing).unwrap();
+        assert_eq!(
+            view(&store).unwrap()["stopped"],
+            "« a » n'a pas pu être commitée sur fleet"
+        );
+        assert_eq!(store.load(&b).unwrap()["status"], "later");
         std::fs::remove_dir_all(tmp).unwrap();
     }
 }

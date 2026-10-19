@@ -2726,6 +2726,7 @@ async function fleetDo(path, body) {
 }
 $("fleet-at-once").onchange = () => fleetDo("/api/fleet", { at_once: Number($("fleet-at-once").value) });
 $("fleet-on-fail").onchange = () => fleetDo("/api/fleet", { on_fail: $("fleet-on-fail").value });
+$("fleet-on-success").onchange = () => fleetDo("/api/fleet", { on_success: $("fleet-on-success").value });
 async function showFleet() {
   const v = await api("/api/fleet");
   const toggle = $("fleet-toggle");
@@ -2736,7 +2737,7 @@ async function showFleet() {
   $("fleet-state").textContent = v.on ? "en marche" : "arrêtée";
   $("fleet-stopped").hidden = !v.stopped;
   $("fleet-stopped").textContent = v.stopped ? `Arrêtée toute seule : ${v.stopped}. Regarde la tâche, puis redémarre.` : "";
-  for (const [id, value] of [["fleet-at-once", String(v.at_once)], ["fleet-on-fail", v.on_fail]]) {
+  for (const [id, value] of [["fleet-at-once", String(v.at_once)], ["fleet-on-fail", v.on_fail], ["fleet-on-success", v.on_success]]) {
     if (document.activeElement !== $(id)) $(id).value = value;
   }
   const s = v.summary;
@@ -2759,7 +2760,7 @@ async function showFleet() {
       move(item, "close", "Retirer de la Fleet", true)))), "Aucune tâche dans la Fleet : coche des tâches dans « Plus tard ».");
   $("n-fleet-working").textContent = v.working.length || "";
   fill($("fleet-working"), v.working.map((item) => link(item, null)), "Rien en cours.");
-  const tone = { "commité": "ok", "échec": "bad", "prêt, t'attend": "accent", "question pour toi": "accent", "mis de côté": "warn" };
+  const tone = { "commité": "ok", "commité sur fleet": "ok", "échec": "bad", "prêt, t'attend": "accent", "question pour toi": "accent", "mis de côté": "warn" };
   $("n-fleet-recent").textContent = v.recent.length || "";
   fill($("fleet-recent"), v.recent.map((item) => link(item, [item.outcome, tone[item.outcome] ?? "muted"])), "Rien encore.");
 }
