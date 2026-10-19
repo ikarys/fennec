@@ -2665,8 +2665,11 @@ async function showPlugins(change) {
     on.setAttribute("aria-checked", String(p.on));
     on.setAttribute("aria-label", `${p.on ? "Désactiver" : "Activer"} le plugin ${p.name}`);
     on.onclick = () => showPlugins({ name: p.name, on: !p.on });
+    // A plugin that relays decisions from a chat says for whom, and whether it listens.
+    const relay = !p.relays ? "" : ` · relaie tes décisions depuis le chat, pour ${p.allow.length ? p.allow.join(", ") : "personne (« allow » est vide)"}${
+      !p.on ? "" : p.listening ? " · en écoute" : " · arrêté : désactive-le puis réactive-le"}`;
     return el("li", { title: p.from }, el("strong", { textContent: p.name }),
-      el("span", { className: "what", textContent: `${p.description ? p.description + " · " : ""}quand une tâche ${when}` }), test, on);
+      el("span", { className: "what", textContent: `${p.description ? p.description + " · " : ""}quand une tâche ${when}${relay}` }), test, on);
   }), ...(got.plugins.length ? [] : [el("li", { className: "muted", textContent: "Aucun plugin dans ~/.config/fennec/plugins." })]));
 }
 
