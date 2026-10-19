@@ -464,14 +464,28 @@ fn wait_turn(store: &Store, id: &str, project: &str) -> io::Result<Taken> {
         let held = match world::held(Path::new(project))? {
             // Its own last try still holds the folder: retrying drops it.
             Some(world::Held::World(w)) if Some(&w) == mine.as_ref() => None,
-            Some(world::Held::World(w)) => Some(
-                store
+            Some(world::Held::World(w)) => {
+                let owner = store
                     .requests()?
                     .into_iter()
-                    .find(|(_, r)| r["run"] == w.as_str())
-                    .map(|(_, r)| format!("« {} »", r["text"].as_str().unwrap_or("")))
-                    .unwrap_or_else(|| "une autre demande".to_string()),
-            ),
+                    .find(|(_, r)| r["run"] == w.as_str());
+                match owner {
+                    Some((_, r)) => Some(format!("« {} »", r["text"].as_str().unwrap_or(""))),
+                    // No request owns it and no worker here holds the folder:
+                    // a start cut short (fennec restarted before the run was
+                    // recorded) left it. Dropping it stashes what it held.
+                    // ponytail: assumes one fennec per project folder; a second
+                    // instance mid-start would lose its world.
+                    None if !TAKEN.lock().is_ok_and(|t| t.iter().any(|p| p == project)) => {
+                        let worlds = Worlds::from_env()?;
+                        match worlds.open(&w).and_then(|o| worlds.drop(o)) {
+                            Ok(()) => continue,
+                            Err(e) => Some(format!("une ancienne demande interrompue ({e})")),
+                        }
+                    }
+                    None => Some("une autre demande".to_string()),
+                }
+            }
             Some(world::Held::Changes) => Some(String::new()),
             None => None,
         };
@@ -1560,6 +1574,49 @@ mod tests {
         // The worker's next checkpoint leaves the queue with the stop's reason.
         let err = wait_turn(&store, "c3", project.to_str().unwrap()).unwrap_err();
         assert_eq!(err.to_string(), "arrêté : tu as demandé d'arrêter");
+        std::fs::remove_dir_all(tmp).unwrap();
+    }
+
+    #[test]
+    fn a_world_no_request_owns_does_not_block_the_folder() {
+        let tmp = std::env::temp_dir().join(format!("fennec-lead-orphan-{}", std::process::id()));
+        let project = tmp.join("p");
+        std::fs::create_dir_all(&project).unwrap();
+        let git = |args: &[&str]| {
+            let out = std::process::Command::new("git")
+                .args(["-c", "user.name=t", "-c", "user.email=t@t"])
+                .args(args)
+                .current_dir(&project)
+                .output()
+                .unwrap();
+            String::from_utf8_lossy(&out.stdout).trim().to_string()
+        };
+        git(&["init", "-q", "-b", "main"]);
+        std::fs::write(project.join("a"), "a").unwrap();
+        git(&["add", "."]);
+        git(&["commit", "-q", "-m", "a"]);
+        // SAFETY: no other test reads FENNEC_OS_HOME.
+        unsafe { std::env::set_var("FENNEC_OS_HOME", tmp.join("os")) };
+        // A start cut short: the world holds the folder, no request knows it.
+        Worlds::from_env()
+            .unwrap()
+            .fork(project.to_str().unwrap())
+            .unwrap();
+        std::fs::write(project.join("half"), "done").unwrap();
+        let store = Store {
+            root: tmp.join("home"),
+        };
+        std::fs::create_dir_all(store.root.join("requests")).unwrap();
+        std::fs::write(
+            store.root.join("requests/c4.json"),
+            r#"{"status": "waiting"}"#,
+        )
+        .unwrap();
+        wait_turn(&store, "c4", project.to_str().unwrap()).unwrap();
+        assert_eq!(git(&["branch", "--show-current"]), "main");
+        assert_eq!(git(&["branch", "--list", "world/*"]), "");
+        // What it held is set aside, not lost.
+        assert!(git(&["stash", "list"]).contains("fennec"));
         std::fs::remove_dir_all(tmp).unwrap();
     }
 
