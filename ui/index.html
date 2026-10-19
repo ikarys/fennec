@@ -468,16 +468,16 @@
   #page .sub { border-top: 1px solid var(--line); padding-top: 4px; margin-top: 14px; }
   #page .sub h3 { display: flex; gap: 8px; align-items: center; margin: 10px 0 8px; font-size: 13px;
                   text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
-  #page-rules ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; }
-  #page-rules li { display: flex; gap: 6px; align-items: center; background: var(--soft); border-radius: 6px; padding: 4px 4px 4px 10px; }
-  #page-rules li .muted { flex: 1; font-size: 12px; text-align: right; }
-  #page-rules li.empty { background: none; padding-left: 0; font-size: 12px; }
-  #page-rules h3 .count { text-transform: none; letter-spacing: 0; background: var(--soft); color: var(--muted); }
+  .rules ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; }
+  .rules li { display: flex; gap: 6px; align-items: center; background: var(--soft); border-radius: 6px; padding: 4px 4px 4px 10px; }
+  .rules li > span:first-child { flex: 1; }
+  .rules li.empty { background: none; padding-left: 0; font-size: 12px; }
+  .rules h3 .count { text-transform: none; letter-spacing: 0; background: var(--soft); color: var(--muted); }
   .small { font-size: 12px; }
   #page .tiles { margin: 10px 0; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
   .rule-form { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 4px; }
   .rule-form input { flex: 1; min-width: 220px; }
-  #page-rules li button { padding: 4px; }
+  .rules li button { padding: 4px; }
   /* The global pages: the team, the figures, the settings — same place as
      the project's page, the address names them. */
   #detail > section { margin-top: 0; }
@@ -689,12 +689,12 @@
     <div class="tiles" id="page-tiles"></div>
     <div class="sub"><h3 data-icon="shield">Où fennec travaille</h3>
       <select id="page-place" aria-label="Où fennec travaille"></select></div>
-    <div class="sub" id="page-rules"><h3 data-icon="rule">Règles <span class="count" hidden></span></h3>
-      <p class="muted small">Des consignes que chaque agent suit à chaque tâche. Tu peux aussi en donner une en corrigeant une tâche : fennec te propose de la garder.</p>
+    <div class="sub rules" id="page-rules"><h3 data-icon="rule">Règles du projet <span class="count" hidden></span></h3>
+      <p class="muted small">Des consignes que chaque agent suit à chaque tâche de ce projet, écrites dans son AGENTS.md.
+        Celles de tous tes projets sont dans <button type="button" class="link" id="to-user-rules">Réglages</button>. En corrigeant une tâche, tu peux aussi en donner une : fennec te propose de la garder.</p>
       <ul></ul>
-      <form id="rule-form" class="rule-form">
-        <input id="rule-text" aria-label="Nouvelle règle" placeholder="Nouvelle règle, par ex. « commits en anglais, format Conventional Commits »" required>
-        <select id="rule-scope" aria-label="S'applique à"><option value="project">À ce projet</option><option value="user">À tous mes projets</option></select>
+      <form class="rule-form">
+        <input aria-label="Nouvelle règle" placeholder="Nouvelle règle, par ex. « lancer cargo test avant de finir »" required>
         <button data-icon="plus" aria-label="Ajouter la règle" title="Ajouter la règle"></button>
       </form></div>
     <p class="error" id="page-error" role="alert"></p>
@@ -762,6 +762,7 @@
     <div class="tabs" role="tablist" id="settings-tabs">
       <button type="button" role="tab" aria-selected="true" data-panel="settings-general">Général</button>
       <button type="button" role="tab" aria-selected="false" data-panel="settings-appearance">Apparence</button>
+      <button type="button" role="tab" aria-selected="false" data-panel="settings-rules">Règles</button>
       <button type="button" role="tab" aria-selected="false" data-panel="settings-skills">Skills</button>
       <button type="button" role="tab" aria-selected="false" data-panel="settings-clean">Nettoyage</button>
     </div>
@@ -802,6 +803,16 @@
       <label class="field">Taille des textes
         <input id="font-scale" type="number" min="12" max="21" step="1" required>
       </label>
+    </div>
+    <div id="settings-rules" class="rules" hidden>
+      <p class="muted">Des consignes que chaque agent suit à chaque tâche, dans tous tes projets, écrites dans ~/.config/fennec/rules.md.
+        Celles d'un seul projet sont sur la page du projet.</p>
+      <ul></ul>
+      <form class="rule-form">
+        <input aria-label="Nouvelle règle" placeholder="Nouvelle règle, par ex. « commits en anglais, format Conventional Commits »" required>
+        <button data-icon="plus" aria-label="Ajouter la règle" title="Ajouter la règle"></button>
+      </form>
+      <p class="error" role="alert"></p>
     </div>
     <div id="settings-skills" hidden>
       <p class="muted">Ils s'appliquent à tous tes projets : l'équipe voit le nom et le but de chaque skill activé, et le lit quand la tâche en a besoin.

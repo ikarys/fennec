@@ -484,7 +484,7 @@ function details(item) {
   if (item.land?.message) part("Message du commit", el("pre", { textContent: item.land.message }));
   // Without stats (an old request), the team that worked on it at least.
   if (item.team?.length && !item.stats?.stages) part("Équipe", el("p", { textContent: item.team.join(", ") }));
-  if (item.rules?.length) part("Règles suivies", el("ul", {}, ...item.rules.map((r) => el("li", { textContent: r }))));
+  if (item.rules?.length) part("Règles appliquées ici", el("ul", {}, ...item.rules.map((r) => el("li", { textContent: r }))));
   // What each step and each model cost, in one table so the columns line up.
   const rows = (key) => Object.entries(item.stats?.[key] ?? {}).sort(([a], [b]) => stageRank(a) - stageRank(b));
   const head = (label) => el("tr", {}, ...[label, label === "Modèle" ? "" : "Rôles", "Temps", "Appels", "Envoyés", "Cache", "Générés", "Vitesse"]
@@ -2255,12 +2255,13 @@ function buildFontScale() {
   };
 }
 
-// The settings panels, one tab each: general, appearance, skills, cleaning.
+// The settings panels, one tab each: general, appearance, rules, skills, cleaning.
 document.querySelectorAll("#settings-tabs [role=tab]").forEach((b) => {
   b.onclick = () => {
     document.querySelectorAll("#settings-tabs [role=tab]").forEach((t) => t.setAttribute("aria-selected", String(t === b)));
-    ["settings-general", "settings-appearance", "settings-skills", "settings-clean"].forEach((id) => $(id).hidden = id !== b.dataset.panel);
+    ["settings-general", "settings-appearance", "settings-rules", "settings-skills", "settings-clean"].forEach((id) => $(id).hidden = id !== b.dataset.panel);
     if (b.dataset.panel === "settings-clean") showLeftovers();
+    if (b.dataset.panel === "settings-rules") changeRules($("settings-rules"), "", "user");
   };
 });
 // What interrupted work left behind, for the human to pick and throw away.
@@ -2440,7 +2441,7 @@ async function showPage(path) {
   place.value = p.place ?? "here";
   place.onchange = () => api("/api/projects", { path, place: place.value })
     .catch((e) => { $("page-error").textContent = e.message; place.value = p.place; });
-  showRules(path, rules);
+  showRules($("page-rules"), path, "project", rules);
 }
 
 // The skills of the machine, valid for every project: chosen from the
@@ -2481,33 +2482,44 @@ function drawSkillList() {
 }
 $("skill-search").oninput = drawSkillList;
 
-function showRules(path, rules) {
-  const box = $("page-rules");
+// The rules said in words, a project's on its page and the human's own in
+// the settings: one list and one form each, the scope fixed by where it is.
+function showRules(box, path, scope, rules) {
+  rules = rules.filter((r) => r.scope === scope);
   const count = box.querySelector(".count");
-  count.textContent = rules.length;
-  count.hidden = !rules.length;
+  if (count) {
+    count.textContent = rules.length;
+    count.hidden = !rules.length;
+  }
   box.querySelector("ul").replaceChildren(...rules.length ? [] : [el("li", { className: "empty muted", textContent: "Aucune règle pour l'instant." })], ...rules.map((r) => {
     const remove = el("button", { type: "button", className: "quiet", ariaLabel: "Retirer la règle", title: "Retirer la règle" });
     setIcon(remove, "close");
-    remove.onclick = () => changeRules(path, { change: "remove", scope: r.scope, text: r.text });
-    return el("li", {}, ...rich(r.text),
-      el("span", { className: "muted", textContent: r.scope === "user" ? "tous tes projets" : "ce projet" }), remove);
+    remove.onclick = () => changeRules(box, path, scope, { change: "remove", text: r.text });
+    return el("li", {}, el("span", {}, ...rich(r.text)), remove);
   }));
 }
 
-async function changeRules(path, change) {
+async function changeRules(box, path, scope, change = {}) {
+  const error = box.querySelector(".error") ?? $("page-error");
   try {
-    showRules(path, await api("/api/rules", { project: path, ...change }));
-    $("page-error").textContent = "";
+    showRules(box, path, scope, await api("/api/rules", { project: path, scope, ...change }));
+    error.textContent = "";
     return true;
   } catch (e) {
-    $("page-error").textContent = explain(e.message);
+    error.textContent = explain(e.message);
     return false;
   }
 }
-$("rule-form").onsubmit = async (e) => {
-  e.preventDefault();
-  if (await changeRules(paged, { change: "add", scope: $("rule-scope").value, text: $("rule-text").value })) $("rule-text").value = "";
+for (const [id, scope] of [["page-rules", "project"], ["settings-rules", "user"]]) {
+  const box = $(id), input = box.querySelector("input");
+  box.querySelector("form").onsubmit = async (e) => {
+    e.preventDefault();
+    if (await changeRules(box, scope === "user" ? "" : paged, scope, { change: "add", text: input.value })) input.value = "";
+  };
+}
+$("to-user-rules").onclick = () => {
+  location.hash = "#settings";
+  document.querySelector('#settings-tabs [data-panel="settings-rules"]').click();
 };
 $("page-team").onclick = () => $("open-team").click();
 $("page-open").onclick = async () => {
