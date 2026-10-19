@@ -2,6 +2,10 @@
 
 ## What this repository is
 
+**fennec's purpose** (the human, 2026-10-19): an assistant to build things with
+AI **fast**, but **efficiently** and **safely**. Every feature is weighed against
+these three; one that serves none of them is not built.
+
 A local cognitive OS for coding agents. Its primitive is the **world**: a
 reversible, forkable sandbox an agent runs in. Everything else (repeated
 attempts, deterministic verification, memory, sleep) plugs into worlds.
