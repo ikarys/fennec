@@ -552,6 +552,46 @@ impl Worlds {
         self.git(world, &["rev-parse", "HEAD"])
     }
 
+    /// A world in the project folder set aside: its work checkpointed and
+    /// kept on its branch, the folder back on the human's branch, so other
+    /// work can start there. [`Self::unpark`] checks it out again. Nothing to
+    /// do for a world apart, or one the folder already left.
+    pub fn park(&self, world: &World) -> io::Result<()> {
+        let (_, _, home) = self.meta(&world.id)?;
+        let Some(home) = home else {
+            return Ok(());
+        };
+        if git(&world.path, &["branch", "--show-current"])? != format!("world/{}", world.id) {
+            return Ok(());
+        }
+        self.commit(world, "fennec: mis de côté")?;
+        git(&world.path, &["checkout", "-q", &home])?;
+        Ok(())
+    }
+
+    /// A parked world back in the project folder, which must be free: on the
+    /// human's branch, with nothing uncommitted.
+    pub fn unpark(&self, world: &World) -> io::Result<()> {
+        let (_, _, home) = self.meta(&world.id)?;
+        let branch = format!("world/{}", world.id);
+        let now = git(&world.path, &["branch", "--show-current"])?;
+        if home.is_none() || now == branch {
+            return Ok(());
+        }
+        if now.starts_with("world/") {
+            return Err(io::Error::other(
+                "une autre tâche travaille dans le dossier : attends qu'elle finisse",
+            ));
+        }
+        if !git(&world.path, &["status", "--porcelain"])?.is_empty() {
+            return Err(io::Error::other(
+                "le dossier a des changements pas encore commités",
+            ));
+        }
+        git(&world.path, &["checkout", "-q", &branch])?;
+        Ok(())
+    }
+
     pub fn drop(&self, world: World) -> io::Result<()> {
         if !crate::grant::paths(self, &world.id)?.is_empty() {
             return Err(io::Error::other(
