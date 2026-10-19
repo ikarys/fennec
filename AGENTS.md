@@ -26,7 +26,7 @@ src/chat.rs      a plain conversation in a folder the person chose (git or not):
 src/outside.rs   the literal host paths a chat tool call names outside its folder: the chat asks, an opened folder stays read-write
 src/agent.rs     tool loop; every tool runs inside the sandbox; loops, idle runs and hung commands are stopped
 src/solve.rs     task → worlds in turn until one passes verify → land (rebase + re-verify, one commit by the human) on the branch the rules ask for → push
-src/spec.rs      request → conversation (`discuss`) → `direct` work (no tests first, proof decides) or acceptance tests + task (`compile`, CLI and sparring); retry from the tests; amend a ready run from its work; sparring findings
+src/spec.rs      request → conversation (`discuss`) → `direct` work (no tests first, proof decides) or acceptance tests + task (`compile`, CLI and sparring); retry from the tests; amend a ready run from its work, or `fix` it from what its proof found; sparring findings
 src/proof.rs     a ready run used as its user would: model proposes tries, pages and clicks/typing; harness runs them, captures before/after (proof.py)
                  `page`: the same product started for the human's browser (host network, a free port, 30 min)
 src/rules.rs     project rules (`.fennec-os/rules.json` at HEAD), glob matching; rules said in words
