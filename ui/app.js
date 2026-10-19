@@ -894,10 +894,8 @@ function landTitle({ branch, remote, committed }) {
 }
 
 function card(item) {
-  // The head above the tabs says the title and the status; the card repeats
-  // the title only where it is the field to edit: a request for later.
-  const node = el("div", { className: "card" },
-    item.kind === "later" ? el("div", { className: "title", textContent: item.title }) : thumbs(item.images));
+  // The head above the tabs says the title and the status: the card does not repeat it.
+  const node = el("div", { className: "card" }, thumbs(item.images));
   const actions = el("div", { className: "actions" });
   const add = (...nodes) => node.append(...nodes.filter(Boolean));
 
@@ -979,12 +977,27 @@ function card(item) {
     add(el("div", { className: "reply" }, change, images.node), actions, el("div", { className: "error", role: "alert" }),
       el("div", { className: "changes-slot" }), doneWhen(item), ...work(item), shots(item), ...facts(item));
   } else if (item.kind === "later") {
-    // Kept, not started: said again if need be, then launched.
-    const text = el("textarea", { className: "later-text", defaultValue: item.title, ariaLabel: "La tâche" });
-    const images = attach(text, item.images);
-    node.querySelector(".title").replaceWith(el("div", { className: "reply" }, text, images.node));
-    actions.append(action("Lancer", "/api/launch", { id: item.id }, { primary: true }),
-      action("Enregistrer", "/api/rewrite", () => ({ id: item.id, text: images.value() })),
+    // Kept, not started: read in the details, said again there if need be,
+    // then launched.
+    let images;
+    const save = action("Enregistrer", "/api/rewrite", () => ({ id: item.id, text: images.value() }));
+    save.hidden = true;
+    const edit = el("button", { type: "button", textContent: "Éditer" });
+    edit.onclick = () => {
+      const text = el("textarea", { className: "later-text", defaultValue: item.title, ariaLabel: "La tâche" });
+      images = attach(text, item.images);
+      const reply = el("div", { className: "reply" }, text, images.node);
+      // The field takes the place of the task as the details read it.
+      const more = node.querySelector("details.more");
+      const read = [...(more?.querySelectorAll("h3") ?? [])].find((h) => h.textContent === "La tâche");
+      read?.nextSibling.remove();
+      read?.remove();
+      if (more) { more.open = true; more.firstChild.after(reply); } else node.prepend(reply);
+      edit.hidden = true;
+      save.hidden = false;
+      text.focus();
+    };
+    actions.append(action("Lancer", "/api/launch", { id: item.id }, { primary: true }), edit, save,
       action("Supprimer", "/api/forget", { id: item.id }, { quiet: true }));
   } else if (item.kind === "failed") {
     add(stages(item), why(item.reason), conversation(item), doneWhen(item), ...work(item), shots(item), ...facts(item));
@@ -1869,7 +1882,7 @@ const ICONS = {
 };
 const ICON_OF = [[/^(Commit|Pousser|Préparer)/, "commit"], [/^Ouvrir la page/, "page"], [/changements/, "diff"],
   [/^Ouvrir le code/, "code"], [/^Corriger|^Envoyer/, "fix"], [/^Passer/, "pass"], [/^Journal/, "journal"],
-  [/^Annuler$|^Abandonner/, "undo"], [/^Reprendre|^Lancer/, "resume"], [/^Supprimer/, "trash"], [/^Enregistrer$/, "save"], [/^Réessayer/, "retry"], [/^Archiver/, "inbox"], [/^Arrêter/, "stop"]];
+  [/^Annuler$|^Abandonner/, "undo"], [/^Reprendre|^Lancer/, "resume"], [/^Supprimer/, "trash"], [/^Enregistrer$/, "save"], [/^Éditer$/, "pencil"], [/^Réessayer/, "retry"], [/^Archiver/, "inbox"], [/^Arrêter/, "stop"]];
 function iconize(button) {
   const name = ICON_OF.find(([re]) => re.test(button.textContent))?.[1];
   if (name) setIcon(button, name);
