@@ -1,6 +1,6 @@
 # Factory, plugins, self-improvement
 
-Date: 2026-10-19. Status: steps 1 (the Fleet), 2 (outbound plugins) and 3 (framing ahead) built. Asked by the human after a
+Date: 2026-10-19. Status: steps 1 (the Fleet), 2 (outbound plugins), 3 (framing ahead) and 4 (approval from a chat) built. Asked by the human after a
 comparison with OpenFox (task board, Planner/Builder agents, plugins).
 
 Purpose test (AGENTS.md): **fast**, **efficient**, **safe**. Each part below
@@ -167,14 +167,20 @@ dark) when it shows. The status choke point is `Store::update`
   launched, and launching it skips the conversation.
 
 **4. Inbound plugins: approval from a chat** (fast, safe)
-- `main.rs`: per-plugin token (Réglages, revocable) accepted on `/api/land`,
-  `/api/drop`, `/api/answer` only; every other route refuses it.
-- `plugin.rs`: long-running plugins (`"serve": true`) started and stopped by
-  fennec; sender allow-list lives in the plugin's config, checked by fennec
-  from the `from` field the plugin passes.
-- Journal: "validé via <plugin> par <sender>".
-- `examples/plugins/telegram/`: long-polling bot, buttons Valider / Abandonner,
-  reply = answer.
+- Built 2026-10-19. `plugin.json` names a `serve` program and its senders
+  (`allow`); fennec-os `plugin::start` runs it with `FENNEC_URL` and
+  `FENNEC_TOKEN`. `src/relay.rs` starts it when enabled and fennec listens,
+  stops it when disabled (the token dies with it: that is the revocation),
+  and restarts one that exited only when the person turns it off and on.
+- A call with `Authorization: Bearer <token>` reaches `/api/land`,
+  `/api/drop`, `/api/answer`, `/api/say`, `/api/reply` only (POST), with a
+  `from` in the plugin's `allow`; anything else is refused (403).
+- Journal: "Via <plugin> — commit validé par <sender>".
+- `examples/plugins/telegram/`: stdlib Python, long polling; buttons Valider /
+  Abandonner, a reply answers a question. Not tried against Telegram itself.
+- The local API stays open to the person's own programs (Host + JSON
+  check): the token names who decided and keeps a plugin to its decisions,
+  it does not fence a hostile local program.
 - Done when: a token can land a proven request and is refused on
   `/api/settings`; a sender off the list is ignored.
 

@@ -4,6 +4,7 @@
 //! to pull an async runtime into a synchronous codebase.
 
 mod fleet;
+mod relay;
 mod state;
 mod work;
 
@@ -29,6 +30,8 @@ struct Request {
     path: String,
     host: String,
     json: bool,
+    /// A relaying plugin's token (`relay`), from `Authorization: Bearer`.
+    token: Option<String>,
     body: Vec<u8>,
 }
 
@@ -57,6 +60,7 @@ fn serve(addr: &str) -> io::Result<()> {
     let listener = TcpListener::bind(addr)?;
     let port = listener.local_addr()?.port();
     println!("fennec : http://127.0.0.1:{port}");
+    relay::listen(port);
     for stream in listener.incoming() {
         let Ok(stream) = stream else { continue };
         // ponytail: one thread per connection, fine for one local user.
@@ -76,7 +80,7 @@ fn read_request(stream: &TcpStream) -> io::Result<Request> {
     let mut parts = line.split_whitespace();
     let method = parts.next().unwrap_or("").to_string();
     let path = parts.next().unwrap_or("").to_string();
-    let (mut host, mut json, mut length) = (String::new(), false, 0usize);
+    let (mut host, mut json, mut length, mut token) = (String::new(), false, 0usize, None);
     loop {
         line.clear();
         if reader.read_line(&mut line)? == 0 || line.trim().is_empty() {
@@ -90,6 +94,7 @@ fn read_request(stream: &TcpStream) -> io::Result<Request> {
             "host" => host = value.to_string(),
             "content-type" => json = value.starts_with("application/json"),
             "content-length" => length = value.parse().unwrap_or(usize::MAX),
+            "authorization" => token = value.strip_prefix("Bearer ").map(str::to_string),
             _ => {}
         }
     }
@@ -103,6 +108,7 @@ fn read_request(stream: &TcpStream) -> io::Result<Request> {
         path,
         host,
         json,
+        token,
         body,
     })
 }
@@ -147,6 +153,28 @@ fn handle(mut stream: TcpStream, port: u16) -> io::Result<()> {
                     ("200 OK", kind, bytes)
                 }
                 Err(_) => ("404 Not Found", "text/plain", b"not found".to_vec()),
+            }
+        }
+        // A plugin relaying a decision from a chat: only what its token may.
+        (method, path) if req.token.is_some() => {
+            match relay::allowed(req.token.as_deref().unwrap_or(""), method, path, &req.body) {
+                Err(why) => (
+                    "403 Forbidden",
+                    "application/json",
+                    json!({"error": why}).to_string().into_bytes(),
+                ),
+                Ok((plugin, from)) => {
+                    let (status, value) = match api(method, path, &req.body) {
+                        Ok(v) => {
+                            if let Ok(store) = Store::from_env() {
+                                relay::note(&store, &plugin, &from, path, &req.body);
+                            }
+                            ("200 OK", v)
+                        }
+                        Err(e) => ("400 Bad Request", json!({"error": e.to_string()})),
+                    };
+                    (status, "application/json", value.to_string().into_bytes())
+                }
             }
         }
         (method, path) if path.starts_with("/api/") => {
@@ -480,6 +508,7 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
                 tried = json!(plugin::call(&p, &test).err().unwrap_or_default());
             } else if !name.is_empty() {
                 plugin::choose(&name, v["on"] == true)?;
+                relay::restart(&name);
             }
             let on = plugin::enabled()?;
             let home = std::env::var("HOME").unwrap_or_default();
@@ -490,6 +519,8 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
                         let from = p.run.display().to_string();
                         json!({"name": p.name, "description": p.description,
                                "events": p.events, "on": on.contains(&p.name),
+                               "relays": p.serve.is_some(), "allow": p.allow,
+                               "listening": relay::running(&p.name),
                                "from": from.replacen(&home, "~", 1)})
                     }
                     Err((name, why)) => json!({"name": name, "error": why}),
