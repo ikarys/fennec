@@ -102,13 +102,11 @@ dark) when it shows. The status choke point is `Store::update`
 **0. Docs** — commit rule 1, the purpose line, this file.
 
 **1. The Fleet** (fast, safe)
-- `state.rs`: a `later` task gets `fleet: true` and a `rank` (one order
-  across projects); `fleet.json` in the store holds run/pause and the
-  optional number at once. `Store::next_fleet()`: the first ranked task whose
-  folder is free (or set "À part").
-- `work.rs`: whenever a task leaves its folder (landed, dropped, passed,
-  failed), on start, and on unpause, `launch` what `next_fleet` gives, while
-  under the number at once. Pause stops launching only.
+- Built 2026-10-19 in `src/fleet.rs`. `fleet.json` in the store holds the
+  queue (task ids, one order across projects), run/pause and how many at
+  once (default 1). A task launched, forgotten or archived leaves the queue.
+- Every 3 s, when running and under the number at once, the first queued
+  task whose folder is free starts (`work::talk`). Pause stops launching only.
 - UI: "Dans la Fleet" / "Plus tard" on a task; `/fleet` page: run/pause, the
   ordered queue (move up/down, take out), what runs now.
 - Done when: three Fleet tasks in two projects land in rank order with no

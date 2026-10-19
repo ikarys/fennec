@@ -1014,7 +1014,10 @@ function card(item) {
       save.hidden = false;
       text.focus();
     };
-    actions.append(action("Lancer", "/api/launch", { id: item.id }, { primary: true }), edit, save,
+    const fleet = item.fleet
+      ? action("Retirer de la Fleet", "/api/fleet/place", { id: item.id, action: "remove" })
+      : action("Dans la Fleet", "/api/fleet/place", { id: item.id, action: "add" });
+    actions.append(action("Lancer", "/api/launch", { id: item.id }, { primary: true }), fleet, edit, save,
       action("Supprimer", "/api/forget", { id: item.id }, { quiet: true }));
     if (saved === item.id) {
       saved = "";
@@ -1216,6 +1219,7 @@ function renderSide(view) {
   $("side-archived-label").hidden = !archived.length;
   $("side-archived").replaceChildren(...archived.map(archivedProjectEntry));
   const page = PAGES.includes(where().path) ? where().path : "";
+  $("open-fleet").setAttribute("aria-current", String(page === "fleet"));
   $("open-team").setAttribute("aria-current", String(page === "team"));
   $("open-stats").setAttribute("aria-current", String(page === "stats"));
   $("open-settings").setAttribute("aria-current", String(page === "settings"));
@@ -1735,6 +1739,8 @@ async function refresh(force) {
   // froze it after a mere click on a tab.)
   const typing = !force && ([...document.querySelectorAll("#detail textarea, #detail input")].some((t) => t.value !== t.defaultValue)
     || document.activeElement?.matches("#detail textarea, #detail input"));
+  // The Fleet's waits move with the folders, not only with the requests.
+  if (where().path === "fleet" && shownPageKey.startsWith("fleet")) showFleet().catch(() => {});
   try {
     const view = await api("/api/view");
     const json = JSON.stringify(view);
@@ -1785,7 +1791,7 @@ async function refresh(force) {
     const later = mine(view.later ?? []);
     $("later-box").hidden = !later.length;
     $("n-later").textContent = later.length || "";
-    fill($("later"), later.map((i) => row(i, line(i, "à lancer"),
+    fill($("later"), later.map((i) => row(i, line(i, i.fleet ? "dans la Fleet" : "à lancer"),
       rowActions(i.id, { archive: "/api/request/archive", forget: "/api/forget" }))), "");
     const history = mine(view.history);
     fill($("history"), history.map((i) => row(i, line(i, pastState(i), false),
@@ -1811,7 +1817,7 @@ async function refresh(force) {
 // The right pane: the chosen request in full, a page the address names,
 // or else the project's page. Drawn again only when the request changed,
 // so what the human opened in it stays open.
-const PAGES = ["team", "stats", "settings"];
+const PAGES = ["fleet", "team", "stats", "settings"];
 // A discussion or a page owns the address: the project's page must not take
 // it back, and a project chosen from there sends the address to it.
 const owned = (path) => path === "chat" || PAGES.includes(path);
@@ -1833,6 +1839,7 @@ function showDetail(found) {
       const key = page + "|" + $("project").value;
       if (key !== shownPageKey) {
         shownPageKey = key;
+        if (page === "fleet") showFleet().catch((e) => ($("fleet-error").textContent = e.message));
         if (page === "team") showTeamPage();
         if (page === "stats") showStats().catch((e) => ($("stats-error").textContent = e.message));
         if (page === "settings") showSettingsPage();
@@ -1908,10 +1915,15 @@ const ICONS = {
   shield: '<path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.7 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z"/>',
   rule: '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
   chevron: '<path d="m6 9 6 6 6-6"/>',
+  fleet: '<path d="M12 10.2V14M12 2v3"/><path d="M19 13V7a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v6"/><path d="M19.4 20A11.6 11.6 0 0 0 21 14l-8.2-3.6a2 2 0 0 0-1.6 0L3 14a11.6 11.6 0 0 0 2.8 7.8"/><path d="M2 21c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1s1.2 1 2.5 1c2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/>',
+  up: '<path d="m5 12 7-7 7 7M12 19V5"/>',
+  down: '<path d="M12 5v14M19 12l-7 7-7-7"/>',
+  play: '<path d="M6 3v18l14-9z"/>',
+  pause: '<rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/>',
 };
 const ICON_OF = [[/^(Commit|Pousser|Préparer)/, "commit"], [/^Ouvrir la page/, "page"], [/changements/, "diff"],
   [/^Ouvrir le code/, "code"], [/^Corriger|^Envoyer/, "fix"], [/^Passer/, "pass"], [/^Journal/, "journal"],
-  [/^Annuler$|^Abandonner/, "undo"], [/^Reprendre|^Lancer/, "resume"], [/^Supprimer/, "trash"], [/^Enregistrer$/, "save"], [/^Éditer$/, "pencil"], [/^Réessayer/, "retry"], [/^Archiver/, "inbox"], [/^Arrêter/, "stop"]];
+  [/^Annuler$|^Abandonner/, "undo"], [/^Reprendre|^Lancer/, "resume"], [/^Supprimer/, "trash"], [/^Enregistrer$/, "save"], [/^Éditer$/, "pencil"], [/^Réessayer/, "retry"], [/^Archiver/, "inbox"], [/^Arrêter/, "stop"], [/Fleet$/, "fleet"]];
 function iconize(button) {
   const name = ICON_OF.find(([re]) => re.test(button.textContent))?.[1];
   if (name) setIcon(button, name);
@@ -2004,6 +2016,19 @@ $("later-add").onclick = async () => {
   $("compose-error").textContent = "";
   try {
     await api("/api/requests", { project: $("project").value, text: composed.value(), later: true });
+    composed.clear();
+    $("compose").close();
+    refresh(true);
+  } catch (e) {
+    $("compose-error").textContent = e.message;
+  }
+};
+
+// Written now, started by the Fleet when its turn comes.
+$("fleet-add").onclick = async () => {
+  $("compose-error").textContent = "";
+  try {
+    await api("/api/requests", { project: $("project").value, text: composed.value(), fleet: true });
     composed.clear();
     $("compose").close();
     refresh(true);
@@ -2581,6 +2606,49 @@ $("page-open").onclick = async () => {
     $("page-error").textContent = e.message;
   }
 };
+
+$("open-fleet").onclick = () => {
+  location.hash === "#fleet" ? refresh(true) : (location.hash = "#fleet");
+};
+
+// The Fleet: one queue of tasks across projects, started on their own.
+$("fleet-at-once").replaceChildren(...Array.from({ length: 10 }, (_, i) => new Option(String(i + 1), String(i + 1))));
+async function fleetDo(path, body) {
+  $("fleet-error").textContent = "";
+  try {
+    await api(path, body);
+    await showFleet();
+    refresh(true);
+  } catch (e) {
+    $("fleet-error").textContent = e.message;
+  }
+}
+$("fleet-at-once").onchange = () => fleetDo("/api/fleet", { at_once: Number($("fleet-at-once").value) });
+async function showFleet() {
+  const v = await api("/api/fleet");
+  const toggle = $("fleet-toggle");
+  toggle.textContent = v.on ? "Mettre en pause" : "Reprendre";
+  setIcon(toggle, v.on ? "pause" : "play");
+  toggle.classList.toggle("primary", !v.on);
+  toggle.onclick = () => fleetDo("/api/fleet", { on: !v.on });
+  $("fleet-state").textContent = v.on ? "en marche" : "en pause";
+  if (document.activeElement !== $("fleet-at-once")) $("fleet-at-once").value = String(v.at_once);
+  const link = (item, state) => el("a", { className: "row", href: hashOf(item.path, item.id) }, line(item, state));
+  const move = (item, name, label, enabled) => {
+    const b = el("button", { type: "button", className: "icon", ariaLabel: label, title: label, disabled: !enabled });
+    setIcon(b, name);
+    b.onclick = () => fleetDo("/api/fleet/place", { id: item.id, action: name === "close" ? "remove" : name });
+    return b;
+  };
+  const last = v.queue.length - 1;
+  $("n-fleet").textContent = v.queue.length || "";
+  fill($("fleet-queue"), v.queue.map((item, i) => rowWrap(
+    link(item, item.waits ? [item.waits, "muted"] : ["part ensuite", "accent"]),
+    el("div", { className: "row-actions" }, move(item, "up", "Monter", i > 0), move(item, "down", "Descendre", i < last),
+      move(item, "close", "Retirer de la Fleet", true)))), "Aucune tâche dans la Fleet.");
+  $("n-fleet-working").textContent = v.working.length || "";
+  fill($("fleet-working"), v.working.map((item) => link(item, null)), "Rien en cours.");
+}
 
 $("open-stats").onclick = () => {
   location.hash === "#stats" ? refresh(true) : (location.hash = "#stats");

@@ -118,9 +118,7 @@ impl Store {
         match request["status"].as_str() {
             Some("later" | "landed" | "passed" | "dropped") => {}
             _ => {
-                return Err(io::Error::other(
-                    "fennec travaille encore sur cette tâche",
-                ));
+                return Err(io::Error::other("fennec travaille encore sur cette tâche"));
             }
         }
         self.update(id, |r| r["archived"] = json!(on))
@@ -234,9 +232,7 @@ impl Store {
                 }
             }
             _ => {
-                return Err(io::Error::other(
-                    "fennec travaille encore sur cette tâche",
-                ));
+                return Err(io::Error::other("fennec travaille encore sur cette tâche"));
             }
         }
         // The step's exchange too: a forgotten request leaves no trace.
@@ -308,7 +304,16 @@ impl Store {
     /// Runs fennec-os made outside a request are not shown: nothing here
     /// could act on them.
     pub fn view(&self) -> io::Result<Value> {
-        Ok(classify(&self.requests()?, &self.projects_all()?))
+        let mut view = classify(&self.requests()?, &self.projects_all()?);
+        // A task for later says whether the Fleet will start it.
+        let fleet: Vec<String> = crate::fleet::queue(self)?
+            .into_iter()
+            .map(|(id, _)| id)
+            .collect();
+        for c in view["later"].as_array_mut().into_iter().flatten() {
+            c["fleet"] = json!(fleet.iter().any(|id| c["id"] == id.as_str()));
+        }
+        Ok(view)
     }
 }
 
@@ -319,7 +324,7 @@ pub fn image_lines(text: &str) -> impl Iterator<Item = &str> {
 }
 
 /// What the human wrote, without its image lines: a title.
-fn words(text: &str) -> String {
+pub(crate) fn words(text: &str) -> String {
     text.lines()
         .filter(|l| !l.trim().starts_with("![image](file://"))
         .collect::<Vec<_>>()
@@ -348,7 +353,7 @@ fn unbase64(text: &str) -> Option<Vec<u8>> {
     Some(out)
 }
 
-fn write_json(path: &Path, value: &Value) -> io::Result<()> {
+pub(crate) fn write_json(path: &Path, value: &Value) -> io::Result<()> {
     let text = serde_json::to_string_pretty(value).map_err(io::Error::other)?;
     // Write then rename: a reader never sees half a file.
     let tmp = path.with_extension("tmp");
@@ -399,7 +404,7 @@ pub fn start(path: &Path) -> io::Result<()> {
 }
 
 /// A step fennec is in right now: the project may not be taken out of view.
-fn is_working(request: &Value) -> bool {
+pub(crate) fn is_working(request: &Value) -> bool {
     matches!(
         request["status"].as_str(),
         Some("thinking" | "framing" | "waiting" | "running" | "proving" | "landing")
