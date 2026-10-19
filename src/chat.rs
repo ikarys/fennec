@@ -1,6 +1,7 @@
 //! Chat: a plain conversation with an agent in a folder the person chose,
-//! git or not. No world, no request, no proof: the agent reads, runs
-//! commands and writes in that folder directly, in the same sandbox as a
+//! git or not. No world, no request, no proof: the agent reads and runs
+//! commands in that folder, and writes there directly once the person
+//! allows changes (a chat starts read-only), in the same sandbox as a
 //! world's (no network, hidden home, private /tmp), and its turn ends when
 //! it answers without a tool call. Chats live in `<store>/chats/<id>.json`:
 //! the folder, the messages without the system prompt,
@@ -21,11 +22,19 @@ use crate::world::Worlds;
 
 const SYSTEM: &str = "You are fennec, talking with a person about the folder they chose; \
 it is the current directory. Answer in their language, like a colleague, in Markdown. Use the \
-tools whenever the answer is in the files or needs a command: read before you answer, and do \
-what they ask. Your changes are made directly in their folder and cannot be undone by the \
-harness, so ask before deleting or overwriting what you did not write. The sandbox has no \
-network and hides their home except this folder. Your turn ends when you reply without a tool \
-call: that reply is what they read.";
+tools whenever the answer is in the files or needs a command: read before you answer. The \
+sandbox has no network and hides their home except this folder. Your turn ends when you reply \
+without a tool call: that reply is what they read.";
+
+/// A chat starts read-only: talking about a project is not asking to build it.
+const READ: &str = " The folder is read-only for now: read, discuss and plan. When they \
+want something built or changed, propose a short plan (files, steps, open questions) and tell \
+them with `propose_plan`: if they approve, changes are allowed and you apply it in the same \
+turn; if not, keep discussing. Do not try to write before.";
+
+const WRITE: &str = " They allowed changes: do what they ask. Your changes are made directly \
+in their folder and cannot be undone by the harness, so ask before deleting or overwriting \
+what you did not write.";
 
 /// Every write of a chat file goes through this lock: the turn running in
 /// the background and the page (stop) change the same file.
@@ -178,6 +187,12 @@ pub fn title(chat: &Value) -> String {
     }
 }
 
+/// Allows the chat to change its folder (and the folders opened for it), or
+/// takes it back to read-only; the next call follows.
+pub fn write(worlds: &Worlds, id: &str, on: bool) -> io::Result<Value> {
+    update(worlds, id, |c| c["write"] = json!(on))
+}
+
 /// Asks the turn under way to end after its current call.
 pub fn stop(worlds: &Worlds, id: &str) -> io::Result<Value> {
     update(worlds, id, |c| c["stop"] = json!(true))
@@ -249,7 +264,10 @@ pub fn decide(worlds: &Worlds, id: &str, allow: bool) -> io::Result<()> {
         answered = true;
         c["status"] = json!("thinking");
         c["decision"] = json!(allow);
-        if allow {
+        // An approved plan allows changes, as the button on the page does.
+        if allow && c["pending"]["tool"] == "propose_plan" {
+            c["write"] = json!(true);
+        } else if allow {
             let dir = c["pending"]["directory"].as_str().map(String::from);
             if let Some(d) = dir {
                 push_grant(c, &d);
@@ -310,17 +328,10 @@ pub fn recover(worlds: &Worlds) -> io::Result<()> {
 /// Shows the question on the page and waits for the person's decision, the
 /// chat file being what the page writes. `None` when a stop asked for the
 /// turn to end.
-fn ask(
-    worlds: &Worlds,
-    id: &str,
-    tool: &str,
-    path: &Path,
-    directory: &Path,
-) -> io::Result<Option<bool>> {
+fn ask(worlds: &Worlds, id: &str, pending: Value) -> io::Result<Option<bool>> {
     update(worlds, id, |c| {
         c["status"] = json!("waiting");
-        c["pending"] = json!({"tool": tool, "path": path.display().to_string(),
-                              "directory": directory.display().to_string()});
+        c["pending"] = pending;
     })?;
     loop {
         std::thread::sleep(Duration::from_millis(250));
@@ -340,13 +351,6 @@ fn ask(
 fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::Result<()> {
     let chat = load(worlds, id)?;
     let folder = PathBuf::from(chat["folder"].as_str().unwrap_or(""));
-    let tools: Value = agent::tools()
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter(|t| t["function"]["name"] != "done")
-        .cloned()
-        .collect();
     let mut watch = agent::Watch::default();
     // Blank: the model spent its whole budget reasoning; the rest of the turn
     // goes without reasoning, as in `agent::run`.
@@ -362,7 +366,19 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
             .iter()
             .map(|s| (s.name.clone(), s.dir.clone()))
             .collect();
-        let system = format!("{SYSTEM}{}", skill::brief(&skills));
+        // Read at each call: the person may allow changes while the turn runs.
+        let write = chat["write"] == true;
+        let tools: Value = agent::tools()
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|t| t["function"]["name"] != "done")
+            .filter(|t| write || t["function"]["name"] != "write_file")
+            .cloned()
+            .chain((!write).then(propose_plan))
+            .collect();
+        let mode = if write { WRITE } else { READ };
+        let system = format!("{SYSTEM}{mode}{}", skill::brief(&skills));
         let mut messages = vec![json!({"role": "system", "content": system})];
         messages.extend(chat["messages"].as_array().cloned().unwrap_or_default());
         agent::bound(&mut messages);
@@ -413,6 +429,20 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
                 .and_then(|a| serde_json::from_str(a).ok())
                 .unwrap_or(Value::Null);
             let started = Instant::now();
+            // The plan is the question: approved, the rest of the turn writes.
+            if name == "propose_plan" {
+                let plan = args["plan"].as_str().unwrap_or("").to_string();
+                let answer = match ask(worlds, id, json!({"tool": name, "plan": plan}))? {
+                    Some(true) => "approved: changes are allowed now, apply the plan",
+                    Some(false) => {
+                        "not approved: the folder stays read-only; ask what to change in the plan"
+                    }
+                    None => return Ok(()),
+                };
+                times.push(json!({"name": name, "ms": started.elapsed().as_millis() as u64}));
+                said.push(json!({"role": "tool", "tool_call_id": call["id"], "content": answer}));
+                continue;
+            }
             // A literal path outside the folder the person chose: ask before
             // the call touches it; opening a folder stays open for the chat.
             if let Some(p) = outside::outside(&folder, &worlds.home, &worlds.ro_paths, name, &args)
@@ -428,7 +458,9 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
                         "content": format!("refused without asking: {why}; it is untouched")}));
                     continue;
                 }
-                match ask(worlds, id, name, &p, &directory)? {
+                let pending = json!({"tool": name, "path": p.display().to_string(),
+                                     "directory": directory.display().to_string()});
+                match ask(worlds, id, pending)? {
                     Some(true) => {
                         grants.push(directory.clone());
                         update(worlds, id, |c| {
@@ -449,7 +481,8 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
                     None => return Ok(()),
                 }
             }
-            let sandbox = |argv: &[String]| worlds.sandbox_folder(&folder, &mounts, &grants, argv);
+            let sandbox =
+                |argv: &[String]| worlds.sandbox_folder(&folder, &mounts, &grants, write, argv);
             let result =
                 agent::execute(&sandbox, name, &args).unwrap_or_else(|e| format!("error: {e}"));
             times.push(json!({"name": name, "ms": started.elapsed().as_millis() as u64}));
@@ -482,7 +515,18 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
     )))
 }
 
-/// The folders the person opened for chat `id`; a granted call runs read-write.
+/// The tool a read-only chat ends its planning with, as a coding harness's
+/// plan mode does: the person approves on the page, or not.
+fn propose_plan() -> Value {
+    json!({"type": "function", "function": {
+        "name": "propose_plan",
+        "description": "Show the person your plan and ask them to allow changes. Their answer is the result.",
+        "parameters": {"type": "object", "required": ["plan"], "properties": {
+            "plan": {"type": "string", "description": "the plan in Markdown, in their language"}}}
+    }})
+}
+
+/// The folders the person opened for chat `id`; writable as the folder is.
 fn grants(worlds: &Worlds, id: &str) -> io::Result<Vec<PathBuf>> {
     Ok(load(worlds, id)?["grants"]
         .as_array()
