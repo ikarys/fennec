@@ -517,10 +517,14 @@ fn wait_turn(store: &Store, id: &str, project: &str) -> io::Result<Taken> {
 
 fn solve_now(store: &Store, id: &str) -> io::Result<()> {
     let request = store.load(id)?;
-    let worlds = Worlds::from_env()?;
+    let mut worlds = Worlds::from_env()?;
+    // The Fleet's work goes apart: ready and waiting for the human, it must
+    // not hold the folder the next task of the queue needs.
+    let fleet = request["fleet"] == true;
+    worlds.apart = fleet;
     let project = Path::new(request["project"].as_str().unwrap_or(""));
     // A correction works on the ready work, which already holds the folder.
-    let _turn = match request["amend"].is_string() {
+    let _turn = match request["amend"].is_string() || fleet {
         true => None,
         false => Some(wait_turn(
             store,

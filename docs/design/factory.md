@@ -15,9 +15,10 @@ task; the project stays a place (the folder), only a constraint.
   or "Dans la Fleet" (it starts on its own).
 - **One queue for every project**, ordered by task: the urgent task of any
   project moves up.
-- The project only constrains: "Dans le dossier" runs one task at a time per
-  folder (already `wait_turn`, "attend son tour"), so the Fleet takes the next
-  task whose folder is free; "À part" lets several tasks of one project run.
+- The Fleet's work always goes apart (one worktree per task), whatever the
+  project chose: a task ready and waiting for the human never holds the
+  folder from the next one (changed 2026-10-19, after the first Fleet task
+  stopped the queue until the human committed it).
 - **The Fleet page** (named by the address, like Team and Stats): run/pause
   for everything (what runs finishes), the ordered queue (project as a tag,
   state: being framed, waits for its folder, next), what runs now, optionally
@@ -107,7 +108,9 @@ dark) when it shows. The status choke point is `Store::update`
   queue (task ids, one order across projects), run/pause and how many at
   once (default 1). A task launched, forgotten or archived leaves the queue.
 - Every 3 s, when running and under the number at once, the first queued
-  task whose folder is free starts (`work::talk`). Stopping stops launching only.
+  task starts (`work::talk`), apart. Stopping stops launching only.
+- "Passer" on work in the folder parks it on its branch and gives the folder
+  back; "Reprendre" brings it back (fennec-os `park` / `unpark`).
 - A failure of a task the Fleet started stops the Fleet by default ("Après
   un échec": arrêter / continuer), so a model server down never fails the
   whole queue; the page says which task stopped it.
