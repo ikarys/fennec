@@ -424,13 +424,16 @@ impl Worlds {
     /// Back to the last checkpoint, exactly: ignored files go too, except in
     /// the project folder, where they are the human's (`.env`, `.venv`).
     pub fn rollback(&self, world: &World) -> io::Result<()> {
+        if self.home(world)?.is_some() {
+            // The human may have edited their folder while fennec worked: what
+            // goes is set aside in the stash, never lost.
+            let mut args = COMMITTER.to_vec();
+            args.extend(["stash", "push", "-q", "-u", "-m", "fennec: essai annulé"]);
+            self.git(world, &args)?;
+            return Ok(());
+        }
         self.git(world, &["reset", "-q", "--hard", "HEAD"])?;
-        let clean = if self.home(world)?.is_some() {
-            "-fd"
-        } else {
-            "-fdx"
-        };
-        self.git(world, &["clean", "-q", clean])?;
+        self.git(world, &["clean", "-q", "-fdx"])?;
         Ok(())
     }
 
