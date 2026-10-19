@@ -348,8 +348,8 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
         .cloned()
         .collect();
     let mut watch = agent::Watch::default();
-    // Blank: the model spent its whole budget reasoning; the next call goes
-    // without reasoning, as in `agent::run`.
+    // Blank: the model spent its whole budget reasoning; the rest of the turn
+    // goes without reasoning, as in `agent::run`.
     let mut blank = false;
     for _ in 0..max_steps {
         // Skills are read again at each call: the person may change them.
@@ -397,7 +397,6 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
             update(worlds, id, |c| push(&mut c["turns"], record))?;
             continue;
         }
-        blank = false;
         if calls.is_empty() {
             reply["content"] = json!(text);
         }
