@@ -43,7 +43,7 @@ eval(src.match(/const el = \(tag, props = \{\}, \.\.\.children\) => \{[\s\S]*?\n
   + grab("timeline")
   + src.match(/const STAGE_TIP = \{[\s\S]*?\};\n/)[0]
   + arrow("roleTag") + grab("duration") + grab("facts") + grab("details")
-  + grab("past")
+  + src.match(/const STEPS = \[[\s\S]*?\]\];\n/)[0] + grab("stages") + grab("ended") + grab("past")
   + arrow("stageRank") + arrow("number") + arrow("compact") + arrow("percent")
   + arrow("tps") + arrow("stageOf") + arrow("stageName")
   + "globalThis.past = past; globalThis.roleTag = roleTag;");

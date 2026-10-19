@@ -516,6 +516,8 @@
   .stages li { padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
   .stages li.done { color: var(--text); }
   .stages li.done::before { content: "✓ "; color: var(--ok); }
+  .stages li.stop { color: var(--bad); border-color: var(--bad); font-weight: 600; }
+  .stages li.stop::before { content: "✕ "; }
   .stages li.now { color: var(--accent); border-color: var(--accent); font-weight: 600; }
   .past.run > .state { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
   .step.said p { margin: 6px 0 0; white-space: pre-wrap; }
