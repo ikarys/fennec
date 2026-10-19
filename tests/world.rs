@@ -328,6 +328,48 @@ fn a_rollback_in_the_folder_sets_changes_aside() {
 }
 
 #[test]
+fn a_parked_world_frees_the_folder_and_comes_back() {
+    let f = Fixture::new("park");
+    let git = |args: &[&str]| {
+        let out = Command::new("git")
+            .arg("-C")
+            .arg(&f.project)
+            .args(args)
+            .output()
+            .unwrap();
+        String::from_utf8_lossy(&out.stdout).trim().to_string()
+    };
+    git(&["config", "--unset", "fennec.workspace"]);
+    let home = git(&["branch", "--show-current"]);
+    let w = f.worlds.fork(&f.project.to_string_lossy()).unwrap();
+    std::fs::write(w.path.join("work"), "done\n").unwrap();
+    f.worlds.park(&w).unwrap();
+    assert_eq!(
+        git(&["branch", "--show-current"]),
+        home,
+        "the folder is the human's again"
+    );
+    assert!(!f.project.join("work").exists());
+    assert!(fennec_os::world::held(&f.project).unwrap().is_none());
+    f.worlds.park(&w).unwrap();
+    // Something uncommitted in the folder: it does not come back over it.
+    std::fs::write(f.project.join("mine"), "x").unwrap();
+    assert!(f.worlds.unpark(&w).is_err());
+    std::fs::remove_file(f.project.join("mine")).unwrap();
+    f.worlds.unpark(&w).unwrap();
+    assert_eq!(
+        git(&["branch", "--show-current"]),
+        format!("world/{}", w.id)
+    );
+    assert_eq!(
+        std::fs::read_to_string(f.project.join("work")).unwrap(),
+        "done\n"
+    );
+    f.worlds.drop(w).unwrap();
+    assert_eq!(git(&["branch", "--show-current"]), home);
+}
+
+#[test]
 fn a_world_cut_short_is_described_then_forgotten() {
     let f = Fixture::new("forget");
     let w = f.worlds.fork(f.project.to_str().unwrap()).unwrap();
