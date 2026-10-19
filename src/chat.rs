@@ -463,8 +463,10 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
             let started = Instant::now();
             // The plan is the question: approved, the rest of the turn writes.
             if name == "propose_plan" {
-                let plan = args["plan"].as_str().unwrap_or("").to_string();
-                let answer = match ask(worlds, id, json!({"tool": name, "plan": plan}))? {
+                // Steps, when given, let the page split the plan into tasks.
+                let pending = json!({"tool": name, "plan": args["plan"].as_str().unwrap_or(""),
+                                     "steps": args["steps"].as_array().cloned().unwrap_or_default()});
+                let answer = match ask(worlds, id, pending)? {
                     Some(true) => "approved: changes are allowed now, apply the plan",
                     Some(false) => {
                         "not approved: the folder stays read-only; ask what to change in the plan"
@@ -554,7 +556,10 @@ fn propose_plan() -> Value {
         "name": "propose_plan",
         "description": "Show the person your plan and ask them to allow changes. Their answer is the result.",
         "parameters": {"type": "object", "required": ["plan"], "properties": {
-            "plan": {"type": "string", "description": "the plan in Markdown, in their language"}}}
+            "plan": {"type": "string", "description": "the plan in Markdown, in their language"},
+            "steps": {"type": "array", "items": {"type": "string"}, "description":
+                "when the plan has several independent steps: each one alone, its title on the first line, \
+                 then what to do; the person may make each a task of its own"}}}
     }})
 }
 

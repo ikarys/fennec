@@ -471,7 +471,11 @@ fn an_approved_plan_allows_changes_within_the_turn() {
     let id = c["id"].as_str().unwrap().to_string();
     chat::say(&f.worlds, &id, "Copie a.txt dans b.txt").unwrap();
     let model = Replies(Mutex::new(VecDeque::from([
-        call("c0", "propose_plan", json!({"plan": "- copier a.txt"})),
+        call(
+            "c0",
+            "propose_plan",
+            json!({"plan": "- copier a.txt", "steps": ["Copier a.txt"]}),
+        ),
         call("c1", "shell", json!({"command": "cp a.txt b.txt"})),
         json!({"content": "C'est fait."}),
     ])));
@@ -479,6 +483,7 @@ fn an_approved_plan_allows_changes_within_the_turn() {
     let t = std::thread::spawn(move || chat::answer(&w, &tid, &model, 10));
     let pending = until_waiting(&f, &id);
     assert_eq!(pending["pending"]["plan"], "- copier a.txt");
+    assert_eq!(pending["pending"]["steps"], json!(["Copier a.txt"]));
     chat::decide(&f.worlds, &id, true).unwrap();
     t.join().unwrap().unwrap();
     let c = chat::load(&f.worlds, &id).unwrap();
