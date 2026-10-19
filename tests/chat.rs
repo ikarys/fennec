@@ -125,6 +125,7 @@ fn twin(f: &Fixture) -> Worlds {
         home: f.worlds.home.clone(),
         ro_paths: Vec::new(),
         memory_mb: Some(8192),
+        apart: false,
     }
 }
 

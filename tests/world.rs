@@ -370,6 +370,31 @@ fn a_parked_world_frees_the_folder_and_comes_back() {
 }
 
 #[test]
+fn worlds_told_apart_leave_a_here_folder_free() {
+    let mut f = Fixture::new("apart-anyway");
+    let git = |args: &[&str]| {
+        let out = Command::new("git")
+            .arg("-C")
+            .arg(&f.project)
+            .args(args)
+            .output()
+            .unwrap();
+        String::from_utf8_lossy(&out.stdout).trim().to_string()
+    };
+    git(&["config", "--unset", "fennec.workspace"]);
+    let home = git(&["branch", "--show-current"]);
+    f.worlds.apart = true;
+    let a = f.worlds.fork(&f.project.to_string_lossy()).unwrap();
+    let b = f.worlds.fork(&f.project.to_string_lossy()).unwrap();
+    assert_ne!(a.path, f.project);
+    assert_ne!(a.path, b.path, "two at once in one project");
+    assert_eq!(git(&["branch", "--show-current"]), home);
+    assert!(fennec_os::world::held(&f.project).unwrap().is_none());
+    f.worlds.drop(a).unwrap();
+    f.worlds.drop(b).unwrap();
+}
+
+#[test]
 fn a_world_cut_short_is_described_then_forgotten() {
     let f = Fixture::new("forget");
     let w = f.worlds.fork(f.project.to_str().unwrap()).unwrap();

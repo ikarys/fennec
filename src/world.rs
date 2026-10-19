@@ -42,6 +42,10 @@ pub struct Worlds {
     pub ro_paths: Vec<PathBuf>,
     /// Address-space cap per sandboxed command, in MiB; `None` is unlimited.
     pub memory_mb: Option<u64>,
+    /// New worlds of a project go apart whatever it chose: work no one
+    /// watches (fennec-lead's Fleet) must not hold the folder while it
+    /// waits for the human.
+    pub apart: bool,
 }
 
 pub struct World {
@@ -99,6 +103,7 @@ impl Worlds {
             home,
             ro_paths,
             memory_mb,
+            apart: false,
         })
     }
 
@@ -122,7 +127,11 @@ impl Worlds {
                     project,
                     &["rev-parse", "--path-format=absolute", "--git-common-dir"],
                 )?;
-                let place = place(project)?;
+                let place = if self.apart {
+                    apart(project)?
+                } else {
+                    place(project)?
+                };
                 (
                     PathBuf::from(common),
                     git(project, &["rev-parse", "HEAD"])?,
@@ -746,21 +755,24 @@ fn place(project: &Path) -> io::Result<Place> {
             }
             Ok(Place::Here(project.to_path_buf(), home.clone(), home))
         }
-        "apart" => {
-            let project = std::fs::canonicalize(project)?;
-            let name = project
-                .file_name()
-                .map(|n| n.to_string_lossy().into_owned())
-                .unwrap_or_default();
-            Ok(Place::Apart(
-                project
-                    .parent()
-                    .unwrap_or(&project)
-                    .join(format!("{name}-fennec")),
-            ))
-        }
+        "apart" => apart(project),
         dir => Ok(Place::Apart(PathBuf::from(dir))),
     }
+}
+
+/// Next to the project: `<parent>/<name>-fennec/`.
+fn apart(project: &Path) -> io::Result<Place> {
+    let project = std::fs::canonicalize(project)?;
+    let name = project
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    Ok(Place::Apart(
+        project
+            .parent()
+            .unwrap_or(&project)
+            .join(format!("{name}-fennec")),
+    ))
 }
 
 /// Every harness git call: hooks off, whatever the repository says.
