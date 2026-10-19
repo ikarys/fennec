@@ -1241,6 +1241,9 @@ pub fn journal(store: &Store, id: &str) -> io::Result<Value> {
                 }
             }
             Some("said") => steps.push(json!({"name": "Ta réponse", "said": e["text"]})),
+            Some("outside") => steps.push(json!({
+                "name": format!("Via {}", e["via"].as_str().unwrap_or("")),
+                "said": format!("{} par {}", e["did"].as_str().unwrap_or(""), e["from"].as_str().unwrap_or(""))})),
             Some("plugin") => steps.push(json!({
                 "name": format!("Plugin {}", e["name"].as_str().unwrap_or("")),
                 "said": format!("n'a pas pu prévenir : {}", e["error"].as_str().unwrap_or(""))})),
