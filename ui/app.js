@@ -475,7 +475,7 @@ function shots(item) {
 
 // Everything that explains but does not decide.
 function details(item) {
-  const box = el("details", { className: "more" }, el("summary", { textContent: "Détails" }));
+  const box = el("details", { className: "more", open: true }, el("summary", { textContent: "Détails" }));
   box.dataset.key = item.id;
   const part = (title, ...nodes) => box.append(el("h3", { textContent: title }), ...nodes);
   if (item.title && item.title !== lead(item.title)) part("La tâche", el("div", {}, ...md(item.title)));
