@@ -85,6 +85,24 @@ Runs in the background (`schedule`), like sleep.
 judges): it blocks through commands (`check:`, `cargo audit`, `semgrep`) or
 sends findings back to the builder for another try.
 
+## 7. The proof sends work back — fast, efficient
+
+Added 2026-10-20, asked by the human after a Fleet task failed four times on
+its proof (`uvicorn: command not found`, no Node, no `ruff`) with nothing sent
+back to the builder: "si QA rencontre des soucis, il faut renvoyer au dev".
+
+- When the proof of a ready run fails (a try exits non-zero, a role's check
+  vetoes, a page does not show, nothing could be tried), its findings (each
+  failing command and the end of its output) go back to the builder, which
+  starts from its own work (fennec-os `spec::fix`), then the product is proven
+  again. Twice at most (`MAX_FIXES`), then the task fails with the proof's
+  reason.
+- The builder is told that a command missing here is to be made easy to try
+  (a script, a README line), not only the code fixed.
+- A question while fixing goes to the human, like any question.
+- Journal: "Preuve ratée : renvoyée au travail" with the findings.
+- Not yet: sending a "done when" the proof shows unreachable back to framing.
+
 ## Not built
 
 - **Kanban board**: the single view covers it; dragging cards is managing,
