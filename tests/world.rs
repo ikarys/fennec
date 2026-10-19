@@ -78,6 +78,9 @@ fn build_output_is_not_the_work() {
         !files.contains("target/") && files.contains("src.rs"),
         "{files}"
     );
+    // Left on disk, it is no change either: verify said the checks changed
+    // the world over a `__pycache__` a solve left (2026-10-19).
+    assert!(f.worlds.status(&w).unwrap().is_empty());
 }
 
 #[test]

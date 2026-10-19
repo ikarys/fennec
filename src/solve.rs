@@ -481,7 +481,7 @@ pub(crate) fn verify(
         checks.push(json!({"rule": rule.id, "block": rule.block, "command": command, "exit": code, "ms": ms, "output": tail}));
     }
     // What lands must be exactly what was checked.
-    if !worlds.git(world, &["status", "--porcelain"])?.is_empty() {
+    if !worlds.status(world)?.is_empty() {
         return Ok((checks, Some("verify changed the world")));
     }
     Ok((checks, (!all_pass).then_some("verify failed")))
@@ -659,8 +659,8 @@ pub fn land(
     };
     // The human may have edited the work in their editor: it lands too, once
     // its checks pass again on the edited tree.
-    let edited = worlds.git(&world, &["rev-parse", "HEAD"])? != commit
-        || !worlds.git(&world, &["status", "--porcelain"])?.is_empty();
+    let edited =
+        worlds.git(&world, &["rev-parse", "HEAD"])? != commit || !worlds.status(&world)?.is_empty();
     if edited {
         let now = worlds.commit(&world, "human edits")?;
         if worlds
