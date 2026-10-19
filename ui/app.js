@@ -1376,7 +1376,7 @@ function showChat(c) {
   const detail = $("detail");
   const follow = fresh || detail.scrollHeight - detail.scrollTop - detail.clientHeight < 80;
   const opened = [...box.thread.querySelectorAll("details")].map((d) => d.open);
-  box.thread.replaceChildren(...chatThread(c, box.composer.again));
+  box.thread.replaceChildren(...chatThread(c, box.composer));
   if (thinking) box.thread.append(el("div", { className: "thinking" }, el("span", { className: "dot" }), "fennec répond…"));
   // A turn that waits on the person is the last thing on screen: on top of
   // the exchange, it would read as a turn that stopped answering.
@@ -1440,32 +1440,59 @@ function chatTitle(c) {
 
 // The exchange: the human's words in bubbles, fennec's in Markdown, the tool
 // calls folded, each with what it brought back.
-function chatThread(c, again) {
+function chatThread(c, acts) {
   const calls = new Map();
   for (const m of c.messages ?? []) for (const t of m.tool_calls ?? []) calls.set(t.id, t);
   const results = new Map();
   for (const m of c.messages ?? []) if (m.role === "tool") results.set(m.tool_call_id, m.content);
   const nodes = [];
+  // The person's message a reply answers: the one regenerating it says again.
+  let asked = null;
   for (const [i, m] of (c.messages ?? []).entries()) {
     if (m.role === "tool") continue;
     if (m.role === "user") {
-      // Said again from the composer: what followed is dropped.
-      const replay = again ? el("button", { type: "button", className: "quiet replay",
-        ariaLabel: "Rejouer ce message", title: "Rejouer ce message" }) : null;
-      if (replay) {
-        setIcon(replay, "replay");
-        replay.onclick = () => again(i, m.content);
-      }
-      nodes.push(el("div", { className: "said human" },
-        el("span", { className: "label" }, "Toi", replay), ...rich(m.content)));
+      asked = i;
+      nodes.push(el("div", { className: "msg human" },
+        el("div", { className: "said human" },
+          el("span", { className: "label", textContent: "Toi" }), ...rich(m.content)),
+        acts && msgActions(copyButton(m.content),
+          iconButton("pencil", "Modifier", () => acts.again(i, m.content)))));
       continue;
     }
     const box = el("div", { className: "said" }, el("span", { className: "label", textContent: "fennec" }));
     if (m.content) box.append(...md(m.content));
     for (const t of m.tool_calls ?? []) box.append(toolCall(t, results.get(t.id)));
-    nodes.push(box);
+    const from = asked;
+    nodes.push(el("div", { className: "msg" }, box,
+      acts && m.content && msgActions(copyButton(m.content),
+        iconButton("replay", "Régénérer", () => acts.replay(from, c.messages[from].content)))));
   }
+  // The last message keeps its icons in sight, as chat apps do.
+  if (nodes.length) nodes.at(-1).className += " last";
   return nodes.length ? nodes : [el("div", { className: "muted", textContent: "Écris ce qui t'intéresse : fennec lit le dossier et répond." })];
+}
+
+// The small icons under a message, as chat apps have them.
+function msgActions(...buttons) {
+  return el("div", { className: "msg-actions" }, ...buttons);
+}
+
+function iconButton(icon, label, onclick) {
+  const b = el("button", { type: "button", className: "quiet", ariaLabel: label, title: label });
+  setIcon(b, icon);
+  b.onclick = onclick;
+  return b;
+}
+
+function copyButton(text) {
+  const b = iconButton("copy", "Copier", async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setIcon(b, "check");
+      setTimeout(() => setIcon(b, "copy"), 1500);
+    } catch { /* no clipboard: nothing to say */ }
+  });
+  return b;
 }
 
 function toolCall(t, result) {
@@ -1498,6 +1525,12 @@ function chatComposer(id) {
     send.textContent = "Rejouer";
     text.focus();
   };
+  // Regenerating a reply: the message it answers, said again as it was.
+  const replay = async (index, content) => {
+    $("chat-error").textContent = "";
+    try { await api("/api/chat/replay", { id, index, text: content }); }
+    catch (e) { $("chat-error").textContent = e.message; }
+  };
   const say = async () => {
     if (!images.value().trim()) return;
     try {
@@ -1519,7 +1552,7 @@ function chatComposer(id) {
   };
   return { node: el("div", { className: "chat-composer" }, replaying, text,
     el("div", { className: "chat-actions" }, images.node, stop, el("span", { className: "spacer" }), send)),
-    send, stop, text, again };
+    send, stop, text, again, replay };
 }
 
 function chatAside(c) {
@@ -1742,6 +1775,8 @@ const ICONS = {
   trash: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>',
   stop: '<rect x="6" y="6" width="12" height="12" rx="2"/>',
   replay: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
+  copy: '<rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
   lock: '<rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
   pencil: '<path d="M21.17 6.81a1 1 0 0 0-3.98-3.98L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z"/>',
   save: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/>',
