@@ -19,9 +19,10 @@ Scenarios: `../lead-scenarios.md`. Inventory and decisions: `../inventory.md`.
 ```
 src/main.rs   `fennec` binary: std HTTP server, routes, folder browser
 src/fleet.rs  the Fleet: one queue of tasks for later, across projects, started on their own (`fleet.json`)
-src/state.rs  requests and projects in files; the single view (what needs you, running, landed)
+src/state.rs  requests and projects in files; the single view (what needs you, running, landed); a status change tells the enabled plugins (fennec-os `plugin`)
 src/work.rs   request life in the background: stats per request and overall ("Stats"); conversation, direct work (fennec-os `spec::direct`), proof, retry; correct, commit, pass or drop; rule offers; journal of every step
 ui/           index.html + app.js, embedded in the binary
+examples/plugins/  plugins to copy into ~/.config/fennec/plugins/ (apprise: Discord, Telegram, Teams, ntfy...)
 ```
 
 ## Build, test, run

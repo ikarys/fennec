@@ -1095,6 +1095,9 @@ pub fn journal(store: &Store, id: &str) -> io::Result<Value> {
                 }
             }
             Some("said") => steps.push(json!({"name": "Ta réponse", "said": e["text"]})),
+            Some("plugin") => steps.push(json!({
+                "name": format!("Plugin {}", e["name"].as_str().unwrap_or("")),
+                "said": format!("n'a pas pu prévenir : {}", e["error"].as_str().unwrap_or(""))})),
             _ => {}
         }
     }
@@ -1347,6 +1350,23 @@ fn land_now(store: &Store, id: &str) -> io::Result<()> {
     }
     let branch = target["branch"].as_str().unwrap_or("");
     if !request["commit"].is_string() {
+        // The person's hooks look first; one refusing stops the commit.
+        let hook = json!({"event": "before_land", "task": id, "project": project,
+                          "branch": branch, "run": run});
+        // Tests never reach the person's real plugins.
+        let said = if cfg!(test) {
+            Vec::new()
+        } else {
+            fennec_os::plugin::emit(&hook)?
+        };
+        for (name, said) in said {
+            if let Err(e) = said {
+                return store.update(id, |r| {
+                    r["status"] = json!("ready");
+                    r["land_error"] = json!(format!("non vérifié : le plugin {name} refuse ({e})"));
+                });
+            }
+        }
         match solve::land(
             &worlds,
             run,

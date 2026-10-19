@@ -1,6 +1,6 @@
 # Factory, plugins, self-improvement
 
-Date: 2026-10-19. Status: design, nothing built. Asked by the human after a
+Date: 2026-10-19. Status: steps 1 (the Fleet) and 2 (outbound plugins) built. Asked by the human after a
 comparison with OpenFox (task board, Planner/Builder agents, plugins).
 
 Purpose test (AGENTS.md): **fast**, **efficient**, **safe**. Each part below
@@ -36,8 +36,9 @@ One mechanism: the Journal already records every step; each entry is an event.
 - `~/.config/fennec/plugins/<name>/` holds an executable and `plugin.json`
   (events listened to). fennec runs it with the event as JSON on stdin, with a
   timeout. A hook is a plugin listening to a step event ("before commit").
-- Events: started, question, landed, failed, not verified.
-  Default on: question, landed, failed.
+- Events: started, question, ready, failed, landed (a proof that fails is a
+  failure, "not verified" included). Default: question, ready, failed — the
+  moments a task needs the person.
 - No new Rust dependency: the plugin does its own HTTPS. A shipped example
   calls Apprise (Teams, Discord, Telegram, Slack, ntfy...).
 - Enabled in Réglages, "Plugins" tab.
@@ -122,20 +123,27 @@ dark) when it shows. The status choke point is `Store::update`
   running one (tests with a scripted `Model`).
 
 **2. Plugins and hooks, outbound** (fast, safe)
-- New `fennec-os/src/plugin.rs`: read `~/.config/fennec/plugins/*/plugin.json`
+- Built 2026-10-19. Enabled plugins are listed in `~/.config/fennec/plugins.json`
+  (off until the person turns one on). Each event carries `message` (French,
+  ready to send), `title`, `project`, `url` (the task's page). A Réglages
+  "Plugins" tab lists them, turns them on, sends a test message.
+- `fennec-os/src/plugin.rs`: read `~/.config/fennec/plugins/*/plugin.json`
   (`run`, `events`), run the executable with the event JSON on stdin, 10 s
   timeout, outside the request's thread; a failure goes to the Journal, never
   blocks work. Execution logic, so fennec-os (lead rule 4). Plugins run on
   the host with the person's rights, so they are read from
   `~/.config/fennec/plugins/` only, never from a project or a world (os rule 2).
 - `state.rs`: `Store::update` compares status before/after and emits
-  `started`, `question`, `landed`, `failed`, `not_verified`.
+  `started`, `question`, `ready`, `failed`, `landed`.
 - Hooks: same plugin, step events (`before_land`); a hook's non-zero exit
   stops the landing with "not verified: hook X".
 - `examples/plugins/apprise/`: shell script calling `apprise`.
-- UI: Réglages, "Plugins" tab: list, on/off, events per plugin.
-- Done when: a test plugin writing stdin to a file receives the five events of
+- UI: Réglages, "Plugins" tab: list, on/off, the events each listens to
+  (chosen in its `plugin.json`), a test message.
+- Done when: a test plugin writing stdin to a file receives the events of
   one request's life; a failing `before_land` hook stops the landing.
+- Not yet: the hook gets the project folder and branch, not the world's own
+  folder when work goes "À part".
 
 **3. Framing in the background** (fast)
 - `work.rs`: requests kept for later run `discuss` once the folder's
