@@ -1284,7 +1284,9 @@ async function showChats() {
   if (!id) {
     chatBox = null;
     detailed = "";
-    return $("pick").replaceChildren();
+    return $("pick").replaceChildren(el("p", { className: "muted", textContent: chats.length
+      ? "Choisis une discussion à gauche pour la lire et continuer, ou « Nouvelle discussion » pour en démarrer une."
+      : "« Nouvelle discussion » pour en démarrer une." }));
   }
   let c;
   try {
