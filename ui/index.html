@@ -376,6 +376,8 @@
   .line { display: flex; gap: 10px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--line);
           font-size: 14px; overflow-wrap: anywhere; }
   .line .what { flex: 1; min-width: 0; }
+  /* A request or a discussion in a list: one line, the whole text on hover. */
+  .line .clip { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* One project on screen: its name on every line is noise. */
   body.focused .proj { display: none; }
   #n-others { font-size: 12px; text-transform: none; letter-spacing: 0; font-weight: 400; }

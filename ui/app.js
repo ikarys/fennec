@@ -1024,13 +1024,13 @@ function line(item, state, dot) {
     if (!item.waiting) elapsed.dataset.since = item.since;
     return el("div", { className: "line" }, el("span", { className: item.waiting ? "dot idle" : "dot" }),
       el("span", { className: "muted proj", textContent: item.project }),
-      el("span", { className: "what", textContent: item.title.length > 120 ? item.title.slice(0, 120) + "…" : item.title }),
+      el("span", { className: "what clip", title: item.title, textContent: headline(item.title) }),
       el("span", { className: "state" }, stateNode, stateNode ? " · " : null, elapsed));
   }
   const s = item.stats;
   return el("div", { className: "line" }, dot ? el("span", { className: "dot" }) : null,
     el("span", { className: "muted proj", textContent: item.project }),
-    el("span", { className: "what", textContent: item.title.length > 120 ? item.title.slice(0, 120) + "…" : item.title }),
+    el("span", { className: "what clip", title: item.title, textContent: headline(item.title) }),
     s?.turns ? el("span", { className: "state cost", title: "temps de modèle · tokens envoyés · générés" },
       el("span", { className: "mini", textContent: `⏱ ${duration(s.ms)}` }), el("span", { className: "mini", textContent: `↑ ${compact(s.sent)}` }),
       el("span", { className: "mini", textContent: `↓ ${compact(s.received)}` })) : null,
@@ -1486,8 +1486,15 @@ function planSteps(plan) {
 function chatTitle(c) {
   const first = (c.messages ?? []).find((m) => m.role === "user")?.content;
   if (!first) return "Nouvelle discussion";
-  const line = (first.split("\n").find((l) => l.trim()) ?? "").trim();
-  return line.length > 60 ? line.slice(0, 60) + "…" : line;
+  return headline(first);
+}
+
+// A name for a list: the first line written, cut at a word near 50 characters.
+function headline(text) {
+  const line = (text.split("\n").find((l) => l.trim()) ?? "").trim();
+  if (line.length <= 50) return line;
+  const cut = line.lastIndexOf(" ", 50);
+  return line.slice(0, cut > 30 ? cut : 50).replace(/[\s:,;.+—-]+$/, "") + "…";
 }
 
 // The exchange: the human's words in bubbles, fennec's in Markdown, the tool
