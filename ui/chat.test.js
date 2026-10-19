@@ -38,7 +38,7 @@ eval("let chatBox = null; let detailed = '';"
   + "const attach = (t) => ({ node: null, value: () => t.value, clear: () => { t.value = ''; } });"
   + grab("isImage")
   + grab("inline") + grab("rich") + grab("md")
-  + grab("chatTitle") + grab("toolCall") + grab("chatThread")
+  + grab("chatTitle") + grab("msgActions") + grab("iconButton") + grab("copyButton") + grab("toolCall") + grab("chatThread")
   + grab("chatQuestion") + grab("chatComposer") + grab("chatAside") + grab("showChat")
   + "globalThis.showChat = showChat; globalThis.chatThread = chatThread; globalThis.getChatBox = () => chatBox;");
 
@@ -84,13 +84,17 @@ assert.ok(!thread.children.some((n) => (n.className ?? "").includes("ask")));
 assert.ok(!thread.children.some((n) => (n.className ?? "").includes("thinking")));
 console.log("ok");
 
-// Saying a message again: its text goes back in the composer, and the index
-// sent is the message's own in the exchange.
+// The icons under the messages: the person's edit sends its own index, a
+// reply's regenerate says again the message it answers.
 {
   const seen = [];
-  const nodes = chatThread({ ...base, messages: [...base.messages, { role: "user", content: "encore" }] },
-    (i, content) => seen.push([i, content]));
-  const human = nodes.filter((n) => n.className === "said human");
-  human.at(-1).children[0].children[1].onclick();
-  assert.deepEqual(seen, [[3, "encore"]]);
+  const acts = { again: (i, t) => seen.push(["again", i, t]), replay: (i, t) => seen.push(["replay", i, t]) };
+  const nodes = chatThread({ ...base, messages: [...base.messages,
+    { role: "assistant", content: "voilà" }, { role: "user", content: "encore" }] }, acts);
+  const button = (n, label) => n.children[1].children.find((b) => b.ariaLabel === label);
+  button(nodes.at(-1), "Modifier").onclick();
+  button(nodes.at(-2), "Régénérer").onclick();
+  assert.deepEqual(seen, [["again", 4, "encore"], ["replay", 0, "and now ?"]]);
+  assert.ok(nodes.at(-1).className.endsWith("last"), "the last message keeps its icons in sight");
+  assert.ok(!nodes[1].children[1], "a reply made only of tool calls has no icons");
 }
