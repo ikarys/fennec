@@ -251,16 +251,11 @@ pub fn used(messages: &[serde_json::Value]) -> Vec<String> {
 mod tests {
     use super::{choose, chosen, enabled, front_matter, migrate, used};
     use serde_json::json;
-    use std::sync::Mutex;
-
-    // The global list and the skill roots read process-wide variables; the
-    // tests move them, so they hold the lock while doing so.
-    static ENV: Mutex<()> = Mutex::new(());
 
     /// A home and a config dir of the test, empty; the lock stays held until
     /// the test ends.
     fn sandbox() -> (std::sync::MutexGuard<'static, ()>, std::path::PathBuf) {
-        let held = ENV.lock().unwrap_or_else(|e| e.into_inner());
+        let held = crate::ENV.lock().unwrap_or_else(|e| e.into_inner());
         let dir = std::env::temp_dir().join(format!("fennec-os-skill-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();

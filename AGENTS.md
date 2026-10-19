@@ -39,6 +39,8 @@ src/skill.rs     skills (Agent Skills folders, `SKILL.md`) read where the person
                  ~/.claude/skills and plugins, the project's .claude/skills); enabled once for every project
                  (`~/.config/fennec/skills.json`, the old `git config fennec.skill` migrated); listed to the agent,
                  mounted read-only at ~/.skills/<name>, traced from the reads
+src/plugin.rs    plugins the person keeps (~/.config/fennec/plugins/<name>/plugin.json, enabled in plugins.json): run on the
+                 host with an event on stdin (a question, work ready...), 10 s at most; `before_<step>` ones are hooks
 src/review.rs    review queue, rejections, corrections said twice, agenda
 src/sleep.rs     landed runs → candidate know-how (`.fennec-os/knowhow.md`)
 src/schedule.rs  background work (sleep) waits while interactive work (solve) runs
