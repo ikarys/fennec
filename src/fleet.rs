@@ -143,6 +143,12 @@ fn held(project: &str, requests: &[(String, Value)]) -> Option<String> {
         Ok(Some(Held::World(w))) => {
             let owner = requests.iter().find(|(_, r)| r["run"] == w.as_str());
             return Some(match owner {
+                // Set aside, its work still sits in the folder: nothing else
+                // starts there until it is committed or dropped.
+                Some((_, r)) if r["status"] == "passed" => format!(
+                    "« {} », mise de côté, occupe encore le dossier : commite-la ou abandonne-la",
+                    short(r)
+                ),
                 Some((_, r)) => format!("« {} » occupe le dossier", short(r)),
                 None => "une autre tâche occupe le dossier".into(),
             });
@@ -158,6 +164,35 @@ fn held(project: &str, requests: &[(String, Value)]) -> Option<String> {
         .iter()
         .any(|(_, r)| r["project"] == project && is_working(r));
     (here && busy).then(|| "une autre tâche travaille dans ce projet".into())
+}
+
+/// The task whose work holds `project`'s folder, if one does.
+fn holder<'a>(project: &str, requests: &'a [(String, Value)]) -> Option<&'a (String, Value)> {
+    match world::held(Path::new(project)) {
+        Ok(Some(Held::World(w))) => requests.iter().find(|(_, r)| r["run"] == w.as_str()),
+        _ => None,
+    }
+}
+
+/// Why a running Fleet starts nothing although tasks are queued and nothing
+/// works: the first task's wait, and the task in its way to open. `None`
+/// when it is stopped, empty, busy or about to start one.
+pub fn stuck(store: &Store, requests: &[(String, Value)]) -> io::Result<Option<Value>> {
+    let v = load(store)?;
+    let queue = queue(store)?;
+    if v["on"] != true || queue.is_empty() || requests.iter().any(|(_, r)| is_working(r)) {
+        return Ok(None);
+    }
+    let at_once = v["at_once"].as_u64().unwrap_or(1) as usize;
+    let states = states(&queue, requests, at_once, |p| held(p, requests));
+    if states.iter().any(Option::is_none) {
+        return Ok(None);
+    }
+    let project = queue[0].1["project"].as_str().unwrap_or("");
+    let by = holder(project, requests);
+    Ok(Some(json!({
+        "why": states[0], "id": by.map(|(id, _)| id), "path": by.map(|(_, r)| &r["project"]),
+    })))
 }
 
 /// Each queued task with what it waits for (`None`: it starts next), in order.
@@ -302,6 +337,7 @@ pub fn view(store: &Store) -> io::Result<Value> {
     });
     Ok(
         json!({"on": v["on"], "at_once": v["at_once"], "on_fail": v["on_fail"], "stopped": v["stopped"],
+              "stuck": stuck(store, &requests)?,
               "queue": queued, "working": working, "summary": summary, "recent": recent}),
     )
 }

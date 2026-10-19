@@ -258,6 +258,10 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
             fleet::place(&store, &field(&v, "id"), &field(&v, "action"))?;
             Ok(json!({}))
         }
+        ("POST", "/api/later") => {
+            work::later(&store, &field(&input()?, "id"))?;
+            Ok(json!({}))
+        }
         ("POST", "/api/rewrite") => {
             let v = input()?;
             store.rewrite(&field(&v, "id"), &field(&v, "text"))?;
