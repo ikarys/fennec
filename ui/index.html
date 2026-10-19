@@ -264,10 +264,28 @@
   .thumb-wrap .drop::before { width: 12px; height: 12px; }
   details { margin-top: 10px; font-size: 13px; color: var(--muted); }
   summary { cursor: pointer; }
-  details code, details pre { display: block; font: 12px ui-monospace, monospace; overflow-wrap: anywhere;
+  :is(details, .more) code, :is(details, .more) pre { display: block; font: 12px ui-monospace, monospace; overflow-wrap: anywhere;
               white-space: pre-wrap; margin: 4px 0; }
-  details pre { background: var(--soft); border-radius: 6px; padding: 6px 8px; max-height: 240px; overflow: auto; }
-  details p { margin: 6px 0; }
+  :is(details, .more) pre { background: var(--soft); border-radius: 6px; padding: 6px 8px; max-height: 240px; overflow: auto; }
+  :is(details, .more) p { margin: 6px 0; }
+  .more { font-size: 13px; }
+  .more > h3 { margin: 18px 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+  .more > h3:first-child, details.more > summary + h3 { margin-top: 4px; }
+  .more ul { margin: 0; padding-left: 18px; }
+  .more li code { display: inline; }
+  .more pre.failed { color: var(--text); border-left: 3px solid var(--bad); }
+  .more tbody.sub th { border-top: 1px solid var(--line); padding-top: 12px; }
+  .more tbody.sub tr:first-child th { color: var(--muted); font-weight: 600; }
+  /* Numbers right-aligned so they read down a column; tight enough to fit beside the side panel. */
+  .more table.grid :is(th, td) { padding: 3px 6px; }
+  .more table.grid :is(th, td):nth-child(n+3) { text-align: right; }
+  details.try { margin: 2px 0; }
+  details.message.try > summary b { width: 7em; color: var(--ok); }
+  details.try > summary::before { width: 1em; text-align: center; }
+  details.message.try.failed > summary b { color: var(--bad); }
+  details.try > summary .head { font: 12px ui-monospace, monospace; color: var(--text); }
+  details.try[open] > summary .head { white-space: pre-wrap; overflow-wrap: anywhere; }
+  details.try > pre { margin: 2px 0 8px 1.2em; max-height: 360px; }
   .past { margin: 0; font-size: 14px; color: inherit; }
   details.past > summary { list-style: none; }
   details.past > summary::-webkit-details-marker { display: none; }
@@ -508,7 +526,7 @@
   .row-actions .error { display: none; font-size: 11px; }
   .row-actions .error:not(:empty) { display: block; }
   /* The stop on the work under way: below its line, above the journal. */
-  .run-actions { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .run-actions { display: flex; gap: 8px; align-items: center; margin: 12px 0 8px; }
   .run-actions .error { margin: 0; }
   .step.said { border-left: 3px solid var(--accent); }
   pre.why { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; margin: 6px 0 12px; }
