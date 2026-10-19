@@ -342,6 +342,10 @@
           overflow-wrap: anywhere; white-space: pre-wrap; font-size: 14px; }
   .said.human { align-self: flex-end; background: transparent; border: 1px solid var(--line); }
   .said .label { display: block; font-size: 12px; color: var(--muted); }
+  .said .label .replay { padding: 0 4px; margin-left: 6px; border: 0; vertical-align: middle; opacity: .6; }
+  .said .label .replay:hover { opacity: 1; }
+  .replaying { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; font-size: 12px; }
+  .replaying[hidden] { display: none; }
   .said code { font: 13px ui-monospace, monospace; }
   /* Markdown the model writes in a discussion. */
   .said p, .said ul, .said ol, .said pre, .said table, .said blockquote { margin: 6px 0; }
