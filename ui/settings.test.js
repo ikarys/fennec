@@ -58,7 +58,7 @@ store2[FONT_KEY] = "42";
 assert.equal(loadFontScale(), 15, "hors bornes : 15");
 
 // The tab wiring: a click selects its tab and shows only its panel.
-const tabs = ["settings-general", "settings-appearance", "settings-skills"].map((panel) => ({
+const tabs = ["settings-general", "settings-appearance", "settings-skills", "settings-clean"].map((panel) => ({
   dataset: { panel }, setAttribute(k, v) { this[k] = v; }, onclick: null,
 }));
 const panels = {};
@@ -69,14 +69,20 @@ global.document = {
   getElementById: (id) => panels[id],
 };
 const $ = (id) => panels[id];
-eval(src.match(/\n\/\/ The three settings panels[\s\S]*?\n\}\);\n/)[0]);
+eval(src.match(/\n\/\/ The settings panels[\s\S]*?\n\}\);\n/)[0]);
 tabs[2].onclick();
 assert.equal(tabs[2]["aria-selected"], "true", "l'onglet Skills est sélectionné");
 assert.equal(tabs[0]["aria-selected"], "false", "Général n'est plus sélectionné");
-assert.deepEqual(tabs.map((t) => t["aria-selected"]), ["false", "false", "true"]);
+assert.deepEqual(tabs.map((t) => t["aria-selected"]), ["false", "false", "true", "false"]);
 assert.deepEqual(Object.fromEntries(Object.entries(panels).map(([k, v]) => [k, v.hidden])),
-  { "settings-general": true, "settings-appearance": true, "settings-skills": false }, "seul le panneau Skills est visible");
+  { "settings-general": true, "settings-appearance": true, "settings-skills": false, "settings-clean": true }, "seul le panneau Skills est visible");
 tabs[0].onclick();
 assert.equal(panels["settings-general"].hidden, false, "revenir à Général");
 assert.equal(panels["settings-skills"].hidden, true, "Skills refermé");
+// Opening "Nettoyage" loads what is left behind.
+let loaded = 0;
+global.showLeftovers = () => loaded++;
+tabs[3].onclick();
+assert.equal(panels["settings-clean"].hidden, false, "Nettoyage visible");
+assert.equal(loaded, 1, "la liste est chargée à l'ouverture");
 console.log("ok");
