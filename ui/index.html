@@ -342,8 +342,14 @@
           overflow-wrap: anywhere; white-space: pre-wrap; font-size: 14px; }
   .said.human { align-self: flex-end; background: transparent; border: 1px solid var(--line); }
   .said .label { display: block; font-size: 12px; color: var(--muted); }
-  .said .label .replay { padding: 0 4px; margin-left: 6px; border: 0; vertical-align: middle; opacity: .6; }
-  .said .label .replay:hover { opacity: 1; }
+  .msg { display: flex; flex-direction: column; align-items: flex-start; max-width: 85%; min-width: 0; }
+  .msg.human { align-self: flex-end; align-items: flex-end; }
+  .msg > .said { max-width: 100%; }
+  .msg-actions { display: flex; gap: 2px; opacity: 0; transition: opacity .15s; }
+  .msg:hover .msg-actions, .msg:focus-within .msg-actions, .msg.last .msg-actions { opacity: 1; }
+  .msg-actions .ic::before { width: 15px; height: 15px; }
+  .msg-actions button { padding: 3px 5px; border: 0; background: transparent; color: var(--muted); }
+  .msg-actions button:hover { color: var(--text); }
   .replaying { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; font-size: 12px; }
   .replaying[hidden] { display: none; }
   .said code { font: 13px ui-monospace, monospace; }
