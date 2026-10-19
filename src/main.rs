@@ -648,7 +648,7 @@ fn transcript(chat: &Value) -> io::Result<String> {
         text.push('\n');
     }
     if text.trim().is_empty() {
-        return Err(io::Error::other("aucun message à transformer en demande"));
+        return Err(io::Error::other("aucun message à transformer en tâche"));
     }
     Ok(text)
 }

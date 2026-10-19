@@ -219,7 +219,7 @@ pub fn say(store: &Store, id: &str, text: &str) -> io::Result<()> {
         _ => false,
     };
     if !open {
-        return Err(io::Error::other("cette demande n'attend pas de réponse"));
+        return Err(io::Error::other("cette tâche n'attend pas de réponse"));
     }
     let text = text.trim();
     if text.is_empty() {
@@ -253,7 +253,7 @@ pub fn say(store: &Store, id: &str, text: &str) -> io::Result<()> {
 pub fn frame_anyway(store: &Store, id: &str) -> io::Result<()> {
     let request = store.load(id)?;
     if request["status"] != "talk" {
-        return Err(io::Error::other("cette demande n'est pas en discussion"));
+        return Err(io::Error::other("cette tâche n'est pas en discussion"));
     }
     let brief = transcript(&request);
     store.update(id, |r| {
@@ -319,7 +319,7 @@ fn frame_now(store: &Store, id: &str) -> io::Result<()> {
 pub fn answer(store: &Store, id: &str, accept: bool, correction: &str) -> io::Result<()> {
     let request = store.load(id)?;
     if request["status"] != "question" {
-        return Err(io::Error::other("cette demande n'attend pas de réponse"));
+        return Err(io::Error::other("cette tâche n'attend pas de réponse"));
     }
     if accept {
         store.update(id, |r| r["status"] = json!("running"))?;
@@ -406,7 +406,7 @@ fn block(request: &mut Value, stage: &str, question: &str, why: &str) {
 pub fn reply(store: &Store, id: &str, text: &str) -> io::Result<()> {
     let request = store.load(id)?;
     if request["status"] != "blocked" {
-        return Err(io::Error::other("cette demande n'attend pas de réponse"));
+        return Err(io::Error::other("cette tâche n'attend pas de réponse"));
     }
     let text = text.trim();
     if text.is_empty() {
@@ -480,10 +480,10 @@ fn wait_turn(store: &Store, id: &str, project: &str) -> io::Result<Taken> {
                         let worlds = Worlds::from_env()?;
                         match worlds.open(&w).and_then(|o| worlds.drop(o)) {
                             Ok(()) => continue,
-                            Err(e) => Some(format!("une ancienne demande interrompue ({e})")),
+                            Err(e) => Some(format!("une ancienne tâche interrompue ({e})")),
                         }
                     }
-                    None => Some("une autre demande".to_string()),
+                    None => Some("une autre tâche".to_string()),
                 }
             }
             Some(world::Held::Changes) => Some(String::new()),
@@ -492,7 +492,7 @@ fn wait_turn(store: &Store, id: &str, project: &str) -> io::Result<Taken> {
         let mut taken = TAKEN.lock().map_err(|_| io::Error::other("lock"))?;
         let behind = match held {
             Some(by) => Some(by),
-            None if taken.iter().any(|p| p == project) => Some("une autre demande".to_string()),
+            None if taken.iter().any(|p| p == project) => Some("une autre tâche".to_string()),
             None => {
                 taken.push(project.to_string());
                 if store.load(id)?["status"] == "waiting" {
@@ -628,7 +628,7 @@ pub fn retry(store: &Store, id: &str) -> io::Result<()> {
     // place: the step starts over and sets the status again as it goes.
     if matches!(request["status"].as_str(), Some("waiting" | "landing")) {
         if working(id) {
-            return Err(io::Error::other("cette demande est déjà en cours"));
+            return Err(io::Error::other("cette tâche est déjà en cours"));
         }
         spawn(
             id.to_string(),
@@ -640,7 +640,7 @@ pub fn retry(store: &Store, id: &str) -> io::Result<()> {
         return Ok(());
     }
     if request["status"] != "failed" {
-        return Err(io::Error::other("cette demande n'a pas échoué"));
+        return Err(io::Error::other("cette tâche n'a pas échoué"));
     }
     let validated = match request["spec"].as_str() {
         Some(s) => matches!(
@@ -810,7 +810,7 @@ fn failure(record: &Value) -> String {
 pub fn amend(store: &Store, id: &str, text: &str) -> io::Result<()> {
     let request = store.load(id)?;
     if request["status"] != "ready" || request["commit"].is_string() {
-        return Err(io::Error::other("cette demande n'attend pas ta décision"));
+        return Err(io::Error::other("cette tâche n'attend pas ta décision"));
     }
     let text = text.trim();
     if text.is_empty() {
@@ -844,7 +844,7 @@ pub fn stop(store: &Store, id: &str) -> io::Result<()> {
         Some("thinking" | "framing" | "waiting" | "running" | "proving" | "landing")
     ) {
         return Err(io::Error::other(
-            "fennec ne travaille plus sur cette demande",
+            "fennec ne travaille plus sur cette tâche",
         ));
     }
     if let Ok(mut s) = STOPS.lock() {
@@ -919,7 +919,7 @@ pub fn clear(store: &Store, ids: &[String]) -> io::Result<Value> {
             .flatten()
             .any(|f| f["id"] == id.as_str())
         {
-            errors.push(format!("{id} : une demande s'en sert de nouveau"));
+            errors.push(format!("{id} : une tâche s'en sert de nouveau"));
         } else if let Err(e) = worlds.forget(id) {
             errors.push(format!("{id} : {e}"));
         }
@@ -936,7 +936,7 @@ pub fn drop(store: &Store, id: &str) -> io::Result<()> {
         "talk" | "question" | "blocked" | "ready" | "failed"
     ) {
         return Err(io::Error::other(
-            "fennec travaille encore sur cette demande",
+            "fennec travaille encore sur cette tâche",
         ));
     }
     // Its work goes too: in the project folder, the folder comes back.
@@ -964,7 +964,7 @@ pub fn drop(store: &Store, id: &str) -> io::Result<()> {
 /// so the human can come back to it and commit later.
 pub fn pass(store: &Store, id: &str) -> io::Result<()> {
     if store.load(id)?["status"] != "ready" {
-        return Err(io::Error::other("cette demande n'attend pas ta décision"));
+        return Err(io::Error::other("cette tâche n'attend pas ta décision"));
     }
     store.update(id, |r| r["status"] = json!("passed"))
 }
@@ -972,7 +972,7 @@ pub fn pass(store: &Store, id: &str) -> io::Result<()> {
 /// Back from the history to the human's decisions.
 pub fn resume(store: &Store, id: &str) -> io::Result<()> {
     if store.load(id)?["status"] != "passed" {
-        return Err(io::Error::other("cette demande n'a pas été mise de côté"));
+        return Err(io::Error::other("cette tâche n'a pas été mise de côté"));
     }
     store.update(id, |r| r["status"] = json!("ready"))
 }
@@ -1004,7 +1004,7 @@ pub fn open(store: &Store, id: &str) -> io::Result<Value> {
     let run = request["run"]
         .as_str()
         .filter(|_| request["status"] == "ready")
-        .ok_or_else(|| io::Error::other("cette demande n'a pas de travail prêt"))?;
+        .ok_or_else(|| io::Error::other("cette tâche n'a pas de travail prêt"))?;
     let folder = Worlds::from_env()?.open(run)?.path;
     let opened = editor(&folder);
     Ok(json!({"folder": folder, "opened": opened}))
@@ -1017,7 +1017,7 @@ pub fn page(store: &Store, id: &str) -> io::Result<Value> {
     let run = request["run"]
         .as_str()
         .filter(|_| request["status"] == "ready")
-        .ok_or_else(|| io::Error::other("cette demande n'a pas de travail prêt"))?;
+        .ok_or_else(|| io::Error::other("cette tâche n'a pas de travail prêt"))?;
     Ok(json!({"url": proof::page(&Worlds::from_env()?, run)?}))
 }
 
@@ -1027,7 +1027,7 @@ pub fn changes(store: &Store, id: &str) -> io::Result<Value> {
     let request = store.load(id)?;
     let run = request["run"]
         .as_str()
-        .ok_or_else(|| io::Error::other("fennec n'a rien changé pour cette demande"))?;
+        .ok_or_else(|| io::Error::other("fennec n'a rien changé pour cette tâche"))?;
     let record = review::load(&Worlds::from_env()?, run)?;
     let attempt = record["attempts"]
         .as_array()
@@ -1317,7 +1317,7 @@ pub fn land(store: &Store, id: &str) -> io::Result<()> {
     let request = store.load(id)?;
     if request["status"] != "ready" || !request["run"].is_string() {
         return Err(io::Error::other(
-            "cette demande n'est pas prête pour un commit",
+            "cette tâche n'est pas prête pour un commit",
         ));
     }
     store.update(id, |r| {

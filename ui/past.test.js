@@ -65,7 +65,7 @@ assert.deepEqual(costBlock.children.filter((c) => c.tag === "h3").map((c) => c.t
 assert.ok(costBlock.children.find((c) => c.textContent === "Équipe").title.includes("page Équipe"), "le titre Équipe renvoie au concept, défini dans la page Équipe");
 const cards = costBlock.children.find((c) => c.className === "metrics").children;
 assert.ok(cards.every((c) => c.title), "chaque figure de coût a un tooltip explicatif");
-assert.equal(cards.find((c) => c.children.some((k) => k.textContent === "Appels")).title, "Nombre d'appels faits au modèle pour cette demande.");
+assert.equal(cards.find((c) => c.children.some((k) => k.textContent === "Appels")).title, "Nombre d'appels faits au modèle pour cette tâche.");
 const segs = costBlock.children.find((c) => c.className === "timeline").children;
 assert.ok(segs.length && segs.every((c) => c.title), "chaque segment explique son étape en une phrase");
 assert.equal(segs[0].title, "Réalisation : le travail est écrit et exécuté, essai après essai.");

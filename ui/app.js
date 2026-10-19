@@ -140,7 +140,7 @@ const errorOf = (button) => button.closest(".decide, .card, .past-actions").quer
 // Giving up is one more click than doing: the first click only asks.
 // Once there is work, giving up undoes it: the label says so.
 function dropButton(id, undo = false) {
-  const button = el("button", { type: "button", className: "quiet", textContent: undo ? "Annuler" : "Abandonner", title: undo ? "Annuler le travail : ton dossier redevient comme avant" : "Abandonner la demande" });
+  const button = el("button", { type: "button", className: "quiet", textContent: undo ? "Annuler" : "Abandonner", title: undo ? "Annuler le travail : ton dossier redevient comme avant" : "Abandonner la tâche" });
   button.onclick = () => {
     const sure = action("Confirmer", "/api/drop", { id }, { quiet: true });
     sure.style.color = "var(--bad)";
@@ -152,7 +152,7 @@ function dropButton(id, undo = false) {
 // Erasing a finished request is one more click than reading it: the first
 // click only asks.
 function forgetButton(id) {
-  const button = el("button", { type: "button", className: "quiet", textContent: "Supprimer", title: "Supprimer cette demande" });
+  const button = el("button", { type: "button", className: "quiet", textContent: "Supprimer", title: "Supprimer cette tâche" });
   button.onclick = () => {
     const sure = action("Confirmer", "/api/forget", { id }, { quiet: true });
     sure.style.color = "var(--bad)";
@@ -433,7 +433,7 @@ function explain(reason) {
     return "ton dossier a des changements non commités : fennec y travaille et doit pouvoir annuler un essai raté sans toucher aux tiens. Commit-les ou mets-les de côté (git stash), puis réessaie";
   }
   if (/the project folder already holds work in progress/.test(line)) {
-    return "ton dossier contient déjà le travail d'une autre demande : commit-la, ou abandonne-la, puis réessaie";
+    return "ton dossier contient déjà le travail d'une autre tâche : commit-la, ou abandonne-la, puis réessaie";
   }
   m = line.match(/^port (\d+) is already taken/);
   if (m) return `le port ${m[1]} est déjà pris sur ta machine : arrête ce qui l'occupe, puis rouvre la page`;
@@ -478,7 +478,7 @@ function details(item) {
   const box = el("details", { className: "more" }, el("summary", { textContent: "Détails" }));
   box.dataset.key = item.id;
   const part = (title, ...nodes) => box.append(el("h3", { textContent: title }), ...nodes);
-  if (item.title?.length > 200) part("La demande", el("p", { textContent: item.title }));
+  if (item.title?.length > 200) part("La tâche", el("p", { textContent: item.title }));
   const errors = [item.reason, item.land_error].filter(Boolean);
   if (errors.length) part("Erreur", ...errors.map((e) => el("pre", { className: "failed", textContent: e })));
   if (item.land?.message) part("Message du commit", el("pre", { textContent: item.land.message }));
@@ -605,7 +605,7 @@ function journalButton(item, where) {
 }
 async function journal(item) {
   const steps = await api("/api/journal", { id: item.id });
-  if (!steps.length) return [el("div", { className: "muted", textContent: "Aucune étape gardée pour cette demande." })];
+  if (!steps.length) return [el("div", { className: "muted", textContent: "Aucune étape gardée pour cette tâche." })];
   return steps.map(stepView);
 }
 
@@ -719,7 +719,7 @@ function facts(item) {
   return [el("div", { className: "facts" },
     metrics(s),
     bar ? el("h3", { textContent: "Répartition du temps" }) : null, bar,
-    who ? el("h3", { textContent: "Équipe", title: "L'équipe du projet qui a travaillé sur cette demande : qui fait quoi se définit dans la page Équipe." }) : null, who,
+    who ? el("h3", { textContent: "Équipe", title: "L'équipe du projet qui a travaillé sur cette tâche : qui fait quoi se définit dans la page Équipe." }) : null, who,
     el("h3", { textContent: "L'isolement" }), safe)];
 }
 
@@ -731,7 +731,7 @@ function pill(icon, text, tone = "", title = "") {
 // Model time, tokens in and out, cache and speed: a figure each, not a sentence.
 const METRIC_TIP = {
   "Temps de modèle": "Temps de génération du modèle, sans les outils ni les attentes.",
-  "Appels": "Nombre d'appels faits au modèle pour cette demande.",
+  "Appels": "Nombre d'appels faits au modèle pour cette tâche.",
   "Envoyés": "Ce qui part vers le modèle : contexte, consignes, résultats d'outils.",
   "Générés": "Ce que le modèle a produit : réponses, code, réflexion.",
   "Vitesse": "Moyenne de tokens produits par seconde.",
@@ -798,7 +798,7 @@ function stepView(step) {
     ...(messages.length ? messages.map(messageView)
       : [el("div", { className: "muted", textContent: step.live
         ? "fennec attend la première réponse du modèle…"
-        : "Les messages de cette étape n'ont pas été gardés (demande ancienne)." })]));
+        : "Les messages de cette étape n'ont pas été gardés (tâche ancienne)." })]));
 }
 
 // Who of the team took part: what each role told the model, and what it ran itself.
@@ -974,7 +974,7 @@ function card(item) {
       el("div", { className: "changes-slot" }), doneWhen(item), ...work(item), shots(item), ...facts(item));
   } else if (item.kind === "later") {
     // Kept, not started: said again if need be, then launched.
-    const text = el("textarea", { className: "later-text", defaultValue: item.title, ariaLabel: "La demande" });
+    const text = el("textarea", { className: "later-text", defaultValue: item.title, ariaLabel: "La tâche" });
     const images = attach(text, item.images);
     node.querySelector(".title").replaceWith(el("div", { className: "reply" }, text, images.node));
     actions.append(action("Lancer", "/api/launch", { id: item.id }, { primary: true }),
@@ -1153,15 +1153,17 @@ function renderSide(view) {
   };
   const entry = (button, path, items) => {
     const n = items.filter((i) => !path || i.path === path).length;
-    button.setAttribute("aria-current", String($("project").value === path));
+    // The Agent mode or a page in view: no task list is current.
+    const tasks = where().path !== "chat" && !PAGES.includes(where().path);
+    button.setAttribute("aria-current", String(tasks && $("project").value === path));
     button.onclick = () => pick(path);
     button.querySelectorAll(".count, .dot").forEach((e) => e.remove());
     if (path && view.running.some((i) => i.path === path)) button.append(el("span", { className: "dot", title: "fennec y travaille" }));
     if (n) button.append(el("span", { className: "count", title: "t'attend", textContent: n }));
     return button;
   };
+  // The Tâches mode stays in sight, even with one project.
   entry($("side-all"), "", view.todo);
-  $("side-all").parentElement.hidden = view.projects.length < 2;
   $("side-projects").replaceChildren(...view.projects.map((p) => projectEntry(p, entry, view.todo)));
   // The archived projects, out of the select: brought back or erased there.
   const archived = view.projectsArchived ?? [];
@@ -1270,6 +1272,7 @@ async function showChats() {
   $("hint").hidden = true;
   for (const name of PAGES) $(name).hidden = true;
   $("side-chats").setAttribute("aria-current", "true");
+  $("side-all").setAttribute("aria-current", "false");
   let chats, archived;
   try {
     [chats, archived] = await Promise.all([api("/api/chats"), api("/api/chats/archived")]);
@@ -1599,7 +1602,7 @@ function chatAside(c) {
   }
   if (c.stats?.turns) nodes.push(el("h2", { textContent: "Coût" }), metrics(c.stats));
   const button = el("button", { type: "button", className: "convert",
-    textContent: c.project ? "En faire une demande" : "En faire un projet" });
+    textContent: c.project ? "En faire une tâche" : "En faire un projet" });
   button.onclick = async () => {
     $("chat-error").textContent = "";
     try {
@@ -1614,7 +1617,7 @@ function chatAside(c) {
       $("chat-error").textContent = explain(e.message);
     }
   };
-  nodes.push(el("h2", { textContent: c.project ? "Demande" : "Projet" }), button);
+  nodes.push(el("h2", { textContent: c.project ? "Tâche" : "Projet" }), button);
   return nodes;
 }
 
@@ -2325,7 +2328,7 @@ async function showStats() {
   const a = v.all;
   const tile = (value, label) => el("div", { className: "tile" }, el("b", { textContent: value }), el("span", { textContent: label }));
   $("stats-tiles").replaceChildren(
-    tile(number(a.requests), "demandes"),
+    tile(number(a.requests), "tâches"),
     tile(duration(a.ms ?? 0), "de modèle"),
     tile(compact(a.sent), `tokens envoyés · ${percent(a.cached, a.sent)} % en cache`),
     tile(compact(a.received), `tokens générés · ${speed(a) || "—"}`));
@@ -2371,7 +2374,7 @@ async function showPage(path) {
   const p = stats.projects.find((x) => x.path === path) ?? {};
   const tile = (value, label, tone = "") => el("div", { className: `tile ${tone}` }, el("b", { textContent: value }), el("span", { textContent: label }));
   $("page-tiles").replaceChildren(
-    tile(number(p.requests), "demandes"), tile(number(p.landed), "commitées"),
+    tile(number(p.requests), "tâches"), tile(number(p.landed), "commitées"),
     tile(number(p.failed), "échouées", p.failed ? "bad" : ""),
     tile(number(p.failed_attempts), "essais ratés annulés"),
     tile(duration(p.ms ?? 0), "de modèle"), tile(compact(p.sent), "tokens envoyés"));
@@ -2470,10 +2473,10 @@ async function showChips() {
   try {
     const v = await api("/api/team", { project });
     const roles = v.roles.filter((r) => !r.out);
-    $("chips").replaceChildren(el("span", { className: "muted", textContent: "Équipe pour cette demande :" }),
+    $("chips").replaceChildren(el("span", { className: "muted", textContent: "Équipe pour cette tâche :" }),
       ...roles.map((r) => {
         const chip = el("button", { type: "button", className: `rtag ${r.stage} chip`, textContent: r.name,
-          title: "Clique pour faire sans ce rôle sur cette demande" });
+          title: "Clique pour faire sans ce rôle sur cette tâche" });
         chip.dataset.key = r.key;
         chip.setAttribute("aria-pressed", "true");
         chip.onclick = () => chip.setAttribute("aria-pressed", chip.getAttribute("aria-pressed") === "true" ? "false" : "true");

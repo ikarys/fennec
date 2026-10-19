@@ -22,7 +22,7 @@ assert.match(
   /n'est plus un dépôt git/,
 );
 assert.match(explain("the project folder has uncommitted changes"), /changements non commités/);
-assert.match(explain("the project folder already holds work in progress (world 1a)"), /autre demande/);
+assert.match(explain("the project folder already holds work in progress (world 1a)"), /autre tâche/);
 // A test's own output is not the server's.
 assert.equal(explain("tests failed: case ... timeout: 5s"), "tests failed: case ... timeout: 5s");
 console.log("ok");

@@ -607,13 +607,13 @@
     <button type="button" class="link" id="close-side" data-icon="panelLeft" aria-label="Fermer la barre des projets" title="Fermer la barre des projets"></button>
   </div>
   <div class="mid">
-    <ul><li><button type="button" class="item" id="side-all"><span class="name">Tous les projets</span></button></li></ul>
+    <ul><li><button type="button" class="item" id="side-all"><span class="name">Tâches</span></button></li></ul>
     <div class="label"><span>Projets</span> <button class="link" id="add-project" data-icon="plus" aria-label="Ajouter un projet" title="Ajouter un projet"></button></div>
     <ul id="side-projects"></ul>
     <div class="label" id="side-archived-label" hidden><span>Archivés</span></div>
     <ul id="side-archived"></ul>
     <p class="error" id="side-error" role="alert"></p>
-    <button class="link" id="side-chats" data-icon="chat">Discussions</button>
+    <button class="link" id="side-chats" data-icon="chat">Agent</button>
   </div>
   <span class="spacer"></span>
   <div class="tools">
@@ -624,17 +624,17 @@
   <div id="version"></div>
 </nav>
 <main>
-  <section id="list" aria-label="Demandes">
+  <section id="list" aria-label="Tâches">
   <button type="button" class="link" id="open-side" data-icon="panelLeft" aria-label="Ouvrir la barre des projets" title="Ouvrir la barre des projets"></button>
   <div id="list-head" hidden><strong id="list-head-name"></strong> <span class="muted" id="list-head-path"></span></div>
   <div id="chats" hidden>
     <button type="button" class="primary" id="new-chat" data-icon="plus">Nouvelle discussion</button>
-    <h2>Discussions</h2>
+    <h2>Agent</h2>
     <div id="chat-list"></div>
     <p class="muted">fennec lit et lance des commandes dans le dossier que tu choisis, git ou pas, sans réseau et ton dossier personnel caché. Il ne modifie rien tant que tu ne l’autorises pas. Le coût de la discussion est à droite.</p>
   </div>
   <div id="reqs">
-  <button type="button" class="primary" id="compose-open" data-icon="plus">Nouvelle demande</button>
+  <button type="button" class="primary" id="compose-open" data-icon="plus">Nouvelle tâche</button>
   <p class="error" id="error" role="alert"></p>
 
 
@@ -642,11 +642,11 @@
     <strong>Comment ça marche</strong>
     <ol>
       <li>Choisis un projet : un dossier de ton disque (« + projet »).</li>
-      <li>Écris ta demande, comme à un collègue, puis « Demander ». Si elle est floue, fennec en discute avec toi.</li>
+      <li>Décris ta tâche, comme à un collègue, puis « Lancer ». Si elle est floue, fennec en discute avec toi.</li>
       <li>Une fois clair, fennec répond par « terminé quand » : ce que tu pourras constater une fois fini. Valide-le ou corrige-le.</li>
       <li>fennec travaille seul, puis essaie le résultat et t'en montre la preuve.</li>
       <li>Tu regardes la preuve et les changements, puis tu choisis : commit, ou passer (le travail reste de côté).</li>
-      <li>Tout reste dans l'historique : clique une demande pour revoir ce qui a été demandé, fait et prouvé.</li>
+      <li>Tout reste dans l'historique : clique une tâche pour revoir ce qui a été demandé, fait et prouvé.</li>
     </ol>
     <p class="muted">L'équipe (« Équipe ») choisit les rôles qui travaillent sur le projet ; « Réglages » choisit le modèle.</p>
   </section>
@@ -671,9 +671,9 @@
   <section id="detail">
   <button type="button" class="link" id="open-side-2" data-icon="panelLeft" aria-label="Ouvrir la barre des projets" title="Ouvrir la barre des projets"></button>
   <div id="detail-head" hidden><strong id="detail-head-name"></strong> <span class="muted" id="detail-head-path"></span></div>
-  <button type="button" class="link" id="back">← Revenir aux <span class="to-reqs">demandes</span><span class="to-chats">discussions</span></button>
+  <button type="button" class="link" id="back">← Revenir aux <span class="to-reqs">tâches</span><span class="to-chats">discussions</span></button>
   <div id="pick"></div>
-  <p id="hint" hidden>Choisis une demande à gauche pour la lire en entier, ou un projet pour voir sa page.</p>
+  <p id="hint" hidden>Choisis une tâche à gauche pour la lire en entier, ou un projet pour voir sa page.</p>
   <!-- The chosen project's own page: what it cost, how it is worked on, its rules. -->
   <aside id="page" hidden>
     <div class="page-head"><strong id="page-name"></strong> <span class="muted" id="page-path"></span>
@@ -689,7 +689,7 @@
         <select id="rule-scope" aria-label="Pour"><option value="project">Pour ce projet</option><option value="user">Pour tous mes projets</option></select>
         <button data-icon="plus" aria-label="Ajouter la règle" title="Ajouter la règle"></button>
       </form>
-      <p class="muted small">fennec la donne à toute l'équipe à chaque demande. Tu peux aussi la dire en corrigeant une demande : fennec propose de la garder.</p></div>
+      <p class="muted small">fennec la donne à toute l'équipe à chaque tâche. Tu peux aussi la dire en corrigeant une tâche : fennec propose de la garder.</p></div>
     <p class="error" id="page-error" role="alert"></p>
   </aside>
   <!-- The team, the figures and the settings: pages the address names,
@@ -743,10 +743,10 @@
     </table></div>
     <h3>Par projet</h3>
     <div class="scroll"><table>
-      <thead><tr><th>Projet</th><th>Où fennec travaille</th><th>Demandes</th><th>Commits</th><th>Échecs</th><th>Essais annulés</th><th>Temps</th><th>Envoyés</th></tr></thead>
+      <thead><tr><th>Projet</th><th>Où fennec travaille</th><th>Tâches</th><th>Commits</th><th>Échecs</th><th>Essais annulés</th><th>Temps</th><th>Envoyés</th></tr></thead>
       <tbody id="stats-projects"></tbody>
     </table></div>
-    <p class="muted">« Dans le dossier » : tu vois le travail en direct, sur une branche de travail. « À part » : ton dossier ne change qu'au commit. Le changement vaut pour les prochaines demandes.
+    <p class="muted">« Dans le dossier » : tu vois le travail en direct, sur une branche de travail. « À part » : ton dossier ne change qu'au commit. Le changement vaut pour les prochaines tâches.
       Isolement de chaque travail : sans réseau, sans accès à ton dossier personnel, historique git en lecture seule, mémoire plafonnée ; un essai raté est annulé sans trace.</p>
     <p class="error" id="stats-error" role="alert"></p>
   </section>
@@ -797,7 +797,7 @@
       </label>
     </div>
     <div id="settings-skills" hidden>
-      <p class="muted">Ils s'appliquent à tous tes projets : l'équipe voit le nom et le but de chaque skill activé, et le lit quand la demande en a besoin.
+      <p class="muted">Ils s'appliquent à tous tes projets : l'équipe voit le nom et le but de chaque skill activé, et le lit quand la tâche en a besoin.
         Ils viennent de ~/.claude/skills et de tes plugins, de ~/.config/fennec/skills ou du dossier .claude/skills d'un projet.</p>
       <input id="skill-search" type="search" aria-label="Chercher un skill" placeholder="Chercher parmi les skills de ta machine…">
       <ul id="skills-list"></ul>
@@ -805,7 +805,7 @@
     </div>
     <div id="settings-clean" hidden>
       <p class="muted">Ce que fennec a laissé derrière lui quand un travail a été coupé en route (redémarrage, arrêt au mauvais moment) :
-        plus aucune demande ne s'en sert. Coche ce que tu veux supprimer.</p>
+        plus aucune tâche ne s'en sert. Coche ce que tu veux supprimer.</p>
       <ul id="leftovers"></ul>
       <p class="error" id="leftovers-error" role="alert"></p>
       <div class="row"><button type="button" class="stop" id="leftovers-clear" data-icon="trash" disabled>Supprimer la sélection</button></div>
@@ -818,15 +818,15 @@
 <!-- Written on demand, not spread over the list: the list is for what waits. -->
 <dialog id="compose">
   <form id="new-request">
-    <div class="row head"><strong>Nouvelle demande</strong><span class="spacer"></span>
+    <div class="row head"><strong>Nouvelle tâche</strong><span class="spacer"></span>
       <button type="button" class="quiet" id="compose-close" data-icon="close" aria-label="Fermer" title="Fermer"></button></div>
     <select id="project" aria-label="Projet" required></select>
-    <textarea id="text" aria-label="Demande" placeholder="Ce que tu veux, comme à un collègue…" rows="6" required></textarea>
+    <textarea id="text" aria-label="Tâche" placeholder="Ce que tu veux, comme à un collègue…" rows="6" required></textarea>
     <div id="chips"></div>
     <p class="error" id="compose-error" role="alert"></p>
     <div class="row">
-      <button type="button" id="later-add" data-icon="clock" title="Garder la demande sans la lancer">Plus tard</button>
-      <button class="primary" data-icon="send">Demander</button>
+      <button type="button" id="later-add" data-icon="clock" title="Garder la tâche sans la lancer">Plus tard</button>
+      <button class="primary" data-icon="send">Lancer</button>
     </div>
   </form>
 </dialog>
