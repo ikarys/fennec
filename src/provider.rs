@@ -132,6 +132,8 @@ pub struct OpenAi {
     pub temperature: f64,
     /// See [`Settings::max_tokens`].
     pub max_tokens: u64,
+    /// See [`Settings::effort`].
+    pub effort: String,
     agent: ureq::Agent,
 }
 
@@ -149,6 +151,7 @@ impl OpenAi {
             api_key,
             temperature,
             max_tokens: DEFAULT_MAX_TOKENS,
+            effort: String::new(),
             agent: ureq::Agent::new_with_config(config),
         }
     }
@@ -161,6 +164,7 @@ impl OpenAi {
             models,
             api_key: key,
             max_tokens,
+            effort,
         } = Settings::current()?;
         // None chosen: the models the server says it serves, so a local
         // server that serves one model needs no configuration but its address.
@@ -187,6 +191,7 @@ impl OpenAi {
                 let temperature = TEMPERATURES[(i / models.len()) % TEMPERATURES.len()];
                 Self {
                     max_tokens,
+                    effort: effort.clone(),
                     ..Self::new(&base, model, key.clone(), temperature)
                 }
             })
@@ -208,6 +213,10 @@ pub struct Settings {
     /// Servers default low (ninfer: 8192), and a reasoning model can spend
     /// all of it thinking and answer nothing.
     pub max_tokens: u64,
+    /// The standard `reasoning_effort` sent with a reasoning call (none,
+    /// low, medium, xhigh…); empty sends none, so the model's own default
+    /// holds (Qwen 3.8: xhigh, which can think a whole budget away).
+    pub effort: String,
 }
 
 pub const DEFAULT_MAX_TOKENS: u64 = 32_768;
@@ -249,6 +258,7 @@ impl Settings {
                 .filter(|k| !k.is_empty())
                 .map(str::to_string),
             max_tokens: v["max_tokens"].as_u64().unwrap_or(DEFAULT_MAX_TOKENS),
+            effort: v["effort"].as_str().unwrap_or("").to_string(),
         })
     }
 
@@ -284,7 +294,7 @@ impl Settings {
         let path = Self::path()?;
         std::fs::create_dir_all(path.parent().unwrap_or(&path))?;
         let json = json!({"base_url": self.base_url, "models": self.models, "api_key": self.api_key,
-                   "max_tokens": self.max_tokens});
+                   "max_tokens": self.max_tokens, "effort": self.effort});
         let mut file = std::fs::OpenOptions::new()
             .write(true)
             .create(true)
@@ -332,6 +342,9 @@ impl OpenAi {
         // ninfer); servers without it ignore unknown keys.
         if !think {
             body["chat_template_kwargs"] = json!({"enable_thinking": false});
+        } else if !self.effort.is_empty() {
+            // Not with the switch above: ninfer rejects the two together.
+            body["reasoning_effort"] = json!(self.effort);
         }
         // Some servers reject an empty tool list.
         if tools.as_array().is_some_and(|t| !t.is_empty()) {
@@ -582,5 +595,60 @@ mod tests {
         let gone = format!("http://{}/v1", closed.local_addr().unwrap());
         drop(closed);
         assert!(served(&gone, None).is_err(), "nothing listens");
+    }
+
+    #[test]
+    fn the_effort_goes_with_a_reasoning_call_only() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let base = format!("http://{}/v1", listener.local_addr().unwrap());
+        let server = std::thread::spawn(move || {
+            let mut bodies = Vec::new();
+            for _ in 0..2 {
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut got = Vec::new();
+                let mut chunk = [0u8; 4096];
+                // Headers, then as many bytes as they announce.
+                let body = loop {
+                    let n = stream.read(&mut chunk).unwrap();
+                    got.extend_from_slice(&chunk[..n]);
+                    let text = String::from_utf8_lossy(&got).to_string();
+                    if let Some((head, body)) = text.split_once("\r\n\r\n") {
+                        let len: usize = head
+                            .lines()
+                            .find_map(|l| {
+                                l.to_lowercase()
+                                    .strip_prefix("content-length: ")
+                                    .map(str::to_string)
+                            })
+                            .and_then(|l| l.trim().parse().ok())
+                            .unwrap_or(0);
+                        if body.len() >= len {
+                            break body.to_string();
+                        }
+                    }
+                };
+                bodies.push(serde_json::from_str::<Value>(&body).unwrap());
+                let reply = r#"{"choices":[{"message":{"role":"assistant","content":"ok"}}]}"#;
+                write!(
+                    stream,
+                    "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{reply}",
+                    reply.len()
+                )
+                .unwrap();
+            }
+            bodies
+        });
+        let model = OpenAi {
+            effort: "low".into(),
+            ..OpenAi::new(&base, "m", None, 0.3)
+        };
+        let said = [json!({"role": "user", "content": "hi"})];
+        model.chat(&said, &json!([])).unwrap();
+        model.chat_quick(&said, &json!([])).unwrap();
+        let bodies = server.join().unwrap();
+        assert_eq!(bodies[0]["reasoning_effort"], "low");
+        assert!(bodies[0]["chat_template_kwargs"].is_null());
+        assert!(bodies[1]["reasoning_effort"].is_null(), "{}", bodies[1]);
+        assert_eq!(bodies[1]["chat_template_kwargs"]["enable_thinking"], false);
     }
 }
