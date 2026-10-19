@@ -434,12 +434,12 @@ fn a_world_edited_after_its_verdict_lands_only_if_its_checks_pass_again() {
 }
 
 #[test]
-fn a_blank_reply_is_asked_again_without_reasoning() {
+fn a_blank_reply_turns_reasoning_off_for_the_rest_of_the_run() {
     let f = fixture("blank");
     let model = Script::new("blank", &[write("answer", "42\n"), done()]);
-    // Between the two steps, a reply whose reasoning ate the whole budget.
+    // First, a reply whose reasoning ate the whole budget.
     let mut replies = model.replies.lock().unwrap();
-    replies.insert(1, json!({"content": "", "reasoning_content": "on and on"}));
+    replies.insert(0, json!({"content": "", "reasoning_content": "on and on"}));
     drop(replies);
     let record = solve(&f.worlds, &f.project, &task(&[]), &[&model], 10).unwrap();
     assert!(record["winner"].is_string(), "{record}");
@@ -449,7 +449,7 @@ fn a_blank_reply_is_asked_again_without_reasoning() {
         .iter()
         .map(|t| t["think"].clone())
         .collect();
-    assert_eq!(think, [json!(true), json!(true), json!(false)]);
+    assert_eq!(think, [json!(true), json!(false), json!(false)]);
 }
 
 #[test]

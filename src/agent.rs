@@ -127,8 +127,9 @@ pub fn run(
     let policy = std::env::var("FENNEC_OS_THINK").unwrap_or_else(|_| "always".to_string());
     let mut think = true;
     // A reply with nothing in it: the model spent its whole budget reasoning.
-    // Asked again the same way it does it again (seen: four times in six),
-    // so the next turn goes without reasoning, whatever the policy.
+    // Asked again the same way it does it again (seen: four times in six, and
+    // again after one quick turn, 2-3 minutes each on a local model), so the
+    // rest of the run goes without reasoning, whatever the policy.
     let mut blank = false;
     let ms = |since: Instant| since.elapsed().as_millis() as u64;
     // The starting state counts as "no change yet".
@@ -187,7 +188,7 @@ pub fn run(
             turn["usage"] = usage;
         }
         reply["role"] = json!("assistant");
-        blank = reply["tool_calls"].as_array().is_none_or(|c| c.is_empty())
+        blank |= reply["tool_calls"].as_array().is_none_or(|c| c.is_empty())
             && reply["content"]
                 .as_str()
                 .is_none_or(|c| c.trim().is_empty());
