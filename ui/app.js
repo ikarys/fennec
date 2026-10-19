@@ -2179,6 +2179,7 @@ async function showSettingsPage() {
     chosen = s.models;
     $("settings-url").value = s.base_url;
     $("settings-tokens").value = s.max_tokens;
+    $("settings-effort").value = s.effort;
     $("settings-key").value = "";
     $("settings-key").placeholder = s.has_key ? "enregistrée (laisse vide pour la garder)" : "";
     $("settings-env").hidden = !s.env.length;
@@ -2207,7 +2208,7 @@ $("settings-form").onsubmit = async (e) => {
   const models = boxes.length ? boxes.filter((b) => b.checked).map((b) => b.value) : chosen;
   try {
     await api("/api/settings/save", { base_url: $("settings-url").value, api_key: $("settings-key").value, models,
-      max_tokens: Number($("settings-tokens").value) });
+      max_tokens: Number($("settings-tokens").value), effort: $("settings-effort").value });
     $("settings-key").value = "";
   } catch (err) {
     $("settings-error").textContent = err.message;
