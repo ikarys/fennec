@@ -140,9 +140,9 @@ const errorOf = (button) => button.closest(".decide, .card, .past-actions").quer
 // Giving up is one more click than doing: the first click only asks.
 // Once there is work, giving up undoes it: the label says so.
 function dropButton(id, undo = false) {
-  const button = el("button", { type: "button", className: "quiet", textContent: undo ? "Annuler le travail" : "Abandonner" });
+  const button = el("button", { type: "button", className: "quiet", textContent: undo ? "Annuler" : "Abandonner", title: undo ? "Annuler le travail : ton dossier redevient comme avant" : "Abandonner la demande" });
   button.onclick = () => {
-    const sure = action(undo ? "Confirmer : tout annuler" : "Confirmer l'abandon", "/api/drop", { id }, { quiet: true });
+    const sure = action("Confirmer", "/api/drop", { id }, { quiet: true });
     sure.style.color = "var(--bad)";
     button.replaceWith(sure);
   };
@@ -154,7 +154,7 @@ function dropButton(id, undo = false) {
 function forgetButton(id) {
   const button = el("button", { type: "button", className: "quiet", textContent: "Supprimer", title: "Supprimer cette demande" });
   button.onclick = () => {
-    const sure = action("Confirmer la suppression", "/api/forget", { id }, { quiet: true });
+    const sure = action("Confirmer", "/api/forget", { id }, { quiet: true });
     sure.style.color = "var(--bad)";
     button.replaceWith(sure);
   };
@@ -606,14 +606,21 @@ async function journal(item) {
   return steps.map(stepView);
 }
 
-// Work under way: it opens on its journal, which follows the model as it
-// answers. The stop is there too: no action on what runs was the trap.
+// Work under way reads as a story: what was asked and said, what "done"
+// means, and where the work stands; the model's raw exchange is the Journal tab.
+const STEPS = [["Discussion", /^réfléchit/], ["Cadrage", /^se met au travail/], ["Travail", /^travaille/],
+  ["Essai", /^essaie/], ["Commit", /^fait le commit/]];
+function stages(item) {
+  const now = STEPS.findIndex(([, re]) => re.test(item.step ?? ""));
+  return el("ol", { className: "stages" }, ...STEPS.map(([name], i) =>
+    el("li", { className: i < now ? "done" : i === now ? "now" : "", textContent: name })));
+}
+
 function underway(item) {
-  const slot = el("div");
   const stop = el("button", { type: "button", className: "stop", textContent: "Arrêter" });
   setIcon(stop, "stop");
   stop.onclick = () => {
-    const sure = action("Confirmer l'arrêt", "/api/stop", { id: item.id });
+    const sure = action("Confirmer", "/api/stop", { id: item.id });
     sure.classList.add("stop", "sure");
     setIcon(sure, "stop");
     stop.replaceWith(sure);
@@ -626,8 +633,6 @@ function underway(item) {
       : []),
     stop,
     el("div", { className: "error", role: "alert" }));
-  // The head above says the title; the fold says only what moved since: the
-  // step under way and how long it has run.
   let elapsed = null;
   if (item.since) {
     // Queued, not working: no ticking figure, one age at each redraw.
@@ -636,18 +641,21 @@ function underway(item) {
       : el("span", { className: "elapsed" });
     if (!item.waiting) elapsed.dataset.since = item.since;
   }
-  const box = el("details", { className: "past" },
-    el("summary", {}, el("span", { className: "dot" }),
-      el("span", { className: "state" }, item.step, elapsed ? " · " : "", elapsed)),
-    bar, slot);
+  const box = el("div", { className: "past run" },
+    stages(item),
+    el("div", { className: "state" }, el("span", { className: "dot" }), "fennec ", item.step, elapsed ? " · " : "", elapsed),
+    conversation(item), doneWhen(item), bar, ...facts(item));
   box.dataset.key = "run-" + item.id;
-  box.ontoggle = () => follow(item.id, box, slot);
   return box;
 }
 
-async function follow(id, box, slot) {
+// The Journal tab of a request under way follows the model as it answers;
+// a newer view of the request starts its own and this one stops.
+let followed = 0;
+async function follow(id, slot) {
+  const mine = ++followed;
   let last = "";
-  while (box.open && box.isConnected) {
+  while (mine === followed && picked === id) {
     try {
       const steps = await api("/api/journal", { id });
       const json = JSON.stringify(steps);
@@ -655,8 +663,12 @@ async function follow(id, box, slot) {
         last = json;
         // What the human opened stays open as new messages come in.
         const opened = [...slot.querySelectorAll("details")].map((d) => d.open);
+        // Follow the model as it writes, unless the human scrolled up to read.
+        const end = slot.lastElementChild?.getBoundingClientRect().bottom;
+        const following = end == null || end <= innerHeight + 80;
         slot.replaceChildren(...steps.map(stepView));
         slot.querySelectorAll("details").forEach((d, i) => { d.open = opened[i] ?? false; });
+        if (following && slot.isConnected) slot.lastElementChild?.scrollIntoView({ block: "end", behavior: "smooth" });
       }
     } catch (e) {
       slot.replaceChildren(el("div", { className: "bad", textContent: e.message }));
@@ -748,6 +760,8 @@ function duration(ms) {
 }
 
 function stepView(step) {
+  if (step.said != null) return el("section", { className: "step said" },
+    el("div", { className: "step-name" }, el("span", { textContent: step.name })), el("p", { textContent: step.said }));
   const c = step.cost ?? {};
   const verdict = step.passed === true ? " ✓" : step.passed === false ? " ✗" : "";
   const messages = step.messages ?? [];
@@ -844,7 +858,12 @@ function conversation(item) {
       el("span", { className: "label", textContent: t.who === "human" ? "Toi" : "fennec" }), ...rich(t.text))));
 }
 
-function landLabel({ branch, remote, committed }) {
+// A button says the act in a word; where it goes is its title.
+function landLabel({ branch, committed }) {
+  if (!branch) return "Préparer";
+  return committed ? "Pousser" : "Commit";
+}
+function landTitle({ branch, remote, committed }) {
   if (!branch) return "Préparer le commit";
   if (committed) return `Pousser ${branch} vers ${remote}`;
   return remote ? `Commit dans ${branch} et pousser vers ${remote}` : `Commit dans ${branch}`;
@@ -864,9 +883,9 @@ function card(item) {
     const images = attach(text);
     add(el("div", { className: "reply" }, text, images.node));
     actions.append(dropButton(item.id), el("span", { className: "spacer" }),
-      Object.assign(action("Lancer tel quel", "/api/frame", { id: item.id }),
+      Object.assign(action("Lancer", "/api/frame", { id: item.id }),
         { title: "Lancer le travail sur la conversation telle quelle, sans autre question" }),
-      Object.assign(action("Envoyer à fennec", "/api/say", () => ({ id: item.id, text: images.value() }), { primary: true }),
+      Object.assign(action("Envoyer", "/api/say", () => ({ id: item.id, text: images.value() }), { primary: true }),
         { title: "fennec lit ta réponse : il repose une question s'il le faut, sinon il lance le travail" }));
   } else if (item.kind === "validate") {
     add(conversation(item), focus("Terminé quand", item.done_when));
@@ -875,6 +894,7 @@ function card(item) {
     fix.onclick = () => {
       // Opening the field is the first click; sending is the second.
       correction.hidden = false;
+      correction.rows = 6;
       correction.focus();
       fix.replaceWith(action("Envoyer", "/api/say", () => ({ id: item.id, text: images.value() })));
     };
@@ -895,8 +915,8 @@ function card(item) {
   } else if (item.kind === "rule") {
     add(focus("Règle proposée", item.rule), el("div", { className: "muted", textContent: `D'après ce que tu as dit : « ${item.heard ?? ""} »` }));
     actions.append(action("Non", "/api/rule", { id: item.id, scope: "no" }),
-      action("Pour ce projet", "/api/rule", { id: item.id, scope: "project" }),
-      action("Pour tous mes projets", "/api/rule", { id: item.id, scope: "user" }, { primary: true }));
+      Object.assign(action("Ce projet", "/api/rule", { id: item.id, scope: "project" }), { title: "Garder la règle pour ce projet" }),
+      Object.assign(action("Partout", "/api/rule", { id: item.id, scope: "user" }, { primary: true }), { title: "Garder la règle pour tous mes projets" }));
   } else if (item.kind === "ready") {
     // The decision first, without scrolling: what was proven, what was not,
     // and the buttons. What fennec did and what it cost come under them.
@@ -916,7 +936,7 @@ function card(item) {
     // "Ready" reads as "done": say where the work is until the commit.
     const commit = item.land ? `« ${landLabel(item.land)} »` : "le commit";
     add(el("div", { className: "muted", style: "margin-top:10px", textContent: item.here
-      ? `Le travail est dans ton dossier, sur une branche de travail. ${commit} le met sur ta branche ; « Annuler le travail » rend ton dossier comme avant.`
+      ? `Le travail est dans ton dossier, sur une branche de travail. ${commit} le met sur ta branche ; « Annuler » rend ton dossier comme avant.`
       : `Ton dossier n'a pas encore changé : le travail attend à part. ${commit} l'y met.` }));
     // Ways out, none forced: commit, look, ask for a change, set aside or undo.
     const change = el("textarea", { placeholder: "Ce qu'il faut changer", ariaLabel: "Ce qu'il faut changer", hidden: true });
@@ -924,10 +944,10 @@ function card(item) {
     fix.onclick = () => {
       change.hidden = false;
       change.focus();
-      fix.replaceWith(action("Envoyer la correction", "/api/amend", () => ({ id: item.id, text: images.value() })));
+      fix.replaceWith(action("Envoyer", "/api/amend", () => ({ id: item.id, text: images.value() })));
     };
     const images = attach(change);
-    if (item.land) actions.append(action(landLabel(item.land), "/api/land", { id: item.id }, { primary: true }));
+    if (item.land) actions.append(Object.assign(action(landLabel(item.land), "/api/land", { id: item.id }, { primary: true }), { title: landTitle(item.land) }));
     if (item.page) actions.append(pageButton(item));
     actions.append(changesButton(item, () => node.querySelector(".changes-slot")),
       codeButton(item, () => node.querySelector(".changes-slot")), fix,
@@ -940,7 +960,7 @@ function card(item) {
     const images = attach(text, item.images);
     node.querySelector(".title").replaceWith(el("div", { className: "reply" }, text, images.node));
     actions.append(action("Lancer", "/api/launch", { id: item.id }, { primary: true }),
-      action("Enregistrer le texte", "/api/rewrite", () => ({ id: item.id, text: images.value() })),
+      action("Enregistrer", "/api/rewrite", () => ({ id: item.id, text: images.value() })),
       action("Supprimer", "/api/forget", { id: item.id }, { quiet: true }));
   } else if (item.kind === "failed") {
     add(el("div", { className: "bad", textContent: explain(item.reason) || "raison inconnue" }), shots(item), ...facts(item));
@@ -1600,7 +1620,7 @@ function showDetail(found) {
   if (node.tagName === "DETAILS") node.open = true;
   const decide = decision(node, item, kind);
   // Nothing done yet on a request for later: no tabs to read.
-  const main = decide && item.kind !== "later" ? tabbed(node, item) : node;
+  const main = (decide || kind === "run") && item.kind !== "later" ? tabbed(node, item) : node;
   // A committed request has nothing left to decide: tabs, but no panel.
   const panel = decide?.querySelector("button") ? decide : null;
   const facts = [...node.querySelectorAll(".facts")];
@@ -1652,7 +1672,7 @@ const ICONS = {
 };
 const ICON_OF = [[/^(Commit|Pousser|Préparer)/, "commit"], [/^Ouvrir la page/, "page"], [/changements/, "diff"],
   [/^Ouvrir le code/, "code"], [/^Corriger|^Envoyer/, "fix"], [/^Passer/, "pass"], [/^Journal/, "journal"],
-  [/^Annuler le travail|^Abandonner/, "undo"], [/^Reprendre|^Lancer/, "resume"], [/^Supprimer/, "trash"], [/^Enregistrer le texte/, "save"], [/^Réessayer/, "retry"], [/^Archiver/, "inbox"], [/^Arrêter/, "stop"]];
+  [/^Annuler$|^Abandonner/, "undo"], [/^Reprendre|^Lancer/, "resume"], [/^Supprimer/, "trash"], [/^Enregistrer$/, "save"], [/^Réessayer/, "retry"], [/^Archiver/, "inbox"], [/^Arrêter/, "stop"]];
 function iconize(button) {
   const name = ICON_OF.find(([re]) => re.test(button.textContent))?.[1];
   if (name) setIcon(button, name);
@@ -1670,7 +1690,10 @@ let tabNow = "Résumé";
 function tabbed(node, item) {
   const more = [...node.querySelectorAll("details")].find((d) => d.firstChild?.textContent === "Détails");
   more?.remove();
-  const panes = [["Résumé", async () => [node]], ["Changements", () => changes(item)], ["Journal", () => journal(item)]];
+  const run = node.classList.contains("run");
+  const live = async () => { const slot = el("div"); follow(item.id, slot); return [slot]; };
+  const panes = [["Résumé", async () => [node]], ...(run ? [] : [["Changements", () => changes(item)]]),
+    ["Journal", run ? live : () => journal(item)]];
   if (more) panes.push(["Détails", async () => [...more.childNodes].slice(1)]);
   const panel = el("div", { className: "tab-panel" });
   const shown = new Map();
@@ -1781,7 +1804,7 @@ async function browse(path) {
     $("picker-choose").textContent = "Discuter ici";
   } else {
     $("picker-choose").disabled = data.home || (!data.repo && !data.empty);
-    $("picker-choose").textContent = data.repo || !data.empty ? "Ajouter ce dossier" : "Créer le projet ici";
+    $("picker-choose").textContent = data.repo || !data.empty ? "Ajouter" : "Créer ici";
   }
   const entries = (data.parent ? [{ name: "..", path: data.parent }] : []).concat(data.children);
   $("picker-list").replaceChildren(...entries.map((entry) => {

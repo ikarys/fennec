@@ -24,7 +24,7 @@ eval(src.match(/const el = \(tag, props = \{\}, \.\.\.children\) => \{[\s\S]*?\n
   + src.match(/const ICON_OF = \[[\s\S]*?\];/)[0]
   + grab("pastState") + grab("duration") + arrow("compact")
   + grab("setIcon") + grab("statusOf") + grab("reqHead")
-  + grab("iconize") + arrow("errorOf") + grab("action") + src.match(/async function follow\([\s\S]*?\n\}\n/)[0] + grab("underway")
+  + grab("iconize") + arrow("errorOf") + grab("action") + src.match(/async function follow\([\s\S]*?\n\}\n/)[0] + grab("underway") + src.match(/const STEPS = \[[\s\S]*?\]\];\n/)[0] + grab("stages") + grab("conversation") + grab("doneWhen") + grab("facts")
   + "globalThis.statusOf = statusOf; globalThis.reqHead = reqHead; globalThis.underway = underway;");
 global.api = async () => [];
 global.refresh = () => {};
@@ -70,5 +70,9 @@ assert.ok(barOf(underway({ ...busy, step: "fait le commit" }))
   .children.some((b) => b.textContent === "Réessayer"), "en train du commit : on peut réessayer");
 assert.ok(!barOf(underway({ ...busy, waiting: true, alive: true }))
   .children.some((b) => b.textContent === "Réessayer"), "en attente, worker vivant : rien à réessayer");
+
+// Where the work stands, as steps: before it done, it highlighted.
+const steps = underway(busy).children[0].children;
+assert.deepEqual(steps.map((li) => li.className), ["done", "done", "now", "", ""], "travaille = Travail en cours");
 
 console.log("OK");

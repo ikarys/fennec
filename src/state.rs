@@ -491,7 +491,7 @@ fn classify(requests: &[(String, Value)], projects_all: &[Value]) -> Value {
             json!({"id": id, "kind": kind, "project": name(r["project"].as_str().unwrap_or("")), "path": r["project"],
                    "title": words(r["text"].as_str().unwrap_or("")),
                    "images": image_lines(r["text"].as_str().unwrap_or("")).collect::<Vec<_>>(), "rules": r["rules"], "checks": r["verify"], "team": r["team"],
-                   "thread": r["thread"], "stats": r["stats"], "since": r["since"]})
+                   "thread": r["thread"], "stats": r["stats"], "since": r["since"], "done_when": r["done_when"]})
         };
         // Scenario 4: what the human said may become a rule, at one word.
         if let Some(rule) = r["offer"]["rule"].as_str() {
