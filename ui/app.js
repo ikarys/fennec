@@ -2483,13 +2483,15 @@ $("skill-search").oninput = drawSkillList;
 
 function showRules(path, rules) {
   const box = $("page-rules");
-  box.querySelector(".summary").textContent = rules.length ? `Règles suivies (${rules.length})` : "Aucune règle pour l'instant";
-  box.querySelector("ul").replaceChildren(...rules.map((r) => {
+  const count = box.querySelector(".count");
+  count.textContent = rules.length;
+  count.hidden = !rules.length;
+  box.querySelector("ul").replaceChildren(...rules.length ? [] : [el("li", { className: "empty muted", textContent: "Aucune règle pour l'instant." })], ...rules.map((r) => {
     const remove = el("button", { type: "button", className: "quiet", ariaLabel: "Retirer la règle", title: "Retirer la règle" });
     setIcon(remove, "close");
     remove.onclick = () => changeRules(path, { change: "remove", scope: r.scope, text: r.text });
     return el("li", {}, ...rich(r.text),
-      el("span", { className: "muted", textContent: r.scope === "user" ? " — tous tes projets" : " — ce projet" }), remove);
+      el("span", { className: "muted", textContent: r.scope === "user" ? "tous tes projets" : "ce projet" }), remove);
   }));
 }
 
