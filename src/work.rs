@@ -935,8 +935,20 @@ pub fn drop(store: &Store, id: &str) -> io::Result<()> {
     ) {
         return Err(io::Error::other("fennec travaille encore sur cette tâche"));
     }
-    // Its work goes too: in the project folder, the folder comes back.
-    let request = store.load(id)?;
+    undo(&store.load(id)?)?;
+    store.update(id, |r| {
+        r["status"] = json!("dropped");
+        if let Some(m) = r.as_object_mut() {
+            m.remove("offer");
+        }
+    })
+}
+
+/// A request's work goes: in the project folder, the folder comes back.
+fn undo(request: &Value) -> io::Result<()> {
+    if !request["run"].is_string() && !request["spec"].is_string() {
+        return Ok(());
+    }
     let worlds = Worlds::from_env()?;
     if let Some(run) = request["run"].as_str()
         && worlds.open(run).is_ok()
@@ -948,11 +960,23 @@ pub fn drop(store: &Store, id: &str) -> io::Result<()> {
     {
         spec::reject(&worlds, s, None)?;
     }
+    Ok(())
+}
+
+/// A failed request back to "Plus tard", as first written: its work goes,
+/// the human can reword it and launch it again, or give it to the Fleet.
+/// The Journal stays, so what the failed try cost is still counted.
+pub fn later(store: &Store, id: &str) -> io::Result<()> {
+    let request = store.load(id)?;
+    if request["status"] != "failed" {
+        return Err(io::Error::other("cette tâche n'a pas échoué"));
+    }
+    undo(&request)?;
     store.update(id, |r| {
-        r["status"] = json!("dropped");
-        if let Some(m) = r.as_object_mut() {
-            m.remove("offer");
-        }
+        let text = r["text"].clone();
+        *r = json!({"project": r["project"], "text": text, "off": r["off"],
+                    "journal": r["journal"], "status": "later",
+                    "thread": [{"who": "human", "text": text}]});
     })
 }
 
@@ -1472,6 +1496,39 @@ mod tests {
             "x"
         );
         assert_eq!(human_words(&r), "un test — un script python");
+    }
+
+    #[test]
+    fn a_failed_request_goes_back_for_later_as_first_written() {
+        let tmp = std::env::temp_dir().join(format!("fennec-lead-later-{}", std::process::id()));
+        let store = Store { root: tmp.clone() };
+        std::fs::create_dir_all(tmp.join("requests")).unwrap();
+        let id = "1".to_string();
+        std::fs::write(
+            tmp.join("requests/1.json"),
+            r#"{"project": "/p", "text": "add filters", "status": "running", "fleet": true,
+                "reason": "timeout", "journal": [{"stage": "said", "text": "x"}],
+                "thread": [{"who": "human", "text": "add filters"}, {"who": "fennec", "text": "ok"}]}"#,
+        )
+        .unwrap();
+        assert!(later(&store, &id).is_err(), "only a failed request");
+        store
+            .update(&id, |r| r["status"] = json!("failed"))
+            .unwrap();
+        later(&store, &id).unwrap();
+        let r = store.load(&id).unwrap();
+        assert_eq!(r["status"], "later");
+        assert_eq!(r["text"], "add filters");
+        assert_eq!(r["thread"].as_array().unwrap().len(), 1);
+        assert_eq!(
+            r["journal"].as_array().unwrap().len(),
+            1,
+            "the Journal stays"
+        );
+        assert!(r["reason"].is_null() && r["fleet"].is_null());
+        // Back for later, it can be reworded.
+        store.rewrite(&id, "add two filters").unwrap();
+        std::fs::remove_dir_all(tmp).unwrap();
     }
 
     #[test]

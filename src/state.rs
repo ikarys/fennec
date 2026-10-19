@@ -348,7 +348,8 @@ impl Store {
     /// Runs fennec-os made outside a request are not shown: nothing here
     /// could act on them.
     pub fn view(&self) -> io::Result<Value> {
-        let mut view = classify(&self.requests()?, &self.projects_all()?);
+        let requests = self.requests()?;
+        let mut view = classify(&requests, &self.projects_all()?);
         // A task for later says whether the Fleet will start it.
         let fleet: Vec<String> = crate::fleet::queue(self)?
             .into_iter()
@@ -358,7 +359,8 @@ impl Store {
             c["fleet"] = json!(fleet.iter().any(|id| c["id"] == id.as_str()));
         }
         // The list starts and stops the Fleet too.
-        view["fleet"] = json!({"on": crate::fleet::running(self)?, "queued": fleet.len()});
+        view["fleet"] = json!({"on": crate::fleet::running(self)?, "queued": fleet.len(),
+                               "stuck": crate::fleet::stuck(self, &requests)?});
         Ok(view)
     }
 }
