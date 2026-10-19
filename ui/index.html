@@ -780,6 +780,8 @@
         <label>Tâches à la fois <select id="fleet-at-once"></select></label>
         <label>Après un échec <select id="fleet-on-fail">
           <option value="stop">arrêter la Fleet</option><option value="go on">continuer</option></select></label>
+        <label title="Sur la branche fleet de chaque projet, jamais sur ta branche : la tâche suivante part de là, et tu fusionnes quand tu veux.">Après une réussite <select id="fleet-on-success">
+          <option value="wait">attendre ma validation</option><option value="branch">commiter sur la branche fleet</option></select></label>
       </div></div>
   </section>
   <section id="stats" hidden>

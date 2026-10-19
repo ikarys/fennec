@@ -522,6 +522,8 @@ fn solve_now(store: &Store, id: &str) -> io::Result<()> {
     // not hold the folder the next task of the queue needs.
     let fleet = request["fleet"] == true;
     worlds.apart = fleet;
+    // Committed on the Fleet's branch, it builds on what landed there.
+    worlds.base = request["fleet_branch"].as_str().map(str::to_string);
     let project = Path::new(request["project"].as_str().unwrap_or(""));
     // A correction works on the ready work, which already holds the folder.
     let _turn = match request["amend"].is_string() || fleet {

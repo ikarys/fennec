@@ -250,6 +250,7 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
                 v["on"].as_bool(),
                 v["at_once"].as_u64(),
                 v["on_fail"].as_str(),
+                v["on_success"].as_str(),
             )?;
             Ok(json!({}))
         }
