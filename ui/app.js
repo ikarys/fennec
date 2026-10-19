@@ -1791,8 +1791,16 @@ async function refresh(force) {
     const later = mine(view.later ?? []);
     $("later-box").hidden = !later.length;
     $("n-later").textContent = later.length || "";
-    fill($("later"), later.map((i) => row(i, line(i, i.fleet ? "dans la Fleet" : "à lancer"),
-      rowActions(i.id, { archive: "/api/request/archive", forget: "/api/forget" }))), "");
+    // Ticked rows survive a redraw: the list moves under the human's hand.
+    ticked = new Set([...ticked].filter((id) => later.some((i) => i.id === id)));
+    fill($("later"), later.map((i) => {
+      const box = el("input", { type: "checkbox", checked: ticked.has(i.id), ariaLabel: "Choisir " + headline(i.title) });
+      box.onchange = () => { box.checked ? ticked.add(i.id) : ticked.delete(i.id); showPicked(later); };
+      return el("div", { className: "pick-row" }, box, row(i, line(i, i.fleet ? "dans la Fleet" : "à lancer"),
+        rowActions(i.id, { archive: "/api/request/archive", forget: "/api/forget" })));
+    }), "");
+    showPicked(later);
+    showFleetBar(view.fleet, later.length);
     const history = mine(view.history);
     fill($("history"), history.map((i) => row(i, line(i, pastState(i), false),
       rowActions(i.id, { archive: "/api/request/archive", forget: "/api/forget" }))), "Rien de terminé pour l'instant.");
@@ -1812,6 +1820,62 @@ async function refresh(force) {
   } catch (e) {
     $("error").textContent = "Serveur injoignable : " + e.message;
   }
+}
+
+// The backlog's ticked tasks, sent to the Fleet or taken out of it at once.
+let ticked = new Set();
+function showPicked(later) {
+  const bar = $("later-pick");
+  bar.hidden = !ticked.size;
+  if (!ticked.size) return bar.replaceChildren();
+  const ids = later.filter((i) => ticked.has(i.id));
+  const error = el("span", { className: "error", role: "alert" });
+  const send = (label, action, which) => {
+    // Only what applies to the ticked tasks is offered.
+    if (!which.length) return null;
+    const b = el("button", { type: "button", textContent: label });
+    b.onclick = async () => {
+      try {
+        for (const i of which) await api("/api/fleet/place", { id: i.id, action });
+      } catch (e) {
+        error.textContent = e.message;
+      }
+      ticked.clear();
+      refresh(true);
+    };
+    iconize(b);
+    return b;
+  };
+  const all = el("button", { type: "button", className: "quiet", textContent: ticked.size === later.length ? "Aucune" : "Toutes" });
+  all.onclick = () => {
+    ticked = ticked.size === later.length ? new Set() : new Set(later.map((i) => i.id));
+    refresh(true);
+  };
+  bar.replaceChildren(el("span", { textContent: `${ticked.size} choisie${ticked.size > 1 ? "s" : ""}` }), all,
+    el("span", { className: "spacer" }),
+    ...[send("Dans la Fleet", "add", ids.filter((i) => !i.fleet)), send("Retirer de la Fleet", "remove", ids.filter((i) => i.fleet))].filter(Boolean), error);
+}
+
+// The Fleet from the list: whether it runs, how many wait, and its switch.
+function showFleetBar(fleet, later) {
+  const bar = $("fleet-bar");
+  bar.hidden = !fleet || !(fleet.queued || later);
+  if (bar.hidden) return;
+  bar.classList.toggle("on", fleet.on && fleet.queued > 0);
+  const name = el("a", { href: "#fleet", textContent: "Fleet" });
+  setIcon(name, "fleet");
+  const toggle = el("button", { type: "button", textContent: fleet.on ? "Arrêter" : "Démarrer" });
+  setIcon(toggle, fleet.on ? "pause" : "play");
+  toggle.onclick = async () => {
+    try {
+      await api("/api/fleet", { on: !fleet.on });
+    } catch (e) {
+      $("error").textContent = e.message;
+    }
+    refresh(true);
+  };
+  bar.replaceChildren(name, el("span", { className: "muted",
+    textContent: `${fleet.on ? "en marche" : "arrêtée"} · ${fleet.queued} en file` }), el("span", { className: "spacer" }), toggle);
 }
 
 // The right pane: the chosen request in full, a page the address names,
@@ -2624,15 +2688,25 @@ async function fleetDo(path, body) {
   }
 }
 $("fleet-at-once").onchange = () => fleetDo("/api/fleet", { at_once: Number($("fleet-at-once").value) });
+$("fleet-on-fail").onchange = () => fleetDo("/api/fleet", { on_fail: $("fleet-on-fail").value });
 async function showFleet() {
   const v = await api("/api/fleet");
   const toggle = $("fleet-toggle");
-  toggle.textContent = v.on ? "Mettre en pause" : "Reprendre";
+  toggle.textContent = v.on ? "Arrêter la Fleet" : "Démarrer la Fleet";
   setIcon(toggle, v.on ? "pause" : "play");
   toggle.classList.toggle("primary", !v.on);
   toggle.onclick = () => fleetDo("/api/fleet", { on: !v.on });
-  $("fleet-state").textContent = v.on ? "en marche" : "en pause";
-  if (document.activeElement !== $("fleet-at-once")) $("fleet-at-once").value = String(v.at_once);
+  $("fleet-state").textContent = v.on ? "en marche" : "arrêtée";
+  $("fleet-stopped").hidden = !v.stopped;
+  $("fleet-stopped").textContent = v.stopped ? `Arrêtée toute seule : ${v.stopped}. Regarde la tâche, puis redémarre.` : "";
+  for (const [id, value] of [["fleet-at-once", String(v.at_once)], ["fleet-on-fail", v.on_fail]]) {
+    if (document.activeElement !== $(id)) $(id).value = value;
+  }
+  const s = v.summary;
+  const tile = (value, label) => el("div", { className: "tile" }, el("b", { textContent: value }), el("span", { textContent: label }));
+  $("fleet-tiles").replaceChildren(tile(number(s.queued), "en file"), tile(number(s.working), "en cours"),
+    tile(number(s.yours), "t'attendent"), tile(number(s.landed), "commitées"), tile(number(s.failed), "en échec"),
+    tile(duration(s.cost.ms), `de modèle · ↑ ${compact(s.cost.sent)} ↓ ${compact(s.cost.received)}`));
   const link = (item, state) => el("a", { className: "row", href: hashOf(item.path, item.id) }, line(item, state));
   const move = (item, name, label, enabled) => {
     const b = el("button", { type: "button", className: "icon", ariaLabel: label, title: label, disabled: !enabled });
@@ -2643,11 +2717,14 @@ async function showFleet() {
   const last = v.queue.length - 1;
   $("n-fleet").textContent = v.queue.length || "";
   fill($("fleet-queue"), v.queue.map((item, i) => rowWrap(
-    link(item, item.waits ? [item.waits, "muted"] : ["part ensuite", "accent"]),
+    link(item, item.waits ? [item.waits, "muted"] : [v.on ? "part ensuite" : "part au démarrage", "accent"]),
     el("div", { className: "row-actions" }, move(item, "up", "Monter", i > 0), move(item, "down", "Descendre", i < last),
-      move(item, "close", "Retirer de la Fleet", true)))), "Aucune tâche dans la Fleet.");
+      move(item, "close", "Retirer de la Fleet", true)))), "Aucune tâche dans la Fleet : coche des tâches dans « Plus tard ».");
   $("n-fleet-working").textContent = v.working.length || "";
   fill($("fleet-working"), v.working.map((item) => link(item, null)), "Rien en cours.");
+  const tone = { "commité": "ok", "échec": "bad", "prêt, t'attend": "accent", "question pour toi": "accent", "mis de côté": "warn" };
+  $("n-fleet-recent").textContent = v.recent.length || "";
+  fill($("fleet-recent"), v.recent.map((item) => link(item, [item.outcome, tone[item.outcome] ?? "muted"])), "Rien encore.");
 }
 
 $("open-stats").onclick = () => {
