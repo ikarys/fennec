@@ -104,7 +104,7 @@ impl Store {
         }
         if self.requests()?.iter().any(|(_, r)| r["project"] == path) {
             return Err(io::Error::other(
-                "ce projet a des demandes : supprime-les d'abord",
+                "ce projet a des tâches : supprime-les d'abord",
             ));
         }
         all.retain(|p| p["path"] != path);
@@ -119,7 +119,7 @@ impl Store {
             Some("later" | "landed" | "passed" | "dropped") => {}
             _ => {
                 return Err(io::Error::other(
-                    "fennec travaille encore sur cette demande",
+                    "fennec travaille encore sur cette tâche",
                 ));
             }
         }
@@ -138,7 +138,7 @@ impl Store {
             return Err(io::Error::other("projet inconnu"));
         }
         if text.trim().is_empty() {
-            return Err(io::Error::other("demande vide"));
+            return Err(io::Error::other("tâche vide"));
         }
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -205,7 +205,7 @@ impl Store {
     pub fn rewrite(&self, id: &str, text: &str) -> io::Result<()> {
         self.later(id)?;
         if text.trim().is_empty() {
-            return Err(io::Error::other("demande vide"));
+            return Err(io::Error::other("tâche vide"));
         }
         self.update(id, |r| {
             r["text"] = json!(text.trim());
@@ -235,7 +235,7 @@ impl Store {
             }
             _ => {
                 return Err(io::Error::other(
-                    "fennec travaille encore sur cette demande",
+                    "fennec travaille encore sur cette tâche",
                 ));
             }
         }
@@ -246,7 +246,7 @@ impl Store {
 
     fn later(&self, id: &str) -> io::Result<()> {
         if self.load(id)?["status"] != "later" {
-            return Err(io::Error::other("cette demande n'est plus pour plus tard"));
+            return Err(io::Error::other("cette tâche n'est plus pour plus tard"));
         }
         Ok(())
     }
@@ -254,7 +254,7 @@ impl Store {
     fn request_path(&self, id: &str) -> io::Result<PathBuf> {
         // Ids come from the page: hex only, so none can name another file.
         if id.is_empty() || !id.bytes().all(|b| b.is_ascii_hexdigit()) {
-            return Err(io::Error::other("demande inconnue"));
+            return Err(io::Error::other("tâche inconnue"));
         }
         Ok(self.root.join("requests").join(format!("{id}.json")))
     }
@@ -269,7 +269,7 @@ impl Store {
 
     pub fn load(&self, id: &str) -> io::Result<Value> {
         let text = std::fs::read_to_string(self.request_path(id)?)
-            .map_err(|_| io::Error::other("demande inconnue"))?;
+            .map_err(|_| io::Error::other("tâche inconnue"))?;
         serde_json::from_str(&text).map_err(io::Error::other)
     }
 
@@ -511,7 +511,7 @@ fn classify(requests: &[(String, Value)], projects_all: &[Value]) -> Value {
                     later.push(card("later"));
                 }
             }
-            Some("thinking") => running.push(card_step(card("running"), "réfléchit à ta demande")),
+            Some("thinking") => running.push(card_step(card("running"), "réfléchit à ta tâche")),
             Some("talk") => todo.push((0, card("talk"))),
             Some("framing") => running.push(card_step(card("running"), "se met au travail")),
             Some("waiting") => {
@@ -925,7 +925,7 @@ mod tests {
         // With a request, even a forgotten one, the project is not removed.
         let a = store.add_request(&p, "dark mode", &[], true).unwrap();
         let err = store.remove_project(&p).unwrap_err().to_string();
-        assert!(err.contains("demandes"), "{err}");
+        assert!(err.contains("tâches"), "{err}");
         store.forget(&a).unwrap();
         store.remove_project(&p).unwrap();
         assert!(store.projects_all().unwrap().is_empty());
