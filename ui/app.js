@@ -1260,7 +1260,9 @@ let chatBox = null;
 // stay unfolded, so the opened folders are remembered here.
 const chatOpen = new Set();
 async function showChats() {
-  document.body.classList.add("chats", "picked");
+  document.body.classList.add("chats");
+  // Narrow: the list of discussions gives way only to an open one.
+  document.body.classList.toggle("picked", !!where().id);
   // Coming from Équipe, Stats or Réglages: their class hides the list column.
   document.body.classList.remove("paged");
   $("chats").hidden = false;
@@ -1783,7 +1785,7 @@ window.addEventListener("hashchange", () => {
   $("detail").scrollTop = 0;
   refresh(true);
 });
-$("back").onclick = () => (location.hash = hashOf($("project").value, ""));
+$("back").onclick = () => (location.hash = document.body.classList.contains("chats") ? "#chat" : hashOf($("project").value, ""));
 
 function compose() {
   $("compose-error").textContent = "";
@@ -2185,6 +2187,7 @@ async function showSettingsPage() {
     $("settings-env").hidden = !s.env.length;
     $("settings-env").textContent = `Au lancement, ${s.env.join(", ")} passe avant ces réglages.`;
     $("settings-error").textContent = "";
+    $("settings-saved").textContent = "";
     listModels();
     showSkillList();
   } catch (e) {
@@ -2210,10 +2213,15 @@ $("settings-form").onsubmit = async (e) => {
     await api("/api/settings/save", { base_url: $("settings-url").value, api_key: $("settings-key").value, models,
       max_tokens: Number($("settings-tokens").value), effort: $("settings-effort").value });
     $("settings-key").value = "";
+    $("settings-error").textContent = "";
+    $("settings-saved").textContent = "✓ Enregistré";
   } catch (err) {
+    $("settings-saved").textContent = "";
     $("settings-error").textContent = err.message;
   }
 };
+// Saved until something changes again.
+$("settings-form").oninput = () => ($("settings-saved").textContent = "");
 
 // Stats: what every request cost, per model and per project, and where
 // fennec works in each project, which can be changed here.
