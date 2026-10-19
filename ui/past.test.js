@@ -42,7 +42,7 @@ eval(src.match(/const el = \(tag, props = \{\}, \.\.\.children\) => \{[\s\S]*?\n
   + grab("metrics") + grab("metric")
   + grab("timeline")
   + src.match(/const STAGE_TIP = \{[\s\S]*?\};\n/)[0]
-  + arrow("roleTag") + grab("duration") + grab("facts") + grab("details")
+  + arrow("roleTag") + grab("duration") + grab("facts") + arrow("lead") + grab("details")
   + src.match(/const STEPS = \[[\s\S]*?\]\];\n/)[0] + grab("stages") + grab("ended") + grab("past")
   + arrow("stageRank") + arrow("number") + arrow("compact") + arrow("percent")
   + arrow("tps") + arrow("stageOf") + arrow("stageName")
