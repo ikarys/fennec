@@ -100,7 +100,7 @@ fn spawn(id: String, step: fn(&Store, &str) -> io::Result<()>) {
             });
         }
         // A stopped request ends failed, whatever the step wrote last.
-        if STOPS.lock().is_ok_and(|s| s.iter().any(|x| x == &id)) {
+        if stopped(&id) {
             let _ = store.update(&id, |r| {
                 r["status"] = json!("failed");
                 r["reason"] = json!(STOPPED);
@@ -551,7 +551,7 @@ impl Drop for Taken {
 fn wait_turn(store: &Store, id: &str, project: &str) -> io::Result<Taken> {
     let mine = store.load(id)?["run"].as_str().map(str::to_string);
     loop {
-        if STOPS.lock().is_ok_and(|s| s.iter().any(|x| x == id)) {
+        if stopped(id) {
             return Err(io::Error::other(STOPPED));
         }
         let held = match world::held(Path::new(project))? {
@@ -666,13 +666,7 @@ fn solve_now(store: &Store, id: &str) -> io::Result<()> {
         apply_run(r, &record);
         // A correction starts from the ready work: its files are still part of it.
         if amend.is_some() {
-            let mut files = before.as_array().cloned().unwrap_or_default();
-            for f in r["files"].as_array().into_iter().flatten() {
-                if !files.contains(f) {
-                    files.push(f.clone());
-                }
-            }
-            r["files"] = json!(files);
+            r["files"] = merged(&before, &r["files"]);
         }
         // The acceptance tests land in the same commit: they are part of what fennec did.
         if let Some(files) = r["files"].as_array_mut() {
@@ -686,11 +680,9 @@ fn solve_now(store: &Store, id: &str) -> io::Result<()> {
             }
         }
     })?;
-    let Some(run) = record["winner"].as_str() else {
+    let Some(mut run) = record["winner"].as_str().map(str::to_string) else {
         return Ok(());
     };
-    // Tests passing is not "ready": the product is tried first.
-    store.update(id, |r| r["status"] = json!("proving"))?;
     let r = store.load(id)?;
     let done_when = [&r["done_when"], &r["brief"], &r["text"]]
         .into_iter()
@@ -698,20 +690,131 @@ fn solve_now(store: &Store, id: &str) -> io::Result<()> {
         .map(str::to_string);
     let prover = staffed(OpenAi::variants_from_env(1)?.remove(0), project, "prove")?;
     let watched = Live::new(&prover, store.live_path(id)?);
-    let proof = proof::gather(&worlds, run, done_when.as_deref(), &watched)?;
-    // Where it will land is decided before "ready", so the card never shows
-    // a branch the click would not use.
-    let mut probe = store.load(id)?;
-    apply_proof(&mut probe, &proof);
-    let target = (probe["status"] == "ready")
-        .then(|| solve::plan(&worlds, run, &variants[0]).ok())
-        .flatten();
-    store.update(id, |r| {
-        apply_proof(r, &proof);
-        if let Some(t) = &target {
-            r["target"] = target_json(t);
+    let mut fixes = 0;
+    loop {
+        // Tests passing is not "ready": the product is tried first.
+        store.update(id, |r| r["status"] = json!("proving"))?;
+        let proof = proof::gather(&worlds, &run, done_when.as_deref(), &watched)?;
+        let mut probe = store.load(id)?;
+        apply_proof(&mut probe, &proof);
+        // What the proof found goes back to the builder, which starts from
+        // its own work: a missing script or a crash is fixed, not failed.
+        if probe["status"] == "failed" && fixes < MAX_FIXES && !stopped(id) {
+            fixes += 1;
+            let found = findings(&proof);
+            store.update(id, |r| {
+                note(r, json!({"stage": "qa", "findings": found}));
+                r["status"] = json!("running");
+            })?;
+            let fixed = spec::fix(&worlds, spec_id, &found, &models, MAX_STEPS)?;
+            if let Some(w) = fixed["winner"].as_str() {
+                run = w.to_string();
+                store.update(id, |r| {
+                    let before = r["files"].clone();
+                    note(r, json!({"stage": "solve", "run": fixed["id"]}));
+                    apply_run(r, &fixed);
+                    r["files"] = merged(&before, &r["files"]);
+                })?;
+                continue;
+            }
+            // No fix passed: a question goes to the human, otherwise the
+            // proof's own reason stands.
+            let asked = fixed["attempts"]
+                .as_array()
+                .is_some_and(|a| a.iter().any(|t| t["question"].is_string()));
+            return store.update(id, |r| {
+                note(r, json!({"stage": "solve", "run": fixed["id"]}));
+                if asked {
+                    apply_run(r, &fixed);
+                } else {
+                    apply_proof(r, &proof);
+                }
+            });
         }
-    })
+        // Where it will land is decided before "ready", so the card never shows
+        // a branch the click would not use.
+        let target = (probe["status"] == "ready")
+            .then(|| solve::plan(&worlds, &run, &variants[0]).ok())
+            .flatten();
+        return store.update(id, |r| {
+            apply_proof(r, &proof);
+            if let Some(t) = &target {
+                r["target"] = target_json(t);
+            }
+        });
+    }
+}
+
+/// How many times the proof sends a ready run back to its builder.
+const MAX_FIXES: usize = 2;
+
+fn stopped(id: &str) -> bool {
+    STOPS.lock().is_ok_and(|s| s.iter().any(|x| x == id))
+}
+
+/// Files of the work so far, then the new ones a later run touched.
+fn merged(before: &Value, after: &Value) -> Value {
+    let mut files = before.as_array().cloned().unwrap_or_default();
+    for f in after.as_array().into_iter().flatten() {
+        if !files.contains(f) {
+            files.push(f.clone());
+        }
+    }
+    json!(files)
+}
+
+/// What a failed proof tells the builder: each failing try with the end of
+/// its output, a page that did not show, a role's check, or no proof at all.
+fn findings(proof: &Value) -> String {
+    let tail = |o: &Value| {
+        let o = o.as_str().unwrap_or("").trim();
+        o[o.floor_char_boundary(o.len().saturating_sub(1500))..].to_string()
+    };
+    let mut out = Vec::new();
+    for t in proof["tries"].as_array().into_iter().flatten() {
+        if t["exit"] != 0 {
+            out.push(format!(
+                "`{}` exited {}:\n{}",
+                t["command"].as_str().unwrap_or(""),
+                t["exit"],
+                tail(&t["output"])
+            ));
+        }
+    }
+    for c in proof["checks"].as_array().into_iter().flatten() {
+        if c["exit"] != 0 && c["missing"] != true {
+            out.push(format!(
+                "the {} check `{}` exited {}:\n{}",
+                c["role"].as_str().unwrap_or(""),
+                c["command"].as_str().unwrap_or(""),
+                c["exit"],
+                tail(&c["output"])
+            ));
+        }
+    }
+    for s in proof["shots"].as_array().into_iter().flatten() {
+        if s["ok"] != true && s["missing"] != true {
+            out.push(format!(
+                "the page {} did not show: {}",
+                s["url"].as_str().unwrap_or(""),
+                s["reason"].as_str().unwrap_or("")
+            ));
+        }
+    }
+    if out.is_empty() {
+        let why: Vec<&str> = proof["unverified"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .collect();
+        out.push(format!(
+            "nothing could be tried: no command or page proved it works ({}). \
+             Make it runnable here and say how in the README.",
+            why.join("; ")
+        ));
+    }
+    out.join("\n\n")
 }
 
 fn target_json(t: &solve::Landing) -> Value {
@@ -1241,6 +1344,7 @@ pub fn journal(store: &Store, id: &str) -> io::Result<Value> {
                 }
             }
             Some("said") => steps.push(json!({"name": "Ta réponse", "said": e["text"]})),
+            Some("qa") => steps.push(json!({"name": "Preuve ratée : renvoyée au travail", "said": e["findings"]})),
             Some("outside") => steps.push(json!({
                 "name": format!("Via {}", e["via"].as_str().unwrap_or("")),
                 "said": format!("{} par {}", e["did"].as_str().unwrap_or(""), e["from"].as_str().unwrap_or(""))})),
@@ -1578,6 +1682,31 @@ pub fn recover(store: &Store) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_failed_proof_tells_the_builder_what_failed() {
+        let long = format!("{}uvicorn: command not found", "x".repeat(3000));
+        let f = findings(&json!({
+            "tries": [{"command": "make run", "exit": 127, "output": long}, {"command": "ls", "exit": 0, "output": "ok"}],
+            "checks": [{"role": "QA", "command": "ruff check", "exit": 1, "output": "E501"},
+                       {"role": "QA", "command": "semgrep", "exit": 127, "missing": true}],
+            "shots": [{"url": "http://localhost:5173", "ok": false, "reason": "nothing listens"}]
+        }));
+        assert!(f.contains("`make run` exited 127") && f.ends_with("nothing listens"));
+        assert!(
+            f.contains("uvicorn: command not found") && f.len() < 2000,
+            "only the end of the output"
+        );
+        assert!(
+            f.contains("QA check `ruff check`") && !f.contains("semgrep"),
+            "a missing tool is not sent back"
+        );
+        assert!(!f.contains("`ls`"));
+        assert!(
+            findings(&json!({"tries": [], "unverified": ["no try proposed"]}))
+                .contains("no try proposed")
+        );
+    }
 
     #[test]
     fn a_stopped_attempt_with_a_question_asks_the_human() {
