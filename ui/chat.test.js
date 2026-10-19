@@ -40,7 +40,7 @@ eval("let chatBox = null; let detailed = '';"
   + grab("inline") + grab("rich") + grab("md")
   + grab("chatTitle") + grab("toolCall") + grab("chatThread")
   + grab("chatQuestion") + grab("chatComposer") + grab("chatAside") + grab("showChat")
-  + "globalThis.showChat = showChat; globalThis.getChatBox = () => chatBox;");
+  + "globalThis.showChat = showChat; globalThis.chatThread = chatThread; globalThis.getChatBox = () => chatBox;");
 
 const base = {
   id: "abc1234567890",
@@ -83,3 +83,14 @@ thread = getChatBox().thread;
 assert.ok(!thread.children.some((n) => (n.className ?? "").includes("ask")));
 assert.ok(!thread.children.some((n) => (n.className ?? "").includes("thinking")));
 console.log("ok");
+
+// Saying a message again: its text goes back in the composer, and the index
+// sent is the message's own in the exchange.
+{
+  const seen = [];
+  const nodes = chatThread({ ...base, messages: [...base.messages, { role: "user", content: "encore" }] },
+    (i, content) => seen.push([i, content]));
+  const human = nodes.filter((n) => n.className === "said human");
+  human.at(-1).children[0].children[1].onclick();
+  assert.deepEqual(seen, [[3, "encore"]]);
+}
