@@ -164,11 +164,11 @@
   #hint { color: var(--muted); padding: 40px 0; text-align: center; }
   #compose-open { width: 100%; justify-content: center; padding: 6px 12px; margin-bottom: 4px; }
   /* Each part of the list in its own box: what waits for the human stands out. */
-  #list .box { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px 4px;
+  #list .box, #fleet .box { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px 4px;
                margin-top: 14px; }
-  #list .box h2 { margin: 0 0 4px; display: flex; gap: 8px; align-items: center; }
-  #list .box .count { text-transform: none; letter-spacing: 0; }
-  #list .box .empty { padding: 4px 0 8px; font-size: 13px; }
+  #list .box h2, #fleet .box h2 { margin: 0 0 4px; display: flex; gap: 8px; align-items: center; }
+  #list .box .count, #fleet .box .count { text-transform: none; letter-spacing: 0; }
+  #list .box .empty, #fleet .box .empty { padding: 4px 0 8px; font-size: 13px; }
   #todo-box:has(a.row) { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
   #n-others { margin-left: auto; }
   #list .cost, #detail summary .cost { display: none; }
@@ -623,6 +623,7 @@
   </div>
   <span class="spacer"></span>
   <div class="tools">
+    <button class="link" id="open-fleet" data-icon="fleet" aria-label="Fleet" title="Fleet"></button>
     <button class="link" id="open-team" data-icon="team" aria-label="Équipe" title="Équipe"></button>
     <button class="link" id="open-stats" data-icon="stats" aria-label="Stats" title="Stats"></button>
     <button class="link" id="open-settings" data-icon="gear" aria-label="Réglages" title="Réglages"></button>
@@ -735,6 +736,17 @@
       <button type="button" class="quiet" id="team-save-open">Enregistrer comme équipe…</button>
     </div>
   </section>
+  <section id="fleet" hidden>
+    <div class="page-head"><strong>Fleet</strong> <span class="muted" id="fleet-state"></span><span class="spacer"></span>
+      <label class="muted">À la fois <select id="fleet-at-once" aria-label="Tâches à la fois"></select></label>
+      <button type="button" id="fleet-toggle"></button></div>
+    <p class="muted">fennec lance seul les tâches de la Fleet, dans cet ordre, dès qu'une place et leur dossier sont libres. La pause arrête les lancements, pas ce qui tourne.</p>
+    <p class="error" id="fleet-error" role="alert"></p>
+    <div class="box"><h2 data-icon="fleet">File <span class="count" id="n-fleet"></span></h2>
+    <div id="fleet-queue"></div></div>
+    <div class="box"><h2 data-icon="work">fennec travaille <span class="count" id="n-fleet-working"></span></h2>
+    <div id="fleet-working"></div></div>
+  </section>
   <section id="stats" hidden>
     <div class="page-head"><strong>Stats</strong></div>
     <div class="tiles" id="stats-tiles"></div>
@@ -844,6 +856,7 @@
     <p class="error" id="compose-error" role="alert"></p>
     <div class="row">
       <button type="button" id="later-add" data-icon="clock" title="Garder la tâche sans la lancer">Plus tard</button>
+      <button type="button" id="fleet-add" data-icon="fleet" title="fennec la lancera seul, à son tour dans la Fleet">Fleet</button>
       <button class="primary" data-icon="send">Lancer</button>
     </div>
   </form>
