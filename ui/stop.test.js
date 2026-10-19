@@ -38,7 +38,7 @@ eval(src.match(/const el = \(tag, props = \{\}, \.\.\.children\) => \{[\s\S]*?\n
   + src.match(/const errorOf = \(button\) => [^\n]*\n/)[0]
   + src.match(/async function api\([\s\S]*?\n}\n/)[0]
   + grab("action") + grab("line") + grab("rowActions")
-  + grab("underway")
+  + grab("underway") + src.match(/const STEPS = \[[\s\S]*?\]\];\n/)[0] + grab("stages") + grab("conversation") + grab("doneWhen") + grab("facts")
   + "globalThis.rowActions = rowActions; globalThis.underway = underway;");
 
 // The row of a running request: a stop icon, one click more to confirm.
@@ -64,13 +64,13 @@ sure.onclick().then(() => {
 
   // The detail view of a running request offers "Arrêter".
   const box = underway({ id: "u1", step: "travaille", since: 100, title: "x" });
-  const bar = box.children[1];
+  const bar = box.children.find((n) => n.className?.includes("run-actions"));
   assert.ok(bar.className.includes("run-actions"), "la barre d'arrêt est sous la ligne");
   const stop = bar.children[0];
   assert.equal(stop.textContent, "Arrêter");
   stop.onclick();
   const confirm = stop.replacedBy;
-  assert.equal(confirm.textContent, "Confirmer l'arrêt");
+  assert.equal(confirm.textContent, "Confirmer");
   confirm.onclick().then(() => {
     assert.ok(calls.some(([p, b]) => p === "/api/stop" && b.id === "u1"), "le détail arrête aussi");
     console.log("ok");

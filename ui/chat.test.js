@@ -33,6 +33,7 @@ const text = (n) => (typeof n === "string" ? n : n.textContent ?? "") + (n.child
 eval("let chatBox = null; let detailed = '';"
   + src.match(/const \$ = \(id\) => document\.getElementById\(id\);/)[0]
   + src.match(/const el = \(tag, props = \{\}, \.\.\.children\) => \{[\s\S]*?\n\};/)[0]
+  + "const setIcon = () => {};"
   + "const metrics = () => {}; const openPicker = () => {}; const thumbs = () => null;"
   + "const attach = (t) => ({ node: null, value: () => t.value, clear: () => { t.value = ''; } });"
   + grab("isImage")
