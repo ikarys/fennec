@@ -754,6 +754,15 @@
         <label class="field">Tokens par réponse, réflexion comprise (0 : la valeur du serveur)
           <input id="settings-tokens" type="number" min="0" step="1024" required>
         </label>
+        <label class="field">Réflexion avant chaque réponse
+          <select id="settings-effort">
+            <option value="">Celle du modèle</option>
+            <option value="none">Aucune : plus rapide</option>
+            <option value="low">Faible</option>
+            <option value="medium">Moyenne</option>
+            <option value="xhigh">Maximale : plus lente</option>
+          </select>
+        </label>
         <label class="field">Clé d'accès (facultative)
           <input id="settings-key" type="password" autocomplete="off">
         </label>
