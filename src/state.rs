@@ -273,14 +273,58 @@ impl Store {
         let mut record = self.load(id)?;
         let was = record["status"].clone();
         change(&mut record);
+        let moved = record["status"] != was;
         // When the current step began: a running line says for how long.
-        if record["status"] != was {
+        if moved {
             let secs = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .map_or(0, |d| d.as_secs());
             record["since"] = json!(secs);
         }
-        write_json(&self.request_path(id)?, &record)
+        write_json(&self.request_path(id)?, &record)?;
+        // Only a change of status is news; the Journal written after a
+        // plugin failed is not, or it would call the plugin again.
+        if let Some(e) = event(was.as_str().unwrap_or(""), id, &record).filter(|_| moved) {
+            self.tell(id, e);
+        }
+        Ok(())
+    }
+
+    /// The enabled plugins hear of a status change, in their own thread: a
+    /// slow or broken one never holds the work. A failure is written in the
+    /// request's Journal.
+    fn tell(&self, id: &str, event: Value) {
+        // Tests never reach the person's real plugins.
+        if cfg!(test) {
+            return;
+        }
+        let (store, id) = (
+            Store {
+                root: self.root.clone(),
+            },
+            id.to_string(),
+        );
+        std::thread::spawn(move || {
+            let failed: Vec<Value> = match fennec_os::plugin::emit(&event) {
+                Ok(said) => said
+                    .into_iter()
+                    .filter_map(|(name, r)| r.err().map(|e| (name, e)))
+                    .map(|(name, e)| json!({"stage": "plugin", "name": name, "error": e}))
+                    .collect(),
+                Err(e) => vec![json!({"stage": "plugin", "name": "", "error": e.to_string()})],
+            };
+            if failed.is_empty() {
+                return;
+            }
+            let _ = store.update(&id, |r| {
+                if !r["journal"].is_array() {
+                    r["journal"] = json!([]);
+                }
+                if let Some(j) = r["journal"].as_array_mut() {
+                    j.extend(failed);
+                }
+            });
+        });
     }
 
     /// Every request, oldest first.
@@ -323,6 +367,69 @@ impl Store {
 pub fn image_lines(text: &str) -> impl Iterator<Item = &str> {
     text.lines()
         .filter(|l| l.trim().starts_with("![image](file://"))
+}
+
+/// The plugin event a status change is, if any, with what a message needs:
+/// the task's first line and, in French, what happened to it.
+fn event(was: &str, id: &str, r: &Value) -> Option<Value> {
+    let now = r["status"].as_str().unwrap_or("");
+    let title = words(r["text"].as_str().unwrap_or(""))
+        .lines()
+        .next()
+        .unwrap_or("")
+        .to_string();
+    let (name, message) = match now {
+        "running" => ("started", format!("fennec commence « {title} »")),
+        "talk" | "question" | "blocked" => {
+            // What is asked: a stopped step's question, the conversation's
+            // last word, or the "done when" to accept.
+            let last = r["thread"]
+                .as_array()
+                .and_then(|t| t.iter().rev().find(|t| t["who"] == "fennec"))
+                .map(|t| &t["text"]);
+            let ask = match now {
+                "blocked" => &r["question"],
+                "question" => &r["done_when"],
+                _ => last.unwrap_or(&Value::Null),
+            };
+            let ask = ask.as_str().unwrap_or("");
+            (
+                "question",
+                format!("fennec a une question sur « {title} » : {ask}"),
+            )
+        }
+        // Back from a commit tried: the human is the one who just clicked.
+        "ready" if was == "landing" => return None,
+        "ready" => ("ready", format!("« {title} » est prêt : à valider")),
+        "failed" => (
+            "failed",
+            format!(
+                "« {title} » a échoué : {}",
+                r["reason"].as_str().unwrap_or("")
+            ),
+        ),
+        "landed" => ("landed", format!("« {title} » est commité")),
+        _ => return None,
+    };
+    let project = r["project"].as_str().unwrap_or("");
+    // The page's address for the task, so a message can open it.
+    let addr = std::env::var("FENNEC_LEAD_ADDR").unwrap_or_else(|_| "127.0.0.1:7777".into());
+    let path: String = project
+        .bytes()
+        .map(|b| match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                (b as char).to_string()
+            }
+            _ => format!("%{b:02X}"),
+        })
+        .collect();
+    Some(json!({
+        "url": format!("http://{addr}/#{path}/{id}"),
+        "event": name, "task": id, "title": title, "message": message,
+        "project": project,
+        "project_name": Path::new(project).file_name().map(|n| n.to_string_lossy()),
+        "status": now,
+    }))
 }
 
 /// What the human wrote, without its image lines: a title.
@@ -647,6 +754,35 @@ fn card_step(mut card: Value, step: &str) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn status_changes_become_plugin_events() {
+        let r = |status: &str| {
+            json!({"project": "/p/my app", "text": "Add filters\nmore", "status": status,
+                   "question": "Which port?", "reason": "timeout",
+                   "thread": [{"who": "fennec", "text": "Hi?"}]})
+        };
+        let name = |was: &str, now: &str| event(was, "7", &r(now)).map(|e| e["event"].clone());
+        assert_eq!(name("framing", "running"), Some(json!("started")));
+        assert_eq!(name("running", "blocked"), Some(json!("question")));
+        assert_eq!(name("proving", "ready"), Some(json!("ready")));
+        assert_eq!(name("landing", "ready"), None, "the human just clicked");
+        assert_eq!(name("running", "proving"), None);
+        let e = event("running", "7", &r("blocked")).unwrap();
+        assert_eq!(
+            e["message"],
+            "fennec a une question sur « Add filters » : Which port?"
+        );
+        assert_eq!(e["project_name"], "my app");
+        assert!(e["url"].as_str().unwrap().ends_with("/#%2Fp%2Fmy%20app/7"));
+        let e = event("thinking", "7", &r("talk")).unwrap();
+        assert_eq!(
+            e["message"],
+            "fennec a une question sur « Add filters » : Hi?"
+        );
+        let e = event("proving", "7", &r("failed")).unwrap();
+        assert_eq!(e["message"], "« Add filters » a échoué : timeout");
+    }
 
     #[test]
     fn an_attached_image_is_kept_and_named_by_a_line() {

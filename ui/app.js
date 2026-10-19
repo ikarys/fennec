@@ -2395,12 +2395,13 @@ function buildFontScale() {
   };
 }
 
-// The settings panels, one tab each: general, appearance, rules, skills, cleaning.
+// The settings panels, one tab each: general, appearance, rules, skills, plugins, cleaning.
 document.querySelectorAll("#settings-tabs [role=tab]").forEach((b) => {
   b.onclick = () => {
     document.querySelectorAll("#settings-tabs [role=tab]").forEach((t) => t.setAttribute("aria-selected", String(t === b)));
-    ["settings-general", "settings-appearance", "settings-rules", "settings-skills", "settings-clean"].forEach((id) => $(id).hidden = id !== b.dataset.panel);
+    ["settings-general", "settings-appearance", "settings-rules", "settings-skills", "settings-plugins", "settings-clean"].forEach((id) => $(id).hidden = id !== b.dataset.panel);
     if (b.dataset.panel === "settings-clean") showLeftovers();
+    if (b.dataset.panel === "settings-plugins") showPlugins({});
     if (b.dataset.panel === "settings-rules") changeRules($("settings-rules"), "", "user");
   };
 });
@@ -2621,6 +2622,40 @@ function drawSkillList() {
       ? "Aucun skill ne correspond à la recherche." : "Aucun skill sur cette machine." })]));
 }
 $("skill-search").oninput = drawSkillList;
+
+// The person's plugins: each says when it speaks; one is tried with a test
+// message before trusting it with real questions.
+const PLUGIN_EVENTS = { started: "commence", question: "a une question", ready: "est prête", failed: "échoue",
+  landed: "est commitée", before_land: "avant chaque commit, qu'il peut empêcher" };
+async function showPlugins(change) {
+  $("plugins-error").textContent = $("plugins-saved").textContent = "";
+  let got;
+  try {
+    got = await api("/api/plugins", change);
+  } catch (e) {
+    $("plugins-error").textContent = e.message;
+    return;
+  }
+  if (change.test && got.tried) $("plugins-error").textContent = `${change.name} : ${got.tried}`;
+  else if (change.test) $("plugins-saved").textContent = `Message d'essai envoyé par ${change.name}.`;
+  $("plugins-list").replaceChildren(...got.plugins.map((p) => {
+    if (p.error) return el("li", {}, el("strong", { textContent: p.name }), el("span", { className: "what error", textContent: p.error }));
+    const when = p.events.map((e) => PLUGIN_EVENTS[e] ?? e).join(", ");
+    const test = el("button", { type: "button", className: "quiet", ariaLabel: `Essayer ${p.name}`, title: "Envoyer un message d'essai" });
+    setIcon(test, "send");
+    test.onclick = async () => {
+      test.disabled = true;
+      await showPlugins({ name: p.name, test: true });
+    };
+    const on = el("button", { type: "button", className: "switch" });
+    on.setAttribute("role", "switch");
+    on.setAttribute("aria-checked", String(p.on));
+    on.setAttribute("aria-label", `${p.on ? "Désactiver" : "Activer"} le plugin ${p.name}`);
+    on.onclick = () => showPlugins({ name: p.name, on: !p.on });
+    return el("li", { title: p.from }, el("strong", { textContent: p.name }),
+      el("span", { className: "what", textContent: `${p.description ? p.description + " · " : ""}quand une tâche ${when}` }), test, on);
+  }), ...(got.plugins.length ? [] : [el("li", { className: "muted", textContent: "Aucun plugin dans ~/.config/fennec/plugins." })]));
+}
 
 // The rules said in words, a project's on its page and the human's own in
 // the settings: one list and one form each, the scope fixed by where it is.

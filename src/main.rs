@@ -457,6 +457,41 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
             all.sort_by_key(|s| s["chosen"] != true);
             Ok(json!(all))
         }
+        // The person's plugins: enable one, take it back, or send it a test
+        // message; then every plugin found, with what it listens to.
+        ("POST", "/api/plugins") => {
+            use fennec_os::plugin;
+            let v = input()?;
+            let name = field(&v, "name");
+            let mut tried = Value::Null;
+            if !name.is_empty() && v["test"] == true {
+                let p = plugin::catalog()?
+                    .into_iter()
+                    .flatten()
+                    .find(|p| p.name == name)
+                    .ok_or_else(|| io::Error::other("plugin inconnu"))?;
+                let test = json!({"event": "test", "title": "Essai",
+                                  "message": "fennec : essai du plugin, tout va bien"});
+                tried = json!(plugin::call(&p, &test).err().unwrap_or_default());
+            } else if !name.is_empty() {
+                plugin::choose(&name, v["on"] == true)?;
+            }
+            let on = plugin::enabled()?;
+            let home = std::env::var("HOME").unwrap_or_default();
+            let all: Vec<Value> = plugin::catalog()?
+                .into_iter()
+                .map(|p| match p {
+                    Ok(p) => {
+                        let from = p.run.display().to_string();
+                        json!({"name": p.name, "description": p.description,
+                               "events": p.events, "on": on.contains(&p.name),
+                               "from": from.replacen(&home, "~", 1)})
+                    }
+                    Err((name, why)) => json!({"name": name, "error": why}),
+                })
+                .collect();
+            Ok(json!({"plugins": all, "tried": tried}))
+        }
         // Discussions: a plain conversation with an agent in a folder the
         // person chose; the chat file is the exchange, the page follows it.
         ("POST", "/api/chats") => {

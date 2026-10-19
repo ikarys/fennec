@@ -511,6 +511,13 @@
                           overflow: hidden; }
   #skills-list li button { grid-column: 2; grid-row: 1 / span 2; padding: 2px 10px; font-size: 13px; }
   #skill-search { width: 100%; margin-top: 6px; }
+  #plugins-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; column-gap: 8px; align-items: center;
+                     padding: 6px 8px; margin-bottom: 4px; border-radius: 6px; background: var(--soft); }
+  #plugins-list li .what { grid-column: 1; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+  #plugins-list li .what.error { color: var(--bad); }
+  #plugins-list li strong { grid-column: 1; overflow-wrap: anywhere; }
+  #plugins-list li button { grid-row: 1 / span 2; grid-column: 2; padding: 2px 10px; font-size: 13px; }
+  #plugins-list li button.switch { grid-column: 3; }
   #leftovers li label { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; align-items: baseline;
                         padding: 8px 10px; margin-bottom: 4px; border-radius: 6px; background: var(--soft); cursor: pointer; }
   #leftovers li .what { grid-column: 2; font-size: 13px; color: var(--muted); }
@@ -804,6 +811,7 @@
       <button type="button" role="tab" aria-selected="false" data-panel="settings-appearance">Apparence</button>
       <button type="button" role="tab" aria-selected="false" data-panel="settings-rules">Règles</button>
       <button type="button" role="tab" aria-selected="false" data-panel="settings-skills">Skills</button>
+      <button type="button" role="tab" aria-selected="false" data-panel="settings-plugins">Plugins</button>
       <button type="button" role="tab" aria-selected="false" data-panel="settings-clean">Nettoyage</button>
     </div>
     <div id="settings-general">
@@ -860,6 +868,13 @@
       <input id="skill-search" type="search" aria-label="Chercher un skill" placeholder="Chercher parmi les skills de ta machine…">
       <ul id="skills-list"></ul>
       <p class="error" id="skills-error" role="alert"></p>
+    </div>
+    <div id="settings-plugins" hidden>
+      <p class="muted">Un plugin te prévient ailleurs (Discord, Telegram, Teams, ntfy…) quand une tâche a une question, est prête ou échoue.
+        Chacun est un dossier de ~/.config/fennec/plugins avec un plugin.json ; il tourne sur ta machine avec tes droits, seulement une fois activé.</p>
+      <ul id="plugins-list"></ul>
+      <p class="error" id="plugins-error" role="alert"></p>
+      <p class="saved" id="plugins-saved" role="status"></p>
     </div>
     <div id="settings-clean" hidden>
       <p class="muted">Ce que fennec a laissé derrière lui quand un travail a été coupé en route (redémarrage, arrêt au mauvais moment) :
