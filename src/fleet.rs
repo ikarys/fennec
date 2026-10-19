@@ -146,7 +146,7 @@ fn held(project: &str, requests: &[(String, Value)]) -> Option<String> {
                 // Set aside, its work still sits in the folder: nothing else
                 // starts there until it is committed or dropped.
                 Some((_, r)) if r["status"] == "passed" => format!(
-                    "« {} », mise de côté, occupe encore le dossier : commite-la ou abandonne-la",
+                    "« {} », mise de côté, rend le dossier au prochain passage",
                     short(r)
                 ),
                 Some((_, r)) => format!("« {} » occupe le dossier", short(r)),
@@ -244,6 +244,21 @@ pub fn tick(store: &Store, start: fn(String)) -> io::Result<()> {
         }
     }
     let queue = queue(store)?;
+    // Work set aside before it gave its folder back: it gives it back now.
+    for (_, r) in &queue {
+        if let Some((_, owner)) = holder(r["project"].as_str().unwrap_or(""), &requests)
+            && owner["status"] == "passed"
+            && let Err(e) = crate::work::park(owner, true)
+        {
+            // Said once, on the page, rather than tried again every look.
+            v["on"] = json!(false);
+            v["stopped"] = json!(format!(
+                "« {} » n'a pas pu rendre son dossier ({e})",
+                short(owner)
+            ));
+            return save(store, &v);
+        }
+    }
     let at_once = v["at_once"].as_u64().unwrap_or(1) as usize;
     let states = states(&queue, &requests, at_once, |p| held(p, &requests));
     if let Some(((id, _), _)) = queue.iter().zip(&states).find(|(_, s)| s.is_none()) {

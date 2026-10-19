@@ -983,18 +983,41 @@ pub fn later(store: &Store, id: &str) -> io::Result<()> {
 /// "Passer": the work is set aside, the project untouched. The world stays,
 /// so the human can come back to it and commit later.
 pub fn pass(store: &Store, id: &str) -> io::Result<()> {
-    if store.load(id)?["status"] != "ready" {
+    let request = store.load(id)?;
+    if request["status"] != "ready" {
         return Err(io::Error::other("cette tâche n'attend pas ta décision"));
     }
+    park(&request, true)?;
     store.update(id, |r| r["status"] = json!("passed"))
 }
 
-/// Back from the history to the human's decisions.
+/// Back from the history to the human's decisions: its work back in the
+/// folder, if the folder is free.
 pub fn resume(store: &Store, id: &str) -> io::Result<()> {
-    if store.load(id)?["status"] != "passed" {
+    let request = store.load(id)?;
+    if request["status"] != "passed" {
         return Err(io::Error::other("cette tâche n'a pas été mise de côté"));
     }
+    park(&request, false)?;
     store.update(id, |r| r["status"] = json!("ready"))
+}
+
+/// Work set aside does not hold the project folder: it waits on its branch,
+/// the folder goes back to the human (fennec-os `park`), and comes back to
+/// it when resumed.
+pub fn park(request: &Value, on: bool) -> io::Result<()> {
+    let Some(run) = request["run"].as_str() else {
+        return Ok(());
+    };
+    let worlds = Worlds::from_env()?;
+    let Ok(world) = worlds.open(run) else {
+        return Ok(());
+    };
+    if on {
+        worlds.park(&world)
+    } else {
+        worlds.unpark(&world)
+    }
 }
 
 /// Opens `folder` in the human's editor; false when there is none.
@@ -1500,7 +1523,7 @@ mod tests {
 
     #[test]
     fn a_failed_request_goes_back_for_later_as_first_written() {
-        let tmp = std::env::temp_dir().join(format!("fennec-lead-later-{}", std::process::id()));
+        let tmp = std::env::temp_dir().join(format!("fennec-lead-relater-{}", std::process::id()));
         let store = Store { root: tmp.clone() };
         std::fs::create_dir_all(tmp.join("requests")).unwrap();
         let id = "1".to_string();
