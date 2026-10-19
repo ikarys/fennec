@@ -565,7 +565,9 @@
   .chat .ask code { font-size: 13px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .chat .ask .muted { font-size: 12px; }
   .chat .ask button { padding: 3px 10px; font-size: 13px; }
-  .chat .ask.plan { flex-direction: column; align-items: stretch; }
+  /* One line: wrapped, a column takes its widest child's width and a long
+     code block would push past the page. */
+  .chat .ask.plan { flex-direction: column; flex-wrap: nowrap; align-items: stretch; }
   .chat .ask.plan .said { max-width: none; }
   .chat-composer { margin-top: 10px; }
   .chat-actions { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
