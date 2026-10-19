@@ -843,9 +843,7 @@ pub fn stop(store: &Store, id: &str) -> io::Result<()> {
         request["status"].as_str(),
         Some("thinking" | "framing" | "waiting" | "running" | "proving" | "landing")
     ) {
-        return Err(io::Error::other(
-            "fennec ne travaille plus sur cette tâche",
-        ));
+        return Err(io::Error::other("fennec ne travaille plus sur cette tâche"));
     }
     if let Ok(mut s) = STOPS.lock() {
         s.push(id.to_string());
@@ -935,9 +933,7 @@ pub fn drop(store: &Store, id: &str) -> io::Result<()> {
         status.as_str(),
         "talk" | "question" | "blocked" | "ready" | "failed"
     ) {
-        return Err(io::Error::other(
-            "fennec travaille encore sur cette tâche",
-        ));
+        return Err(io::Error::other("fennec travaille encore sur cette tâche"));
     }
     // Its work goes too: in the project folder, the folder comes back.
     let request = store.load(id)?;

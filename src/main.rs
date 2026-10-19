@@ -3,6 +3,7 @@
 //! The HTTP server is std only: one local user, a handful of routes, no reason
 //! to pull an async runtime into a synchronous codebase.
 
+mod fleet;
 mod state;
 mod work;
 
@@ -52,6 +53,7 @@ fn serve(addr: &str) -> io::Result<()> {
     }
     // Requests from before stats were kept get theirs, once, off the way.
     std::thread::spawn(|| Store::from_env().map(|s| work::overview(&s)));
+    fleet::watch();
     let listener = TcpListener::bind(addr)?;
     let port = listener.local_addr()?.port();
     println!("fennec : http://127.0.0.1:{port}");
@@ -220,8 +222,13 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
                 .flatten()
                 .filter_map(|k| k.as_str().map(str::to_string))
                 .collect();
-            let later = v["later"] == true;
+            // Put in the Fleet: kept for later, started by the Fleet.
+            let fleet = v["fleet"] == true;
+            let later = v["later"] == true || fleet;
             let id = store.add_request(&field(&v, "project"), &field(&v, "text"), &off, later)?;
+            if fleet {
+                fleet::place(&store, &id, "add")?;
+            }
             if !later {
                 work::talk(id.clone());
             }
@@ -232,6 +239,18 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
             let id = field(&input()?, "id");
             store.launch(&id)?;
             work::talk(id);
+            Ok(json!({}))
+        }
+        // The Fleet: tasks for later fennec starts on its own, in one queue.
+        ("GET", "/api/fleet") => fleet::view(&store),
+        ("POST", "/api/fleet") => {
+            let v = input()?;
+            fleet::set(&store, v["on"].as_bool(), v["at_once"].as_u64())?;
+            Ok(json!({}))
+        }
+        ("POST", "/api/fleet/place") => {
+            let v = input()?;
+            fleet::place(&store, &field(&v, "id"), &field(&v, "action"))?;
             Ok(json!({}))
         }
         ("POST", "/api/rewrite") => {
@@ -472,8 +491,15 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
         ("POST", "/api/chat/replay") => {
             let v = input()?;
             let id = field(&v, "id");
-            let index = v["index"].as_u64().ok_or_else(|| io::Error::other("missing index"))?;
-            fennec_os::chat::replay(&Worlds::from_env()?, &id, index as usize, &field(&v, "text"))?;
+            let index = v["index"]
+                .as_u64()
+                .ok_or_else(|| io::Error::other("missing index"))?;
+            fennec_os::chat::replay(
+                &Worlds::from_env()?,
+                &id,
+                index as usize,
+                &field(&v, "text"),
+            )?;
             work::chat(id);
             Ok(json!({}))
         }
