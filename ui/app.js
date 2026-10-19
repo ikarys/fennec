@@ -1422,16 +1422,61 @@ function chatQuestion(c) {
   if (p.tool === "propose_plan") {
     open.textContent = "Appliquer le plan";
     refuse.textContent = "Continuer à discuter";
+    const actions = el("div", { className: "chat-actions" }, open);
+    // A plan in numbered steps, in a project: each step can become a task of
+    // its own, kept for later; the turn ends there.
+    const steps = planSteps(p.plan ?? "");
+    if (c.project && steps.length > 1) {
+      const split = el("button", { type: "button", textContent: `En faire ${steps.length} tâches` });
+      split.onclick = async () => {
+        $("chat-error").textContent = "";
+        split.disabled = true;
+        try {
+          for (const s of steps) {
+            const text = `${s}\n\n---\nUne étape du plan ci-dessous, issu de la discussion « ${chatTitle(c)} ». `
+              + `Ne traite que cette étape.\n\n${p.plan}`;
+            await api("/api/requests", { project: c.folder, text, later: true });
+          }
+          await api("/api/chat/stop", { id: c.id });
+          location.hash = hashOf(c.folder);
+        } catch (e) {
+          split.disabled = false;
+          $("chat-error").textContent = e.message;
+        }
+      };
+      actions.append(split);
+    }
+    actions.append(refuse);
     return el("div", { className: "ask plan" },
       el("span", { className: "muted", textContent: "fennec propose ce plan et demande à modifier le dossier" }),
       el("div", { className: "said" }, ...md(p.plan ?? "")),
-      el("div", { className: "chat-actions" }, open, refuse));
+      actions);
   }
   return el("div", { className: "ask" },
     el("span", { className: "muted", textContent: "fennec demande" }),
     el("code", { title: p.path, textContent: p.path }),
     el("span", { className: "muted", title: p.directory, textContent: p.directory }),
     open, refuse);
+}
+
+// The numbered sections of a plan ("### 1. …"), each up to the next heading
+// as high as its own; what comes before or after them stays out.
+function planSteps(plan) {
+  const steps = [];
+  let level = 0;
+  for (const line of plan.split("\n")) {
+    const h = line.match(/^(#{1,6})\s+(\d+[.)])?/);
+    if (h && (!level || h[1].length <= level)) {
+      if (h[2]) {
+        level = h[1].length;
+        steps.push([line.replace(/^#+\s*/, "")]);
+        continue;
+      }
+      if (level) level = -1;
+    }
+    if (level > 0) steps.at(-1).push(line);
+  }
+  return steps.map((s) => s.join("\n").trim());
 }
 
 function chatTitle(c) {
