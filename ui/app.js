@@ -481,7 +481,9 @@ function details(item) {
   // A plan step carries the discussion's whole plan after "---": the same in
   // every step, so it is named as shared, apart from the step itself.
   const [step, plan] = (item.title ?? "").split("\n\n---\n");
-  if (step && step !== lead(step)) part("La tâche", el("div", {}, ...md(step)));
+  // Its first paragraph is the page's title already.
+  const rest = (step ?? "").trim().slice(lead(step).length).trim();
+  if (rest) part("La tâche", el("div", {}, ...md(rest)));
   if (plan) part("Le plan de la discussion, commun à ses tâches", el("div", {}, ...md(plan)));
   const errors = [item.reason, item.land_error].filter(Boolean);
   if (errors.length) part("Erreur", ...errors.map((e) => el("pre", { className: "failed", textContent: e })));
