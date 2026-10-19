@@ -299,6 +299,16 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
             work::rule(&store, &field(&v, "id"), &field(&v, "scope"))?;
             Ok(json!({}))
         }
+        ("GET", "/api/leftovers") => work::leftovers(&store),
+        ("POST", "/api/leftovers/clear") => {
+            let ids: Vec<String> = input()?["ids"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|v| v.as_str().map(str::to_string))
+                .collect();
+            work::clear(&store, &ids)
+        }
         ("POST", "/api/drop") => {
             work::drop(&store, &field(&input()?, "id"))?;
             Ok(json!({}))
