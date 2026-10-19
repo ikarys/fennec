@@ -564,6 +564,7 @@ mod tests {
             ro_paths: Vec::new(),
             memory_mb: None,
             apart: false,
+            base: None,
         }
     }
 

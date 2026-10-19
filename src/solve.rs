@@ -675,7 +675,22 @@ pub fn land(
     }
     let home = worlds.home(&world)?;
     let current = current_branch(worlds, id, project)?;
-    let head = git(project, &["rev-parse", &format!("refs/heads/{current}")])?;
+    // An existing branch other than the folder's is landed on as it stands:
+    // the work is replayed on it and checked again, like a moved branch.
+    let onto = match branch {
+        Some(b)
+            if b != current
+                && git(
+                    project,
+                    &["rev-parse", "-q", "--verify", &format!("refs/heads/{b}")],
+                )
+                .is_ok() =>
+        {
+            b.to_string()
+        }
+        _ => current.clone(),
+    };
+    let head = git(project, &["rev-parse", &format!("refs/heads/{onto}")])?;
     let moved = git(project, &["merge-base", "--is-ancestor", &head, &commit]).is_err();
     if moved {
         // The verdict no longer holds for any tree but the old one. Edits
@@ -746,8 +761,13 @@ pub fn land(
         None => {
             git(project, &["merge", "-q", "--ff-only", &squashed])?;
         }
-        // `git branch` without -f refuses an existing branch: the commit was
-        // verified on the current branch's tree, not on that one.
+        // Not the folder's branch: its ref moves, no work tree is touched.
+        Some(b) if b == onto => {
+            git(
+                project,
+                &["update-ref", &format!("refs/heads/{b}"), &squashed, &head],
+            )?;
+        }
         Some(b) => {
             git(project, &["branch", "--", b, &squashed])?;
         }

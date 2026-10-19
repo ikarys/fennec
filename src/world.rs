@@ -46,6 +46,10 @@ pub struct Worlds {
     /// watches (fennec-lead's Fleet) must not hold the folder while it
     /// waits for the human.
     pub apart: bool,
+    /// New worlds of a project start from this branch when it exists,
+    /// rather than from the folder's HEAD: work queued on a branch of its
+    /// own builds on what landed there before.
+    pub base: Option<String>,
 }
 
 pub struct World {
@@ -104,6 +108,7 @@ impl Worlds {
             ro_paths,
             memory_mb,
             apart: false,
+            base: None,
         })
     }
 
@@ -132,11 +137,18 @@ impl Worlds {
                 } else {
                     place(project)?
                 };
-                (
-                    PathBuf::from(common),
-                    git(project, &["rev-parse", "HEAD"])?,
-                    place,
-                )
+                let base = self.base.as_deref().and_then(|b| {
+                    git(
+                        project,
+                        &["rev-parse", "-q", "--verify", &format!("refs/heads/{b}")],
+                    )
+                    .ok()
+                });
+                let rev = match base {
+                    Some(rev) => rev,
+                    None => git(project, &["rev-parse", "HEAD"])?,
+                };
+                (PathBuf::from(common), rev, place)
             }
         };
         let id = new_id();

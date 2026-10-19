@@ -260,6 +260,54 @@ fn a_run_lands_on_the_branch_the_rules_ask_for_and_is_pushed() {
 }
 
 #[test]
+fn work_queued_on_a_branch_builds_on_what_landed_there() {
+    let mut f = fixture("queue-branch");
+    f.worlds.base = Some("fleet".to_string());
+    let before = git(&f, &["rev-parse", "HEAD"]);
+    let first = Script::new("first", &[write("answer", "42\n"), done()]);
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&first], 10).unwrap();
+    let one = land(
+        &f.worlds,
+        record["winner"].as_str().unwrap(),
+        Some("fleet"),
+        Some("one"),
+    )
+    .unwrap();
+    assert_eq!(git(&f, &["rev-parse", "fleet"]), one);
+
+    // The next one starts from the branch: it sees the first one's work.
+    let second = Script::new("second", &[write("more", "x\n"), done()]);
+    let mut t = task(&[]);
+    t.verify = vec!["test -f answer".to_string()];
+    let record = solve(&f.worlds, &f.project, &t, &[&second], 10).unwrap();
+    let two = land(
+        &f.worlds,
+        record["winner"].as_str().unwrap(),
+        Some("fleet"),
+        Some("two"),
+    )
+    .unwrap();
+    assert_eq!(git(&f, &["rev-parse", "fleet~1"]), one);
+    assert_eq!(git(&f, &["rev-parse", "fleet"]), two);
+
+    // Work started elsewhere is replayed on the branch and checked again.
+    f.worlds.base = None;
+    let third = Script::new("third", &[write("third", "3\n"), done()]);
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&third], 10).unwrap();
+    land(
+        &f.worlds,
+        record["winner"].as_str().unwrap(),
+        Some("fleet"),
+        Some("three"),
+    )
+    .unwrap();
+    assert_eq!(git(&f, &["rev-parse", "fleet~1"]), two);
+    // The human's branch and folder never moved.
+    assert_eq!(git(&f, &["rev-parse", "HEAD"]), before);
+    assert!(!f.project.join("answer").exists());
+}
+
+#[test]
 fn a_proof_clicks_like_a_user_and_fails_on_what_the_page_does_not_show() {
     if Command::new("chromium").arg("--version").output().is_err() {
         return; // no browser on this machine: nothing to drive
