@@ -63,6 +63,9 @@
   /* Team, figures and settings: one row of icons, named on hover. */
   #side .tools { display: flex; gap: 4px; border-top: 1px solid var(--line); padding-top: 10px; }
   #side .tools button { flex: 1; justify-content: center; color: var(--muted); padding: 8px; border-radius: 6px; }
+  #version { font: 11px ui-monospace, monospace; color: var(--muted); text-align: center; margin-top: 6px; }
+  #version .dirty { color: var(--warn); }
+  #version .stale { color: var(--accent); font-family: system-ui, sans-serif; margin-top: 2px; }
   #side .tools button:hover, #side .tools button[aria-current=true] { color: var(--text); background: var(--soft); }
   #side .link.ic { color: var(--text); }
   #side .spacer { flex: 1; }
@@ -600,6 +603,7 @@
     <button class="link" id="open-stats" data-icon="stats" aria-label="Stats" title="Stats"></button>
     <button class="link" id="open-settings" data-icon="gear" aria-label="Réglages" title="Réglages"></button>
   </div>
+  <div id="version"></div>
 </nav>
 <main>
   <section id="list" aria-label="Demandes">

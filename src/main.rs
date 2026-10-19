@@ -178,12 +178,38 @@ fn shot(file: &str) -> io::Result<Vec<u8>> {
     std::fs::read(Worlds::from_env()?.root.join("proofs").join(file))
 }
 
+/// What this binary was built from (see build.rs), and where its branch is
+/// now: a newer commit means the running fennec is not the latest.
+fn version() -> Value {
+    let branch = env!("FENNEC_BRANCH");
+    let latest = (!branch.is_empty())
+        .then(|| {
+            std::process::Command::new("git")
+                .args(["rev-parse", "--short", branch])
+                .current_dir(env!("CARGO_MANIFEST_DIR"))
+                .output()
+                .ok()
+        })
+        .flatten()
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string());
+    json!({
+        "version": env!("CARGO_PKG_VERSION"),
+        "commit": env!("FENNEC_COMMIT"),
+        "branch": branch,
+        "dirty": env!("FENNEC_DIRTY") == "true",
+        "built": env!("FENNEC_BUILT").parse::<u64>().unwrap_or(0),
+        "latest": latest,
+    })
+}
+
 fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
     let store = Store::from_env()?;
     let input = || -> io::Result<Value> { serde_json::from_slice(body).map_err(io::Error::other) };
     let field = |v: &Value, k: &str| v[k].as_str().map(str::to_string).unwrap_or_default();
     match (method, path) {
         ("GET", "/api/view") => store.view(),
+        ("GET", "/api/version") => Ok(version()),
         ("POST", "/api/image") => Ok(json!({"line": store.save_image(&field(&input()?, "data"))?})),
         ("POST", "/api/requests") => {
             let v = input()?;
