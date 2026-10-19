@@ -468,6 +468,15 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
             work::chat(id);
             Ok(json!({}))
         }
+        // One of the person's messages said again: what followed is dropped.
+        ("POST", "/api/chat/replay") => {
+            let v = input()?;
+            let id = field(&v, "id");
+            let index = v["index"].as_u64().ok_or_else(|| io::Error::other("missing index"))?;
+            fennec_os::chat::replay(&Worlds::from_env()?, &id, index as usize, &field(&v, "text"))?;
+            work::chat(id);
+            Ok(json!({}))
+        }
         ("POST", "/api/chat/stop") => {
             fennec_os::chat::stop(&Worlds::from_env()?, &field(&input()?, "id"))?;
             Ok(json!({}))
