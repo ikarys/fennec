@@ -470,7 +470,9 @@
                   text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
   #page-rules ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; }
   #page-rules li { display: flex; gap: 6px; align-items: center; background: var(--soft); border-radius: 6px; padding: 4px 4px 4px 10px; }
-  #page-rules li .muted { flex: 1; font-size: 12px; }
+  #page-rules li .muted { flex: 1; font-size: 12px; text-align: right; }
+  #page-rules li.empty { background: none; padding-left: 0; font-size: 12px; }
+  #page-rules h3 .count { text-transform: none; letter-spacing: 0; background: var(--soft); color: var(--muted); }
   .small { font-size: 12px; }
   #page .tiles { margin: 10px 0; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
   .rule-form { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 4px; }
@@ -687,13 +689,14 @@
     <div class="tiles" id="page-tiles"></div>
     <div class="sub"><h3 data-icon="shield">Où fennec travaille</h3>
       <select id="page-place" aria-label="Où fennec travaille"></select></div>
-    <div class="sub" id="page-rules"><h3 data-icon="rule"><span class="summary"></span></h3><ul></ul>
+    <div class="sub" id="page-rules"><h3 data-icon="rule">Règles <span class="count" hidden></span></h3>
+      <p class="muted small">Des consignes que chaque agent suit à chaque tâche. Tu peux aussi en donner une en corrigeant une tâche : fennec te propose de la garder.</p>
+      <ul></ul>
       <form id="rule-form" class="rule-form">
-        <input id="rule-text" aria-label="Nouvelle règle" placeholder="Une règle, par ex. « commits en anglais, format Conventional Commits »" required>
-        <select id="rule-scope" aria-label="Pour"><option value="project">Pour ce projet</option><option value="user">Pour tous mes projets</option></select>
+        <input id="rule-text" aria-label="Nouvelle règle" placeholder="Nouvelle règle, par ex. « commits en anglais, format Conventional Commits »" required>
+        <select id="rule-scope" aria-label="S'applique à"><option value="project">À ce projet</option><option value="user">À tous mes projets</option></select>
         <button data-icon="plus" aria-label="Ajouter la règle" title="Ajouter la règle"></button>
-      </form>
-      <p class="muted small">fennec la donne à toute l'équipe à chaque tâche. Tu peux aussi la dire en corrigeant une tâche : fennec propose de la garder.</p></div>
+      </form></div>
     <p class="error" id="page-error" role="alert"></p>
   </aside>
   <!-- The team, the figures and the settings: pages the address names,
