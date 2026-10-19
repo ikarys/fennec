@@ -38,7 +38,7 @@ eval(src.match(/const el = \(tag, props = \{\}, \.\.\.children\) => \{[\s\S]*?\n
   + src.match(/const errorOf = \(button\) => [^\n]*\n/)[0]
   + src.match(/async function api\([\s\S]*?\n}\n/)[0]
   + grab("action") + grab("line") + grab("rowActions")
-  + grab("underway") + src.match(/const STEPS = \[[\s\S]*?\]\];\n/)[0] + grab("stages") + grab("conversation") + grab("doneWhen") + grab("facts")
+  + grab("underway") + src.match(/const STEPS = \[[\s\S]*?\]\];\n/)[0] + grab("stages") + grab("ended") + grab("conversation") + grab("doneWhen") + grab("facts")
   + "globalThis.rowActions = rowActions; globalThis.underway = underway;");
 
 // The row of a running request: a stop icon, one click more to confirm.

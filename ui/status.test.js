@@ -24,7 +24,7 @@ eval(src.match(/const el = \(tag, props = \{\}, \.\.\.children\) => \{[\s\S]*?\n
   + src.match(/const ICON_OF = \[[\s\S]*?\];/)[0]
   + grab("pastState") + grab("duration") + arrow("compact")
   + grab("setIcon") + grab("statusOf") + grab("reqHead")
-  + grab("iconize") + arrow("errorOf") + grab("action") + src.match(/async function follow\([\s\S]*?\n\}\n/)[0] + grab("underway") + src.match(/const STEPS = \[[\s\S]*?\]\];\n/)[0] + grab("stages") + grab("conversation") + grab("doneWhen") + grab("facts")
+  + grab("iconize") + arrow("errorOf") + grab("action") + src.match(/async function follow\([\s\S]*?\n\}\n/)[0] + grab("underway") + src.match(/const STEPS = \[[\s\S]*?\]\];\n/)[0] + grab("stages") + grab("ended") + grab("conversation") + grab("doneWhen") + grab("facts")
   + "globalThis.statusOf = statusOf; globalThis.reqHead = reqHead; globalThis.underway = underway;");
 global.api = async () => [];
 global.refresh = () => {};
@@ -74,5 +74,11 @@ assert.ok(!barOf(underway({ ...busy, waiting: true, alive: true }))
 // Where the work stands, as steps: before it done, it highlighted.
 const steps = underway(busy).children[0].children;
 assert.deepEqual(steps.map((li) => li.className), ["done", "done", "now", "", ""], "travaille = Travail en cours");
+
+// Finished: what the figures show reached, and where it broke.
+const failed = ended({ kind: "failed", stats: { stages: { Discussion: {}, Travail: {}, Preuve: {} } } }).children;
+assert.deepEqual(failed.map((li) => li.className), ["done", "", "done", "stop", ""], "échoué à l'essai, sans cadrage");
+const landed = ended({ kind: "landed", stats: { stages: { Discussion: {}, Travail: {}, Preuve: {} } } }).children;
+assert.equal(landed.at(-1).className, "done", "commité : Commit fait");
 
 console.log("OK");
