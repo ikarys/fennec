@@ -224,6 +224,38 @@ pub fn say(worlds: &Worlds, id: &str, text: &str) -> io::Result<()> {
     Ok(())
 }
 
+/// Says `text` again in place of the person's message at `index`: the
+/// exchange from there on is dropped, then the turn runs as after [`say`].
+/// Files changed since stay as they are; the cost already spent stays counted.
+pub fn replay(worlds: &Worlds, id: &str, index: usize, text: &str) -> io::Result<()> {
+    if text.trim().is_empty() {
+        return Err(io::Error::other("empty message"));
+    }
+    let mut refused = None;
+    update(worlds, id, |c| {
+        if c["status"] == "thinking" || c["status"] == "waiting" {
+            refused = Some("fennec is still answering");
+            return;
+        }
+        if c["messages"][index]["role"] != "user" {
+            refused = Some("no message of yours there");
+            return;
+        }
+        if let Some(m) = c["messages"].as_array_mut() {
+            m.truncate(index);
+            m.push(json!({"role": "user", "content": text.trim()}));
+        }
+        c["status"] = json!("thinking");
+        c["since"] = json!(now());
+        c["stop"] = json!(false);
+        c["error"] = Value::Null;
+    })?;
+    match refused {
+        Some(why) => Err(io::Error::other(why)),
+        None => Ok(()),
+    }
+}
+
 /// fennec's turn: model calls and tools until a reply without a tool call,
 /// a stop asked by the person, or `max_steps`. Each call is saved as it
 /// comes, so the page follows the turn while it runs.
