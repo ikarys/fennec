@@ -512,10 +512,16 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
             Ok(json!({"id": id}))
         }
         ("POST", "/api/rules") => {
-            // Read, or first add or take back one rule said on the project page.
+            // Read, or first add or take back one rule: a project's on its
+            // page, the human's own (every project) in the settings.
             let v = input()?;
-            let path = project(&store, &field(&v, "project"))?;
             let (scope, text) = (field(&v, "scope"), field(&v, "text"));
+            let path = match field(&v, "project").as_str() {
+                // No project: only the user's rules; the config folder holds
+                // no AGENTS.md, so none of a project's are read with them.
+                "" if scope == "user" || scope.is_empty() => fennec_os::rules::config_dir()?,
+                p => project(&store, p)?,
+            };
             match field(&v, "change").as_str() {
                 "add" => fennec_os::rules::say(&path, &scope, &text)?,
                 "remove" => fennec_os::rules::unsay(&path, &scope, &text)?,
