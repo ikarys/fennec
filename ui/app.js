@@ -611,9 +611,24 @@ async function journal(item) {
 const STEPS = [["Discussion", /^réfléchit/], ["Cadrage", /^se met au travail/], ["Travail", /^travaille/],
   ["Essai", /^essaie/], ["Commit", /^fait le commit/]];
 function stages(item) {
-  const now = STEPS.findIndex(([, re]) => re.test(item.step ?? ""));
+  if (item.step == null) return ended(item);
+  const now = STEPS.findIndex(([, re]) => re.test(item.step));
   return el("ol", { className: "stages" }, ...STEPS.map(([name], i) =>
     el("li", { className: i < now ? "done" : i === now ? "now" : "", textContent: name })));
+}
+// A finished request: the steps its figures show it reached, and where it
+// stopped when it did not end in a commit. A step skipped (direct work has
+// no Cadrage) stays plain.
+function ended(item) {
+  const reached = Object.keys(item.stats?.stages ?? {})
+    .map((name) => ["Discussion", "Cadrage", "Travail", "Preuve"].findIndex((s) => name.startsWith(s)));
+  if (item.kind === "landed") reached.push(STEPS.length - 1);
+  if (!reached.length) return null;
+  const last = Math.max(...reached);
+  const broke = item.kind === "failed" || item.kind === "dropped";
+  return el("ol", { className: "stages" }, ...STEPS.map(([name], i) => el("li", {
+    className: !reached.includes(i) ? "" : i === last && broke ? "stop" : "done", textContent: name,
+    title: i === last && broke ? (item.kind === "failed" ? "Échoué ici" : "Arrêté ici") : "" })));
 }
 
 function underway(item) {
@@ -963,7 +978,7 @@ function card(item) {
       action("Enregistrer", "/api/rewrite", () => ({ id: item.id, text: images.value() })),
       action("Supprimer", "/api/forget", { id: item.id }, { quiet: true }));
   } else if (item.kind === "failed") {
-    add(why(item.reason), conversation(item), doneWhen(item), ...work(item), shots(item), ...facts(item));
+    add(stages(item), why(item.reason), conversation(item), doneWhen(item), ...work(item), shots(item), ...facts(item));
     actions.append(dropButton(item.id, true), el("span", { className: "spacer" }),
       action("Réessayer", "/api/retry", { id: item.id }, { primary: true }));
   }
@@ -1025,6 +1040,8 @@ function line(item, state, dot) {
 function past(item) {
   const box = el("div", { className: "past" });
   box.dataset.key = "past-" + item.id;
+  const steps = stages(item);
+  if (steps) box.append(steps);
   if (item.kind === "dropped" && item.reason) box.append(el("div", { className: "muted", textContent: explain(item.reason) }));
   const talk = conversation(item);
   if (talk) box.append(talk);
