@@ -1027,7 +1027,9 @@ function card(item) {
     }
   } else if (item.kind === "failed") {
     add(stages(item), why(item.reason), conversation(item), doneWhen(item), ...work(item), shots(item), ...facts(item));
+    // Back to "Plus tard", as written: reworded there, launched again or given to the Fleet.
     actions.append(dropButton(item.id, true), el("span", { className: "spacer" }),
+      action("Remettre à plus tard", "/api/later", { id: item.id }),
       action("Réessayer", "/api/retry", { id: item.id }, { primary: true }));
   }
   // What was said to the model so far, on every card with a choice to make.
@@ -1861,7 +1863,8 @@ function showFleetBar(fleet, later) {
   const bar = $("fleet-bar");
   bar.hidden = !fleet || !(fleet.queued || later);
   if (bar.hidden) return;
-  bar.classList.toggle("on", fleet.on && fleet.queued > 0);
+  bar.classList.toggle("on", fleet.on && fleet.queued > 0 && !fleet.stuck);
+  bar.classList.toggle("blocked", !!fleet.stuck);
   const name = el("a", { href: "#fleet", textContent: "Fleet" });
   setIcon(name, "fleet");
   const toggle = el("button", { type: "button", textContent: fleet.on ? "Arrêter" : "Démarrer" });
@@ -1875,7 +1878,13 @@ function showFleetBar(fleet, later) {
     refresh(true);
   };
   bar.replaceChildren(name, el("span", { className: "muted",
-    textContent: `${fleet.on ? "en marche" : "arrêtée"} · ${fleet.queued} en file` }), el("span", { className: "spacer" }), toggle);
+    textContent: `${fleet.on ? "en marche" : "arrêtée"} · ${fleet.queued} en file` }), ...stuckLine(fleet.stuck), el("span", { className: "spacer" }), toggle);
+}
+// Running yet starting nothing: why, and the task in the way, to open.
+function stuckLine(stuck) {
+  if (!stuck) return [];
+  const link = stuck.id ? [" ", el("a", { href: hashOf(stuck.path, stuck.id), textContent: "voir la tâche" })] : [];
+  return [el("div", { className: "stuck warn-line" }, `Bloquée : ${stuck.why}.`, ...link)];
 }
 
 // The right pane: the chosen request in full, a page the address names,
@@ -1987,7 +1996,7 @@ const ICONS = {
 };
 const ICON_OF = [[/^(Commit|Pousser|Préparer)/, "commit"], [/^Ouvrir la page/, "page"], [/changements/, "diff"],
   [/^Ouvrir le code/, "code"], [/^Corriger|^Envoyer/, "fix"], [/^Passer/, "pass"], [/^Journal/, "journal"],
-  [/^Annuler$|^Abandonner/, "undo"], [/^Reprendre|^Lancer/, "resume"], [/^Supprimer/, "trash"], [/^Enregistrer$/, "save"], [/^Éditer$/, "pencil"], [/^Réessayer/, "retry"], [/^Archiver/, "inbox"], [/^Arrêter/, "stop"], [/Fleet$/, "fleet"]];
+  [/^Annuler$|^Abandonner/, "undo"], [/^Reprendre|^Lancer/, "resume"], [/^Supprimer/, "trash"], [/^Enregistrer$/, "save"], [/^Éditer$/, "pencil"], [/^Réessayer/, "retry"], [/^Archiver/, "inbox"], [/^Remettre à plus tard/, "clock"], [/^Arrêter/, "stop"], [/Fleet$/, "fleet"]];
 function iconize(button) {
   const name = ICON_OF.find(([re]) => re.test(button.textContent))?.[1];
   if (name) setIcon(button, name);
@@ -2734,6 +2743,8 @@ async function showFleet() {
   $("fleet-state").textContent = v.on ? "en marche" : "arrêtée";
   $("fleet-stopped").hidden = !v.stopped;
   $("fleet-stopped").textContent = v.stopped ? `Arrêtée toute seule : ${v.stopped}. Regarde la tâche, puis redémarre.` : "";
+  $("fleet-stuck").hidden = !v.stuck;
+  $("fleet-stuck").replaceChildren(...stuckLine(v.stuck));
   for (const [id, value] of [["fleet-at-once", String(v.at_once)], ["fleet-on-fail", v.on_fail]]) {
     if (document.activeElement !== $(id)) $(id).value = value;
   }
