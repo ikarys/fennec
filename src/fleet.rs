@@ -1,6 +1,7 @@
 //! The Fleet: tasks kept for later that fennec starts on its own, in one
 //! queue across projects. The decision is the task's; the project is only a
-//! place: where fennec works in the folder itself, one task at a time.
+//! place. Its work always goes apart, whatever the project chose: a task
+//! ready and waiting for the human never holds the folder from the next.
 //! `fleet.json` in the store holds the queue's order, run or stop, how many
 //! tasks may work at once, and whether a failure stops it. A task the Fleet
 //! started carries `fleet: true`, for its summary.
@@ -8,7 +9,6 @@
 use std::io;
 use std::path::Path;
 
-use fennec_os::world::{self, Held};
 use serde_json::{Value, json};
 
 use crate::state::{Store, is_working};
@@ -135,82 +135,18 @@ pub fn running(store: &Store) -> io::Result<bool> {
     Ok(load(store)?["on"] == true)
 }
 
-/// Why `project`'s folder cannot take a task now, or `None` when it can.
-fn held(project: &str, requests: &[(String, Value)]) -> Option<String> {
-    let p = Path::new(project);
-    match world::held(p) {
-        Err(e) => return Some(format!("dossier illisible ({e})")),
-        Ok(Some(Held::World(w))) => {
-            let owner = requests.iter().find(|(_, r)| r["run"] == w.as_str());
-            return Some(match owner {
-                // Set aside, its work still sits in the folder: nothing else
-                // starts there until it is committed or dropped.
-                Some((_, r)) if r["status"] == "passed" => format!(
-                    "« {} », mise de côté, rend le dossier au prochain passage",
-                    short(r)
-                ),
-                Some((_, r)) => format!("« {} » occupe le dossier", short(r)),
-                None => "une autre tâche occupe le dossier".into(),
-            });
-        }
-        Ok(Some(Held::Changes)) => {
-            return Some("le dossier a des changements pas encore commités".into());
-        }
-        Ok(None) => {}
-    }
-    // Still in conversation, the task has not checked the folder out yet.
-    let here = world::workspace(p) == "here";
-    let busy = requests
-        .iter()
-        .any(|(_, r)| r["project"] == project && is_working(r));
-    (here && busy).then(|| "une autre tâche travaille dans ce projet".into())
-}
-
-/// The task whose work holds `project`'s folder, if one does.
-fn holder<'a>(project: &str, requests: &'a [(String, Value)]) -> Option<&'a (String, Value)> {
-    match world::held(Path::new(project)) {
-        Ok(Some(Held::World(w))) => requests.iter().find(|(_, r)| r["run"] == w.as_str()),
-        _ => None,
-    }
-}
-
-/// Why a running Fleet starts nothing although tasks are queued and nothing
-/// works: the first task's wait, and the task in its way to open. `None`
-/// when it is stopped, empty, busy or about to start one.
-pub fn stuck(store: &Store, requests: &[(String, Value)]) -> io::Result<Option<Value>> {
-    let v = load(store)?;
-    let queue = queue(store)?;
-    if v["on"] != true || queue.is_empty() || requests.iter().any(|(_, r)| is_working(r)) {
-        return Ok(None);
-    }
-    let at_once = v["at_once"].as_u64().unwrap_or(1) as usize;
-    let states = states(&queue, requests, at_once, |p| held(p, requests));
-    if states.iter().any(Option::is_none) {
-        return Ok(None);
-    }
-    let project = queue[0].1["project"].as_str().unwrap_or("");
-    let by = holder(project, requests);
-    Ok(Some(json!({
-        "why": states[0], "id": by.map(|(id, _)| id), "path": by.map(|(_, r)| &r["project"]),
-    })))
-}
-
 /// Each queued task with what it waits for (`None`: it starts next), in order.
-/// Pure, given what holds each folder, so the choice is tested here.
+/// The folder is not one of them: the Fleet's work goes apart (`work`).
 fn states(
     queue: &[(String, Value)],
     requests: &[(String, Value)],
     at_once: usize,
-    held: impl Fn(&str) -> Option<String>,
 ) -> Vec<Option<String>> {
     let working = requests.iter().filter(|(_, r)| is_working(r)).count();
     let mut next = false;
     queue
         .iter()
-        .map(|(_, r)| {
-            if let Some(why) = held(r["project"].as_str().unwrap_or("")) {
-                return Some(why);
-            }
+        .map(|_| {
             if working >= at_once {
                 return Some("attend une place".into());
             }
@@ -224,8 +160,8 @@ fn states(
         .collect()
 }
 
-/// One look: when running and a place is free, the first queued task whose
-/// folder is free starts. `start` begins its work (`work::talk`).
+/// One look: when running and a place is free, the first queued task
+/// starts. `start` begins its work (`work::talk`).
 pub fn tick(store: &Store, start: fn(String)) -> io::Result<()> {
     let mut v = load(store)?;
     if v["on"] != true {
@@ -244,23 +180,8 @@ pub fn tick(store: &Store, start: fn(String)) -> io::Result<()> {
         }
     }
     let queue = queue(store)?;
-    // Work set aside before it gave its folder back: it gives it back now.
-    for (_, r) in &queue {
-        if let Some((_, owner)) = holder(r["project"].as_str().unwrap_or(""), &requests)
-            && owner["status"] == "passed"
-            && let Err(e) = crate::work::park(owner, true)
-        {
-            // Said once, on the page, rather than tried again every look.
-            v["on"] = json!(false);
-            v["stopped"] = json!(format!(
-                "« {} » n'a pas pu rendre son dossier ({e})",
-                short(owner)
-            ));
-            return save(store, &v);
-        }
-    }
     let at_once = v["at_once"].as_u64().unwrap_or(1) as usize;
-    let states = states(&queue, &requests, at_once, |p| held(p, &requests));
+    let states = states(&queue, &requests, at_once);
     if let Some(((id, _), _)) = queue.iter().zip(&states).find(|(_, s)| s.is_none()) {
         store.launch(id)?;
         store.update(id, |r| r["fleet"] = json!(true))?;
@@ -270,7 +191,7 @@ pub fn tick(store: &Store, start: fn(String)) -> io::Result<()> {
 }
 
 /// The Fleet, looked at every 3 s for as long as fennec runs.
-/// ponytail: polls; a task leaving its folder could wake it instead.
+/// ponytail: polls; a task finishing could wake it instead.
 pub fn watch() {
     std::thread::spawn(|| {
         loop {
@@ -289,7 +210,7 @@ pub fn view(store: &Store) -> io::Result<Value> {
     let queue = queue(store)?;
     let requests = store.requests()?;
     let at_once = v["at_once"].as_u64().unwrap_or(1) as usize;
-    let states = states(&queue, &requests, at_once, |p| held(p, &requests));
+    let states = states(&queue, &requests, at_once);
     let card = |id: &str, r: &Value| {
         let project = r["project"].as_str().unwrap_or("");
         json!({"id": id, "path": project, "title": crate::state::words(r["text"].as_str().unwrap_or("")),
@@ -352,7 +273,6 @@ pub fn view(store: &Store) -> io::Result<Value> {
     });
     Ok(
         json!({"on": v["on"], "at_once": v["at_once"], "on_fail": v["on_fail"], "stopped": v["stopped"],
-              "stuck": stuck(store, &requests)?,
               "queue": queued, "working": working, "summary": summary, "recent": recent}),
     )
 }
@@ -366,22 +286,19 @@ mod tests {
     }
 
     #[test]
-    fn the_first_free_task_starts_and_the_others_say_why_they_wait() {
+    fn the_first_task_starts_and_the_others_say_why_they_wait() {
         let queue = vec![
             ("a".to_string(), task("/p", "later")),
-            ("b".to_string(), task("/q", "later")),
-            ("c".to_string(), task("/r", "later")),
+            ("b".to_string(), task("/p", "later")),
         ];
-        let held = |p: &str| (p == "/p").then(|| "occupé".to_string());
-        let s = states(&queue, &[], 1, held);
-        assert_eq!(s[0].as_deref(), Some("occupé"));
-        assert_eq!(s[1], None, "the first free folder goes first");
-        assert_eq!(s[2].as_deref(), Some("attend son tour dans la Fleet"));
-        // Every place taken: nothing starts, whatever the folders.
+        let s = states(&queue, &[], 1);
+        assert_eq!(s[0], None, "the first goes first, whatever its folder");
+        assert_eq!(s[1].as_deref(), Some("attend son tour dans la Fleet"));
+        // Every place taken: nothing starts.
         let working = vec![("w".to_string(), task("/z", "running"))];
-        let s = states(&queue, &working, 1, held);
-        assert_eq!(s[1].as_deref(), Some("attend une place"));
-        assert_eq!(states(&queue, &working, 2, held)[1], None);
+        let s = states(&queue, &working, 1);
+        assert_eq!(s[0].as_deref(), Some("attend une place"));
+        assert_eq!(states(&queue, &working, 2)[0], None);
     }
 
     #[test]

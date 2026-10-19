@@ -1863,8 +1863,7 @@ function showFleetBar(fleet, later) {
   const bar = $("fleet-bar");
   bar.hidden = !fleet || !(fleet.queued || later);
   if (bar.hidden) return;
-  bar.classList.toggle("on", fleet.on && fleet.queued > 0 && !fleet.stuck);
-  bar.classList.toggle("blocked", !!fleet.stuck);
+  bar.classList.toggle("on", fleet.on && fleet.queued > 0);
   const name = el("a", { href: "#fleet", textContent: "Fleet" });
   setIcon(name, "fleet");
   const toggle = el("button", { type: "button", textContent: fleet.on ? "Arrêter" : "Démarrer" });
@@ -1878,13 +1877,7 @@ function showFleetBar(fleet, later) {
     refresh(true);
   };
   bar.replaceChildren(name, el("span", { className: "muted",
-    textContent: `${fleet.on ? "en marche" : "arrêtée"} · ${fleet.queued} en file` }), ...stuckLine(fleet.stuck), el("span", { className: "spacer" }), toggle);
-}
-// Running yet starting nothing: why, and the task in the way, to open.
-function stuckLine(stuck) {
-  if (!stuck) return [];
-  const link = stuck.id ? [" ", el("a", { href: hashOf(stuck.path, stuck.id), textContent: "voir la tâche" })] : [];
-  return [el("div", { className: "stuck warn-line" }, `Bloquée : ${stuck.why}.`, ...link)];
+    textContent: `${fleet.on ? "en marche" : "arrêtée"} · ${fleet.queued} en file` }), el("span", { className: "spacer" }), toggle);
 }
 
 // The right pane: the chosen request in full, a page the address names,
@@ -2743,8 +2736,6 @@ async function showFleet() {
   $("fleet-state").textContent = v.on ? "en marche" : "arrêtée";
   $("fleet-stopped").hidden = !v.stopped;
   $("fleet-stopped").textContent = v.stopped ? `Arrêtée toute seule : ${v.stopped}. Regarde la tâche, puis redémarre.` : "";
-  $("fleet-stuck").hidden = !v.stuck;
-  $("fleet-stuck").replaceChildren(...stuckLine(v.stuck));
   for (const [id, value] of [["fleet-at-once", String(v.at_once)], ["fleet-on-fail", v.on_fail]]) {
     if (document.activeElement !== $(id)) $(id).value = value;
   }

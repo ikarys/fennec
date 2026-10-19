@@ -186,12 +186,6 @@
   .fleet-settings { display: flex; gap: 24px; flex-wrap: wrap; padding: 4px 0 10px; font-size: 13px; }
   .fleet-settings label { display: flex; align-items: center; gap: 8px; }
   .warn-line { color: var(--warn); }
-  /* Why a running Fleet starts nothing: a line of its own under the bar. */
-  #fleet-bar { flex-wrap: wrap; }
-  #fleet-bar > .muted { white-space: nowrap; }
-  #fleet-bar .stuck { order: 9; flex-basis: 100%; font-size: 13px; }
-  #fleet-bar .stuck a, .stuck a { color: inherit; font-weight: 600; text-decoration: underline; }
-  #fleet-bar.blocked { border-color: var(--warn); }
   #todo-box:has(a.row) { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
   #n-others { margin-left: auto; }
   #list .cost, #detail summary .cost { display: none; }
@@ -771,9 +765,8 @@
   <section id="fleet" hidden>
     <div class="page-head"><strong>Fleet</strong> <span class="muted" id="fleet-state"></span><span class="spacer"></span>
       <button type="button" id="fleet-toggle"></button></div>
-    <p class="muted">fennec lance seul les tâches de la Fleet, dans cet ordre, dès qu'une place et leur dossier sont libres. L'arrêter ne coupe pas ce qui tourne.</p>
+    <p class="muted">fennec lance seul les tâches de la Fleet, dans cet ordre, dès qu'une place est libre. Chacune travaille à part : prête, elle t'attend sans bloquer la suivante. L'arrêter ne coupe pas ce qui tourne.</p>
     <p class="warn-line" id="fleet-stopped" hidden></p>
-    <p id="fleet-stuck" hidden></p>
     <p class="error" id="fleet-error" role="alert"></p>
     <div class="tiles" id="fleet-tiles"></div>
     <div class="box"><h2 data-icon="fleet">File <span class="count" id="n-fleet"></span></h2>
