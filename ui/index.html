@@ -539,15 +539,18 @@
     .app { display: block; }
     #side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center;
             border-right: none; border-bottom: 1px solid var(--line); padding: 10px 16px; }
-    #side .side-top { margin: 0 8px 0 0; }
+    /* Title and tools share the first line; the projects take the next one. */
+    #side .side-top { flex: 1; margin: 0; }
     #side ul { display: flex; flex-wrap: wrap; }
-    #side .item { width: auto; }
+    #side .item, #side .project > .item { width: auto; flex: none; }
+    #side-archived:empty, #side-error:empty { display: none; }
     #side .label span, #side .spacer { display: none; }
     #side .label { margin: 0; }
     #side .tools { border-top: none; padding-top: 0; }
     /* The bar wraps instead of scrolling: nothing in it, Discussions
        included, may disappear behind an invisible scrollbar. */
-    #side .mid { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; overflow: visible; }
+    #side .mid { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; overflow: visible;
+                 order: 1; flex-basis: 100%; margin-top: 6px; }
     #list, #detail { padding: 16px; }
     .tabs button { padding: 8px 7px; font-size: 14px; }
     .line .cost { display: none; }
