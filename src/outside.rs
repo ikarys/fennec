@@ -52,15 +52,19 @@ pub fn covers(g: &Path, p: &Path) -> bool {
 }
 
 /// The folder to grant for a referenced `p`: `p` itself when it is a
-/// directory, its parent otherwise (a file's folder is what stays open).
+/// directory, its parent otherwise (a file's folder is what stays open),
+/// symlinks resolved.
 pub fn grant_dir(p: &Path) -> PathBuf {
-    if p.is_dir() {
+    let dir = if p.is_dir() {
         p.to_path_buf()
     } else {
         p.parent()
             .map(Path::to_path_buf)
             .unwrap_or_else(|| p.to_path_buf())
-    }
+    };
+    // The sandbox mounts where a symlink leads: that folder is the one asked
+    // about and checked, never the harmless-looking link to the home.
+    std::fs::canonicalize(&dir).unwrap_or(dir)
 }
 
 /// `~`, `$HOME` and relative references resolve against the folder; `..` is
@@ -329,7 +333,20 @@ mod tests {
     fn the_grant_dir_of_a_file_is_its_folder() {
         let p = PathBuf::from("/home/t/ws/other/o.txt");
         assert_eq!(grant_dir(&p), PathBuf::from("/home/t/ws/other"));
-        let d = std::env::temp_dir();
+        let d = std::fs::canonicalize(std::env::temp_dir()).unwrap();
         assert_eq!(grant_dir(&d), d);
+    }
+
+    #[test]
+    fn a_symlink_grants_the_folder_it_leads_to() {
+        let root = std::env::temp_dir().join(format!("fennec-os-link-{}", std::process::id()));
+        let target = root.join("target");
+        std::fs::create_dir_all(&target).unwrap();
+        let link = root.join("link");
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+        let got = grant_dir(&link.join("x.txt"));
+        let want = std::fs::canonicalize(&target).unwrap();
+        std::fs::remove_dir_all(&root).unwrap();
+        assert_eq!(got, want);
     }
 }

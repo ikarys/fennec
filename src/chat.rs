@@ -43,7 +43,7 @@ static LOCK: Mutex<()> = Mutex::new(());
 
 fn path(worlds: &Worlds, id: &str) -> io::Result<PathBuf> {
     if id.is_empty() || !id.chars().all(|c| c.is_ascii_alphanumeric()) {
-        return Err(io::Error::other(format!("no chat {id}")));
+        return Err(io::Error::other(format!("discussion introuvable : {id}")));
     }
     Ok(worlds.root.join("chats").join(format!("{id}.json")))
 }
@@ -56,7 +56,7 @@ fn now() -> u64 {
 
 pub fn load(worlds: &Worlds, id: &str) -> io::Result<Value> {
     let text = std::fs::read_to_string(path(worlds, id)?)
-        .map_err(|_| io::Error::other(format!("no chat {id}")))?;
+        .map_err(|_| io::Error::other(format!("discussion introuvable : {id}")))?;
     serde_json::from_str(&text).map_err(io::Error::other)
 }
 
@@ -76,24 +76,6 @@ fn update(worlds: &Worlds, id: &str, change: impl FnOnce(&mut Value)) -> io::Res
     Ok(chat)
 }
 
-/// Why `dir` cannot be opened read-write, as a chat's folder or a grant:
-/// it must sit strictly inside the home and never over the store.
-fn unopenable(worlds: &Worlds, dir: &Path) -> Option<String> {
-    let home = std::fs::canonicalize(&worlds.home).unwrap_or(worlds.home.clone());
-    let store = std::fs::canonicalize(&worlds.root).unwrap_or(worlds.root.clone());
-    if !dir.starts_with(&home) || dir == home {
-        return Some(format!(
-            "{} is not a folder strictly inside {}",
-            dir.display(),
-            home.display()
-        ));
-    }
-    if dir.starts_with(&store) || store.starts_with(dir) {
-        return Some(format!("{} overlaps the world store", dir.display()));
-    }
-    None
-}
-
 /// A new chat over `folder`: strictly inside the home, as a grant, and never
 /// over the store. Skills come from the person's global list, read at each
 /// turn; the chat keeps none of its own.
@@ -105,7 +87,7 @@ pub fn start(worlds: &Worlds, folder: &Path) -> io::Result<Value> {
             folder.display()
         )));
     }
-    if let Some(why) = unopenable(worlds, &folder) {
+    if let Some(why) = worlds.unopenable(&folder) {
         return Err(io::Error::other(why));
     }
     let id = crate::world::new_id();
@@ -118,15 +100,16 @@ pub fn start(worlds: &Worlds, folder: &Path) -> io::Result<Value> {
 
 /// Every chat, the latest first, without its messages.
 pub fn list(worlds: &Worlds) -> io::Result<Vec<Value>> {
-    listed(worlds, false)
+    listed(worlds, Some(false))
 }
 
 /// The archived ones, the latest first: hidden from the list, kept on disk.
 pub fn list_archived(worlds: &Worlds) -> io::Result<Vec<Value>> {
-    listed(worlds, true)
+    listed(worlds, Some(true))
 }
 
-fn listed(worlds: &Worlds, archived: bool) -> io::Result<Vec<Value>> {
+/// `None`: archived or not.
+fn listed(worlds: &Worlds, archived: Option<bool>) -> io::Result<Vec<Value>> {
     let Ok(entries) = std::fs::read_dir(worlds.root.join("chats")) else {
         return Ok(Vec::new());
     };
@@ -145,7 +128,7 @@ fn listed(worlds: &Worlds, archived: bool) -> io::Result<Vec<Value>> {
         .iter()
         .filter_map(|id| load(worlds, id).ok())
         // A chat without the key is a legacy one: not archived.
-        .filter(|c| c["archived"].as_bool().unwrap_or(false) == archived)
+        .filter(|c| archived.is_none_or(|a| c["archived"].as_bool().unwrap_or(false) == a))
         .map(|c| {
             json!({"id": c["id"], "folder": c["folder"], "status": c["status"],
                    "title": title(&c), "since": c["since"]})
@@ -161,13 +144,13 @@ pub fn archive(worlds: &Worlds, id: &str, on: bool) -> io::Result<Value> {
 /// Gone for good. A turn under way would rewrite the file from under it, so
 /// it is refused while the chat thinks or waits; stop it first.
 pub fn forget(worlds: &Worlds, id: &str) -> io::Result<()> {
-    let chat = load(worlds, id)?;
-    if chat["status"] == "thinking" || chat["status"] == "waiting" {
+    // Checked under the lock: a turn started in between would lose its file.
+    let _held = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    if busy(&load(worlds, id)?) {
         return Err(io::Error::other(
             "la discussion est en cours : arrête-la d'abord",
         ));
     }
-    let _held = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     std::fs::remove_file(path(worlds, id)?)
 }
 
@@ -201,58 +184,60 @@ pub fn stop(worlds: &Worlds, id: &str) -> io::Result<Value> {
 /// Marks the person's message as said and the chat as thinking; the caller
 /// then runs [`answer`], usually in the background. Fails while a turn runs.
 pub fn say(worlds: &Worlds, id: &str, text: &str) -> io::Result<()> {
-    if text.trim().is_empty() {
-        return Err(io::Error::other("empty message"));
-    }
-    let mut busy = false;
-    update(worlds, id, |c| {
-        busy = c["status"] == "thinking" || c["status"] == "waiting";
-        if busy {
-            return;
-        }
-        if let Some(m) = c["messages"].as_array_mut() {
-            m.push(json!({"role": "user", "content": text.trim()}));
-        }
-        c["status"] = json!("thinking");
-        c["since"] = json!(now());
-        c["stop"] = json!(false);
-        c["error"] = Value::Null;
-    })?;
-    if busy {
-        return Err(io::Error::other("fennec is still answering"));
-    }
-    Ok(())
+    speak(worlds, id, None, text)
 }
 
 /// Says `text` again in place of the person's message at `index`: the
 /// exchange from there on is dropped, then the turn runs as after [`say`].
 /// Files changed since stay as they are; the cost already spent stays counted.
 pub fn replay(worlds: &Worlds, id: &str, index: usize, text: &str) -> io::Result<()> {
+    speak(worlds, id, Some(index), text)
+}
+
+fn speak(worlds: &Worlds, id: &str, at: Option<usize>, text: &str) -> io::Result<()> {
     if text.trim().is_empty() {
-        return Err(io::Error::other("empty message"));
+        return Err(io::Error::other("message vide"));
     }
     let mut refused = None;
     update(worlds, id, |c| {
-        if c["status"] == "thinking" || c["status"] == "waiting" {
-            refused = Some("fennec is still answering");
+        if busy(c) {
+            refused = Some("fennec répond encore");
             return;
         }
-        if c["messages"][index]["role"] != "user" {
-            refused = Some("no message of yours there");
-            return;
+        if let Some(i) = at {
+            if c["messages"][i]["role"] != "user" {
+                refused = Some("aucun message de toi à cet endroit");
+                return;
+            }
+            if let Some(m) = c["messages"].as_array_mut() {
+                m.truncate(i);
+            }
         }
-        if let Some(m) = c["messages"].as_array_mut() {
-            m.truncate(index);
-            m.push(json!({"role": "user", "content": text.trim()}));
-        }
+        push(
+            &mut c["messages"],
+            json!({"role": "user", "content": text.trim()}),
+        );
         c["status"] = json!("thinking");
         c["since"] = json!(now());
         c["stop"] = json!(false);
         c["error"] = Value::Null;
     })?;
-    match refused {
-        Some(why) => Err(io::Error::other(why)),
-        None => Ok(()),
+    refused.map_or(Ok(()), |why| Err(io::Error::other(why)))
+}
+
+fn busy(c: &Value) -> bool {
+    c["status"] == "thinking" || c["status"] == "waiting"
+}
+
+/// Back to idle, `why` said if the turn did not end well: the person may
+/// speak again.
+fn settle(c: &mut Value, why: Option<String>) {
+    c["status"] = json!("idle");
+    c["stop"] = json!(false);
+    c["pending"] = Value::Null;
+    c["decision"] = Value::Null;
+    if let Some(why) = why {
+        c["error"] = json!(why);
     }
 }
 
@@ -261,27 +246,14 @@ pub fn replay(worlds: &Worlds, id: &str, index: usize, text: &str) -> io::Result
 /// comes, so the page follows the turn while it runs.
 pub fn answer(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::Result<()> {
     let ran = turn(worlds, id, model, max_steps);
-    update(worlds, id, |c| {
-        c["status"] = json!("idle");
-        c["stop"] = json!(false);
-        c["pending"] = Value::Null;
-        c["decision"] = Value::Null;
-        if let Err(e) = &ran {
-            c["error"] = json!(e.to_string());
-        }
-    })?;
+    update(worlds, id, |c| settle(c, ran.err().map(|e| e.to_string())))?;
     Ok(())
 }
 
 /// The turn never started: its settings gave no model. Say so, as [`answer`]
 /// does when its turn fails, so the page does not stay on "répond…".
 pub fn fail(worlds: &Worlds, id: &str, why: &str) -> io::Result<()> {
-    update(worlds, id, |c| {
-        c["status"] = json!("idle");
-        c["stop"] = json!(false);
-        c["error"] = json!(why);
-    })
-    .map(drop)
+    update(worlds, id, |c| settle(c, Some(why.to_string()))).map(drop)
 }
 
 /// The person's answer to the pending question: `true` opens the folder for
@@ -340,17 +312,13 @@ fn push_grant(c: &mut Value, dir: &str) {
 /// to idle with the reason, so the person can speak again. Archived chats
 /// are recovered too: hidden from the list, their turn must not freeze.
 pub fn recover(worlds: &Worlds) -> io::Result<()> {
-    for c in listed(worlds, false)?
-        .into_iter()
-        .chain(listed(worlds, true)?)
-    {
-        if c["status"] == "thinking" || c["status"] == "waiting" {
+    for c in listed(worlds, None)? {
+        if busy(&c) {
             update(worlds, c["id"].as_str().unwrap_or(""), |c| {
-                c["status"] = json!("idle");
-                c["stop"] = json!(false);
-                c["pending"] = Value::Null;
-                c["decision"] = Value::Null;
-                c["error"] = json!("interrompu : fennec a été arrêté pendant la réponse");
+                settle(
+                    c,
+                    Some("interrompu : fennec a été arrêté pendant la réponse".into()),
+                )
             })?;
         }
     }
@@ -486,7 +454,7 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
                 let directory = outside::grant_dir(&p);
                 // The home itself, `/` or the store is never offered: one
                 // click there would undo the sandbox.
-                if let Some(why) = unopenable(worlds, &directory) {
+                if let Some(why) = worlds.unopenable(&directory) {
                     times.push(json!({"name": name, "ms": started.elapsed().as_millis() as u64}));
                     said.push(json!({"role": "tool", "tool_call_id": call["id"],
                         "content": format!("refused without asking: {why}; it is untouched")}));

@@ -49,7 +49,9 @@ pub struct World {
     pub path: PathBuf,
 }
 
-/// The folders a Cargo project's `path = "..."` dependencies point to, outside it.
+/// The crates a Cargo project's `path = "..."` dependencies point to, outside it.
+/// The Cargo.toml is the agent's to write: only a folder holding a crate is
+/// taken, and [`Worlds::unopenable`] filters the rest where it is mounted.
 /// ponytail: the top Cargo.toml only, resolved from `dir`; a world kept apart
 /// from the project folder does not find `../x`, read the project's own then.
 fn path_deps(dir: &Path) -> Vec<PathBuf> {
@@ -66,7 +68,7 @@ fn path_deps(dir: &Path) -> Vec<PathBuf> {
             let rest = rest.strip_prefix('"')?;
             std::fs::canonicalize(dir.join(&rest[..rest.find('"')?])).ok()
         })
-        .filter(|p| p.is_dir() && !p.starts_with(&dir))
+        .filter(|p| p.join("Cargo.toml").is_file() && !p.starts_with(&dir))
         .collect()
 }
 
@@ -398,6 +400,25 @@ impl Worlds {
         self.jail(dir, &mounts, false, argv)
     }
 
+    /// Why `dir` cannot be opened in a sandbox, as a chat's folder, a folder
+    /// opened for it or a path dependency: it must sit strictly inside the
+    /// home and never over the store.
+    pub(crate) fn unopenable(&self, dir: &Path) -> Option<String> {
+        let home = std::fs::canonicalize(&self.home).unwrap_or(self.home.clone());
+        let store = std::fs::canonicalize(&self.root).unwrap_or(self.root.clone());
+        if !dir.starts_with(&home) || dir == home {
+            return Some(format!(
+                "{} is not a folder strictly inside {}",
+                dir.display(),
+                home.display()
+            ));
+        }
+        if dir.starts_with(&store) || store.starts_with(dir) {
+            return Some(format!("{} overlaps the world store", dir.display()));
+        }
+        None
+    }
+
     /// Skills, read-only, where the brief says they are.
     fn skill_mounts(&self, skills: &[(String, PathBuf)]) -> Vec<(bool, PathBuf, PathBuf)> {
         skills
@@ -429,7 +450,12 @@ impl Worlds {
         }
         // A Cargo path dependency in the hidden home: without it the project
         // cannot build, so QA could not even start it.
-        for p in path_deps(dir) {
+        // Never the home, the store or anything around them: `path = "~/.ssh"`
+        // would show what the hidden home hides.
+        for p in path_deps(dir)
+            .into_iter()
+            .filter(|p| self.unopenable(p).is_none())
+        {
             cmd.arg("--ro-bind").arg(&p).arg(&p);
         }
         for (rw, from, to) in mounts {
@@ -762,9 +788,12 @@ mod tests {
         let (app, lib) = (root.join("app"), root.join("lib"));
         std::fs::create_dir_all(app.join("inner")).unwrap();
         std::fs::create_dir_all(&lib).unwrap();
+        std::fs::write(lib.join("Cargo.toml"), "").unwrap();
+        // A folder that holds no crate is no dependency, whatever is written.
+        std::fs::create_dir_all(root.join("secret")).unwrap();
         std::fs::write(
             app.join("Cargo.toml"),
-            "[dependencies]\nlib = { path = \"../lib\" }\ninner = { path=\"inner\" }\ngone = { path = \"../gone\" }\n",
+            "[dependencies]\nlib = { path = \"../lib\" }\ninner = { path=\"inner\" }\ngone = { path = \"../gone\" }\nx = { path = \"../secret\" }\n",
         )
         .unwrap();
         let found = super::path_deps(&app);
