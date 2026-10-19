@@ -10,10 +10,15 @@
 //! (rule 2), and runs only once enabled (`~/.config/fennec/plugins.json`).
 //! An event listened to as `before_<step>` is a hook: its non-zero exit
 //! stops that step.
+//!
+//! A plugin may also relay the person's decisions from a chat: `"serve":
+//! "bot.py"` runs for as long as it is enabled, with `FENNEC_URL` and its
+//! own `FENNEC_TOKEN`; `"allow": ["<sender>"]` names who it may speak for.
+//! What that token may do is fennec-lead's to limit.
 
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
 use serde_json::Value;
@@ -31,6 +36,10 @@ pub struct Plugin {
     pub description: String,
     pub events: Vec<String>,
     pub run: PathBuf,
+    /// What runs for as long as the plugin is enabled, to relay decisions.
+    pub serve: Option<PathBuf>,
+    /// The senders it may relay decisions from.
+    pub allow: Vec<String>,
 }
 
 fn root() -> io::Result<PathBuf> {
@@ -78,11 +87,22 @@ fn read(dir: &Path) -> Result<Plugin, (String, String)> {
             .collect(),
         None => DEFAULT_EVENTS.map(str::to_string).to_vec(),
     };
+    let allow = v["allow"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|a| a.as_str().map_or_else(|| a.to_string(), str::to_string))
+        .collect();
     Ok(Plugin {
         name: name.clone(),
         description: v["description"].as_str().unwrap_or("").to_string(),
         events,
         run: dir.join(run),
+        serve: v["serve"]
+            .as_str()
+            .filter(|s| !s.is_empty())
+            .map(|s| dir.join(s)),
+        allow,
     })
 }
 
@@ -157,6 +177,23 @@ pub fn call(plugin: &Plugin, event: &Value) -> Result<(), String> {
         Some(c) => format!("sortie {c} : {}", last.trim()),
         None => "tué par un signal".into(),
     })
+}
+
+/// Starts a plugin's `serve` program from its folder; the caller keeps the
+/// child and stops it when the plugin is disabled. Its stderr goes to
+/// fennec's, where its errors are read.
+pub fn start(plugin: &Plugin, url: &str, token: &str) -> io::Result<Child> {
+    let serve = plugin
+        .serve
+        .as_ref()
+        .ok_or_else(|| io::Error::other("ce plugin ne relaie rien"))?;
+    Command::new(serve)
+        .current_dir(serve.parent().unwrap_or(Path::new("/")))
+        .env("FENNEC_URL", url)
+        .env("FENNEC_TOKEN", token)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .spawn()
 }
 
 /// Runs, one after the other, every enabled plugin listening to the event's
@@ -244,6 +281,29 @@ mod tests {
 
         choose("a", false).unwrap();
         assert_eq!(enabled().unwrap(), ["b", "c"]);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_relaying_plugin_runs_with_its_address_and_token() {
+        let (_held, dir) = sandbox("serve");
+        let got = dir.join("got");
+        make(
+            &dir,
+            "bot",
+            json!({"run": "run.sh", "serve": "run.sh", "allow": ["42", 7]}),
+            &format!("echo \"$FENNEC_URL $FENNEC_TOKEN\" > {}", got.display()),
+        );
+        let bot = catalog().unwrap().remove(0).unwrap();
+        assert_eq!(bot.allow, ["42", "7"], "a number is a sender too");
+        super::start(&bot, "http://127.0.0.1:1", "t0k")
+            .unwrap()
+            .wait()
+            .unwrap();
+        assert_eq!(
+            std::fs::read_to_string(&got).unwrap(),
+            "http://127.0.0.1:1 t0k\n"
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 
