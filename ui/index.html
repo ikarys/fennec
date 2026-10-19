@@ -479,6 +479,11 @@
                           overflow: hidden; }
   #skills-list li button { grid-column: 2; grid-row: 1 / span 2; padding: 2px 10px; font-size: 13px; }
   #skill-search { width: 100%; margin-top: 6px; }
+  #leftovers li label { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; align-items: baseline;
+                        padding: 8px 10px; margin-bottom: 4px; border-radius: 6px; background: var(--soft); cursor: pointer; }
+  #leftovers li .what { grid-column: 2; font-size: 13px; color: var(--muted); }
+  #leftovers li .what code { font: 12px ui-monospace, monospace; color: var(--text); }
+  #leftovers li .what.held { color: var(--warn); }
   .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 12px 0; }
   .tile { background: var(--soft); border-radius: 8px; padding: 10px 12px; display: grid; align-content: start; }
   .tile.bad b { color: var(--bad); }
@@ -738,6 +743,7 @@
       <button type="button" role="tab" aria-selected="true" data-panel="settings-general">Général</button>
       <button type="button" role="tab" aria-selected="false" data-panel="settings-appearance">Apparence</button>
       <button type="button" role="tab" aria-selected="false" data-panel="settings-skills">Skills</button>
+      <button type="button" role="tab" aria-selected="false" data-panel="settings-clean">Nettoyage</button>
     </div>
     <div id="settings-general">
       <form id="settings-form">
@@ -773,6 +779,13 @@
       <input id="skill-search" type="search" aria-label="Chercher un skill" placeholder="Chercher parmi les skills de ta machine…">
       <ul id="skills-list"></ul>
       <p class="error" id="skills-error" role="alert"></p>
+    </div>
+    <div id="settings-clean" hidden>
+      <p class="muted">Ce que fennec a laissé derrière lui quand un travail a été coupé en route (redémarrage, arrêt au mauvais moment) :
+        plus aucune demande ne s'en sert. Coche ce que tu veux supprimer.</p>
+      <ul id="leftovers"></ul>
+      <p class="error" id="leftovers-error" role="alert"></p>
+      <div class="row"><button type="button" class="stop" id="leftovers-clear" data-icon="trash" disabled>Supprimer la sélection</button></div>
     </div>
   </section>
   </section>

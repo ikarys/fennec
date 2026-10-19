@@ -2098,13 +2098,75 @@ function buildFontScale() {
   };
 }
 
-// The three settings panels, one tab each: general, appearance, skills.
+// The settings panels, one tab each: general, appearance, skills, cleaning.
 document.querySelectorAll("#settings-tabs [role=tab]").forEach((b) => {
   b.onclick = () => {
     document.querySelectorAll("#settings-tabs [role=tab]").forEach((t) => t.setAttribute("aria-selected", String(t === b)));
-    ["settings-general", "settings-appearance", "settings-skills"].forEach((id) => $(id).hidden = id !== b.dataset.panel);
+    ["settings-general", "settings-appearance", "settings-skills", "settings-clean"].forEach((id) => $(id).hidden = id !== b.dataset.panel);
+    if (b.dataset.panel === "settings-clean") showLeftovers();
   };
 });
+// What interrupted work left behind, for the human to pick and throw away.
+const bytes = (n) => n >= 1e9 ? `${(n / 1e9).toFixed(1)} Go` : n >= 1e6 ? `${Math.round(n / 1e6)} Mo` : `${Math.ceil(n / 1e3)} Ko`;
+async function showLeftovers() {
+  $("leftovers-error").textContent = "";
+  $("leftovers-clear").disabled = true;
+  let left;
+  try {
+    left = await api("/api/leftovers");
+  } catch (e) {
+    $("leftovers-error").textContent = e.message;
+    return;
+  }
+  $("leftovers-clear").hidden = !left.length;
+  if (!left.length) {
+    $("leftovers").replaceChildren(el("li", { className: "muted", textContent: "Rien à nettoyer." }));
+    return;
+  }
+  const sync = () => {
+    const n = $("leftovers").querySelectorAll("input:checked").length;
+    $("leftovers-clear").disabled = !n;
+    $("leftovers-clear").textContent = n ? `Supprimer la sélection (${n})` : "Supprimer la sélection";
+    setIcon($("leftovers-clear"), "trash");
+  };
+  $("leftovers").replaceChildren(...left.map((f) => {
+    const box = el("input", { type: "checkbox", value: f.id });
+    box.onchange = sync;
+    const when = f.since ? new Date(f.since * 1000).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" }) : "";
+    const where = f.in_folder ? "dans ton dossier" : `à part, ${bytes(f.bytes)}`;
+    return el("li", {}, el("label", {}, box,
+      el("span", {}, el("strong", { textContent: f.project.split("/").pop() }), el("span", { className: "muted", textContent: ` · ${when} · ${where}` })),
+      el("span", { className: "what" }, ...(f.commits.length
+        ? [`${f.commits.length} commit${f.commits.length > 1 ? "s" : ""} qu'aucune branche n'a repris : `,
+          ...f.commits.flatMap((c, i) => [i ? ", " : "", el("code", { textContent: c })])]
+        : ["Aucun commit à perdre."])),
+      f.checked_out ? el("span", { className: "what held",
+        textContent: "Ton dossier est dessus : il revient sur sa branche, et ce qui n'est pas commité va dans le stash git." }) : null));
+  }));
+  sync();
+}
+$("leftovers-clear").onclick = async () => {
+  const button = $("leftovers-clear");
+  // Two clicks: what goes cannot come back.
+  if (!button.classList.contains("sure")) {
+    button.classList.add("sure");
+    button.textContent = "Confirmer la suppression";
+    setIcon(button, "trash");
+    return;
+  }
+  button.classList.remove("sure");
+  button.disabled = true;
+  const ids = [...$("leftovers").querySelectorAll("input:checked")].map((b) => b.value);
+  try {
+    const r = await api("/api/leftovers/clear", { ids });
+    await showLeftovers();
+    $("leftovers-error").textContent = r.errors.join("\n");
+  } catch (e) {
+    $("leftovers-error").textContent = e.message;
+    button.disabled = false;
+  }
+};
+
 async function showSettingsPage() {
   buildThemePicker();
   buildFontScale();

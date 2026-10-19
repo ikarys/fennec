@@ -867,6 +867,66 @@ pub fn stop(store: &Store, id: &str) -> io::Result<()> {
     })
 }
 
+/// Work left behind that no request needs any more: a start or a drop cut
+/// short (fennec restarted, a step failed half way). A request that is not
+/// dropped or landed keeps what it names; a project with work in flight is
+/// left out, since its newest world may not be on its request yet.
+pub fn leftovers(store: &Store) -> io::Result<Value> {
+    let worlds = Worlds::from_env()?;
+    let requests = store.requests()?;
+    let kept: Vec<String> = requests
+        .iter()
+        .filter(|(_, r)| !matches!(r["status"].as_str(), Some("dropped" | "landed")))
+        .map(|(_, r)| r.to_string())
+        .collect();
+    let mut busy: Vec<String> = requests
+        .iter()
+        .filter(|(_, r)| {
+            matches!(
+                r["status"].as_str(),
+                Some("thinking" | "framing" | "waiting" | "running" | "proving" | "landing")
+            )
+        })
+        .filter_map(|(_, r)| r["project"].as_str().map(str::to_string))
+        .collect();
+    busy.extend(TAKEN.lock().map(|t| t.clone()).unwrap_or_default());
+    let mut left = Vec::new();
+    for id in worlds.list()? {
+        if kept.iter().any(|r| r.contains(&id)) {
+            continue;
+        }
+        let Ok(facts) = worlds.facts(&id) else {
+            continue;
+        };
+        let project = Path::new(facts["project"].as_str().unwrap_or(""));
+        if !busy.iter().any(|p| Path::new(p) == project) {
+            left.push(facts);
+        }
+    }
+    Ok(json!(left))
+}
+
+/// Throws away the leftovers the human picked, checked again here: what
+/// became used since the page was drawn stays.
+pub fn clear(store: &Store, ids: &[String]) -> io::Result<Value> {
+    let left = leftovers(store)?;
+    let worlds = Worlds::from_env()?;
+    let mut errors = Vec::new();
+    for id in ids {
+        if !left
+            .as_array()
+            .into_iter()
+            .flatten()
+            .any(|f| f["id"] == id.as_str())
+        {
+            errors.push(format!("{id} : une demande s'en sert de nouveau"));
+        } else if let Err(e) = worlds.forget(id) {
+            errors.push(format!("{id} : {e}"));
+        }
+    }
+    Ok(json!({"errors": errors}))
+}
+
 /// The human gives up on a request. Only one waiting for them: work in
 /// progress would write its result over the decision.
 pub fn drop(store: &Store, id: &str) -> io::Result<()> {
