@@ -491,7 +491,10 @@ fn classify(requests: &[(String, Value)], projects_all: &[Value]) -> Value {
             json!({"id": id, "kind": kind, "project": name(r["project"].as_str().unwrap_or("")), "path": r["project"],
                    "title": words(r["text"].as_str().unwrap_or("")),
                    "images": image_lines(r["text"].as_str().unwrap_or("")).collect::<Vec<_>>(), "rules": r["rules"], "checks": r["verify"], "team": r["team"],
-                   "thread": r["thread"], "stats": r["stats"], "since": r["since"], "done_when": r["done_when"]})
+                   "thread": r["thread"], "stats": r["stats"], "since": r["since"],
+                   // As the work reads it: said in the conversation, else
+                   // the request as fennec restated it.
+                   "done_when": ([&r["done_when"], &r["brief"]].into_iter().find(|v| v.is_string()))})
         };
         // Scenario 4: what the human said may become a rule, at one word.
         if let Some(rule) = r["offer"]["rule"].as_str() {
@@ -528,8 +531,7 @@ fn classify(requests: &[(String, Value)], projects_all: &[Value]) -> Value {
             Some("proving") => running.push(card_step(card("running"), "essaie le produit")),
             Some("landing") => running.push(card_step(card("running"), "fait le commit")),
             Some("question") => {
-                let mut c = card("validate");
-                c["done_when"] = r["done_when"].clone();
+                let c = card("validate");
                 todo.push((0, c));
             }
             Some("blocked") => {
@@ -540,7 +542,6 @@ fn classify(requests: &[(String, Value)], projects_all: &[Value]) -> Value {
             }
             Some("ready") => {
                 let mut c = card("ready");
-                c["done_when"] = r["done_when"].clone();
                 c["unverified"] = unverified(&r["proof"]);
                 c["tries"] = r["proof"]["tries"].clone();
                 c["role_checks"] = r["proof"]["checks"].clone();
@@ -575,6 +576,9 @@ fn classify(requests: &[(String, Value)], projects_all: &[Value]) -> Value {
                 c["tries"] = r["proof"]["tries"].clone();
                 c["role_checks"] = r["proof"]["checks"].clone();
                 c["shots"] = r["proof"]["shots"].clone();
+                for k in ["summary", "files", "skills"] {
+                    c[k] = r[k].clone();
+                }
                 todo.push((2, c));
             }
             // Finished one way or another: kept, so the human is never blind
@@ -585,14 +589,7 @@ fn classify(requests: &[(String, Value)], projects_all: &[Value]) -> Value {
                 c["remote"] = r["target"]["remote"].clone();
                 c["commit"] = r["commit"].clone();
                 c["changed"] = json!(r["run"].is_string());
-                for k in [
-                    "done_when",
-                    "summary",
-                    "files",
-                    "skills",
-                    "question",
-                    "reason",
-                ] {
+                for k in ["summary", "files", "skills", "question", "reason"] {
                     c[k] = r[k].clone();
                 }
                 c["tries"] = r["proof"]["tries"].clone();
@@ -815,7 +812,7 @@ mod tests {
             ),
             (
                 "4".to_string(),
-                json!({"project": "/p/a", "text": "f", "status": "failed", "reason": "timeout"}),
+                json!({"project": "/p/a", "text": "f", "status": "failed", "reason": "timeout", "brief": "B", "summary": "S"}),
             ),
             (
                 "5".to_string(),
@@ -835,6 +832,9 @@ mod tests {
             .collect();
         assert_eq!(kinds, ["rule", "validate", "ready", "failed"]);
         assert_eq!(v["todo"][1]["done_when"], "Q");
+        // Without "done when" said, it is the request as fennec restated it.
+        assert_eq!(v["todo"][3]["done_when"], "B");
+        assert_eq!(v["todo"][3]["summary"], "S");
         let ready = &v["todo"][2];
         assert_eq!(ready["untried"], true);
         assert_eq!(ready["land_error"], "conflit");

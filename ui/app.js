@@ -963,7 +963,7 @@ function card(item) {
       action("Enregistrer", "/api/rewrite", () => ({ id: item.id, text: images.value() })),
       action("Supprimer", "/api/forget", { id: item.id }, { quiet: true }));
   } else if (item.kind === "failed") {
-    add(el("div", { className: "bad", textContent: explain(item.reason) || "raison inconnue" }), shots(item), ...facts(item));
+    add(why(item.reason), conversation(item), doneWhen(item), ...work(item), shots(item), ...facts(item));
     actions.append(dropButton(item.id, true), el("span", { className: "spacer" }),
       action("Réessayer", "/api/retry", { id: item.id }, { primary: true }));
   }
@@ -973,6 +973,16 @@ function card(item) {
   if (node.contains(actions)) add(details(item));
   else add(el("div", { className: "changes-slot" }), details(item), actions, el("div", { className: "error", role: "alert" }));
   return node;
+}
+
+// Why it failed in a sentence; a long tail (the command that failed, its
+// output) goes in a block of its own instead of a wall of red.
+function why(reason) {
+  const text = explain(reason) || "raison inconnue";
+  const cut = text.length > 140 ? text.indexOf(" : ") : -1;
+  if (cut < 0) return el("div", { className: "bad", textContent: text });
+  return el("div", {}, el("div", { className: "bad", textContent: text.slice(0, cut) }),
+    el("pre", { className: "why", textContent: text.slice(cut + 3) }));
 }
 
 // When the work started straight from the request, "done when" is the
@@ -1015,6 +1025,7 @@ function line(item, state, dot) {
 function past(item) {
   const box = el("div", { className: "past" });
   box.dataset.key = "past-" + item.id;
+  if (item.kind === "dropped" && item.reason) box.append(el("div", { className: "muted", textContent: explain(item.reason) }));
   const talk = conversation(item);
   if (talk) box.append(talk);
   const done = doneWhen(item);
