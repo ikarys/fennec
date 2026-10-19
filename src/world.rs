@@ -267,6 +267,88 @@ impl Worlds {
         Ok(ids)
     }
 
+    /// What a world holds, for a person deciding whether to throw it away:
+    /// its project, whether it sits in that folder (and is checked out
+    /// there), when it was made, its size apart, and the subjects of the
+    /// commits no other branch has.
+    pub fn facts(&self, id: &str) -> io::Result<serde_json::Value> {
+        let ((common, path, home), _) = self.meta_all(id)?;
+        let project = common.parent().map(Path::to_path_buf).unwrap_or_default();
+        let branch = format!("refs/heads/world/{id}");
+        let git_dir = format!("--git-dir={}", common.display());
+        // --branches matches its patterns without the refs/heads/ prefix.
+        let exclude = format!("--exclude=world/{id}");
+        let only = git(
+            &self.root,
+            &[
+                &git_dir,
+                "log",
+                "--format=%s",
+                &branch,
+                "--not",
+                &exclude,
+                "--branches",
+            ],
+        )
+        .unwrap_or_default();
+        let checked_out = home.is_some()
+            && git(&project, &["branch", "--show-current"]).ok() == Some(format!("world/{id}"));
+        let dir = path.unwrap_or_else(|| self.root.join("worlds").join(id));
+        // Ids are hex seconds then five hex digits of microseconds (`new_id`).
+        let since = id
+            .get(..id.len().saturating_sub(5))
+            .and_then(|s| u64::from_str_radix(s, 16).ok());
+        Ok(serde_json::json!({
+            "id": id,
+            "project": project,
+            "in_folder": home.is_some(),
+            "checked_out": checked_out,
+            "since": since,
+            "bytes": if home.is_none() { size(&dir) } else { 0 },
+            "commits": only.lines().collect::<Vec<_>>(),
+        }))
+    }
+
+    /// Removes a world whatever is left of it. A start or a drop cut short
+    /// leaves part of its branch, folder and metadata, which `drop` needs whole.
+    pub fn forget(&self, id: &str) -> io::Result<()> {
+        if let Ok(world) = self.open(id)
+            && self.drop(world).is_ok()
+        {
+            return Ok(());
+        }
+        if !crate::grant::paths(self, id)?.is_empty() {
+            return Err(io::Error::other(
+                "this world has a grant: keep or revert it before dropping the world",
+            ));
+        }
+        let ((common, path, home), _) = self.meta_all(id)?;
+        let git_dir = format!("--git-dir={}", common.display());
+        if home.is_none() {
+            let dir = path.unwrap_or_else(|| self.root.join("worlds").join(id));
+            if dir.is_dir() {
+                std::fs::remove_dir_all(&dir)?;
+            }
+            git(&self.root, &[&git_dir, "worktree", "prune"])?;
+        }
+        let branch = format!("refs/heads/world/{id}");
+        if git(
+            &self.root,
+            &[&git_dir, "rev-parse", "-q", "--verify", &branch],
+        )
+        .is_ok()
+        {
+            // Checked out in the project folder, git refuses: the folder stays as it is.
+            git(
+                &self.root,
+                &[&git_dir, "branch", "-q", "-D", &format!("world/{id}")],
+            )?;
+        }
+        std::fs::remove_file(self.root.join("meta").join(id))?;
+        let _ = std::fs::remove_file(self.root.join("skills").join(id));
+        Ok(())
+    }
+
     /// The command that runs `argv` inside the world's sandbox: read-only
     /// system, hidden home, private /tmp, no network, own pid namespace.
     pub fn sandbox_command(&self, world: &World, argv: &[String]) -> io::Result<Command> {
@@ -637,6 +719,21 @@ pub(crate) fn git(dir: &Path, args: &[&str]) -> io::Result<String> {
         )));
     }
     Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
+}
+
+/// Bytes under `dir`, symlinks not followed; 0 when it is gone.
+fn size(dir: &Path) -> u64 {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return 0;
+    };
+    entries
+        .filter_map(|e| e.ok())
+        .map(|e| match e.file_type() {
+            Ok(t) if t.is_dir() => size(&e.path()),
+            Ok(t) if t.is_file() => e.metadata().map_or(0, |m| m.len()),
+            _ => 0,
+        })
+        .sum()
 }
 
 /// Time-ordered ids: runs are named after their world, and "the latest run"
