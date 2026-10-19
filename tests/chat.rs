@@ -487,3 +487,32 @@ fn an_approved_plan_allows_changes_within_the_turn() {
     assert!(c["grants"].as_array().unwrap().is_empty());
     assert!(folder.join("b.txt").exists(), "approved: the turn writes");
 }
+
+#[test]
+fn a_message_said_again_drops_what_followed_it() {
+    let f = Fixture::new("chat-replay");
+    let folder = f.worlds.home.join("notes");
+    std::fs::create_dir_all(&folder).unwrap();
+    let c = chat::start(&f.worlds, &folder).unwrap();
+    let id = c["id"].as_str().unwrap();
+    for (said, reply) in [("un", "1"), ("deux", "2")] {
+        chat::say(&f.worlds, id, said).unwrap();
+        let model = Replies(Mutex::new(VecDeque::from([json!({"content": reply})])));
+        chat::answer(&f.worlds, id, &model, 10).unwrap();
+    }
+    // Only a message of the person's can be said again.
+    assert!(chat::replay(&f.worlds, id, 1, "x").is_err());
+    chat::replay(&f.worlds, id, 0, "trois").unwrap();
+    let model = Replies(Mutex::new(VecDeque::from([json!({"content": "3"})])));
+    chat::answer(&f.worlds, id, &model, 10).unwrap();
+    let c = chat::load(&f.worlds, id).unwrap();
+    let said: Vec<&str> = c["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|m| m["content"].as_str().unwrap())
+        .collect();
+    assert_eq!(said, ["trois", "3"]);
+    // The cost spent before stays counted.
+    assert_eq!(c["turns"].as_array().unwrap().len(), 3);
+}
