@@ -893,6 +893,8 @@ function landTitle({ branch, remote, committed }) {
   return remote ? `Commit dans ${branch} et pousser vers ${remote}` : `Commit dans ${branch}`;
 }
 
+// The request for later just saved: its card says so once.
+let saved = "";
 function card(item) {
   // The head above the tabs says the title and the status: the card does not repeat it.
   const node = el("div", { className: "card" }, thumbs(item.images));
@@ -980,8 +982,20 @@ function card(item) {
     // Kept, not started: read in the details, said again there if need be,
     // then launched.
     let images;
-    const save = action("Enregistrer", "/api/rewrite", () => ({ id: item.id, text: images.value() }));
-    save.hidden = true;
+    const save = el("button", { type: "button", textContent: "Enregistrer", hidden: true });
+    save.onclick = async () => {
+      const error = errorOf(save);
+      error.textContent = "";
+      try {
+        await api("/api/rewrite", { id: item.id, text: images.value() });
+      } catch (e) {
+        return (error.textContent = e.message);
+      }
+      // Read again from the file, even unchanged, with a word that it was kept.
+      saved = item.id;
+      detailed = "";
+      refresh(true);
+    };
     const edit = el("button", { type: "button", textContent: "Éditer" });
     edit.onclick = () => {
       const text = el("textarea", { className: "later-text", defaultValue: item.title, ariaLabel: "La tâche" });
@@ -999,6 +1013,12 @@ function card(item) {
     };
     actions.append(action("Lancer", "/api/launch", { id: item.id }, { primary: true }), edit, save,
       action("Supprimer", "/api/forget", { id: item.id }, { quiet: true }));
+    if (saved === item.id) {
+      saved = "";
+      const kept = el("div", { className: "proved", textContent: "✓ Enregistré" });
+      actions.append(kept);
+      setTimeout(() => kept.remove(), 3000);
+    }
   } else if (item.kind === "failed") {
     add(stages(item), why(item.reason), conversation(item), doneWhen(item), ...work(item), shots(item), ...facts(item));
     actions.append(dropButton(item.id, true), el("span", { className: "spacer" }),

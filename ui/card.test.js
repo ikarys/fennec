@@ -57,6 +57,7 @@ eval(src.match(/const el = \(tag, props = \{\}, \.\.\.children\) => \{[\s\S]*?\n
   const doneWhen = () => null;
   const rich = () => [new Node("span")];
   const explain = (r) => r;
+  let saved = "";
   `
   + grab("card")
   + "globalThis.card = card;");
