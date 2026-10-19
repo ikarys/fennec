@@ -349,7 +349,7 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
                 .collect();
             Ok(json!({"base_url": s.base_url, "models": s.models,
                       "has_key": s.api_key.is_some(), "env": env,
-                      "max_tokens": s.max_tokens}))
+                      "max_tokens": s.max_tokens, "effort": s.effort}))
         }
         ("POST", "/api/settings/served") => {
             let v = input()?;
@@ -386,11 +386,17 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
             let max_tokens = v["max_tokens"].as_u64().ok_or_else(|| {
                 io::Error::other("le nombre de tokens doit être un entier positif")
             })?;
+            // The page's choices; anything else would be sent to the server as is.
+            let effort = field(&v, "effort");
+            if !["", "none", "low", "medium", "xhigh"].contains(&effort.as_str()) {
+                return Err(io::Error::other("réflexion inconnue"));
+            }
             Settings {
                 base_url,
                 models,
                 api_key,
                 max_tokens,
+                effort,
             }
             .save()?;
             Ok(json!({}))
