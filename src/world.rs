@@ -502,7 +502,7 @@ impl Worlds {
     /// Checkpoint the world. Returns the commit; a world with no change keeps its HEAD.
     pub fn commit(&self, world: &World, message: &str) -> io::Result<String> {
         self.stage(world)?;
-        if !self.git(world, &["status", "--porcelain"])?.is_empty() {
+        if !self.status(world)?.is_empty() {
             let mut args = COMMITTER.to_vec();
             args.extend(["commit", "-q", "-m", message]);
             self.git(world, &args)?;
@@ -510,24 +510,18 @@ impl Worlds {
         self.git(world, &["rev-parse", "HEAD"])
     }
 
-    /// Every file in the world is the work, but what a build writes is not:
-    /// a project without a .gitignore would land `target/` or `node_modules/`.
-    /// ponytail: a fixed list of tool outputs; a project that tracks one of
-    /// these dirs on purpose cannot change it through fennec.
     fn stage(&self, world: &World) -> io::Result<String> {
-        self.git(
-            world,
-            &[
-                "add",
-                "-A",
-                "--",
-                ".",
-                ":(exclude,glob)**/target/**",
-                ":(exclude,glob)**/node_modules/**",
-                ":(exclude,glob)**/__pycache__/**",
-                ":(exclude,glob)**/.venv/**",
-            ],
-        )
+        let mut args = vec!["add", "-A", "--", "."];
+        args.extend(BUILD_OUTPUT);
+        self.git(world, &args)
+    }
+
+    /// What changed in the work since the last checkpoint, build output left
+    /// out as [`Self::commit`] leaves it: a `.pyc` a build wrote is no change.
+    pub fn status(&self, world: &World) -> io::Result<String> {
+        let mut args = vec!["status", "--porcelain", "--", "."];
+        args.extend(BUILD_OUTPUT);
+        self.git(world, &args)
     }
 
     /// Back to the last checkpoint, exactly: ignored files go too, except in
@@ -762,6 +756,17 @@ fn size(dir: &Path) -> u64 {
         })
         .sum()
 }
+
+/// Every file in the world is the work, but what a build writes is not:
+/// a project without a .gitignore would land `target/` or `node_modules/`.
+/// ponytail: a fixed list of tool outputs; a project that tracks one of
+/// these dirs on purpose cannot change it through fennec.
+const BUILD_OUTPUT: [&str; 4] = [
+    ":(exclude,glob)**/target/**",
+    ":(exclude,glob)**/node_modules/**",
+    ":(exclude,glob)**/__pycache__/**",
+    ":(exclude,glob)**/.venv/**",
+];
 
 /// Time-ordered ids: runs are named after their world, and "the latest run"
 /// is the last id in lexical order. Wall time can step back (an NTP or WSL

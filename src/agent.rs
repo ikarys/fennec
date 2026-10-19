@@ -134,7 +134,7 @@ pub fn run(
     let ms = |since: Instant| since.elapsed().as_millis() as u64;
     // The starting state counts as "no change yet".
     let mut watch = Watch {
-        files: worlds.git(world, &["status", "--porcelain"])?,
+        files: worlds.status(world)?,
         ..Watch::default()
     };
     let stop = |messages: Vec<Value>, turns: Vec<Value>, step, why: String| {
@@ -280,7 +280,7 @@ pub fn run(
         }
         turn["tools"] = json!(tool_times);
         turns.push(turn);
-        match watch.step(worlds.git(world, &["status", "--porcelain"])?) {
+        match watch.step(worlds.status(world)?) {
             Some(true) => {
                 return stop(messages, turns, step, format!("stuck: no file changed in {IDLE_STOP} steps"));
             }
