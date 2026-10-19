@@ -1445,9 +1445,8 @@ function chatQuestion(c) {
         try {
           if (!c.project) await api("/api/projects", { path: c.folder, place: "here" });
           for (const s of steps) {
-            const text = `${s}\n\n---\nUne étape du plan ci-dessous, issu de la discussion « ${chatTitle(c)} ». `
-              + `Ne traite que cette étape.\n\n${p.plan}`;
-            await api("/api/requests", { project: c.folder, text, later: true });
+            // Each task holds its own step, not the whole plan again.
+            await api("/api/requests", { project: c.folder, text: s, later: true });
           }
           await api("/api/chat/stop", { id: c.id });
           location.hash = hashOf(c.folder);
