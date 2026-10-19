@@ -10,16 +10,22 @@ dev:
 
 # Install fennec as a systemd user service (enable, do not start)
 service-install: build
-  ROOT="$(dirname "{{justfile()}}")"
+  #!/usr/bin/env bash
+  set -euo pipefail
   mkdir -p ~/.config/systemd/user
+  # The service gets the installer's PATH: the work runs cargo, node, git...
   cat > ~/.config/systemd/user/fennec.service <<EOF
   [Unit]
   Description=fennec lead (local web UI)
 
   [Service]
   Type=simple
-  ExecStart=$ROOT/target/release/fennec
+  ExecStart={{justfile_directory()}}/target/release/fennec
+  Environment="PATH=$PATH"
   Restart=on-failure
+
+  [Install]
+  WantedBy=default.target
   EOF
   systemctl --user daemon-reload
   systemctl --user enable fennec.service
