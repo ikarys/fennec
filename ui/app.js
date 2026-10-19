@@ -478,7 +478,7 @@ function details(item) {
   const box = el("details", { className: "more" }, el("summary", { textContent: "Détails" }));
   box.dataset.key = item.id;
   const part = (title, ...nodes) => box.append(el("h3", { textContent: title }), ...nodes);
-  if (item.title?.length > 200) part("La tâche", el("p", { textContent: item.title }));
+  if (item.title && item.title !== lead(item.title)) part("La tâche", el("div", {}, ...md(item.title)));
   const errors = [item.reason, item.land_error].filter(Boolean);
   if (errors.length) part("Erreur", ...errors.map((e) => el("pre", { className: "failed", textContent: e })));
   if (item.land?.message) part("Message du commit", el("pre", { textContent: item.land.message }));
@@ -1092,12 +1092,16 @@ function statusOf(item, kind) {
   return [label, color.replace("var(--", "").replace(")", "")];
 }
 
-// The request read in full: its title in whole and where it stands, above
-// what it holds. The title is not repeated in the card, the past or the run.
+// A request's first paragraph: what it asks. What follows (a plan step's
+// whole plan, say) is context, read in the details.
+const lead = (text) => (text ?? "").trim().split(/\n\s*\n/)[0];
+
+// The request read in full: its title and where it stands, above what it
+// holds. The title is not repeated in the card, the past or the run.
 function reqHead(item, kind) {
   const [label, tone] = statusOf(item, kind);
   const head = el("div", { className: "req-head" },
-    el("strong", { textContent: item.title }),
+    el("strong", { textContent: lead(item.title) }),
     el("span", { className: `status ${tone}`, textContent: label }));
   if (kind === "past" && item.stats?.turns) {
     const s = item.stats;

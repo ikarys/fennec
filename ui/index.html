@@ -276,7 +276,7 @@
   .more > h3 { margin: 18px 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
   .more > h3:first-child, details.more > summary + h3 { margin-top: 4px; }
   .more ul { margin: 0; padding-left: 18px; }
-  .more li code { display: inline; }
+  .more :is(li, p) code { display: inline; margin: 0; }
   .more pre.failed { color: var(--text); border-left: 3px solid var(--bad); }
   .more tbody.sub th { border-top: 1px solid var(--line); padding-top: 12px; }
   .more tbody.sub tr:first-child th { color: var(--muted); font-weight: 600; }
