@@ -445,6 +445,12 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
             fennec_os::chat::archive(&Worlds::from_env()?, &field(&v, "id"), v["on"] == true)?;
             Ok(json!({}))
         }
+        // Read-only by default; the person allows changes, or takes them back.
+        ("POST", "/api/chat/write") => {
+            let v = input()?;
+            fennec_os::chat::write(&Worlds::from_env()?, &field(&v, "id"), v["on"] == true)?;
+            Ok(json!({}))
+        }
         ("POST", "/api/chat/forget") => {
             fennec_os::chat::forget(&Worlds::from_env()?, &field(&input()?, "id"))?;
             Ok(json!({}))

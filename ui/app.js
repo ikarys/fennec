@@ -1389,7 +1389,7 @@ function showChat(c) {
   const busy = thinking || c.status === "waiting";
   box.composer.send.disabled = busy;
   box.composer.stop.hidden = !busy;
-  const asideKey = JSON.stringify([c.stats, c.project, c.grants]);
+  const asideKey = JSON.stringify([c.stats, c.project, c.grants, c.write]);
   if (box.asideKey !== asideKey) {
     box.asideKey = asideKey;
     box.aside.replaceChildren(...chatAside(c));
@@ -1414,6 +1414,16 @@ function chatQuestion(c) {
   };
   open.onclick = () => decide(true);
   refuse.onclick = () => decide(false);
+  // A plan to approve: approved, the folder opens for changes and fennec
+  // applies it; otherwise the discussion goes on, read-only.
+  if (p.tool === "propose_plan") {
+    open.textContent = "Appliquer le plan";
+    refuse.textContent = "Continuer à discuter";
+    return el("div", { className: "ask plan" },
+      el("span", { className: "muted", textContent: "fennec propose ce plan et demande à modifier le dossier" }),
+      el("div", { className: "said" }, ...md(p.plan ?? "")),
+      el("div", { className: "chat-actions" }, open, refuse));
+  }
   return el("div", { className: "ask" },
     el("span", { className: "muted", textContent: "fennec demande" }),
     el("code", { title: p.path, textContent: p.path }),
@@ -1490,6 +1500,26 @@ function chatComposer(id) {
 
 function chatAside(c) {
   const nodes = [];
+  // Read-only until the person allows changes: talking about a project is
+  // not asking to build it.
+  const write = c.write === true;
+  const toggle = el("button", { type: "button", className: write ? "quiet" : "primary",
+    textContent: write ? "Repasser en lecture seule" : "Autoriser les modifications" });
+  setIcon(toggle, write ? "lock" : "pencil");
+  toggle.onclick = async () => {
+    $("chat-error").textContent = "";
+    try {
+      await api("/api/chat/write", { id: c.id, on: !write });
+      refresh(true);
+    } catch (e) {
+      $("chat-error").textContent = e.message;
+    }
+  };
+  nodes.push(el("h2", { textContent: "Mode" }),
+    el("p", { className: "muted", textContent: write
+      ? "fennec modifie le dossier directement."
+      : "Lecture seule : fennec lit, discute et propose un plan." }),
+    toggle);
   // Folders the person opened for this chat: a refusal was not, an opening
   // stays until taken back.
   const grants = c.grants ?? [];
@@ -1687,6 +1717,8 @@ const ICONS = {
   resume: '<path d="M6 3l14 9-14 9z"/>',
   trash: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>',
   stop: '<rect x="6" y="6" width="12" height="12" rx="2"/>',
+  lock: '<rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  pencil: '<path d="M21.17 6.81a1 1 0 0 0-3.98-3.98L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z"/>',
   save: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/>',
   retry: '<path d="M3 12a9 9 0 0 1 15.7-6L21 8M21 3v5h-5M21 12a9 9 0 0 1-15.7 6L3 16M8 16H3v5"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',

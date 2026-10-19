@@ -555,6 +555,8 @@
   .chat .ask code { font-size: 13px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .chat .ask .muted { font-size: 12px; }
   .chat .ask button { padding: 3px 10px; font-size: 13px; }
+  .chat .ask.plan { flex-direction: column; align-items: stretch; }
+  .chat .ask.plan .said { max-width: none; }
   .chat-composer { margin-top: 10px; }
   .chat-actions { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
   .chat-actions .spacer { flex: 1; }
@@ -619,7 +621,7 @@
     <button type="button" class="primary" id="new-chat" data-icon="plus">Nouvelle discussion</button>
     <h2>Discussions</h2>
     <div id="chat-list"></div>
-    <p class="muted">fennec lit, écrit et lance des commandes dans le dossier que tu choisis, git ou pas : sans réseau, ton dossier personnel caché. Le coût de la discussion est à droite.</p>
+    <p class="muted">fennec lit et lance des commandes dans le dossier que tu choisis, git ou pas, sans réseau et ton dossier personnel caché. Il ne modifie rien tant que tu ne l’autorises pas. Le coût de la discussion est à droite.</p>
   </div>
   <div id="reqs">
   <button type="button" class="primary" id="compose-open" data-icon="plus">Nouvelle demande</button>
