@@ -24,7 +24,7 @@ ui/           index.html + app.js, embedded in the binary
 ```bash
 cargo build
 cargo test
-node ui/explain.test.js    # UI wording of failure reasons
+node --check ui/app.js && for t in ui/*.test.js; do node $t || echo "FAIL $t"; done  # UI tests (each extracts pieces of app.js, so --check guards the whole file)
 cargo clippy --all-targets  # must be clean
 cargo fmt --all
 fennec                      # http://127.0.0.1:7777

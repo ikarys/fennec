@@ -42,7 +42,7 @@ assert.ok((b.className).includes("quiet"));
 b.onclick();
 assert.equal(calls.length, 0, "le premier clic ne fait que demander");
 const sure = b.replacedBy;
-assert.equal(sure.textContent, "Confirmer la suppression");
+assert.equal(sure.textContent, "Confirmer");
 sure.onclick().then(() => {
   assert.deepEqual(calls, [["/api/forget", { id: "abc" }]], "le second clic efface");
   console.log("ok");

@@ -510,6 +510,14 @@
   /* The stop on the work under way: below its line, above the journal. */
   .run-actions { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
   .run-actions .error { margin: 0; }
+  .step.said { border-left: 3px solid var(--accent); }
+  .stages { display: flex; flex-wrap: wrap; gap: 4px; list-style: none; padding: 0; margin: 0 0 10px; font-size: 12px; }
+  .stages li { padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+  .stages li.done { color: var(--text); }
+  .stages li.done::before { content: "✓ "; color: var(--ok); }
+  .stages li.now { color: var(--accent); border-color: var(--accent); font-weight: 600; }
+  .past.run > .state { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+  .step.said p { margin: 6px 0 0; white-space: pre-wrap; }
   .chat .thinking { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px;
                     padding: 2px 0 6px; }
   .chat .ask { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 2px 0 6px;
@@ -660,7 +668,7 @@
       <textarea id="role-checks" aria-label="Commandes lancées à chaque preuve" rows="2"
         placeholder="Commandes lancées à chaque preuve, une par ligne : si l'une échoue, ce n'est pas prêt"></textarea>
       <div class="row"><button type="button" id="role-cancel">Annuler</button>
-        <button class="primary">Enregistrer le rôle</button></div>
+        <button class="primary">Enregistrer</button></div>
     </form>
     <form class="go" id="team-save" hidden>
       <input id="team-new-name" aria-label="Nom de la nouvelle équipe" placeholder="Nom de la nouvelle équipe" required>
@@ -779,7 +787,7 @@
   </label>
   <div class="row">
     <button type="button" id="picker-cancel">Annuler</button>
-    <button type="button" class="primary" id="picker-choose">Ajouter ce dossier</button>
+    <button type="button" class="primary" id="picker-choose">Ajouter</button>
   </div>
 </dialog>
 

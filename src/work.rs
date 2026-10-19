@@ -234,6 +234,9 @@ pub fn say(store: &Store, id: &str, text: &str) -> io::Result<()> {
     }
     store.update(id, |r| {
         say_in(r, "human", text);
+        // The journal reads as a story: what the human said marks where the
+        // work turned.
+        note(r, json!({"stage": "said", "text": text}));
         r["status"] = json!("thinking");
         r["heard"] = json!(text);
         if let Some(m) = r.as_object_mut() {
@@ -1021,6 +1024,7 @@ pub fn journal(store: &Store, id: &str) -> io::Result<Value> {
                     steps.push(s);
                 }
             }
+            Some("said") => steps.push(json!({"name": "Ta réponse", "said": e["text"]})),
             _ => {}
         }
     }

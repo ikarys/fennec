@@ -35,7 +35,7 @@ global.document = { createElement: (t) => new Node(t), getElementById: () => new
 
 eval(src.match(/const el = \(tag, props = \{\}, \.\.\.children\) => \{[\s\S]*?\n\};/)[0]
   + src.match(/const TAGS = \{[\s\S]*?\n\};/)[0]
-  + grab("landLabel") + grab("firstLine")
+  + grab("landLabel") + grab("landTitle") + grab("firstLine")
   // card's collaborators, stubbed: they only shape the structure under test.
   + `
   const conversation = () => null;
