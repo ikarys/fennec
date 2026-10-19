@@ -37,7 +37,7 @@ eval(src.match(/const el = \(tag, props = \{\}, \.\.\.children\) => \{[\s\S]*?\n
   + grab("setIcon") + grab("iconize")
   + src.match(/const errorOf = \(button\) => [^\n]*\n/)[0]
   + src.match(/async function api\([\s\S]*?\n}\n/)[0]
-  + grab("action") + grab("line") + grab("rowActions")
+  + grab("action") + grab("line") + grab("headline") + grab("rowActions")
   + grab("underway") + src.match(/const STEPS = \[[\s\S]*?\]\];\n/)[0] + grab("stages") + grab("ended") + grab("conversation") + grab("doneWhen") + grab("facts")
   + "globalThis.rowActions = rowActions; globalThis.underway = underway;");
 

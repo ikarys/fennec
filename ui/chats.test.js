@@ -40,7 +40,7 @@ eval(src.match(/const el = \(tag, props = \{\}, \.\.\.children\) => \{[\s\S]*?\n
   + src.match(/const TAGS = \{[\s\S]*?\n\};/)[0]
   + src.match(/const chatOpen = new Set\(\);/)[0]
   + src.match(/async function api\([\s\S]*?\n}\n/)[0]
-  + grab("setIcon") + grab("line") + grab("rowActions")
+  + grab("setIcon") + grab("line") + grab("headline") + grab("rowActions")
   + src.match(/const rowWrap = \(link, actions\) => [^\n]*\n/)[0]
   + grab("chatRow") + grab("chatGroup") + grab("chatGroups")
   + "globalThis.chatGroups = chatGroups; globalThis.rowActions = rowActions;");

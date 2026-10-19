@@ -38,7 +38,7 @@ eval("let chatBox = null; let detailed = '';"
   + "const attach = (t) => ({ node: null, value: () => t.value, clear: () => { t.value = ''; } });"
   + grab("isImage")
   + grab("inline") + grab("rich") + grab("md")
-  + grab("chatTitle") + grab("msgActions") + grab("iconButton") + grab("copyButton") + grab("toolCall") + grab("chatThread")
+  + grab("chatTitle") + grab("headline") + grab("msgActions") + grab("iconButton") + grab("copyButton") + grab("toolCall") + grab("chatThread")
   + grab("chatQuestion") + grab("chatComposer") + grab("chatAside") + grab("showChat")
   + "globalThis.showChat = showChat; globalThis.chatThread = chatThread; globalThis.getChatBox = () => chatBox;");
 
