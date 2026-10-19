@@ -208,6 +208,12 @@ impl Store {
         self.update(id, |r| {
             r["text"] = json!(text.trim());
             r["thread"] = json!([{"who": "human", "text": text.trim()}]);
+            // Framed ahead on the old words: framed again on the new ones.
+            if let Some(m) = r.as_object_mut() {
+                for k in ["ahead", "asked", "ahead_failed", "done_when"] {
+                    m.remove(k);
+                }
+            }
         })
     }
 
@@ -608,7 +614,7 @@ fn classify(requests: &[(String, Value)], projects_all: &[Value]) -> Value {
                    "thread": r["thread"], "stats": r["stats"], "since": r["since"],
                    // As the work reads it: said in the conversation, else
                    // the request as fennec restated it.
-                   "done_when": ([&r["done_when"], &r["brief"]].into_iter().find(|v| v.is_string()))})
+                   "done_when": ([&r["done_when"], &r["brief"], &r["ahead"]].into_iter().find(|v| v.is_string()))})
         };
         // Scenario 4: what the human said may become a rule, at one word.
         if let Some(rule) = r["offer"]["rule"].as_str() {
@@ -621,8 +627,15 @@ fn classify(requests: &[(String, Value)], projects_all: &[Value]) -> Value {
             Some("later") => {
                 if r["archived"] == true {
                     archived.push(card("later"));
+                } else if r["asked"] == true {
+                    // Framed ahead, it asked: answered now, it stays for later.
+                    let mut c = card("talk");
+                    c["later"] = json!(true);
+                    todo.push((0, c));
                 } else {
-                    later.push(card("later"));
+                    let mut c = card("later");
+                    c["framed"] = json!(r["ahead"].is_string());
+                    later.push(c);
                 }
             }
             Some("thinking") => running.push(card_step(card("running"), "réfléchit à ta tâche")),
