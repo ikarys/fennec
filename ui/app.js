@@ -1423,15 +1423,19 @@ function chatQuestion(c) {
     open.textContent = "Appliquer le plan";
     refuse.textContent = "Continuer à discuter";
     const actions = el("div", { className: "chat-actions" }, open);
-    // A plan in numbered steps, in a project: each step can become a task of
-    // its own, kept for later; the turn ends there.
-    const steps = planSteps(p.plan ?? "");
-    if (c.project && steps.length > 1) {
+    // A plan in steps (as fennec gave them, or else its numbered sections):
+    // each step can become a task of its own, kept for later; a folder that
+    // is no project yet becomes one, in place, as the project picker would
+    // make it. The turn ends there.
+    const steps = p.steps?.length > 1 ? p.steps : planSteps(p.plan ?? "");
+    if (steps.length > 1) {
       const split = el("button", { type: "button", textContent: `En faire ${steps.length} tâches` });
+      if (!c.project) split.title = "Le dossier devient un projet";
       split.onclick = async () => {
         $("chat-error").textContent = "";
         split.disabled = true;
         try {
+          if (!c.project) await api("/api/projects", { path: c.folder, place: "here" });
           for (const s of steps) {
             const text = `${s}\n\n---\nUne étape du plan ci-dessous, issu de la discussion « ${chatTitle(c)} ». `
               + `Ne traite que cette étape.\n\n${p.plan}`;
