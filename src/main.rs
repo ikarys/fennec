@@ -245,7 +245,12 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
         ("GET", "/api/fleet") => fleet::view(&store),
         ("POST", "/api/fleet") => {
             let v = input()?;
-            fleet::set(&store, v["on"].as_bool(), v["at_once"].as_u64())?;
+            fleet::set(
+                &store,
+                v["on"].as_bool(),
+                v["at_once"].as_u64(),
+                v["on_fail"].as_str(),
+            )?;
             Ok(json!({}))
         }
         ("POST", "/api/fleet/place") => {
