@@ -323,3 +323,29 @@ fn a_rollback_in_the_folder_sets_changes_aside() {
         .unwrap();
     assert!(String::from_utf8_lossy(&stash.stdout).contains("mine"));
 }
+
+#[test]
+fn a_world_cut_short_is_described_then_forgotten() {
+    let f = Fixture::new("forget");
+    let w = f.worlds.fork(f.project.to_str().unwrap()).unwrap();
+    std::fs::write(w.path.join("work"), "half done").unwrap();
+    f.worlds.commit(&w, "half done").unwrap();
+    let facts = f.worlds.facts(&w.id).unwrap();
+    assert_eq!(facts["commits"], serde_json::json!(["half done"]));
+    assert_eq!(facts["in_folder"], false);
+    assert!(facts["bytes"].as_u64().unwrap() > 0);
+    assert!(facts["since"].as_u64().is_some());
+    // A drop cut short: the folder went, the branch and metadata stayed.
+    std::fs::remove_dir_all(&w.path).unwrap();
+    let id = w.id.clone();
+    f.worlds.forget(&id).unwrap();
+    assert!(f.worlds.list().unwrap().is_empty());
+    let branch = Command::new("git")
+        .arg("-C")
+        .arg(&f.project)
+        .args(["branch", "--list", "world/*"])
+        .output()
+        .unwrap();
+    assert!(branch.stdout.is_empty());
+    std::fs::remove_dir_all(&f.dir).unwrap();
+}

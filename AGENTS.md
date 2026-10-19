@@ -12,7 +12,7 @@ not binding): `docs/history/`; synthesis note in the `iatraining` repo,
 ## Layout
 
 ```
-src/world.rs     worlds: fork, sandbox (bubblewrap), diff, commit, rollback, drop
+src/world.rs     worlds: fork, sandbox (bubblewrap), diff, commit, rollback, drop; facts and forget for what a cut-short start or drop left
 src/grant.rs     human-issued grant: a world writes named host paths, backed up until keep/revert
 src/provider.rs  `Model` trait + OpenAI-compatible client; `ask` (one question), `Live` (the exchange so far, in a file)
 src/recipe.rs    replay a landed run's tool calls when the same goal returns
