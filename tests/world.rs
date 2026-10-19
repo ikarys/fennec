@@ -296,3 +296,30 @@ fn pending_grants_are_listed_and_a_killed_give_is_cleared() {
     grant::keep(&f.worlds, &w).unwrap();
     assert_eq!(grant::summary(&f.worlds).unwrap(), None);
 }
+
+#[test]
+fn a_rollback_in_the_folder_sets_changes_aside() {
+    let f = Fixture::new("rollback-here");
+    let unset = ["config", "--unset", "fennec.workspace"];
+    assert!(
+        Command::new("git")
+            .arg("-C")
+            .arg(&f.project)
+            .args(unset)
+            .status()
+            .unwrap()
+            .success()
+    );
+    let w = f.worlds.fork(&f.project.to_string_lossy()).unwrap();
+    // The human edits their folder while fennec works in it.
+    std::fs::write(w.path.join("mine"), "keep me\n").unwrap();
+    f.worlds.rollback(&w).unwrap();
+    assert!(!w.path.join("mine").exists());
+    let stash = Command::new("git")
+        .arg("-C")
+        .arg(&w.path)
+        .args(["stash", "show", "-u", "--name-only"])
+        .output()
+        .unwrap();
+    assert!(String::from_utf8_lossy(&stash.stdout).contains("mine"));
+}
