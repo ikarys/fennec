@@ -559,7 +559,8 @@ fn propose_plan() -> Value {
             "plan": {"type": "string", "description": "the plan in Markdown, in their language"},
             "steps": {"type": "array", "items": {"type": "string"}, "description":
                 "when the plan has several independent steps: each one alone, its title on the first line, \
-                 then what to do; the person may make each a task of its own"}}}
+                 then in a few lines what to do and how to know it is done (not the title only); \
+                 the person may make each a task of its own"}}}
     }})
 }
 
