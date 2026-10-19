@@ -2332,3 +2332,24 @@ $("project").addEventListener("change", () => {
   focusOn($("project").value);
   refresh(true);
 });
+
+// Which build runs, so the human knows they test the latest: a newer commit
+// on its branch, or changes left out of it, are said.
+async function showVersion() {
+  try {
+    const v = await api("/api/version");
+    const built = new Date(v.built * 1000).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+    $("version").title = `Compilé le ${built}${v.branch ? ` depuis la branche ${v.branch}` : ""}`;
+    $("version").replaceChildren(el("div", { textContent: `v${v.version} · ${v.commit}` }),
+      el("div", {}, built,
+        v.dirty ? el("span", { className: "dirty", textContent: " · +modifs", title: "Compilé avec des changements pas encore commités" }) : ""),
+      v.latest && v.latest !== v.commit
+        ? el("div", { className: "stale", textContent: `${v.branch} est à ${v.latest} : à recompiler`,
+          title: "Cette version n'est plus la dernière : just build puis just service-restart" })
+        : "");
+  } catch {
+    // An older binary has no version: nothing to say.
+  }
+}
+showVersion();
+setInterval(showVersion, 60000);
