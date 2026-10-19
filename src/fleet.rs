@@ -1,8 +1,9 @@
 //! The Fleet: tasks kept for later that fennec starts on its own, in one
 //! queue across projects. The decision is the task's; the project is only a
 //! place: where fennec works in the folder itself, one task at a time.
-//! `fleet.json` in the store holds the queue's order, run or pause, and how
-//! many tasks may work at once.
+//! `fleet.json` in the store holds the queue's order, run or stop, how many
+//! tasks may work at once, and whether a failure stops it. A task the Fleet
+//! started carries `fleet: true`, for its summary.
 
 use std::io;
 use std::path::Path;
@@ -32,6 +33,11 @@ fn load(store: &Store) -> io::Result<Value> {
     }
     if !v["queue"].is_array() {
         v["queue"] = json!([]);
+    }
+    // A failure stops the Fleet by default: a model server down would
+    // otherwise fail the whole queue, one task after the other.
+    if !v["on_fail"].is_string() {
+        v["on_fail"] = json!("stop");
     }
     Ok(v)
 }
@@ -86,16 +92,47 @@ pub fn place(store: &Store, id: &str, action: &str) -> io::Result<()> {
     save(store, &v)
 }
 
-/// Run or pause, and how many tasks at once (1 to 10).
-pub fn set(store: &Store, on: Option<bool>, at_once: Option<u64>) -> io::Result<()> {
+/// Run or stop, how many tasks at once (1 to 10), and what a failure does
+/// (`stop` or `go on`).
+pub fn set(
+    store: &Store,
+    on: Option<bool>,
+    at_once: Option<u64>,
+    on_fail: Option<&str>,
+) -> io::Result<()> {
     let mut v = load(store)?;
     if let Some(on) = on {
         v["on"] = json!(on);
+        // Started again: the reason it stopped is the past.
+        if let Some(m) = v.as_object_mut() {
+            m.remove("stopped");
+        }
+    }
+    if let Some(f) = on_fail {
+        if !matches!(f, "stop" | "go on") {
+            return Err(io::Error::other("réglage inconnu"));
+        }
+        v["on_fail"] = json!(f);
     }
     if let Some(n) = at_once {
         v["at_once"] = json!(n.clamp(1, 10));
     }
     save(store, &v)
+}
+
+/// A task named in a line: its first words.
+fn short(r: &Value) -> String {
+    let title = crate::state::words(r["text"].as_str().unwrap_or(""));
+    let first = title.lines().next().unwrap_or("");
+    match first.char_indices().nth(40) {
+        Some((at, _)) => format!("{}…", &first[..at]),
+        None => first.to_string(),
+    }
+}
+
+/// Whether the Fleet runs.
+pub fn running(store: &Store) -> io::Result<bool> {
+    Ok(load(store)?["on"] == true)
 }
 
 /// Why `project`'s folder cannot take a task now, or `None` when it can.
@@ -106,15 +143,7 @@ fn held(project: &str, requests: &[(String, Value)]) -> Option<String> {
         Ok(Some(Held::World(w))) => {
             let owner = requests.iter().find(|(_, r)| r["run"] == w.as_str());
             return Some(match owner {
-                Some((_, r)) => {
-                    // Its first words: the reason is a tag, not the task.
-                    let title = crate::state::words(r["text"].as_str().unwrap_or(""));
-                    let first = title.lines().next().unwrap_or("");
-                    match first.char_indices().nth(40) {
-                        Some((at, _)) => format!("« {}… » occupe le dossier", &first[..at]),
-                        None => format!("« {first} » occupe le dossier"),
-                    }
-                }
+                Some((_, r)) => format!("« {} » occupe le dossier", short(r)),
                 None => "une autre tâche occupe le dossier".into(),
             });
         }
@@ -163,16 +192,28 @@ fn states(
 /// One look: when running and a place is free, the first queued task whose
 /// folder is free starts. `start` begins its work (`work::talk`).
 pub fn tick(store: &Store, start: fn(String)) -> io::Result<()> {
-    let v = load(store)?;
+    let mut v = load(store)?;
     if v["on"] != true {
         return Ok(());
     }
-    let queue = queue(store)?;
     let requests = store.requests()?;
+    // A failure is seen once; it stops the Fleet unless told to go on.
+    for (id, r) in &requests {
+        if r["fleet"] == true && r["status"] == "failed" && r["fleet_seen"] != true {
+            store.update(id, |r| r["fleet_seen"] = json!(true))?;
+            if v["on_fail"] == "stop" {
+                v["on"] = json!(false);
+                v["stopped"] = json!(format!("« {} » a échoué", short(r)));
+                return save(store, &v);
+            }
+        }
+    }
+    let queue = queue(store)?;
     let at_once = v["at_once"].as_u64().unwrap_or(1) as usize;
     let states = states(&queue, &requests, at_once, |p| held(p, &requests));
     if let Some(((id, _), _)) = queue.iter().zip(&states).find(|(_, s)| s.is_none()) {
         store.launch(id)?;
+        store.update(id, |r| r["fleet"] = json!(true))?;
         start(id.clone());
     }
     Ok(())
@@ -218,7 +259,51 @@ pub fn view(store: &Store) -> io::Result<Value> {
         .filter(|(_, r)| is_working(r))
         .map(|(id, r)| card(id, r))
         .collect();
-    Ok(json!({"on": v["on"], "at_once": v["at_once"], "queue": queued, "working": working}))
+    // What the Fleet started: where each stands, what it cost, the latest first.
+    let started: Vec<&(String, Value)> = requests
+        .iter()
+        .filter(|(_, r)| r["fleet"] == true)
+        .collect();
+    let count = |states: &[&str]| {
+        started
+            .iter()
+            .filter(|(_, r)| states.contains(&r["status"].as_str().unwrap_or("")))
+            .count()
+    };
+    let mut cost = json!({"ms": 0, "sent": 0, "received": 0});
+    for (_, r) in &started {
+        for k in ["ms", "sent", "received"] {
+            cost[k] = json!(cost[k].as_u64().unwrap_or(0) + r["stats"][k].as_u64().unwrap_or(0));
+        }
+    }
+    let mut done: Vec<&&(String, Value)> = started.iter().filter(|(_, r)| !is_working(r)).collect();
+    done.sort_by_key(|(_, r)| std::cmp::Reverse(r["since"].as_u64().unwrap_or(0)));
+    let recent: Vec<Value> = done
+        .iter()
+        .take(10)
+        .map(|(id, r)| {
+            let mut c = card(id, r);
+            c["outcome"] = json!(match r["status"].as_str() {
+                Some("landed") => "commité",
+                Some("passed") => "mis de côté",
+                Some("dropped") => "abandonné",
+                Some("failed") => "échec",
+                Some("ready") => "prêt, t'attend",
+                Some("later") => "remis à plus tard",
+                _ => "question pour toi",
+            });
+            c
+        })
+        .collect();
+    let summary = json!({
+        "queued": queue.len(), "working": count(&["thinking", "framing", "waiting", "running", "proving", "landing"]),
+        "yours": count(&["ready", "question", "talk", "blocked"]), "landed": count(&["landed"]),
+        "failed": count(&["failed"]), "cost": cost,
+    });
+    Ok(
+        json!({"on": v["on"], "at_once": v["at_once"], "on_fail": v["on_fail"], "stopped": v["stopped"],
+              "queue": queued, "working": working, "summary": summary, "recent": recent}),
+    )
 }
 
 #[cfg(test)]
@@ -270,14 +355,14 @@ mod tests {
         place(&store, &b, "add").unwrap();
         // The human moves b first; "kept" stays for later, out of the Fleet.
         place(&store, &b, "up").unwrap();
-        set(&store, None, Some(2)).unwrap();
+        set(&store, None, Some(2), None).unwrap();
         tick(&store, |_| {}).unwrap();
         assert_eq!(store.load(&b).unwrap()["status"], "thinking");
         assert_eq!(store.load(&a).unwrap()["status"], "later");
-        set(&store, Some(false), None).unwrap();
+        set(&store, Some(false), None, None).unwrap();
         tick(&store, |_| {}).unwrap();
         assert_eq!(store.load(&a).unwrap()["status"], "later", "paused");
-        set(&store, Some(true), None).unwrap();
+        set(&store, Some(true), None, None).unwrap();
         tick(&store, |_| {}).unwrap();
         assert_eq!(store.load(&a).unwrap()["status"], "thinking");
         // Two work, two places: the queue is empty and "kept" never moved.
@@ -285,6 +370,20 @@ mod tests {
         tick(&store, |_| {}).unwrap();
         assert_eq!(store.load(&kept).unwrap()["status"], "later");
         assert!(place(&store, &a, "add").is_err(), "no longer for later");
+        // A task the Fleet started fails: the Fleet stops and says why.
+        place(&store, &kept, "add").unwrap();
+        store.update(&a, |r| r["status"] = json!("failed")).unwrap();
+        store.update(&b, |r| r["status"] = json!("landed")).unwrap();
+        tick(&store, |_| {}).unwrap();
+        assert_eq!(store.load(&kept).unwrap()["status"], "later", "stopped");
+        let v = view(&store).unwrap();
+        assert_eq!(v["on"], false);
+        assert_eq!(v["stopped"], "« a » a échoué");
+        assert_eq!(v["summary"]["landed"], 1);
+        // Told to go on, the same failure, already seen, stops nothing.
+        set(&store, Some(true), None, Some("go on")).unwrap();
+        tick(&store, |_| {}).unwrap();
+        assert_eq!(store.load(&kept).unwrap()["status"], "thinking");
         std::fs::remove_dir_all(tmp).unwrap();
     }
 }

@@ -313,6 +313,8 @@ impl Store {
         for c in view["later"].as_array_mut().into_iter().flatten() {
             c["fleet"] = json!(fleet.iter().any(|id| c["id"] == id.as_str()));
         }
+        // The list starts and stops the Fleet too.
+        view["fleet"] = json!({"on": crate::fleet::running(self)?, "queued": fleet.len()});
         Ok(view)
     }
 }

@@ -169,6 +169,22 @@
   #list .box h2, #fleet .box h2 { margin: 0 0 4px; display: flex; gap: 8px; align-items: center; }
   #list .box .count, #fleet .box .count { text-transform: none; letter-spacing: 0; }
   #list .box .empty, #fleet .box .empty { padding: 4px 0 8px; font-size: 13px; }
+  /* The Fleet, from the list: its state and its switch, one line. */
+  #fleet-bar { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 6px 12px;
+               border: 1px solid var(--line); border-radius: 8px; background: var(--card); font-size: 13px; }
+  #fleet-bar a { color: var(--text); font-weight: 600; text-decoration: none; }
+  #fleet-bar button { padding: 3px 10px; }
+  #fleet-bar.on { border-color: var(--info); }
+  /* The backlog's boxes to tick, and what to do with the ticked ones. */
+  .pick-row { display: flex; align-items: center; gap: 6px; }
+  .pick-row > input { flex: none; margin: 0 0 0 2px; accent-color: var(--accent); }
+  .pick-row > .row-wrap { flex: 1; min-width: 0; }
+  #later-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 4px 0 6px; font-size: 13px; }
+  #later-pick button { padding: 3px 10px; white-space: nowrap; }
+  #fleet-bar .spacer, #later-pick .spacer { flex: 1; }
+  .fleet-settings { display: flex; gap: 24px; flex-wrap: wrap; padding: 4px 0 10px; font-size: 13px; }
+  .fleet-settings label { display: flex; align-items: center; gap: 8px; }
+  .warn-line { color: var(--warn); }
   #todo-box:has(a.row) { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
   #n-others { margin-left: auto; }
   #list .cost, #detail summary .cost { display: none; }
@@ -642,6 +658,7 @@
   </div>
   <div id="reqs">
   <button type="button" class="primary" id="compose-open" data-icon="plus">Nouvelle tâche</button>
+  <div id="fleet-bar" hidden></div>
   <p class="error" id="error" role="alert"></p>
 
 
@@ -663,6 +680,7 @@
   <div id="todo"></div></div>
 
   <div class="box" id="later-box" hidden><h2 data-icon="clock">Plus tard <span class="count" id="n-later"></span></h2>
+  <div id="later-pick" hidden></div>
   <div id="later"></div></div>
 
   <div class="box"><h2 data-icon="work">fennec travaille</h2>
@@ -738,14 +756,23 @@
   </section>
   <section id="fleet" hidden>
     <div class="page-head"><strong>Fleet</strong> <span class="muted" id="fleet-state"></span><span class="spacer"></span>
-      <label class="muted">À la fois <select id="fleet-at-once" aria-label="Tâches à la fois"></select></label>
       <button type="button" id="fleet-toggle"></button></div>
-    <p class="muted">fennec lance seul les tâches de la Fleet, dans cet ordre, dès qu'une place et leur dossier sont libres. La pause arrête les lancements, pas ce qui tourne.</p>
+    <p class="muted">fennec lance seul les tâches de la Fleet, dans cet ordre, dès qu'une place et leur dossier sont libres. L'arrêter ne coupe pas ce qui tourne.</p>
+    <p class="warn-line" id="fleet-stopped" hidden></p>
     <p class="error" id="fleet-error" role="alert"></p>
+    <div class="tiles" id="fleet-tiles"></div>
     <div class="box"><h2 data-icon="fleet">File <span class="count" id="n-fleet"></span></h2>
     <div id="fleet-queue"></div></div>
     <div class="box"><h2 data-icon="work">fennec travaille <span class="count" id="n-fleet-working"></span></h2>
     <div id="fleet-working"></div></div>
+    <div class="box"><h2 data-icon="history">Lancées par la Fleet <span class="count" id="n-fleet-recent"></span></h2>
+    <div id="fleet-recent"></div></div>
+    <div class="box"><h2 data-icon="gear">Réglages</h2>
+      <div class="fleet-settings">
+        <label>Tâches à la fois <select id="fleet-at-once"></select></label>
+        <label>Après un échec <select id="fleet-on-fail">
+          <option value="stop">arrêter la Fleet</option><option value="go on">continuer</option></select></label>
+      </div></div>
   </section>
   <section id="stats" hidden>
     <div class="page-head"><strong>Stats</strong></div>

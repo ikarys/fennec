@@ -106,7 +106,15 @@ dark) when it shows. The status choke point is `Store::update`
   queue (task ids, one order across projects), run/pause and how many at
   once (default 1). A task launched, forgotten or archived leaves the queue.
 - Every 3 s, when running and under the number at once, the first queued
-  task whose folder is free starts (`work::talk`). Pause stops launching only.
+  task whose folder is free starts (`work::talk`). Stopping stops launching only.
+- A failure of a task the Fleet started stops the Fleet by default ("Après
+  un échec": arrêter / continuer), so a model server down never fails the
+  whole queue; the page says which task stopped it.
+- From the list: a Fleet line (state, queued count, start/stop) and boxes to
+  tick in "Plus tard" to send several tasks to the Fleet, or take them out.
+- The Fleet page: start/stop, figures (queued, working, waiting for you,
+  committed, failed, model time and tokens of what it started), the queue,
+  what works, what it started lately, and its settings.
 - UI: "Dans la Fleet" / "Plus tard" on a task; `/fleet` page: run/pause, the
   ordered queue (move up/down, take out), what runs now.
 - Done when: three Fleet tasks in two projects land in rank order with no
