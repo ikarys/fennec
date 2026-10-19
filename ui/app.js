@@ -1261,6 +1261,8 @@ let chatBox = null;
 const chatOpen = new Set();
 async function showChats() {
   document.body.classList.add("chats", "picked");
+  // Coming from Équipe, Stats or Réglages: their class hides the list column.
+  document.body.classList.remove("paged");
   $("chats").hidden = false;
   $("page").hidden = true;
   $("hint").hidden = true;
