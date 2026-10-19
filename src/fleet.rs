@@ -161,7 +161,11 @@ fn states(
     let mut next = false;
     queue
         .iter()
-        .map(|_| {
+        .map(|(_, r)| {
+            // Framed ahead, it asked: it starts once the human answered.
+            if r["asked"] == true {
+                return Some("attend ta réponse".into());
+            }
             if working >= at_once {
                 return Some("attend une place".into());
             }
@@ -178,17 +182,20 @@ fn states(
 /// One look: when running, proven work meant for the `fleet` branch is
 /// committed there first (`land`, `work::land`), so the next task starts
 /// from it; else, when a place is free, the first queued task starts
-/// (`start`, `work::talk`). One step per look.
+/// (`start`, `work::talk`). One step per look. When nothing works, even
+/// stopped, the first queued task not framed yet is framed ahead
+/// (`prepare`, `work::prepare`).
 pub fn tick(
     store: &Store,
     start: fn(String),
     land: fn(&Store, &str) -> io::Result<()>,
+    prepare: fn(String),
 ) -> io::Result<()> {
     let mut v = load(store)?;
-    if v["on"] != true {
-        return Ok(());
-    }
     let requests = store.requests()?;
+    if v["on"] != true {
+        return ahead(store, &requests, prepare);
+    }
     // A failure is seen once; it stops the Fleet unless told to go on. A
     // commit on the branch that failed (a conflict, a check) is one too.
     for (id, r) in &requests {
@@ -229,6 +236,23 @@ pub fn tick(
             }
         })?;
         start(id.clone());
+        return Ok(());
+    }
+    ahead(store, &requests, prepare)
+}
+
+/// Framing ahead takes the model only when no task needs it.
+fn ahead(store: &Store, requests: &[(String, Value)], prepare: fn(String)) -> io::Result<()> {
+    if requests.iter().any(|(_, r)| is_working(r)) || crate::work::busy() {
+        return Ok(());
+    }
+    let framed = |r: &Value| {
+        ["ahead", "asked", "ahead_failed"]
+            .iter()
+            .any(|k| !r[k].is_null())
+    };
+    if let Some((id, _)) = queue(store)?.into_iter().find(|(_, r)| !framed(r)) {
+        prepare(id);
     }
     Ok(())
 }
@@ -238,9 +262,14 @@ pub fn tick(
 pub fn watch() {
     std::thread::spawn(|| {
         loop {
-            if let Err(e) =
-                Store::from_env().and_then(|s| tick(&s, crate::work::talk, crate::work::land))
-            {
+            if let Err(e) = Store::from_env().and_then(|s| {
+                tick(
+                    &s,
+                    crate::work::talk,
+                    crate::work::land,
+                    crate::work::prepare,
+                )
+            }) {
                 eprintln!("fennec: la Fleet : {e}");
             }
             std::thread::sleep(std::time::Duration::from_secs(3));
@@ -267,6 +296,7 @@ pub fn view(store: &Store) -> io::Result<Value> {
         .map(|((id, r), s)| {
             let mut c = card(id, r);
             c["waits"] = json!(s);
+            c["framed"] = json!(r["ahead"].is_string());
             c
         })
         .collect();
@@ -370,25 +400,25 @@ mod tests {
         // The human moves b first; "kept" stays for later, out of the Fleet.
         place(&store, &b, "up").unwrap();
         set(&store, None, Some(2), None, None).unwrap();
-        tick(&store, |_| {}, |_, _| Ok(())).unwrap();
+        tick(&store, |_| {}, |_, _| Ok(()), |_| {}).unwrap();
         assert_eq!(store.load(&b).unwrap()["status"], "thinking");
         assert_eq!(store.load(&a).unwrap()["status"], "later");
         set(&store, Some(false), None, None, None).unwrap();
-        tick(&store, |_| {}, |_, _| Ok(())).unwrap();
+        tick(&store, |_| {}, |_, _| Ok(()), |_| {}).unwrap();
         assert_eq!(store.load(&a).unwrap()["status"], "later", "paused");
         set(&store, Some(true), None, None, None).unwrap();
-        tick(&store, |_| {}, |_, _| Ok(())).unwrap();
+        tick(&store, |_| {}, |_, _| Ok(()), |_| {}).unwrap();
         assert_eq!(store.load(&a).unwrap()["status"], "thinking");
         // Two work, two places: the queue is empty and "kept" never moved.
         assert!(queue(&store).unwrap().is_empty());
-        tick(&store, |_| {}, |_, _| Ok(())).unwrap();
+        tick(&store, |_| {}, |_, _| Ok(()), |_| {}).unwrap();
         assert_eq!(store.load(&kept).unwrap()["status"], "later");
         assert!(place(&store, &a, "add").is_err(), "no longer for later");
         // A task the Fleet started fails: the Fleet stops and says why.
         place(&store, &kept, "add").unwrap();
         store.update(&a, |r| r["status"] = json!("failed")).unwrap();
         store.update(&b, |r| r["status"] = json!("landed")).unwrap();
-        tick(&store, |_| {}, |_, _| Ok(())).unwrap();
+        tick(&store, |_| {}, |_, _| Ok(()), |_| {}).unwrap();
         assert_eq!(store.load(&kept).unwrap()["status"], "later", "stopped");
         let v = view(&store).unwrap();
         assert_eq!(v["on"], false);
@@ -396,10 +426,61 @@ mod tests {
         assert_eq!(v["summary"]["landed"], 1);
         // Told to go on, the same failure, already seen, stops nothing.
         set(&store, Some(true), None, Some("go on"), None).unwrap();
-        tick(&store, |_| {}, |_, _| Ok(())).unwrap();
+        tick(&store, |_| {}, |_, _| Ok(()), |_| {}).unwrap();
         assert_eq!(store.load(&kept).unwrap()["status"], "thinking");
         std::fs::remove_dir_all(tmp).unwrap();
     }
+    static PREPARED: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+
+    #[test]
+    fn idle_queued_tasks_are_framed_ahead_and_one_that_asked_waits_for_the_human() {
+        let tmp = std::env::temp_dir().join(format!("fennec-lead-ahead-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        let store = Store {
+            root: tmp.join("home"),
+        };
+        std::fs::create_dir_all(store.root.join("requests")).unwrap();
+        let p = tmp.join("p");
+        std::fs::create_dir_all(&p).unwrap();
+        store.add_project(p.to_str().unwrap(), "apart").unwrap();
+        let p = std::fs::canonicalize(p).unwrap().display().to_string();
+        let a = store.add_request(&p, "a", &[], true).unwrap();
+        let b = store.add_request(&p, "b", &[], true).unwrap();
+        place(&store, &a, "add").unwrap();
+        place(&store, &b, "add").unwrap();
+        let prepare = |id: String| PREPARED.lock().unwrap().push(id);
+        let prepared = || std::mem::take(&mut *PREPARED.lock().unwrap());
+        // Stopped, nothing works: the first task is framed ahead.
+        set(&store, Some(false), None, None, None).unwrap();
+        tick(&store, |_| {}, |_, _| Ok(()), prepare).unwrap();
+        assert_eq!(prepared(), std::slice::from_ref(&a));
+        // It asked: the next one is framed, and the Fleet passes it by.
+        store.update(&a, |r| r["asked"] = json!(true)).unwrap();
+        tick(&store, |_| {}, |_, _| Ok(()), prepare).unwrap();
+        assert_eq!(prepared(), std::slice::from_ref(&b));
+        assert_eq!(
+            view(&store).unwrap()["queue"][0]["waits"],
+            "attend ta réponse"
+        );
+        store.update(&b, |r| r["ahead"] = json!("brief")).unwrap();
+        tick(&store, |_| {}, |_, _| Ok(()), prepare).unwrap();
+        assert!(prepared().is_empty(), "all framed");
+        set(&store, Some(true), None, None, None).unwrap();
+        tick(&store, |_| {}, |_, _| Ok(()), prepare).unwrap();
+        assert_eq!(store.load(&a).unwrap()["status"], "later");
+        assert_eq!(store.load(&b).unwrap()["status"], "thinking");
+        // Reworded, a task is framed again on its new words.
+        store.rewrite(&a, "a2").unwrap();
+        store.update(&b, |r| r["status"] = json!("landed")).unwrap();
+        tick(&store, |_| {}, |_, _| Ok(()), prepare).unwrap();
+        assert_eq!(
+            store.load(&a).unwrap()["status"],
+            "thinking",
+            "no longer waits"
+        );
+        std::fs::remove_dir_all(tmp).unwrap();
+    }
+
     #[test]
     fn on_the_branch_proven_work_is_committed_before_the_next_starts() {
         let tmp =
@@ -420,11 +501,11 @@ mod tests {
         set(&store, None, Some(2), None, Some("branch")).unwrap();
         assert!(set(&store, None, None, None, Some("main")).is_err());
         let landing = |s: &Store, id: &str| s.update(id, |r| r["status"] = json!("landing"));
-        tick(&store, |_| {}, landing).unwrap();
+        tick(&store, |_| {}, landing, |_| {}).unwrap();
         assert_eq!(store.load(&a).unwrap()["fleet_branch"], BRANCH);
         // Proven: the next look commits it rather than starting b.
         store.update(&a, |r| r["status"] = json!("ready")).unwrap();
-        tick(&store, |_| {}, landing).unwrap();
+        tick(&store, |_| {}, landing, |_| {}).unwrap();
         let r = store.load(&a).unwrap();
         assert_eq!(
             (r["status"].as_str(), &r["target"]["branch"]),
@@ -438,7 +519,7 @@ mod tests {
                 r["land_error"] = json!("conflit");
             })
             .unwrap();
-        tick(&store, |_| {}, landing).unwrap();
+        tick(&store, |_| {}, landing, |_| {}).unwrap();
         assert_eq!(
             view(&store).unwrap()["stopped"],
             "« a » n'a pas pu être commitée sur fleet"
