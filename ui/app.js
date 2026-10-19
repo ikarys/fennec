@@ -478,7 +478,11 @@ function details(item) {
   const box = el("details", { className: "more", open: true }, el("summary", { textContent: "Détails" }));
   box.dataset.key = item.id;
   const part = (title, ...nodes) => box.append(el("h3", { textContent: title }), ...nodes);
-  if (item.title && item.title !== lead(item.title)) part("La tâche", el("div", {}, ...md(item.title)));
+  // A plan step carries the discussion's whole plan after "---": the same in
+  // every step, so it is named as shared, apart from the step itself.
+  const [step, plan] = (item.title ?? "").split("\n\n---\n");
+  if (step && step !== lead(step)) part("La tâche", el("div", {}, ...md(step)));
+  if (plan) part("Le plan de la discussion, commun à ses tâches", el("div", {}, ...md(plan)));
   const errors = [item.reason, item.land_error].filter(Boolean);
   if (errors.length) part("Erreur", ...errors.map((e) => el("pre", { className: "failed", textContent: e })));
   if (item.land?.message) part("Message du commit", el("pre", { textContent: item.land.message }));
