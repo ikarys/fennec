@@ -37,6 +37,7 @@ fn the_review_page_obeys_only_its_human_and_keeps_diffs_inert() {
         ro_paths: Vec::new(),
         memory_mb: fx.worlds.memory_mb,
         apart: false,
+        base: None,
     };
     std::thread::spawn(move || fennec_os::serve::serve(worlds, listener, "s3cret"));
 

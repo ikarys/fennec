@@ -74,6 +74,7 @@ impl Fixture {
             ro_paths: Vec::new(),
             memory_mb: Some(8192),
             apart: false,
+            base: None,
         };
         Self {
             dir,

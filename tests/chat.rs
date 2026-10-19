@@ -126,6 +126,7 @@ fn twin(f: &Fixture) -> Worlds {
         ro_paths: Vec::new(),
         memory_mb: Some(8192),
         apart: false,
+        base: None,
     }
 }
 
