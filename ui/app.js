@@ -909,11 +909,17 @@ function card(item) {
     const text = el("textarea", { placeholder: "Ta réponse", ariaLabel: "Ta réponse" });
     const images = attach(text);
     add(el("div", { className: "reply" }, text, images.node));
+    // Framed ahead while it waits in the Fleet: answering does not start it.
     actions.append(dropButton(item.id), el("span", { className: "spacer" }),
-      Object.assign(action("Lancer", "/api/frame", { id: item.id }),
-        { title: "Lancer le travail sur la conversation telle quelle, sans autre question" }),
+      item.later
+        ? Object.assign(action("Assez clair", "/api/frame", { id: item.id }),
+          { title: "Garder la conversation telle quelle : la Fleet la lancera sans autre question" })
+        : Object.assign(action("Lancer", "/api/frame", { id: item.id }),
+          { title: "Lancer le travail sur la conversation telle quelle, sans autre question" }),
       Object.assign(action("Envoyer", "/api/say", () => ({ id: item.id, text: images.value() }), { primary: true }),
-        { title: "fennec lit ta réponse : il repose une question s'il le faut, sinon il lance le travail" }));
+        { title: item.later
+          ? "fennec lit ta réponse quand le modèle est libre ; la tâche reste dans la Fleet"
+          : "fennec lit ta réponse : il repose une question s'il le faut, sinon il lance le travail" }));
   } else if (item.kind === "validate") {
     add(conversation(item), focus("Terminé quand", item.done_when));
     const correction = el("textarea", { placeholder: "Ce qui ne va pas, ou une précision", hidden: true });
@@ -1014,6 +1020,11 @@ function card(item) {
       save.hidden = false;
       text.focus();
     };
+    // Framed ahead: said once, with what fennec understood. A task that fits
+    // in its title has nothing else to read: said too, rather than a blank.
+    const more = (item.title ?? "").trim().includes("\n");
+    add(item.framed ? el("div", { className: "proved", textContent: "✓ Préparée : fennec a compris la tâche, elle partira sans question" }) : null,
+      doneWhen(item), !item.framed && !more && !item.done_when ? el("div", { className: "muted", textContent: "La tâche tient dans son titre." }) : null);
     const fleet = item.fleet
       ? action("Retirer de la Fleet", "/api/fleet/place", { id: item.id, action: "remove" })
       : action("Dans la Fleet", "/api/fleet/place", { id: item.id, action: "add" });
@@ -2755,7 +2766,7 @@ async function showFleet() {
   const last = v.queue.length - 1;
   $("n-fleet").textContent = v.queue.length || "";
   fill($("fleet-queue"), v.queue.map((item, i) => rowWrap(
-    link(item, item.waits ? [item.waits, "muted"] : [v.on ? "part ensuite" : "part au démarrage", "accent"]),
+    link(item, [`${item.waits ?? (v.on ? "part ensuite" : "part au démarrage")}${item.framed ? " · préparée" : ""}`, item.waits ? "muted" : "accent"]),
     el("div", { className: "row-actions" }, move(item, "up", "Monter", i > 0), move(item, "down", "Descendre", i < last),
       move(item, "close", "Retirer de la Fleet", true)))), "Aucune tâche dans la Fleet : coche des tâches dans « Plus tard ».");
   $("n-fleet-working").textContent = v.working.length || "";

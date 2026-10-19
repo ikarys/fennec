@@ -69,6 +69,12 @@ pub fn working(id: &str) -> bool {
     WORKING.lock().is_ok_and(|w| w.iter().any(|x| x == id))
 }
 
+/// Whether any worker runs, so the model server is in use.
+/// ponytail: a discussion's turn is not counted; it is short.
+pub fn busy() -> bool {
+    WORKING.lock().is_ok_and(|w| !w.is_empty())
+}
+
 /// Runs `step` in the background; an error fails the request with its reason.
 fn spawn(id: String, step: fn(&Store, &str) -> io::Result<()>) {
     std::thread::spawn(move || {
@@ -172,6 +178,27 @@ fn staffed(mut model: OpenAi, project: &Path, stage: &str) -> io::Result<OpenAi>
 
 fn talk_now(store: &Store, id: &str) -> io::Result<()> {
     let request = store.load(id)?;
+    // Framed while it waited: the conversation already took place.
+    if let Some(brief) = request["ahead"].as_str() {
+        let brief = brief.to_string();
+        store.update(id, |r| {
+            r["brief"] = json!(brief);
+            r["status"] = json!("framing");
+            if let Some(m) = r.as_object_mut() {
+                m.remove("ahead");
+            }
+        })?;
+        return frame_now(store, id);
+    }
+    // Asked while it waited: the human's answer comes first.
+    if request["asked"] == true {
+        return store.update(id, |r| {
+            r["status"] = json!("talk");
+            if let Some(m) = r.as_object_mut() {
+                m.remove("asked");
+            }
+        });
+    }
     let project = Path::new(request["project"].as_str().unwrap_or(""));
     // The conversation is framing's first part: it runs on framing's model.
     let model = staffed(OpenAi::variants_from_env(1)?.remove(0), project, "frame")?;
@@ -188,17 +215,7 @@ fn talk_now(store: &Store, id: &str) -> io::Result<()> {
             r["status"] = json!("talk");
         }),
         spec::Discussed::Brief(brief) => {
-            // The model restates the request in words: the images the human
-            // attached go with them, for the work to see.
-            let images: Vec<&str> = thread
-                .iter()
-                .filter(|t| t["who"] == "human")
-                .flat_map(|t| crate::state::image_lines(t["text"].as_str().unwrap_or("")))
-                .collect();
-            let brief = std::iter::once(brief.as_str())
-                .chain(images)
-                .collect::<Vec<_>>()
-                .join("\n");
+            let brief = with_images(&brief, &thread);
             store.update(id, |r| {
                 note(r, step);
                 r["brief"] = json!(brief);
@@ -209,12 +226,68 @@ fn talk_now(store: &Store, id: &str) -> io::Result<()> {
     }
 }
 
+/// The model restates the request in words: the images the human attached go
+/// with them, for the work to see.
+fn with_images(brief: &str, thread: &[Value]) -> String {
+    let images = thread
+        .iter()
+        .filter(|t| t["who"] == "human")
+        .flat_map(|t| crate::state::image_lines(t["text"].as_str().unwrap_or("")));
+    std::iter::once(brief)
+        .chain(images)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// A Fleet task framed while it waits: the conversation's turn runs now, so
+/// a question reaches the human before the Fleet gets to the task, and the
+/// task starts on its brief. It stays for later either way.
+pub fn prepare(id: String) {
+    std::thread::spawn(move || {
+        let _working = Working::new(id.clone());
+        let Ok(store) = Store::from_env() else { return };
+        if let Err(e) = prepare_now(&store, &id) {
+            // Not tried again: the task is framed as usual once launched.
+            let _ = store.update(&id, |r| {
+                r["ahead_failed"] = json!(true);
+                note(r, json!({"stage": "talk", "error": e.to_string()}));
+            });
+        }
+    });
+}
+
+fn prepare_now(store: &Store, id: &str) -> io::Result<()> {
+    let request = store.load(id)?;
+    if request["status"] != "later" {
+        return Ok(());
+    }
+    let project = Path::new(request["project"].as_str().unwrap_or(""));
+    let model = staffed(OpenAi::variants_from_env(1)?.remove(0), project, "frame")?;
+    let thread = request["thread"].as_array().cloned().unwrap_or_default();
+    let (said, exchange) = spec::discuss(project, &thread, &model)?;
+    store.update(id, |r| {
+        // Reworded, launched or answered meanwhile: this turn is out of date.
+        if r["status"] != "later" || r["thread"] != request["thread"] {
+            return;
+        }
+        note(r, json!({"stage": "talk", "exchange": exchange}));
+        match &said {
+            spec::Discussed::Reply(text) => {
+                say_in(r, "fennec", text);
+                r["asked"] = json!(true);
+            }
+            spec::Discussed::Brief(brief) => r["ahead"] = json!(with_images(brief, &thread)),
+        }
+    })
+}
+
 /// The human speaks in the conversation: an answer, a precision, or a
 /// correction of the proposed "done when", which is then dropped.
 pub fn say(store: &Store, id: &str, text: &str) -> io::Result<()> {
     let request = store.load(id)?;
     let open = match request["status"].as_str() {
         Some("talk" | "question") => true,
+        Some("later") => request["asked"] == true,
         Some("blocked") => request["stage"] == "framing",
         _ => false,
     };
@@ -224,6 +297,17 @@ pub fn say(store: &Store, id: &str, text: &str) -> io::Result<()> {
     let text = text.trim();
     if text.is_empty() {
         return Err(io::Error::other("message vide"));
+    }
+    // A task framed ahead stays for later: the next turn runs when the
+    // model is free again.
+    if request["status"] == "later" {
+        return store.update(id, |r| {
+            say_in(r, "human", text);
+            note(r, json!({"stage": "said", "text": text}));
+            if let Some(m) = r.as_object_mut() {
+                m.remove("asked");
+            }
+        });
     }
     if request["status"] == "question" {
         spec::reject(
@@ -252,10 +336,19 @@ pub fn say(store: &Store, id: &str, text: &str) -> io::Result<()> {
 /// conversation becomes the brief.
 pub fn frame_anyway(store: &Store, id: &str) -> io::Result<()> {
     let request = store.load(id)?;
+    let brief = transcript(&request);
+    if request["status"] == "later" && request["asked"] == true {
+        return store.update(id, |r| {
+            r["ahead"] = json!(brief);
+            r["done_when"] = json!(human_words(&request));
+            if let Some(m) = r.as_object_mut() {
+                m.remove("asked");
+            }
+        });
+    }
     if request["status"] != "talk" {
         return Err(io::Error::other("cette tâche n'est pas en discussion"));
     }
-    let brief = transcript(&request);
     store.update(id, |r| {
         r["brief"] = json!(brief);
         r["done_when"] = json!(human_words(&request));
@@ -937,7 +1030,7 @@ pub fn drop(store: &Store, id: &str) -> io::Result<()> {
     let status = store.load(id)?["status"].as_str().unwrap_or("").to_string();
     if !matches!(
         status.as_str(),
-        "talk" | "question" | "blocked" | "ready" | "failed"
+        "talk" | "question" | "blocked" | "ready" | "failed" | "later"
     ) {
         return Err(io::Error::other("fennec travaille encore sur cette tâche"));
     }
@@ -1525,6 +1618,43 @@ mod tests {
             "x"
         );
         assert_eq!(human_words(&r), "un test — un script python");
+    }
+
+    #[test]
+    fn a_task_framed_ahead_takes_its_answer_and_stays_for_later() {
+        let tmp = std::env::temp_dir().join(format!("fennec-lead-asked-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        let store = Store { root: tmp.clone() };
+        std::fs::create_dir_all(tmp.join("requests")).unwrap();
+        std::fs::write(
+            tmp.join("requests/1.json"),
+            r#"{"project": "/p", "text": "un test", "status": "later", "asked": true,
+                "thread": [{"who": "human", "text": "un test"}, {"who": "fennec", "text": "Un script ?"}]}"#,
+        )
+        .unwrap();
+        assert_eq!(store.view().unwrap()["todo"][0]["kind"], "talk");
+        say(&store, "1", "oui, en python").unwrap();
+        let r = store.load("1").unwrap();
+        assert_eq!(r["status"], "later");
+        assert!(r["asked"].is_null(), "framed again when the model is free");
+        assert_eq!(r["thread"][2]["text"], "oui, en python");
+        assert!(say(&store, "1", "encore").is_err(), "nothing asked now");
+        // Launched while it asks: the conversation goes on with the human.
+        store.update("1", |r| r["asked"] = json!(true)).unwrap();
+        frame_anyway(&store, "1").unwrap();
+        let r = store.load("1").unwrap();
+        assert_eq!(r["status"], "later");
+        assert!(r["ahead"].as_str().unwrap().contains("oui, en python"));
+        store
+            .update("1", |r| {
+                r["ahead"] = Value::Null;
+                r["asked"] = json!(true);
+                r["status"] = json!("thinking");
+            })
+            .unwrap();
+        talk_now(&store, "1").unwrap();
+        assert_eq!(store.load("1").unwrap()["status"], "talk");
+        std::fs::remove_dir_all(tmp).unwrap();
     }
 
     #[test]

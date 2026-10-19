@@ -1,6 +1,6 @@
 # Factory, plugins, self-improvement
 
-Date: 2026-10-19. Status: steps 1 (the Fleet) and 2 (outbound plugins) built. Asked by the human after a
+Date: 2026-10-19. Status: steps 1 (the Fleet), 2 (outbound plugins) and 3 (framing ahead) built. Asked by the human after a
 comparison with OpenFox (task board, Planner/Builder agents, plugins).
 
 Purpose test (AGENTS.md): **fast**, **efficient**, **safe**. Each part below
@@ -154,10 +154,15 @@ dark) when it shows. The status choke point is `Store::update`
   folder when work goes "À part".
 
 **3. Framing in the background** (fast)
-- `work.rs`: requests kept for later run `discuss` once the folder's
-  interactive work is idle (`schedule::yield_to_interactive`); the result
-  ("done when" or one question) is stored, status stays `later`.
-- UI: a framed backlog task shows its "done when"; a question goes to "À moi".
+- Built 2026-10-19. When no task works (the model is free), the Fleet frames
+  its first queued task not framed yet (`work::prepare`, one `discuss` turn),
+  even while stopped; the status stays `later`. A brief is kept (`ahead`) and
+  the launch starts from it; a question is kept in the thread (`asked`): the
+  task goes to "À moi", the Fleet passes it by ("attend ta réponse"), the
+  answer leaves it for later and framed again; "Assez clair" keeps the
+  conversation as the brief. Rewording drops what was framed. Only Fleet
+  tasks: "Plus tard" alone starts nothing, model included.
+- UI: a framed backlog task says so with its "done when"; a question goes to "À moi".
 - Done when: a task kept for later gets its "done when" without being
   launched, and launching it skips the conversation.
 
