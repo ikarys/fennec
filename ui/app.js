@@ -610,10 +610,12 @@ async function journal(item) {
 // answers. The stop is there too: no action on what runs was the trap.
 function underway(item) {
   const slot = el("div");
-  const stop = el("button", { type: "button", className: "quiet", textContent: "Arrêter" });
+  const stop = el("button", { type: "button", className: "stop", textContent: "Arrêter" });
+  setIcon(stop, "stop");
   stop.onclick = () => {
-    const sure = action("Confirmer l'arrêt", "/api/stop", { id: item.id }, { quiet: true });
-    sure.style.color = "var(--bad)";
+    const sure = action("Confirmer l'arrêt", "/api/stop", { id: item.id });
+    sure.classList.add("stop", "sure");
+    setIcon(sure, "stop");
     stop.replaceWith(sure);
   };
   const bar = el("div", { className: "past-actions run-actions" },
@@ -862,8 +864,10 @@ function card(item) {
     const images = attach(text);
     add(el("div", { className: "reply" }, text, images.node));
     actions.append(dropButton(item.id), el("span", { className: "spacer" }),
-      action("C'est clair, fais-le", "/api/frame", { id: item.id }),
-      action("Répondre", "/api/say", () => ({ id: item.id, text: images.value() }), { primary: true }));
+      Object.assign(action("Lancer tel quel", "/api/frame", { id: item.id }),
+        { title: "Lancer le travail sur la conversation telle quelle, sans autre question" }),
+      Object.assign(action("Envoyer à fennec", "/api/say", () => ({ id: item.id, text: images.value() }), { primary: true }),
+        { title: "fennec lit ta réponse : il repose une question s'il le faut, sinon il lance le travail" }));
   } else if (item.kind === "validate") {
     add(conversation(item), focus("Terminé quand", item.done_when));
     const correction = el("textarea", { placeholder: "Ce qui ne va pas, ou une précision", hidden: true });
@@ -1402,7 +1406,8 @@ function toolCall(t, result) {
 function chatComposer(id) {
   const text = el("textarea", { placeholder: "Ton message", ariaLabel: "Ton message" });
   const images = attach(text);
-  const stop = el("button", { type: "button", className: "quiet", textContent: "Arrêter", hidden: true });
+  const stop = el("button", { type: "button", className: "stop", textContent: "Arrêter", hidden: true });
+  setIcon(stop, "stop");
   const send = el("button", { type: "button", className: "primary", textContent: "Envoyer" });
   const say = async () => {
     if (!images.value().trim()) return;

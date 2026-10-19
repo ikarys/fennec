@@ -8,8 +8,8 @@ build:
 dev:
   cargo run
 
-# Install fennec as a systemd user service and start it
-service: build
+# Install fennec as a systemd user service (enable, do not start)
+service-install: build
   ROOT="$(dirname "{{justfile()}}")"
   mkdir -p ~/.config/systemd/user
   cat > ~/.config/systemd/user/fennec.service <<EOF
@@ -22,4 +22,16 @@ service: build
   Restart=on-failure
   EOF
   systemctl --user daemon-reload
-  systemctl --user enable --now fennec.service
+  systemctl --user enable fennec.service
+
+# Start the fennec user service
+service-start:
+  systemctl --user start fennec.service
+
+# Restart the fennec user service
+service-restart:
+  systemctl --user restart fennec.service
+
+# Stop the fennec user service
+service-stop:
+  systemctl --user stop fennec.service
