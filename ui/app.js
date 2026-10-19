@@ -245,7 +245,10 @@ function inline(text) {
     else if (m[2]) out.push(el("b", {}, ...inline(m[2].slice(2, -2))));
     else if (m[3]) {
       const link = m[3].match(/^\[([^\]\n]*)\]\(([^)\s]+)\)$/);
-      out.push(el("a", { href: link[2], target: "_blank", rel: "noreferrer" }, ...inline(link[1])));
+      // The model writes these, steered by any file it read: a `javascript:`
+      // link would run as this page, which can change the settings.
+      if (/^(https?:|\/|#)/i.test(link[2])) out.push(el("a", { href: link[2], target: "_blank", rel: "noreferrer" }, ...inline(link[1])));
+      else out.push(m[3]);
     }
     else out.push(el("i", {}, ...inline(m[4].slice(1, -1))));
     last = m.index + m[0].length;
@@ -1404,7 +1407,7 @@ function showChat(c) {
     const head = el("div", { className: "chat-head" });
     const thread = el("div", { className: "thread" });
     const aside = el("aside", { className: "chat-side" });
-    chatBox = { id: c.id, composer, head, thread, aside, asideKey: "" };
+    chatBox = { id: c.id, composer, head, thread, aside, asideKey: "", threadKey: "" };
     detailed = "";
     $("pick").replaceChildren(el("div", { className: "split" },
       el("div", { className: "card chat" }, head, thread, composer.node,
@@ -1421,17 +1424,23 @@ function showChat(c) {
   // turn to the bottom, unless the person scrolled up to read.
   const detail = $("detail");
   const follow = fresh || detail.scrollHeight - detail.scrollTop - detail.clientHeight < 80;
-  const opened = [...box.thread.querySelectorAll("details")].map((d) => d.open);
-  box.thread.replaceChildren(...chatThread(c, box.composer));
-  if (thinking) box.thread.append(el("div", { className: "thinking" }, el("span", { className: "dot" }), "fennec répond…"));
-  // A turn that waits on the person is the last thing on screen: on top of
-  // the exchange, it would read as a turn that stopped answering.
-  if (c.status === "waiting" && c.pending) {
-    box.thread.append(chatQuestion(c));
-    box.thread.append(el("div", { className: "thinking" }, el("span", { className: "dot" }), "fennec attend ta réponse"));
+  // Redrawn only when it moved: a redraw every refresh would drop the text
+  // the person is selecting and parse the whole exchange again.
+  const threadKey = JSON.stringify([c.messages, c.status, c.pending, c.error]);
+  if (box.threadKey !== threadKey) {
+    box.threadKey = threadKey;
+    const opened = [...box.thread.querySelectorAll("details")].map((d) => d.open);
+    box.thread.replaceChildren(...chatThread(c, box.composer));
+    if (thinking) box.thread.append(el("div", { className: "thinking" }, el("span", { className: "dot" }), "fennec répond…"));
+    // A turn that waits on the person is the last thing on screen: on top of
+    // the exchange, it would read as a turn that stopped answering.
+    if (c.status === "waiting" && c.pending) {
+      box.thread.append(chatQuestion(c));
+      box.thread.append(el("div", { className: "thinking" }, el("span", { className: "dot" }), "fennec attend ta réponse"));
+    }
+    if (c.error) box.thread.append(el("div", { className: "bad", textContent: explain(c.error) }));
+    box.thread.querySelectorAll("details").forEach((d, i) => { d.open = opened[i] ?? false; });
   }
-  if (c.error) box.thread.append(el("div", { className: "bad", textContent: explain(c.error) }));
-  box.thread.querySelectorAll("details").forEach((d, i) => { d.open = opened[i] ?? false; });
   const busy = thinking || c.status === "waiting";
   box.composer.send.disabled = busy;
   box.composer.stop.hidden = !busy;

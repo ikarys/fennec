@@ -65,6 +65,11 @@ const link = deep(blocks, "a")[0];
 assert.strictEqual(link.props.href, "https://exemple.fr");
 assert.strictEqual(link.props.target, "_blank");
 
+// A link that would run script stays text: the model writes these links.
+blocks = md("[clic](javascript:alert(1))");
+assert.strictEqual(deep(blocks, "a").length, 0);
+assert.strictEqual(blocks[0].children.join(""), "[clic](javascript:alert(1))");
+
 // Empty text: no block at all.
 assert.deepStrictEqual(md(""), []);
 console.log("ok");
