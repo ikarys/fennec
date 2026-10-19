@@ -475,41 +475,44 @@ function shots(item) {
 
 // Everything that explains but does not decide.
 function details(item) {
-  const box = el("details", {}, el("summary", { textContent: "Détails" }));
+  const box = el("details", { className: "more" }, el("summary", { textContent: "Détails" }));
   box.dataset.key = item.id;
-  if (item.title?.length > 200) box.append(el("p", { textContent: item.title }));
-  if (item.reason) box.append(el("pre", { textContent: item.reason }));
-  if (item.land_error) box.append(el("pre", { textContent: item.land_error }));
-  if (item.land?.message) box.append(el("p", { textContent: `Message du commit : ${item.land.message}` }));
+  const part = (title, ...nodes) => box.append(el("h3", { textContent: title }), ...nodes);
+  if (item.title?.length > 200) part("La demande", el("p", { textContent: item.title }));
+  const errors = [item.reason, item.land_error].filter(Boolean);
+  if (errors.length) part("Erreur", ...errors.map((e) => el("pre", { className: "failed", textContent: e })));
+  if (item.land?.message) part("Message du commit", el("pre", { textContent: item.land.message }));
   // Without stats (an old request), the team that worked on it at least.
-  if (item.team?.length && !item.stats?.stages) box.append(el("p", { textContent: `Équipe : ${item.team.join(", ")}` }));
-  for (const rule of item.rules ?? []) box.append(el("p", { textContent: `Règle suivie : ${rule}` }));
-  // What each step and each model cost, as a table.
-  for (const [key, label] of [["stages", "Étape"], ["models", "Modèle"]]) {
-    const rows = Object.entries(item.stats?.[key] ?? {}).sort(([a], [b]) => stageRank(a) - stageRank(b));
-    if (!rows.length) continue;
-    box.append(el("div", { className: "scroll" }, el("table", { className: "grid" },
-      el("thead", {}, el("tr", {}, ...[label, key === "stages" ? "Rôles" : "", "Temps", "Appels", "Envoyés", "Cache", "Générés", "Vitesse"]
-        .map((h) => el("th", { textContent: h })))),
-      el("tbody", {}, ...rows.map(([name, c]) => el("tr", {},
-        el("th", {}, key === "stages" ? el("span", { className: `dotc ${stageOf(name)}` }) : null, key === "stages" ? stageName(name) : name),
-        el("td", {}, ...(c.roles ?? []).map((r) => roleTag(r, stageOf(name)))),
-        el("td", { textContent: duration(c.ms ?? 0) }), el("td", { textContent: number(c.turns) }),
-        el("td", { textContent: compact(c.sent) }),
-        el("td", {}, el("span", { className: "meter", style: `--p:${percent(c.cached, c.sent)}%` }), `${percent(c.cached, c.sent)} %`),
-        el("td", { textContent: compact(c.received) }), el("td", { textContent: c.ms ? `${tps(c)}/s` : "—" })))))));
+  if (item.team?.length && !item.stats?.stages) part("Équipe", el("p", { textContent: item.team.join(", ") }));
+  if (item.rules?.length) part("Règles suivies", el("ul", {}, ...item.rules.map((r) => el("li", { textContent: r }))));
+  // What each step and each model cost, in one table so the columns line up.
+  const rows = (key) => Object.entries(item.stats?.[key] ?? {}).sort(([a], [b]) => stageRank(a) - stageRank(b));
+  const head = (label) => el("tr", {}, ...[label, label === "Modèle" ? "" : "Rôles", "Temps", "Appels", "Envoyés", "Cache", "Générés", "Vitesse"]
+    .map((h) => el("th", { textContent: h })));
+  const line = (stage) => ([name, c]) => el("tr", {},
+    el("th", {}, stage ? el("span", { className: `dotc ${stageOf(name)}` }) : null, stage ? stageName(name) : name),
+    el("td", {}, ...(c.roles ?? []).map((r) => roleTag(r, stageOf(name)))),
+    el("td", { textContent: duration(c.ms ?? 0) }), el("td", { textContent: number(c.turns) }),
+    el("td", { textContent: compact(c.sent) }),
+    el("td", { textContent: `${percent(c.cached, c.sent)} %` }),
+    el("td", { textContent: compact(c.received) }), el("td", { textContent: c.ms ? `${tps(c)}/s` : "—" }));
+  const [stages, models] = [rows("stages"), rows("models")];
+  if (stages.length || models.length) {
+    part("Coût par étape", el("div", { className: "scroll" }, el("table", { className: "grid" },
+      stages.length ? el("thead", {}, head("Étape")) : null, el("tbody", {}, ...stages.map(line(true))),
+      models.length ? el("tbody", { className: "sub" }, head("Modèle"), ...models.map(line(false))) : null)));
   }
-  if (item.checks?.length) {
-    box.append(el("p", { textContent: "Tests :" }));
-    for (const c of item.checks) box.append(el("code", { textContent: c }));
-  }
-  for (const t of item.tries ?? []) {
-    box.append(el("code", { textContent: `$ ${t.command}  → ${t.exit}` }), el("pre", { textContent: t.output }));
-  }
-  for (const t of item.role_checks ?? []) {
-    box.append(el("code", { textContent: `${t.role} : $ ${t.command}  → ${t.missing ? "pas installé" : t.exit}` }),
-      el("pre", { textContent: t.output }));
-  }
+  if (item.checks?.length) part("Tests", el("ul", {}, ...item.checks.map((c) => el("li", {}, el("code", { textContent: c })))));
+  // Each command run to prove the work, folded; a failed one opens by itself.
+  const ran = (who) => (t) => {
+    const ok = !t.missing && t.exit === 0;
+    return el("details", { className: `message try${ok ? "" : " failed"}`, open: !ok },
+      el("summary", {}, el("b", { textContent: t.missing ? "pas installé" : ok ? "✓ réussi" : `✗ code ${t.exit}` }),
+        el("span", { className: "head", textContent: `${who}$ ${t.command}` })),
+      t.output ? el("pre", { textContent: t.output }) : null);
+  };
+  if (item.tries?.length) part("Essais de fennec", ...item.tries.map(ran("")));
+  if (item.role_checks?.length) part("Vérifications de l'équipe", ...item.role_checks.map((t) => ran(`${t.role} · `)(t)));
   return box.children.length > 1 ? box : null;
 }
 
@@ -1722,7 +1725,8 @@ function tabbed(node, item) {
   const live = async () => { const slot = el("div"); follow(item.id, slot); return [slot]; };
   const panes = [["Résumé", async () => [node]], ...(run ? [] : [["Changements", () => changes(item)]]),
     ["Journal", run ? live : () => journal(item)]];
-  if (more) panes.push(["Détails", async () => [...more.childNodes].slice(1)]);
+  // Out of its <details>, the content keeps its look through the "more" class.
+  if (more) panes.push(["Détails", async () => [el("div", { className: "more" }, ...[...more.childNodes].slice(1))]]);
   const panel = el("div", { className: "tab-panel" });
   const shown = new Map();
   const bar = el("div", { className: "tabs", role: "tablist" });
