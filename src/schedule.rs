@@ -84,6 +84,7 @@ mod tests {
             home: dir.clone(),
             ro_paths: Vec::new(),
             memory_mb: None,
+            apart: false,
         };
         assert!(!yield_to_interactive(&worlds).unwrap());
         let a = interactive(&worlds).unwrap();

@@ -563,6 +563,7 @@ mod tests {
             home: dir.to_path_buf(),
             ro_paths: Vec::new(),
             memory_mb: None,
+            apart: false,
         }
     }
 
