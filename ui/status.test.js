@@ -23,7 +23,7 @@ eval(src.match(/const el = \(tag, props = \{\}, \.\.\.children\) => \{[\s\S]*?\n
   + src.match(/const ICONS = \{[\s\S]*?\n\};/)[0]
   + src.match(/const ICON_OF = \[[\s\S]*?\];/)[0]
   + grab("pastState") + grab("duration") + arrow("compact")
-  + grab("setIcon") + grab("statusOf") + grab("reqHead")
+  + grab("setIcon") + grab("statusOf") + arrow("lead") + grab("reqHead")
   + grab("iconize") + arrow("errorOf") + grab("action") + src.match(/async function follow\([\s\S]*?\n\}\n/)[0] + grab("underway") + src.match(/const STEPS = \[[\s\S]*?\]\];\n/)[0] + grab("stages") + grab("ended") + grab("conversation") + grab("doneWhen") + grab("facts")
   + "globalThis.statusOf = statusOf; globalThis.reqHead = reqHead; globalThis.underway = underway;");
 global.api = async () => [];
@@ -82,3 +82,5 @@ const landed = ended({ kind: "landed", stats: { stages: { Discussion: {}, Travai
 assert.equal(landed.at(-1).className, "done", "commité : Commit fait");
 
 console.log("OK");
+// A plan step's head is its first paragraph, not the plan it carries.
+assert.equal(reqHead({ id: "p", title: "Scaffolding\n\n---\n## Plan\n- a" }, "run").children[0].textContent, "Scaffolding");
