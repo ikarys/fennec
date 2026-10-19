@@ -41,6 +41,7 @@ fn a_chat_reads_and_writes_its_folder_and_ends_on_a_reply() {
     std::fs::write(folder.join("a.txt"), "alpha\n").unwrap();
     let c = chat::start(&f.worlds, &folder).unwrap();
     let id = c["id"].as_str().unwrap();
+    chat::write(&f.worlds, id, true).unwrap();
     chat::say(&f.worlds, id, "Copie a.txt dans b.txt").unwrap();
     assert!(
         chat::say(&f.worlds, id, "encore").is_err(),
@@ -82,6 +83,39 @@ fn a_chat_reads_and_writes_its_folder_and_ends_on_a_reply() {
     );
     // The home itself is never a chat's folder.
     assert!(chat::start(&f.worlds, &f.worlds.home).is_err());
+}
+
+#[test]
+fn a_chat_starts_read_only_until_changes_are_allowed() {
+    let f = Fixture::new("chat-read");
+    let folder = f.worlds.home.join("notes");
+    std::fs::create_dir_all(&folder).unwrap();
+    std::fs::write(folder.join("a.txt"), "alpha\n").unwrap();
+    let c = chat::start(&f.worlds, &folder).unwrap();
+    let id = c["id"].as_str().unwrap();
+    chat::say(&f.worlds, id, "Copie a.txt dans b.txt").unwrap();
+    let model = Replies(Mutex::new(VecDeque::from([
+        call(
+            "c0",
+            "shell",
+            json!({"command": "cat a.txt && cp a.txt b.txt"}),
+        ),
+        json!({"content": "Voici le plan."}),
+    ])));
+    chat::answer(&f.worlds, id, &model, 10).unwrap();
+    assert!(!folder.join("b.txt").exists(), "read-only by default");
+    let c = chat::load(&f.worlds, id).unwrap();
+    let ran = c["messages"][2]["content"].as_str().unwrap();
+    assert!(ran.contains("alpha") && ran.contains("Read-only"), "{ran}");
+    // Allowed: the same command now writes.
+    chat::write(&f.worlds, id, true).unwrap();
+    chat::say(&f.worlds, id, "vas-y").unwrap();
+    let model = Replies(Mutex::new(VecDeque::from([
+        call("c1", "shell", json!({"command": "cp a.txt b.txt"})),
+        json!({"content": "C'est fait."}),
+    ])));
+    chat::answer(&f.worlds, id, &model, 10).unwrap();
+    assert!(folder.join("b.txt").exists());
 }
 
 /// A second handle on the same store, for the thread the turn runs in.
@@ -127,6 +161,7 @@ fn an_out_of_folder_path_is_asked_and_the_folder_grant_spares_the_next_call() {
     std::fs::write(other.join("o.txt"), "omega\n").unwrap();
     let c = chat::start(&f.worlds, &folder).unwrap();
     let id = c["id"].as_str().unwrap().to_string();
+    chat::write(&f.worlds, &id, true).unwrap();
     chat::say(&f.worlds, &id, "lis ../other/o.txt").unwrap();
     let model = Replies(Mutex::new(VecDeque::from([
         call("c0", "shell", json!({"command": "cat ../other/o.txt"})),
@@ -180,6 +215,7 @@ fn a_refused_path_is_not_touched_and_asks_again() {
     std::fs::write(other.join("o.txt"), "omega\n").unwrap();
     let c = chat::start(&f.worlds, &folder).unwrap();
     let id = c["id"].as_str().unwrap().to_string();
+    chat::write(&f.worlds, &id, true).unwrap();
     chat::say(&f.worlds, &id, "ecris ../other/n.txt").unwrap();
     let model = Replies(Mutex::new(VecDeque::from([
         call(
@@ -227,6 +263,7 @@ fn a_stop_while_waiting_ends_the_turn_without_running_the_call() {
     std::fs::write(other.join("o.txt"), "omega\n").unwrap();
     let c = chat::start(&f.worlds, &folder).unwrap();
     let id = c["id"].as_str().unwrap().to_string();
+    chat::write(&f.worlds, &id, true).unwrap();
     chat::say(&f.worlds, &id, "ecris ../other/n.txt").unwrap();
     let model = Replies(Mutex::new(VecDeque::from([
         call(
@@ -258,6 +295,7 @@ fn the_home_or_the_root_is_refused_without_asking() {
     std::fs::create_dir_all(&folder).unwrap();
     let c = chat::start(&f.worlds, &folder).unwrap();
     let id = c["id"].as_str().unwrap().to_string();
+    chat::write(&f.worlds, &id, true).unwrap();
     chat::say(&f.worlds, &id, "ecris ~/n.txt").unwrap();
     let model = Replies(Mutex::new(VecDeque::from([
         call(
@@ -322,6 +360,7 @@ fn a_folder_taken_back_closes_within_the_turn() {
     std::fs::write(other.join("o.txt"), "omega\n").unwrap();
     let c = chat::start(&f.worlds, &folder).unwrap();
     let id = c["id"].as_str().unwrap().to_string();
+    chat::write(&f.worlds, &id, true).unwrap();
     chat::say(&f.worlds, &id, "lis puis ecris").unwrap();
     let model = UngrantMidTurn {
         replies: Replies(Mutex::new(VecDeque::from([
@@ -382,6 +421,7 @@ fn a_folder_taken_back_between_two_calls_of_one_reply_closes_for_the_second() {
     }
     let c = chat::start(&f.worlds, &folder).unwrap();
     let id = c["id"].as_str().unwrap().to_string();
+    chat::write(&f.worlds, &id, true).unwrap();
     // A first turn opens `other`.
     chat::say(&f.worlds, &id, "lis ../other/o.txt").unwrap();
     let model = Replies(Mutex::new(VecDeque::from([
@@ -419,4 +459,31 @@ fn a_folder_taken_back_between_two_calls_of_one_reply_closes_for_the_second() {
         !other.join("n.txt").exists(),
         "a folder taken back stays closed"
     );
+}
+
+#[test]
+fn an_approved_plan_allows_changes_within_the_turn() {
+    let f = Fixture::new_in("chat-plan", &var_tmp());
+    let folder = f.worlds.home.join("notes");
+    std::fs::create_dir_all(&folder).unwrap();
+    std::fs::write(folder.join("a.txt"), "alpha\n").unwrap();
+    let c = chat::start(&f.worlds, &folder).unwrap();
+    let id = c["id"].as_str().unwrap().to_string();
+    chat::say(&f.worlds, &id, "Copie a.txt dans b.txt").unwrap();
+    let model = Replies(Mutex::new(VecDeque::from([
+        call("c0", "propose_plan", json!({"plan": "- copier a.txt"})),
+        call("c1", "shell", json!({"command": "cp a.txt b.txt"})),
+        json!({"content": "C'est fait."}),
+    ])));
+    let (w, tid) = (twin(&f), id.clone());
+    let t = std::thread::spawn(move || chat::answer(&w, &tid, &model, 10));
+    let pending = until_waiting(&f, &id);
+    assert_eq!(pending["pending"]["plan"], "- copier a.txt");
+    chat::decide(&f.worlds, &id, true).unwrap();
+    t.join().unwrap().unwrap();
+    let c = chat::load(&f.worlds, &id).unwrap();
+    assert!(c["error"].is_null(), "{}", c["error"]);
+    assert_eq!(c["write"], true);
+    assert!(c["grants"].as_array().unwrap().is_empty());
+    assert!(folder.join("b.txt").exists(), "approved: the turn writes");
 }

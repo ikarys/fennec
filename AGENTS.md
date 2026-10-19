@@ -16,7 +16,7 @@ src/world.rs     worlds: fork, sandbox (bubblewrap), diff, commit, rollback, dro
 src/grant.rs     human-issued grant: a world writes named host paths, backed up until keep/revert
 src/provider.rs  `Model` trait + OpenAI-compatible client; `ask` (one question), `Live` (the exchange so far, in a file)
 src/recipe.rs    replay a landed run's tool calls when the same goal returns
-src/chat.rs      a plain conversation in a folder the person chose (git or not): same sandbox, folder read-write, skills; no world
+src/chat.rs      a plain conversation in a folder the person chose (git or not): same sandbox, folder read-only until the person allows changes, skills; no world
 src/outside.rs   the literal host paths a chat tool call names outside its folder: the chat asks, an opened folder stays read-write
 src/agent.rs     tool loop; every tool runs inside the sandbox; loops, idle runs and hung commands are stopped
 src/solve.rs     task → worlds in turn until one passes verify → land (rebase + re-verify, one commit by the human) on the branch the rules ask for → push
