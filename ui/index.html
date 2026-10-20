@@ -621,6 +621,9 @@
                padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); }
   .chat .ask code { font-size: 13px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .chat .ask .muted { font-size: 12px; }
+  /* A check is a command: shown whole, to be read before approving. */
+  .chat .ask.plan code, .chat-side ul.plan li .what { max-width: none; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .chat .ask.plan code { flex-basis: 100%; }
   .chat .ask button { padding: 3px 10px; font-size: 13px; }
   /* One line: wrapped, a column takes its widest child's width and a long
      code block would push past the page. */
