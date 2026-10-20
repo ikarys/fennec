@@ -13,8 +13,10 @@ use serde_json::{Value, json};
 
 use crate::state::Store;
 
-/// Agent steps per compile or attempt, as in the fennec-os CLI.
-const MAX_STEPS: usize = 40;
+/// Agent steps per compile, attempt or chat turn. A scaffold took more than
+/// 40 (seen 2026-10-20); loops and idle runs are stopped well before this by
+/// the engine's watch, so the cap only bounds a run that keeps progressing.
+const MAX_STEPS: usize = 150;
 
 /// `FENNEC_LEAD_ATTEMPTS` (default 1): parallel attempts once validated.
 fn attempts() -> usize {

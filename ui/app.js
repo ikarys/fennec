@@ -719,7 +719,7 @@ function facts(item) {
   if (!s?.turns) return [];
   const n = s.failed_attempts;
   const safe = el("div", { className: "pills" },
-    pill("🔒", "sans réseau", "", "L'essai n'a pas accès à Internet : il ne télécharge rien et n'appelle aucun service externe."),
+    pill("🔒", "vérifié sans réseau", "", "L'essai a accès à Internet pour installer ce que le projet demande ; la vérification et la preuve tournent sans réseau."),
     pill("🏠", "ton dossier personnel caché", "", "Ton dossier personnel (~) est hors de portée : l'essai ne lit ni n'écrit que le projet."),
     pill("📖", "git en lecture seule", "", "L'historique git du projet est visible, mais l'essai ne le modifie pas."),
     n ? pill("↺", `${n} essai${n > 1 ? "s" : ""} raté${n > 1 ? "s" : ""} annulé${n > 1 ? "s" : ""}`, "warn",
@@ -1461,7 +1461,7 @@ function showChat(c) {
   const busy = thinking || c.status === "waiting";
   box.composer.send.disabled = busy;
   box.composer.stop.hidden = !busy;
-  const asideKey = JSON.stringify([c.stats, c.project, c.grants, c.write]);
+  const asideKey = JSON.stringify([c.stats, c.project, c.grants, c.write, c.criteria]);
   if (box.asideKey !== asideKey) {
     box.asideKey = asideKey;
     box.aside.replaceChildren(...chatAside(c));
@@ -1486,6 +1486,25 @@ function chatQuestion(c) {
   };
   open.onclick = () => decide(true);
   refuse.onclick = () => decide(false);
+  // One of the person's rules asks first: once, for the rest of the chat,
+  // or not at all (the call does not run, fennec does without).
+  if (p.tool === "rule") {
+    const chat = el("button", { type: "button", textContent: "Pour cette discussion" });
+    open.textContent = "Autoriser une fois";
+    chat.onclick = async () => {
+      $("chat-error").textContent = "";
+      try {
+        await api("/api/chat/decide", { id: c.id, allow: true, for_chat: true });
+      } catch (e) {
+        $("chat-error").textContent = e.message;
+      }
+    };
+    const why = p.rule?.why ? `${p.rule.why} (règle « ${p.rule.pattern} »)` : `règle « ${p.rule?.pattern ?? ""} »`;
+    return el("div", { className: "ask" },
+      el("span", { className: "muted", textContent: `fennec demande : ${why}` }),
+      el("code", { title: p.call, textContent: p.call ?? p.target }),
+      el("div", { className: "chat-actions" }, open, chat, refuse));
+  }
   // A plan to approve: approved, the folder opens for changes and fennec
   // applies it; otherwise the discussion goes on, read-only.
   if (p.tool === "propose_plan") {
@@ -1576,7 +1595,9 @@ function chatThread(c, acts) {
   // The person's message a reply answers: the one regenerating it says again.
   let asked = null;
   for (const [i, m] of (c.messages ?? []).entries()) {
-    if (m.role === "tool") continue;
+    // What fennec's harness said to the model (back to the plan, notes
+    // after a long exchange) is not the person's: the Journal keeps it.
+    if (m.role === "tool" || m.harness) continue;
     if (m.role === "user") {
       asked = i;
       nodes.push(el("div", { className: "msg human" },
@@ -1723,6 +1744,20 @@ function chatAside(c) {
       ul.append(el("li", {}, el("span", { className: "what", title: g }, g), b));
     }
     nodes.push(el("h2", { textContent: "Dossiers ouverts" }), ul);
+  }
+  // The approved plan's steps: the turn works through them, one by one.
+  const plan = (c.criteria ?? []).filter((s) => s.state !== "rule");
+  if (plan.length) {
+    const met = plan.filter((s) => s.state === "done" || s.state === "passed").length;
+    const ul = el("ul", { className: "plan" });
+    for (const s of plan) {
+      const ok = s.state === "done" || s.state === "passed";
+      const li = el("li", { className: ok ? "ok" : s.state === "failed" ? "bad" : "" },
+        el("span", { className: "what", title: s.text, textContent: s.text }));
+      if (ok) setIcon(li, "check");
+      ul.append(li);
+    }
+    nodes.push(el("h2", { textContent: `Plan · ${met}/${plan.length}` }), ul);
   }
   if (c.stats?.turns) nodes.push(el("h2", { textContent: "Coût" }), metrics(c.stats));
   const button = el("button", { type: "button", className: "convert",
@@ -2416,6 +2451,7 @@ document.querySelectorAll("#settings-tabs [role=tab]").forEach((b) => {
     if (b.dataset.panel === "settings-clean") showLeftovers();
     if (b.dataset.panel === "settings-plugins") showPlugins({});
     if (b.dataset.panel === "settings-rules") changeRules($("settings-rules"), "", "user");
+    if (b.dataset.panel === "settings-rules") changeGuard();
   };
 });
 // What interrupted work left behind, for the human to pick and throw away.
@@ -2708,6 +2744,38 @@ for (const [id, scope] of [["page-rules", "project"], ["settings-rules", "user"]
     if (await changeRules(box, scope === "user" ? "" : paged, scope, { change: "add", text: input.value })) input.value = "";
   };
 }
+// The rules on what agents run, read and write, as the person's file holds
+// them: removing one names its place and its pattern, so an older list
+// removes nothing by mistake.
+const GUARD_EFFECT = { deny: "Interdit", ask: "Demande", allow: "Autorisé" };
+const GUARD_ON = { command: "commande", read: "lecture", write: "écriture", file: "lecture, écriture" };
+async function changeGuard(change = {}) {
+  try {
+    const { rules } = await api("/api/guard", change);
+    $("guard-error").textContent = "";
+    $("guard-count").textContent = rules.length;
+    $("guard-list").replaceChildren(...rules.length ? [] : [el("li", { className: "empty muted", textContent: "Aucune règle : seul l'isolement protège." })],
+      ...rules.map((r, i) => {
+        const remove = iconButton("close", "Retirer la règle", () => changeGuard({ remove: i, pattern: r.pattern }));
+        return el("li", {},
+          el("span", { className: `effect ${r.effect}`, textContent: GUARD_EFFECT[r.effect] ?? r.effect }),
+          el("span", { className: "muted", textContent: GUARD_ON[r.on] ?? r.on }),
+          el("span", {}, el("code", { textContent: r.pattern }),
+            r.why ? el("span", { className: "why", textContent: " — " + r.why }) : null,
+            r.project ? el("span", { className: "why", textContent: " · " + r.project }) : null),
+          remove);
+      }));
+    return true;
+  } catch (e) {
+    $("guard-error").textContent = explain(e.message);
+    return false;
+  }
+}
+$("guard-form").onsubmit = async (e) => {
+  e.preventDefault();
+  const add = { effect: $("guard-effect").value, on: $("guard-on").value, pattern: $("guard-pattern").value, why: $("guard-why").value };
+  if (await changeGuard({ add })) $("guard-pattern").value = $("guard-why").value = "";
+};
 $("to-user-rules").onclick = () => {
   location.hash = "#settings";
   document.querySelector('#settings-tabs [data-panel="settings-rules"]').click();
