@@ -1,6 +1,6 @@
 # Factory, plugins, self-improvement
 
-Date: 2026-10-19. Status: steps 1 (the Fleet), 2 (outbound plugins), 3 (framing ahead) and 4 (approval from a chat) built; §8 steps 2 (Backlog → Ready), 3 (Split, `after`) and 4 (skills per task) built 2026-10-20. Asked by the human after a
+Date: 2026-10-19. Status: steps 1 (the Fleet), 2 (outbound plugins), 3 (framing ahead) and 4 (approval from a chat) built; §8 steps 2 (Backlog → Ready), 3 (Split, `after`), 4 (skills per task) and 5 (dashboards) built 2026-10-20. Asked by the human after a
 comparison with OpenFox (task board, Planner/Builder agents, plugins).
 
 Purpose test (AGENTS.md): **fast**, **efficient**, **safe**. Each part below
@@ -146,6 +146,12 @@ Backlog ──► Ready ──► running ──► to validate ──► done
   disk of the worlds) and costs. A project's: tasks per section, open
   discussions, what runs, time and tokens, quality (proofs passed first
   time, sent back, failed), disk, what is ready to run next, its settings.
+  Built: the home (Tasks, nothing picked) shows the five latest moves, the
+  ones since the page was last left in bold, tiles for each section, model
+  time and tokens, disk of the worlds and the machine's memory, and the next
+  three Ready tasks. The project page adds its sections, open discussions,
+  share proven at the first try and the disk of its worlds. Not built: money
+  (no prices known), per-task RAM.
 
 Plan, in order, each step landing alone:
 

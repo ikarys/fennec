@@ -1612,7 +1612,38 @@ pub fn overview(store: &Store) -> io::Result<Value> {
             (p, place)
         })
         .collect::<Vec<_>>();
-    Ok(summarize(&requests, &places))
+    let mut v = summarize(&requests, &places);
+    // Disk the worlds take apart from the folders, all and per project; a
+    // world in the folder itself takes none.
+    // ponytail: walks every world at each look; cache it if worlds grow big.
+    let worlds = Worlds::from_env()?;
+    let mut disk = 0;
+    for id in worlds.list()? {
+        let Ok(f) = worlds.facts(&id) else { continue };
+        let bytes = f["bytes"].as_u64().unwrap_or(0);
+        disk += bytes;
+        if let Some(p) = v["projects"]
+            .as_array_mut()
+            .and_then(|l| l.iter_mut().find(|p| p["path"] == f["project"]))
+        {
+            p["disk"] = json!(p["disk"].as_u64().unwrap_or(0) + bytes);
+        }
+    }
+    v["all"]["disk"] = json!(disk);
+    v["memory"] = memory();
+    Ok(v)
+}
+
+/// The machine's memory, total and available, in bytes; empty off Linux.
+fn memory() -> Value {
+    let info = std::fs::read_to_string("/proc/meminfo").unwrap_or_default();
+    let kb = |k: &str| {
+        info.lines()
+            .find_map(|l| l.strip_prefix(k))
+            .and_then(|l| l.trim().trim_end_matches("kB").trim().parse::<u64>().ok())
+            .map(|n| n * 1024)
+    };
+    json!({"total": kb("MemTotal:"), "available": kb("MemAvailable:")})
 }
 
 fn summarize(requests: &[(String, Value)], places: &[(String, String)]) -> Value {
@@ -1623,8 +1654,9 @@ fn summarize(requests: &[(String, Value)], places: &[(String, String)]) -> Value
                 .file_name()
                 .and_then(|n| n.to_str())
                 .unwrap_or(path);
-            json!({"path": path, "name": name, "place": place,
-                   "requests": 0, "landed": 0, "failed": 0, "failed_attempts": 0})
+            json!({"path": path, "name": name, "place": place, "disk": 0,
+                   "requests": 0, "landed": 0, "failed": 0, "failed_attempts": 0,
+                   "first_try": 0, "retried": 0})
         })
         .collect();
     let (mut models, mut stages) = (json!({}), json!({}));
@@ -1640,6 +1672,14 @@ fn summarize(requests: &[(String, Value)], places: &[(String, String)]) -> Value
             bump(p, "requests", 1);
             bump(p, "landed", u64::from(r["status"] == "landed"));
             bump(p, "failed", u64::from(r["status"] == "failed"));
+            // Quality: proven work, at the first try or after failed ones.
+            if matches!(r["status"].as_str(), Some("ready" | "landed")) {
+                let key = match s["failed_attempts"].as_u64().unwrap_or(0) {
+                    0 => "first_try",
+                    _ => "retried",
+                };
+                bump(p, key, 1);
+            }
             bump(
                 p,
                 "failed_attempts",
@@ -1905,7 +1945,7 @@ mod tests {
         let id = "1".to_string();
         std::fs::write(
             tmp.join("requests/1.json"),
-            r#"{"project": "/p", "text": "add filters", "status": "running", "fleet": true,
+            r#"{"project": "/p", "text": "add filters", "status": "running", "fleet": true, "after": ["0"],
                 "reason": "timeout", "journal": [{"stage": "said", "text": "x"}],
                 "thread": [{"who": "human", "text": "add filters"}, {"who": "fennec", "text": "ok"}]}"#,
         )
@@ -1918,6 +1958,7 @@ mod tests {
         let r = store.load(&id).unwrap();
         assert_eq!(r["status"], "later");
         assert_eq!(r["text"], "add filters");
+        assert_eq!(r["after"], json!(["0"]), "it still comes after");
         assert_eq!(r["thread"].as_array().unwrap().len(), 1);
         assert_eq!(
             r["journal"].as_array().unwrap().len(),
@@ -2000,6 +2041,11 @@ mod tests {
             (Some("apart"), Some(1), Some(1))
         );
         assert_eq!(p["ms"], 3000);
+        // Landed after one failed try: proven, but not at the first.
+        assert_eq!(
+            (p["first_try"].as_u64(), p["retried"].as_u64()),
+            (Some(0), Some(1))
+        );
         assert_eq!(v["models"].as_array().unwrap().len(), 2);
     }
 
