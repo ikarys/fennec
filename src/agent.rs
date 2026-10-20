@@ -561,7 +561,8 @@ You have network access: install what the project needs inside it, with the proj
 tools (its manifest, lockfile or build file), since the home is emptied after each command and \
 the checks that judge the work run without network. Dependencies go where the project's \
 ecosystem keeps them (`.venv`, `node_modules`, `target`...), never committed; download caches \
-are kept for you in `.fennec/`. Never install into the system or the home (`--user`, \
+are kept for you in the project's `.fennec/`, shared by all its copies (a Cargo `target/` too). \
+Never install into the system or the home (`--user`, \
 `--break-system-packages`, global installs), never copy packages into the source tree.\n\
 You cannot commit: the harness checkpoints your work. Anything you break can be rolled back, \
 so act directly instead of asking.\n\

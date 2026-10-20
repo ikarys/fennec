@@ -78,14 +78,35 @@ fn build_output_is_not_the_work() {
         !files.contains("target/") && files.contains("src.rs"),
         "{files}"
     );
-    // Package caches stay out of the work and survive an undone try.
-    assert!(f.sh(&w, "mkdir -p .fennec/npm && echo c > .fennec/npm/c && test \"$npm_config_cache\" = \"$PWD/.fennec/npm\"").0);
+    // Package caches are the project's, out of the work, and survive an
+    // undone try.
+    let cache = f.project.join(".fennec");
+    let npm = format!("{}/npm", cache.display());
+    assert!(
+        f.sh(
+            &w,
+            &format!("mkdir -p {npm} && echo c > {npm}/c && test \"$npm_config_cache\" = {npm}")
+        )
+        .0
+    );
     assert!(f.worlds.status(&w).unwrap().is_empty());
     f.worlds.rollback(&w).unwrap();
-    assert!(w.path.join(".fennec/npm/c").is_file());
+    assert!(cache.join("npm/c").is_file());
     // Left on disk, it is no change either: verify said the checks changed
     // the world over a `__pycache__` a solve left (2026-10-19).
     assert!(f.worlds.status(&w).unwrap().is_empty());
+    // Another world of the project finds them, and a Cargo build folder.
+    let other = f.worlds.fork(&f.project.to_string_lossy()).unwrap();
+    assert!(f.sh(&other, &format!("cat {npm}/c")).0);
+    for world in [&w, &other] {
+        std::fs::write(world.path.join("Cargo.toml"), "").unwrap();
+    }
+    assert!(
+        f.sh(&w, "mkdir -p target/debug && echo b > target/debug/built")
+            .0
+    );
+    assert!(f.sh(&other, "cat target/debug/built").0);
+    assert!(cache.join("target/debug/built").is_file());
 }
 
 #[test]

@@ -425,8 +425,24 @@ impl Worlds {
         // the worktree's admin dir lives inside it; read-only either way, as
         // its config steers every harness git call.
         mounts.push((true, world.path.clone(), world.path.clone()));
+        // Caches are the project's, shared by all its worlds: a world apart
+        // would otherwise fetch and build everything again, and each would
+        // take as much disk (asked by the human, 2026-10-20). A Cargo build
+        // folder goes over the world's own `target/`, so paths stay as the
+        // project writes them.
+        let project = common.parent().unwrap_or(&common).to_path_buf();
+        let cache = project.join(CACHE);
+        if world.path != project {
+            std::fs::create_dir_all(&cache)?;
+            mounts.push((true, cache.clone(), cache.clone()));
+            if world.path.join("Cargo.toml").is_file() {
+                let target = cache.join("target");
+                std::fs::create_dir_all(&target)?;
+                mounts.push((true, target, world.path.join("target")));
+            }
+        }
         mounts.push((false, common.clone(), common));
-        self.jail(&world.path, &mounts, net, argv)
+        self.jail(&world.path, &cache, &mounts, net, argv)
     }
 
     /// The command that runs `argv` in a sandbox over a folder of the
@@ -447,7 +463,7 @@ impl Worlds {
         }
         mounts.push((rw, dir.to_path_buf(), dir.to_path_buf()));
         // On the network, as an agent's work is (`sandbox_work`).
-        self.jail(dir, &mounts, true, argv)
+        self.jail(dir, &dir.join(CACHE), &mounts, true, argv)
     }
 
     /// Why `dir` cannot be opened in a sandbox, as a chat's folder, a folder
@@ -500,10 +516,12 @@ impl Worlds {
             .collect()
     }
 
-    /// bwrap over `mounts` (read-write?, host path, sandbox path), in order.
+    /// bwrap over `mounts` (read-write?, host path, sandbox path), in order,
+    /// package managers caching in `cache`.
     fn jail(
         &self,
         dir: &Path,
+        cache: &Path,
         mounts: &[(bool, PathBuf, PathBuf)],
         net: bool,
         argv: &[String],
@@ -551,7 +569,6 @@ impl Worlds {
         // project's `.fennec/` instead, never committed (`BUILD_OUTPUT`), gone
         // with the project: nothing piles up elsewhere (asked by the human,
         // 2026-10-20).
-        let cache = dir.join(CACHE);
         for (var, sub) in CACHES {
             cmd.arg("--setenv").arg(var).arg(cache.join(sub));
         }
@@ -929,8 +946,11 @@ const CACHE: &str = ".fennec";
 
 /// The variable each package manager reads its cache from, and its folder
 /// under [`CACHE`]. Maven takes a property ([`Worlds::jail`]).
-const CACHES: [(&str, &str); 7] = [
+const CACHES: [(&str, &str); 9] = [
     ("CARGO_HOME", "cargo"),
+    // pnpm's store: its own prefix since pnpm 10, npm's before.
+    ("npm_config_store_dir", "pnpm"),
+    ("pnpm_config_store_dir", "pnpm"),
     ("UV_CACHE_DIR", "uv"),
     ("PIP_CACHE_DIR", "pip"),
     ("npm_config_cache", "npm"),

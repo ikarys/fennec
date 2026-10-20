@@ -16,7 +16,7 @@ not binding): `docs/history/`; synthesis note in the `iatraining` repo,
 ## Layout
 
 ```
-src/world.rs     worlds: fork, sandbox (bubblewrap), diff, commit, rollback, drop; facts and forget for what a cut-short start or drop left;
+src/world.rs     worlds: fork, sandbox (bubblewrap; a world apart sees its project's `.fennec/` caches and Cargo target), diff, commit, rollback, drop; facts and forget for what a cut-short start or drop left;
                  park/unpark (work set aside gives the folder back); `Worlds::apart` forks apart whatever the project chose,
                  `Worlds::base` from a named branch when it exists
 src/grant.rs     human-issued grant: a world writes named host paths, backed up until keep/revert
