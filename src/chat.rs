@@ -50,7 +50,7 @@ static LOCK: Mutex<()> = Mutex::new(());
 
 fn path(worlds: &Worlds, id: &str) -> io::Result<PathBuf> {
     if id.is_empty() || !id.chars().all(|c| c.is_ascii_alphanumeric()) {
-        return Err(io::Error::other(format!("discussion introuvable : {id}")));
+        return Err(io::Error::other(format!("discussion not found: {id}")));
     }
     Ok(worlds.root.join("chats").join(format!("{id}.json")))
 }
@@ -63,7 +63,7 @@ fn now() -> u64 {
 
 pub fn load(worlds: &Worlds, id: &str) -> io::Result<Value> {
     let text = std::fs::read_to_string(path(worlds, id)?)
-        .map_err(|_| io::Error::other(format!("discussion introuvable : {id}")))?;
+        .map_err(|_| io::Error::other(format!("discussion not found: {id}")))?;
     serde_json::from_str(&text).map_err(io::Error::other)
 }
 
@@ -154,9 +154,7 @@ pub fn forget(worlds: &Worlds, id: &str) -> io::Result<()> {
     // Checked under the lock: a turn started in between would lose its file.
     let _held = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     if busy(&load(worlds, id)?) {
-        return Err(io::Error::other(
-            "la discussion est en cours : arrête-la d'abord",
-        ));
+        return Err(io::Error::other("the discussion is running: stop it first"));
     }
     std::fs::remove_file(path(worlds, id)?)
 }
@@ -169,7 +167,7 @@ pub fn title(chat: &Value) -> String {
         .flatten()
         .find(|m| m["role"] == "user")
         .and_then(|m| m["content"].as_str())
-        .unwrap_or("Nouvelle discussion");
+        .unwrap_or("New discussion");
     let line = first.lines().next().unwrap_or("");
     match line.char_indices().nth(60) {
         Some((i, _)) => format!("{}…", &line[..i]),
@@ -203,17 +201,17 @@ pub fn replay(worlds: &Worlds, id: &str, index: usize, text: &str) -> io::Result
 
 fn speak(worlds: &Worlds, id: &str, at: Option<usize>, text: &str) -> io::Result<()> {
     if text.trim().is_empty() {
-        return Err(io::Error::other("message vide"));
+        return Err(io::Error::other("empty message"));
     }
     let mut refused = None;
     update(worlds, id, |c| {
         if busy(c) {
-            refused = Some("fennec répond encore");
+            refused = Some("fennec is still answering");
             return;
         }
         if let Some(i) = at {
             if c["messages"][i]["role"] != "user" {
-                refused = Some("aucun message de toi à cet endroit");
+                refused = Some("no message of yours at this place");
                 return;
             }
             if let Some(m) = c["messages"].as_array_mut() {
@@ -299,7 +297,7 @@ pub fn decide_for(worlds: &Worlds, id: &str, allow: bool, for_chat: bool) -> io:
         c["pending"] = Value::Null;
     })?;
     if !answered {
-        return Err(io::Error::other("fennec n'attend plus de réponse"));
+        return Err(io::Error::other("fennec no longer waits for an answer"));
     }
     Ok(())
 }
@@ -336,7 +334,7 @@ pub fn recover(worlds: &Worlds) -> io::Result<()> {
             update(worlds, c["id"].as_str().unwrap_or(""), |c| {
                 settle(
                     c,
-                    Some("interrompu : fennec a été arrêté pendant la réponse".into()),
+                    Some("interrupted: fennec was stopped during the answer".into()),
                 )
             })?;
         }
@@ -703,7 +701,7 @@ mod tests {
         say(&w, &id, "bonjour").unwrap();
         assert_eq!(load(&w, &id).unwrap()["status"], "thinking");
         let err = forget(&w, &id).unwrap_err().to_string();
-        assert!(err.contains("en cours"), "{err}");
+        assert!(err.contains("running"), "{err}");
         fail(&w, &id, "no model").unwrap();
         forget(&w, &id).unwrap();
         assert!(load(&w, &id).is_err());

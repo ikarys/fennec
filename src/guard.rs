@@ -38,42 +38,47 @@ fn file() -> io::Result<PathBuf> {
 fn defaults() -> Vec<Value> {
     let r = |effect: &str, on: &str, pattern: &str, why: &str| json!({"effect": effect, "on": on, "pattern": pattern, "why": why});
     let mut v = vec![
-        r("deny", "command", "rm -fr /", "jamais effacer la racine"),
-        r("deny", "command", "rm -fr / *", "jamais effacer la racine"),
+        r("deny", "command", "rm -fr /", "never erase the root"),
+        r("deny", "command", "rm -fr / *", "never erase the root"),
         // `\*`: a star as written, not any text (`rm -rf /tmp/x` is fine).
-        r("deny", "command", "rm -fr /\\*", "jamais effacer la racine"),
-        r("deny", "command", "rm -fr ~", "jamais effacer le dossier personnel"),
-        r("deny", "command", "rm -fr ~/", "jamais effacer le dossier personnel"),
+        r("deny", "command", "rm -fr /\\*", "never erase the root"),
+        r("deny", "command", "rm -fr ~", "never erase the home folder"),
+        r(
+            "deny",
+            "command",
+            "rm -fr ~/",
+            "never erase the home folder",
+        ),
         r(
             "deny",
             "command",
             "*--no-preserve-root*",
-            "jamais effacer la racine",
+            "never erase the root",
         ),
-        r("deny", "command", "mkfs*", "jamais formater un disque"),
-        r(
-            "deny",
-            "command",
-            "dd * of=/dev/*",
-            "jamais écrire sur un disque",
-        ),
-        r("ask", "command", "*| sh*", "un téléchargement exécuté dans un shell"),
-        r(
-            "ask",
-            "command",
-            "*| bash*",
-            "un téléchargement exécuté dans un shell",
-        ),
+        r("deny", "command", "mkfs*", "never format a disk"),
+        r("deny", "command", "dd * of=/dev/*", "never write to a disk"),
+        r("ask", "command", "*| sh*", "a download run in a shell"),
+        r("ask", "command", "*| bash*", "a download run in a shell"),
         // The harness lands the work; a push from the agent is the person's call.
-        r("ask", "command", "git push*", "un push quitte la machine"),
-        r("deny", "file", "**/.ssh/id_*", "clés SSH privées"),
-        r("ask", "read", "**/.env", "des secrets dans .env"),
-        r("ask", "read", "**/.env.*", "des secrets dans .env"),
-        r("allow", "read", "**/.env.example", "un modèle, sans secret"),
-        r("allow", "read", "**/.env.sample", "un modèle, sans secret"),
+        r("ask", "command", "git push*", "a push leaves the machine"),
+        r("deny", "file", "**/.ssh/id_*", "private SSH keys"),
+        r("ask", "read", "**/.env", "secrets in .env"),
+        r("ask", "read", "**/.env.*", "secrets in .env"),
+        r(
+            "allow",
+            "read",
+            "**/.env.example",
+            "a template, without secrets",
+        ),
+        r(
+            "allow",
+            "read",
+            "**/.env.sample",
+            "a template, without secrets",
+        ),
     ];
     for ext in ["pem", "key", "p12", "pfx", "jks", "keystore", "ppk"] {
-        v.push(r("deny", "file", &format!("**/*.{ext}"), "clés privées"));
+        v.push(r("deny", "file", &format!("**/*.{ext}"), "private keys"));
     }
     for p in [
         "**/.aws/credentials",
@@ -85,7 +90,7 @@ fn defaults() -> Vec<Value> {
         "/etc/shadow",
         "/etc/sudoers",
     ] {
-        v.push(r("ask", "file", p, "des identifiants"));
+        v.push(r("ask", "file", p, "credentials"));
     }
     v
 }
@@ -129,7 +134,7 @@ pub fn add(rule: &Value) -> io::Result<()> {
     let pattern = rule["pattern"].as_str().unwrap_or("").trim();
     if !EFFECTS.contains(&effect) || !ON.contains(&on) || pattern.is_empty() {
         return Err(io::Error::other(
-            "une règle dit interdire, demander ou autoriser, sur une commande, une lecture ou une écriture, et un motif",
+            "a rule says deny, ask or allow, on a command, a read or a write, and a pattern",
         ));
     }
     let mut kept = json!({"effect": effect, "on": on, "pattern": pattern,
@@ -147,7 +152,7 @@ pub fn add(rule: &Value) -> io::Result<()> {
 pub fn remove(index: usize, pattern: &str) -> io::Result<()> {
     let mut rules = list()?;
     if rules.get(index).and_then(|r| r["pattern"].as_str()) != Some(pattern) {
-        return Err(io::Error::other("cette règle a changé : recharge la page"));
+        return Err(io::Error::other("this rule changed: reload the page"));
     }
     rules.remove(index);
     save(&rules)

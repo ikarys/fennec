@@ -131,7 +131,7 @@ pub fn enabled() -> io::Result<Vec<String>> {
         Err(e) => return Err(e),
     };
     let names: Vec<String> = serde_json::from_str(&text)
-        .map_err(|e| io::Error::other(format!("skills.json est illisible : {e}")))?;
+        .map_err(|e| io::Error::other(format!("skills.json is unreadable: {e}")))?;
     Ok(names)
 }
 

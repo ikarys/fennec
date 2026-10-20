@@ -568,7 +568,7 @@ impl Worlds {
             // The human may have edited their folder while fennec worked: what
             // goes is set aside in the stash, never lost.
             let mut args = COMMITTER.to_vec();
-            args.extend(["stash", "push", "-q", "-u", "-m", "fennec: essai annulé"]);
+            args.extend(["stash", "push", "-q", "-u", "-m", "fennec: try undone"]);
             self.git(world, &args)?;
             return Ok(());
         }
@@ -601,7 +601,7 @@ impl Worlds {
         if git(&world.path, &["branch", "--show-current"])? != format!("world/{}", world.id) {
             return Ok(());
         }
-        self.commit(world, "fennec: mis de côté")?;
+        self.commit(world, "fennec: set aside")?;
         git(&world.path, &["checkout", "-q", &home])?;
         Ok(())
     }
@@ -617,13 +617,11 @@ impl Worlds {
         }
         if now.starts_with("world/") {
             return Err(io::Error::other(
-                "une autre tâche travaille dans le dossier : attends qu'elle finisse",
+                "another task works in the folder: wait until it finishes",
             ));
         }
         if !git(&world.path, &["status", "--porcelain"])?.is_empty() {
-            return Err(io::Error::other(
-                "le dossier a des changements pas encore commités",
-            ));
+            return Err(io::Error::other("the folder has changes not committed yet"));
         }
         git(&world.path, &["checkout", "-q", &branch])?;
         Ok(())
