@@ -1028,6 +1028,13 @@ function card(item) {
     }
     if (item.land_error) add(el("div", { className: "bad", textContent: t("Commit interrupted: {0}", t(firstLine(item.land_error))) }));
     if (item.amend_error) add(el("div", { className: "bad", textContent: t("Correction not done, the work stayed as it was: {0}", t(firstLine(item.amend_error))) }));
+    if (item.disagreements?.length) {
+      add(el("div", { className: "muted", style: "margin-top:10px", textContent: t("Reviewer points the dev refused — your call:") }),
+        el("ul", { className: "warn" }, ...item.disagreements.map((d) => el("li", {},
+          el("span", { textContent: `${d.point} — ${d.reason ?? ""}` }),
+          action(t("Force the point"), "/api/disagree", { id: item.id, point: d.point, action: "force" }),
+          action(t("Keep the dev's position"), "/api/disagree", { id: item.id, point: d.point, action: "keep" })))));
+    }
     // "Ready" reads as "done": say where the work is until the commit.
     const commit = item.land ? `"${landLabel(item.land)}"` : t("the commit");
     // Nothing changed: what was asked already held, no commit will be made.
@@ -2438,7 +2445,7 @@ function renderTeam(view) {
     new Option(name === view.default ? t("{0} (default)", name) : name, name)));
   $("team-name").value = view.team;
   $("team-roles").replaceChildren(...view.roles.map((r) => {
-    const meta = el("span", { className: "muted", textContent: [STAGES[r.stage] ? t(STAGES[r.stage]) : r.stage, r.model].filter(Boolean).join(" · ") });
+    const meta = el("span", { className: "muted", textContent: [STAGES[r.stage] ? t(STAGES[r.stage]) : r.stage, r.tools, r.model].filter(Boolean).join(" · ") });
     if (global) return el("li", {}, el("span", { textContent: r.name }), meta);
     const box = el("input", { type: "checkbox", checked: !r.out, ariaLabel: r.name });
     box.onchange = () => {
@@ -2480,6 +2487,7 @@ async function editRole(r) {
   }
   for (const m of new Set([...served, r?.model].filter(Boolean))) $("role-model").append(new Option(t("Model: {0}", m), m));
   $("role-model").value = r?.model ?? "";
+  $("role-tools").value = r?.tools ?? "";
   $("role-name").value = r?.name ?? "";
   $("role-stage").value = r?.stage ?? "solve";
   // Role files wrap their lines; the box shows each paragraph as one.
@@ -2497,7 +2505,7 @@ $("role-cancel").onclick = () => ($("team-role").hidden = true);
 $("team-role").onsubmit = async (e) => {
   e.preventDefault();
   const checks = $("role-stage").value === "prove" ? $("role-checks").value.split("\n").filter((c) => c.trim()) : [];
-  const body = { key: editing, name: $("role-name").value, stage: $("role-stage").value, brief: $("role-brief").value, checks, model: $("role-model").value };
+  const body = { key: editing, name: $("role-name").value, stage: $("role-stage").value, brief: $("role-brief").value, checks, model: $("role-model").value, tools: $("role-tools").value };
   if (await teamCall("/api/team/role", body)) $("team-role").hidden = true;
 };
 $("team-save-open").onclick = () => {
