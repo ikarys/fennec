@@ -1972,6 +1972,7 @@ async function refresh(force) {
     $("n-archived").textContent = archived.length || "";
     fill($("archived"), archived.map((i) => row(i, line(i, pastState(i), false),
       rowActions(i.id, { archive: "/api/request/archive", forget: "/api/forget", restore: true }))), "");
+    homeView = view;
     if (!typing) showDetail(todo.map((i) => [i, "todo"]).concat(later.map((i) => [i, "todo"]), running.map((i) => [i, "run"]), history.map((i) => [i, "past"]))
       .find(([i]) => i.id === picked));
     tick();
@@ -1982,6 +1983,46 @@ async function refresh(force) {
   } catch (e) {
     $("error").textContent = t("Server unreachable: {0}", e.message);
   }
+}
+
+// The last visit: when the page was last left. What moved since stands out.
+let seenBefore = 0;
+const readSeen = () => { try { seenBefore = Number(localStorage.getItem("fennec.seen")) || 0; } catch {} };
+const remember = () => { try { localStorage.setItem("fennec.seen", String(Math.floor(Date.now() / 1000))); } catch {} };
+readSeen();
+document.addEventListener("visibilitychange", () => (document.hidden ? remember() : readSeen()));
+window.addEventListener("pagehide", remember);
+
+// Home: what moved lately, the figures that lead the work, what runs next.
+// The figures walk the worlds on disk: read on entry and every minute, not
+// at each refresh.
+let homeStats = null, homeStatsAt = 0, homeView = null;
+function drawHome(view = homeView) {
+  homeView = view;
+  if (!view || $("hint").hidden) return;
+  if (Date.now() - homeStatsAt > 60000) {
+    homeStatsAt = Date.now();
+    api("/api/stats").then((s) => { homeStats = s; drawHome(view); }).catch(() => {});
+  }
+  const ready = view.later.filter((i) => i.fleet).sort((a, b) => a.rank - b.rank);
+  const toValidate = view.later.filter((i) => !i.fleet && i.framed).length;
+  const tile = (value, label, href) => el(href ? "a" : "div", { className: "tile", href }, el("b", { textContent: value }), el("span", { textContent: label }));
+  const a = homeStats?.all, mem = homeStats?.memory;
+  $("home-tiles").replaceChildren(
+    tile(number(view.todo.length), t("for you")), tile(number(view.running.length), t("running")),
+    tile(number(ready.length), t("ready to run"), "#fleet"), tile(number(toValidate), t("to validate in the Backlog")),
+    ...(a ? [tile(duration(a.ms ?? 0), t("of model · ↑ {0} ↓ {1}", compact(a.sent), compact(a.received)), "#stats"),
+      tile(bytes(a.disk ?? 0), t("disk of the worlds"))] : []),
+    ...(mem?.total ? [tile(`${percent(mem.total - mem.available, mem.total)} %`, t("memory used of {0}", bytes(mem.total)))] : []));
+  const link = (item, state, fresh) => el("a", { className: "row" + (fresh ? " fresh" : ""), href: hashOf(item.path, item.id) }, line(item, state));
+  const news = [...view.todo.map((i) => [i, statusOf(i, "todo")]), ...view.running.map((i) => [i, statusOf(i, "run")]),
+    ...view.history.map((i) => [i, statusOf(i, "past")])].sort(([x], [y]) => (y.since ?? 0) - (x.since ?? 0)).slice(0, 5);
+  const fresh = news.filter(([i]) => i.since > seenBefore).length;
+  $("n-home-news").textContent = fresh || "";
+  fill($("home-news"), news.map(([i, s]) => link(i, s, i.since > seenBefore)), t("Nothing yet."));
+  $("n-home-next").textContent = ready.length || "";
+  fill($("home-next"), ready.slice(0, 3).map((i) => link(i, i.after?.length ? [t("waits for \"{0}\"", i.after[0]), "muted"]
+    : [t("#{0} in line", i.rank + 1), "info"])), t("No task ready: validate tasks in the Backlog."));
 }
 
 // A box's ticked tasks, validated (Backlog) or put back (Ready) at once.
@@ -2050,6 +2091,7 @@ function showDetail(found) {
   document.body.classList.toggle("paged", !!page);
   $("page").hidden = !!found || !!page || !paged;
   $("hint").hidden = !!found || !!page || !!paged;
+  drawHome();
   for (const name of PAGES) $(name).hidden = name !== page;
   if (!found) {
     detailed = "";
@@ -2730,15 +2772,27 @@ async function showPage(path) {
   $("page-error").textContent = "";
   $("page-name").textContent = path.split("/").pop();
   $("page-path").textContent = path;
-  const [stats, rules] = await Promise.all([api("/api/stats"), api("/api/rules", { project: path })]);
+  const [stats, rules, chats] = await Promise.all([api("/api/stats"), api("/api/rules", { project: path }), api("/api/chats")]);
   if (paged !== path) return;
   const p = stats.projects.find((x) => x.path === path) ?? {};
   const tile = (value, label, tone = "") => el("div", { className: `tile ${tone}` }, el("b", { textContent: value }), el("span", { textContent: label }));
+  // Where its tasks stand now, then what they cost and how well they went.
+  const v = homeView ?? { todo: [], running: [], later: [] };
+  const here = (items) => items.filter((i) => i.path === path);
+  const later = here(v.later);
+  $("page-now").replaceChildren(
+    tile(number(here(v.todo).length), t("for you")), tile(number(here(v.running).length), t("running")),
+    tile(number(later.filter((i) => i.fleet).length), t("ready to run")),
+    tile(number(later.filter((i) => !i.fleet).length), t("in the Backlog")),
+    tile(number(chats.filter((c) => c.folder === path).length), t("open discussions")));
+  const proven = (p.first_try ?? 0) + (p.retried ?? 0);
   $("page-tiles").replaceChildren(
-    tile(number(p.requests), t("tasks")), tile(number(p.landed), t("commits")),
+    tile(number(p.landed), t("commits")),
+    tile(proven ? `${percent(p.first_try, proven)} %` : "—", t("proven at the first try")),
     tile(number(p.failed), t("failures"), p.failed ? "bad" : ""),
     tile(number(p.failed_attempts), t("failed tries undone")),
-    tile(duration(p.ms ?? 0), t("of model")), tile(compact(p.sent), t("tokens sent")));
+    tile(duration(p.ms ?? 0), t("of model")), tile(compact(p.sent), t("tokens sent")),
+    tile(bytes(p.disk ?? 0), t("disk of its worlds")));
   const place = $("page-place");
   place.replaceChildren(...Object.entries(PLACES).map(([k, label]) => new Option(t(label), k)));
   if (p.place && !PLACES[p.place]) place.append(new Option(p.place, p.place));
