@@ -522,7 +522,7 @@ function details(item) {
   if (plan) part(t("The discussion's plan, shared by its tasks"), el("div", {}, ...md(plan)));
   const errors = [item.reason, item.land_error].filter(Boolean);
   if (errors.length) part(t("Error"), ...errors.map((e) => el("pre", { className: "failed", textContent: e })));
-  if (item.land?.message) part(t("Commit message"), el("pre", { textContent: item.land.message }));
+  if (item.land?.message && item.files?.length !== 0) part(t("Commit message"), el("pre", { textContent: item.land.message }));
   // Without stats (an old request), the team that worked on it at least.
   if (item.team?.length && !item.stats?.stages) part(t("Team"), el("p", { textContent: item.team.join(", ") }));
   if (item.rules?.length) part(t("Rules applied here"), el("ul", {}, ...item.rules.map((r) => el("li", { textContent: r }))));
@@ -1030,7 +1030,11 @@ function card(item) {
     if (item.amend_error) add(el("div", { className: "bad", textContent: t("Correction not done, the work stayed as it was: {0}", t(firstLine(item.amend_error))) }));
     // "Ready" reads as "done": say where the work is until the commit.
     const commit = item.land ? `"${landLabel(item.land)}"` : t("the commit");
-    add(el("div", { className: "muted", style: "margin-top:10px", textContent: item.here
+    // Nothing changed: what was asked already held, no commit will be made.
+    const none = Array.isArray(item.files) && !item.files.length;
+    add(el("div", { className: "muted", style: "margin-top:10px", textContent: none
+      ? t("fennec changed nothing: what you asked already holds. {0} closes the task without a commit.", commit)
+      : item.here
       ? t("The work is in your folder, on a work branch. {0} puts it on your branch; \"Undo\" gives your folder back as it was.", commit)
       : t("Your folder has not changed yet: the work waits apart. {0} puts it there.", commit) }));
     // Ways out, none forced: commit, look, ask for a change, set aside or undo.
