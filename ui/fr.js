@@ -334,6 +334,7 @@ const FR = {
   "You look at the proof and the changes, then choose: commit, or pass (the work is set aside).": "Tu regardes la preuve et les changements, puis tu choisis : commit, ou passer (le travail reste de côté).",
   "You may change the code there: at commit, fennec runs the tests again before putting it all in your folder.": "Tu peux y modifier le code : au commit, fennec refait les tests avant de mettre le tout dans ton dossier.",
   "Your answer": "Ta réponse",
+  "nothing to change": "rien à changer",
   "fennec changed nothing: what you asked already holds. {0} closes the task without a commit.": "fennec n'a rien changé : ce que tu demandais est déjà le cas. {0} clôt la tâche sans commit.",
   "Your folder has not changed yet: the work waits apart. {0} puts it there.": "Ton dossier n'a pas encore changé : le travail attend à part. {0} l'y met.",
   "Your folder is on it: it goes back to its branch, and what is not committed goes to the git stash.": "Ton dossier est dessus : il revient sur sa branche, et ce qui n'est pas commité va dans le stash git.",
