@@ -2426,15 +2426,20 @@ function renderTeam(view) {
   view.roles.sort(byStage);
   view.catalog.sort(byStage);
   team = view;
+  const global = view.global;
   // A team named by the project but not found here: say so, and let the
   // human pick one, since fennec cannot work on the project until then.
   $("team-error").textContent = view.missing
     ? t("The team \"{0}\" is not found here: pick one so that fennec can work.", view.team)
     : "";
   const missing = view.missing ? [new Option(t("{0} (not found)", view.team), view.team)] : [];
-  $("team-name").replaceChildren(...missing, ...view.teams.map((name) => new Option(name, name)));
+  $("team-label").textContent = global ? t("Teams") : t("The project's team");
+  $("team-name").replaceChildren(...missing, ...view.teams.map((name) =>
+    new Option(name === view.default ? t("{0} (default)", name) : name, name)));
   $("team-name").value = view.team;
   $("team-roles").replaceChildren(...view.roles.map((r) => {
+    const meta = el("span", { className: "muted", textContent: [STAGES[r.stage] ? t(STAGES[r.stage]) : r.stage, r.model].filter(Boolean).join(" · ") });
+    if (global) return el("li", {}, el("span", { textContent: r.name }), meta);
     const box = el("input", { type: "checkbox", checked: !r.out, ariaLabel: r.name });
     box.onchange = () => {
       const remove = team.roles.filter((x) => x.key === r.key ? !box.checked : x.out).map((x) => x.key);
@@ -2442,8 +2447,7 @@ function renderTeam(view) {
     };
     const name = el("button", { type: "button", textContent: r.name, title: t("Edit this role") });
     name.onclick = () => editRole(r);
-    return el("li", { className: r.out ? "out" : "" }, box, name,
-      el("span", { className: "muted", textContent: [STAGES[r.stage] ? t(STAGES[r.stage]) : r.stage, r.model].filter(Boolean).join(" · ") }));
+    return el("li", { className: r.out ? "out" : "" }, box, name, meta);
   }));
   $("team-catalog").replaceChildren(new Option(t("Add a role…"), ""),
     ...view.catalog.map((r) => new Option(`${r.name} — ${STAGES[r.stage] ? t(STAGES[r.stage]) : r.stage}`, r.key)));
@@ -2508,25 +2512,22 @@ $("team-save").onsubmit = async (e) => {
   }
 };
 
-// The team of the chosen project, as a page the address names: #team.
+// The teams, as a page the address names: #team. Teams are global, so
+// without a project the page browses them; leaving roles out, adding roles,
+// and assigning a team to a project stay a project's choice.
 async function showTeamPage() {
   $("team-role").hidden = $("team-save").hidden = true;
   $("team-error").textContent = "";
   const project = $("project").value;
-  if (!project) {
-    $("team-title").textContent = t("Team");
-    $("team-body").hidden = true;
-    $("team-hint").hidden = false;
-    $("team-name").replaceChildren();
-    $("team-roles").replaceChildren();
-    $("team-catalog").replaceChildren();
-    return;
-  }
-  $("team-title").textContent = t("Team — {0}", $("project").selectedOptions[0].textContent);
   $("team-body").hidden = false;
-  $("team-hint").hidden = true;
+  $("team-add").hidden = $("role-new").hidden = $("team-save-open").hidden = !project;
+  $("team-title").textContent = project
+    ? t("Team — {0}", $("project").selectedOptions[0].textContent)
+    : t("Teams");
   try {
-    renderTeam(await api("/api/team", { project }));
+    renderTeam(await api("/api/team", project
+      ? { project }
+      : team?.global ? { team: team.team } : {}));
   } catch (e) {
     $("team-error").textContent = e.message;
   }
@@ -2535,7 +2536,11 @@ $("open-team").onclick = () => {
   location.hash === "#team" ? refresh(true) : (location.hash = "#team");
 };
 // Another team starts whole: what was left out belonged to the old one.
-$("team-name").onchange = () => teamCall("/api/team/choose", { team: $("team-name").value, remove: [] });
+// Without a project the pick only browses that team's roles.
+$("team-name").onchange = () => {
+  if ($("project").value) teamCall("/api/team/choose", { team: $("team-name").value, remove: [] });
+  else teamCall("/api/team", { team: $("team-name").value });
+};
 $("team-add").onsubmit = (e) => {
   e.preventDefault();
   if ($("team-catalog").value) teamCall("/api/team/add", { role: $("team-catalog").value });
