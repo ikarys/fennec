@@ -46,8 +46,9 @@ Keep each command short. Reply in exactly this form, nothing else:\n\
 try: <one shell command>   (one line per command, at most 5)\n\
 serve: <shell command that starts the web interface and keeps running>   (omit if none)\n\
 shot: <page URL on 127.0.0.1, port included>   (one line per page, at most 3, only with serve)\n\
-act: click <text the user sees on what they click> | type <field's placeholder or label> => \
-<text> | key <Enter, Tab, Escape or Backspace>   (after its shot line, at most 10 per page)\n\
+act: one action per line, either `click <text the user sees on what they click>`, \
+`type <field's placeholder or label> => <text>` or `key <Enter, Tab, Escape or Backspace>`   \
+(after its shot line, at most 10 per page)\n\
 unverified: <what these cannot show, for the person: in the language of the Done when \
 (or the goal), product terms, no file or tag names>   (one line per item, omit if none)";
 
@@ -447,11 +448,14 @@ fn parse(reply: &str) -> Plan {
             "serve" => plan.serve = Some(value),
             "shot" if plan.shots.len() < MAX_SHOTS => plan.shots.push((value, Vec::new())),
             "act" => {
-                if let Some((_, steps)) = plan.shots.last_mut()
-                    && steps.len() < MAX_STEPS
-                {
-                    // Models quote what they aim at: `click `Save``.
-                    steps.push(value.replace('`', ""));
+                if let Some((_, steps)) = plan.shots.last_mut() {
+                    // Models quote what they aim at (`click `Save``), and
+                    // some chain actions on one line: `click A | click B`.
+                    for step in value.split(" | ") {
+                        if steps.len() < MAX_STEPS {
+                            steps.push(step.replace('`', "").trim().to_string());
+                        }
+                    }
                 }
             }
             "unverified" if !value.eq_ignore_ascii_case("none") => plan.unverified.push(value),
@@ -504,7 +508,7 @@ mod tests {
     #[test]
     fn steps_belong_to_the_page_before_them() {
         let plan = parse(
-            "act: click orphan\nshot: http://127.0.0.1:8000/\nact: click `pain`\nact: type Nouvel article => lait\nshot: http://127.0.0.1:8000/b\n",
+            "act: click orphan\nshot: http://127.0.0.1:8000/\nact: click `pain`\nact: type Nouvel article => lait | key Enter\nshot: http://127.0.0.1:8000/b\n",
         );
         assert_eq!(
             plan.shots,
@@ -513,7 +517,8 @@ mod tests {
                     "http://127.0.0.1:8000/".to_string(),
                     vec![
                         "click pain".to_string(),
-                        "type Nouvel article => lait".to_string()
+                        "type Nouvel article => lait".to_string(),
+                        "key Enter".to_string()
                     ]
                 ),
                 ("http://127.0.0.1:8000/b".to_string(), vec![])
