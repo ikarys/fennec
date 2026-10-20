@@ -508,7 +508,8 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
                     Some(false) => {
                         "not approved: the folder stays read-only; ask what to change in the plan"
                     }
-                    None => return Ok(()),
+                    // Stopped while asking: the step's cost stays counted.
+                    None => return update(worlds, id, |c| push(&mut c["turns"], record)).map(drop),
                 };
                 push(&mut record["tools"], timed(name));
                 said.push(json!({"role": "tool", "tool_call_id": call["id"], "content": answer}));
@@ -547,7 +548,7 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
                         )}));
                         continue;
                     }
-                    None => return Ok(()),
+                    None => return update(worlds, id, |c| push(&mut c["turns"], record)).map(drop),
                 }
             }
             let sandbox =
