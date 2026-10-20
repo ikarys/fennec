@@ -639,9 +639,14 @@ pub fn reply(store: &Store, id: &str, text: &str) -> io::Result<()> {
         })?;
         frame(id.to_string());
     } else {
+        // A question mid-solve may come after the spec was accepted (a role
+        // asked while its chain already had a winner): solve_now then goes
+        // through spec::retry, which handles an accepted spec, not
+        // spec::accept, which would fail on it.
         store.update(id, |r| {
             r["status"] = json!("running");
             r["heard"] = json!(text);
+            r["retry"] = json!(text);
         })?;
         spawn(id.to_string(), solve_now);
     }
@@ -1973,6 +1978,51 @@ mod tests {
             r["thread"],
             json!([{"who": "fennec", "text": "Which port?"}])
         );
+    }
+
+    #[test]
+    fn an_answer_during_an_accepted_solve_restarts_through_retry() {
+        let tmp = std::env::temp_dir().join(format!("fennec-lead-reply-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        let os = tmp.join("os");
+        let home = tmp.join("home");
+        let project = tmp.join("p");
+        std::fs::create_dir_all(home.join("requests")).unwrap();
+        std::fs::create_dir_all(&project).unwrap();
+        // SAFETY: no other test reads FENNEC_OS_HOME at the same time.
+        unsafe { std::env::set_var("FENNEC_OS_HOME", &os) };
+        let worlds = Worlds::from_env().unwrap();
+        let s = fennec_os::spec::direct(&worlds, &project, "a task", None, None).unwrap();
+        let spec_id = s["world"].as_str().unwrap().to_string();
+        // The first solve accepted the spec (the chain had a winner) while a
+        // role of the chain was still asking: the run keeps it accepted.
+        let mut spec = s.clone();
+        spec["status"] = json!("accepted");
+        spec["run"] = json!("w1");
+        std::fs::write(
+            os.join("specs").join(format!("{spec_id}.json")),
+            spec.to_string(),
+        )
+        .unwrap();
+        let id = "cafe";
+        std::fs::write(
+            home.join("requests/cafe.json"),
+            json!({"project": project.to_string_lossy(), "text": "a task",
+                   "status": "blocked", "stage": "solving", "question": "Which port?",
+                   "spec": spec_id, "thread": [{"who": "human", "text": "a task"}]})
+                .to_string(),
+        )
+        .unwrap();
+        let store = Store { root: home.clone() };
+        reply(&store, id, "port 9").unwrap();
+        let r = store.load(id).unwrap();
+        assert_eq!(r["status"], "running");
+        // Routed through spec::retry, which handles an accepted spec:
+        // spec::accept would fail it with `spec is "accepted"`.
+        assert_eq!(r["retry"], "port 9");
+        let spec = fennec_os::spec::load(&worlds, &spec_id).unwrap();
+        assert_eq!(spec["answers"][0]["answer"], "port 9");
+        std::fs::remove_dir_all(&tmp).unwrap();
     }
 
     #[test]
