@@ -254,6 +254,10 @@ pub fn tick(
         let branch = (v["on_success"] == "branch").then_some(BRANCH);
         store.update(id, |r| {
             r["fleet"] = json!(true);
+            // A failure seen on an earlier run must not hide this one's.
+            if let Some(m) = r.as_object_mut() {
+                m.remove("fleet_seen");
+            }
             if let Some(b) = branch {
                 r["fleet_branch"] = json!(b);
             }

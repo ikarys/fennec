@@ -957,6 +957,8 @@ pub fn retry(store: &Store, id: &str) -> io::Result<()> {
         if let Some(m) = r.as_object_mut() {
             m.remove("proof");
             m.remove("reason");
+            // Its next failure stops the Fleet as the first one did.
+            m.remove("fleet_seen");
         }
         if validated {
             r["status"] = json!("running");
