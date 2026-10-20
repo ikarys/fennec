@@ -100,6 +100,24 @@
   .split > aside .timeline { flex-direction: column; height: auto; gap: 3px; background: none; }
   .split > aside .seg { flex: none !important; padding: 3px 8px; border-radius: 4px; }
   .split > aside .pills { flex-direction: column; align-items: flex-start; }
+  .guard { margin-top: 18px; }
+  #guard-list { list-style: none; padding: 0; margin: 8px 0; display: flex; flex-direction: column; gap: 4px; }
+  #guard-list li { display: grid; grid-template-columns: 92px 110px minmax(0, 1fr) auto; gap: 10px; align-items: center; font-size: 13px; }
+  #guard-list li code { font: 12px ui-monospace, monospace; overflow-wrap: anywhere; }
+  #guard-list li .why { color: var(--muted); }
+  #guard-list .effect { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  #guard-list .effect.deny { color: var(--bad); }
+  #guard-list .effect.ask { color: var(--warn); }
+  #guard-list .effect.allow { color: var(--ok); }
+  #guard-form { display: grid; grid-template-columns: auto auto minmax(0, 1fr) minmax(0, 1fr) auto; gap: 6px; }
+  .split > aside ul.plan { list-style: none; padding: 0; margin: 0 0 12px; display: flex; flex-direction: column; gap: 4px; }
+  .split > aside ul.plan li { display: flex; justify-content: flex-start; align-items: flex-start; gap: 7px; font-size: 13px; text-align: left; }
+  .split > aside ul.plan li .what { flex: 1; min-width: 0; }
+  .split > aside ul.plan li:not(.ic)::before { content: ""; flex: none; width: 11px; height: 11px; margin: 3px 3px 0 3px;
+    border: 1.5px solid var(--muted); border-radius: 50%; }
+  .split > aside ul.plan li.ok { color: var(--muted); }
+  .split > aside ul.plan li.ok::before { color: var(--ok); }
+  .split > aside ul.plan li.bad:not(.ic)::before { border-color: var(--bad); }
   /* Narrow: the decision goes first, the figures after the request. */
   .split > aside { display: contents; }
   .split .decide { order: -1; }
@@ -662,7 +680,7 @@
     <button type="button" class="primary" id="new-chat" data-icon="plus">Nouvelle discussion</button>
     <h2>Agent</h2>
     <div id="chat-list"></div>
-    <p class="muted">fennec lit et lance des commandes dans le dossier que tu choisis, git ou pas, sans réseau et ton dossier personnel caché. Il ne modifie rien tant que tu ne l’autorises pas. Le coût de la discussion est à droite.</p>
+    <p class="muted">fennec lit et lance des commandes dans le dossier que tu choisis, git ou pas, ton dossier personnel caché (le réseau reste ouvert pour installer ce qu’il faut). Il ne modifie rien tant que tu ne l’autorises pas. Le coût de la discussion est à droite.</p>
   </div>
   <div id="reqs">
   <button type="button" class="primary" id="compose-open" data-icon="plus">Nouvelle tâche</button>
@@ -803,7 +821,7 @@
       <tbody id="stats-projects"></tbody>
     </table></div>
     <p class="muted">« Dans le dossier » : tu vois le travail en direct, sur une branche de travail. « À part » : ton dossier ne change qu'au commit. Le changement vaut pour les prochaines tâches.
-      Isolement de chaque travail : sans réseau, sans accès à ton dossier personnel, historique git en lecture seule, mémoire plafonnée ; un essai raté est annulé sans trace.</p>
+      Isolement de chaque travail : réseau pour installer les dépendances, vérification sans réseau, sans accès à ton dossier personnel, historique git en lecture seule, mémoire plafonnée ; un essai raté est annulé sans trace.</p>
     <p class="error" id="stats-error" role="alert"></p>
   </section>
   <section id="settings" hidden>
@@ -863,6 +881,26 @@
         <button data-icon="plus" aria-label="Ajouter la règle" title="Ajouter la règle"></button>
       </form>
       <p class="error" role="alert"></p>
+      <div class="box guard">
+        <h2 data-icon="shield">Commandes et fichiers <span class="count" id="guard-count"></span></h2>
+        <p class="muted">Vérifiées avant chaque commande, lecture ou écriture d'un agent, quel que soit le modèle.
+          « Interdire » refuse ; « Demander » attend ta réponse dans une discussion, et une tâche fait sans ;
+          « Autoriser » lève une demande, jamais une interdiction. Gardées dans ~/.config/fennec/guard.json, jamais dans un projet.</p>
+        <ul id="guard-list"></ul>
+        <form id="guard-form">
+          <select id="guard-effect" aria-label="Effet">
+            <option value="deny">Interdire</option><option value="ask">Demander</option><option value="allow">Autoriser</option>
+          </select>
+          <select id="guard-on" aria-label="Sur">
+            <option value="command">la commande</option><option value="read">la lecture de</option>
+            <option value="write">l'écriture de</option><option value="file">l'accès à</option>
+          </select>
+          <input id="guard-pattern" aria-label="Motif" placeholder="rm -rf /   ou   **/.env" required>
+          <input id="guard-why" aria-label="Pourquoi" placeholder="Pourquoi (facultatif)">
+          <button data-icon="plus" aria-label="Ajouter la règle" title="Ajouter la règle"></button>
+        </form>
+        <p class="error" id="guard-error" role="alert"></p>
+      </div>
     </div>
     <div id="settings-skills" hidden>
       <p class="muted">Ils s'appliquent à tous tes projets : l'équipe voit le nom et le but de chaque skill activé, et le lit quand la tâche en a besoin.
