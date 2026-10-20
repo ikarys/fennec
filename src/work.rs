@@ -709,6 +709,18 @@ fn wait_turn(store: &Store, id: &str, project: &str) -> io::Result<Taken> {
     }
 }
 
+/// The branch the last of `request`'s `after` tasks was committed on.
+/// ponytail: the last one only; tasks after work on two branches need a merge.
+fn after_branch(store: &Store, request: &Value) -> Option<String> {
+    request["after"]
+        .as_array()?
+        .iter()
+        .filter_map(|a| store.load(a.as_str()?).ok())
+        .filter(|d| d["status"] == "landed")
+        .filter_map(|d| d["target"]["branch"].as_str().map(str::to_string))
+        .next_back()
+}
+
 fn solve_now(store: &Store, id: &str) -> io::Result<()> {
     let request = store.load(id)?;
     let mut worlds = Worlds::from_env()?;
@@ -716,8 +728,13 @@ fn solve_now(store: &Store, id: &str) -> io::Result<()> {
     // not hold the folder the next task of the queue needs.
     let fleet = request["fleet"] == true;
     worlds.apart = fleet;
-    // Committed on the Fleet's branch, it builds on what landed there.
-    worlds.base = request["fleet_branch"].as_str().map(str::to_string);
+    // Committed on the Fleet's branch, it builds on what landed there; else
+    // on the branch the tasks it comes after were committed on, or it would
+    // redo or undo their work.
+    worlds.base = request["fleet_branch"]
+        .as_str()
+        .map(str::to_string)
+        .or(after_branch(store, &request));
     let project = Path::new(request["project"].as_str().unwrap_or(""));
     // A correction works on the ready work, which already holds the folder.
     let _turn = match request["amend"].is_string() || fleet {
@@ -2133,6 +2150,35 @@ mod tests {
             let err = stop(&store, id).unwrap_err().to_string();
             assert!(err.contains("no longer works"), "{id}: {err}");
         }
+        std::fs::remove_dir_all(tmp).unwrap();
+    }
+
+    #[test]
+    fn a_task_starts_from_the_branch_its_dependency_was_committed_on() {
+        let tmp = std::env::temp_dir().join(format!("fennec-lead-after-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        let store = Store {
+            root: tmp.join("home"),
+        };
+        std::fs::create_dir_all(store.root.join("requests")).unwrap();
+        let p = tmp.join("p");
+        std::fs::create_dir_all(&p).unwrap();
+        store.add_project(p.to_str().unwrap(), "apart").unwrap();
+        let p = std::fs::canonicalize(p).unwrap().display().to_string();
+        let first = store.add_request(&p, "first", &[], true).unwrap();
+        let next = store.add_request(&p, "next", &[], true).unwrap();
+        store
+            .update(&next, |r| r["after"] = json!([first]))
+            .unwrap();
+        let after = |s: &Store| after_branch(s, &s.load(&next).unwrap());
+        assert_eq!(after(&store), None);
+        store
+            .update(&first, |r| {
+                r["status"] = json!("landed");
+                r["target"] = json!({"branch": "feat/a"});
+            })
+            .unwrap();
+        assert_eq!(after(&store).as_deref(), Some("feat/a"));
         std::fs::remove_dir_all(tmp).unwrap();
     }
 
