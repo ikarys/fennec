@@ -511,6 +511,52 @@ fn an_approved_plan_allows_changes_within_the_turn() {
 }
 
 #[test]
+fn the_plan_checks_run_after_a_change_and_failures_go_back() {
+    let f = Fixture::new_in("chat-checks", &var_tmp());
+    let folder = f.worlds.home.join("notes");
+    std::fs::create_dir_all(&folder).unwrap();
+    std::fs::write(folder.join("a.txt"), "alpha\n").unwrap();
+    let c = chat::start(&f.worlds, &folder).unwrap();
+    let id = c["id"].as_str().unwrap().to_string();
+    chat::say(&f.worlds, &id, "Copie a.txt dans b.txt").unwrap();
+    let model = Replies(Mutex::new(VecDeque::from([
+        call(
+            "c0",
+            "propose_plan",
+            json!({"plan": "- copier a.txt", "checks": ["test -f b.txt"]}),
+        ),
+        call("c1", "shell", json!({"command": "touch c.txt"})),
+        // The check fails: the reply goes back to work.
+        json!({"content": "C'est fait."}),
+        call("c2", "shell", json!({"command": "cp a.txt b.txt"})),
+        json!({"content": "C'est fait."}),
+    ])));
+    let (w, tid) = (twin(&f), id.clone());
+    let t = std::thread::spawn(move || chat::answer(&w, &tid, &model, 10));
+    let pending = until_waiting(&f, &id);
+    assert_eq!(pending["pending"]["checks"], json!(["test -f b.txt"]));
+    chat::decide(&f.worlds, &id, true).unwrap();
+    t.join().unwrap().unwrap();
+    let c = chat::load(&f.worlds, &id).unwrap();
+    assert!(c["error"].is_null(), "{}", c["error"]);
+    assert_eq!(c["checks"]["results"][0]["command"], "test -f b.txt");
+    assert_eq!(c["checks"]["results"][0]["exit"], 0);
+    let sent_back: Vec<&Value> = c["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|m| m["harness"] == true)
+        .collect();
+    assert_eq!(sent_back.len(), 1, "{sent_back:?}");
+    assert!(
+        sent_back[0]["content"]
+            .as_str()
+            .unwrap()
+            .contains("test -f b.txt")
+    );
+}
+
+#[test]
 fn a_message_said_again_drops_what_followed_it() {
     let f = Fixture::new("chat-replay");
     let folder = f.worlds.home.join("notes");

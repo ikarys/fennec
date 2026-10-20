@@ -3,7 +3,8 @@
 //! commands in that folder, and writes there directly once the person
 //! allows changes (a chat starts read-only), in the same sandbox as a
 //! world's (no network, hidden home, private /tmp), and its turn ends when
-//! it answers without a tool call. Chats live in `<store>/chats/<id>.json`:
+//! it answers without a tool call, or, when it changed the folder, once the
+//! approved plan's checks and the project's rules pass (or failed twice). Chats live in `<store>/chats/<id>.json`:
 //! the folder, the messages without the system prompt,
 //! and one entry per model call for the cost.
 
@@ -37,7 +38,9 @@ turn; if not, keep discussing. Do not try to write before.";
 const WRITE: &str = " They allowed changes: do what they ask. Your changes are made directly \
 in their folder and cannot be undone by the harness, so ask before deleting or overwriting \
 what you did not write. Read a file before changing it (read_file), change it with edit_file \
-(write_file for a new file), never with sed or a script; build and test after each change.";
+(write_file for a new file), never with sed or a script; build and test after each change. \
+When you answer after changing the folder, the harness runs the approved plan's checks (and the \
+project's rules): a failure comes back to you to fix.";
 
 /// The reminder's line while an approved plan's steps are open.
 const PLAN: &str = "Work through the approved plan, step by step: build and test what you \
@@ -388,6 +391,9 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
     // Replies without a tool call while the plan has open steps: the model
     // is sent back to them, twice at most, then the turn ends.
     let mut pushed = 0;
+    // The dev loop: a turn that changed the folder runs the checks before
+    // it ends; failures go back to the model, twice at most.
+    let (mut changed, mut fixes) = (false, 0);
     for step in 1..=max_steps {
         // Skills are read again at each call: the person may change them.
         let chat = load(worlds, id)?;
@@ -486,7 +492,7 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
                 // Steps, when given, let the page split the plan into tasks.
                 let steps = args["steps"].as_array().cloned().unwrap_or_default();
                 let pending = json!({"tool": name, "plan": args["plan"].as_str().unwrap_or(""),
-                                     "steps": steps});
+                                     "steps": steps, "checks": args["checks"]});
                 let answer = match ask(worlds, id, pending)? {
                     Some(true) => {
                         // Its steps are what the turn works through, one by one.
@@ -495,6 +501,8 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
                             .filter_map(Value::as_str)
                             .map(|s| agent::step_criterion(s.lines().next().unwrap_or(s)))
                             .collect();
+                        let checks = args["checks"].clone();
+                        update(worlds, id, |c| c["verify"] = checks)?;
                         "approved: changes are allowed now, apply the plan"
                     }
                     Some(false) => {
@@ -545,6 +553,7 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
             let sandbox =
                 |argv: &[String]| worlds.sandbox_folder(&folder, &mounts, &grants, write, argv);
             let result = engine.tool(&sandbox, call);
+            changed |= write && !matches!(name, "read_file" | "criteria");
             push(&mut record["tools"], timed(name));
             if engine
                 .watch
@@ -570,6 +579,38 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
                  the next one now, and mark each with `criteria` when it is done. If one cannot \
                  be done, say why.</system-reminder>"
             )))
+        } else if calls.is_empty() && changed {
+            changed = false;
+            let sandbox = |argv: &[String]| {
+                worlds.sandbox_folder(&folder, &mounts, &grants(worlds, id)?, true, argv)
+            };
+            let checks = verify(&engine, &sandbox, &commands(&folder, &chat));
+            let failed: Vec<String> = checks
+                .iter()
+                .filter(|c| c["exit"] != 0)
+                .map(|c| {
+                    format!(
+                        "`{}` (exit {}):\n{}",
+                        c["command"].as_str().unwrap_or(""),
+                        c["exit"],
+                        c["output"].as_str().unwrap_or("")
+                    )
+                })
+                .collect();
+            let at = now();
+            update(worlds, id, |c| {
+                if !checks.is_empty() {
+                    c["checks"] = json!({"at": at, "results": checks});
+                }
+            })?;
+            (!failed.is_empty() && fixes < 2).then(|| {
+                fixes += 1;
+                agent::harness(&format!(
+                    "<system-reminder>The checks fail after your changes:\n{}\nFix it, then answer \
+                     again.</system-reminder>",
+                    failed.join("\n\n")
+                ))
+            })
         } else {
             None
         };
@@ -595,6 +636,53 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
     )))
 }
 
+/// What proves a chat's changes: the approved plan's checks, then the
+/// project's standing commands (its rules, read from HEAD).
+fn commands(folder: &Path, chat: &Value) -> Vec<String> {
+    let mut all: Vec<String> = chat["verify"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .filter(|c| !c.trim().is_empty())
+        .map(str::to_string)
+        .collect();
+    all.extend(
+        crate::rules::load(folder)
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|r| match r.kind {
+                crate::rules::Kind::StandingCommand(c) if r.block => Some(c),
+                _ => None,
+            }),
+    );
+    all
+}
+
+/// Runs `commands` in the folder's sandbox: `{command, exit, output}` each,
+/// the output's last 40 lines. The person's rules hold for them too.
+fn verify(engine: &agent::Engine, sandbox: tools::Sandbox, commands: &[String]) -> Vec<Value> {
+    commands
+        .iter()
+        .map(|command| {
+            let refused = engine.guard.as_ref().and_then(|g| {
+                match g.check("shell", &json!({"command": command})) {
+                    crate::guard::Verdict::Allow => None,
+                    _ => Some("exit -1\nrefused by the person's rules".to_string()),
+                }
+            });
+            let out = refused.unwrap_or_else(|| {
+                tools::shell(sandbox, command).unwrap_or_else(|e| format!("exit -1\n{e}"))
+            });
+            let (head, rest) = out.split_once('\n').unwrap_or((&out, ""));
+            let exit: i64 = head.trim_start_matches("exit ").parse().unwrap_or(-1);
+            let lines: Vec<&str> = rest.lines().collect();
+            let tail = lines[lines.len().saturating_sub(40)..].join("\n");
+            json!({"command": command, "exit": exit, "output": tail})
+        })
+        .collect()
+}
+
 /// The tool a read-only chat ends its planning with, as a coding harness's
 /// plan mode does: the person approves on the page, or not.
 fn propose_plan() -> Value {
@@ -607,7 +695,10 @@ fn propose_plan() -> Value {
                 "when the plan has several independent steps: each one alone, its title on the first line, \
                  then in a few lines what to do, the context it needs (it is done without the plan) \
                  and how to know it is done; \
-                 the person may make each a task of its own"}}}
+                 the person may make each a task of its own"},
+            "checks": {"type": "array", "items": {"type": "string"}, "description":
+                "bash commands that prove the work once done (build, tests, a run), each exiting 0 \
+                 when it holds: the harness runs them after each of your turns that changes the folder"}}}
     }})
 }
 
