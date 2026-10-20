@@ -1026,7 +1026,10 @@ function card(item) {
       add(el("div", { className: "muted", style: "margin-top:10px", textContent: t("Not verified — look at it yourself:") }),
         el("ul", { className: "warn" }, ...warns.map((w) => el("li", {}, ...rich(w)))));
     }
-    if (item.land_error) add(el("div", { className: "bad", textContent: t("Commit interrupted: {0}", t(firstLine(item.land_error))) }));
+    if (item.land_error) {
+      add(el("div", { className: "bad", textContent: t("Commit interrupted: {0}", t(firstLine(item.land_error))) }));
+      actions.append(action(t("Retry"), "/api/retry", { id: item.id }, { primary: true }));
+    }
     if (item.amend_error) add(el("div", { className: "bad", textContent: t("Correction not done, the work stayed as it was: {0}", t(firstLine(item.amend_error))) }));
     if (item.disagreements?.length) {
       add(el("div", { className: "muted", style: "margin-top:10px", textContent: t("Reviewer points the dev refused — your call:") }),
