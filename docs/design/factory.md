@@ -1,6 +1,6 @@
 # Factory, plugins, self-improvement
 
-Date: 2026-10-19. Status: steps 1 (the Fleet), 2 (outbound plugins), 3 (framing ahead) and 4 (approval from a chat) built; §8 steps 2 (Backlog → Ready), 3 (Split, `after`), 4 (skills per task) and 5 (dashboards) built 2026-10-20. Asked by the human after a
+Date: 2026-10-19. Status: steps 1 (the Fleet), 2 (outbound plugins), 3 (framing ahead) and 4 (approval from a chat) built; §8 steps 2 (Backlog → Ready), 3 (Split, `after`), 4 (skills per task), 5 (dashboards) and 6 (shared caches) built 2026-10-20. Asked by the human after a
 comparison with OpenFox (task board, Planner/Builder agents, plugins).
 
 Purpose test (AGENTS.md): **fast**, **efficient**, **safe**. Each part below
@@ -137,9 +137,11 @@ Backlog ──► Ready ──► running ──► to validate ──► done
   model call) gives 2 to 6 tasks, each after the earlier ones it builds on;
   they inherit the original's `after`, and its followers come after all of
   them. A plan's steps made into tasks each come after the step before.
-- **Disk**: worlds share the git store; build folders are shared per
-  project in `.fennec/` (`CARGO_TARGET_DIR`, pnpm and uv stores), and a
-  world is removed once its task is committed or dropped.
+- **Disk**: worlds share the git store; download caches are shared per
+  project in its `.fennec/` (npm, pnpm, uv, pip, cargo...), a Cargo
+  `target/` too (`.fennec/target` mounted on the world's `target/`), and a
+  world is removed once its task is committed (`solve::land`) or dropped
+  (`review::reject`); that clean-up was already there.
 - **Dashboards** (piloting, not watching): the global one opens on the last
   five things since the last visit, each with a button to its page, then
   what runs (task, step, for how long), resources (tokens, model time, RAM,
