@@ -1563,7 +1563,7 @@ function showChat(c) {
   const busy = thinking || c.status === "waiting";
   box.composer.send.disabled = busy;
   box.composer.stop.hidden = !busy;
-  const asideKey = JSON.stringify([c.stats, c.project, c.grants, c.write, c.criteria]);
+  const asideKey = JSON.stringify([c.stats, c.project, c.grants, c.write, c.criteria, c.verify, c.checks]);
   if (box.asideKey !== asideKey) {
     box.asideKey = asideKey;
     box.aside.replaceChildren(...chatAside(c));
@@ -1646,6 +1646,8 @@ function chatQuestion(c) {
     return el("div", { className: "ask plan" },
       el("span", { className: "muted", textContent: t("fennec proposes this plan and asks to change the folder") }),
       el("div", { className: "said" }, ...md(p.plan ?? "")),
+      ...(p.checks?.length ? [el("span", { className: "muted", textContent: t("Checked after each change with:") }),
+        ...p.checks.map((x) => el("code", { textContent: x }))] : []),
       actions);
   }
   return el("div", { className: "ask" },
@@ -1863,6 +1865,22 @@ function chatAside(c) {
       ul.append(li);
     }
     nodes.push(el("h2", { textContent: t("Plan · {0}/{1}", met, plan.length) }), ul);
+  }
+  // The dev loop: what fennec runs after each turn that changed the
+  // folder, with the last results once they ran.
+  const results = c.checks?.results ?? (c.verify ?? []).map((command) => ({ command }));
+  if (results.length) {
+    const passed = results.filter((r) => r.exit === 0).length;
+    const ul = el("ul", { className: "plan" });
+    for (const r of results) {
+      const li = el("li", { className: r.exit === 0 ? "ok" : r.exit == null ? "" : "bad" },
+        el("code", { className: "what", title: r.output ?? "", textContent: r.command }));
+      if (r.exit === 0) setIcon(li, "check");
+      else if (r.exit != null) setIcon(li, "close");
+      ul.append(li);
+      if (r.exit != null && r.exit !== 0 && r.output) ul.append(el("li", { className: "out" }, el("pre", { textContent: r.output.split("\n").slice(-8).join("\n") })));
+    }
+    nodes.push(el("h2", { textContent: t("Checks · {0}/{1}", passed, results.length) }), ul);
   }
   if (c.stats?.turns) nodes.push(el("h2", { textContent: t("Cost") }), metrics(c.stats));
   const button = el("button", { type: "button", className: "convert",
