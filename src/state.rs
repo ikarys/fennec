@@ -210,7 +210,7 @@ impl Store {
             r["thread"] = json!([{"who": "human", "text": text.trim()}]);
             // Framed ahead on the old words: framed again on the new ones.
             if let Some(m) = r.as_object_mut() {
-                for k in ["ahead", "asked", "ahead_failed", "done_when"] {
+                for k in ["ahead", "asked", "ahead_failed", "done_when", "split_error"] {
                     m.remove(k);
                 }
             }
@@ -635,6 +635,14 @@ fn classify(requests: &[(String, Value)], projects_all: &[Value]) -> Value {
                     let mut c = card("later");
                     c["framed"] = json!(r["ahead"].is_string());
                     c["ahead_failed"] = json!(r["ahead_failed"] == true);
+                    c["splitting"] = json!(r["splitting"] == true);
+                    c["split_error"] = r["split_error"].clone();
+                    // What it builds on, not committed yet: the Fleet waits.
+                    let after: Vec<String> = crate::fleet::blockers(r, requests)
+                        .into_iter()
+                        .map(crate::fleet::short)
+                        .collect();
+                    c["after"] = json!(after);
                     later.push(c);
                 }
             }
