@@ -1084,11 +1084,15 @@ function card(item) {
     };
     // Framed ahead: what fennec understood, for the human to validate or
     // correct. Only a validated task is Ready, and only Ready ones run alone.
-    const state = item.fleet ? t("✓ Validated: it runs in its turn when the Fleet runs")
+    const state = item.splitting ? t("fennec splits it into smaller tasks…")
+      : item.fleet ? t("✓ Validated: it runs in its turn when the Fleet runs")
       : item.framed ? t("Read what fennec understood, then validate it or correct it.")
       : item.ahead_failed ? t("fennec could not restate it: edit it to try again, or start it now.")
       : t("fennec restates it when the model is free; you validate it then.");
     add(el("div", { className: item.fleet ? "proved" : "muted", textContent: state }),
+      item.split_error ? el("div", { className: "error", textContent: t("Could not split it: {0}", item.split_error) }) : null,
+      // What it builds on: the Fleet starts it once those are committed.
+      item.after?.length ? el("div", { className: "muted", textContent: t("Starts once these are committed: {0}", item.after.join(", ")) }) : null,
       item.framed && item.done_when ? focus(t("What fennec understood"), item.done_when) : null);
     let fix = null;
     if (item.framed) {
@@ -1106,7 +1110,13 @@ function card(item) {
     const place = item.fleet
       ? action(t("Back to the Backlog"), "/api/fleet/place", { id: item.id, action: "remove" })
       : item.framed ? action(t("Validate"), "/api/fleet/place", { id: item.id, action: "add" }, { primary: true }) : null;
-    actions.append(...[place, fix, action(t("Start now"), "/api/launch", { id: item.id }, { primary: !place }), edit, save,
+    // Too big for one go: smaller tasks take its place, in order.
+    const split = item.fleet ? null : action(t("Split"), "/api/split", { id: item.id });
+    if (split) {
+      split.title = t("fennec cuts it into smaller tasks, each after the ones it builds on; they take its place in the Backlog");
+      split.disabled = item.splitting;
+    }
+    actions.append(...[place, fix, action(t("Start now"), "/api/launch", { id: item.id }, { primary: !place }), split, edit, save,
       action(t("Delete"), "/api/forget", { id: item.id }, { quiet: true })].filter(Boolean));
     if (saved === item.id) {
       saved = "";
@@ -1151,7 +1161,9 @@ function doneWhen(item) {
 // A step the server says with a task's name in it.
 function stepText(step) {
   const m = step.match(/^waits its turn: (.*) holds the folder$/s);
-  return m ? t("waits its turn: {0} holds the folder", m[1]) : t(step);
+  if (m) return t("waits its turn: {0} holds the folder", m[1]);
+  const after = step.match(/^waits for "(.*)"$/s);
+  return after ? t("waits for \"{0}\"", after[1]) : t(step);
 }
 
 function line(item, state, dot) {
@@ -1612,9 +1624,11 @@ function chatQuestion(c) {
         split.disabled = true;
         try {
           if (!c.project) await api("/api/projects", { path: c.folder, place: "here" });
+          let prev = null;
           for (const s of steps) {
-            // Each task holds its own step, not the whole plan again.
-            await api("/api/requests", { project: c.folder, text: s, later: true });
+            // Each task holds its own step, not the whole plan again, and
+            // starts once the step before it is committed.
+            prev = (await api("/api/requests", { project: c.folder, text: s, later: true, after: prev ? [prev] : [] })).id;
           }
           await api("/api/chat/stop", { id: c.id });
           location.hash = hashOf(c.folder);
@@ -1942,9 +1956,9 @@ async function refresh(force) {
       }), "");
       showPicked(bar, items, send);
     };
-    picks("later", backlog, (i) => i.framed ? "to validate" : i.ahead_failed ? "could not be restated" : "being restated",
+    picks("later", backlog, (i) => i.splitting ? "being split" : i.framed ? "to validate" : i.ahead_failed ? "could not be restated" : "being restated",
       [t("Validate"), "add", (i) => i.framed]);
-    picks("ready", ready, (i) => t("#{0} in line", i.rank + 1), [t("Back to the Backlog"), "remove", () => true]);
+    picks("ready", ready, (i) => i.after?.length ? t("#{0} in line, waits for \"{1}\"", i.rank + 1, i.after[0]) : t("#{0} in line", i.rank + 1), [t("Back to the Backlog"), "remove", () => true]);
     showFleetBar(view.fleet, later.length);
     const history = mine(view.history);
     fill($("history"), history.map((i) => row(i, line(i, pastState(i), false),
@@ -2122,6 +2136,7 @@ const ICONS = {
   up: '<path d="m5 12 7-7 7 7M12 19V5"/>',
   down: '<path d="M12 5v14M19 12l-7 7-7-7"/>',
   play: '<path d="M6 3v18l14-9z"/>',
+  split: '<path d="M16 3h5v5M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.17-2.87L3 3M15 9l6-6"/>',
   pause: '<rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/>',
 };
 // A button's icon from its label, in either language.
@@ -2129,7 +2144,7 @@ const ICON_OF = [[/^(Commit|Push|Prepare|Pousser|Préparer)/, "commit"], [/^(Ope
   [/^(Open the code|Ouvrir le code)/, "code"], [/^(Correct|Send|Corriger|Envoyer)/, "fix"], [/^(Pass|Passer)/, "pass"], [/^Journal/, "journal"],
   [/^(Undo|Annuler)$|^(Drop|Abandonner)/, "undo"], [/^(Resume|Start|Reprendre|Lancer)/, "resume"], [/^(Delete|Supprimer)/, "trash"], [/^(Save|Enregistrer)$/, "save"],
   [/^(Edit|Éditer)$/, "pencil"], [/^(Retry|Réessayer)/, "retry"], [/^(Archive|Archiver)/, "inbox"], [/^(Back to the Backlog|Remettre au Backlog)/, "clock"],
-  [/^(Validate|Valider)/, "check"],
+  [/^(Validate|Valider)/, "check"], [/^(Split|Découper)$/, "split"],
   [/^(Stop|Arrêter)/, "stop"], [/Fleet$/, "fleet"]];
 function iconize(button) {
   const name = ICON_OF.find(([re]) => re.test(button.textContent))?.[1];
@@ -2933,7 +2948,7 @@ async function showFleet() {
   const last = v.queue.length - 1;
   $("n-fleet").textContent = v.queue.length || "";
   fill($("fleet-queue"), v.queue.map((item, i) => rowWrap(
-    link(item, [(item.waits ? t(item.waits) : v.on ? t("goes next") : t("goes at start")) + (item.framed ? " · " + t("prepared") : ""), item.waits ? "muted" : "accent"]),
+    link(item, [(item.waits ? stepText(item.waits) : v.on ? t("goes next") : t("goes at start")), item.waits ? "muted" : "accent"]),
     el("div", { className: "row-actions" }, move(item, "up", t("Move up"), i > 0), move(item, "down", t("Move down"), i < last),
       move(item, "close", t("Back to the Backlog"), true)))), t("No task ready: validate tasks in the Backlog."));
   $("n-fleet-working").textContent = v.working.length || "";

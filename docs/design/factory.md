@@ -1,6 +1,6 @@
 # Factory, plugins, self-improvement
 
-Date: 2026-10-19. Status: steps 1 (the Fleet), 2 (outbound plugins), 3 (framing ahead) and 4 (approval from a chat) built; §8 step 2 (Backlog → Ready) built 2026-10-20. Asked by the human after a
+Date: 2026-10-19. Status: steps 1 (the Fleet), 2 (outbound plugins), 3 (framing ahead) and 4 (approval from a chat) built; §8 steps 2 (Backlog → Ready) and 3 (Split, `after`) built 2026-10-20. Asked by the human after a
 comparison with OpenFox (task board, Planner/Builder agents, plugins).
 
 Purpose test (AGENTS.md): **fast**, **efficient**, **safe**. Each part below
@@ -113,7 +113,7 @@ Replaces "Plus tard" / "Dans la Fleet".
 ```
 Backlog ──► Ready ──► running ──► to validate ──► done
    │                                 └──► failed (why, what fennec offers)
-   └─ Split ─► N tasks back in the Backlog, already framed
+   └─ Split ─► N tasks back in the Backlog, each framed in turn
 ```
 
 - **Backlog**: a task comes from a discussion, a split, or is typed. While
@@ -126,10 +126,15 @@ Backlog ──► Ready ──► running ──► to validate ──► done
 - **Ready**: one ordered queue. Run / Stop takes only Ready tasks, in order,
   never one from the Backlog. "Start" on a task still starts it at once.
 - **Linked tasks** (`after`): a task that comes after another starts once
-  that one is committed on the project's `fleet` branch, from that branch:
-  it sees the work before it, so no merge conflict later. Independent
-  tasks of one project run side by side, within "tasks at once". A failed
-  one keeps its followers in Ready, "waits for X".
+  that one is committed (`landed`): on the project's `fleet` branch when
+  the Fleet commits there, and it starts from that branch; else once the
+  human committed it. It sees the work before it, so no merge conflict
+  later. Independent tasks of one project run side by side, within "tasks
+  at once". A failed one keeps its followers in Ready, "waits for X"; a
+  deleted one holds nothing back. Split (`spec::split` in fennec-os, one
+  model call) gives 2 to 6 tasks, each after the earlier ones it builds on;
+  they inherit the original's `after`, and its followers come after all of
+  them. A plan's steps made into tasks each come after the step before.
 - **Disk**: worlds share the git store; build folders are shared per
   project in `.fennec/` (`CARGO_TARGET_DIR`, pnpm and uv stores), and a
   world is removed once its task is committed or dropped.

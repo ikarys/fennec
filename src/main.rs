@@ -259,6 +259,10 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
             // Kept in the Backlog: framed ahead, Ready once the human validates.
             let later = v["later"] == true;
             let id = store.add_request(&field(&v, "project"), &field(&v, "text"), &off, later)?;
+            // The tasks it builds on: the Fleet starts it once they are committed.
+            if v["after"].is_array() {
+                store.update(&id, |r| r["after"] = v["after"].clone())?;
+            }
             if !later {
                 work::talk(id.clone());
             }
@@ -291,6 +295,10 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
         }
         ("POST", "/api/later") => {
             work::later(&store, &field(&input()?, "id"))?;
+            Ok(json!({}))
+        }
+        ("POST", "/api/split") => {
+            work::split(&store, &field(&input()?, "id"))?;
             Ok(json!({}))
         }
         ("POST", "/api/rewrite") => {

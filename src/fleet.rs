@@ -154,6 +154,19 @@ pub(crate) fn short(r: &Value) -> String {
     }
 }
 
+/// The tasks `r` builds on (its `after`) not committed yet. A task deleted
+/// since holds nothing back.
+pub(crate) fn blockers<'a>(r: &Value, requests: &'a [(String, Value)]) -> Vec<&'a Value> {
+    r["after"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|a| requests.iter().find(|(id, _)| a == id.as_str()))
+        .map(|(_, d)| d)
+        .filter(|d| d["status"] != "landed")
+        .collect()
+}
+
 /// Whether the Fleet runs.
 pub fn running(store: &Store) -> io::Result<bool> {
     Ok(load(store)?["on"] == true)
@@ -170,7 +183,12 @@ fn states(
     let mut next = false;
     queue
         .iter()
-        .map(|_| {
+        .map(|(_, r)| {
+            // Started before what it builds on is committed, it would work
+            // on code that is not there and conflict with it later.
+            if let Some(d) = blockers(r, requests).first() {
+                return Some(format!("waits for \"{}\"", short(d)));
+            }
             if working >= at_once {
                 return Some("waits for a slot".into());
             }
@@ -308,7 +326,6 @@ pub fn view(store: &Store) -> io::Result<Value> {
         .map(|((id, r), s)| {
             let mut c = card(id, r);
             c["waits"] = json!(s);
-            c["framed"] = json!(r["ahead"].is_string());
             c
         })
         .collect();
@@ -388,6 +405,17 @@ mod tests {
         assert_eq!(s[0], None, "the first goes first, whatever its folder");
         assert_eq!(s[1].as_deref(), Some("waits its turn in the Fleet"));
         // Every place taken: nothing starts.
+        // b builds on a: it waits for a's commit, and c may go first.
+        let mut b = task("/p", "later");
+        b["after"] = json!(["a"]);
+        let queue2 = vec![("b".to_string(), b), ("c".to_string(), task("/p", "later"))];
+        let mut a = task("/p", "running");
+        a["text"] = json!("the api");
+        let s = states(&queue2, &[("a".to_string(), a.clone())], 2);
+        assert_eq!(s[0].as_deref(), Some("waits for \"the api\""));
+        assert_eq!(s[1], None);
+        a["status"] = json!("landed");
+        assert_eq!(states(&queue2, &[("a".to_string(), a)], 2)[0], None);
         let working = vec![("w".to_string(), task("/z", "running"))];
         let s = states(&queue, &working, 1);
         assert_eq!(s[0].as_deref(), Some("waits for a slot"));
