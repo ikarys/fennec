@@ -289,7 +289,8 @@ pub fn say(store: &Store, id: &str, text: &str) -> io::Result<()> {
     let request = store.load(id)?;
     let open = match request["status"].as_str() {
         Some("talk" | "question") => true,
-        Some("later") => request["asked"] == true,
+        // In the Backlog: an answer, or a correction of what fennec understood.
+        Some("later") => request["asked"] == true || request["ahead"].is_string(),
         Some("blocked") => request["stage"] == "framing",
         _ => false,
     };
@@ -301,13 +302,15 @@ pub fn say(store: &Store, id: &str, text: &str) -> io::Result<()> {
         return Err(io::Error::other("message vide"));
     }
     // A task framed ahead stays for later: the next turn runs when the
-    // model is free again.
+    // model is free again. Corrected, it leaves Ready until validated anew.
     if request["status"] == "later" {
         return store.update(id, |r| {
             say_in(r, "human", text);
             note(r, json!({"stage": "said", "text": text}));
             if let Some(m) = r.as_object_mut() {
-                m.remove("asked");
+                for k in ["asked", "ahead", "done_when"] {
+                    m.remove(k);
+                }
             }
         });
     }
@@ -1781,6 +1784,11 @@ mod tests {
         let r = store.load("1").unwrap();
         assert_eq!(r["status"], "later");
         assert!(r["ahead"].as_str().unwrap().contains("oui, en python"));
+        // What fennec understood, corrected: framed again, to validate again.
+        say(&store, "1", "plutôt en rust").unwrap();
+        let r = store.load("1").unwrap();
+        assert!(r["ahead"].is_null() && r["done_when"].is_null());
+        assert_eq!(r["status"], "later");
         store
             .update("1", |r| {
                 r["ahead"] = Value::Null;

@@ -38,7 +38,8 @@ assert.deepEqual(statusOf({ kind: "validate" }, "todo"), ["To validate", "accent
 assert.deepEqual(statusOf({ kind: "blocked" }, "todo"), ["Question", "accent"]);
 assert.deepEqual(statusOf({ kind: "rule" }, "todo"), ["Rule?", "accent"]);
 assert.deepEqual(statusOf({ kind: "ready" }, "todo"), ["Ready", "ok"]);
-assert.deepEqual(statusOf({ kind: "later" }, "todo"), ["Later", "muted"]);
+assert.deepEqual(statusOf({ kind: "later" }, "todo"), ["Backlog", "muted"]);
+assert.deepEqual(statusOf({ kind: "later", fleet: true }, "todo"), ["Ready to run", "info"]);
 assert.deepEqual(statusOf({ kind: "failed" }, "todo"), ["Failed", "bad"]);
 assert.deepEqual(statusOf({ kind: "dropped" }, "past"), ["dropped", "bad"]);
 assert.deepEqual(statusOf({ kind: "passed" }, "past"), ["set aside", "warn"]);
