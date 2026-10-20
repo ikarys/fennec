@@ -1238,6 +1238,7 @@ function past(item) {
 function pastState(item) {
   if (item.kind === "passed") return t("set aside");
   if (item.kind === "dropped") return t("dropped");
+  if (item.files?.length === 0) return "✓ " + t("nothing to change");
   const parts = [item.branch, item.remote && t("pushed to {0}", item.remote), item.commit?.slice(0, 7)];
   return "✓ commit " + parts.filter(Boolean).join(" · ");
 }
