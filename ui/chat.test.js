@@ -3,6 +3,9 @@
 // under it.
 const assert = require("assert");
 const src = require("fs").readFileSync(__dirname + "/app.js", "utf8");
+// `t` in English, as app.js shows it by default.
+globalThis.t = (s, ...a) => s.replace(/\{(\d+)\}/g, (_, i) => String(a[i] ?? ""));
+globalThis.lang = () => "en";
 const grab = (name) => src.match(new RegExp(`function ${name}\\([\\s\\S]*?\\n}\\n`))[0];
 
 // A fake DOM just wide enough for the chat pane: what goes in comes out in order.
@@ -67,7 +70,7 @@ assert.equal(ask.length, 1, "the pending question is drawn");
 assert.notEqual(thread.children[0], ask[0], "the question is not buried on top of the exchange");
 assert.equal(thread.children.at(-2), ask[0], "the question is last but one, next to the marker");
 assert.ok((thread.children.at(-1).className ?? "").includes("thinking"), "a marker sits at the very bottom");
-assert.equal(text(thread.children.at(-1)), "fennec attend ta réponse");
+assert.equal(text(thread.children.at(-1)), "fennec waits for your answer");
 assert.equal(getChatBox().composer.send.disabled, true, "send stays off while the turn waits");
 assert.equal(getChatBox().composer.stop.hidden, false, "staying can still be asked");
 
@@ -75,7 +78,7 @@ assert.equal(getChatBox().composer.stop.hidden, false, "staying can still be ask
 showChat({ ...base, status: "thinking" });
 thread = getChatBox().thread;
 assert.ok(thread.children.every((n) => !(n.className ?? "").includes("ask")));
-assert.equal(text(thread.children.at(-1)), "fennec répond…");
+assert.equal(text(thread.children.at(-1)), "fennec is answering…");
 
 // A finished turn: no question, no marker.
 showChat({ ...base, status: "idle" });
@@ -92,8 +95,8 @@ console.log("ok");
   const nodes = chatThread({ ...base, messages: [...base.messages,
     { role: "assistant", content: "voilà" }, { role: "user", content: "encore" }] }, acts);
   const button = (n, label) => n.children[1].children.find((b) => b.ariaLabel === label);
-  button(nodes.at(-1), "Modifier").onclick();
-  button(nodes.at(-2), "Régénérer").onclick();
+  button(nodes.at(-1), "Edit").onclick();
+  button(nodes.at(-2), "Regenerate").onclick();
   assert.deepEqual(seen, [["again", 4, "encore"], ["replay", 0, "and now ?"]]);
   assert.ok(nodes.at(-1).className.endsWith("last"), "the last message keeps its icons in sight");
   assert.ok(!nodes[1].children[1], "a reply made only of tool calls has no icons");

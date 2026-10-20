@@ -5,6 +5,9 @@
 // one click more, erasing.
 const assert = require("assert");
 const src = require("fs").readFileSync(__dirname + "/app.js", "utf8");
+// `t` in English, as app.js shows it by default.
+globalThis.t = (s, ...a) => s.replace(/\{(\d+)\}/g, (_, i) => String(a[i] ?? ""));
+globalThis.lang = () => "en";
 const grab = (name) => src.match(new RegExp(`function ${name}\\([\\s\\S]*?\\n}\\n`))[0];
 
 class Node {
@@ -40,7 +43,7 @@ eval(src.match(/const el = \(tag, props = \{\}, \.\.\.children\) => \{[\s\S]*?\n
   + src.match(/const TAGS = \{[\s\S]*?\n\};/)[0]
   + src.match(/const chatOpen = new Set\(\);/)[0]
   + src.match(/async function api\([\s\S]*?\n}\n/)[0]
-  + grab("setIcon") + grab("line") + grab("headline") + grab("rowActions")
+  + grab("setIcon") + grab("stepText") + grab("line") + grab("headline") + grab("rowActions")
   + src.match(/const rowWrap = \(link, actions\) => [^\n]*\n/)[0]
   + grab("chatRow") + grab("chatGroup") + grab("chatGroups")
   + "globalThis.chatGroups = chatGroups; globalThis.rowActions = rowActions;");
@@ -61,7 +64,7 @@ assert.equal(head.tag, "button", "l'en-tête de section est un bouton");
 assert.equal(head["aria-expanded"], "false", "la section na repliée");
 assert.equal(head.title, "/home/tony/work/a", "le nom du dossier ordonne les sections, pas le chemin");
 assert.equal(head.children[0].textContent, "a", "la section porte le nom du dossier");
-assert.equal(head.children[1].textContent, "projet", "un projet enregistré est marqué");
+assert.equal(head.children[1].textContent, "project", "un projet enregistré est marqué");
 assert.equal(head.children[2].textContent, 2, "le compteur dit combien de discussions");
 const body = groups[0].children[1];
 assert.equal(body.hidden, true, "repliée par défaut");

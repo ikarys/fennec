@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -209,7 +209,8 @@
   #list .cost, #detail summary .cost { display: none; }
   /* In the narrow list, the state goes under the title. */
   #reqs .line { flex-wrap: wrap; row-gap: 0; }
-  #reqs .line .state { flex-basis: 100%; order: 3; white-space: normal; text-align: left; font-size: 12px; }
+  #reqs .line .state { flex-basis: 100%; order: 3; white-space: normal; text-align: left; font-size: 12px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   a.row { display: block; color: inherit; text-decoration: none; border-radius: 6px; padding: 0 8px; margin: 0 -8px; }
   a.row:hover { background: var(--soft); }
   a.row[aria-current=true] { background: var(--soft); box-shadow: inset 3px 0 0 var(--accent); }
@@ -368,7 +369,7 @@
   details.message > pre { margin: 2px 0 6px 1.2em; }
   details.message pre { max-height: 420px; }
   details.message pre.thought { color: var(--muted); border-left: 3px solid var(--warn); }
-  details.message pre.thought::before { content: "Réflexion"; display: block; font: 600 11px system-ui, sans-serif;
+  details.message pre.thought::before { content: attr(data-label); display: block; font: 600 11px system-ui, sans-serif;
                                         text-transform: uppercase; letter-spacing: .06em; color: var(--warn); margin-bottom: 4px; }
   details.message > summary .thinks { flex: none; color: var(--warn); align-self: center; }
   details.message > summary .thinks::before { width: 13px; height: 13px; }
@@ -404,6 +405,10 @@
   /* Inline here, though they sit inside a details box that blocks its code. */
   details .focus code, details .files code, details .warn code, details .said code { display: inline; white-space: normal; margin: 0; }
   .files code { font: 12px ui-monospace, monospace; }
+  .files code:not(:last-of-type)::after { content: ", "; }
+  .files details { display: inline; }
+  .files details[open] { display: block; }
+  .files summary { display: inline; cursor: pointer; color: var(--accent); margin-left: 6px; }
   #how { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px;
          margin-top: 16px; font-size: 14px; }
   #how ol { margin: 6px 0 0; padding-left: 20px; }
@@ -649,16 +654,16 @@
 </head>
 <body>
 <div class="app">
-<nav id="side" aria-label="Projets">
+<nav id="side" aria-label="Projects">
   <div class="side-top">
     <h1>fennec</h1>
-    <button type="button" class="link" id="close-side" data-icon="panelLeft" aria-label="Fermer la barre des projets" title="Fermer la barre des projets"></button>
+    <button type="button" class="link" id="close-side" data-icon="panelLeft" aria-label="Close the projects bar" title="Close the projects bar"></button>
   </div>
   <div class="mid">
-    <ul><li><button type="button" class="item" id="side-all"><span class="name">Tâches</span></button></li></ul>
-    <div class="label"><span>Projets</span> <button class="link" id="add-project" data-icon="plus" aria-label="Ajouter un projet" title="Ajouter un projet"></button></div>
+    <ul><li><button type="button" class="item" id="side-all"><span class="name" data-t>Tasks</span></button></li></ul>
+    <div class="label"><span data-t>Projects</span> <button class="link" id="add-project" data-icon="plus" aria-label="Add a project" title="Add a project"></button></div>
     <ul id="side-projects"></ul>
-    <div class="label" id="side-archived-label" hidden><span>Archivés</span></div>
+    <div class="label" id="side-archived-label" hidden><span data-t>Archived projects</span></div>
     <ul id="side-archived"></ul>
     <p class="error" id="side-error" role="alert"></p>
     <button class="link" id="side-chats" data-icon="chat">Agent</button>
@@ -666,262 +671,258 @@
   <span class="spacer"></span>
   <div class="tools">
     <button class="link" id="open-fleet" data-icon="fleet" aria-label="Fleet" title="Fleet"></button>
-    <button class="link" id="open-team" data-icon="team" aria-label="Équipe" title="Équipe"></button>
+    <button class="link" id="open-team" data-icon="team" aria-label="Team" title="Team"></button>
     <button class="link" id="open-stats" data-icon="stats" aria-label="Stats" title="Stats"></button>
-    <button class="link" id="open-settings" data-icon="gear" aria-label="Réglages" title="Réglages"></button>
+    <button class="link" id="open-settings" data-icon="gear" aria-label="Settings" title="Settings"></button>
   </div>
   <div id="version"></div>
 </nav>
 <main>
-  <section id="list" aria-label="Tâches">
-  <button type="button" class="link" id="open-side" data-icon="panelLeft" aria-label="Ouvrir la barre des projets" title="Ouvrir la barre des projets"></button>
+  <section id="list" aria-label="Tasks">
+  <button type="button" class="link" id="open-side" data-icon="panelLeft" aria-label="Open the projects bar" title="Open the projects bar"></button>
   <div id="list-head" hidden><strong id="list-head-name"></strong> <span class="muted" id="list-head-path"></span></div>
   <div id="chats" hidden>
-    <button type="button" class="primary" id="new-chat" data-icon="plus">Nouvelle discussion</button>
+    <button type="button" class="primary" id="new-chat" data-icon="plus" data-t>New discussion</button>
     <h2>Agent</h2>
     <div id="chat-list"></div>
-    <p class="muted">fennec lit et lance des commandes dans le dossier que tu choisis, git ou pas, ton dossier personnel caché (le réseau reste ouvert pour installer ce qu’il faut). Il ne modifie rien tant que tu ne l’autorises pas. Le coût de la discussion est à droite.</p>
+    <p class="muted" data-t>fennec reads and runs commands in the folder you pick, git or not, with your home folder hidden (the network stays open to install what is needed). It changes nothing until you allow it. The discussion's cost is on the right.</p>
   </div>
   <div id="reqs">
-  <button type="button" class="primary" id="compose-open" data-icon="plus">Nouvelle tâche</button>
+  <button type="button" class="primary" id="compose-open" data-icon="plus" data-t>New task</button>
   <div id="fleet-bar" hidden></div>
   <p class="error" id="error" role="alert"></p>
 
 
   <section id="how" hidden>
-    <strong>Comment ça marche</strong>
+    <strong data-t>How it works</strong>
     <ol>
-      <li>Choisis un projet : un dossier de ton disque (« + projet »).</li>
-      <li>Décris ta tâche, comme à un collègue, puis « Lancer ». Si elle est floue, fennec en discute avec toi.</li>
-      <li>Une fois clair, fennec répond par « terminé quand » : ce que tu pourras constater une fois fini. Valide-le ou corrige-le.</li>
-      <li>fennec travaille seul, puis essaie le résultat et t'en montre la preuve.</li>
-      <li>Tu regardes la preuve et les changements, puis tu choisis : commit, ou passer (le travail reste de côté).</li>
-      <li>Tout reste dans l'historique : clique une tâche pour revoir ce qui a été demandé, fait et prouvé.</li>
+      <li data-t>Pick a project: a folder on your disk ("+ project").</li>
+      <li data-t>Describe your task, as to a colleague, then "Start". If it is vague, fennec discusses it with you.</li>
+      <li data-t>Once it is clear, fennec answers with "done when": what you will be able to see once it is finished. Validate it or correct it.</li>
+      <li data-t>fennec works alone, then tries the result and shows you the proof.</li>
+      <li data-t>You look at the proof and the changes, then choose: commit, or pass (the work is set aside).</li>
+      <li data-t>Everything stays in the history: click a task to see again what was asked, done and proven.</li>
     </ol>
-    <p class="muted">L'équipe (« Équipe ») choisit les rôles qui travaillent sur le projet ; « Réglages » choisit le modèle.</p>
+    <p class="muted" data-t>The team ("Team") picks the roles that work on the project; "Settings" picks the model.</p>
   </section>
 
-  <div class="box" id="todo-box"><h2 data-icon="inbox">À toi <span class="count" id="n-todo"></span>
+  <div class="box" id="todo-box"><h2 data-icon="inbox"><span data-t>For you</span> <span class="count" id="n-todo"></span>
     <button class="link" id="n-others" type="button"></button></h2>
   <div id="todo"></div></div>
 
-  <div class="box" id="later-box" hidden><h2 data-icon="clock">Plus tard <span class="count" id="n-later"></span></h2>
+  <div class="box" id="later-box" hidden><h2 data-icon="clock"><span data-t>Later</span> <span class="count" id="n-later"></span></h2>
   <div id="later-pick" hidden></div>
   <div id="later"></div></div>
 
-  <div class="box"><h2 data-icon="work">fennec travaille</h2>
+  <div class="box"><h2 data-icon="work" data-t>fennec is working</h2>
   <div id="running"></div></div>
 
-  <div class="box"><h2 data-icon="history">Historique</h2>
+  <div class="box"><h2 data-icon="history" data-t>History</h2>
   <div id="history"></div></div>
 
-  <div class="box" id="archived-box" hidden><h2 data-icon="inbox">Archivées <span class="count" id="n-archived"></span></h2>
+  <div class="box" id="archived-box" hidden><h2 data-icon="inbox"><span data-t>Archived</span> <span class="count" id="n-archived"></span></h2>
   <div id="archived"></div></div>
   </div>
   </section>
   <section id="detail">
-  <button type="button" class="link" id="open-side-2" data-icon="panelLeft" aria-label="Ouvrir la barre des projets" title="Ouvrir la barre des projets"></button>
+  <button type="button" class="link" id="open-side-2" data-icon="panelLeft" aria-label="Open the projects bar" title="Open the projects bar"></button>
   <div id="detail-head" hidden><strong id="detail-head-name"></strong> <span class="muted" id="detail-head-path"></span></div>
-  <button type="button" class="link" id="back">← Revenir aux <span class="to-reqs">tâches</span><span class="to-chats">discussions</span></button>
+  <button type="button" class="link" id="back"><span class="to-reqs" data-t>← Back to the tasks</span><span class="to-chats" data-t>← Back to the discussions</span></button>
   <div id="pick"></div>
-  <p id="hint" hidden>Choisis une tâche à gauche pour la lire en entier, ou un projet pour voir sa page.</p>
+  <p id="hint" hidden data-t>Pick a task on the left to read it in full, or a project to see its page.</p>
   <!-- The chosen project's own page: what it cost, how it is worked on, its rules. -->
   <aside id="page" hidden>
     <div class="page-head"><strong id="page-name"></strong> <span class="muted" id="page-path"></span>
       <span class="spacer"></span>
-      <button type="button" id="page-team" data-icon="team" aria-label="Équipe" title="Équipe"></button>
-      <button type="button" id="page-open" data-icon="folder" aria-label="Ouvrir le dossier" title="Ouvrir le dossier"></button></div>
+      <button type="button" id="page-team" data-icon="team" aria-label="Team" title="Team"></button>
+      <button type="button" id="page-open" data-icon="folder" aria-label="Open the folder" title="Open the folder"></button></div>
     <div class="tiles" id="page-tiles"></div>
-    <div class="sub"><h3 data-icon="shield">Où fennec travaille</h3>
-      <select id="page-place" aria-label="Où fennec travaille"></select></div>
-    <div class="sub rules" id="page-rules"><h3 data-icon="rule">Règles du projet <span class="count" hidden></span></h3>
-      <p class="muted small">Des consignes que chaque agent suit à chaque tâche de ce projet, écrites dans son AGENTS.md.
-        Celles de tous tes projets sont dans <button type="button" class="link" id="to-user-rules">Réglages</button>. En corrigeant une tâche, tu peux aussi en donner une : fennec te propose de la garder.</p>
+    <div class="sub"><h3 data-icon="shield" data-t>Where fennec works</h3>
+      <select id="page-place" aria-label="Where fennec works"></select></div>
+    <div class="sub rules" id="page-rules"><h3 data-icon="rule"><span data-t>Project rules</span> <span class="count" hidden></span></h3>
+      <p class="muted small"><span data-t>Instructions every agent follows on each task of this project, written in its AGENTS.md. The ones for all your projects are in</span>
+        <button type="button" class="link" id="to-user-rules" data-t>Settings</button>. <span data-t>When you correct a task, you may give one too: fennec offers to keep it.</span></p>
       <ul></ul>
       <form class="rule-form">
-        <input aria-label="Nouvelle règle" placeholder="Nouvelle règle, par ex. « lancer cargo test avant de finir »" required>
-        <button data-icon="plus" aria-label="Ajouter la règle" title="Ajouter la règle"></button>
+        <input aria-label="New rule" placeholder="New rule, e.g. &quot;run cargo test before finishing&quot;" required>
+        <button data-icon="plus" aria-label="Add the rule" title="Add the rule"></button>
       </form></div>
     <p class="error" id="page-error" role="alert"></p>
   </aside>
   <!-- The team, the figures and the settings: pages the address names,
      not dialogs. -->
   <section id="team" hidden>
-    <div class="page-head"><strong id="team-title">Équipe</strong></div>
+    <div class="page-head"><strong id="team-title" data-t>Team</strong></div>
     <div id="team-body">
-    <label class="team-pick">Équipe du projet
+    <label class="team-pick"><span data-t>The project's team</span>
       <select id="team-name"></select>
     </label>
     <ul id="team-roles"></ul>
     <form class="go" id="team-add">
-      <select id="team-catalog" aria-label="Rôle à ajouter"></select>
-      <button>Ajouter</button>
+      <select id="team-catalog" aria-label="Role to add"></select>
+      <button data-t>Add</button>
     </form>
     <form id="team-role" hidden>
-      <input id="role-name" aria-label="Nom du rôle" placeholder="Nom du rôle" required>
-      <select id="role-stage" aria-label="Étape"></select>
-      <select id="role-model" aria-label="Modèle"></select>
-      <textarea id="role-brief" aria-label="Ce que fait ce rôle" rows="6"
-        placeholder="Ce que ce rôle exige, en une poignée de phrases" required></textarea>
-      <textarea id="role-checks" aria-label="Commandes lancées à chaque preuve" rows="2"
-        placeholder="Commandes lancées à chaque preuve, une par ligne : si l'une échoue, ce n'est pas prêt"></textarea>
-      <div class="row"><button type="button" id="role-cancel">Annuler</button>
-        <button class="primary">Enregistrer</button></div>
+      <input id="role-name" aria-label="Role name" placeholder="Role name" required>
+      <select id="role-stage" aria-label="Step"></select>
+      <select id="role-model" aria-label="Model"></select>
+      <textarea id="role-brief" aria-label="What this role does" rows="6"
+        placeholder="What this role demands, in a handful of sentences" required></textarea>
+      <textarea id="role-checks" aria-label="Commands run at each proof" rows="2"
+        placeholder="Commands run at each proof, one per line: if one fails, it is not ready"></textarea>
+      <div class="row"><button type="button" id="role-cancel" data-t>Cancel</button>
+        <button class="primary" data-t>Save</button></div>
     </form>
     <form class="go" id="team-save" hidden>
-      <input id="team-new-name" aria-label="Nom de la nouvelle équipe" placeholder="Nom de la nouvelle équipe" required>
-      <button class="primary">Enregistrer</button>
+      <input id="team-new-name" aria-label="Name of the new team" placeholder="Name of the new team" required>
+      <button class="primary" data-t>Save</button>
     </form>
     </div>
-    <p class="muted hint" id="team-hint" hidden>Choisis un projet à gauche pour gérer son équipe.</p>
+    <p class="muted hint" id="team-hint" hidden data-t>Pick a project on the left to manage its team.</p>
     <p class="error" id="team-error" role="alert"></p>
     <div class="row">
-      <button type="button" class="quiet" id="role-new">+ nouveau rôle</button>
-      <button type="button" class="quiet" id="team-save-open">Enregistrer comme équipe…</button>
+      <button type="button" class="quiet" id="role-new" data-t>+ new role</button>
+      <button type="button" class="quiet" id="team-save-open" data-t>Save as a team…</button>
     </div>
   </section>
   <section id="fleet" hidden>
     <div class="page-head"><strong>Fleet</strong> <span class="muted" id="fleet-state"></span><span class="spacer"></span>
       <button type="button" id="fleet-toggle"></button></div>
-    <p class="muted">fennec lance seul les tâches de la Fleet, dans cet ordre, dès qu'une place est libre. Chacune travaille à part : prête, elle t'attend sans bloquer la suivante. Quand rien ne travaille, fennec prépare les suivantes : s'il a une question, elle arrive dans « À toi ». L'arrêter ne coupe pas ce qui tourne.</p>
+    <p class="muted" data-t>fennec starts the Fleet's tasks on its own, in this order, as soon as a slot is free. Each works apart: once ready, it waits for you without holding up the next. When nothing works, fennec prepares the next ones: if it has a question, it comes in "For you". Stopping it does not cut what runs.</p>
     <p class="warn-line" id="fleet-stopped" hidden></p>
     <p class="error" id="fleet-error" role="alert"></p>
     <div class="tiles" id="fleet-tiles"></div>
-    <div class="box"><h2 data-icon="fleet">File <span class="count" id="n-fleet"></span></h2>
+    <div class="box"><h2 data-icon="fleet"><span data-t>Queue</span> <span class="count" id="n-fleet"></span></h2>
     <div id="fleet-queue"></div></div>
-    <div class="box"><h2 data-icon="work">fennec travaille <span class="count" id="n-fleet-working"></span></h2>
+    <div class="box"><h2 data-icon="work"><span data-t>fennec is working</span> <span class="count" id="n-fleet-working"></span></h2>
     <div id="fleet-working"></div></div>
-    <div class="box"><h2 data-icon="history">Lancées par la Fleet <span class="count" id="n-fleet-recent"></span></h2>
+    <div class="box"><h2 data-icon="history"><span data-t>Started by the Fleet</span> <span class="count" id="n-fleet-recent"></span></h2>
     <div id="fleet-recent"></div></div>
-    <div class="box"><h2 data-icon="gear">Réglages</h2>
+    <div class="box"><h2 data-icon="gear" data-t>Settings</h2>
       <div class="fleet-settings">
-        <label>Tâches à la fois <select id="fleet-at-once"></select></label>
-        <label>Après un échec <select id="fleet-on-fail">
-          <option value="stop">arrêter la Fleet</option><option value="go on">continuer</option></select></label>
-        <label title="Sur la branche fleet de chaque projet, jamais sur ta branche : la tâche suivante part de là, et tu fusionnes quand tu veux.">Après une réussite <select id="fleet-on-success">
-          <option value="wait">attendre ma validation</option><option value="branch">commiter sur la branche fleet</option></select></label>
+        <label><span data-t>Tasks at once</span> <select id="fleet-at-once"></select></label>
+        <label><span data-t>After a failure</span> <select id="fleet-on-fail">
+          <option value="stop" data-t>stop the Fleet</option><option value="go on" data-t>go on</option></select></label>
+        <label title="On each project's fleet branch, never on your branch: the next task starts from there, and you merge when you want."><span data-t>After a success</span> <select id="fleet-on-success">
+          <option value="wait" data-t>wait for my validation</option><option value="branch" data-t>commit on the fleet branch</option></select></label>
       </div></div>
   </section>
   <section id="stats" hidden>
     <div class="page-head"><strong>Stats</strong></div>
     <div class="tiles" id="stats-tiles"></div>
-    <h3>Par modèle</h3>
+    <h3 data-t>By model</h3>
     <div class="scroll"><table>
-      <thead><tr><th>Modèle</th><th>Appels</th><th>Envoyés</th><th>En cache</th><th>Générés</th><th>Vitesse</th><th>Temps</th></tr></thead>
+      <thead><tr><th data-t>Model</th><th data-t>Calls</th><th data-t>Sent</th><th data-t>Cached</th><th data-t>Generated</th><th data-t>Speed</th><th data-t>Time</th></tr></thead>
       <tbody id="stats-models"></tbody>
     </table></div>
-    <h3>Par étape : où passe le temps</h3>
+    <h3 data-t>By step: where the time goes</h3>
     <div class="scroll"><table>
-      <thead><tr><th>Étape</th><th>Appels</th><th>Temps</th><th>Part</th><th>Envoyés</th><th>Générés</th><th>Vitesse</th></tr></thead>
+      <thead><tr><th data-t>Step</th><th data-t>Calls</th><th data-t>Time</th><th data-t>Share</th><th data-t>Sent</th><th data-t>Generated</th><th data-t>Speed</th></tr></thead>
       <tbody id="stats-stages"></tbody>
     </table></div>
-    <h3>Par projet</h3>
+    <h3 data-t>By project</h3>
     <div class="scroll"><table>
-      <thead><tr><th>Projet</th><th>Où fennec travaille</th><th>Tâches</th><th>Commits</th><th>Échecs</th><th>Essais annulés</th><th>Temps</th><th>Envoyés</th></tr></thead>
+      <thead><tr><th data-t>Project</th><th data-t>Where fennec works</th><th data-t>Tasks</th><th data-t>Commits</th><th data-t>Failures</th><th data-t>Undone tries</th><th data-t>Time</th><th data-t>Sent</th></tr></thead>
       <tbody id="stats-projects"></tbody>
     </table></div>
-    <p class="muted">« Dans le dossier » : tu vois le travail en direct, sur une branche de travail. « À part » : ton dossier ne change qu'au commit. Le changement vaut pour les prochaines tâches.
-      Isolement de chaque travail : réseau pour installer les dépendances, vérification sans réseau, sans accès à ton dossier personnel, historique git en lecture seule, mémoire plafonnée ; un essai raté est annulé sans trace.</p>
+    <p class="muted" data-t>"In the folder": you see the work live, on a work branch. "Apart": your folder changes only at commit. The change applies to the next tasks. Each work's isolation: network to install dependencies, offline verification, no access to your home folder, read-only git history, capped memory; a failed try is undone without a trace.</p>
     <p class="error" id="stats-error" role="alert"></p>
   </section>
   <section id="settings" hidden>
-    <div class="page-head"><strong>Réglages</strong></div>
+    <div class="page-head"><strong data-t>Settings</strong></div>
     <div class="tabs" role="tablist" id="settings-tabs">
-      <button type="button" role="tab" aria-selected="true" data-panel="settings-general">Général</button>
-      <button type="button" role="tab" aria-selected="false" data-panel="settings-appearance">Apparence</button>
-      <button type="button" role="tab" aria-selected="false" data-panel="settings-rules">Règles</button>
+      <button type="button" role="tab" aria-selected="true" data-panel="settings-general" data-t>General</button>
+      <button type="button" role="tab" aria-selected="false" data-panel="settings-appearance" data-t>Appearance</button>
+      <button type="button" role="tab" aria-selected="false" data-panel="settings-rules" data-t>Rules</button>
       <button type="button" role="tab" aria-selected="false" data-panel="settings-skills">Skills</button>
       <button type="button" role="tab" aria-selected="false" data-panel="settings-plugins">Plugins</button>
-      <button type="button" role="tab" aria-selected="false" data-panel="settings-clean">Nettoyage</button>
+      <button type="button" role="tab" aria-selected="false" data-panel="settings-clean" data-t>Cleaning</button>
     </div>
     <div id="settings-general">
       <form id="settings-form">
-        <label class="field">Serveur du modèle
+        <label class="field"><span data-t>Model server</span>
           <span class="go"><input id="settings-url" required placeholder="http://localhost:8000/v1">
-            <button type="button" id="settings-test">Tester</button></span>
+            <button type="button" id="settings-test" data-t>Test</button></span>
         </label>
         <div class="muted" id="settings-status"></div>
         <ul id="settings-models"></ul>
-        <label class="field">Tokens par réponse, réflexion comprise (0 : la valeur du serveur)
+        <label class="field"><span data-t>Tokens per answer, reasoning included (0: the server's value)</span>
           <input id="settings-tokens" type="number" min="0" step="1024" required>
         </label>
-        <label class="field">Réflexion avant chaque réponse
+        <label class="field"><span data-t>Reasoning before each answer</span>
           <select id="settings-effort">
-            <option value="">Celle du modèle</option>
-            <option value="none">Aucune : plus rapide</option>
-            <option value="low">Faible</option>
-            <option value="medium">Moyenne</option>
-            <option value="xhigh">Maximale : plus lente</option>
+            <option value="" data-t>The model's own</option>
+            <option value="none" data-t>None: faster</option>
+            <option value="low" data-t>Low</option>
+            <option value="medium" data-t>Medium</option>
+            <option value="xhigh" data-t>Highest: slower</option>
           </select>
         </label>
-        <label class="field">Clé d'accès (facultative)
+        <label class="field"><span data-t>Access key (optional)</span>
           <input id="settings-key" type="password" autocomplete="off">
         </label>
         <p class="muted" id="settings-env" hidden></p>
         <p class="error" id="settings-error" role="alert"></p>
         <div class="row">
           <span class="saved" id="settings-saved" role="status"></span>
-          <button type="button" id="settings-cancel">Annuler</button>
-          <button class="primary">Enregistrer</button>
+          <button type="button" id="settings-cancel" data-t>Cancel</button>
+          <button class="primary" data-t>Save</button>
         </div>
       </form>
     </div>
     <div id="settings-appearance" hidden>
+      <label class="field"><span data-t>Language</span>
+        <select id="language"></select>
+      </label>
       <ul id="theme-picker"></ul>
-      <label class="field">Taille des textes
+      <label class="field"><span data-t>Text size</span>
         <input id="font-scale" type="number" min="12" max="21" step="1" required>
       </label>
     </div>
     <div id="settings-rules" class="rules" hidden>
-      <p class="muted">Des consignes que chaque agent suit à chaque tâche, dans tous tes projets, écrites dans ~/.config/fennec/rules.md.
-        Celles d'un seul projet sont sur la page du projet.</p>
+      <p class="muted" data-t>Instructions every agent follows on each task, in all your projects, written in ~/.config/fennec/rules.md. The ones for a single project are on the project's page.</p>
       <ul></ul>
       <form class="rule-form">
-        <input aria-label="Nouvelle règle" placeholder="Nouvelle règle, par ex. « commits en anglais, format Conventional Commits »" required>
-        <button data-icon="plus" aria-label="Ajouter la règle" title="Ajouter la règle"></button>
+        <input aria-label="New rule" placeholder="New rule, e.g. &quot;commits in English, Conventional Commits format&quot;" required>
+        <button data-icon="plus" aria-label="Add the rule" title="Add the rule"></button>
       </form>
       <p class="error" role="alert"></p>
       <div class="box guard">
-        <h2 data-icon="shield">Commandes et fichiers <span class="count" id="guard-count"></span></h2>
-        <p class="muted">Vérifiées avant chaque commande, lecture ou écriture d'un agent, quel que soit le modèle.
-          « Interdire » refuse ; « Demander » attend ta réponse dans une discussion, et une tâche fait sans ;
-          « Autoriser » lève une demande, jamais une interdiction. Gardées dans ~/.config/fennec/guard.json, jamais dans un projet.</p>
+        <h2 data-icon="shield"><span data-t>Commands and files</span> <span class="count" id="guard-count"></span></h2>
+        <p class="muted" data-t>Checked before each command, read or write of an agent, whatever the model. "Deny" refuses; "Ask" waits for your answer in a discussion, and a task does without; "Allow" lifts an ask, never a deny. Kept in ~/.config/fennec/guard.json, never in a project.</p>
         <ul id="guard-list"></ul>
         <form id="guard-form">
-          <select id="guard-effect" aria-label="Effet">
-            <option value="deny">Interdire</option><option value="ask">Demander</option><option value="allow">Autoriser</option>
+          <select id="guard-effect" aria-label="Effect">
+            <option value="deny" data-t>Deny</option><option value="ask" data-t>Ask</option><option value="allow" data-t>Allow</option>
           </select>
-          <select id="guard-on" aria-label="Sur">
-            <option value="command">la commande</option><option value="read">la lecture de</option>
-            <option value="write">l'écriture de</option><option value="file">l'accès à</option>
+          <select id="guard-on" aria-label="On">
+            <option value="command" data-t>the command</option><option value="read" data-t>reading</option>
+            <option value="write" data-t>writing</option><option value="file" data-t>access to</option>
           </select>
-          <input id="guard-pattern" aria-label="Motif" placeholder="rm -rf /   ou   **/.env" required>
-          <input id="guard-why" aria-label="Pourquoi" placeholder="Pourquoi (facultatif)">
-          <button data-icon="plus" aria-label="Ajouter la règle" title="Ajouter la règle"></button>
+          <input id="guard-pattern" aria-label="Pattern" placeholder="rm -rf /   or   **/.env" required>
+          <input id="guard-why" aria-label="Why" placeholder="Why (optional)">
+          <button data-icon="plus" aria-label="Add the rule" title="Add the rule"></button>
         </form>
         <p class="error" id="guard-error" role="alert"></p>
       </div>
     </div>
     <div id="settings-skills" hidden>
-      <p class="muted">Ils s'appliquent à tous tes projets : l'équipe voit le nom et le but de chaque skill activé, et le lit quand la tâche en a besoin.
-        Ils viennent de ~/.claude/skills et de tes plugins, de ~/.config/fennec/skills ou du dossier .claude/skills d'un projet.</p>
-      <input id="skill-search" type="search" aria-label="Chercher un skill" placeholder="Chercher parmi les skills de ta machine…">
+      <p class="muted" data-t>They apply to all your projects: the team sees the name and goal of each enabled skill, and reads it when the task needs it. They come from ~/.claude/skills and your plugins, from ~/.config/fennec/skills or from a project's .claude/skills folder.</p>
+      <input id="skill-search" type="search" aria-label="Search a skill" placeholder="Search the skills on your machine…">
       <ul id="skills-list"></ul>
       <p class="error" id="skills-error" role="alert"></p>
     </div>
     <div id="settings-plugins" hidden>
-      <p class="muted">Un plugin te prévient ailleurs (Discord, Telegram, Teams, ntfy…) quand une tâche a une question, est prête ou échoue.
-        Chacun est un dossier de ~/.config/fennec/plugins avec un plugin.json ; il tourne sur ta machine avec tes droits, seulement une fois activé. Un plugin qui relaie (le bot Telegram fourni) te laisse aussi valider, abandonner ou répondre depuis le chat, pour les seuls expéditeurs de sa liste « allow » ; chaque décision est écrite dans le Journal.</p>
+      <p class="muted" data-t>A plugin tells you elsewhere (Discord, Telegram, Teams, ntfy…) when a task has a question, is ready or fails. Each is a folder of ~/.config/fennec/plugins with a plugin.json; it runs on your machine with your rights, only once enabled. A plugin that relays (the bundled Telegram bot) also lets you validate, drop or answer from the chat, for the senders in its "allow" list only; each decision is written in the Journal.</p>
       <ul id="plugins-list"></ul>
       <p class="error" id="plugins-error" role="alert"></p>
       <p class="saved" id="plugins-saved" role="status"></p>
     </div>
     <div id="settings-clean" hidden>
-      <p class="muted">Ce que fennec a laissé derrière lui quand un travail a été coupé en route (redémarrage, arrêt au mauvais moment) :
-        plus aucune tâche ne s'en sert. Coche ce que tu veux supprimer.</p>
+      <p class="muted" data-t>What fennec left behind when a work was cut short (a restart, a stop at the wrong time): no task uses it anymore. Tick what you want to delete.</p>
       <ul id="leftovers"></ul>
       <p class="error" id="leftovers-error" role="alert"></p>
-      <div class="row"><button type="button" class="stop" id="leftovers-clear" data-icon="trash" disabled>Supprimer la sélection</button></div>
+      <div class="row"><button type="button" class="stop" id="leftovers-clear" data-icon="trash" disabled data-t>Delete the selection</button></div>
     </div>
   </section>
   </section>
@@ -931,44 +932,43 @@
 <!-- Written on demand, not spread over the list: the list is for what waits. -->
 <dialog id="compose">
   <form id="new-request">
-    <div class="row head"><strong>Nouvelle tâche</strong><span class="spacer"></span>
-      <button type="button" class="quiet" id="compose-close" data-icon="close" aria-label="Fermer" title="Fermer"></button></div>
-    <select id="project" aria-label="Projet" required></select>
-    <textarea id="text" aria-label="Tâche" placeholder="Ce que tu veux, comme à un collègue…" rows="6" required></textarea>
+    <div class="row head"><strong data-t>New task</strong><span class="spacer"></span>
+      <button type="button" class="quiet" id="compose-close" data-icon="close" aria-label="Close" title="Close"></button></div>
+    <select id="project" aria-label="Project" required></select>
+    <textarea id="text" aria-label="Task" placeholder="What you want, as to a colleague…" rows="6" required></textarea>
     <div id="chips"></div>
     <p class="error" id="compose-error" role="alert"></p>
     <div class="row">
-      <button type="button" id="later-add" data-icon="clock" title="Garder la tâche sans la lancer">Plus tard</button>
-      <button type="button" id="fleet-add" data-icon="fleet" title="fennec la lancera seul, à son tour dans la Fleet">Fleet</button>
-      <button class="primary" data-icon="send">Lancer</button>
+      <button type="button" id="later-add" data-icon="clock" title="Keep the task without starting it" data-t>Later</button>
+      <button type="button" id="fleet-add" data-icon="fleet" title="fennec will start it on its own, in its turn in the Fleet">Fleet</button>
+      <button class="primary" data-icon="send" data-t>Start</button>
     </div>
   </form>
 </dialog>
 
 <dialog id="picker">
-  <strong id="picker-title">Ajouter un projet</strong>
+  <strong id="picker-title" data-t>Add a project</strong>
   <form class="go" id="picker-go">
-    <input id="picker-input" aria-label="Chemin du dossier" placeholder="Colle un chemin, ou parcours ci-dessous">
-    <button type="submit">Aller</button>
+    <input id="picker-input" aria-label="Folder path" placeholder="Paste a path, or browse below">
+    <button type="submit" data-t>Go</button>
   </form>
   <div class="muted" id="picker-path"></div>
   <ul id="picker-list"></ul>
   <form class="go" id="picker-new">
-    <input id="picker-new-name" aria-label="Nouveau dossier" placeholder="Ou un nouveau dossier ici : son nom" required>
-    <button>Créer le dossier</button>
+    <input id="picker-new-name" aria-label="New folder" placeholder="Or a new folder here: its name" required>
+    <button data-t>Create the folder</button>
   </form>
-  <label id="picker-place-wrap">Où fennec travaille
-    <select id="picker-place" aria-label="Où fennec travaille">
-      <option value="here">Dans ce dossier : tu vois le travail en direct</option>
-      <option value="apart">Dans un dossier à part, à côté : ce dossier ne change qu'au commit</option>
+  <label id="picker-place-wrap"><span data-t>Where fennec works</span>
+    <select id="picker-place" aria-label="Where fennec works">
+      <option value="here" data-t>In this folder: you see the work live</option>
+      <option value="apart" data-t>In a folder apart, next to it: this folder changes only at commit</option>
     </select>
   </label>
   <div class="row">
-    <button type="button" id="picker-cancel">Annuler</button>
-    <button type="button" class="primary" id="picker-choose">Ajouter</button>
+    <button type="button" id="picker-cancel" data-t>Cancel</button>
+    <button type="button" class="primary" id="picker-choose" data-t>Add</button>
   </div>
 </dialog>
 
+<script src="/fr.js"></script>
 <script src="/app.js"></script>
-</body>
-</html>

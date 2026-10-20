@@ -1,5 +1,5 @@
 // The single view. Polls the server; a page left open stays current.
-// A card shows only what the decision needs; the rest waits behind "Détails".
+// A card shows only what the decision needs; the rest waits behind "Details".
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, props = {}, ...children) => {
@@ -8,6 +8,36 @@ const el = (tag, props = {}, ...children) => {
   return node;
 };
 
+// The interface's language, chosen in the settings: English unless the
+// person picked another. Text is written in English in this file; `t` gives
+// it in the chosen language (`FR` in fr.js), `{0}`, `{1}`... filled from
+// `args`. A display-only preference kept in localStorage, like the theme.
+const LANG_KEY = "fennec.lang";
+const LANGS = [["en", "English"], ["fr", "Français"]];
+function lang() {
+  let l;
+  try { l = localStorage.getItem(LANG_KEY); } catch { l = null; }
+  return LANGS.some(([id]) => id === l) ? l : "en";
+}
+function t(text, ...args) {
+  let said = (lang() === "fr" && typeof FR !== "undefined" && FR[text]) || text;
+  // A translation that depends on the count: [one, many], the count first.
+  if (Array.isArray(said)) said = said[Number(args[0]) > 1 ? 1 : 0];
+  return said.replace(/\{(\d+)\}/g, (_, i) => String(args[i] ?? ""));
+}
+// The page's own text, written in English in index.html: elements marked
+// `data-t` and every placeholder, title and aria-label.
+function translatePage(root = document) {
+  if (lang() === "en") return;
+  for (const node of root.querySelectorAll("[data-t]")) node.textContent = t(node.textContent.trim().replace(/\s+/g, " "));
+  for (const attr of ["placeholder", "title", "aria-label"]) {
+    for (const node of root.querySelectorAll(`[${attr}]`)) node.setAttribute(attr, t(node.getAttribute(attr)));
+  }
+}
+
+document.documentElement.lang = lang();
+translatePage();
+
 async function api(path, body) {
   const res = await fetch(path, body === undefined ? {} : {
     method: "POST",
@@ -15,7 +45,7 @@ async function api(path, body) {
     body: JSON.stringify(body),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || res.statusText);
+  if (!res.ok) throw new Error(t(data.error || res.statusText));
   return data;
 }
 
@@ -36,8 +66,8 @@ const SABLE_DARK = {
   "--warn": "#d9a441", "--bad": "#d46a6a", "--info": "#7d9ccc"
 };
 const THEMES = [
-  { id: "sable", name: "Fennec Sable", palette: SABLE_DARK },
-  { id: "sable-clair", name: "Fennec Sable Clair", palette: SABLE_LIGHT },
+  { id: "sable", name: "Fennec Sand", palette: SABLE_DARK },
+  { id: "sable-clair", name: "Fennec Sand Light", palette: SABLE_LIGHT },
   { id: "slate", name: "Fennec Slate", palette: {
     "--bg": "#191d24", "--card": "#1f242d", "--text": "#dde2e9", "--muted": "#98a0ad",
     "--line": "#353c49", "--soft": "#272d38", "--accent": "#e5a55c", "--ok": "#62b183",
@@ -78,13 +108,13 @@ function saveTheme(id) {
 
 applyTheme();
 
-// Les barres latérales se ferment une fois, restent fermées : comme le thème,
-// une préférence d'affichage gardée en localStorage.
+// The side bars, once closed, stay closed: like the theme, a display-only
+// preference kept in localStorage.
 const SIDE_KEY = "fennec.side";
 const FACTS_KEY = "fennec.facts";
 const pref = (key) => { try { return localStorage.getItem(key); } catch { return null; } };
 const setPref = (key, value) => {
-  try { value ? localStorage.setItem(key, value) : localStorage.removeItem(key); } catch { /* pour cette session */ }
+  try { value ? localStorage.setItem(key, value) : localStorage.removeItem(key); } catch { /* for this session */ }
 };
 const setSide = (off) => { document.body.classList.toggle("side-off", off); setPref(SIDE_KEY, off ? "off" : null); };
 const setFacts = (off) => { document.body.classList.toggle("facts-off", off); setPref(FACTS_KEY, off ? "off" : null); };
@@ -140,9 +170,9 @@ const errorOf = (button) => button.closest(".decide, .card, .past-actions").quer
 // Giving up is one more click than doing: the first click only asks.
 // Once there is work, giving up undoes it: the label says so.
 function dropButton(id, undo = false) {
-  const button = el("button", { type: "button", className: "quiet", textContent: undo ? "Annuler" : "Abandonner", title: undo ? "Annuler le travail : ton dossier redevient comme avant" : "Abandonner la tâche" });
+  const button = el("button", { type: "button", className: "quiet", textContent: undo ? t("Undo") : t("Drop"), title: undo ? t("Undo the work: your folder goes back as it was") : t("Drop the task") });
   button.onclick = () => {
-    const sure = action("Confirmer", "/api/drop", { id }, { quiet: true });
+    const sure = action(t("Confirm"), "/api/drop", { id }, { quiet: true });
     sure.style.color = "var(--bad)";
     button.replaceWith(sure);
   };
@@ -152,9 +182,9 @@ function dropButton(id, undo = false) {
 // Erasing a finished request is one more click than reading it: the first
 // click only asks.
 function forgetButton(id) {
-  const button = el("button", { type: "button", className: "quiet", textContent: "Supprimer", title: "Supprimer cette tâche" });
+  const button = el("button", { type: "button", className: "quiet", textContent: t("Delete"), title: t("Delete this task") });
   button.onclick = () => {
-    const sure = action("Confirmer", "/api/forget", { id }, { quiet: true });
+    const sure = action(t("Confirm"), "/api/forget", { id }, { quiet: true });
     sure.style.color = "var(--bad)";
     button.replaceWith(sure);
   };
@@ -177,10 +207,10 @@ function rowActions(id, { archive, forget, restore = false, stop } = {}) {
   const nodes = [];
   // Stopping work under way is one more click than reading the line.
   if (stop) {
-    const halt = el("button", { type: "button", className: "icon", ariaLabel: "Arrêter", title: "Arrêter" });
+    const halt = el("button", { type: "button", className: "icon", ariaLabel: t("Stop"), title: t("Stop") });
     setIcon(halt, "stop");
     halt.onclick = () => {
-      const sure = el("button", { type: "button", className: "quiet", textContent: "Sûr ?" });
+      const sure = el("button", { type: "button", className: "quiet", textContent: t("Sure?") });
       sure.style.color = "var(--bad)";
       sure.onclick = go(stop, { id });
       halt.replaceWith(sure);
@@ -189,16 +219,16 @@ function rowActions(id, { archive, forget, restore = false, stop } = {}) {
   }
   if (archive) {
     const first = el("button", { type: "button", className: "icon",
-      ariaLabel: restore ? "Rétablir" : "Archiver", title: restore ? "Rétablir" : "Archiver" });
+      ariaLabel: restore ? t("Restore") : t("Archive"), title: restore ? t("Restore") : t("Archive") });
     setIcon(first, restore ? "undo" : "inbox");
     first.onclick = go(archive, { id, on: !restore });
     nodes.push(first);
   }
   if (forget) {
-    const del = el("button", { type: "button", className: "icon", ariaLabel: "Supprimer", title: "Supprimer" });
+    const del = el("button", { type: "button", className: "icon", ariaLabel: t("Delete"), title: t("Delete") });
     setIcon(del, "trash");
     del.onclick = () => {
-      const sure = el("button", { type: "button", className: "quiet", textContent: "Confirmer" });
+      const sure = el("button", { type: "button", className: "quiet", textContent: t("Confirm") });
       sure.style.color = "var(--bad)";
       sure.onclick = go(forget, { id });
       del.replaceWith(sure);
@@ -209,14 +239,15 @@ function rowActions(id, { archive, forget, restore = false, stop } = {}) {
 }
 const rowWrap = (link, actions) => el("div", { className: "row-wrap" }, link, actions);
 
+// A status's label, in English: shown through `t`.
 const TAGS = {
   talk: ["Discussion", "var(--accent)"],
-  validate: ["À valider", "var(--accent)"],
+  validate: ["To validate", "var(--accent)"],
   blocked: ["Question", "var(--accent)"],
-  rule: ["Règle ?", "var(--accent)"],
-  ready: ["Prêt", "var(--ok)"],
-  later: ["Plus tard", "var(--muted)"],
-  failed: ["Échoué", "var(--bad)"],
+  rule: ["Rule?", "var(--accent)"],
+  ready: ["Ready", "var(--ok)"],
+  later: ["Later", "var(--muted)"],
+  failed: ["Failed", "var(--bad)"],
 };
 
 function focus(label, text) {
@@ -267,9 +298,9 @@ function thumbs(lines, remove) {
   if (!lines?.length) return null;
   return el("div", { className: "thumbs" }, ...lines.map((l) => {
     const link = el("a", { href: imageUrl(l), target: "_blank", rel: "noreferrer", className: "thumb" },
-      el("img", { src: imageUrl(l), alt: "image jointe", loading: "lazy" }));
+      el("img", { src: imageUrl(l), alt: t("attached image"), loading: "lazy" }));
     if (!remove) return link;
-    const x = el("button", { type: "button", className: "quiet drop", ariaLabel: "Retirer l'image", title: "Retirer l'image" });
+    const x = el("button", { type: "button", className: "quiet drop", ariaLabel: t("Remove the image"), title: t("Remove the image") });
     setIcon(x, "close");
     x.onclick = () => remove(l);
     return el("span", { className: "thumb-wrap" }, link, x);
@@ -310,8 +341,8 @@ function attach(text, start = []) {
   });
   const pick = el("input", { type: "file", accept: "image/png,image/jpeg,image/gif,image/webp", multiple: true, hidden: true });
   pick.onchange = () => { add([...pick.files]); pick.value = ""; };
-  const button = el("button", { type: "button", className: "quiet", ariaLabel: "Joindre une image",
-    title: "Joindre une image — ou colle-la, ou glisse-la dans le texte" });
+  const button = el("button", { type: "button", className: "quiet", ariaLabel: t("Attach an image"),
+    title: t("Attach an image — or paste it, or drop it in the text") });
   setIcon(button, "image");
   button.onclick = () => pick.click();
   show();
@@ -406,58 +437,59 @@ function firstLine(text) {
 }
 
 // fennec-os reports rule breaks in its own words; the card says what happened.
-// The raw reason stays behind "Détails".
+// The raw reason stays behind "Details".
 // The model server's errors (ureq's wording), in the human's words.
 function unreachable(line) {
   // Anchored: a test's output that mentions a timeout is not the server's.
   const m = line.match(/(?:^|\()(timeout|http status|io|host not found|connection failed|bad uri)(?::? ?([^\s:]*))/);
   if (!m) return null;
   const model = line.match(/model '([^']+)' not found/);
-  if (model) return `le serveur ne sert pas le modèle « ${model[1]} » (choisi dans Équipe ou dans les Réglages)`;
-  if (m[1] === "timeout") return "le serveur ne répond pas à temps";
-  if (m[1] === "http status") return m[2] === "401" || m[2] === "403" ? "le serveur refuse la clé"
-    : m[2] === "404" ? "le serveur ne connaît pas cette adresse (elle finit souvent par /v1)"
-    : `le serveur répond l'erreur ${m[2]}`;
-  if (m[1] === "host not found") return "cette adresse n'existe pas";
-  if (m[1] === "bad uri") return "cette adresse n'est pas valide";
-  return "rien ne répond à cette adresse";
+  if (model) return t("the server does not serve the model \"{0}\" (chosen in Team or in Settings)", model[1]);
+  if (m[1] === "timeout") return t("the server does not answer in time");
+  if (m[1] === "http status") return m[2] === "401" || m[2] === "403" ? t("the server refuses the key")
+    : m[2] === "404" ? t("the server does not know this address (it often ends with /v1)")
+    : t("the server answers with error {0}", m[2]);
+  if (m[1] === "host not found") return t("this address does not exist");
+  if (m[1] === "bad uri") return t("this address is not valid");
+  return t("nothing answers at this address");
 }
 
 function explain(reason) {
   const line = firstLine(reason);
   let m = line.match(/^rule task\.protect violated: changed (.+)$/);
-  if (m) return `fennec a modifié un test validé (${m[1]}), ce qui lui est interdit`;
+  if (m) return t("fennec changed a validated test ({0}), which it may not do", m[1]);
   m = line.match(/^rule \S+ violated: changed (\S+) but nothing under (\S+)$/);
-  if (m) return `${m[1]} a changé sans changement dans ${m[2]}, comme les règles du projet l'exigent`;
+  if (m) return t("{0} changed with no change under {1}, as the project's rules require", m[1], m[2]);
   if (/not a git repository/.test(line)) {
-    return "le dossier du projet n'est plus un dépôt git (son .git a disparu) : ajoute-le de nouveau avec « + projet », puis réessaie";
+    return t("the project folder is no longer a git repository (its .git is gone): add it again with \"+ project\", then retry");
   }
   if (/the project folder has uncommitted changes/.test(line)) {
-    return "ton dossier a des changements non commités : fennec y travaille et doit pouvoir annuler un essai raté sans toucher aux tiens. Commit-les ou mets-les de côté (git stash), puis réessaie";
+    return t("your folder has uncommitted changes: fennec works there and must be able to undo a failed try without touching yours. Commit them or set them aside (git stash), then retry");
   }
   if (/the project folder already holds work in progress/.test(line)) {
-    return "ton dossier contient déjà le travail d'une autre tâche : commit-la, ou abandonne-la, puis réessaie";
+    return t("your folder already holds another task's work: commit it, or drop it, then retry");
   }
   m = line.match(/^port (\d+) is already taken/);
-  if (m) return `le port ${m[1]} est déjà pris sur ta machine : arrête ce qui l'occupe, puis rouvre la page`;
+  if (m) return t("port {0} is already taken on your machine: stop what holds it, then open the page again", m[1]);
   m = line.match(/^nothing listens on port (\d+) after 30 s/);
-  if (m) return `la page n'a pas démarré : rien n'écoute sur le port ${m[1]} après 30 s`;
-  if (/the project folder is on no branch/.test(line)) return "ton dossier n'est sur aucune branche git : fais un checkout d'une branche, puis réessaie";
+  if (m) return t("the page did not start: nothing listens on port {0} after 30 s", m[1]);
+  if (/the project folder is on no branch/.test(line)) return t("your folder is on no git branch: check out a branch, then retry");
   m = line.match(/^no model: .* and (\S+)\/models did not answer/);
   const down = unreachable(line);
-  if (m) return `fennec ne joint aucun modèle à ${m[1]}${down ? ` (${down})` : ""} : vérifie les Réglages, puis réessaie`;
-  if (down) return `fennec ne joint pas son modèle : ${down}. Vérifie les Réglages, puis réessaie`;
+  if (m) return down ? t("fennec reaches no model at {0} ({1}): check Settings, then retry", m[1], down)
+    : t("fennec reaches no model at {0}: check Settings, then retry", m[1]);
+  if (down) return t("fennec cannot reach its model: {0}. Check Settings, then retry", down);
   m = line.match(/^rule \S+ violated: changed (.+)$/);
-  if (m) return `fennec a modifié ${m[1]}, que les règles du projet protègent`;
-  return line;
+  if (m) return t("fennec changed {0}, which the project's rules protect", m[1]);
+  return t(line);
 }
 
 function shots(item) {
   const row = el("div", { className: "shots" });
   for (const s of item.shots ?? []) {
-    if (s.missing) continue; // said in "non vérifié"
+    if (s.missing) continue; // said in "not verified"
     if (!s.file) {
-      row.append(el("div", { className: "bad", textContent: `Page ${s.url} : ${firstLine(s.reason)}` }));
+      row.append(el("div", { className: "bad", textContent: t("Page {0}: {1}", s.url, t(firstLine(s.reason))) }));
       continue;
     }
     const capture = (file, label) => {
@@ -466,11 +498,11 @@ function shots(item) {
       return link;
     };
     if (s.before) {
-      row.append(capture(s.before, "Avant"),
-        el("div", { className: "steps", textContent: "↓ Fait par fennec : " + (s.steps ?? []).join(" → ") }),
-        capture(s.file, "Après"));
+      row.append(capture(s.before, t("Before")),
+        el("div", { className: "steps", textContent: t("↓ Done by fennec: {0}", (s.steps ?? []).join(" → ")) }),
+        capture(s.file, t("After")));
     } else {
-      row.append(capture(s.file, "Capture"));
+      row.append(capture(s.file, t("Screenshot")));
     }
   }
   return row.children.length ? row : null;
@@ -478,7 +510,7 @@ function shots(item) {
 
 // Everything that explains but does not decide.
 function details(item) {
-  const box = el("details", { className: "more", open: true }, el("summary", { textContent: "Détails" }));
+  const box = el("details", { className: "more", open: true }, el("summary", { textContent: t("Details") }));
   box.dataset.key = item.id;
   const part = (title, ...nodes) => box.append(el("h3", { textContent: title }), ...nodes);
   // A plan step carries the discussion's whole plan after "---": the same in
@@ -486,18 +518,18 @@ function details(item) {
   const [step, plan] = (item.title ?? "").split("\n\n---\n");
   // Its first paragraph is the page's title already.
   const rest = (step ?? "").trim().slice(lead(step).length).trim();
-  if (rest) part("La tâche", el("div", {}, ...md(rest)));
-  if (plan) part("Le plan de la discussion, commun à ses tâches", el("div", {}, ...md(plan)));
+  if (rest) part(t("The task"), el("div", {}, ...md(rest)));
+  if (plan) part(t("The discussion's plan, shared by its tasks"), el("div", {}, ...md(plan)));
   const errors = [item.reason, item.land_error].filter(Boolean);
-  if (errors.length) part("Erreur", ...errors.map((e) => el("pre", { className: "failed", textContent: e })));
-  if (item.land?.message) part("Message du commit", el("pre", { textContent: item.land.message }));
+  if (errors.length) part(t("Error"), ...errors.map((e) => el("pre", { className: "failed", textContent: e })));
+  if (item.land?.message) part(t("Commit message"), el("pre", { textContent: item.land.message }));
   // Without stats (an old request), the team that worked on it at least.
-  if (item.team?.length && !item.stats?.stages) part("Équipe", el("p", { textContent: item.team.join(", ") }));
-  if (item.rules?.length) part("Règles appliquées ici", el("ul", {}, ...item.rules.map((r) => el("li", { textContent: r }))));
+  if (item.team?.length && !item.stats?.stages) part(t("Team"), el("p", { textContent: item.team.join(", ") }));
+  if (item.rules?.length) part(t("Rules applied here"), el("ul", {}, ...item.rules.map((r) => el("li", { textContent: r }))));
   // What each step and each model cost, in one table so the columns line up.
   const rows = (key) => Object.entries(item.stats?.[key] ?? {}).sort(([a], [b]) => stageRank(a) - stageRank(b));
-  const head = (label) => el("tr", {}, ...[label, label === "Modèle" ? "" : "Rôles", "Temps", "Appels", "Envoyés", "Cache", "Générés", "Vitesse"]
-    .map((h) => el("th", { textContent: h })));
+  const head = (label) => el("tr", {}, ...[label, label === "Model" ? "" : "Roles", "Time", "Calls", "Sent", "Cache", "Generated", "Speed"]
+    .map((h) => el("th", { textContent: t(h) })));
   const line = (stage) => ([name, c]) => el("tr", {},
     el("th", {}, stage ? el("span", { className: `dotc ${stageOf(name)}` }) : null, stage ? stageName(name) : name),
     el("td", {}, ...(c.roles ?? []).map((r) => roleTag(r, stageOf(name)))),
@@ -507,34 +539,39 @@ function details(item) {
     el("td", { textContent: compact(c.received) }), el("td", { textContent: c.ms ? `${tps(c)}/s` : "—" }));
   const [stages, models] = [rows("stages"), rows("models")];
   if (stages.length || models.length) {
-    part("Coût par étape", el("div", { className: "scroll" }, el("table", { className: "grid" },
-      stages.length ? el("thead", {}, head("Étape")) : null, el("tbody", {}, ...stages.map(line(true))),
-      models.length ? el("tbody", { className: "sub" }, head("Modèle"), ...models.map(line(false))) : null)));
+    part(t("Cost per step"), el("div", { className: "scroll" }, el("table", { className: "grid" },
+      stages.length ? el("thead", {}, head("Step")) : null, el("tbody", {}, ...stages.map(line(true))),
+      models.length ? el("tbody", { className: "sub" }, head("Model"), ...models.map(line(false))) : null)));
   }
-  if (item.checks?.length) part("Tests", el("ul", {}, ...item.checks.map((c) => el("li", {}, el("code", { textContent: c })))));
+  if (item.checks?.length) part(t("Tests"), el("ul", {}, ...item.checks.map((c) => el("li", {}, el("code", { textContent: c })))));
   // Each command run to prove the work, folded; a failed one opens by itself.
-  const ran = (who) => (t) => {
-    const ok = !t.missing && t.exit === 0;
+  const ran = (who) => (c) => {
+    const ok = !c.missing && c.exit === 0;
     return el("details", { className: `message try${ok ? "" : " failed"}`, open: !ok },
-      el("summary", {}, el("b", { textContent: t.missing ? "pas installé" : ok ? "✓ réussi" : `✗ code ${t.exit}` }),
-        el("span", { className: "head", textContent: `${who}$ ${t.command}` })),
-      t.output ? el("pre", { textContent: t.output }) : null);
+      el("summary", {}, el("b", { textContent: c.missing ? t("not installed") : ok ? t("✓ passed") : t("✗ code {0}", c.exit) }),
+        el("span", { className: "head", textContent: `${who}$ ${c.command}` })),
+      c.output ? el("pre", { textContent: c.output }) : null);
   };
-  if (item.tries?.length) part("Essais de fennec", ...item.tries.map(ran("")));
-  if (item.role_checks?.length) part("Vérifications de l'équipe", ...item.role_checks.map((t) => ran(`${t.role} · `)(t)));
+  if (item.tries?.length) part(t("fennec's tries"), ...item.tries.map(ran("")));
+  if (item.role_checks?.length) part(t("The team's checks"), ...item.role_checks.map((c) => ran(`${c.role} · `)(c)));
   return box.children.length > 1 ? box : null;
 }
 
 // What fennec did, in its words, and where: the work itself, not just its verdict.
+const FILES_SHOWN = 8;
 function work(item) {
   const nodes = [];
-  if (item.summary) nodes.push(focus("Ce que fennec a fait", item.summary));
+  if (item.summary) nodes.push(focus(t("What fennec did"), item.summary));
   if (item.files?.length) {
-    nodes.push(el("div", { className: "files" }, "Fichiers : ",
-      ...item.files.flatMap((f, i) => [i ? ", " : "", el("code", { textContent: f })])));
+    // A long list (installed packages...) shows its first lines; the rest on demand.
+    const list = (files) => files.map((f) => el("code", { textContent: f }));
+    const rest = item.files.length > FILES_SHOWN + 2 ? item.files.slice(FILES_SHOWN) : [];
+    nodes.push(el("div", { className: "files" }, t("Files ({0}): ", item.files.length),
+      ...list(item.files.slice(0, item.files.length - rest.length)),
+      rest.length ? el("details", {}, el("summary", { textContent: t("{0} more", rest.length) }), ...list(rest)) : null));
   }
   // Which of the project's skills the work read: the Journal shows where.
-  if (item.skills?.length) nodes.push(el("div", { className: "files" }, "Skills utilisés : ", item.skills.join(", ")));
+  if (item.skills?.length) nodes.push(el("div", { className: "files" }, t("Skills used: "), item.skills.join(", ")));
   return nodes;
 }
 
@@ -549,7 +586,7 @@ function opener(label, hide, where, load) {
       button.textContent = label;
       return;
     }
-    box = el("div", { className: "changes" }, el("div", { className: "muted", textContent: "Je charge…" }));
+    box = el("div", { className: "changes" }, el("div", { className: "muted", textContent: t("Loading…") }));
     where().append(box);
     button.textContent = hide;
     try {
@@ -563,22 +600,22 @@ function opener(label, hide, where, load) {
 
 // The exact change.
 function changesButton(item, where) {
-  return opener("Voir les changements", "Masquer les changements", where, () => changes(item));
+  return opener(t("See the changes"), t("Hide the changes"), where, () => changes(item));
 }
 async function changes(item) {
   const c = await api("/api/changes", { id: item.id });
-  const nodes = item.summary || !c.summary ? [] : [focus("Ce que fennec a fait", c.summary)];
+  const nodes = item.summary || !c.summary ? [] : [focus(t("What fennec did"), c.summary)];
   nodes.push(diffView(c.diff));
-  if (c.cut) nodes.push(el("div", { className: "muted", textContent: "Coupé : le reste est trop long pour la page, regarde-le dans le projet." }));
+  if (c.cut) nodes.push(el("div", { className: "muted", textContent: t("Cut: the rest is too long for the page, look at it in the project.") }));
   return nodes;
 }
 
 // The ready work is a real folder: opened in the editor, its path shown to copy.
 function codeButton(item, where) {
-  return opener("Ouvrir le code", "Masquer le dossier", where, async () => {
+  return opener(t("Open the code"), t("Hide the folder"), where, async () => {
     const c = await api("/api/open", { id: item.id });
-    return [el("div", { className: "muted", textContent: (c.opened ? "Ouvert dans VS Code. " : "VS Code introuvable : ouvre ce dossier dans ton éditeur. ")
-        + "Tu peux y modifier le code : au commit, fennec refait les tests avant de mettre le tout dans ton dossier." }),
+    return [el("div", { className: "muted", textContent: (c.opened ? t("Opened in VS Code.") : t("VS Code not found: open this folder in your editor."))
+        + " " + t("You may change the code there: at commit, fennec runs the tests again before putting it all in your folder.") }),
       el("pre", { textContent: c.folder })];
   });
 }
@@ -587,11 +624,11 @@ function codeButton(item, where) {
 // The tab opens on the click itself: one opened after the answer would be blocked.
 function pageButton(item) {
   const error = () => errorOf(button);
-  const button = el("button", { type: "button", textContent: "Ouvrir la page" });
+  const button = el("button", { type: "button", textContent: t("Open the page") });
   button.onclick = async () => {
     const tab = window.open("", "_blank");
     button.disabled = true;
-    button.textContent = "Je lance la page…";
+    button.textContent = t("Starting the page…");
     try {
       const c = await api("/api/page", { id: item.id });
       if (tab) tab.location = c.url;
@@ -602,7 +639,7 @@ function pageButton(item) {
       error().textContent = explain(e.message);
     } finally {
       button.disabled = false;
-      button.textContent = "Ouvrir la page";
+      button.textContent = t("Open the page");
     }
   };
   return button;
@@ -610,53 +647,53 @@ function pageButton(item) {
 
 // Every step, with what was sent to the model, what came back, and what it cost.
 function journalButton(item, where) {
-  return opener("Journal", "Masquer le journal", where, () => journal(item));
+  return opener(t("Journal"), t("Hide the journal"), where, () => journal(item));
 }
 async function journal(item) {
   const steps = await api("/api/journal", { id: item.id });
-  if (!steps.length) return [el("div", { className: "muted", textContent: "Aucune étape gardée pour cette tâche." })];
+  if (!steps.length) return [el("div", { className: "muted", textContent: t("No step kept for this task.") })];
   return steps.map(stepView);
 }
 
 // Work under way reads as a story: what was asked and said, what "done"
 // means, and where the work stands; the model's raw exchange is the Journal tab.
-const STEPS = [["Discussion", /^réfléchit/], ["Cadrage", /^se met au travail/], ["Travail", /^travaille/],
-  ["Essai", /^essaie/], ["Commit", /^fait le commit/]];
+const STEPS = [["Discussion", /^thinks/], ["Framing", /^gets to work/], ["Work", /^works/],
+  ["Try", /^tries/], ["Commit", /^makes the commit/]];
 function stages(item) {
   if (item.step == null) return ended(item);
   const now = STEPS.findIndex(([, re]) => re.test(item.step));
   return el("ol", { className: "stages" }, ...STEPS.map(([name], i) =>
-    el("li", { className: i < now ? "done" : i === now ? "now" : "", textContent: name })));
+    el("li", { className: i < now ? "done" : i === now ? "now" : "", textContent: t(name) })));
 }
 // A finished request: the steps its figures show it reached, and where it
 // stopped when it did not end in a commit. A step skipped (direct work has
-// no Cadrage) stays plain.
+// no Framing) stays plain.
 function ended(item) {
   const reached = Object.keys(item.stats?.stages ?? {})
-    .map((name) => ["Discussion", "Cadrage", "Travail", "Preuve"].findIndex((s) => name.startsWith(s)));
+    .map((name) => ["Discussion", "Framing", "Work", "Proof"].findIndex((s) => stageKey(name).startsWith(s)));
   if (item.kind === "landed") reached.push(STEPS.length - 1);
   if (!reached.length) return null;
   const last = Math.max(...reached);
   const broke = item.kind === "failed" || item.kind === "dropped";
   return el("ol", { className: "stages" }, ...STEPS.map(([name], i) => el("li", {
-    className: !reached.includes(i) ? "" : i === last && broke ? "stop" : "done", textContent: name,
-    title: i === last && broke ? (item.kind === "failed" ? "Échoué ici" : "Arrêté ici") : "" })));
+    className: !reached.includes(i) ? "" : i === last && broke ? "stop" : "done", textContent: t(name),
+    title: i === last && broke ? (item.kind === "failed" ? t("Failed here") : t("Stopped here")) : "" })));
 }
 
 function underway(item) {
-  const stop = el("button", { type: "button", className: "stop", textContent: "Arrêter" });
+  const stop = el("button", { type: "button", className: "stop", textContent: t("Stop") });
   setIcon(stop, "stop");
   stop.onclick = () => {
-    const sure = action("Confirmer", "/api/stop", { id: item.id });
+    const sure = action(t("Confirm"), "/api/stop", { id: item.id });
     sure.classList.add("stop", "sure");
     setIcon(sure, "stop");
     stop.replaceWith(sure);
   };
   const bar = el("div", { className: "past-actions run-actions" },
-    // Queued or mid-commit with its worker dead: "Réessayer" starts it
-    // over; "Arrêter" stays the way out.
-    ...(!item.alive && (item.waiting || item.step === "fait le commit")
-      ? [action("Réessayer", "/api/retry", { id: item.id }, { primary: true })]
+    // Queued or mid-commit with its worker dead: "Retry" starts it
+    // over; "Stop" stays the way out.
+    ...(!item.alive && (item.waiting || item.step === "makes the commit")
+      ? [action(t("Retry"), "/api/retry", { id: item.id }, { primary: true })]
       : []),
     stop,
     el("div", { className: "error", role: "alert" }));
@@ -664,13 +701,13 @@ function underway(item) {
   if (item.since) {
     // Queued, not working: no ticking figure, one age at each redraw.
     elapsed = item.waiting
-      ? el("span", { textContent: "depuis " + duration(Date.now() - item.since * 1000) })
+      ? el("span", { textContent: t("for {0}", duration(Date.now() - item.since * 1000)) })
       : el("span", { className: "elapsed" });
     if (!item.waiting) elapsed.dataset.since = item.since;
   }
   const box = el("div", { className: "past run" },
     stages(item),
-    el("div", { className: "state" }, el("span", { className: "dot" }), "fennec ", item.step, elapsed ? " · " : "", elapsed),
+    el("div", { className: "state" }, el("span", { className: "dot" }), t("fennec {0}", stepText(item.step)), elapsed ? " · " : "", elapsed),
     conversation(item), doneWhen(item), bar, ...facts(item));
   box.dataset.key = "run-" + item.id;
   return box;
@@ -704,10 +741,18 @@ async function follow(id, slot) {
   }
 }
 
+// Steps as the server names them; requests from before fennec spoke English
+// keep their French names, read as the English ones.
+const LEGACY_STEPS = [["Cadrage", "Framing"], ["Démarrage", "Starting"], ["Travail, essai", "Work, try"], ["Travail", "Work"],
+  ["Preuve ratée : renvoyée au travail", "Proof failed: sent back to work"], ["Preuve", "Proof"], ["Ta réponse", "Your answer"]];
+const stageKey = (name) => {
+  const old = LEGACY_STEPS.find(([fr]) => name.startsWith(fr));
+  return old ? old[1] + name.slice(old[0].length) : name;
+};
 // Steps in the order they run; the server keeps them sorted by name.
-const stageRank = (name) => ["Discussion", "Cadrage", "Démarrage", "Travail", "Preuve"].findIndex((s) => name.startsWith(s)) >>> 0;
-const number = (n) => (n ?? 0).toLocaleString("fr-FR");
-const compact = (n) => (n ?? 0).toLocaleString("fr-FR", { notation: "compact", maximumFractionDigits: 1 });
+const stageRank = (name) => ["Discussion", "Framing", "Starting", "Work", "Proof"].findIndex((s) => stageKey(name).startsWith(s)) >>> 0;
+const number = (n) => (n ?? 0).toLocaleString(lang());
+const compact = (n) => (n ?? 0).toLocaleString(lang(), { notation: "compact", maximumFractionDigits: 1 });
 const percent = (part, whole) => (whole ? Math.round((100 * part) / whole) : 0);
 // Tokens out per second of model time; that time includes reading the prompt.
 const tps = (c) => (c.ms ? Math.round((c.received * 1000) / c.ms) : 0);
@@ -719,17 +764,17 @@ function facts(item) {
   if (!s?.turns) return [];
   const n = s.failed_attempts;
   const safe = el("div", { className: "pills" },
-    pill("🔒", "vérifié sans réseau", "", "L'essai a accès à Internet pour installer ce que le projet demande ; la vérification et la preuve tournent sans réseau."),
-    pill("🏠", "ton dossier personnel caché", "", "Ton dossier personnel (~) est hors de portée : l'essai ne lit ni n'écrit que le projet."),
-    pill("📖", "git en lecture seule", "", "L'historique git du projet est visible, mais l'essai ne le modifie pas."),
-    n ? pill("↺", `${n} essai${n > 1 ? "s" : ""} raté${n > 1 ? "s" : ""} annulé${n > 1 ? "s" : ""}`, "warn",
-      "Ces essais ont échoué et sont annulés : aucune trace dans ton dossier.") : null);
+    pill("🔒", t("verified offline"), "", t("The try reaches the Internet to install what the project needs; verification and proof run offline.")),
+    pill("🏠", t("your home folder hidden"), "", t("Your home folder (~) is out of reach: the try reads and writes the project only.")),
+    pill("📖", t("git read-only"), "", t("The project's git history is visible, but the try does not change it.")),
+    n ? pill("↺", n > 1 ? t("{0} failed tries undone", n) : t("{0} failed try undone", n), "warn",
+      t("These tries failed and are undone: no trace in your folder.")) : null);
   const [bar, who] = timeline(s);
   return [el("div", { className: "facts" },
     metrics(s),
-    bar ? el("h3", { textContent: "Répartition du temps" }) : null, bar,
-    who ? el("h3", { textContent: "Équipe", title: "L'équipe du projet qui a travaillé sur cette tâche : qui fait quoi se définit dans la page Équipe." }) : null, who,
-    el("h3", { textContent: "L'isolement" }), safe)];
+    bar ? el("h3", { textContent: t("Where the time went") }) : null, bar,
+    who ? el("h3", { textContent: t("Team"), title: t("The project's team that worked on this task: who does what is set on the Team page.") }) : null, who,
+    el("h3", { textContent: t("Isolation") }), safe)];
 }
 
 function pill(icon, text, tone = "", title = "") {
@@ -739,26 +784,26 @@ function pill(icon, text, tone = "", title = "") {
 
 // Model time, tokens in and out, cache and speed: a figure each, not a sentence.
 const METRIC_TIP = {
-  "Temps de modèle": "Temps de génération du modèle, sans les outils ni les attentes.",
-  "Appels": "Nombre d'appels faits au modèle pour cette tâche.",
-  "Envoyés": "Ce qui part vers le modèle : contexte, consignes, résultats d'outils.",
-  "Générés": "Ce que le modèle a produit : réponses, code, réflexion.",
-  "Vitesse": "Moyenne de tokens produits par seconde.",
+  "Model time": "The model's generation time, without tools or waits.",
+  "Calls": "How many calls were made to the model for this task.",
+  "Sent": "What goes to the model: context, instructions, tool results.",
+  "Generated": "What the model produced: answers, code, reasoning.",
+  "Speed": "Average tokens produced per second.",
 };
 function metrics(c) {
   const cache = percent(c.cached, c.sent);
   return el("div", { className: "metrics" },
-    metric("Temps de modèle", duration(c.ms ?? 0)),
-    metric("Appels", number(c.turns)),
-    metric("Envoyés", compact(c.sent), el("span", { className: "meter", style: `--p:${cache}%`, title: "Part des tokens envoyés déjà en cache : moins chers, plus vite." }),
-      el("small", { textContent: `${cache} % cache` })),
-    metric("Générés", compact(c.received), c.thinking ? el("small", { textContent: `${percent(c.thinking, c.received)} % réflexion`, title: "Part des tokens générés qui est de la réflexion interne, pas de la réponse." }) : null),
-    metric("Vitesse", c.ms ? `${tps(c)}` : "—", el("small", { textContent: "tokens/s" })));
+    metric("Model time", duration(c.ms ?? 0)),
+    metric("Calls", number(c.turns)),
+    metric("Sent", compact(c.sent), el("span", { className: "meter", style: `--p:${cache}%`, title: t("Share of the tokens sent already cached: cheaper, faster.") }),
+      el("small", { textContent: t("{0} % cache", cache) })),
+    metric("Generated", compact(c.received), c.thinking ? el("small", { textContent: t("{0} % reasoning", percent(c.thinking, c.received)), title: t("Share of the generated tokens that is internal reasoning, not the answer.") }) : null),
+    metric("Speed", c.ms ? `${tps(c)}` : "—", el("small", { textContent: "tokens/s" })));
 }
 
 function metric(label, value, ...extra) {
   const tip = METRIC_TIP[label];
-  return el("span", { className: "metric", ...(tip ? { title: tip } : {}) }, el("small", { textContent: label }), el("b", { textContent: value }), ...extra);
+  return el("span", { className: "metric", ...(tip ? { title: t(tip) } : {}) }, el("small", { textContent: t(label) }), el("b", { textContent: value }), ...extra);
 }
 
 // Where the time went, one coloured segment per step, with the roles of each.
@@ -768,18 +813,31 @@ function timeline(s) {
   const total = stages.reduce((t, [, c]) => t + (c.ms ?? 0), 0) || 1;
   const bar = el("div", { className: "timeline" }, ...stages.map(([name, c]) =>
     el("span", { className: `seg ${stageOf(name)}`, style: `flex:${Math.max(c.ms ?? 0, total / 40)}`,
-      title: STAGE_TIP[stageOf(name)], textContent: `${stageName(name)} ${duration(c.ms ?? 0)}` })));
+      title: t(STAGE_TIP[stageOf(name)]), textContent: `${stageName(name)} ${duration(c.ms ?? 0)}` })));
   const who = el("div", { className: "who" }, ...stages.flatMap(([name, c]) =>
     (c.roles ?? []).map((r) => roleTag(r, stageOf(name)))));
   return [bar, who.children.length ? who : null];
 }
 
-const stageOf = (name) => (name.startsWith("Discussion") ? "talk" : name.startsWith("Travail") ? "solve" : name.startsWith("Preuve") ? "prove" : "frame");
-const stageName = (name) => (name.startsWith("Cadrage") ? "Tests d'abord" : name);
+const stageOf = (name) => {
+  const n = stageKey(name);
+  return n.startsWith("Discussion") ? "talk" : n.startsWith("Work") ? "solve" : n.startsWith("Proof") ? "prove" : "frame";
+};
+// A step's name in the chosen language: "Work, try 2" keeps its number.
+const stageName = (name) => {
+  const n = stageKey(name);
+  if (n.startsWith("Framing")) return t("Tests first");
+  const m = n.match(/^(Work|Proof|Starting) \((?:running|en cours)\)$/);
+  if (m) return t("{0} (running)", t(m[1]));
+  const tried = n.match(/^Work, try (\d+)$/);
+  if (tried) return t("Work, try {0}", tried[1]);
+  const via = n.match(/^(Via|Plugin) (.+)$/);
+  return via ? `${t(via[1])} ${via[2]}` : t(n);
+};
 // One short sentence per stage: what it is, for the bar's segments and the role chips.
-const STAGE_TIP = { talk: "Discussion de départ : ce que tu as demandé, et ce que l'équipe en a retenu.", frame: "Cadrage : les tests qui prouveront la fin et le périmètre, posés avant de coder.", solve: "Réalisation : le travail est écrit et exécuté, essai après essai.", prove: "Preuve : le résultat est vérifié avec les tests et les commandes du rôle." };
+const STAGE_TIP = { talk: "Opening discussion: what you asked, and what the team took from it.", frame: "Framing: the tests that will prove the end and the scope, set before coding.", solve: "Making: the work is written and run, try after try.", prove: "Proof: the result is checked with the tests and the role's commands." };
 // What a role chip is: its brief if the step keeps one, else the stage's job.
-const roleTag = (name, stage, brief) => el("span", { className: `rtag ${stage}`, textContent: name, title: brief ? brief.replace(/\s+/g, " ").trim().slice(0, 200) : STAGE_TIP[stage] });
+const roleTag = (name, stage, brief) => el("span", { className: `rtag ${stage}`, textContent: name, title: brief ? brief.replace(/\s+/g, " ").trim().slice(0, 200) : t(STAGE_TIP[stage]) });
 
 function duration(ms) {
   const s = Math.round(ms / 1000);
@@ -788,26 +846,27 @@ function duration(ms) {
 
 function stepView(step) {
   if (step.said != null) return el("section", { className: "step said" },
-    el("div", { className: "step-name" }, el("span", { textContent: step.name })), el("p", { textContent: step.said }));
+    el("div", { className: "step-name" }, el("span", { textContent: stageName(step.name) })), el("p", { textContent: step.said }));
   const c = step.cost ?? {};
   const verdict = step.passed === true ? " ✓" : step.passed === false ? " ✗" : "";
   const messages = step.messages ?? [];
   // One line of cost in the head: the full figures sit on the Stats tab and
   // tiles per step made the journal a wall of boxes.
   const cost = c.turns ? el("span", { className: "cost",
-    title: `${number(c.turns)} appel${c.turns > 1 ? "s" : ""} · ${percent(c.cached, c.sent)} % en cache${c.thinking ? ` · ${percent(c.thinking, c.received)} % réflexion` : ""}`,
+    title: [c.turns > 1 ? t("{0} calls", number(c.turns)) : t("{0} call", number(c.turns)), t("{0} % cached", percent(c.cached, c.sent)),
+      c.thinking ? t("{0} % reasoning", percent(c.thinking, c.received)) : ""].filter(Boolean).join(" · "),
     textContent: [`⏱ ${duration(c.ms ?? 0)}`, `↑ ${compact(c.sent)}`, `↓ ${compact(c.received)}`, speed(c)].filter(Boolean).join(" · ") }) : null;
   return el("section", { className: `step ${stageOf(step.name)}` },
     el("div", { className: "step-name" }, el("span", { className: `dotc ${stageOf(step.name)}` }),
-      el("span", { textContent: step.name + verdict }),
+      el("span", { textContent: stageName(step.name) + verdict }),
       step.model ? el("span", { className: "model", textContent: step.model }) : null,
-      messages.length ? el("span", { className: "model", textContent: `${messages.length} message${messages.length > 1 ? "s" : ""}` }) : null,
+      messages.length ? el("span", { className: "model", textContent: messages.length > 1 ? t("{0} messages", messages.length) : t("{0} message", messages.length) }) : null,
       el("span", { className: "spacer" }), cost),
     ...rolesView(step),
     ...(messages.length ? messages.map(messageView)
       : [el("div", { className: "muted", textContent: step.live
-        ? "fennec attend la première réponse du modèle…"
-        : "Les messages de cette étape n'ont pas été gardés (tâche ancienne)." })]));
+        ? t("fennec waits for the model's first answer…")
+        : t("This step's messages were not kept (an older task).") })]));
 }
 
 // Who of the team took part: what each role told the model, and what it ran itself.
@@ -817,37 +876,40 @@ function rolesView(step) {
   const nodes = [el("div", { className: "who" }, ...step.roles.map((r) => roleTag(r.name, stageOf(step.name), r.brief)))];
   for (const r of step.roles) {
     if (r.brief) {
-      nodes.push(el("details", { className: "message" }, el("summary", {}, el("b", { textContent: r.name }), el("span", { className: "head", textContent: "sa consigne au modèle" })),
+      nodes.push(el("details", { className: "message" }, el("summary", {}, el("b", { textContent: r.name }), el("span", { className: "head", textContent: t("its brief to the model") })),
         el("pre", { textContent: r.brief })));
     }
   }
   for (const c of step.checks ?? []) {
-    const result = c.missing ? "pas installé, non vérifié" : c.exit === 0 ? "✓ réussi" : `✗ échoué (code ${c.exit}) : bloque`;
+    const result = c.missing ? t("not installed, not verified") : c.exit === 0 ? t("✓ passed") : t("✗ failed (code {0}): blocks", c.exit);
     nodes.push(el("details", { className: "message" },
-      el("summary", {}, el("b", { textContent: c.role }), el("span", { className: "head", textContent: `a lancé « ${c.command} » → ${result}` })),
-      el("pre", { textContent: c.output || "(aucune sortie)" })));
+      el("summary", {}, el("b", { textContent: c.role }), el("span", { className: "head", textContent: t("ran \"{0}\" → {1}", c.command, result) })),
+      el("pre", { textContent: c.output || t("(no output)") })));
   }
   return nodes;
 }
 
-const who = { system: "Consigne", user: "Envoyé", assistant: "Modèle", tool: "Résultat d'outil" };
+const who = { system: "Brief", user: "Sent", assistant: "Model", tool: "Tool result" };
 
 // What the model thought before it answered: where a made-up fact shows first.
 function thinks() {
-  const mark = el("span", { className: "thinks", title: "Le modèle a réfléchi avant de répondre : ouvre pour lire sa réflexion.", ariaLabel: "réflexion" });
+  const mark = el("span", { className: "thinks", title: t("The model reasoned before answering: open to read its reasoning."), ariaLabel: t("reasoning") });
   setIcon(mark, "think");
   return mark;
 }
 
 // A shell call reads as the command it runs, not as its JSON.
-function callText(t) {
-  const args = t.function?.arguments ?? "";
+function callText(call) {
+  const args = call.function?.arguments ?? "";
   try {
     const a = JSON.parse(args);
     if (typeof a?.command === "string" && Object.keys(a).length === 1) return `$ ${a.command}`;
   } catch { /* not JSON: shown as it came */ }
-  return `${t.function?.name ?? "outil"} ${args}`;
+  return `${call.function?.name ?? t("tool")} ${args}`;
 }
+
+// The CSS heading of a block, in the chosen language.
+const labelled = (node, label) => (node.dataset.label = label, node);
 
 function messageView(m) {
   const text = typeof m.content === "string" ? m.content : m.content == null ? "" : JSON.stringify(m.content, null, 1);
@@ -855,16 +917,16 @@ function messageView(m) {
   const thought = m.reasoning_content ?? m.reasoning;
   const head = (calls.join(" ; ") || text || thought || "").replace(/\s+/g, " ").slice(0, 160);
   return el("details", { className: `message ${m.role}${calls.length ? " call" : ""}` },
-    el("summary", {}, el("b", { textContent: who[m.role] ?? m.role }), thought ? thinks() : null,
+    el("summary", {}, el("b", { textContent: who[m.role] ? t(who[m.role]) : m.role }), thought ? thinks() : null,
       el("span", { className: "head", textContent: head })),
-    thought ? el("pre", { className: "thought", textContent: thought }) : null,
+    thought ? labelled(el("pre", { className: "thought", textContent: thought }), t("Reasoning")) : null,
     text ? el("pre", { textContent: text }) : null,
     m.role === "user" ? thumbs(text.split("\n").filter(isImage)) : null,
     calls.length ? el("pre", { className: "calls", textContent: calls.join("\n") }) : null);
 }
 
 function diffView(diff) {
-  if (!diff) return el("div", { className: "muted", textContent: "Aucun changement." });
+  if (!diff) return el("div", { className: "muted", textContent: t("No change.") });
   const pre = el("pre", { className: "diff" });
   for (const l of diff.split("\n")) {
     const kind = l.startsWith("diff --git") ? "file" : l.startsWith("+") && !l.startsWith("+++") ? "add"
@@ -878,22 +940,22 @@ function diffView(diff) {
 // The conversation that shaped the request, the human's words on the right.
 function conversation(item) {
   // The opening message is the card's title already.
-  const said = (item.thread ?? []).filter((t, i) => i > 0 || t.who !== "human");
+  const said = (item.thread ?? []).filter((m, i) => i > 0 || m.who !== "human");
   if (!said.length) return null;
-  return el("div", { className: "thread" }, ...said.map((t) =>
-    el("div", { className: t.who === "human" ? "said human" : "said" },
-      el("span", { className: "label", textContent: t.who === "human" ? "Toi" : "fennec" }), ...rich(t.text))));
+  return el("div", { className: "thread" }, ...said.map((m) =>
+    el("div", { className: m.who === "human" ? "said human" : "said" },
+      el("span", { className: "label", textContent: m.who === "human" ? t("You") : "fennec" }), ...rich(m.text))));
 }
 
 // A button says the act in a word; where it goes is its title.
 function landLabel({ branch, committed }) {
-  if (!branch) return "Préparer";
-  return committed ? "Pousser" : "Commit";
+  if (!branch) return t("Prepare");
+  return committed ? t("Push") : t("Commit");
 }
 function landTitle({ branch, remote, committed }) {
-  if (!branch) return "Préparer le commit";
-  if (committed) return `Pousser ${branch} vers ${remote}`;
-  return remote ? `Commit dans ${branch} et pousser vers ${remote}` : `Commit dans ${branch}`;
+  if (!branch) return t("Prepare the commit");
+  if (committed) return t("Push {0} to {1}", branch, remote);
+  return remote ? t("Commit in {0} and push to {1}", branch, remote) : t("Commit in {0}", branch);
 }
 
 // The request for later just saved: its card says so once.
@@ -906,92 +968,92 @@ function card(item) {
 
   if (item.kind === "talk") {
     add(conversation(item));
-    const text = el("textarea", { placeholder: "Ta réponse", ariaLabel: "Ta réponse" });
+    const text = el("textarea", { placeholder: t("Your answer"), ariaLabel: t("Your answer") });
     const images = attach(text);
     add(el("div", { className: "reply" }, text, images.node));
     // Framed ahead while it waits in the Fleet: answering does not start it.
     actions.append(dropButton(item.id), el("span", { className: "spacer" }),
       item.later
-        ? Object.assign(action("Assez clair", "/api/frame", { id: item.id }),
-          { title: "Garder la conversation telle quelle : la Fleet la lancera sans autre question" })
-        : Object.assign(action("Lancer", "/api/frame", { id: item.id }),
-          { title: "Lancer le travail sur la conversation telle quelle, sans autre question" }),
-      Object.assign(action("Envoyer", "/api/say", () => ({ id: item.id, text: images.value() }), { primary: true }),
+        ? Object.assign(action(t("Clear enough"), "/api/frame", { id: item.id }),
+          { title: t("Keep the conversation as it is: the Fleet will start it without another question") })
+        : Object.assign(action(t("Start"), "/api/frame", { id: item.id }),
+          { title: t("Start the work on the conversation as it is, without another question") }),
+      Object.assign(action(t("Send"), "/api/say", () => ({ id: item.id, text: images.value() }), { primary: true }),
         { title: item.later
-          ? "fennec lit ta réponse quand le modèle est libre ; la tâche reste dans la Fleet"
-          : "fennec lit ta réponse : il repose une question s'il le faut, sinon il lance le travail" }));
+          ? t("fennec reads your answer when the model is free; the task stays in the Fleet")
+          : t("fennec reads your answer: it asks again if it must, otherwise it starts the work") }));
   } else if (item.kind === "validate") {
-    add(conversation(item), focus("Terminé quand", item.done_when));
-    const correction = el("textarea", { placeholder: "Ce qui ne va pas, ou une précision", hidden: true });
-    const fix = el("button", { type: "button", textContent: "Corriger" });
+    add(conversation(item), focus(t("Done when"), item.done_when));
+    const correction = el("textarea", { placeholder: t("What is wrong, or a detail"), hidden: true });
+    const fix = el("button", { type: "button", textContent: t("Correct") });
     fix.onclick = () => {
       // Opening the field is the first click; sending is the second.
       correction.hidden = false;
       correction.rows = 6;
       correction.focus();
-      fix.replaceWith(action("Envoyer", "/api/say", () => ({ id: item.id, text: images.value() })));
+      fix.replaceWith(action(t("Send"), "/api/say", () => ({ id: item.id, text: images.value() })));
     };
     const images = attach(correction);
     add(el("div", { className: "reply" }, correction, images.node));
     actions.append(dropButton(item.id), el("span", { className: "spacer" }), fix,
-      action("Valider", "/api/answer", { id: item.id, accept: true, correction: "" }, { primary: true }));
+      action(t("Validate"), "/api/answer", { id: item.id, accept: true, correction: "" }, { primary: true }));
   } else if (item.kind === "blocked") {
     // Requests from before the conversation have the question alone.
     const last = item.thread?.at(-1);
     add(...(last?.who === "fennec" && last.text === item.question
-      ? [conversation(item)] : [conversation(item), focus("fennec demande", item.question)]));
-    const text = el("textarea", { placeholder: "Ta réponse", ariaLabel: "Ta réponse" });
+      ? [conversation(item)] : [conversation(item), focus(t("fennec asks"), item.question)]));
+    const text = el("textarea", { placeholder: t("Your answer"), ariaLabel: t("Your answer") });
     const images = attach(text);
     add(el("div", { className: "reply" }, text, images.node));
     actions.append(dropButton(item.id), el("span", { className: "spacer" }),
-      action("Répondre", "/api/reply", () => ({ id: item.id, text: images.value() }), { primary: true }));
+      action(t("Answer"), "/api/reply", () => ({ id: item.id, text: images.value() }), { primary: true }));
   } else if (item.kind === "rule") {
-    add(focus("Règle proposée", item.rule), el("div", { className: "muted", textContent: `D'après ce que tu as dit : « ${item.heard ?? ""} »` }));
-    actions.append(action("Non", "/api/rule", { id: item.id, scope: "no" }),
-      Object.assign(action("Ce projet", "/api/rule", { id: item.id, scope: "project" }), { title: "Garder la règle pour ce projet" }),
-      Object.assign(action("Partout", "/api/rule", { id: item.id, scope: "user" }, { primary: true }), { title: "Garder la règle pour tous mes projets" }));
+    add(focus(t("Proposed rule"), item.rule), el("div", { className: "muted", textContent: t("From what you said: \"{0}\"", item.heard ?? "") }));
+    actions.append(action(t("No"), "/api/rule", { id: item.id, scope: "no" }),
+      Object.assign(action(t("This project"), "/api/rule", { id: item.id, scope: "project" }), { title: t("Keep the rule for this project") }),
+      Object.assign(action(t("Everywhere"), "/api/rule", { id: item.id, scope: "user" }, { primary: true }), { title: t("Keep the rule for all my projects") }));
   } else if (item.kind === "ready") {
     // The decision first, without scrolling: what was proven, what was not,
     // and the buttons. What fennec did and what it cost come under them.
     const tried = item.tries?.length ?? 0;
-    // Commands leave no picture: their proof would otherwise hide behind "Détails".
+    // Commands leave no picture: their proof would otherwise hide behind "Details".
     if (tried) {
       add(el("div", { className: "proved",
-        textContent: `✓ fennec l'a essayé : ${tried} essai${tried > 1 ? "s" : ""} réussi${tried > 1 ? "s" : ""} (voir Détails)` }));
+        textContent: tried > 1 ? t("✓ fennec tried it: {0} tries passed (see Details)", tried) : t("✓ fennec tried it: {0} try passed (see Details)", tried) }));
     }
-    const warns = (item.untried ? ["le produit n'a pas encore été essayé"] : []).concat(item.unverified ?? []);
+    const warns = (item.untried ? [t("the product has not been tried yet")] : []).concat(item.unverified ?? []);
     if (warns.length) {
-      add(el("div", { className: "muted", style: "margin-top:10px", textContent: "Non vérifié — à regarder toi-même :" }),
+      add(el("div", { className: "muted", style: "margin-top:10px", textContent: t("Not verified — look at it yourself:") }),
         el("ul", { className: "warn" }, ...warns.map((w) => el("li", {}, ...rich(w)))));
     }
-    if (item.land_error) add(el("div", { className: "bad", textContent: "Commit interrompu : " + firstLine(item.land_error) }));
-    if (item.amend_error) add(el("div", { className: "bad", textContent: "Correction non aboutie, le travail est resté tel quel : " + firstLine(item.amend_error) }));
+    if (item.land_error) add(el("div", { className: "bad", textContent: t("Commit interrupted: {0}", t(firstLine(item.land_error))) }));
+    if (item.amend_error) add(el("div", { className: "bad", textContent: t("Correction not done, the work stayed as it was: {0}", t(firstLine(item.amend_error))) }));
     // "Ready" reads as "done": say where the work is until the commit.
-    const commit = item.land ? `« ${landLabel(item.land)} »` : "le commit";
+    const commit = item.land ? `"${landLabel(item.land)}"` : t("the commit");
     add(el("div", { className: "muted", style: "margin-top:10px", textContent: item.here
-      ? `Le travail est dans ton dossier, sur une branche de travail. ${commit} le met sur ta branche ; « Annuler » rend ton dossier comme avant.`
-      : `Ton dossier n'a pas encore changé : le travail attend à part. ${commit} l'y met.` }));
+      ? t("The work is in your folder, on a work branch. {0} puts it on your branch; \"Undo\" gives your folder back as it was.", commit)
+      : t("Your folder has not changed yet: the work waits apart. {0} puts it there.", commit) }));
     // Ways out, none forced: commit, look, ask for a change, set aside or undo.
-    const change = el("textarea", { placeholder: "Ce qu'il faut changer", ariaLabel: "Ce qu'il faut changer", hidden: true });
-    const fix = el("button", { type: "button", textContent: "Corriger" });
+    const change = el("textarea", { placeholder: t("What to change"), ariaLabel: t("What to change"), hidden: true });
+    const fix = el("button", { type: "button", textContent: t("Correct") });
     fix.onclick = () => {
       change.hidden = false;
       change.focus();
-      fix.replaceWith(action("Envoyer", "/api/amend", () => ({ id: item.id, text: images.value() })));
+      fix.replaceWith(action(t("Send"), "/api/amend", () => ({ id: item.id, text: images.value() })));
     };
     const images = attach(change);
     if (item.land) actions.append(Object.assign(action(landLabel(item.land), "/api/land", { id: item.id }, { primary: true }), { title: landTitle(item.land) }));
     if (item.page) actions.append(pageButton(item));
     actions.append(changesButton(item, () => node.querySelector(".changes-slot")),
       codeButton(item, () => node.querySelector(".changes-slot")), fix,
-      action("Passer", "/api/pass", { id: item.id }), el("span", { className: "spacer" }), dropButton(item.id, true));
+      action(t("Pass"), "/api/pass", { id: item.id }), el("span", { className: "spacer" }), dropButton(item.id, true));
     add(el("div", { className: "reply" }, change, images.node), actions, el("div", { className: "error", role: "alert" }),
       el("div", { className: "changes-slot" }), doneWhen(item), ...work(item), shots(item), ...facts(item));
   } else if (item.kind === "later") {
     // Kept, not started: read in the details, said again there if need be,
     // then launched.
     let images;
-    const save = el("button", { type: "button", textContent: "Enregistrer", hidden: true });
+    const save = el("button", { type: "button", textContent: t("Save"), hidden: true });
     save.onclick = async () => {
       const error = errorOf(save);
       error.textContent = "";
@@ -1005,14 +1067,14 @@ function card(item) {
       detailed = "";
       refresh(true);
     };
-    const edit = el("button", { type: "button", textContent: "Éditer" });
+    const edit = el("button", { type: "button", textContent: t("Edit") });
     edit.onclick = () => {
-      const text = el("textarea", { className: "later-text", defaultValue: item.title, ariaLabel: "La tâche" });
+      const text = el("textarea", { className: "later-text", defaultValue: item.title, ariaLabel: t("The task") });
       images = attach(text, item.images);
       const reply = el("div", { className: "reply" }, text, images.node);
       // The field takes the place of the task as the details read it.
       const more = node.querySelector("details.more");
-      const read = [...(more?.querySelectorAll("h3") ?? [])].find((h) => h.textContent === "La tâche");
+      const read = [...(more?.querySelectorAll("h3") ?? [])].find((h) => h.textContent === t("The task"));
       read?.nextSibling.remove();
       read?.remove();
       if (more) { more.open = true; more.firstChild.after(reply); } else node.prepend(reply);
@@ -1023,25 +1085,25 @@ function card(item) {
     // Framed ahead: said once, with what fennec understood. A task that fits
     // in its title has nothing else to read: said too, rather than a blank.
     const more = (item.title ?? "").trim().includes("\n");
-    add(item.framed ? el("div", { className: "proved", textContent: "✓ Préparée : fennec a compris la tâche, elle partira sans question" }) : null,
-      doneWhen(item), !item.framed && !more && !item.done_when ? el("div", { className: "muted", textContent: "La tâche tient dans son titre." }) : null);
+    add(item.framed ? el("div", { className: "proved", textContent: t("✓ Prepared: fennec understood the task, it will start without a question") }) : null,
+      doneWhen(item), !item.framed && !more && !item.done_when ? el("div", { className: "muted", textContent: t("The task fits in its title.") }) : null);
     const fleet = item.fleet
-      ? action("Retirer de la Fleet", "/api/fleet/place", { id: item.id, action: "remove" })
-      : action("Dans la Fleet", "/api/fleet/place", { id: item.id, action: "add" });
-    actions.append(action("Lancer", "/api/launch", { id: item.id }, { primary: true }), fleet, edit, save,
-      action("Supprimer", "/api/forget", { id: item.id }, { quiet: true }));
+      ? action(t("Remove from the Fleet"), "/api/fleet/place", { id: item.id, action: "remove" })
+      : action(t("Into the Fleet"), "/api/fleet/place", { id: item.id, action: "add" });
+    actions.append(action(t("Start"), "/api/launch", { id: item.id }, { primary: true }), fleet, edit, save,
+      action(t("Delete"), "/api/forget", { id: item.id }, { quiet: true }));
     if (saved === item.id) {
       saved = "";
-      const kept = el("div", { className: "proved", textContent: "✓ Enregistré" });
+      const kept = el("div", { className: "proved", textContent: t("✓ Saved") });
       actions.append(kept);
       setTimeout(() => kept.remove(), 3000);
     }
   } else if (item.kind === "failed") {
     add(stages(item), why(item.reason), conversation(item), doneWhen(item), ...work(item), shots(item), ...facts(item));
-    // Back to "Plus tard", as written: reworded there, launched again or given to the Fleet.
+    // Back to "Later", as written: reworded there, launched again or given to the Fleet.
     actions.append(dropButton(item.id, true), el("span", { className: "spacer" }),
-      action("Remettre à plus tard", "/api/later", { id: item.id }),
-      action("Réessayer", "/api/retry", { id: item.id }, { primary: true }));
+      action(t("Put back for later"), "/api/later", { id: item.id }),
+      action(t("Retry"), "/api/retry", { id: item.id }, { primary: true }));
   }
   // What was said to the model so far, on every card with a choice to make.
   actions.querySelector(".spacer")?.after(journalButton(item, () => node.querySelector(".changes-slot")));
@@ -1054,30 +1116,38 @@ function card(item) {
 // Why it failed in a sentence; a long tail (the command that failed, its
 // output) goes in a block of its own instead of a wall of red.
 function why(reason) {
-  const text = explain(reason) || "raison inconnue";
-  const cut = text.length > 140 ? text.indexOf(" : ") : -1;
-  if (cut < 0) return el("div", { className: "bad", textContent: text });
-  return el("div", {}, el("div", { className: "bad", textContent: text.slice(0, cut) }),
-    el("pre", { className: "why", textContent: text.slice(cut + 3) }));
+  const text = explain(reason) || t("unknown reason");
+  // The first colon, French spaced (" : ") or English (": ").
+  const at = text.length > 140 ? text.search(/ ?: /) : -1;
+  if (at < 0) return el("div", { className: "bad", textContent: text });
+  const rest = text.slice(at).replace(/^ ?: /, "");
+  return el("div", {}, el("div", { className: "bad", textContent: text.slice(0, at) }),
+    el("pre", { className: "why", textContent: rest }));
 }
 
 // When the work started straight from the request, "done when" is the
 // request itself: the title says it already.
 function doneWhen(item) {
   const same = (item.done_when ?? "").trim() === (item.title ?? "").trim();
-  return item.done_when && !same ? focus("Terminé quand", item.done_when) : null;
+  return item.done_when && !same ? focus(t("Done when"), item.done_when) : null;
+}
+
+// A step the server says with a task's name in it.
+function stepText(step) {
+  const m = step.match(/^waits its turn: (.*) holds the folder$/s);
+  return m ? t("waits its turn: {0} holds the folder", m[1]) : t(step);
 }
 
 function line(item, state, dot) {
   // A state, when one is said: the requests say theirs, a discussion says none.
   const stateNode = Array.isArray(state)
-    ? el("span", { className: "status " + state[1], textContent: state[0] })
-    : state ? el("span", { className: "state", textContent: state }) : null;
+    ? el("span", { className: "status " + state[1], textContent: t(state[0]) })
+    : state ? el("span", { className: "state", textContent: stepText(state) }) : null;
   // Under way, the figures are the last finished step's: how long it has run says more.
   if (dot && item.since) {
     // Queued, not working: a static age, redrawn with the list, no tick.
     const elapsed = item.waiting
-      ? el("span", { textContent: "depuis " + duration(Date.now() - item.since * 1000) })
+      ? el("span", { textContent: t("for {0}", duration(Date.now() - item.since * 1000)) })
       : el("span", { className: "elapsed" });
     if (!item.waiting) elapsed.dataset.since = item.since;
     return el("div", { className: "line" }, el("span", { className: item.waiting ? "dot idle" : "dot" }),
@@ -1089,7 +1159,7 @@ function line(item, state, dot) {
   return el("div", { className: "line" }, dot ? el("span", { className: "dot" }) : null,
     el("span", { className: "muted proj", textContent: item.project }),
     el("span", { className: "what clip", title: item.title, textContent: headline(item.title) }),
-    s?.turns ? el("span", { className: "state cost", title: "temps de modèle · tokens envoyés · générés" },
+    s?.turns ? el("span", { className: "state cost", title: t("model time · tokens sent · generated") },
       el("span", { className: "mini", textContent: `⏱ ${duration(s.ms)}` }), el("span", { className: "mini", textContent: `↑ ${compact(s.sent)}` }),
       el("span", { className: "mini", textContent: `↓ ${compact(s.received)}` })) : null,
     stateNode);
@@ -1110,9 +1180,9 @@ function past(item) {
   if (done) box.append(done);
   box.append(...work(item));
   const tried = item.tries?.length ?? 0;
-  if (tried) box.append(el("div", { className: "proved", textContent: `✓ fennec l'a essayé : ${tried} essai${tried > 1 ? "s" : ""} réussi${tried > 1 ? "s" : ""}` }));
+  if (tried) box.append(el("div", { className: "proved", textContent: tried > 1 ? t("✓ fennec tried it: {0} tries passed", tried) : t("✓ fennec tried it: {0} try passed", tried) }));
   if (item.unverified?.length) {
-    box.append(el("div", { className: "muted", textContent: "Non vérifié :" }),
+    box.append(el("div", { className: "muted", textContent: t("Not verified:") }),
       el("ul", { className: "warn" }, ...item.unverified.map((w) => el("li", {}, ...rich(w)))));
   }
   const s = shots(item);
@@ -1124,30 +1194,30 @@ function past(item) {
   const actions = el("div", { className: "actions" });
   actions.append(journalButton(item, () => slot));
   if (item.changed) actions.append(changesButton(item, () => slot));
-  if (item.kind === "passed") actions.append(action("Reprendre", "/api/resume", { id: item.id }, { primary: true }));
-  actions.append(action("Archiver", "/api/request/archive", { id: item.id }, { quiet: true }), forgetButton(item.id));
+  if (item.kind === "passed") actions.append(action(t("Resume"), "/api/resume", { id: item.id }, { primary: true }));
+  actions.append(action(t("Archive"), "/api/request/archive", { id: item.id }, { quiet: true }), forgetButton(item.id));
   box.append(slot, el("div", { className: "past-actions" }, actions, el("div", { className: "error", role: "alert" })));
   return box;
 }
 
 function pastState(item) {
-  if (item.kind === "passed") return "mis de côté";
-  if (item.kind === "dropped") return "abandonné";
-  const parts = [item.branch, item.remote && `poussé vers ${item.remote}`, item.commit?.slice(0, 7)];
+  if (item.kind === "passed") return t("set aside");
+  if (item.kind === "dropped") return t("dropped");
+  const parts = [item.branch, item.remote && t("pushed to {0}", item.remote), item.commit?.slice(0, 7)];
   return "✓ commit " + parts.filter(Boolean).join(" · ");
 }
 
 // Where a request stands, in one coloured word: the list says it per row in
 // the muted, the page says it in a pill the human sees at a glance.
 function statusOf(item, kind) {
-  if (kind === "run") return item.waiting ? ["en attente", "muted"] : ["en cours", "info"];
+  if (kind === "run") return item.waiting ? [t("waiting"), "muted"] : [t("running"), "info"];
   if (kind === "past") {
-    if (item.kind === "passed") return ["mis de côté", "warn"];
-    if (item.kind === "dropped") return ["abandonné", "bad"];
+    if (item.kind === "passed") return [t("set aside"), "warn"];
+    if (item.kind === "dropped") return [t("dropped"), "bad"];
     return [pastState(item), "ok"];
   }
   const [label, color] = TAGS[item.kind];
-  return [label, color.replace("var(--", "").replace(")", "")];
+  return [t(label), color.replace("var(--", "").replace(")", "")];
 }
 
 // A request's first paragraph: what it asks. What follows (a plan step's
@@ -1170,7 +1240,7 @@ function reqHead(item, kind) {
   setIcon(facts, "panelRight");
   const paint = () => facts.setAttribute("aria-label",
     facts.setAttribute("title", document.body.classList.contains("facts-off")
-      ? "Afficher le coût" : "Masquer le coût"));
+      ? t("Show the cost") : t("Hide the cost")));
   paint();
   facts.onclick = () => { setFacts(!document.body.classList.contains("facts-off")); paint(); };
   head.append(facts);
@@ -1197,7 +1267,7 @@ function renderProjects(projects) {
   // With several projects, none is preselected: a silent default sends a
   // request to the wrong project.
   // The empty choice is also the view of every project at once.
-  const prompt = projects.length ? "Tous les projets" : "Aucun projet";
+  const prompt = projects.length ? t("All projects") : t("No project");
   const none = projects.length === 1 ? [] : [new Option(prompt, "")];
   select.replaceChildren(...none, ...projects.map((p) => new Option(p.name, p.path)));
   if (projects.some((p) => p.path === current)) select.value = current;
@@ -1220,11 +1290,11 @@ function renderSide(view) {
     button.setAttribute("aria-current", String(tasks && $("project").value === path));
     button.onclick = () => pick(path);
     button.querySelectorAll(".count, .dot").forEach((e) => e.remove());
-    if (path && view.running.some((i) => i.path === path)) button.append(el("span", { className: "dot", title: "fennec y travaille" }));
-    if (n) button.append(el("span", { className: "count", title: "t'attend", textContent: n }));
+    if (path && view.running.some((i) => i.path === path)) button.append(el("span", { className: "dot", title: t("fennec works on it") }));
+    if (n) button.append(el("span", { className: "count", title: t("waits for you"), textContent: n }));
     return button;
   };
-  // The Tâches mode stays in sight, even with one project.
+  // The Tasks mode stays in sight, even with one project.
   entry($("side-all"), "", view.todo);
   $("side-projects").replaceChildren(...view.projects.map((p) => projectEntry(p, entry, view.todo)));
   // The archived projects, out of the select: brought back or erased there.
@@ -1267,13 +1337,13 @@ function sideCall(path, body) {
 function projectEntry(p, entry, todo) {
   const button = el("button", { type: "button", className: "item", title: p.path },
     el("span", { className: "name", textContent: p.name }));
-  const archive = el("button", { type: "button", className: "icon", ariaLabel: "Archiver le projet", title: "Archiver" });
+  const archive = el("button", { type: "button", className: "icon", ariaLabel: t("Archive the project"), title: t("Archive") });
   setIcon(archive, "inbox");
   archive.onclick = () => sideCall("/api/projects/archive", { path: p.path, on: true });
-  const del = el("button", { type: "button", className: "icon", ariaLabel: "Supprimer le projet", title: "Supprimer" });
+  const del = el("button", { type: "button", className: "icon", ariaLabel: t("Delete the project"), title: t("Delete") });
   setIcon(del, "trash");
   del.onclick = () => {
-    const sure = el("button", { type: "button", className: "quiet", textContent: "Confirmer" });
+    const sure = el("button", { type: "button", className: "quiet", textContent: t("Confirm") });
     sure.style.color = "var(--bad)";
     sure.onclick = () => sideCall("/api/projects/remove", { path: p.path });
     del.replaceWith(sure);
@@ -1282,13 +1352,13 @@ function projectEntry(p, entry, todo) {
   return el("li", { className: "project" }, button, archive, del);
 }
 function archivedProjectEntry(p) {
-  const restore = el("button", { type: "button", className: "icon", ariaLabel: "Rétablir le projet", title: "Rétablir" });
+  const restore = el("button", { type: "button", className: "icon", ariaLabel: t("Restore the project"), title: t("Restore") });
   setIcon(restore, "undo");
   restore.onclick = () => sideCall("/api/projects/archive", { path: p.path, on: false });
-  const del = el("button", { type: "button", className: "icon", ariaLabel: "Supprimer le projet", title: "Supprimer" });
+  const del = el("button", { type: "button", className: "icon", ariaLabel: t("Delete the project"), title: t("Delete") });
   setIcon(del, "trash");
   del.onclick = () => {
-    const sure = el("button", { type: "button", className: "quiet", textContent: "Confirmer" });
+    const sure = el("button", { type: "button", className: "quiet", textContent: t("Confirm") });
     sure.style.color = "var(--bad)";
     sure.onclick = () => sideCall("/api/projects/remove", { path: p.path });
     del.replaceWith(sure);
@@ -1328,7 +1398,7 @@ async function showChats() {
   document.body.classList.add("chats");
   // Narrow: the list of discussions gives way only to an open one.
   document.body.classList.toggle("picked", !!where().id);
-  // Coming from Équipe, Stats or Réglages: their class hides the list column.
+  // Coming from Team, Stats or Settings: their class hides the list column.
   document.body.classList.remove("paged");
   $("chats").hidden = false;
   $("page").hidden = true;
@@ -1345,18 +1415,18 @@ async function showChats() {
   }
   const nodes = chats.length
     ? chatGroups(chats)
-    : [el("div", { className: "empty", textContent: "Aucune discussion : « Nouvelle discussion » pour en démarrer." })];
+    : [el("div", { className: "empty", textContent: t("No discussion: \"New discussion\" starts one.") })];
   // The archived discussions, out of the groups: brought back or erased there.
   if (archived.length) nodes.push(el("div", { className: "chat-archived" },
-    el("h2", { textContent: "Archivées" }), ...archived.map((c) => chatRow(c, true, true))));
+    el("h2", { textContent: t("Archived") }), ...archived.map((c) => chatRow(c, true, true))));
   $("chat-list").replaceChildren(...nodes);
   const id = where().id;
   if (!id) {
     chatBox = null;
     detailed = "";
     return $("pick").replaceChildren(el("p", { className: "muted", textContent: chats.length
-      ? "Choisis une discussion à gauche pour la lire et continuer, ou « Nouvelle discussion » pour en démarrer une."
-      : "« Nouvelle discussion » pour en démarrer une." }));
+      ? t("Pick a discussion on the left to read and go on, or \"New discussion\" to start one.")
+      : t("\"New discussion\" starts one.") }));
   }
   let c;
   try {
@@ -1387,7 +1457,7 @@ function chatGroup(folder, g) {
   const open = chatOpen.has(folder);
   const head = el("button", { type: "button", className: "chat-group-head", title: folder },
     el("span", { className: "what", textContent: folder.split("/").pop() }),
-    g.project ? el("span", { className: "tag", style: "--c: var(--ok)", textContent: "projet" }) : null,
+    g.project ? el("span", { className: "tag", style: "--c: var(--ok)", textContent: t("project") }) : null,
     el("span", { className: "count", textContent: g.rows.length }));
   head.setAttribute("aria-expanded", String(open));
   setIcon(head, "chevron");
@@ -1434,7 +1504,7 @@ function showChat(c) {
   const box = chatBox;
   box.head.replaceChildren(
     el("div", { className: "meta", style: `--c: ${c.project ? "var(--ok)" : "var(--muted)"}` },
-      el("span", { className: "tag", textContent: c.project ? "Projet" : "Dossier" }),
+      el("span", { className: "tag", textContent: c.project ? t("Project") : t("Folder") }),
       el("span", { className: "proj", textContent: c.folder })),
     el("div", { className: "title", textContent: chatTitle(c) }));
   // What was opened stays open as new messages come in; the page follows the
@@ -1448,12 +1518,12 @@ function showChat(c) {
     box.threadKey = threadKey;
     const opened = [...box.thread.querySelectorAll("details")].map((d) => d.open);
     box.thread.replaceChildren(...chatThread(c, box.composer));
-    if (thinking) box.thread.append(el("div", { className: "thinking" }, el("span", { className: "dot" }), "fennec répond…"));
+    if (thinking) box.thread.append(el("div", { className: "thinking" }, el("span", { className: "dot" }), t("fennec is answering…")));
     // A turn that waits on the person is the last thing on screen: on top of
     // the exchange, it would read as a turn that stopped answering.
     if (c.status === "waiting" && c.pending) {
       box.thread.append(chatQuestion(c));
-      box.thread.append(el("div", { className: "thinking" }, el("span", { className: "dot" }), "fennec attend ta réponse"));
+      box.thread.append(el("div", { className: "thinking" }, el("span", { className: "dot" }), t("fennec waits for your answer")));
     }
     if (c.error) box.thread.append(el("div", { className: "bad", textContent: explain(c.error) }));
     box.thread.querySelectorAll("details").forEach((d, i) => { d.open = opened[i] ?? false; });
@@ -1470,12 +1540,12 @@ function showChat(c) {
 }
 
 // A call named a path outside the folder the person chose: fennec asks
-// before running it. "Ouvrir" opens that path's folder for the chat; the
+// before running it. "Open" opens that path's folder for the chat; the
 // refusal covers this call only.
 function chatQuestion(c) {
   const p = c.pending ?? {};
-  const open = el("button", { type: "button", className: "primary", textContent: "Ouvrir le dossier" });
-  const refuse = el("button", { type: "button", className: "quiet", textContent: "Refuser" });
+  const open = el("button", { type: "button", className: "primary", textContent: t("Open the folder") });
+  const refuse = el("button", { type: "button", className: "quiet", textContent: t("Refuse") });
   const decide = async (allow) => {
     $("chat-error").textContent = "";
     try {
@@ -1489,8 +1559,8 @@ function chatQuestion(c) {
   // One of the person's rules asks first: once, for the rest of the chat,
   // or not at all (the call does not run, fennec does without).
   if (p.tool === "rule") {
-    const chat = el("button", { type: "button", textContent: "Pour cette discussion" });
-    open.textContent = "Autoriser une fois";
+    const chat = el("button", { type: "button", textContent: t("For this discussion") });
+    open.textContent = t("Allow once");
     chat.onclick = async () => {
       $("chat-error").textContent = "";
       try {
@@ -1499,17 +1569,18 @@ function chatQuestion(c) {
         $("chat-error").textContent = e.message;
       }
     };
-    const why = p.rule?.why ? `${p.rule.why} (règle « ${p.rule.pattern} »)` : `règle « ${p.rule?.pattern ?? ""} »`;
+    const rule = t("rule \"{0}\"", p.rule?.pattern ?? "");
+    const why = p.rule?.why ? `${t(p.rule.why)} (${rule})` : rule;
     return el("div", { className: "ask" },
-      el("span", { className: "muted", textContent: `fennec demande : ${why}` }),
+      el("span", { className: "muted", textContent: t("fennec asks: {0}", why) }),
       el("code", { title: p.call, textContent: p.call ?? p.target }),
       el("div", { className: "chat-actions" }, open, chat, refuse));
   }
   // A plan to approve: approved, the folder opens for changes and fennec
   // applies it; otherwise the discussion goes on, read-only.
   if (p.tool === "propose_plan") {
-    open.textContent = "Appliquer le plan";
-    refuse.textContent = "Continuer à discuter";
+    open.textContent = t("Apply the plan");
+    refuse.textContent = t("Keep discussing");
     const actions = el("div", { className: "chat-actions" }, open);
     // A plan in steps (as fennec gave them, or else its numbered sections):
     // each step can become a task of its own, kept for later; a folder that
@@ -1517,8 +1588,8 @@ function chatQuestion(c) {
     // make it. The turn ends there.
     const steps = p.steps?.length > 1 ? p.steps : planSteps(p.plan ?? "");
     if (steps.length > 1) {
-      const split = el("button", { type: "button", textContent: `En faire ${steps.length} tâches` });
-      if (!c.project) split.title = "Le dossier devient un projet";
+      const split = el("button", { type: "button", textContent: t("Make {0} tasks of it", steps.length) });
+      if (!c.project) split.title = t("The folder becomes a project");
       split.onclick = async () => {
         $("chat-error").textContent = "";
         split.disabled = true;
@@ -1539,12 +1610,12 @@ function chatQuestion(c) {
     }
     actions.append(refuse);
     return el("div", { className: "ask plan" },
-      el("span", { className: "muted", textContent: "fennec propose ce plan et demande à modifier le dossier" }),
+      el("span", { className: "muted", textContent: t("fennec proposes this plan and asks to change the folder") }),
       el("div", { className: "said" }, ...md(p.plan ?? "")),
       actions);
   }
   return el("div", { className: "ask" },
-    el("span", { className: "muted", textContent: "fennec demande" }),
+    el("span", { className: "muted", textContent: t("fennec asks") }),
     el("code", { title: p.path, textContent: p.path }),
     el("span", { className: "muted", title: p.directory, textContent: p.directory }),
     open, refuse);
@@ -1572,7 +1643,7 @@ function planSteps(plan) {
 
 function chatTitle(c) {
   const first = (c.messages ?? []).find((m) => m.role === "user")?.content;
-  if (!first) return "Nouvelle discussion";
+  if (!first) return t("New discussion");
   return headline(first);
 }
 
@@ -1588,7 +1659,7 @@ function headline(text) {
 // calls folded, each with what it brought back.
 function chatThread(c, acts) {
   const calls = new Map();
-  for (const m of c.messages ?? []) for (const t of m.tool_calls ?? []) calls.set(t.id, t);
+  for (const m of c.messages ?? []) for (const call of m.tool_calls ?? []) calls.set(call.id, call);
   const results = new Map();
   for (const m of c.messages ?? []) if (m.role === "tool") results.set(m.tool_call_id, m.content);
   const nodes = [];
@@ -1602,22 +1673,22 @@ function chatThread(c, acts) {
       asked = i;
       nodes.push(el("div", { className: "msg human" },
         el("div", { className: "said human" },
-          el("span", { className: "label", textContent: "Toi" }), ...rich(m.content)),
+          el("span", { className: "label", textContent: t("You") }), ...rich(m.content)),
         acts && msgActions(copyButton(m.content),
-          iconButton("pencil", "Modifier", () => acts.again(i, m.content)))));
+          iconButton("pencil", t("Edit"), () => acts.again(i, m.content)))));
       continue;
     }
     const box = el("div", { className: "said" }, el("span", { className: "label", textContent: "fennec" }));
     if (m.content) box.append(...md(m.content));
-    for (const t of m.tool_calls ?? []) box.append(toolCall(t, results.get(t.id)));
+    for (const call of m.tool_calls ?? []) box.append(toolCall(call, results.get(call.id)));
     const from = asked;
     nodes.push(el("div", { className: "msg" }, box,
       acts && m.content && msgActions(copyButton(m.content),
-        iconButton("replay", "Régénérer", () => acts.replay(from, c.messages[from].content)))));
+        iconButton("replay", t("Regenerate"), () => acts.replay(from, c.messages[from].content)))));
   }
   // The last message keeps its icons in sight, as chat apps do.
   if (nodes.length) nodes.at(-1).className += " last";
-  return nodes.length ? nodes : [el("div", { className: "muted", textContent: "Écris ce qui t'intéresse : fennec lit le dossier et répond." })];
+  return nodes.length ? nodes : [el("div", { className: "muted", textContent: t("Write what you are after: fennec reads the folder and answers.") })];
 }
 
 // The small icons under a message, as chat apps have them.
@@ -1633,7 +1704,7 @@ function iconButton(icon, label, onclick) {
 }
 
 function copyButton(text) {
-  const b = iconButton("copy", "Copier", async () => {
+  const b = iconButton("copy", t("Copy"), async () => {
     try {
       await navigator.clipboard.writeText(text);
       setIcon(b, "check");
@@ -1643,9 +1714,9 @@ function copyButton(text) {
   return b;
 }
 
-function toolCall(t, result) {
-  const args = t.function?.arguments ?? "";
-  const head = `→ ${t.function?.name ?? "?"} ${String(args).replace(/\s+/g, " ").slice(0, 110)}`;
+function toolCall(call, result) {
+  const args = call.function?.arguments ?? "";
+  const head = `→ ${call.function?.name ?? "?"} ${String(args).replace(/\s+/g, " ").slice(0, 110)}`;
   return el("details", { className: "message" },
     el("summary", {}, head),
     args ? el("pre", { textContent: args }) : null,
@@ -1653,24 +1724,24 @@ function toolCall(t, result) {
 }
 
 function chatComposer(id) {
-  const text = el("textarea", { placeholder: "Ton message", ariaLabel: "Ton message" });
+  const text = el("textarea", { placeholder: t("Your message"), ariaLabel: t("Your message") });
   const images = attach(text);
-  const stop = el("button", { type: "button", className: "stop", textContent: "Arrêter", hidden: true });
+  const stop = el("button", { type: "button", className: "stop", textContent: t("Stop"), hidden: true });
   setIcon(stop, "stop");
-  const send = el("button", { type: "button", className: "primary", textContent: "Envoyer" });
+  const send = el("button", { type: "button", className: "primary", textContent: t("Send") });
   // Set when one of the person's messages is being said again.
   let from = null;
-  const cancel = el("button", { type: "button", className: "quiet", textContent: "Annuler" });
+  const cancel = el("button", { type: "button", className: "quiet", textContent: t("Cancel") });
   const replaying = el("div", { className: "replaying", hidden: true },
-    el("span", { className: "muted", textContent: "Tu rejoues ce message : la suite de l'échange sera effacée, les fichiers modifiés restent tels quels." }),
+    el("span", { className: "muted", textContent: t("You are saying this message again: the rest of the exchange will be erased, changed files stay as they are.") }),
     cancel);
-  const replayOff = () => { from = null; replaying.hidden = true; send.textContent = "Envoyer"; };
+  const replayOff = () => { from = null; replaying.hidden = true; send.textContent = t("Send"); };
   cancel.onclick = () => { replayOff(); images.clear(); };
   const again = (index, content) => {
     from = index;
     text.value = content;
     replaying.hidden = false;
-    send.textContent = "Rejouer";
+    send.textContent = t("Say again");
     text.focus();
   };
   // Regenerating a reply: the message it answers, said again as it was.
@@ -1709,7 +1780,7 @@ function chatAside(c) {
   // not asking to build it.
   const write = c.write === true;
   const toggle = el("button", { type: "button", className: write ? "quiet" : "primary",
-    textContent: write ? "Repasser en lecture seule" : "Autoriser les modifications" });
+    textContent: write ? t("Back to read-only") : t("Allow changes") });
   setIcon(toggle, write ? "lock" : "pencil");
   toggle.onclick = async () => {
     $("chat-error").textContent = "";
@@ -1720,10 +1791,10 @@ function chatAside(c) {
       $("chat-error").textContent = e.message;
     }
   };
-  nodes.push(el("h2", { textContent: "Mode" }),
+  nodes.push(el("h2", { textContent: t("Mode") }),
     el("p", { className: "muted", textContent: write
-      ? "fennec modifie le dossier directement."
-      : "Lecture seule : fennec lit, discute et propose un plan." }),
+      ? t("fennec changes the folder directly.")
+      : t("Read-only: fennec reads, discusses and proposes a plan.") }),
     toggle);
   // Folders the person opened for this chat: a refusal was not, an opening
   // stays until taken back.
@@ -1731,7 +1802,7 @@ function chatAside(c) {
   if (grants.length) {
     const ul = el("ul");
     for (const g of grants) {
-      const b = el("button", { type: "button", textContent: "Retirer" });
+      const b = el("button", { type: "button", textContent: t("Remove") });
       b.onclick = async () => {
         $("chat-error").textContent = "";
         try {
@@ -1743,7 +1814,7 @@ function chatAside(c) {
       };
       ul.append(el("li", {}, el("span", { className: "what", title: g }, g), b));
     }
-    nodes.push(el("h2", { textContent: "Dossiers ouverts" }), ul);
+    nodes.push(el("h2", { textContent: t("Opened folders") }), ul);
   }
   // The approved plan's steps: the turn works through them, one by one.
   const plan = (c.criteria ?? []).filter((s) => s.state !== "rule");
@@ -1757,11 +1828,11 @@ function chatAside(c) {
       if (ok) setIcon(li, "check");
       ul.append(li);
     }
-    nodes.push(el("h2", { textContent: `Plan · ${met}/${plan.length}` }), ul);
+    nodes.push(el("h2", { textContent: t("Plan · {0}/{1}", met, plan.length) }), ul);
   }
-  if (c.stats?.turns) nodes.push(el("h2", { textContent: "Coût" }), metrics(c.stats));
+  if (c.stats?.turns) nodes.push(el("h2", { textContent: t("Cost") }), metrics(c.stats));
   const button = el("button", { type: "button", className: "convert",
-    textContent: c.project ? "En faire une tâche" : "En faire un projet" });
+    textContent: c.project ? t("Make it a task") : t("Make it a project") });
   button.onclick = async () => {
     $("chat-error").textContent = "";
     try {
@@ -1770,13 +1841,13 @@ function chatAside(c) {
         const made = await api("/api/chat/request", { id: c.id });
         location.hash = hashOf(c.folder, made.id);
       } else {
-        openPicker("project", "En faire un projet", c.folder);
+        openPicker("project", t("Make it a project"), c.folder);
       }
     } catch (e) {
       $("chat-error").textContent = explain(e.message);
     }
   };
-  nodes.push(el("h2", { textContent: c.project ? "Tâche" : "Projet" }), button);
+  nodes.push(el("h2", { textContent: c.project ? t("Task") : t("Project") }), button);
   return nodes;
 }
 
@@ -1785,7 +1856,7 @@ async function refresh(force) {
   // Never wipe what the human is typing in the request read in full; the
   // rest keeps up. (Holding the whole page whenever focus sat in that pane
   // froze it after a mere click on a tab.)
-  const typing = !force && ([...document.querySelectorAll("#detail textarea, #detail input")].some((t) => t.value !== t.defaultValue)
+  const typing = !force && ([...document.querySelectorAll("#detail textarea, #detail input")].some((f) => f.value !== f.defaultValue)
     || document.activeElement?.matches("#detail textarea, #detail input"));
   // The Fleet's waits move with the folders, not only with the requests.
   if (where().path === "fleet" && shownPageKey.startsWith("fleet")) showFleet().catch(() => {});
@@ -1826,15 +1897,15 @@ async function refresh(force) {
       a.setAttribute("aria-current", String(item.id === picked));
       return actions ? rowWrap(a, actions) : a;
     };
-    fill($("todo"), todo.map((i) => row(i, line(i, TAGS[i.kind][0]))), "Rien ne t'attend.");
+    fill($("todo"), todo.map((i) => row(i, line(i, TAGS[i.kind][0]))), t("Nothing waits for you."));
     $("n-todo").textContent = todo.length || "";
     // Seen from another tab: what waits for the human, in the tab's title.
     const others = view.todo.length - todo.length;
-    $("n-others").textContent = others ? `${others} autre${others > 1 ? "s" : ""} t'attend${others > 1 ? "ent" : ""} ailleurs` : "";
+    $("n-others").textContent = !others ? "" : others > 1 ? t("{0} others wait for you elsewhere", others) : t("{0} other waits for you elsewhere", others);
     const name = $("project").selectedOptions[0]?.value ? $("project").selectedOptions[0].text : "fennec";
     document.title = todo.length ? `(${todo.length}) ${name}` : name;
     fill($("running"), running.map((i) => row(i, line(i, i.step, true),
-      rowActions(i.id, { stop: "/api/stop" }))), "Rien en cours.");
+      rowActions(i.id, { stop: "/api/stop" }))), t("Nothing running."));
     // The backlog: only there when it holds something.
     const later = mine(view.later ?? []);
     $("later-box").hidden = !later.length;
@@ -1842,16 +1913,16 @@ async function refresh(force) {
     // Ticked rows survive a redraw: the list moves under the human's hand.
     ticked = new Set([...ticked].filter((id) => later.some((i) => i.id === id)));
     fill($("later"), later.map((i) => {
-      const box = el("input", { type: "checkbox", checked: ticked.has(i.id), ariaLabel: "Choisir " + headline(i.title) });
+      const box = el("input", { type: "checkbox", checked: ticked.has(i.id), ariaLabel: t("Pick {0}", headline(i.title)) });
       box.onchange = () => { box.checked ? ticked.add(i.id) : ticked.delete(i.id); showPicked(later); };
-      return el("div", { className: "pick-row" }, box, row(i, line(i, i.fleet ? "dans la Fleet" : "à lancer"),
+      return el("div", { className: "pick-row" }, box, row(i, line(i, i.fleet ? "in the Fleet" : "to start"),
         rowActions(i.id, { archive: "/api/request/archive", forget: "/api/forget" })));
     }), "");
     showPicked(later);
     showFleetBar(view.fleet, later.length);
     const history = mine(view.history);
     fill($("history"), history.map((i) => row(i, line(i, pastState(i), false),
-      rowActions(i.id, { archive: "/api/request/archive", forget: "/api/forget" }))), "Rien de terminé pour l'instant.");
+      rowActions(i.id, { archive: "/api/request/archive", forget: "/api/forget" }))), t("Nothing finished yet."));
     // The archived requests, out of the lists: brought back or erased there.
     const archived = mine(view.archived ?? []);
     $("archived-box").hidden = !archived.length;
@@ -1866,7 +1937,7 @@ async function refresh(force) {
     // Its figures move as its requests do.
     if (paged && !force) showPage(paged).catch(() => {});
   } catch (e) {
-    $("error").textContent = "Serveur injoignable : " + e.message;
+    $("error").textContent = t("Server unreachable: {0}", e.message);
   }
 }
 
@@ -1894,14 +1965,14 @@ function showPicked(later) {
     iconize(b);
     return b;
   };
-  const all = el("button", { type: "button", className: "quiet", textContent: ticked.size === later.length ? "Aucune" : "Toutes" });
+  const all = el("button", { type: "button", className: "quiet", textContent: ticked.size === later.length ? t("None") : t("All") });
   all.onclick = () => {
     ticked = ticked.size === later.length ? new Set() : new Set(later.map((i) => i.id));
     refresh(true);
   };
-  bar.replaceChildren(el("span", { textContent: `${ticked.size} choisie${ticked.size > 1 ? "s" : ""}` }), all,
+  bar.replaceChildren(el("span", { textContent: t("{0} picked", ticked.size) }), all,
     el("span", { className: "spacer" }),
-    ...[send("Dans la Fleet", "add", ids.filter((i) => !i.fleet)), send("Retirer de la Fleet", "remove", ids.filter((i) => i.fleet))].filter(Boolean), error);
+    ...[send(t("Into the Fleet"), "add", ids.filter((i) => !i.fleet)), send(t("Remove from the Fleet"), "remove", ids.filter((i) => i.fleet))].filter(Boolean), error);
 }
 
 // The Fleet from the list: whether it runs, how many wait, and its switch.
@@ -1912,7 +1983,7 @@ function showFleetBar(fleet, later) {
   bar.classList.toggle("on", fleet.on && fleet.queued > 0);
   const name = el("a", { href: "#fleet", textContent: "Fleet" });
   setIcon(name, "fleet");
-  const toggle = el("button", { type: "button", textContent: fleet.on ? "Arrêter" : "Démarrer" });
+  const toggle = el("button", { type: "button", textContent: fleet.on ? t("Stop") : t("Start") });
   setIcon(toggle, fleet.on ? "pause" : "play");
   toggle.onclick = async () => {
     try {
@@ -1923,7 +1994,7 @@ function showFleetBar(fleet, later) {
     refresh(true);
   };
   bar.replaceChildren(name, el("span", { className: "muted",
-    textContent: `${fleet.on ? "en marche" : "arrêtée"} · ${fleet.queued} en file` }), el("span", { className: "spacer" }), toggle);
+    textContent: t(fleet.on ? "running · {0} queued" : "stopped · {0} queued", fleet.queued) }), el("span", { className: "spacer" }), toggle);
 }
 
 // The right pane: the chosen request in full, a page the address names,
@@ -1963,7 +2034,7 @@ function showDetail(found) {
   }
   const [item, kind] = found;
   // Under way, its figures move at each call: the journal would restart with them.
-  // A queued request only ages: one redraw a minute keeps its "depuis" honest.
+  // A queued request only ages: one redraw a minute keeps its "for" honest.
   const key = kind + (kind === "run"
     ? item.id + item.step + (item.waiting ? String(Math.floor(Date.now() / 60000)) : "")
     : JSON.stringify(item));
@@ -1980,11 +2051,11 @@ function showDetail(found) {
   // The right bar always exists on a request page, so it can be closed:
   // without figures yet, it says so instead of disappearing.
   const cost = facts.length ? facts : [el("div", { className: "facts" },
-    el("p", { className: "muted", textContent: "Pas encore de mesure : les chiffres apparaîtront dès que fennec travaillera." }))];
+    el("p", { className: "muted", textContent: t("No figures yet: they show up as soon as fennec works.") }))];
   chatBox = null;
   $("pick").replaceChildren(reqHead(item, kind),
     el("div", { className: "split" }, main, el("aside", {}, panel,
-      el("h2", { textContent: "Coût et isolement" }), ...cost)));
+      el("h2", { textContent: t("Cost and isolation") }), ...cost)));
   $("toggle-facts").hidden = false;
 }
 
@@ -2033,9 +2104,12 @@ const ICONS = {
   play: '<path d="M6 3v18l14-9z"/>',
   pause: '<rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/>',
 };
-const ICON_OF = [[/^(Commit|Pousser|Préparer)/, "commit"], [/^Ouvrir la page/, "page"], [/changements/, "diff"],
-  [/^Ouvrir le code/, "code"], [/^Corriger|^Envoyer/, "fix"], [/^Passer/, "pass"], [/^Journal/, "journal"],
-  [/^Annuler$|^Abandonner/, "undo"], [/^Reprendre|^Lancer/, "resume"], [/^Supprimer/, "trash"], [/^Enregistrer$/, "save"], [/^Éditer$/, "pencil"], [/^Réessayer/, "retry"], [/^Archiver/, "inbox"], [/^Remettre à plus tard/, "clock"], [/^Arrêter/, "stop"], [/Fleet$/, "fleet"]];
+// A button's icon from its label, in either language.
+const ICON_OF = [[/^(Commit|Push|Prepare|Pousser|Préparer)/, "commit"], [/^(Open the page|Ouvrir la page)/, "page"], [/changes|changements/, "diff"],
+  [/^(Open the code|Ouvrir le code)/, "code"], [/^(Correct|Send|Corriger|Envoyer)/, "fix"], [/^(Pass|Passer)/, "pass"], [/^Journal/, "journal"],
+  [/^(Undo|Annuler)$|^(Drop|Abandonner)/, "undo"], [/^(Resume|Start|Reprendre|Lancer)/, "resume"], [/^(Delete|Supprimer)/, "trash"], [/^(Save|Enregistrer)$/, "save"],
+  [/^(Edit|Éditer)$/, "pencil"], [/^(Retry|Réessayer)/, "retry"], [/^(Archive|Archiver)/, "inbox"], [/^(Put back for later|Remettre à plus tard)/, "clock"],
+  [/^(Stop|Arrêter)/, "stop"], [/Fleet$/, "fleet"]];
 function iconize(button) {
   const name = ICON_OF.find(([re]) => re.test(button.textContent))?.[1];
   if (name) setIcon(button, name);
@@ -2049,24 +2123,25 @@ document.querySelectorAll("[data-icon]").forEach((node) => setIcon(node, node.da
 
 // What was asked, done and proven first; the exact change, the exchange with
 // the model and the rest behind tabs above it, loaded when opened.
-let tabNow = "Résumé";
+let tabNow = "Summary";
 function tabbed(node, item) {
-  const more = [...node.querySelectorAll("details")].find((d) => d.firstChild?.textContent === "Détails");
+  const more = [...node.querySelectorAll("details")].find((d) => d.firstChild?.textContent === t("Details"));
   more?.remove();
   const run = node.classList.contains("run");
   const live = async () => { const slot = el("div"); follow(item.id, slot); return [slot]; };
-  const panes = [["Résumé", async () => [node]], ...(run ? [] : [["Changements", () => changes(item)]]),
+  // Each tab by its English name, shown in the chosen language.
+  const panes = [["Summary", async () => [node]], ...(run ? [] : [["Changes", () => changes(item)]]),
     ["Journal", run ? live : () => journal(item)]];
   // Out of its <details>, the content keeps its look through the "more" class.
-  if (more) panes.push(["Détails", async () => [el("div", { className: "more" }, ...[...more.childNodes].slice(1))]]);
+  if (more) panes.push(["Details", async () => [el("div", { className: "more" }, ...[...more.childNodes].slice(1))]]);
   const panel = el("div", { className: "tab-panel" });
   const shown = new Map();
   const bar = el("div", { className: "tabs", role: "tablist" });
   const open = async (name) => {
     tabNow = name;
-    bar.querySelectorAll("button").forEach((b) => b.setAttribute("aria-selected", String(b.textContent === name)));
+    bar.querySelectorAll("button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === name)));
     if (!shown.has(name)) {
-      shown.set(name, el("div", {}, el("div", { className: "muted", textContent: "Je charge…" })));
+      shown.set(name, el("div", {}, el("div", { className: "muted", textContent: t("Loading…") })));
       const box = shown.get(name);
       panes.find(([n]) => n === name)[1]().then((nodes) => box.replaceChildren(...nodes))
         .catch((e) => box.replaceChildren(el("div", { className: "bad", textContent: e.message })));
@@ -2074,11 +2149,12 @@ function tabbed(node, item) {
     panel.replaceChildren(shown.get(name));
   };
   bar.append(...panes.map(([name]) => {
-    const b = el("button", { type: "button", role: "tab", textContent: name });
+    const b = el("button", { type: "button", role: "tab", textContent: t(name) });
+    b.dataset.tab = name;
     b.onclick = () => open(name);
     return b;
   }));
-  open(panes.some(([n]) => n === tabNow) ? tabNow : "Résumé");
+  open(panes.some(([n]) => n === tabNow) ? tabNow : "Summary");
   return el("div", {}, bar, panel);
 }
 
@@ -2091,9 +2167,9 @@ function decision(node, item, kind) {
     : [":scope > .reply", ":scope > .actions", ":scope > .error"].map((q) => node.querySelector(q));
   const box = el("div", { className: "decide" }, ...parts.filter(Boolean));
   // These two are tabs over the request now.
-  box.querySelectorAll("button").forEach((b) => /changements|^Journal/.test(b.textContent) && b.remove());
-  // The correction is written where "Corriger" was clicked.
-  const fix = [...box.querySelectorAll("button")].find((b) => b.textContent === "Corriger");
+  box.querySelectorAll("button").forEach((b) => (b.textContent === t("See the changes") || b.textContent === t("Journal")) && b.remove());
+  // The correction is written where "Correct" was clicked.
+  const fix = [...box.querySelectorAll("button")].find((b) => b.textContent === t("Correct"));
   const reply = box.querySelector(":scope > .reply");
   if (fix && reply) fix.before(reply);
   box.querySelectorAll("button").forEach(iconize);
@@ -2172,16 +2248,16 @@ async function browse(path) {
   const data = await api("/api/folders", { path });
   pickerPath = data.path;
   // An empty folder starts a new project; files without git are not ours to commit.
-  $("picker-path").textContent = data.path + (data.home ? " · ton dossier personnel : choisis un dossier dedans"
-    : data.repo ? " · dépôt git"
-    : data.empty ? " · dossier vide" : " · pas un dépôt git : choisis un dépôt ou un dossier vide");
+  $("picker-path").textContent = data.path + " · " + (data.home ? t("your home folder: pick a folder inside it")
+    : data.repo ? t("git repository")
+    : data.empty ? t("empty folder") : t("not a git repository: pick a repository or an empty folder"));
   if (pickerMode === "chat") {
     // A discussion works in any folder inside the home, git or not.
     $("picker-choose").disabled = data.home;
-    $("picker-choose").textContent = "Discuter ici";
+    $("picker-choose").textContent = t("Discuss here");
   } else {
     $("picker-choose").disabled = data.home || (!data.repo && !data.empty);
-    $("picker-choose").textContent = data.repo || !data.empty ? "Ajouter" : "Créer ici";
+    $("picker-choose").textContent = data.repo || !data.empty ? t("Add") : t("Create here");
   }
   const entries = (data.parent ? [{ name: "..", path: data.parent }] : []).concat(data.children);
   $("picker-list").replaceChildren(...entries.map((entry) => {
@@ -2218,9 +2294,9 @@ async function openPicker(mode, title, path) {
 $("add-project").onclick = () => {
   // Next to the projects already there: new ones usually sit beside them.
   const last = $("project").value || [...$("project").options].at(-1)?.value || "";
-  openPicker("project", "Ajouter un projet", pickerPath || last.replace(/\/[^/]+$/, ""));
+  openPicker("project", t("Add a project"), pickerPath || last.replace(/\/[^/]+$/, ""));
 };
-$("new-chat").onclick = () => openPicker("chat", "Nouvelle discussion", "");
+$("new-chat").onclick = () => openPicker("chat", t("New discussion"), "");
 $("side-chats").onclick = () => {
   location.hash === "#chat" ? refresh(true) : (location.hash = "#chat");
 };
@@ -2229,7 +2305,7 @@ $("close-side").onclick = () => setSide(true);
 $("open-side").onclick = $("open-side-2").onclick = () => setSide(false);
 $("picker-go").onsubmit = (e) => {
   e.preventDefault();
-  browse($("picker-input").value.trim()).catch(() => ($("picker-path").textContent = "Dossier introuvable : " + $("picker-input").value));
+  browse($("picker-input").value.trim()).catch(() => ($("picker-path").textContent = t("Folder not found: {0}", $("picker-input").value)));
 };
 $("picker-cancel").onclick = () => $("picker").close();
 $("picker-choose").onclick = async () => {
@@ -2256,7 +2332,7 @@ $("picker-choose").onclick = async () => {
 
 // The team of the project chosen above: which team, which of its roles
 // work, and roles to add from the catalogue. Each change is saved at once.
-const STAGES = { frame: "cadrage", solve: "réalisation", prove: "preuve" };
+const STAGES = { frame: "framing", solve: "making", prove: "proof" };
 const order = Object.keys(STAGES);
 const byStage = (a, b) => order.indexOf(a.stage) - order.indexOf(b.stage);
 let team = null;
@@ -2268,10 +2344,10 @@ function renderTeam(view) {
   // A team named by the project but not found here: say so, and let the
   // human pick one, since fennec cannot work on the project until then.
   $("team-error").textContent = view.missing
-    ? `L'équipe « ${view.team} » est introuvable ici : choisis-en une pour que fennec puisse travailler.`
+    ? t("The team \"{0}\" is not found here: pick one so that fennec can work.", view.team)
     : "";
-  const missing = view.missing ? [new Option(`${view.team} (introuvable)`, view.team)] : [];
-  $("team-name").replaceChildren(...missing, ...view.teams.map((t) => new Option(t, t)));
+  const missing = view.missing ? [new Option(t("{0} (not found)", view.team), view.team)] : [];
+  $("team-name").replaceChildren(...missing, ...view.teams.map((name) => new Option(name, name)));
   $("team-name").value = view.team;
   $("team-roles").replaceChildren(...view.roles.map((r) => {
     const box = el("input", { type: "checkbox", checked: !r.out, ariaLabel: r.name });
@@ -2279,13 +2355,13 @@ function renderTeam(view) {
       const remove = team.roles.filter((x) => x.key === r.key ? !box.checked : x.out).map((x) => x.key);
       teamCall("/api/team/choose", { team: team.team, remove });
     };
-    const name = el("button", { type: "button", textContent: r.name, title: "Modifier ce rôle" });
+    const name = el("button", { type: "button", textContent: r.name, title: t("Edit this role") });
     name.onclick = () => editRole(r);
     return el("li", { className: r.out ? "out" : "" }, box, name,
-      el("span", { className: "muted", textContent: [STAGES[r.stage] ?? r.stage, r.model].filter(Boolean).join(" · ") }));
+      el("span", { className: "muted", textContent: [STAGES[r.stage] ? t(STAGES[r.stage]) : r.stage, r.model].filter(Boolean).join(" · ") }));
   }));
-  $("team-catalog").replaceChildren(new Option("Ajouter un rôle…", ""),
-    ...view.catalog.map((r) => new Option(`${r.name} — ${STAGES[r.stage] ?? r.stage}`, r.key)));
+  $("team-catalog").replaceChildren(new Option(t("Add a role…"), ""),
+    ...view.catalog.map((r) => new Option(`${r.name} — ${STAGES[r.stage] ? t(STAGES[r.stage]) : r.stage}`, r.key)));
 }
 
 async function teamCall(path, body) {
@@ -2300,11 +2376,11 @@ async function teamCall(path, body) {
 
 // One form for a role edited or written from scratch; saved in the project.
 let editing = null;
-$("role-stage").replaceChildren(...Object.entries(STAGES).map(([k, label]) => new Option(label, k)));
+$("role-stage").replaceChildren(...Object.entries(STAGES).map(([k, label]) => new Option(t(label), k)));
 async function editRole(r) {
   editing = r?.key ?? null;
   // The models the server serves; the role's own stays listed if it no longer does.
-  const fallback = new Option("Modèle : celui des Réglages", "");
+  const fallback = new Option(t("Model: the one in Settings"), "");
   $("role-model").replaceChildren(fallback);
   let served = [];
   try {
@@ -2313,7 +2389,7 @@ async function editRole(r) {
   } catch {
     // The server does not answer: the role keeps what it has.
   }
-  for (const m of new Set([...served, r?.model].filter(Boolean))) $("role-model").append(new Option(`Modèle : ${m}`, m));
+  for (const m of new Set([...served, r?.model].filter(Boolean))) $("role-model").append(new Option(t("Model: {0}", m), m));
   $("role-model").value = r?.model ?? "";
   $("role-name").value = r?.name ?? "";
   $("role-stage").value = r?.stage ?? "solve";
@@ -2353,7 +2429,7 @@ async function showTeamPage() {
   $("team-error").textContent = "";
   const project = $("project").value;
   if (!project) {
-    $("team-title").textContent = "Équipe";
+    $("team-title").textContent = t("Team");
     $("team-body").hidden = true;
     $("team-hint").hidden = false;
     $("team-name").replaceChildren();
@@ -2361,7 +2437,7 @@ async function showTeamPage() {
     $("team-catalog").replaceChildren();
     return;
   }
-  $("team-title").textContent = `Équipe — ${$("project").selectedOptions[0].textContent}`;
+  $("team-title").textContent = t("Team — {0}", $("project").selectedOptions[0].textContent);
   $("team-body").hidden = false;
   $("team-hint").hidden = true;
   try {
@@ -2389,14 +2465,14 @@ let asked = 0;
 async function listModels() {
   // A slow answer for an address since replaced must not overwrite the new one.
   const ask = ++asked;
-  $("settings-status").textContent = "Je demande au serveur…";
+  $("settings-status").textContent = t("Asking the server…");
   $("settings-models").replaceChildren();
   try {
     const { models } = await api("/api/settings/served", { base_url: $("settings-url").value, api_key: $("settings-key").value });
     if (ask !== asked) return;
     $("settings-status").textContent = models.length
-      ? "Coche les modèles à utiliser ; aucun coché : tous ceux du serveur."
-      : "Le serveur répond mais ne sert aucun modèle.";
+      ? t("Tick the models to use; none ticked: all the server's.")
+      : t("The server answers but serves no model.");
     $("settings-models").replaceChildren(...models.map((m) =>
       el("li", {}, el("input", { type: "checkbox", value: m, checked: chosen.includes(m), ariaLabel: m }), m)));
   } catch (e) {
@@ -2407,15 +2483,15 @@ async function listModels() {
 // the model's settings only.
 function buildThemePicker() {
   const themes = $("theme-picker");
-  themes.replaceChildren(...THEMES.map((t) => {
+  themes.replaceChildren(...THEMES.map((theme) => {
     const b = el("button", { type: "button", className: "theme" });
-    b.setAttribute("aria-pressed", String(t.id === loadTheme()));
+    b.setAttribute("aria-pressed", String(theme.id === loadTheme()));
     b.append(el("span", { className: "preview" },
-      el("span", { className: "bg", style: `background: ${t.palette["--bg"]}` }),
-      el("span", { className: "accent", style: `background: ${t.palette["--accent"]}` })),
-      el("span", { className: "name", textContent: t.name }));
+      el("span", { className: "bg", style: `background: ${theme.palette["--bg"]}` }),
+      el("span", { className: "accent", style: `background: ${theme.palette["--accent"]}` })),
+      el("span", { className: "name", textContent: theme.name }));
     b.onclick = () => {
-      saveTheme(t.id);
+      saveTheme(theme.id);
       applyTheme();
       themes.querySelectorAll(".theme").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
     };
@@ -2446,7 +2522,7 @@ function buildFontScale() {
 // The settings panels, one tab each: general, appearance, rules, skills, plugins, cleaning.
 document.querySelectorAll("#settings-tabs [role=tab]").forEach((b) => {
   b.onclick = () => {
-    document.querySelectorAll("#settings-tabs [role=tab]").forEach((t) => t.setAttribute("aria-selected", String(t === b)));
+    document.querySelectorAll("#settings-tabs [role=tab]").forEach((tab) => tab.setAttribute("aria-selected", String(tab === b)));
     ["settings-general", "settings-appearance", "settings-rules", "settings-skills", "settings-plugins", "settings-clean"].forEach((id) => $(id).hidden = id !== b.dataset.panel);
     if (b.dataset.panel === "settings-clean") showLeftovers();
     if (b.dataset.panel === "settings-plugins") showPlugins({});
@@ -2455,7 +2531,7 @@ document.querySelectorAll("#settings-tabs [role=tab]").forEach((b) => {
   };
 });
 // What interrupted work left behind, for the human to pick and throw away.
-const bytes = (n) => n >= 1e9 ? `${(n / 1e9).toFixed(1)} Go` : n >= 1e6 ? `${Math.round(n / 1e6)} Mo` : `${Math.ceil(n / 1e3)} Ko`;
+const bytes = (n) => n >= 1e9 ? t("{0} GB", (n / 1e9).toFixed(1)) : n >= 1e6 ? t("{0} MB", Math.round(n / 1e6)) : t("{0} kB", Math.ceil(n / 1e3));
 async function showLeftovers() {
   $("leftovers-error").textContent = "";
   $("leftovers-clear").disabled = true;
@@ -2468,28 +2544,28 @@ async function showLeftovers() {
   }
   $("leftovers-clear").hidden = !left.length;
   if (!left.length) {
-    $("leftovers").replaceChildren(el("li", { className: "muted", textContent: "Rien à nettoyer." }));
+    $("leftovers").replaceChildren(el("li", { className: "muted", textContent: t("Nothing to clean.") }));
     return;
   }
   const sync = () => {
     const n = $("leftovers").querySelectorAll("input:checked").length;
     $("leftovers-clear").disabled = !n;
-    $("leftovers-clear").textContent = n ? `Supprimer la sélection (${n})` : "Supprimer la sélection";
+    $("leftovers-clear").textContent = n ? t("Delete the selection ({0})", n) : t("Delete the selection");
     setIcon($("leftovers-clear"), "trash");
   };
   $("leftovers").replaceChildren(...left.map((f) => {
     const box = el("input", { type: "checkbox", value: f.id });
     box.onchange = sync;
-    const when = f.since ? new Date(f.since * 1000).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" }) : "";
-    const where = f.in_folder ? "dans ton dossier" : `à part, ${bytes(f.bytes)}`;
+    const when = f.since ? new Date(f.since * 1000).toLocaleString(lang(), { dateStyle: "short", timeStyle: "short" }) : "";
+    const where = f.in_folder ? t("in your folder") : t("apart, {0}", bytes(f.bytes));
     return el("li", {}, el("label", {}, box,
       el("span", {}, el("strong", { textContent: f.project.split("/").pop() }), el("span", { className: "muted", textContent: ` · ${when} · ${where}` })),
       el("span", { className: "what" }, ...(f.commits.length
-        ? [`${f.commits.length} commit${f.commits.length > 1 ? "s" : ""} qu'aucune branche n'a repris : `,
+        ? [t("{0} commits no branch took up: ", f.commits.length),
           ...f.commits.flatMap((c, i) => [i ? ", " : "", el("code", { textContent: c })])]
-        : ["Aucun commit à perdre."])),
+        : [t("No commit to lose.")])),
       f.checked_out ? el("span", { className: "what held",
-        textContent: "Ton dossier est dessus : il revient sur sa branche, et ce qui n'est pas commité va dans le stash git." }) : null));
+        textContent: t("Your folder is on it: it goes back to its branch, and what is not committed goes to the git stash.") }) : null));
   }));
   sync();
 }
@@ -2498,7 +2574,7 @@ $("leftovers-clear").onclick = async () => {
   // Two clicks: what goes cannot come back.
   if (!button.classList.contains("sure")) {
     button.classList.add("sure");
-    button.textContent = "Confirmer la suppression";
+    button.textContent = t("Confirm the deletion");
     setIcon(button, "trash");
     return;
   }
@@ -2515,9 +2591,21 @@ $("leftovers-clear").onclick = async () => {
   }
 };
 
+// The language picker: the page is drawn again in the chosen one.
+function buildLanguage() {
+  const select = $("language");
+  select.replaceChildren(...LANGS.map(([id, name]) => new Option(name, id)));
+  select.value = lang();
+  select.onchange = () => {
+    try { localStorage.setItem(LANG_KEY, select.value); } catch { /* stays as it was */ }
+    location.reload();
+  };
+}
+
 async function showSettingsPage() {
   buildThemePicker();
   buildFontScale();
+  buildLanguage();
   try {
     const s = await api("/api/settings", {});
     chosen = s.models;
@@ -2525,9 +2613,9 @@ async function showSettingsPage() {
     $("settings-tokens").value = s.max_tokens;
     $("settings-effort").value = s.effort;
     $("settings-key").value = "";
-    $("settings-key").placeholder = s.has_key ? "enregistrée (laisse vide pour la garder)" : "";
+    $("settings-key").placeholder = s.has_key ? t("saved (leave empty to keep it)") : "";
     $("settings-env").hidden = !s.env.length;
-    $("settings-env").textContent = `Au lancement, ${s.env.join(", ")} passe avant ces réglages.`;
+    $("settings-env").textContent = t("At launch, {0} goes before these settings.", s.env.join(", "));
     $("settings-error").textContent = "";
     $("settings-saved").textContent = "";
     listModels();
@@ -2556,7 +2644,7 @@ $("settings-form").onsubmit = async (e) => {
       max_tokens: Number($("settings-tokens").value), effort: $("settings-effort").value });
     $("settings-key").value = "";
     $("settings-error").textContent = "";
-    $("settings-saved").textContent = "✓ Enregistré";
+    $("settings-saved").textContent = t("✓ Saved");
   } catch (err) {
     $("settings-saved").textContent = "";
     $("settings-error").textContent = err.message;
@@ -2567,7 +2655,7 @@ $("settings-form").oninput = () => ($("settings-saved").textContent = "");
 
 // Stats: what every request cost, per model and per project, and where
 // fennec works in each project, which can be changed here.
-const PLACES = { here: "Dans le dossier", apart: "À part, à côté" };
+const PLACES = { here: "In the folder", apart: "Apart, next to it" };
 const cell = (text, className = "") => el("td", { textContent: text, className });
 
 async function showStats() {
@@ -2575,10 +2663,10 @@ async function showStats() {
   const a = v.all;
   const tile = (value, label) => el("div", { className: "tile" }, el("b", { textContent: value }), el("span", { textContent: label }));
   $("stats-tiles").replaceChildren(
-    tile(number(a.requests), "tâches"),
-    tile(duration(a.ms ?? 0), "de modèle"),
-    tile(compact(a.sent), `tokens envoyés · ${percent(a.cached, a.sent)} % en cache`),
-    tile(compact(a.received), `tokens générés · ${speed(a) || "—"}`));
+    tile(number(a.requests), t("tasks")),
+    tile(duration(a.ms ?? 0), t("of model")),
+    tile(compact(a.sent), t("tokens sent · {0} % cached", percent(a.cached, a.sent))),
+    tile(compact(a.received), t("tokens generated · {0}", speed(a) || "—")));
   const fastest = Math.max(1, ...v.models.map(tps));
   $("stats-models").replaceChildren(...v.models.map((m) => el("tr", {},
     el("th", { textContent: m.name }), cell(number(m.turns)), cell(compact(m.sent)),
@@ -2586,12 +2674,12 @@ async function showStats() {
     cell(compact(m.received)),
     el("td", {}, el("span", { className: "bar", style: `--p:${percent(tps(m), fastest)}%` }), m.ms ? `${tps(m)}/s` : "—"),
     cell(duration(m.ms ?? 0)))));
-  $("stats-stages").replaceChildren(...v.stages.sort((x, y) => stageRank(x.name) - stageRank(y.name)).map((t) => el("tr", {},
-    el("th", { textContent: t.name }), cell(number(t.turns)), cell(duration(t.ms ?? 0)),
-    cell(`${percent(t.ms, a.ms)} %`), cell(compact(t.sent)), cell(compact(t.received)), cell(t.ms ? `${tps(t)}/s` : "—"))));
+  $("stats-stages").replaceChildren(...v.stages.sort((x, y) => stageRank(x.name) - stageRank(y.name)).map((s) => el("tr", {},
+    el("th", { textContent: stageName(s.name) }), cell(number(s.turns)), cell(duration(s.ms ?? 0)),
+    cell(`${percent(s.ms, a.ms)} %`), cell(compact(s.sent)), cell(compact(s.received)), cell(s.ms ? `${tps(s)}/s` : "—"))));
   $("stats-projects").replaceChildren(...v.projects.map((p) => {
-    const place = el("select", { ariaLabel: `Où fennec travaille dans ${p.name}` },
-      ...Object.entries(PLACES).map(([k, label]) => new Option(label, k)));
+    const place = el("select", { ariaLabel: t("Where fennec works in {0}", p.name) },
+      ...Object.entries(PLACES).map(([k, label]) => new Option(t(label), k)));
     if (!PLACES[p.place]) place.append(new Option(p.place, p.place));
     place.value = p.place;
     place.onchange = async () => {
@@ -2621,12 +2709,12 @@ async function showPage(path) {
   const p = stats.projects.find((x) => x.path === path) ?? {};
   const tile = (value, label, tone = "") => el("div", { className: `tile ${tone}` }, el("b", { textContent: value }), el("span", { textContent: label }));
   $("page-tiles").replaceChildren(
-    tile(number(p.requests), "tâches"), tile(number(p.landed), "commitées"),
-    tile(number(p.failed), "échouées", p.failed ? "bad" : ""),
-    tile(number(p.failed_attempts), "essais ratés annulés"),
-    tile(duration(p.ms ?? 0), "de modèle"), tile(compact(p.sent), "tokens envoyés"));
+    tile(number(p.requests), t("tasks")), tile(number(p.landed), t("commits")),
+    tile(number(p.failed), t("failures"), p.failed ? "bad" : ""),
+    tile(number(p.failed_attempts), t("failed tries undone")),
+    tile(duration(p.ms ?? 0), t("of model")), tile(compact(p.sent), t("tokens sent")));
   const place = $("page-place");
-  place.replaceChildren(...Object.entries(PLACES).map(([k, label]) => new Option(label, k)));
+  place.replaceChildren(...Object.entries(PLACES).map(([k, label]) => new Option(t(label), k)));
   if (p.place && !PLACES[p.place]) place.append(new Option(p.place, p.place));
   place.value = p.place ?? "here";
   place.onchange = () => api("/api/projects", { path, place: place.value })
@@ -2655,7 +2743,7 @@ function drawSkillList() {
       const b = el("button", { type: "button", className: "switch" });
       b.setAttribute("role", "switch");
       b.setAttribute("aria-checked", String(s.chosen));
-      b.setAttribute("aria-label", `${s.chosen ? "Désactiver" : "Activer"} le skill ${s.name}`);
+      b.setAttribute("aria-label", t(s.chosen ? "Disable the skill {0}" : "Enable the skill {0}", s.name));
       b.onclick = async () => {
         try {
           skillList = await api("/api/skills", { name: s.name, on: !s.chosen });
@@ -2668,14 +2756,14 @@ function drawSkillList() {
         el("span", { className: "what", textContent: s.description }), b);
     }),
     ...(list.length ? [] : [el("li", { className: "muted", textContent: skillList.length
-      ? "Aucun skill ne correspond à la recherche." : "Aucun skill sur cette machine." })]));
+      ? t("No skill matches the search.") : t("No skill on this machine.") })]));
 }
 $("skill-search").oninput = drawSkillList;
 
 // The person's plugins: each says when it speaks; one is tried with a test
 // message before trusting it with real questions.
-const PLUGIN_EVENTS = { started: "commence", question: "a une question", ready: "est prête", failed: "échoue",
-  landed: "est commitée", before_land: "avant chaque commit, qu'il peut empêcher" };
+const PLUGIN_EVENTS = { started: "starts", question: "has a question", ready: "is ready", failed: "fails",
+  landed: "is committed", before_land: "before each commit, which it may block" };
 async function showPlugins(change) {
   $("plugins-error").textContent = $("plugins-saved").textContent = "";
   let got;
@@ -2686,11 +2774,11 @@ async function showPlugins(change) {
     return;
   }
   if (change.test && got.tried) $("plugins-error").textContent = `${change.name} : ${got.tried}`;
-  else if (change.test) $("plugins-saved").textContent = `Message d'essai envoyé par ${change.name}.`;
+  else if (change.test) $("plugins-saved").textContent = t("Test message sent by {0}.", change.name);
   $("plugins-list").replaceChildren(...got.plugins.map((p) => {
     if (p.error) return el("li", {}, el("strong", { textContent: p.name }), el("span", { className: "what error", textContent: p.error }));
-    const when = p.events.map((e) => PLUGIN_EVENTS[e] ?? e).join(", ");
-    const test = el("button", { type: "button", className: "quiet", ariaLabel: `Essayer ${p.name}`, title: "Envoyer un message d'essai" });
+    const when = p.events.map((e) => (PLUGIN_EVENTS[e] ? t(PLUGIN_EVENTS[e]) : e)).join(", ");
+    const test = el("button", { type: "button", className: "quiet", ariaLabel: t("Try {0}", p.name), title: t("Send a test message") });
     setIcon(test, "send");
     test.onclick = async () => {
       test.disabled = true;
@@ -2699,14 +2787,14 @@ async function showPlugins(change) {
     const on = el("button", { type: "button", className: "switch" });
     on.setAttribute("role", "switch");
     on.setAttribute("aria-checked", String(p.on));
-    on.setAttribute("aria-label", `${p.on ? "Désactiver" : "Activer"} le plugin ${p.name}`);
+    on.setAttribute("aria-label", t(p.on ? "Disable the plugin {0}" : "Enable the plugin {0}", p.name));
     on.onclick = () => showPlugins({ name: p.name, on: !p.on });
     // A plugin that relays decisions from a chat says for whom, and whether it listens.
-    const relay = !p.relays ? "" : ` · relaie tes décisions depuis le chat, pour ${p.allow.length ? p.allow.join(", ") : "personne (« allow » est vide)"}${
-      !p.on ? "" : p.listening ? " · en écoute" : " · arrêté : désactive-le puis réactive-le"}`;
+    const relay = !p.relays ? "" : " · " + t("relays your decisions from the chat, for {0}", p.allow.length ? p.allow.join(", ") : t("nobody (\"allow\" is empty)"))
+      + (!p.on ? "" : p.listening ? " · " + t("listening") : " · " + t("stopped: disable it, then enable it again"));
     return el("li", { title: p.from }, el("strong", { textContent: p.name }),
-      el("span", { className: "what", textContent: `${p.description ? p.description + " · " : ""}quand une tâche ${when}${relay}` }), test, on);
-  }), ...(got.plugins.length ? [] : [el("li", { className: "muted", textContent: "Aucun plugin dans ~/.config/fennec/plugins." })]));
+      el("span", { className: "what", textContent: `${p.description ? p.description + " · " : ""}${t("when a task {0}", when)}${relay}` }), test, on);
+  }), ...(got.plugins.length ? [] : [el("li", { className: "muted", textContent: t("No plugin in ~/.config/fennec/plugins.") })]));
 }
 
 // The rules said in words, a project's on its page and the human's own in
@@ -2718,8 +2806,8 @@ function showRules(box, path, scope, rules) {
     count.textContent = rules.length;
     count.hidden = !rules.length;
   }
-  box.querySelector("ul").replaceChildren(...rules.length ? [] : [el("li", { className: "empty muted", textContent: "Aucune règle pour l'instant." })], ...rules.map((r) => {
-    const remove = el("button", { type: "button", className: "quiet", ariaLabel: "Retirer la règle", title: "Retirer la règle" });
+  box.querySelector("ul").replaceChildren(...rules.length ? [] : [el("li", { className: "empty muted", textContent: t("No rule yet.") })], ...rules.map((r) => {
+    const remove = el("button", { type: "button", className: "quiet", ariaLabel: t("Remove the rule"), title: t("Remove the rule") });
     setIcon(remove, "close");
     remove.onclick = () => changeRules(box, path, scope, { change: "remove", text: r.text });
     return el("li", {}, el("span", {}, ...rich(r.text)), remove);
@@ -2747,21 +2835,21 @@ for (const [id, scope] of [["page-rules", "project"], ["settings-rules", "user"]
 // The rules on what agents run, read and write, as the person's file holds
 // them: removing one names its place and its pattern, so an older list
 // removes nothing by mistake.
-const GUARD_EFFECT = { deny: "Interdit", ask: "Demande", allow: "Autorisé" };
-const GUARD_ON = { command: "commande", read: "lecture", write: "écriture", file: "lecture, écriture" };
+const GUARD_EFFECT = { deny: "Denied", ask: "Asks", allow: "Allowed" };
+const GUARD_ON = { command: "command", read: "read", write: "write", file: "read, write" };
 async function changeGuard(change = {}) {
   try {
     const { rules } = await api("/api/guard", change);
     $("guard-error").textContent = "";
     $("guard-count").textContent = rules.length;
-    $("guard-list").replaceChildren(...rules.length ? [] : [el("li", { className: "empty muted", textContent: "Aucune règle : seul l'isolement protège." })],
+    $("guard-list").replaceChildren(...rules.length ? [] : [el("li", { className: "empty muted", textContent: t("No rule: isolation alone protects.") })],
       ...rules.map((r, i) => {
-        const remove = iconButton("close", "Retirer la règle", () => changeGuard({ remove: i, pattern: r.pattern }));
+        const remove = iconButton("close", t("Remove the rule"), () => changeGuard({ remove: i, pattern: r.pattern }));
         return el("li", {},
-          el("span", { className: `effect ${r.effect}`, textContent: GUARD_EFFECT[r.effect] ?? r.effect }),
-          el("span", { className: "muted", textContent: GUARD_ON[r.on] ?? r.on }),
+          el("span", { className: `effect ${r.effect}`, textContent: GUARD_EFFECT[r.effect] ? t(GUARD_EFFECT[r.effect]) : r.effect }),
+          el("span", { className: "muted", textContent: GUARD_ON[r.on] ? t(GUARD_ON[r.on]) : r.on }),
           el("span", {}, el("code", { textContent: r.pattern }),
-            r.why ? el("span", { className: "why", textContent: " — " + r.why }) : null,
+            r.why ? el("span", { className: "why", textContent: " — " + t(r.why) }) : null,
             r.project ? el("span", { className: "why", textContent: " · " + r.project }) : null),
           remove);
       }));
@@ -2784,7 +2872,7 @@ $("page-team").onclick = () => $("open-team").click();
 $("page-open").onclick = async () => {
   try {
     const c = await api("/api/open-project", { project: paged });
-    $("page-error").textContent = c.opened ? "" : `VS Code introuvable : ouvre ${c.folder} dans ton éditeur.`;
+    $("page-error").textContent = c.opened ? "" : t("VS Code not found: open {0} in your editor.", c.folder);
   } catch (e) {
     $("page-error").textContent = e.message;
   }
@@ -2812,21 +2900,21 @@ $("fleet-on-success").onchange = () => fleetDo("/api/fleet", { on_success: $("fl
 async function showFleet() {
   const v = await api("/api/fleet");
   const toggle = $("fleet-toggle");
-  toggle.textContent = v.on ? "Arrêter la Fleet" : "Démarrer la Fleet";
+  toggle.textContent = v.on ? t("Stop the Fleet") : t("Start the Fleet");
   setIcon(toggle, v.on ? "pause" : "play");
   toggle.classList.toggle("primary", !v.on);
   toggle.onclick = () => fleetDo("/api/fleet", { on: !v.on });
-  $("fleet-state").textContent = v.on ? "en marche" : "arrêtée";
+  $("fleet-state").textContent = v.on ? t("running") : t("stopped");
   $("fleet-stopped").hidden = !v.stopped;
-  $("fleet-stopped").textContent = v.stopped ? `Arrêtée toute seule : ${v.stopped}. Regarde la tâche, puis redémarre.` : "";
+  $("fleet-stopped").textContent = v.stopped ? t("Stopped on its own: {0}. Look at the task, then start again.", t(v.stopped)) : "";
   for (const [id, value] of [["fleet-at-once", String(v.at_once)], ["fleet-on-fail", v.on_fail], ["fleet-on-success", v.on_success]]) {
     if (document.activeElement !== $(id)) $(id).value = value;
   }
   const s = v.summary;
   const tile = (value, label) => el("div", { className: "tile" }, el("b", { textContent: value }), el("span", { textContent: label }));
-  $("fleet-tiles").replaceChildren(tile(number(s.queued), "en file"), tile(number(s.working), "en cours"),
-    tile(number(s.yours), "t'attendent"), tile(number(s.landed), "commitées"), tile(number(s.failed), "en échec"),
-    tile(duration(s.cost.ms), `de modèle · ↑ ${compact(s.cost.sent)} ↓ ${compact(s.cost.received)}`));
+  $("fleet-tiles").replaceChildren(tile(number(s.queued), t("queued")), tile(number(s.working), t("running")),
+    tile(number(s.yours), t("wait for you")), tile(number(s.landed), t("commits")), tile(number(s.failed), t("failing")),
+    tile(duration(s.cost.ms), t("of model · ↑ {0} ↓ {1}", compact(s.cost.sent), compact(s.cost.received))));
   const link = (item, state) => el("a", { className: "row", href: hashOf(item.path, item.id) }, line(item, state));
   const move = (item, name, label, enabled) => {
     const b = el("button", { type: "button", className: "icon", ariaLabel: label, title: label, disabled: !enabled });
@@ -2837,14 +2925,14 @@ async function showFleet() {
   const last = v.queue.length - 1;
   $("n-fleet").textContent = v.queue.length || "";
   fill($("fleet-queue"), v.queue.map((item, i) => rowWrap(
-    link(item, [`${item.waits ?? (v.on ? "part ensuite" : "part au démarrage")}${item.framed ? " · préparée" : ""}`, item.waits ? "muted" : "accent"]),
-    el("div", { className: "row-actions" }, move(item, "up", "Monter", i > 0), move(item, "down", "Descendre", i < last),
-      move(item, "close", "Retirer de la Fleet", true)))), "Aucune tâche dans la Fleet : coche des tâches dans « Plus tard ».");
+    link(item, [(item.waits ? t(item.waits) : v.on ? t("goes next") : t("goes at start")) + (item.framed ? " · " + t("prepared") : ""), item.waits ? "muted" : "accent"]),
+    el("div", { className: "row-actions" }, move(item, "up", t("Move up"), i > 0), move(item, "down", t("Move down"), i < last),
+      move(item, "close", t("Remove from the Fleet"), true)))), t("No task in the Fleet: tick tasks in \"Later\"."));
   $("n-fleet-working").textContent = v.working.length || "";
-  fill($("fleet-working"), v.working.map((item) => link(item, null)), "Rien en cours.");
-  const tone = { "commité": "ok", "commité sur fleet": "ok", "échec": "bad", "prêt, t'attend": "accent", "question pour toi": "accent", "mis de côté": "warn" };
+  fill($("fleet-working"), v.working.map((item) => link(item, null)), t("Nothing running."));
+  const tone = { "committed": "ok", "committed on fleet": "ok", "failed": "bad", "ready, waits for you": "accent", "a question for you": "accent", "set aside": "warn" };
   $("n-fleet-recent").textContent = v.recent.length || "";
-  fill($("fleet-recent"), v.recent.map((item) => link(item, [item.outcome, tone[item.outcome] ?? "muted"])), "Rien encore.");
+  fill($("fleet-recent"), v.recent.map((item) => link(item, [item.outcome, tone[item.outcome] ?? "muted"])), t("Nothing yet."));
 }
 
 $("open-stats").onclick = () => {
@@ -2859,10 +2947,10 @@ async function showChips() {
   try {
     const v = await api("/api/team", { project });
     const roles = v.roles.filter((r) => !r.out);
-    $("chips").replaceChildren(el("span", { className: "muted", textContent: "Équipe pour cette tâche :" }),
+    $("chips").replaceChildren(el("span", { className: "muted", textContent: t("Team for this task:") }),
       ...roles.map((r) => {
         const chip = el("button", { type: "button", className: `rtag ${r.stage} chip`, textContent: r.name,
-          title: "Clique pour faire sans ce rôle sur cette tâche" });
+          title: t("Click to do without this role on this task") });
         chip.dataset.key = r.key;
         chip.setAttribute("aria-pressed", "true");
         chip.onclick = () => chip.setAttribute("aria-pressed", chip.getAttribute("aria-pressed") === "true" ? "false" : "true");
@@ -2894,14 +2982,14 @@ $("project").addEventListener("change", () => {
 async function showVersion() {
   try {
     const v = await api("/api/version");
-    const built = new Date(v.built * 1000).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
-    $("version").title = `Compilé le ${built}${v.branch ? ` depuis la branche ${v.branch}` : ""}`;
+    const built = new Date(v.built * 1000).toLocaleString(lang(), { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+    $("version").title = v.branch ? t("Built on {0} from branch {1}", built, v.branch) : t("Built on {0}", built);
     $("version").replaceChildren(el("div", { textContent: `v${v.version} · ${v.commit}` }),
       el("div", {}, built,
-        v.dirty ? el("span", { className: "dirty", textContent: " · +modifs", title: "Compilé avec des changements pas encore commités" }) : ""),
+        v.dirty ? el("span", { className: "dirty", textContent: " · " + t("+changes"), title: t("Built with changes not committed yet") }) : ""),
       v.latest && v.latest !== v.commit
-        ? el("div", { className: "stale", textContent: `${v.branch} est à ${v.latest} : à recompiler`,
-          title: "Cette version n'est plus la dernière : just build puis just service-restart" })
+        ? el("div", { className: "stale", textContent: t("{0} is at {1}: build again", v.branch, v.latest),
+          title: t("This build is no longer the latest: just build, then just service-restart") })
         : "");
   } catch {
     // An older binary has no version: nothing to say.

@@ -2,6 +2,9 @@
 // folder, and the person's answer.
 const assert = require("assert");
 const src = require("fs").readFileSync(__dirname + "/app.js", "utf8");
+// `t` in English, as app.js shows it by default.
+globalThis.t = (s, ...a) => s.replace(/\{(\d+)\}/g, (_, i) => String(a[i] ?? ""));
+globalThis.lang = () => "en";
 const region = src.match(/function chatQuestion\(c\) \{[\s\S]*?\n\}\n/)[0];
 
 const nodes = [];
@@ -29,11 +32,11 @@ const c = { id: "abc", pending: {
 const card = chatQuestion(c);
 assert.strictEqual(card.className, "ask");
 const byText = (t) => nodes.find((n) => n.textContent === t);
-assert.strictEqual(byText("fennec demande").tag, "span");
+assert.strictEqual(byText("fennec asks").tag, "span");
 assert.strictEqual(byText("/home/t/other/o.txt").tag, "code");
 assert.strictEqual(byText("/home/t/other").parent, card);
-const open = byText("Ouvrir le dossier");
-const refuse = byText("Refuser");
+const open = byText("Open the folder");
+const refuse = byText("Refuse");
 assert.strictEqual(open.className, "primary");
 assert.strictEqual(refuse.className, "quiet");
 assert.strictEqual(open.parent, card);

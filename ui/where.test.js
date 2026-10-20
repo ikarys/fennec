@@ -1,6 +1,9 @@
 // node ui/where.test.js — the address round-trips: "#<project>/<request>".
 const assert = require("assert");
 const src = require("fs").readFileSync(__dirname + "/app.js", "utf8");
+// `t` in English, as app.js shows it by default.
+globalThis.t = (s, ...a) => s.replace(/\{(\d+)\}/g, (_, i) => String(a[i] ?? ""));
+globalThis.lang = () => "en";
 const region = src.match(/const where = \(\) => \{[\s\S]*?\n\};\nconst hashOf = [\s\S]*?;/)[0];
 
 global.location = { hash: "" };

@@ -1,6 +1,9 @@
 // node ui/md.test.js — the model's Markdown becomes blocks, not one wall of text.
 const assert = require("assert");
 const src = require("fs").readFileSync(__dirname + "/app.js", "utf8");
+// `t` in English, as app.js shows it by default.
+globalThis.t = (s, ...a) => s.replace(/\{(\d+)\}/g, (_, i) => String(a[i] ?? ""));
+globalThis.lang = () => "en";
 const grab = (name) => src.match(new RegExp(`function ${name}[\\s\\S]*?\\n}\\n`))[0];
 const el = (tag, props = {}, ...children) => {
   const keep = (c) => c !== null && c !== undefined && c !== false;

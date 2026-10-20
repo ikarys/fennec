@@ -3,6 +3,9 @@
 // otherwise the page stays on screen and the requests bar never comes back.
 const assert = require("assert");
 const src = require("fs").readFileSync(__dirname + "/app.js", "utf8");
+// `t` in English, as app.js shows it by default.
+globalThis.t = (s, ...a) => s.replace(/\{(\d+)\}/g, (_, i) => String(a[i] ?? ""));
+globalThis.lang = () => "en";
 
 eval(src.match(/const PAGES = \[[^\n]*\n/)[0]
   + src.match(/const owned = [^\n]*\n/)[0]

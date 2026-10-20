@@ -32,7 +32,7 @@ fn attempts() -> usize {
 /// later "Réessayer" of the same id starts clean.
 static STOPS: std::sync::Mutex<std::vec::Vec<String>> = std::sync::Mutex::new(Vec::new());
 
-const STOPPED: &str = "arrêté : tu as demandé d'arrêter";
+const STOPPED: &str = "stopped: you asked to stop";
 
 struct Stopped(String);
 
@@ -138,11 +138,11 @@ pub fn chat(id: String) {
             // let the page move on, as a failed turn would.
             Err(e) => {
                 let _ = fennec_os::chat::fail(&worlds, &id, &e.to_string());
-                eprintln!("fennec: la discussion {id} ne peut pas démarrer : {e}");
+                eprintln!("fennec: discussion {id} cannot start: {e}");
             }
             Ok(model) => {
                 if let Err(e) = fennec_os::chat::answer(&worlds, &id, &model[0], MAX_STEPS) {
-                    eprintln!("fennec: la discussion {id} s'arrête : {e}");
+                    eprintln!("fennec: discussion {id} stops: {e}");
                 }
             }
         }
@@ -294,7 +294,7 @@ pub fn say(store: &Store, id: &str, text: &str) -> io::Result<()> {
         _ => false,
     };
     if !open {
-        return Err(io::Error::other("cette tâche n'attend pas de réponse"));
+        return Err(io::Error::other("this task does not wait for an answer"));
     }
     let text = text.trim();
     if text.is_empty() {
@@ -349,7 +349,7 @@ pub fn frame_anyway(store: &Store, id: &str) -> io::Result<()> {
         });
     }
     if request["status"] != "talk" {
-        return Err(io::Error::other("cette tâche n'est pas en discussion"));
+        return Err(io::Error::other("this task is not in discussion"));
     }
     store.update(id, |r| {
         r["brief"] = json!(brief);
@@ -414,7 +414,7 @@ fn frame_now(store: &Store, id: &str) -> io::Result<()> {
 pub fn answer(store: &Store, id: &str, accept: bool, correction: &str) -> io::Result<()> {
     let request = store.load(id)?;
     if request["status"] != "question" {
-        return Err(io::Error::other("cette tâche n'attend pas de réponse"));
+        return Err(io::Error::other("this task does not wait for an answer"));
     }
     if accept {
         store.update(id, |r| r["status"] = json!("running"))?;
@@ -422,7 +422,7 @@ pub fn answer(store: &Store, id: &str, accept: bool, correction: &str) -> io::Re
     } else {
         let correction = correction.trim();
         if correction.is_empty() {
-            return Err(io::Error::other("dis ce qui ne va pas"));
+            return Err(io::Error::other("say what is wrong"));
         }
         // fennec-os feeds the correction to the next compile of this request.
         let worlds = Worlds::from_env()?;
@@ -468,7 +468,7 @@ fn offer_rule(store: &Store, id: &str, request: &Value, model: &dyn Model) -> io
 pub fn rule(store: &Store, id: &str, scope: &str) -> io::Result<()> {
     let request = store.load(id)?;
     let Some(text) = request["offer"]["rule"].as_str() else {
-        return Err(io::Error::other("aucune règle proposée"));
+        return Err(io::Error::other("no rule offered"));
     };
     match scope {
         "user" | "project" => rules::say(
@@ -501,11 +501,11 @@ fn block(request: &mut Value, stage: &str, question: &str, why: &str) {
 pub fn reply(store: &Store, id: &str, text: &str) -> io::Result<()> {
     let request = store.load(id)?;
     if request["status"] != "blocked" {
-        return Err(io::Error::other("cette tâche n'attend pas de réponse"));
+        return Err(io::Error::other("this task does not wait for an answer"));
     }
     let text = text.trim();
     if text.is_empty() {
-        return Err(io::Error::other("réponse vide"));
+        return Err(io::Error::other("empty answer"));
     }
     spec::answer(
         &Worlds::from_env()?,
@@ -565,7 +565,7 @@ fn wait_turn(store: &Store, id: &str, project: &str) -> io::Result<Taken> {
                     .into_iter()
                     .find(|(_, r)| r["run"] == w.as_str());
                 match owner {
-                    Some((_, r)) => Some(format!("« {} »", r["text"].as_str().unwrap_or(""))),
+                    Some((_, r)) => Some(format!("\"{}\"", crate::fleet::short(&r))),
                     // No request owns it and no worker here holds the folder:
                     // a start cut short (fennec restarted before the run was
                     // recorded) left it. Dropping it stashes what it held.
@@ -575,10 +575,10 @@ fn wait_turn(store: &Store, id: &str, project: &str) -> io::Result<Taken> {
                         let worlds = Worlds::from_env()?;
                         match worlds.open(&w).and_then(|o| worlds.drop(o)) {
                             Ok(()) => continue,
-                            Err(e) => Some(format!("une ancienne tâche interrompue ({e})")),
+                            Err(e) => Some(format!("an old interrupted task ({e})")),
                         }
                     }
-                    None => Some("une autre tâche".to_string()),
+                    None => Some("another task".to_string()),
                 }
             }
             Some(world::Held::Changes) => Some(String::new()),
@@ -587,7 +587,7 @@ fn wait_turn(store: &Store, id: &str, project: &str) -> io::Result<Taken> {
         let mut taken = TAKEN.lock().map_err(|_| io::Error::other("lock"))?;
         let behind = match held {
             Some(by) => Some(by),
-            None if taken.iter().any(|p| p == project) => Some("une autre tâche".to_string()),
+            None if taken.iter().any(|p| p == project) => Some("another task".to_string()),
             None => {
                 taken.push(project.to_string());
                 if store.load(id)?["status"] == "waiting" {
@@ -832,7 +832,7 @@ pub fn retry(store: &Store, id: &str) -> io::Result<()> {
     // place: the step starts over and sets the status again as it goes.
     if matches!(request["status"].as_str(), Some("waiting" | "landing")) {
         if working(id) {
-            return Err(io::Error::other("cette tâche est déjà en cours"));
+            return Err(io::Error::other("this task is already running"));
         }
         spawn(
             id.to_string(),
@@ -844,7 +844,7 @@ pub fn retry(store: &Store, id: &str) -> io::Result<()> {
         return Ok(());
     }
     if request["status"] != "failed" {
-        return Err(io::Error::other("cette tâche n'a pas échoué"));
+        return Err(io::Error::other("this task did not fail"));
     }
     let validated = match request["spec"].as_str() {
         Some(s) => matches!(
@@ -907,13 +907,13 @@ fn apply_proof(request: &mut Value, proof: &Value) {
     if let Some(t) = failed {
         request["status"] = json!("failed");
         request["reason"] = json!(format!(
-            "le travail est fait, mais l'essai a échoué : {}",
+            "the work is done, but the try failed: {}",
             t["command"].as_str().unwrap_or("")
         ));
     } else if let Some(c) = vetoed {
         request["status"] = json!("failed");
         request["reason"] = json!(format!(
-            "le travail est fait, mais {} bloque : `{}` a échoué",
+            "the work is done, but {} blocks: `{}` failed",
             c["role"].as_str().unwrap_or(""),
             c["command"].as_str().unwrap_or("")
         ));
@@ -925,7 +925,7 @@ fn apply_proof(request: &mut Value, proof: &Value) {
     {
         request["status"] = json!("failed");
         request["reason"] = json!(format!(
-            "le travail est fait, mais la page {} ne s'affiche pas : {}",
+            "the work is done, but the page {} does not show: {}",
             s["url"].as_str().unwrap_or(""),
             s["reason"].as_str().unwrap_or("")
         ));
@@ -936,9 +936,9 @@ fn apply_proof(request: &mut Value, proof: &Value) {
             .is_some_and(|s| s.iter().any(|s| s["missing"] == true));
         request["status"] = json!("failed");
         request["reason"] = json!(if blind {
-            "le travail est fait, mais fennec n'a pas pu regarder la page : aucun navigateur n'est installé (chromium)"
+            "the work is done, but fennec could not look at the page: no browser is installed (chromium)"
         } else {
-            "le travail est fait, mais fennec n'a pas su essayer le produit : aucune preuve"
+            "the work is done, but fennec could not try the product: no proof"
         });
     } else {
         request["status"] = json!("ready");
@@ -1014,11 +1014,13 @@ fn failure(record: &Value) -> String {
 pub fn amend(store: &Store, id: &str, text: &str) -> io::Result<()> {
     let request = store.load(id)?;
     if request["status"] != "ready" || request["commit"].is_string() {
-        return Err(io::Error::other("cette tâche n'attend pas ta décision"));
+        return Err(io::Error::other(
+            "this task does not wait for your decision",
+        ));
     }
     let text = text.trim();
     if text.is_empty() {
-        return Err(io::Error::other("dis ce qui ne va pas"));
+        return Err(io::Error::other("say what is wrong"));
     }
     store.update(id, |r| {
         say_in(r, "human", text);
@@ -1047,7 +1049,7 @@ pub fn stop(store: &Store, id: &str) -> io::Result<()> {
         request["status"].as_str(),
         Some("thinking" | "framing" | "waiting" | "running" | "proving" | "landing")
     ) {
-        return Err(io::Error::other("fennec ne travaille plus sur cette tâche"));
+        return Err(io::Error::other("fennec no longer works on this task"));
     }
     if let Ok(mut s) = STOPS.lock() {
         s.push(id.to_string());
@@ -1121,7 +1123,7 @@ pub fn clear(store: &Store, ids: &[String]) -> io::Result<Value> {
             .flatten()
             .any(|f| f["id"] == id.as_str())
         {
-            errors.push(format!("{id} : une tâche s'en sert de nouveau"));
+            errors.push(format!("{id}: a task uses it again"));
         } else if let Err(e) = worlds.forget(id) {
             errors.push(format!("{id} : {e}"));
         }
@@ -1137,7 +1139,7 @@ pub fn drop(store: &Store, id: &str) -> io::Result<()> {
         status.as_str(),
         "talk" | "question" | "blocked" | "ready" | "failed" | "later"
     ) {
-        return Err(io::Error::other("fennec travaille encore sur cette tâche"));
+        return Err(io::Error::other("fennec still works on this task"));
     }
     undo(&store.load(id)?)?;
     store.update(id, |r| {
@@ -1173,7 +1175,7 @@ fn undo(request: &Value) -> io::Result<()> {
 pub fn later(store: &Store, id: &str) -> io::Result<()> {
     let request = store.load(id)?;
     if request["status"] != "failed" {
-        return Err(io::Error::other("cette tâche n'a pas échoué"));
+        return Err(io::Error::other("this task did not fail"));
     }
     undo(&request)?;
     store.update(id, |r| {
@@ -1189,7 +1191,9 @@ pub fn later(store: &Store, id: &str) -> io::Result<()> {
 pub fn pass(store: &Store, id: &str) -> io::Result<()> {
     let request = store.load(id)?;
     if request["status"] != "ready" {
-        return Err(io::Error::other("cette tâche n'attend pas ta décision"));
+        return Err(io::Error::other(
+            "this task does not wait for your decision",
+        ));
     }
     park(&request, true)?;
     store.update(id, |r| r["status"] = json!("passed"))
@@ -1200,7 +1204,7 @@ pub fn pass(store: &Store, id: &str) -> io::Result<()> {
 pub fn resume(store: &Store, id: &str) -> io::Result<()> {
     let request = store.load(id)?;
     if request["status"] != "passed" {
-        return Err(io::Error::other("cette tâche n'a pas été mise de côté"));
+        return Err(io::Error::other("this task was not set aside"));
     }
     park(&request, false)?;
     store.update(id, |r| r["status"] = json!("ready"))
@@ -1251,7 +1255,7 @@ pub fn open(store: &Store, id: &str) -> io::Result<Value> {
     let run = request["run"]
         .as_str()
         .filter(|_| request["status"] == "ready")
-        .ok_or_else(|| io::Error::other("cette tâche n'a pas de travail prêt"))?;
+        .ok_or_else(|| io::Error::other("this task has no work ready"))?;
     let folder = Worlds::from_env()?.open(run)?.path;
     let opened = editor(&folder);
     Ok(json!({"folder": folder, "opened": opened}))
@@ -1264,7 +1268,7 @@ pub fn page(store: &Store, id: &str) -> io::Result<Value> {
     let run = request["run"]
         .as_str()
         .filter(|_| request["status"] == "ready")
-        .ok_or_else(|| io::Error::other("cette tâche n'a pas de travail prêt"))?;
+        .ok_or_else(|| io::Error::other("this task has no work ready"))?;
     Ok(json!({"url": proof::page(&Worlds::from_env()?, run)?}))
 }
 
@@ -1274,7 +1278,7 @@ pub fn changes(store: &Store, id: &str) -> io::Result<Value> {
     let request = store.load(id)?;
     let run = request["run"]
         .as_str()
-        .ok_or_else(|| io::Error::other("fennec n'a rien changé pour cette tâche"))?;
+        .ok_or_else(|| io::Error::other("fennec changed nothing for this task"))?;
     let record = review::load(&Worlds::from_env()?, run)?;
     let attempt = record["attempts"]
         .as_array()
@@ -1324,7 +1328,7 @@ pub fn journal(store: &Store, id: &str) -> io::Result<Value> {
             Some("frame") => {
                 if let Ok(s) = spec::load(&worlds, e["spec"].as_str().unwrap_or("")) {
                     steps.push(roles(
-                        step("Cadrage : terminé quand et tests", &s),
+                        step("Framing: done when and tests", &s),
                         &s["team"],
                     ));
                 }
@@ -1334,33 +1338,33 @@ pub fn journal(store: &Store, id: &str) -> io::Result<Value> {
                     continue;
                 };
                 for (n, a) in r["attempts"].as_array().into_iter().flatten().enumerate() {
-                    let mut s = roles(step(&format!("Travail, essai {}", n + 1), a), &r["team"]);
+                    let mut s = roles(step(&format!("Work, try {}", n + 1), a), &r["team"]);
                     s["passed"] = a["passed"].clone();
                     steps.push(s);
                 }
                 if !r["proof"]["exchange"].is_null() {
-                    let mut s = roles(step("Preuve", &r["proof"]["exchange"]), &r["proof"]["team"]);
+                    let mut s = roles(step("Proof", &r["proof"]["exchange"]), &r["proof"]["team"]);
                     // A prove role also acts on its own: its commands, run by fennec.
                     s["checks"] = r["proof"]["checks"].clone();
                     steps.push(s);
                 }
             }
-            Some("said") => steps.push(json!({"name": "Ta réponse", "said": e["text"]})),
-            Some("qa") => steps.push(json!({"name": "Preuve ratée : renvoyée au travail", "said": e["findings"]})),
+            Some("said") => steps.push(json!({"name": "Your answer", "said": e["text"]})),
+            Some("qa") => steps.push(json!({"name": "Proof failed: sent back to work", "said": e["findings"]})),
             Some("outside") => steps.push(json!({
                 "name": format!("Via {}", e["via"].as_str().unwrap_or("")),
-                "said": format!("{} par {}", e["did"].as_str().unwrap_or(""), e["from"].as_str().unwrap_or(""))})),
+                "said": format!("{} by {}", e["did"].as_str().unwrap_or(""), e["from"].as_str().unwrap_or(""))})),
             Some("plugin") => steps.push(json!({
                 "name": format!("Plugin {}", e["name"].as_str().unwrap_or("")),
-                "said": format!("n'a pas pu prévenir : {}", e["error"].as_str().unwrap_or(""))})),
+                "said": format!("could not notify: {}", e["error"].as_str().unwrap_or(""))})),
             _ => {}
         }
     }
     // The step under way, as far as it has gone.
     let under_way = match request["status"].as_str() {
-        Some("framing") => Some("Démarrage (en cours)"),
-        Some("running") => Some("Travail (en cours)"),
-        Some("proving") => Some("Preuve (en cours)"),
+        Some("framing") => Some("Starting (running)"),
+        Some("running") => Some("Work (running)"),
+        Some("proving") => Some("Proof (running)"),
         _ => None,
     };
     if let Some(name) = under_way {
@@ -1423,7 +1427,7 @@ pub fn cost(turns: &Value) -> Value {
     })
 }
 
-const STATS_VERSION: u64 = 2;
+const STATS_VERSION: u64 = 3;
 const COUNTS: [&str; 6] = ["turns", "sent", "cached", "received", "thinking", "ms"];
 
 /// A request's cost summed over its finished steps, in all and per model,
@@ -1451,7 +1455,7 @@ fn totals(steps: &[Value]) -> Value {
             all["models"][model] = json!({});
         }
         add(&mut all["models"][model], &s["cost"]);
-        // "Travail, essai 2" counts as "Travail".
+        // "Work, try 2" counts as "Work".
         let stage = s["name"]
             .as_str()
             .unwrap_or("?")
@@ -1570,9 +1574,7 @@ fn summarize(requests: &[(String, Value)], places: &[(String, String)]) -> Value
 pub fn land(store: &Store, id: &str) -> io::Result<()> {
     let request = store.load(id)?;
     if request["status"] != "ready" || !request["run"].is_string() {
-        return Err(io::Error::other(
-            "cette tâche n'est pas prête pour un commit",
-        ));
+        return Err(io::Error::other("this task is not ready for a commit"));
     }
     store.update(id, |r| {
         r["status"] = json!("landing");
@@ -1618,7 +1620,7 @@ fn land_now(store: &Store, id: &str) -> io::Result<()> {
             if let Err(e) = said {
                 return store.update(id, |r| {
                     r["status"] = json!("ready");
-                    r["land_error"] = json!(format!("non vérifié : le plugin {name} refuse ({e})"));
+                    r["land_error"] = json!(format!("not verified: plugin {name} refuses ({e})"));
                 });
             }
         }
@@ -1637,7 +1639,7 @@ fn land_now(store: &Store, id: &str) -> io::Result<()> {
     {
         return store.update(id, |r| {
             r["status"] = json!("ready");
-            r["land_error"] = json!(format!("le commit est fait, mais pas poussé : {e}"));
+            r["land_error"] = json!(format!("the commit is done, but not pushed: {e}"));
         });
     }
     store.update(id, |r| r["status"] = json!("landed"))
@@ -1647,7 +1649,7 @@ fn fail_landing(store: &Store, id: &str, e: io::Error) -> io::Result<()> {
     let mut why = e.to_string();
     if why.contains(" after edits onto ") {
         why = format!(
-            "tes modifications font échouer les tests : corrige-les dans le dossier du code, puis refais le commit\n{why}"
+            "your changes make the tests fail: fix them in the code folder, then commit again\n{why}"
         );
     }
     store.update(id, |r| {
@@ -1666,7 +1668,7 @@ pub fn recover(store: &Store) -> io::Result<()> {
         ) {
             store.update(&id, |r| {
                 r["status"] = json!("failed");
-                r["reason"] = json!("interrompu : fennec a été arrêté pendant le travail");
+                r["reason"] = json!("interrupted: fennec was stopped during the work");
             })?;
         } else if r["status"] == "waiting" {
             // Nothing started yet: it waits its turn again.
@@ -1674,7 +1676,7 @@ pub fn recover(store: &Store) -> io::Result<()> {
         } else if r["status"] == "landing" {
             store.update(&id, |r| {
                 r["status"] = json!("ready");
-                r["land_error"] = json!("interrompu : fennec a été arrêté pendant le commit");
+                r["land_error"] = json!("interrupted: fennec was stopped during the commit");
             })?;
         }
     }
@@ -1862,8 +1864,8 @@ mod tests {
         let cost = |n: u64| json!({"turns": 1, "sent": n, "cached": n / 2, "received": 10, "thinking": 0, "ms": 1000});
         let steps = [
             json!({"name": "Discussion", "model": "a", "cost": cost(100)}),
-            json!({"name": "Travail, essai 1", "model": "b", "cost": cost(200), "passed": false}),
-            json!({"name": "Travail, essai 2", "model": "b", "cost": cost(300), "passed": true}),
+            json!({"name": "Work, try 1", "model": "b", "cost": cost(200), "passed": false}),
+            json!({"name": "Work, try 2", "model": "b", "cost": cost(300), "passed": true}),
             json!({"model": "b", "cost": cost(999), "live": true}),
         ];
         let s = totals(&steps);
@@ -1871,7 +1873,7 @@ mod tests {
         assert_eq!(s["cached"], 300);
         assert_eq!(s["failed_attempts"], 1);
         assert_eq!(s["models"]["b"]["sent"], 500);
-        assert_eq!(s["stages"]["Travail"]["turns"], 2);
+        assert_eq!(s["stages"]["Work"]["turns"], 2);
         let requests = [
             (
                 "1".to_string(),
@@ -1956,7 +1958,7 @@ mod tests {
         stop(&store, id).unwrap();
         let r = store.load(id).unwrap();
         assert_eq!(r["status"], "failed");
-        assert_eq!(r["reason"], "arrêté : tu as demandé d'arrêter");
+        assert_eq!(r["reason"], "stopped: you asked to stop");
         assert!(r.get("behind").is_none());
         // Stopped: not worked on anymore, so no second stop, and recover leaves it.
         assert!(stop(&store, id).is_err());
@@ -1977,7 +1979,7 @@ mod tests {
             )
             .unwrap();
             let err = stop(&store, id).unwrap_err().to_string();
-            assert!(err.contains("ne travaille plus"), "{id}: {err}");
+            assert!(err.contains("no longer works"), "{id}: {err}");
         }
         std::fs::remove_dir_all(tmp).unwrap();
     }
@@ -1999,7 +2001,7 @@ mod tests {
         stop(&store, "c3").unwrap();
         // The worker's next checkpoint leaves the queue with the stop's reason.
         let err = wait_turn(&store, "c3", project.to_str().unwrap()).unwrap_err();
-        assert_eq!(err.to_string(), "arrêté : tu as demandé d'arrêter");
+        assert_eq!(err.to_string(), "stopped: you asked to stop");
         std::fs::remove_dir_all(tmp).unwrap();
     }
 
@@ -2108,7 +2110,7 @@ mod tests {
             r["reason"]
                 .as_str()
                 .unwrap()
-                .ends_with("u ne s'affiche pas : no text")
+                .ends_with("does not show: no text")
         );
         let check = |exit: i32, missing: bool| {
             json!({"tries": [{"command": "a", "exit": 0}], "passed": missing,
@@ -2117,7 +2119,7 @@ mod tests {
         apply_proof(&mut r, &check(1, false));
         assert_eq!(
             r["reason"],
-            "le travail est fait, mais Sec bloque : `audit` a échoué"
+            "the work is done, but Sec blocks: `audit` failed"
         );
         apply_proof(&mut r, &check(127, true));
         assert_eq!(r["status"], "ready", "a missing tool is not a veto");

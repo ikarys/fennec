@@ -1,6 +1,9 @@
 // node ui/forget.test.js — erasing a finished request asks once before doing.
 const assert = require("assert");
 const src = require("fs").readFileSync(__dirname + "/app.js", "utf8");
+// `t` in English, as app.js shows it by default.
+globalThis.t = (s, ...a) => s.replace(/\{(\d+)\}/g, (_, i) => String(a[i] ?? ""));
+globalThis.lang = () => "en";
 const grab = (name) => src.match(new RegExp(`function ${name}\\([\\s\\S]*?\\n}\\n`))[0];
 
 class Node {
@@ -37,12 +40,12 @@ eval(src.match(/const el = \(tag, props = \{\}, \.\.\.children\) => \{[\s\S]*?\n
   + "globalThis.forgetButton = forgetButton;");
 
 const b = forgetButton("abc");
-assert.equal(b.textContent, "Supprimer");
+assert.equal(b.textContent, "Delete");
 assert.ok((b.className).includes("quiet"));
 b.onclick();
 assert.equal(calls.length, 0, "le premier clic ne fait que demander");
 const sure = b.replacedBy;
-assert.equal(sure.textContent, "Confirmer");
+assert.equal(sure.textContent, "Confirm");
 sure.onclick().then(() => {
   assert.deepEqual(calls, [["/api/forget", { id: "abc" }]], "le second clic efface");
   console.log("ok");
