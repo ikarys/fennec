@@ -1995,7 +1995,7 @@ async function refresh(force) {
       .find(([i]) => i.id === picked));
     tick();
     // How it works, until the first request: the page alone must explain itself.
-    $("how").hidden = view.todo.length + view.running.length + view.history.length > 0;
+    $("how").hidden = view.todo.length + view.later.length + view.running.length + view.history.length > 0;
     // Its figures move as its requests do.
     if (paged && !force) showPage(paged).catch(() => {});
   } catch (e) {
