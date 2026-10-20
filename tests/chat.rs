@@ -479,6 +479,9 @@ fn an_approved_plan_allows_changes_within_the_turn() {
             json!({"plan": "- copier a.txt", "steps": ["Copier a.txt"]}),
         ),
         call("c1", "shell", json!({"command": "cp a.txt b.txt"})),
+        // The step is left open: the turn goes back to it.
+        json!({"content": "C'est fait."}),
+        call("c2", "criteria", json!({"action": "done", "number": 1})),
         json!({"content": "C'est fait."}),
     ])));
     let (w, tid) = (twin(&f), id.clone());
@@ -493,6 +496,18 @@ fn an_approved_plan_allows_changes_within_the_turn() {
     assert_eq!(c["write"], true);
     assert!(c["grants"].as_array().unwrap().is_empty());
     assert!(folder.join("b.txt").exists(), "approved: the turn writes");
+    assert_eq!(c["criteria"][0]["text"], "Copier a.txt");
+    assert_eq!(c["criteria"][0]["state"], "done");
+    let sent_back = c["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|m| m["harness"] == true)
+        .count();
+    assert_eq!(
+        sent_back, 1,
+        "a reply with the plan unfinished goes back to it"
+    );
 }
 
 #[test]

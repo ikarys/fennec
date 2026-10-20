@@ -119,7 +119,12 @@ fn fixture(name: &str) -> Fixture {
 #[test]
 fn attempts_run_in_turn_and_the_first_pass_lands() {
     let f = fixture("solve");
-    let wrong = Script::new("wrong", &[write("answer", "41\n"), done()]);
+    let wrong = Script::new(
+        "wrong",
+        // `done` is refused twice while the check fails, then the
+        // verification judges.
+        &[write("answer", "41\n"), done(), done(), done()],
+    );
     let noisy = Script::new(
         "noisy",
         &[write("answer", "42\n"), write("notes", "a\nb\nc\n"), done()],
@@ -1281,7 +1286,12 @@ fn every_turn_is_timed_for_the_profile() {
 #[test]
 fn a_failed_attempt_teaches_the_next_one() {
     let f = fixture("lesson");
-    let wrong = Script::new("wrong", &[write("answer", "41\n"), done()]);
+    let wrong = Script::new(
+        "wrong",
+        // `done` is refused twice while the check fails, then the
+        // verification judges.
+        &[write("answer", "41\n"), done(), done(), done()],
+    );
     let spy = Spy(Mutex::new(String::new()));
     let record = solve(&f.worlds, &f.project, &task(&[]), &[&wrong, &spy], 10).unwrap();
     assert_eq!(record["attempts"].as_array().unwrap().len(), 2);

@@ -254,6 +254,7 @@ fn check(
     spec: &mut Value,
 ) -> io::Result<()> {
     let base = worlds.git(world, &["rev-parse", "HEAD"])?;
+    let criteria = criteria.iter().map(|c| agent::criterion(c, None)).collect();
     let outcome = agent::run(worlds, world, model, brief, criteria, context, max_steps)?;
     spec["steps"] = json!(outcome.steps);
     spec["stuck"] = json!(outcome.stuck);

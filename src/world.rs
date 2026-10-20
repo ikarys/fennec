@@ -227,6 +227,13 @@ impl Worlds {
         Ok(self.meta(&world.id)?.2)
     }
 
+    /// The project a world was forked from: its git store's folder, from
+    /// harness metadata.
+    pub fn project(&self, world: &World) -> io::Result<PathBuf> {
+        let common = self.common_dir(world)?;
+        Ok(common.parent().map_or(common.clone(), Path::to_path_buf))
+    }
+
     /// A world in the project folder is there only while its branch is
     /// checked out: anything else in the folder is not this world.
     fn present(&self, world: &World) -> io::Result<()> {
@@ -378,6 +385,14 @@ impl Worlds {
         self.sandboxed(world, argv, false)
     }
 
+    /// The sandbox an agent works in: the same, on the network, so it
+    /// installs what the project needs (asked by the human, 2026-10-20: a
+    /// project with dependencies could never be built nor proven). What
+    /// judges the work runs without it ([`Self::sandbox_command`]).
+    pub fn sandbox_work(&self, world: &World, argv: &[String]) -> io::Result<Command> {
+        self.sandboxed(world, argv, true)
+    }
+
     /// The same sandbox on the host's network: only for the product the
     /// human asked to open in their own browser (`proof::page`).
     pub fn sandbox_on_host_network(&self, world: &World, argv: &[String]) -> io::Result<Command> {
@@ -418,7 +433,8 @@ impl Worlds {
             mounts.push((rw, g.clone(), g.clone()));
         }
         mounts.push((rw, dir.to_path_buf(), dir.to_path_buf()));
-        self.jail(dir, &mounts, false, argv)
+        // On the network, as an agent's work is (`sandbox_work`).
+        self.jail(dir, &mounts, true, argv)
     }
 
     /// Why `dir` cannot be opened in a sandbox, as a chat's folder, a folder

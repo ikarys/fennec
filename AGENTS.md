@@ -24,7 +24,13 @@ src/provider.rs  `Model` trait + OpenAI-compatible client; `ask` (one question),
 src/recipe.rs    replay a landed run's tool calls when the same goal returns
 src/chat.rs      a plain conversation in a folder the person chose (git or not): same sandbox, folder read-only until the person allows changes, skills; no world
 src/outside.rs   the literal host paths a chat tool call names outside its folder: the chat asks, an opened folder stays read-write
-src/agent.rs     tool loop; every tool runs inside the sandbox; loops, idle runs and hung commands are stopped
+src/agent.rs     the engine every agent runs on (task attempts, chat turns): criteria kept by the harness and checked
+                 by commands, a reminder as the last message of every call, `done` refused while criteria are open,
+                 compaction into the model's notes, cut replies continued; loops, idle runs and hung commands stopped
+src/guard.rs     the person's rules on what agents run, read and write (`~/.config/fennec/guard.json`, never in a project;
+                 defaults seeded once): deny, ask (a chat asks, a task does without and records it), allow; commands
+                 split and normalized, paths resolved; checked by the engine before every call and every criterion check
+src/tools.rs     the agent's tools, run in the sandbox: shell, read_file (numbered), edit_file (exact replace, read first), write_file
 src/solve.rs     task → worlds in turn until one passes verify → land (rebase + re-verify, one commit by the human) on the branch the rules ask for → push
 src/spec.rs      request → conversation (`discuss`) → `direct` work (no tests first, proof decides) or acceptance tests + task (`compile`, CLI and sparring); retry from the tests; amend a ready run from its work, or `fix` it from what its proof found; sparring findings
 src/proof.rs     a ready run used as its user would: model proposes tries, pages and clicks/typing; harness runs them, captures before/after (proof.py)
@@ -71,7 +77,8 @@ Env: `FENNEC_OS_HOME` (store, default `~/.local/share/fennec-os`),
 `FENNEC_OS_RO` (paths re-exposed read-only inside the hidden home),
 `FENNEC_OS_MEMORY_MB` (memory cap per sandboxed command, `ulimit -d`, default 8192, 0 = none),
 `FENNEC_OS_BASE_URL`, `FENNEC_OS_MODELS` (comma-separated; default: what the server lists), `FENNEC_OS_API_KEY`,
-`FENNEC_OS_MAX_TOKENS` (a reply's budget, reasoning included; default 32768, 0 = the server's)
+`FENNEC_OS_MAX_TOKENS` (a reply's budget, reasoning included; default 32768, 0 = the server's),
+`FENNEC_OS_CONTEXT` (the model's context window in tokens, default 65536; a conversation past 70 % of it is compacted)
 (each overrides `~/.config/fennec/model.json`, which fennec-lead's settings write),
 `FENNEC_OS_BROWSER` (headless browser for proof screenshots, default `chromium`).
 
@@ -87,10 +94,13 @@ branch to give back.
 
 ## Non-negotiable rules
 
-1. **Nothing leaves a world except through the harness.** The sandbox has no
-   network, a hidden home, a private /tmp, and a read-only view of the
-   project's git store. Never widen a default. The one exception is a
-   `grant` issued by the human (files inside the home only, backed up first).
+1. **Nothing leaves a world except through the harness.** The sandbox has a
+   hidden home, a private /tmp, and a read-only view of the project's git
+   store. Never widen a default. Exceptions: a `grant` issued by the human
+   (files inside the home only, backed up first), and the network for the
+   agent's own work (`Worlds::sandbox_work`, chats), asked by the human on
+   2026-10-20 so a project's dependencies can be installed; what judges the
+   work (verify, proof) still runs without network.
 2. **The agent never commits.** Checkpoints and landing are harness operations.
    The harness never takes a path or setting from a world's files (`.git`
    included): git dirs come from `<store>/meta/`, hooks are always off.
