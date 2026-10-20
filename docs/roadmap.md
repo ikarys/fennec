@@ -18,6 +18,16 @@ and shareable on its own.
 Watch points:
 
 - P0 is Linux-only (namespaces). macOS (`sandbox-exec`) comes later.
+- Later, maybe (the human, 2026-10-20): a project's devcontainer as an
+  option, set per project ("tools: the machine's / the devcontainer's").
+  When the project has `.devcontainer/` and Docker runs, the agent works
+  inside it: its toolchain comes from the project, not from what the machine
+  has, and Docker also covers macOS and Windows. Offered for the tools, not
+  as more safety: the isolation is the same namespaces as bubblewrap, and
+  the person's rules on commands and files apply as they are. Costs: Docker
+  installed and running, images of several GB per project, a VM on macOS and
+  Windows. Until then the sandbox uses the machine's toolchains, named to
+  the agent, with package caches in the project's `.fennec/`.
 - P2 is only as good as its verifiers: weak criteria turn N attempts into a
   random pick. The intent compiler (P7) may need to move earlier.
 - Worlds that cannot be forked (external effects, live state, hardware) need

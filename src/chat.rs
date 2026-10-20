@@ -24,8 +24,8 @@ use crate::world::Worlds;
 const SYSTEM: &str = "You are fennec, talking with a person about the folder they chose; \
 it is the current directory. Answer in their language, like a colleague, in Markdown. Use the \
 tools whenever the answer is in the files or needs a command: read before you answer. The \
-sandbox reaches the network and hides their home except this folder. Python packages: uv \
-only, in the folder's `.venv` (`uv add`, `uv run`); Node: `npm install`. Your turn ends when you reply \
+sandbox reaches the network and hides their home except this folder. Dependencies go in the \
+folder with its own tools, never in the system or the home. Your turn ends when you reply \
 without a tool call: that reply is what they read.";
 
 /// A chat starts read-only: talking about a project is not asking to build it.
@@ -410,7 +410,7 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
         let tools = Value::Array(tools);
         let mode = if write { WRITE } else { READ };
         let system = json!({"role": "system",
-                            "content": format!("{SYSTEM}{mode}{}", skill::brief(&skills))});
+                            "content": format!("{SYSTEM}{}{mode}{}", agent::tools_line(worlds), skill::brief(&skills))});
         let mut log = chat["messages"].as_array().cloned().unwrap_or_default();
         // The model sees the exchange from `window` on: past the last
         // compaction, whose notes open it.

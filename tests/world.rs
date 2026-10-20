@@ -78,6 +78,11 @@ fn build_output_is_not_the_work() {
         !files.contains("target/") && files.contains("src.rs"),
         "{files}"
     );
+    // Package caches stay out of the work and survive an undone try.
+    assert!(f.sh(&w, "mkdir -p .fennec/npm && echo c > .fennec/npm/c && test \"$npm_config_cache\" = \"$PWD/.fennec/npm\"").0);
+    assert!(f.worlds.status(&w).unwrap().is_empty());
+    f.worlds.rollback(&w).unwrap();
+    assert!(w.path.join(".fennec/npm/c").is_file());
     // Left on disk, it is no change either: verify said the checks changed
     // the world over a `__pycache__` a solve left (2026-10-19).
     assert!(f.worlds.status(&w).unwrap().is_empty());
@@ -316,8 +321,13 @@ fn a_rollback_in_the_folder_sets_changes_aside() {
     let w = f.worlds.fork(&f.project.to_string_lossy()).unwrap();
     // The human edits their folder while fennec works in it.
     std::fs::write(w.path.join("mine"), "keep me\n").unwrap();
+    // The package caches are no change of theirs: they stay where they are.
+    std::fs::create_dir_all(w.path.join(".fennec/cargo")).unwrap();
+    assert!(f.worlds.status(&w).unwrap().contains("mine"));
+    assert!(!f.worlds.status(&w).unwrap().contains(".fennec"));
     f.worlds.rollback(&w).unwrap();
     assert!(!w.path.join("mine").exists());
+    assert!(w.path.join(".fennec/cargo").is_dir());
     let stash = Command::new("git")
         .arg("-C")
         .arg(&w.path)

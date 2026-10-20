@@ -119,12 +119,12 @@ fn save(rules: &[Value]) -> io::Result<()> {
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir)?;
     }
-    let tmp = path.with_extension("tmp");
-    std::fs::write(
-        &tmp,
-        serde_json::to_string_pretty(&json!({"rules": rules}))?,
-    )?;
-    std::fs::rename(tmp, path)
+    // Two agents starting at once both seed the defaults: one shared temp
+    // file made the second rename fail.
+    crate::review::write_atomic(
+        &path,
+        &serde_json::to_string_pretty(&json!({"rules": rules}))?,
+    )
 }
 
 /// Adds a rule the person wrote; refused when it would not mean anything.
