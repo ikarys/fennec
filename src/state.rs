@@ -372,8 +372,9 @@ impl Store {
             c["fleet"] = json!(rank.is_some());
             c["rank"] = json!(rank);
         }
-        // The list starts and stops the Fleet too.
-        view["fleet"] = json!({"on": crate::fleet::running(self)?, "queued": fleet.len()});
+        // The list starts and stops the Fleet too, and sees why it stopped.
+        view["fleet"] = json!({"on": crate::fleet::running(self)?, "queued": fleet.len(),
+                               "stopped": crate::fleet::stopped(self)?});
         Ok(view)
     }
 }
@@ -917,6 +918,26 @@ mod tests {
                 .unwrap()
                 .is_empty()
         );
+        std::fs::remove_dir_all(&tmp).unwrap();
+    }
+
+    #[test]
+    fn the_list_sees_the_fleet_and_why_it_stopped() {
+        let tmp =
+            std::env::temp_dir().join(format!("fennec-lead-fleet-stopped-{}", std::process::id()));
+        let project = tmp.join("p");
+        std::fs::create_dir_all(&project).unwrap();
+        let store = Store {
+            root: tmp.join("home"),
+        };
+        std::fs::create_dir_all(store.root.join("requests")).unwrap();
+        store
+            .add_project(project.to_str().unwrap(), "here")
+            .unwrap();
+        let view = store.view().unwrap();
+        assert_eq!(view["fleet"]["on"], true);
+        assert_eq!(view["fleet"]["queued"], 0);
+        assert!(view["fleet"]["stopped"].is_null());
         std::fs::remove_dir_all(&tmp).unwrap();
     }
 

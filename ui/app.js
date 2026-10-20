@@ -1339,7 +1339,6 @@ function renderSide(view) {
   $("side-archived-label").hidden = !archived.length;
   $("side-archived").replaceChildren(...archived.map(archivedProjectEntry));
   const page = PAGES.includes(where().path) ? where().path : "";
-  $("open-fleet").setAttribute("aria-current", String(page === "fleet"));
   $("open-team").setAttribute("aria-current", String(page === "team"));
   $("open-stats").setAttribute("aria-current", String(page === "stats"));
   $("open-settings").setAttribute("aria-current", String(page === "settings"));
@@ -1915,8 +1914,6 @@ async function refresh(force) {
   // froze it after a mere click on a tab.)
   const typing = !force && ([...document.querySelectorAll("#detail textarea, #detail input")].some((f) => f.value !== f.defaultValue)
     || document.activeElement?.matches("#detail textarea, #detail input"));
-  // The Fleet's waits move with the folders, not only with the requests.
-  if (where().path === "fleet" && shownPageKey.startsWith("fleet")) showFleet().catch(() => {});
   try {
     const view = await api("/api/view");
     const json = JSON.stringify(view);
@@ -1961,17 +1958,16 @@ async function refresh(force) {
     $("n-others").textContent = !others ? "" : others > 1 ? t("{0} others wait for you elsewhere", others) : t("{0} other waits for you elsewhere", others);
     const name = $("project").selectedOptions[0]?.value ? $("project").selectedOptions[0].text : "fennec";
     document.title = todo.length ? `(${todo.length}) ${name}` : name;
+    $("n-running").textContent = running.length || "";
     fill($("running"), running.map((i) => row(i, line(i, i.step, true),
       rowActions(i.id, { stop: "/api/stop" }))), t("Nothing running."));
-    // The Backlog, then what was validated, in the order the Fleet runs it:
-    // each only there when it holds something.
+    // The Backlog, then what was validated, in the order the Fleet runs it.
     const later = mine(view.later ?? []);
     const backlog = later.filter((i) => !i.fleet);
     const ready = later.filter((i) => i.fleet).sort((a, b) => a.rank - b.rank);
     // Ticked rows survive a redraw: the list moves under the human's hand.
     ticked = new Set([...ticked].filter((id) => later.some((i) => i.id === id)));
     const picks = (name, items, label, send) => {
-      $(name + "-box").hidden = !items.length;
       $("n-" + name).textContent = items.length || "";
       const bar = $(name + "-pick");
       fill($(name), items.map((i) => {
@@ -1987,11 +1983,12 @@ async function refresh(force) {
     picks("ready", ready, (i) => i.after?.length ? t("#{0} in line, waits for \"{1}\"", i.rank + 1, i.after[0]) : t("#{0} in line", i.rank + 1), [t("Back to the Backlog"), "remove", () => true]);
     showFleetBar(view.fleet, later.length);
     const history = mine(view.history);
+    $("n-history").textContent = history.length || "";
     fill($("history"), history.map((i) => row(i, line(i, pastState(i), false),
       rowActions(i.id, { archive: "/api/request/archive", forget: "/api/forget" }))), t("Nothing finished yet."));
     // The archived requests, out of the lists: brought back or erased there.
     const archived = mine(view.archived ?? []);
-    $("archived-box").hidden = !archived.length;
+    $("archived-box").hidden = !archived.length || listTab !== "history";
     $("n-archived").textContent = archived.length || "";
     fill($("archived"), archived.map((i) => row(i, line(i, pastState(i), false),
       rowActions(i.id, { archive: "/api/request/archive", forget: "/api/forget", restore: true }))), "");
@@ -2033,7 +2030,7 @@ function drawHome(view = homeView) {
   const a = homeStats?.all, mem = homeStats?.memory;
   $("home-tiles").replaceChildren(
     tile(number(view.todo.length), t("for you")), tile(number(view.running.length), t("running")),
-    tile(number(ready.length), t("ready to run"), "#fleet"), tile(number(toValidate), t("to validate in the Backlog")),
+    tile(number(ready.length), t("ready to run")), tile(number(toValidate), t("to validate in the Backlog")),
     ...(a ? [tile(duration(a.ms ?? 0), t("of model · ↑ {0} ↓ {1}", compact(a.sent), compact(a.received)), "#stats"),
       tile(bytes(a.disk ?? 0), t("disk of the worlds"))] : []),
     ...(mem?.total ? [tile(`${percent(mem.total - mem.available, mem.total)} %`, t("memory used of {0}", bytes(mem.total)))] : []));
@@ -2043,9 +2040,6 @@ function drawHome(view = homeView) {
   const fresh = news.filter(([i]) => i.since > seenBefore).length;
   $("n-home-news").textContent = fresh || "";
   fill($("home-news"), news.map(([i, s]) => link(i, s, i.since > seenBefore)), t("Nothing yet."));
-  $("n-home-next").textContent = ready.length || "";
-  fill($("home-next"), ready.slice(0, 3).map((i) => link(i, i.after?.length ? [t("waits for \"{0}\"", i.after[0]), "muted"]
-    : [t("#{0} in line", i.rank + 1), "info"])), t("No task ready: validate tasks in the Backlog."));
 }
 
 // A box's ticked tasks, validated (Backlog) or put back (Ready) at once.
@@ -2076,14 +2070,15 @@ function showPicked(bar, items, [label, action, applies]) {
   bar.replaceChildren(el("span", { textContent: t("{0} picked", ids.length) }), all, el("span", { className: "spacer" }), b, error);
 }
 
-// The Fleet from the list: whether it runs, how many wait, and its switch.
+// The Fleet's switch on top of the Ready tab: whether it runs, how many wait.
 function showFleetBar(fleet, later) {
+  const stopped = $("fleet-stopped");
+  stopped.hidden = !fleet?.stopped;
+  stopped.textContent = fleet?.stopped ? t("Stopped on its own: {0}. Look at the task, then start again.", t(fleet.stopped)) : "";
   const bar = $("fleet-bar");
   bar.hidden = !fleet || !(fleet.queued || later);
   if (bar.hidden) return;
   bar.classList.toggle("on", fleet.on && fleet.queued > 0);
-  const name = el("a", { href: "#fleet", textContent: "Fleet" });
-  setIcon(name, "fleet");
   const toggle = el("button", { type: "button", textContent: fleet.on ? t("Stop") : t("Start") });
   setIcon(toggle, fleet.on ? "pause" : "play");
   toggle.onclick = async () => {
@@ -2094,14 +2089,14 @@ function showFleetBar(fleet, later) {
     }
     refresh(true);
   };
-  bar.replaceChildren(name, el("span", { className: "muted",
+  bar.replaceChildren(el("span", { className: "muted",
     textContent: t(fleet.on ? "running · {0} queued" : "stopped · {0} queued", fleet.queued) }), el("span", { className: "spacer" }), toggle);
 }
 
 // The right pane: the chosen request in full, a page the address names,
 // or else the project's page. Drawn again only when the request changed,
 // so what the human opened in it stays open.
-const PAGES = ["fleet", "team", "stats", "settings"];
+const PAGES = ["team", "stats", "settings"];
 // A discussion or a page owns the address: the project's page must not take
 // it back, and a project chosen from there sends the address to it.
 const owned = (path) => path === "chat" || PAGES.includes(path);
@@ -2124,7 +2119,6 @@ function showDetail(found) {
       const key = page + "|" + $("project").value;
       if (key !== shownPageKey) {
         shownPageKey = key;
-        if (page === "fleet") showFleet().catch((e) => ($("fleet-error").textContent = e.message));
         if (page === "team") showTeamPage();
         if (page === "stats") showStats().catch((e) => ($("stats-error").textContent = e.message));
         if (page === "settings") showSettingsPage();
@@ -2610,12 +2604,13 @@ function buildFontScale() {
   };
 }
 
-// The settings panels, one tab each: general, appearance, rules, skills, plugins, cleaning.
+// The settings panels, one tab each: general, appearance, rules, fleet, skills, plugins, cleaning.
 document.querySelectorAll("#settings-tabs [role=tab]").forEach((b) => {
   b.onclick = () => {
     document.querySelectorAll("#settings-tabs [role=tab]").forEach((tab) => tab.setAttribute("aria-selected", String(tab === b)));
-    ["settings-general", "settings-appearance", "settings-rules", "settings-skills", "settings-plugins", "settings-clean"].forEach((id) => $(id).hidden = id !== b.dataset.panel);
+    ["settings-general", "settings-appearance", "settings-rules", "settings-fleet", "settings-skills", "settings-plugins", "settings-clean"].forEach((id) => $(id).hidden = id !== b.dataset.panel);
     if (b.dataset.panel === "settings-clean") showLeftovers();
+    if (b.dataset.panel === "settings-fleet") showFleetSettings();
     if (b.dataset.panel === "settings-plugins") showPlugins({});
     if (b.dataset.panel === "settings-rules") changeRules($("settings-rules"), "", "user");
     if (b.dataset.panel === "settings-rules") changeGuard();
@@ -2793,21 +2788,10 @@ async function showPage(path) {
   paged = path;
   if (!path) return;
   $("page-error").textContent = "";
-  $("page-name").textContent = path.split("/").pop();
-  $("page-path").textContent = path;
-  const [stats, rules, chats] = await Promise.all([api("/api/stats"), api("/api/rules", { project: path }), api("/api/chats")]);
+  const [stats, rules] = await Promise.all([api("/api/stats"), api("/api/rules", { project: path })]);
   if (paged !== path) return;
   const p = stats.projects.find((x) => x.path === path) ?? {};
   const tile = (value, label, tone = "") => el("div", { className: `tile ${tone}` }, el("b", { textContent: value }), el("span", { textContent: label }));
-  // Where its tasks stand now, then what they cost and how well they went.
-  const v = homeView ?? { todo: [], running: [], later: [] };
-  const here = (items) => items.filter((i) => i.path === path);
-  const later = here(v.later);
-  $("page-now").replaceChildren(
-    tile(number(here(v.todo).length), t("for you")), tile(number(here(v.running).length), t("running")),
-    tile(number(later.filter((i) => i.fleet).length), t("ready to run")),
-    tile(number(later.filter((i) => !i.fleet).length), t("in the Backlog")),
-    tile(number(chats.filter((c) => c.folder === path).length), t("open discussions")));
   const proven = (p.first_try ?? 0) + (p.retried ?? 0);
   $("page-tiles").replaceChildren(
     tile(number(p.landed), t("commits")),
@@ -2981,17 +2965,13 @@ $("page-open").onclick = async () => {
   }
 };
 
-$("open-fleet").onclick = () => {
-  location.hash === "#fleet" ? refresh(true) : (location.hash = "#fleet");
-};
-
 // The Fleet: one queue of tasks across projects, started on their own.
 $("fleet-at-once").replaceChildren(...Array.from({ length: 10 }, (_, i) => new Option(String(i + 1), String(i + 1))));
 async function fleetDo(path, body) {
   $("fleet-error").textContent = "";
   try {
     await api(path, body);
-    await showFleet();
+    await showFleetSettings();
     refresh(true);
   } catch (e) {
     $("fleet-error").textContent = e.message;
@@ -3000,43 +2980,27 @@ async function fleetDo(path, body) {
 $("fleet-at-once").onchange = () => fleetDo("/api/fleet", { at_once: Number($("fleet-at-once").value) });
 $("fleet-on-fail").onchange = () => fleetDo("/api/fleet", { on_fail: $("fleet-on-fail").value });
 $("fleet-on-success").onchange = () => fleetDo("/api/fleet", { on_success: $("fleet-on-success").value });
-async function showFleet() {
-  const v = await api("/api/fleet");
-  const toggle = $("fleet-toggle");
-  toggle.textContent = v.on ? t("Stop the Fleet") : t("Start the Fleet");
-  setIcon(toggle, v.on ? "pause" : "play");
-  toggle.classList.toggle("primary", !v.on);
-  toggle.onclick = () => fleetDo("/api/fleet", { on: !v.on });
-  $("fleet-state").textContent = v.on ? t("running") : t("stopped");
-  $("fleet-stopped").hidden = !v.stopped;
-  $("fleet-stopped").textContent = v.stopped ? t("Stopped on its own: {0}. Look at the task, then start again.", t(v.stopped)) : "";
-  for (const [id, value] of [["fleet-at-once", String(v.at_once)], ["fleet-on-fail", v.on_fail], ["fleet-on-success", v.on_success]]) {
-    if (document.activeElement !== $(id)) $(id).value = value;
+// The Fleet's settings, in the settings tab: the values the queue runs with.
+async function showFleetSettings() {
+  try {
+    const v = await api("/api/fleet");
+    for (const [id, value] of [["fleet-at-once", String(v.at_once)], ["fleet-on-fail", v.on_fail], ["fleet-on-success", v.on_success]]) {
+      if (document.activeElement !== $(id)) $(id).value = value;
+    }
+  } catch (e) {
+    $("fleet-error").textContent = e.message;
   }
-  const s = v.summary;
-  const tile = (value, label) => el("div", { className: "tile" }, el("b", { textContent: value }), el("span", { textContent: label }));
-  $("fleet-tiles").replaceChildren(tile(number(s.queued), t("queued")), tile(number(s.working), t("running")),
-    tile(number(s.yours), t("wait for you")), tile(number(s.landed), t("commits")), tile(number(s.failed), t("failing")),
-    tile(duration(s.cost.ms), t("of model · ↑ {0} ↓ {1}", compact(s.cost.sent), compact(s.cost.received))));
-  const link = (item, state) => el("a", { className: "row", href: hashOf(item.path, item.id) }, line(item, state));
-  const move = (item, name, label, enabled) => {
-    const b = el("button", { type: "button", className: "icon", ariaLabel: label, title: label, disabled: !enabled });
-    setIcon(b, name);
-    b.onclick = () => fleetDo("/api/fleet/place", { id: item.id, action: name === "close" ? "remove" : name });
-    return b;
-  };
-  const last = v.queue.length - 1;
-  $("n-fleet").textContent = v.queue.length || "";
-  fill($("fleet-queue"), v.queue.map((item, i) => rowWrap(
-    link(item, [(item.waits ? stepText(item.waits) : v.on ? t("goes next") : t("goes at start")), item.waits ? "muted" : "accent"]),
-    el("div", { className: "row-actions" }, move(item, "up", t("Move up"), i > 0), move(item, "down", t("Move down"), i < last),
-      move(item, "close", t("Back to the Backlog"), true)))), t("No task ready: validate tasks in the Backlog."));
-  $("n-fleet-working").textContent = v.working.length || "";
-  fill($("fleet-working"), v.working.map((item) => link(item, null)), t("Nothing running."));
-  const tone = { "committed": "ok", "committed on fleet": "ok", "failed": "bad", "ready, waits for you": "accent", "a question for you": "accent", "set aside": "warn" };
-  $("n-fleet-recent").textContent = v.recent.length || "";
-  fill($("fleet-recent"), v.recent.map((item) => link(item, [item.outcome, tone[item.outcome] ?? "muted"])), t("Nothing yet."));
 }
+
+// The task list, one step at a time: the tab the human picked shows its box.
+let listTab = "todo";
+function listTabs(name) {
+  listTab = name;
+  document.querySelectorAll("#list-tabs [role=tab]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === name)));
+  document.querySelectorAll(".box[data-tab]").forEach((box) => { box.hidden = box.dataset.tab !== name; });
+}
+document.querySelectorAll("#list-tabs [role=tab]").forEach((b) => { b.onclick = () => listTabs(b.dataset.tab); });
+listTabs("todo");
 
 $("open-stats").onclick = () => {
   location.hash === "#stats" ? refresh(true) : (location.hash = "#stats");

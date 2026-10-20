@@ -10,8 +10,8 @@ globalThis.lang = () => "en";
 
 // The tab bar: three tabs, one panel each, general first and open.
 assert.match(html, /<div class="tabs" role="tablist" id="settings-tabs">/, "la barre d'onglets");
-for (const [label, panel, open] of [["General", "settings-general", true], ["Appearance", "settings-appearance", false], ["Skills", "settings-skills", false]]) {
-  assert.match(html, new RegExp(`<button type="button" role="tab" aria-selected="${open}" data-panel="${panel}"${label === "Skills" ? "" : " data-t"}>${label}</button>`), label + " : son onglet");
+for (const [label, panel, open] of [["General", "settings-general", true], ["Appearance", "settings-appearance", false], ["Skills", "settings-skills", false], ["Fleet", "settings-fleet", false]]) {
+  assert.match(html, new RegExp(`<button type="button" role="tab" aria-selected="${open}" data-panel="${panel}"${["Skills", "Fleet"].includes(label) ? "" : " data-t"}>${label}</button>`), label + " : son onglet");
   assert.match(html, new RegExp(`<div id="${panel}"${open ? "" : " hidden"}>`), label + " : son panneau" + (open ? ", ouvert" : ", fermé"));
 }
 // Each panel keeps its content.
@@ -61,7 +61,7 @@ store2[FONT_KEY] = "42";
 assert.equal(loadFontScale(), 15, "hors bornes : 15");
 
 // The tab wiring: a click selects its tab and shows only its panel.
-const tabs = ["settings-general", "settings-appearance", "settings-rules", "settings-skills", "settings-plugins", "settings-clean"].map((panel) => ({
+const tabs = ["settings-general", "settings-appearance", "settings-rules", "settings-fleet", "settings-skills", "settings-plugins", "settings-clean"].map((panel) => ({
   dataset: { panel }, setAttribute(k, v) { this[k] = v; }, onclick: null,
 }));
 const panels = {};
@@ -72,20 +72,24 @@ global.document = {
   getElementById: (id) => panels[id],
 };
 const $ = (id) => panels[id];
+// Opening "Fleet" reads the queue's settings.
+let fleetLoaded = 0;
+global.showFleetSettings = () => fleetLoaded++;
 eval(src.match(/\n\/\/ The settings panels[\s\S]*?\n\}\);\n/)[0]);
 tabs[3].onclick();
-assert.equal(tabs[3]["aria-selected"], "true", "l'onglet Skills est sélectionné");
+assert.equal(tabs[3]["aria-selected"], "true", "l'onglet Fleet est sélectionné");
 assert.equal(tabs[0]["aria-selected"], "false", "Général n'est plus sélectionné");
-assert.deepEqual(tabs.map((t) => t["aria-selected"]), ["false", "false", "false", "true", "false", "false"]);
+assert.deepEqual(tabs.map((t) => t["aria-selected"]), ["false", "false", "false", "true", "false", "false", "false"]);
 assert.deepEqual(Object.fromEntries(Object.entries(panels).map(([k, v]) => [k, v.hidden])),
-  { "settings-general": true, "settings-appearance": true, "settings-rules": true, "settings-skills": false, "settings-plugins": true, "settings-clean": true }, "seul le panneau Skills est visible");
+  { "settings-general": true, "settings-appearance": true, "settings-rules": true, "settings-fleet": false, "settings-skills": true, "settings-plugins": true, "settings-clean": true }, "seul le panneau Fleet est visible");
+assert.equal(fleetLoaded, 1, "les réglages de la Fleet sont lus à l'ouverture");
 tabs[0].onclick();
 assert.equal(panels["settings-general"].hidden, false, "revenir à Général");
-assert.equal(panels["settings-skills"].hidden, true, "Skills refermé");
+assert.equal(panels["settings-fleet"].hidden, true, "Fleet refermé");
 // Opening "Cleaning" loads what is left behind.
 let loaded = 0;
 global.showLeftovers = () => loaded++;
-tabs[5].onclick();
+tabs[6].onclick();
 assert.equal(panels["settings-clean"].hidden, false, "Nettoyage visible");
 assert.equal(loaded, 1, "la liste est chargée à l'ouverture");
 // Opening "Rules" reads the rules for every project, no project named.
@@ -97,7 +101,7 @@ global.changeGuard = () => guard++;
 // Opening "Plugins" reads the plugins of the machine.
 let plugins = 0;
 global.showPlugins = () => plugins++;
-tabs[4].onclick();
+tabs[5].onclick();
 assert.equal(panels["settings-plugins"].hidden, false, "Plugins visible");
 assert.equal(plugins, 1, "les plugins sont lus à l'ouverture");
 tabs[2].onclick();

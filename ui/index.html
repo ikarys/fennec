@@ -187,15 +187,14 @@
   #hint .row.fresh .what { font-weight: 600; }
   #compose-open { width: 100%; justify-content: center; padding: 6px 12px; margin-bottom: 4px; }
   /* Each part of the list in its own box: what waits for the human stands out. */
-  #list .box, #fleet .box, #hint .box { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px 4px;
+  #list .box, #hint .box { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px 4px;
                margin-top: 14px; }
-  #list .box h2, #fleet .box h2, #hint .box h2 { margin: 0 0 4px; display: flex; gap: 8px; align-items: center; }
-  #list .box .count, #fleet .box .count, #hint .box .count { text-transform: none; letter-spacing: 0; }
-  #list .box .empty, #fleet .box .empty, #hint .box .empty { padding: 4px 0 8px; font-size: 13px; }
-  /* The Fleet, from the list: its state and its switch, one line. */
+  #list .box h2, #hint .box h2 { margin: 0 0 4px; display: flex; gap: 8px; align-items: center; }
+  #list .box .count, #hint .box .count { text-transform: none; letter-spacing: 0; }
+  #list .box .empty, #hint .box .empty { padding: 4px 0 8px; font-size: 13px; }
+  /* The Fleet, from the Ready tab: its state and its switch, one line. */
   #fleet-bar { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 6px 12px;
                border: 1px solid var(--line); border-radius: 8px; background: var(--card); font-size: 13px; }
-  #fleet-bar a { color: var(--text); font-weight: 600; text-decoration: none; }
   #fleet-bar button { padding: 3px 10px; }
   #fleet-bar.on { border-color: var(--info); }
   /* The backlog's boxes to tick, and what to do with the ticked ones. */
@@ -669,17 +668,16 @@
     <button type="button" class="link" id="close-side" data-icon="panelLeft" aria-label="Close the projects bar" title="Close the projects bar"></button>
   </div>
   <div class="mid">
-    <ul><li><button type="button" class="item" id="side-all"><span class="name" data-t>Tasks</span></button></li></ul>
+    <ul><li><button type="button" class="item" id="side-all" data-icon="inbox"><span class="name" data-t>Tasks</span></button></li>
+      <li><button type="button" class="item" id="side-chats" data-icon="chat"><span class="name">Agent</span></button></li></ul>
     <div class="label"><span data-t>Projects</span> <button class="link" id="add-project" data-icon="plus" aria-label="Add a project" title="Add a project"></button></div>
     <ul id="side-projects"></ul>
     <div class="label" id="side-archived-label" hidden><span data-t>Archived projects</span></div>
     <ul id="side-archived"></ul>
     <p class="error" id="side-error" role="alert"></p>
-    <button class="link" id="side-chats" data-icon="chat">Agent</button>
   </div>
   <span class="spacer"></span>
   <div class="tools">
-    <button class="link" id="open-fleet" data-icon="fleet" aria-label="Fleet" title="Fleet"></button>
     <button class="link" id="open-team" data-icon="team" aria-label="Team" title="Team"></button>
     <button class="link" id="open-stats" data-icon="stats" aria-label="Stats" title="Stats"></button>
     <button class="link" id="open-settings" data-icon="gear" aria-label="Settings" title="Settings"></button>
@@ -698,7 +696,6 @@
   </div>
   <div id="reqs">
   <button type="button" class="primary" id="compose-open" data-icon="plus" data-t>New task</button>
-  <div id="fleet-bar" hidden></div>
   <p class="error" id="error" role="alert"></p>
 
 
@@ -715,25 +712,33 @@
     <p class="muted" data-t>The team ("Team") picks the roles that work on the project; "Settings" picks the model.</p>
   </section>
 
-  <div class="box" id="todo-box"><h2 data-icon="inbox"><span data-t>For you</span> <span class="count" id="n-todo"></span>
-    <button class="link" id="n-others" type="button"></button></h2>
+  <!-- Where tasks stand, one step at a time: the active tab names itself,
+     the others show their icon and count. -->
+  <div class="tabs" role="tablist" id="list-tabs">
+    <button type="button" role="tab" data-tab="todo" data-icon="inbox" title="For you"><span class="label" data-t>For you</span> <span class="count" id="n-todo"></span></button>
+    <button type="button" role="tab" data-tab="later" data-icon="clock" title="Backlog"><span class="label" data-t>Backlog</span> <span class="count" id="n-later"></span></button>
+    <button type="button" role="tab" data-tab="ready" data-icon="fleet" title="Ready to run"><span class="label" data-t>Ready to run</span> <span class="count" id="n-ready"></span></button>
+    <button type="button" role="tab" data-tab="running" data-icon="work" title="Running"><span class="label" data-t>Running</span> <span class="count" id="n-running"></span></button>
+    <button type="button" role="tab" data-tab="history" data-icon="history" title="History"><span class="label" data-t>History</span> <span class="count" id="n-history"></span></button>
+  </div>
+
+  <div class="box" id="todo-box" data-tab="todo"><button class="link" id="n-others" type="button"></button>
   <div id="todo"></div></div>
 
-  <div class="box" id="later-box" hidden><h2 data-icon="clock"><span data-t>Backlog</span> <span class="count" id="n-later"></span></h2>
-  <div id="later-pick" class="pick" hidden></div>
+  <div class="box" data-tab="later"><div id="later-pick" class="pick" hidden></div>
   <div id="later"></div></div>
 
-  <div class="box" id="ready-box" hidden><h2 data-icon="fleet"><span data-t>Ready to run</span> <span class="count" id="n-ready"></span></h2>
+  <!-- Ready is the Fleet's queue: its switch on top, the tasks in the order it starts them. -->
+  <div class="box" data-tab="ready"><div id="fleet-bar"></div>
+  <p class="warn-line" id="fleet-stopped" hidden></p>
   <div id="ready-pick" class="pick" hidden></div>
   <div id="ready"></div></div>
 
-  <div class="box"><h2 data-icon="work" data-t>fennec is working</h2>
-  <div id="running"></div></div>
+  <div class="box" data-tab="running"><div id="running"></div></div>
 
-  <div class="box"><h2 data-icon="history" data-t>History</h2>
-  <div id="history"></div></div>
+  <div class="box" data-tab="history"><div id="history"></div></div>
 
-  <div class="box" id="archived-box" hidden><h2 data-icon="inbox"><span data-t>Archived</span> <span class="count" id="n-archived"></span></h2>
+  <div class="box" id="archived-box" data-tab="history" hidden><h2 data-icon="inbox"><span data-t>Archived</span> <span class="count" id="n-archived"></span></h2>
   <div id="archived"></div></div>
   </div>
   </section>
@@ -748,17 +753,13 @@
     <div class="tiles" id="home-tiles"></div>
     <div class="box"><h2 data-icon="history"><span data-t>Since your last visit</span> <span class="count" id="n-home-news"></span></h2>
     <div id="home-news"></div></div>
-    <div class="box"><h2 data-icon="fleet"><span data-t>Ready next</span> <span class="count" id="n-home-next"></span></h2>
-    <div id="home-next"></div></div>
     <p class="muted hint-text" data-t>Pick a task on the left to read it in full, or a project to see its page.</p>
   </div>
   <!-- The chosen project's own page: what it cost, how it is worked on, its rules. -->
   <aside id="page" hidden>
-    <div class="page-head"><strong id="page-name"></strong> <span class="muted" id="page-path"></span>
-      <span class="spacer"></span>
+    <div class="page-head"><span class="spacer"></span>
       <button type="button" id="page-team" data-icon="team" aria-label="Team" title="Team"></button>
       <button type="button" id="page-open" data-icon="folder" aria-label="Open the folder" title="Open the folder"></button></div>
-    <div class="tiles" id="page-now"></div>
     <div class="tiles" id="page-tiles"></div>
     <div class="sub"><h3 data-icon="shield" data-t>Where fennec works</h3>
       <select id="page-place" aria-label="Where fennec works"></select></div>
@@ -808,28 +809,6 @@
       <button type="button" class="quiet" id="team-save-open" data-t>Save as a team…</button>
     </div>
   </section>
-  <section id="fleet" hidden>
-    <div class="page-head"><strong>Fleet</strong> <span class="muted" id="fleet-state"></span><span class="spacer"></span>
-      <button type="button" id="fleet-toggle"></button></div>
-    <p class="muted" data-t>fennec starts the Fleet's tasks on its own, in this order, as soon as a slot is free. Each works apart: once ready, it waits for you without holding up the next. When nothing works, fennec prepares the next ones: if it has a question, it comes in "For you". Stopping it does not cut what runs.</p>
-    <p class="warn-line" id="fleet-stopped" hidden></p>
-    <p class="error" id="fleet-error" role="alert"></p>
-    <div class="tiles" id="fleet-tiles"></div>
-    <div class="box"><h2 data-icon="fleet"><span data-t>Ready to run</span> <span class="count" id="n-fleet"></span></h2>
-    <div id="fleet-queue"></div></div>
-    <div class="box"><h2 data-icon="work"><span data-t>fennec is working</span> <span class="count" id="n-fleet-working"></span></h2>
-    <div id="fleet-working"></div></div>
-    <div class="box"><h2 data-icon="history"><span data-t>Started by the Fleet</span> <span class="count" id="n-fleet-recent"></span></h2>
-    <div id="fleet-recent"></div></div>
-    <div class="box"><h2 data-icon="gear" data-t>Settings</h2>
-      <div class="fleet-settings">
-        <label><span data-t>Tasks at once</span> <select id="fleet-at-once"></select></label>
-        <label><span data-t>After a failure</span> <select id="fleet-on-fail">
-          <option value="stop" data-t>stop the Fleet</option><option value="go on" data-t>go on</option></select></label>
-        <label title="On each project's fleet branch, never on your branch: the next task starts from there, and you merge when you want."><span data-t>After a success</span> <select id="fleet-on-success">
-          <option value="wait" data-t>wait for my validation</option><option value="branch" data-t>commit on the fleet branch</option></select></label>
-      </div></div>
-  </section>
   <section id="stats" hidden>
     <div class="page-head"><strong>Stats</strong></div>
     <div class="tiles" id="stats-tiles"></div>
@@ -857,6 +836,7 @@
       <button type="button" role="tab" aria-selected="true" data-panel="settings-general" data-t>General</button>
       <button type="button" role="tab" aria-selected="false" data-panel="settings-appearance" data-t>Appearance</button>
       <button type="button" role="tab" aria-selected="false" data-panel="settings-rules" data-t>Rules</button>
+      <button type="button" role="tab" aria-selected="false" data-panel="settings-fleet">Fleet</button>
       <button type="button" role="tab" aria-selected="false" data-panel="settings-skills">Skills</button>
       <button type="button" role="tab" aria-selected="false" data-panel="settings-plugins">Plugins</button>
       <button type="button" role="tab" aria-selected="false" data-panel="settings-clean" data-t>Cleaning</button>
@@ -928,6 +908,17 @@
         </form>
         <p class="error" id="guard-error" role="alert"></p>
       </div>
+    </div>
+    <div id="settings-fleet" hidden>
+      <p class="muted" data-t>fennec starts the Fleet's tasks on its own, in this order, as soon as a slot is free. Each works apart: once ready, it waits for you without holding up the next. When nothing works, fennec prepares the next ones: if it has a question, it comes in "For you". Stopping it does not cut what runs.</p>
+      <div class="fleet-settings">
+        <label><span data-t>Tasks at once</span> <select id="fleet-at-once"></select></label>
+        <label><span data-t>After a failure</span> <select id="fleet-on-fail">
+          <option value="stop" data-t>stop the Fleet</option><option value="go on" data-t>go on</option></select></label>
+        <label title="On each project's fleet branch, never on your branch: the next task starts from there, and you merge when you want."><span data-t>After a success</span> <select id="fleet-on-success">
+          <option value="wait" data-t>wait for my validation</option><option value="branch" data-t>commit on the fleet branch</option></select></label>
+      </div>
+      <p class="error" id="fleet-error" role="alert"></p>
     </div>
     <div id="settings-skills" hidden>
       <p class="muted" data-t>They apply to all your projects: the team sees the name and goal of each enabled skill, and reads it when the task needs it. They come from ~/.claude/skills and your plugins, from ~/.config/fennec/skills or from a project's .claude/skills folder.</p>
