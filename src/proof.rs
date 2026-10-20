@@ -26,8 +26,9 @@ const BRIEF: &str = "A change was made to a project and its tests pass. Show tha
 the way its user would see it: run the program or command, call the new code from a short \
 script, start the server and query it. Do not run the test suite: it already passed, so \
 never list it as unverified either. The commands run from the \
-project root in a sandbox without network; anything you start must stop on its own (use \
-`timeout`). Each command must print what a user would look at, and exit 0 only if the \
+project root in a sandbox without network, so use only what the project or the machine \
+already has: `npx` cannot fetch a package the project does not depend on. Anything you start \
+must stop on its own (use `timeout`). Each command must print what a user would look at, and exit 0 only if the \
 product behaves as the goal says. When the product is meant to fail (a bad argument, a \
 usage line, no argument at all), write the try as `! <command>`: it passes only if the \
 command fails. Never end a try with `; echo`, `|| true` or anything else that makes it \
