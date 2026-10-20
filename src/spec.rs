@@ -480,7 +480,14 @@ fn key<'a>(line: &'a str, name: &str) -> Option<&'a str> {
 /// world and no checks of its own, whose attempts fork from the project.
 /// Its verdict is the project's rules and the proof of the product
 /// (`proof::gather`); test-first is a rule the human writes, not a stage.
-pub fn direct(worlds: &Worlds, project: &Path, request: &str) -> io::Result<Value> {
+/// `skills`: the ones picked for this request at framing; `None`, all the
+/// person keeps.
+pub fn direct(
+    worlds: &Worlds,
+    project: &Path,
+    request: &str,
+    skills: Option<&[String]>,
+) -> io::Result<Value> {
     let project = std::fs::canonicalize(project)?;
     let id = crate::world::new_id();
     let spec = json!({
@@ -492,6 +499,7 @@ pub fn direct(worlds: &Worlds, project: &Path, request: &str) -> io::Result<Valu
         "verify": [],
         "protect": [],
         "status": "proposed",
+        "skills": skills,
     });
     save(worlds, &id, &spec)?;
     Ok(spec)
@@ -648,6 +656,7 @@ fn run_spec(
         // A direct spec has no world of its own: it starts from the project.
         base: (spec["origin"] != "direct" || base != spec["world"]).then(|| base.to_string()),
         grant: Vec::new(),
+        skills: spec["skills"].is_array().then(|| strings("skills")),
     };
     let project = PathBuf::from(spec["project"].as_str().unwrap_or(""));
     solve::solve(worlds, &project, &task, models, max_steps)
@@ -733,12 +742,19 @@ with exactly one line and nothing else:\n\
 `brief: <the whole request restated precisely, with everything agreed in this conversation, \
 in their language>`";
 
+/// Asked after `DISCUSS` when the person keeps skills: the work then sees
+/// only the ones that serve this request.
+const PICK: &str = "\n\nThe person keeps these skills for the developers. With the brief, add \
+one more line naming the ones this request needs, or none:\n`skills: <names, comma separated>`\n";
+
 /// One turn of shaping a request before work starts: either a message for
 /// the human, or the brief the work takes.
+/// A brief comes with the skills picked for it; `None` when the person
+/// keeps none or the model did not say, and the work then sees them all.
 #[derive(Debug, PartialEq)]
 pub enum Discussed {
     Reply(String),
-    Brief(String),
+    Brief(String, Option<Vec<String>>),
 }
 
 /// `thread`: `{"who": "human" | "fennec", "text"}` in order. One model call,
@@ -752,8 +768,18 @@ pub fn discuss(
     let context = context(project);
     // The roles that shaped requests before work starts speak here now.
     let (roles, team) = team::brief(project, "frame")?;
+    let kept = crate::skill::chosen(Some(project))?;
+    let pick = if kept.is_empty() {
+        String::new()
+    } else {
+        let list: String = kept
+            .iter()
+            .map(|s| format!("  - {}: {}\n", s.name, s.description))
+            .collect();
+        format!("{PICK}{list}")
+    };
     let mut messages =
-        vec![json!({"role": "system", "content": format!("{DISCUSS}\n\n{context}{roles}")})];
+        vec![json!({"role": "system", "content": format!("{DISCUSS}{pick}\n\n{context}{roles}")})];
     for turn in thread {
         let role = if turn["who"] == "human" {
             "user"
@@ -772,11 +798,28 @@ pub fn discuss(
         .find_map(|l| l.trim().trim_matches('`').strip_prefix("brief:"))
         .map(|b| b.trim().trim_matches('`').trim().to_string())
         .filter(|b| !b.is_empty());
+    let names: Vec<String> = kept.into_iter().map(|s| s.name).collect();
     let said = match brief {
-        Some(b) => Discussed::Brief(b),
+        Some(b) => Discussed::Brief(b, picked(&content, &names)),
         None => Discussed::Reply(content),
     };
     Ok((said, exchange))
+}
+
+/// The `skills:` line of a reply, kept to the names the person keeps.
+fn picked(content: &str, kept: &[String]) -> Option<Vec<String>> {
+    if kept.is_empty() {
+        return None;
+    }
+    let line = content
+        .lines()
+        .find_map(|l| l.trim().trim_matches('`').strip_prefix("skills:"))?;
+    Some(
+        line.split(',')
+            .map(|n| n.trim().trim_matches('`').to_string())
+            .filter(|n| kept.contains(n))
+            .collect(),
+    )
 }
 
 /// What the model knows of the project: its files and README, enough to
@@ -866,7 +909,7 @@ pub fn reject(worlds: &Worlds, id: &str, correction: Option<&str>) -> io::Result
 
 #[cfg(test)]
 mod tests {
-    use super::{done_when, parse, parse_split, reformat};
+    use super::{done_when, parse, parse_split, picked, reformat};
     use crate::provider::Model;
     use serde_json::{Value, json};
     use std::io;
@@ -914,7 +957,7 @@ mod tests {
             )
             .unwrap()
             .0,
-            Discussed::Brief("un script bonjour.py qui affiche Bonjour".into())
+            Discussed::Brief("un script bonjour.py qui affiche Bonjour".into(), None)
         );
         assert!(discuss(&empty, &thread, &Fixed("<think>only this</think>")).is_err());
     }
@@ -977,5 +1020,15 @@ mod tests {
         );
         assert!(parse_split("no list").is_err());
         assert!(parse_split("[{\"task\": \"a\"}, {\"x\": 1}]").is_err());
+    }
+
+    #[test]
+    fn the_skills_picked_are_among_those_kept() {
+        let kept = ["frontend".to_string(), "rust".to_string()];
+        let reply = "brief: a page\n`skills: frontend, design`";
+        assert_eq!(picked(reply, &kept), Some(vec!["frontend".to_string()]));
+        assert_eq!(picked("brief: x\nskills: none", &kept), Some(vec![]));
+        assert_eq!(picked("brief: x", &kept), None, "not said: all of them");
+        assert_eq!(picked(reply, &[]), None);
     }
 }
