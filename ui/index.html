@@ -118,6 +118,8 @@
   .split > aside ul.plan li.ok { color: var(--muted); }
   .split > aside ul.plan li.ok::before { color: var(--ok); }
   .split > aside ul.plan li.bad:not(.ic)::before { border-color: var(--bad); }
+  .split > aside ul.plan li.out::before { display: none; }
+  .split > aside ul.plan li.out pre { margin: 0 0 4px 21px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; color: var(--muted); }
   /* Narrow: the decision goes first, the figures after the request. */
   .split > aside { display: contents; }
   .split .decide { order: -1; }
