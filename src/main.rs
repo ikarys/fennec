@@ -668,7 +668,15 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
             let path = project(&store, &field(&input()?, "project"))?;
             Ok(json!({"folder": path, "opened": work::editor(&path)}))
         }
-        ("POST", "/api/team") => team_view(&project(&store, &field(&input()?, "project"))?),
+        ("POST", "/api/team") => {
+            let v = input()?;
+            let name = field(&v, "project");
+            if name.is_empty() {
+                global_team_view(&field(&v, "team"))
+            } else {
+                team_view(&project(&store, &name)?)
+            }
+        }
         ("POST", "/api/team/choose") => {
             let v = input()?;
             let remove: Vec<String> = v["remove"]
@@ -801,20 +809,21 @@ fn transcript(chat: &Value) -> io::Result<String> {
     Ok(format!("{title}\n\n{text}"))
 }
 
+fn role_json(r: &team::Role) -> Value {
+    json!({"key": r.key, "name": r.name, "stage": r.stage, "brief": r.brief,
+           "checks": r.checks, "model": r.model})
+}
+
 /// A project's team for the "Équipe" dialog: the teams to pick from, the
 /// roles of the one picked (left-out ones flagged), and the catalogue roles
 /// not in it yet.
 fn team_view(path: &Path) -> io::Result<Value> {
     let setup = team::setup(path)?;
-    let role = |r: &team::Role| {
-        json!({"key": r.key, "name": r.name, "stage": r.stage, "brief": r.brief,
-                                    "checks": r.checks, "model": r.model})
-    };
     let roles: Vec<Value> = setup
         .roles
         .iter()
         .map(|r| {
-            let mut v = role(r);
+            let mut v = role_json(r);
             v["out"] = json!(setup.remove.contains(&r.key));
             v
         })
@@ -822,11 +831,28 @@ fn team_view(path: &Path) -> io::Result<Value> {
     let catalog: Vec<Value> = team::catalog()?
         .iter()
         .filter(|c| !setup.roles.iter().any(|r| r.key == c.key))
-        .map(role)
+        .map(role_json)
         .collect();
     Ok(
         json!({"teams": team::teams()?, "team": setup.team, "roles": roles, "catalog": catalog,
-              "missing": setup.missing.is_some()}),
+              "missing": setup.missing.is_some(), "default": team::DEFAULT_TEAM}),
+    )
+}
+
+/// The teams, browsed without a project: the roles of one of them as a
+/// project that picked it would see them. Left-out roles, new roles, and a
+/// team saved from one are a project's choice, so none of it is here.
+fn global_team_view(name: &str) -> io::Result<Value> {
+    let name = if name.trim().is_empty() { team::DEFAULT_TEAM } else { name };
+    let roles = team::team_roles(name)?;
+    let catalog: Vec<Value> = team::catalog()?
+        .iter()
+        .filter(|c| !roles.iter().any(|r| r.key == c.key))
+        .map(role_json)
+        .collect();
+    Ok(
+        json!({"teams": team::teams()?, "team": name, "roles": roles.iter().map(role_json).collect::<Vec<_>>(),
+               "catalog": catalog, "missing": false, "default": team::DEFAULT_TEAM, "global": true}),
     )
 }
 
@@ -907,6 +933,22 @@ mod tests {
     fn a_chat_without_words_keeps_no_request() {
         assert!(transcript(&json!({"messages": []})).is_err());
         assert!(transcript(&json!({"messages": [{"role": "tool", "content": "…"}]})).is_err());
+    }
+
+    #[test]
+    fn a_team_is_browsed_without_a_project() {
+        let home = std::env::temp_dir().join(format!("fennec-lead-teams-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&home);
+        // SAFETY: no other test reads XDG_CONFIG_HOME.
+        unsafe { std::env::set_var("XDG_CONFIG_HOME", &home) };
+        let v = global_team_view("").unwrap();
+        assert_eq!(v["team"], team::DEFAULT_TEAM);
+        assert_eq!(v["default"], team::DEFAULT_TEAM);
+        assert!(v["global"].as_bool().unwrap());
+        assert!(v["roles"].as_array().unwrap().iter().any(|r| r["key"] == "qa"));
+        assert_eq!(v["teams"].as_array().unwrap().len(), 2);
+        assert!(global_team_view("nope-no-such-team").is_err());
+        let _ = std::fs::remove_dir_all(&home);
     }
 
     #[test]
