@@ -34,6 +34,9 @@ pub struct Task {
     /// The skills picked for this task at framing; `None`, all the person
     /// keeps.
     pub skills: Option<Vec<String>>,
+    /// The solve roles the framing marked for this task; `None`, the usual
+    /// chain of the team.
+    pub roles: Option<Vec<String>>,
 }
 
 impl Task {
@@ -56,6 +59,14 @@ impl Task {
             base: None,
             grant: Vec::new(),
             skills: None,
+            roles: v["roles"]
+                .as_array()
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|s| s.as_str().map(str::to_string))
+                        .collect()
+                })
+                .filter(|a: &Vec<String>| !a.is_empty()),
         };
         if task.goal.is_empty() {
             return Err(io::Error::other("task has no goal"));
@@ -114,8 +125,12 @@ pub fn solve(
     }
     let said = rules::said(&project)?;
     context.push_str(&rules::brief(&said));
-    let (roles, team) = team::brief(&project, "solve")?;
-    context.push_str(&roles);
+    // The solve chain: one agent run per role, in team order, each in its
+    // own context; the framing's `roles` line marked which of them work on
+    // this task. The chain is empty (no team, no solve roles) when the
+    // attempt runs as one agent, as before.
+    let chain = team::solve_chain(&project, task.roles.as_deref())?;
+    let team: Vec<String> = chain.iter().map(|r| r.name.clone()).collect();
     let skills: Vec<skill::Skill> = skill::chosen(Some(&project))?
         .into_iter()
         .filter(|s| task.skills.as_ref().is_none_or(|n| n.contains(&s.name)))
@@ -134,6 +149,7 @@ pub fn solve(
         said: &said,
         context: &context,
         skills: &skills,
+        chain: &chain,
         max_steps,
     };
     let source = match &task.base {
@@ -296,6 +312,66 @@ fn lesson(record: &Value) -> String {
     text.chars().take(3000).collect()
 }
 
+/// A role that runs the work's commands, or builds it without restrictions:
+/// the only roles the checks can judge.
+fn buildable(role: &team::Role) -> bool {
+    role.tools.is_empty() || role.tools.iter().any(|t| t.name == "shell")
+}
+
+/// The goal a role of the chain works to: the task's, with the earlier
+/// roles' notes for it to read first.
+fn goal_for(world: &World, goal: &str, earlier: &[(Option<&team::Role>, String, agent::Outcome)]) -> String {
+    let names = earlier
+        .iter()
+        .filter_map(|(r, _, _)| r.map(|r| r.name.as_str()))
+        .collect::<Vec<_>>()
+        .join(", ");
+    if names.is_empty() {
+        return goal.to_string();
+    }
+    let notes = relay_files(world);
+    let notes = if notes.is_empty() {
+        "none yet".to_string()
+    } else {
+        notes.join(", ")
+    };
+    format!(
+        "{goal}\n\nEarlier roles of this team: {names}. Their notes are in \
+         relay/: {notes}. Read them first, then do your part."
+    )
+}
+
+/// The team's notes so far, by file name, in relay/ of the world.
+fn relay_files(world: &World) -> Vec<String> {
+    match std::fs::read_dir(world.path.join("relay")) {
+        Ok(entries) => entries
+            .filter_map(|e| e.ok())
+            .filter_map(|e| e.file_name().to_str().map(str::to_string))
+            .collect(),
+        Err(_) => Vec::new(),
+    }
+}
+
+/// The builder's rejections of the reviewer's points, from relay/dev.md.
+/// ponytail: the line protocol is asked in the prompt, not enforced; the
+/// match is forgiving (case, dash/colon variants) so a drift does not drop
+/// a point the human should have decided.
+fn decisions(text: &str) -> Vec<Value> {
+    text.lines()
+        .filter_map(|l| {
+            let lowered = l.to_lowercase();
+            let i = lowered.find("rejeté")?;
+            let point = l[..i].trim().trim_end_matches(':').trim().to_string();
+            let reason = l[i + "rejeté".len()..]
+                .trim()
+                .trim_start_matches(['—', '-', ':', ' '])
+                .trim()
+                .to_string();
+            (!point.is_empty() && !reason.is_empty()).then_some(json!({"point": point, "reason": reason}))
+        })
+        .collect()
+}
+
 /// What every attempt of a run is given.
 struct Brief<'a> {
     task: &'a Task,
@@ -306,6 +382,8 @@ struct Brief<'a> {
     context: &'a str,
     /// Mounted in each attempt's sandbox; listed in `context`.
     skills: &'a [skill::Skill],
+    /// The solve roles that work the attempt, one agent run each.
+    chain: &'a [team::Role],
     max_steps: usize,
 }
 
@@ -345,6 +423,7 @@ fn attempt_inner(
         rules,
         said,
         context,
+        chain,
         max_steps,
         ..
     } = *brief;
@@ -374,19 +453,146 @@ fn attempt_inner(
         "" => task.goal.clone(),
         _ => format!("{}\n\n{lessons}", task.goal),
     };
-    let outcome = agent::run(worlds, world, model, &goal, criteria, &context, max_steps)?;
-    record["steps"] = json!(outcome.steps);
-    record["rules"] = json!(rules::used(outcome.summary.as_deref().unwrap_or(""), said));
-    record["summary"] = json!(outcome.summary.as_deref().map(rules::shown));
-    record["skills"] = json!(skill::used(&outcome.messages));
-    record["messages"] = json!(outcome.messages);
-    record["stuck"] = json!(outcome.stuck);
-    record["question"] = json!(outcome.question);
-    record["turns"] = json!(outcome.turns);
-    record["criteria"] = json!(outcome.criteria);
-    record["asked"] = json!(outcome.asked);
-    if let Some(e) = outcome.error {
-        return Err(io::Error::other(e));
+    // The attempt's roles, in order: the chain's, or one agent when it is
+    // empty. A recipe replayed its recorded trajectory whole: it runs as
+    // one agent too, the chain would re-play it once per role.
+    // ponytail: the recipe is recognised by its label.
+    let solo = chain.is_empty() || model.label().starts_with("recipe:");
+    let mut outcomes: Vec<(Option<&team::Role>, String, agent::Outcome)> = Vec::new();
+    if solo {
+        let outcome = agent::run(
+            worlds, world, model, &goal, criteria.clone(), &context, max_steps, None,
+        )?;
+        outcomes.push((None, model.label(), outcome));
+    } else {
+        for role in chain {
+            // A role runs on its model; the stage keeps its own. The boxed
+            // variant must outlive the run it is borrowed for.
+            let boxed = role.model.as_ref().map(|m| model.variant(m));
+            let role_model = boxed.as_deref().unwrap_or(model);
+            let role_context =
+                format!("{context}\n\nAs {} on the team:\n{}\n", role.name, role.brief);
+            let role_goal = goal_for(world, &goal, &outcomes);
+            // The checks judge the work, so only the roles that can build
+            // them run against them; a reviewer that cannot run a command
+            // cannot meet one.
+            let role_criteria = buildable(role).then(|| criteria.clone()).unwrap_or_default();
+            let outcome = agent::run(
+                worlds,
+                world,
+                role_model,
+                &role_goal,
+                role_criteria,
+                &role_context,
+                max_steps,
+                Some(&role.tools),
+            )?;
+            outcomes.push((Some(role), role_model.label(), outcome));
+        }
+        // The reviewer says the work is à refaire: the builder answers point
+        // by point, applying each one or rejecting it with a reason.
+        let review = std::fs::read_to_string(world.path.join("relay").join("review.md")).ok();
+        let mut disagreements = Vec::new();
+        if let Some(text) = review.as_deref()
+            && text.contains("à refaire")
+            && let Some(builder) = chain.iter().rev().find(|r| buildable(r))
+        {
+            let ask = format!(
+                "{goal}\n\nThe team's reviewer found the work à refaire. Its report \
+                 (relay/review.md):\n{text}\n\
+                 For each point of the report: apply it, or reject it with a reason. Write \
+                 your decisions to relay/dev.md, one line per point, each line \
+                 `point: appliqué` or `point: rejeté — <reason>`."
+            );
+            let boxed = builder.model.as_ref().map(|m| model.variant(m));
+            let role_model = boxed.as_deref().unwrap_or(model);
+            let role_context = format!(
+                "{context}\n\nAs {} on the team:\n{}\n",
+                builder.name, builder.brief
+            );
+            let outcome = agent::run(
+                worlds,
+                world,
+                role_model,
+                &ask,
+                buildable(builder).then(|| criteria.clone()).unwrap_or_default(),
+                &role_context,
+                max_steps,
+                Some(&builder.tools),
+            )?;
+            outcomes.push((Some(builder), role_model.label(), outcome));
+            disagreements = std::fs::read_to_string(world.path.join("relay").join("dev.md"))
+                .ok()
+                .map(|t| decisions(&t))
+                .unwrap_or_default();
+        }
+        record["disagreements"] = json!(disagreements);
+    }
+    // ponytail: each role's full transcript is stored here, and the
+    // concatenated copy below: recipe and sleep replay read the whole, the
+    // journal reads the parts. Twice, on purpose.
+    record["roles"] = json!(
+        outcomes
+            .iter()
+            .map(|(role, label, o)| {
+                json!({
+                    "name": role.map(|r| r.name.clone()),
+                    "model": label.clone(),
+                    "tools": role.map(|r| team::tool_line(&r.tools)),
+                    "steps": o.steps,
+                    "summary": o.summary.clone(),
+                    "stuck": o.stuck.clone(),
+                    "question": o.question.clone(),
+                    "criteria": o.criteria.clone(),
+                    "asked": o.asked.clone(),
+                    "turns": o.turns.clone(),
+                    "messages": o.messages.clone(),
+                    "error": o.error.clone(),
+                })
+            })
+            .collect::<Vec<_>>()
+    );
+    let summary = outcomes.iter().rev().find_map(|(_, _, o)| o.summary.clone());
+    let question = outcomes.iter().find_map(|(_, _, o)| o.question.clone());
+    let stuck = outcomes.iter().rev().find_map(|(_, _, o)| o.stuck.clone());
+    let steps: usize = outcomes.iter().map(|(_, _, o)| o.steps).sum();
+    let (mut messages, mut turns, mut asked) = (Vec::new(), Vec::new(), Vec::new());
+    for (_, _, o) in &outcomes {
+        messages.extend(o.messages.iter().cloned());
+        turns.extend(o.turns.iter().cloned());
+        asked.extend(o.asked.iter().cloned());
+    }
+    let criteria = outcomes
+        .last()
+        .map(|(_, _, o)| o.criteria.clone())
+        .unwrap_or_default();
+    record["steps"] = json!(steps);
+    record["rules"] = json!(rules::used(summary.as_deref().unwrap_or(""), said));
+    record["summary"] = json!(summary.as_deref().map(rules::shown));
+    record["skills"] = json!(skill::used(&messages));
+    record["messages"] = json!(messages);
+    record["stuck"] = json!(stuck);
+    record["question"] = json!(question);
+    record["turns"] = json!(turns);
+    record["criteria"] = json!(criteria);
+    record["asked"] = json!(asked);
+    // What the team left in relay/, for the journal and the card.
+    // ponytail: each file is cut at 4000 chars; a long review needs the world.
+    let mut relay = serde_json::Map::new();
+    for name in relay_files(world) {
+        if let Ok(text) = std::fs::read_to_string(world.path.join("relay").join(&name)) {
+            relay.insert(name, json!(text.chars().take(4000).collect::<String>()));
+        }
+    }
+    if !relay.is_empty() {
+        record["relay"] = json!(relay);
+    }
+
+    // A run that died mid-team is a failed attempt, not an error: the turns
+    // it left stay for the journal and the profile.
+    if let Some(why) = outcomes.iter().find_map(|(_, _, o)| o.error.clone()) {
+        record["reason"] = json!(why);
+        return Ok(());
     }
 
     let title: String = task
@@ -432,7 +638,7 @@ fn attempt_inner(
     if let Some(reason) = failure {
         // A stopped agent's failure is explained by why it was stopped. Work
         // that passes anyway is kept: the verdict is the checks, not the stop.
-        record["reason"] = json!(match &outcome.stuck {
+        record["reason"] = json!(match &stuck {
             Some(why) => format!("{why}; then {reason}"),
             None => reason.to_string(),
         });

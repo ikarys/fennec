@@ -16,6 +16,9 @@ pub trait Model: Sync {
     }
     /// Names the variant in run records.
     fn label(&self) -> String;
+    /// The same model at a different id, when a role names its own: a role
+    /// runs on its model, the stage keeps its own.
+    fn variant<'s>(&'s self, model: &str) -> Box<dyn Model + 's>;
 }
 
 /// One question without tools, asked again without reasoning when the reply
@@ -74,6 +77,7 @@ impl<'a> Live<'a> {
 
     fn record(
         &self,
+        label: &str,
         messages: &[Value],
         reply: io::Result<Value>,
         think: bool,
@@ -91,7 +95,7 @@ impl<'a> Live<'a> {
                           "think": think, "usage": usage.clone()}));
         let mut said = messages.to_vec();
         said.push(reply.clone());
-        let now = json!({"model": self.inner.label(), "messages": said, "turns": *turns});
+        let now = json!({"model": label, "messages": said, "turns": *turns});
         // Watching is best effort: a write that fails never stops the work.
         let tmp = self.path.with_extension("tmp");
         if std::fs::write(&tmp, now.to_string()).is_ok() {
@@ -107,12 +111,19 @@ impl<'a> Live<'a> {
 impl Model for Live<'_> {
     fn chat(&self, messages: &[Value], tools: &Value) -> io::Result<Value> {
         let asked = Instant::now();
-        self.record(messages, self.inner.chat(messages, tools), true, asked)
+        self.record(
+            &self.inner.label(),
+            messages,
+            self.inner.chat(messages, tools),
+            true,
+            asked,
+        )
     }
 
     fn chat_quick(&self, messages: &[Value], tools: &Value) -> io::Result<Value> {
         let asked = Instant::now();
         self.record(
+            &self.inner.label(),
             messages,
             self.inner.chat_quick(messages, tools),
             false,
@@ -123,8 +134,59 @@ impl Model for Live<'_> {
     fn label(&self) -> String {
         self.inner.label()
     }
+
+    fn variant<'s>(&'s self, model: &str) -> Box<dyn Model + 's> {
+        // A role runs on its own model id; the exchange keeps recording to
+        // this Live's file.
+        Box::new(Variant {
+            live: self,
+            inner: self.inner.variant(model),
+        })
+    }
 }
 
+/// A role's variant of a `Live` model: the same file, the role's model id.
+struct Variant<'a> {
+    live: &'a Live<'a>,
+    inner: Box<dyn Model + 'a>,
+}
+
+impl Model for Variant<'_> {
+    fn chat(&self, messages: &[Value], tools: &Value) -> io::Result<Value> {
+        let asked = Instant::now();
+        self.live.record(
+            &self.inner.label(),
+            messages,
+            self.inner.chat(messages, tools),
+            true,
+            asked,
+        )
+    }
+
+    fn chat_quick(&self, messages: &[Value], tools: &Value) -> io::Result<Value> {
+        let asked = Instant::now();
+        self.live.record(
+            &self.inner.label(),
+            messages,
+            self.inner.chat_quick(messages, tools),
+            false,
+            asked,
+        )
+    }
+
+    fn label(&self) -> String {
+        self.inner.label()
+    }
+
+    fn variant<'s>(&'s self, model: &str) -> Box<dyn Model + 's> {
+        Box::new(Variant {
+            live: self.live,
+            inner: self.inner.variant(model),
+        })
+    }
+}
+
+#[derive(Clone)]
 pub struct OpenAi {
     pub base_url: String,
     pub model: String,
@@ -485,6 +547,13 @@ impl Model for OpenAi {
     fn label(&self) -> String {
         format!("{}@{}", self.model, self.temperature)
     }
+
+    fn variant<'s>(&'s self, model: &str) -> Box<dyn Model + 's> {
+        Box::new(OpenAi {
+            model: model.to_string(),
+            ..self.clone()
+        })
+    }
 }
 
 #[cfg(test)]
@@ -502,6 +571,9 @@ mod tests {
         }
         fn label(&self) -> String {
             "echo".into()
+        }
+        fn variant<'s>(&'s self, _: &str) -> Box<dyn Model + 's> {
+            Box::new(Echo)
         }
     }
 

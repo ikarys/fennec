@@ -255,7 +255,7 @@ fn check(
 ) -> io::Result<()> {
     let base = worlds.git(world, &["rev-parse", "HEAD"])?;
     let criteria = criteria.iter().map(|c| agent::criterion(c, None)).collect();
-    let outcome = agent::run(worlds, world, model, brief, criteria, context, max_steps)?;
+    let outcome = agent::run(worlds, world, model, brief, criteria, context, max_steps, None)?;
     spec["steps"] = json!(outcome.steps);
     spec["stuck"] = json!(outcome.stuck);
     spec["question"] = json!(outcome.question);
@@ -481,12 +481,14 @@ fn key<'a>(line: &'a str, name: &str) -> Option<&'a str> {
 /// Its verdict is the project's rules and the proof of the product
 /// (`proof::gather`); test-first is a rule the human writes, not a stage.
 /// `skills`: the ones picked for this request at framing; `None`, all the
-/// person keeps.
+/// person keeps. `roles`: the solve roles the framing marked for this
+/// request; `None` runs the team's usual chain.
 pub fn direct(
     worlds: &Worlds,
     project: &Path,
     request: &str,
     skills: Option<&[String]>,
+    roles: Option<&[String]>,
 ) -> io::Result<Value> {
     let project = std::fs::canonicalize(project)?;
     let id = crate::world::new_id();
@@ -500,6 +502,7 @@ pub fn direct(
         "protect": [],
         "status": "proposed",
         "skills": skills,
+        "roles": roles,
     });
     save(worlds, &id, &spec)?;
     Ok(spec)
@@ -657,6 +660,7 @@ fn run_spec(
         base: (spec["origin"] != "direct" || base != spec["world"]).then(|| base.to_string()),
         grant: Vec::new(),
         skills: spec["skills"].is_array().then(|| strings("skills")),
+        roles: spec["roles"].is_array().then(|| strings("roles")),
     };
     let project = PathBuf::from(spec["project"].as_str().unwrap_or(""));
     solve::solve(worlds, &project, &task, models, max_steps)
@@ -747,14 +751,21 @@ in their language>`";
 const PICK: &str = "\n\nThe person keeps these skills for the developers. With the brief, add \
 one more line naming the ones this request needs, or none:\n`skills: <names, comma separated>`\n";
 
+/// Asked with `PICK` when the team has solve roles: which of them this
+/// request needs. The work then runs exactly those, in team order.
+const MARK: &str = "\n\nThe team's developers are:\n{}With the brief, add one more line naming \
+the ones this request needs, or none:\n`roles: <keys, comma separated>`\n";
+
 /// One turn of shaping a request before work starts: either a message for
 /// the human, or the brief the work takes.
 /// A brief comes with the skills picked for it; `None` when the person
 /// keeps none or the model did not say, and the work then sees them all.
+/// It also marks the solve roles the work needs; `None` runs the team's
+/// usual chain.
 #[derive(Debug, PartialEq)]
 pub enum Discussed {
     Reply(String),
-    Brief(String, Option<Vec<String>>),
+    Brief(String, Option<Vec<String>>, Option<Vec<String>>),
 }
 
 /// `thread`: `{"who": "human" | "fennec", "text"}` in order. One model call,
@@ -778,8 +789,26 @@ pub fn discuss(
             .collect();
         format!("{PICK}{list}")
     };
+    // The team's solve roles, so the PM marks which of them this request
+    // needs; the work then runs exactly those.
+    // All of them, the usual chain included: the PM marks what the request
+    // needs, and what it does not mark stays out of the work.
+    let chain = team::members(project)?
+        .into_iter()
+        .filter(|r| r.stage == "solve")
+        .collect::<Vec<_>>();
+    let mark = if chain.is_empty() {
+        String::new()
+    } else {
+        let list: String = chain
+            .iter()
+            .map(|r| format!("  - {}: {}\n", r.key, r.name))
+            .collect();
+        format!("{MARK}{list}")
+    };
+    let keys: Vec<String> = chain.iter().map(|r| r.key.clone()).collect();
     let mut messages =
-        vec![json!({"role": "system", "content": format!("{DISCUSS}{pick}\n\n{context}{roles}")})];
+        vec![json!({"role": "system", "content": format!("{DISCUSS}{pick}{mark}\n\n{context}{roles}")})];
     for turn in thread {
         let role = if turn["who"] == "human" {
             "user"
@@ -800,7 +829,7 @@ pub fn discuss(
         .filter(|b| !b.is_empty());
     let names: Vec<String> = kept.into_iter().map(|s| s.name).collect();
     let said = match brief {
-        Some(b) => Discussed::Brief(b, picked(&content, &names)),
+        Some(b) => Discussed::Brief(b, picked(&content, &names), marked(&content, &keys)),
         None => Discussed::Reply(content),
     };
     Ok((said, exchange))
@@ -818,6 +847,23 @@ fn picked(content: &str, kept: &[String]) -> Option<Vec<String>> {
         line.split(',')
             .map(|n| n.trim().trim_matches('`').to_string())
             .filter(|n| kept.contains(n))
+            .collect(),
+    )
+}
+
+/// The `roles:` line of a reply, kept to the keys of the team's solve
+/// roles. Not said: the team's usual chain works.
+fn marked(content: &str, keys: &[String]) -> Option<Vec<String>> {
+    if keys.is_empty() {
+        return None;
+    }
+    let line = content
+        .lines()
+        .find_map(|l| l.trim().trim_matches('`').strip_prefix("roles:"))?;
+    Some(
+        line.split(',')
+            .map(|n| n.trim().trim_matches('`').to_string())
+            .filter(|n| keys.contains(n))
             .collect(),
     )
 }
@@ -909,7 +955,7 @@ pub fn reject(worlds: &Worlds, id: &str, correction: Option<&str>) -> io::Result
 
 #[cfg(test)]
 mod tests {
-    use super::{done_when, parse, parse_split, picked, reformat};
+    use super::{done_when, marked, parse, parse_split, picked, reformat};
     use crate::provider::Model;
     use serde_json::{Value, json};
     use std::io;
@@ -921,6 +967,9 @@ mod tests {
         }
         fn label(&self) -> String {
             "fixed".into()
+        }
+        fn variant<'s>(&'s self, _: &str) -> Box<dyn Model + 's> {
+            Box::new(Fixed(self.0))
         }
     }
 
@@ -957,7 +1006,7 @@ mod tests {
             )
             .unwrap()
             .0,
-            Discussed::Brief("un script bonjour.py qui affiche Bonjour".into(), None)
+            Discussed::Brief("un script bonjour.py qui affiche Bonjour".into(), None, None)
         );
         assert!(discuss(&empty, &thread, &Fixed("<think>only this</think>")).is_err());
     }
@@ -1020,6 +1069,15 @@ mod tests {
         );
         assert!(parse_split("no list").is_err());
         assert!(parse_split("[{\"task\": \"a\"}, {\"x\": 1}]").is_err());
+    }
+
+    #[test]
+    fn the_roles_marked_are_the_team_s_solve_roles() {
+        let keys = ["senior-developer".to_string(), "tech-lead".to_string()];
+        let reply = "brief: une page\n`roles: senior-developer, design`";
+        assert_eq!(marked(reply, &keys), Some(vec!["senior-developer".to_string()]));
+        assert_eq!(marked("brief: x", &keys), None, "not said: the usual chain works");
+        assert_eq!(marked(reply, &[]), None);
     }
 
     #[test]

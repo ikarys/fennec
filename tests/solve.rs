@@ -62,6 +62,12 @@ impl Model for Script {
     fn label(&self) -> String {
         self.name.to_string()
     }
+    fn variant<'s>(&'s self, _: &str) -> Box<dyn Model + 's> {
+        Box::new(Script {
+            name: self.name,
+            replies: Mutex::new(VecDeque::new()),
+        })
+    }
 }
 
 fn write(path: &str, content: &str) -> (&'static str, Value) {
@@ -95,6 +101,7 @@ fn task(protect: &[&str]) -> Task {
         base: None,
         grant: Vec::new(),
         skills: None,
+        roles: None,
     }
 }
 
@@ -770,6 +777,9 @@ impl Model for Spy {
     fn label(&self) -> String {
         "spy".to_string()
     }
+    fn variant<'s>(&'s self, _: &str) -> Box<dyn Model + 's> {
+        Box::new(Spy(Mutex::new(String::new())))
+    }
 }
 
 #[test]
@@ -802,6 +812,7 @@ fn a_new_run_starts_from_the_project_history() {
 }
 
 /// Answers every distillation with the same facts, reasoning inline.
+#[derive(Clone)]
 struct Distiller;
 
 impl Model for Distiller {
@@ -814,6 +825,9 @@ impl Model for Distiller {
     }
     fn label(&self) -> String {
         "distiller".to_string()
+    }
+    fn variant<'s>(&'s self, _: &str) -> Box<dyn Model + 's> {
+        Box::new(self.clone())
     }
 }
 
@@ -1139,6 +1153,7 @@ fn host_task(f: &Fixture) -> (std::path::PathBuf, Task) {
         base: None,
         grant: vec![conf.clone()],
         skills: None,
+        roles: None,
     };
     (conf, task)
 }
@@ -1461,7 +1476,7 @@ fn a_request_is_framed_solved_and_landed_in_the_project_folder() {
     assert_eq!(git(&f, &["branch", "--show-current"]), "main");
     assert!(f.project.join("spec.sh").exists() && f.project.join("answer").exists());
     assert_eq!(git(&f, &["branch", "--list", "world/*"]), "");
-    assert_eq!(git(&f, &["log", "--format=%s"]).lines().count(), 3);
+    assert_eq!(git(&f, &["log", "--format=%s"]).lines().count(), 4);
 }
 
 #[test]
@@ -1525,7 +1540,7 @@ fn a_change_that_won_gives_the_folder_back_to_the_human_when_dropped() {
 #[test]
 fn a_direct_request_is_solved_from_the_project_and_lands() {
     let f = here("here-direct");
-    let s = spec::direct(&f.worlds, &f.project, "answer 42", None).unwrap();
+    let s = spec::direct(&f.worlds, &f.project, "answer 42", None, None).unwrap();
     let id = s["world"].as_str().unwrap().to_string();
     let honest = Script::new("honest", &[write("answer", "42\n"), done()]);
     let record = spec::accept(&f.worlds, &id, &[&honest], 10).unwrap();

@@ -190,6 +190,8 @@ pub(crate) struct Engine<'a> {
     /// Rules the person allowed for the rest of the chat.
     pub(crate) allowed: Vec<Value>,
     pub(crate) asked: Vec<Value>,
+    /// The role's tools line: `None` runs with every tool.
+    pub(crate) tools: Option<Vec<crate::team::Tool>>,
 }
 
 impl<'a> Engine<'a> {
@@ -213,6 +215,7 @@ impl<'a> Engine<'a> {
             asker: None,
             allowed: Vec::new(),
             asked: Vec::new(),
+            tools: None,
         }
     }
 
@@ -354,6 +357,9 @@ impl<'a> Engine<'a> {
         if let Some(refused) = self.guarded(name, args) {
             return refused;
         }
+        if let Some(refused) = self.role_tool(name, args) {
+            return refused;
+        }
         let path = args["path"].as_str().unwrap_or("").trim_start_matches("./");
         match name {
             "criteria" => return self.criteria_call(sandbox, args),
@@ -377,6 +383,33 @@ impl<'a> Engine<'a> {
             }
             Err(e) => format!("error: {e}"),
         }
+    }
+
+    /// The role's `tools` line, checked where the tool runs: what it does not
+    /// list is refused, and a tool limited to a path is refused outside it.
+    /// The brief only asks; this refuses.
+    fn role_tool(&self, name: &str, args: &Value) -> Option<String> {
+        let tools = self.tools.as_ref()?;
+        // The harness keeps the criteria and `done` for every role.
+        if matches!(name, "criteria" | "done") {
+            return None;
+        }
+        let want = name.strip_suffix("_file").unwrap_or(name);
+        let Some(t) = tools.iter().find(|t| t.name == want) else {
+            return Some(format!(
+                "error: refused: `{name}` is not allowed for this role (allowed: {})",
+                crate::team::tool_line(tools)
+            ));
+        };
+        if let Some(prefix) = &t.prefix {
+            let path = args["path"].as_str().unwrap_or("").trim_start_matches("./");
+            if !path.starts_with(prefix.as_str()) {
+                return Some(format!(
+                    "error: refused: this role may write `{want}` under `{prefix}`, not `{path}`"
+                ));
+            }
+        }
+        None
     }
 
     fn criteria_call(&mut self, sandbox: Sandbox, args: &Value) -> String {
@@ -591,7 +624,10 @@ pub fn run(
     criteria: Vec<Value>,
     context: &str,
     max_steps: usize,
+    tools: Option<&[crate::team::Tool]>,
 ) -> io::Result<Outcome> {
+    // An empty `tools` line means no restriction, like no line at all.
+    let role_tools = tools.filter(|t| !t.is_empty()).map(|t| t.to_vec());
     let mut tools = tools::definitions(true);
     tools.push(tools::criteria_tool());
     tools.push(tools::done_tool());
@@ -599,6 +635,7 @@ pub fn run(
     let system =
         json!({"role": "system", "content": format!("{TASK}{}{context}", tools_line(worlds))});
     let mut engine = Engine::new(model, criteria);
+    engine.tools = role_tools;
     engine.guard = Some(Guard::load(
         &worlds.project(world)?,
         &world.path,
@@ -845,6 +882,9 @@ mod tests {
         fn label(&self) -> String {
             "silent".into()
         }
+        fn variant<'s>(&'s self, _: &str) -> Box<dyn Model + 's> {
+            Box::new(Silent)
+        }
     }
 
     fn call(name: &str, args: Value) -> Value {
@@ -906,6 +946,61 @@ mod tests {
     }
 
     #[test]
+    fn a_read_only_role_is_refused_by_the_system_not_the_brief() {
+        // The neutral-brief lock: the agent is told only "do what you are
+        // told"; the tools line, not the prompt, keeps its write off.
+        let dir = std::env::temp_dir().join(format!("fennec-os-readonly-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("a.txt"), "here").unwrap();
+        std::fs::create_dir_all(dir.join("relay")).unwrap();
+        let sandbox = |argv: &[String]| {
+            let mut c = Command::new(&argv[0]);
+            c.args(&argv[1..]).current_dir(&dir);
+            Ok(c)
+        };
+        let read = crate::team::Tool {
+            name: "read".into(),
+            prefix: None,
+        };
+        let write = crate::team::Tool {
+            name: "write".into(),
+            prefix: Some("relay/".into()),
+        };
+        let mut e = Engine::new(&Silent, Vec::new());
+        e.tools = Some(vec![read.clone(), write.clone()]);
+        let out = e.tool(
+            &sandbox,
+            &call("write_file", json!({"path": "new.txt", "content": "x"})),
+        );
+        assert!(out.contains("refused"), "{out}");
+        assert!(!dir.join("new.txt").exists(), "the system refused, not the brief");
+        // Its own relay path is the one it may write.
+        let out = e.tool(
+            &sandbox,
+            &call("write_file", json!({"path": "relay/review.md", "content": "verdict"})),
+        );
+        assert!(dir.join("relay").join("review.md").exists(), "{out}");
+        // `edit` is not on its list: the system refuses it too.
+        assert!(
+            e.tool(
+                &sandbox,
+                &call("edit_file", json!({"path": "relay/review.md", "old_string": "verdict", "new_string": "verdict: valide"}))
+            )
+            .contains("refused")
+        );
+        let out = e.tool(&sandbox, &call("shell", json!({"command": "ls"})));
+        assert!(out.contains("refused"), "the role lists only read and write: {out}");
+        // Unrestricted, the same call runs.
+        let mut e = Engine::new(&Silent, Vec::new());
+        e.tool(
+            &sandbox,
+            &call("write_file", json!({"path": "free.txt", "content": "x"})),
+        );
+        assert!(dir.join("free.txt").exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn the_persons_rules_refuse_ask_or_record() {
         let ran = std::cell::Cell::new(0);
         let sandbox = |_: &[String]| {
@@ -957,6 +1052,9 @@ mod tests {
             }
             fn label(&self) -> String {
                 "big".into()
+            }
+            fn variant<'s>(&'s self, _: &str) -> Box<dyn Model + 's> {
+                Box::new(Big(Mutex::new(VecDeque::new())))
             }
         }
         let model = Big(Mutex::new(VecDeque::from([

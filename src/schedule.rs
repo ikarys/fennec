@@ -68,6 +68,14 @@ impl Model for Background<'_> {
     fn label(&self) -> String {
         self.model.label()
     }
+
+    fn variant<'s>(&'s self, _model: &str) -> Box<dyn Model + 's> {
+        // A background work has no role of its own: it keeps its model.
+        Box::new(Background {
+            worlds: self.worlds,
+            model: self.model,
+        })
+    }
 }
 
 #[cfg(test)]
