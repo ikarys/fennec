@@ -93,10 +93,22 @@ impl Worlds {
             .unwrap_or_else(|| home.join(".local/share/fennec-os"));
         let ro_paths = match std::env::var_os("FENNEC_OS_RO") {
             Some(v) => std::env::split_paths(&v).collect(),
-            None => [".cargo", ".rustup", ".local/bin"]
-                .iter()
-                .map(|p| home.join(p))
-                .collect(),
+            // Toolchains the human installed in their home: Rust, uv and the
+            // Pythons it manages, Node through nvm, the tools pipx links into
+            // ~/.local/bin. Read-only: a project's
+            // packages go in the project (`.venv`, `node_modules`), never here.
+            None => [
+                ".cargo",
+                ".rustup",
+                ".local/bin",
+                ".local/share/pipx",
+                ".local/share/uv/python",
+                ".nvm",
+                ".local/share/nvm",
+            ]
+            .iter()
+            .map(|p| home.join(p))
+            .collect(),
         };
         let memory_mb = match std::env::var("FENNEC_OS_MEMORY_MB") {
             Ok(v) => Some(v.parse::<u64>().map_err(io::Error::other)?).filter(|&m| m > 0),
@@ -507,6 +519,17 @@ impl Worlds {
             // ponytail: Python only; another tool's untracked cache needs its
             // own switch, or the project's .gitignore.
             .args(["--setenv", "PYTHONDONTWRITEBYTECODE", "1"])
+            // uv keeps the project's packages in its `.venv`, never committed
+            // (`BUILD_OUTPUT`). It may not download a Python into the hidden
+            // home, gone after the command; its cache, there too, is on
+            // another filesystem, so it copies instead of linking.
+            .args(["--setenv", "UV_PYTHON_DOWNLOADS", "never"])
+            .args(["--setenv", "UV_LINK_MODE", "copy"])
+            .args(if net {
+                &[][..]
+            } else {
+                &["--setenv", "UV_OFFLINE", "1"][..]
+            })
             // `~` is the hidden home, where skills are mounted.
             .arg("--setenv")
             .arg("HOME")
