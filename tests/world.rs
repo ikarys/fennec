@@ -12,12 +12,20 @@ use fennec_os::grant;
 fn rollback_restores_the_last_checkpoint() {
     let f = Fixture::new("rollback");
     let w = f.worlds.fork(&f.project.to_string_lossy()).unwrap();
+    assert!(f.sh(&w, "echo node_modules/ > .gitignore").0);
+    f.worlds.commit(&w, "ignore").unwrap();
     assert!(f.sh(&w, "echo new > made && echo changed > README").0);
+    // Installed dependencies stay: the product must still start offline.
+    assert!(
+        f.sh(&w, "mkdir node_modules && echo x > node_modules/vite")
+            .0
+    );
     let diff = f.worlds.diff(&w).unwrap();
     assert!(diff.contains("made") && diff.contains("changed"), "{diff}");
 
     f.worlds.rollback(&w).unwrap();
     assert!(!w.path.join("made").exists());
+    assert!(w.path.join("node_modules/vite").is_file());
     assert_eq!(
         std::fs::read_to_string(w.path.join("README")).unwrap(),
         "hello\n"

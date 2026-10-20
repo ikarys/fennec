@@ -635,8 +635,10 @@ impl Worlds {
         self.git(world, &args)
     }
 
-    /// Back to the last checkpoint, exactly: ignored files go too, except in
-    /// the project folder, where they are the human's (`.env`, `.venv`).
+    /// Back to the last checkpoint: what the work changed goes, ignored files
+    /// stay (`node_modules`, `target`): a proof's try is undone before the
+    /// product starts, without network to install them again. In the
+    /// project folder, what goes is set aside instead.
     pub fn rollback(&self, world: &World) -> io::Result<()> {
         if self.home(world)?.is_some() {
             // The human may have edited their folder while fennec worked: what
@@ -648,7 +650,7 @@ impl Worlds {
         }
         self.git(world, &["reset", "-q", "--hard", "HEAD"])?;
         // The package caches stay: an undone try did not make them wrong.
-        self.git(world, &["clean", "-q", "-fdx", "-e", "/.fennec"])?;
+        self.git(world, &["clean", "-q", "-fd", "-e", "/.fennec"])?;
         Ok(())
     }
 
