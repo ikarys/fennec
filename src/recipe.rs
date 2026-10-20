@@ -32,6 +32,14 @@ impl Model for Recipe {
     fn label(&self) -> String {
         format!("recipe:{}", self.run)
     }
+
+    fn variant<'s>(&'s self, _model: &str) -> Box<dyn Model + 's> {
+        // A replay has no model to change: it plays the same turns.
+        Box::new(Recipe {
+            run: self.run.clone(),
+            turns: self.turns.clone(),
+        })
+    }
 }
 
 /// The recipe for this goal, if the latest run on it landed and its trajectory

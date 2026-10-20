@@ -25,6 +25,9 @@ impl Model for Replies {
     fn label(&self) -> String {
         "replies".into()
     }
+    fn variant<'s>(&'s self, _: &str) -> Box<dyn Model + 's> {
+        Box::new(Replies(Mutex::new(VecDeque::new())))
+    }
 }
 
 fn call(id: &str, name: &str, args: Value) -> Value {
@@ -349,6 +352,15 @@ impl Model for UngrantMidTurn {
     }
     fn label(&self) -> String {
         "ungrant".into()
+    }
+    fn variant<'s>(&'s self, _: &str) -> Box<dyn Model + 's> {
+        Box::new(UngrantMidTurn {
+            replies: Replies(Mutex::new(VecDeque::new())),
+            worlds: self.worlds.clone(),
+            id: self.id.clone(),
+            dir: self.dir.clone(),
+            calls: Mutex::new(0),
+        })
     }
 }
 

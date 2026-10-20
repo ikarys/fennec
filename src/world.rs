@@ -34,6 +34,7 @@ const COMMITTER: [&str; 4] = [
 ];
 
 /// Where worlds live and what the sandbox lets through.
+#[derive(Clone)]
 pub struct Worlds {
     pub root: PathBuf,
     /// Hidden in the sandbox: replaced by an empty tmpfs.
@@ -916,13 +917,14 @@ fn size(dir: &Path) -> u64 {
 /// a project without a .gitignore would land `target/` or `node_modules/`.
 /// ponytail: a fixed list of tool outputs; a project that tracks one of
 /// these dirs on purpose cannot change it through fennec.
-const BUILD_OUTPUT: [&str; 6] = [
+const BUILD_OUTPUT: [&str; 7] = [
     ":(exclude,glob)**/target/**",
     ":(exclude,glob)**/node_modules/**",
     ":(exclude,glob)**/__pycache__/**",
     ":(exclude,glob)**/.venv/**",
     ":(exclude,glob)**/.gradle/**",
     ":(exclude,glob).fennec/**",
+    ":(exclude,glob)**/relay/**",
 ];
 
 /// The package caches stay out of the human's `git status` and out of a
@@ -931,7 +933,8 @@ fn ignore_cache(common: &Path) -> io::Result<()> {
     let info = common.join("info");
     let file = info.join("exclude");
     let text = std::fs::read_to_string(&file).unwrap_or_default();
-    if text.lines().any(|l| l.trim() == "/.fennec/") {
+    let has = |line: &str| text.lines().any(|l| l.trim() == line);
+    if has("/.fennec/") && has("/relay/") {
         return Ok(());
     }
     std::fs::create_dir_all(&info)?;
@@ -940,7 +943,14 @@ fn ignore_cache(common: &Path) -> io::Result<()> {
     } else {
         "\n"
     };
-    std::fs::write(&file, format!("{text}{sep}/.fennec/\n"))
+    let mut out = format!("{text}{sep}");
+    if !has("/.fennec/") {
+        out.push_str("/.fennec/\n");
+    }
+    if !has("/relay/") {
+        out.push_str("/relay/\n");
+    }
+    std::fs::write(&file, out)
 }
 
 /// Where a sandboxed command's package caches live, in the project.

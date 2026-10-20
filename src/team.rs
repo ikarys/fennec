@@ -19,6 +19,11 @@
 //! it, instead of the one set in the settings: a cheap model to frame, a
 //! strong one to solve.
 //!
+//! `tools` (optional) lists the tools the role's agent may run: `shell`,
+//! `read`, `write`, `edit`; `write` and `edit` may name a path,
+//! `write:relay/`, that the role may only write under. Absent or empty, the
+//! role runs with every tool: the brief asks, the tools line refuses.
+//!
 //! A team is a named set of roles, because different work needs different
 //! people: software is not a study. The human's teams are folders,
 //! `~/.config/fennec/teams/<team>/*.md`; built-in teams are lists of roles
@@ -43,7 +48,7 @@ pub const DEFAULT_TEAM: &str = "Développement";
 
 /// Every built-in role, in or out of a built-in team: what the human picks
 /// from to build their own.
-const CATALOG: [(&str, &str); 14] = [
+const CATALOG: [(&str, &str); 15] = [
     ("architect", include_str!("../catalog/architect.md")),
     (
         "critical-reviewer",
@@ -71,6 +76,7 @@ const CATALOG: [(&str, &str); 14] = [
         "sources-specialist",
         include_str!("../catalog/sources-specialist.md"),
     ),
+    ("tech-lead", include_str!("../catalog/tech-lead.md")),
     ("ux-specialist", include_str!("../catalog/ux-specialist.md")),
     ("writer", include_str!("../catalog/writer.md")),
 ];
@@ -82,6 +88,7 @@ const TEAMS: [(&str, &[&str]); 2] = [
         &[
             "project-manager",
             "senior-developer",
+            "tech-lead",
             "frontend-designer",
             "qa",
         ],
@@ -110,6 +117,54 @@ pub struct Role {
     pub checks: Vec<String>,
     /// The model this role's stage runs on; see the module doc.
     pub model: Option<String>,
+    /// The tools this role's agent may run; see the module doc.
+    pub tools: Vec<Tool>,
+}
+
+/// One tool a role's agent may run: `shell`, `read`, `write`, `edit`;
+/// `write` and `edit` may name a path they may only write under.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Tool {
+    pub name: String,
+    pub prefix: Option<String>,
+}
+
+/// The tool names a `tools` line may name, and the agent tool each runs.
+pub const TOOL_NAMES: [&str; 4] = ["shell", "read", "write", "edit"];
+
+pub fn parse_tools(line: &str) -> io::Result<Vec<Tool>> {
+    line.split(',')
+        .map(str::trim)
+        .filter(|t| !t.is_empty())
+        .map(|t| {
+            let (name, prefix) = match t.split_once(':') {
+                Some((name, prefix)) if name == "write" || name == "edit" => {
+                    (name.to_string(), Some(prefix.trim().to_string()))
+                }
+                _ => (t.to_string(), None),
+            };
+            if !TOOL_NAMES.contains(&name.as_str()) {
+                return Err(io::Error::other(format!(
+                    "unknown tool `{name}`; known: {}",
+                    TOOL_NAMES.join(", ")
+                )));
+            }
+            Ok(Tool { name, prefix })
+        })
+        .collect()
+}
+
+pub fn tool_line(tools: &[Tool]) -> String {
+    tools
+        .iter()
+        .map(|t| {
+            t.prefix
+                .as_ref()
+                .map(|p| format!("{}:{p}", t.name))
+                .unwrap_or_else(|| t.name.clone())
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 /// Every built-in role.
@@ -264,6 +319,7 @@ pub fn save_role(
     brief: &str,
     checks: &[String],
     model: &str,
+    tools: &str,
 ) -> io::Result<String> {
     let (name, brief) = (name.trim(), brief.trim());
     if name.is_empty() || brief.is_empty() {
@@ -289,6 +345,7 @@ pub fn save_role(
     if model.contains(['\n', '\r']) {
         return Err(io::Error::other("a model is one line"));
     }
+    let tools = parse_tools(tools).map_err(|e| io::Error::other(format!("tools: {e}")))?;
     let role = Role {
         key: key.clone(),
         name: name.to_string(),
@@ -300,6 +357,7 @@ pub fn save_role(
             .filter(|c| !c.is_empty())
             .collect(),
         model: Some(model.trim().to_string()).filter(|m| !m.is_empty()),
+        tools,
     };
     // Checked as any role file is, before it is written.
     parse(&key, &to_md(&role))?;
@@ -346,8 +404,13 @@ fn to_md(r: &Role) -> String {
         .as_ref()
         .map(|m| format!("model: {m}\n"))
         .unwrap_or_default();
+    let tools = if r.tools.is_empty() {
+        String::new()
+    } else {
+        format!("tools: {}\n", tool_line(&r.tools))
+    };
     format!(
-        "---\nname: {}\nstage: {}\n{model}{checks}---\n{}\n",
+        "---\nname: {}\nstage: {}\n{model}{tools}{checks}---\n{}\n",
         r.name, r.stage, r.brief
     )
 }
@@ -438,6 +501,23 @@ pub fn brief(project: &Path, stage: &str) -> io::Result<(String, Vec<String>)> {
     Ok((text, roles.into_iter().map(|r| r.name).collect()))
 }
 
+/// The solve chain: the team's solve roles, one agent run each, in team
+/// order. `wanted` is the roles the framing marked for this task (the PM's
+/// `roles` line): only those, in team order. Absent, the usual chain works:
+/// the solve roles minus the ones that only add when asked, the front-end
+/// designer among them (it passes when the change shows nothing).
+pub fn solve_chain(project: &Path, wanted: Option<&[String]>) -> io::Result<Vec<Role>> {
+    let solve = members(project)?
+        .into_iter()
+        .filter(|r| r.stage == "solve")
+        .collect::<Vec<_>>();
+    let keep = |r: &Role| match wanted {
+        Some(w) if !w.is_empty() => w.iter().any(|k| k == &r.key),
+        _ => r.key != "frontend-designer",
+    };
+    Ok(solve.into_iter().filter(keep).collect())
+}
+
 /// The model `stage` runs on, when one of its roles names one.
 /// ponytail: two roles of one stage naming different models: the first by
 /// file name wins; say so in the dialog if teams start doing it.
@@ -510,6 +590,10 @@ fn parse(key: &str, text: &str) -> io::Result<Role> {
     if !checks.is_empty() && stage != "prove" {
         return Err(bad("only a `prove` role can have `check` lines"));
     }
+    let tools = match field("tools") {
+        Some(t) => parse_tools(&t).map_err(|e| bad(&e.to_string()))?,
+        None => Vec::new(),
+    };
     Ok(Role {
         key: key.to_string(),
         name: field("name").unwrap_or_else(|| key.to_string()),
@@ -517,6 +601,7 @@ fn parse(key: &str, text: &str) -> io::Result<Role> {
         brief: body.trim().to_string(),
         checks,
         model: field("model"),
+        tools,
     })
 }
 
@@ -587,6 +672,37 @@ mod tests {
         r.model = Some("small".into());
         assert_eq!(parse("sec", &to_md(&r)).unwrap(), r, "written as read");
         assert!(parse("dev", "---\nstage: solve\ncheck: x\n---\nx").is_err());
+    }
+
+    #[test]
+    fn a_tools_line_restricts_the_role_and_round_trips() {
+        let r = parse(
+            "lead",
+            "---\nname: Tech lead\nstage: solve\ntools: read, write:relay/\n---\nReview.\n",
+        )
+        .unwrap();
+        assert_eq!(
+            r.tools,
+            vec![
+                Tool {
+                    name: "read".into(),
+                    prefix: None
+                },
+                Tool {
+                    name: "write".into(),
+                    prefix: Some("relay/".into())
+                }
+            ]
+        );
+        assert_eq!(parse("lead", &to_md(&r)).unwrap(), r, "written as read");
+        // No tools line: unrestricted, as before.
+        assert!(parse("x", "---\nstage: solve\n---\nx").unwrap().tools.is_empty());
+        for bad in ["read, git", "shell:relay/", "draw"] {
+            assert!(parse("x", &format!("---\nstage: solve\ntools: {bad}\n---\nx")).is_err(), "{bad}");
+        }
+        // An empty tools line is a present line with no tools: unrestricted.
+        assert!(parse("x", "---\nstage: solve\ntools: \n---\nx").unwrap().tools.is_empty());
+        assert!(parse_tools("").unwrap().is_empty(), "absent stays unrestricted");
     }
 
     #[test]
@@ -693,6 +809,36 @@ mod tests {
     // ponytail: save_team writes the real ~/.config/fennec/teams, so it is
     // checked through the UI against an isolated XDG_CONFIG_HOME, not here.
     #[test]
+    fn the_solve_chain_works_in_team_order_and_the_pm_marks_roles() {
+        let project = std::env::temp_dir().join(format!("fennec-os-chain-{}", std::process::id()));
+        std::fs::create_dir_all(&project).unwrap();
+        choose(&project, "Développement", &[]).unwrap();
+        let chain = solve_chain(&project, None).unwrap();
+        let keys: Vec<&str> = chain.iter().map(|r| r.key.as_str()).collect();
+        assert_eq!(
+            keys,
+            ["senior-developer", "tech-lead"],
+            "the front-end designer passes unless marked"
+        );
+        let marked = solve_chain(&project, Some(&["frontend-designer".to_string()])).unwrap();
+        assert_eq!(
+            marked.iter().map(|r| r.key.as_str()).collect::<Vec<_>>(),
+            ["frontend-designer"],
+            "only what the PM marked, in team order"
+        );
+        let both = solve_chain(
+            &project,
+            Some(&["frontend-designer".to_string(), "senior-developer".to_string()]),
+        )
+        .unwrap();
+        assert_eq!(
+            both.iter().map(|r| r.key.as_str()).collect::<Vec<_>>(),
+            ["frontend-designer", "senior-developer"]
+        );
+        std::fs::remove_dir_all(project).unwrap();
+    }
+
+    #[test]
     fn the_human_edits_a_role_and_writes_a_new_one() {
         let project = std::env::temp_dir().join(format!("fennec-os-role-{}", std::process::id()));
         std::fs::create_dir_all(&project).unwrap();
@@ -705,6 +851,7 @@ mod tests {
             "prove",
             "Click everything.",
             &[],
+            "",
             "",
         )
         .unwrap();
@@ -726,30 +873,31 @@ mod tests {
             "Check the data.",
             &[],
             "",
+            "",
         )
         .unwrap();
         assert_eq!(key, "specialiste-donnees");
         assert!(
-            save_role(&project, None, "Spécialiste données", "solve", "x", &[], "").is_err(),
+            save_role(&project, None, "Spécialiste données", "solve", "x", &[], "", "").is_err(),
             "taken"
         );
-        assert!(save_role(&project, Some("nobody"), "x", "solve", "x", &[], "").is_err());
+        assert!(save_role(&project, Some("nobody"), "x", "solve", "x", &[], "", "").is_err());
         assert!(
-            save_role(&project, None, "Ops", "deploy", "x", &[], "").is_err(),
+            save_role(&project, None, "Ops", "deploy", "x", &[], "", "").is_err(),
             "unknown stage"
         );
         assert!(
-            save_role(&project, None, "Ops", "solve", " ", &[], "").is_err(),
+            save_role(&project, None, "Ops", "solve", " ", &[], "", "").is_err(),
             "empty brief"
         );
         let veto = ["gitleaks detect".to_string()];
-        save_role(&project, Some("qa"), "QA", "prove", "Try.", &veto, "").unwrap();
+        save_role(&project, Some("qa"), "QA", "prove", "Try.", &veto, "", "").unwrap();
         assert_eq!(
             checks(&project).unwrap(),
             [("QA".to_string(), veto[0].clone())]
         );
         let two = ["a\nb".to_string()];
-        assert!(save_role(&project, Some("qa"), "QA", "prove", "Try.", &two, "").is_err());
+        assert!(save_role(&project, Some("qa"), "QA", "prove", "Try.", &two, "", "").is_err());
         assert_eq!(
             model(&project, "solve").unwrap(),
             None,
@@ -763,6 +911,7 @@ mod tests {
             "x",
             &[],
             " big ",
+            "",
         )
         .unwrap();
         assert_eq!(model(&project, "solve").unwrap().as_deref(), Some("big"));
@@ -771,7 +920,9 @@ mod tests {
             None,
             "another stage keeps its own"
         );
-        assert!(save_role(&project, Some("qa"), "QA", "prove", "x", &[], "a\nb").is_err());
+        assert!(
+            save_role(&project, Some("qa"), "QA", "prove", "x", &[], "a\nb", "").is_err()
+        );
         assert_eq!(slug("  Dev -- Senior! "), "dev-senior");
         std::fs::remove_dir_all(project).unwrap();
     }

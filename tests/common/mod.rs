@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use fennec_os::world::{World, Worlds};
+use fennec_os::team;
 
 pub struct Fixture {
     pub dir: PathBuf,
@@ -55,6 +56,43 @@ impl Fixture {
                     .success()
             );
         }
+        // One solve role: the existing tests script a single agent. Tests
+        // that want the team's chain add the roles back.
+        team::choose(
+            &project,
+            team::DEFAULT_TEAM,
+            &["tech-lead".to_string(), "frontend-designer".to_string()],
+        )
+        .unwrap();
+        // The team state is part of the project: commit it, the folder stays
+        // clean for the fork's check.
+        assert!(
+            Command::new("git")
+                .arg("-C")
+                .arg(&project)
+                .args(["add", "-A"])
+                .status()
+                .unwrap()
+                .success()
+        );
+        assert!(
+            Command::new("git")
+                .arg("-C")
+                .arg(&project)
+                .args([
+                    "-c",
+                    "user.name=t",
+                    "-c",
+                    "user.email=t@t",
+                    "commit",
+                    "-q",
+                    "-m",
+                    "team",
+                ])
+                .status()
+                .unwrap()
+                .success()
+        );
         // Worlds apart, in the store, unless a test asks for the folder.
         let store = dir.join("store");
         let apart = store.join("worlds");
