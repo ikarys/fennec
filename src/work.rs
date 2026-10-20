@@ -154,7 +154,16 @@ pub fn talk(id: String) {
 /// A discussion's turn: the settings' model, no team; the chat file keeps the
 /// exchange and each call's cost, the page follows it.
 pub fn chat(id: String) {
-    let Some(turn) = ChatTurn::new(id.clone()) else { return };
+    let Some(turn) = ChatTurn::new(id.clone()) else {
+        // The previous turn has not released the guard: its message was
+        // already committed as thinking, so settle it here with a reason —
+        // otherwise the page stays on "répond…" with no way out.
+        if let Ok(worlds) = Worlds::from_env() {
+            let _ = fennec_os::chat::fail(&worlds, &id, "the previous turn is still running");
+        }
+        eprintln!("fennec: discussion {id} refused, a turn is still running");
+        return;
+    };
     std::thread::spawn(move || {
         let _turn = turn;
         let Ok(worlds) = Worlds::from_env() else {
@@ -2536,6 +2545,34 @@ mod tests {
         assert!(ChatTurn::new("c2".to_string()).is_some(), "another chat is not");
         std::mem::drop(first);
         assert!(ChatTurn::new("c1".to_string()).is_some(), "the guard clears when the turn ends");
+    }
+
+    #[test]
+    fn a_refused_chat_turn_is_settled_with_a_reason() {
+        let tmp = std::env::temp_dir().join(format!("fennec-lead-chatrefuse-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        let home = tmp.join("home");
+        let chats = home.join("chats");
+        std::fs::create_dir_all(&chats).unwrap();
+        let id = "c9";
+        // As chat::say leaves it: the message is committed as thinking before
+        // work::chat runs.
+        std::fs::write(
+            chats.join(format!("{id}.json")),
+            json!({"id": id, "status": "thinking", "messages": []}).to_string(),
+        )
+        .unwrap();
+        // SAFETY: no other test reads FENNEC_OS_HOME at the same time.
+        unsafe { std::env::set_var("FENNEC_OS_HOME", &home) };
+        let worlds = Worlds::from_env().unwrap();
+        // A previous turn still holds the guard: this one is refused.
+        let held = ChatTurn::new(id.to_string()).unwrap();
+        chat(id.to_string());
+        let c = fennec_os::chat::load(&worlds, id).unwrap();
+        assert_eq!(c["status"], "idle", "a refused turn settles the chat");
+        assert!(c["error"].is_string(), "and says why, so the page recovers");
+        std::mem::drop(held);
+        std::fs::remove_dir_all(&tmp).unwrap();
     }
 
     #[test]
