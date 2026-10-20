@@ -77,6 +77,31 @@ pub fn busy() -> bool {
     WORKING.lock().is_ok_and(|w| !w.is_empty())
 }
 
+/// A discussion's turn lives here while it runs: a second turn on the same
+/// chat is refused, so two threads never write the same chat file.
+static CHATS: std::sync::Mutex<std::vec::Vec<String>> = std::sync::Mutex::new(Vec::new());
+
+struct ChatTurn(String);
+
+impl ChatTurn {
+    fn new(id: String) -> Option<Self> {
+        let mut c = CHATS.lock().ok()?;
+        if c.iter().any(|x| x == &id) {
+            return None;
+        }
+        c.push(id.clone());
+        Some(Self(id))
+    }
+}
+
+impl Drop for ChatTurn {
+    fn drop(&mut self) {
+        if let Ok(mut c) = CHATS.lock() {
+            c.retain(|x| x != &self.0);
+        }
+    }
+}
+
 /// Runs `step` in the background; an error fails the request with its reason.
 fn spawn(id: String, step: fn(&Store, &str) -> io::Result<()>) {
     std::thread::spawn(move || {
@@ -129,7 +154,9 @@ pub fn talk(id: String) {
 /// A discussion's turn: the settings' model, no team; the chat file keeps the
 /// exchange and each call's cost, the page follows it.
 pub fn chat(id: String) {
+    let Some(turn) = ChatTurn::new(id.clone()) else { return };
     std::thread::spawn(move || {
+        let _turn = turn;
         let Ok(worlds) = Worlds::from_env() else {
             return;
         };
@@ -308,9 +335,14 @@ pub fn split(store: &Store, id: &str) -> io::Result<()> {
         }
     })?;
     let id = id.to_string();
+    let root = store.root.clone();
     std::thread::spawn(move || {
         let _working = Working::new(id.clone());
-        let Ok(store) = Store::from_env() else { return };
+        let Ok(store) = Store::from_env() else {
+            // The turn never started: the task is splittable again.
+            let _ = Store { root }.update(&id, |r| r["splitting"] = json!(false));
+            return;
+        };
         if let Err(e) = split_now(&store, &id) {
             let _ = store.update(&id, |r| {
                 r["split_error"] = json!(e.to_string());
@@ -404,7 +436,7 @@ pub fn say(store: &Store, id: &str, text: &str) -> io::Result<()> {
             say_in(r, "human", text);
             note(r, json!({"stage": "said", "text": text}));
             if let Some(m) = r.as_object_mut() {
-                for k in ["asked", "ahead", "done_when", "picked"] {
+                for k in ["asked", "ahead", "done_when", "picked", "roles"] {
                     m.remove(k);
                 }
             }
@@ -2494,6 +2526,16 @@ mod tests {
         );
         apply_proof(&mut r, &check(127, true));
         assert_eq!(r["status"], "ready", "a missing tool is not a veto");
+    }
+
+    #[test]
+    fn a_second_turn_on_the_same_chat_is_refused() {
+        let first = ChatTurn::new("c1".to_string());
+        assert!(first.is_some(), "the first turn starts");
+        assert!(ChatTurn::new("c1".to_string()).is_none(), "a second one is refused");
+        assert!(ChatTurn::new("c2".to_string()).is_some(), "another chat is not");
+        std::mem::drop(first);
+        assert!(ChatTurn::new("c1".to_string()).is_some(), "the guard clears when the turn ends");
     }
 
     #[test]

@@ -1589,10 +1589,13 @@ function chatQuestion(c) {
   const p = c.pending ?? {};
   const open = el("button", { type: "button", className: "primary", textContent: t("Open the folder") });
   const refuse = el("button", { type: "button", className: "quiet", textContent: t("Refuse") });
-  const decide = async (allow) => {
+  // Set once one of the person's rules asks first.
+  let chat = null;
+  const decide = async (allow, forChat) => {
     $("chat-error").textContent = "";
+    for (const b of [open, refuse, chat]) if (b) b.disabled = true;
     try {
-      await api("/api/chat/decide", { id: c.id, allow });
+      await api("/api/chat/decide", forChat ? { id: c.id, allow, for_chat: true } : { id: c.id, allow });
     } catch (e) {
       $("chat-error").textContent = e.message;
     }
@@ -1602,16 +1605,9 @@ function chatQuestion(c) {
   // One of the person's rules asks first: once, for the rest of the chat,
   // or not at all (the call does not run, fennec does without).
   if (p.tool === "rule") {
-    const chat = el("button", { type: "button", textContent: t("For this discussion") });
+    chat = el("button", { type: "button", textContent: t("For this discussion") });
     open.textContent = t("Allow once");
-    chat.onclick = async () => {
-      $("chat-error").textContent = "";
-      try {
-        await api("/api/chat/decide", { id: c.id, allow: true, for_chat: true });
-      } catch (e) {
-        $("chat-error").textContent = e.message;
-      }
-    };
+    chat.onclick = () => decide(true, true);
     const rule = t("rule \"{0}\"", p.rule?.pattern ?? "");
     const why = p.rule?.why ? `${t(p.rule.why)} (${rule})` : rule;
     return el("div", { className: "ask" },

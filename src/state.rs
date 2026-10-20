@@ -8,6 +8,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::{Value, json};
 
+/// Held by every `Store::update`: a request's read-modify-write is atomic
+/// against the other threads (workers, plugins) and the HTTP handlers.
+static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 pub struct Store {
     pub root: PathBuf,
 }
@@ -217,6 +221,7 @@ impl Store {
                     "done_when",
                     "split_error",
                     "picked",
+                    "roles",
                 ] {
                     m.remove(k);
                 }
@@ -283,6 +288,7 @@ impl Store {
     }
 
     pub fn update(&self, id: &str, change: impl FnOnce(&mut Value)) -> io::Result<()> {
+        let _lock = LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let mut record = self.load(id)?;
         let was = record["status"].clone();
         change(&mut record);
@@ -457,6 +463,11 @@ pub(crate) fn words(text: &str) -> String {
 
 fn unbase64(text: &str) -> Option<Vec<u8>> {
     let text = text.trim_end_matches('=').as_bytes();
+    // A base64 body is a multiple of 4: a length of 4n+1 is not a padding of
+    // a valid one, so it is refused, not decoded.
+    if text.len() % 4 == 1 {
+        return None;
+    }
     let value = |c: u8| match c {
         b'A'..=b'Z' => Some(c - b'A'),
         b'a'..=b'z' => Some(c - b'a' + 26),
@@ -819,6 +830,7 @@ mod tests {
         let store = Store { root: root.clone() };
         assert_eq!(unbase64("TWFu").unwrap(), b"Man");
         assert_eq!(unbase64("TWE=").unwrap(), b"Ma");
+        assert!(unbase64("TWFuX").is_none(), "a length of 4n+1 is not base64");
         let line = store.save_image("data:image/png;base64,TWFu").unwrap();
         let name = line.rsplit('/').next().unwrap().trim_end_matches(')');
         assert_eq!(store.image(name).unwrap(), b"Man");
