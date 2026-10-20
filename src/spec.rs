@@ -749,23 +749,7 @@ pub fn discuss(
     thread: &[Value],
     model: &dyn Model,
 ) -> io::Result<(Discussed, Value)> {
-    // What the model knows of the project: its files and README, enough to
-    // ask about this project rather than a generic one.
-    // ponytail: 200 files and 3 kB of README; a big project needs a summary.
-    let files = crate::world::git(project, &["ls-files"]).unwrap_or_default();
-    let files: Vec<&str> = files.lines().take(200).collect();
-    let readme: String = ["README.md", "README", "AGENTS.md"]
-        .iter()
-        .find_map(|f| std::fs::read_to_string(project.join(f)).ok())
-        .unwrap_or_default()
-        .chars()
-        .take(3000)
-        .collect();
-    let context = if files.is_empty() {
-        "The project is empty.".to_string()
-    } else {
-        format!("Project files:\n{}\n\nREADME:\n{readme}", files.join("\n"))
-    };
+    let context = context(project);
     // The roles that shaped requests before work starts speak here now.
     let (roles, team) = team::brief(project, "frame")?;
     let mut messages =
@@ -795,6 +779,79 @@ pub fn discuss(
     Ok((said, exchange))
 }
 
+/// What the model knows of the project: its files and README, enough to
+/// talk about this project rather than a generic one.
+fn context(project: &Path) -> String {
+    // ponytail: 200 files and 3 kB of README; a big project needs a summary.
+    let files = crate::world::git(project, &["ls-files"]).unwrap_or_default();
+    let files: Vec<&str> = files.lines().take(200).collect();
+    let readme: String = ["README.md", "README", "AGENTS.md"]
+        .iter()
+        .find_map(|f| std::fs::read_to_string(project.join(f)).ok())
+        .unwrap_or_default()
+        .chars()
+        .take(3000)
+        .collect();
+    if files.is_empty() {
+        "The project is empty.".to_string()
+    } else {
+        format!("Project files:\n{}\n\nREADME:\n{readme}", files.join("\n"))
+    }
+}
+
+const SPLIT: &str = "You split a task for a team of AI developers into smaller tasks, each one \
+delivered and tested alone, in the order they should be done. Two to six tasks; fewer is better. \
+Each one says in a few sentences, in the task's language, what to build and how to know it \
+works. A task needs an earlier one only when it builds on its code. Reply with JSON only:\n\
+`[{\"task\": \"...\", \"after\": [numbers of the earlier tasks it needs, from 0]}]`";
+
+/// A task cut into smaller ones, in order, each with the earlier ones it
+/// builds on (their positions). One model call, no world.
+pub fn split(
+    project: &Path,
+    task: &str,
+    model: &dyn Model,
+) -> io::Result<Vec<(String, Vec<usize>)>> {
+    let messages = [
+        json!({"role": "system", "content": format!("{SPLIT}\n\n{}", context(project))}),
+        json!({"role": "user", "content": task}),
+    ];
+    let (content, _) = crate::provider::ask(model, &messages)?;
+    parse_split(&content)
+}
+
+/// The model's list, read leniently (fenced or not); a task can only need
+/// earlier ones, so there is no cycle.
+fn parse_split(content: &str) -> io::Result<Vec<(String, Vec<usize>)>> {
+    let bad = || io::Error::other("the model did not give a list of tasks");
+    let (start, end) = (
+        content.find('[').ok_or_else(bad)?,
+        content.rfind(']').ok_or_else(bad)?,
+    );
+    let list: Vec<Value> =
+        serde_json::from_str(content.get(start..=end).ok_or_else(bad)?).map_err(|_| bad())?;
+    let tasks: Vec<(String, Vec<usize>)> = list
+        .iter()
+        .enumerate()
+        .filter_map(|(i, t)| {
+            let text = t["task"].as_str()?.trim().to_string();
+            let after = t["after"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_u64)
+                .map(|a| a as usize)
+                .filter(|a| *a < i)
+                .collect();
+            (!text.is_empty()).then_some((text, after))
+        })
+        .collect();
+    if tasks.len() < 2 || tasks.len() != list.len() {
+        return Err(bad());
+    }
+    Ok(tasks)
+}
+
 pub fn reject(worlds: &Worlds, id: &str, correction: Option<&str>) -> io::Result<()> {
     let mut spec = load(worlds, id)?;
     if let Ok(world) = worlds.open(id) {
@@ -809,7 +866,7 @@ pub fn reject(worlds: &Worlds, id: &str, correction: Option<&str>) -> io::Result
 
 #[cfg(test)]
 mod tests {
-    use super::{done_when, parse, reformat};
+    use super::{done_when, parse, parse_split, reformat};
     use crate::provider::Model;
     use serde_json::{Value, json};
     use std::io;
@@ -905,5 +962,20 @@ mod tests {
         );
         assert_eq!(goal, "add `f`.");
         assert_eq!(verify, ["cargo test", "sh t.sh"]);
+    }
+
+    #[test]
+    fn a_split_needs_two_tasks_and_only_earlier_ones() {
+        let got = parse_split(
+            "Here:\n```json\n[{\"task\": \"api\", \"after\": [1]}, {\"task\": \"ui\", \"after\": [0]}]\n```",
+        )
+        .unwrap();
+        assert_eq!(got, vec![("api".into(), vec![]), ("ui".into(), vec![0])]);
+        assert!(
+            parse_split("[{\"task\": \"one\"}]").is_err(),
+            "nothing to split"
+        );
+        assert!(parse_split("no list").is_err());
+        assert!(parse_split("[{\"task\": \"a\"}, {\"x\": 1}]").is_err());
     }
 }
