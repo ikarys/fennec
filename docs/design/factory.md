@@ -103,6 +103,52 @@ back to the builder: "si QA rencontre des soucis, il faut renvoyer au dev".
 - Journal: "Preuve ratée : renvoyée au travail" with the findings.
 - Not yet: sending a "done when" the proof shows unreachable back to framing.
 
+## 8. Backlog → Ready: the human validates what fennec understood — safe, fast
+
+Added 2026-10-20, asked by the human after describing their day-to-day use:
+an Agent mode to discuss, then everything cut into tasks that work alone,
+which only start once the human validated that fennec understood them.
+Replaces "Plus tard" / "Dans la Fleet".
+
+```
+Backlog ──► Ready ──► running ──► to validate ──► done
+   │                                 └──► failed (why, what fennec offers)
+   └─ Split ─► N tasks back in the Backlog, already framed
+```
+
+- **Backlog**: a task comes from a discussion, a split, or is typed. While
+  the model is free, fennec frames it (restates it, "done when", the skills
+  it will use, its size, what it comes after). A question goes to "For you".
+- **Validation**: only the human moves a task to Ready, after reading what
+  fennec understood: Validate, Discuss (Agent mode on the task), Split,
+  Delete. Several at once with the boxes. A task not framed yet cannot be
+  validated; reworded, it leaves Ready and is framed again.
+- **Ready**: one ordered queue. Run / Stop takes only Ready tasks, in order,
+  never one from the Backlog. "Start" on a task still starts it at once.
+- **Linked tasks** (`after`): a task that comes after another starts once
+  that one is committed on the project's `fleet` branch, from that branch:
+  it sees the work before it, so no merge conflict later. Independent
+  tasks of one project run side by side, within "tasks at once". A failed
+  one keeps its followers in Ready, "waits for X".
+- **Disk**: worlds share the git store; build folders are shared per
+  project in `.fennec/` (`CARGO_TARGET_DIR`, pnpm and uv stores), and a
+  world is removed once its task is committed or dropped.
+- **Dashboards** (piloting, not watching): the global one opens on the last
+  five things since the last visit, each with a button to its page, then
+  what runs (task, step, for how long), resources (tokens, model time, RAM,
+  disk of the worlds) and costs. A project's: tasks per section, open
+  discussions, what runs, time and tokens, quality (proofs passed first
+  time, sent back, failed), disk, what is ready to run next, its settings.
+
+Plan, in order, each step landing alone:
+
+1. Docs (this section, "task" in AGENTS.md).
+2. Backlog and Ready sections, validation, Run takes only Ready.
+3. Split a Backlog task; `after` links honoured by the queue.
+4. Skills chosen per task at framing, shown in the validation.
+5. Global dashboard, then project dashboard (RAM and disk are new figures).
+6. Shared build caches and world clean-up.
+
 ## Not built
 
 - **Kanban board**: the single view covers it; dragging cards is managing,
