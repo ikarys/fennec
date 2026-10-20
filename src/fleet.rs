@@ -1,5 +1,6 @@
-//! The Fleet: tasks kept for later that fennec starts on its own, in one
-//! queue across projects. The decision is the task's; the project is only a
+//! The Fleet: the Ready tasks fennec starts on its own, in one queue across
+//! projects. A task enters it only when the human validated what fennec
+//! understood of it (framed ahead while in the Backlog). The decision is the task's; the project is only a
 //! place. Its work always goes apart, whatever the project chose: a task
 //! ready and waiting for the human never holds the folder from the next.
 //! `fleet.json` in the store holds the queue's order, run or stop, how many
@@ -51,8 +52,8 @@ fn save(store: &Store, v: &Value) -> io::Result<()> {
     crate::state::write_json(&path(store), v)
 }
 
-/// The queue as it stands: a task launched, forgotten or archived since has
-/// left it, whatever the file still says.
+/// The queue as it stands: a task launched, forgotten, archived or reworded
+/// (its framing dropped) since has left it, whatever the file still says.
 pub fn queue(store: &Store) -> io::Result<Vec<(String, Value)>> {
     let v = load(store)?;
     let projects = store.projects()?;
@@ -64,6 +65,7 @@ pub fn queue(store: &Store) -> io::Result<Vec<(String, Value)>> {
             let id = id.as_str()?;
             let r = store.load(id).ok()?;
             (r["status"] == "later"
+                && r["ahead"].is_string()
                 && r["archived"] != true
                 && projects.iter().any(|p| r["project"] == p.as_str()))
             .then(|| (id.to_string(), r))
@@ -77,8 +79,15 @@ pub fn place(store: &Store, id: &str, action: &str) -> io::Result<()> {
     let at = ids.iter().position(|x| x == id);
     match (action, at) {
         ("add", None) => {
-            if store.load(id)?["status"] != "later" {
+            let r = store.load(id)?;
+            if r["status"] != "later" {
                 return Err(io::Error::other("this task is no longer for later"));
+            }
+            // Ready means the human read what fennec understood.
+            if !r["ahead"].is_string() {
+                return Err(io::Error::other(
+                    "fennec has not restated this task yet: validate it once prepared",
+                ));
             }
             ids.push(id.to_string());
         }
@@ -161,11 +170,7 @@ fn states(
     let mut next = false;
     queue
         .iter()
-        .map(|(_, r)| {
-            // Framed ahead, it asked: it starts once the human answered.
-            if r["asked"] == true {
-                return Some("waits for your answer".into());
-            }
+        .map(|_| {
             if working >= at_once {
                 return Some("waits for a slot".into());
             }
@@ -241,18 +246,25 @@ pub fn tick(
     ahead(store, &requests, prepare)
 }
 
-/// Framing ahead takes the model only when no task needs it.
+/// Framing ahead takes the model only when no task needs it: the Backlog's
+/// first task not framed yet, so the human finds it ready to validate.
 fn ahead(store: &Store, requests: &[(String, Value)], prepare: fn(String)) -> io::Result<()> {
     if requests.iter().any(|(_, r)| is_working(r)) || crate::work::busy() {
         return Ok(());
     }
+    let projects = store.projects()?;
     let framed = |r: &Value| {
         ["ahead", "asked", "ahead_failed"]
             .iter()
             .any(|k| !r[k].is_null())
     };
-    if let Some((id, _)) = queue(store)?.into_iter().find(|(_, r)| !framed(r)) {
-        prepare(id);
+    if let Some((id, _)) = requests.iter().find(|(_, r)| {
+        r["status"] == "later"
+            && r["archived"] != true
+            && !framed(r)
+            && projects.iter().any(|p| r["project"] == p.as_str())
+    }) {
+        prepare(id.clone());
     }
     Ok(())
 }
@@ -361,6 +373,11 @@ mod tests {
         json!({"project": project, "status": status, "text": "t"})
     }
 
+    /// What framing ahead leaves: a brief the human can validate.
+    fn framed(store: &Store, id: &str) {
+        store.update(id, |r| r["ahead"] = json!("brief")).unwrap();
+    }
+
     #[test]
     fn the_first_task_starts_and_the_others_say_why_they_wait() {
         let queue = vec![
@@ -395,6 +412,10 @@ mod tests {
         let a = store.add_request(&p, "a", &[], true).unwrap();
         let b = store.add_request(&q, "b", &[], true).unwrap();
         let kept = store.add_request(&p, "kept", &[], true).unwrap();
+        assert!(place(&store, &a, "add").is_err(), "not framed yet");
+        for id in [&a, &b, &kept] {
+            framed(&store, id);
+        }
         place(&store, &a, "add").unwrap();
         place(&store, &b, "add").unwrap();
         // The human moves b first; "kept" stays for later, out of the Fleet.
@@ -433,7 +454,7 @@ mod tests {
     static PREPARED: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
 
     #[test]
-    fn idle_queued_tasks_are_framed_ahead_and_one_that_asked_waits_for_the_human() {
+    fn idle_backlog_tasks_are_framed_ahead_and_only_validated_ones_start() {
         let tmp = std::env::temp_dir().join(format!("fennec-lead-ahead-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&tmp);
         let store = Store {
@@ -446,26 +467,25 @@ mod tests {
         let p = std::fs::canonicalize(p).unwrap().display().to_string();
         let a = store.add_request(&p, "a", &[], true).unwrap();
         let b = store.add_request(&p, "b", &[], true).unwrap();
-        place(&store, &a, "add").unwrap();
-        place(&store, &b, "add").unwrap();
         let prepare = |id: String| PREPARED.lock().unwrap().push(id);
         let prepared = || std::mem::take(&mut *PREPARED.lock().unwrap());
-        // Stopped, nothing works: the first task is framed ahead.
+        // Stopped, nothing works: the Backlog's first task is framed ahead.
         set(&store, Some(false), None, None, None).unwrap();
         tick(&store, |_| {}, |_, _| Ok(()), prepare).unwrap();
         assert_eq!(prepared(), std::slice::from_ref(&a));
-        // It asked: the next one is framed, and the Fleet passes it by.
+        // It asked: it cannot be validated, and the next one is framed.
         store.update(&a, |r| r["asked"] = json!(true)).unwrap();
+        assert!(place(&store, &a, "add").is_err());
         tick(&store, |_| {}, |_, _| Ok(()), prepare).unwrap();
         assert_eq!(prepared(), std::slice::from_ref(&b));
-        assert_eq!(
-            view(&store).unwrap()["queue"][0]["waits"],
-            "waits for your answer"
-        );
-        store.update(&b, |r| r["ahead"] = json!("brief")).unwrap();
+        framed(&store, &b);
         tick(&store, |_| {}, |_, _| Ok(()), prepare).unwrap();
         assert!(prepared().is_empty(), "all framed");
+        // Running, nothing validated: nothing starts.
         set(&store, Some(true), None, None, None).unwrap();
+        tick(&store, |_| {}, |_, _| Ok(()), prepare).unwrap();
+        assert_eq!(store.load(&b).unwrap()["status"], "later");
+        place(&store, &b, "add").unwrap();
         tick(&store, |_| {}, |_, _| Ok(()), prepare).unwrap();
         assert_eq!(store.load(&a).unwrap()["status"], "later");
         assert_eq!(store.load(&b).unwrap()["status"], "thinking");
@@ -473,11 +493,13 @@ mod tests {
         store.rewrite(&a, "a2").unwrap();
         store.update(&b, |r| r["status"] = json!("landed")).unwrap();
         tick(&store, |_| {}, |_, _| Ok(()), prepare).unwrap();
-        assert_eq!(
-            store.load(&a).unwrap()["status"],
-            "thinking",
-            "no longer waits"
-        );
+        assert_eq!(prepared(), std::slice::from_ref(&a));
+        // A Ready task reworded leaves Ready until validated again.
+        framed(&store, &a);
+        set(&store, Some(false), None, None, None).unwrap();
+        place(&store, &a, "add").unwrap();
+        store.rewrite(&a, "a3").unwrap();
+        assert!(queue(&store).unwrap().is_empty());
         std::fs::remove_dir_all(tmp).unwrap();
     }
 
@@ -496,6 +518,8 @@ mod tests {
         let p = std::fs::canonicalize(p).unwrap().display().to_string();
         let a = store.add_request(&p, "a", &[], true).unwrap();
         let b = store.add_request(&p, "b", &[], true).unwrap();
+        framed(&store, &a);
+        framed(&store, &b);
         place(&store, &a, "add").unwrap();
         place(&store, &b, "add").unwrap();
         set(&store, None, Some(2), None, Some("branch")).unwrap();
