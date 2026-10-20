@@ -622,18 +622,53 @@ impl Worlds {
         self.git(world, &["rev-parse", "HEAD"])
     }
 
+    /// `git add .` meets the harness's own ignored top-level folders
+    /// (`.fennec/`, `relay/`) as pathspec matches and refuses the whole
+    /// command, and the exclude pathspecs do not silence it (git 2.43): the
+    /// entries are named instead, the ones git ignores left out. Deeper
+    /// ignored paths, met on the way down, git skips on its own.
+    fn top_level(&self, world: &World) -> io::Result<Vec<String>> {
+        let mut names = Vec::new();
+        for entry in std::fs::read_dir(&world.path)? {
+            let Ok(name) = entry?.file_name().into_string() else {
+                continue;
+            };
+            if name == ".git" {
+                continue;
+            }
+            // Ignored by the project (or the harness's store excludes): not
+            // named, so the command is not refused for it.
+            if self.git(world, &["check-ignore", "-q", "--", &name]).is_ok() {
+                continue;
+            }
+            names.push(name);
+        }
+        Ok(names)
+    }
+
     fn stage(&self, world: &World) -> io::Result<String> {
-        let mut args = vec!["add", "-A", "--", "."];
-        args.extend(BUILD_OUTPUT);
-        self.git(world, &args)
+        let mut args: Vec<String> = vec!["add".into(), "-A".into(), "--".into()];
+        let mut names = self.top_level(world)?;
+        if names.is_empty() {
+            names.push(".".into());
+        }
+        args.extend(names);
+        args.extend(BUILD_OUTPUT.iter().map(ToString::to_string));
+        self.git(world, &args.iter().map(String::as_str).collect::<Vec<_>>())
     }
 
     /// What changed in the work since the last checkpoint, build output left
     /// out as [`Self::commit`] leaves it: a `.pyc` a build wrote is no change.
     pub fn status(&self, world: &World) -> io::Result<String> {
-        let mut args = vec!["status", "--porcelain", "--", "."];
-        args.extend(BUILD_OUTPUT);
-        self.git(world, &args)
+        let mut args: Vec<String> =
+            vec!["status".into(), "--porcelain".into(), "--".into()];
+        let mut names = self.top_level(world)?;
+        if names.is_empty() {
+            names.push(".".into());
+        }
+        args.extend(names);
+        args.extend(BUILD_OUTPUT.iter().map(ToString::to_string));
+        self.git(world, &args.iter().map(String::as_str).collect::<Vec<_>>())
     }
 
     /// Back to the last checkpoint: what the work changed goes, ignored files
@@ -923,7 +958,7 @@ const BUILD_OUTPUT: [&str; 7] = [
     ":(exclude,glob)**/__pycache__/**",
     ":(exclude,glob)**/.venv/**",
     ":(exclude,glob)**/.gradle/**",
-    ":(exclude,glob).fennec/**",
+    ":(exclude,glob)**/.fennec/**",
     ":(exclude,glob)**/relay/**",
 ];
 
