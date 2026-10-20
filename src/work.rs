@@ -283,6 +283,92 @@ fn prepare_now(store: &Store, id: &str) -> io::Result<()> {
     })
 }
 
+/// A Backlog task too big for one go: the model cuts it into smaller ones
+/// that take its place in the Backlog, each after the ones it builds on, so
+/// the Fleet runs them in order. Each is framed and validated as usual.
+pub fn split(store: &Store, id: &str) -> io::Result<()> {
+    let request = store.load(id)?;
+    if request["status"] != "later" || request["splitting"] == true {
+        return Err(io::Error::other("only a task in the Backlog can be split"));
+    }
+    store.update(id, |r| {
+        r["splitting"] = json!(true);
+        if let Some(m) = r.as_object_mut() {
+            m.remove("split_error");
+        }
+    })?;
+    let id = id.to_string();
+    std::thread::spawn(move || {
+        let _working = Working::new(id.clone());
+        let Ok(store) = Store::from_env() else { return };
+        if let Err(e) = split_now(&store, &id) {
+            let _ = store.update(&id, |r| {
+                r["split_error"] = json!(e.to_string());
+                if let Some(m) = r.as_object_mut() {
+                    m.remove("splitting");
+                }
+            });
+        }
+    });
+    Ok(())
+}
+
+fn split_now(store: &Store, id: &str) -> io::Result<()> {
+    let request = store.load(id)?;
+    let project = request["project"].as_str().unwrap_or("");
+    let model = staffed(
+        OpenAi::variants_from_env(1)?.remove(0),
+        Path::new(project),
+        "frame",
+    )?;
+    // What fennec understood, when the human read it; else their words.
+    let task = match request["ahead"].as_str() {
+        Some(brief) => brief.to_string(),
+        None => transcript(&request),
+    };
+    let parts = spec::split(Path::new(project), &task, &model)?;
+    replace_by(store, id, &parts)
+}
+
+/// `id` gives way to `parts`: each inherits its `after` and its roles left
+/// out, and a task that came after `id` comes after all of them.
+fn replace_by(store: &Store, id: &str, parts: &[(String, Vec<usize>)]) -> io::Result<()> {
+    let request = store.load(id)?;
+    if request["status"] != "later" {
+        return Err(io::Error::other("the task left the Backlog meanwhile"));
+    }
+    let project = request["project"].as_str().unwrap_or("");
+    let off: Vec<String> = request["off"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|k| k.as_str().map(str::to_string))
+        .collect();
+    let inherited = request["after"].as_array().cloned().unwrap_or_default();
+    let mut ids: Vec<String> = Vec::new();
+    for (text, after) in parts {
+        let new = store.add_request(project, text, &off, true)?;
+        let mut deps = inherited.clone();
+        deps.extend(after.iter().map(|a| json!(ids[*a])));
+        store.update(&new, |r| r["after"] = json!(deps))?;
+        ids.push(new);
+    }
+    for (other, r) in store.requests()? {
+        if r["after"]
+            .as_array()
+            .is_some_and(|a| a.contains(&json!(id)))
+        {
+            store.update(&other, |r| {
+                if let Some(a) = r["after"].as_array_mut() {
+                    a.retain(|x| x != id);
+                    a.extend(ids.iter().map(|i| json!(i)));
+                }
+            })?;
+        }
+    }
+    store.forget(id)
+}
+
 /// The human speaks in the conversation: an answer, a precision, or a
 /// correction of the proposed "done when", which is then dropped.
 pub fn say(store: &Store, id: &str, text: &str) -> io::Result<()> {
@@ -1989,6 +2075,41 @@ mod tests {
             let err = stop(&store, id).unwrap_err().to_string();
             assert!(err.contains("no longer works"), "{id}: {err}");
         }
+        std::fs::remove_dir_all(tmp).unwrap();
+    }
+
+    #[test]
+    fn a_split_task_gives_way_to_its_parts_in_order() {
+        let tmp = std::env::temp_dir().join(format!("fennec-lead-split-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        let store = Store {
+            root: tmp.join("home"),
+        };
+        std::fs::create_dir_all(store.root.join("requests")).unwrap();
+        let p = tmp.join("p");
+        std::fs::create_dir_all(&p).unwrap();
+        store.add_project(p.to_str().unwrap(), "apart").unwrap();
+        let p = std::fs::canonicalize(p).unwrap().display().to_string();
+        let first = store.add_request(&p, "first", &[], true).unwrap();
+        let big = store
+            .add_request(&p, "big", &["review".into()], true)
+            .unwrap();
+        let next = store.add_request(&p, "next", &[], true).unwrap();
+        store.update(&big, |r| r["after"] = json!([first])).unwrap();
+        store.update(&next, |r| r["after"] = json!([big])).unwrap();
+        let parts = [("api".to_string(), vec![]), ("ui".to_string(), vec![0])];
+        replace_by(&store, &big, &parts).unwrap();
+        assert!(store.load(&big).is_err(), "the big one is gone");
+        let all = store.requests().unwrap();
+        let id = |t: &str| all.iter().find(|(_, r)| r["text"] == t).unwrap().0.clone();
+        let (api, ui) = (id("api"), id("ui"));
+        let r = store.load(&ui).unwrap();
+        assert_eq!(
+            (r["status"].as_str(), &r["off"]),
+            (Some("later"), &json!(["review"]))
+        );
+        assert_eq!(r["after"], json!([first, api]));
+        assert_eq!(store.load(&next).unwrap()["after"], json!([api, ui]));
         std::fs::remove_dir_all(tmp).unwrap();
     }
 
