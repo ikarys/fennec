@@ -88,6 +88,9 @@ assert.equal(loaded, 1, "la liste est chargée à l'ouverture");
 // Opening "Règles" reads the rules for every project, no project named.
 let read;
 global.changeRules = (box, path, scope) => (read = [box, path, scope]);
+// ...and the rules on commands and files.
+let guard = 0;
+global.changeGuard = () => guard++;
 // Opening "Plugins" reads the plugins of the machine.
 let plugins = 0;
 global.showPlugins = () => plugins++;
@@ -96,4 +99,5 @@ assert.equal(panels["settings-plugins"].hidden, false, "Plugins visible");
 assert.equal(plugins, 1, "les plugins sont lus à l'ouverture");
 tabs[2].onclick();
 assert.deepEqual(read, [panels["settings-rules"], "", "user"], "les règles de l'utilisateur sont lues à l'ouverture");
+assert.equal(guard, 1, "les règles sur les commandes et fichiers sont lues à l'ouverture");
 console.log("ok");

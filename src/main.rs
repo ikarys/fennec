@@ -585,10 +585,28 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
         }
         // The person's answer to a question the turn is waiting on: allow
         // opens the folder for the chat, refuse covers the call only.
+        // A rule's question may be answered for the rest of the chat.
         ("POST", "/api/chat/decide") => {
             let v = input()?;
-            fennec_os::chat::decide(&Worlds::from_env()?, &field(&v, "id"), v["allow"] == true)?;
+            fennec_os::chat::decide_for(
+                &Worlds::from_env()?,
+                &field(&v, "id"),
+                v["allow"] == true,
+                v["for_chat"] == true,
+            )?;
             Ok(json!({}))
+        }
+        // The rules on what agents run, read and write: listed, or one added
+        // or removed first.
+        ("POST", "/api/guard") => {
+            let v = input()?;
+            if v["add"].is_object() {
+                fennec_os::guard::add(&v["add"])?;
+            }
+            if let Some(i) = v["remove"].as_u64() {
+                fennec_os::guard::remove(i as usize, &field(&v, "pattern"))?;
+            }
+            Ok(json!({"rules": fennec_os::guard::list()?}))
         }
         // A folder opened for the chat, taken back.
         ("POST", "/api/chat/grant") => {
@@ -742,7 +760,8 @@ fn transcript(chat: &Value) -> io::Result<String> {
     let mut text = String::new();
     for m in chat["messages"].as_array().cloned().unwrap_or_default() {
         let content = m["content"].as_str().unwrap_or("").trim();
-        if content.is_empty() {
+        // The harness's words to the model are nobody's in the request.
+        if content.is_empty() || m["harness"] == true {
             continue;
         }
         let who = match m["role"].as_str() {
