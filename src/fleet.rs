@@ -172,6 +172,11 @@ pub fn running(store: &Store) -> io::Result<bool> {
     Ok(load(store)?["on"] == true)
 }
 
+/// Why the Fleet stopped on its own, if it did; nothing once it runs again.
+pub fn stopped(store: &Store) -> io::Result<Value> {
+    Ok(load(store)?["stopped"].clone())
+}
+
 /// Each queued task with what it waits for (`None`: it starts next), in order.
 /// The folder is not one of them: the Fleet's work goes apart (`work`).
 fn states(
