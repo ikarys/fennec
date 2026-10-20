@@ -751,41 +751,55 @@ pub fn land(
         .map(str::trim)
         .filter(|m| !m.is_empty())
         .unwrap_or(&goal);
-    // commit-tree, not commit: no hook runs, the project's worktree is not
-    // touched until the fast-forward below.
-    let squashed = git(
-        project,
-        &[
-            "commit-tree",
-            &format!("{commit}^{{tree}}"),
-            "-p",
-            &head,
-            "-m",
-            message,
-        ],
-    )?;
-    match branch.filter(|b| *b != current) {
-        // The folder holds the world: its files are the commit's already, so
-        // the branch moves to it and the folder goes back on that branch.
-        None if home.is_some() => {
-            let target = format!("refs/heads/{current}");
-            git(project, &["update-ref", &target, &squashed, &head])?;
-            git(project, &["symbolic-ref", "HEAD", &target])?;
-        }
-        None => {
-            git(project, &["merge", "-q", "--ff-only", &squashed])?;
-        }
-        // Not the folder's branch: its ref moves, no work tree is touched.
-        Some(b) if b == onto => {
+    let tree = |c: &str| git(project, &["rev-parse", &format!("{c}^{{tree}}")]);
+    // Work that changed nothing (what was asked already held) lands as no
+    // commit: an empty one would carry a message about changes never made.
+    let squashed = if tree(&commit)? == tree(&head)? {
+        if home.is_some() {
             git(
                 project,
-                &["update-ref", &format!("refs/heads/{b}"), &squashed, &head],
+                &["symbolic-ref", "HEAD", &format!("refs/heads/{current}")],
             )?;
         }
-        Some(b) => {
-            git(project, &["branch", "--", b, &squashed])?;
+        head.clone()
+    } else {
+        // commit-tree, not commit: no hook runs, the project's worktree is not
+        // touched until the fast-forward below.
+        let squashed = git(
+            project,
+            &[
+                "commit-tree",
+                &format!("{commit}^{{tree}}"),
+                "-p",
+                &head,
+                "-m",
+                message,
+            ],
+        )?;
+        match branch.filter(|b| *b != current) {
+            // The folder holds the world: its files are the commit's already, so
+            // the branch moves to it and the folder goes back on that branch.
+            None if home.is_some() => {
+                let target = format!("refs/heads/{current}");
+                git(project, &["update-ref", &target, &squashed, &head])?;
+                git(project, &["symbolic-ref", "HEAD", &target])?;
+            }
+            None => {
+                git(project, &["merge", "-q", "--ff-only", &squashed])?;
+            }
+            // Not the folder's branch: its ref moves, no work tree is touched.
+            Some(b) if b == onto => {
+                git(
+                    project,
+                    &["update-ref", &format!("refs/heads/{b}"), &squashed, &head],
+                )?;
+            }
+            Some(b) => {
+                git(project, &["branch", "--", b, &squashed])?;
+            }
         }
-    }
+        squashed
+    };
     let commit = squashed;
     let _ = std::fs::remove_file(&marker);
     worlds.drop(world)?;

@@ -163,6 +163,41 @@ fn attempts_run_in_turn_and_the_first_pass_lands() {
 }
 
 #[test]
+fn work_that_changed_nothing_lands_without_a_commit() {
+    let f = fixture("unchanged");
+    // What is asked already holds: the model finds nothing to change.
+    std::fs::write(f.project.join("answer"), "42\n").unwrap();
+    git(&f, &["add", "-A"]);
+    git(
+        &f,
+        &[
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "-qm",
+            "answer",
+        ],
+    );
+    let idle = Script::new("idle", &[done()]);
+    let record = solve(
+        &f.worlds,
+        &f.project,
+        &task(&[]),
+        &[&idle as &dyn Model],
+        10,
+    )
+    .unwrap();
+    let winner = record["winner"].as_str().unwrap().to_string();
+    let before = git(&f, &["rev-parse", "HEAD"]);
+    let landed = land(&f.worlds, &winner, None, Some("feat: change things")).unwrap();
+    assert_eq!(landed, before);
+    assert_eq!(git(&f, &["rev-parse", "HEAD"]), before, "no empty commit");
+    assert!(f.worlds.list().unwrap().is_empty());
+}
+
+#[test]
 fn a_chosen_skill_is_listed_mounted_read_only_and_traced() {
     let f = fixture("skill");
     // The global choice lives outside the project: give it a home of its own.
@@ -291,6 +326,8 @@ fn work_queued_on_a_branch_builds_on_what_landed_there() {
     // The next one starts from the branch: it sees the first one's work.
     let second = Script::new("second", &[write("more", "x\n"), done()]);
     let mut t = task(&[]);
+    // Another goal: the same one would replay the first run's calls.
+    t.goal = "Write the file `more`.".to_string();
     t.verify = vec!["test -f answer".to_string()];
     let record = solve(&f.worlds, &f.project, &t, &[&second], 10).unwrap();
     let two = land(
@@ -306,7 +343,10 @@ fn work_queued_on_a_branch_builds_on_what_landed_there() {
     // Work started elsewhere is replayed on the branch and checked again.
     f.worlds.base = None;
     let third = Script::new("third", &[write("third", "3\n"), done()]);
-    let record = solve(&f.worlds, &f.project, &task(&[]), &[&third], 10).unwrap();
+    let mut t = task(&[]);
+    t.goal = "Write the file `third`.".to_string();
+    t.verify = vec!["test -f third".to_string()];
+    let record = solve(&f.worlds, &f.project, &t, &[&third], 10).unwrap();
     land(
         &f.worlds,
         record["winner"].as_str().unwrap(),
