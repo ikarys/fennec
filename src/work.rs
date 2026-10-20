@@ -389,7 +389,7 @@ pub fn say(store: &Store, id: &str, text: &str) -> io::Result<()> {
     }
     let text = text.trim();
     if text.is_empty() {
-        return Err(io::Error::other("message vide"));
+        return Err(io::Error::other("empty message"));
     }
     // A task framed ahead stays for later: the next turn runs when the
     // model is free again. Corrected, it leaves Ready until validated anew.
