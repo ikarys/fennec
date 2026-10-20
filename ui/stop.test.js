@@ -1,8 +1,11 @@
 // node ui/stop.test.js — a request under way can be stopped: the row offers
-// a stop icon (one click more to confirm), the detail view offers "Arrêter",
+// a stop icon (one click more to confirm), the detail view offers "Stop",
 // both call /api/stop, and the old row actions keep working.
 const assert = require("assert");
 const src = require("fs").readFileSync(__dirname + "/app.js", "utf8");
+// `t` in English, as app.js shows it by default.
+globalThis.t = (s, ...a) => s.replace(/\{(\d+)\}/g, (_, i) => String(a[i] ?? ""));
+globalThis.lang = () => "en";
 const grab = (name) => src.match(new RegExp(`function ${name}\\([\\s\\S]*?\\n}\\n`))[0];
 
 class Node {
@@ -37,7 +40,7 @@ eval(src.match(/const el = \(tag, props = \{\}, \.\.\.children\) => \{[\s\S]*?\n
   + grab("setIcon") + grab("iconize")
   + src.match(/const errorOf = \(button\) => [^\n]*\n/)[0]
   + src.match(/async function api\([\s\S]*?\n}\n/)[0]
-  + grab("action") + grab("line") + grab("headline") + grab("rowActions")
+  + grab("action") + grab("stepText") + grab("line") + grab("headline") + grab("rowActions")
   + grab("underway") + src.match(/const STEPS = \[[\s\S]*?\]\];\n/)[0] + grab("stages") + grab("ended") + grab("conversation") + grab("doneWhen") + grab("facts")
   + "globalThis.rowActions = rowActions; globalThis.underway = underway;");
 
@@ -46,31 +49,31 @@ const row = rowActions("r1", { stop: "/api/stop" });
 assert.equal(row.children.length, 2, "stop + error, ni archive ni suppression");
 const halt = row.children[0];
 assert.equal(halt.className, "icon");
-assert.equal(halt.ariaLabel, "Arrêter");
+assert.equal(halt.ariaLabel, "Stop");
 halt.onclick();
 assert.equal(calls.length, 0, "le premier clic ne fait que demander");
 const sure = halt.replacedBy;
-assert.equal(sure.textContent, "Sûr ?");
+assert.equal(sure.textContent, "Sure?");
 sure.onclick().then(() => {
   assert.deepEqual(calls, [["/api/stop", { id: "r1" }]], "le second clic arrête");
 
   // The old rows keep their own actions.
   const old = rowActions("r2", { archive: "/api/request/archive", forget: "/api/forget" });
   assert.equal(old.children.length, 3);
-  assert.equal(old.children[0].ariaLabel, "Archiver");
-  assert.equal(old.children[1].ariaLabel, "Supprimer");
+  assert.equal(old.children[0].ariaLabel, "Archive");
+  assert.equal(old.children[1].ariaLabel, "Delete");
   old.children[1].onclick();
-  assert.equal(old.children[1].replacedBy.textContent, "Confirmer");
+  assert.equal(old.children[1].replacedBy.textContent, "Confirm");
 
-  // The detail view of a running request offers "Arrêter".
-  const box = underway({ id: "u1", step: "travaille", since: 100, title: "x" });
+  // The detail view of a running request offers "Stop".
+  const box = underway({ id: "u1", step: "works", since: 100, title: "x" });
   const bar = box.children.find((n) => n.className?.includes("run-actions"));
   assert.ok(bar.className.includes("run-actions"), "la barre d'arrêt est sous la ligne");
   const stop = bar.children[0];
-  assert.equal(stop.textContent, "Arrêter");
+  assert.equal(stop.textContent, "Stop");
   stop.onclick();
   const confirm = stop.replacedBy;
-  assert.equal(confirm.textContent, "Confirmer");
+  assert.equal(confirm.textContent, "Confirm");
   confirm.onclick().then(() => {
     assert.ok(calls.some(([p, b]) => p === "/api/stop" && b.id === "u1"), "le détail arrête aussi");
     console.log("ok");

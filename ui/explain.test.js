@@ -1,6 +1,10 @@
 // node ui/explain.test.js — checks reasons are put in the human's words.
 const assert = require("assert");
 const src = require("fs").readFileSync(__dirname + "/app.js", "utf8");
+// In French through fr.js: the reasons and their translation together.
+eval(require("fs").readFileSync(__dirname + "/fr.js", "utf8").replace("const FR", "globalThis.FR"));
+globalThis.lang = () => "fr";
+eval(src.match(/function t\([\s\S]*?\n}\n/)[0].replace("function t(", "globalThis.t = function ("));
 const firstLine = (s) => (s ?? "").split("\n")[0];
 const grab = (name) => src.match(new RegExp(`function ${name}[\\s\\S]*?\\n}\\n`))[0];
 eval(grab("unreachable") + grab("explain"));

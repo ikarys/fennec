@@ -20,11 +20,11 @@ use crate::state::Store;
 
 /// The only routes a token reaches, with what the Journal says of each.
 const DECISIONS: [(&str, &str); 5] = [
-    ("/api/land", "commit validé"),
-    ("/api/drop", "tâche abandonnée"),
-    ("/api/answer", "« terminé quand » validé"),
-    ("/api/say", "réponse donnée"),
-    ("/api/reply", "réponse donnée"),
+    ("/api/land", "commit approved"),
+    ("/api/drop", "task dropped"),
+    ("/api/answer", "\"done when\" approved"),
+    ("/api/say", "answer given"),
+    ("/api/reply", "answer given"),
 ];
 
 struct Relay {
@@ -89,7 +89,7 @@ pub fn sync() {
                 allow: p.allow,
                 child,
             }),
-            Err(e) => eprintln!("fennec: le plugin {} ne démarre pas : {e}", p.name),
+            Err(e) => eprintln!("fennec: plugin {} does not start: {e}", p.name),
         }
     }
 }
@@ -128,16 +128,16 @@ pub fn allowed(
 
 fn check(allow: &[String], method: &str, path: &str, body: &[u8]) -> Result<String, &'static str> {
     if method != "POST" || !DECISIONS.iter().any(|(p, _)| *p == path) {
-        return Err("ce plugin ne peut pas faire ça");
+        return Err("this plugin may not do that");
     }
     let v: Value = serde_json::from_slice(body).map_err(|_| "corps illisible")?;
     let from = match &v["from"] {
         Value::String(s) => s.clone(),
         Value::Number(n) => n.to_string(),
-        _ => return Err("expéditeur manquant"),
+        _ => return Err("sender missing"),
     };
     if !allow.contains(&from) {
-        return Err("expéditeur non autorisé");
+        return Err("sender not allowed");
     }
     Ok(from)
 }
@@ -193,11 +193,11 @@ mod tests {
         assert!(check(&allow, "GET", "/api/land", body).is_err());
         assert_eq!(
             check(&allow, "POST", "/api/land", br#"{"id": "1", "from": 7}"#),
-            Err("expéditeur non autorisé")
+            Err("sender not allowed")
         );
         assert_eq!(
             check(&allow, "POST", "/api/land", br#"{"id": "1"}"#),
-            Err("expéditeur manquant")
+            Err("sender missing")
         );
         assert!(
             check(&[], "POST", "/api/land", body).is_err(),

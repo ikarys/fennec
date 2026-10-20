@@ -81,7 +81,7 @@ impl Store {
     pub fn set_project_archived(&self, path: &str, on: bool) -> io::Result<()> {
         let mut all = self.projects_all()?;
         let Some(p) = all.iter_mut().find(|p| p["path"] == path) else {
-            return Err(io::Error::other("projet inconnu"));
+            return Err(io::Error::other("unknown project"));
         };
         if on
             && self
@@ -89,7 +89,7 @@ impl Store {
                 .iter()
                 .any(|(_, r)| r["project"] == path && is_working(r))
         {
-            return Err(io::Error::other("fennec travaille encore sur ce projet"));
+            return Err(io::Error::other("fennec still works on this project"));
         }
         p["archived"] = json!(on);
         write_json(&self.root.join("projects.json"), &json!(all))
@@ -100,11 +100,11 @@ impl Store {
     pub fn remove_project(&self, path: &str) -> io::Result<()> {
         let mut all = self.projects_all()?;
         if !all.iter().any(|p| p["path"] == path) {
-            return Err(io::Error::other("projet inconnu"));
+            return Err(io::Error::other("unknown project"));
         }
         if self.requests()?.iter().any(|(_, r)| r["project"] == path) {
             return Err(io::Error::other(
-                "ce projet a des tâches : supprime-les d'abord",
+                "this project has tasks: delete them first",
             ));
         }
         all.retain(|p| p["path"] != path);
@@ -118,7 +118,7 @@ impl Store {
         match request["status"].as_str() {
             Some("later" | "landed" | "passed" | "dropped") => {}
             _ => {
-                return Err(io::Error::other("fennec travaille encore sur cette tâche"));
+                return Err(io::Error::other("fennec still works on this task"));
             }
         }
         self.update(id, |r| r["archived"] = json!(on))
@@ -133,10 +133,10 @@ impl Store {
         later: bool,
     ) -> io::Result<String> {
         if !self.projects()?.iter().any(|p| p == project) {
-            return Err(io::Error::other("projet inconnu"));
+            return Err(io::Error::other("unknown project"));
         }
         if text.trim().is_empty() {
-            return Err(io::Error::other("tâche vide"));
+            return Err(io::Error::other("empty task"));
         }
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -203,7 +203,7 @@ impl Store {
     pub fn rewrite(&self, id: &str, text: &str) -> io::Result<()> {
         self.later(id)?;
         if text.trim().is_empty() {
-            return Err(io::Error::other("tâche vide"));
+            return Err(io::Error::other("empty task"));
         }
         self.update(id, |r| {
             r["text"] = json!(text.trim());
@@ -238,7 +238,7 @@ impl Store {
                 }
             }
             _ => {
-                return Err(io::Error::other("fennec travaille encore sur cette tâche"));
+                return Err(io::Error::other("fennec still works on this task"));
             }
         }
         // The step's exchange too: a forgotten request leaves no trace.
@@ -248,7 +248,7 @@ impl Store {
 
     fn later(&self, id: &str) -> io::Result<()> {
         if self.load(id)?["status"] != "later" {
-            return Err(io::Error::other("cette tâche n'est plus pour plus tard"));
+            return Err(io::Error::other("this task is no longer for later"));
         }
         Ok(())
     }
@@ -256,7 +256,7 @@ impl Store {
     fn request_path(&self, id: &str) -> io::Result<PathBuf> {
         // Ids come from the page: hex only, so none can name another file.
         if id.is_empty() || !id.bytes().all(|b| b.is_ascii_hexdigit()) {
-            return Err(io::Error::other("tâche inconnue"));
+            return Err(io::Error::other("unknown task"));
         }
         Ok(self.root.join("requests").join(format!("{id}.json")))
     }
@@ -271,7 +271,7 @@ impl Store {
 
     pub fn load(&self, id: &str) -> io::Result<Value> {
         let text = std::fs::read_to_string(self.request_path(id)?)
-            .map_err(|_| io::Error::other("tâche inconnue"))?;
+            .map_err(|_| io::Error::other("unknown task"))?;
         serde_json::from_str(&text).map_err(io::Error::other)
     }
 
@@ -385,7 +385,7 @@ fn event(was: &str, id: &str, r: &Value) -> Option<Value> {
         .unwrap_or("")
         .to_string();
     let (name, message) = match now {
-        "running" => ("started", format!("fennec commence « {title} »")),
+        "running" => ("started", format!("fennec starts \"{title}\"")),
         "talk" | "question" | "blocked" => {
             // What is asked: a stopped step's question, the conversation's
             // last word, or the "done when" to accept.
@@ -401,20 +401,17 @@ fn event(was: &str, id: &str, r: &Value) -> Option<Value> {
             let ask = ask.as_str().unwrap_or("");
             (
                 "question",
-                format!("fennec a une question sur « {title} » : {ask}"),
+                format!("fennec has a question on \"{title}\": {ask}"),
             )
         }
         // Back from a commit tried: the human is the one who just clicked.
         "ready" if was == "landing" => return None,
-        "ready" => ("ready", format!("« {title} » est prêt : à valider")),
+        "ready" => ("ready", format!("\"{title}\" is ready to validate")),
         "failed" => (
             "failed",
-            format!(
-                "« {title} » a échoué : {}",
-                r["reason"].as_str().unwrap_or("")
-            ),
+            format!("\"{title}\" failed: {}", r["reason"].as_str().unwrap_or("")),
         ),
-        "landed" => ("landed", format!("« {title} » est commité")),
+        "landed" => ("landed", format!("\"{title}\" is committed")),
         _ => return None,
     };
     let project = r["project"].as_str().unwrap_or("");
@@ -505,7 +502,7 @@ pub fn start(path: &Path) -> io::Result<()> {
     if !is_repository(path) {
         if !is_empty(path)? {
             return Err(io::Error::other(
-                "ce dossier contient des fichiers mais n'est pas un dépôt git",
+                "this folder holds files but is not a git repository",
             ));
         }
         git(&["init", "-q"])?;
@@ -556,21 +553,21 @@ fn unverified(proof: &Value) -> Value {
     for s in proof["shots"].as_array().into_iter().flatten() {
         if s["missing"] == true {
             lines.push(json!(format!(
-                "fennec n'a pas pu regarder {} : aucun navigateur n'est installé",
-                s["url"].as_str().unwrap_or("la page")
+                "fennec could not look at {}: no browser is installed",
+                s["url"].as_str().unwrap_or("the page")
             )));
         }
         if s["unchanged"] == true {
             lines.push(json!(format!(
-                "rien n'a changé à l'écran sur {} entre avant et après : la capture ne montre pas le travail",
-                s["url"].as_str().unwrap_or("la page")
+                "nothing changed on screen at {} between before and after: the capture does not show the work",
+                s["url"].as_str().unwrap_or("the page")
             )));
         }
     }
     for c in proof["checks"].as_array().into_iter().flatten() {
         if c["missing"] == true {
             lines.push(json!(format!(
-                "{} n'a pas pu lancer `{}` : l'outil n'est pas installé",
+                "{} could not run `{}`: the tool is not installed",
                 c["role"].as_str().unwrap_or(""),
                 c["command"].as_str().unwrap_or("")
             )));
@@ -638,25 +635,24 @@ fn classify(requests: &[(String, Value)], projects_all: &[Value]) -> Value {
                     later.push(c);
                 }
             }
-            Some("thinking") => running.push(card_step(card("running"), "réfléchit à ta tâche")),
+            Some("thinking") => running.push(card_step(card("running"), "thinks about your task")),
             Some("talk") => todo.push((0, card("talk"))),
-            Some("framing") => running.push(card_step(card("running"), "se met au travail")),
+            Some("framing") => running.push(card_step(card("running"), "gets to work")),
             Some("waiting") => {
                 let step = match r["behind"].as_str() {
                     Some(by) if !by.is_empty() => {
-                        format!("attend son tour : {by} occupe le dossier")
+                        format!("waits its turn: {by} holds the folder")
                     }
-                    _ => "attend son tour : le dossier a des changements pas encore commités"
-                        .to_string(),
+                    _ => "waits its turn: the folder has changes not committed yet".to_string(),
                 };
                 // Queued, not working: the UI reads it as idle, not active.
                 let mut c = card_step(card("running"), &step);
                 c["waiting"] = json!(true);
                 running.push(c)
             }
-            Some("running") => running.push(card_step(card("running"), "travaille")),
-            Some("proving") => running.push(card_step(card("running"), "essaie le produit")),
-            Some("landing") => running.push(card_step(card("running"), "fait le commit")),
+            Some("running") => running.push(card_step(card("running"), "works")),
+            Some("proving") => running.push(card_step(card("running"), "tries the product")),
+            Some("landing") => running.push(card_step(card("running"), "makes the commit")),
             Some("question") => {
                 let c = card("validate");
                 todo.push((0, c));
@@ -784,17 +780,17 @@ mod tests {
         let e = event("running", "7", &r("blocked")).unwrap();
         assert_eq!(
             e["message"],
-            "fennec a une question sur « Add filters » : Which port?"
+            "fennec has a question on \"Add filters\": Which port?"
         );
         assert_eq!(e["project_name"], "my app");
         assert!(e["url"].as_str().unwrap().ends_with("/#%2Fp%2Fmy%20app/7"));
         let e = event("thinking", "7", &r("talk")).unwrap();
         assert_eq!(
             e["message"],
-            "fennec a une question sur « Add filters » : Hi?"
+            "fennec has a question on \"Add filters\": Hi?"
         );
         let e = event("proving", "7", &r("failed")).unwrap();
-        assert_eq!(e["message"], "« Add filters » a échoué : timeout");
+        assert_eq!(e["message"], "\"Add filters\" failed: timeout");
     }
 
     #[test]
@@ -944,9 +940,9 @@ mod tests {
             unverified(&proof),
             json!([
                 "le GUI",
-                "fennec n'a pas pu regarder http://127.0.0.1:8000/ : aucun navigateur n'est installé",
-                "rien n'a changé à l'écran sur http://x/ entre avant et après : la capture ne montre pas le travail",
-                "DevSecOps n'a pas pu lancer `gitleaks detect` : l'outil n'est pas installé"
+                "fennec could not look at http://127.0.0.1:8000/: no browser is installed",
+                "nothing changed on screen at http://x/ between before and after: the capture does not show the work",
+                "DevSecOps could not run `gitleaks detect`: the tool is not installed"
             ])
         );
     }
@@ -996,7 +992,7 @@ mod tests {
         assert_eq!(ready["land_error"], "conflit");
         assert_eq!(ready["rules"][0], "use uv");
         assert_eq!(ready["land"]["branch"], Value::Null);
-        assert_eq!(v["running"][0]["step"], "se met au travail");
+        assert_eq!(v["running"][0]["step"], "gets to work");
         let history: Vec<&str> = v["history"]
             .as_array()
             .unwrap()
@@ -1013,20 +1009,20 @@ mod tests {
         let requests = vec![
             (
                 "1".into(),
-                json!({"status": "waiting", "behind": "« filtres »"}),
+                json!({"status": "waiting", "behind": "\"filtres\""}),
             ),
             ("2".into(), json!({"status": "waiting", "behind": ""})),
         ];
         let v = classify(&requests, &[]);
         assert_eq!(
             v["running"][0]["step"],
-            "attend son tour : « filtres » occupe le dossier"
+            "waits its turn: \"filtres\" holds the folder"
         );
         assert!(
             v["running"][1]["step"]
                 .as_str()
                 .unwrap()
-                .contains("pas encore commités")
+                .contains("not committed yet")
         );
     }
 
@@ -1081,7 +1077,7 @@ mod tests {
         // With a request, even a forgotten one, the project is not removed.
         let a = store.add_request(&p, "dark mode", &[], true).unwrap();
         let err = store.remove_project(&p).unwrap_err().to_string();
-        assert!(err.contains("tâches"), "{err}");
+        assert!(err.contains("tasks"), "{err}");
         store.forget(&a).unwrap();
         store.remove_project(&p).unwrap();
         assert!(store.projects_all().unwrap().is_empty());
@@ -1110,7 +1106,7 @@ mod tests {
             .set_project_archived(&p, true)
             .unwrap_err()
             .to_string();
-        assert!(err.contains("travaille"), "{err}");
+        assert!(err.contains("works"), "{err}");
         assert_eq!(store.projects().unwrap(), vec![p]);
         std::fs::remove_dir_all(tmp).unwrap();
     }

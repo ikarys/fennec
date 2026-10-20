@@ -78,7 +78,7 @@ pub fn place(store: &Store, id: &str, action: &str) -> io::Result<()> {
     match (action, at) {
         ("add", None) => {
             if store.load(id)?["status"] != "later" {
-                return Err(io::Error::other("cette tâche n'est plus pour plus tard"));
+                return Err(io::Error::other("this task is no longer for later"));
             }
             ids.push(id.to_string());
         }
@@ -89,7 +89,7 @@ pub fn place(store: &Store, id: &str, action: &str) -> io::Result<()> {
         ("up", Some(i)) if i > 0 => ids.swap(i, i - 1),
         ("down", Some(i)) if i + 1 < ids.len() => ids.swap(i, i + 1),
         ("up" | "down", Some(_)) => {}
-        (_, None) => return Err(io::Error::other("cette tâche n'est pas dans la Fleet")),
+        (_, None) => return Err(io::Error::other("this task is not in the Fleet")),
         _ => return Err(io::Error::other("action inconnue")),
     }
     let mut v = load(store)?;
@@ -119,13 +119,13 @@ pub fn set(
     }
     if let Some(f) = on_fail {
         if !matches!(f, "stop" | "go on") {
-            return Err(io::Error::other("réglage inconnu"));
+            return Err(io::Error::other("unknown setting"));
         }
         v["on_fail"] = json!(f);
     }
     if let Some(f) = on_success {
         if !matches!(f, "wait" | "branch") {
-            return Err(io::Error::other("réglage inconnu"));
+            return Err(io::Error::other("unknown setting"));
         }
         v["on_success"] = json!(f);
     }
@@ -136,7 +136,7 @@ pub fn set(
 }
 
 /// A task named in a line: its first words.
-fn short(r: &Value) -> String {
+pub(crate) fn short(r: &Value) -> String {
     let title = crate::state::words(r["text"].as_str().unwrap_or(""));
     let first = title.lines().next().unwrap_or("");
     match first.char_indices().nth(40) {
@@ -164,14 +164,14 @@ fn states(
         .map(|(_, r)| {
             // Framed ahead, it asked: it starts once the human answered.
             if r["asked"] == true {
-                return Some("attend ta réponse".into());
+                return Some("waits for your answer".into());
             }
             if working >= at_once {
-                return Some("attend une place".into());
+                return Some("waits for a slot".into());
             }
             // Only the first free one starts at the next look.
             if next {
-                return Some("attend son tour dans la Fleet".into());
+                return Some("waits its turn in the Fleet".into());
             }
             next = true;
             None
@@ -206,8 +206,8 @@ pub fn tick(
             if v["on_fail"] == "stop" {
                 v["on"] = json!(false);
                 v["stopped"] = json!(match r["status"].as_str() {
-                    Some("failed") => format!("« {} » a échoué", short(r)),
-                    _ => format!("« {} » n'a pas pu être commitée sur {BRANCH}", short(r)),
+                    Some("failed") => format!("\"{}\" failed", short(r)),
+                    _ => format!("\"{}\" could not be committed on {BRANCH}", short(r)),
                 });
                 return save(store, &v);
             }
@@ -330,14 +330,14 @@ pub fn view(store: &Store) -> io::Result<Value> {
         .map(|(id, r)| {
             let mut c = card(id, r);
             c["outcome"] = json!(match r["status"].as_str() {
-                Some("landed") if r["fleet_branch"].is_string() => "commité sur fleet",
-                Some("landed") => "commité",
-                Some("passed") => "mis de côté",
-                Some("dropped") => "abandonné",
-                Some("failed") => "échec",
-                Some("ready") => "prêt, t'attend",
-                Some("later") => "remis à plus tard",
-                _ => "question pour toi",
+                Some("landed") if r["fleet_branch"].is_string() => "committed on fleet",
+                Some("landed") => "committed",
+                Some("passed") => "set aside",
+                Some("dropped") => "dropped",
+                Some("failed") => "failed",
+                Some("ready") => "ready, waits for you",
+                Some("later") => "put off for later",
+                _ => "a question for you",
             });
             c
         })
@@ -369,11 +369,11 @@ mod tests {
         ];
         let s = states(&queue, &[], 1);
         assert_eq!(s[0], None, "the first goes first, whatever its folder");
-        assert_eq!(s[1].as_deref(), Some("attend son tour dans la Fleet"));
+        assert_eq!(s[1].as_deref(), Some("waits its turn in the Fleet"));
         // Every place taken: nothing starts.
         let working = vec![("w".to_string(), task("/z", "running"))];
         let s = states(&queue, &working, 1);
-        assert_eq!(s[0].as_deref(), Some("attend une place"));
+        assert_eq!(s[0].as_deref(), Some("waits for a slot"));
         assert_eq!(states(&queue, &working, 2)[0], None);
     }
 
@@ -422,7 +422,7 @@ mod tests {
         assert_eq!(store.load(&kept).unwrap()["status"], "later", "stopped");
         let v = view(&store).unwrap();
         assert_eq!(v["on"], false);
-        assert_eq!(v["stopped"], "« a » a échoué");
+        assert_eq!(v["stopped"], "\"a\" failed");
         assert_eq!(v["summary"]["landed"], 1);
         // Told to go on, the same failure, already seen, stops nothing.
         set(&store, Some(true), None, Some("go on"), None).unwrap();
@@ -460,7 +460,7 @@ mod tests {
         assert_eq!(prepared(), std::slice::from_ref(&b));
         assert_eq!(
             view(&store).unwrap()["queue"][0]["waits"],
-            "attend ta réponse"
+            "waits for your answer"
         );
         store.update(&b, |r| r["ahead"] = json!("brief")).unwrap();
         tick(&store, |_| {}, |_, _| Ok(()), prepare).unwrap();
@@ -522,7 +522,7 @@ mod tests {
         tick(&store, |_| {}, landing, |_| {}).unwrap();
         assert_eq!(
             view(&store).unwrap()["stopped"],
-            "« a » n'a pas pu être commitée sur fleet"
+            "\"a\" could not be committed on fleet"
         );
         assert_eq!(store.load(&b).unwrap()["status"], "later");
         std::fs::remove_dir_all(tmp).unwrap();
