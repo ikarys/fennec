@@ -256,26 +256,22 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
                 .flatten()
                 .filter_map(|k| k.as_str().map(str::to_string))
                 .collect();
-            // Put in the Fleet: kept for later, started by the Fleet.
-            let fleet = v["fleet"] == true;
-            let later = v["later"] == true || fleet;
+            // Kept in the Backlog: framed ahead, Ready once the human validates.
+            let later = v["later"] == true;
             let id = store.add_request(&field(&v, "project"), &field(&v, "text"), &off, later)?;
-            if fleet {
-                fleet::place(&store, &id, "add")?;
-            }
             if !later {
                 work::talk(id.clone());
             }
             Ok(json!({"id": id}))
         }
-        // The backlog: a request kept for later, started, reworded or forgotten.
+        // The Backlog: a task kept for later, started, reworded or forgotten.
         ("POST", "/api/launch") => {
             let id = field(&input()?, "id");
             store.launch(&id)?;
             work::talk(id);
             Ok(json!({}))
         }
-        // The Fleet: tasks for later fennec starts on its own, in one queue.
+        // The Fleet: the Ready tasks fennec starts on its own, in one queue.
         ("GET", "/api/fleet") => fleet::view(&store),
         ("POST", "/api/fleet") => {
             let v = input()?;

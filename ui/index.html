@@ -198,9 +198,9 @@
   .pick-row { display: flex; align-items: center; gap: 6px; }
   .pick-row > input { flex: none; margin: 0 0 0 2px; accent-color: var(--accent); }
   .pick-row > .row-wrap { flex: 1; min-width: 0; }
-  #later-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 4px 0 6px; font-size: 13px; }
-  #later-pick button { padding: 3px 10px; white-space: nowrap; }
-  #fleet-bar .spacer, #later-pick .spacer { flex: 1; }
+  .pick { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 4px 0 6px; font-size: 13px; }
+  .pick button { padding: 3px 10px; white-space: nowrap; }
+  #fleet-bar .spacer, .pick .spacer { flex: 1; }
   .fleet-settings { display: flex; gap: 24px; flex-wrap: wrap; padding: 4px 0 10px; font-size: 13px; }
   .fleet-settings label { display: flex; align-items: center; gap: 8px; }
   .warn-line { color: var(--warn); }
@@ -710,9 +710,13 @@
     <button class="link" id="n-others" type="button"></button></h2>
   <div id="todo"></div></div>
 
-  <div class="box" id="later-box" hidden><h2 data-icon="clock"><span data-t>Later</span> <span class="count" id="n-later"></span></h2>
-  <div id="later-pick" hidden></div>
+  <div class="box" id="later-box" hidden><h2 data-icon="clock"><span data-t>Backlog</span> <span class="count" id="n-later"></span></h2>
+  <div id="later-pick" class="pick" hidden></div>
   <div id="later"></div></div>
+
+  <div class="box" id="ready-box" hidden><h2 data-icon="fleet"><span data-t>Ready to run</span> <span class="count" id="n-ready"></span></h2>
+  <div id="ready-pick" class="pick" hidden></div>
+  <div id="ready"></div></div>
 
   <div class="box"><h2 data-icon="work" data-t>fennec is working</h2>
   <div id="running"></div></div>
@@ -792,7 +796,7 @@
     <p class="warn-line" id="fleet-stopped" hidden></p>
     <p class="error" id="fleet-error" role="alert"></p>
     <div class="tiles" id="fleet-tiles"></div>
-    <div class="box"><h2 data-icon="fleet"><span data-t>Queue</span> <span class="count" id="n-fleet"></span></h2>
+    <div class="box"><h2 data-icon="fleet"><span data-t>Ready to run</span> <span class="count" id="n-fleet"></span></h2>
     <div id="fleet-queue"></div></div>
     <div class="box"><h2 data-icon="work"><span data-t>fennec is working</span> <span class="count" id="n-fleet-working"></span></h2>
     <div id="fleet-working"></div></div>
@@ -939,8 +943,7 @@
     <div id="chips"></div>
     <p class="error" id="compose-error" role="alert"></p>
     <div class="row">
-      <button type="button" id="later-add" data-icon="clock" title="Keep the task without starting it" data-t>Later</button>
-      <button type="button" id="fleet-add" data-icon="fleet" title="fennec will start it on its own, in its turn in the Fleet">Fleet</button>
+      <button type="button" id="later-add" data-icon="clock" title="Keep it in the Backlog: fennec restates it, you validate it, then the Fleet runs it" data-t>Backlog</button>
       <button class="primary" data-icon="send" data-t>Start</button>
     </div>
   </form>

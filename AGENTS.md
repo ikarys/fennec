@@ -18,7 +18,7 @@ Scenarios: `../lead-scenarios.md`. Inventory and decisions: `../inventory.md`.
 
 ```
 src/main.rs   `fennec` binary: std HTTP server, routes, folder browser
-src/fleet.rs  the Fleet: one queue of tasks for later, across projects, framed ahead while the model is free, started on their own (`fleet.json`)
+src/fleet.rs  the Fleet: Backlog tasks framed ahead while the model is free; the human validates them into Ready, one queue across projects started on their own (`fleet.json`)
 src/relay.rs  plugins relaying decisions from a chat: started while enabled, a token limited to commit, drop, answer
 src/state.rs  requests and projects in files; the single view (what needs you, running, landed); a status change tells the enabled plugins (fennec-os `plugin`)
 src/work.rs   request life in the background: stats per request and overall ("Stats"); conversation, direct work (fennec-os `spec::direct`), proof (a failed one goes back to the work, twice at most: `spec::fix`), retry; correct, commit, pass or drop; rule offers; journal of every step

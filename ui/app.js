@@ -246,7 +246,7 @@ const TAGS = {
   blocked: ["Question", "var(--accent)"],
   rule: ["Rule?", "var(--accent)"],
   ready: ["Ready", "var(--ok)"],
-  later: ["Later", "var(--muted)"],
+  later: ["Backlog", "var(--muted)"],
   failed: ["Failed", "var(--bad)"],
 };
 
@@ -971,16 +971,16 @@ function card(item) {
     const text = el("textarea", { placeholder: t("Your answer"), ariaLabel: t("Your answer") });
     const images = attach(text);
     add(el("div", { className: "reply" }, text, images.node));
-    // Framed ahead while it waits in the Fleet: answering does not start it.
+    // Framed ahead while it waits in the Backlog: answering does not start it.
     actions.append(dropButton(item.id), el("span", { className: "spacer" }),
       item.later
         ? Object.assign(action(t("Clear enough"), "/api/frame", { id: item.id }),
-          { title: t("Keep the conversation as it is: the Fleet will start it without another question") })
+          { title: t("Keep the conversation as it is: the task waits in the Backlog for you to validate it") })
         : Object.assign(action(t("Start"), "/api/frame", { id: item.id }),
           { title: t("Start the work on the conversation as it is, without another question") }),
       Object.assign(action(t("Send"), "/api/say", () => ({ id: item.id, text: images.value() }), { primary: true }),
         { title: item.later
-          ? t("fennec reads your answer when the model is free; the task stays in the Fleet")
+          ? t("fennec reads your answer when the model is free; the task stays in the Backlog")
           : t("fennec reads your answer: it asks again if it must, otherwise it starts the work") }));
   } else if (item.kind === "validate") {
     add(conversation(item), focus(t("Done when"), item.done_when));
@@ -1082,16 +1082,32 @@ function card(item) {
       save.hidden = false;
       text.focus();
     };
-    // Framed ahead: said once, with what fennec understood. A task that fits
-    // in its title has nothing else to read: said too, rather than a blank.
-    const more = (item.title ?? "").trim().includes("\n");
-    add(item.framed ? el("div", { className: "proved", textContent: t("✓ Prepared: fennec understood the task, it will start without a question") }) : null,
-      doneWhen(item), !item.framed && !more && !item.done_when ? el("div", { className: "muted", textContent: t("The task fits in its title.") }) : null);
-    const fleet = item.fleet
-      ? action(t("Remove from the Fleet"), "/api/fleet/place", { id: item.id, action: "remove" })
-      : action(t("Into the Fleet"), "/api/fleet/place", { id: item.id, action: "add" });
-    actions.append(action(t("Start"), "/api/launch", { id: item.id }, { primary: true }), fleet, edit, save,
-      action(t("Delete"), "/api/forget", { id: item.id }, { quiet: true }));
+    // Framed ahead: what fennec understood, for the human to validate or
+    // correct. Only a validated task is Ready, and only Ready ones run alone.
+    const state = item.fleet ? t("✓ Validated: it runs in its turn when the Fleet runs")
+      : item.framed ? t("Read what fennec understood, then validate it or correct it.")
+      : item.ahead_failed ? t("fennec could not restate it: edit it to try again, or start it now.")
+      : t("fennec restates it when the model is free; you validate it then.");
+    add(el("div", { className: item.fleet ? "proved" : "muted", textContent: state }),
+      item.framed && item.done_when ? focus(t("What fennec understood"), item.done_when) : null);
+    let fix = null;
+    if (item.framed) {
+      const correction = el("textarea", { placeholder: t("What is wrong, or a detail"), hidden: true });
+      const notes = attach(correction);
+      add(el("div", { className: "reply" }, correction, notes.node));
+      fix = el("button", { type: "button", textContent: t("Correct"), title: t("fennec restates it again with your words; it leaves Ready until you validate it") });
+      fix.onclick = () => {
+        correction.hidden = false;
+        correction.rows = 4;
+        correction.focus();
+        fix.replaceWith(action(t("Send"), "/api/say", () => ({ id: item.id, text: notes.value() })));
+      };
+    }
+    const place = item.fleet
+      ? action(t("Back to the Backlog"), "/api/fleet/place", { id: item.id, action: "remove" })
+      : item.framed ? action(t("Validate"), "/api/fleet/place", { id: item.id, action: "add" }, { primary: true }) : null;
+    actions.append(...[place, fix, action(t("Start now"), "/api/launch", { id: item.id }, { primary: !place }), edit, save,
+      action(t("Delete"), "/api/forget", { id: item.id }, { quiet: true })].filter(Boolean));
     if (saved === item.id) {
       saved = "";
       const kept = el("div", { className: "proved", textContent: t("✓ Saved") });
@@ -1100,9 +1116,9 @@ function card(item) {
     }
   } else if (item.kind === "failed") {
     add(stages(item), why(item.reason), conversation(item), doneWhen(item), ...work(item), shots(item), ...facts(item));
-    // Back to "Later", as written: reworded there, launched again or given to the Fleet.
+    // Back to the Backlog, as written: reworded there, launched again or validated.
     actions.append(dropButton(item.id, true), el("span", { className: "spacer" }),
-      action(t("Put back for later"), "/api/later", { id: item.id }),
+      action(t("Back to the Backlog"), "/api/later", { id: item.id }),
       action(t("Retry"), "/api/retry", { id: item.id }, { primary: true }));
   }
   // What was said to the model so far, on every card with a choice to make.
@@ -1216,6 +1232,7 @@ function statusOf(item, kind) {
     if (item.kind === "dropped") return [t("dropped"), "bad"];
     return [pastState(item), "ok"];
   }
+  if (item.kind === "later" && item.fleet) return [t("Ready to run"), "info"];
   const [label, color] = TAGS[item.kind];
   return [t(label), color.replace("var(--", "").replace(")", "")];
 }
@@ -1906,19 +1923,28 @@ async function refresh(force) {
     document.title = todo.length ? `(${todo.length}) ${name}` : name;
     fill($("running"), running.map((i) => row(i, line(i, i.step, true),
       rowActions(i.id, { stop: "/api/stop" }))), t("Nothing running."));
-    // The backlog: only there when it holds something.
+    // The Backlog, then what was validated, in the order the Fleet runs it:
+    // each only there when it holds something.
     const later = mine(view.later ?? []);
-    $("later-box").hidden = !later.length;
-    $("n-later").textContent = later.length || "";
+    const backlog = later.filter((i) => !i.fleet);
+    const ready = later.filter((i) => i.fleet).sort((a, b) => a.rank - b.rank);
     // Ticked rows survive a redraw: the list moves under the human's hand.
     ticked = new Set([...ticked].filter((id) => later.some((i) => i.id === id)));
-    fill($("later"), later.map((i) => {
-      const box = el("input", { type: "checkbox", checked: ticked.has(i.id), ariaLabel: t("Pick {0}", headline(i.title)) });
-      box.onchange = () => { box.checked ? ticked.add(i.id) : ticked.delete(i.id); showPicked(later); };
-      return el("div", { className: "pick-row" }, box, row(i, line(i, i.fleet ? "in the Fleet" : "to start"),
-        rowActions(i.id, { archive: "/api/request/archive", forget: "/api/forget" })));
-    }), "");
-    showPicked(later);
+    const picks = (name, items, label, send) => {
+      $(name + "-box").hidden = !items.length;
+      $("n-" + name).textContent = items.length || "";
+      const bar = $(name + "-pick");
+      fill($(name), items.map((i) => {
+        const box = el("input", { type: "checkbox", checked: ticked.has(i.id), ariaLabel: t("Pick {0}", headline(i.title)) });
+        box.onchange = () => { box.checked ? ticked.add(i.id) : ticked.delete(i.id); showPicked(bar, items, send); };
+        return el("div", { className: "pick-row" }, box, row(i, line(i, label(i)),
+          rowActions(i.id, { archive: "/api/request/archive", forget: "/api/forget" })));
+      }), "");
+      showPicked(bar, items, send);
+    };
+    picks("later", backlog, (i) => i.framed ? "to validate" : i.ahead_failed ? "could not be restated" : "being restated",
+      [t("Validate"), "add", (i) => i.framed]);
+    picks("ready", ready, (i) => t("#{0} in line", i.rank + 1), [t("Back to the Backlog"), "remove", () => true]);
     showFleetBar(view.fleet, later.length);
     const history = mine(view.history);
     fill($("history"), history.map((i) => row(i, line(i, pastState(i), false),
@@ -1941,38 +1967,32 @@ async function refresh(force) {
   }
 }
 
-// The backlog's ticked tasks, sent to the Fleet or taken out of it at once.
+// A box's ticked tasks, validated (Backlog) or put back (Ready) at once.
 let ticked = new Set();
-function showPicked(later) {
-  const bar = $("later-pick");
-  bar.hidden = !ticked.size;
-  if (!ticked.size) return bar.replaceChildren();
-  const ids = later.filter((i) => ticked.has(i.id));
+function showPicked(bar, items, [label, action, applies]) {
+  const ids = items.filter((i) => ticked.has(i.id));
+  bar.hidden = !ids.length;
+  if (!ids.length) return bar.replaceChildren();
   const error = el("span", { className: "error", role: "alert" });
-  const send = (label, action, which) => {
-    // Only what applies to the ticked tasks is offered.
-    if (!which.length) return null;
-    const b = el("button", { type: "button", textContent: label });
-    b.onclick = async () => {
-      try {
-        for (const i of which) await api("/api/fleet/place", { id: i.id, action });
-      } catch (e) {
-        error.textContent = e.message;
-      }
-      ticked.clear();
-      refresh(true);
-    };
-    iconize(b);
-    return b;
-  };
-  const all = el("button", { type: "button", className: "quiet", textContent: ticked.size === later.length ? t("None") : t("All") });
-  all.onclick = () => {
-    ticked = ticked.size === later.length ? new Set() : new Set(later.map((i) => i.id));
+  // Only the ticked tasks it applies to: a task not restated yet cannot be validated.
+  const which = ids.filter(applies);
+  const b = el("button", { type: "button", textContent: which.length === ids.length ? label : `${label} (${which.length})`, disabled: !which.length });
+  b.onclick = async () => {
+    try {
+      for (const i of which) await api("/api/fleet/place", { id: i.id, action });
+    } catch (e) {
+      error.textContent = e.message;
+    }
+    ticked.clear();
     refresh(true);
   };
-  bar.replaceChildren(el("span", { textContent: t("{0} picked", ticked.size) }), all,
-    el("span", { className: "spacer" }),
-    ...[send(t("Into the Fleet"), "add", ids.filter((i) => !i.fleet)), send(t("Remove from the Fleet"), "remove", ids.filter((i) => i.fleet))].filter(Boolean), error);
+  iconize(b);
+  const all = el("button", { type: "button", className: "quiet", textContent: ids.length === items.length ? t("None") : t("All") });
+  all.onclick = () => {
+    for (const i of items) ids.length === items.length ? ticked.delete(i.id) : ticked.add(i.id);
+    refresh(true);
+  };
+  bar.replaceChildren(el("span", { textContent: t("{0} picked", ids.length) }), all, el("span", { className: "spacer" }), b, error);
 }
 
 // The Fleet from the list: whether it runs, how many wait, and its switch.
@@ -2108,7 +2128,8 @@ const ICONS = {
 const ICON_OF = [[/^(Commit|Push|Prepare|Pousser|Préparer)/, "commit"], [/^(Open the page|Ouvrir la page)/, "page"], [/changes|changements/, "diff"],
   [/^(Open the code|Ouvrir le code)/, "code"], [/^(Correct|Send|Corriger|Envoyer)/, "fix"], [/^(Pass|Passer)/, "pass"], [/^Journal/, "journal"],
   [/^(Undo|Annuler)$|^(Drop|Abandonner)/, "undo"], [/^(Resume|Start|Reprendre|Lancer)/, "resume"], [/^(Delete|Supprimer)/, "trash"], [/^(Save|Enregistrer)$/, "save"],
-  [/^(Edit|Éditer)$/, "pencil"], [/^(Retry|Réessayer)/, "retry"], [/^(Archive|Archiver)/, "inbox"], [/^(Put back for later|Remettre à plus tard)/, "clock"],
+  [/^(Edit|Éditer)$/, "pencil"], [/^(Retry|Réessayer)/, "retry"], [/^(Archive|Archiver)/, "inbox"], [/^(Back to the Backlog|Remettre au Backlog)/, "clock"],
+  [/^(Validate|Valider)/, "check"],
   [/^(Stop|Arrêter)/, "stop"], [/Fleet$/, "fleet"]];
 function iconize(button) {
   const name = ICON_OF.find(([re]) => re.test(button.textContent))?.[1];
@@ -2199,24 +2220,11 @@ const composed = attach($("text"));
 $("text").after(composed.node);
 $("compose-close").onclick = () => $("compose").close();
 
-// Written now, worked on later: kept in the project's backlog, nothing starts.
+// Written now, worked on later: kept in the Backlog, framed ahead, validated.
 $("later-add").onclick = async () => {
   $("compose-error").textContent = "";
   try {
     await api("/api/requests", { project: $("project").value, text: composed.value(), later: true });
-    composed.clear();
-    $("compose").close();
-    refresh(true);
-  } catch (e) {
-    $("compose-error").textContent = e.message;
-  }
-};
-
-// Written now, started by the Fleet when its turn comes.
-$("fleet-add").onclick = async () => {
-  $("compose-error").textContent = "";
-  try {
-    await api("/api/requests", { project: $("project").value, text: composed.value(), fleet: true });
     composed.clear();
     $("compose").close();
     refresh(true);
@@ -2927,7 +2935,7 @@ async function showFleet() {
   fill($("fleet-queue"), v.queue.map((item, i) => rowWrap(
     link(item, [(item.waits ? t(item.waits) : v.on ? t("goes next") : t("goes at start")) + (item.framed ? " · " + t("prepared") : ""), item.waits ? "muted" : "accent"]),
     el("div", { className: "row-actions" }, move(item, "up", t("Move up"), i > 0), move(item, "down", t("Move down"), i < last),
-      move(item, "close", t("Remove from the Fleet"), true)))), t("No task in the Fleet: tick tasks in \"Later\"."));
+      move(item, "close", t("Back to the Backlog"), true)))), t("No task ready: validate tasks in the Backlog."));
   $("n-fleet-working").textContent = v.working.length || "";
   fill($("fleet-working"), v.working.map((item) => link(item, null)), t("Nothing running."));
   const tone = { "committed": "ok", "committed on fleet": "ok", "failed": "bad", "ready, waits for you": "accent", "a question for you": "accent", "set aside": "warn" };

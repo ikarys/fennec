@@ -355,13 +355,15 @@ impl Store {
     /// could act on them.
     pub fn view(&self) -> io::Result<Value> {
         let mut view = classify(&self.requests()?, &self.projects_all()?);
-        // A task for later says whether the Fleet will start it.
+        // A task for later is in the Backlog, or Ready at its place in line.
         let fleet: Vec<String> = crate::fleet::queue(self)?
             .into_iter()
             .map(|(id, _)| id)
             .collect();
         for c in view["later"].as_array_mut().into_iter().flatten() {
-            c["fleet"] = json!(fleet.iter().any(|id| c["id"] == id.as_str()));
+            let rank = fleet.iter().position(|id| c["id"] == id.as_str());
+            c["fleet"] = json!(rank.is_some());
+            c["rank"] = json!(rank);
         }
         // The list starts and stops the Fleet too.
         view["fleet"] = json!({"on": crate::fleet::running(self)?, "queued": fleet.len()});
@@ -632,6 +634,7 @@ fn classify(requests: &[(String, Value)], projects_all: &[Value]) -> Value {
                 } else {
                     let mut c = card("later");
                     c["framed"] = json!(r["ahead"].is_string());
+                    c["ahead_failed"] = json!(r["ahead_failed"] == true);
                     later.push(c);
                 }
             }
