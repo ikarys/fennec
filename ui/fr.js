@@ -573,6 +573,8 @@ const FR = {
   "Ready to run": "Prête à lancer",
   "Keep it in the Backlog: fennec restates it, you validate it, then the Fleet runs it": "La garder dans le Backlog : fennec la reformule, tu la valides, puis la Fleet la lance",
   "being split": "en découpage",
+  "Skills it will use: {0}": "Skills qu'elle utilisera : {0}",
+  "No skill needed": "Aucun skill nécessaire",
   "Split": "Découper",
   "fennec cuts it into smaller tasks, each after the ones it builds on; they take its place in the Backlog": "fennec la découpe en tâches plus petites, chacune après celles sur lesquelles elle s'appuie ; elles prennent sa place dans le Backlog",
   "fennec splits it into smaller tasks…": "fennec la découpe en tâches plus petites…",

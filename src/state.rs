@@ -210,7 +210,14 @@ impl Store {
             r["thread"] = json!([{"who": "human", "text": text.trim()}]);
             // Framed ahead on the old words: framed again on the new ones.
             if let Some(m) = r.as_object_mut() {
-                for k in ["ahead", "asked", "ahead_failed", "done_when", "split_error"] {
+                for k in [
+                    "ahead",
+                    "asked",
+                    "ahead_failed",
+                    "done_when",
+                    "split_error",
+                    "picked",
+                ] {
                     m.remove(k);
                 }
             }
@@ -610,7 +617,7 @@ fn classify(requests: &[(String, Value)], projects_all: &[Value]) -> Value {
             json!({"id": id, "kind": kind, "project": name(r["project"].as_str().unwrap_or("")), "path": r["project"],
                    "title": words(r["text"].as_str().unwrap_or("")),
                    "images": image_lines(r["text"].as_str().unwrap_or("")).collect::<Vec<_>>(), "rules": r["rules"], "checks": r["verify"], "team": r["team"],
-                   "thread": r["thread"], "stats": r["stats"], "since": r["since"],
+                   "thread": r["thread"], "stats": r["stats"], "since": r["since"], "picked": r["picked"],
                    // As the work reads it: said in the conversation, else
                    // the request as fennec restated it.
                    "done_when": ([&r["done_when"], &r["brief"], &r["ahead"]].into_iter().find(|v| v.is_string()))})

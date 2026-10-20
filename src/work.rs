@@ -216,11 +216,12 @@ fn talk_now(store: &Store, id: &str) -> io::Result<()> {
             say_in(r, "fennec", &text);
             r["status"] = json!("talk");
         }),
-        spec::Discussed::Brief(brief) => {
+        spec::Discussed::Brief(brief, skills) => {
             let brief = with_images(&brief, &thread);
             store.update(id, |r| {
                 note(r, step);
                 r["brief"] = json!(brief);
+                r["picked"] = json!(skills);
                 r["status"] = json!("framing");
             })?;
             frame_now(store, id)
@@ -278,7 +279,10 @@ fn prepare_now(store: &Store, id: &str) -> io::Result<()> {
                 say_in(r, "fennec", text);
                 r["asked"] = json!(true);
             }
-            spec::Discussed::Brief(brief) => r["ahead"] = json!(with_images(brief, &thread)),
+            spec::Discussed::Brief(brief, skills) => {
+                r["ahead"] = json!(with_images(brief, &thread));
+                r["picked"] = json!(skills);
+            }
         }
     })
 }
@@ -394,7 +398,7 @@ pub fn say(store: &Store, id: &str, text: &str) -> io::Result<()> {
             say_in(r, "human", text);
             note(r, json!({"stage": "said", "text": text}));
             if let Some(m) = r.as_object_mut() {
-                for k in ["asked", "ahead", "done_when"] {
+                for k in ["asked", "ahead", "done_when", "picked"] {
                     m.remove(k);
                 }
             }
@@ -489,7 +493,13 @@ fn frame_now(store: &Store, id: &str) -> io::Result<()> {
         .or(request["text"].as_str())
         .unwrap_or("")
         .to_string();
-    let s = spec::direct(&Worlds::from_env()?, project, &brief)?;
+    // The skills framing picked; none recorded, all the human keeps.
+    let skills: Option<Vec<String>> = request["picked"].as_array().map(|a| {
+        a.iter()
+            .filter_map(|s| s.as_str().map(str::to_string))
+            .collect()
+    });
+    let s = spec::direct(&Worlds::from_env()?, project, &brief, skills.as_deref())?;
     // "Done when" stays unset: the request already says it, and the human
     // would read it twice. The proof falls back to the brief.
     store.update(id, |r| {
@@ -1269,7 +1279,7 @@ pub fn later(store: &Store, id: &str) -> io::Result<()> {
     undo(&request)?;
     store.update(id, |r| {
         let text = r["text"].clone();
-        *r = json!({"project": r["project"], "text": text, "off": r["off"],
+        *r = json!({"project": r["project"], "text": text, "off": r["off"], "after": r["after"],
                     "journal": r["journal"], "status": "later",
                     "thread": [{"who": "human", "text": text}]});
     })
