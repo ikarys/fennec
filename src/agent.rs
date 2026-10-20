@@ -557,9 +557,12 @@ fn render(criteria: &[Value]) -> String {
 }
 
 const TASK: &str = "You work in a sandboxed copy of a project; the current directory is its root.\n\
-You have network access: install what the project needs inside it (`python3 -m venv .venv`, \
-`npm install`...), since the home is emptied after each command and the checks that judge \
-the work run without network.\n\
+You have network access: install what the project needs inside it, since the home is \
+emptied after each command and the checks that judge the work run without network. Python: \
+uv only (`uv init`, `uv add <package>`, `uv sync`), packages in the project's `.venv`, and \
+run with `uv run <command>`, in checks and proofs too. Node: `npm install` (into \
+`node_modules`). `.venv` and `node_modules` are never committed. Never pip, \
+`--break-system-packages`, `--user` nor `--target`, never copy packages into the source tree.\n\
 You cannot commit: the harness checkpoints your work. Anything you break can be rolled back, \
 so act directly instead of asking.\n\
 Work in small verified steps: read the files you change (read_file), change them with \
