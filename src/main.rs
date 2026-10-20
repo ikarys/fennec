@@ -787,7 +787,18 @@ fn transcript(chat: &Value) -> io::Result<String> {
     if text.trim().is_empty() {
         return Err(io::Error::other("no message to turn into a task"));
     }
-    Ok(text)
+    // The task's title is its first paragraph: the person's first words,
+    // not the whole exchange run together.
+    let first = chat["messages"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .find(|m| m["role"] == "user" && m["harness"] != true)
+        .and_then(|m| m["content"].as_str())
+        .unwrap_or("")
+        .trim();
+    let title = first.split("\n\n").next().unwrap_or("").replace('\n', " ");
+    Ok(format!("{title}\n\n{text}"))
 }
 
 /// A project's team for the "Équipe" dialog: the teams to pick from, the
@@ -888,7 +899,7 @@ mod tests {
         ]});
         assert_eq!(
             transcript(&chat).unwrap(),
-            "You: regarde où on en est\nfennec: c'est à jour\n"
+            "regarde où on en est\n\nYou: regarde où on en est\nfennec: c'est à jour\n"
         );
     }
 
