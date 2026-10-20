@@ -50,8 +50,10 @@ variables override them.
    an answer to a question, or a decision already offered (validate, drop) —
    from senders they allowed, written in the request's Journal. Nothing else:
    no grant, rule, setting or wider access is ever given through a plugin.
-2. **Seven words on screen**: project, request, done when, proof, question, rule,
-   team (made of roles; added 2026-10-17, see `docs/design/team.md`). Internal
+2. **Seven words on screen**: project, task, done when, proof, question, rule,
+   team (made of roles; added 2026-10-17, see `docs/design/team.md`; "task"
+   replaced "request" on 2026-10-20, asked by the human). A task moves through
+   Backlog, Ready, running, to validate, done (see `docs/design/factory.md` §8). Internal
    concepts (world, run, grant, permissions, limits, stage keys) never reach the UI.
    One exception, outside the work itself: the "Réglages" dialog names the model
    server and its models, since choosing them is the human's setup; the "Équipe"
