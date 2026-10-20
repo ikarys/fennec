@@ -1616,8 +1616,10 @@ pub fn journal(store: &Store, id: &str) -> io::Result<Value> {
                         Some(rs) => {
                             for role in rs {
                                 let name = role["name"].as_str().unwrap_or("agent");
-                                let mut s =
-                                    step(&format!("Work, try {} · {name}", n + 1), role);
+                                let mut s = roles(
+                                    step(&format!("Work, try {} · {name}", n + 1), role),
+                                    &json!([name]),
+                                );
                                 s["tools"] = role["tools"].clone();
                                 s["passed"] = a["passed"].clone();
                                 steps.push(s);
@@ -1716,7 +1718,7 @@ pub fn cost(turns: &Value) -> Value {
     })
 }
 
-const STATS_VERSION: u64 = 3;
+const STATS_VERSION: u64 = 4;
 const COUNTS: [&str; 6] = ["turns", "sent", "cached", "received", "thinking", "ms"];
 
 /// A request's cost summed over its finished steps, in all and per model,
@@ -2021,6 +2023,10 @@ pub fn recover(store: &Store) -> io::Result<()> {
 mod tests {
     use super::*;
 
+    // FENNEC_OS_HOME is process-wide, so tests that point it at a temp dir
+    // must not overlap: each holds this until its `Worlds::from_env` is done.
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     #[test]
     fn a_failed_proof_tells_the_builder_what_failed() {
         let long = format!("{}uvicorn: command not found", "x".repeat(3000));
@@ -2068,7 +2074,8 @@ mod tests {
         let _ = std::fs::remove_dir_all(&tmp);
         let home = tmp.join("home");
         std::fs::create_dir_all(home.join("requests")).unwrap();
-        // SAFETY: no other test needs the worlds here.
+        let _env = ENV_LOCK.lock().unwrap();
+        // SAFETY: this test holds ENV_LOCK across its env use.
         unsafe { std::env::set_var("FENNEC_OS_HOME", tmp.join("os")) };
         let id = "cafe";
         std::fs::write(
@@ -2113,7 +2120,8 @@ mod tests {
         let project = tmp.join("p");
         std::fs::create_dir_all(home.join("requests")).unwrap();
         std::fs::create_dir_all(&project).unwrap();
-        // SAFETY: no other test reads FENNEC_OS_HOME at the same time.
+        let _env = ENV_LOCK.lock().unwrap();
+        // SAFETY: this test holds ENV_LOCK across its env use.
         unsafe { std::env::set_var("FENNEC_OS_HOME", &os) };
         let worlds = Worlds::from_env().unwrap();
         let s = fennec_os::spec::direct(&worlds, &project, "a task", None, None).unwrap();
@@ -2341,8 +2349,63 @@ mod tests {
         );
         assert_eq!(s["roles"][1]["brief"], "Keep it small.");
         assert_eq!(s["roles"][2]["brief"], Value::Null);
-        let t = totals(&[s.clone(), s]);
+        let t = totals(&[s.clone(), s.clone()]);
         assert_eq!(t["stages"]["?"]["roles"], json!(["QA", "Dev", "Gone"]));
+        // A per-role work step names its role in the step: it counts for Work.
+        let w = roles(
+            json!({"name": "Work, try 1 · Dev", "messages": s["messages"].clone()}),
+            &json!(["Dev"]),
+        );
+        let t = totals(&[w]);
+        assert_eq!(t["stages"]["Work"]["roles"], json!(["Dev"]));
+    }
+
+    #[test]
+    fn a_per_role_work_step_keeps_its_role_for_the_stats() {
+        let tmp = std::env::temp_dir().join(format!("fennec-lead-per-role-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        let os = tmp.join("os");
+        let home = tmp.join("home");
+        let project = tmp.join("p");
+        std::fs::create_dir_all(home.join("requests")).unwrap();
+        std::fs::create_dir_all(os.join("runs")).unwrap();
+        std::fs::create_dir_all(&project).unwrap();
+        let _env = ENV_LOCK.lock().unwrap();
+        // SAFETY: this test holds ENV_LOCK across its env use.
+        unsafe { std::env::set_var("FENNEC_OS_HOME", &os) };
+        std::fs::write(
+            os.join("runs/abcd.json"),
+            json!({"team": [], "proof": {}, "attempts": [{"world": "w1", "passed": true,
+                "roles": [{"name": "Dev senior", "model": "m", "turns": [],
+                    "messages": [{"role": "system",
+                        "content": "As Dev senior on the team:\nKeep it small."}]}]}]})
+            .to_string(),
+        )
+        .unwrap();
+        let id = "cafe";
+        std::fs::write(
+            home.join("requests/cafe.json"),
+            json!({"project": project.to_string_lossy(), "text": "a task",
+                   "status": "failed", "journal": [{"stage": "solve", "run": "abcd"}]})
+            .to_string(),
+        )
+        .unwrap();
+        let store = Store { root: home.clone() };
+        let steps: Vec<Value> = journal(&store, id)
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .clone()
+            .into_iter()
+            .collect();
+        assert_eq!(steps[0]["name"], "Work, try 1 · Dev senior");
+        assert_eq!(
+            steps[0]["roles"][0],
+            json!({"name": "Dev senior", "brief": "Keep it small."})
+        );
+        let t = totals(&steps);
+        assert_eq!(t["stages"]["Work"]["roles"], json!(["Dev senior"]));
+        std::fs::remove_dir_all(&tmp).unwrap();
     }
 
     #[test]
@@ -2518,7 +2581,8 @@ mod tests {
         std::fs::write(project.join("a"), "a").unwrap();
         git(&["add", "."]);
         git(&["commit", "-q", "-m", "a"]);
-        // SAFETY: no other test reads FENNEC_OS_HOME.
+        let _env = ENV_LOCK.lock().unwrap();
+        // SAFETY: this test holds ENV_LOCK across its env use.
         unsafe { std::env::set_var("FENNEC_OS_HOME", tmp.join("os")) };
         // A start cut short: the world holds the folder, no request knows it.
         Worlds::from_env()
@@ -2655,7 +2719,8 @@ mod tests {
             json!({"id": id, "status": "thinking", "messages": []}).to_string(),
         )
         .unwrap();
-        // SAFETY: no other test reads FENNEC_OS_HOME at the same time.
+        let _env = ENV_LOCK.lock().unwrap();
+        // SAFETY: this test holds ENV_LOCK across its env use.
         unsafe { std::env::set_var("FENNEC_OS_HOME", &home) };
         let worlds = Worlds::from_env().unwrap();
         // A previous turn still holds the guard: this one is refused.
