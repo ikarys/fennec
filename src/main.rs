@@ -706,8 +706,21 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
                     .filter_map(|c| c.as_str().map(str::to_string))
                     .collect::<Vec<_>>(),
                 &field(&v, "model"),
+                v["tools"]
+                    .as_str()
+                    .unwrap_or_default(),
             )?;
             team_view(&path)
+        }
+        ("POST", "/api/disagree") => {
+            let v = input()?;
+            work::disagree(
+                &store,
+                &field(&v, "id"),
+                &field(&v, "point"),
+                &field(&v, "action"),
+            )?;
+            Ok(json!({}))
         }
         ("POST", "/api/team/save") => {
             let v = input()?;
@@ -811,7 +824,7 @@ fn transcript(chat: &Value) -> io::Result<String> {
 
 fn role_json(r: &team::Role) -> Value {
     json!({"key": r.key, "name": r.name, "stage": r.stage, "brief": r.brief,
-           "checks": r.checks, "model": r.model})
+           "checks": r.checks, "model": r.model, "tools": team::tool_line(&r.tools)})
 }
 
 /// A project's team for the "Équipe" dialog: the teams to pick from, the

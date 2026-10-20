@@ -695,6 +695,7 @@ fn classify(requests: &[(String, Value)], projects_all: &[Value]) -> Value {
                 c["summary"] = r["summary"].clone();
                 c["files"] = r["files"].clone();
                 c["skills"] = r["skills"].clone();
+                c["disagreements"] = r["disagreements"].clone();
                 // A run that predates the proof was never tried: say so.
                 c["untried"] = json!(
                     r["proof"]["tries"].as_array().is_none_or(Vec::is_empty)

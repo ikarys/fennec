@@ -216,12 +216,15 @@ fn talk_now(store: &Store, id: &str) -> io::Result<()> {
             say_in(r, "fennec", &text);
             r["status"] = json!("talk");
         }),
-        spec::Discussed::Brief(brief, skills) => {
+        spec::Discussed::Brief(brief, skills, roles) => {
             let brief = with_images(&brief, &thread);
             store.update(id, |r| {
                 note(r, step);
                 r["brief"] = json!(brief);
                 r["picked"] = json!(skills);
+                if let Some(roles) = roles {
+                    r["roles"] = json!(roles);
+                }
                 r["status"] = json!("framing");
             })?;
             frame_now(store, id)
@@ -279,9 +282,12 @@ fn prepare_now(store: &Store, id: &str) -> io::Result<()> {
                 say_in(r, "fennec", text);
                 r["asked"] = json!(true);
             }
-            spec::Discussed::Brief(brief, skills) => {
+            spec::Discussed::Brief(brief, skills, roles) => {
                 r["ahead"] = json!(with_images(brief, &thread));
                 r["picked"] = json!(skills);
+                if let Some(roles) = roles {
+                    r["roles"] = json!(roles);
+                }
             }
         }
     })
@@ -499,7 +505,18 @@ fn frame_now(store: &Store, id: &str) -> io::Result<()> {
             .filter_map(|s| s.as_str().map(str::to_string))
             .collect()
     });
-    let s = spec::direct(&Worlds::from_env()?, project, &brief, skills.as_deref())?;
+    let roles: Option<Vec<String>> = request["roles"].as_array().map(|a| {
+        a.iter()
+            .filter_map(|s| s.as_str().map(str::to_string))
+            .collect()
+    });
+    let s = spec::direct(
+        &Worlds::from_env()?,
+        project,
+        &brief,
+        skills.as_deref(),
+        roles.as_deref(),
+    )?;
     // "Done when" stays unset: the request already says it, and the human
     // would read it twice. The proof falls back to the brief.
     store.update(id, |r| {
@@ -864,7 +881,7 @@ fn solve_now(store: &Store, id: &str) -> io::Result<()> {
 }
 
 /// How many times the proof sends a ready run back to its builder.
-const MAX_FIXES: usize = 2;
+const MAX_FIXES: usize = 3;
 
 fn stopped(id: &str) -> bool {
     STOPS.lock().is_ok_and(|s| s.iter().any(|x| x == id))
@@ -1101,6 +1118,13 @@ fn apply_run(request: &mut Value, record: &Value) {
             request["summary"] = t["summary"].clone();
             request["files"] = json!(changed_files(t["diff"].as_str().unwrap_or("")));
             request["skills"] = t["skills"].clone();
+            // The reviewer's points the dev rejected, for the human's call:
+            // fresh with each run, the stale ones die with it.
+            if let Some(d) = t["disagreements"].as_array() {
+                request["disagreements"] = json!(d);
+            } else {
+                request.as_object_mut().map(|m| m.remove("disagreements"));
+            }
         }
     } else if let Some(t) = record["attempts"]
         .as_array()
@@ -1152,6 +1176,52 @@ pub fn amend(store: &Store, id: &str, text: &str) -> io::Result<()> {
     })?;
     spawn(id.to_string(), solve_now);
     Ok(())
+}
+
+/// "Forcer le point" / "Garder la position du dev" on a ready card: the
+/// human's call on each of the reviewer's points the dev rejected.
+pub fn disagree(store: &Store, id: &str, point: &str, action: &str) -> io::Result<()> {
+    let request = store.load(id)?;
+    if request["status"] != "ready" || request["commit"].is_string() {
+        return Err(io::Error::other(
+            "this task does not wait for your decision",
+        ));
+    }
+    let point = point.trim();
+    if point.is_empty() {
+        return Err(io::Error::other("say which point"));
+    }
+    if action == "keep" {
+        // The dev's position stands; the point leaves the card.
+        store.update(id, |r| {
+            if let Some(d) = r["disagreements"].as_array()
+                && d.iter().any(|d| d["point"].as_str() == Some(point))
+            {
+                r["disagreements"] = json!(
+                    d.iter()
+                        .filter(|d| d["point"].as_str() != Some(point))
+                        .cloned()
+                        .collect::<Vec<_>>()
+                );
+            }
+        })
+    } else {
+        // The reviewer's point is forced: the work is redone on it.
+        let text = format!("force the reviewer's point: {point}");
+        store.update(id, |r| {
+            say_in(r, "human", &text);
+            r["status"] = json!("running");
+            r["amend"] = json!(format!("the reviewer's point is forced, apply it: {point}"));
+            r["heard"] = json!(text);
+            r.as_object_mut().map(|m| m.remove("disagreements"));
+            if let Some(m) = r.as_object_mut() {
+                m.remove("amend_error");
+                m.remove("land_error");
+            }
+        })?;
+        spawn(id.to_string(), solve_now);
+        Ok(())
+    }
 }
 
 /// "Intégrer" on a ready request: its work becomes one commit on the branch
@@ -1456,9 +1526,27 @@ pub fn journal(store: &Store, id: &str) -> io::Result<Value> {
                     continue;
                 };
                 for (n, a) in r["attempts"].as_array().into_iter().flatten().enumerate() {
-                    let mut s = roles(step(&format!("Work, try {}", n + 1), a), &r["team"]);
-                    s["passed"] = a["passed"].clone();
-                    steps.push(s);
+                    // The team's attempt: one step per role, its own context.
+                    match a["roles"].as_array().filter(|rs| {
+                        !rs.is_empty() && rs[0]["name"].is_string()
+                    }) {
+                        Some(rs) => {
+                            for role in rs {
+                                let name = role["name"].as_str().unwrap_or("agent");
+                                let mut s =
+                                    step(&format!("Work, try {} · {name}", n + 1), role);
+                                s["tools"] = role["tools"].clone();
+                                s["passed"] = a["passed"].clone();
+                                steps.push(s);
+                            }
+                        }
+                        None => {
+                            let mut s =
+                                roles(step(&format!("Work, try {}", n + 1), a), &r["team"]);
+                            s["passed"] = a["passed"].clone();
+                            steps.push(s);
+                        }
+                    }
                 }
                 if !r["proof"]["exchange"].is_null() {
                     let mut s = roles(step("Proof", &r["proof"]["exchange"]), &r["proof"]["team"]);
