@@ -557,12 +557,12 @@ fn render(criteria: &[Value]) -> String {
 }
 
 const TASK: &str = "You work in a sandboxed copy of a project; the current directory is its root.\n\
-You have network access: install what the project needs inside it, since the home is \
-emptied after each command and the checks that judge the work run without network. Python: \
-uv only (`uv init`, `uv add <package>`, `uv sync`), packages in the project's `.venv`, and \
-run with `uv run <command>`, in checks and proofs too. Node: `npm install` (into \
-`node_modules`). `.venv` and `node_modules` are never committed. Never pip, \
-`--break-system-packages`, `--user` nor `--target`, never copy packages into the source tree.\n\
+You have network access: install what the project needs inside it, with the project's own \
+tools (its manifest, lockfile or build file), since the home is emptied after each command and \
+the checks that judge the work run without network. Dependencies go where the project's \
+ecosystem keeps them (`.venv`, `node_modules`, `target`...), never committed; download caches \
+are kept for you in `.fennec/`. Never install into the system or the home (`--user`, \
+`--break-system-packages`, global installs), never copy packages into the source tree.\n\
 You cannot commit: the harness checkpoints your work. Anything you break can be rolled back, \
 so act directly instead of asking.\n\
 Work in small verified steps: read the files you change (read_file), change them with \
@@ -570,6 +570,15 @@ edit_file (write_file for new files), never with sed or a script; run the build 
 tests after each change.\n\
 The harness keeps the criteria the work is judged on and reminds you of them at each step. \
 Call `done` when every criterion is met.";
+
+/// What the sandbox finds installed, so the agent picks among real tools
+/// instead of guessing.
+pub(crate) fn tools_line(worlds: &Worlds) -> String {
+    match worlds.tools() {
+        [] => String::new(),
+        t => format!("\nInstalled on this machine: {}.", t.join(", ")),
+    }
+}
 
 /// A task's attempt in `world`: `goal` to reach, `criteria` to meet (see
 /// [`criterion`]), `context` added to the system prompt.
@@ -586,7 +595,8 @@ pub fn run(
     tools.push(tools::criteria_tool());
     tools.push(tools::done_tool());
     let tools = Value::Array(tools);
-    let system = json!({"role": "system", "content": format!("{TASK}{context}")});
+    let system =
+        json!({"role": "system", "content": format!("{TASK}{}{context}", tools_line(worlds))});
     let mut engine = Engine::new(model, criteria);
     engine.guard = Some(Guard::load(
         &worlds.project(world)?,

@@ -163,6 +163,7 @@ impl Worlds {
                 (PathBuf::from(common), rev, place)
             }
         };
+        ignore_cache(&common)?;
         let id = new_id();
         let meta = self.root.join("meta");
         std::fs::create_dir_all(&meta)?;
@@ -468,6 +469,28 @@ impl Worlds {
         None
     }
 
+    /// The [`TOOLS`] a sandboxed command finds on its PATH: in a folder the
+    /// home hides, only under the toolchains re-exposed ([`Self::ro_paths`]).
+    /// Looked up once: a PATH through slow mounts (WSL's `/mnt/c`) takes a
+    /// second to scan.
+    /// ponytail: the first `Worlds` decides for the process; a server whose
+    /// toolchains change needs a restart.
+    pub fn tools(&self) -> &'static [&'static str] {
+        static FOUND: std::sync::OnceLock<Vec<&'static str>> = std::sync::OnceLock::new();
+        FOUND.get_or_init(|| {
+            let path = std::env::var_os("PATH").unwrap_or_default();
+            let dirs: Vec<PathBuf> = std::env::split_paths(&path)
+                .filter(|d| {
+                    !d.starts_with(&self.home) || self.ro_paths.iter().any(|r| d.starts_with(r))
+                })
+                .collect();
+            TOOLS
+                .into_iter()
+                .filter(|t| dirs.iter().any(|d| d.join(t).is_file()))
+                .collect()
+        })
+    }
+
     /// Skills, read-only, where the brief says they are.
     fn skill_mounts(&self, skills: &[(String, PathBuf)]) -> Vec<(bool, PathBuf, PathBuf)> {
         skills
@@ -519,17 +542,28 @@ impl Worlds {
             // ponytail: Python only; another tool's untracked cache needs its
             // own switch, or the project's .gitignore.
             .args(["--setenv", "PYTHONDONTWRITEBYTECODE", "1"])
-            // uv keeps the project's packages in its `.venv`, never committed
-            // (`BUILD_OUTPUT`). It may not download a Python into the hidden
-            // home, gone after the command; its cache, there too, is on
-            // another filesystem, so it copies instead of linking.
-            .args(["--setenv", "UV_PYTHON_DOWNLOADS", "never"])
-            .args(["--setenv", "UV_LINK_MODE", "copy"])
-            .args(if net {
-                &[][..]
-            } else {
-                &["--setenv", "UV_OFFLINE", "1"][..]
-            })
+            // No Python downloaded behind the human's back: the project uses
+            // one the machine has.
+            .args(["--setenv", "UV_PYTHON_DOWNLOADS", "never"]);
+        // Package managers download into the home, hidden and emptied after
+        // each command: every command would fetch again, and the checks,
+        // without network, would find nothing. Their caches go in the
+        // project's `.fennec/` instead, never committed (`BUILD_OUTPUT`), gone
+        // with the project: nothing piles up elsewhere (asked by the human,
+        // 2026-10-20).
+        let cache = dir.join(CACHE);
+        for (var, sub) in CACHES {
+            cmd.arg("--setenv").arg(var).arg(cache.join(sub));
+        }
+        let mut maven = std::ffi::OsString::from("-Dmaven.repo.local=");
+        maven.push(cache.join("m2"));
+        cmd.arg("--setenv").arg("MAVEN_OPTS").arg(maven);
+        if !net {
+            for (var, value) in OFFLINE {
+                cmd.args(["--setenv", var, value]);
+            }
+        }
+        cmd
             // `~` is the hidden home, where skills are mounted.
             .arg("--setenv")
             .arg("HOME")
@@ -596,7 +630,8 @@ impl Worlds {
             return Ok(());
         }
         self.git(world, &["reset", "-q", "--hard", "HEAD"])?;
-        self.git(world, &["clean", "-q", "-fdx"])?;
+        // The package caches stay: an undone try did not make them wrong.
+        self.git(world, &["clean", "-q", "-fdx", "-e", "/.fennec"])?;
         Ok(())
     }
 
@@ -862,11 +897,62 @@ fn size(dir: &Path) -> u64 {
 /// a project without a .gitignore would land `target/` or `node_modules/`.
 /// ponytail: a fixed list of tool outputs; a project that tracks one of
 /// these dirs on purpose cannot change it through fennec.
-const BUILD_OUTPUT: [&str; 4] = [
+const BUILD_OUTPUT: [&str; 6] = [
     ":(exclude,glob)**/target/**",
     ":(exclude,glob)**/node_modules/**",
     ":(exclude,glob)**/__pycache__/**",
     ":(exclude,glob)**/.venv/**",
+    ":(exclude,glob)**/.gradle/**",
+    ":(exclude,glob).fennec/**",
+];
+
+/// The package caches stay out of the human's `git status` and out of a
+/// stash: listed in the store's own excludes, never in a file they commit.
+fn ignore_cache(common: &Path) -> io::Result<()> {
+    let info = common.join("info");
+    let file = info.join("exclude");
+    let text = std::fs::read_to_string(&file).unwrap_or_default();
+    if text.lines().any(|l| l.trim() == "/.fennec/") {
+        return Ok(());
+    }
+    std::fs::create_dir_all(&info)?;
+    let sep = if text.is_empty() || text.ends_with('\n') {
+        ""
+    } else {
+        "\n"
+    };
+    std::fs::write(&file, format!("{text}{sep}/.fennec/\n"))
+}
+
+/// Where a sandboxed command's package caches live, in the project.
+const CACHE: &str = ".fennec";
+
+/// The variable each package manager reads its cache from, and its folder
+/// under [`CACHE`]. Maven takes a property ([`Worlds::jail`]).
+const CACHES: [(&str, &str); 7] = [
+    ("CARGO_HOME", "cargo"),
+    ("UV_CACHE_DIR", "uv"),
+    ("PIP_CACHE_DIR", "pip"),
+    ("npm_config_cache", "npm"),
+    ("GOMODCACHE", "go/mod"),
+    ("GOCACHE", "go/build"),
+    ("GRADLE_USER_HOME", "gradle"),
+];
+
+/// Without network, package managers use what the cache holds instead of
+/// failing on a fetch.
+const OFFLINE: [(&str, &str); 4] = [
+    ("UV_OFFLINE", "1"),
+    ("CARGO_NET_OFFLINE", "true"),
+    ("npm_config_offline", "true"),
+    ("GOPROXY", "off"),
+];
+
+/// Tools an agent may look for, named to it when the sandbox finds them.
+const TOOLS: [&str; 30] = [
+    "python3", "uv", "pip3", "poetry", "node", "npm", "pnpm", "yarn", "bun", "deno", "cargo",
+    "rustc", "go", "java", "mvn", "gradle", "kotlinc", "dotnet", "gcc", "g++", "clang", "cmake",
+    "make", "ninja", "meson", "php", "composer", "ruby", "bundle", "sqlite3",
 ];
 
 /// Time-ordered ids: runs are named after their world, and "the latest run"
