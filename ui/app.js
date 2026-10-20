@@ -1093,7 +1093,10 @@ function card(item) {
       item.split_error ? el("div", { className: "error", textContent: t("Could not split it: {0}", item.split_error) }) : null,
       // What it builds on: the Fleet starts it once those are committed.
       item.after?.length ? el("div", { className: "muted", textContent: t("Starts once these are committed: {0}", item.after.join(", ")) }) : null,
-      item.framed && item.done_when ? focus(t("What fennec understood"), item.done_when) : null);
+      item.framed && item.done_when ? focus(t("What fennec understood"), item.done_when) : null,
+      // The skills the work will see, picked at framing among those kept.
+      item.framed && Array.isArray(item.picked) ? el("div", { className: "files" }, item.picked.length
+        ? t("Skills it will use: {0}", item.picked.join(", ")) : t("No skill needed")) : null);
     let fix = null;
     if (item.framed) {
       const correction = el("textarea", { placeholder: t("What is wrong, or a detail"), hidden: true });

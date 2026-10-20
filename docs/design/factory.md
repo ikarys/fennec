@@ -1,6 +1,6 @@
 # Factory, plugins, self-improvement
 
-Date: 2026-10-19. Status: steps 1 (the Fleet), 2 (outbound plugins), 3 (framing ahead) and 4 (approval from a chat) built; §8 steps 2 (Backlog → Ready) and 3 (Split, `after`) built 2026-10-20. Asked by the human after a
+Date: 2026-10-19. Status: steps 1 (the Fleet), 2 (outbound plugins), 3 (framing ahead) and 4 (approval from a chat) built; §8 steps 2 (Backlog → Ready), 3 (Split, `after`) and 4 (skills per task) built 2026-10-20. Asked by the human after a
 comparison with OpenFox (task board, Planner/Builder agents, plugins).
 
 Purpose test (AGENTS.md): **fast**, **efficient**, **safe**. Each part below
@@ -118,7 +118,9 @@ Backlog ──► Ready ──► running ──► to validate ──► done
 
 - **Backlog**: a task comes from a discussion, a split, or is typed. While
   the model is free, fennec frames it (restates it, "done when", the skills
-  it will use, its size, what it comes after). A question goes to "For you".
+  it will use, its size, what it comes after). A question goes to "For you". Skills: framing names, among the ones
+  the human keeps, those this task needs (`skills:` after the brief); the
+  work sees only those, and the validation shows them. Not said: all.
 - **Validation**: only the human moves a task to Ready, after reading what
   fennec understood: Validate, Discuss (Agent mode on the task), Split,
   Delete. Several at once with the boxes. A task not framed yet cannot be
