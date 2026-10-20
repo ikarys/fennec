@@ -199,6 +199,8 @@ const FR = {
   "Pick a project: a folder on your disk (\"+ project\").": "Choisis un projet : un dossier de ton disque (« + projet »).",
   "Pick a task on the left to read it in full, or a project to see its page.": "Choisis une tâche à gauche pour la lire en entier, ou un projet pour voir sa page.",
   "Pick {0}": "Choisir {0}",
+  "Checks · {0}/{1}": "Vérifications · {0}/{1}",
+  "Checked after each change with:": "Vérifié après chaque changement avec :",
   "Plan · {0}/{1}": "Plan · {0}/{1}",
   "Plugin": "Plugin",
   "Prepare": "Préparer",
