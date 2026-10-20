@@ -406,7 +406,7 @@ fn a_turn_cut_by_a_restart_lets_the_person_speak_again() {
     chat::recover(&f.worlds).unwrap();
     let c = chat::load(&f.worlds, &id).unwrap();
     assert_eq!(c["status"], "idle");
-    assert!(c["error"].as_str().unwrap().contains("interrompu"));
+    assert!(c["error"].as_str().unwrap().contains("interrupted"));
     chat::say(&f.worlds, &id, "encore").unwrap();
 }
 

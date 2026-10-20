@@ -75,11 +75,11 @@ fn read(dir: &Path) -> Result<Plugin, (String, String)> {
     let bad = |why: String| (name.clone(), why);
     let text = std::fs::read_to_string(dir.join("plugin.json")).map_err(|e| bad(e.to_string()))?;
     let v: Value =
-        serde_json::from_str(&text).map_err(|e| bad(format!("plugin.json est illisible : {e}")))?;
+        serde_json::from_str(&text).map_err(|e| bad(format!("plugin.json is unreadable: {e}")))?;
     let run = v["run"]
         .as_str()
         .filter(|r| !r.is_empty())
-        .ok_or_else(|| bad("plugin.json ne dit pas quoi lancer (run)".into()))?;
+        .ok_or_else(|| bad("plugin.json does not say what to run (run)".into()))?;
     let events = match v["events"].as_array() {
         Some(a) => a
             .iter()
@@ -114,7 +114,7 @@ pub fn enabled() -> io::Result<Vec<String>> {
         Err(e) => return Err(e),
     };
     serde_json::from_str(&text)
-        .map_err(|e| io::Error::other(format!("plugins.json est illisible : {e}")))
+        .map_err(|e| io::Error::other(format!("plugins.json is unreadable: {e}")))
 }
 
 /// Enables or disables a plugin.
@@ -140,7 +140,7 @@ pub fn call(plugin: &Plugin, event: &Value) -> Result<(), String> {
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| format!("ne démarre pas : {e}"))?;
+        .map_err(|e| format!("does not start: {e}"))?;
     // A plugin that does not read its stdin only loses the event.
     if let Some(mut stdin) = child.stdin.take() {
         let _ = stdin.write_all(event.to_string().as_bytes());
@@ -155,7 +155,7 @@ pub fn call(plugin: &Plugin, event: &Value) -> Result<(), String> {
             Ok(None) => {
                 let _ = child.kill();
                 let _ = child.wait();
-                return Err(format!("arrêté après {} s", TIMEOUT.as_secs()));
+                return Err(format!("stopped after {} s", TIMEOUT.as_secs()));
             }
             Err(e) => return Err(e.to_string()),
         }
@@ -175,7 +175,7 @@ pub fn call(plugin: &Plugin, event: &Value) -> Result<(), String> {
     Err(match status.code() {
         Some(c) if last.is_empty() => format!("sortie {c}"),
         Some(c) => format!("sortie {c} : {}", last.trim()),
-        None => "tué par un signal".into(),
+        None => "killed by a signal".into(),
     })
 }
 
@@ -186,7 +186,7 @@ pub fn start(plugin: &Plugin, url: &str, token: &str) -> io::Result<Child> {
     let serve = plugin
         .serve
         .as_ref()
-        .ok_or_else(|| io::Error::other("ce plugin ne relaie rien"))?;
+        .ok_or_else(|| io::Error::other("this plugin relays nothing"))?;
     Command::new(serve)
         .current_dir(serve.parent().unwrap_or(Path::new("/")))
         .env("FENNEC_URL", url)
