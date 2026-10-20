@@ -21,6 +21,7 @@ use state::Store;
 
 const INDEX: &str = include_str!("../ui/index.html");
 const APP: &str = include_str!("../ui/app.js");
+const FR: &str = include_str!("../ui/fr.js");
 /// A request body larger than this is refused: an attached image, in
 /// base64, is the largest the UI sends.
 const MAX_BODY: usize = 16 * 1024 * 1024;
@@ -136,6 +137,11 @@ fn handle(mut stream: TcpStream, port: u16) -> io::Result<()> {
             "200 OK",
             "text/javascript; charset=utf-8",
             APP.as_bytes().to_vec(),
+        ),
+        ("GET", "/fr.js") => (
+            "200 OK",
+            "text/javascript; charset=utf-8",
+            FR.as_bytes().to_vec(),
         ),
         ("GET", path) if path.starts_with("/shots/") => match shot(&path[7..]) {
             Ok(png) => ("200 OK", "image/png", png),
@@ -441,12 +447,12 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
                 .filter_map(|m| m.as_str().map(str::to_string))
                 .collect();
             let max_tokens = v["max_tokens"].as_u64().ok_or_else(|| {
-                io::Error::other("le nombre de tokens doit être un entier positif")
+                io::Error::other("the number of tokens must be a positive integer")
             })?;
             // The page's choices; anything else would be sent to the server as is.
             let effort = field(&v, "effort");
             if !["", "none", "low", "medium", "xhigh"].contains(&effort.as_str()) {
-                return Err(io::Error::other("réflexion inconnue"));
+                return Err(io::Error::other("unknown reasoning level"));
             }
             Settings {
                 base_url,
@@ -504,7 +510,7 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
                     .find(|p| p.name == name)
                     .ok_or_else(|| io::Error::other("plugin inconnu"))?;
                 let test = json!({"event": "test", "title": "Essai",
-                                  "message": "fennec : essai du plugin, tout va bien"});
+                                  "message": "fennec: plugin test, all is well"});
                 tried = json!(plugin::call(&p, &test).err().unwrap_or_default());
             } else if !name.is_empty() {
                 plugin::choose(&name, v["on"] == true)?;
@@ -627,7 +633,7 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
                 .projects()?
                 .into_iter()
                 .find(|p| p == folder)
-                .ok_or_else(|| io::Error::other("ce dossier n'est pas un projet"))?;
+                .ok_or_else(|| io::Error::other("this folder is not a project"))?;
             let id = store.add_request(&project, &transcript(&chat)?, &[], true)?;
             Ok(json!({"id": id}))
         }
@@ -713,7 +719,7 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
 /// names a path, and that path must be one of theirs.
 fn project(store: &Store, path: &str) -> io::Result<std::path::PathBuf> {
     if !store.projects()?.iter().any(|p| p == path) {
-        return Err(io::Error::other("projet inconnu"));
+        return Err(io::Error::other("unknown project"));
     }
     Ok(path.into())
 }
@@ -765,17 +771,17 @@ fn transcript(chat: &Value) -> io::Result<String> {
             continue;
         }
         let who = match m["role"].as_str() {
-            Some("user") => "Toi",
+            Some("user") => "You",
             Some("assistant") => "fennec",
             _ => continue,
         };
         text.push_str(who);
-        text.push_str(" : ");
+        text.push_str(": ");
         text.push_str(content);
         text.push('\n');
     }
     if text.trim().is_empty() {
-        return Err(io::Error::other("aucun message à transformer en tâche"));
+        return Err(io::Error::other("no message to turn into a task"));
     }
     Ok(text)
 }
@@ -815,12 +821,12 @@ fn new_folder(parent: &str, name: &str) -> io::Result<String> {
     let name = name.trim();
     if name.is_empty() || name.starts_with('.') || name.contains(['/', '\\', '\0']) {
         return Err(io::Error::other(
-            "un nom de dossier simple, sans / ni point au début",
+            "a plain folder name, without / nor a leading dot",
         ));
     }
     let path = std::fs::canonicalize(parent)?.join(name);
     std::fs::create_dir(&path).map_err(|e| match e.kind() {
-        io::ErrorKind::AlreadyExists => io::Error::other(format!("{name} existe déjà ici")),
+        io::ErrorKind::AlreadyExists => io::Error::other(format!("{name} already exists here")),
         _ => e,
     })?;
     Ok(path.display().to_string())
@@ -878,7 +884,7 @@ mod tests {
         ]});
         assert_eq!(
             transcript(&chat).unwrap(),
-            "Toi : regarde où on en est\nfennec : c'est à jour\n"
+            "You: regarde où on en est\nfennec: c'est à jour\n"
         );
     }
 

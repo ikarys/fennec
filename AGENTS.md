@@ -22,7 +22,7 @@ src/fleet.rs  the Fleet: one queue of tasks for later, across projects, framed a
 src/relay.rs  plugins relaying decisions from a chat: started while enabled, a token limited to commit, drop, answer
 src/state.rs  requests and projects in files; the single view (what needs you, running, landed); a status change tells the enabled plugins (fennec-os `plugin`)
 src/work.rs   request life in the background: stats per request and overall ("Stats"); conversation, direct work (fennec-os `spec::direct`), proof (a failed one goes back to the work, twice at most: `spec::fix`), retry; correct, commit, pass or drop; rule offers; journal of every step
-ui/           index.html + app.js, embedded in the binary
+ui/           index.html + app.js + fr.js (French), embedded in the binary
 examples/plugins/  plugins to copy into ~/.config/fennec/plugins/ (apprise: Discord, Telegram, Teams, ntfy...; telegram: approve from a chat)
 ```
 
@@ -79,7 +79,12 @@ variables override them.
 ## Style
 
 Rust 2024, rustfmt defaults, clippy clean. UI: plain JS, no build step, served
-by the binary. English for code, comments and docs; French for UI text.
+by the binary. English for code, comments, docs and UI text (changed
+2026-10-20, asked by the human): the UI shows English by default, and the
+language picked in Settings › Appearance through `t()` in app.js, `data-t` in
+index.html and one dictionary per language (`ui/fr.js`, keyed by the English
+text). Server messages the UI shows are English too, so they are keys.
+`ui/i18n.test.js` fails on a text without its French.
 Comments explain *why*.
 
 ## UI design

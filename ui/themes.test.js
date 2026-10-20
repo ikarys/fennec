@@ -1,10 +1,13 @@
 // node ui/themes.test.js — the four themes, selectable in the settings:
-// Fennec Sable (dark), Fennec Sable Clair, Fennec Slate, the first fennec's
+// Fennec Sand (dark), Fennec Sand Light, Fennec Slate, the first fennec's
 // palette, and Fennec Orange, the v4 design's. Each theme is a single
 // palette of its own; there is no appearance mode. Display-only preferences
 // kept in localStorage; unknown ids fall back to Sable.
 const assert = require("assert");
 const src = require("fs").readFileSync(__dirname + "/app.js", "utf8");
+// `t` in English, as app.js shows it by default.
+globalThis.t = (s, ...a) => s.replace(/\{(\d+)\}/g, (_, i) => String(a[i] ?? ""));
+globalThis.lang = () => "en";
 const grab = (name) => src.match(new RegExp(`function ${name}\\([\\s\\S]*?\\n\\}\\n`))[0];
 
 const style = { colorScheme: "" };
@@ -26,9 +29,9 @@ eval(src.match(/const THEME_KEY = [^\n]*\n/)[0]
 
 assert.equal(THEMES.length, 4, "quatre thèmes");
 assert.equal(THEMES[0].id, "sable", "Sable d'abord : c'est le défaut");
-assert.equal(THEMES[0].name, "Fennec Sable");
+assert.equal(THEMES[0].name, "Fennec Sand");
 assert.equal(THEMES[1].id, "sable-clair", "le mode clair est un thème à part entière");
-assert.equal(THEMES[1].name, "Fennec Sable Clair");
+assert.equal(THEMES[1].name, "Fennec Sand Light");
 assert.equal(THEMES[2].id, "slate");
 assert.equal(THEMES[2].name, "Fennec Slate");
 assert.equal(THEMES[3].id, "orange");

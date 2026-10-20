@@ -4,16 +4,19 @@
 const assert = require("assert");
 const html = require("fs").readFileSync(__dirname + "/index.html", "utf8");
 const src = require("fs").readFileSync(__dirname + "/app.js", "utf8");
+// `t` in English, as app.js shows it by default.
+globalThis.t = (s, ...a) => s.replace(/\{(\d+)\}/g, (_, i) => String(a[i] ?? ""));
+globalThis.lang = () => "en";
 
 // The tab bar: three tabs, one panel each, general first and open.
 assert.match(html, /<div class="tabs" role="tablist" id="settings-tabs">/, "la barre d'onglets");
-for (const [label, panel, open] of [["Général", "settings-general", true], ["Apparence", "settings-appearance", false], ["Skills", "settings-skills", false]]) {
-  assert.match(html, new RegExp(`<button type="button" role="tab" aria-selected="${open}" data-panel="${panel}">${label}</button>`), label + " : son onglet");
+for (const [label, panel, open] of [["General", "settings-general", true], ["Appearance", "settings-appearance", false], ["Skills", "settings-skills", false]]) {
+  assert.match(html, new RegExp(`<button type="button" role="tab" aria-selected="${open}" data-panel="${panel}"${label === "Skills" ? "" : " data-t"}>${label}</button>`), label + " : son onglet");
   assert.match(html, new RegExp(`<div id="${panel}"${open ? "" : " hidden"}>`), label + " : son panneau" + (open ? ", ouvert" : ", fermé"));
 }
 // Each panel keeps its content.
 assert.match(html, /<div id="settings-general">\s*<form id="settings-form">/, "le formulaire dans Général");
-assert.match(html, /<div id="settings-appearance" hidden>\s*<ul id="theme-picker">/, "les thèmes dans Apparence");
+assert.match(html, /<div id="settings-appearance" hidden>[\s\S]*?<select id="language">[\s\S]*?<ul id="theme-picker">/, "la langue et les thèmes dans Apparence");
 assert.match(html, /<div id="settings-skills" hidden>[\s\S]*<input id="skill-search"[\s\S]*<ul id="skills-list">/, "la recherche et la liste dans Skills");
 assert.doesNotMatch(html.match(/<section id="settings" hidden>[\s\S]*?\n  <\/section>/)[0], /<h3>/, "plus de titres de section : les onglets les remplacent");
 
@@ -35,7 +38,7 @@ assert.match(html, /#theme-picker \{[^}]*grid-template-columns: repeat\(2, minma
 assert.match(html, /\.theme\[aria-pressed=true\] \{ border-color: var\(--accent\); \}/, "la tuile choisie");
 const picker = src.match(/function buildThemePicker\(\) \{[\s\S]*?\n\}/)[0];
 assert.match(picker, /className: "theme"/, "une tuile par thème");
-assert.match(picker, /setAttribute\("aria-pressed", String\(t\.id === loadTheme\(\)\)\)/, "l'état initial : le thème chargé");
+assert.match(picker, /setAttribute\("aria-pressed", String\(theme\.id === loadTheme\(\)\)\)/, "l'état initial : le thème chargé");
 assert.doesNotMatch(picker, /type: "radio"/, "plus de radios");
 
 // The font size: a number field in pixels, not a slider; old zoom values migrate.
@@ -79,13 +82,13 @@ assert.deepEqual(Object.fromEntries(Object.entries(panels).map(([k, v]) => [k, v
 tabs[0].onclick();
 assert.equal(panels["settings-general"].hidden, false, "revenir à Général");
 assert.equal(panels["settings-skills"].hidden, true, "Skills refermé");
-// Opening "Nettoyage" loads what is left behind.
+// Opening "Cleaning" loads what is left behind.
 let loaded = 0;
 global.showLeftovers = () => loaded++;
 tabs[5].onclick();
 assert.equal(panels["settings-clean"].hidden, false, "Nettoyage visible");
 assert.equal(loaded, 1, "la liste est chargée à l'ouverture");
-// Opening "Règles" reads the rules for every project, no project named.
+// Opening "Rules" reads the rules for every project, no project named.
 let read;
 global.changeRules = (box, path, scope) => (read = [box, path, scope]);
 // ...and the rules on commands and files.
