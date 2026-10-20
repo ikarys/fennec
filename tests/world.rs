@@ -47,6 +47,23 @@ fn a_folder_inside_a_repository_is_not_that_repository() {
 }
 
 #[test]
+fn an_ignored_top_level_folder_does_not_block_the_checkpoint() {
+    let f = Fixture::new("ignored-top");
+    let w = f.worlds.fork(&f.project.to_string_lossy()).unwrap();
+    assert!(f.sh(&w, "echo .fennec/ > .gitignore").0);
+    f.worlds.commit(&w, "ignore").unwrap();
+    // The harness keeps its package cache in an ignored top-level folder.
+    assert!(f.sh(&w, "mkdir .fennec && echo x > .fennec/cache").0);
+    assert!(f.sh(&w, "echo changed > README").0);
+    let diff = f.worlds.diff(&w).unwrap();
+    assert!(diff.contains("README") && !diff.contains(".fennec"), "{diff}");
+    let commit = f.worlds.commit(&w, "work").unwrap();
+    assert!(!commit.is_empty());
+    let log = f.worlds.git(&w, &["log", "--name-only", "-1"]).unwrap();
+    assert!(log.contains("README") && !log.contains(".fennec"), "{log}");
+}
+
+#[test]
 fn running_python_leaves_no_bytecode_in_the_work() {
     let f = Fixture::new("bytecode");
     let w = f.worlds.fork(&f.project.to_string_lossy()).unwrap();
