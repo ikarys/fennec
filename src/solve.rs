@@ -31,6 +31,9 @@ pub struct Task {
     /// Host paths the human lets the one attempt write, backed up first.
     /// Set by the harness from the command line, never read from a task file.
     pub grant: Vec<PathBuf>,
+    /// The skills picked for this task at framing; `None`, all the person
+    /// keeps.
+    pub skills: Option<Vec<String>>,
 }
 
 impl Task {
@@ -52,6 +55,7 @@ impl Task {
             protect: strings("protect"),
             base: None,
             grant: Vec::new(),
+            skills: None,
         };
         if task.goal.is_empty() {
             return Err(io::Error::other("task has no goal"));
@@ -112,7 +116,10 @@ pub fn solve(
     context.push_str(&rules::brief(&said));
     let (roles, team) = team::brief(&project, "solve")?;
     context.push_str(&roles);
-    let skills = skill::chosen(Some(&project))?;
+    let skills: Vec<skill::Skill> = skill::chosen(Some(&project))?
+        .into_iter()
+        .filter(|s| task.skills.as_ref().is_none_or(|n| n.contains(&s.name)))
+        .collect();
     context.push_str(&skill::brief(&skills));
     let history = review::agenda(worlds, &project.display().to_string(), 12)?;
     if !history.is_empty() {

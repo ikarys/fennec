@@ -94,6 +94,7 @@ fn task(protect: &[&str]) -> Task {
         protect: protect.iter().map(|p| p.to_string()).collect(),
         base: None,
         grant: Vec::new(),
+        skills: None,
     }
 }
 
@@ -203,6 +204,13 @@ fn a_chosen_skill_is_listed_mounted_read_only_and_traced() {
         "{said}"
     );
     assert_eq!(attempt["skills"], json!(["answer"]), "{attempt:#}");
+    // Framing picked none for this task: it is not told of the skill.
+    let plain = Script::new("plain", &[write("answer", "42\n"), done()]);
+    let mut none = task(&[]);
+    none.skills = Some(vec![]);
+    let record = solve(&f.worlds, &f.project, &none, &[&plain], 10).unwrap();
+    let said = record["attempts"][0]["messages"].to_string();
+    assert!(!said.contains("How this person answers."), "{said}");
 
     skill::choose("answer", false).unwrap();
     assert!(skill::chosen(Some(&f.project)).unwrap().is_empty());
@@ -1090,6 +1098,7 @@ fn host_task(f: &Fixture) -> (std::path::PathBuf, Task) {
         protect: Vec::new(),
         base: None,
         grant: vec![conf.clone()],
+        skills: None,
     };
     (conf, task)
 }
@@ -1476,7 +1485,7 @@ fn a_change_that_won_gives_the_folder_back_to_the_human_when_dropped() {
 #[test]
 fn a_direct_request_is_solved_from_the_project_and_lands() {
     let f = here("here-direct");
-    let s = spec::direct(&f.worlds, &f.project, "answer 42").unwrap();
+    let s = spec::direct(&f.worlds, &f.project, "answer 42", None).unwrap();
     let id = s["world"].as_str().unwrap().to_string();
     let honest = Script::new("honest", &[write("answer", "42\n"), done()]);
     let record = spec::accept(&f.worlds, &id, &[&honest], 10).unwrap();
