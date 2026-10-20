@@ -372,6 +372,7 @@ const FR = {
   "fennec asks: {0}": "fennec demande : {0}",
   "fennec cannot reach its model: {0}. Check Settings, then retry": "fennec ne joint pas son modèle : {0}. Vérifie les Réglages, puis réessaie",
   "fennec changed a validated test ({0}), which it may not do": "fennec a modifié un test validé ({0}), ce qui lui est interdit",
+  "fennec changed nothing, and the proof asked for the change": "fennec n'a rien changé, alors que la preuve en demandait",
   "fennec changed nothing for this task": "fennec n'a rien changé pour cette tâche",
   "fennec changed {0}, which the project's rules protect": "fennec a modifié {0}, que les règles du projet protègent",
   "fennec changes the folder directly.": "fennec modifie le dossier directement.",
