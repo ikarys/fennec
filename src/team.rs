@@ -139,6 +139,15 @@ pub fn teams() -> io::Result<Vec<String>> {
     Ok(names)
 }
 
+/// The roles of a global team, without a project: what a project that picks
+/// `name` would work with.
+pub fn team_roles(name: &str) -> io::Result<Vec<Role>> {
+    team_files(name)?
+        .iter()
+        .map(|(key, text)| parse(key, text))
+        .collect()
+}
+
 /// A project's team as the human sets it up: the team picked, the roles it
 /// leaves out, and every role before any is left out (so a left-out role can
 /// be shown, and taken back). A team that cannot be found (deleted, or named
@@ -544,6 +553,14 @@ mod tests {
             e.contains("unknown team") && e.contains("Développement") && e.contains("Études"),
             "{e}"
         );
+    }
+
+    #[test]
+    fn a_global_team_gives_its_roles_without_a_project() {
+        let roles = team_roles("Développement").unwrap();
+        assert!(roles.iter().any(|r| r.key == "project-manager"));
+        assert!(roles.iter().any(|r| r.key == "qa"));
+        assert!(team_roles("nope-no-such-team").is_err());
     }
 
     #[test]
