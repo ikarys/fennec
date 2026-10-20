@@ -890,6 +890,16 @@ fn solve_now(store: &Store, id: &str) -> io::Result<()> {
             let fixed = spec::fix(&worlds, spec_id, &found, &models, MAX_STEPS)?;
             if let Some(w) = fixed["winner"].as_str() {
                 run = w.to_string();
+                // The proof asked for a change: a fix that changed nothing
+                // holds no work to prove, it fails where it stands.
+                if nothing_changed(&probe["files"], &fixed) {
+                    return store.update(id, |r| {
+                        note(r, json!({"stage": "solve", "run": fixed["id"]}));
+                        r["status"] = json!("failed");
+                        r["reason"] =
+                            json!("fennec changed nothing, and the proof asked for the change");
+                    });
+                }
                 store.update(id, |r| {
                     let before = r["files"].clone();
                     note(r, json!({"stage": "solve", "run": fixed["id"]}));
@@ -942,6 +952,21 @@ fn merged(before: &Value, after: &Value) -> Value {
         }
     }
     json!(files)
+}
+
+/// The proof asked for a change, so a fix that changed nothing — on top of
+/// work that changed nothing — holds no work to prove.
+fn nothing_changed(held: &Value, fixed: &Value) -> bool {
+    let held_empty = held.as_array().is_some_and(|f| f.is_empty());
+    let diff = fixed["attempts"]
+        .as_array()
+        .and_then(|a| {
+            a.iter()
+                .find(|t| t["world"] == fixed["winner"].as_str().unwrap_or(""))
+        })
+        .map(|t| t["diff"].as_str().unwrap_or(""))
+        .unwrap_or("");
+    held_empty && changed_files(diff).is_empty()
 }
 
 /// What a failed proof tells the builder: each failing try with the end of
@@ -1022,7 +1047,10 @@ pub fn retry(store: &Store, id: &str) -> io::Result<()> {
         );
         return Ok(());
     }
-    if request["status"] != "failed" {
+    // A ready request whose commit did not push landed nothing: the work is
+    // redone.
+    let recommit = request["status"] == "ready" && request["land_error"].is_string();
+    if request["status"] != "failed" && !recommit {
         return Err(io::Error::other("this task did not fail"));
     }
     let validated = match request["spec"].as_str() {
@@ -1032,11 +1060,20 @@ pub fn retry(store: &Store, id: &str) -> io::Result<()> {
         ),
         None => false,
     };
-    let why = request["reason"].as_str().unwrap_or("").to_string();
+    let why = if recommit {
+        request["land_error"].as_str().unwrap_or("").to_string()
+    } else {
+        request["reason"].as_str().unwrap_or("").to_string()
+    };
     store.update(id, |r| {
         if let Some(m) = r.as_object_mut() {
             m.remove("proof");
             m.remove("reason");
+            if recommit {
+                // Nothing was pushed: the commit is redone with the new work.
+                m.remove("commit");
+                m.remove("land_error");
+            }
             // Its next failure stops the Fleet as the first one did.
             m.remove("fleet_seen");
         }
@@ -1883,6 +1920,11 @@ fn land_now(store: &Store, id: &str) -> io::Result<()> {
     let run = request["run"].as_str().unwrap_or("");
     let project = Path::new(request["project"].as_str().unwrap_or(""));
     let worlds = Worlds::from_env()?;
+    // The work changed nothing: nothing commits, nothing pushes, nothing to
+    // lose: the task closes where it stands.
+    if request["files"].as_array().is_some_and(Vec::is_empty) {
+        return store.update(id, |r| r["status"] = json!("landed"));
+    }
     let target = request["target"].clone();
     if !target["branch"].is_string() {
         // Nothing lands where the human has not seen it: this click only
@@ -2005,6 +2047,47 @@ mod tests {
     }
 
     #[test]
+    fn a_fix_that_changes_nothing_holds_nothing_to_prove() {
+        let fixed =
+            |diff: &str| json!({"winner": "w2", "attempts": [{"world": "w2", "diff": diff}]});
+        assert!(nothing_changed(&json!([]), &fixed("")));
+        let orphan =
+            json!({"winner": "w9", "attempts": [{"world": "w2", "diff": "diff --git a/b b/b\n"}]});
+        assert!(nothing_changed(&json!([]), &orphan));
+        assert!(!nothing_changed(&json!(["ui/app.js"]), &fixed("")));
+        assert!(!nothing_changed(
+            &json!([]),
+            &fixed("diff --git a/ui/app.js b/ui/app.js\n")
+        ));
+    }
+
+    #[test]
+    fn a_task_that_changed_nothing_lands_without_committing() {
+        let tmp =
+            std::env::temp_dir().join(format!("fennec-lead-land-none-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        let home = tmp.join("home");
+        std::fs::create_dir_all(home.join("requests")).unwrap();
+        // SAFETY: no other test needs the worlds here.
+        unsafe { std::env::set_var("FENNEC_OS_HOME", tmp.join("os")) };
+        let id = "cafe";
+        std::fs::write(
+            home.join("requests/cafe.json"),
+            json!({"project": "/p", "status": "ready", "run": "w1", "files": [],
+                   "target": {"branch": "feat/x", "message": "m", "remote": "origin"}})
+            .to_string(),
+        )
+        .unwrap();
+        let store = Store { root: home.clone() };
+        land_now(&store, id).unwrap();
+        let r = store.load(id).unwrap();
+        assert_eq!(r["status"], "landed");
+        assert_eq!(r["commit"], Value::Null);
+        assert_eq!(r["land_error"], Value::Null);
+        std::fs::remove_dir_all(&tmp).unwrap();
+    }
+
+    #[test]
     fn a_stopped_attempt_with_a_question_asks_the_human() {
         let mut r = json!({"status": "running"});
         apply_run(
@@ -2051,7 +2134,7 @@ mod tests {
             json!({"project": project.to_string_lossy(), "text": "a task",
                    "status": "blocked", "stage": "solving", "question": "Which port?",
                    "spec": spec_id, "thread": [{"who": "human", "text": "a task"}]})
-                .to_string(),
+            .to_string(),
         )
         .unwrap();
         let store = Store { root: home.clone() };
@@ -2541,15 +2624,25 @@ mod tests {
     fn a_second_turn_on_the_same_chat_is_refused() {
         let first = ChatTurn::new("c1".to_string());
         assert!(first.is_some(), "the first turn starts");
-        assert!(ChatTurn::new("c1".to_string()).is_none(), "a second one is refused");
-        assert!(ChatTurn::new("c2".to_string()).is_some(), "another chat is not");
+        assert!(
+            ChatTurn::new("c1".to_string()).is_none(),
+            "a second one is refused"
+        );
+        assert!(
+            ChatTurn::new("c2".to_string()).is_some(),
+            "another chat is not"
+        );
         std::mem::drop(first);
-        assert!(ChatTurn::new("c1".to_string()).is_some(), "the guard clears when the turn ends");
+        assert!(
+            ChatTurn::new("c1".to_string()).is_some(),
+            "the guard clears when the turn ends"
+        );
     }
 
     #[test]
     fn a_refused_chat_turn_is_settled_with_a_reason() {
-        let tmp = std::env::temp_dir().join(format!("fennec-lead-chatrefuse-{}", std::process::id()));
+        let tmp =
+            std::env::temp_dir().join(format!("fennec-lead-chatrefuse-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&tmp);
         let home = tmp.join("home");
         let chats = home.join("chats");
@@ -2601,9 +2694,20 @@ mod tests {
             )
             .unwrap();
         }
+        // Nothing was pushed on c5: its work may be redone.
+        std::fs::write(
+            tmp.join("requests/c5.json"),
+            r#"{"status": "ready", "land_error": "the push failed", "commit": "c9"}"#,
+        )
+        .unwrap();
         // The stuck ones start over; the rest is left where it is.
         retry(&store, "c1").unwrap();
         retry(&store, "c2").unwrap();
+        retry(&store, "c5").unwrap();
+        let c5 = store.load("c5").unwrap();
+        assert_eq!(c5["status"], "framing");
+        assert_eq!(c5["commit"], Value::Null);
+        assert_eq!(c5["land_error"], Value::Null);
         assert!(retry(&store, "c3").is_err());
         assert!(retry(&store, "c4").is_err());
         assert!(retry(&store, "nope").is_err());
