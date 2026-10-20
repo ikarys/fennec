@@ -1,22 +1,36 @@
-//! The agent loop. Every tool runs inside the world's sandbox: the harness
-//! never touches world files itself, so a symlink cannot lead it outside.
-//! There is no permission list: whatever the agent does stays in its world.
+//! The engine every agent runs on: a task's attempt (`run`) and a chat's
+//! turn (`chat`) alike. One loop: ask the model, run its tool calls in the
+//! sandbox, again, until it finishes or the harness stops it.
+//!
+//! The model is framed at every step, not only by the first prompt (seen:
+//! a local model given the goal once drifted, re-read the same files and
+//! ran out of steps three times on a plain scaffold):
+//! - criteria: what must hold when the work is done, kept by the harness,
+//!   each with a check command when one can prove it; the model marks them,
+//!   the check decides (the model never judges);
+//! - a reminder, the last message of every call: the step, the criteria and
+//!   what to do next. It is never kept: the conversation stays an
+//!   append-only prefix the server caches;
+//! - `done` is refused while criteria are open or their checks fail (twice,
+//!   then the outer verification judges);
+//! - the context is compacted into the model's own summary when it grows
+//!   past the server's window, instead of cutting what the model read (cut,
+//!   it read the same files again and again);
+//! - loops, idle runs and hung commands are stopped, as before.
 
-use std::io::{self, Write};
-use std::process::Stdio;
+use std::collections::HashSet;
+use std::io;
 use std::time::Instant;
 
 use serde_json::{Value, json};
 
+use crate::guard::{Guard, Verdict};
 use crate::provider::Model;
+use crate::tools::{self, Sandbox};
 use crate::world::{World, Worlds};
 
-const OUTPUT_LIMIT: usize = 8_000;
-const COMMAND_TIMEOUT_SECS: u32 = 300;
-/// Bytes of conversation past which old tool output is elided.
-const CONTEXT_BUDGET: usize = 48_000;
-/// The latest messages are never elided: the model is acting on them.
-const KEEP_RECENT: usize = 6;
+pub(crate) use crate::tools::truncate;
+
 /// The same call with the same result this many times in a row is a loop:
 /// the model is told once, then stopped.
 const REPEAT_NUDGE: usize = 3;
@@ -26,6 +40,10 @@ const IDLE_NUDGE: usize = 15;
 const IDLE_STOP: usize = 25;
 /// A command killed by its timeout costs minutes; a second one ends the run.
 const TIMEOUT_STOP: usize = 2;
+/// `done` refused this many times at most: then the verification judges.
+const REFUSALS: usize = 2;
+/// A reply cut by the length limit is continued this many times at most.
+const CUT_RETRIES: usize = 3;
 
 pub struct Outcome {
     /// The agent's own account; never used as a verdict.
@@ -43,7 +61,24 @@ pub struct Outcome {
     /// Why the loop ended early (the model failed or was stopped). The turns
     /// before it are kept: a stopped attempt shows where its time went too.
     pub error: Option<String>,
+    /// The criteria as they ended: the journal shows what was met.
+    pub criteria: Vec<Value>,
+    /// Calls a rule wanted the person to approve, refused since nobody was
+    /// there: what to allow before trying again.
+    pub asked: Vec<Value>,
 }
+
+/// The person's answer to a rule's question, in a chat: `None` when the
+/// turn was stopped meanwhile.
+#[derive(Clone, Copy, PartialEq)]
+pub enum Answer {
+    No,
+    Once,
+    /// For the rest of the chat.
+    Chat,
+}
+
+pub(crate) type Asker<'a> = &'a dyn Fn(Value) -> io::Result<Option<Answer>>;
 
 /// Watches the loop for the three ways a run gets stuck. Pure bookkeeping:
 /// each method says whether to nudge (`Some(false)`) or stop (`Some(true)`).
@@ -93,210 +128,601 @@ impl Watch {
     }
 }
 
+/// A criterion: with a check it is work to finish (`open`), without one a
+/// constraint to respect (`rule`), which the harness checks afterwards.
+pub fn criterion(text: &str, check: Option<&str>) -> Value {
+    json!({"text": text, "check": check, "state": if check.is_some() { "open" } else { "rule" }})
+}
+
+/// A step of an approved plan: to finish, nothing runs to prove it.
+pub(crate) fn step_criterion(text: &str) -> Value {
+    json!({"text": text, "check": null, "state": "open"})
+}
+
+/// Done or proven: what `done` no longer waits for.
+fn met(c: &Value) -> bool {
+    matches!(c["state"].as_str(), Some("done" | "passed" | "rule"))
+}
+
+/// A message the harness adds to the conversation: sent as the person's,
+/// hidden from them on the page.
+pub(crate) fn harness(text: &str) -> Value {
+    json!({"role": "user", "content": text, "harness": true})
+}
+
+/// The tokens past which the conversation is compacted: most of the
+/// server's window, leaving room for the reply.
+/// ponytail: one window for every model (`FENNEC_OS_CONTEXT`, default 64k
+/// tokens); ask the server (`max_model_len`) if models differ widely.
+fn compact_at() -> u64 {
+    let window = std::env::var("FENNEC_OS_CONTEXT")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(65_536);
+    window * 7 / 10
+}
+
+/// One loop's state, the same for a task and a chat.
+pub(crate) struct Engine<'a> {
+    model: &'a dyn Model,
+    pub(crate) criteria: Vec<Value>,
+    pub(crate) watch: Watch,
+    pub(crate) turns: Vec<Value>,
+    /// Files read (or written) in this loop: an edit needs one.
+    read: HashSet<String>,
+    refusals: usize,
+    /// Reasoning is skipped on routine turns under the `adaptive` policy.
+    think: bool,
+    policy: String,
+    /// A reply with nothing in it: the model spent its whole budget
+    /// reasoning. Asked again the same way it does it again (seen: four
+    /// times in six, 2-3 minutes each on a local model), so the rest of the
+    /// loop goes without reasoning, whatever the policy.
+    pub(crate) blank: bool,
+    cuts: usize,
+    /// What the last call cost in prompt tokens: the size of the context.
+    context: u64,
+    start: Instant,
+    /// The person's rules on commands and files, checked before each call.
+    pub(crate) guard: Option<Guard>,
+    /// Who answers a rule's question; nobody in a task: refused, recorded.
+    pub(crate) asker: Option<Asker<'a>>,
+    /// Rules the person allowed for the rest of the chat.
+    pub(crate) allowed: Vec<Value>,
+    pub(crate) asked: Vec<Value>,
+}
+
+impl<'a> Engine<'a> {
+    pub(crate) fn new(model: &'a dyn Model, criteria: Vec<Value>) -> Self {
+        Self {
+            model,
+            criteria,
+            watch: Watch::default(),
+            turns: Vec::new(),
+            read: HashSet::new(),
+            refusals: 0,
+            think: true,
+            // EXPERIMENT: FENNEC_OS_THINK=always|adaptive|never, to be
+            // measured and removed.
+            policy: std::env::var("FENNEC_OS_THINK").unwrap_or_else(|_| "always".to_string()),
+            blank: false,
+            cuts: 0,
+            context: 0,
+            start: Instant::now(),
+            guard: None,
+            asker: None,
+            allowed: Vec::new(),
+            asked: Vec::new(),
+        }
+    }
+
+    /// What the person's rules say of a call: `None` to run it, or what the
+    /// model is told instead.
+    fn guarded(&mut self, name: &str, args: &Value) -> Option<String> {
+        let verdict = self.guard.as_ref()?.check(name, args);
+        let (rule, target) = match verdict {
+            Verdict::Allow => return None,
+            Verdict::Deny(rule, target) => {
+                return Some(format!(
+                    "error: refused by the person's rule `{}` ({}) on `{target}`. Do without it; \
+                     do not try another way around the rule.",
+                    rule["pattern"].as_str().unwrap_or(""),
+                    rule["why"].as_str().unwrap_or("")
+                ));
+            }
+            Verdict::Ask(rule, target) => (rule, target),
+        };
+        if self.allowed.contains(&rule) {
+            return None;
+        }
+        let why = rule["why"].as_str().unwrap_or("").to_string();
+        let Some(asker) = self.asker else {
+            self.asked
+                .push(json!({"rule": rule, "target": target, "tool": name}));
+            return Some(format!(
+                "error: the person's rules ask them first ({why}: `{target}`), and nobody can \
+                 answer during this task. Do without it, and say in your summary what you needed."
+            ));
+        };
+        let question = json!({"tool": "rule", "rule": rule.clone(), "target": target,
+                              "call": format!("{name} {}", short(args))});
+        match asker(question) {
+            Ok(Some(Answer::Once)) => None,
+            Ok(Some(Answer::Chat)) => {
+                self.allowed.push(rule);
+                None
+            }
+            Ok(Some(Answer::No)) => Some(format!(
+                "error: the person refused ({why}: `{target}`); it did not run. Do not retry it."
+            )),
+            Ok(None) => Some("error: the person stopped the turn; it did not run".to_string()),
+            Err(e) => Some(format!("error: {e}")),
+        }
+    }
+
+    /// One model call. The reply comes back as it goes into the
+    /// conversation; the turn record (`self.turns`, last) keeps what it
+    /// cost. `true` with it: the reply was cut by the length limit.
+    pub(crate) fn ask(&mut self, window: &[Value], tools: &Value) -> io::Result<(Value, bool)> {
+        let think = !self.blank
+            && match self.policy.as_str() {
+                "never" => false,
+                "adaptive" => self.think,
+                _ => true,
+            };
+        let at = self.start.elapsed().as_millis() as u64;
+        let asked = Instant::now();
+        let reply = if think {
+            self.model.chat(window, tools)
+        } else {
+            self.model.chat_quick(window, tools)
+        };
+        let mut turn = json!({"step": self.turns.len() + 1, "at_ms": at,
+                              "model_ms": asked.elapsed().as_millis() as u64, "think": think});
+        let mut reply = match reply {
+            Ok(r) => r,
+            Err(e) => {
+                self.turns.push(turn);
+                return Err(e);
+            }
+        };
+        let mut cut = false;
+        if let Some(obj) = reply.as_object_mut() {
+            if let Some(usage) = obj.remove("usage") {
+                turn["usage"] = usage;
+            }
+            cut = obj.remove("finish_reason").is_some_and(|f| f == "length");
+        }
+        // The server's count when it gives one; four bytes a token if not.
+        self.context = turn["usage"]["prompt_tokens"]
+            .as_u64()
+            .unwrap_or_else(|| window.iter().map(|m| m.to_string().len() as u64 / 4).sum());
+        reply["role"] = json!("assistant");
+        let calls = reply["tool_calls"]
+            .as_array()
+            .is_some_and(|c| !c.is_empty());
+        let text = reply["content"]
+            .as_str()
+            .is_some_and(|c| !c.rsplit("</think>").next().unwrap_or("").trim().is_empty());
+        self.blank |= !calls && !text;
+        // Routine unless something goes wrong: then the next turn reasons.
+        self.think = !calls;
+        self.turns.push(turn);
+        Ok((reply, cut && !calls))
+    }
+
+    /// Whether a cut reply is continued; the message that asks for it.
+    pub(crate) fn continue_cut(&mut self) -> Option<Value> {
+        self.cuts += 1;
+        (self.cuts <= CUT_RETRIES).then(|| {
+            harness(
+                "Your reply was cut by the length limit. Continue where it stopped, shorter: \
+                 one step at a time, and write long files in several edits.",
+            )
+        })
+    }
+
+    /// Runs one tool call (not `done`, nor the chat's own ones) and returns
+    /// what goes back to the model, its time recorded in the last turn.
+    pub(crate) fn tool(&mut self, sandbox: Sandbox, call: &Value) -> String {
+        let name = call["function"]["name"].as_str().unwrap_or("");
+        let started = Instant::now();
+        let raw = call["function"]["arguments"].as_str().unwrap_or("{}");
+        let result = match serde_json::from_str::<Value>(raw) {
+            Err(e) => format!(
+                "error: the arguments are not valid JSON ({e}); call the tool again with valid JSON"
+            ),
+            Ok(args) => self.run_tool(sandbox, name, &args),
+        };
+        if result.starts_with("error:")
+            || (result.starts_with("exit ") && !result.starts_with("exit 0\n"))
+        {
+            self.think = true;
+        }
+        if let Some(turn) = self.turns.last_mut() {
+            if !turn["tools"].is_array() {
+                turn["tools"] = json!([]);
+            }
+            if let Some(t) = turn["tools"].as_array_mut() {
+                t.push(json!({"name": name, "ms": started.elapsed().as_millis() as u64}));
+            }
+        }
+        result
+    }
+
+    fn run_tool(&mut self, sandbox: Sandbox, name: &str, args: &Value) -> String {
+        if let Some(refused) = self.guarded(name, args) {
+            return refused;
+        }
+        let path = args["path"].as_str().unwrap_or("").trim_start_matches("./");
+        match name {
+            "criteria" => return self.criteria_call(sandbox, args),
+            "edit_file" if !self.read.contains(path) => {
+                return format!(
+                    "error: read {path} with read_file before editing it: the edit quotes it exactly"
+                );
+            }
+            _ => {}
+        }
+        match tools::execute(sandbox, name, args) {
+            Ok(out) => {
+                if matches!(name, "read_file" | "write_file" | "edit_file") {
+                    self.read.insert(path.to_string());
+                }
+                if name == "read_file" {
+                    out
+                } else {
+                    truncate(&out)
+                }
+            }
+            Err(e) => format!("error: {e}"),
+        }
+    }
+
+    fn criteria_call(&mut self, sandbox: Sandbox, args: &Value) -> String {
+        match args["action"].as_str() {
+            Some("add") => {
+                let Some(text) = args["text"].as_str().filter(|t| !t.trim().is_empty()) else {
+                    return "error: `add` needs the criterion's `text`".to_string();
+                };
+                let check = args["check"].as_str().filter(|c| !c.trim().is_empty());
+                let mut c = criterion(text.trim(), check);
+                c["state"] = json!("open");
+                self.criteria.push(c);
+                format!("added.\n{}", render(&self.criteria))
+            }
+            Some("done") => {
+                let n = args["number"].as_u64().unwrap_or(0) as usize;
+                let Some(i) = n.checked_sub(1).filter(|i| *i < self.criteria.len()) else {
+                    return format!(
+                        "error: no criterion number {n}.\n{}",
+                        render(&self.criteria)
+                    );
+                };
+                let failed = self.check(sandbox, i);
+                match failed {
+                    None => format!("criterion {n} met.\n{}", render(&self.criteria)),
+                    Some(out) => format!(
+                        "criterion {n} is not met: its check failed.\n{out}\nFix it, then mark it done again."
+                    ),
+                }
+            }
+            _ => "error: `action` is `add` or `done`".to_string(),
+        }
+    }
+
+    /// Marks criterion `i` done, its check deciding when it has one. The
+    /// check's output when it failed.
+    fn check(&mut self, sandbox: Sandbox, i: usize) -> Option<String> {
+        let c = &mut self.criteria[i];
+        let Some(check) = c["check"].as_str().map(str::to_string) else {
+            if c["state"] != "rule" {
+                c["state"] = json!("done");
+            }
+            return None;
+        };
+        // A check is a command the model wrote: the rules hold for it too,
+        // without asking (nobody waits on a check).
+        let refused =
+            self.guard
+                .as_ref()
+                .and_then(|g| match g.check("shell", &json!({"command": check})) {
+                    Verdict::Allow => None,
+                    Verdict::Ask(r, t) | Verdict::Deny(r, t) => Some(format!(
+                        "exit -1\nrefused by the person's rule `{}` on `{t}`",
+                        r["pattern"].as_str().unwrap_or("")
+                    )),
+                });
+        let out = refused.unwrap_or_else(|| {
+            tools::shell(sandbox, &check).unwrap_or_else(|e| format!("exit -1\n{e}"))
+        });
+        if out.starts_with("exit 0\n") {
+            c["state"] = json!("passed");
+            c["failure"] = Value::Null;
+            return None;
+        }
+        let tail: Vec<&str> = out.lines().collect();
+        let tail = tail[tail.len().saturating_sub(15)..].join("\n");
+        c["state"] = json!("failed");
+        c["failure"] = json!(tail);
+        Some(format!("`{check}`:\n{}", truncate(&out)))
+    }
+
+    /// Whether `done` is accepted. Every unproven check runs first. A
+    /// refusal says what is left; after [`REFUSALS`] of them `done` goes
+    /// through, the verification then judging.
+    pub(crate) fn finish(&mut self, sandbox: Sandbox) -> Option<String> {
+        for i in 0..self.criteria.len() {
+            if self.criteria[i]["check"].is_string() && self.criteria[i]["state"] != "passed" {
+                self.check(sandbox, i);
+            }
+        }
+        if self.criteria.iter().all(met) || self.refusals >= REFUSALS {
+            return None;
+        }
+        self.refusals += 1;
+        Some(format!(
+            "Not finished: some criteria are not met.\n{}\nFinish them (mark each with `criteria`), \
+             then call `done` again. If one cannot be met, say why in the summary.",
+            render(&self.criteria)
+        ))
+    }
+
+    /// Criteria left to finish.
+    pub(crate) fn open(&self) -> usize {
+        self.criteria.iter().filter(|c| !met(c)).count()
+    }
+
+    /// The reminder sent as the last message of a call; `None` when there
+    /// is nothing to frame (a chat without a plan).
+    pub(crate) fn reminder(&self, step: usize, max: usize, mode: &str) -> Value {
+        let mut text = format!("<system-reminder>\nStep {step} of at most {max}. {mode}\n");
+        if self.criteria.is_empty() {
+            text.push_str(
+                "No criteria yet: add the ones this work must meet with `criteria` (action add), \
+                 each with a check command whenever one can prove it.\n",
+            );
+        } else {
+            text.push_str(&render(&self.criteria));
+            match self.criteria.iter().position(|c| !met(c)) {
+                Some(i) => text.push_str(&format!(
+                    "Next: criterion {}. Mark it with `criteria` (action done) when it holds.\n",
+                    i + 1
+                )),
+                None => text.push_str("Every criterion is met: call `done`.\n"),
+            }
+        }
+        if step * 5 >= max * 4 {
+            text.push_str(
+                "Few steps are left: finish what is open, or call `done` saying what remains.\n",
+            );
+        }
+        text.push_str("</system-reminder>");
+        json!({"role": "user", "content": text})
+    }
+
+    pub(crate) fn needs_compaction(&self) -> bool {
+        self.context > compact_at()
+    }
+
+    /// The model's own summary of `window`, to go on with instead of it.
+    pub(crate) fn compact(&mut self, window: &[Value]) -> io::Result<String> {
+        let mut asked = window.to_vec();
+        asked.push(json!({"role": "user", "content":
+            "The conversation is about to be shortened. Write down, for yourself, everything you \
+             need to go on: the goal, what is done (files changed, commands that work), what \
+             failed and why, what remains, and the facts you will need (paths, names, errors, \
+             decisions). Plain text, no tool call."}));
+        let at = self.start.elapsed().as_millis() as u64;
+        let (summary, exchange) = crate::provider::ask(self.model, &asked)?;
+        for mut t in exchange["turns"].as_array().cloned().unwrap_or_default() {
+            t["at_ms"] = json!(at);
+            t["compaction"] = json!(true);
+            self.turns.push(t);
+        }
+        self.context = 0;
+        if summary.is_empty() {
+            return Err(io::Error::other("the model gave no summary"));
+        }
+        Ok(summary)
+    }
+}
+
+/// The criteria, numbered, as the model and the journal read them.
+fn render(criteria: &[Value]) -> String {
+    let mut out = String::from("Criteria:\n");
+    for (i, c) in criteria.iter().enumerate() {
+        let mark = match c["state"].as_str() {
+            Some("passed") => "[x] (check passed)",
+            Some("done") => "[x]",
+            Some("failed") => "[ ] (check failed)",
+            Some("rule") => "[rule]",
+            _ => "[ ]",
+        };
+        out.push_str(&format!(
+            "  {}. {mark} {}",
+            i + 1,
+            c["text"].as_str().unwrap_or("")
+        ));
+        if let Some(check) = c["check"].as_str() {
+            out.push_str(&format!(" — check: `{check}`"));
+        }
+        out.push('\n');
+        if let Some(f) = c["failure"].as_str().filter(|_| c["state"] == "failed") {
+            let last = f.lines().rev().find(|l| !l.trim().is_empty()).unwrap_or("");
+            out.push_str(&format!("     last failure: {last}\n"));
+        }
+    }
+    out
+}
+
+const TASK: &str = "You work in a sandboxed copy of a project; the current directory is its root.\n\
+You have network access: install what the project needs inside it (`python3 -m venv .venv`, \
+`npm install`...), since the home is emptied after each command and the checks that judge \
+the work run without network.\n\
+You cannot commit: the harness checkpoints your work. Anything you break can be rolled back, \
+so act directly instead of asking.\n\
+Work in small verified steps: read the files you change (read_file), change them with \
+edit_file (write_file for new files), never with sed or a script; run the build and the \
+tests after each change.\n\
+The harness keeps the criteria the work is judged on and reminds you of them at each step. \
+Call `done` when every criterion is met.";
+
+/// A task's attempt in `world`: `goal` to reach, `criteria` to meet (see
+/// [`criterion`]), `context` added to the system prompt.
 pub fn run(
     worlds: &Worlds,
     world: &World,
     model: &dyn Model,
     goal: &str,
-    criteria: &[String],
+    criteria: Vec<Value>,
     context: &str,
     max_steps: usize,
 ) -> io::Result<Outcome> {
-    let tools = tools();
-    let mut system = format!(
-        "You work in a sandboxed copy of a project; the current directory is its root.\n\
-         There is no network. You cannot commit: the harness checkpoints your work.\n\
-         Anything you break can be rolled back, so act directly instead of asking.\n\
-         When you are finished, call `done`. Your work is then judged only by these \
-         criteria:\n{}",
-        criteria
-            .iter()
-            .map(|c| format!("  - {c}"))
-            .collect::<Vec<_>>()
-            .join("\n")
-    );
-    system.push_str(context);
-    let mut messages = vec![
-        json!({"role": "system", "content": system}),
-        json!({"role": "user", "content": goal}),
-    ];
-    let start = Instant::now();
-    let mut turns = Vec::new();
-    // EXPERIMENT: FENNEC_OS_THINK=always|adaptive|never, to be measured and
-    // removed.
-    let policy = std::env::var("FENNEC_OS_THINK").unwrap_or_else(|_| "always".to_string());
-    let mut think = true;
-    // A reply with nothing in it: the model spent its whole budget reasoning.
-    // Asked again the same way it does it again (seen: four times in six, and
-    // again after one quick turn, 2-3 minutes each on a local model), so the
-    // rest of the run goes without reasoning, whatever the policy.
-    let mut blank = false;
-    let ms = |since: Instant| since.elapsed().as_millis() as u64;
+    let mut tools = tools::definitions(true);
+    tools.push(tools::criteria_tool());
+    tools.push(tools::done_tool());
+    let tools = Value::Array(tools);
+    let system = json!({"role": "system", "content": format!("{TASK}{context}")});
+    let mut engine = Engine::new(model, criteria);
+    engine.guard = Some(Guard::load(
+        &worlds.project(world)?,
+        &world.path,
+        &worlds.home,
+    )?);
+    // Everything said, for the journal; the model sees it from `from` on,
+    // past the last compaction.
+    let mut log = vec![json!({"role": "user", "content": goal})];
+    let mut from = 0;
+    let sandbox = |argv: &[String]| worlds.sandbox_work(world, argv);
     // The starting state counts as "no change yet".
-    let mut watch = Watch {
-        files: worlds.status(world)?,
-        ..Watch::default()
-    };
-    let stop = |messages: Vec<Value>, turns: Vec<Value>, step, why: String| {
+    engine.watch.files = worlds.status(world)?;
+    let end = |engine: Engine, log: Vec<Value>, step, summary, stuck: Option<String>, error| {
+        let mut messages = vec![system.clone()];
+        messages.extend(log);
+        let question = stuck
+            .as_deref()
+            .and_then(|why| ask(model, goal, &messages, why));
         Ok(Outcome {
-            summary: None,
+            summary,
             steps: step,
-            question: ask(model, goal, &messages, &why),
             messages,
-            turns,
-            stuck: Some(why),
-            error: None,
+            stuck,
+            question,
+            turns: engine.turns,
+            error,
+            criteria: engine.criteria,
+            asked: engine.asked,
         })
     };
+    const MODE: &str = "Change the files to meet the criteria; read before you edit, edit \
+                        with edit_file, run the build and tests after each change.";
     for step in 1..=max_steps {
-        bound(&mut messages);
-        let at = start.elapsed().as_millis() as u64;
-        let asked = Instant::now();
-        let think_now = !blank
-            && match policy.as_str() {
-                "never" => false,
-                "adaptive" => think,
-                _ => true,
-            };
-        let chat = if think_now {
-            model.chat(&messages, &tools)
-        } else {
-            model.chat_quick(&messages, &tools)
-        };
-        let mut turn =
-            json!({"step": step, "at_ms": at, "model_ms": ms(asked), "think": think_now});
-        let mut reply = match chat {
-            Ok(reply) => reply,
-            Err(e) => {
-                turns.push(turn);
-                return Ok(Outcome {
-                    summary: None,
-                    steps: step,
-                    messages,
-                    turns,
-                    stuck: None,
-                    question: None,
-                    error: Some(e.to_string()),
-                });
+        if engine.needs_compaction() {
+            let window: Vec<Value> = std::iter::once(system.clone())
+                .chain(log[from..].iter().cloned())
+                .collect();
+            if let Ok(summary) = engine.compact(&window) {
+                log.push(harness(&format!(
+                    "The goal:\n{goal}\n\nThe conversation was shortened; your own notes on the \
+                     work so far:\n{summary}"
+                )));
+                from = log.len() - 1;
             }
-        };
-        // Usage is for the profile, not the conversation. Reasoning stays for
-        // the journal; the provider leaves it out of what goes back.
-        if let Some(obj) = reply.as_object_mut()
-            && let Some(usage) = obj.remove("usage")
-        {
-            turn["usage"] = usage;
         }
-        reply["role"] = json!("assistant");
-        blank |= reply["tool_calls"].as_array().is_none_or(|c| c.is_empty())
-            && reply["content"]
-                .as_str()
-                .is_none_or(|c| c.trim().is_empty());
+        let mut window: Vec<Value> = std::iter::once(system.clone())
+            .chain(log[from..].iter().cloned())
+            .collect();
+        window.push(engine.reminder(step, max_steps, MODE));
+        let (reply, cut) = match engine.ask(&window, &tools) {
+            Ok(r) => r,
+            Err(e) => return end(engine, log, step, None, None, Some(e.to_string())),
+        };
         let calls = reply["tool_calls"].as_array().cloned().unwrap_or_default();
-        messages.push(reply);
-        if calls.is_empty() {
-            think = true;
-            turns.push(turn);
-            messages.push(json!({"role": "user", "content": "Use a tool, or call `done`."}));
+        log.push(reply);
+        if cut && let Some(more) = engine.continue_cut() {
+            log.push(more);
             continue;
         }
-        let mut tool_times = Vec::new();
-        // Routine unless something went wrong: then the next turn reasons.
-        think = false;
-        for call in calls {
+        if calls.is_empty() {
+            log.push(harness("Use a tool, or call `done`."));
+            continue;
+        }
+        for call in &calls {
             let name = call["function"]["name"].as_str().unwrap_or("");
+            if name == "done" {
+                let refused = engine.finish(&sandbox);
+                if let Some(why) = refused {
+                    log.push(json!({"role": "tool", "tool_call_id": call["id"], "content": why}));
+                    continue;
+                }
+                let args: Value = call["function"]["arguments"]
+                    .as_str()
+                    .and_then(|a| serde_json::from_str(a).ok())
+                    .unwrap_or(Value::Null);
+                let summary = args["summary"].as_str().map(str::to_string);
+                return end(engine, log, step, summary, None, None);
+            }
+            let mut result = engine.tool(&sandbox, call);
             let args: Value = call["function"]["arguments"]
                 .as_str()
                 .and_then(|a| serde_json::from_str(a).ok())
                 .unwrap_or(Value::Null);
-            if name == "done" {
-                turn["tools"] = json!(tool_times);
-                turns.push(turn);
-                return Ok(Outcome {
-                    summary: args["summary"].as_str().map(str::to_string),
-                    steps: step,
-                    messages,
-                    stuck: None,
-                    question: None,
-                    turns,
-                    error: None,
-                });
-            }
-            let ran = Instant::now();
-            let sandbox = |argv: &[String]| worlds.sandbox_command(world, argv);
-            let mut result = match execute(&sandbox, name, &args) {
-                Ok(out) => out,
-                Err(e) => format!("error: {e}"),
-            };
-            tool_times.push(json!({"name": name, "ms": ms(ran)}));
-            if result.starts_with("error:")
-                || (result.starts_with("exit ") && !result.starts_with("exit 0\n"))
-            {
-                think = true;
-            }
             let shown = format!("{name} {}", short(&args));
             // `timeout` exits 124 (TERM) or 137 (KILL after the grace period).
             if name == "shell"
                 && (result.starts_with("exit 124\n") || result.starts_with("exit 137\n"))
             {
-                watch.timeouts += 1;
-                if watch.timeouts >= TIMEOUT_STOP {
-                    messages.push(json!({"role": "tool", "tool_call_id": call["id"], "content": truncate(&result)}));
-                    turn["tools"] = json!(tool_times);
-                    turns.push(turn);
-                    return stop(
-                        messages,
-                        turns,
-                        step,
-                        format!(
-                            "stuck: a second command hung and was killed after {COMMAND_TIMEOUT_SECS} s: {shown}"
-                        ),
+                engine.watch.timeouts += 1;
+                if engine.watch.timeouts >= TIMEOUT_STOP {
+                    log.push(
+                        json!({"role": "tool", "tool_call_id": call["id"], "content": result}),
                     );
+                    let why = format!(
+                        "stuck: a second command hung and was killed after {} s: {shown}",
+                        tools::COMMAND_TIMEOUT_SECS
+                    );
+                    return end(engine, log, step, None, Some(why), None);
                 }
                 result = format!(
-                    "timed out after {COMMAND_TIMEOUT_SECS} s and was killed. Do not run it again as is: \
-                     bound it (smaller input, `timeout`, no watch mode, no prompt) or do without it.\n{result}"
+                    "timed out after {} s and was killed. Do not run it again as is: bound it \
+                     (smaller input, `timeout`, no watch mode, no prompt) or do without it.\n{result}",
+                    tools::COMMAND_TIMEOUT_SECS
                 );
             }
-            let repeated = watch.call(&call["function"]["arguments"].to_string(), &result);
-            messages.push(json!({
-                "role": "tool",
-                "tool_call_id": call["id"],
-                "content": truncate(&result),
-            }));
+            let repeated = engine
+                .watch
+                .call(&call["function"]["arguments"].to_string(), &result);
+            log.push(json!({"role": "tool", "tool_call_id": call["id"], "content": result}));
             match repeated {
                 Some(true) => {
-                    turn["tools"] = json!(tool_times);
-                    turns.push(turn);
-                    return stop(messages, turns, step, format!("stuck: the same call gave the same result {REPEAT_STOP} times in a row: {shown}"));
+                    let why = format!(
+                        "stuck: the same call gave the same result {REPEAT_STOP} times in a row: {shown}"
+                    );
+                    return end(engine, log, step, None, Some(why), None);
                 }
-                Some(false) => messages.push(json!({"role": "user", "content": format!(
+                Some(false) => log.push(harness(&format!(
                     "You have made this exact call {REPEAT_NUDGE} times with the same result: {shown}. \
                      Repeating it will not change anything. Try a different approach, or call `done` \
                      and say what blocks you."
-                )})),
+                ))),
                 None => {}
             }
         }
-        turn["tools"] = json!(tool_times);
-        turns.push(turn);
-        match watch.step(worlds.status(world)?) {
+        match engine.watch.step(worlds.status(world)?) {
             Some(true) => {
-                return stop(messages, turns, step, format!("stuck: no file changed in {IDLE_STOP} steps"));
+                let why = format!("stuck: no file changed in {IDLE_STOP} steps");
+                return end(engine, log, step, None, Some(why), None);
             }
-            Some(false) => messages.push(json!({"role": "user", "content": format!(
+            Some(false) => log.push(harness(&format!(
                 "{IDLE_NUDGE} steps without changing any file. Stop exploring: make the change now, \
                  or call `done` and say what blocks you."
-            )})),
+            ))),
             None => {}
         }
     }
-    stop(
-        messages,
-        turns,
-        max_steps,
-        format!("stopped after {max_steps} steps without calling `done`"),
-    )
+    let why = format!("stopped after {max_steps} steps without calling `done`");
+    end(engine, log, max_steps, None, Some(why), None)
 }
 
 /// Asks a stopped model for the one question a human could answer. It gets
@@ -344,73 +770,8 @@ pub(crate) fn parse_question(reply: &str) -> Option<String> {
     (!q.is_empty() && !q.trim_end_matches('.').eq_ignore_ascii_case("none")).then(|| q.to_string())
 }
 
-/// Runs one tool call; `sandbox` builds the command that runs inside the
-/// sandbox (a world's, or a chat's folder).
-pub(crate) fn execute(
-    sandbox: &dyn Fn(&[String]) -> io::Result<std::process::Command>,
-    name: &str,
-    args: &Value,
-) -> io::Result<String> {
-    let arg = |k: &str| {
-        args[k]
-            .as_str()
-            .ok_or_else(|| io::Error::other(format!("missing string argument `{k}`")))
-    };
-    match name {
-        "shell" => {
-            let argv = [
-                "timeout".to_string(),
-                "-k".to_string(),
-                "5".to_string(),
-                COMMAND_TIMEOUT_SECS.to_string(),
-                // The same shell as the checks that judge the work (`solve::verify`).
-                "bash".to_string(),
-                "-c".to_string(),
-                arg("command")?.to_string(),
-            ];
-            let out = sandbox(&argv)?.stdin(Stdio::null()).output()?;
-            Ok(format!(
-                "exit {}\n{}{}",
-                out.status.code().unwrap_or(-1),
-                String::from_utf8_lossy(&out.stdout),
-                String::from_utf8_lossy(&out.stderr)
-            ))
-        }
-        "write_file" => {
-            let argv = [
-                "sh".to_string(),
-                "-c".to_string(),
-                r#"mkdir -p "$(dirname "$1")" && cat > "$1""#.to_string(),
-                "sh".to_string(),
-                arg("path")?.to_string(),
-            ];
-            let content = arg("content")?;
-            let mut child = sandbox(&argv)?
-                .stdin(Stdio::piped())
-                .stdout(Stdio::null())
-                .stderr(Stdio::piped())
-                .spawn()?;
-            if let Some(mut stdin) = child.stdin.take() {
-                stdin.write_all(content.as_bytes())?;
-            }
-            let out = child.wait_with_output()?;
-            if out.status.success() {
-                Ok(format!("wrote {} bytes", content.len()))
-            } else {
-                Err(io::Error::other(
-                    String::from_utf8_lossy(&out.stderr).trim().to_string(),
-                ))
-            }
-        }
-        _ => Err(io::Error::other(format!("unknown tool `{name}`"))),
-    }
-}
-
-/// Keeps the conversation under budget by eliding old tool output and old
-/// file contents, oldest first. It cuts down to half the budget at once: each
-/// cut changes the prefix and costs a fresh prefill, so cuts must be rare.
 /// A call in one line for a reason the human reads.
-fn short(args: &Value) -> String {
+pub(crate) fn short(args: &Value) -> String {
     let text = args["command"]
         .as_str()
         .or(args["path"].as_str())
@@ -422,111 +783,13 @@ fn short(args: &Value) -> String {
     }
 }
 
-pub(crate) fn bound(messages: &mut [Value]) {
-    // Reasoning is kept for the journal but never sent: it costs no context.
-    let size = |m: &Value| {
-        let kept: usize = ["reasoning_content", "reasoning"]
-            .iter()
-            .filter_map(|k| m[*k].as_str())
-            .map(str::len)
-            .sum();
-        m.to_string().len().saturating_sub(kept)
-    };
-    let mut total: usize = messages.iter().map(size).sum();
-    let end = messages.len().saturating_sub(KEEP_RECENT);
-    if total <= CONTEXT_BUDGET || end <= 2 {
-        return;
-    }
-    // The system prompt and the goal (0, 1) are never elided.
-    for m in &mut messages[2..end] {
-        if total <= CONTEXT_BUDGET / 2 {
-            break;
-        }
-        let before = size(m);
-        elide(m);
-        total = total + size(m) - before;
-    }
-}
-
-fn elide(m: &mut Value) {
-    if m["role"] == "tool"
-        && let Some(c) = m["content"].as_str()
-        && c.len() > 200
-    {
-        let first = c.lines().next().unwrap_or("");
-        m["content"] = json!(format!(
-            "{first}\n[{} bytes elided to bound the context; run again if needed]",
-            c.len()
-        ));
-    }
-    for call in m["tool_calls"].as_array_mut().into_iter().flatten() {
-        let Some(mut args) = call["function"]["arguments"]
-            .as_str()
-            .and_then(|a| serde_json::from_str::<Value>(a).ok())
-        else {
-            continue;
-        };
-        if let Some(c) = args["content"].as_str()
-            && c.len() > 200
-        {
-            args["content"] = json!(format!("[{} bytes elided]", c.len()));
-            call["function"]["arguments"] = json!(args.to_string());
-        }
-    }
-}
-
-/// Keep the head and the tail: errors usually sit at the end.
-pub(crate) fn truncate(s: &str) -> String {
-    if s.len() <= OUTPUT_LIMIT {
-        return s.to_string();
-    }
-    let half = OUTPUT_LIMIT / 2;
-    let head_end = (0..=half)
-        .rev()
-        .find(|&i| s.is_char_boundary(i))
-        .unwrap_or(0);
-    let tail_start = (s.len() - half..s.len())
-        .find(|&i| s.is_char_boundary(i))
-        .unwrap_or(s.len());
-    format!(
-        "{}\n[... {} bytes cut ...]\n{}",
-        &s[..head_end],
-        tail_start - head_end,
-        &s[tail_start..]
-    )
-}
-
-pub(crate) fn tools() -> Value {
-    let tool = |name: &str, description: &str, params: Value| {
-        json!({"type": "function", "function": {
-            "name": name, "description": description,
-            "parameters": {"type": "object", "properties": params,
-                           "required": params.as_object().map(|p| p.keys().cloned().collect::<Vec<_>>())}
-        }})
-    };
-    let string = |d: &str| json!({"type": "string", "description": d});
-    json!([
-        tool(
-            "shell",
-            "Run a shell command in the project root. Returns exit code and output.",
-            json!({"command": string("sh -c script")})
-        ),
-        tool(
-            "write_file",
-            "Create or overwrite a file with the given content.",
-            json!({"path": string("relative to the project root"), "content": string("full file content")})
-        ),
-        tool(
-            "done",
-            "Finish the task.",
-            json!({"summary": string("what you changed and why, for the person who asked, in their language")})
-        ),
-    ])
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::VecDeque;
+    use std::path::Path;
+    use std::process::Command;
+    use std::sync::Mutex;
 
     #[test]
     fn question_parsing() {
@@ -560,37 +823,138 @@ mod tests {
         }
     }
 
-    #[test]
-    fn bound_elides_old_output_and_keeps_the_frame() {
-        let big = "exit 0\n".to_string() + &"x".repeat(10_000);
-        let mut messages = vec![
-            json!({"role": "system", "content": big}),
-            json!({"role": "user", "content": "goal"}),
-        ];
-        for i in 0..10 {
-            let args = json!({"path": "f", "content": "y".repeat(5_000)}).to_string();
-            messages.push(json!({"role": "assistant", "tool_calls": [{"id": i, "function": {"name": "write_file", "arguments": args}}]}));
-            messages.push(json!({"role": "tool", "content": big}));
+    struct Silent;
+    impl Model for Silent {
+        fn chat(&self, _: &[Value], _: &Value) -> io::Result<Value> {
+            Ok(json!({"content": "notes"}))
         }
-        let size = |m: &[Value]| m.iter().map(|m| m.to_string().len()).sum::<usize>();
-        let before = size(&messages);
-        bound(&mut messages);
-        assert!(size(&messages) < before / 2);
-        assert_eq!(messages[0]["content"].as_str().unwrap().len(), big.len());
-        assert!(
-            messages[3]["content"]
-                .as_str()
-                .unwrap()
-                .starts_with("exit 0\n[")
+        fn label(&self) -> String {
+            "silent".into()
+        }
+    }
+
+    fn call(name: &str, args: Value) -> Value {
+        json!({"id": "c", "function": {"name": name, "arguments": args.to_string()}})
+    }
+
+    #[test]
+    fn criteria_are_checked_and_done_waits_for_them() {
+        let dir = std::env::temp_dir().join(format!("fennec-os-engine-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let sandbox = |argv: &[String]| {
+            let mut c = Command::new(&argv[0]);
+            c.args(&argv[1..]).current_dir(&dir);
+            Ok(c)
+        };
+        let mut e = Engine::new(&Silent, vec![criterion("do not touch x", None)]);
+        let added = e.tool(
+            &sandbox,
+            &call(
+                "criteria",
+                json!({"action": "add", "text": "f exists", "check": "test -f f"}),
+            ),
         );
-        let last = messages.last().unwrap();
-        assert_eq!(last["content"].as_str().unwrap().len(), big.len());
-        let args: Value = serde_json::from_str(
-            messages[2]["tool_calls"][0]["function"]["arguments"]
-                .as_str()
-                .unwrap(),
-        )
-        .unwrap();
-        assert_eq!(args["path"], "f");
+        assert!(added.contains("2. [ ] f exists"), "{added}");
+        assert!(
+            e.finish(&sandbox).is_some(),
+            "an open criterion refuses done"
+        );
+        let failed = e.tool(
+            &sandbox,
+            &call("criteria", json!({"action": "done", "number": 2})),
+        );
+        assert!(failed.contains("not met"), "{failed}");
+        // An edit needs a read first; a write counts as one.
+        let edit = json!({"path": "f", "old_string": "a", "new_string": "b"});
+        assert!(
+            e.tool(&sandbox, &call("edit_file", edit.clone()))
+                .contains("read f")
+        );
+        e.tool(
+            &sandbox,
+            &call("write_file", json!({"path": "f", "content": "a"})),
+        );
+        assert!(
+            e.tool(&sandbox, &call("edit_file", edit))
+                .contains("edited")
+        );
+        assert!(e.finish(&sandbox).is_none(), "the check now passes");
+        assert_eq!(e.criteria[1]["state"], "passed");
+        let reminder = e.reminder(9, 10, "Build.");
+        let text = reminder["content"].as_str().unwrap();
+        assert!(
+            text.contains("call `done`") && text.contains("Few steps"),
+            "{text}"
+        );
+        let bad = json!({"id": "c", "function": {"name": "shell", "arguments": "{oops"}});
+        assert!(e.tool(&sandbox, &bad).contains("not valid JSON"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn the_persons_rules_refuse_ask_or_record() {
+        let ran = std::cell::Cell::new(0);
+        let sandbox = |_: &[String]| {
+            ran.set(ran.get() + 1);
+            Ok(Command::new("true"))
+        };
+        let rules = vec![
+            json!({"effect": "deny", "on": "command", "pattern": "rm -fr /", "why": "root"}),
+            json!({"effect": "ask", "on": "read", "pattern": "**/.env", "why": "secrets"}),
+        ];
+        let guard = || Some(Guard::new(rules.clone(), Path::new("/p"), Path::new("/h")));
+        let shell = |c: &str| call("shell", json!({"command": c}));
+        // A task: nobody to ask, so refused and recorded.
+        let mut e = Engine::new(&Silent, Vec::new());
+        e.guard = guard();
+        assert!(e.tool(&sandbox, &shell("rm -r -f /")).contains("refused"));
+        assert!(e.tool(&sandbox, &shell("cat .env")).contains("nobody can"));
+        assert_eq!(e.asked.len(), 1);
+        assert_eq!(ran.get(), 0, "nothing ran");
+        // A chat: asked; allowed for the chat, it is not asked again.
+        let asks = std::cell::Cell::new(0);
+        let asker = |_: Value| {
+            asks.set(asks.get() + 1);
+            Ok(Some(Answer::Chat))
+        };
+        let mut e = Engine::new(&Silent, Vec::new());
+        e.guard = guard();
+        e.asker = Some(&asker);
+        e.tool(&sandbox, &shell("cat .env"));
+        e.tool(&sandbox, &call("read_file", json!({"path": ".env"})));
+        assert_eq!((asks.get(), ran.get()), (1, 2));
+    }
+
+    #[test]
+    fn done_goes_through_after_two_refusals() {
+        let sandbox = |_: &[String]| Ok(Command::new("false"));
+        let mut e = Engine::new(&Silent, vec![step_criterion("never done")]);
+        assert!(e.finish(&sandbox).is_some());
+        assert!(e.finish(&sandbox).is_some());
+        assert!(e.finish(&sandbox).is_none());
+    }
+
+    #[test]
+    fn a_large_context_is_compacted_into_the_models_notes() {
+        struct Big(Mutex<VecDeque<Value>>);
+        impl Model for Big {
+            fn chat(&self, _: &[Value], _: &Value) -> io::Result<Value> {
+                Ok(self.0.lock().unwrap().pop_front().unwrap())
+            }
+            fn label(&self) -> String {
+                "big".into()
+            }
+        }
+        let model = Big(Mutex::new(VecDeque::from([
+            json!({"content": "hi", "usage": {"prompt_tokens": 1_000_000}}),
+            json!({"content": "my notes"}),
+        ])));
+        let mut e = Engine::new(&model, Vec::new());
+        e.ask(&[json!({"role": "user", "content": "go"})], &json!([]))
+            .unwrap();
+        assert!(e.needs_compaction());
+        assert_eq!(e.compact(&[]).unwrap(), "my notes");
+        assert!(!e.needs_compaction());
+        assert_eq!(e.turns.len(), 2);
     }
 }

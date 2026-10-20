@@ -1,6 +1,7 @@
 pub mod agent;
 pub mod chat;
 pub mod grant;
+pub mod guard;
 pub mod outside;
 pub mod plugin;
 pub mod proof;
@@ -15,6 +16,7 @@ pub mod sleep;
 pub mod solve;
 pub mod spec;
 pub mod team;
+pub mod tools;
 pub mod world;
 
 /// Tests that move process-wide variables (`HOME`, `XDG_CONFIG_HOME`) hold

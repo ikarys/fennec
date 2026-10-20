@@ -351,10 +351,15 @@ fn attempt_inner(
         record["grant"] = json!(granted);
     }
     let base = worlds.git(world, &["rev-parse", "HEAD"])?;
-    let criteria: Vec<String> = rules
+    let criteria: Vec<Value> = rules
         .iter()
         .filter(|r| r.block)
-        .map(Rule::describe)
+        .map(|r| match &r.kind {
+            // A command that judges the work is a check the agent runs too,
+            // before it says it is done.
+            Kind::StandingCommand(c) => agent::criterion(&r.describe(), Some(c)),
+            _ => agent::criterion(&r.describe(), None),
+        })
         .collect();
     // In the goal message, not the system prompt: the system prompt stays
     // the same across attempts and keeps the server's prefix cache.
@@ -362,7 +367,7 @@ fn attempt_inner(
         "" => task.goal.clone(),
         _ => format!("{}\n\n{lessons}", task.goal),
     };
-    let outcome = agent::run(worlds, world, model, &goal, &criteria, &context, max_steps)?;
+    let outcome = agent::run(worlds, world, model, &goal, criteria, &context, max_steps)?;
     record["steps"] = json!(outcome.steps);
     record["rules"] = json!(rules::used(outcome.summary.as_deref().unwrap_or(""), said));
     record["summary"] = json!(outcome.summary.as_deref().map(rules::shown));
@@ -371,6 +376,8 @@ fn attempt_inner(
     record["stuck"] = json!(outcome.stuck);
     record["question"] = json!(outcome.question);
     record["turns"] = json!(outcome.turns);
+    record["criteria"] = json!(outcome.criteria);
+    record["asked"] = json!(outcome.asked);
     if let Some(e) = outcome.error {
         return Err(io::Error::other(e));
     }

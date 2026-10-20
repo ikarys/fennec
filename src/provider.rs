@@ -377,6 +377,8 @@ impl OpenAi {
                 if !reply["usage"].is_null() {
                     message["usage"] = reply["usage"].take();
                 }
+                // `length`: the reply was cut, the agent continues it.
+                message["finish_reason"] = reply["choices"][0]["finish_reason"].take();
                 Ok(message)
             }
         }
@@ -394,6 +396,9 @@ fn outgoing(messages: &[Value]) -> Vec<Value> {
             if let Some(o) = m.as_object_mut() {
                 o.remove("reasoning_content");
                 o.remove("reasoning");
+                // Marks a message the harness added (`agent::harness`).
+                o.remove("harness");
+                o.remove("finish_reason");
             }
             with_images(&mut m);
             m

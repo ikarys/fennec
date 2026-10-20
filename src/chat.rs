@@ -18,12 +18,13 @@ use crate::agent;
 use crate::outside;
 use crate::provider::Model;
 use crate::skill;
+use crate::tools;
 use crate::world::Worlds;
 
 const SYSTEM: &str = "You are fennec, talking with a person about the folder they chose; \
 it is the current directory. Answer in their language, like a colleague, in Markdown. Use the \
 tools whenever the answer is in the files or needs a command: read before you answer. The \
-sandbox has no network and hides their home except this folder. Your turn ends when you reply \
+sandbox reaches the network and hides their home except this folder. Your turn ends when you reply \
 without a tool call: that reply is what they read.";
 
 /// A chat starts read-only: talking about a project is not asking to build it.
@@ -34,7 +35,13 @@ turn; if not, keep discussing. Do not try to write before.";
 
 const WRITE: &str = " They allowed changes: do what they ask. Your changes are made directly \
 in their folder and cannot be undone by the harness, so ask before deleting or overwriting \
-what you did not write.";
+what you did not write. Read a file before changing it (read_file), change it with edit_file \
+(write_file for a new file), never with sed or a script; build and test after each change.";
+
+/// The reminder's line while an approved plan's steps are open.
+const PLAN: &str = "Work through the approved plan, step by step: build and test what you \
+change, then mark the step with `criteria` (action done). Answer the person once every step \
+is done.";
 
 /// Every write of a chat file goes through this lock: the turn running in
 /// the background and the page (stop) change the same file.
@@ -212,6 +219,11 @@ fn speak(worlds: &Worlds, id: &str, at: Option<usize>, text: &str) -> io::Result
             if let Some(m) = c["messages"].as_array_mut() {
                 m.truncate(i);
             }
+            // Notes taken past the cut summarize what is gone: the whole
+            // exchange is sent again, compacted anew if it must be.
+            if c["window"].as_u64().is_some_and(|w| w as usize > i) {
+                c["window"] = json!(0);
+            }
         }
         push(
             &mut c["messages"],
@@ -260,6 +272,12 @@ pub fn fail(worlds: &Worlds, id: &str, why: &str) -> io::Result<()> {
 /// the whole chat (a grant), `false` covers this call only, so the next
 /// attempt asks again.
 pub fn decide(worlds: &Worlds, id: &str, allow: bool) -> io::Result<()> {
+    decide_for(worlds, id, allow, false)
+}
+
+/// [`decide`]; `for_chat`: a rule's question answered for the rest of the
+/// chat, not this call only.
+pub fn decide_for(worlds: &Worlds, id: &str, allow: bool, for_chat: bool) -> io::Result<()> {
     let mut answered = false;
     update(worlds, id, |c| {
         if c["status"] != "waiting" {
@@ -268,6 +286,7 @@ pub fn decide(worlds: &Worlds, id: &str, allow: bool) -> io::Result<()> {
         answered = true;
         c["status"] = json!("thinking");
         c["decision"] = json!(allow);
+        c["for_chat"] = json!(for_chat);
         // An approved plan allows changes, as the button on the page does.
         if allow && c["pending"]["tool"] == "propose_plan" {
             c["write"] = json!(true);
@@ -351,11 +370,26 @@ fn ask(worlds: &Worlds, id: &str, pending: Value) -> io::Result<Option<bool>> {
 fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::Result<()> {
     let chat = load(worlds, id)?;
     let folder = PathBuf::from(chat["folder"].as_str().unwrap_or(""));
-    let mut watch = agent::Watch::default();
-    // Blank: the model spent its whole budget reasoning; the rest of the turn
-    // goes without reasoning, as in `agent::run`.
-    let mut blank = false;
-    for _ in 0..max_steps {
+    // The plan's steps, kept across turns until they are all done.
+    let criteria = chat["criteria"].as_array().cloned().unwrap_or_default();
+    let mut engine = agent::Engine::new(model, criteria);
+    engine.guard = Some(crate::guard::Guard::load(&folder, &folder, &worlds.home)?);
+    engine.allowed = chat["allowed"].as_array().cloned().unwrap_or_default();
+    // A rule's question goes to the page as the others do.
+    let asker = |question: Value| {
+        Ok(
+            ask(worlds, id, question)?.map(|yes| match (yes, load(worlds, id)) {
+                (false, _) => agent::Answer::No,
+                (true, Ok(c)) if c["for_chat"] == true => agent::Answer::Chat,
+                (true, _) => agent::Answer::Once,
+            }),
+        )
+    };
+    engine.asker = Some(&asker);
+    // Replies without a tool call while the plan has open steps: the model
+    // is sent back to them, twice at most, then the turn ends.
+    let mut pushed = 0;
+    for step in 1..=max_steps {
         // Skills are read again at each call: the person may change them.
         let chat = load(worlds, id)?;
         if chat["stop"] == true {
@@ -368,34 +402,53 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
             .collect();
         // Read at each call: the person may allow changes while the turn runs.
         let write = chat["write"] == true;
-        let tools: Value = agent::tools()
-            .as_array()
-            .into_iter()
-            .flatten()
-            .filter(|t| t["function"]["name"] != "done")
-            .filter(|t| write || t["function"]["name"] != "write_file")
-            .cloned()
-            .chain((!write).then(propose_plan))
-            .collect();
-        let mode = if write { WRITE } else { READ };
-        let system = format!("{SYSTEM}{mode}{}", skill::brief(&skills));
-        let mut messages = vec![json!({"role": "system", "content": system})];
-        messages.extend(chat["messages"].as_array().cloned().unwrap_or_default());
-        agent::bound(&mut messages);
-        let asked = Instant::now();
-        let mut reply = if blank {
-            model.chat_quick(&messages, &tools)?
+        let mut tools = tools::definitions(write);
+        tools.push(if write {
+            tools::criteria_tool()
         } else {
-            model.chat(&messages, &tools)?
-        };
-        let mut record = json!({"at": now(), "model_ms": asked.elapsed().as_millis() as u64,
-                                "think": !blank});
-        if let Some(obj) = reply.as_object_mut()
-            && let Some(usage) = obj.remove("usage")
-        {
-            record["usage"] = usage;
+            propose_plan()
+        });
+        let tools = Value::Array(tools);
+        let mode = if write { WRITE } else { READ };
+        let system = json!({"role": "system",
+                            "content": format!("{SYSTEM}{mode}{}", skill::brief(&skills))});
+        let mut log = chat["messages"].as_array().cloned().unwrap_or_default();
+        // The model sees the exchange from `window` on: past the last
+        // compaction, whose notes open it.
+        let mut from = (chat["window"].as_u64().unwrap_or(0) as usize).min(log.len());
+        if engine.needs_compaction() {
+            let window: Vec<Value> = std::iter::once(system.clone())
+                .chain(log[from..].iter().cloned())
+                .collect();
+            if let Ok(notes) = engine.compact(&window) {
+                let last = log
+                    .iter()
+                    .rev()
+                    .find(|m| m["role"] == "user" && m["harness"] != true)
+                    .and_then(|m| m["content"].as_str())
+                    .unwrap_or("");
+                log.push(agent::harness(&format!(
+                    "The conversation was shortened; your own notes on it:\n{notes}\n\n\
+                     The person's latest message:\n{last}"
+                )));
+                from = log.len() - 1;
+                update(worlds, id, |c| {
+                    c["messages"] = json!(log);
+                    c["window"] = json!(from);
+                })?;
+            }
         }
-        reply["role"] = json!("assistant");
+        let mut window: Vec<Value> = std::iter::once(system)
+            .chain(log[from..].iter().cloned())
+            .collect();
+        // Framed at each step while a plan is under way.
+        if write && engine.open() > 0 {
+            window.push(engine.reminder(step, max_steps, PLAN));
+        }
+        let was_blank = engine.blank;
+        let (mut reply, cut) = engine.ask(&window, &tools)?;
+        let mut record = engine.turns.last().cloned().unwrap_or_default();
+        record["at"] = json!(now());
         let calls = reply["tool_calls"].as_array().cloned().unwrap_or_default();
         let text = reply["content"].as_str().unwrap_or("");
         // Some servers leave the reasoning inline.
@@ -406,10 +459,9 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
             .trim()
             .to_string();
         if calls.is_empty() && text.is_empty() {
-            if blank {
+            if was_blank {
                 return Err(io::Error::other("the model gave an empty reply twice"));
             }
-            blank = true;
             update(worlds, id, |c| push(&mut c["turns"], record))?;
             continue;
         }
@@ -418,7 +470,6 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
         }
         let mut said = vec![reply];
         let mut stuck = None;
-        let mut times = Vec::new();
         for call in &calls {
             let name = call["function"]["name"].as_str().unwrap_or("");
             // Folders the person opened for this chat, read again before each
@@ -429,19 +480,30 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
                 .and_then(|a| serde_json::from_str(a).ok())
                 .unwrap_or(Value::Null);
             let started = Instant::now();
+            let timed =
+                |name: &str| json!({"name": name, "ms": started.elapsed().as_millis() as u64});
             // The plan is the question: approved, the rest of the turn writes.
             if name == "propose_plan" {
                 // Steps, when given, let the page split the plan into tasks.
+                let steps = args["steps"].as_array().cloned().unwrap_or_default();
                 let pending = json!({"tool": name, "plan": args["plan"].as_str().unwrap_or(""),
-                                     "steps": args["steps"].as_array().cloned().unwrap_or_default()});
+                                     "steps": steps});
                 let answer = match ask(worlds, id, pending)? {
-                    Some(true) => "approved: changes are allowed now, apply the plan",
+                    Some(true) => {
+                        // Its steps are what the turn works through, one by one.
+                        engine.criteria = steps
+                            .iter()
+                            .filter_map(Value::as_str)
+                            .map(|s| agent::step_criterion(s.lines().next().unwrap_or(s)))
+                            .collect();
+                        "approved: changes are allowed now, apply the plan"
+                    }
                     Some(false) => {
                         "not approved: the folder stays read-only; ask what to change in the plan"
                     }
                     None => return Ok(()),
                 };
-                times.push(json!({"name": name, "ms": started.elapsed().as_millis() as u64}));
+                push(&mut record["tools"], timed(name));
                 said.push(json!({"role": "tool", "tool_call_id": call["id"], "content": answer}));
                 continue;
             }
@@ -455,7 +517,7 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
                 // The home itself, `/` or the store is never offered: one
                 // click there would undo the sandbox.
                 if let Some(why) = worlds.unopenable(&directory) {
-                    times.push(json!({"name": name, "ms": started.elapsed().as_millis() as u64}));
+                    push(&mut record["tools"], timed(name));
                     said.push(json!({"role": "tool", "tool_call_id": call["id"],
                         "content": format!("refused without asking: {why}; it is untouched")}));
                     continue;
@@ -470,9 +532,7 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
                         })?;
                     }
                     Some(false) => {
-                        times.push(
-                            json!({"name": name, "ms": started.elapsed().as_millis() as u64}),
-                        );
+                        push(&mut record["tools"], timed(name));
                         said.push(json!({"role": "tool", "tool_call_id": call["id"],
                         "content": format!(
                             "the person refused access to {}; it is untouched, do not retry it",
@@ -485,30 +545,49 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
             }
             let sandbox =
                 |argv: &[String]| worlds.sandbox_folder(&folder, &mounts, &grants, write, argv);
-            let result =
-                agent::execute(&sandbox, name, &args).unwrap_or_else(|e| format!("error: {e}"));
-            times.push(json!({"name": name, "ms": started.elapsed().as_millis() as u64}));
-            if watch.call(&call["function"]["arguments"].to_string(), &result) == Some(true) {
+            let result = engine.tool(&sandbox, call);
+            push(&mut record["tools"], timed(name));
+            if engine
+                .watch
+                .call(&call["function"]["arguments"].to_string(), &result)
+                == Some(true)
+            {
                 stuck = Some(format!(
                     "stopped: the same call gave the same result {} times in a row",
                     agent::REPEAT_STOP
                 ));
             }
-            said.push(json!({"role": "tool", "tool_call_id": call["id"],
-                             "content": agent::truncate(&result)}));
+            said.push(json!({"role": "tool", "tool_call_id": call["id"], "content": result}));
         }
-        record["tools"] = json!(times);
-        // What was cut to bound the context stays cut: cutting again at each
-        // call would change the prefix and cost a fresh prefill every time.
-        let kept: Vec<Value> = messages.into_iter().skip(1).chain(said).collect();
+        let open = engine.open();
+        // A reply that leaves the plan's steps open, or one cut by the
+        // length limit: sent back to work.
+        let more = if cut {
+            engine.continue_cut()
+        } else if calls.is_empty() && write && open > 0 && pushed < 2 {
+            pushed += 1;
+            Some(agent::harness(&format!(
+                "<system-reminder>{open} step(s) of the approved plan are not done. Go on with \
+                 the next one now, and mark each with `criteria` when it is done. If one cannot \
+                 be done, say why.</system-reminder>"
+            )))
+        } else {
+            None
+        };
+        let going = more.is_some();
+        said.extend(more);
+        let criteria = engine.criteria.clone();
+        let allowed = engine.allowed.clone();
         update(worlds, id, |c| {
-            c["messages"] = json!(kept);
+            push_all(&mut c["messages"], said);
+            c["criteria"] = json!(criteria);
+            c["allowed"] = json!(allowed);
             push(&mut c["turns"], record);
         })?;
         if let Some(why) = stuck {
             return Err(io::Error::other(why));
         }
-        if calls.is_empty() {
+        if calls.is_empty() && !going {
             return Ok(());
         }
     }
@@ -542,6 +621,12 @@ fn grants(worlds: &Worlds, id: &str) -> io::Result<Vec<PathBuf>> {
         .filter_map(Value::as_str)
         .map(PathBuf::from)
         .collect())
+}
+
+fn push_all(list: &mut Value, items: Vec<Value>) {
+    for item in items {
+        push(list, item);
+    }
 }
 
 fn push(list: &mut Value, item: Value) {
