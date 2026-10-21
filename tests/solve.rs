@@ -672,7 +672,7 @@ fn a_blank_reply_turns_reasoning_off_for_the_rest_of_the_run() {
 }
 
 #[test]
-fn an_idle_model_is_told_twice_then_stopped_at_step_25() {
+fn an_idle_model_is_told_twice_then_stopped_at_step_15() {
     let f = fixture("idle-hard");
     // Reading two different files: no repeat loop, no file changed.
     let mut steps: Vec<(&str, Value)> = Vec::new();
@@ -687,7 +687,7 @@ fn an_idle_model_is_told_twice_then_stopped_at_step_25() {
         attempt["reason"]
             .as_str()
             .unwrap()
-            .starts_with("stuck: no file changed in 25 steps"),
+            .starts_with("stuck: no file changed in 15 steps"),
         "{record:#}"
     );
     let counts = |needle: &str| {
@@ -698,15 +698,15 @@ fn an_idle_model_is_told_twice_then_stopped_at_step_25() {
             .filter(|m| m["content"].as_str().is_some_and(|c| c.contains(needle)))
             .count()
     };
-    assert_eq!(counts("15 steps without changing any file"), 1);
-    assert_eq!(counts("20 steps without a single file changed"), 1);
+    assert_eq!(counts("8 steps without changing any file"), 1);
+    assert_eq!(counts("12 steps without a single file changed"), 1);
 }
 
 #[test]
-fn an_edit_before_step_20_spares_the_harder_notice() {
+fn an_edit_before_step_12_spares_the_harder_notice() {
     let f = fixture("idle-soft");
     let mut steps: Vec<(&str, Value)> = Vec::new();
-    for i in 0..17 {
+    for i in 0..9 {
         let file = if i % 2 == 0 { "check.sh" } else { "README" };
         steps.push(("read_file", json!({"path": file})));
     }
@@ -724,8 +724,8 @@ fn an_edit_before_step_20_spares_the_harder_notice() {
             .filter(|m| m["content"].as_str().is_some_and(|c| c.contains(needle)))
             .count()
     };
-    assert_eq!(counts("15 steps without changing any file"), 1);
-    assert_eq!(counts("20 steps without a single file changed"), 0);
+    assert_eq!(counts("8 steps without changing any file"), 1);
+    assert_eq!(counts("12 steps without a single file changed"), 0);
 }
 
 #[test]
@@ -786,12 +786,7 @@ fn the_spec_discussion_reaches_the_solution_not_the_proof() {
 fn a_chain_role_leaves_relay_notes_the_next_role_reads() {
     let f = fixture("relay");
     // Two roles in team order: senior-developer builds, tech-lead reviews.
-    team::choose(
-        &f.project,
-        team::DEFAULT_TEAM,
-        &["frontend-designer".into()],
-    )
-    .unwrap();
+    team::choose(&f.project, team::DEFAULT_TEAM, &[]).unwrap();
     git(&f, &["add", "-A"]);
     git(
         &f,
@@ -1903,27 +1898,4 @@ fn a_change_that_won_gives_the_folder_back_to_the_human_when_dropped() {
     assert_eq!(git(&f, &["branch", "--show-current"]), "main");
     assert_eq!(git(&f, &["branch", "--list", "world/*"]), "");
     assert!(!f.project.join("note").exists() && !f.project.join("answer").exists());
-}
-
-#[test]
-fn a_direct_request_is_solved_from_the_project_and_lands() {
-    let f = here("here-direct");
-    let s = spec::direct(&f.worlds, &f.project, "answer 42", None, None).unwrap();
-    let id = s["world"].as_str().unwrap().to_string();
-    let honest = Script::new("honest", &[write("answer", "42\n"), done()]);
-    let record = spec::accept(&f.worlds, &id, &[&honest], 10, None).unwrap();
-    let run = record["winner"].as_str().unwrap().to_string();
-    // No tests first: nothing protected, the attempt forked from the project.
-    assert_eq!(record["protect"], json!([]));
-    assert!(record["spec"].is_null(), "{record:#}");
-    assert_eq!(
-        git(&f, &["branch", "--show-current"]),
-        format!("world/{run}")
-    );
-    land(&f.worlds, &run, None, None).unwrap();
-    assert_eq!(git(&f, &["branch", "--show-current"]), "main");
-    assert_eq!(
-        std::fs::read_to_string(f.project.join("answer")).unwrap(),
-        "42\n"
-    );
 }

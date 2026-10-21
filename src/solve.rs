@@ -521,7 +521,7 @@ fn attempt_inner(
         context.push('\n');
     }
     let base = worlds.git(world, &["rev-parse", "HEAD"])?;
-    let criteria: Vec<Value> = rules
+    let mut criteria: Vec<Value> = rules
         .iter()
         .filter(|r| r.block)
         .map(|r| match &r.kind {
@@ -531,6 +531,11 @@ fn attempt_inner(
             _ => agent::criterion(&r.describe(), None),
         })
         .collect();
+    // A task with no checks of its own still names what is wanted, so the
+    // agent is not left to invent its own bar.
+    if task.verify.is_empty() {
+        criteria.push(agent::criterion(&task.goal, None));
+    }
     // In the goal message, not the system prompt: the system prompt stays
     // the same across attempts and keeps the server's prefix cache.
     let goal = match lessons {

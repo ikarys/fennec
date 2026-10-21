@@ -489,38 +489,6 @@ fn key<'a>(line: &'a str, name: &str) -> Option<&'a str> {
     Some(rest.trim_start_matches('*').trim())
 }
 
-/// A request taken as it is, with no tests written first: a spec with no
-/// world and no checks of its own, whose attempts fork from the project.
-/// Its verdict is the project's rules and the proof of the product
-/// (`proof::gather`); test-first is a rule the human writes, not a stage.
-/// `skills`: the ones picked for this request at framing; `None`, all the
-/// person keeps. `roles`: the solve roles the framing marked for this
-/// request; `None` runs the team's usual chain.
-pub fn direct(
-    worlds: &Worlds,
-    project: &Path,
-    request: &str,
-    skills: Option<&[String]>,
-    roles: Option<&[String]>,
-) -> io::Result<Value> {
-    let project = std::fs::canonicalize(project)?;
-    let id = crate::world::new_id();
-    let spec = json!({
-        "project": project.display().to_string(),
-        "request": request,
-        "origin": "direct",
-        "world": id,
-        "goal": request,
-        "verify": [],
-        "protect": [],
-        "status": "proposed",
-        "skills": skills,
-        "roles": roles,
-    });
-    save(worlds, &id, &spec)?;
-    Ok(spec)
-}
-
 /// The human validates the spec: its tests become the task's protected
 /// checks and the attempts fork from its world. Returns the run record.
 pub fn accept(
@@ -696,8 +664,7 @@ fn run_spec(
         ),
         verify: strings("verify"),
         protect: strings("protect"),
-        // A direct spec has no world of its own: it starts from the project.
-        base: (spec["origin"] != "direct" || base != spec["world"]).then(|| base.to_string()),
+        base: Some(base.to_string()),
         grant: Vec::new(),
         skills: spec["skills"].is_array().then(|| strings("skills")),
         roles: spec["roles"].is_array().then(|| strings("roles")),
