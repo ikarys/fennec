@@ -258,7 +258,21 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
                 .collect();
             // Kept in the Backlog: framed ahead, Ready once the human validates.
             let later = v["later"] == true;
-            let id = store.add_request(&field(&v, "project"), &field(&v, "text"), &off, later)?;
+            // The task's content: the page sends it as the description, older
+            // clients as the text.
+            let text = v["description"]
+                .as_str()
+                .map(str::to_string)
+                .filter(|s| !s.trim().is_empty())
+                .or_else(|| v["text"].as_str().map(str::to_string))
+                .unwrap_or_default();
+            let id = store.add_request(
+                &field(&v, "project"),
+                &text,
+                &field(&v, "title"),
+                &off,
+                later,
+            )?;
             // The tasks it builds on: the Fleet starts it once they are committed.
             if v["after"].is_array() {
                 store.update(&id, |r| r["after"] = v["after"].clone())?;
@@ -303,7 +317,14 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
         }
         ("POST", "/api/rewrite") => {
             let v = input()?;
-            store.rewrite(&field(&v, "id"), &field(&v, "text"))?;
+            // The content as the description, as the create sends it.
+            let text = v["description"]
+                .as_str()
+                .map(str::to_string)
+                .filter(|s| !s.trim().is_empty())
+                .or_else(|| v["text"].as_str().map(str::to_string))
+                .unwrap_or_default();
+            store.rewrite(&field(&v, "id"), &text, &field(&v, "title"))?;
             Ok(json!({}))
         }
         ("POST", "/api/forget") => {
@@ -643,7 +664,7 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
                 .into_iter()
                 .find(|p| p == folder)
                 .ok_or_else(|| io::Error::other("this folder is not a project"))?;
-            let id = store.add_request(&project, &transcript(&chat)?, &[], true)?;
+            let id = store.add_request(&project, &transcript(&chat)?, "", &[], true)?;
             Ok(json!({"id": id}))
         }
         ("POST", "/api/rules") => {
@@ -711,9 +732,7 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
                     .filter_map(|c| c.as_str().map(str::to_string))
                     .collect::<Vec<_>>(),
                 &field(&v, "model"),
-                v["tools"]
-                    .as_str()
-                    .unwrap_or_default(),
+                v["tools"].as_str().unwrap_or_default(),
             )?;
             team_view(&path)
         }
@@ -861,7 +880,11 @@ fn team_view(path: &Path) -> io::Result<Value> {
 /// project that picked it would see them. Left-out roles, new roles, and a
 /// team saved from one are a project's choice, so none of it is here.
 fn global_team_view(name: &str) -> io::Result<Value> {
-    let name = if name.trim().is_empty() { team::DEFAULT_TEAM } else { name };
+    let name = if name.trim().is_empty() {
+        team::DEFAULT_TEAM
+    } else {
+        name
+    };
     let roles = team::team_roles(name)?;
     let catalog: Vec<Value> = team::catalog()?
         .iter()
@@ -963,7 +986,13 @@ mod tests {
         assert_eq!(v["team"], team::DEFAULT_TEAM);
         assert_eq!(v["default"], team::DEFAULT_TEAM);
         assert!(v["global"].as_bool().unwrap());
-        assert!(v["roles"].as_array().unwrap().iter().any(|r| r["key"] == "qa"));
+        assert!(
+            v["roles"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|r| r["key"] == "qa")
+        );
         assert_eq!(v["teams"].as_array().unwrap().len(), 2);
         assert!(global_team_view("nope-no-such-team").is_err());
         let _ = std::fs::remove_dir_all(&home);

@@ -658,7 +658,7 @@ async function journal(item) {
 // Work under way reads as a story: what was asked and said, what "done"
 // means, and where the work stands; the model's raw exchange is the Journal tab.
 const STEPS = [["Discussion", /^thinks/], ["Framing", /^gets to work/], ["Work", /^works/],
-  ["Try", /^tries/], ["Commit", /^makes the commit/]];
+  ["Review", /^reviews/], ["Try", /^tries/], ["Commit", /^makes the commit/]];
 function stages(item) {
   if (item.step == null) return ended(item);
   const now = STEPS.findIndex(([, re]) => re.test(item.step));
@@ -670,7 +670,7 @@ function stages(item) {
 // no Framing) stays plain.
 function ended(item) {
   const reached = Object.keys(item.stats?.stages ?? {})
-    .map((name) => ["Discussion", "Framing", "Work", "Proof"].findIndex((s) => stageKey(name).startsWith(s)));
+    .map((name) => ["Discussion", "Framing", "Work", "Review", "Proof"].findIndex((s) => stageKey(name).startsWith(s)));
   if (item.kind === "landed") reached.push(STEPS.length - 1);
   if (!reached.length) return null;
   const last = Math.max(...reached);
@@ -750,7 +750,7 @@ const stageKey = (name) => {
   return old ? old[1] + name.slice(old[0].length) : name;
 };
 // Steps in the order they run; the server keeps them sorted by name.
-const stageRank = (name) => ["Discussion", "Framing", "Starting", "Work", "Proof"].findIndex((s) => stageKey(name).startsWith(s)) >>> 0;
+const stageRank = (name) => ["Discussion", "Framing", "Starting", "Work", "Review", "Proof"].findIndex((s) => stageKey(name).startsWith(s)) >>> 0;
 const number = (n) => (n ?? 0).toLocaleString(lang());
 const compact = (n) => (n ?? 0).toLocaleString(lang(), { notation: "compact", maximumFractionDigits: 1 });
 const percent = (part, whole) => (whole ? Math.round((100 * part) / whole) : 0);
@@ -821,13 +821,13 @@ function timeline(s) {
 
 const stageOf = (name) => {
   const n = stageKey(name);
-  return n.startsWith("Discussion") ? "talk" : n.startsWith("Work") ? "solve" : n.startsWith("Proof") ? "prove" : "frame";
+  return n.startsWith("Discussion") ? "talk" : n.startsWith("Work") ? "solve" : n.startsWith("Proof") ? "prove" : n.startsWith("Review") ? "review" : "frame";
 };
 // A step's name in the chosen language: "Work, try 2" keeps its number.
 const stageName = (name) => {
   const n = stageKey(name);
   if (n.startsWith("Framing")) return t("Tests first");
-  const m = n.match(/^(Work|Proof|Starting) \((?:running|en cours)\)$/);
+  const m = n.match(/^(Work|Proof|Starting|Review) \((?:running|en cours)\)$/);
   if (m) return t("{0} (running)", t(m[1]));
   const tried = n.match(/^Work, try (\d+)$/);
   if (tried) return t("Work, try {0}", tried[1]);
@@ -835,7 +835,7 @@ const stageName = (name) => {
   return via ? `${t(via[1])} ${via[2]}` : t(n);
 };
 // One short sentence per stage: what it is, for the bar's segments and the role chips.
-const STAGE_TIP = { talk: "Opening discussion: what you asked, and what the team took from it.", frame: "Framing: the tests that will prove the end and the scope, set before coding.", solve: "Making: the work is written and run, try after try.", prove: "Proof: the result is checked with the tests and the role's commands." };
+const STAGE_TIP = { talk: "Opening discussion: what you asked, and what the team took from it.", frame: "Framing: the tests that will prove the end and the scope, set before coding.", solve: "Making: the work is written and run, try after try.", review: "Review: the team's reviewer checks the work against the goal and the done when.", prove: "Proof: the result is checked with the tests and the role's commands." };
 // What a role chip is: its brief if the step keeps one, else the stage's job.
 const roleTag = (name, stage, brief) => el("span", { className: `rtag ${stage}`, textContent: name, title: brief ? brief.replace(/\s+/g, " ").trim().slice(0, 200) : t(STAGE_TIP[stage]) });
 
@@ -2423,7 +2423,7 @@ $("picker-choose").onclick = async () => {
 
 // The team of the project chosen above: which team, which of its roles
 // work, and roles to add from the catalogue. Each change is saved at once.
-const STAGES = { frame: "framing", solve: "making", prove: "proof" };
+const STAGES = { frame: "framing", solve: "making", review: "review", prove: "proof" };
 const order = Object.keys(STAGES);
 const byStage = (a, b) => order.indexOf(a.stage) - order.indexOf(b.stage);
 let team = null;

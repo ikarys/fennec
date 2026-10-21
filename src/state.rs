@@ -133,6 +133,7 @@ impl Store {
         &self,
         project: &str,
         text: &str,
+        title: &str,
         off: &[String],
         later: bool,
     ) -> io::Result<String> {
@@ -150,8 +151,13 @@ impl Store {
         let id = format!("{nanos:032x}");
         // Every request opens a conversation; a clear one ends at its first turn.
         let status = if later { "later" } else { "thinking" };
-        let record = json!({"project": project, "text": text.trim(), "status": status, "off": off,
+        let mut record = json!({"project": project, "text": text.trim(), "status": status, "off": off,
                             "since": nanos / 1_000_000_000, "thread": [{"who": "human", "text": text.trim()}]});
+        // A short label of its own, apart from the task's content.
+        let title = title.trim();
+        if !title.is_empty() {
+            record["title"] = json!(title);
+        }
         write_json(&self.request_path(&id)?, &record)?;
         Ok(id)
     }
@@ -203,17 +209,34 @@ impl Store {
         self.update(id, |r| r["status"] = json!("thinking"))
     }
 
-    /// The backlog's text, said again before it starts.
-    pub fn rewrite(&self, id: &str, text: &str) -> io::Result<()> {
+    /// The backlog's task, said again before it starts. The content and its
+    /// short label are separate: rewording the content re-frames, relabelling
+    /// does not.
+    pub fn rewrite(&self, id: &str, text: &str, title: &str) -> io::Result<()> {
         self.later(id)?;
+        let before = self.load(id)?;
         if text.trim().is_empty() {
             return Err(io::Error::other("empty task"));
         }
+        let words_changed = before["text"]
+            .as_str()
+            .map(|t| t.trim() != text.trim())
+            .unwrap_or(true);
         self.update(id, |r| {
             r["text"] = json!(text.trim());
             r["thread"] = json!([{"who": "human", "text": text.trim()}]);
+            // The label of its own, apart from the content.
+            let title = title.trim();
+            if title.is_empty() {
+                r.as_object_mut().map(|m| m.remove("title"));
+            } else {
+                r["title"] = json!(title);
+            }
             // Framed ahead on the old words: framed again on the new ones.
-            if let Some(m) = r.as_object_mut() {
+            if words_changed {
+                let Some(m) = r.as_object_mut() else {
+                    return;
+                };
                 for k in [
                     "ahead",
                     "asked",
@@ -540,7 +563,7 @@ pub fn start(path: &Path) -> io::Result<()> {
 pub(crate) fn is_working(request: &Value) -> bool {
     matches!(
         request["status"].as_str(),
-        Some("thinking" | "framing" | "waiting" | "running" | "proving" | "landing")
+        Some("thinking" | "framing" | "waiting" | "running" | "reviewing" | "proving" | "landing")
     )
 }
 
@@ -625,9 +648,17 @@ fn classify(requests: &[(String, Value)], projects_all: &[Value]) -> Value {
         {
             continue;
         }
+        // The task's content, and its short label of its own: older tasks
+        // have no label, so the content stands in for it.
+        let body = words(r["text"].as_str().unwrap_or(""));
+        let label = r["title"]
+            .as_str()
+            .filter(|t| !t.trim().is_empty())
+            .map(str::to_string)
+            .unwrap_or_else(|| body.clone());
         let card = |kind: &str| {
             json!({"id": id, "kind": kind, "project": name(r["project"].as_str().unwrap_or("")), "path": r["project"],
-                   "title": words(r["text"].as_str().unwrap_or("")),
+                   "title": label, "description": body,
                    "images": image_lines(r["text"].as_str().unwrap_or("")).collect::<Vec<_>>(), "rules": r["rules"], "checks": r["verify"], "team": r["team"],
                    "thread": r["thread"], "stats": r["stats"], "since": r["since"], "picked": r["picked"],
                    // As the work reads it: said in the conversation, else
@@ -681,6 +712,7 @@ fn classify(requests: &[(String, Value)], projects_all: &[Value]) -> Value {
                 running.push(c)
             }
             Some("running") => running.push(card_step(card("running"), "works")),
+            Some("reviewing") => running.push(card_step(card("running"), "reviews the work")),
             Some("proving") => running.push(card_step(card("running"), "tries the product")),
             Some("landing") => running.push(card_step(card("running"), "makes the commit")),
             Some("question") => {
@@ -830,7 +862,10 @@ mod tests {
         let store = Store { root: root.clone() };
         assert_eq!(unbase64("TWFu").unwrap(), b"Man");
         assert_eq!(unbase64("TWE=").unwrap(), b"Ma");
-        assert!(unbase64("TWFuX").is_none(), "a length of 4n+1 is not base64");
+        assert!(
+            unbase64("TWFuX").is_none(),
+            "a length of 4n+1 is not base64"
+        );
         let line = store.save_image("data:image/png;base64,TWFu").unwrap();
         let name = line.rsplit('/').next().unwrap().trim_end_matches(')');
         assert_eq!(store.image(name).unwrap(), b"Man");
@@ -910,19 +945,19 @@ mod tests {
             .add_project(project.to_str().unwrap(), "here")
             .unwrap();
         let p = store.projects().unwrap()[0].clone();
-        let a = store.add_request(&p, "dark mode", &[], true).unwrap();
-        let b = store.add_request(&p, "export", &[], true).unwrap();
+        let a = store.add_request(&p, "dark mode", "", &[], true).unwrap();
+        let b = store.add_request(&p, "export", "", &[], true).unwrap();
         let view = store.view().unwrap();
         assert_eq!(view["later"].as_array().unwrap().len(), 2);
         assert!(view["running"].as_array().unwrap().is_empty());
 
-        store.rewrite(&a, "  dark mode, auto  ").unwrap();
+        store.rewrite(&a, "  dark mode, auto  ", "").unwrap();
         assert_eq!(store.load(&a).unwrap()["text"], "dark mode, auto");
-        assert!(store.rewrite(&a, " ").is_err());
+        assert!(store.rewrite(&a, " ", "").is_err());
         store.launch(&a).unwrap();
         assert_eq!(store.load(&a).unwrap()["status"], "thinking");
         // Started, it is no longer the backlog's to change.
-        assert!(store.rewrite(&a, "x").is_err() && store.forget(&a).is_err());
+        assert!(store.rewrite(&a, "x", "").is_err() && store.forget(&a).is_err());
         store.forget(&b).unwrap();
         assert!(store.load(&b).is_err());
         assert!(
@@ -967,8 +1002,8 @@ mod tests {
             .add_project(project.to_str().unwrap(), "here")
             .unwrap();
         let p = store.projects().unwrap()[0].clone();
-        let landed = store.add_request(&p, "dark mode", &[], true).unwrap();
-        let running = store.add_request(&p, "export", &[], true).unwrap();
+        let landed = store.add_request(&p, "dark mode", "", &[], true).unwrap();
+        let running = store.add_request(&p, "export", "", &[], true).unwrap();
         store
             .update(&landed, |r| r["status"] = json!("landed"))
             .unwrap();
@@ -1091,7 +1126,7 @@ mod tests {
             .add_project(project.to_str().unwrap(), "here")
             .unwrap();
         let p = store.projects().unwrap()[0].clone();
-        let a = store.add_request(&p, "dark mode", &[], true).unwrap();
+        let a = store.add_request(&p, "dark mode", "", &[], true).unwrap();
         store.update(&a, |r| r["status"] = json!("landed")).unwrap();
         assert_eq!(
             store.view().unwrap()["history"].as_array().unwrap().len(),
@@ -1127,7 +1162,7 @@ mod tests {
             .unwrap();
         let p = store.projects().unwrap()[0].clone();
         // With a request, even a forgotten one, the project is not removed.
-        let a = store.add_request(&p, "dark mode", &[], true).unwrap();
+        let a = store.add_request(&p, "dark mode", "", &[], true).unwrap();
         let err = store.remove_project(&p).unwrap_err().to_string();
         assert!(err.contains("tasks"), "{err}");
         store.forget(&a).unwrap();
@@ -1152,7 +1187,7 @@ mod tests {
             .add_project(project.to_str().unwrap(), "here")
             .unwrap();
         let p = store.projects().unwrap()[0].clone();
-        let a = store.add_request(&p, "dark mode", &[], false).unwrap();
+        let a = store.add_request(&p, "dark mode", "", &[], false).unwrap();
         assert_eq!(store.load(&a).unwrap()["status"], "thinking");
         let err = store
             .set_project_archived(&p, true)
@@ -1176,8 +1211,8 @@ mod tests {
             .add_project(project.to_str().unwrap(), "here")
             .unwrap();
         let p = store.projects().unwrap()[0].clone();
-        let a = store.add_request(&p, "dark mode", &[], true).unwrap();
-        let b = store.add_request(&p, "export", &[], true).unwrap();
+        let a = store.add_request(&p, "dark mode", "", &[], true).unwrap();
+        let b = store.add_request(&p, "export", "", &[], true).unwrap();
         store.update(&a, |r| r["status"] = json!("landed")).unwrap();
         store
             .update(&b, |r| r["status"] = json!("thinking"))

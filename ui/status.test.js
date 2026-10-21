@@ -77,11 +77,11 @@ assert.ok(!barOf(underway({ ...busy, waiting: true, alive: true }))
 
 // Where the work stands, as steps: before it done, it highlighted.
 const steps = underway(busy).children[0].children;
-assert.deepEqual(steps.map((li) => li.className), ["done", "done", "now", "", ""], "travaille = Travail en cours");
+assert.deepEqual(steps.map((li) => li.className), ["done", "done", "now", "", "", ""], "travaille = Travail en cours");
 
 // Finished: what the figures show reached, and where it broke.
 const failed = ended({ kind: "failed", stats: { stages: { Discussion: {}, Travail: {}, Preuve: {} } } }).children;
-assert.deepEqual(failed.map((li) => li.className), ["done", "", "done", "stop", ""], "échoué à l'essai, sans cadrage");
+assert.deepEqual(failed.map((li) => li.className), ["done", "", "done", "", "stop", ""], "échoué à l'essai, sans cadrage");
 const landed = ended({ kind: "landed", stats: { stages: { Discussion: {}, Travail: {}, Preuve: {} } } }).children;
 assert.equal(landed.at(-1).className, "done", "commité : Commit fait");
 

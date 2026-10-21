@@ -347,6 +347,7 @@
           border-radius: 8px; padding: 8px 12px 10px; background: var(--card); }
   .step.talk { border-left-color: var(--talk); }
   .step.solve { border-left-color: var(--solve); }
+  .step.review { border-left-color: var(--review); }
   .step.prove { border-left-color: var(--prove); }
   .step-name { font-weight: 600; font-size: 14px; display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 8px;
                padding-bottom: 6px; margin-bottom: 4px; border-bottom: 1px solid var(--line); }
@@ -461,7 +462,7 @@
   .theme .preview .accent { width: 18px; }
   .theme .name { font-size: 13px; }
   #font-scale { width: 90px; }
-  :root { --talk: var(--warn); --frame: var(--accent); --solve: var(--info); --prove: var(--ok); }
+  :root { --talk: var(--warn); --frame: var(--accent); --solve: var(--info); --review: color-mix(in oklab, var(--accent) 45%, var(--info) 55%); --prove: var(--ok); }
   .facts { margin-top: 12px; display: grid; gap: 8px; }
   .facts h3 { margin: 0; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
   .metrics { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
@@ -476,6 +477,7 @@
   .seg.talk, .dotc.talk { background: var(--talk); }
   .seg.frame, .dotc.frame { background: var(--frame); }
   .seg.solve, .dotc.solve { background: var(--solve); }
+  .seg.review, .dotc.review { background: var(--review); }
   .seg.prove, .dotc.prove { background: var(--prove); }
   .who { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
   .rtag { display: inline-block; font-size: 12px; line-height: 1.4; padding: 1px 8px; border-radius: 999px; font-weight: 500;
@@ -483,6 +485,7 @@
   .rtag.talk { color: var(--talk); border-color: var(--talk); }
   .rtag.frame { color: var(--frame); border-color: var(--frame); }
   .rtag.solve { color: var(--solve); border-color: var(--solve); }
+  .rtag.review { color: var(--review); border-color: var(--review); }
   .rtag.prove { color: var(--prove); border-color: var(--prove); }
   .rtag.chip { cursor: pointer; background: transparent; }
   .rtag.chip[aria-pressed=false] { color: var(--muted); border-color: var(--line); text-decoration: line-through; }
