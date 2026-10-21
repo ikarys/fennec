@@ -311,6 +311,7 @@ pub fn add(project: &Path, key: &str) -> io::Result<()> {
 
 /// The human writes a role for a project: an edit of role `key`, or a new
 /// role when `key` is `None` (its key is made from the name). Returns the key.
+#[allow(clippy::too_many_arguments)]
 pub fn save_role(
     project: &Path,
     key: Option<&str>,

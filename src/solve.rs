@@ -37,6 +37,10 @@ pub struct Task {
     /// The solve roles the framing marked for this task; `None`, the usual
     /// chain of the team.
     pub roles: Option<Vec<String>>,
+    /// What the person and fennec agreed in conversation before the work
+    /// began: it goes to the roles that produce, never to the ones that
+    /// judge. Set by the harness, read from a task file.
+    pub discussion: Option<String>,
 }
 
 impl Task {
@@ -59,6 +63,7 @@ impl Task {
             base: None,
             grant: Vec::new(),
             skills: None,
+            discussion: v["discussion"].as_str().map(str::to_string),
             roles: v["roles"]
                 .as_array()
                 .map(|a| {
@@ -81,13 +86,15 @@ impl Task {
 
 /// Runs one attempt per model in turn, until one passes. Keeps its world
 /// for `land`, drops the others, and returns the run record, also saved
-/// under `<root>/runs/`.
+/// under `<root>/runs/`. `log`, when given, is written by the attempts
+/// after every model call: a solve that crashes resumes from it.
 pub fn solve(
     worlds: &Worlds,
     project: &Path,
     task: &Task,
     models: &[&dyn Model],
     max_steps: usize,
+    log: Option<&Path>,
 ) -> io::Result<Value> {
     // Parallel attempts would write the same host paths.
     if !task.grant.is_empty() && models.len() != 1 {
@@ -151,25 +158,29 @@ pub fn solve(
         skills: &skills,
         chain: &chain,
         max_steps,
+        log,
     };
     let source = match &task.base {
         Some(world) => world.clone(),
         None => project.to_string_lossy().to_string(),
     };
+    // A crashed attempt left its conversation in the log: it starts again in
+    // the same world, where it stopped, instead of forking one from the start.
+    let resumed = log.and_then(|p| resumed_attempt(worlds, p));
     // A recorded way to this goal is tried first, alone: if it passes, no
     // model is called. Never with a grant: a replay must not write host paths.
     let (mut forked, mut attempts) = (Vec::new(), Vec::new());
-    let recipe = match task.grant.is_empty() {
-        true => recipe::find(worlds, &project, &task.goal)?,
-        false => None,
+    let recipe = match (task.grant.is_empty(), resumed.is_none()) {
+        (true, true) => recipe::find(worlds, &project, &task.goal)?,
+        _ => None,
     };
     if let Some(recipe) = recipe {
-        let (f, a) = attempts_for(worlds, &source, &[&recipe], brief)?;
+        let (f, a) = attempts_for(worlds, &source, &[&recipe], brief, None)?;
         forked = f;
         attempts = a;
     }
     if !attempts.iter().any(|a| a["passed"] == true) {
-        let (f, a) = attempts_for(worlds, &source, models, brief)?;
+        let (f, a) = attempts_for(worlds, &source, models, brief, resumed)?;
         forked.extend(f);
         attempts.extend(a);
     }
@@ -222,7 +233,44 @@ pub fn solve(
     // The name it is kept under, for whoever shows it later.
     record["id"] = json!(name);
     review::save(worlds, &name, &record)?;
+    // The attempt went on; its log is the next solve's, not this one's.
+    if let Some(p) = log {
+        let _ = std::fs::remove_file(p);
+    }
     Ok(record)
+}
+
+/// What a crashed attempt left in its log, ready to run again: the same
+/// world (its changes are kept), the conversation where it stopped, its
+/// criteria and its reads. `None` when the log is gone, unreadable, or its
+/// world no longer is.
+fn resumed_attempt(worlds: &Worlds, path: &Path) -> Option<(World, agent::Resume)> {
+    let text = std::fs::read_to_string(path).ok()?;
+    let v: Value = serde_json::from_str(&text).ok()?;
+    let world = worlds.open(v["world"].as_str()?).ok()?;
+    // The file keeps the system message first; the live log the window is
+    // built from does not.
+    let mut messages = v["log"].as_array()?[..].to_vec();
+    if messages.first().is_some_and(|m| m["role"] == "system") {
+        messages.remove(0);
+    }
+    Some((
+        world,
+        agent::Resume {
+            goal: v["goal"].as_str()?.to_string(),
+            messages,
+            from: v["from"].as_u64()?.try_into().unwrap_or(0),
+            criteria: v["criteria"].as_array().cloned().unwrap_or_default(),
+            read: v["read"]
+                .as_array()
+                .cloned()
+                .unwrap_or_default()
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::to_string)
+                .collect(),
+        },
+    ))
 }
 
 /// One attempt per model, one after the other, each in a fresh world forked
@@ -237,20 +285,29 @@ fn attempts_for(
     source: &str,
     models: &[&dyn Model],
     brief: &Brief,
+    mut resumed: Option<(World, agent::Resume)>,
 ) -> io::Result<(Vec<World>, Vec<Value>)> {
     let (mut forked, mut attempts) = (Vec::new(), Vec::new());
     let mut lessons = String::new();
     for model in models {
-        let world = worlds.fork(source)?;
-        skill::give(worlds, &world, brief.skills)?;
-        // One world: `solve` refuses a grant with several attempts.
-        if !brief.task.grant.is_empty()
-            && let Err(e) = grant::give(worlds, &world, &brief.task.grant)
-        {
-            worlds.drop(world)?;
-            return Err(e);
-        }
-        let record = attempt(worlds, &world, *model, brief, &lessons);
+        // The crashed attempt goes on where it stopped: its world is kept,
+        // its conversation is where it left off.
+        let (world, state): (World, Option<agent::Resume>) = match resumed.take() {
+            Some(r) => (r.0, Some(r.1)),
+            None => {
+                let world = worlds.fork(source)?;
+                skill::give(worlds, &world, brief.skills)?;
+                // One world: `solve` refuses a grant with several attempts.
+                if !brief.task.grant.is_empty()
+                    && let Err(e) = grant::give(worlds, &world, &brief.task.grant)
+                {
+                    worlds.drop(world)?;
+                    return Err(e);
+                }
+                (world, None)
+            }
+        };
+        let record = attempt(worlds, &world, *model, brief, &lessons, state);
         let passed = record["passed"] == true;
         if !passed {
             if lessons.is_empty() {
@@ -316,6 +373,16 @@ fn lesson(record: &Value) -> String {
 /// the only roles the checks can judge.
 fn buildable(role: &team::Role) -> bool {
     role.tools.is_empty() || role.tools.iter().any(|t| t.name == "shell")
+}
+
+/// A role's working context: the team's, plus its stage and the note it must
+/// leave the next role.
+fn role_context(context: &str, role: &team::Role) -> String {
+    format!(
+        "{context}\n\nAs {} on the team:\n{}\nLeave a note for the next role in \
+         relay/{}.md: what you did, what you found, what it must check.\n",
+        role.name, role.brief, role.key
+    )
 }
 
 /// The goal a role of the chain works to: the task's, with the earlier
@@ -389,18 +456,24 @@ struct Brief<'a> {
     skills: &'a [skill::Skill],
     /// The solve roles that work the attempt, one agent run each.
     chain: &'a [team::Role],
+    /// The whole attempt's budget: the chain's roles share it.
     max_steps: usize,
+    /// Where the attempt writes its own log after every model call; `None`
+    /// keeps it in memory only (a recipe replay, a sub-agent).
+    log: Option<&'a Path>,
 }
 
 /// Never fails: any error becomes a failed attempt in the record.
 /// `lessons` is what earlier failed attempts of the run teach; empty for the
-/// first.
+/// first. `resumed` is the crashed attempt's state, run on again in its own
+/// world; `None` starts the attempt from its fork.
 fn attempt(
     worlds: &Worlds,
     world: &World,
     model: &dyn Model,
     brief: &Brief,
     lessons: &str,
+    resumed: Option<agent::Resume>,
 ) -> Value {
     let started = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -408,7 +481,7 @@ fn attempt(
     let clock = Instant::now();
     let mut record = json!({"world": world.id, "model": model.label(), "passed": false,
                             "started_ms": started});
-    if let Err(e) = attempt_inner(worlds, world, model, brief, lessons, &mut record) {
+    if let Err(e) = attempt_inner(worlds, world, model, brief, lessons, &mut record, resumed) {
         record["reason"] = json!(e.to_string());
     }
     record["ms"] = json!(clock.elapsed().as_millis() as u64);
@@ -422,6 +495,7 @@ fn attempt_inner(
     brief: &Brief,
     lessons: &str,
     record: &mut Value,
+    resumed: Option<agent::Resume>,
 ) -> io::Result<()> {
     let Brief {
         task,
@@ -440,6 +514,11 @@ fn attempt_inner(
             .iter()
             .for_each(|p| context.push_str(&format!("  - {}\n", p.display())));
         record["grant"] = json!(granted);
+    }
+    if let Some(d) = &task.discussion {
+        context.push_str("\n\nThe request's discussion, before the work began — what the human and fennec agreed; the goal already reflects it, do not re-litigate it:\n");
+        context.push_str(d);
+        context.push('\n');
     }
     let base = worlds.git(world, &["rev-parse", "HEAD"])?;
     let criteria: Vec<Value> = rules
@@ -464,7 +543,16 @@ fn attempt_inner(
     // ponytail: the recipe is recognised by its label.
     let solo = chain.is_empty() || model.label().starts_with("recipe:");
     let mut outcomes: Vec<(Option<&team::Role>, String, agent::Outcome)> = Vec::new();
-    if solo {
+    // One budget for the whole attempt: every role, and the answer to a
+    // "à refaire" review, spends from it.
+    let mut remaining = max_steps;
+    // A crashed attempt goes on where it stopped: its world keeps its
+    // changes (and its relay notes), its conversation is where it left off;
+    // the chain is not run again, it ran to the crash.
+    if let Some(state) = resumed {
+        let outcome = agent::resume(worlds, world, model, state, remaining, None, brief.log)?;
+        outcomes.push((None, model.label(), outcome));
+    } else if solo {
         let outcome = agent::run(
             worlds,
             world,
@@ -472,27 +560,31 @@ fn attempt_inner(
             &goal,
             criteria.clone(),
             &context,
-            max_steps,
+            remaining,
             None,
+            false,
+            brief.log,
         )?;
         outcomes.push((None, model.label(), outcome));
     } else {
         for role in chain {
+            if remaining == 0 {
+                break;
+            }
             // A role runs on its model; the stage keeps its own. The boxed
             // variant must outlive the run it is borrowed for.
             let boxed = role.model.as_ref().map(|m| model.variant(m));
             let role_model = boxed.as_deref().unwrap_or(model);
-            let role_context = format!(
-                "{context}\n\nAs {} on the team:\n{}\n",
-                role.name, role.brief
-            );
+            let role_context = role_context(&context, role);
             let role_goal = goal_for(world, &goal, &outcomes);
             // The checks judge the work, so only the roles that can build
             // them run against them; a reviewer that cannot run a command
             // cannot meet one.
-            let role_criteria = buildable(role)
-                .then(|| criteria.clone())
-                .unwrap_or_default();
+            let role_criteria = if buildable(role) {
+                criteria.clone()
+            } else {
+                Vec::new()
+            };
             let outcome = agent::run(
                 worlds,
                 world,
@@ -500,9 +592,12 @@ fn attempt_inner(
                 &role_goal,
                 role_criteria,
                 &role_context,
-                max_steps,
+                remaining,
                 Some(&role.tools),
+                false,
+                brief.log,
             )?;
+            remaining = remaining.saturating_sub(outcome.steps);
             outcomes.push((Some(role), role_model.label(), outcome));
         }
         // The reviewer says the work is à refaire: the builder answers point
@@ -511,6 +606,7 @@ fn attempt_inner(
         let mut disagreements = Vec::new();
         if let Some(text) = review.as_deref()
             && text.contains("à refaire")
+            && remaining > 0
             && let Some(builder) = chain.iter().rev().find(|r| buildable(r))
         {
             let ask = format!(
@@ -522,21 +618,22 @@ fn attempt_inner(
             );
             let boxed = builder.model.as_ref().map(|m| model.variant(m));
             let role_model = boxed.as_deref().unwrap_or(model);
-            let role_context = format!(
-                "{context}\n\nAs {} on the team:\n{}\n",
-                builder.name, builder.brief
-            );
+            let role_context = role_context(&context, builder);
             let outcome = agent::run(
                 worlds,
                 world,
                 role_model,
                 &ask,
-                buildable(builder)
-                    .then(|| criteria.clone())
-                    .unwrap_or_default(),
+                if buildable(builder) {
+                    criteria.clone()
+                } else {
+                    Vec::new()
+                },
                 &role_context,
-                max_steps,
+                remaining,
                 Some(&builder.tools),
+                false,
+                brief.log,
             )?;
             outcomes.push((Some(builder), role_model.label(), outcome));
             disagreements = std::fs::read_to_string(world.path.join("relay").join("dev.md"))

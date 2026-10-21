@@ -37,6 +37,8 @@ const REPEAT_NUDGE: usize = 3;
 pub(crate) const REPEAT_STOP: usize = 5;
 /// Steps that change no file in the world: told once, then stopped.
 const IDLE_NUDGE: usize = 15;
+/// The first notice leaves room to read it; the second one does not.
+const IDLE_HARD: usize = 20;
 const IDLE_STOP: usize = 25;
 /// A command killed by its timeout costs minutes; a second one ends the run.
 const TIMEOUT_STOP: usize = 2;
@@ -44,6 +46,12 @@ const TIMEOUT_STOP: usize = 2;
 const REFUSALS: usize = 2;
 /// A reply cut by the length limit is continued this many times at most.
 const CUT_RETRIES: usize = 3;
+/// A blank reply (the whole budget spent reasoning) turns reasoning off this
+/// many calls, then the policy holds again: a permanent latch made the rest
+/// of a long run think nothing, and a stuck model cannot reason its way out.
+const BLANK_LATCH: usize = 4;
+/// Two blank replies in a row end the run: the model has nothing to say.
+const BLANK_STOP: usize = 2;
 
 pub struct Outcome {
     /// The agent's own account; never used as a verdict.
@@ -80,48 +88,83 @@ pub enum Answer {
 
 pub(crate) type Asker<'a> = &'a dyn Fn(Value) -> io::Result<Option<Answer>>;
 
-/// Watches the loop for the three ways a run gets stuck. Pure bookkeeping:
-/// each method says whether to nudge (`Some(false)`) or stop (`Some(true)`).
+/// What the harness says after watching a step change nothing.
+#[derive(Debug, PartialEq)]
+pub(crate) enum Stuck {
+    /// A notice goes into the conversation; the loop keeps going.
+    Nudge(&'static str),
+    /// The loop ends; the reason is recorded on the outcome.
+    Stop,
+}
+
+/// Watches the loop for the ways a run gets stuck. Pure bookkeeping:
+/// `call` says nudge (`Some(false)`) or stop (`Some(true)`); `step` says
+/// which notice to send, or none.
 #[derive(Default)]
 pub(crate) struct Watch {
     last_call: String,
     repeats: usize,
+    nudged: usize,
     files: String,
     idle: usize,
     timeouts: usize,
-    nudged_repeat: bool,
     nudged_idle: bool,
+    nudged_idle_hard: bool,
 }
 
+/// How many times the same call is nudged before the run ends on it: the
+/// first notice is read, the second is not.
+const REPEAT_NUDGES: usize = 2;
+/// Only the head of the result joins the repeat key: a call that outputs a
+/// growing log is a loop on its command, not on its last line.
+const FINGERPRINT: usize = 256;
+
 impl Watch {
+    /// `call` is the tool's arguments, canonicalized by the caller; the
+    /// result's first lines join them. A changed file, a changed output, a
+    /// changed argument: the run is moving, the count starts over.
     pub(crate) fn call(&mut self, call: &str, result: &str) -> Option<bool> {
-        let key = format!("{call}\n{result}");
+        let fingerprint: String = result.chars().take(FINGERPRINT).collect();
+        let key = format!("{call}\n{fingerprint}");
         if key == self.last_call {
             self.repeats += 1;
         } else {
-            (self.last_call, self.repeats) = (key, 1);
+            (self.last_call, self.repeats, self.nudged) = (key, 1, 0);
         }
         if self.repeats >= REPEAT_STOP {
             Some(true)
-        } else if self.repeats >= REPEAT_NUDGE && !self.nudged_repeat {
-            self.nudged_repeat = true;
+        } else if self.repeats >= REPEAT_NUDGE && self.nudged < REPEAT_NUDGES {
+            self.nudged += 1;
             Some(false)
         } else {
             None
         }
     }
 
-    fn step(&mut self, files: String) -> Option<bool> {
+    fn step(&mut self, files: String) -> Option<Stuck> {
         if files == self.files {
             self.idle += 1;
         } else {
-            (self.files, self.idle, self.nudged_idle) = (files, 0, false);
+            (
+                self.files,
+                self.idle,
+                self.nudged_idle,
+                self.nudged_idle_hard,
+            ) = (files, 0, false, false);
         }
         if self.idle >= IDLE_STOP {
-            Some(true)
+            Some(Stuck::Stop)
+        } else if self.idle >= IDLE_HARD && !self.nudged_idle_hard {
+            self.nudged_idle_hard = true;
+            Some(Stuck::Nudge(
+                "20 steps without a single file changed. Edit now — change a file that moves the work forward, in this step — or call `done` and say exactly what blocks you.",
+            ))
         } else if self.idle >= IDLE_NUDGE && !self.nudged_idle {
             self.nudged_idle = true;
-            Some(false)
+            Some(Stuck::Nudge(
+                "15 steps without changing any file. Stop exploring: make the change now, \
+                 or call `done` and say what blocks you.",
+            ))
         } else {
             None
         }
@@ -176,10 +219,28 @@ pub(crate) struct Engine<'a> {
     policy: String,
     /// A reply with nothing in it: the model spent its whole budget
     /// reasoning. Asked again the same way it does it again (seen: four
-    /// times in six, 2-3 minutes each on a local model), so the rest of the
-    /// loop goes without reasoning, whatever the policy.
-    pub(crate) blank: bool,
+    /// times in six, 2-3 minutes each on a local model), so the next
+    /// [`BLANK_LATCH`] calls go without reasoning; after them the policy
+    /// holds again, so a stuck model can think its way out.
+    blank: usize,
     cuts: usize,
+    /// Model calls made: the parent's and a `task` child's steps share the
+    /// same budget, so the loop counts calls, not iterations.
+    steps: usize,
+    /// A task's loop refuses `done` while the criteria list is empty: the
+    /// work must be planned before it is judged. A chat's plan steps are
+    /// approved by the person, not written by the model: it stays false.
+    pub(crate) require_criteria: bool,
+    /// The reply `ask` just got was cut by the length limit, calls included.
+    last_cut: bool,
+    /// The reply `ask` just got was blank (no call, no text): a chat ends on
+    /// two of them in a row.
+    pub(crate) last_blank: bool,
+    /// The `task` tool, offered only in a task's loop: the child runs in the
+    /// same world, read-only, and its steps come out of the parent's budget.
+    task_worlds: Option<&'a Worlds>,
+    task_world: Option<&'a World>,
+    task_budget: usize,
     /// What the last call cost in prompt tokens: the size of the context.
     context: u64,
     start: Instant,
@@ -203,12 +264,25 @@ impl<'a> Engine<'a> {
             turns: Vec::new(),
             read: HashSet::new(),
             refusals: 0,
-            think: true,
-            // EXPERIMENT: FENNEC_OS_THINK=always|adaptive|never, to be
-            // measured and removed.
-            policy: std::env::var("FENNEC_OS_THINK").unwrap_or_else(|_| "always".to_string()),
-            blank: false,
+            // Non-thinking first: on the local server (ninfer, measured
+            // 2026-10-21) a thinking request never stores its prompt KV, so
+            // the next turn's prefix recompute is cold (0 cached tokens);
+            // the first non-thinking turn stores it and every later turn
+            // reuses it (measured: 10048/10055 cached on a repeated call).
+            // Thinking comes back after a tool error, one turn only.
+            think: false,
+            // FENNEC_OS_THINK=always|adaptive|never wins over the settings'
+            // think (always, since a thinking model that skips routine
+            // reasoning answers routine turns with a non-thinking model);
+            // adaptive skips reasoning on routine turns so the server's
+            // prefix cache pays.
+            policy: std::env::var("FENNEC_OS_THINK")
+                .ok()
+                .or_else(|| crate::provider::Settings::current().ok().map(|s| s.think))
+                .unwrap_or_else(|| crate::provider::DEFAULT_THINK.to_string()),
+            blank: 0,
             cuts: 0,
+            steps: 0,
             context: 0,
             start: Instant::now(),
             guard: None,
@@ -216,6 +290,12 @@ impl<'a> Engine<'a> {
             allowed: Vec::new(),
             asked: Vec::new(),
             tools: None,
+            require_criteria: false,
+            last_cut: false,
+            last_blank: false,
+            task_worlds: None,
+            task_world: None,
+            task_budget: 0,
         }
     }
 
@@ -267,12 +347,13 @@ impl<'a> Engine<'a> {
     /// conversation; the turn record (`self.turns`, last) keeps what it
     /// cost. `true` with it: the reply was cut by the length limit.
     pub(crate) fn ask(&mut self, window: &[Value], tools: &Value) -> io::Result<(Value, bool)> {
-        let think = !self.blank
+        let think = self.blank == 0
             && match self.policy.as_str() {
                 "never" => false,
                 "adaptive" => self.think,
                 _ => true,
             };
+        self.steps += 1;
         let at = self.start.elapsed().as_millis() as u64;
         let asked = Instant::now();
         let reply = if think {
@@ -307,9 +388,20 @@ impl<'a> Engine<'a> {
         let text = reply["content"]
             .as_str()
             .is_some_and(|c| !c.rsplit("</think>").next().unwrap_or("").trim().is_empty());
-        self.blank |= !calls && !text;
-        // Routine unless something goes wrong: then the next turn reasons.
-        self.think = !calls;
+        if !calls && !text {
+            self.blank = BLANK_LATCH;
+            self.last_blank = true;
+        } else {
+            self.blank = self.blank.saturating_sub(1);
+            self.last_blank = false;
+        }
+        self.last_cut = cut;
+        // Routine unless something goes wrong: a tool error reasons the next
+        // turn, and the next tool call ends it. A text-only turn changes
+        // nothing: on the local server a thinking turn stores no prompt KV,
+        // so reasoning the loop back on itself after every pause would cost
+        // the whole prefix cache.
+        self.think = !calls && self.think;
         self.turns.push(turn);
         Ok((reply, cut && !calls))
     }
@@ -335,7 +427,13 @@ impl<'a> Engine<'a> {
             Err(e) => format!(
                 "error: the arguments are not valid JSON ({e}); call the tool again with valid JSON"
             ),
-            Ok(args) => self.run_tool(sandbox, name, &args),
+            Ok(args) => {
+                if name == "task" {
+                    self.task_tool(sandbox, &args)
+                } else {
+                    self.run_tool(sandbox, name, &args)
+                }
+            }
         };
         if result.starts_with("error:")
             || (result.starts_with("exit ") && !result.starts_with("exit 0\n"))
@@ -485,6 +583,18 @@ impl<'a> Engine<'a> {
     /// refusal says what is left; after [`REFUSALS`] of them `done` goes
     /// through, the verification then judging.
     pub(crate) fn finish(&mut self, sandbox: Sandbox) -> Option<String> {
+        if self.require_criteria && self.criteria.is_empty() {
+            self.refusals += 1;
+            if self.refusals >= REFUSALS {
+                return None;
+            }
+            return Some(
+                "Not finished: no criterion says what the work must meet. Add them with \
+                 `criteria` (action add), at least two, each with a check command whenever one \
+                 can prove it, then call `done` again."
+                    .to_string(),
+            );
+        }
         for i in 0..self.criteria.len() {
             if self.criteria[i]["check"].is_string() && self.criteria[i]["state"] != "passed" {
                 self.check(sandbox, i);
@@ -506,10 +616,75 @@ impl<'a> Engine<'a> {
         self.criteria.iter().filter(|c| !met(c)).count()
     }
 
+    /// The files read so far, sorted: the run log keeps them, a resume starts
+    /// with them.
+    pub(crate) fn read_set(&self) -> Vec<String> {
+        let mut v: Vec<String> = self.read.iter().cloned().collect();
+        v.sort();
+        v
+    }
+
+    /// The `task` tool: a sub-agent in the same world, read-only, its own
+    /// conversation, its own budget drawn from the parent's. Only its summary
+    /// comes back, so the parent's context does not grow on its explorations.
+    fn task_tool(&mut self, _sandbox: Sandbox, args: &Value) -> String {
+        let (worlds, world) = match (self.task_worlds, self.task_world) {
+            (Some(w), Some(d)) if self.task_budget > 0 => (w, d),
+            _ => return "error: the task tool is not available here".to_string(),
+        };
+        let budget = self.task_budget;
+        let goal = match args["goal"].as_str().filter(|g| !g.trim().is_empty()) {
+            Some(g) => g.to_string(),
+            None => {
+                return "error: `task` needs a `goal`: what the sub-agent must find or decide"
+                    .to_string();
+            }
+        };
+        // Half of what is left, as the sub-agent's own budget; the rest stays
+        // for the parent to do the work.
+        let left = budget.saturating_sub(self.steps).max(1);
+        let asked = args["steps"]
+            .as_u64()
+            .map(|s| s as usize)
+            .unwrap_or(left / 2 + 1);
+        let child_max = asked.min(left / 2 + 1).max(1);
+        let outcome = crate::agent::run(
+            worlds,
+            world,
+            self.model,
+            &goal,
+            Vec::new(),
+            "",
+            child_max,
+            None,
+            true,
+            None,
+        );
+        let child = match outcome {
+            Ok(o) => o,
+            Err(e) => return format!("error: the sub-agent failed: {e}"),
+        };
+        // The child's steps count against the parent's budget.
+        self.steps += child.steps;
+        let what = match (child.summary, child.stuck, child.error) {
+            (Some(s), _, _) => s,
+            (None, Some(s), _) => format!("stuck: {s}"),
+            (None, None, Some(e)) => format!("failed: {e}"),
+            (None, None, None) => "the sub-agent used its steps without a summary".to_string(),
+        };
+        const CAP: usize = 2_000;
+        let mut out: String = what.chars().take(CAP).collect();
+        if what.chars().count() > CAP {
+            out.push_str("… (the sub-agent's answer was cut)");
+        }
+        out
+    }
+
     /// The reminder sent as the last message of a call; `None` when there
     /// is nothing to frame (a chat without a plan).
     pub(crate) fn reminder(&self, step: usize, max: usize, mode: &str) -> Value {
         let mut text = format!("<system-reminder>\nStep {step} of at most {max}. {mode}\n");
+        let next = self.criteria.iter().position(|c| !met(c));
         if self.criteria.is_empty() {
             text.push_str(
                 "No criteria yet: add the ones this work must meet with `criteria` (action add), \
@@ -517,18 +692,29 @@ impl<'a> Engine<'a> {
             );
         } else {
             text.push_str(&render(&self.criteria));
-            match self.criteria.iter().position(|c| !met(c)) {
+            match next {
                 Some(i) => text.push_str(&format!(
-                    "Next: criterion {}. Mark it with `criteria` (action done) when it holds.\n",
+                    "Next: criterion {} — make the change, then mark it done with `criteria`.\n",
                     i + 1
                 )),
                 None => text.push_str("Every criterion is met: call `done`.\n"),
             }
         }
         if step * 5 >= max * 4 {
-            text.push_str(
-                "Few steps are left: finish what is open, or call `done` saying what remains.\n",
-            );
+            match next {
+                Some(i) => text.push_str(&format!(
+                    "Few steps are left. Finish criterion {i} now: make the change, run its \
+                     check, mark it done. Do not end with what remains.\n",
+                )),
+                None => text.push_str(&format!(
+                    "Few steps are left: {}. Call `done` now.",
+                    if self.criteria.is_empty() {
+                        "add the criteria first"
+                    } else {
+                        "every criterion is met"
+                    }
+                )),
+            }
         }
         text.push_str("</system-reminder>");
         json!({"role": "user", "content": text})
@@ -536,6 +722,11 @@ impl<'a> Engine<'a> {
 
     pub(crate) fn needs_compaction(&self) -> bool {
         self.context > compact_at()
+    }
+
+    /// The context no longer counts: the conversation was cut and rebuilt.
+    pub(crate) fn reset_context(&mut self) {
+        self.context = 0;
     }
 
     /// The model's own summary of `window`, to go on with instead of it.
@@ -599,11 +790,26 @@ Never install into the system or the home (`--user`, \
 `--break-system-packages`, global installs), never copy packages into the source tree.\n\
 You cannot commit: the harness checkpoints your work. Anything you break can be rolled back, \
 so act directly instead of asking.\n\
-Work in small verified steps: read the files you change (read_file), change them with \
-edit_file (write_file for new files), never with sed or a script; run the build and the \
-tests after each change.\n\
-The harness keeps the criteria the work is judged on and reminds you of them at each step. \
-Call `done` when every criterion is met.";
+Plan before code: once you have read enough to scope the work, add the criteria it must meet \
+with `criteria` (action add) — at least two, each in one line, each with a `check` (a bash \
+command that exits 0 once it holds) whenever it can be proven: a test, a build, the content of \
+a file. The harness keeps them, reminds you of them every step, and refuses `done` while one \
+is open or the list is empty.\n\
+Work in small verified steps: read a file with read_file before you touch it (it comes with \
+line numbers and says how to read on with offset); change it with edit_file (its old_string \
+must be the exact text, found once) or write_file for a new file, never with sed or a script; \
+run the build and the tests with shell after each change (a command over 300 s is killed: \
+bound it with timeout); mark each criterion done with `criteria` (action done) as it holds. \
+Several independent reads may go in one reply: they run at once.\n\
+Call `done` when every criterion is met. If one cannot be met, say why in the summary instead \
+of looping; if you are stuck, call `done` with what is left and why.";
+
+/// A sub-agent's brief: it reads, it answers, it changes nothing.
+const TASK_RO: &str = "You work in a sandboxed copy of a project; the current directory is its \
+root. You are a sub-agent: you read and you answer, you change nothing — there is no write \
+tool. Read what the goal needs (read_file, shell for search with rg/grep/find, builds and \
+tests to check a claim), then call `done` with a short, complete answer to the goal: the facts, \
+the paths and the verdict. Do not pad; the parent agent reads only your summary.";
 
 /// What the sandbox finds installed, so the agent picks among real tools
 /// instead of guessing.
@@ -615,7 +821,10 @@ pub(crate) fn tools_line(worlds: &Worlds) -> String {
 }
 
 /// A task's attempt in `world`: `goal` to reach, `criteria` to meet (see
-/// [`criterion`]), `context` added to the system prompt.
+/// [`criterion`]), `context` added to the system prompt. `log`, when given,
+/// is written atomically after every model call, so an attempt that crashes
+/// in the middle resumes from it ([`resume`]).
+#[allow(clippy::too_many_arguments)]
 pub fn run(
     worlds: &Worlds,
     world: &World,
@@ -625,35 +834,140 @@ pub fn run(
     context: &str,
     max_steps: usize,
     tools: Option<&[crate::team::Tool]>,
+    read_only: bool,
+    log: Option<&std::path::Path>,
+) -> io::Result<Outcome> {
+    run_in(
+        worlds, world, model, goal, criteria, context, max_steps, tools, read_only, log, None,
+    )
+}
+
+/// What a crashed attempt left in its log: the whole conversation (the
+/// system message first), where the model looks from, the criteria as they
+/// stand, the files it read.
+pub struct Resume {
+    pub goal: String,
+    /// The live log, without the system message; `from` indexes it.
+    pub messages: Vec<Value>,
+    pub from: usize,
+    pub criteria: Vec<Value>,
+    pub read: Vec<String>,
+}
+
+/// A crashed attempt back at work: the same world (its changes are kept),
+/// its criteria and its reads, the conversation on where it stopped — its
+/// last reply's calls, not run yet, are run again.
+pub fn resume(
+    worlds: &Worlds,
+    world: &World,
+    model: &dyn Model,
+    state: Resume,
+    max_steps: usize,
+    tools: Option<&[crate::team::Tool]>,
+    log: Option<&std::path::Path>,
+) -> io::Result<Outcome> {
+    let goal = state.goal.clone();
+    run_in(
+        worlds,
+        world,
+        model,
+        &goal,
+        Vec::new(),
+        "",
+        max_steps,
+        tools,
+        false,
+        log,
+        Some(state),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_in(
+    worlds: &Worlds,
+    world: &World,
+    model: &dyn Model,
+    goal: &str,
+    criteria: Vec<Value>,
+    context: &str,
+    max_steps: usize,
+    tools: Option<&[crate::team::Tool]>,
+    read_only: bool,
+    log: Option<&std::path::Path>,
+    resumed: Option<Resume>,
 ) -> io::Result<Outcome> {
     // An empty `tools` line means no restriction, like no line at all.
     let role_tools = tools.filter(|t| !t.is_empty()).map(|t| t.to_vec());
-    let mut tools = tools::definitions(true);
-    tools.push(tools::criteria_tool());
-    tools.push(tools::done_tool());
-    let tools = Value::Array(tools);
-    let system =
-        json!({"role": "system", "content": format!("{TASK}{}{context}", tools_line(worlds))});
+    let mut defs: Vec<Value> = tools::definitions(!read_only);
+    if !read_only {
+        defs.push(tools::criteria_tool());
+        defs.push(tools::task_tool());
+    }
+    defs.push(tools::done_tool());
+    let defs = Value::Array(defs);
+    let system = json!({"role": "system",
+    "content": format!(
+        "{}{}{context}",
+        if read_only { TASK_RO } else { TASK },
+        tools_line(worlds)
+    )});
+    let log_path = log;
+    let (log, from, criteria, read) = match resumed {
+        Some(r) => (r.messages, r.from, r.criteria, r.read.into_iter().collect()),
+        None => (
+            vec![json!({"role": "user", "content": goal})],
+            0,
+            criteria,
+            std::collections::HashSet::new(),
+        ),
+    };
     let mut engine = Engine::new(model, criteria);
+    engine.read = read;
     engine.tools = role_tools;
+    // A direct run must say what good looks like before it may finish; a
+    // team role is steered by its brief, a sub-agent is read-only.
+    engine.require_criteria = !read_only && tools.is_none();
+    engine.task_worlds = Some(worlds);
+    engine.task_world = Some(world);
+    engine.task_budget = max_steps;
     engine.guard = Some(Guard::load(
         &worlds.project(world)?,
         &world.path,
         &worlds.home,
     )?);
-    // Everything said, for the journal; the model sees it from `from` on,
-    // past the last compaction.
-    let mut log = vec![json!({"role": "user", "content": goal})];
-    let mut from = 0;
+    drive(
+        worlds, world, model, goal, system, engine, log, from, max_steps, defs, log_path,
+    )
+}
+
+/// One loop, a task's or a sub-agent's: model calls and tools until `done`,
+/// a stop the harness decides, or the budget.
+#[allow(clippy::too_many_arguments)]
+fn drive(
+    worlds: &Worlds,
+    world: &World,
+    model: &dyn Model,
+    goal: &str,
+    system: Value,
+    mut engine: Engine,
+    mut log: Vec<Value>,
+    mut from: usize,
+    max_steps: usize,
+    defs: Value,
+    log_path: Option<&std::path::Path>,
+) -> io::Result<Outcome> {
     let sandbox = |argv: &[String]| worlds.sandbox_work(world, argv);
     // The starting state counts as "no change yet".
-    engine.watch.files = worlds.status(world)?;
+    engine.watch.files = worlds.status(world).unwrap_or_default();
     let end = |engine: Engine, log: Vec<Value>, step, summary, stuck: Option<String>, error| {
         let mut messages = vec![system.clone()];
         messages.extend(log);
         let question = stuck
             .as_deref()
             .and_then(|why| ask(model, goal, &messages, why));
+        if let Some(p) = log_path {
+            write_run_log(p, world, goal, step, 0, &engine, &messages);
+        }
         Ok(Outcome {
             summary,
             steps: step,
@@ -668,53 +982,195 @@ pub fn run(
     };
     const MODE: &str = "Change the files to meet the criteria; read before you edit, edit \
                         with edit_file, run the build and tests after each change.";
-    for step in 1..=max_steps {
+    let mut step = 0;
+    let mut blanks = 0;
+    // A resumed log may end on a reply whose calls never ran: they run now,
+    // without a model call.
+    let mut pending = log
+        .last()
+        .filter(|m| m["role"].as_str() == Some("assistant"))
+        .and_then(|m| m["tool_calls"].as_array())
+        .filter(|c| !c.is_empty())
+        .cloned();
+    while engine.steps < max_steps {
+        step += 1;
         if engine.needs_compaction() {
             let window: Vec<Value> = std::iter::once(system.clone())
                 .chain(log[from..].iter().cloned())
                 .collect();
-            if let Ok(summary) = engine.compact(&window) {
-                log.push(harness(&format!(
-                    "The goal:\n{goal}\n\nThe conversation was shortened; your own notes on the \
-                     work so far:\n{summary}"
-                )));
-                from = log.len() - 1;
+            let files = worlds.status(world).unwrap_or_default();
+            match engine.compact(&window) {
+                Ok(summary) => {
+                    log.push(harness(&format!(
+                        "The goal:\n{goal}\n\nThe conversation was shortened; your own notes on \
+                         the work so far:\n{summary}\n\nThe criteria as they stand now:\n{}\n\
+                         The files changed so far:\n{files}",
+                        render(&engine.criteria)
+                    )));
+                    from = log.len() - 1;
+                }
+                // The model gave no notes (an empty summary is an error):
+                // the goal and the end of the exchange stay, so the run
+                // goes on instead of dying on it.
+                Err(_) => {
+                    const KEEP: usize = 12;
+                    let tail: Vec<Value> = log
+                        .iter()
+                        .rev()
+                        .take(KEEP)
+                        .cloned()
+                        .collect::<Vec<_>>()
+                        .into_iter()
+                        .rev()
+                        .collect();
+                    log = vec![json!({"role": "user", "content": goal})];
+                    log.extend(tail);
+                    log.push(harness(
+                        "The conversation was shortened and left no notes: the older messages \
+                         are gone. The goal is above; re-read the files you need with read_file.",
+                    ));
+                    from = 0;
+                    engine.context = 0;
+                }
             }
         }
-        let mut window: Vec<Value> = std::iter::once(system.clone())
-            .chain(log[from..].iter().cloned())
-            .collect();
-        window.push(engine.reminder(step, max_steps, MODE));
-        let (reply, cut) = match engine.ask(&window, &tools) {
-            Ok(r) => r,
-            Err(e) => return end(engine, log, step, None, None, Some(e.to_string())),
-        };
-        let calls = reply["tool_calls"].as_array().cloned().unwrap_or_default();
-        log.push(reply);
-        if cut && let Some(more) = engine.continue_cut() {
-            log.push(more);
-            continue;
-        }
-        if calls.is_empty() {
-            log.push(harness("Use a tool, or call `done`."));
-            continue;
-        }
-        for call in &calls {
-            let name = call["function"]["name"].as_str().unwrap_or("");
-            if name == "done" {
-                let refused = engine.finish(&sandbox);
-                if let Some(why) = refused {
-                    log.push(json!({"role": "tool", "tool_call_id": call["id"], "content": why}));
+        let calls: Vec<Value> = match pending.take() {
+            Some(c) => c,
+            None => {
+                let mut window: Vec<Value> = std::iter::once(system.clone())
+                    .chain(log[from..].iter().cloned())
+                    .collect();
+                window.push(engine.reminder(step, max_steps, MODE));
+                let (reply, cut) = match engine.ask(&window, &defs) {
+                    Ok(r) => r,
+                    Err(e) => return end(engine, log, step, None, None, Some(e.to_string())),
+                };
+                let calls = reply["tool_calls"].as_array().cloned().unwrap_or_default();
+                let text: String = reply["content"]
+                    .as_str()
+                    .unwrap_or("")
+                    .rsplit("</think>")
+                    .next()
+                    .unwrap_or("")
+                    .trim()
+                    .to_string();
+                log.push(reply);
+                if let Some(p) = log_path {
+                    let mut messages = vec![system.clone()];
+                    messages.extend(log.iter().cloned());
+                    write_run_log(p, world, goal, step, from, &engine, &messages);
+                }
+                // A cut is the server's limit, not the agent's step: it is
+                // continued without costing one.
+                if cut
+                    && calls.is_empty()
+                    && let Some(more) = engine.continue_cut()
+                {
+                    log.push(more);
                     continue;
                 }
-                let args: Value = call["function"]["arguments"]
-                    .as_str()
-                    .and_then(|a| serde_json::from_str(a).ok())
-                    .unwrap_or(Value::Null);
-                let summary = args["summary"].as_str().map(str::to_string);
-                return end(engine, log, step, summary, None, None);
+                if calls.is_empty() && text.is_empty() {
+                    blanks += 1;
+                    if blanks >= BLANK_STOP {
+                        let why = format!(
+                            "stopped: the model gave an empty reply {BLANK_STOP} times in a row"
+                        );
+                        return end(engine, log, step, None, Some(why), None);
+                    }
+                    log.push(harness("Your reply was empty. Use a tool, or call `done`."));
+                    continue;
+                }
+                blanks = 0;
+                if calls.is_empty() {
+                    log.push(harness("Use a tool, or call `done`."));
+                    continue;
+                }
+                calls
             }
-            let mut result = engine.tool(&sandbox, call);
+        };
+        // `done` ends the run; it is settled first, the rest then runs.
+        for call in &calls {
+            if call["function"]["name"].as_str().unwrap_or("") != "done" {
+                continue;
+            }
+            let refused = engine.finish(&sandbox);
+            if let Some(why) = refused {
+                log.push(json!({"role": "tool", "tool_call_id": call["id"], "content": why}));
+                continue;
+            }
+            let args: Value = call["function"]["arguments"]
+                .as_str()
+                .and_then(|a| serde_json::from_str(a).ok())
+                .unwrap_or(Value::Null);
+            let summary = args["summary"].as_str().map(str::to_string);
+            return end(engine, log, step, summary, None, None);
+        }
+        // The calls: the reads run at once, the rest one after the other,
+        // and the results go back in the order the model made them.
+        let mut results: Vec<Option<String>> = vec![None; calls.len()];
+        let mut reads: Vec<(usize, Value)> = Vec::new();
+        for (i, call) in calls.iter().enumerate() {
+            let name = call["function"]["name"].as_str().unwrap_or("");
+            if name != "read_file" {
+                continue;
+            }
+            let args: Value = call["function"]["arguments"]
+                .as_str()
+                .and_then(|a| serde_json::from_str(a).ok())
+                .unwrap_or(Value::Null);
+            if let Some(refused) = engine.guarded(name, &args) {
+                results[i] = Some(refused);
+            } else {
+                reads.push((i, args));
+            }
+        }
+        let mut read_outs: Vec<(usize, String)> = Vec::new();
+        std::thread::scope(|s| {
+            let mut handles: Vec<(usize, std::thread::ScopedJoinHandle<'_, String>)> =
+                Vec::with_capacity(reads.len());
+            for (i, args) in &reads {
+                let args = args.clone();
+                handles.push((
+                    *i,
+                    s.spawn(move || {
+                        let sb: Sandbox = &|argv: &[String]| worlds.sandbox_work(world, argv);
+                        match tools::execute(sb, "read_file", &args) {
+                            Ok(out) => out,
+                            Err(e) => format!("error: {e}"),
+                        }
+                    }),
+                ));
+            }
+            for (i, h) in handles {
+                let out = h
+                    .join()
+                    .unwrap_or_else(|_| "error: the read's thread died".to_string());
+                read_outs.push((i, out));
+            }
+        });
+        for (k, (i, out)) in read_outs.into_iter().enumerate() {
+            if out.starts_with("error:") {
+                engine.think = true;
+            }
+            let path = reads[k].1["path"]
+                .as_str()
+                .unwrap_or("")
+                .trim_start_matches("./")
+                .to_string();
+            if !path.is_empty() {
+                engine.read.insert(path);
+            }
+            results[i] = Some(out);
+        }
+        for (i, call) in calls.iter().enumerate() {
+            if results[i].is_some() {
+                continue;
+            }
+            results[i] = Some(engine.tool(&sandbox, call));
+        }
+        for (i, call) in calls.iter().enumerate() {
+            let mut result = results[i].take().unwrap_or_default();
+            let name = call["function"]["name"].as_str().unwrap_or("");
             let args: Value = call["function"]["arguments"]
                 .as_str()
                 .and_then(|a| serde_json::from_str(a).ok())
@@ -741,9 +1197,8 @@ pub fn run(
                     tools::COMMAND_TIMEOUT_SECS
                 );
             }
-            let repeated = engine
-                .watch
-                .call(&call["function"]["arguments"].to_string(), &result);
+            // `args` is already parsed and written back: canonical.
+            let repeated = engine.watch.call(&args.to_string(), &result);
             log.push(json!({"role": "tool", "tool_call_id": call["id"], "content": result}));
             match repeated {
                 Some(true) => {
@@ -760,20 +1215,51 @@ pub fn run(
                 None => {}
             }
         }
-        match engine.watch.step(worlds.status(world)?) {
-            Some(true) => {
+        // A reply cut with tools in it: the tools ran, the reply did not
+        // finish — the model is told to write smaller, free of charge.
+        if engine.last_cut && engine.continue_cut().is_some() {
+            log.push(harness(
+                "Your reply was cut by the length limit with tools in it. Write in smaller \
+                 chunks: one step at a time, smaller edits, shorter messages.",
+            ));
+            continue;
+        }
+        match engine.watch.step(worlds.status(world).unwrap_or_default()) {
+            Some(Stuck::Stop) => {
                 let why = format!("stuck: no file changed in {IDLE_STOP} steps");
                 return end(engine, log, step, None, Some(why), None);
             }
-            Some(false) => log.push(harness(&format!(
-                "{IDLE_NUDGE} steps without changing any file. Stop exploring: make the change now, \
-                 or call `done` and say what blocks you."
-            ))),
+            Some(Stuck::Nudge(text)) => log.push(harness(text)),
             None => {}
         }
     }
     let why = format!("stopped after {max_steps} steps without calling `done`");
-    end(engine, log, max_steps, None, Some(why), None)
+    end(engine, log, step.min(max_steps), None, Some(why), None)
+}
+
+/// The run's own log, written atomically after every model call: the whole
+/// conversation, the criteria, the reads. A run that crashes resumes from it
+/// ([`resume`]); a write that fails never stops the work.
+fn write_run_log(
+    path: &std::path::Path,
+    world: &World,
+    goal: &str,
+    step: usize,
+    from: usize,
+    engine: &Engine,
+    messages: &[Value],
+) {
+    if let Some(parent) = path.parent()
+        && std::fs::create_dir_all(parent).is_err()
+    {
+        return;
+    }
+    let now = json!({"world": world.id, "goal": goal, "steps": step, "from": from,
+                     "log": messages, "criteria": engine.criteria, "read": engine.read_set()});
+    let tmp = path.with_extension("tmp");
+    if std::fs::write(&tmp, now.to_string()).is_ok() {
+        let _ = std::fs::rename(&tmp, path);
+    }
 }
 
 /// Asks a stopped model for the one question a human could answer. It gets
@@ -853,17 +1339,24 @@ mod tests {
     }
 
     #[test]
-    fn idle_steps_nudge_once_then_stop() {
+    fn idle_steps_nudge_twice_then_stop() {
         let mut w = Watch::default();
         let verdicts: Vec<_> = (0..IDLE_STOP).map(|_| w.step(String::new())).collect();
-        assert_eq!(verdicts[IDLE_NUDGE - 1], Some(false));
-        assert_eq!(verdicts.iter().filter(|v| **v == Some(false)).count(), 1);
-        assert_eq!(verdicts[IDLE_STOP - 1], Some(true));
-        // A changed file resets the count.
+        assert!(matches!(verdicts[IDLE_NUDGE - 1], Some(Stuck::Nudge(_))));
+        assert!(matches!(verdicts[IDLE_HARD - 1], Some(Stuck::Nudge(_))));
+        assert_eq!(
+            verdicts
+                .iter()
+                .filter(|v| matches!(v, Some(Stuck::Nudge(_))))
+                .count(),
+            2
+        );
+        assert!(matches!(verdicts[IDLE_STOP - 1], Some(Stuck::Stop)));
+        // A changed file resets the count and both notices.
         let mut w = Watch::default();
-        (0..IDLE_STOP - 1).for_each(|_| _ = w.step(String::new()));
+        (0..IDLE_HARD).for_each(|_| _ = w.step(String::new()));
         assert_eq!(w.step(" M a".into()), None);
-        assert_eq!(w.idle, 0);
+        assert!(!w.nudged_idle && !w.nudged_idle_hard);
     }
 
     #[test]
@@ -946,6 +1439,31 @@ mod tests {
     }
 
     #[test]
+    fn a_direct_run_must_add_criteria_before_done() {
+        let dir = std::env::temp_dir().join(format!("fennec-os-criteria-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let sandbox = |argv: &[String]| {
+            let mut c = Command::new(&argv[0]);
+            c.args(&argv[1..]).current_dir(&dir);
+            Ok(c)
+        };
+        // A direct run says what good looks like before it may finish.
+        let mut e = Engine::new(&Silent, Vec::new());
+        e.require_criteria = true;
+        let refused = e.finish(&sandbox).unwrap();
+        assert!(refused.contains("no criterion"), "{refused}");
+        let _ = e.finish(&sandbox);
+        assert!(
+            e.finish(&sandbox).is_none(),
+            "two refusals, then it goes through"
+        );
+        // A role, steered by its brief, is not asked for the list.
+        let mut e = Engine::new(&Silent, Vec::new());
+        assert!(e.finish(&sandbox).is_none());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn a_read_only_role_is_refused_by_the_system_not_the_brief() {
         // The neutral-brief lock: the agent is told only "do what you are
         // told"; the tools line, not the prompt, keeps its write off.
@@ -1011,9 +1529,9 @@ mod tests {
 
     #[test]
     fn the_persons_rules_refuse_ask_or_record() {
-        let ran = std::cell::Cell::new(0);
+        let ran = std::sync::atomic::AtomicUsize::new(0);
         let sandbox = |_: &[String]| {
-            ran.set(ran.get() + 1);
+            ran.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             Ok(Command::new("true"))
         };
         let rules = vec![
@@ -1028,7 +1546,11 @@ mod tests {
         assert!(e.tool(&sandbox, &shell("rm -r -f /")).contains("refused"));
         assert!(e.tool(&sandbox, &shell("cat .env")).contains("nobody can"));
         assert_eq!(e.asked.len(), 1);
-        assert_eq!(ran.get(), 0, "nothing ran");
+        assert_eq!(
+            ran.load(std::sync::atomic::Ordering::Relaxed),
+            0,
+            "nothing ran"
+        );
         // A chat: asked; allowed for the chat, it is not asked again.
         let asks = std::cell::Cell::new(0);
         let asker = |_: Value| {
@@ -1040,7 +1562,10 @@ mod tests {
         e.asker = Some(&asker);
         e.tool(&sandbox, &shell("cat .env"));
         e.tool(&sandbox, &call("read_file", json!({"path": ".env"})));
-        assert_eq!((asks.get(), ran.get()), (1, 2));
+        assert_eq!(
+            (asks.get(), ran.load(std::sync::atomic::Ordering::Relaxed)),
+            (1, 2)
+        );
     }
 
     #[test]
