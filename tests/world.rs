@@ -56,7 +56,10 @@ fn an_ignored_top_level_folder_does_not_block_the_checkpoint() {
     assert!(f.sh(&w, "mkdir .fennec && echo x > .fennec/cache").0);
     assert!(f.sh(&w, "echo changed > README").0);
     let diff = f.worlds.diff(&w).unwrap();
-    assert!(diff.contains("README") && !diff.contains(".fennec"), "{diff}");
+    assert!(
+        diff.contains("README") && !diff.contains(".fennec"),
+        "{diff}"
+    );
     let commit = f.worlds.commit(&w, "work").unwrap();
     assert!(!commit.is_empty());
     let log = f.worlds.git(&w, &["log", "--name-only", "-1"]).unwrap();
