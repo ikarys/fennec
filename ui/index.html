@@ -264,6 +264,7 @@
   #new-request .head strong { font-size: 16px; }
   dialog::backdrop { background: rgb(0 0 0 / .45); }
   .later-text { width: 100%; min-height: 40vh; margin: 4px 0 0; }
+  .later-title { width: 100%; margin: 4px 0 10px; }
   /* The left list already says which project: the request goes there. */
   body.focused #project { display: none; }
   .error { color: var(--bad); font-size: 13px; min-height: 0; margin: 4px 0 0; }
@@ -959,7 +960,8 @@
     <div class="row head"><strong data-t>New task</strong><span class="spacer"></span>
       <button type="button" class="quiet" id="compose-close" data-icon="close" aria-label="Close" title="Close"></button></div>
     <select id="project" aria-label="Project" required></select>
-    <textarea id="text" aria-label="Task" placeholder="What you want, as to a colleague…" rows="6" required></textarea>
+    <input id="title" aria-label="Title" placeholder="A short title (optional)" maxlength="120">
+    <textarea id="text" aria-label="Description" placeholder="What you want, as to a colleague…" rows="6" required></textarea>
     <div id="chips"></div>
     <p class="error" id="compose-error" role="alert"></p>
     <div class="row">

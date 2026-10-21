@@ -531,6 +531,9 @@ pub fn start(path: &Path) -> io::Result<()> {
         let out = std::process::Command::new("git")
             .arg("-C")
             .arg(path)
+            // fennec's own bookkeeping commit, signed by fennec: the human's
+            // identity is not required for a project to start.
+            .args(["-c", "user.name=fennec", "-c", "user.email=fennec@fennec"])
             .args(args)
             // Never a parent folder's repository (a home can be one).
             .env("GIT_CEILING_DIRECTORIES", path.parent().unwrap_or(path))
