@@ -696,13 +696,29 @@ mod tests {
         );
         assert_eq!(parse("lead", &to_md(&r)).unwrap(), r, "written as read");
         // No tools line: unrestricted, as before.
-        assert!(parse("x", "---\nstage: solve\n---\nx").unwrap().tools.is_empty());
+        assert!(
+            parse("x", "---\nstage: solve\n---\nx")
+                .unwrap()
+                .tools
+                .is_empty()
+        );
         for bad in ["read, git", "shell:relay/", "draw"] {
-            assert!(parse("x", &format!("---\nstage: solve\ntools: {bad}\n---\nx")).is_err(), "{bad}");
+            assert!(
+                parse("x", &format!("---\nstage: solve\ntools: {bad}\n---\nx")).is_err(),
+                "{bad}"
+            );
         }
         // An empty tools line is a present line with no tools: unrestricted.
-        assert!(parse("x", "---\nstage: solve\ntools: \n---\nx").unwrap().tools.is_empty());
-        assert!(parse_tools("").unwrap().is_empty(), "absent stays unrestricted");
+        assert!(
+            parse("x", "---\nstage: solve\ntools: \n---\nx")
+                .unwrap()
+                .tools
+                .is_empty()
+        );
+        assert!(
+            parse_tools("").unwrap().is_empty(),
+            "absent stays unrestricted"
+        );
     }
 
     #[test]
@@ -828,7 +844,10 @@ mod tests {
         );
         let both = solve_chain(
             &project,
-            Some(&["frontend-designer".to_string(), "senior-developer".to_string()]),
+            Some(&[
+                "frontend-designer".to_string(),
+                "senior-developer".to_string(),
+            ]),
         )
         .unwrap();
         assert_eq!(
@@ -878,7 +897,17 @@ mod tests {
         .unwrap();
         assert_eq!(key, "specialiste-donnees");
         assert!(
-            save_role(&project, None, "Spécialiste données", "solve", "x", &[], "", "").is_err(),
+            save_role(
+                &project,
+                None,
+                "Spécialiste données",
+                "solve",
+                "x",
+                &[],
+                "",
+                ""
+            )
+            .is_err(),
             "taken"
         );
         assert!(save_role(&project, Some("nobody"), "x", "solve", "x", &[], "", "").is_err());
@@ -920,9 +949,7 @@ mod tests {
             None,
             "another stage keeps its own"
         );
-        assert!(
-            save_role(&project, Some("qa"), "QA", "prove", "x", &[], "a\nb", "").is_err()
-        );
+        assert!(save_role(&project, Some("qa"), "QA", "prove", "x", &[], "a\nb", "").is_err());
         assert_eq!(slug("  Dev -- Senior! "), "dev-senior");
         std::fs::remove_dir_all(project).unwrap();
     }

@@ -973,11 +973,17 @@ mod tests {
             &call("write_file", json!({"path": "new.txt", "content": "x"})),
         );
         assert!(out.contains("refused"), "{out}");
-        assert!(!dir.join("new.txt").exists(), "the system refused, not the brief");
+        assert!(
+            !dir.join("new.txt").exists(),
+            "the system refused, not the brief"
+        );
         // Its own relay path is the one it may write.
         let out = e.tool(
             &sandbox,
-            &call("write_file", json!({"path": "relay/review.md", "content": "verdict"})),
+            &call(
+                "write_file",
+                json!({"path": "relay/review.md", "content": "verdict"}),
+            ),
         );
         assert!(dir.join("relay").join("review.md").exists(), "{out}");
         // `edit` is not on its list: the system refuses it too.
@@ -989,7 +995,10 @@ mod tests {
             .contains("refused")
         );
         let out = e.tool(&sandbox, &call("shell", json!({"command": "ls"})));
-        assert!(out.contains("refused"), "the role lists only read and write: {out}");
+        assert!(
+            out.contains("refused"),
+            "the role lists only read and write: {out}"
+        );
         // Unrestricted, the same call runs.
         let mut e = Engine::new(&Silent, Vec::new());
         e.tool(

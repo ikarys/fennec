@@ -3,8 +3,8 @@
 use std::path::PathBuf;
 use std::process::Command;
 
-use fennec_os::world::{World, Worlds};
 use fennec_os::team;
+use fennec_os::world::{World, Worlds};
 
 pub struct Fixture {
     pub dir: PathBuf,

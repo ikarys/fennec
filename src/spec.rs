@@ -255,7 +255,9 @@ fn check(
 ) -> io::Result<()> {
     let base = worlds.git(world, &["rev-parse", "HEAD"])?;
     let criteria = criteria.iter().map(|c| agent::criterion(c, None)).collect();
-    let outcome = agent::run(worlds, world, model, brief, criteria, context, max_steps, None)?;
+    let outcome = agent::run(
+        worlds, world, model, brief, criteria, context, max_steps, None,
+    )?;
     spec["steps"] = json!(outcome.steps);
     spec["stuck"] = json!(outcome.stuck);
     spec["question"] = json!(outcome.question);
@@ -807,8 +809,9 @@ pub fn discuss(
         format!("{MARK}{list}")
     };
     let keys: Vec<String> = chain.iter().map(|r| r.key.clone()).collect();
-    let mut messages =
-        vec![json!({"role": "system", "content": format!("{DISCUSS}{pick}{mark}\n\n{context}{roles}")})];
+    let mut messages = vec![
+        json!({"role": "system", "content": format!("{DISCUSS}{pick}{mark}\n\n{context}{roles}")}),
+    ];
     for turn in thread {
         let role = if turn["who"] == "human" {
             "user"
@@ -1006,7 +1009,11 @@ mod tests {
             )
             .unwrap()
             .0,
-            Discussed::Brief("un script bonjour.py qui affiche Bonjour".into(), None, None)
+            Discussed::Brief(
+                "un script bonjour.py qui affiche Bonjour".into(),
+                None,
+                None
+            )
         );
         assert!(discuss(&empty, &thread, &Fixed("<think>only this</think>")).is_err());
     }
@@ -1075,8 +1082,15 @@ mod tests {
     fn the_roles_marked_are_the_team_s_solve_roles() {
         let keys = ["senior-developer".to_string(), "tech-lead".to_string()];
         let reply = "brief: une page\n`roles: senior-developer, design`";
-        assert_eq!(marked(reply, &keys), Some(vec!["senior-developer".to_string()]));
-        assert_eq!(marked("brief: x", &keys), None, "not said: the usual chain works");
+        assert_eq!(
+            marked(reply, &keys),
+            Some(vec!["senior-developer".to_string()])
+        );
+        assert_eq!(
+            marked("brief: x", &keys),
+            None,
+            "not said: the usual chain works"
+        );
         assert_eq!(marked(reply, &[]), None);
     }
 
