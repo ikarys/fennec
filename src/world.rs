@@ -174,6 +174,9 @@ impl Worlds {
                 // human looks. From a world, local changes (their edits) carry over.
                 let branch = format!("world/{id}");
                 git(&folder, &["checkout", "-q", "-b", &branch, &rev])?;
+                // The folder's last world wrote notes for its own task; the
+                // new one must not read them.
+                Self::clean_relay(&folder);
                 let record = format!("{}\n{}\n{home}\n{back}", common.display(), folder.display());
                 std::fs::write(meta.join(&id), record)?;
                 return Ok(World { id, path: folder });
@@ -638,7 +641,10 @@ impl Worlds {
             }
             // Ignored by the project (or the harness's store excludes): not
             // named, so the command is not refused for it.
-            if self.git(world, &["check-ignore", "-q", "--", &name]).is_ok() {
+            if self
+                .git(world, &["check-ignore", "-q", "--", &name])
+                .is_ok()
+            {
                 continue;
             }
             names.push(name);
@@ -660,8 +666,7 @@ impl Worlds {
     /// What changed in the work since the last checkpoint, build output left
     /// out as [`Self::commit`] leaves it: a `.pyc` a build wrote is no change.
     pub fn status(&self, world: &World) -> io::Result<String> {
-        let mut args: Vec<String> =
-            vec!["status".into(), "--porcelain".into(), "--".into()];
+        let mut args: Vec<String> = vec!["status".into(), "--porcelain".into(), "--".into()];
         let mut names = self.top_level(world)?;
         if names.is_empty() {
             names.push(".".into());
@@ -740,6 +745,13 @@ impl Worlds {
         Ok(())
     }
 
+    /// The team's notes for a task, in the folder's `relay/`; a task's world
+    /// is dropped or landed, the folder is not, so the notes would be read
+    /// by the next task.
+    pub(crate) fn clean_relay(dir: &Path) {
+        let _ = std::fs::remove_dir_all(dir.join("relay"));
+    }
+
     pub fn drop(&self, world: World) -> io::Result<()> {
         if !crate::grant::paths(self, &world.id)?.is_empty() {
             return Err(io::Error::other(
@@ -767,6 +779,7 @@ impl Worlds {
             if git(&world.path, &["branch", "--show-current"])? == branch {
                 self.rollback(&world)?;
                 git(&world.path, &["checkout", "-q", &back])?;
+                Self::clean_relay(&world.path);
             }
             git(&world.path, &["branch", "-q", "-D", &branch])?;
             std::fs::remove_file(self.root.join("meta").join(&world.id))?;

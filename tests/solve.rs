@@ -170,7 +170,7 @@ fn attempts_run_in_turn_and_the_first_pass_lands() {
 }
 
 #[test]
-fn work_that_changed_nothing_lands_without_a_commit() {
+fn work_that_changed_nothing_fails_where_it_stands() {
     let f = fixture("unchanged");
     // What is asked already holds: the model finds nothing to change.
     std::fs::write(f.project.join("answer"), "42\n").unwrap();
@@ -187,6 +187,7 @@ fn work_that_changed_nothing_lands_without_a_commit() {
             "answer",
         ],
     );
+    let before = git(&f, &["rev-parse", "HEAD"]);
     let idle = Script::new("idle", &[done()]);
     let record = solve(
         &f.worlds,
@@ -196,11 +197,14 @@ fn work_that_changed_nothing_lands_without_a_commit() {
         10,
     )
     .unwrap();
-    let winner = record["winner"].as_str().unwrap().to_string();
-    let before = git(&f, &["rev-parse", "HEAD"]);
-    let landed = land(&f.worlds, &winner, None, Some("feat: change things")).unwrap();
-    assert_eq!(landed, before);
-    assert_eq!(git(&f, &["rev-parse", "HEAD"]), before, "no empty commit");
+    // An empty diff would pass an empty proof and land as work never done.
+    assert_eq!(record["status"], "failed", "{record:#}");
+    assert!(record["winner"].is_null());
+    assert_eq!(
+        record["attempts"][0]["reason"],
+        "no file changed: the work produced nothing to prove"
+    );
+    assert_eq!(git(&f, &["rev-parse", "HEAD"]), before, "nothing landed");
     assert!(f.worlds.list().unwrap().is_empty());
 }
 
