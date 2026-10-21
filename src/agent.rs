@@ -35,9 +35,9 @@ pub(crate) use crate::tools::truncate;
 /// the model is told once, then stopped.
 const REPEAT_NUDGE: usize = 3;
 pub(crate) const REPEAT_STOP: usize = 5;
-/// Steps that change no file in the world: told once, then stopped.
+/// The solve nudges at these idle steps; the framer reads a lot before it
+/// writes a single test, so it is given room by [`Watch::framing`].
 const IDLE_NUDGE: usize = 8;
-/// The first notice leaves room to read it; the second one does not.
 const IDLE_HARD: usize = 12;
 const IDLE_STOP: usize = 15;
 /// A command killed by its timeout costs minutes; a second one ends the run.
@@ -100,8 +100,7 @@ pub(crate) enum Stuck {
 /// Watches the loop for the ways a run gets stuck. Pure bookkeeping:
 /// `call` says nudge (`Some(false)`) or stop (`Some(true)`); `step` says
 /// which notice to send, or none.
-#[derive(Default)]
-pub(crate) struct Watch {
+pub struct Watch {
     last_call: String,
     repeats: usize,
     nudged: usize,
@@ -110,6 +109,27 @@ pub(crate) struct Watch {
     timeouts: usize,
     nudged_idle: bool,
     nudged_idle_hard: bool,
+    idle_nudge: usize,
+    idle_hard: usize,
+    idle_stop: usize,
+}
+
+impl Default for Watch {
+    fn default() -> Self {
+        Self {
+            last_call: String::new(),
+            repeats: 0,
+            nudged: 0,
+            files: String::new(),
+            idle: 0,
+            timeouts: 0,
+            nudged_idle: false,
+            nudged_idle_hard: false,
+            idle_nudge: IDLE_NUDGE,
+            idle_hard: IDLE_HARD,
+            idle_stop: IDLE_STOP,
+        }
+    }
 }
 
 /// How many times the same call is nudged before the run ends on it: the
@@ -120,6 +140,24 @@ const REPEAT_NUDGES: usize = 2;
 const FINGERPRINT: usize = 256;
 
 impl Watch {
+    /// The framing attempt: it explores the code before it writes a single
+    /// test, so the idle notices arrive late.
+    pub const fn framing() -> Self {
+        Self {
+            last_call: String::new(),
+            repeats: 0,
+            nudged: 0,
+            files: String::new(),
+            idle: 0,
+            timeouts: 0,
+            nudged_idle: false,
+            nudged_idle_hard: false,
+            idle_nudge: 15,
+            idle_hard: 20,
+            idle_stop: 25,
+        }
+    }
+
     /// `call` is the tool's arguments, canonicalized by the caller; the
     /// result's first lines join them. A changed file, a changed output, a
     /// changed argument: the run is moving, the count starts over.
@@ -152,20 +190,22 @@ impl Watch {
                 self.nudged_idle_hard,
             ) = (files, 0, false, false);
         }
-        if self.idle >= IDLE_STOP {
+        if self.idle >= self.idle_stop {
             Some(Stuck::Stop)
-        } else if self.idle >= IDLE_HARD && !self.nudged_idle_hard {
+        } else if self.idle >= self.idle_hard && !self.nudged_idle_hard {
             self.nudged_idle_hard = true;
             Some(Stuck::Nudge(format!(
-                "{IDLE_HARD} steps without a single file changed. Edit now — change a file \
+                "{} steps without a single file changed. Edit now — change a file \
                  that moves the work forward, in this step — or call `done` and say exactly \
                  what blocks you.",
+                self.idle_hard
             )))
-        } else if self.idle >= IDLE_NUDGE && !self.nudged_idle {
+        } else if self.idle >= self.idle_nudge && !self.nudged_idle {
             self.nudged_idle = true;
             Some(Stuck::Nudge(format!(
-                "{IDLE_NUDGE} steps without changing any file. Stop exploring: make the change \
+                "{} steps without changing any file. Stop exploring: make the change \
                  now, or call `done` and say what blocks you.",
+                self.idle_nudge
             )))
         } else {
             None
@@ -661,6 +701,7 @@ impl<'a> Engine<'a> {
             None,
             true,
             None,
+            Watch::default(),
         );
         let child = match outcome {
             Ok(o) => o,
@@ -839,9 +880,11 @@ pub fn run(
     tools: Option<&[crate::team::Tool]>,
     read_only: bool,
     log: Option<&std::path::Path>,
+    watch: Watch,
 ) -> io::Result<Outcome> {
     run_in(
         worlds, world, model, goal, criteria, context, max_steps, tools, read_only, log, None,
+        watch,
     )
 }
 
@@ -882,6 +925,7 @@ pub fn resume(
         false,
         log,
         Some(state),
+        Watch::default(),
     )
 }
 
@@ -898,6 +942,7 @@ fn run_in(
     read_only: bool,
     log: Option<&std::path::Path>,
     resumed: Option<Resume>,
+    watch: Watch,
 ) -> io::Result<Outcome> {
     // An empty `tools` line means no restriction, like no line at all.
     let role_tools = tools.filter(|t| !t.is_empty()).map(|t| t.to_vec());
@@ -925,6 +970,7 @@ fn run_in(
         ),
     };
     let mut engine = Engine::new(model, criteria);
+    engine.watch = watch;
     engine.read = read;
     engine.tools = role_tools;
     // A direct run must say what good looks like before it may finish; a
@@ -1229,7 +1275,7 @@ fn drive(
         }
         match engine.watch.step(worlds.status(world).unwrap_or_default()) {
             Some(Stuck::Stop) => {
-                let why = format!("stuck: no file changed in {IDLE_STOP} steps");
+                let why = format!("stuck: no file changed in {} steps", engine.watch.idle_stop);
                 return end(engine, log, step, None, Some(why), None);
             }
             Some(Stuck::Nudge(text)) => log.push(harness(&text)),
@@ -1346,9 +1392,9 @@ mod tests {
     #[test]
     fn idle_steps_nudge_twice_then_stop() {
         let mut w = Watch::default();
-        let verdicts: Vec<_> = (0..IDLE_STOP).map(|_| w.step(String::new())).collect();
-        assert!(matches!(verdicts[IDLE_NUDGE - 1], Some(Stuck::Nudge(_))));
-        assert!(matches!(verdicts[IDLE_HARD - 1], Some(Stuck::Nudge(_))));
+        let verdicts: Vec<_> = (0..w.idle_stop).map(|_| w.step(String::new())).collect();
+        assert!(matches!(verdicts[w.idle_nudge - 1], Some(Stuck::Nudge(_))));
+        assert!(matches!(verdicts[w.idle_hard - 1], Some(Stuck::Nudge(_))));
         assert_eq!(
             verdicts
                 .iter()
@@ -1356,12 +1402,29 @@ mod tests {
                 .count(),
             2
         );
-        assert!(matches!(verdicts[IDLE_STOP - 1], Some(Stuck::Stop)));
+        assert!(matches!(verdicts[w.idle_stop - 1], Some(Stuck::Stop)));
         // A changed file resets the count and both notices.
         let mut w = Watch::default();
-        (0..IDLE_HARD).for_each(|_| _ = w.step(String::new()));
+        (0..w.idle_hard).for_each(|_| _ = w.step(String::new()));
         assert_eq!(w.step(" M a".into()), None);
         assert!(!w.nudged_idle && !w.nudged_idle_hard);
+    }
+
+    #[test]
+    fn a_framing_watch_nudges_later_and_stops_later() {
+        let mut w = Watch::framing();
+        assert!((15, 20, 25) == (w.idle_nudge, w.idle_hard, w.idle_stop));
+        let verdicts: Vec<_> = (0..w.idle_stop).map(|_| w.step(String::new())).collect();
+        assert!(matches!(verdicts[w.idle_nudge - 1], Some(Stuck::Nudge(_))));
+        assert!(matches!(verdicts[w.idle_hard - 1], Some(Stuck::Nudge(_))));
+        assert_eq!(
+            verdicts
+                .iter()
+                .filter(|v| matches!(v, Some(Stuck::Nudge(_))))
+                .count(),
+            2
+        );
+        assert!(matches!(verdicts[w.idle_stop - 1], Some(Stuck::Stop)));
     }
 
     #[test]
