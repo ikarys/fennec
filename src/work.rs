@@ -569,6 +569,9 @@ fn frame_now(store: &Store, id: &str) -> io::Result<()> {
             spec::save(&worlds, &spec_id, &s)?;
             store.update(id, |r| {
                 r["spec"] = json!(spec_id);
+                // The solve forks from this world; naming it keeps wait_turn
+                // from dropping it while the human answers.
+                r["run"] = json!(spec_id);
                 r["done_when"] = s["done_when"].clone();
                 r["status"] = json!("question");
                 note(r, json!({"stage": "frame", "spec": spec_id}));
@@ -1421,7 +1424,7 @@ pub fn stop(store: &Store, id: &str) -> io::Result<()> {
     // Its work goes too: in the project folder, the folder comes back.
     let worlds = Worlds::from_env()?;
     if let Some(run) = request["run"].as_str()
-        && worlds.open(run).is_ok()
+        && review::load(&worlds, run).is_ok()
     {
         review::reject(&worlds, run, None)?;
     }
@@ -1529,7 +1532,7 @@ fn undo(request: &Value) -> io::Result<()> {
     }
     let worlds = Worlds::from_env()?;
     if let Some(run) = request["run"].as_str()
-        && worlds.open(run).is_ok()
+        && review::load(&worlds, run).is_ok()
     {
         review::reject(&worlds, run, None)?;
     }
@@ -2715,6 +2718,55 @@ mod tests {
         assert_eq!(git(&["branch", "--list", "world/*"]), "");
         // What it held is set aside, not lost.
         assert!(git(&["stash", "list"]).contains("fennec"));
+        std::fs::remove_dir_all(tmp).unwrap();
+    }
+
+    #[test]
+    fn a_world_the_request_names_is_not_dropped_awaiting_its_turn() {
+        let tmp = std::env::temp_dir().join(format!("fennec-lead-framing-{}", std::process::id()));
+        let project = tmp.join("p");
+        std::fs::create_dir_all(&project).unwrap();
+        let git = |args: &[&str]| {
+            let out = std::process::Command::new("git")
+                .args(["-c", "user.name=t", "-c", "user.email=t@t"])
+                .args(args)
+                .current_dir(&project)
+                .output()
+                .unwrap();
+            String::from_utf8_lossy(&out.stdout).trim().to_string()
+        };
+        git(&["init", "-q", "-b", "main"]);
+        std::fs::write(project.join("a"), "a").unwrap();
+        git(&["add", "."]);
+        git(&["commit", "-q", "-m", "a"]);
+        let _env = ENV_LOCK.lock().unwrap();
+        // SAFETY: this test holds ENV_LOCK across its env use.
+        unsafe { std::env::set_var("FENNEC_OS_HOME", tmp.join("os")) };
+        // The framing's world holds the folder; the request's run names it,
+        // as frame_now does while the human answers.
+        let world = Worlds::from_env()
+            .unwrap()
+            .fork(project.to_str().unwrap())
+            .unwrap();
+        let store = Store {
+            root: tmp.join("home"),
+        };
+        std::fs::create_dir_all(store.root.join("requests")).unwrap();
+        std::fs::write(
+            store.root.join("requests/c5.json"),
+            format!(
+                r#"{{"status": "running", "project": "{}", "spec": "{}", "run": "{}"}}"#,
+                project.display(),
+                world.id,
+                world.id
+            ),
+        )
+        .unwrap();
+        wait_turn(&store, "c5", project.to_str().unwrap()).unwrap();
+        assert_eq!(
+            git(&["branch", "--show-current"]),
+            format!("world/{}", world.id)
+        );
         std::fs::remove_dir_all(tmp).unwrap();
     }
 
