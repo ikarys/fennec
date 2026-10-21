@@ -1,14 +1,15 @@
-//! A request's life, driven in the background: fennec-os compiles it into
-//! "done when" (goal + failing tests), the human validates or corrects once,
-//! then fennec-os solves it. Each step runs on its own thread; the request
-//! file is the only state, so the view reads it like any other.
+//! A request's life, driven in the background: fennec-os frames it into
+//! "done when" (goal + the command that runs the project's tests), the human
+//! validates or corrects once, then fennec-os solves, reviews and proves it.
+//! Each step runs on its own thread; the request file is the only state, so
+//! the view reads it like any other.
 
 use std::io;
 use std::path::Path;
 
 use fennec_os::provider::{Live, Model, OpenAi};
 use fennec_os::world::{self, Worlds};
-use fennec_os::{proof, review, rules, solve, spec};
+use fennec_os::{proof, review, review_stage, rules, solve, spec};
 use serde_json::{Value, json};
 
 use crate::state::Store;
@@ -398,7 +399,7 @@ fn replace_by(store: &Store, id: &str, parts: &[(String, Vec<usize>)]) -> io::Re
     let inherited = request["after"].as_array().cloned().unwrap_or_default();
     let mut ids: Vec<String> = Vec::new();
     for (text, after) in parts {
-        let new = store.add_request(project, text, &off, true)?;
+        let new = store.add_request(project, text, "", &off, true)?;
         let mut deps = inherited.clone();
         deps.extend(after.iter().map(|a| json!(ids[*a])));
         store.update(&new, |r| r["after"] = json!(deps))?;
@@ -528,7 +529,8 @@ fn transcript(request: &Value) -> String {
     text
 }
 
-/// Once the request is clear, the framer writes its tests: a valid spec is
+/// Once the request is clear, the framer frames it in one pass: the "done
+/// when" and the command that runs the project's tests; a valid spec is
 /// proposed to the human, who validates once; a question goes to the human,
 /// a reason fails the request.
 fn frame_now(store: &Store, id: &str) -> io::Result<()> {
@@ -553,7 +555,7 @@ fn frame_now(store: &Store, id: &str) -> io::Result<()> {
     });
     let worlds = Worlds::from_env()?;
     let model = staffed(OpenAi::variants_from_env(1)?.remove(0), project, "frame")?;
-    let mut s = spec::compile(&worlds, project, &brief, &model, MAX_STEPS)?;
+    let mut s = spec::frame(&worlds, project, &brief, &model)?;
     let spec_id = s["world"].as_str().unwrap_or("").to_string();
     match s["status"].as_str() {
         Some("proposed") => {
@@ -900,6 +902,63 @@ fn solve_now(store: &Store, id: &str) -> io::Result<()> {
         .into_iter()
         .find_map(Value::as_str)
         .map(str::to_string);
+    // The review stage, then the proof: the team's review roles judge the
+    // work before it is tried; a team without them skips it.
+    let reviewer = staffed(OpenAi::variants_from_env(1)?.remove(0), project, "review")?;
+    let mut reviews = 0;
+    loop {
+        store.update(id, |r| r["status"] = json!("reviewing"))?;
+        let review = review_stage::run(&worlds, &run, done_when.as_deref(), &reviewer, MAX_STEPS)?;
+        if review["skipped"] == true || review["passed"] == true {
+            break;
+        }
+        let found = review["findings"].as_str().unwrap_or("").to_string();
+        if let Some(q) = review["question"].as_str() {
+            return store.update(id, |r| {
+                note(r, json!({"stage": "review", "findings": found}));
+                block(r, "reviewing", q, "the review asks before judging");
+            });
+        }
+        if reviews >= MAX_REVIEW || stopped(id) {
+            return store.update(id, |r| {
+                note(r, json!({"stage": "review", "findings": found}));
+                r["status"] = json!("failed");
+                r["reason"] = json!(format!(
+                    "the review sent the work back and it does not pass: {found}"
+                ));
+            });
+        }
+        reviews += 1;
+        store.update(id, |r| {
+            note(r, json!({"stage": "review", "findings": found}));
+            r["status"] = json!("running");
+        })?;
+        let fixed = spec::fix(&worlds, spec_id, &found, &models, MAX_STEPS, None)?;
+        if let Some(w) = fixed["winner"].as_str() {
+            run = w.to_string();
+            store.update(id, |r| {
+                let before = r["files"].clone();
+                note(r, json!({"stage": "solve", "run": fixed["id"]}));
+                apply_run(r, &fixed);
+                r["files"] = merged(&before, &r["files"]);
+            })?;
+            continue;
+        }
+        // No fix passed: a question goes to the human, otherwise the run's
+        // own reason stands.
+        let asked = fixed["attempts"]
+            .as_array()
+            .is_some_and(|a| a.iter().any(|t| t["question"].is_string()));
+        return store.update(id, |r| {
+            note(r, json!({"stage": "solve", "run": fixed["id"]}));
+            if asked {
+                apply_run(r, &fixed);
+            } else {
+                r["status"] = json!("failed");
+                r["reason"] = json!(failure(&fixed));
+            }
+        });
+    }
     let prover = staffed(OpenAi::variants_from_env(1)?.remove(0), project, "prove")?;
     let watched = Live::new(&prover, store.live_path(id)?);
     let mut fixes = 0;
@@ -969,6 +1028,9 @@ fn solve_now(store: &Store, id: &str) -> io::Result<()> {
 
 /// How many times the proof sends a ready run back to its builder.
 const MAX_FIXES: usize = 3;
+
+/// How many times the review sends the work back before the proof.
+const MAX_REVIEW: usize = 2;
 
 fn stopped(id: &str) -> bool {
     STOPS.lock().is_ok_and(|s| s.iter().any(|x| x == id))
@@ -1349,7 +1411,7 @@ pub fn stop(store: &Store, id: &str) -> io::Result<()> {
     let request = store.load(id)?;
     if !matches!(
         request["status"].as_str(),
-        Some("thinking" | "framing" | "waiting" | "running" | "proving" | "landing")
+        Some("thinking" | "framing" | "waiting" | "running" | "reviewing" | "proving" | "landing",)
     ) {
         return Err(io::Error::other("fennec no longer works on this task"));
     }
@@ -1390,7 +1452,15 @@ pub fn leftovers(store: &Store) -> io::Result<Value> {
         .filter(|(_, r)| {
             matches!(
                 r["status"].as_str(),
-                Some("thinking" | "framing" | "waiting" | "running" | "proving" | "landing")
+                Some(
+                    "thinking"
+                        | "framing"
+                        | "waiting"
+                        | "running"
+                        | "reviewing"
+                        | "proving"
+                        | "landing"
+                )
             )
         })
         .filter_map(|(_, r)| r["project"].as_str().map(str::to_string))
@@ -1664,6 +1734,12 @@ pub fn journal(store: &Store, id: &str) -> io::Result<Value> {
                         }
                     }
                 }
+                if !r["review"]["exchange"].is_null() {
+                    let mut s =
+                        roles(step("Review", &r["review"]["exchange"]), &r["review"]["team"]);
+                    s["passed"] = r["review"]["passed"].clone();
+                    steps.push(s);
+                }
                 if !r["proof"]["exchange"].is_null() {
                     let mut s = roles(step("Proof", &r["proof"]["exchange"]), &r["proof"]["team"]);
                     // A prove role also acts on its own: its commands, run by fennec.
@@ -1673,6 +1749,9 @@ pub fn journal(store: &Store, id: &str) -> io::Result<Value> {
             }
             Some("said") => steps.push(json!({"name": "Your answer", "said": e["text"]})),
             Some("qa") => steps.push(json!({"name": "Proof failed: sent back to work", "said": e["findings"]})),
+    Some("review") => {
+        steps.push(json!({"name": "Review failed: sent back to work", "said": e["findings"]}))
+    }
             Some("outside") => steps.push(json!({
                 "name": format!("Via {}", e["via"].as_str().unwrap_or("")),
                 "said": format!("{} by {}", e["did"].as_str().unwrap_or(""), e["from"].as_str().unwrap_or(""))})),
@@ -1686,6 +1765,7 @@ pub fn journal(store: &Store, id: &str) -> io::Result<Value> {
     let under_way = match request["status"].as_str() {
         Some("framing") => Some("Starting (running)"),
         Some("running") => Some("Work (running)"),
+        Some("reviewing") => Some("Review (running)"),
         Some("proving") => Some("Proof (running)"),
         _ => None,
     };
@@ -2031,7 +2111,7 @@ pub fn recover(store: &Store) -> io::Result<()> {
     for (id, r) in store.requests()? {
         if matches!(
             r["status"].as_str(),
-            Some("thinking" | "framing" | "running" | "proving")
+            Some("thinking" | "framing" | "running" | "reviewing" | "proving")
         ) {
             store.update(&id, |r| {
                 r["status"] = json!("failed");
@@ -2287,7 +2367,7 @@ mod tests {
         );
         assert!(r["reason"].is_null() && r["fleet"].is_null());
         // Back for later, it can be reworded.
-        store.rewrite(&id, "add two filters").unwrap();
+        store.rewrite(&id, "add two filters", "").unwrap();
         std::fs::remove_dir_all(tmp).unwrap();
     }
 
@@ -2521,8 +2601,8 @@ mod tests {
         std::fs::create_dir_all(&p).unwrap();
         store.add_project(p.to_str().unwrap(), "apart").unwrap();
         let p = std::fs::canonicalize(p).unwrap().display().to_string();
-        let first = store.add_request(&p, "first", &[], true).unwrap();
-        let next = store.add_request(&p, "next", &[], true).unwrap();
+        let first = store.add_request(&p, "first", "", &[], true).unwrap();
+        let next = store.add_request(&p, "next", "", &[], true).unwrap();
         store
             .update(&next, |r| r["after"] = json!([first]))
             .unwrap();
@@ -2550,11 +2630,11 @@ mod tests {
         std::fs::create_dir_all(&p).unwrap();
         store.add_project(p.to_str().unwrap(), "apart").unwrap();
         let p = std::fs::canonicalize(p).unwrap().display().to_string();
-        let first = store.add_request(&p, "first", &[], true).unwrap();
+        let first = store.add_request(&p, "first", "", &[], true).unwrap();
         let big = store
-            .add_request(&p, "big", &["review".into()], true)
+            .add_request(&p, "big", "", &["review".into()], true)
             .unwrap();
-        let next = store.add_request(&p, "next", &[], true).unwrap();
+        let next = store.add_request(&p, "next", "", &[], true).unwrap();
         store.update(&big, |r| r["after"] = json!([first])).unwrap();
         store.update(&next, |r| r["after"] = json!([big])).unwrap();
         let parts = [("api".to_string(), vec![]), ("ui".to_string(), vec![0])];

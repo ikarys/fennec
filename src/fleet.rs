@@ -381,7 +381,7 @@ pub fn view(store: &Store) -> io::Result<Value> {
         })
         .collect();
     let summary = json!({
-        "queued": queue.len(), "working": count(&["thinking", "framing", "waiting", "running", "proving", "landing"]),
+        "queued": queue.len(), "working": count(&["thinking", "framing", "waiting", "running", "reviewing", "proving", "landing"]),
         "yours": count(&["ready", "question", "talk", "blocked"]), "landed": count(&["landed"]),
         "failed": count(&["failed"]), "cost": cost,
     });
@@ -446,9 +446,9 @@ mod tests {
         }
         let p = std::fs::canonicalize(p).unwrap().display().to_string();
         let q = std::fs::canonicalize(q).unwrap().display().to_string();
-        let a = store.add_request(&p, "a", &[], true).unwrap();
-        let b = store.add_request(&q, "b", &[], true).unwrap();
-        let kept = store.add_request(&p, "kept", &[], true).unwrap();
+        let a = store.add_request(&p, "a", "", &[], true).unwrap();
+        let b = store.add_request(&q, "b", "", &[], true).unwrap();
+        let kept = store.add_request(&p, "kept", "", &[], true).unwrap();
         assert!(place(&store, &a, "add").is_err(), "not framed yet");
         for id in [&a, &b, &kept] {
             framed(&store, id);
@@ -502,8 +502,8 @@ mod tests {
         std::fs::create_dir_all(&p).unwrap();
         store.add_project(p.to_str().unwrap(), "apart").unwrap();
         let p = std::fs::canonicalize(p).unwrap().display().to_string();
-        let a = store.add_request(&p, "a", &[], true).unwrap();
-        let b = store.add_request(&p, "b", &[], true).unwrap();
+        let a = store.add_request(&p, "a", "", &[], true).unwrap();
+        let b = store.add_request(&p, "b", "", &[], true).unwrap();
         let prepare = |id: String| PREPARED.lock().unwrap().push(id);
         let prepared = || std::mem::take(&mut *PREPARED.lock().unwrap());
         // Stopped, nothing works: the Backlog's first task is framed ahead.
@@ -527,7 +527,7 @@ mod tests {
         assert_eq!(store.load(&a).unwrap()["status"], "later");
         assert_eq!(store.load(&b).unwrap()["status"], "thinking");
         // Reworded, a task is framed again on its new words.
-        store.rewrite(&a, "a2").unwrap();
+        store.rewrite(&a, "a2", "").unwrap();
         store.update(&b, |r| r["status"] = json!("landed")).unwrap();
         tick(&store, |_| {}, |_, _| Ok(()), prepare).unwrap();
         assert_eq!(prepared(), std::slice::from_ref(&a));
@@ -535,7 +535,7 @@ mod tests {
         framed(&store, &a);
         set(&store, Some(false), None, None, None).unwrap();
         place(&store, &a, "add").unwrap();
-        store.rewrite(&a, "a3").unwrap();
+        store.rewrite(&a, "a3", "").unwrap();
         assert!(queue(&store).unwrap().is_empty());
         std::fs::remove_dir_all(tmp).unwrap();
     }
@@ -553,8 +553,8 @@ mod tests {
         std::fs::create_dir_all(&p).unwrap();
         store.add_project(p.to_str().unwrap(), "apart").unwrap();
         let p = std::fs::canonicalize(p).unwrap().display().to_string();
-        let a = store.add_request(&p, "a", &[], true).unwrap();
-        let b = store.add_request(&p, "b", &[], true).unwrap();
+        let a = store.add_request(&p, "a", "", &[], true).unwrap();
+        let b = store.add_request(&p, "b", "", &[], true).unwrap();
         framed(&store, &a);
         framed(&store, &b);
         place(&store, &a, "add").unwrap();
