@@ -48,9 +48,10 @@ The home is plain JSON, seedable by a script for a demo (`try.sh` does it):
 `requests/<id>.json` per task (the id is the file name: hex only) with
 `project` (a path from the list), `title` (its short label) and `text` (its
 content), and `status` (`later`: Backlog, `ready`, `running`, `landed`,
-`failed`). `fleet.json` keeps the Ready queue. In the details of a Backlog
-task the title and description fields sit behind the Edit button; the Save
-button writes each as it stands, the other untouched.
+`failed`). `fleet.json` keeps the Ready queue. The page opens on the For you tab; a
+Backlog task is only visible after clicking the Backlog tab. In the details of
+a Backlog task the title and description fields sit behind the Edit button;
+the Save button writes each as it stands, the other untouched.
 
 ## Non-negotiable rules
 
