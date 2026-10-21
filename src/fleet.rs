@@ -506,31 +506,39 @@ mod tests {
         let b = store.add_request(&p, "b", "", &[], true).unwrap();
         let prepare = |id: String| PREPARED.lock().unwrap().push(id);
         let prepared = || std::mem::take(&mut *PREPARED.lock().unwrap());
+        // A model turn this binary's other tests run in flight keeps
+        // ahead() quiet: the Fleet looks again, so the test ticks again.
+        let settle = |want: &Vec<String>| {
+            for _ in 0..2000 {
+                tick(&store, |_| {}, |_, _| Ok(()), prepare).unwrap();
+                if prepared() == *want {
+                    return;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(5));
+            }
+            panic!("the Fleet did not frame the Backlog in time");
+        };
         // Stopped, nothing works: the Backlog's first task is framed ahead.
         set(&store, Some(false), None, None, None).unwrap();
-        tick(&store, |_| {}, |_, _| Ok(()), prepare).unwrap();
-        assert_eq!(prepared(), std::slice::from_ref(&a));
+        settle(&vec![a.clone()]);
         // It asked: it cannot be validated, and the next one is framed.
         store.update(&a, |r| r["asked"] = json!(true)).unwrap();
         assert!(place(&store, &a, "add").is_err());
-        tick(&store, |_| {}, |_, _| Ok(()), prepare).unwrap();
-        assert_eq!(prepared(), std::slice::from_ref(&b));
+        settle(&vec![b.clone()]);
         framed(&store, &b);
-        tick(&store, |_| {}, |_, _| Ok(()), prepare).unwrap();
-        assert!(prepared().is_empty(), "all framed");
+        settle(&Vec::new());
         // Running, nothing validated: nothing starts.
         set(&store, Some(true), None, None, None).unwrap();
         tick(&store, |_| {}, |_, _| Ok(()), prepare).unwrap();
         assert_eq!(store.load(&b).unwrap()["status"], "later");
         place(&store, &b, "add").unwrap();
-        tick(&store, |_| {}, |_, _| Ok(()), prepare).unwrap();
+        settle(&Vec::new());
         assert_eq!(store.load(&a).unwrap()["status"], "later");
         assert_eq!(store.load(&b).unwrap()["status"], "thinking");
         // Reworded, a task is framed again on its new words.
         store.rewrite(&a, "a2", "").unwrap();
         store.update(&b, |r| r["status"] = json!("landed")).unwrap();
-        tick(&store, |_| {}, |_, _| Ok(()), prepare).unwrap();
-        assert_eq!(prepared(), std::slice::from_ref(&a));
+        settle(&vec![a.clone()]);
         // A Ready task reworded leaves Ready until validated again.
         framed(&store, &a);
         set(&store, Some(false), None, None, None).unwrap();
