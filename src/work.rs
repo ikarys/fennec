@@ -983,16 +983,9 @@ fn solve_now(store: &Store, id: &str) -> io::Result<()> {
             let fixed = spec::fix(&worlds, spec_id, &found, &models, MAX_STEPS, None)?;
             if let Some(w) = fixed["winner"].as_str() {
                 run = w.to_string();
-                // The proof asked for a change: a fix that changed nothing
-                // holds no work to prove, it fails where it stands.
-                if nothing_changed(&probe["files"], &fixed) {
-                    return store.update(id, |r| {
-                        note(r, json!({"stage": "solve", "run": fixed["id"]}));
-                        r["status"] = json!("failed");
-                        r["reason"] =
-                            json!("fennec changed nothing, and the proof asked for the change");
-                    });
-                }
+                // The fix stands with what it proved — even when it changed
+                // nothing: the proof's own plan is re-drawn then, told what
+                // the page showed, on a goal that carries the findings.
                 store.update(id, |r| {
                     let before = r["files"].clone();
                     note(r, json!({"stage": "solve", "run": fixed["id"]}));
@@ -1048,21 +1041,6 @@ fn merged(before: &Value, after: &Value) -> Value {
         }
     }
     json!(files)
-}
-
-/// The proof asked for a change, so a fix that changed nothing — on top of
-/// work that changed nothing — holds no work to prove.
-fn nothing_changed(held: &Value, fixed: &Value) -> bool {
-    let held_empty = held.as_array().is_some_and(|f| f.is_empty());
-    let diff = fixed["attempts"]
-        .as_array()
-        .and_then(|a| {
-            a.iter()
-                .find(|t| t["world"] == fixed["winner"].as_str().unwrap_or(""))
-        })
-        .map(|t| t["diff"].as_str().unwrap_or(""))
-        .unwrap_or("");
-    held_empty && changed_files(diff).is_empty()
 }
 
 /// What a failed proof tells the builder: each failing try with the end of
@@ -2164,21 +2142,6 @@ mod tests {
             findings(&json!({"tries": [], "unverified": ["no try proposed"]}))
                 .contains("no try proposed")
         );
-    }
-
-    #[test]
-    fn a_fix_that_changes_nothing_holds_nothing_to_prove() {
-        let fixed =
-            |diff: &str| json!({"winner": "w2", "attempts": [{"world": "w2", "diff": diff}]});
-        assert!(nothing_changed(&json!([]), &fixed("")));
-        let orphan =
-            json!({"winner": "w9", "attempts": [{"world": "w2", "diff": "diff --git a/b b/b\n"}]});
-        assert!(nothing_changed(&json!([]), &orphan));
-        assert!(!nothing_changed(&json!(["ui/app.js"]), &fixed("")));
-        assert!(!nothing_changed(
-            &json!([]),
-            &fixed("diff --git a/ui/app.js b/ui/app.js\n")
-        ));
     }
 
     #[test]
