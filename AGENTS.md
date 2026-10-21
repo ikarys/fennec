@@ -35,12 +35,19 @@ node --check ui/app.js && for t in ui/*.test.js; do node $t || echo "FAIL $t"; d
 cargo clippy --all-targets  # must be clean
 cargo fmt --all
 fennec                      # http://127.0.0.1:7777
+./try.sh                    # try it here: seeds a demo home (one project, one task) and starts the server on 127.0.0.1:7777
 ```
 
 Env: `FENNEC_LEAD_HOME` (default `~/.local/share/fennec-lead`), `FENNEC_LEAD_ADDR`
 (default `127.0.0.1:7777`), `FENNEC_LEAD_ATTEMPTS` (default 1). The model server and
 models are set in "Réglages" (`~/.config/fennec/model.json`); fennec-os's `FENNEC_OS_*`
 variables override them.
+
+The home is plain JSON, seedable by a script for a demo (`try.sh` does it):
+`projects.json` a list of `{"path": a git folder, "archived": false}`; one
+`requests/<id>.json` per task with `project` (a path from the list), `title`
+(its short label) and `text` (its content), and `status` (`later`: Backlog,
+`ready`, `running`, `landed`, `failed`). `fleet.json` keeps the Ready queue.
 
 ## Non-negotiable rules
 
