@@ -569,6 +569,7 @@ fn attempt_inner(
             None,
             false,
             brief.log,
+            agent::Watch::default(),
         )?;
         outcomes.push((None, model.label(), outcome));
     } else {
@@ -601,6 +602,7 @@ fn attempt_inner(
                 Some(&role.tools),
                 false,
                 brief.log,
+                agent::Watch::default(),
             )?;
             remaining = remaining.saturating_sub(outcome.steps);
             outcomes.push((Some(role), role_model.label(), outcome));
@@ -639,6 +641,7 @@ fn attempt_inner(
                 Some(&builder.tools),
                 false,
                 brief.log,
+                agent::Watch::default(),
             )?;
             outcomes.push((Some(builder), role_model.label(), outcome));
             disagreements = std::fs::read_to_string(world.path.join("relay").join("dev.md"))
