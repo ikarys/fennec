@@ -48,7 +48,7 @@ pub const DEFAULT_TEAM: &str = "Développement";
 
 /// Every built-in role, in or out of a built-in team: what the human picks
 /// from to build their own.
-const CATALOG: [(&str, &str); 15] = [
+const CATALOG: [(&str, &str); 14] = [
     ("architect", include_str!("../catalog/architect.md")),
     (
         "critical-reviewer",
@@ -56,10 +56,6 @@ const CATALOG: [(&str, &str); 15] = [
     ),
     ("devops", include_str!("../catalog/devops.md")),
     ("devsecops", include_str!("../catalog/devsecops.md")),
-    (
-        "frontend-designer",
-        include_str!("../catalog/frontend-designer.md"),
-    ),
     ("maintainer", include_str!("../catalog/maintainer.md")),
     (
         "project-manager",
@@ -85,13 +81,7 @@ const CATALOG: [(&str, &str); 15] = [
 const TEAMS: [(&str, &[&str]); 2] = [
     (
         "Développement",
-        &[
-            "project-manager",
-            "senior-developer",
-            "tech-lead",
-            "frontend-designer",
-            "qa",
-        ],
+        &["project-manager", "senior-developer", "tech-lead", "qa"],
     ),
     (
         "Études",
@@ -504,19 +494,20 @@ pub fn brief(project: &Path, stage: &str) -> io::Result<(String, Vec<String>)> {
 
 /// The solve chain: the team's solve roles, one agent run each, in team
 /// order. `wanted` is the roles the framing marked for this task (the PM's
-/// `roles` line): only those, in team order. Absent, the usual chain works:
-/// the solve roles minus the ones that only add when asked, the front-end
-/// designer among them (it passes when the change shows nothing).
+/// `roles` line): only those, in team order. Absent, the whole solve stage
+/// of the team works.
 pub fn solve_chain(project: &Path, wanted: Option<&[String]>) -> io::Result<Vec<Role>> {
     let solve = members(project)?
         .into_iter()
         .filter(|r| r.stage == "solve")
         .collect::<Vec<_>>();
-    let keep = |r: &Role| match wanted {
-        Some(w) if !w.is_empty() => w.iter().any(|k| k == &r.key),
-        _ => r.key != "frontend-designer",
-    };
-    Ok(solve.into_iter().filter(keep).collect())
+    Ok(match wanted {
+        Some(w) if !w.is_empty() => solve
+            .into_iter()
+            .filter(|r| w.iter().any(|k| k == &r.key))
+            .collect(),
+        _ => solve,
+    })
 }
 
 /// The model `stage` runs on, when one of its roles names one.
@@ -835,25 +826,22 @@ mod tests {
         assert_eq!(
             keys,
             ["senior-developer", "tech-lead"],
-            "the front-end designer passes unless marked"
+            "the team's solve roles, in team order"
         );
-        let marked = solve_chain(&project, Some(&["frontend-designer".to_string()])).unwrap();
+        let marked = solve_chain(&project, Some(&["tech-lead".to_string()])).unwrap();
         assert_eq!(
             marked.iter().map(|r| r.key.as_str()).collect::<Vec<_>>(),
-            ["frontend-designer"],
+            ["tech-lead"],
             "only what the PM marked, in team order"
         );
         let both = solve_chain(
             &project,
-            Some(&[
-                "frontend-designer".to_string(),
-                "senior-developer".to_string(),
-            ]),
+            Some(&["tech-lead".to_string(), "senior-developer".to_string()]),
         )
         .unwrap();
         assert_eq!(
             both.iter().map(|r| r.key.as_str()).collect::<Vec<_>>(),
-            ["frontend-designer", "senior-developer"]
+            ["senior-developer", "tech-lead"]
         );
         std::fs::remove_dir_all(project).unwrap();
     }
