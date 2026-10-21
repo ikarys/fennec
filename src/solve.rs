@@ -320,7 +320,11 @@ fn buildable(role: &team::Role) -> bool {
 
 /// The goal a role of the chain works to: the task's, with the earlier
 /// roles' notes for it to read first.
-fn goal_for(world: &World, goal: &str, earlier: &[(Option<&team::Role>, String, agent::Outcome)]) -> String {
+fn goal_for(
+    world: &World,
+    goal: &str,
+    earlier: &[(Option<&team::Role>, String, agent::Outcome)],
+) -> String {
     let names = earlier
         .iter()
         .filter_map(|(r, _, _)| r.map(|r| r.name.as_str()))
@@ -367,7 +371,8 @@ fn decisions(text: &str) -> Vec<Value> {
                 .trim_start_matches(['—', '-', ':', ' '])
                 .trim()
                 .to_string();
-            (!point.is_empty() && !reason.is_empty()).then_some(json!({"point": point, "reason": reason}))
+            (!point.is_empty() && !reason.is_empty())
+                .then_some(json!({"point": point, "reason": reason}))
         })
         .collect()
 }
@@ -461,7 +466,14 @@ fn attempt_inner(
     let mut outcomes: Vec<(Option<&team::Role>, String, agent::Outcome)> = Vec::new();
     if solo {
         let outcome = agent::run(
-            worlds, world, model, &goal, criteria.clone(), &context, max_steps, None,
+            worlds,
+            world,
+            model,
+            &goal,
+            criteria.clone(),
+            &context,
+            max_steps,
+            None,
         )?;
         outcomes.push((None, model.label(), outcome));
     } else {
@@ -470,13 +482,17 @@ fn attempt_inner(
             // variant must outlive the run it is borrowed for.
             let boxed = role.model.as_ref().map(|m| model.variant(m));
             let role_model = boxed.as_deref().unwrap_or(model);
-            let role_context =
-                format!("{context}\n\nAs {} on the team:\n{}\n", role.name, role.brief);
+            let role_context = format!(
+                "{context}\n\nAs {} on the team:\n{}\n",
+                role.name, role.brief
+            );
             let role_goal = goal_for(world, &goal, &outcomes);
             // The checks judge the work, so only the roles that can build
             // them run against them; a reviewer that cannot run a command
             // cannot meet one.
-            let role_criteria = buildable(role).then(|| criteria.clone()).unwrap_or_default();
+            let role_criteria = buildable(role)
+                .then(|| criteria.clone())
+                .unwrap_or_default();
             let outcome = agent::run(
                 worlds,
                 world,
@@ -515,7 +531,9 @@ fn attempt_inner(
                 world,
                 role_model,
                 &ask,
-                buildable(builder).then(|| criteria.clone()).unwrap_or_default(),
+                buildable(builder)
+                    .then(|| criteria.clone())
+                    .unwrap_or_default(),
                 &role_context,
                 max_steps,
                 Some(&builder.tools),
@@ -552,7 +570,10 @@ fn attempt_inner(
             })
             .collect::<Vec<_>>()
     );
-    let summary = outcomes.iter().rev().find_map(|(_, _, o)| o.summary.clone());
+    let summary = outcomes
+        .iter()
+        .rev()
+        .find_map(|(_, _, o)| o.summary.clone());
     let question = outcomes.iter().find_map(|(_, _, o)| o.question.clone());
     let stuck = outcomes.iter().rev().find_map(|(_, _, o)| o.stuck.clone());
     let steps: usize = outcomes.iter().map(|(_, _, o)| o.steps).sum();
@@ -614,6 +635,16 @@ fn attempt_inner(
             .count()
     );
     record["diff"] = json!(diff);
+    if diff.trim().is_empty() && record["grant"].as_array().is_none_or(|g| g.is_empty()) {
+        // Nothing to prove would pass an empty proof and land as work never
+        // done: the attempt fails where it stands. A granted run is excepted:
+        // its whole work is the host edit, the world stays clean on purpose.
+        record["reason"] = json!(match &stuck {
+            Some(why) => format!("{why}; no file changed"),
+            None => "no file changed: the work produced nothing to prove".to_string(),
+        });
+        return Ok(());
+    }
 
     let changed = worlds.git(world, &["diff", "--name-only", &base, &commit])?;
     let changed: Vec<&str> = changed.lines().collect();
@@ -1008,6 +1039,11 @@ pub fn land(
     };
     let commit = squashed;
     let _ = std::fs::remove_file(&marker);
+    // Landed, the folder is the human's again: its next task reads no notes
+    // of this one (a world dropped for the folder does the same).
+    if home.is_some() {
+        crate::world::Worlds::clean_relay(project);
+    }
     worlds.drop(world)?;
     // The spec's world is kept for a retry until its run lands.
     if let Some(spec) = review::load(worlds, id)?["spec"].as_str()

@@ -120,7 +120,19 @@ pub fn gather(
     // A model can spend the whole reply reasoning (seen: 8192 tokens of
     // thinking, no answer); `ask` then plans again without.
     let (content, exchange) = crate::provider::ask(model, &messages)?;
-    let mut plan = parse(&content);
+    let (mut plan, clean) = parse(&content);
+    if !clean {
+        // Reasoning monologue parsed as plan lines ran for real and passed:
+        // nothing here is the plan, so nothing may be tried or shown.
+        plan.tries.clear();
+        plan.serve = None;
+        plan.shots.clear();
+        plan.unverified.push(
+            "the model's reply was not the proof plan: prose mixed with the plan's lines; \
+             nothing was tried"
+                .to_string(),
+        );
+    }
 
     let command = |c: &String| Rule {
         id: "proof.try".to_string(),
@@ -157,7 +169,7 @@ pub fn gather(
             worlds.rollback(&world)?;
         }
     }
-    if checks.is_empty() && shots.is_empty() {
+    if checks.is_empty() && shots.is_empty() && clean {
         plan.unverified.push(if content.trim().is_empty() {
             // Reasoning models can spend the whole budget thinking.
             "no try proposed: the model's reply was empty or cut off".to_string()
@@ -431,15 +443,21 @@ fn local_port(url: &str) -> Option<u16> {
         .flatten()
 }
 
-fn parse(reply: &str) -> Plan {
+/// The plan, and `clean`: false when the model's prose leaked into the
+/// plan's lines, so what was run is not the plan the brief asked for.
+fn parse(reply: &str) -> (Plan, bool) {
     let mut plan = Plan::default();
+    let mut clean = true;
     for line in reply.lines() {
         let line = line.trim().trim_start_matches("- ");
-        let clean = |s: &str| s.trim().trim_matches('`').trim().to_string();
+        let clean_value = |s: &str| s.trim().trim_matches('`').trim().to_string();
         let Some((key, value)) = line.split_once(':') else {
+            if !line.is_empty() {
+                clean = false;
+            }
             continue;
         };
-        let value = clean(value);
+        let value = clean_value(value);
         if value.is_empty() {
             continue;
         }
@@ -459,10 +477,12 @@ fn parse(reply: &str) -> Plan {
                 }
             }
             "unverified" if !value.eq_ignore_ascii_case("none") => plan.unverified.push(value),
-            _ => {}
+            _ => {
+                clean = false;
+            }
         }
     }
-    plan
+    (plan, clean)
 }
 
 #[cfg(test)]
@@ -494,20 +514,36 @@ mod tests {
 
     #[test]
     fn reply_parsing() {
-        let plan = parse(
+        let (plan, clean) = parse(
             "Sure.\ntry: `python3 -c 'print(1)'`\n- try: ./run.sh\nserve: `python3 -m http.server 8000`\nshot: http://127.0.0.1:8000/\nunverified: the GUI\nunverified: none\n",
         );
         assert_eq!(plan.tries, ["python3 -c 'print(1)'", "./run.sh"]);
         assert_eq!(plan.serve.as_deref(), Some("python3 -m http.server 8000"));
         assert_eq!(plan.shots, [("http://127.0.0.1:8000/".to_string(), vec![])]);
         assert_eq!(plan.unverified, ["the GUI"]);
+        // The "Sure." is prose around the plan: the plan alone was not answered.
+        assert!(!clean);
+        let (plan, clean) = parse(
+            "try: `python3 -c 'print(1)'`\nserve: `python3 -m http.server 8000`\nshot: http://127.0.0.1:8000/\n",
+        );
+        assert!(clean);
+        assert_eq!(plan.tries, ["python3 -c 'print(1)'"]);
         let many = "try: a\n".repeat(9);
-        assert_eq!(parse(&many).tries.len(), 5);
+        assert_eq!(parse(&many).0.tries.len(), 5);
+    }
+
+    #[test]
+    fn a_reply_that_is_only_prose_is_not_a_plan() {
+        let (plan, clean) = parse(
+            "Let me look at what was changed.\nFirst the tests look fine.\ntry: cat src/main.rs\nThen I can run it.\n",
+        );
+        assert!(!clean);
+        assert_eq!(plan.tries, ["cat src/main.rs"]);
     }
 
     #[test]
     fn steps_belong_to_the_page_before_them() {
-        let plan = parse(
+        let (plan, clean) = parse(
             "act: click orphan\nshot: http://127.0.0.1:8000/\nact: click `pain`\nact: type Nouvel article => lait | key Enter\nshot: http://127.0.0.1:8000/b\n",
         );
         assert_eq!(
@@ -524,6 +560,7 @@ mod tests {
                 ("http://127.0.0.1:8000/b".to_string(), vec![])
             ]
         );
+        assert!(clean);
     }
 
     #[test]
