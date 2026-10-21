@@ -8,6 +8,10 @@ build:
 dev:
   cargo run
 
+# Run the tests
+test:
+  cargo test
+
 # Install fennec as a systemd user service (enable, do not start)
 service-install: build
   #!/usr/bin/env bash
