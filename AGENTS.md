@@ -119,4 +119,4 @@ Conventional Commits, imperative mood (`feat:`, `fix:`, `docs:`, `refactor:`,
 
 ## Rules
 
-- Analyser d'abord à quoi sert quelque chose avant d'agir.
+- Analyze what something is for before acting.

@@ -20,6 +20,12 @@ assert.match(html, /<div id="settings-appearance" hidden>[\s\S]*?<select id="lan
 assert.match(html, /<div id="settings-skills" hidden>[\s\S]*<input id="skill-search"[\s\S]*<ul id="skills-list">/, "la recherche et la liste dans Skills");
 assert.doesNotMatch(html.match(/<section id="settings" hidden>[\s\S]*?\n  <\/section>/)[0], /<h3>/, "plus de titres de section : les onglets les remplacent");
 
+// The reasoning policy: always first (a thinking model must not skip its
+// reasoning), then adaptive, then never.
+assert.match(html, /<select id="settings-think">\s*<option value="always"[\s\S]*<option value="adaptive"[\s\S]*<option value="never"/, "la politique de réflexion, always en tête");
+assert.match(src, /\$\("settings-think"\)\.value = s\.think;/, "chargée depuis le serveur");
+assert.match(src, /think: \$\("settings-think"\)\.value/, "envoyée à la sauvegarde");
+
 // The switch in the CSS, driven by aria-checked.
 assert.match(html, /\.switch \{/, "le style du switch");
 assert.match(html, /\.switch\[aria-checked=true\] \{ background: var\(--ok\); \}/, "allumé : l'ok");

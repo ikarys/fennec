@@ -2710,6 +2710,7 @@ async function showSettingsPage() {
     $("settings-url").value = s.base_url;
     $("settings-tokens").value = s.max_tokens;
     $("settings-effort").value = s.effort;
+    $("settings-think").value = s.think;
     $("settings-key").value = "";
     $("settings-key").placeholder = s.has_key ? t("saved (leave empty to keep it)") : "";
     $("settings-env").hidden = !s.env.length;
@@ -2739,7 +2740,8 @@ $("settings-form").onsubmit = async (e) => {
   const models = boxes.length ? boxes.filter((b) => b.checked).map((b) => b.value) : chosen;
   try {
     await api("/api/settings/save", { base_url: $("settings-url").value, api_key: $("settings-key").value, models,
-      max_tokens: Number($("settings-tokens").value), effort: $("settings-effort").value });
+      max_tokens: Number($("settings-tokens").value), effort: $("settings-effort").value,
+      think: $("settings-think").value });
     $("settings-key").value = "";
     $("settings-error").textContent = "";
     $("settings-saved").textContent = t("✓ Saved");
