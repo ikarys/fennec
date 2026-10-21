@@ -116,3 +116,7 @@ What the human expects without having to ask; apply it on every UI change.
 
 Conventional Commits, imperative mood (`feat:`, `fix:`, `docs:`, `refactor:`,
 `test:`, `chore:`).
+
+## Rules
+
+- Analyser d'abord à quoi sert quelque chose avant d'agir.
