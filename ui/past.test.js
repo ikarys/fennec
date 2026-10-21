@@ -38,7 +38,7 @@ eval(src.match(/const el = \(tag, props = \{\}, \.\.\.children\) => \{[\s\S]*?\n
   + grab("action") + grab("forgetButton") + grab("opener")
   + grab("journalButton") + grab("changesButton")
   + src.match(/async function changes\([\s\S]*?\n}\n/)[0] + grab("diffView")
-  + grab("rich") + grab("inline") + grab("md") + grab("focus") + grab("firstLine")
+  + grab("rich") + grab("inline") + grab("md") + grab("isImage") + grab("focus") + grab("firstLine")
   + grab("conversation") + grab("doneWhen") + grab("work") + grab("shots")
   + grab("stepText") + grab("line") + grab("headline") + grab("pastState") + grab("pill")
   + src.match(/const METRIC_TIP = \{[\s\S]*?\n\};\n/)[0]

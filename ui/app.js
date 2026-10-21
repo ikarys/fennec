@@ -513,12 +513,12 @@ function details(item) {
   const box = el("details", { className: "more", open: true }, el("summary", { textContent: t("Details") }));
   box.dataset.key = item.id;
   const part = (title, ...nodes) => box.append(el("h3", { textContent: title }), ...nodes);
+  // The short label and the content are apart: each is read on its own.
+  if (item.title) part(t("Title"), el("div", {}, ...md(item.title)));
   // A plan step carries the discussion's whole plan after "---": the same in
   // every step, so it is named as shared, apart from the step itself.
-  const [step, plan] = (item.title ?? "").split("\n\n---\n");
-  // Its first paragraph is the page's title already.
-  const rest = (step ?? "").trim().slice(lead(step).length).trim();
-  if (rest) part(t("The task"), el("div", {}, ...md(rest)));
+  const [step, plan] = (item.description ?? "").split("\n\n---\n");
+  if (step) part(t("Description"), el("div", {}, ...md(step)));
   if (plan) part(t("The discussion's plan, shared by its tasks"), el("div", {}, ...md(plan)));
   const errors = [item.reason, item.land_error].filter(Boolean);
   if (errors.length) part(t("Error"), ...errors.map((e) => el("pre", { className: "failed", textContent: e })));
@@ -1067,12 +1067,14 @@ function card(item) {
     // Kept, not started: read in the details, said again there if need be,
     // then launched.
     let images;
+    let titleField;
     const save = el("button", { type: "button", textContent: t("Save"), hidden: true });
     save.onclick = async () => {
       const error = errorOf(save);
       error.textContent = "";
       try {
-        await api("/api/rewrite", { id: item.id, text: images.value() });
+        // The title and the description are apart: each is sent as it stands.
+        await api("/api/rewrite", { id: item.id, title: titleField.value, text: images.value() });
       } catch (e) {
         return (error.textContent = e.message);
       }
@@ -1083,18 +1085,21 @@ function card(item) {
     };
     const edit = el("button", { type: "button", textContent: t("Edit") });
     edit.onclick = () => {
-      const text = el("textarea", { className: "later-text", defaultValue: item.title, ariaLabel: t("The task") });
+      titleField = el("input", { className: "later-title", value: item.title ?? "", ariaLabel: t("Title") });
+      const text = el("textarea", { className: "later-text", defaultValue: item.description ?? "", ariaLabel: t("Description") });
       images = attach(text, item.images);
-      const reply = el("div", { className: "reply" }, text, images.node);
-      // The field takes the place of the task as the details read it.
+      const reply = el("div", { className: "reply" },
+        el("label", { className: "muted", textContent: t("Title") }), titleField,
+        el("label", { className: "muted", textContent: t("Description") }), text, images.node);
+      // The fields take the place of the task as the details read it.
       const more = node.querySelector("details.more");
-      const read = [...(more?.querySelectorAll("h3") ?? [])].find((h) => h.textContent === t("The task"));
-      read?.nextSibling.remove();
+      const read = [...(more?.querySelectorAll("h3") ?? [])].find((h) => h.textContent === t("Title") || h.textContent === t("Description"));
+      read?.nextElementSibling?.remove();
       read?.remove();
       if (more) { more.open = true; more.firstChild.after(reply); } else node.prepend(reply);
       edit.hidden = true;
       save.hidden = false;
-      text.focus();
+      titleField.focus();
     };
     // Framed ahead: what fennec understood, for the human to validate or
     // correct. Only a validated task is Ready, and only Ready ones run alone.
@@ -2296,6 +2301,7 @@ $("back").onclick = () => (location.hash = document.body.classList.contains("cha
 function compose() {
   $("compose-error").textContent = "";
   $("compose").showModal();
+  $("title").value = "";
   $("text").focus();
 }
 $("compose-open").onclick = compose;
@@ -2307,7 +2313,7 @@ $("compose-close").onclick = () => $("compose").close();
 $("later-add").onclick = async () => {
   $("compose-error").textContent = "";
   try {
-    await api("/api/requests", { project: $("project").value, text: composed.value(), later: true });
+    await api("/api/requests", { project: $("project").value, title: $("title").value, text: composed.value(), later: true });
     composed.clear();
     $("compose").close();
     refresh(true);
@@ -2321,7 +2327,7 @@ $("new-request").addEventListener("submit", async (event) => {
   $("compose-error").textContent = "";
   try {
     const off = [...document.querySelectorAll("#chips button[aria-pressed=false]")].map((b) => b.dataset.key);
-    const made = await api("/api/requests", { project: $("project").value, text: composed.value(), off });
+    const made = await api("/api/requests", { project: $("project").value, title: $("title").value, text: composed.value(), off });
     composed.clear();
     $("compose").close();
     // What was just asked is what the human watches next.
