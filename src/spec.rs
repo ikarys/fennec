@@ -19,7 +19,10 @@ use crate::world::{World, Worlds};
 use crate::{schedule, sleep};
 
 const BRIEF: &str = "Turn the request below into acceptance tests, before anyone implements it. \
-Read the project first and follow its test conventions. Write tests only, in new files: they are \
+Read the project first and follow its test conventions. Read the data model and entry points \
+before writing tests: the goal you write must be specific enough that an implementer never \
+needs to ask about code structure — if the request says 'two fields' and the code has one, \
+say which one to split and how. Write tests only, in new files: they are \
 protected whole once accepted, so the implementation must stay free to edit every existing file \
 (in Rust, an integration test under `tests/`). No implementation, no stubs. Cover the edge cases the request implies; where it is ambiguous, \
 pick the reading a careful maintainer would and say so in the goal. \
