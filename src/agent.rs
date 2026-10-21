@@ -789,7 +789,8 @@ are kept for you in the project's `.fennec/`, shared by all its copies (a Cargo 
 Never install into the system or the home (`--user`, \
 `--break-system-packages`, global installs), never copy packages into the source tree.\n\
 You cannot commit: the harness checkpoints your work. Anything you break can be rolled back, \
-so act directly instead of asking.\n\
+so act directly instead of asking. If the goal is ambiguous about code structure, read the \
+code and decide — do not ask; only ask the human about product decisions the goal does not cover.\n\
 Plan before code: once you have read enough to scope the work, add the criteria it must meet \
 with `criteria` (action add) — at least two, each in one line, each with a `check` (a bash \
 command that exits 0 once it holds) whenever it can be proven: a test, a build, the content of \
@@ -1283,8 +1284,10 @@ fn ask(model: &dyn Model, goal: &str, messages: &[Value], why: &str) -> Option<S
         "You were working on this goal:\n{goal}\n\nThe end of your work:\n{}\n\n\
          The harness stopped you: {why}.\n\
          A human who knows the project, but has not read your work, can answer one question. \
-         If an answer would unblock you (a choice only they can make, a missing fact, a command \
-         or tool that hangs), ask it with the context needed to answer it in one line. \
+         If an answer would unblock you and the answer is not in the code, the goal, or the \
+         request (a product decision the goal does not cover, a requirement not stated, a \
+         command or tool that hangs), ask it with the context needed to answer it in one line. \
+         If the answer is in the code or in the goal, do not ask. \
          Reply in exactly this form, nothing else:\nquestion: <your question, or none>",
         recent.join("\n")
     );
