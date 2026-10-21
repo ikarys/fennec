@@ -528,9 +528,9 @@ fn transcript(request: &Value) -> String {
     text
 }
 
-/// Once the request is clear, the work starts: no tests are written first
-/// (that is a rule the human may say, not a stage); the proof of the product
-/// is what makes it ready.
+/// Once the request is clear, the framer writes its tests: a valid spec is
+/// proposed to the human, who validates once; a question goes to the human,
+/// a reason fails the request.
 fn frame_now(store: &Store, id: &str) -> io::Result<()> {
     let request = store.load(id)?;
     let project = Path::new(request["project"].as_str().unwrap_or(""));
@@ -551,20 +551,51 @@ fn frame_now(store: &Store, id: &str) -> io::Result<()> {
             .filter_map(|s| s.as_str().map(str::to_string))
             .collect()
     });
-    let s = spec::direct(
-        &Worlds::from_env()?,
-        project,
-        &brief,
-        skills.as_deref(),
-        roles.as_deref(),
-    )?;
-    // "Done when" stays unset: the request already says it, and the human
-    // would read it twice. The proof falls back to the brief.
-    store.update(id, |r| {
-        r["spec"] = s["world"].clone();
-        r["status"] = json!("running");
-    })?;
-    solve_now(store, id)
+    let worlds = Worlds::from_env()?;
+    let model = staffed(OpenAi::variants_from_env(1)?.remove(0), project, "frame")?;
+    let mut s = spec::compile(&worlds, project, &brief, &model, MAX_STEPS)?;
+    let spec_id = s["world"].as_str().unwrap_or("").to_string();
+    match s["status"].as_str() {
+        Some("proposed") => {
+            // The framing's picks ride on the spec the human validates.
+            if let Some(skills) = &skills {
+                s["skills"] = json!(skills);
+            }
+            if let Some(roles) = &roles {
+                s["roles"] = json!(roles);
+            }
+            spec::save(&worlds, &spec_id, &s)?;
+            store.update(id, |r| {
+                r["spec"] = json!(spec_id);
+                r["done_when"] = s["done_when"].clone();
+                r["status"] = json!("question");
+                note(r, json!({"stage": "frame", "spec": spec_id}));
+            })
+        }
+        _ if s["question"].is_string() => {
+            let q = s["question"].as_str().unwrap_or("").to_string();
+            let why = s["reason"]
+                .as_str()
+                .unwrap_or("it asks before it can write the tests");
+            store.update(id, |r| {
+                r["spec"] = json!(spec_id);
+                note(r, json!({"stage": "frame", "spec": spec_id}));
+                block(r, "framing", &q, why);
+            })
+        }
+        _ => {
+            let why = s["reason"]
+                .as_str()
+                .unwrap_or("the framer wrote no tests")
+                .to_string();
+            store.update(id, |r| {
+                r["spec"] = json!(spec_id);
+                r["status"] = json!("failed");
+                r["reason"] = json!(why);
+                note(r, json!({"stage": "frame", "spec": spec_id}));
+            })
+        }
+    }
 }
 
 /// The human's one answer: validate starts the work, a correction re-frames.
@@ -2124,13 +2155,13 @@ mod tests {
         // SAFETY: this test holds ENV_LOCK across its env use.
         unsafe { std::env::set_var("FENNEC_OS_HOME", &os) };
         let worlds = Worlds::from_env().unwrap();
-        let s = fennec_os::spec::direct(&worlds, &project, "a task", None, None).unwrap();
-        let spec_id = s["world"].as_str().unwrap().to_string();
+        let spec_id = "s1";
         // The first solve accepted the spec (the chain had a winner) while a
         // role of the chain was still asking: the run keeps it accepted.
-        let mut spec = s.clone();
-        spec["status"] = json!("accepted");
-        spec["run"] = json!("w1");
+        let spec = json!({"project": project.to_string_lossy(), "request": "a task",
+                          "world": "w0", "goal": "a task", "verify": [], "protect": [],
+                          "status": "accepted", "run": "w1"});
+        std::fs::create_dir_all(os.join("specs")).unwrap();
         std::fs::write(
             os.join("specs").join(format!("{spec_id}.json")),
             spec.to_string(),
@@ -2152,7 +2183,7 @@ mod tests {
         // Routed through spec::retry, which handles an accepted spec:
         // spec::accept would fail it with `spec is "accepted"`.
         assert_eq!(r["retry"], "port 9");
-        let spec = fennec_os::spec::load(&worlds, &spec_id).unwrap();
+        let spec = fennec_os::spec::load(&worlds, spec_id).unwrap();
         assert_eq!(spec["answers"][0]["answer"], "port 9");
         std::fs::remove_dir_all(&tmp).unwrap();
     }
