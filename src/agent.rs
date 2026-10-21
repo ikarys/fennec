@@ -36,10 +36,10 @@ pub(crate) use crate::tools::truncate;
 const REPEAT_NUDGE: usize = 3;
 pub(crate) const REPEAT_STOP: usize = 5;
 /// Steps that change no file in the world: told once, then stopped.
-const IDLE_NUDGE: usize = 15;
+const IDLE_NUDGE: usize = 8;
 /// The first notice leaves room to read it; the second one does not.
-const IDLE_HARD: usize = 20;
-const IDLE_STOP: usize = 25;
+const IDLE_HARD: usize = 12;
+const IDLE_STOP: usize = 15;
 /// A command killed by its timeout costs minutes; a second one ends the run.
 const TIMEOUT_STOP: usize = 2;
 /// `done` refused this many times at most: then the verification judges.
@@ -92,7 +92,7 @@ pub(crate) type Asker<'a> = &'a dyn Fn(Value) -> io::Result<Option<Answer>>;
 #[derive(Debug, PartialEq)]
 pub(crate) enum Stuck {
     /// A notice goes into the conversation; the loop keeps going.
-    Nudge(&'static str),
+    Nudge(String),
     /// The loop ends; the reason is recorded on the outcome.
     Stop,
 }
@@ -156,15 +156,17 @@ impl Watch {
             Some(Stuck::Stop)
         } else if self.idle >= IDLE_HARD && !self.nudged_idle_hard {
             self.nudged_idle_hard = true;
-            Some(Stuck::Nudge(
-                "20 steps without a single file changed. Edit now — change a file that moves the work forward, in this step — or call `done` and say exactly what blocks you.",
-            ))
+            Some(Stuck::Nudge(format!(
+                "{IDLE_HARD} steps without a single file changed. Edit now — change a file \
+                 that moves the work forward, in this step — or call `done` and say exactly \
+                 what blocks you.",
+            )))
         } else if self.idle >= IDLE_NUDGE && !self.nudged_idle {
             self.nudged_idle = true;
-            Some(Stuck::Nudge(
-                "15 steps without changing any file. Stop exploring: make the change now, \
-                 or call `done` and say what blocks you.",
-            ))
+            Some(Stuck::Nudge(format!(
+                "{IDLE_NUDGE} steps without changing any file. Stop exploring: make the change \
+                 now, or call `done` and say what blocks you.",
+            )))
         } else {
             None
         }
@@ -1230,7 +1232,7 @@ fn drive(
                 let why = format!("stuck: no file changed in {IDLE_STOP} steps");
                 return end(engine, log, step, None, Some(why), None);
             }
-            Some(Stuck::Nudge(text)) => log.push(harness(text)),
+            Some(Stuck::Nudge(text)) => log.push(harness(&text)),
             None => {}
         }
     }
