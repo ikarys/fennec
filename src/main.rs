@@ -416,7 +416,7 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
                 .collect();
             Ok(json!({"base_url": s.base_url, "models": s.models,
                       "has_key": s.api_key.is_some(), "env": env,
-                      "max_tokens": s.max_tokens, "effort": s.effort}))
+                      "max_tokens": s.max_tokens, "effort": s.effort, "think": s.think}))
         }
         ("POST", "/api/settings/served") => {
             let v = input()?;
@@ -458,12 +458,17 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
             if !["", "none", "low", "medium", "xhigh"].contains(&effort.as_str()) {
                 return Err(io::Error::other("unknown reasoning level"));
             }
+            let think = field(&v, "think");
+            if !["always", "adaptive", "never"].contains(&think.as_str()) {
+                return Err(io::Error::other("unknown reasoning policy"));
+            }
             Settings {
                 base_url,
                 models,
                 api_key,
                 max_tokens,
                 effort,
+                think,
             }
             .save()?;
             Ok(json!({}))

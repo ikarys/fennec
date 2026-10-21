@@ -821,9 +821,9 @@ fn solve_now(store: &Store, id: &str) -> io::Result<()> {
     let spec_id = request["spec"].as_str().unwrap_or("");
     let amend = request["amend"].as_str();
     let record = match (amend, request["retry"].as_str()) {
-        (Some(change), _) => spec::amend(&worlds, spec_id, change, &models, MAX_STEPS)?,
-        (None, Some(why)) => spec::retry(&worlds, spec_id, why, &models, MAX_STEPS)?,
-        (None, None) => spec::accept(&worlds, spec_id, &models, MAX_STEPS)?,
+        (Some(change), _) => spec::amend(&worlds, spec_id, change, &models, MAX_STEPS, None)?,
+        (None, Some(why)) => spec::retry(&worlds, spec_id, why, &models, MAX_STEPS, None)?,
+        (None, None) => spec::accept(&worlds, spec_id, &models, MAX_STEPS, None)?,
     };
     let tests = spec::load(&worlds, spec_id)?;
     if amend.is_some() && !record["winner"].is_string() {
@@ -887,7 +887,7 @@ fn solve_now(store: &Store, id: &str) -> io::Result<()> {
                 note(r, json!({"stage": "qa", "findings": found}));
                 r["status"] = json!("running");
             })?;
-            let fixed = spec::fix(&worlds, spec_id, &found, &models, MAX_STEPS)?;
+            let fixed = spec::fix(&worlds, spec_id, &found, &models, MAX_STEPS, None)?;
             if let Some(w) = fixed["winner"].as_str() {
                 run = w.to_string();
                 // The proof asked for a change: a fix that changed nothing
