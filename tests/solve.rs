@@ -11,7 +11,7 @@ use std::sync::Mutex;
 use common::Fixture;
 use fennec_os::provider::Model;
 use fennec_os::solve::{Task, land, plan, push, solve};
-use fennec_os::{grant, proof, review, rules, skill, sleep, spec};
+use fennec_os::{grant, proof, review, rules, skill, sleep, spec, team};
 use serde_json::{Value, json};
 
 /// The global skill list reads process-wide variables; the one test that
@@ -102,6 +102,7 @@ fn task(protect: &[&str]) -> Task {
         grant: Vec::new(),
         skills: None,
         roles: None,
+        discussion: None,
     }
 }
 
@@ -140,7 +141,7 @@ fn attempts_run_in_turn_and_the_first_pass_lands() {
     let tight = Script::new("tight", &[write("answer", "42\n"), done()]);
     let models: Vec<&dyn Model> = vec![&wrong, &tight, &noisy];
 
-    let record = solve(&f.worlds, &f.project, &task(&[]), &models, 10).unwrap();
+    let record = solve(&f.worlds, &f.project, &task(&[]), &models, 10, None).unwrap();
     let attempts = record["attempts"].as_array().unwrap();
     // The third model is never called: the second passed.
     let passed: Vec<bool> = attempts.iter().map(|a| a["passed"] == true).collect();
@@ -170,6 +171,75 @@ fn attempts_run_in_turn_and_the_first_pass_lands() {
 }
 
 #[test]
+fn a_crashed_attempt_goes_on_in_its_own_world() {
+    let f = fixture("resume");
+    let world = f.worlds.fork(&f.project.to_string_lossy()).unwrap();
+    let log_path = f.dir.join("live/resume.json");
+    std::fs::create_dir_all(log_path.parent().unwrap()).unwrap();
+    // What the crashed attempt left: its world, its conversation, and a
+    // reply whose call never ran.
+    std::fs::write(
+        &log_path,
+        json!({
+            "world": world.id,
+            "goal": "Write 42 into the file `answer`.",
+            "steps": 1,
+            "from": 0,
+            "log": [
+                {"role": "system", "content": "the system message"},
+                {"role": "user", "content": "Write 42 into the file `answer`."},
+                {
+                    "role": "assistant", "content": null,
+                    "reasoning_content": "hmm",
+                    "tool_calls": [{
+                        "id": "c0", "type": "function",
+                        "function": {
+                            "name": "write_file",
+                            "arguments": "{\"path\": \"answer\", \"content\": \"42\\n\"}"
+                        }
+                    }]
+                }
+            ],
+            "criteria": [],
+            "read": []
+        })
+        .to_string(),
+    )
+    .unwrap();
+    // The pending call runs without a model call; `done` is refused twice
+    // (the run must say what good looks like), then it goes through.
+    let spy = Spy(Mutex::new(String::new()));
+    let record = solve(
+        &f.worlds,
+        &f.project,
+        &task(&[]),
+        &[&spy as &dyn Model],
+        10,
+        Some(&log_path),
+    )
+    .unwrap();
+    assert_eq!(record["status"], "ready", "{record:#}");
+    // The same world, not a fork: its pending write ran in it.
+    assert_eq!(record["winner"], world.id);
+    assert_eq!(record["attempts"][0]["world"], world.id);
+    assert_eq!(
+        std::fs::read_to_string(world.path.join("answer")).unwrap(),
+        "42\n"
+    );
+    // The window the model saw: the system prompt once, not twice.
+    let seen = spy.0.lock().unwrap().clone();
+    assert_eq!(
+        seen.matches("You work in a sandboxed copy of a project")
+            .count(),
+        1,
+        "{record:#}"
+    );
+    // A run that goes on keeps its log only if it crashes again.
+    assert!(!log_path.exists());
+    assert_eq!(f.worlds.list().unwrap(), vec![world.id]);
+}
+
+#[test]
 fn work_that_changed_nothing_fails_where_it_stands() {
     let f = fixture("unchanged");
     // What is asked already holds: the model finds nothing to change.
@@ -195,6 +265,7 @@ fn work_that_changed_nothing_fails_where_it_stands() {
         &task(&[]),
         &[&idle as &dyn Model],
         10,
+        None,
     )
     .unwrap();
     // An empty diff would pass an empty proof and land as work never done.
@@ -240,7 +311,7 @@ fn a_chosen_skill_is_listed_mounted_read_only_and_traced() {
             done(),
         ],
     );
-    let record = solve(&f.worlds, &f.project, &task(&[]), &[&reader], 10).unwrap();
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&reader], 10, None).unwrap();
     let attempt = &record["attempts"][0];
     let said = attempt["messages"].to_string();
     assert!(said.contains("answer: How this person answers."), "{said}");
@@ -254,7 +325,7 @@ fn a_chosen_skill_is_listed_mounted_read_only_and_traced() {
     let plain = Script::new("plain", &[write("answer", "42\n"), done()]);
     let mut none = task(&[]);
     none.skills = Some(vec![]);
-    let record = solve(&f.worlds, &f.project, &none, &[&plain], 10).unwrap();
+    let record = solve(&f.worlds, &f.project, &none, &[&plain], 10, None).unwrap();
     let said = record["attempts"][0]["messages"].to_string();
     assert!(!said.contains("How this person answers."), "{said}");
 
@@ -268,7 +339,7 @@ fn checks_run_in_bash_as_models_write_them() {
     let tight = Script::new("tight", &[write("answer", "42\n"), done()]);
     let mut t = task(&[]);
     t.verify = vec!["diff <(printf '42\\n') answer && [[ -s answer ]]".to_string()];
-    let record = solve(&f.worlds, &f.project, &t, &[&tight], 10).unwrap();
+    let record = solve(&f.worlds, &f.project, &t, &[&tight], 10, None).unwrap();
     assert!(record["winner"].is_string(), "{record:#}");
 }
 
@@ -283,7 +354,7 @@ fn a_run_lands_on_the_branch_the_rules_ask_for_and_is_pushed() {
         .unwrap();
     git(&f, &["remote", "add", "origin", remote.to_str().unwrap()]);
     let tight = Script::new("tight", &[write("answer", "42\n"), done()]);
-    let record = solve(&f.worlds, &f.project, &task(&[]), &[&tight], 10).unwrap();
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&tight], 10, None).unwrap();
     let winner = record["winner"].as_str().unwrap().to_string();
 
     tight.replies.lock().unwrap().push_back(json!({
@@ -324,7 +395,7 @@ fn work_queued_on_a_branch_builds_on_what_landed_there() {
     f.worlds.base = Some("fleet".to_string());
     let before = git(&f, &["rev-parse", "HEAD"]);
     let first = Script::new("first", &[write("answer", "42\n"), done()]);
-    let record = solve(&f.worlds, &f.project, &task(&[]), &[&first], 10).unwrap();
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&first], 10, None).unwrap();
     let one = land(
         &f.worlds,
         record["winner"].as_str().unwrap(),
@@ -340,7 +411,7 @@ fn work_queued_on_a_branch_builds_on_what_landed_there() {
     // Another goal: the same one would replay the first run's calls.
     t.goal = "Write the file `more`.".to_string();
     t.verify = vec!["test -f answer".to_string()];
-    let record = solve(&f.worlds, &f.project, &t, &[&second], 10).unwrap();
+    let record = solve(&f.worlds, &f.project, &t, &[&second], 10, None).unwrap();
     let two = land(
         &f.worlds,
         record["winner"].as_str().unwrap(),
@@ -357,7 +428,7 @@ fn work_queued_on_a_branch_builds_on_what_landed_there() {
     let mut t = task(&[]);
     t.goal = "Write the file `third`.".to_string();
     t.verify = vec!["test -f third".to_string()];
-    let record = solve(&f.worlds, &f.project, &t, &[&third], 10).unwrap();
+    let record = solve(&f.worlds, &f.project, &t, &[&third], 10, None).unwrap();
     land(
         &f.worlds,
         record["winner"].as_str().unwrap(),
@@ -382,7 +453,7 @@ fn a_proof_clicks_like_a_user_and_fails_on_what_the_page_does_not_show() {
         "page",
         &[write("answer", "42\n"), write("index.html", page), done()],
     );
-    let record = solve(&f.worlds, &f.project, &task(&[]), &[&model], 10).unwrap();
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&model], 10, None).unwrap();
     let winner = record["winner"].as_str().unwrap().to_string();
     let serve = "serve: python3 -m http.server 8765\nshot: http://127.0.0.1:8765/\n";
 
@@ -426,7 +497,7 @@ fn a_page_without_a_browser_to_look_at_is_unverified_not_failed() {
             done(),
         ],
     );
-    let record = solve(&f.worlds, &f.project, &task(&[]), &[&model], 10).unwrap();
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&model], 10, None).unwrap();
     let winner = record["winner"].as_str().unwrap().to_string();
     let page = "serve: python3 -m http.server 8766\nshot: http://127.0.0.1:8766/\n";
     let prove = |reply: String| {
@@ -454,7 +525,7 @@ fn a_page_without_a_browser_to_look_at_is_unverified_not_failed() {
 fn a_proof_whose_reasoning_eats_the_reply_is_asked_again() {
     let f = fixture("rethink");
     let model = Script::new("think", &[write("answer", "42\n"), done()]);
-    let record = solve(&f.worlds, &f.project, &task(&[]), &[&model], 10).unwrap();
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&model], 10, None).unwrap();
     let winner = record["winner"].as_str().unwrap().to_string();
     let mut replies = model.replies.lock().unwrap();
     replies.push_back(json!({"content": "", "reasoning_content": "on and on"}));
@@ -469,7 +540,7 @@ fn a_proof_whose_reasoning_eats_the_reply_is_asked_again() {
 fn a_role_check_vetoes_the_proof_and_a_missing_tool_is_only_unverified() {
     let f = fixture("veto");
     let model = Script::new("veto", &[write("answer", "42\n"), done()]);
-    let record = solve(&f.worlds, &f.project, &task(&[]), &[&model], 10).unwrap();
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&model], 10, None).unwrap();
     let winner = record["winner"].as_str().unwrap().to_string();
     let team = f.project.join(".fennec-os/team");
     std::fs::create_dir_all(&team).unwrap();
@@ -518,7 +589,15 @@ fn a_role_check_vetoes_the_proof_and_a_missing_tool_is_only_unverified() {
 fn editing_a_protected_check_fails_even_if_it_passes() {
     let f = fixture("protect");
     let cheat = Script::new("cheat", &[write("check.sh", "exit 0\n"), done()]);
-    let record = solve(&f.worlds, &f.project, &task(&["check.sh"]), &[&cheat], 10).unwrap();
+    let record = solve(
+        &f.worlds,
+        &f.project,
+        &task(&["check.sh"]),
+        &[&cheat],
+        10,
+        None,
+    )
+    .unwrap();
     assert_eq!(record["winner"], Value::Null);
     assert_eq!(
         record["attempts"][0]["reason"],
@@ -531,7 +610,7 @@ fn editing_a_protected_check_fails_even_if_it_passes() {
 fn a_world_edited_after_its_verdict_lands_only_if_its_checks_pass_again() {
     let f = fixture("tamper");
     let tight = Script::new("tight", &[write("answer", "42\n"), done()]);
-    let record = solve(&f.worlds, &f.project, &task(&[]), &[&tight], 10).unwrap();
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&tight], 10, None).unwrap();
     let id = record["winner"].as_str().unwrap();
     let world = f.worlds.open(id).unwrap();
     // The human edits the work in their editor and breaks it: refused.
@@ -547,13 +626,18 @@ fn a_world_edited_after_its_verdict_lands_only_if_its_checks_pass_again() {
 
 #[test]
 fn a_blank_reply_turns_reasoning_off_for_the_rest_of_the_run() {
+    // The default policy is always: run this one under adaptive.
+    let _env = ENV.lock().unwrap_or_else(|e| e.into_inner());
+    unsafe {
+        std::env::set_var("FENNEC_OS_THINK", "adaptive");
+    }
     let f = fixture("blank");
     let model = Script::new("blank", &[write("answer", "42\n"), done()]);
     // First, a reply whose reasoning ate the whole budget.
     let mut replies = model.replies.lock().unwrap();
     replies.insert(0, json!({"content": "", "reasoning_content": "on and on"}));
     drop(replies);
-    let record = solve(&f.worlds, &f.project, &task(&[]), &[&model], 10).unwrap();
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&model], 10, None).unwrap();
     assert!(record["winner"].is_string(), "{record}");
     let think: Vec<Value> = record["attempts"][0]["turns"]
         .as_array()
@@ -561,14 +645,275 @@ fn a_blank_reply_turns_reasoning_off_for_the_rest_of_the_run() {
         .iter()
         .map(|t| t["think"].clone())
         .collect();
-    assert_eq!(think, [json!(true), json!(false), json!(false)]);
+    // The first turn already skips reasoning (the server's prefix cache
+    // only pays for non-thinking turns); a blank reply keeps it off.
+    assert_eq!(think, [json!(false), json!(false), json!(false)]);
+    // A tool error reasons the next turn, one turn only: a text-only turn
+    // does not (a thinking turn would cost the server's prefix cache the
+    // turn after it).
+    let f = fixture("blank2");
+    let model = Script::new(
+        "blank",
+        &[
+            ("shell", json!({"command": "ls missing"})),
+            write("answer", "42\n"),
+            done(),
+        ],
+    );
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&model], 10, None).unwrap();
+    assert!(record["winner"].is_string(), "{record}");
+    let think: Vec<Value> = record["attempts"][0]["turns"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| t["think"].clone())
+        .collect();
+    assert_eq!(think, [json!(false), json!(true), json!(false)]);
+}
+
+#[test]
+fn an_idle_model_is_told_twice_then_stopped_at_step_25() {
+    let f = fixture("idle-hard");
+    // Reading two different files: no repeat loop, no file changed.
+    let mut steps: Vec<(&str, Value)> = Vec::new();
+    for i in 0..30 {
+        let file = if i % 2 == 0 { "check.sh" } else { "README" };
+        steps.push(("read_file", json!({"path": file})));
+    }
+    let idle = Script::new("idle", &steps);
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&idle], 30, None).unwrap();
+    let attempt = &record["attempts"][0];
+    assert!(
+        attempt["reason"]
+            .as_str()
+            .unwrap()
+            .starts_with("stuck: no file changed in 25 steps"),
+        "{record:#}"
+    );
+    let counts = |needle: &str| {
+        attempt["messages"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|m| m["content"].as_str().is_some_and(|c| c.contains(needle)))
+            .count()
+    };
+    assert_eq!(counts("15 steps without changing any file"), 1);
+    assert_eq!(counts("20 steps without a single file changed"), 1);
+}
+
+#[test]
+fn an_edit_before_step_20_spares_the_harder_notice() {
+    let f = fixture("idle-soft");
+    let mut steps: Vec<(&str, Value)> = Vec::new();
+    for i in 0..17 {
+        let file = if i % 2 == 0 { "check.sh" } else { "README" };
+        steps.push(("read_file", json!({"path": file})));
+    }
+    steps.push(write("answer", "42\n"));
+    steps.push(done());
+    let late = Script::new("late", &steps);
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&late], 30, None).unwrap();
+    let attempt = &record["attempts"][0];
+    assert_eq!(attempt["passed"], true, "{record:#}");
+    let counts = |needle: &str| {
+        attempt["messages"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|m| m["content"].as_str().is_some_and(|c| c.contains(needle)))
+            .count()
+    };
+    assert_eq!(counts("15 steps without changing any file"), 1);
+    assert_eq!(counts("20 steps without a single file changed"), 0);
+}
+
+#[test]
+fn the_discussion_reaches_the_producers_of_the_run() {
+    let f = fixture("discussion");
+    let mut with = task(&[]);
+    with.discussion = Some("AGREED: the answer lives in `answer`, not `out`.".to_string());
+    let spy = Spy(Mutex::new(String::new()));
+    let record = solve(&f.worlds, &f.project, &with, &[&spy], 10, None).unwrap();
+    assert!(record["winner"].is_null());
+    let seen = spy.0.lock().unwrap();
+    assert!(
+        seen.contains("AGREED: the answer lives in `answer`, not `out`."),
+        "{seen}"
+    );
+    assert!(seen.contains("do not re-litigate it"), "{seen}");
+    let plain = Spy(Mutex::new(String::new()));
+    let _ = solve(&f.worlds, &f.project, &task(&[]), &[&plain], 10, None).unwrap();
+    assert!(!plain.0.lock().unwrap().contains("do not re-litigate it"));
+}
+
+#[test]
+fn the_spec_discussion_reaches_the_solution_not_the_proof() {
+    let f = fixture("spec-discussion");
+    let request = "answer should say 42";
+    let good = Script::new(
+        "good",
+        &[write("spec.sh", "grep -qx 42 answer\n"), finish(SPEC)],
+    );
+    let s = spec::compile(&f.worlds, &f.project, request, &good, 10).unwrap();
+    let id = s["world"].as_str().unwrap().to_string();
+    spec::set_discussion(
+        &f.worlds,
+        &id,
+        "AGREED: the answer lives in `answer`, not `out`.",
+    )
+    .unwrap();
+    let honest = Script::new("honest", &[write("answer", "42\n"), done()]);
+    let record = spec::accept(&f.worlds, &id, &[&honest], 10, None).unwrap();
+    let winner = record["winner"].as_str().unwrap().to_string();
+    // The solution's system prompt carried the discussion...
+    let role_prompt = record["attempts"][0]["roles"][0]["messages"][0]["content"]
+        .as_str()
+        .unwrap();
+    assert!(
+        role_prompt.contains("AGREED: the answer lives in `answer`, not `out`."),
+        "{role_prompt}"
+    );
+    // ...the proof's request did not.
+    let spy = Spy(Mutex::new(String::new()));
+    proof::gather(&f.worlds, &winner, None, &spy).unwrap();
+    let asked = spy.0.lock().unwrap();
+    assert!(!asked.contains("AGREED:"), "{asked}");
+    assert!(!asked.contains("do not re-litigate it"), "{asked}");
+}
+
+#[test]
+fn a_chain_role_leaves_relay_notes_the_next_role_reads() {
+    let f = fixture("relay");
+    // Two roles in team order: senior-developer builds, tech-lead reviews.
+    team::choose(
+        &f.project,
+        team::DEFAULT_TEAM,
+        &["frontend-designer".into()],
+    )
+    .unwrap();
+    git(&f, &["add", "-A"]);
+    git(
+        &f,
+        &[
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "-qm",
+            "team",
+        ],
+    );
+    let chain = Script::new(
+        "chain",
+        &[
+            write("answer", "42\n"),
+            write(
+                "relay/senior-developer.md",
+                "wrote the answer; nothing found\n",
+            ),
+            done(),
+            ("read_file", json!({"path": "relay/senior-developer.md"})),
+            write("relay/tech-lead.md", "the answer is right\n"),
+            done(),
+        ],
+    );
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&chain], 30, None).unwrap();
+    assert!(record["winner"].is_string(), "{record:#}");
+    let attempt = &record["attempts"][0];
+    let roles = attempt["roles"].as_array().unwrap();
+    assert_eq!(roles.len(), 2, "{record:#}");
+    // The builder's transcript shows the note it left for the next role.
+    assert!(
+        roles[0]["messages"]
+            .to_string()
+            .contains("relay/senior-developer.md")
+    );
+    // The reviewer's goal names the notes, and its transcript carries the
+    // builder's words.
+    let goal = roles[1]["messages"][1]["content"].as_str().unwrap();
+    assert!(
+        goal.contains("Their notes are in relay/: senior-developer.md"),
+        "{goal}"
+    );
+    assert!(
+        roles[1]["messages"]
+            .to_string()
+            .contains("wrote the answer")
+    );
+    // The note is in the winner's world, for the journal and the card.
+    let world = f.worlds.open(record["winner"].as_str().unwrap()).unwrap();
+    let note =
+        std::fs::read_to_string(world.path.join("relay").join("senior-developer.md")).unwrap();
+    assert_eq!(note, "wrote the answer; nothing found\n");
+}
+
+/// Opt-in (`-- --ignored`): it needs a live server and a big, cacheable
+/// prefix, and it is flaky under the parallel suite's CPU load, which evicts
+/// its checkpoint from the server's shared KV pool mid-run.
+#[test]
+#[ignore]
+fn a_run_reuses_the_servers_prefix_from_its_second_turn() {
+    // Needs the configured server; every other test runs offline.
+    let base = fennec_os::provider::DEFAULT_BASE_URL;
+    let Ok(models) = fennec_os::provider::served(base, None) else {
+        return;
+    };
+    let _env = ENV.lock().unwrap_or_else(|e| e.into_inner());
+    unsafe {
+        std::env::remove_var("FENNEC_OS_THINK");
+    }
+    let f = fixture("cache");
+    // A big committed knowhow lands in the stable system prompt: measured,
+    // ~12k prefill tokens survive the shared KV pool, small prompts (<~1k)
+    // do not, so the test needs this to be cacheable.
+    let knowhow = (0..2000)
+        .map(|i| format!("- fact {i}: the answer file stays small"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    std::fs::create_dir_all(f.project.join(".fennec-os")).unwrap();
+    std::fs::write(f.project.join(".fennec-os/knowhow.md"), knowhow).unwrap();
+    git(&f, &["add", "-A"]);
+    git(&f, &["commit", "-m", "knowhow"]);
+    let model = fennec_os::provider::OpenAi::new(base, &models[0], None, 0.3);
+    let hit = |r: &Value| {
+        r["attempts"][0]["turns"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .skip(1)
+            .any(|t| {
+                t["usage"]["prompt_tokens_details"]["cached_tokens"]
+                    .as_u64()
+                    .is_some_and(|c| c > 0)
+            })
+    };
+    // The non-thinking turns store the prompt KV and the later ones read it
+    // back: with the old always-thinking default every turn was 0 (measured:
+    // 75 turns, 0 cached). The pool is shared by concurrent sessions, so a
+    // run's checkpoint can be evicted between its own turns; try again when
+    // it is eaten.
+    let mut record = solve(&f.worlds, &f.project, &task(&[]), &[&model], 10, None).unwrap();
+    for _ in 0..2 {
+        if hit(&record) {
+            break;
+        }
+        record = solve(&f.worlds, &f.project, &task(&[]), &[&model], 10, None).unwrap();
+    }
+    let turns = record["attempts"][0]["turns"].as_array().unwrap();
+    assert!(turns.len() >= 2, "{record:#}");
+    assert!(
+        hit(&record),
+        "no turn past the first reused any of the server's prefix cache ({record:#})"
+    );
 }
 
 #[test]
 fn a_model_that_stops_answering_is_a_failed_attempt() {
     let f = fixture("exhausted");
     let mute = Script::new("mute", &[write("answer", "42\n")]);
-    let record = solve(&f.worlds, &f.project, &task(&[]), &[&mute], 10).unwrap();
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&mute], 10, None).unwrap();
     assert_eq!(record["attempts"][0]["reason"], "script exhausted");
     assert_eq!(record["winner"], Value::Null);
     // The turns before the failure stay, for the profile.
@@ -580,7 +925,7 @@ fn a_model_in_a_loop_is_told_then_stopped() {
     let f = fixture("loop");
     let same = ("shell", json!({"command": "cat check.sh"}));
     let looping = Script::new("loop", &vec![same; 6]);
-    let record = solve(&f.worlds, &f.project, &task(&[]), &[&looping], 20).unwrap();
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&looping], 20, None).unwrap();
     let attempt = &record["attempts"][0];
     let reason = attempt["reason"].as_str().unwrap();
     assert!(
@@ -598,14 +943,14 @@ fn a_model_in_a_loop_is_told_then_stopped() {
                 .is_some_and(|c| c.contains("Try a different approach"))
         })
         .count();
-    assert_eq!(told, 1, "the model is told once before being stopped");
+    assert_eq!(told, 2, "the model is told twice before being stopped");
 }
 
 #[test]
 fn a_world_rebases_and_reverifies_when_the_project_moved() {
     let f = fixture("rebase");
     let tight = Script::new("tight", &[write("answer", "42\n"), done()]);
-    let record = solve(&f.worlds, &f.project, &task(&[]), &[&tight], 10).unwrap();
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&tight], 10, None).unwrap();
     let id = record["winner"].as_str().unwrap();
 
     std::fs::write(f.project.join("other"), "meanwhile\n").unwrap();
@@ -637,7 +982,7 @@ fn a_world_rebases_and_reverifies_when_the_project_moved() {
 fn a_rebase_that_breaks_the_checks_does_not_land() {
     let f = fixture("rebreak");
     let tight = Script::new("tight", &[write("answer", "42\n"), done()]);
-    let record = solve(&f.worlds, &f.project, &task(&[]), &[&tight], 10).unwrap();
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&tight], 10, None).unwrap();
     let id = record["winner"].as_str().unwrap();
 
     // Meanwhile the project tightens its check: the old verdict means nothing.
@@ -709,6 +1054,7 @@ fn project_rules_judge_every_attempt() {
         &task(&[]),
         &[&bare, &cheat, &paired],
         10,
+        None,
     )
     .unwrap();
     let a = record["attempts"].as_array().unwrap();
@@ -738,7 +1084,7 @@ fn a_correction_said_twice_is_counted_and_promoted() {
     let mut ids = Vec::new();
     for _ in 0..2 {
         let tight = Script::new("tight", &[write("answer", "42\n"), done()]);
-        let record = solve(&f.worlds, &f.project, &task(&[]), &[&tight], 10).unwrap();
+        let record = solve(&f.worlds, &f.project, &task(&[]), &[&tight], 10, None).unwrap();
         ids.push(record["winner"].as_str().unwrap().to_string());
     }
     assert_eq!(review::queue(&f.worlds).unwrap().len(), 2);
@@ -790,13 +1136,13 @@ impl Model for Spy {
 fn a_new_run_starts_from_the_project_history() {
     let f = fixture("agenda");
     let tight = Script::new("tight", &[write("answer", "42\n"), done()]);
-    let first = solve(&f.worlds, &f.project, &task(&[]), &[&tight], 10).unwrap();
+    let first = solve(&f.worlds, &f.project, &task(&[]), &[&tight], 10, None).unwrap();
     land(&f.worlds, first["winner"].as_str().unwrap(), None, None).unwrap();
     let again = Script::new(
         "again",
         &[write("answer", "42\n"), write("x", "1\n"), done()],
     );
-    let second = solve(&f.worlds, &f.project, &task(&[]), &[&again], 10).unwrap();
+    let second = solve(&f.worlds, &f.project, &task(&[]), &[&again], 10, None).unwrap();
     review::reject(
         &f.worlds,
         second["winner"].as_str().unwrap(),
@@ -805,7 +1151,7 @@ fn a_new_run_starts_from_the_project_history() {
     .unwrap();
 
     let spy = Spy(Mutex::new(String::new()));
-    solve(&f.worlds, &f.project, &task(&["tests"]), &[&spy], 10).unwrap();
+    solve(&f.worlds, &f.project, &task(&["tests"]), &[&spy], 10, None).unwrap();
     let system = spy.0.lock().unwrap().clone();
     assert!(
         system.contains("landed \"Write 42 into the file `answer`.\": all good, trust me"),
@@ -839,7 +1185,7 @@ impl Model for Distiller {
 fn sleep_proposes_know_how_that_a_human_keeps() {
     let f = fixture("sleep");
     let tight = Script::new("tight", &[write("answer", "42\n"), done()]);
-    let run = solve(&f.worlds, &f.project, &task(&[]), &[&tight], 10).unwrap();
+    let run = solve(&f.worlds, &f.project, &task(&[]), &[&tight], 10, None).unwrap();
     land(&f.worlds, run["winner"].as_str().unwrap(), None, None).unwrap();
 
     let new = sleep::sleep(&f.worlds, &Distiller).unwrap();
@@ -880,7 +1226,7 @@ fn sleep_proposes_know_how_that_a_human_keeps() {
     let mut next = task(&[]);
     next.goal = "Write 43 into the file `answer`.".to_string();
     let spy = Spy(Mutex::new(String::new()));
-    solve(&f.worlds, &f.project, &next, &[&spy], 10).unwrap();
+    solve(&f.worlds, &f.project, &next, &[&spy], 10, None).unwrap();
     let system = spy.0.lock().unwrap().clone();
     assert!(
         system.contains("Know-how kept for this project:\n  - checks run with `sh check.sh`"),
@@ -909,13 +1255,13 @@ fn commit_file(f: &Fixture, path: &str, content: &str) {
 fn a_landed_goal_comes_back_as_a_replay_without_the_model() {
     let f = fixture("recipe");
     let first = Script::new("first", &[write("answer", "42\n"), done()]);
-    let record = solve(&f.worlds, &f.project, &task(&[]), &[&first], 10).unwrap();
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&first], 10, None).unwrap();
     land(&f.worlds, record["winner"].as_str().unwrap(), None, None).unwrap();
     commit_file(&f, "answer", "0\n");
 
     // Same goal again: the recipe passes, the model is never called.
     let mute = Script::new("mute", &[]);
-    let record = solve(&f.worlds, &f.project, &task(&[]), &[&mute], 10).unwrap();
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&mute], 10, None).unwrap();
     let attempts = record["attempts"].as_array().unwrap();
     assert_eq!(attempts.len(), 1, "{record:#}");
     assert!(
@@ -929,7 +1275,7 @@ fn a_landed_goal_comes_back_as_a_replay_without_the_model() {
     // The project moved on: the replay fails its checks and the model runs.
     commit_file(&f, "check.sh", "grep -qx 43 answer\n");
     let fresh = Script::new("fresh", &[write("answer", "43\n"), done()]);
-    let record = solve(&f.worlds, &f.project, &task(&[]), &[&fresh], 10).unwrap();
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&fresh], 10, None).unwrap();
     let attempts = record["attempts"].as_array().unwrap();
     assert_eq!(attempts.len(), 2, "{record:#}");
     assert_eq!(attempts[0]["passed"], false);
@@ -939,7 +1285,7 @@ fn a_landed_goal_comes_back_as_a_replay_without_the_model() {
     // A rejected latest run retires the recipe.
     review::reject(&f.worlds, record["winner"].as_str().unwrap(), None).unwrap();
     let again = Script::new("again", &[write("answer", "43\n"), done()]);
-    let record = solve(&f.worlds, &f.project, &task(&[]), &[&again], 10).unwrap();
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&again], 10, None).unwrap();
     assert_eq!(record["attempts"].as_array().unwrap().len(), 1);
     assert_eq!(record["attempts"][0]["model"], "again");
 }
@@ -1055,7 +1401,7 @@ fn a_request_compiles_to_failing_tests_that_the_solution_must_pass() {
     // Accepted: attempts start from the tests and may not edit them.
     let cheat = Script::new("cheat", &[write("spec.sh", "true\n"), done()]);
     let honest = Script::new("honest", &[write("answer", "42\n"), done()]);
-    let record = spec::accept(&f.worlds, &id, &[&cheat, &honest], 10).unwrap();
+    let record = spec::accept(&f.worlds, &id, &[&cheat, &honest], 10, None).unwrap();
     let attempts = record["attempts"].as_array().unwrap();
     assert_eq!(
         attempts[0]["reason"],
@@ -1068,7 +1414,15 @@ fn a_request_compiles_to_failing_tests_that_the_solution_must_pass() {
     // The winner's product failed later: retried from the tests, told why.
     let first = record["winner"].as_str().unwrap().to_string();
     let spy = Spy(Mutex::new(String::new()));
-    let again = spec::retry(&f.worlds, &id, "the page renders no text", &[&spy], 10).unwrap();
+    let again = spec::retry(
+        &f.worlds,
+        &id,
+        "the page renders no text",
+        &[&spy],
+        10,
+        None,
+    )
+    .unwrap();
     assert!(
         again["goal"]
             .as_str()
@@ -1082,20 +1436,20 @@ fn a_request_compiles_to_failing_tests_that_the_solution_must_pass() {
     );
     assert!(f.worlds.open(&first).is_err());
     let honest = Script::new("honest", &[write("answer", "42\n"), done()]);
-    let record = spec::retry(&f.worlds, &id, "x", &[&honest], 10).unwrap();
+    let record = spec::retry(&f.worlds, &id, "x", &[&honest], 10, None).unwrap();
     assert!(record["winner"].is_string(), "{record:#}");
 
     // The human asks for a change on the ready run: a failed change leaves it
     // ready; a passing one starts from its work and replaces it.
     let ready = record["winner"].as_str().unwrap().to_string();
     let broken = Script::new("broken", &[write("answer", "41\n"), done()]);
-    let failed = spec::amend(&f.worlds, &id, "add a note", &[&broken], 10).unwrap();
+    let failed = spec::amend(&f.worlds, &id, "add a note", &[&broken], 10, None).unwrap();
     assert!(failed["winner"].is_null(), "{failed:#}");
     assert!(f.worlds.open(&ready).is_ok());
     assert_eq!(spec::load(&f.worlds, &id).unwrap()["run"], json!(ready));
     // It writes only the note: `answer` is already there, from the ready run.
     let noter = Script::new("noter", &[write("note", "hi\n"), done()]);
-    let record = spec::amend(&f.worlds, &id, "add a note", &[&noter], 10).unwrap();
+    let record = spec::amend(&f.worlds, &id, "add a note", &[&noter], 10, None).unwrap();
     assert!(
         record["goal"].as_str().unwrap().contains("add a note"),
         "{record:#}"
@@ -1116,6 +1470,7 @@ fn a_request_compiles_to_failing_tests_that_the_solution_must_pass() {
         "`cat note` printed hi, not hi!",
         &[&fixer],
         10,
+        None,
     )
     .unwrap();
     assert!(
@@ -1158,6 +1513,7 @@ fn host_task(f: &Fixture) -> (std::path::PathBuf, Task) {
         grant: vec![conf.clone()],
         skills: None,
         roles: None,
+        discussion: None,
     };
     (conf, task)
 }
@@ -1170,7 +1526,7 @@ fn a_granted_run_edits_the_host_until_the_human_decides() {
     let path = format!("{}/app.cfg", conf.display());
 
     let good = Script::new("good", &[write(&path, "v2\n"), done()]);
-    let record = solve(&f.worlds, &f.project, &task, &[&good], 10).unwrap();
+    let record = solve(&f.worlds, &f.project, &task, &[&good], 10, None).unwrap();
     assert_eq!(record["status"], "ready", "{record:#}");
     assert_eq!(record["grant"], json!([conf.display().to_string()]));
     // The host changed and waits for the human; the winner's world waits too.
@@ -1193,7 +1549,7 @@ fn a_failed_granted_run_leaves_the_host_as_it_found_it() {
     let path = format!("{}/app.cfg", conf.display());
 
     let bad = Script::new("bad", &[write(&path, "v3\n"), done()]);
-    let record = solve(&f.worlds, &f.project, &task, &[&bad], 10).unwrap();
+    let record = solve(&f.worlds, &f.project, &task, &[&bad], 10, None).unwrap();
     assert_eq!(record["status"], "failed", "{record:#}");
     assert_eq!(
         std::fs::read_to_string(conf.join("app.cfg")).unwrap(),
@@ -1215,10 +1571,10 @@ fn a_grant_refuses_parallel_attempts_and_bad_paths() {
     let f = fixture("solve-grant-refuse");
     let (_, mut task) = host_task(&f);
     let (a, b) = (Script::new("a", &[done()]), Script::new("b", &[done()]));
-    assert!(solve(&f.worlds, &f.project, &task, &[&a, &b], 10).is_err());
+    assert!(solve(&f.worlds, &f.project, &task, &[&a, &b], 10, None).is_err());
 
     task.grant = vec![f.worlds.home.clone()];
-    assert!(solve(&f.worlds, &f.project, &task, &[&a], 10).is_err());
+    assert!(solve(&f.worlds, &f.project, &task, &[&a], 10, None).is_err());
     assert!(f.worlds.list().unwrap().is_empty());
 }
 
@@ -1232,7 +1588,7 @@ fn a_rule_said_once_reaches_every_agent_which_reports_using_it() {
     assert_eq!(agents, "## Rules\n\n- use uv, never .venv\n");
 
     let spy = Spy(Mutex::new(String::new()));
-    solve(&f.worlds, &f.project, &task(&[]), &[&spy], 10).unwrap();
+    solve(&f.worlds, &f.project, &task(&[]), &[&spy], 10, None).unwrap();
     let system = spy.0.lock().unwrap().clone();
     // The user's own rules come first; find this one's number.
     let n = system
@@ -1247,7 +1603,7 @@ fn a_rule_said_once_reaches_every_agent_which_reports_using_it() {
             finish(&format!("wrote it\nrules: {n}")),
         ],
     );
-    let record = solve(&f.worlds, &f.project, &task(&[]), &[&tight], 10).unwrap();
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&tight], 10, None).unwrap();
     assert_eq!(
         record["attempts"][0]["rules"],
         json!(["use uv, never .venv"])
@@ -1326,7 +1682,7 @@ fn every_turn_is_timed_for_the_profile() {
     let fast = Script::new("fast", &[write("answer", "42\n"), done()]);
     fast.replies.lock().unwrap()[0]["usage"] = json!({"prompt_tokens": 900, "completion_tokens": 40,
                "prompt_tokens_details": {"cached_tokens": 800}});
-    let record = solve(&f.worlds, &f.project, &task(&[]), &[&fast], 40).unwrap();
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&fast], 40, None).unwrap();
     let attempts = record["attempts"].as_array().unwrap();
 
     // Usage feeds the profile and is never sent back to the model.
@@ -1361,7 +1717,7 @@ fn a_failed_attempt_teaches_the_next_one() {
         &[write("answer", "41\n"), done(), done(), done()],
     );
     let spy = Spy(Mutex::new(String::new()));
-    let record = solve(&f.worlds, &f.project, &task(&[]), &[&wrong, &spy], 10).unwrap();
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&wrong, &spy], 10, None).unwrap();
     assert_eq!(record["attempts"].as_array().unwrap().len(), 2);
     let seen = spy.0.lock().unwrap();
     assert!(
@@ -1424,7 +1780,15 @@ fn work_in_the_project_folder_is_seen_there_and_lands_on_its_branch() {
         &[write("answer", "41\n"), write("junk", "j\n"), done()],
     );
     let right = Script::new("right", &[write("answer", "42\n"), done()]);
-    let record = solve(&f.worlds, &f.project, &task(&[]), &[&wrong, &right], 10).unwrap();
+    let record = solve(
+        &f.worlds,
+        &f.project,
+        &task(&[]),
+        &[&wrong, &right],
+        10,
+        None,
+    )
+    .unwrap();
     let id = record["winner"].as_str().unwrap().to_string();
     // The work is in the folder; the failed attempt left nothing, the human's file stayed.
     assert_eq!(
@@ -1470,7 +1834,7 @@ fn a_request_is_framed_solved_and_landed_in_the_project_folder() {
     // The tests wait in the folder for the human to validate.
     assert!(f.project.join("spec.sh").exists());
     let honest = Script::new("honest", &[write("answer", "42\n"), done()]);
-    let record = spec::accept(&f.worlds, &id, &[&honest], 10).unwrap();
+    let record = spec::accept(&f.worlds, &id, &[&honest], 10, None).unwrap();
     let run = record["winner"].as_str().unwrap().to_string();
     assert_eq!(
         git(&f, &["branch", "--show-current"]),
@@ -1493,12 +1857,12 @@ fn a_failed_change_gives_the_folder_back_to_the_ready_work() {
     let s = spec::compile(&f.worlds, &f.project, "answer 42", &good, 10).unwrap();
     let id = s["world"].as_str().unwrap().to_string();
     let honest = Script::new("honest", &[write("answer", "42\n"), done()]);
-    let run = spec::accept(&f.worlds, &id, &[&honest], 10).unwrap()["winner"]
+    let run = spec::accept(&f.worlds, &id, &[&honest], 10, None).unwrap()["winner"]
         .as_str()
         .unwrap()
         .to_string();
     let broken = Script::new("broken", &[write("answer", "41\n"), done()]);
-    let failed = spec::amend(&f.worlds, &id, "x", &[&broken], 10).unwrap();
+    let failed = spec::amend(&f.worlds, &id, "x", &[&broken], 10, None).unwrap();
     assert!(failed["winner"].is_null());
     // Back on the ready work, not on the human's branch: it still lands.
     assert_eq!(
@@ -1527,9 +1891,9 @@ fn a_change_that_won_gives_the_folder_back_to_the_human_when_dropped() {
     let s = spec::compile(&f.worlds, &f.project, "answer 42", &good, 10).unwrap();
     let id = s["world"].as_str().unwrap().to_string();
     let honest = Script::new("honest", &[write("answer", "42\n"), done()]);
-    spec::accept(&f.worlds, &id, &[&honest], 10).unwrap();
+    spec::accept(&f.worlds, &id, &[&honest], 10, None).unwrap();
     let noter = Script::new("noter", &[write("note", "hi\n"), done()]);
-    let amended = spec::amend(&f.worlds, &id, "add a note", &[&noter], 10).unwrap()["winner"]
+    let amended = spec::amend(&f.worlds, &id, "add a note", &[&noter], 10, None).unwrap()["winner"]
         .as_str()
         .unwrap()
         .to_string();
@@ -1547,7 +1911,7 @@ fn a_direct_request_is_solved_from_the_project_and_lands() {
     let s = spec::direct(&f.worlds, &f.project, "answer 42", None, None).unwrap();
     let id = s["world"].as_str().unwrap().to_string();
     let honest = Script::new("honest", &[write("answer", "42\n"), done()]);
-    let record = spec::accept(&f.worlds, &id, &[&honest], 10).unwrap();
+    let record = spec::accept(&f.worlds, &id, &[&honest], 10, None).unwrap();
     let run = record["winner"].as_str().unwrap().to_string();
     // No tests first: nothing protected, the attempt forked from the project.
     assert_eq!(record["protect"], json!([]));

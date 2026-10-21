@@ -441,6 +441,30 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
                     c["messages"] = json!(log);
                     c["window"] = json!(from);
                 })?;
+            } else {
+                // No notes: the recent exchange stays, the rest is gone —
+                // the turn goes on instead of dying on the cut.
+                const KEEP: usize = 12;
+                let tail: Vec<Value> = log
+                    .iter()
+                    .rev()
+                    .take(KEEP)
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .into_iter()
+                    .rev()
+                    .collect();
+                log = tail;
+                log.push(agent::harness(
+                    "The conversation was shortened and left no notes: the older messages \
+                     are gone. Re-read the files you need with read_file.",
+                ));
+                from = 0;
+                engine.reset_context();
+                update(worlds, id, |c| {
+                    c["messages"] = json!(log);
+                    c["window"] = json!(from);
+                })?;
             }
         }
         let mut window: Vec<Value> = std::iter::once(system)
@@ -450,7 +474,7 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
         if write && engine.open() > 0 {
             window.push(engine.reminder(step, max_steps, PLAN));
         }
-        let was_blank = engine.blank;
+        let was_blank = engine.last_blank;
         let (mut reply, cut) = engine.ask(&window, &tools)?;
         let mut record = engine.turns.last().cloned().unwrap_or_default();
         record["at"] = json!(now());

@@ -58,10 +58,18 @@ pub fn load(worlds: &Worlds, id: &str) -> io::Result<Value> {
     serde_json::from_str(&text).map_err(io::Error::other)
 }
 
-fn save(worlds: &Worlds, id: &str, spec: &Value) -> io::Result<()> {
+pub fn save(worlds: &Worlds, id: &str, spec: &Value) -> io::Result<()> {
     std::fs::create_dir_all(worlds.root.join("specs"))?;
     let text = serde_json::to_string_pretty(spec).map_err(io::Error::other)?;
     review::write_atomic(&spec_path(worlds, id)?, &text)
+}
+
+/// The conversation that preceded the work; the solve reads it into every
+/// attempt, the proof never sees it.
+pub fn set_discussion(worlds: &Worlds, id: &str, discussion: &str) -> io::Result<()> {
+    let mut spec = load(worlds, id)?;
+    spec["discussion"] = json!(discussion);
+    save(worlds, id, &spec)
 }
 
 /// Every spec, oldest first.
@@ -256,7 +264,7 @@ fn check(
     let base = worlds.git(world, &["rev-parse", "HEAD"])?;
     let criteria = criteria.iter().map(|c| agent::criterion(c, None)).collect();
     let outcome = agent::run(
-        worlds, world, model, brief, criteria, context, max_steps, None,
+        worlds, world, model, brief, criteria, context, max_steps, None, false, None,
     )?;
     spec["steps"] = json!(outcome.steps);
     spec["stuck"] = json!(outcome.stuck);
@@ -517,8 +525,9 @@ pub fn accept(
     id: &str,
     models: &[&dyn Model],
     max_steps: usize,
+    log: Option<&Path>,
 ) -> io::Result<Value> {
-    solve_spec(worlds, id, "", models, max_steps)
+    solve_spec(worlds, id, "", models, max_steps, log)
 }
 
 /// Solves a spec again after its run failed, possibly after it was called a
@@ -530,6 +539,7 @@ pub fn retry(
     why: &str,
     models: &[&dyn Model],
     max_steps: usize,
+    log: Option<&Path>,
 ) -> io::Result<Value> {
     let mut spec = load(worlds, id)?;
     if spec["status"] == "accepted" {
@@ -540,7 +550,7 @@ pub fn retry(
         save(worlds, id, &spec)?;
     }
     let why = format!("\n\nAn earlier solution failed: {why}\nDo not repeat it.");
-    solve_spec(worlds, id, &why, models, max_steps)
+    solve_spec(worlds, id, &why, models, max_steps, log)
 }
 
 /// The human tried a ready run and asks for a change: attempts start from
@@ -553,13 +563,14 @@ pub fn amend(
     correction: &str,
     models: &[&dyn Model],
     max_steps: usize,
+    log: Option<&Path>,
 ) -> io::Result<Value> {
     let ask = format!(
         "\n\nA solution already passed and is in your world: start from it. \
          The human tried it and asks for this change:\n{correction}\n\
          Make that change and keep the rest."
     );
-    rework(worlds, id, &ask, Some(correction), models, max_steps)
+    rework(worlds, id, &ask, Some(correction), models, max_steps, log)
 }
 
 /// The proof tried a ready run and it failed: attempts start from that run's
@@ -571,6 +582,7 @@ pub fn fix(
     findings: &str,
     models: &[&dyn Model],
     max_steps: usize,
+    log: Option<&Path>,
 ) -> io::Result<Value> {
     let ask = format!(
         "\n\nA solution is in your world: start from it. It was then tried as \
@@ -579,7 +591,27 @@ pub fn fix(
          was tried (a command not installed here, a wrong path), make the \
          product easy to try: a script or a README line that works here."
     );
-    rework(worlds, id, &ask, None, models, max_steps)
+    rework(worlds, id, &ask, None, models, max_steps, log)
+}
+
+/// A run stopped by the person back at work: attempts start from its world
+/// (its changes stay), told why it was stopped, as `fix` does for a proof's
+/// findings. It is not the person's correction, so it never becomes a rule
+/// offer.
+pub fn restart(
+    worlds: &Worlds,
+    id: &str,
+    why: &str,
+    models: &[&dyn Model],
+    max_steps: usize,
+    log: Option<&Path>,
+) -> io::Result<Value> {
+    let ask = format!(
+        "\n\nAn earlier run of this work was stopped: {why}\nIts changes are \
+         already in the world. Continue from where it stopped; do not redo what \
+         it did."
+    );
+    rework(worlds, id, &ask, None, models, max_steps, log)
 }
 
 fn rework(
@@ -589,12 +621,13 @@ fn rework(
     correction: Option<&str>,
     models: &[&dyn Model],
     max_steps: usize,
+    log: Option<&Path>,
 ) -> io::Result<Value> {
     let mut spec = load(worlds, id)?;
     let Some(run) = spec["run"].as_str().map(str::to_string) else {
         return Err(io::Error::other(format!("spec {id} has no ready run")));
     };
-    let mut record = run_spec(worlds, &spec, ask, &run, models, max_steps)?;
+    let mut record = run_spec(worlds, &spec, ask, &run, models, max_steps, log)?;
     // Forked from the run, but still this spec's: landing drops its world.
     record["spec"] = json!(id);
     let name = record["id"].as_str().unwrap_or("run").to_string();
@@ -613,12 +646,13 @@ fn solve_spec(
     why: &str,
     models: &[&dyn Model],
     max_steps: usize,
+    log: Option<&Path>,
 ) -> io::Result<Value> {
     let mut spec = load(worlds, id)?;
     if spec["status"] != "proposed" {
         return Err(io::Error::other(format!("spec {id} is {}", spec["status"])));
     }
-    let record = run_spec(worlds, &spec, why, id, models, max_steps)?;
+    let record = run_spec(worlds, &spec, why, id, models, max_steps, log)?;
     spec["status"] = json!("accepted");
     spec["run"] = record["winner"].clone();
     // The spec's world stays until the run lands (`solve::land`): a winner
@@ -640,6 +674,7 @@ fn run_spec(
     base: &str,
     models: &[&dyn Model],
     max_steps: usize,
+    log: Option<&Path>,
 ) -> io::Result<Value> {
     let strings = |k: &str| -> Vec<String> {
         spec[k]
@@ -663,9 +698,10 @@ fn run_spec(
         grant: Vec::new(),
         skills: spec["skills"].is_array().then(|| strings("skills")),
         roles: spec["roles"].is_array().then(|| strings("roles")),
+        discussion: spec["discussion"].as_str().map(str::to_string),
     };
     let project = PathBuf::from(spec["project"].as_str().unwrap_or(""));
-    solve::solve(worlds, &project, &task, models, max_steps)
+    solve::solve(worlds, &project, &task, models, max_steps, log)
 }
 
 /// Records the human's answer to a question a stopped agent asked. The next

@@ -227,6 +227,7 @@ impl OpenAi {
             api_key: key,
             max_tokens,
             effort,
+            ..
         } = Settings::current()?;
         // None chosen: the models the server says it serves, so a local
         // server that serves one model needs no configuration but its address.
@@ -279,16 +280,23 @@ pub struct Settings {
     /// low, medium, xhigh…); empty sends none, so the model's own default
     /// holds (Qwen 3.8: xhigh, which can think a whole budget away).
     pub effort: String,
+    /// The reasoning policy (always, adaptive, never); always thinks,
+    /// adaptive only after a tool error, never never. `adaptive` traded
+    /// quality for the server's prefix cache: on a thinking model that
+    /// trade loses, so the default is always.
+    pub think: String,
 }
 
-pub const DEFAULT_MAX_TOKENS: u64 = 32_768;
+pub const DEFAULT_MAX_TOKENS: u64 = 65_536;
 pub const DEFAULT_BASE_URL: &str = "http://localhost:8000/v1";
+pub const DEFAULT_THINK: &str = "always";
 /// The variables that win over the file, for the UI to say so.
-pub const ENV: [&str; 4] = [
+pub const ENV: [&str; 5] = [
     "FENNEC_OS_BASE_URL",
     "FENNEC_OS_MODELS",
     "FENNEC_OS_API_KEY",
     "FENNEC_OS_MAX_TOKENS",
+    "FENNEC_OS_THINK",
 ];
 
 impl Settings {
@@ -321,6 +329,11 @@ impl Settings {
                 .map(str::to_string),
             max_tokens: v["max_tokens"].as_u64().unwrap_or(DEFAULT_MAX_TOKENS),
             effort: v["effort"].as_str().unwrap_or("").to_string(),
+            think: v["think"]
+                .as_str()
+                .filter(|t| !t.is_empty())
+                .unwrap_or(DEFAULT_THINK)
+                .to_string(),
         })
     }
 
@@ -347,6 +360,9 @@ impl Settings {
         {
             s.max_tokens = n;
         }
+        if let Ok(t) = std::env::var("FENNEC_OS_THINK") {
+            s.think = t;
+        }
         Ok(s)
     }
 
@@ -356,7 +372,7 @@ impl Settings {
         let path = Self::path()?;
         std::fs::create_dir_all(path.parent().unwrap_or(&path))?;
         let json = json!({"base_url": self.base_url, "models": self.models, "api_key": self.api_key,
-                   "max_tokens": self.max_tokens, "effort": self.effort});
+                   "max_tokens": self.max_tokens, "effort": self.effort, "think": self.think});
         let mut file = std::fs::OpenOptions::new()
             .write(true)
             .create(true)

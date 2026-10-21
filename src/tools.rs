@@ -16,8 +16,8 @@ const READ_LINES: usize = 600;
 const READ_BYTES: usize = 40_000;
 
 /// Builds the command that runs `argv` inside the sandbox (a world's, or a
-/// chat's folder).
-pub(crate) type Sandbox<'a> = &'a dyn Fn(&[String]) -> io::Result<Command>;
+/// chat's folder). `Send + Sync`: the reads a reply makes run in threads.
+pub(crate) type Sandbox<'a> = &'a (dyn Fn(&[String]) -> io::Result<Command> + Send + Sync);
 
 /// Runs one tool call. `Err` is a failed call the model is told about.
 pub(crate) fn execute(sandbox: Sandbox, name: &str, args: &Value) -> io::Result<String> {
@@ -201,14 +201,21 @@ pub(crate) fn definitions(write: bool) -> Vec<Value> {
     let mut tools = vec![
         tool(
             "shell",
-            "Run a bash command in the project root (build, tests, git, search with rg/grep/find). \
-             Returns the exit code and output. Never edit files with it: use edit_file.",
+            "Run a bash command in the project root. Builds, tests, git, and code search \
+             (rg, grep, find) go here. Returns `exit <code>` then stdout and stderr. A command \
+             over 300 s is killed — bound long work with `timeout`, and never use watch mode or \
+             interactive prompts. The home is emptied between commands: install dependencies \
+             inside the project. Never edit files with this: use edit_file.",
             json!({"command": string("bash script")}),
             &["command"],
         ),
         tool(
             "read_file",
-            "Read a text file, with line numbers. Read a file before editing it.",
+            "Read a text file as numbered lines, and before editing it. `offset` is the first \
+             line, 1-based (default 1); `limit` how many lines (default and max 600, ~40 KB). \
+             If the file continues, the result ends with `[N lines in all; read on with \
+             offset=K]`: read on with that offset. Independent reads may go in one reply: they \
+             run at once.",
             json!({"path": string("relative to the project root"),
                    "offset": int("first line to read, from 1"),
                    "limit": int("how many lines")}),
@@ -218,8 +225,10 @@ pub(crate) fn definitions(write: bool) -> Vec<Value> {
     if write {
         tools.push(tool(
             "edit_file",
-            "Replace exact text in a file you have read. `old_string` is quoted exactly as in \
-             the file, without line numbers, with enough lines around it to be found once.",
+            "Replace exact text in a file you have read. `old_string` must be the file's exact \
+             text — same characters, same indentation, no line numbers — and be found exactly \
+             once; if it appears several times, quote more lines around it, or set replace_all. \
+             It is the tool for any partial change: it cannot clobber the rest of the file.",
             json!({"path": string("relative to the project root"),
                    "old_string": string("the exact text to replace"),
                    "new_string": string("its replacement"),
@@ -228,12 +237,31 @@ pub(crate) fn definitions(write: bool) -> Vec<Value> {
         ));
         tools.push(tool(
             "write_file",
-            "Create a file, or rewrite a small one entirely. To change part of a file, use edit_file.",
+            "Create a file, or replace a whole file; parent folders are created. Use it for new \
+             files and total rewrites only: for a change to part of a file use edit_file. Keep \
+             the reply short — do not repeat the file's content in the message text.",
             json!({"path": string("relative to the project root"), "content": string("full file content")}),
             &["path", "content"],
         ));
     }
     tools
+}
+
+/// The sub-agent tool: an isolated loop in the same world, read-only, whose
+/// summary is all that comes back (see `agent`).
+pub(crate) fn task_tool() -> Value {
+    tool(
+        "task",
+        "Send a sub-agent to read the project and answer a goal. It changes nothing (read-only) \
+         and runs in its own conversation, so it costs your steps but not your context: use it \
+         to explore (where is X defined, what does the suite cover, how is Y wired) instead of \
+         spending your own steps reading. It returns its summary of the answer — make the goal \
+         self-contained: the sub-agent sees nothing of your conversation.",
+        json!({"goal": string("what the sub-agent must find or decide, on its own"),
+               "steps": {"type": "integer", "description":
+                   "its own step budget, at most half of what you have left (default: half)"}}),
+        &["goal"],
+    )
 }
 
 /// The tool that keeps the criteria of the work in sight (see `agent`).

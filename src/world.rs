@@ -842,6 +842,9 @@ pub enum Held {
 /// Whether a new world must wait for `project`'s folder; never for worlds
 /// that go apart.
 pub fn held(project: &Path) -> io::Result<Option<Held>> {
+    if !project.exists() {
+        return Ok(None);
+    }
     if !matches!(workspace(project).as_str(), "here") {
         return Ok(None);
     }
@@ -965,7 +968,7 @@ fn size(dir: &Path) -> u64 {
 /// a project without a .gitignore would land `target/` or `node_modules/`.
 /// ponytail: a fixed list of tool outputs; a project that tracks one of
 /// these dirs on purpose cannot change it through fennec.
-const BUILD_OUTPUT: [&str; 7] = [
+const BUILD_OUTPUT: [&str; 17] = [
     ":(exclude,glob)**/target/**",
     ":(exclude,glob)**/node_modules/**",
     ":(exclude,glob)**/__pycache__/**",
@@ -973,6 +976,19 @@ const BUILD_OUTPUT: [&str; 7] = [
     ":(exclude,glob)**/.gradle/**",
     ":(exclude,glob)**/.fennec/**",
     ":(exclude,glob)**/relay/**",
+    // The proof's own output: a check that builds or tests leaves these, and
+    // they are not work (a `dist/` a verify built would fail the next verify
+    // with "the world changed").
+    ":(exclude,glob)**/dist/**",
+    ":(exclude,glob)**/build/**",
+    ":(exclude,glob)**/out/**",
+    ":(exclude,glob)**/coverage/**",
+    ":(exclude,glob)**/test-results/**",
+    ":(exclude,glob)**/playwright-report/**",
+    ":(exclude,glob)**/.pytest_cache/**",
+    ":(exclude,glob)**/.mypy_cache/**",
+    ":(exclude,glob)**/.ruff_cache/**",
+    ":(exclude,glob)**/.nyc_output/**",
 ];
 
 /// The package caches stay out of the human's `git status` and out of a

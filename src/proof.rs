@@ -77,6 +77,33 @@ struct Plan {
     unverified: Vec<String>,
 }
 
+/// The proof's request: what the product is, what changed, what the person
+/// validated. Nothing the producers carried — the discussion, the relay
+/// notes — reaches the judge: the verdict stays independent of the
+/// conversation that made the work.
+pub(crate) fn proof_request(
+    goal: &str,
+    diff: &str,
+    readme: &str,
+    done_when: Option<&str>,
+) -> String {
+    let done = done_when.map_or_else(String::new, |d| format!("Done when:\n{d}\n\n"));
+    // The reminder comes last: the brief alone, in English, was not enough to
+    // keep unverified lines out of English for a French Done when.
+    // Their own words name the language better than any example would:
+    // a French example leaked into English proofs.
+    format!(
+        "{done}Goal:\n{goal}\n\nChange:\n{diff}\n\nREADME:\n{readme}\n\n\
+         The person reads only the language of «{}»: write each unverified line in it, \
+         not in the language of this message.",
+        done_when
+            .unwrap_or(goal)
+            .chars()
+            .take(80)
+            .collect::<String>()
+    )
+}
+
 /// Gathers the proof for the run `id` (its winner's world) and saves it in
 /// the run record. Screenshots are kept under `<root>/proofs/`. Returns
 /// `{"tries": [...], "shots": [...], "unverified": [...], "passed": bool}`.
@@ -94,22 +121,11 @@ pub fn gather(
         .and_then(|a| a.iter().find(|t| t["world"] == id))
         .and_then(|t| t["diff"].as_str())
         .unwrap_or("");
-    let done = done_when.map_or_else(String::new, |d| format!("Done when:\n{d}\n\n"));
-    // The reminder comes last: the brief alone, in English, was not enough to
-    // keep unverified lines out of English for a French Done when.
-    let request = format!(
-        "{done}Goal:\n{}\n\nChange:\n{diff}\n\nREADME:\n{}\n\n\
-         The person reads only the language of «{}»: write each unverified line in it, \
-         not in the language of this message.",
+    let request = proof_request(
         record["goal"].as_str().unwrap_or(""),
-        readme(worlds, &world)?,
-        // Their own words name the language better than any example would:
-        // a French example leaked into English proofs.
-        done_when
-            .unwrap_or(record["goal"].as_str().unwrap_or(""))
-            .chars()
-            .take(80)
-            .collect::<String>()
+        diff,
+        &readme(worlds, &world)?,
+        done_when,
     );
     let project = Path::new(record["project"].as_str().unwrap_or(""));
     let (roles, team) = team::brief(project, "prove")?;

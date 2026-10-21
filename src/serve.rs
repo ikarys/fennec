@@ -200,7 +200,7 @@ impl Server {
             ("spec", "accept") => self.job(format!("solve spec {id}"), move |w| {
                 let variants = OpenAi::variants_from_env(attempts)?;
                 let models: Vec<&dyn Model> = variants.iter().map(|m| m as &dyn Model).collect();
-                Ok(solved(&spec::accept(w, &id, &models, STEPS)?))
+                Ok(solved(&spec::accept(w, &id, &models, STEPS, None)?))
             }),
             ("spec", "reject") => {
                 let (correction, again) = (text("correction"), !field(form, "again").is_empty());

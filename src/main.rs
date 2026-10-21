@@ -98,13 +98,14 @@ fn run(args: &[String]) -> std::io::Result<ExitCode> {
                 &task,
                 &models,
                 flag(args, "--steps", 40)?,
+                None,
             )?;
             return Ok(print_run(&worlds, &record));
         }
         "spec" if args.len() >= 3 && arg(1) == "accept" => {
             let variants = OpenAi::variants_from_env(flag(args, "--attempts", 1)?.max(1))?;
             let models: Vec<&dyn Model> = variants.iter().map(|m| m as &dyn Model).collect();
-            let record = spec::accept(&worlds, arg(2), &models, flag(args, "--steps", 40)?)?;
+            let record = spec::accept(&worlds, arg(2), &models, flag(args, "--steps", 40)?, None)?;
             return Ok(print_run(&worlds, &record));
         }
         "spec" if (args.len() == 3 || args.len() == 4) && arg(1) == "reject" => {
