@@ -690,6 +690,36 @@ fn a_blank_reply_turns_reasoning_off_for_the_rest_of_the_run() {
 }
 
 #[test]
+fn a_stuck_run_that_changed_nothing_never_wins_on_passing_checks() {
+    let f = fixture("idle-passing");
+    // The checks already pass on the untouched project.
+    std::fs::write(f.project.join("answer"), "42\n").unwrap();
+    git(&f, &["add", "-A"]);
+    git(
+        &f,
+        &[
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "-qm",
+            "answered",
+        ],
+    );
+    let mut steps: Vec<(&str, Value)> = Vec::new();
+    for i in 0..30 {
+        let file = if i % 2 == 0 { "check.sh" } else { "README" };
+        steps.push(("read_file", json!({"path": file})));
+    }
+    let idle = Script::new("idle", &steps);
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&idle], 30, None).unwrap();
+    assert!(record["winner"].is_null(), "{record:#}");
+    let reason = record["attempts"][0]["reason"].as_str().unwrap();
+    assert!(reason.ends_with("no file changed"), "{reason}");
+}
+
+#[test]
 fn an_idle_model_is_told_twice_then_stopped_at_step_15() {
     let f = fixture("idle-hard");
     // Reading two different files: no repeat loop, no file changed.
