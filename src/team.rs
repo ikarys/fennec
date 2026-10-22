@@ -40,8 +40,8 @@ use serde_json::Value;
 
 use crate::rules::{self, HARNESS_DIR};
 
-/// Where a role speaks: framing "done when", solving, proving.
-pub const STAGES: [&str; 3] = ["frame", "solve", "prove"];
+/// Where a role speaks: framing "done when", solving, reviewing, proving.
+pub const STAGES: [&str; 4] = ["frame", "solve", "review", "prove"];
 
 /// The team of a project that has not picked one: small on purpose.
 pub const DEFAULT_TEAM: &str = "Développement";
@@ -64,6 +64,7 @@ const CATALOG: [(&str, &str); 14] = [
     ("qa", include_str!("../catalog/qa.md")),
     ("research-lead", include_str!("../catalog/research-lead.md")),
     ("researcher", include_str!("../catalog/researcher.md")),
+    ("reviewer", include_str!("../catalog/reviewer.md")),
     (
         "senior-developer",
         include_str!("../catalog/senior-developer.md"),
@@ -72,16 +73,16 @@ const CATALOG: [(&str, &str); 14] = [
         "sources-specialist",
         include_str!("../catalog/sources-specialist.md"),
     ),
-    ("tech-lead", include_str!("../catalog/tech-lead.md")),
     ("ux-specialist", include_str!("../catalog/ux-specialist.md")),
     ("writer", include_str!("../catalog/writer.md")),
 ];
 
-/// Built-in teams, by catalogue key. Each covers every stage.
+/// Built-in teams, by catalogue key. Each covers framing, solving and
+/// proving; review is optional: a team without a reviewer skips the stage.
 const TEAMS: [(&str, &[&str]); 2] = [
     (
         "Développement",
-        &["project-manager", "senior-developer", "tech-lead", "qa"],
+        &["project-manager", "senior-developer", "reviewer", "qa"],
     ),
     (
         "Études",
@@ -478,13 +479,18 @@ fn team_files(name: &str) -> io::Result<Vec<(String, String)>> {
         .collect())
 }
 
+/// The roles of `stage`, in team order.
+pub fn stage_roles(project: &Path, stage: &str) -> io::Result<Vec<Role>> {
+    Ok(members(project)?
+        .into_iter()
+        .filter(|r| r.stage == stage)
+        .collect())
+}
+
 /// What the roles of `stage` add to the agent's context, and their names
 /// for the human.
 pub fn brief(project: &Path, stage: &str) -> io::Result<(String, Vec<String>)> {
-    let roles: Vec<Role> = members(project)?
-        .into_iter()
-        .filter(|r| r.stage == stage)
-        .collect();
+    let roles = stage_roles(project, stage)?;
     let mut text = String::new();
     for r in &roles {
         text.push_str(&format!("\n\nAs {} on the team:\n{}\n", r.name, r.brief));
@@ -604,6 +610,10 @@ mod tests {
     #[test]
     fn every_built_in_team_covers_every_stage_from_the_catalogue() {
         let catalog = catalog().unwrap();
+        assert!(
+            catalog.iter().any(|r| r.stage == "review"),
+            "the catalogue offers a review role"
+        );
         for (name, keys) in TEAMS {
             let team: Vec<&Role> = catalog
                 .iter()
@@ -614,7 +624,7 @@ mod tests {
                 keys.len(),
                 "{name}: a key is not in the catalogue"
             );
-            for stage in STAGES {
+            for stage in ["frame", "solve", "prove"] {
                 assert!(team.iter().any(|r| r.stage == stage), "{name}: {stage}");
             }
         }
@@ -825,24 +835,18 @@ mod tests {
         let keys: Vec<&str> = chain.iter().map(|r| r.key.as_str()).collect();
         assert_eq!(
             keys,
-            ["senior-developer", "tech-lead"],
+            ["senior-developer"],
             "the team's solve roles, in team order"
         );
-        let marked = solve_chain(&project, Some(&["tech-lead".to_string()])).unwrap();
+        let marked = solve_chain(&project, Some(&["senior-developer".to_string()])).unwrap();
         assert_eq!(
             marked.iter().map(|r| r.key.as_str()).collect::<Vec<_>>(),
-            ["tech-lead"],
+            ["senior-developer"],
             "only what the PM marked, in team order"
         );
-        let both = solve_chain(
-            &project,
-            Some(&["tech-lead".to_string(), "senior-developer".to_string()]),
-        )
-        .unwrap();
-        assert_eq!(
-            both.iter().map(|r| r.key.as_str()).collect::<Vec<_>>(),
-            ["senior-developer", "tech-lead"]
-        );
+        // The reviewer reviews, it does not build: marking it leaves nothing.
+        let none = solve_chain(&project, Some(&["reviewer".to_string()])).unwrap();
+        assert!(none.is_empty());
         std::fs::remove_dir_all(project).unwrap();
     }
 

@@ -58,7 +58,7 @@ impl Fixture {
         }
         // One solve role: the existing tests script a single agent. Tests
         // that want the team's chain add the roles back.
-        team::choose(&project, team::DEFAULT_TEAM, &["tech-lead".to_string()]).unwrap();
+        team::choose(&project, team::DEFAULT_TEAM, &["reviewer".to_string()]).unwrap();
         // The team state is part of the project: commit it, the folder stays
         // clean for the fork's check.
         assert!(
