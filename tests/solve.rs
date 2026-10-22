@@ -1999,3 +1999,32 @@ fn a_change_that_won_gives_the_folder_back_to_the_human_when_dropped() {
     assert_eq!(git(&f, &["branch", "--list", "world/*"]), "");
     assert!(!f.project.join("note").exists() && !f.project.join("answer").exists());
 }
+
+/// Frames every request the same way, in one reply.
+struct Framer;
+
+impl Model for Framer {
+    fn chat(&self, _: &[Value], _: &Value) -> io::Result<Value> {
+        Ok(json!({"content": "done_when: answer says 42\nverify: sh check.sh"}))
+    }
+    fn label(&self) -> String {
+        "framer".to_string()
+    }
+    fn variant<'s>(&'s self, _: &str) -> Box<dyn Model + 's> {
+        Box::new(Framer)
+    }
+}
+
+#[test]
+fn a_framing_keeps_its_exchange_for_the_journal() {
+    let f = fixture("frame-exchange");
+    let s = spec::frame(&f.worlds, &f.project, "answer 42", &Framer).unwrap();
+    assert_eq!(s["status"], "proposed", "{s:#}");
+    assert_eq!(s["verify"], json!(["sh check.sh"]));
+    // What the lead's journal and stats read the framing's cost from.
+    assert_eq!(s["turns"].as_array().map(Vec::len), Some(1), "{s:#}");
+    assert!(
+        s["messages"].as_array().is_some_and(|m| m.len() >= 2),
+        "{s:#}"
+    );
+}
