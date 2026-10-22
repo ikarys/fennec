@@ -35,11 +35,12 @@ pub(crate) use crate::tools::truncate;
 /// the model is told once, then stopped.
 const REPEAT_NUDGE: usize = 3;
 pub(crate) const REPEAT_STOP: usize = 5;
-/// The solve nudges at these idle steps; the framer reads a lot before it
-/// writes a single test, so it is given room by [`Watch::framing`].
-const IDLE_NUDGE: usize = 8;
-const IDLE_HARD: usize = 12;
-const IDLE_STOP: usize = 15;
+/// Steps that change no file: told twice, then stopped. A 27B model reads a
+/// real codebase for more than 15 steps before its first edit: at 8/12/15 it
+/// was stopped before it could start.
+const IDLE_NUDGE: usize = 15;
+const IDLE_HARD: usize = 20;
+const IDLE_STOP: usize = 25;
 /// A command killed by its timeout costs minutes; a second one ends the run.
 const TIMEOUT_STOP: usize = 2;
 /// `done` refused this many times at most: then the verification judges.
@@ -140,24 +141,6 @@ const REPEAT_NUDGES: usize = 2;
 const FINGERPRINT: usize = 256;
 
 impl Watch {
-    /// The framing attempt: it explores the code before it writes a single
-    /// test, so the idle notices arrive late.
-    pub const fn framing() -> Self {
-        Self {
-            last_call: String::new(),
-            repeats: 0,
-            nudged: 0,
-            files: String::new(),
-            idle: 0,
-            timeouts: 0,
-            nudged_idle: false,
-            nudged_idle_hard: false,
-            idle_nudge: 15,
-            idle_hard: 20,
-            idle_stop: 25,
-        }
-    }
-
     /// `call` is the tool's arguments, canonicalized by the caller; the
     /// result's first lines join them. A changed file, a changed output, a
     /// changed argument: the run is moving, the count starts over.
@@ -1417,23 +1400,6 @@ mod tests {
         (0..w.idle_hard).for_each(|_| _ = w.step(String::new()));
         assert_eq!(w.step(" M a".into()), None);
         assert!(!w.nudged_idle && !w.nudged_idle_hard);
-    }
-
-    #[test]
-    fn a_framing_watch_nudges_later_and_stops_later() {
-        let mut w = Watch::framing();
-        assert!((15, 20, 25) == (w.idle_nudge, w.idle_hard, w.idle_stop));
-        let verdicts: Vec<_> = (0..w.idle_stop).map(|_| w.step(String::new())).collect();
-        assert!(matches!(verdicts[w.idle_nudge - 1], Some(Stuck::Nudge(_))));
-        assert!(matches!(verdicts[w.idle_hard - 1], Some(Stuck::Nudge(_))));
-        assert_eq!(
-            verdicts
-                .iter()
-                .filter(|v| matches!(v, Some(Stuck::Nudge(_))))
-                .count(),
-            2
-        );
-        assert!(matches!(verdicts[w.idle_stop - 1], Some(Stuck::Stop)));
     }
 
     #[test]
