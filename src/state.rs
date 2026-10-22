@@ -316,6 +316,17 @@ impl Store {
         let was = record["status"].clone();
         change(&mut record);
         let moved = record["status"] != was;
+        // Why a task failed or stopped means nothing once it works again: a
+        // landed card kept a failed commit's error otherwise.
+        if moved
+            && !matches!(
+                record["status"].as_str(),
+                Some("failed" | "blocked" | "dropped")
+            )
+            && let Some(m) = record.as_object_mut()
+        {
+            m.remove("reason");
+        }
         // When the current step began: a running line says for how long.
         if moved {
             let secs = SystemTime::now()
@@ -1114,6 +1125,37 @@ mod tests {
                 .unwrap()
                 .contains("not committed yet")
         );
+    }
+
+    #[test]
+    fn a_task_that_works_again_drops_why_it_failed() {
+        let tmp = std::env::temp_dir().join(format!("fennec-lead-reason-{}", std::process::id()));
+        let store = Store {
+            root: tmp.join("home"),
+        };
+        std::fs::create_dir_all(store.root.join("requests")).unwrap();
+        let id = "abc1";
+        write_json(
+            &store.request_path(id).unwrap(),
+            &json!({"status": "running", "project": "/p", "text": "t"}),
+        )
+        .unwrap();
+        let fail = |r: &mut Value| {
+            r["status"] = json!("failed");
+            r["reason"] = json!("git add failed");
+        };
+        store.update(id, fail).unwrap();
+        assert_eq!(store.load(id).unwrap()["reason"], "git add failed");
+        store.update(id, |r| r["status"] = json!("ready")).unwrap();
+        store.update(id, |r| r["status"] = json!("landed")).unwrap();
+        assert!(store.load(id).unwrap()["reason"].is_null());
+        // A dropped task keeps why it had failed, for its history.
+        store.update(id, fail).unwrap();
+        store
+            .update(id, |r| r["status"] = json!("dropped"))
+            .unwrap();
+        assert_eq!(store.load(id).unwrap()["reason"], "git add failed");
+        std::fs::remove_dir_all(tmp).unwrap();
     }
 
     #[test]
