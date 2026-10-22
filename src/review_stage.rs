@@ -33,7 +33,9 @@ pub fn run(
         .unwrap_or("");
     let project = Path::new(record["project"].as_str().unwrap_or(""));
     let roles = team::stage_roles(project, "review")?;
-    if roles.is_empty() {
+    // Work that changed nothing leaves nothing to review: the proof still
+    // tries the product against the done when.
+    if roles.is_empty() || diff.trim().is_empty() {
         let res = json!({"passed": true, "skipped": true, "findings": "",
                          "question": null, "team": Vec::<String>::new(), "steps": 0});
         record["review"] = res.clone();
@@ -41,9 +43,12 @@ pub fn run(
         return Ok(res);
     }
     let done = done_when.map_or_else(String::new, |d| format!("Done when:\n{d}\n\n"));
+    // The ask is resent on every turn: a long diff is cut, its files read on demand.
+    let diff = agent::truncate(diff);
     let ask = format!(
         "{done}Goal:\n{}\n\nThe change to review (diff):\n{diff}\n\n\
-         Review the work in this world against its goal and the done when.",
+         Review the work in this world against its goal and the done when; where the diff \
+         is cut, read the changed files.",
         record["goal"].as_str().unwrap_or("")
     );
     let mut context = String::new();
