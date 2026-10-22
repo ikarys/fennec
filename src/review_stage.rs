@@ -102,8 +102,10 @@ pub fn run(
     let _ = std::fs::remove_file(&report_path);
     worlds.rollback(&world)?;
     let (rejected, findings) = verdict(report.as_deref(), summary.as_deref(), error.as_deref());
+    let judged = report.is_some() || summary.is_some();
+    let (passed, question) = conclude(rejected, judged, error, question);
     let res = json!({
-        "passed": !rejected,
+        "passed": passed,
         "skipped": false,
         "findings": findings,
         "question": question,
@@ -133,9 +135,24 @@ fn verdict(report: Option<&str>, summary: Option<&str>, error: Option<&str>) -> 
     )
 }
 
+/// How the stage ends from what the reviewer left: a verdict passes or
+/// rejects, and a review that never ended with one — no report, no summary,
+/// the step budget spent — surfaces the stop, it does not pass silently.
+fn conclude(
+    rejected: bool,
+    judged: bool,
+    error: Option<String>,
+    question: Option<String>,
+) -> (bool, Option<String>) {
+    if !rejected && !judged && error.is_some() {
+        return (false, question.or(error));
+    }
+    (!rejected, question)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::verdict;
+    use super::{conclude, verdict};
 
     #[test]
     fn the_verdict_is_read_from_the_report_then_the_model() {
@@ -159,5 +176,22 @@ mod tests {
             (false, String::new()),
             "no report, no verdict: the work is not judged against"
         );
+    }
+
+    #[test]
+    fn a_review_that_never_ended_with_a_verdict_does_not_pass() {
+        assert_eq!(
+            conclude(false, true, Some("stopped".into()), None),
+            (true, None)
+        );
+        assert_eq!(conclude(true, true, None, None), (false, None));
+        let (passed, question) =
+            conclude(false, false, Some("stopped after 10 steps".into()), None);
+        assert!(!passed, "{passed}");
+        assert!(question.is_some(), "the stop is surfaced, not silent");
+        assert_eq!(conclude(false, false, None, None), (true, None));
+        let (passed, question) = conclude(true, true, Some("stopped".into()), None);
+        assert!(!passed, "{passed}");
+        assert!(question.is_none(), "a rejection keeps the findings path");
     }
 }
