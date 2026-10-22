@@ -915,8 +915,13 @@ fn solve_now(store: &Store, id: &str) -> io::Result<()> {
     let mut reviews = 0;
     loop {
         store.update(id, |r| r["status"] = json!("reviewing"))?;
-        let review =
-            review_stage::run(&worlds, &run, done_when.as_deref(), &reviewer, MAX_REVIEW_STEPS)?;
+        let review = review_stage::run(
+            &worlds,
+            &run,
+            done_when.as_deref(),
+            &reviewer,
+            MAX_REVIEW_STEPS,
+        )?;
         if review["skipped"] == true || review["passed"] == true {
             break;
         }
