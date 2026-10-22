@@ -62,7 +62,8 @@ is (language, command line or web page), reply with exactly one line and nothing
 Otherwise reply in exactly this form, nothing else:\n\
 done_when: <what the person using the product will see or be able to do once it is done, in \
 one or two sentences, in the request's language; product terms only, no file, tag, function \
-or test names>\n\
+or test names, and never the state of git (a diff, a commit): the work is committed as it \
+goes>\n\
 verify: <the shell command that runs the project's whole test suite, from its root; one line \
 per command, at most two; `none` if the project has no tests>";
 

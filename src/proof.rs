@@ -33,6 +33,8 @@ product behaves as the goal says. When the product is meant to fail (a bad argum
 usage line, no argument at all), write the try as `! <command>`: it passes only if the \
 command fails. Never end a try with `; echo`, `|| true` or anything else that makes it \
 exit 0 whatever the product did. \
+Never judge with git (`git diff`, `git status`, `git log`): the harness commits the work \
+as it goes, so git shows nothing of it; judge the files and the product. \
 If the project has a web interface the change shows in, also say how to start it and which \
 pages to capture: the harness starts it, opens each page in a real browser and takes a \
 screenshot, so never imitate a browser or a DOM in a try: when the change only shows in \
@@ -487,6 +489,11 @@ fn parse(reply: &str) -> (Plan, bool) {
             continue;
         }
         match key.trim() {
+            // The harness commits the work as it goes: git shows none of it,
+            // and a try judging by it fails work that is there.
+            "try" if runs_git(&value) => plan
+                .unverified
+                .push(format!("`{value}` (git cannot show work fennec commits)")),
             "try" if plan.tries.len() < MAX_TRIES => plan.tries.push(value),
             "serve" => plan.serve = Some(value),
             "shot" if plan.shots.len() < MAX_SHOTS => plan.shots.push((value, Vec::new())),
@@ -508,6 +515,13 @@ fn parse(reply: &str) -> (Plan, bool) {
         }
     }
     (plan, clean)
+}
+
+/// Whether a try's command runs git, as a word of the command line.
+fn runs_git(command: &str) -> bool {
+    command
+        .split(|c: char| c.is_whitespace() || "|;&()$`".contains(c))
+        .any(|w| w == "git")
 }
 
 #[cfg(test)]
@@ -553,6 +567,13 @@ mod tests {
         );
         assert!(clean);
         assert_eq!(plan.tries, ["python3 -c 'print(1)'"]);
+        let (plan, _) = parse("try: tail -n 1 README.md && git diff HEAD --numstat\ntry: ./gitk\n");
+        assert_eq!(plan.tries, ["./gitk"], "a try judging by git is not run");
+        assert!(
+            plan.unverified[0].contains("git diff HEAD"),
+            "{:?}",
+            plan.unverified
+        );
         let many = "try: a\n".repeat(9);
         assert_eq!(parse(&many).0.tries.len(), 5);
     }
