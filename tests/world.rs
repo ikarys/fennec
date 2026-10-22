@@ -387,6 +387,35 @@ fn a_rollback_in_the_folder_sets_changes_aside() {
 }
 
 #[test]
+fn a_dropped_world_leaves_nothing_its_own_ignore_rules_hid() {
+    let f = Fixture::new("drop-ignored");
+    let unset = ["config", "--unset", "fennec.workspace"];
+    assert!(
+        Command::new("git")
+            .arg("-C")
+            .arg(&f.project)
+            .args(unset)
+            .status()
+            .unwrap()
+            .success()
+    );
+    // The human ignores their own build output: it is theirs to keep.
+    std::fs::write(f.project.join(".git/info/exclude"), "/out/\n").unwrap();
+    std::fs::create_dir_all(f.project.join("out")).unwrap();
+    std::fs::write(f.project.join("out/keep"), "x").unwrap();
+    let w = f.worlds.fork(&f.project.to_string_lossy()).unwrap();
+    assert!(f.sh(&w, "printf 'node_modules/\\n*.db\\n' > .gitignore && mkdir -p web/node_modules/x api && echo j > web/node_modules/x/i.js && echo d > api/test.db && echo s > web/app.js").0);
+    f.worlds.commit(&w, "scaffold").unwrap();
+    f.worlds.drop(w).unwrap();
+    assert!(!f.project.join("web/node_modules").exists() && !f.project.join("api").exists());
+    assert!(f.project.join("out/keep").is_file());
+    assert!(
+        fennec_os::world::held(&f.project).unwrap().is_none(),
+        "the folder is free for the next task"
+    );
+}
+
+#[test]
 fn a_parked_world_frees_the_folder_and_comes_back() {
     let f = Fixture::new("park");
     let git = |args: &[&str]| {
