@@ -240,7 +240,7 @@ fn a_crashed_attempt_goes_on_in_its_own_world() {
 }
 
 #[test]
-fn work_that_changed_nothing_fails_where_it_stands() {
+fn work_already_in_place_passes_without_changing_anything() {
     let f = fixture("unchanged");
     // What is asked already holds: the model finds nothing to change.
     std::fs::write(f.project.join("answer"), "42\n").unwrap();
@@ -257,7 +257,6 @@ fn work_that_changed_nothing_fails_where_it_stands() {
             "answer",
         ],
     );
-    let before = git(&f, &["rev-parse", "HEAD"]);
     let idle = Script::new("idle", &[done()]);
     let record = solve(
         &f.worlds,
@@ -268,14 +267,33 @@ fn work_that_changed_nothing_fails_where_it_stands() {
         None,
     )
     .unwrap();
-    // An empty diff would pass an empty proof and land as work never done.
+    // Nothing was changed: the checks judge, they pass, the work is done.
+    assert_eq!(record["status"], "ready", "{record:#}");
+    assert!(record["winner"].is_string());
+    assert_eq!(record["attempts"][0]["checks"][0]["exit"], 0);
+}
+
+#[test]
+fn work_that_changed_nothing_and_failed_the_checks_fails_where_it_stands() {
+    let f = fixture("unchanged-fail");
+    // The check wants 42 in `answer`; the world holds nothing to prove.
+    let idle = Script::new("idle", &[done(), done(), done()]);
+    let record = solve(
+        &f.worlds,
+        &f.project,
+        &task(&[]),
+        &[&idle as &dyn Model],
+        10,
+        None,
+    )
+    .unwrap();
+    // Nothing passed the checks: the attempt fails where it stands.
     assert_eq!(record["status"], "failed", "{record:#}");
     assert!(record["winner"].is_null());
     assert_eq!(
         record["attempts"][0]["reason"],
-        "no file changed: the work produced nothing to prove"
+        "no file changed, and verify failed"
     );
-    assert_eq!(git(&f, &["rev-parse", "HEAD"]), before, "nothing landed");
     assert!(f.worlds.list().unwrap().is_empty());
 }
 
@@ -787,6 +805,17 @@ fn a_chain_role_leaves_relay_notes_the_next_role_reads() {
     let f = fixture("relay");
     // Two roles in team order: senior-developer builds, tech-lead reviews.
     team::choose(&f.project, team::DEFAULT_TEAM, &[]).unwrap();
+    team::save_role(
+        &f.project,
+        None,
+        "Tech lead",
+        "solve",
+        "Check the answer.",
+        &[],
+        "",
+        "read, write:relay/",
+    )
+    .unwrap();
     git(&f, &["add", "-A"]);
     git(
         &f,
@@ -842,6 +871,77 @@ fn a_chain_role_leaves_relay_notes_the_next_role_reads() {
     let note =
         std::fs::read_to_string(world.path.join("relay").join("senior-developer.md")).unwrap();
     assert_eq!(note, "wrote the answer; nothing found\n");
+}
+
+#[test]
+fn the_review_stage_judges_the_work_and_skips_without_reviewers() {
+    let f = fixture("review-stage");
+    // The full team: the reviewer speaks at the review stage.
+    team::choose(&f.project, team::DEFAULT_TEAM, &[]).unwrap();
+    git(&f, &["add", "-A"]);
+    git(
+        &f,
+        &[
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "-qm",
+            "team",
+        ],
+    );
+    let dev = Script::new("dev", &[write("answer", "42\n"), done()]);
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&dev], 10, None).unwrap();
+    let winner = record["winner"].as_str().unwrap().to_string();
+    // The reviewer finds a fault: the harness reads its report, not its exit.
+    let reviewer = Script::new(
+        "reviewer",
+        &[
+            ("read_file", json!({"path": "answer"})),
+            write(
+                "relay/review.md",
+                "l'answer est 42, mais le titre manque\nà refaire\n",
+            ),
+            done(),
+        ],
+    );
+    let v = fennec_os::review_stage::run(&f.worlds, &winner, Some("42 et le titre"), &reviewer, 10)
+        .unwrap();
+    assert!(v["passed"] == false, "{v:#}");
+    assert!(
+        v["findings"].as_str().unwrap().contains("le titre manque"),
+        "{v:#}"
+    );
+    let names: Vec<&str> = v["team"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|n| n.as_str().unwrap())
+        .collect();
+    assert_eq!(names, ["Reviewer"], "{v:#}");
+    // The note does not change the work: the world is back to the solver's.
+    let world = f.worlds.open(&winner).unwrap();
+    assert!(
+        !world.path.join("relay").join("review.md").exists(),
+        "the report is rolled back"
+    );
+    // The run record keeps the review, for the journal.
+    assert!(review::load(&f.worlds, &winner).unwrap()["review"]["passed"] == false);
+    // The verdict the model ends with stands when it leaves no report.
+    let verdict = Script::new(
+        "verdict",
+        &[("read_file", json!({"path": "answer"})), done()],
+    );
+    // A `done` summary without a report: nothing is judged against.
+    let v = fennec_os::review_stage::run(&f.worlds, &winner, None, &verdict, 10).unwrap();
+    assert!(v["passed"] == true, "{v:#}");
+    // A team without review roles skips the stage: no model is called.
+    team::choose(&f.project, team::DEFAULT_TEAM, &["reviewer".to_string()]).unwrap();
+    let quiet = Script::new("quiet", &[]);
+    let v = fennec_os::review_stage::run(&f.worlds, &winner, None, &quiet, 10).unwrap();
+    assert!(v["skipped"] == true && v["passed"] == true, "{v:#}");
+    assert!(v["team"].as_array().unwrap().is_empty(), "{v:#}");
 }
 
 /// Opt-in (`-- --ignored`): it needs a live server and a big, cacheable
