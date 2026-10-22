@@ -8,6 +8,7 @@ pub mod proof;
 pub mod provider;
 pub mod recipe;
 pub mod review;
+pub mod review_stage;
 pub mod rules;
 pub mod schedule;
 pub mod serve;

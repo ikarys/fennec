@@ -48,6 +48,24 @@ a summary in exactly this form:\n\
 goal: <the defect and the expected behaviour, for whoever fixes it, naming the failing test>\n\
 verify: <a shell command that runs the new test; one line per command>";
 
+/// Framing without tests: one model call, no world to explore. The person \
+/// validates "done when"; the work is judged by the project's own tests, \
+/// named here. `compile` keeps the full path (a sparring finding still \
+/// needs its failing test).
+const FRAME: &str = "Turn the request below into the words the person will check it with, \
+before anyone implements it. Read the project first: what it is, and how its tests are run. \
+Write nothing. \
+A careful project lead does not invent the product: when the request does not say what to \
+build or change, or the project is empty and the request leaves open what kind of program it \
+is (language, command line or web page), reply with exactly one line and nothing else:\n\
+`question: <the one question whose answer lets you frame it, in the request's language>`\n\
+Otherwise reply in exactly this form, nothing else:\n\
+done_when: <what the person using the product will see or be able to do once it is done, in \
+one or two sentences, in the request's language; product terms only, no file, tag, function \
+or test names>\n\
+verify: <the shell command that runs the project's whole test suite, from its root; one line \
+per command, at most two; `none` if the project has no tests>";
+
 fn spec_path(worlds: &Worlds, id: &str) -> io::Result<PathBuf> {
     if id.is_empty() || id.contains('/') {
         return Err(io::Error::other(format!("no spec {id}")));
@@ -137,6 +155,92 @@ pub fn compile(
     write_spec(
         worlds, &project, &brief, request, "request", &context, model, max_steps,
     )
+}
+
+/// Frames a request without compiling tests: one model call writes
+/// "done when", the words the human validates, and the command that runs
+/// the project's tests, the check every attempt of the work is judged on.
+/// The spec's world is forked with no test of its own: attempts fork from
+/// it, as from `compile`'s world. A question goes to the human, whose
+/// answer reaches the next framing.
+pub fn frame(
+    worlds: &Worlds,
+    project: &Path,
+    request: &str,
+    model: &dyn Model,
+) -> io::Result<Value> {
+    let project = std::fs::canonicalize(project)?;
+    let _turn = schedule::interactive(worlds)?;
+    let name = project.display().to_string();
+    let key = normalise(request);
+    let answers: Vec<Value> = specs(worlds)?
+        .into_iter()
+        .filter(|(_, s)| {
+            s["project"] == name.as_str()
+                && s["request"].as_str().map(normalise) == Some(key.clone())
+        })
+        .flat_map(|(_, s)| s["answers"].as_array().cloned().unwrap_or_default())
+        .collect();
+    let files = context(&project);
+    let mut context = String::new();
+    let knowhow = sleep::knowhow(&project)?;
+    if !knowhow.is_empty() {
+        context.push_str("\n\nKnow-how kept for this project:\n");
+        knowhow
+            .iter()
+            .for_each(|k| context.push_str(&format!("  - {k}\n")));
+    }
+    let said = rules::said(&project)?;
+    context.push_str(&rules::brief(&said));
+    let (roles, team) = team::brief(&project, "frame")?;
+    context.push_str(&roles);
+    let messages = vec![
+        json!({"role": "system", "content": format!("{FRAME}\n\n{files}\n\n{context}")}),
+        json!({"role": "user", "content": answered(&answers) + request}),
+    ];
+    let (content, _exchange) = crate::provider::ask(model, &messages)?;
+    let (done, verify, question) = frame_parse(&content);
+    let world = worlds.fork(&name)?;
+    let id = world.id.clone();
+    let mut spec = json!({
+        "project": name,
+        "request": request,
+        "origin": "frame",
+        "world": world.id,
+        "model": model.label(),
+        "team": team,
+        "status": "invalid",
+        "summary": content,
+        "rules": rules::used(request, &said),
+    });
+    match (done, question) {
+        (Some(d), _) => {
+            // The goal the work builds to: the request itself, no one
+            // restating it; the tests the developer writes are its own.
+            spec["goal"] = json!(request);
+            spec["done_when"] = json!(d);
+            spec["verify"] = json!(verify);
+            spec["protect"] = json!(Vec::<String>::new());
+            spec["diff"] = json!("");
+            spec["checks"] = json!(Vec::<Value>::new());
+            spec["status"] = json!("proposed");
+        }
+        (None, Some(q)) => {
+            spec["question"] = json!(q);
+            spec["reason"] = json!("asks before framing");
+        }
+        (None, None) => {
+            let said: String = content.chars().take(300).collect();
+            spec["reason"] = json!(format!(
+                "the reply has no `done_when:` line; it said: {said}"
+            ));
+        }
+    }
+    if spec["status"] != "proposed" {
+        worlds.drop(world)?;
+    }
+    save(worlds, &id, &spec)?;
+    Ok(spec)
 }
 
 /// Sparring: background work that hunts for one defect and proves it with a
@@ -497,6 +601,46 @@ fn key<'a>(line: &'a str, name: &str) -> Option<&'a str> {
         .trim_start_matches('*')
         .strip_prefix(':')?;
     Some(rest.trim_start_matches('*').trim())
+}
+
+/// `done_when:`, `verify:`, and the `question:` a framing reply may carry
+/// instead, with the same tolerance as `parse`. `verify` is `none` for a
+/// project without tests.
+fn frame_parse(content: &str) -> (Option<String>, Vec<String>, Option<String>) {
+    let (mut done, mut verify, mut question) = (None, Vec::new(), None);
+    let mut in_verify = false;
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if let Some(d) = key(trimmed, "done_when") {
+            if !d.is_empty() {
+                done = Some(d.to_string());
+            }
+            in_verify = false;
+        } else if let Some(q) = key(trimmed, "question") {
+            if !q.is_empty() {
+                question = Some(q.to_string());
+            }
+            in_verify = false;
+        } else if let Some(cmd) = key(trimmed, "verify") {
+            in_verify = cmd.is_empty();
+            if !cmd.is_empty() && !cmd.eq_ignore_ascii_case("none") {
+                verify.push(cmd.trim_matches('`').to_string());
+            }
+        } else if in_verify {
+            if trimmed.is_empty() && !verify.is_empty() {
+                in_verify = false;
+            } else if !trimmed.is_empty() && !trimmed.starts_with("```") {
+                verify.push(
+                    trimmed
+                        .trim_start_matches("- ")
+                        .trim_start_matches("$ ")
+                        .trim_matches('`')
+                        .to_string(),
+                );
+            }
+        }
+    }
+    (done, verify, question)
 }
 
 /// The human validates the spec: its tests become the task's protected
@@ -1056,6 +1200,25 @@ mod tests {
         assert_eq!(parse(summary).0, "add `count()`");
         assert_eq!(done_when(summary), Some("la liste affiche « 3 articles »"));
         assert_eq!(done_when("goal: g\ndone_when:  \n"), None);
+    }
+
+    #[test]
+    fn framing_reads_done_when_verify_and_the_question() {
+        use super::frame_parse;
+        let (done, verify, question) =
+            frame_parse("Clair.\ndone_when: la page s'ouvre avec le titre\nverify: `npm test`\n");
+        assert_eq!(done.as_deref(), Some("la page s'ouvre avec le titre"));
+        assert_eq!(verify, ["npm test"]);
+        assert_eq!(question, None);
+        // `none` for a project without tests, and a bare key takes the lines.
+        let (_, verify, _) = frame_parse("done_when: ok\nverify:\nnpm test\ncargo test\n");
+        assert_eq!(verify, ["npm test", "cargo test"]);
+        let (_, verify, _) = frame_parse("done_when: ok\nverify: none\n");
+        assert!(verify.is_empty());
+        // A question is the reply, not the framing.
+        let (done, _, question) = frame_parse("question: une page ou un script ?\n");
+        assert_eq!(done, None);
+        assert_eq!(question.as_deref(), Some("une page ou un script ?"));
     }
 
     #[test]

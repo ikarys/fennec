@@ -36,10 +36,19 @@ exit 0 whatever the product did. \
 If the project has a web interface the change shows in, also say how to start it and which \
 pages to capture: the harness starts it, opens each page in a real browser and takes a \
 screenshot, so never imitate a browser or a DOM in a try: when the change only shows in \
-the web interface, give serve and shot lines and no try. When the change shows only after \
-the user does something on the page, follow its shot line with act lines doing it, in \
+the web interface, give serve and shot lines and no try. The server starts in a fresh \
+sandbox: its home is empty and the project holds only its own files, so if the product \
+shows data it stores, create that data in the serve command, before the server starts: a \
+try runs in its own command and leaves nothing for the server. \
+Leave the project folder clean: the seeded data lives in the temporary home or \
+another throwaway place, never inside the folder, which the work reads after. \
+When the change shows only \
+after the user does something on the page, follow its shot line with act lines doing it, in \
 order: the harness does them with a real mouse and keyboard and captures the page before \
-and after. When a \"Done when\" is given, it is what the person validated: show every \
+and after. The acts start where the page starts: before acting on an element, the acts \
+first reach where it is (the list, the detail view, the menu it opens from), and they \
+name only what the page shows and the Done when names: a step on a field the page does \
+not show fails the shot. When a \"Done when\" is given, it is what the person validated: show every \
 action and result it names (each click it describes is an act, a click that undoes \
 another is an act too), and give an unverified line for each one you cannot show. \
 Keep each command short. Reply in exactly this form, nothing else:\n\
@@ -341,7 +350,7 @@ fn readme(worlds: &Worlds, world: &World) -> io::Result<String> {
     let argv = [
         "sh",
         "-c",
-        "cat README* readme* AGENTS.md 2>/dev/null | head -c 6000",
+        "cat README* readme* AGENTS.md 2>/dev/null | head -c 12000",
     ]
     .map(String::from);
     let out = worlds

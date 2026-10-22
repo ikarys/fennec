@@ -87,6 +87,15 @@ def shot():
     return base64.b64decode(cdp("Page.captureScreenshot", format="png", clip=clip)["data"])
 
 
+# What a user can aim at: the visible interactive elements, by name.
+LABELS = """
+[...document.querySelectorAll('button, a, [role="button"], input, textarea, select, [contenteditable]')]
+.filter(e => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0; })
+.map(e => (e.innerText || e.getAttribute('aria-label') || e.placeholder || '').trim().slice(0, 40))
+.filter(t => t)
+"""
+
+
 # The element a user would aim at: a visible one showing the text (the
 # innermost), or a field by placeholder, label, name or CSS selector.
 FIND = """(([what, field]) => {
@@ -118,7 +127,15 @@ FIND = """(([what, field]) => {
 def aim(what, field=False):
     found = js(FIND % json.dumps([what, field]))
     if not found:
-        raise RuntimeError(f"nothing on the page shows « {what} »")
+        labels = js(LABELS) or []
+        shown = []
+        for t in labels:
+            if t not in shown:
+                shown.append(t)
+        named = ", ".join(shown[:20]) if shown else "no visible label"
+        raise RuntimeError(
+            f"nothing on the page shows « {what} » (the page shows: {named})"
+        )
     if not found[2]:
         raise RuntimeError(f"« {what} » is covered by something else")
     for kind in ("mouseMoved", "mousePressed", "mouseReleased"):
@@ -126,6 +143,23 @@ def aim(what, field=False):
 
 
 KEYS = {"Enter": ("\r", 13), "Tab": ("\t", 9), "Escape": ("", 27), "Backspace": ("", 8)}
+
+
+# A user retypes a field, they do not grow it: the typed text replaces what
+# is there. The click left the field focused; this selects its content so
+# the next insert overwrites it.
+SELECT = """((what) => {
+  const seen = el => { const b = el.getBoundingClientRect(); return b.width > 0 && b.height > 0; };
+  const fields = [...document.querySelectorAll("input, textarea, select, [contenteditable]")].filter(seen);
+  const el = fields.find(f => f.placeholder === what || f.getAttribute("aria-label") === what || f.name === what
+    || [...(f.labels || [])].some(l => l.innerText.trim() === what));
+  if (!el) return false;
+  el.focus();
+  if (el.select) { el.select(); return true; }
+  const range = document.createRange(); range.selectNodeContents(el);
+  const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+  return true;
+})(%s)"""
 
 
 def step(s):
@@ -138,6 +172,8 @@ def step(s):
         if not sep:
             raise RuntimeError("type needs <field> => <text>")
         aim(target.strip(), field=True)
+        if not js(SELECT % json.dumps(target.strip())):
+            raise RuntimeError(f"no field named « {target.strip()} » to type into")
         cdp("Input.insertText", text=text.strip())
     elif verb == "key":
         text, code = KEYS.get(arg, (arg, 0))

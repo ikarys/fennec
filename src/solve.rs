@@ -741,13 +741,33 @@ fn attempt_inner(
     );
     record["diff"] = json!(diff);
     if diff.trim().is_empty() && record["grant"].as_array().is_none_or(|g| g.is_empty()) {
-        // Nothing to prove would pass an empty proof and land as work never
-        // done: the attempt fails where it stands. A granted run is excepted:
-        // its whole work is the host edit, the world stays clean on purpose.
-        record["reason"] = json!(match &stuck {
-            Some(why) => format!("{why}; no file changed"),
-            None => "no file changed: the work produced nothing to prove".to_string(),
-        });
+        let judged = rules
+            .iter()
+            .any(|r| matches!(&r.kind, Kind::StandingCommand(_)));
+        if !judged {
+            // Nothing to prove would pass an empty proof and land as work
+            // never done: the attempt fails where it stands. A granted run
+            // is excepted: its whole work is the host edit, the world stays
+            // clean on purpose.
+            record["reason"] = json!(match &stuck {
+                Some(why) => format!("{why}; no file changed"),
+                None => "no file changed: the work produced nothing to prove".to_string(),
+            });
+        } else {
+            // The work is already in the repository: nothing new to prove,
+            // so the checks alone decide. Passing, the work lands as it is:
+            // with nothing new.
+            let (checks, failure) = verify(worlds, world, rules)?;
+            record["checks"] = json!(checks);
+            if let Some(reason) = failure {
+                record["reason"] = json!(match &stuck {
+                    Some(why) => format!("{why}; then {reason}"),
+                    None => format!("no file changed, and {reason}"),
+                });
+            } else {
+                record["passed"] = json!(true);
+            }
+        }
         return Ok(());
     }
 
