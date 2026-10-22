@@ -344,6 +344,15 @@ impl<'a> Engine<'a> {
     /// What the person's rules say of a call: `None` to run it, or what the
     /// model is told instead.
     fn guarded(&mut self, name: &str, args: &Value) -> Option<String> {
+        // The harness's own rule, before the person's: no rule of theirs lifts it.
+        if name == "shell"
+            && let Some(flag) = crate::guard::stray_install(args["command"].as_str().unwrap_or(""))
+        {
+            return Some(format!(
+                "error: refused by the harness: `{flag}` installs packages into the source tree \
+                 or the home. Install into the project's virtual environment (`.venv`) instead."
+            ));
+        }
         let verdict = self.guard.as_ref()?.check(name, args);
         let (rule, target) = match verdict {
             Verdict::Allow => return None,
