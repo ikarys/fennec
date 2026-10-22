@@ -874,6 +874,33 @@ fn a_chain_role_leaves_relay_notes_the_next_role_reads() {
 }
 
 #[test]
+fn work_that_changed_nothing_skips_the_review() {
+    let f = fixture("review-empty");
+    team::choose(&f.project, team::DEFAULT_TEAM, &[]).unwrap();
+    // What was asked already holds: the work has nothing to change.
+    std::fs::write(f.project.join("answer"), "42\n").unwrap();
+    git(&f, &["add", "-A"]);
+    git(
+        &f,
+        &[
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "-qm",
+            "answered",
+        ],
+    );
+    let dev = Script::new("dev", &[done()]);
+    let record = solve(&f.worlds, &f.project, &task(&[]), &[&dev], 10, None).unwrap();
+    let winner = record["winner"].as_str().unwrap().to_string();
+    let quiet = Script::new("quiet", &[]);
+    let v = fennec_os::review_stage::run(&f.worlds, &winner, None, &quiet, 10).unwrap();
+    assert!(v["skipped"] == true && v["passed"] == true, "{v:#}");
+}
+
+#[test]
 fn the_review_stage_judges_the_work_and_skips_without_reviewers() {
     let f = fixture("review-stage");
     // The full team: the reviewer speaks at the review stage.
