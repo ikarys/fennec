@@ -354,6 +354,34 @@ fn parts(command: &str) -> Vec<Vec<String>> {
     all.into_iter().filter(|w| !w.is_empty()).collect()
 }
 
+/// The flag of a pip install that writes packages into the source tree or
+/// the home (`--target backend`, `--user`): the project's virtual
+/// environment and caches are where they go. `None` for any other command.
+pub fn stray_install(command: &str) -> Option<String> {
+    const STRAY: [&str; 6] = [
+        "-t",
+        "--target",
+        "--prefix",
+        "--root",
+        "--user",
+        "--break-system-packages",
+    ];
+    parts(command).into_iter().find_map(|words| {
+        let at = words.iter().position(|w| w == "install")?;
+        // `pip`, `pip3`, `uv pip`, `python -m pip`, a venv's `bin/pip`.
+        let pip = words[..at]
+            .iter()
+            .any(|w| w.rsplit('/').next().unwrap_or(w).starts_with("pip"));
+        if !pip {
+            return None;
+        }
+        words[at + 1..]
+            .iter()
+            .find(|a| STRAY.contains(&a.split('=').next().unwrap_or(a)))
+            .cloned()
+    })
+}
+
 /// A simple command as the rules compare it: wrappers (`sudo`, `env A=b`,
 /// `command`, `exec`, `nohup`, `time`) and the program's directory dropped,
 /// short options merged and sorted where the first one stood.
@@ -467,6 +495,28 @@ mod tests {
             g.check("read_file", &json!({"path": "src/env.rs"})),
             Verdict::Allow
         );
+    }
+
+    #[test]
+    fn an_install_into_the_tree_or_the_home_is_told_apart() {
+        for c in [
+            "cd backend && pip install -t . fastapi",
+            "python3 -m pip install --target=backend pytest",
+            "uv pip install --prefix /x alembic",
+            "pip3 install --user requests",
+            "pip install --break-system-packages x",
+        ] {
+            assert!(stray_install(c).is_some(), "{c}");
+        }
+        for c in [
+            "pip install -r requirements.txt",
+            "uv pip install fastapi",
+            ".venv/bin/pip install -e .",
+            "npm install --prefix frontend",
+            "echo pip; cargo install --root x y",
+        ] {
+            assert_eq!(stray_install(c), None, "{c}");
+        }
     }
 
     #[test]
