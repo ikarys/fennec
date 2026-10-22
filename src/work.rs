@@ -19,6 +19,10 @@ use crate::state::Store;
 /// the engine's watch, so the cap only bounds a run that keeps progressing.
 const MAX_STEPS: usize = 150;
 
+/// The review is a verdict, not a second build: it stays short so the loop
+/// keeps its time budget.
+const MAX_REVIEW_STEPS: usize = 10;
+
 /// `FENNEC_LEAD_ATTEMPTS` (default 1): parallel attempts once validated.
 fn attempts() -> usize {
     std::env::var("FENNEC_LEAD_ATTEMPTS")
@@ -911,7 +915,8 @@ fn solve_now(store: &Store, id: &str) -> io::Result<()> {
     let mut reviews = 0;
     loop {
         store.update(id, |r| r["status"] = json!("reviewing"))?;
-        let review = review_stage::run(&worlds, &run, done_when.as_deref(), &reviewer, MAX_STEPS)?;
+        let review =
+            review_stage::run(&worlds, &run, done_when.as_deref(), &reviewer, MAX_REVIEW_STEPS)?;
         if review["skipped"] == true || review["passed"] == true {
             break;
         }
