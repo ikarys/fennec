@@ -385,7 +385,7 @@ fn check(
         None,
         false,
         None,
-        agent::Watch::framing(),
+        agent::Watch::default(),
     )?;
     spec["steps"] = json!(outcome.steps);
     spec["stuck"] = json!(outcome.stuck);

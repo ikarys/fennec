@@ -720,7 +720,7 @@ fn a_stuck_run_that_changed_nothing_never_wins_on_passing_checks() {
 }
 
 #[test]
-fn an_idle_model_is_told_twice_then_stopped_at_step_15() {
+fn an_idle_model_is_told_twice_then_stopped_at_step_25() {
     let f = fixture("idle-hard");
     // Reading two different files: no repeat loop, no file changed.
     let mut steps: Vec<(&str, Value)> = Vec::new();
@@ -735,7 +735,7 @@ fn an_idle_model_is_told_twice_then_stopped_at_step_15() {
         attempt["reason"]
             .as_str()
             .unwrap()
-            .starts_with("stuck: no file changed in 15 steps"),
+            .starts_with("stuck: no file changed in 25 steps"),
         "{record:#}"
     );
     let counts = |needle: &str| {
@@ -746,15 +746,15 @@ fn an_idle_model_is_told_twice_then_stopped_at_step_15() {
             .filter(|m| m["content"].as_str().is_some_and(|c| c.contains(needle)))
             .count()
     };
-    assert_eq!(counts("8 steps without changing any file"), 1);
-    assert_eq!(counts("12 steps without a single file changed"), 1);
+    assert_eq!(counts("15 steps without changing any file"), 1);
+    assert_eq!(counts("20 steps without a single file changed"), 1);
 }
 
 #[test]
-fn an_edit_before_step_12_spares_the_harder_notice() {
+fn an_edit_before_step_20_spares_the_harder_notice() {
     let f = fixture("idle-soft");
     let mut steps: Vec<(&str, Value)> = Vec::new();
-    for i in 0..9 {
+    for i in 0..17 {
         let file = if i % 2 == 0 { "check.sh" } else { "README" };
         steps.push(("read_file", json!({"path": file})));
     }
@@ -772,8 +772,8 @@ fn an_edit_before_step_12_spares_the_harder_notice() {
             .filter(|m| m["content"].as_str().is_some_and(|c| c.contains(needle)))
             .count()
     };
-    assert_eq!(counts("8 steps without changing any file"), 1);
-    assert_eq!(counts("12 steps without a single file changed"), 0);
+    assert_eq!(counts("15 steps without changing any file"), 1);
+    assert_eq!(counts("20 steps without a single file changed"), 0);
 }
 
 #[test]
