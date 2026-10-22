@@ -778,8 +778,23 @@ impl Worlds {
             // world (landed, or another world of the same request took over).
             if git(&world.path, &["branch", "--show-current"])? == branch {
                 self.rollback(&world)?;
+                // What the world's own ignore rules hid (a database, a
+                // `node_modules`) is no longer ignored once its `.gitignore`
+                // goes: left there, it holds the folder as changes forever.
+                let ignored = self.git(
+                    &world,
+                    &[
+                        "ls-files",
+                        "--others",
+                        "--ignored",
+                        "--exclude-standard",
+                        "--directory",
+                        "-z",
+                    ],
+                )?;
                 git(&world.path, &["checkout", "-q", &back])?;
                 Self::clean_relay(&world.path);
+                remove_unignored(&world.path, &ignored)?;
             }
             git(&world.path, &["branch", "-q", "-D", &branch])?;
             std::fs::remove_file(self.root.join("meta").join(&world.id))?;
@@ -805,6 +820,30 @@ impl Worlds {
         let _ = std::fs::remove_file(self.root.join("skills").join(&world.id));
         Ok(())
     }
+}
+
+/// Removes the paths of `listed` (NUL-separated, from the work tree's root)
+/// that the folder's ignore rules no longer hide. The folder was clean when
+/// the world started, so an untracked path is the world's. A path git cannot
+/// judge stays.
+fn remove_unignored(folder: &Path, listed: &str) -> io::Result<()> {
+    for rel in listed.split('\0').filter(|p| !p.is_empty()) {
+        let status = Command::new("git")
+            .arg("-C")
+            .arg(folder)
+            .args(["check-ignore", "-q", "--", rel])
+            .status()?;
+        if status.code() != Some(1) {
+            continue;
+        }
+        let path = folder.join(rel.trim_end_matches('/'));
+        match std::fs::symlink_metadata(&path) {
+            Ok(m) if m.is_dir() => std::fs::remove_dir_all(&path)?,
+            Ok(_) => std::fs::remove_file(&path)?,
+            Err(_) => {}
+        }
+    }
+    Ok(())
 }
 
 enum Place {
