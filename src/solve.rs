@@ -744,7 +744,9 @@ fn attempt_inner(
         let judged = rules
             .iter()
             .any(|r| matches!(&r.kind, Kind::StandingCommand(_)));
-        if !judged {
+        // A run the harness stopped never said the work was already there:
+        // passing checks on the untouched project would make it a winner.
+        if !judged || stuck.is_some() {
             // Nothing to prove would pass an empty proof and land as work
             // never done: the attempt fails where it stands. A granted run
             // is excepted: its whole work is the host edit, the world stays
