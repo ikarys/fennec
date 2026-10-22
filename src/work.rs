@@ -1137,11 +1137,11 @@ pub fn retry(store: &Store, id: &str) -> io::Result<()> {
     if request["status"] != "failed" && !recommit {
         return Err(io::Error::other("this task did not fail"));
     }
+    // A spec that is gone (its store cleaned) is framed again from the
+    // brief: an error here would leave the task failed for good.
     let validated = match request["spec"].as_str() {
-        Some(s) => matches!(
-            spec::load(&Worlds::from_env()?, s)?["status"].as_str(),
-            Some("proposed" | "accepted")
-        ),
+        Some(s) => spec::load(&Worlds::from_env()?, s)
+            .is_ok_and(|s| matches!(s["status"].as_str(), Some("proposed" | "accepted"))),
         None => false,
     };
     let why = if recommit {
@@ -2241,6 +2241,28 @@ mod tests {
         assert_eq!(r["retry"], "port 9");
         let spec = fennec_os::spec::load(&worlds, spec_id).unwrap();
         assert_eq!(spec["answers"][0]["answer"], "port 9");
+        std::fs::remove_dir_all(&tmp).unwrap();
+    }
+
+    #[test]
+    fn a_task_whose_spec_is_gone_is_framed_again() {
+        let tmp = std::env::temp_dir().join(format!("fennec-lead-nospec-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        let home = tmp.join("home");
+        std::fs::create_dir_all(home.join("requests")).unwrap();
+        let _env = ENV_LOCK.lock().unwrap();
+        // SAFETY: this test holds ENV_LOCK across its env use.
+        unsafe { std::env::set_var("FENNEC_OS_HOME", tmp.join("os")) };
+        std::fs::write(
+            home.join("requests/0f0f0f.json"),
+            json!({"project": "/p", "text": "a task", "status": "failed",
+                   "reason": "no spec gone", "spec": "gone"})
+            .to_string(),
+        )
+        .unwrap();
+        let store = Store { root: home };
+        retry(&store, "0f0f0f").unwrap();
+        assert_eq!(store.load("0f0f0f").unwrap()["status"], "framing");
         std::fs::remove_dir_all(&tmp).unwrap();
     }
 
