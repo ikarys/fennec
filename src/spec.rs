@@ -199,7 +199,7 @@ pub fn frame(
         json!({"role": "system", "content": format!("{FRAME}\n\n{files}\n\n{context}")}),
         json!({"role": "user", "content": answered(&answers) + request}),
     ];
-    let (content, _exchange) = crate::provider::ask(model, &messages)?;
+    let (content, exchange) = crate::provider::ask(model, &messages)?;
     let (done, verify, question) = frame_parse(&content);
     let world = worlds.fork(&name)?;
     let id = world.id.clone();
@@ -213,6 +213,9 @@ pub fn frame(
         "status": "invalid",
         "summary": content,
         "rules": rules::used(request, &said),
+        // What the lead's journal and stats read the framing's cost from.
+        "messages": exchange["messages"],
+        "turns": exchange["turns"],
     });
     match (done, question) {
         (Some(d), _) => {
