@@ -8,3 +8,5 @@ Try it here:
 ```bash
 ./try.sh   # seeds a demo home (one project, one task) and starts the server on 127.0.0.1:7777
 ```
+
+Boucle : solve → review → proof (2026-10-22).
