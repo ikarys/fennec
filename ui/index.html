@@ -821,7 +821,20 @@
   </section>
   <section id="stats" hidden>
     <div class="page-head"><strong>Stats</strong></div>
+    <div class="row" style="justify-content: flex-start">
+      <select id="stats-range" aria-label="Period">
+        <option value="0" data-t>All time</option>
+        <option value="7" data-t>Last 7 days</option>
+        <option value="30" data-t>Last 30 days</option>
+      </select>
+      <select id="stats-project" aria-label="Project"></select>
+    </div>
     <div class="tiles" id="stats-tiles"></div>
+    <h3 data-t>By day</h3>
+    <div class="scroll"><table>
+      <thead><tr><th data-t>Date</th><th data-t>Sent</th><th data-t>Generated</th></tr></thead>
+      <tbody id="stats-days"></tbody>
+    </table></div>
     <h3 data-t>By model</h3>
     <div class="scroll"><table>
       <thead><tr><th data-t>Model</th><th data-t>Calls</th><th data-t>Sent</th><th data-t>Cached</th><th data-t>Generated</th><th data-t>Speed</th><th data-t>Time</th></tr></thead>
@@ -836,6 +849,11 @@
     <div class="scroll"><table>
       <thead><tr><th data-t>Project</th><th data-t>Where fennec works</th><th data-t>Tasks</th><th data-t>Commits</th><th data-t>Failures</th><th data-t>Undone tries</th><th data-t>Time</th><th data-t>Sent</th></tr></thead>
       <tbody id="stats-projects"></tbody>
+    </table></div>
+    <h3 data-t>By task</h3>
+    <div class="scroll"><table>
+      <thead><tr><th data-t>Task</th><th data-t>Project</th><th data-t>Models</th><th data-t>Sent</th><th data-t>Generated</th><th data-t>Cached</th><th data-t>Time</th></tr></thead>
+      <tbody id="stats-tasks"></tbody>
     </table></div>
     <p class="muted" data-t>"In the folder": you see the work live, on a work branch. "Apart": your folder changes only at commit. The change applies to the next tasks. Each work's isolation: network to install dependencies, offline verification, no access to your home folder, read-only git history, capped memory; a failed try is undone without a trace.</p>
     <p class="error" id="stats-error" role="alert"></p>

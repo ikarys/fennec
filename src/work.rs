@@ -6,6 +6,7 @@
 
 use std::io;
 use std::path::Path;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use fennec_os::provider::{Live, Model, OpenAi};
 use fennec_os::world::{self, Worlds};
@@ -1918,11 +1919,24 @@ fn totals(steps: &[Value]) -> Value {
 
 /// "Stats": every request's cost summed per project and per model, with where
 /// fennec works in each project. A request from before stats were kept gets
-/// them now, once.
-pub fn overview(store: &Store) -> io::Result<Value> {
+/// them now, once. `days` (0: all) and `project` (empty: all) narrow the
+/// figures; `by_day` buckets by the day a task was created — a step carries
+/// no timestamp — and `tasks` lists each task.
+pub fn overview(store: &Store, days: u64, project: &str) -> io::Result<Value> {
     let mut requests = store.requests()?;
     // Out of the lists, out of the figures: an archived request is not shown.
     requests.retain(|(_, r)| r["archived"] != true);
+    // The filters, on the day the task was created: the period, then the project.
+    if days > 0 {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_or(0, |d| d.as_secs());
+        let from = now.saturating_sub(days * 86_400);
+        requests.retain(|(_, r)| r["since"].as_u64().unwrap_or(0) >= from);
+    }
+    if !project.is_empty() {
+        requests.retain(|(_, r)| r["project"] == project);
+    }
     for (id, r) in &mut requests {
         // Settled requests only: one under way is written by its own step.
         let settled = matches!(
@@ -1937,7 +1951,7 @@ pub fn overview(store: &Store) -> io::Result<Value> {
             store.update(id, |saved| saved["stats"] = r["stats"].clone())?;
         }
     }
-    let places = store
+    let mut places = store
         .projects()?
         .into_iter()
         .map(|p| {
@@ -1945,6 +1959,9 @@ pub fn overview(store: &Store) -> io::Result<Value> {
             (p, place)
         })
         .collect::<Vec<_>>();
+    if !project.is_empty() {
+        places.retain(|(p, _)| p == project);
+    }
     let mut v = summarize(&requests, &places);
     // Disk the worlds take apart from the folders, all and per project; a
     // world in the folder itself takes none.
@@ -1983,24 +2000,39 @@ fn summarize(requests: &[(String, Value)], places: &[(String, String)]) -> Value
     let mut projects: Vec<Value> = places
         .iter()
         .map(|(path, place)| {
-            let name = Path::new(path)
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or(path);
-            json!({"path": path, "name": name, "place": place, "disk": 0,
+            json!({"path": path, "name": project_name(path), "place": place, "disk": 0,
                    "requests": 0, "landed": 0, "failed": 0, "failed_attempts": 0,
                    "first_try": 0, "retried": 0})
         })
         .collect();
     let (mut models, mut stages) = (json!({}), json!({}));
     let mut all = json!({"requests": 0});
+    // By day: a step carries no timestamp, so a task counts on the day it was
+    // created; and one line per task, as the journal keeps it.
+    let (mut by_day, mut tasks) = (std::collections::BTreeMap::new(), Vec::new());
     let bump = |v: &mut Value, k: &str, n: u64| v[k] = json!(v[k].as_u64().unwrap_or(0) + n);
-    for (_, r) in requests {
+    for (id, r) in requests {
         let s = &r["stats"];
         bump(&mut all, "requests", 1);
         for k in COUNTS {
             bump(&mut all, k, s[k].as_u64().unwrap_or(0));
         }
+        let since = r["since"].as_u64().unwrap_or(0);
+        if since > 0 {
+            let day = by_day
+                .entry(since / 86_400)
+                .or_insert_with(|| json!({"sent": 0, "received": 0}));
+            for k in ["sent", "received"] {
+                bump(day, k, s[k].as_u64().unwrap_or(0));
+            }
+        }
+        tasks.push(json!({
+            "id": id,
+            "title": r["title"].as_str().or(r["text"].as_str()).unwrap_or(""),
+            "project": project_name(r["project"].as_str().unwrap_or("")),
+            "models": s["models"].as_object().map(|m| m.keys().cloned().collect::<Vec<_>>().join(", ")).unwrap_or_default(),
+            "sent": s["sent"], "cached": s["cached"], "received": s["received"], "ms": s["ms"],
+            "since": since}));
         if let Some(p) = projects.iter_mut().find(|p| p["path"] == r["project"]) {
             bump(p, "requests", 1);
             bump(p, "landed", u64::from(r["status"] == "landed"));
@@ -2040,7 +2072,38 @@ fn summarize(requests: &[(String, Value)], places: &[(String, String)]) -> Value
             .map(|(_, m)| m.clone())
             .collect()
     };
-    json!({"all": all, "projects": projects, "models": list(models), "stages": list(stages)})
+    // Newest first: the days, then the tasks.
+    let by_day: Vec<Value> = by_day
+        .into_iter()
+        .rev()
+        .map(|(d, v)| json!({"day": day_label(d), "sent": v["sent"], "received": v["received"]}))
+        .collect();
+    tasks.sort_by_key(|t| std::cmp::Reverse(t["since"].as_u64().unwrap_or(0)));
+    json!({"all": all, "projects": projects, "models": list(models), "stages": list(stages),
+           "by_day": by_day, "tasks": tasks})
+}
+
+/// The folder's name, as the project lists show it.
+fn project_name(path: &str) -> &str {
+    Path::new(path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or(path)
+}
+
+/// The date of the day `days` after 1970-01-01, `YYYY-MM-DD`: the calendar's
+/// own arithmetic, no date crate.
+fn day_label(days: u64) -> String {
+    let z = days as i64 + 719_468;
+    let era = z / 146_097;
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    format!("{:04}-{:02}-{:02}", y + i64::from(m <= 2), m, d)
 }
 
 pub fn land(store: &Store, id: &str) -> io::Result<()> {
@@ -2484,6 +2547,70 @@ mod tests {
             (Some(0), Some(1))
         );
         assert_eq!(v["models"].as_array().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn overview_filters_by_period_and_project_and_lists_days_and_tasks() {
+        let tmp = std::env::temp_dir().join(format!("fennec-lead-overview-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        let home = tmp.join("home");
+        std::fs::create_dir_all(home.join("requests")).unwrap();
+        let _env = ENV_LOCK.lock().unwrap();
+        // SAFETY: this test holds ENV_LOCK across its env use.
+        unsafe { std::env::set_var("FENNEC_OS_HOME", tmp.join("os")) };
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let cost = |n: u64| json!({"turns": 1, "sent": n, "cached": n / 2, "received": 10, "thinking": 0, "ms": 1000});
+        let s1 = totals(&[json!({"name": "Work", "model": "a", "cost": cost(100)})]);
+        let s2 = totals(&[json!({"name": "Work", "model": "b", "cost": cost(200)})]);
+        std::fs::write(
+            home.join("projects.json"),
+            json!([{"path": "/p", "archived": false}, {"path": "/q", "archived": false}])
+                .to_string(),
+        )
+        .unwrap();
+        std::fs::write(
+            home.join("requests/1.json"),
+            json!({"project": "/p", "title": "recent", "status": "landed",
+                   "since": now - 86_400, "stats": s1})
+            .to_string(),
+        )
+        .unwrap();
+        std::fs::write(
+            home.join("requests/2.json"),
+            json!({"project": "/q", "title": "old", "status": "landed",
+                   "since": now - 31 * 86_400, "stats": s2})
+            .to_string(),
+        )
+        .unwrap();
+        let store = Store { root: home.clone() };
+        // All: both tasks, one line per day created, newest first.
+        let v = overview(&store, 0, "").unwrap();
+        assert_eq!(v["all"]["requests"], 2);
+        let days = v["by_day"].as_array().unwrap();
+        assert_eq!(days.len(), 2);
+        assert_eq!(days[0]["sent"], 100, "the newest day first");
+        assert_eq!(days[0]["day"], day_label((now - 86_400) / 86_400));
+        assert_eq!(v["tasks"][0]["title"], "recent");
+        assert_eq!(v["tasks"][0]["project"], "p");
+        assert_eq!(v["tasks"][0]["models"], "a");
+        assert_eq!(v["tasks"][1]["title"], "old");
+        // 7 days: only the recent one; 30 days: the 31-day-old one stays out.
+        let v = overview(&store, 7, "").unwrap();
+        assert_eq!(v["all"]["requests"], 1);
+        assert_eq!(v["all"]["sent"], 100);
+        assert_eq!(v["tasks"][0]["title"], "recent");
+        assert_eq!(overview(&store, 30, "").unwrap()["all"]["requests"], 1);
+        // Project /p: only its task, and the project list is narrowed to it.
+        let v = overview(&store, 0, "/p").unwrap();
+        assert_eq!(v["all"]["requests"], 1);
+        assert_eq!(v["tasks"][0]["title"], "recent");
+        let projects = v["projects"].as_array().unwrap();
+        assert_eq!(projects.len(), 1);
+        assert_eq!(projects[0]["path"], "/p");
+        std::fs::remove_dir_all(&tmp).unwrap();
     }
 
     #[test]
