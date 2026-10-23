@@ -945,10 +945,13 @@ function askedOf(item) {
 function conversation(item) {
   // The opening message is the description, shown above it.
   const said = (item.thread ?? []).filter((m, i) => i > 0 || m.who !== "human");
-  if (!said.length) return null;
+  // The conversation in full, what fennec read included, is a discussion
+  // like the Agent's: it opens there.
+  const full = item.chat ? el("a", { className: "link", href: "#chat/" + item.chat, textContent: t("Follow the conversation") }) : null;
+  if (!said.length) return full && el("div", { className: "thread" }, full);
   return el("div", { className: "thread" }, ...said.map((m) =>
     el("div", { className: m.who === "human" ? "said human" : "said" },
-      el("span", { className: "label", textContent: m.who === "human" ? t("You") : "fennec" }), ...rich(m.text))));
+      el("span", { className: "label", textContent: m.who === "human" ? t("You") : "fennec" }), ...rich(m.text))), full);
 }
 
 // A button says the act in a word; where it goes is its title.
@@ -1585,7 +1588,10 @@ function showChat(c) {
   const busy = thinking || c.status === "waiting";
   box.composer.send.disabled = busy;
   box.composer.stop.hidden = !busy;
-  const asideKey = JSON.stringify([c.stats, c.project, c.grants, c.write, c.criteria, c.verify, c.checks]);
+  // A task's conversation is answered on the task's page: its brief goes to
+  // the framing from there.
+  box.composer.node.hidden = c.task === true;
+  const asideKey = JSON.stringify([c.stats, c.project, c.grants, c.write, c.criteria, c.verify, c.checks, c.task, c.request]);
   if (box.asideKey !== asideKey) {
     box.asideKey = asideKey;
     box.aside.replaceChildren(...chatAside(c));
@@ -1830,6 +1836,14 @@ function chatComposer(id) {
 
 function chatAside(c) {
   const nodes = [];
+  // A task's conversation: read-only, it ends on the task's brief.
+  if (c.task) {
+    nodes.push(el("h2", { textContent: t("Task") }),
+      el("p", { className: "muted", textContent: t("This discussion shapes a task: answer on its page.") }),
+      el("a", { className: "link", href: hashOf(c.folder, c.request), textContent: t("Open the task") }));
+    if (c.stats?.turns) nodes.push(el("h2", { textContent: t("Cost") }), metrics(c.stats));
+    return nodes;
+  }
   // Read-only until the person allows changes: talking about a project is
   // not asking to build it.
   const write = c.write === true;

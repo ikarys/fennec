@@ -190,6 +190,24 @@ pub fn chat(id: String) {
     });
 }
 
+/// The task's conversation: a discussion in its project, the same as the
+/// Agent's, read-only and ending on a brief (fennec-os `chat::link`). Made at
+/// its first turn, or the discussion it was made from.
+fn chat_of(store: &Store, id: &str, request: &Value) -> io::Result<String> {
+    let worlds = Worlds::from_env()?;
+    if let Some(chat) = request["chat"].as_str()
+        && fennec_os::chat::load(&worlds, chat).is_ok()
+    {
+        return Ok(chat.to_string());
+    }
+    let project = Path::new(request["project"].as_str().unwrap_or(""));
+    let made = fennec_os::chat::start(&worlds, project)?;
+    let chat = made["id"].as_str().unwrap_or("").to_string();
+    fennec_os::chat::link(&worlds, &chat, id)?;
+    store.update(id, |r| r["chat"] = json!(chat))?;
+    Ok(chat)
+}
+
 fn say_in(request: &mut Value, who: &str, text: &str) {
     if !request["thread"].is_array() {
         request["thread"] = json!([]);
@@ -247,7 +265,7 @@ fn talk_now(store: &Store, id: &str) -> io::Result<()> {
     let model = staffed(OpenAi::variants_from_env(1)?.remove(0), project, "frame")?;
     offer_rule(store, id, &request, &model)?;
     let thread = request["thread"].as_array().cloned().unwrap_or_default();
-    let (said, exchange) = spec::discuss(&Worlds::from_env()?, project, &thread, &model)?;
+    let (said, exchange) = spec::discuss(&Worlds::from_env()?, &chat_of(store, id, &request)?, &thread, &model)?;
     // ponytail: each turn keeps the whole exchange, the thread resent included;
     // a long conversation could keep only the reply.
     let step = json!({"stage": "talk", "exchange": exchange});
@@ -321,7 +339,7 @@ fn prepare_now(store: &Store, id: &str) -> io::Result<()> {
     let project = Path::new(request["project"].as_str().unwrap_or(""));
     let model = staffed(OpenAi::variants_from_env(1)?.remove(0), project, "frame")?;
     let thread = request["thread"].as_array().cloned().unwrap_or_default();
-    let (said, exchange) = spec::discuss(&Worlds::from_env()?, project, &thread, &model)?;
+    let (said, exchange) = spec::discuss(&Worlds::from_env()?, &chat_of(store, id, &request)?, &thread, &model)?;
     store.update(id, |r| {
         // Reworded, launched or answered meanwhile: this turn is out of date.
         if r["status"] != "later" || r["thread"] != request["thread"] {
