@@ -54,7 +54,7 @@ eval(src.match(/const el = \(tag, props = \{\}, \.\.\.children\) => \{[\s\S]*?\n
   const codeButton = () => new Node("button");
   const pageButton = () => new Node("button");
   const journalButton = () => new Node("button");
-  const details = () => null;
+  const details = () => { const n = new Node("details"); n.className = "more"; return n; };
   const work = () => [];
   const shots = () => null;
   const facts = () => [];
@@ -77,5 +77,12 @@ assert.ok(!later.querySelector(".later-text"), "pas de champ avant « Éditer »
 const find = (n, f) => f(n) ? n : n.children?.map((c) => find(c, f)).find(Boolean);
 find(later, (n) => n.textContent === "Edit").onclick();
 assert.ok(later.querySelector(".later-text"), "« Éditer » ouvre le champ");
+
+// A card that asks a question: the decision buttons come before the stats,
+// so the answer does not wait for the figures.
+const blocked = card({ id: "b", title: "une question", kind: "blocked", project: "p", question: "quel choix ?" });
+const actionsIdx = blocked.children.findIndex((c) => (c.className || "").includes("actions"));
+const detailsIdx = blocked.children.findIndex((c) => (c.className || "").includes("more"));
+assert.ok(actionsIdx >= 0 && detailsIdx >= 0 && actionsIdx < detailsIdx, "les boutons de décision précèdent les stats");
 
 console.log("OK");

@@ -1160,9 +1160,10 @@ function card(item) {
   }
   // What was said to the model so far, on every card with a choice to make.
   actions.querySelector(".spacer")?.after(journalButton(item, () => node.querySelector(".changes-slot")));
-  // A ready card has its buttons at the top already.
+  // A ready card has its buttons at the top already; the others put them
+  // above the stats too, so the decision does not wait for the figures.
   if (node.contains(actions)) add(details(item));
-  else add(el("div", { className: "changes-slot" }), details(item), actions, el("div", { className: "error", role: "alert" }));
+  else add(el("div", { className: "changes-slot" }), actions, el("div", { className: "error", role: "alert" }), details(item));
   return node;
 }
 
