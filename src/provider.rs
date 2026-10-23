@@ -388,6 +388,52 @@ impl Settings {
 
 /// The model ids an OpenAI-compatible server lists.
 pub fn served(base: &str, key: Option<&str>) -> io::Result<Vec<String>> {
+    Ok(listing(base, key)?
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|m| m["id"].as_str().map(str::to_string))
+        .collect())
+}
+
+/// The context window, in tokens: `FENNEC_OS_CONTEXT`, else the smallest
+/// `max_model_len` the server gives for the models in use (vLLM, ninfer),
+/// else 64k. A fixed 64k compacted a 200k model a third of the way in,
+/// and every compaction costs the server's cache.
+/// ponytail: read once per process; a server changed in the settings
+/// takes effect at the next start.
+pub fn context_window() -> u64 {
+    static WINDOW: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+    *WINDOW.get_or_init(|| {
+        if let Some(n) = std::env::var("FENNEC_OS_CONTEXT")
+            .ok()
+            .and_then(|v| v.parse().ok())
+        {
+            return n;
+        }
+        Settings::current()
+            .and_then(|s| {
+                let list = listing(&s.base_url, s.api_key.as_deref())?;
+                Ok(window_of(&list, &s.models))
+            })
+            .ok()
+            .flatten()
+            .unwrap_or(65_536)
+    })
+}
+
+/// The smallest window the listing gives for `models` (all when empty).
+fn window_of(list: &Value, models: &[String]) -> Option<u64> {
+    list.as_array()
+        .into_iter()
+        .flatten()
+        .filter(|m| models.is_empty() || models.iter().any(|id| m["id"] == id.as_str()))
+        .filter_map(|m| m["max_model_len"].as_u64())
+        .min()
+}
+
+/// The `data` of the server's `/models`.
+fn listing(base: &str, key: Option<&str>) -> io::Result<Value> {
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .timeout_global(Some(Duration::from_secs(10)))
         .build()
@@ -397,13 +443,8 @@ pub fn served(base: &str, key: Option<&str>) -> io::Result<Vec<String>> {
         req = req.header("Authorization", &format!("Bearer {key}"));
     }
     let mut resp = req.call().map_err(io::Error::other)?;
-    let list: Value = resp.body_mut().read_json().map_err(io::Error::other)?;
-    Ok(list["data"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter_map(|m| m["id"].as_str().map(str::to_string))
-        .collect())
+    let mut list: Value = resp.body_mut().read_json().map_err(io::Error::other)?;
+    Ok(list["data"].take())
 }
 
 impl OpenAi {
@@ -463,17 +504,22 @@ impl OpenAi {
     }
 }
 
-/// Reasoning is the model's scratch space, kept in the exchange for the human
-/// to read; sending it back costs prefill. Images the human attached go as
-/// images (see [`image_line`]).
+/// Reasoning goes back as the model wrote it, in `reasoning_content`: a
+/// server that caches exact checkpoints (ninfer) only reuses a turn whose
+/// prompt continues the last one, and a turn stripped of its reasoning does
+/// not (measured: 0 tokens cached stripped, the whole prefix kept). Images
+/// the human attached go as images (see [`image_line`]).
 fn outgoing(messages: &[Value]) -> Vec<Value> {
     messages
         .iter()
         .map(|m| {
             let mut m = m.clone();
             if let Some(o) = m.as_object_mut() {
-                o.remove("reasoning_content");
-                o.remove("reasoning");
+                // Some servers name it `reasoning`; one field, the one
+                // chat templates read.
+                if let Some(r) = o.remove("reasoning") {
+                    o.entry("reasoning_content").or_insert(r);
+                }
                 // Marks a message the harness added (`agent::harness`).
                 o.remove("harness");
                 o.remove("finish_reason");
@@ -629,13 +675,22 @@ mod tests {
     }
 
     #[test]
-    fn reasoning_is_kept_but_never_sent_back() {
+    fn reasoning_is_sent_back_once() {
         let said = [
             json!({"role": "assistant", "content": "ok", "reasoning_content": "hmm", "reasoning": "hmm"}),
+            json!({"role": "assistant", "content": "ok", "reasoning": "hmm"}),
         ];
         let sent = outgoing(&said);
-        assert_eq!(sent[0], json!({"role": "assistant", "content": "ok"}));
-        assert_eq!(said[0]["reasoning_content"], "hmm");
+        let back = json!({"role": "assistant", "content": "ok", "reasoning_content": "hmm"});
+        assert_eq!(sent, [back.clone(), back]);
+    }
+
+    #[test]
+    fn the_window_is_the_smallest_of_the_models_in_use() {
+        let list = json!([{"id": "a", "max_model_len": 200000}, {"id": "b", "max_model_len": 32768}, {"id": "c"}]);
+        assert_eq!(window_of(&list, &["a".into()]), Some(200000));
+        assert_eq!(window_of(&list, &[]), Some(32768));
+        assert_eq!(window_of(&list, &["c".into()]), None);
     }
 
     #[test]
