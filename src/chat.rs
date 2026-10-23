@@ -180,9 +180,85 @@ pub fn title(chat: &Value) -> String {
 }
 
 /// Allows the chat to change its folder (and the folders opened for it), or
-/// takes it back to read-only; the next call follows.
+/// takes it back to read-only; the next call follows. A task's never
+/// writes: the team works on a copy.
 pub fn write(worlds: &Worlds, id: &str, on: bool) -> io::Result<Value> {
-    update(worlds, id, |c| c["write"] = json!(on))
+    let c = update(worlds, id, |c| {
+        if c["task"] != true {
+            c["write"] = json!(on);
+        }
+    })?;
+    if on && c["task"] == true {
+        return Err(io::Error::other(
+            "this discussion shapes a task: it stays read-only",
+        ));
+    }
+    Ok(c)
+}
+
+/// The chat becomes the conversation of a task (`request`, the task's id
+/// in fennec-lead): read-only, it ends on a brief instead of a plan (see
+/// [`crate::spec::discuss`]). A chat turned into a task goes on there,
+/// with all it read.
+pub fn link(worlds: &Worlds, id: &str, request: &str) -> io::Result<Value> {
+    update(worlds, id, |c| {
+        c["task"] = json!(true);
+        c["write"] = json!(false);
+        c["request"] = json!(request);
+    })
+}
+
+/// A task's conversation brought up to the task's record of it before its
+/// turn: the person's new messages are added; a record that no longer
+/// follows the conversation (the task reworded) starts it over from the
+/// record. Returns how many turns the chat had, so the caller can tell
+/// this turn's cost.
+pub fn follow(worlds: &Worlds, id: &str, thread: &[Value]) -> io::Result<usize> {
+    let (mut refused, mut before) = (None, 0);
+    let human = |m: &Value| m["who"] == "human";
+    update(worlds, id, |c| {
+        if busy(c) {
+            refused = Some("fennec is still answering");
+            return;
+        }
+        before = c["turns"].as_array().map_or(0, Vec::len);
+        let said: Vec<Value> = c["messages"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|m| m["role"] == "user" && m["harness"] != true)
+            .map(|m| m["content"].clone())
+            .collect();
+        let asked: Vec<Value> = thread
+            .iter()
+            .filter(|t| human(t))
+            .map(|t| t["text"].clone())
+            .collect();
+        if asked.starts_with(&said) {
+            for text in &asked[said.len()..] {
+                push(&mut c["messages"], json!({"role": "user", "content": text}));
+            }
+        } else {
+            c["messages"] = json!(
+                thread
+                    .iter()
+                    .map(
+                        |t| json!({"role": if human(t) { "user" } else { "assistant" },
+                                    "content": t["text"]})
+                    )
+                    .collect::<Vec<_>>()
+            );
+            c["window"] = json!(0);
+        }
+        c["task"] = json!(true);
+        c["write"] = json!(false);
+        c["brief"] = Value::Null;
+        c["status"] = json!("thinking");
+        c["since"] = json!(now());
+        c["stop"] = json!(false);
+        c["error"] = Value::Null;
+    })?;
+    refused.map_or(Ok(before), |why| Err(io::Error::other(why)))
 }
 
 /// Asks the turn under way to end after its current call.
@@ -406,17 +482,29 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
             .iter()
             .map(|s| (s.name.clone(), s.dir.clone()))
             .collect();
+        // A task's conversation: read-only, it ends on `brief`.
+        let task = chat["task"] == true;
         // Read at each call: the person may allow changes while the turn runs.
-        let write = chat["write"] == true;
+        let write = !task && chat["write"] == true;
         // The same tools and system message in both modes: allowing changes
         // mid-chat would otherwise make the server compute the whole
         // conversation again. The mode is said in the conversation instead,
         // and a write while it is read-only is refused below.
-        let mut tools = tools::definitions(true);
-        tools.push(tools::criteria_tool());
-        tools.push(propose_plan());
-        let tools = Value::Array(tools);
-        let mode = if write { WRITE } else { READ }.trim();
+        let tools = Value::Array(if task {
+            let mut t = tools::definitions(false);
+            t.push(crate::spec::brief_tool());
+            t
+        } else {
+            let mut t = tools::definitions(true);
+            t.push(tools::criteria_tool());
+            t.push(propose_plan());
+            t
+        });
+        let mode = if task {
+            crate::spec::task_mode(&folder)?
+        } else {
+            if write { WRITE } else { READ }.trim().to_string()
+        };
         let system = json!({"role": "system",
                             "content": format!("{SYSTEM}{}{}", agent::tools_line(worlds), skill::brief(&skills))});
         let mut log = chat["messages"].as_array().cloned().unwrap_or_default();
@@ -474,12 +562,15 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
         // the server's cache holds (see `agent`). The mode, when it is not
         // the last one said in what the model sees.
         let mut added = Vec::new();
-        let said_mode = log[from..].iter().rev().find_map(|m| {
-            let c = m["content"].as_str()?;
-            (m["harness"] == true && (c == READ.trim() || c == WRITE.trim())).then_some(c)
-        });
-        if said_mode != Some(mode) {
-            added.push(agent::harness(mode));
+        let said_mode = log[from..]
+            .iter()
+            .rev()
+            .find(|m| m["mode"] == true)
+            .and_then(|m| m["content"].as_str());
+        if said_mode != Some(mode.as_str()) {
+            let mut said = agent::harness(&mode);
+            said["mode"] = json!(true);
+            added.push(said);
         }
         // Framed while a plan is under way.
         if write
@@ -520,6 +611,7 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
         }
         let mut said = vec![reply];
         let mut stuck = None;
+        let mut briefed: Option<Value> = None;
         for call in &calls {
             let name = call["function"]["name"].as_str().unwrap_or("");
             // Folders the person opened for this chat, read again before each
@@ -532,6 +624,15 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
             let started = Instant::now();
             let timed =
                 |name: &str| json!({"name": name, "ms": started.elapsed().as_millis() as u64});
+            // A task's conversation ends on its brief: kept for the task,
+            // which frames it.
+            if task && name == "brief" {
+                briefed = Some(args.clone());
+                push(&mut record["tools"], timed(name));
+                said.push(json!({"role": "tool", "tool_call_id": call["id"],
+                                 "content": "handed to the team"}));
+                continue;
+            }
             // The plan is the question: approved, the rest of the turn writes.
             if name == "propose_plan" {
                 // Steps, when given, let the page split the plan into tasks.
@@ -677,14 +778,21 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
         said.extend(more);
         let criteria = engine.criteria.clone();
         let allowed = engine.allowed.clone();
+        let done = briefed.is_some();
         update(worlds, id, |c| {
             push_all(&mut c["messages"], said);
             c["criteria"] = json!(criteria);
             c["allowed"] = json!(allowed);
             push(&mut c["turns"], record);
+            if let Some(b) = briefed {
+                c["brief"] = b;
+            }
         })?;
         if let Some(why) = stuck {
             return Err(io::Error::other(why));
+        }
+        if done {
+            return Ok(());
         }
         if calls.is_empty() && !going {
             return Ok(());

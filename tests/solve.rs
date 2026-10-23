@@ -308,35 +308,6 @@ fn a_run_going_on_from_an_earlier_one_continues_its_conversation() {
 }
 
 #[test]
-fn a_discussion_reads_the_project_before_it_answers() {
-    let f = fixture("discuss-reads");
-    let model = Script::new("reader", &[("read_file", json!({"path": "check.sh"}))]);
-    model
-        .replies
-        .lock()
-        .unwrap()
-        .push_back(json!({"content": "`brief: write 42`", "reasoning_content": "hmm"}));
-    let thread = [json!({"who": "human", "text": "fais passer le check"})];
-    let (said, exchange) =
-        fennec_os::spec::discuss(&f.worlds, &f.project, &thread, &model).unwrap();
-    assert_eq!(
-        said,
-        fennec_os::spec::Discussed::Brief("write 42".into(), None, None, None)
-    );
-    // The read ran in the folder, read-only, and its lines went back.
-    let read = exchange["messages"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|m| m["role"] == "tool")
-        .unwrap()["content"]
-        .as_str()
-        .unwrap()
-        .to_string();
-    assert!(read.contains("grep -qx 42 answer"), "{read}");
-}
-
-#[test]
 fn work_already_in_place_passes_without_changing_anything() {
     let f = fixture("unchanged");
     // What is asked already holds: the model finds nothing to change.

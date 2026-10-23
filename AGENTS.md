@@ -24,6 +24,7 @@ src/provider.rs  `Model` trait + OpenAI-compatible client; `ask` (one question),
 src/recipe.rs    replay a landed run's tool calls when the same goal returns
 src/chat.rs      a plain conversation in a folder the person chose (git or not): same sandbox, folder read-only until the person allows changes
                  (said in the conversation, the system message and tools the same in both modes), skills; no world;
+                 a task's conversation is a chat too (`link`, `follow`): always read-only, it ends on `brief`;
                  a turn that changed the folder runs the approved plan's checks and the rules' commands, failures sent back twice
 src/outside.rs   the literal host paths a chat tool call names outside its folder: the chat asks, an opened folder stays read-write
 src/agent.rs     the engine every agent runs on (task attempts, chat turns): criteria kept by the harness and checked
@@ -36,7 +37,7 @@ src/guard.rs     the person's rules on what agents run, read and write (`~/.conf
                  split and normalized, paths resolved; checked by the engine before every call and every criterion check
 src/tools.rs     the agent's tools, run in the sandbox: shell, read_file (numbered), edit_file (exact replace, read first), write_file
 src/solve.rs     task → worlds in turn until one passes verify → land (rebase + re-verify, one commit by the human) on the branch the rules ask for → push
-src/spec.rs      request → conversation (`discuss`: reads the project read-only, a few steps, then answers; also picks the skills a task needs), or cut into smaller tasks (`split`) → `direct` work (no tests first, proof decides) or acceptance tests + task (`compile`, CLI and sparring); retry from the tests; amend a ready run from its work, or `fix` it from what its proof found; sparring findings
+src/spec.rs      request → conversation (`discuss`: a chat of its own in the project, read-only, ending on the `brief` tool, which also picks the skills and roles), or cut into smaller tasks (`split`) → `direct` work (no tests first, proof decides) or acceptance tests + task (`compile`, CLI and sparring); retry from the tests; amend a ready run from its work, or `fix` it from what its proof found; sparring findings
 src/proof.rs     a ready run used as its user would: model proposes tries, pages and clicks/typing; harness runs them, captures before/after (proof.py)
                  `page`: the same product started for the human's browser (host network, a free port, 30 min)
 src/rules.rs     project rules (`.fennec-os/rules.json` at HEAD), glob matching; rules said in words

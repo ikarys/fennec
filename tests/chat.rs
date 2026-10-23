@@ -50,10 +50,7 @@ fn sent_back(c: &Value) -> Vec<Value> {
         .iter()
         .filter(|m| {
             let t = m["content"].as_str().unwrap_or("");
-            m["harness"] == true
-                && !t.starts_with("<system-reminder>\nStep")
-                && !t.starts_with("The folder is read-only")
-                && !t.starts_with("They allowed changes")
+            m["harness"] == true && m["mode"] != true && !t.starts_with("<system-reminder>\nStep")
         })
         .cloned()
         .collect()
@@ -615,4 +612,81 @@ fn a_message_said_again_drops_what_followed_it() {
     assert_eq!(said, ["trois", "3"]);
     // The cost spent before stays counted.
     assert_eq!(c["turns"].as_array().unwrap().len(), 3);
+}
+
+#[test]
+fn a_task_conversation_reads_asks_then_hands_its_brief() {
+    use fennec_os::spec::{Discussed, discuss};
+    let f = Fixture::new("chat-task");
+    let folder = f.worlds.home.join("proj");
+    std::fs::create_dir_all(&folder).unwrap();
+    std::fs::write(folder.join("a.txt"), "alpha\n").unwrap();
+    let id = chat::start(&f.worlds, &folder).unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let mut thread = vec![json!({"who": "human", "text": "copie a.txt"})];
+    // It reads what the request touches, then asks.
+    let model = Replies(Mutex::new(VecDeque::from([
+        call("c0", "read_file", json!({"path": "a.txt"})),
+        json!({"content": "Vers quel fichier ?"}),
+    ])));
+    let (said, _) = discuss(&f.worlds, &id, &thread, &model).unwrap();
+    assert_eq!(said, Discussed::Reply("Vers quel fichier ?".into()));
+    let first = chat::load(&f.worlds, &id).unwrap()["messages"]
+        .as_array()
+        .unwrap()
+        .clone();
+    assert!(
+        first
+            .iter()
+            .any(|m| m["role"] == "tool" && m["content"].as_str().unwrap().contains("alpha"))
+    );
+    // The answer goes on in the same conversation, which ends on `brief`.
+    thread.push(json!({"who": "fennec", "text": "Vers quel fichier ?"}));
+    thread.push(json!({"who": "human", "text": "b.txt"}));
+    let model = Replies(Mutex::new(VecDeque::from([call(
+        "c1",
+        "brief",
+        json!({"brief": "copier a.txt dans b.txt", "title": "Copier a.txt", "skills": ["nope"]}),
+    )])));
+    let (said, exchange) = discuss(&f.worlds, &id, &thread, &model).unwrap();
+    // An unknown skill is never picked; which skills exist depends on the machine.
+    let Discussed::Brief(brief, skills, roles, title) = said else {
+        panic!("{said:?}")
+    };
+    assert_eq!(brief, "copier a.txt dans b.txt");
+    assert!(skills.unwrap_or_default().is_empty());
+    assert_eq!(roles, None);
+    assert_eq!(title.as_deref(), Some("Copier a.txt"));
+    assert_eq!(
+        exchange["turns"].as_array().unwrap().len(),
+        1,
+        "this turn's cost only"
+    );
+    let c = chat::load(&f.worlds, &id).unwrap();
+    let now = c["messages"].as_array().unwrap();
+    assert_eq!(now[..first.len()], first[..], "the conversation went on");
+    assert!(!folder.join("b.txt").exists(), "read-only");
+    assert!(
+        chat::write(&f.worlds, &id, true).is_err(),
+        "a task's never writes"
+    );
+    // The task reworded: the conversation starts over from its record.
+    let model = Replies(Mutex::new(VecDeque::from([
+        json!({"content": "D'accord ?"}),
+    ])));
+    discuss(
+        &f.worlds,
+        &id,
+        &[json!({"who": "human", "text": "autre chose"})],
+        &model,
+    )
+    .unwrap();
+    let shown = said_of(&chat::load(&f.worlds, &id).unwrap());
+    assert_eq!(shown[0]["content"], "autre chose");
+}
+
+fn said_of(c: &Value) -> Vec<Value> {
+    said(c)
 }
