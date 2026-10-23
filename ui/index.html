@@ -140,7 +140,8 @@
   .status.accent { color: var(--accent); border-color: var(--accent); }
   .status.muted { color: var(--muted); border-color: var(--line); }
   .status.info { color: var(--info); border-color: var(--info); }
-  .tabs { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
+  /* The tabs wrap instead of scrolling: History must never sit behind an invisible scrollbar. */
+  .tabs { display: flex; flex-wrap: wrap; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
   .tabs button { border: none; border-radius: 0; background: none; color: var(--muted); padding: 5px 12px; font-size: 13px;
                  border-bottom: 2px solid transparent; margin-bottom: -1px; }
   .tabs button:hover { color: var(--text); }
