@@ -56,7 +56,7 @@ fn serve(addr: &str) -> io::Result<()> {
         fennec_os::skill::migrate(&projects)?;
     }
     // Requests from before stats were kept get theirs, once, off the way.
-    std::thread::spawn(|| Store::from_env().map(|s| work::overview(&s)));
+    std::thread::spawn(|| Store::from_env().map(|s| work::overview(&s, 0, "")));
     fleet::watch();
     let listener = TcpListener::bind(addr)?;
     let port = listener.local_addr()?.port();
@@ -241,6 +241,9 @@ fn version() -> Value {
 
 fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
     let store = Store::from_env()?;
+    // The Stats page's filters ride on the query string; the routes match the
+    // path alone.
+    let (path, query) = path.split_once('?').unwrap_or((path, ""));
     let input = || -> io::Result<Value> { serde_json::from_slice(body).map_err(io::Error::other) };
     let field = |v: &Value, k: &str| v[k].as_str().map(str::to_string).unwrap_or_default();
     match (method, path) {
@@ -377,7 +380,16 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
         ("POST", "/api/page") => work::page(&store, &field(&input()?, "id")),
         ("POST", "/api/changes") => work::changes(&store, &field(&input()?, "id")),
         ("POST", "/api/journal") => work::journal(&store, &field(&input()?, "id")),
-        ("GET", "/api/stats") => work::overview(&store),
+        ("GET", "/api/stats") => {
+            // The Stats page's filters: the period (0: all) and the project.
+            let days = query_param(query, "days")
+                .and_then(|d| d.parse().ok())
+                .unwrap_or(0);
+            let project = query_param(query, "project")
+                .map(percent_decode)
+                .unwrap_or_default();
+            work::overview(&store, days, &project)
+        }
         ("POST", "/api/retry") => {
             work::retry(&store, &field(&input()?, "id"))?;
             Ok(json!({}))
@@ -796,6 +808,35 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
         }
         _ => Err(io::Error::other("unknown route")),
     }
+}
+
+/// The value of `key` in a query string, `days=7&project=%2Fp`.
+fn query_param<'a>(query: &'a str, key: &str) -> Option<&'a str> {
+    query.split('&').find_map(|kv| {
+        kv.split_once('=')
+            .filter(|(k, _)| *k == key)
+            .map(|(_, v)| v)
+    })
+}
+
+/// `%XX` back to its byte: the UI sends project paths encoded.
+fn percent_decode(s: &str) -> String {
+    let b = s.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'%'
+            && i + 2 < b.len()
+            && let Ok(n) = u8::from_str_radix(&s[i + 1..i + 3], 16)
+        {
+            out.push(n);
+            i += 3;
+            continue;
+        }
+        out.push(b[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 /// One level of the folder browser used to pick a project in a few clicks:

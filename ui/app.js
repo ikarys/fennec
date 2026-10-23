@@ -2153,6 +2153,9 @@ function showDetail(found) {
     detailed = "";
     chatBox = null;
     if (page) {
+      // A page is not a place for the compose form to sit open: it would
+      // shadow the page's own project filter and take the address back.
+      $("compose").close();
       // A page stays drawn while its fields are filled: redraw only on entry.
       const key = page + "|" + $("project").value;
       if (key !== shownPageKey) {
@@ -2326,6 +2329,9 @@ window.addEventListener("hashchange", () => {
 $("back").onclick = () => (location.hash = document.body.classList.contains("chats") ? "#chat" : hashOf($("project").value, ""));
 
 function compose() {
+  // A page is the primary view: the compose form does not sit over it, where
+  // its project choice would take the address back from the page.
+  if (PAGES.includes(where().path)) return;
   $("compose-error").textContent = "";
   $("compose").showModal();
   $("title").value = "";
@@ -2786,13 +2792,20 @@ $("settings-form").onsubmit = async (e) => {
 // Saved until something changes again.
 $("settings-form").oninput = () => ($("settings-saved").textContent = "");
 
-// Stats: what every request cost, per model and per project, and where
-// fennec works in each project, which can be changed here.
+// Stats: what every task cost, per day, per task, per model and per project,
+// and where fennec works in each project, which can be changed here.
 const PLACES = { here: "In the folder", apart: "Apart, next to it" };
 const cell = (text, className = "") => el("td", { textContent: text, className });
 
 async function showStats() {
-  const v = await api("/api/stats");
+  const range = $("stats-range"), project = $("stats-project");
+  if (!project.options.length) {
+    // The project list, once: a filtered answer lists only its project.
+    const all = await api("/api/stats");
+    project.append(new Option(t("All projects"), ""),
+      ...all.projects.map((p) => new Option(p.name, p.path)));
+  }
+  const v = await api(`/api/stats?days=${range.value}&project=${encodeURIComponent(project.value)}`);
   const a = v.all;
   const tile = (value, label) => el("div", { className: "tile" }, el("b", { textContent: value }), el("span", { textContent: label }));
   $("stats-tiles").replaceChildren(
@@ -2800,6 +2813,8 @@ async function showStats() {
     tile(duration(a.ms ?? 0), t("of model")),
     tile(compact(a.sent), t("tokens sent · {0} % cached", percent(a.cached, a.sent))),
     tile(compact(a.received), t("tokens generated · {0}", speed(a) || "—")));
+  $("stats-days").replaceChildren(...v.by_day.map((d) => el("tr", {},
+    el("th", { textContent: d.day }), cell(compact(d.sent)), cell(compact(d.received)))));
   const fastest = Math.max(1, ...v.models.map(tps));
   $("stats-models").replaceChildren(...v.models.map((m) => el("tr", {},
     el("th", { textContent: m.name }), cell(number(m.turns)), cell(compact(m.sent)),
@@ -2828,7 +2843,14 @@ async function showStats() {
       cell(number(p.requests)), cell(number(p.landed)), cell(number(p.failed), p.failed ? "bad" : ""),
       cell(number(p.failed_attempts)), cell(duration(p.ms ?? 0)), cell(compact(p.sent)));
   }));
+  $("stats-tasks").replaceChildren(...v.tasks.map((x) => el("tr", {},
+    el("th", { textContent: x.title, title: x.title }), cell(x.project), cell(x.models),
+    cell(compact(x.sent)), cell(compact(x.received)),
+    el("td", {}, el("span", { className: "bar", style: `--p:${percent(x.cached, x.sent)}%` }), `${percent(x.cached, x.sent)} %`),
+    cell(duration(x.ms ?? 0)))));
 }
+$("stats-range").onchange = () => showStats().catch((e) => ($("stats-error").textContent = e.message));
+$("stats-project").onchange = () => showStats().catch((e) => ($("stats-error").textContent = e.message));
 // One project's page, above its requests: read when it is chosen, not at each refresh.
 let paged = "";
 async function showPage(path) {
