@@ -948,10 +948,16 @@ function conversation(item) {
   // The conversation in full, what fennec read included, is a discussion
   // like the Agent's: it opens there.
   const full = item.chat ? el("a", { className: "link", href: "#chat/" + item.chat, textContent: t("Follow the conversation") }) : null;
-  if (!said.length) return full && el("div", { className: "thread" }, full);
+  // The conversation waits on the person (a folder outside the project, a
+  // rule's call): answered there, where the question and its buttons are.
+  const p = item.asks;
+  const ask = p && item.chat ? el("div", { className: "ask" },
+    el("span", { className: "muted", textContent: t("fennec asks: {0}", p.path ?? p.call ?? p.target ?? "") }),
+    el("a", { className: "link", href: "#chat/" + item.chat, textContent: t("Answer in the conversation") })) : null;
+  if (!said.length) return full && el("div", { className: "thread" }, ask ?? full);
   return el("div", { className: "thread" }, ...said.map((m) =>
     el("div", { className: m.who === "human" ? "said human" : "said" },
-      el("span", { className: "label", textContent: m.who === "human" ? t("You") : "fennec" }), ...rich(m.text))), full);
+      el("span", { className: "label", textContent: m.who === "human" ? t("You") : "fennec" }), ...rich(m.text))), ask ?? full);
 }
 
 // A button says the act in a word; where it goes is its title.

@@ -626,7 +626,7 @@
   .step.said p { margin: 6px 0 0; white-space: pre-wrap; }
   .chat .thinking { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px;
                     padding: 2px 0 6px; }
-  .chat .ask { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 2px 0 6px;
+  :is(.chat, .thread) .ask { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 2px 0 6px;
                padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); }
   .chat .ask code { font-size: 13px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .chat .ask .muted { font-size: 12px; }

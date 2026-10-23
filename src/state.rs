@@ -581,6 +581,18 @@ pub(crate) fn is_working(request: &Value) -> bool {
     )
 }
 
+/// What the task's conversation waits on the person for (a folder to open, a
+/// rule's call): it is answered in the conversation, so the card points
+/// there instead of reading as "fennec is answering".
+fn asks(request: &Value) -> Value {
+    let chat = request["chat"]
+        .as_str()
+        .filter(|_| request["status"] == "thinking")
+        .and_then(|id| fennec_os::chat::load(&fennec_os::world::Worlds::from_env().ok()?, id).ok());
+    chat.filter(|c| c["status"] == "waiting")
+        .map_or(Value::Null, |c| c["pending"].clone())
+}
+
 /// Whether a request's ready work sits in the project folder itself.
 fn in_folder(request: &Value) -> bool {
     let worlds = fennec_os::world::Worlds::from_env();
@@ -674,7 +686,7 @@ fn classify(requests: &[(String, Value)], projects_all: &[Value]) -> Value {
             json!({"id": id, "kind": kind, "project": name(r["project"].as_str().unwrap_or("")), "path": r["project"],
                    "title": label, "description": body,
                    "images": image_lines(r["text"].as_str().unwrap_or("")).collect::<Vec<_>>(), "rules": r["rules"], "checks": r["verify"], "team": r["team"],
-                   "thread": r["thread"], "chat": r["chat"], "stats": r["stats"], "since": r["since"], "picked": r["picked"],
+                   "thread": r["thread"], "chat": r["chat"], "asks": asks(r), "stats": r["stats"], "since": r["since"], "picked": r["picked"],
                    // As the work reads it: said in the conversation, else
                    // the request as fennec restated it.
                    "done_when": ([&r["done_when"], &r["brief"], &r["ahead"]].into_iter().find(|v| v.is_string()))})

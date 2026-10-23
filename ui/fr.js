@@ -148,6 +148,7 @@ const FR = {
   "Follow the conversation": "Suivre la conversation",
   "This discussion shapes a task: answer on its page.": "Cette discussion prépare une tâche : réponds sur sa page.",
   "Open the task": "Ouvrir la tâche",
+  "Answer in the conversation": "Répondre dans la conversation",
   "Make it a task": "En faire une tâche",
   "Make {0} tasks of it": "En faire {0} tâches",
   "Making: the work is written and run, try after try.": "Réalisation : le travail est écrit et exécuté, essai après essai.",
