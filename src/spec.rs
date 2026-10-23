@@ -918,7 +918,9 @@ pub fn ask(worlds: &Worlds, id: &str, question: &str, model: &dyn Model) -> io::
 }
 
 const DISCUSS: &str = "You help a person shape a request for a team of AI developers, before \
-any work starts. Talk with them in their language, briefly, like a colleague. Most requests are \
+any work starts. Talk with them in their language, briefly, like a colleague. You may look at \
+the project first with read_file and shell (read-only): a few reads to see what the request \
+touches, not to do the work. Most requests are \
 clear enough: if a careful developer could build a sound version of it, it is clear. Ask only \
 when you could not start at all (what kind of thing to build is open), in one or two sentences \
 of what you understood and the one or two questions that matter, with concrete options; never \
@@ -957,10 +959,12 @@ pub enum Discussed {
     ),
 }
 
-/// `thread`: `{"who": "human" | "fennec", "text"}` in order. One model call,
-/// no world: the conversation must answer in seconds, not minutes. The
-/// exchange comes back too, as `provider::ask` records it.
+/// `thread`: `{"who": "human" | "fennec", "text"}` in order. No world: the
+/// model may read the project, its folder mounted read-only, a few steps at
+/// most (see [`look`]), then it answers. The exchange comes back too, as
+/// `provider::ask` records it.
 pub fn discuss(
+    worlds: &Worlds,
     project: &Path,
     thread: &[Value],
     model: &dyn Model,
@@ -1007,7 +1011,7 @@ pub fn discuss(
         };
         messages.push(json!({"role": role, "content": turn["text"]}));
     }
-    let (mut content, mut exchange) = crate::provider::ask(model, &messages)?;
+    let (mut content, mut exchange) = look(worlds, project, model, &messages)?;
     // A model trained on tools reaches for them here, where it has none
     // (seen: `<tool_call><function=Read>` as its whole reply, shown to the
     // person as a question). That is no message for them: asked once more.
@@ -1048,10 +1052,75 @@ pub fn discuss(
     Ok((said, exchange))
 }
 
-/// Said when the model wrote tool calls in a conversation that has none.
-const NO_TOOLS: &str = "You have no tools in this conversation: you cannot read files or run \
-anything. Answer from what you were told: the brief line if the request is clear, otherwise \
-your question.";
+/// Said when the model wrote tool calls as text instead of making them.
+const NO_TOOLS: &str = "Your tool calls were written as text, so none ran. Answer now from \
+what you know: the brief line if the request is clear, otherwise your question.";
+
+/// Reads a discussion may make before it answers: enough to see the code
+/// it talks about, not to do the work.
+const LOOKS: usize = 8;
+
+/// Said when the reads are spent.
+const ANSWER_NOW: &str = "<system-reminder>No more reads: answer now, from what you read.\
+</system-reminder>";
+
+/// One turn of a discussion: the model reads the project with the tools
+/// that change nothing (read_file, shell), the folder mounted read-only and
+/// the person's rules checked, then answers. A conversation that cannot
+/// look at the code guesses, or writes calls it has no tool for.
+fn look(
+    worlds: &Worlds,
+    project: &Path,
+    model: &dyn Model,
+    messages: &[Value],
+) -> io::Result<(String, Value)> {
+    let tools = Value::Array(crate::tools::definitions(false));
+    let mut engine = agent::Engine::new(model, Vec::new());
+    engine.guard = Some(crate::guard::Guard::load(project, project, &worlds.home)?);
+    let sandbox = |argv: &[String]| worlds.sandbox_folder(project, &[], &[], false, argv);
+    let mut said = messages.to_vec();
+    let mut answer = String::new();
+    for step in 0..=LOOKS {
+        if step == LOOKS {
+            said.push(agent::harness(ANSWER_NOW));
+        }
+        let (reply, _) = engine.ask(&said, &tools)?;
+        let calls = reply["tool_calls"].as_array().cloned().unwrap_or_default();
+        let content = reply["content"].as_str().unwrap_or("");
+        answer = content
+            .rsplit("</think>")
+            .next()
+            .unwrap_or("")
+            .trim()
+            .to_string();
+        said.push(reply);
+        if calls.is_empty() {
+            // A blank reply is asked again; the engine drops reasoning
+            // for the next call.
+            if answer.is_empty() && step < LOOKS {
+                continue;
+            }
+            break;
+        }
+        if step == LOOKS {
+            break;
+        }
+        for call in &calls {
+            let name = call["function"]["name"].as_str().unwrap_or("");
+            let args: Value = call["function"]["arguments"]
+                .as_str()
+                .and_then(|a| serde_json::from_str(a).ok())
+                .unwrap_or(Value::Null);
+            let out = engine.tool(&sandbox, call);
+            let out = agent::already_read(&said, name, &args, &out).unwrap_or(out);
+            said.push(json!({"role": "tool", "tool_call_id": call["id"], "content": out}));
+        }
+    }
+    Ok((
+        answer,
+        json!({"model": model.label(), "messages": said, "turns": engine.turns}),
+    ))
+}
 
 /// Tool calls written as text, the way Qwen-style templates spell them.
 fn calls_as_text(content: &str) -> bool {
@@ -1200,8 +1269,11 @@ mod tests {
     fn a_discussion_ends_on_a_brief() {
         use super::{Discussed, discuss};
         let empty = std::env::temp_dir();
+        // No call reads anything here: the sandbox is never started.
+        let w = crate::world::Worlds::from_env().unwrap();
         let thread = [json!({"who": "human", "text": "un test"})];
         let (said, exchange) = discuss(
+            &w,
             &empty,
             &thread,
             &Fixed("<think>vague</think>Tu veux tester quoi ? A) un script B) une page"),
@@ -1223,6 +1295,7 @@ mod tests {
         );
         assert_eq!(
             discuss(
+                &w,
                 &empty,
                 &thread,
                 &Fixed("OK.\n`brief: un script bonjour.py qui affiche Bonjour`")
@@ -1238,6 +1311,7 @@ mod tests {
         );
         assert_eq!(
             discuss(
+                &w,
                 &empty,
                 &thread,
                 &Fixed(
@@ -1253,7 +1327,7 @@ mod tests {
                 Some("Script bonjour".into())
             )
         );
-        assert!(discuss(&empty, &thread, &Fixed("<think>only this</think>")).is_err());
+        assert!(discuss(&w, &empty, &thread, &Fixed("<think>only this</think>")).is_err());
         // Tool calls written as text are asked again, without tools.
         struct Seq(std::sync::Mutex<Vec<&'static str>>);
         impl Model for Seq {
@@ -1269,11 +1343,11 @@ mod tests {
         }
         let read = "Je regarde.\n<tool_call>\n<function=Read>\n</function>\n</tool_call>";
         let seq = Seq(std::sync::Mutex::new(vec![read, "`brief: un script`"]));
-        let (said, exchange) = discuss(&empty, &thread, &seq).unwrap();
+        let (said, exchange) = discuss(&w, &empty, &thread, &seq).unwrap();
         assert_eq!(said, Discussed::Brief("un script".into(), None, None, None));
         assert_eq!(exchange["turns"].as_array().unwrap().len(), 2);
         let stubborn = Seq(std::sync::Mutex::new(vec![read, read]));
-        assert!(discuss(&empty, &thread, &stubborn).is_err());
+        assert!(discuss(&w, &empty, &thread, &stubborn).is_err());
     }
 
     #[test]
