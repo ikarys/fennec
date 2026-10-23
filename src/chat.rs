@@ -467,13 +467,17 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
                 })?;
             }
         }
-        let mut window: Vec<Value> = std::iter::once(system)
+        // Framed while a plan is under way, kept: the conversation stays
+        // append-only, so the server's cache holds (see `agent`).
+        if write
+            && engine.open() > 0
+            && let Some(r) = engine.remind(step, max_steps, PLAN)
+        {
+            log.push(r);
+        }
+        let window: Vec<Value> = std::iter::once(system)
             .chain(log[from..].iter().cloned())
             .collect();
-        // Framed at each step while a plan is under way.
-        if write && engine.open() > 0 {
-            window.push(engine.reminder(step, max_steps, PLAN));
-        }
         let was_blank = engine.last_blank;
         let (mut reply, cut) = engine.ask(&window, &tools)?;
         let mut record = engine.turns.last().cloned().unwrap_or_default();
