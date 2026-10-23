@@ -265,7 +265,12 @@ fn talk_now(store: &Store, id: &str) -> io::Result<()> {
     let model = staffed(OpenAi::variants_from_env(1)?.remove(0), project, "frame")?;
     offer_rule(store, id, &request, &model)?;
     let thread = request["thread"].as_array().cloned().unwrap_or_default();
-    let (said, exchange) = spec::discuss(&Worlds::from_env()?, &chat_of(store, id, &request)?, &thread, &model)?;
+    let (said, exchange) = spec::discuss(
+        &Worlds::from_env()?,
+        &chat_of(store, id, &request)?,
+        &thread,
+        &model,
+    )?;
     // ponytail: each turn keeps the whole exchange, the thread resent included;
     // a long conversation could keep only the reply.
     let step = json!({"stage": "talk", "exchange": exchange});
@@ -339,7 +344,12 @@ fn prepare_now(store: &Store, id: &str) -> io::Result<()> {
     let project = Path::new(request["project"].as_str().unwrap_or(""));
     let model = staffed(OpenAi::variants_from_env(1)?.remove(0), project, "frame")?;
     let thread = request["thread"].as_array().cloned().unwrap_or_default();
-    let (said, exchange) = spec::discuss(&Worlds::from_env()?, &chat_of(store, id, &request)?, &thread, &model)?;
+    let (said, exchange) = spec::discuss(
+        &Worlds::from_env()?,
+        &chat_of(store, id, &request)?,
+        &thread,
+        &model,
+    )?;
     store.update(id, |r| {
         // Reworded, launched or answered meanwhile: this turn is out of date.
         if r["status"] != "later" || r["thread"] != request["thread"] {
