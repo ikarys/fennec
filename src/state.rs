@@ -674,7 +674,7 @@ fn classify(requests: &[(String, Value)], projects_all: &[Value]) -> Value {
             json!({"id": id, "kind": kind, "project": name(r["project"].as_str().unwrap_or("")), "path": r["project"],
                    "title": label, "description": body,
                    "images": image_lines(r["text"].as_str().unwrap_or("")).collect::<Vec<_>>(), "rules": r["rules"], "checks": r["verify"], "team": r["team"],
-                   "thread": r["thread"], "stats": r["stats"], "since": r["since"], "picked": r["picked"],
+                   "thread": r["thread"], "chat": r["chat"], "stats": r["stats"], "since": r["since"], "picked": r["picked"],
                    // As the work reads it: said in the conversation, else
                    // the request as fennec restated it.
                    "done_when": ([&r["done_when"], &r["brief"], &r["ahead"]].into_iter().find(|v| v.is_string()))})

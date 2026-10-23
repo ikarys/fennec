@@ -665,6 +665,29 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
                 .find(|p| p == folder)
                 .ok_or_else(|| io::Error::other("this folder is not a project"))?;
             let id = store.add_request(&project, &transcript(&chat)?, "", &[], true)?;
+            // The task's conversation is this one: it goes on there, with
+            // all it read, and the task's record of it is what was said.
+            let chat_id = chat["id"].as_str().unwrap_or("").to_string();
+            let thread: Vec<Value> = chat["messages"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter(|m| m["harness"] != true)
+                .filter_map(|m| {
+                    let text = m["content"].as_str().filter(|t| !t.trim().is_empty())?;
+                    let who = match m["role"].as_str()? {
+                        "user" => "human",
+                        "assistant" => "fennec",
+                        _ => return None,
+                    };
+                    Some(json!({"who": who, "text": text}))
+                })
+                .collect();
+            store.update(&id, |r| {
+                r["chat"] = json!(chat_id);
+                r["thread"] = json!(thread);
+            })?;
+            fennec_os::chat::link(&Worlds::from_env()?, &chat_id, &id)?;
             Ok(json!({"id": id}))
         }
         ("POST", "/api/rules") => {
