@@ -1112,7 +1112,8 @@ function card(item) {
       : item.framed ? t("Read what fennec understood, then validate it or correct it.")
       : item.ahead_failed ? t("fennec could not restate it: edit it to try again, or start it now.")
       : t("fennec restates it when the model is free; you validate it then.");
-    add(el("div", { className: item.fleet ? "proved" : "muted", textContent: state }),
+    // What was said already (a task made from a discussion), then where it stands.
+    add(conversation(item), el("div", { className: item.fleet ? "proved" : "muted", textContent: state }),
       item.split_error ? el("div", { className: "error", textContent: t("Could not split it: {0}", item.split_error) }) : null,
       // What it builds on: the Fleet starts it once those are committed.
       item.after?.length ? el("div", { className: "muted", textContent: t("Starts once these are committed: {0}", item.after.join(", ")) }) : null,
@@ -1574,7 +1575,9 @@ function showChat(c) {
   if (box.threadKey !== threadKey) {
     box.threadKey = threadKey;
     const opened = [...box.thread.querySelectorAll("details")].map((d) => d.open);
-    box.thread.replaceChildren(...chatThread(c, box.composer));
+    // A task's conversation is answered on the task's page: no edit or
+    // regenerate here, whose turn would never reach the framing.
+    box.thread.replaceChildren(...chatThread(c, c.task ? null : box.composer));
     if (thinking) box.thread.append(el("div", { className: "thinking" }, el("span", { className: "dot" }), t("fennec is answering…")));
     // A turn that waits on the person is the last thing on screen: on top of
     // the exchange, it would read as a turn that stopped answering.
