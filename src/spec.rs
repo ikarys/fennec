@@ -917,30 +917,26 @@ pub fn ask(worlds: &Worlds, id: &str, question: &str, model: &dyn Model) -> io::
     Ok(answer.to_string())
 }
 
-const DISCUSS: &str = "You help a person shape a request for a team of AI developers, before \
-any work starts. Talk with them in their language, briefly, like a colleague. You may look at \
-the project first with read_file and shell (read-only): a few reads to see what the request \
-touches, not to do the work. Most requests are \
+const DISCUSS: &str = "This conversation shapes a task for a team of AI developers, before any \
+work starts: the folder stays read-only here, the team works on a copy afterwards. Read what the \
+request touches first (read_file, shell), a few reads, not the work itself. Most requests are \
 clear enough: if a careful developer could build a sound version of it, it is clear. Ask only \
 when you could not start at all (what kind of thing to build is open), in one or two sentences \
 of what you understood and the one or two questions that matter, with concrete options; never \
 invent the product. Layout, style, update rate, file names and other details are the \
-developer's to settle, not questions. Once it is clear, a clear first message included, reply \
-with exactly one line and nothing else:\n\
-`brief: <the whole request restated precisely, with everything agreed in this conversation, \
-in their language>`\n\
-then one more line naming it the way a person titles a ticket:\n\
-`title: <a short label, at most eight words, in their language>`";
+developer's to settle, not questions. Once it is clear, a clear first message included, call \
+`brief`: the whole request restated precisely, with everything agreed and what you read that \
+matters, in their language, and a short title the way a person titles a ticket.";
 
-/// Asked after `DISCUSS` when the person keeps skills: the work then sees
+/// Said after `DISCUSS` when the person keeps skills: the work then sees
 /// only the ones that serve this request.
-const PICK: &str = "\n\nThe person keeps these skills for the developers. With the brief, add \
-one more line naming the ones this request needs, or none:\n`skills: <names, comma separated>`\n";
+const PICK: &str = "\n\nThe person keeps these skills for the developers; name in `brief` the \
+ones this request needs, or none:\n";
 
-/// Asked with `PICK` when the team has solve roles: which of them this
+/// Said with `PICK` when the team has solve roles: which of them this
 /// request needs. The work then runs exactly those, in team order.
-const MARK: &str = "\n\nThe team's developers are:\n{}With the brief, add one more line naming \
-the ones this request needs, or none:\n`roles: <keys, comma separated>`\n";
+const MARK: &str = "\n\nThe team's developers are below; name in `brief` the ones this \
+request needs:\n";
 
 /// One turn of shaping a request before work starts: either a message for
 /// the human, or the brief the work takes.
@@ -959,19 +955,11 @@ pub enum Discussed {
     ),
 }
 
-/// `thread`: `{"who": "human" | "fennec", "text"}` in order. No world: the
-/// model may read the project, its folder mounted read-only, a few steps at
-/// most (see [`look`]), then it answers. The exchange comes back too, as
-/// `provider::ask` records it.
-pub fn discuss(
-    worlds: &Worlds,
-    project: &Path,
-    thread: &[Value],
-    model: &dyn Model,
-) -> io::Result<(Discussed, Value)> {
-    let context = context(project);
+/// What a chat shaping a task is told, as its mode (see [`crate::chat`]):
+/// how to shape it, the skills and roles to pick from, what the project is.
+pub(crate) fn task_mode(project: &Path) -> io::Result<String> {
     // The roles that shaped requests before work starts speak here now.
-    let (roles, team) = team::brief(project, "frame")?;
+    let (roles, _) = team::brief(project, "frame")?;
     let kept = crate::skill::chosen(Some(project))?;
     let pick = if kept.is_empty() {
         String::new()
@@ -982,14 +970,7 @@ pub fn discuss(
             .collect();
         format!("{PICK}{list}")
     };
-    // The team's solve roles, so the PM marks which of them this request
-    // needs; the work then runs exactly those.
-    // All of them, the usual chain included: the PM marks what the request
-    // needs, and what it does not mark stays out of the work.
-    let chain = team::members(project)?
-        .into_iter()
-        .filter(|r| r.stage == "solve")
-        .collect::<Vec<_>>();
+    let chain = solve_roles(project)?;
     let mark = if chain.is_empty() {
         String::new()
     } else {
@@ -999,133 +980,140 @@ pub fn discuss(
             .collect();
         format!("{MARK}{list}")
     };
-    let keys: Vec<String> = chain.iter().map(|r| r.key.clone()).collect();
-    let mut messages = vec![
-        json!({"role": "system", "content": format!("{DISCUSS}{pick}{mark}\n\n{context}{roles}")}),
-    ];
-    for turn in thread {
-        let role = if turn["who"] == "human" {
-            "user"
-        } else {
-            "assistant"
+    Ok(format!(
+        "{DISCUSS}{pick}{mark}\n\n{}{roles}",
+        context(project)
+    ))
+}
+
+/// The team's solve roles: the PM marks which of them a request needs, all
+/// of them offered, the usual chain included; what it does not mark stays
+/// out of the work.
+fn solve_roles(project: &Path) -> io::Result<Vec<team::Role>> {
+    Ok(team::members(project)?
+        .into_iter()
+        .filter(|r| r.stage == "solve")
+        .collect())
+}
+
+/// The tool that ends a task's conversation: the request as the work takes it.
+pub(crate) fn brief_tool() -> Value {
+    json!({"type": "function", "function": {
+        "name": "brief",
+        "description": "The request is clear: hand it to the team. Ends the conversation.",
+        "parameters": {"type": "object", "required": ["brief", "title"], "properties": {
+            "brief": {"type": "string", "description":
+                "the whole request restated precisely, with everything agreed, in their language"},
+            "title": {"type": "string", "description":
+                "a short label, at most eight words, in their language"},
+            "skills": {"type": "array", "items": {"type": "string"},
+                       "description": "the skills this request needs, among those listed"},
+            "roles": {"type": "array", "items": {"type": "string"},
+                      "description": "the keys of the developers this request needs"}
+        }}
+    }})
+}
+
+/// A turn of a task's conversation, `chat` being the task's chat in its
+/// project folder (see [`crate::chat::follow`]): the same conversation as
+/// a discussion's, read-only, that ends on `brief`. It goes on from what it
+/// already read, so its prefix stays in the server's cache. `thread`:
+/// `{"who": "human" | "fennec", "text"}` in order, the task's record of it.
+/// The exchange comes back too, as `provider::ask` records it.
+pub fn discuss(
+    worlds: &Worlds,
+    chat: &str,
+    thread: &[Value],
+    model: &dyn Model,
+) -> io::Result<(Discussed, Value)> {
+    let before = crate::chat::follow(worlds, chat, thread)?;
+    crate::chat::answer(worlds, chat, model, TALK_STEPS)?;
+    let c = crate::chat::load(worlds, chat)?;
+    let turns: Vec<Value> = c["turns"]
+        .as_array()
+        .map(|t| t[before.min(t.len())..].to_vec())
+        .unwrap_or_default();
+    let project = PathBuf::from(c["folder"].as_str().unwrap_or(""));
+    let (_, team) = team::brief(&project, "frame")?;
+    let exchange = json!({"model": model.label(), "messages": c["messages"], "turns": turns,
+                          "team": team});
+    if let Some(why) = c["error"].as_str() {
+        return Err(io::Error::other(why.to_string()));
+    }
+    let names: Vec<String> = crate::skill::chosen(Some(&project))?
+        .into_iter()
+        .map(|s| s.name)
+        .collect();
+    let keys: Vec<String> = solve_roles(&project)?.into_iter().map(|r| r.key).collect();
+    let given = &c["brief"];
+    if let Some(brief) = given["brief"].as_str().filter(|b| !b.trim().is_empty()) {
+        let among = |v: &Value, known: &[String]| -> Option<Vec<String>> {
+            (!known.is_empty()).then(|| {
+                v.as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|n| n.as_str().map(str::to_string))
+                    .filter(|n| known.contains(n))
+                    .collect()
+            })
         };
-        messages.push(json!({"role": role, "content": turn["text"]}));
+        let title = given["title"]
+            .as_str()
+            .map(str::trim)
+            .filter(|t| !t.is_empty());
+        return Ok((
+            Discussed::Brief(
+                brief.trim().to_string(),
+                given["skills"]
+                    .is_array()
+                    .then(|| among(&given["skills"], &names))
+                    .flatten(),
+                given["roles"]
+                    .is_array()
+                    .then(|| among(&given["roles"], &keys))
+                    .flatten(),
+                title.map(str::to_string),
+            ),
+            exchange,
+        ));
     }
-    let (mut content, mut exchange) = look(worlds, project, model, &messages)?;
-    // A model trained on tools reaches for them here, where it has none
-    // (seen: `<tool_call><function=Read>` as its whole reply, shown to the
-    // person as a question). That is no message for them: asked once more.
-    if calls_as_text(&content) {
-        let mut again = messages.clone();
-        again.push(json!({"role": "assistant", "content": content}));
-        again.push(json!({"role": "user", "content": NO_TOOLS}));
-        let (said, mut second) = crate::provider::ask(model, &again)?;
-        let mut turns = exchange["turns"].as_array().cloned().unwrap_or_default();
-        turns.extend(second["turns"].as_array().cloned().unwrap_or_default());
-        second["turns"] = json!(turns);
-        (content, exchange) = (said, second);
-        if calls_as_text(&content) {
-            return Err(io::Error::other(
-                "the model tried to read the project instead of answering",
-            ));
-        }
-    }
-    exchange["team"] = json!(team);
+    // The last reply: a question for the person, or a brief written as lines
+    // instead of a call.
+    let content = c["messages"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .rev()
+        .find(|m| {
+            m["role"] == "assistant" && m["tool_calls"].as_array().is_none_or(|t| t.is_empty())
+        })
+        .and_then(|m| m["content"].as_str())
+        .unwrap_or("")
+        .to_string();
     if content.is_empty() {
         return Err(io::Error::other("the model gave no answer"));
     }
-    let brief = content
-        .lines()
-        .find_map(|l| l.trim().trim_matches('`').strip_prefix("brief:"))
-        .map(|b| b.trim().trim_matches('`').trim().to_string())
-        .filter(|b| !b.is_empty());
-    let title = content
-        .lines()
-        .find_map(|l| l.trim().trim_matches('`').strip_prefix("title:"))
-        .map(|t| t.trim().trim_matches('`').trim().to_string())
-        .filter(|t| !t.is_empty());
-    let names: Vec<String> = kept.into_iter().map(|s| s.name).collect();
-    let said = match brief {
-        Some(b) => Discussed::Brief(b, picked(&content, &names), marked(&content, &keys), title),
+    let line = |key: &str| {
+        content
+            .lines()
+            .find_map(|l| l.trim().trim_matches('`').strip_prefix(key))
+            .map(|b| b.trim().trim_matches('`').trim().to_string())
+            .filter(|b| !b.is_empty())
+    };
+    let said = match line("brief:") {
+        Some(b) => Discussed::Brief(
+            b,
+            picked(&content, &names),
+            marked(&content, &keys),
+            line("title:"),
+        ),
         None => Discussed::Reply(content),
     };
     Ok((said, exchange))
 }
 
-/// Said when the model wrote tool calls as text instead of making them.
-const NO_TOOLS: &str = "Your tool calls were written as text, so none ran. Answer now from \
-what you know: the brief line if the request is clear, otherwise your question.";
-
-/// Reads a discussion may make before it answers: enough to see the code
-/// it talks about, not to do the work.
-const LOOKS: usize = 8;
-
-/// Said when the reads are spent.
-const ANSWER_NOW: &str = "<system-reminder>No more reads: answer now, from what you read.\
-</system-reminder>";
-
-/// One turn of a discussion: the model reads the project with the tools
-/// that change nothing (read_file, shell), the folder mounted read-only and
-/// the person's rules checked, then answers. A conversation that cannot
-/// look at the code guesses, or writes calls it has no tool for.
-fn look(
-    worlds: &Worlds,
-    project: &Path,
-    model: &dyn Model,
-    messages: &[Value],
-) -> io::Result<(String, Value)> {
-    let tools = Value::Array(crate::tools::definitions(false));
-    let mut engine = agent::Engine::new(model, Vec::new());
-    engine.guard = Some(crate::guard::Guard::load(project, project, &worlds.home)?);
-    let sandbox = |argv: &[String]| worlds.sandbox_folder(project, &[], &[], false, argv);
-    let mut said = messages.to_vec();
-    let mut answer = String::new();
-    for step in 0..=LOOKS {
-        if step == LOOKS {
-            said.push(agent::harness(ANSWER_NOW));
-        }
-        let (reply, _) = engine.ask(&said, &tools)?;
-        let calls = reply["tool_calls"].as_array().cloned().unwrap_or_default();
-        let content = reply["content"].as_str().unwrap_or("");
-        answer = content
-            .rsplit("</think>")
-            .next()
-            .unwrap_or("")
-            .trim()
-            .to_string();
-        said.push(reply);
-        if calls.is_empty() {
-            // A blank reply is asked again; the engine drops reasoning
-            // for the next call.
-            if answer.is_empty() && step < LOOKS {
-                continue;
-            }
-            break;
-        }
-        if step == LOOKS {
-            break;
-        }
-        for call in &calls {
-            let name = call["function"]["name"].as_str().unwrap_or("");
-            let args: Value = call["function"]["arguments"]
-                .as_str()
-                .and_then(|a| serde_json::from_str(a).ok())
-                .unwrap_or(Value::Null);
-            let out = engine.tool(&sandbox, call);
-            let out = agent::already_read(&said, name, &args, &out).unwrap_or(out);
-            said.push(json!({"role": "tool", "tool_call_id": call["id"], "content": out}));
-        }
-    }
-    Ok((
-        answer,
-        json!({"model": model.label(), "messages": said, "turns": engine.turns}),
-    ))
-}
-
-/// Tool calls written as text, the way Qwen-style templates spell them.
-fn calls_as_text(content: &str) -> bool {
-    content.contains("<tool_call>") || content.contains("<function=")
-}
+/// A task's conversation turn: reads and a reply, or the brief.
+const TALK_STEPS: usize = 30;
 
 /// The `skills:` line of a reply, kept to the names the person keeps.
 fn picked(content: &str, kept: &[String]) -> Option<Vec<String>> {
@@ -1263,91 +1251,6 @@ mod tests {
         fn variant<'s>(&'s self, _: &str) -> Box<dyn Model + 's> {
             Box::new(Fixed(self.0))
         }
-    }
-
-    #[test]
-    fn a_discussion_ends_on_a_brief() {
-        use super::{Discussed, discuss};
-        let empty = std::env::temp_dir();
-        // No call reads anything here: the sandbox is never started.
-        let w = crate::world::Worlds::from_env().unwrap();
-        let thread = [json!({"who": "human", "text": "un test"})];
-        let (said, exchange) = discuss(
-            &w,
-            &empty,
-            &thread,
-            &Fixed("<think>vague</think>Tu veux tester quoi ? A) un script B) une page"),
-        )
-        .unwrap();
-        // What was sent and what came back, reasoning included, for the human.
-        let messages = exchange["messages"].as_array().unwrap();
-        assert_eq!(messages[1]["content"], "un test");
-        assert!(messages[2]["content"].as_str().unwrap().contains("vague"));
-        assert_eq!(exchange["turns"].as_array().unwrap().len(), 1);
-        // The framing roles are briefed into the conversation, and named.
-        let system = messages[0]["content"].as_str().unwrap();
-        for name in exchange["team"].as_array().unwrap() {
-            assert!(system.contains(&format!("As {} on the team", name.as_str().unwrap())));
-        }
-        assert_eq!(
-            said,
-            Discussed::Reply("Tu veux tester quoi ? A) un script B) une page".into())
-        );
-        assert_eq!(
-            discuss(
-                &w,
-                &empty,
-                &thread,
-                &Fixed("OK.\n`brief: un script bonjour.py qui affiche Bonjour`")
-            )
-            .unwrap()
-            .0,
-            Discussed::Brief(
-                "un script bonjour.py qui affiche Bonjour".into(),
-                None,
-                None,
-                None
-            )
-        );
-        assert_eq!(
-            discuss(
-                &w,
-                &empty,
-                &thread,
-                &Fixed(
-                    "`brief: un script bonjour.py qui affiche Bonjour`\n`title: Script bonjour`"
-                )
-            )
-            .unwrap()
-            .0,
-            Discussed::Brief(
-                "un script bonjour.py qui affiche Bonjour".into(),
-                None,
-                None,
-                Some("Script bonjour".into())
-            )
-        );
-        assert!(discuss(&w, &empty, &thread, &Fixed("<think>only this</think>")).is_err());
-        // Tool calls written as text are asked again, without tools.
-        struct Seq(std::sync::Mutex<Vec<&'static str>>);
-        impl Model for Seq {
-            fn chat(&self, _: &[Value], _: &Value) -> io::Result<Value> {
-                Ok(json!({"content": self.0.lock().unwrap().remove(0)}))
-            }
-            fn label(&self) -> String {
-                "seq".into()
-            }
-            fn variant<'s>(&'s self, _: &str) -> Box<dyn Model + 's> {
-                unreachable!()
-            }
-        }
-        let read = "Je regarde.\n<tool_call>\n<function=Read>\n</function>\n</tool_call>";
-        let seq = Seq(std::sync::Mutex::new(vec![read, "`brief: un script`"]));
-        let (said, exchange) = discuss(&w, &empty, &thread, &seq).unwrap();
-        assert_eq!(said, Discussed::Brief("un script".into(), None, None, None));
-        assert_eq!(exchange["turns"].as_array().unwrap().len(), 2);
-        let stubborn = Seq(std::sync::Mutex::new(vec![read, read]));
-        assert!(discuss(&w, &empty, &thread, &stubborn).is_err());
     }
 
     #[test]
