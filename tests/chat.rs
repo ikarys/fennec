@@ -30,6 +30,35 @@ impl Model for Replies {
     }
 }
 
+/// The messages the page shows: what the harness added (the mode, the
+/// reminders, the nudges) aside.
+fn said(c: &Value) -> Vec<Value> {
+    c["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|m| m["harness"] != true)
+        .cloned()
+        .collect()
+}
+
+/// The harness's nudges back to the work: neither the mode nor a reminder.
+fn sent_back(c: &Value) -> Vec<Value> {
+    c["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|m| {
+            let t = m["content"].as_str().unwrap_or("");
+            m["harness"] == true
+                && !t.starts_with("<system-reminder>\nStep")
+                && !t.starts_with("The folder is read-only")
+                && !t.starts_with("They allowed changes")
+        })
+        .cloned()
+        .collect()
+}
+
 fn call(id: &str, name: &str, args: Value) -> Value {
     json!({"content": null, "tool_calls": [{"id": id, "type": "function",
            "function": {"name": name, "arguments": args.to_string()}}]})
@@ -71,7 +100,7 @@ fn a_chat_reads_and_writes_its_folder_and_ends_on_a_reply() {
     let c = chat::load(&f.worlds, id).unwrap();
     assert_eq!(c["status"], "idle");
     assert!(c["error"].is_null(), "{}", c["error"]);
-    let messages = c["messages"].as_array().unwrap();
+    let messages = said(&c);
     let read = messages[2]["content"].as_str().unwrap();
     assert!(read.contains("alpha"), "{read}");
     assert!(
@@ -108,7 +137,8 @@ fn a_chat_starts_read_only_until_changes_are_allowed() {
     chat::answer(&f.worlds, id, &model, 10).unwrap();
     assert!(!folder.join("b.txt").exists(), "read-only by default");
     let c = chat::load(&f.worlds, id).unwrap();
-    let ran = c["messages"][2]["content"].as_str().unwrap();
+    let shown = said(&c);
+    let ran = shown[2]["content"].as_str().unwrap();
     assert!(ran.contains("alpha") && ran.contains("Read-only"), "{ran}");
     // Allowed: the same command now writes.
     chat::write(&f.worlds, id, true).unwrap();
@@ -253,7 +283,8 @@ fn a_refused_path_is_not_touched_and_asks_again() {
     assert!(c["error"].is_null(), "{}", c["error"]);
     assert_eq!(c["grants"], json!([other.display().to_string()]));
     // The refusal is the refused call's tool result.
-    let refused = &c["messages"].as_array().unwrap()[2];
+    let shown = said(&c);
+    let refused = &shown[2];
     assert_eq!(refused["role"], "tool");
     assert!(refused["content"].as_str().unwrap().contains("refused"));
 }
@@ -510,12 +541,7 @@ fn an_approved_plan_allows_changes_within_the_turn() {
     assert!(folder.join("b.txt").exists(), "approved: the turn writes");
     assert_eq!(c["criteria"][0]["text"], "Copier a.txt");
     assert_eq!(c["criteria"][0]["state"], "done");
-    let sent_back = c["messages"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .filter(|m| m["harness"] == true)
-        .count();
+    let sent_back = sent_back(&c).len();
     assert_eq!(
         sent_back, 1,
         "a reply with the plan unfinished goes back to it"
@@ -553,12 +579,7 @@ fn the_plan_checks_run_after_a_change_and_failures_go_back() {
     assert!(c["error"].is_null(), "{}", c["error"]);
     assert_eq!(c["checks"]["results"][0]["command"], "test -f b.txt");
     assert_eq!(c["checks"]["results"][0]["exit"], 0);
-    let sent_back: Vec<&Value> = c["messages"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .filter(|m| m["harness"] == true)
-        .collect();
+    let sent_back = sent_back(&c);
     assert_eq!(sent_back.len(), 1, "{sent_back:?}");
     assert!(
         sent_back[0]["content"]
@@ -586,9 +607,8 @@ fn a_message_said_again_drops_what_followed_it() {
     let model = Replies(Mutex::new(VecDeque::from([json!({"content": "3"})])));
     chat::answer(&f.worlds, id, &model, 10).unwrap();
     let c = chat::load(&f.worlds, id).unwrap();
-    let said: Vec<&str> = c["messages"]
-        .as_array()
-        .unwrap()
+    let shown = said(&c);
+    let said: Vec<&str> = shown
         .iter()
         .map(|m| m["content"].as_str().unwrap())
         .collect();

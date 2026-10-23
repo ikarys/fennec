@@ -13,7 +13,7 @@ use crate::agent;
 use crate::provider::Model;
 use crate::review::{self, normalise};
 use crate::rules::{self, HARNESS_DIR, Kind, Rule};
-use crate::solve::{self, Task};
+use crate::solve::{self, Follow, Task};
 use crate::team;
 use crate::world::{World, Worlds};
 use crate::{schedule, sleep};
@@ -756,7 +756,20 @@ fn rework(
     let Some(run) = spec["run"].as_str().map(str::to_string) else {
         return Err(io::Error::other(format!("spec {id} has no ready run")));
     };
-    let mut record = run_spec(worlds, &spec, ask, &run, models, max_steps, log)?;
+    // Its roles go on in their own conversations: what they read and did is
+    // still there, and the server still caches it.
+    let follow = review::load(worlds, &run).ok().and_then(|r| {
+        let attempts = r["attempts"].as_array()?;
+        let attempt = attempts
+            .iter()
+            .find(|a| a["world"] == r["winner"])
+            .or(attempts.last())?;
+        Some(Follow {
+            ask: ask.trim().to_string(),
+            roles: attempt["roles"].as_array().cloned().unwrap_or_default(),
+        })
+    });
+    let mut record = run_spec(worlds, &spec, ask, &run, follow, models, max_steps, log)?;
     // Forked from the run, but still this spec's: landing drops its world.
     record["spec"] = json!(id);
     let name = record["id"].as_str().unwrap_or("run").to_string();
@@ -781,7 +794,7 @@ fn solve_spec(
     if spec["status"] != "proposed" {
         return Err(io::Error::other(format!("spec {id} is {}", spec["status"])));
     }
-    let record = run_spec(worlds, &spec, why, id, models, max_steps, log)?;
+    let record = run_spec(worlds, &spec, why, id, None, models, max_steps, log)?;
     spec["status"] = json!("accepted");
     spec["run"] = record["winner"].clone();
     // The spec's world stays until the run lands (`solve::land`): a winner
@@ -796,11 +809,13 @@ fn solve_spec(
 }
 
 /// The spec's tests as a task whose attempts fork from `base`.
+#[allow(clippy::too_many_arguments)]
 fn run_spec(
     worlds: &Worlds,
     spec: &Value,
     why: &str,
     base: &str,
+    follow: Option<Follow>,
     models: &[&dyn Model],
     max_steps: usize,
     log: Option<&Path>,
@@ -827,6 +842,7 @@ fn run_spec(
         skills: spec["skills"].is_array().then(|| strings("skills")),
         roles: spec["roles"].is_array().then(|| strings("roles")),
         discussion: spec["discussion"].as_str().map(str::to_string),
+        follow,
     };
     let project = PathBuf::from(spec["project"].as_str().unwrap_or(""));
     solve::solve(worlds, &project, &task, models, max_steps, log)

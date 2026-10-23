@@ -214,7 +214,8 @@ fn speak(worlds: &Worlds, id: &str, at: Option<usize>, text: &str) -> io::Result
             return;
         }
         if let Some(i) = at {
-            if c["messages"][i]["role"] != "user" {
+            // The person's own: a message the harness added is not theirs.
+            if c["messages"][i]["role"] != "user" || c["messages"][i]["harness"] == true {
                 refused = Some("no message of yours at this place");
                 return;
             }
@@ -407,16 +408,17 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
             .collect();
         // Read at each call: the person may allow changes while the turn runs.
         let write = chat["write"] == true;
-        let mut tools = tools::definitions(write);
-        tools.push(if write {
-            tools::criteria_tool()
-        } else {
-            propose_plan()
-        });
+        // The same tools and system message in both modes: allowing changes
+        // mid-chat would otherwise make the server compute the whole
+        // conversation again. The mode is said in the conversation instead,
+        // and a write while it is read-only is refused below.
+        let mut tools = tools::definitions(true);
+        tools.push(tools::criteria_tool());
+        tools.push(propose_plan());
         let tools = Value::Array(tools);
-        let mode = if write { WRITE } else { READ };
+        let mode = if write { WRITE } else { READ }.trim();
         let system = json!({"role": "system",
-                            "content": format!("{SYSTEM}{}{mode}{}", agent::tools_line(worlds), skill::brief(&skills))});
+                            "content": format!("{SYSTEM}{}{}", agent::tools_line(worlds), skill::brief(&skills))});
         let mut log = chat["messages"].as_array().cloned().unwrap_or_default();
         // The model sees the exchange from `window` on: past the last
         // compaction, whose notes open it.
@@ -467,13 +469,28 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
                 })?;
             }
         }
-        // Framed while a plan is under way, kept: the conversation stays
-        // append-only, so the server's cache holds (see `agent`).
+        // What the harness adds before the call is kept in the chat's file,
+        // read again at each step: the conversation stays append-only, so
+        // the server's cache holds (see `agent`). The mode, when it is not
+        // the last one said in what the model sees.
+        let mut added = Vec::new();
+        let said_mode = log[from..].iter().rev().find_map(|m| {
+            let c = m["content"].as_str()?;
+            (m["harness"] == true && (c == READ.trim() || c == WRITE.trim())).then_some(c)
+        });
+        if said_mode != Some(mode) {
+            added.push(agent::harness(mode));
+        }
+        // Framed while a plan is under way.
         if write
             && engine.open() > 0
             && let Some(r) = engine.remind(step, max_steps, PLAN)
         {
-            log.push(r);
+            added.push(r);
+        }
+        if !added.is_empty() {
+            log.extend(added.iter().cloned());
+            update(worlds, id, |c| push_all(&mut c["messages"], added))?;
         }
         let window: Vec<Value> = std::iter::once(system)
             .chain(log[from..].iter().cloned())
@@ -543,6 +560,13 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
                 said.push(json!({"role": "tool", "tool_call_id": call["id"], "content": answer}));
                 continue;
             }
+            // Offered in both modes, writing only once a plan is approved.
+            if !write && matches!(name, "write_file" | "edit_file" | "criteria") {
+                push(&mut record["tools"], timed(name));
+                said.push(json!({"role": "tool", "tool_call_id": call["id"],
+                    "content": "refused: the folder is read-only until the person approves a plan; propose one with propose_plan"}));
+                continue;
+            }
             // A literal path outside the folder the person chose: ask before
             // the call touches it; opening a folder stays open for the chat.
             if let Some(p) = outside::outside(&folder, &worlds.home, &worlds.ro_paths, name, &args)
@@ -594,6 +618,12 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
                     agent::REPEAT_STOP
                 ));
             }
+            let args: Value = call["function"]["arguments"]
+                .as_str()
+                .and_then(|a| serde_json::from_str(a).ok())
+                .unwrap_or(Value::Null);
+            let result = agent::already_read(log[from..].iter().chain(&said), name, &args, &result)
+                .unwrap_or(result);
             said.push(json!({"role": "tool", "tool_call_id": call["id"], "content": result}));
         }
         let open = engine.open();

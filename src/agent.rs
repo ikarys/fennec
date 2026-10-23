@@ -76,6 +76,11 @@ pub struct Outcome {
     /// Calls a rule wanted the person to approve, refused since nobody was
     /// there: what to allow before trying again.
     pub asked: Vec<Value>,
+    /// Where the model looked from in `messages` (the system message
+    /// aside), past the last compaction; with `read`, what continuing this
+    /// conversation needs (see [`proceed`]).
+    pub from: usize,
+    pub read: Vec<String>,
 }
 
 /// The person's answer to a rule's question, in a chat: `None` when the
@@ -213,6 +218,30 @@ fn met(c: &Value) -> bool {
     matches!(c["state"].as_str(), Some("done" | "passed" | "rule"))
 }
 
+/// A read whose output the model already has, word for word, in what it
+/// sees: a line pointing to it instead of the same lines again. A changed
+/// file reads differently, and a read the compaction dropped is no longer
+/// seen, so the whole file comes back in both cases. Short reads and errors
+/// are sent as they are: the pointer would cost about as much.
+pub(crate) fn already_read<'v>(
+    seen: impl IntoIterator<Item = &'v Value>,
+    name: &str,
+    args: &Value,
+    result: &str,
+) -> Option<String> {
+    if name != "read_file" || result.len() < 256 || result.starts_with("error") {
+        return None;
+    }
+    seen.into_iter()
+        .any(|m| m["role"] == "tool" && m["content"].as_str() == Some(result))
+        .then(|| {
+            format!(
+                "{}: unchanged since you read it above, the same lines: use that read.",
+                args["path"].as_str().unwrap_or("the file")
+            )
+        })
+}
+
 /// A message the harness adds to the conversation: sent as the person's,
 /// hidden from them on the page.
 pub(crate) fn harness(text: &str) -> Value {
@@ -275,12 +304,15 @@ pub(crate) struct Engine<'a> {
     pub(crate) tools: Option<Vec<crate::team::Tool>>,
     /// The last reminder added, its step line aside.
     reminded: String,
+    /// Where the model looks from in the log, past the last compaction.
+    from: usize,
 }
 
 impl<'a> Engine<'a> {
     pub(crate) fn new(model: &'a dyn Model, criteria: Vec<Value>) -> Self {
         Self {
             reminded: String::new(),
+            from: 0,
             model,
             criteria,
             watch: Watch::default(),
@@ -905,14 +937,61 @@ pub struct Resume {
     pub read: Vec<String>,
 }
 
+impl Resume {
+    /// A finished conversation, ready to go on: `messages` with the system
+    /// message first, as an [`Outcome`] or a run record keeps them.
+    pub fn of(
+        goal: &str,
+        messages: &[Value],
+        from: usize,
+        criteria: Vec<Value>,
+        read: Vec<String>,
+    ) -> Self {
+        let messages = match messages.first() {
+            Some(m) if m["role"] == "system" => messages[1..].to_vec(),
+            _ => messages.to_vec(),
+        };
+        let from = from.min(messages.len());
+        Self {
+            goal: goal.to_string(),
+            messages,
+            from,
+            criteria,
+            read,
+        }
+    }
+
+    /// A role's conversation as a run record keeps it (`roles[]` of an
+    /// attempt); `None` when it holds none.
+    pub fn of_record(goal: &str, role: &Value) -> Option<Self> {
+        let messages = role["messages"].as_array().filter(|m| m.len() > 1)?;
+        let read = role["read"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|r| r.as_str().map(str::to_string))
+            .collect();
+        Some(Self::of(
+            goal,
+            messages,
+            role["from"].as_u64().unwrap_or(0) as usize,
+            role["criteria"].as_array().cloned().unwrap_or_default(),
+            read,
+        ))
+    }
+}
+
 /// A crashed attempt back at work: the same world (its changes are kept),
 /// its criteria and its reads, the conversation on where it stopped — its
-/// last reply's calls, not run yet, are run again.
+/// last reply's calls, not run yet, are run again. `context` is the one it
+/// ran with, so its system message, and the server's cache, are the same.
+#[allow(clippy::too_many_arguments)]
 pub fn resume(
     worlds: &Worlds,
     world: &World,
     model: &dyn Model,
     state: Resume,
+    context: &str,
     max_steps: usize,
     tools: Option<&[crate::team::Tool]>,
     log: Option<&std::path::Path>,
@@ -924,7 +1003,7 @@ pub fn resume(
         model,
         &goal,
         Vec::new(),
-        "",
+        context,
         max_steps,
         tools,
         false,
@@ -932,6 +1011,51 @@ pub fn resume(
         Some(state),
         Watch::default(),
     )
+}
+
+/// A finished conversation asked for more: `ask` goes after it, as the
+/// person's next message, instead of a new conversation that reads the
+/// whole project again. The prefix is the same, so the server serves it
+/// from its cache. Its criteria open again: what held before is checked
+/// again before `done`.
+#[allow(clippy::too_many_arguments)]
+pub fn proceed(
+    worlds: &Worlds,
+    world: &World,
+    model: &dyn Model,
+    mut state: Resume,
+    ask: &str,
+    context: &str,
+    max_steps: usize,
+    tools: Option<&[crate::team::Tool]>,
+    log: Option<&std::path::Path>,
+) -> io::Result<Outcome> {
+    for c in &mut state.criteria {
+        if matches!(c["state"].as_str(), Some("done" | "passed")) {
+            c["state"] = json!("open");
+        }
+    }
+    // A run ends on its accepted `done` (and whatever came with it) with
+    // no result: every call gets one, or the server refuses the sequence.
+    let unanswered: Vec<Value> = state
+        .messages
+        .last()
+        .filter(|m| m["role"] == "assistant")
+        .and_then(|m| m["tool_calls"].as_array())
+        .cloned()
+        .unwrap_or_default();
+    for call in unanswered {
+        let said = if call["function"]["name"] == "done" {
+            "done: accepted, the work was checked."
+        } else {
+            "not run: the work ended with done."
+        };
+        state
+            .messages
+            .push(json!({"role": "tool", "tool_call_id": call["id"], "content": said}));
+    }
+    state.messages.push(json!({"role": "user", "content": ask}));
+    resume(worlds, world, model, state, context, max_steps, tools, log)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1011,6 +1135,7 @@ fn drive(
     log_path: Option<&std::path::Path>,
 ) -> io::Result<Outcome> {
     let sandbox = |argv: &[String]| worlds.sandbox_work(world, argv);
+    engine.from = from;
     // The starting state counts as "no change yet".
     engine.watch.files = worlds.status(world).unwrap_or_default();
     let end = |engine: Engine, log: Vec<Value>, step, summary, stuck: Option<String>, error| {
@@ -1022,6 +1147,7 @@ fn drive(
         if let Some(p) = log_path {
             write_run_log(p, world, goal, step, 0, &engine, &messages);
         }
+        let (from, read) = (engine.from, engine.read_set());
         Ok(Outcome {
             summary,
             steps: step,
@@ -1030,6 +1156,8 @@ fn drive(
             question,
             turns: engine.turns,
             error,
+            from,
+            read,
             criteria: engine.criteria,
             asked: engine.asked,
         })
@@ -1062,6 +1190,7 @@ fn drive(
                         render(&engine.criteria)
                     )));
                     from = log.len() - 1;
+                    engine.from = from;
                 }
                 // The model gave no notes (an empty summary is an error):
                 // the goal and the end of the exchange stay, so the run
@@ -1084,6 +1213,7 @@ fn drive(
                          are gone. The goal is above; re-read the files you need with read_file.",
                     ));
                     from = 0;
+                    engine.from = 0;
                     engine.context = 0;
                 }
             }
@@ -1255,6 +1385,7 @@ fn drive(
             }
             // `args` is already parsed and written back: canonical.
             let repeated = engine.watch.call(&args.to_string(), &result);
+            let result = already_read(&log[from..], name, &args, &result).unwrap_or(result);
             log.push(json!({"role": "tool", "tool_call_id": call["id"], "content": result}));
             match repeated {
                 Some(true) => {
@@ -1491,6 +1622,25 @@ mod tests {
             "the same reminder is not added twice"
         );
         let reminder = e.reminder(9, 10, "Build.");
+        let lines = "1\tsome line of the file\n".repeat(20);
+        let seen = [json!({"role": "tool", "tool_call_id": "a", "content": lines})];
+        let args = json!({"path": "src/x.rs"});
+        assert!(
+            already_read(&seen, "read_file", &args, &lines)
+                .is_some_and(|l| l.starts_with("src/x.rs: unchanged"))
+        );
+        assert!(
+            already_read(&seen, "read_file", &args, &format!("{lines}more")).is_none(),
+            "a changed file"
+        );
+        assert!(
+            already_read(&seen, "shell", &args, &lines).is_none(),
+            "only reads"
+        );
+        assert!(
+            already_read(&[], "read_file", &args, &lines).is_none(),
+            "not seen"
+        );
         let text = reminder["content"].as_str().unwrap();
         assert!(
             text.contains("call `done`") && text.contains("Few steps"),
