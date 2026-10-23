@@ -267,14 +267,21 @@ impl Worlds {
 
     /// git on the world's worktree, with paths from harness metadata.
     pub fn git(&self, world: &World, args: &[&str]) -> io::Result<String> {
-        let common = self.common_dir(world)?;
         // A world in the project folder is the store's main work tree, and
         // only while its branch is checked out there: never the human's.
+        if self.home(world)?.is_some() {
+            self.present(world)?;
+        }
+        self.git_here(world, args)
+    }
+
+    /// [`Self::git`] without the check that the folder holds the world:
+    /// only for what must run while it does not (a rebase stopped midway,
+    /// off any branch, aborted).
+    fn git_here(&self, world: &World, args: &[&str]) -> io::Result<String> {
+        let common = self.common_dir(world)?;
         let admin = match self.home(world)? {
-            Some(_) => {
-                self.present(world)?;
-                common
-            }
+            Some(_) => common,
             None => common.join("worktrees").join(&world.id),
         };
         let git_dir = format!("--git-dir={}", admin.display());
@@ -698,10 +705,24 @@ impl Worlds {
     /// Replays the world's checkpoints onto `onto`; on conflict the world is
     /// left as it was. Returns the new HEAD.
     pub fn rebase(&self, world: &World, onto: &str) -> io::Result<String> {
+        // The work replayed as one change, not checkpoint by checkpoint: a
+        // step a later one took back conflicted on its own (seen: a human
+        // edit undoing what the agent had changed).
+        let head = self.git(world, &["rev-parse", "HEAD"])?;
+        let base = self.git(world, &["merge-base", &head, onto])?;
+        let tree = format!("{head}^{{tree}}");
+        let mut args = COMMITTER.to_vec();
+        args.extend(["commit-tree", &tree, "-p", &base, "-m", "fennec: the work"]);
+        let one = self.git(world, &args)?;
+        self.git(world, &["reset", "-q", "--soft", &one])?;
         let mut args = COMMITTER.to_vec();
         args.extend(["rebase", "-q", onto]);
         if let Err(e) = self.git(world, &args) {
-            let _ = self.git(world, &["rebase", "--abort"]);
+            // Stopped midway the folder is off the world's branch: aborted
+            // without that check, or the folder stays mid-rebase.
+            let _ = self.git_here(world, &["rebase", "--abort"]);
+            // Back on its checkpoints, as its verdict knows them.
+            let _ = self.git_here(world, &["reset", "-q", "--soft", &head]);
             return Err(e);
         }
         self.git(world, &["rev-parse", "HEAD"])

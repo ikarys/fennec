@@ -429,6 +429,80 @@ fn checks_run_in_bash_as_models_write_them() {
     assert!(record["winner"].is_string(), "{record:#}");
 }
 
+/// A project with `x` and a run that passed in its folder; the tests then
+/// move the project's branch under it.
+fn moved_under_a_run(name: &str) -> (Fixture, String, String) {
+    let f = fixture(name);
+    std::fs::write(f.project.join("x"), "base\n").unwrap();
+    git(&f, &["add", "-A"]);
+    git(&f, &["commit", "-qm", "x"]);
+    // In the folder, as the person works: the world is the folder's branch.
+    git(&f, &["config", "--unset", "fennec.workspace"]);
+    let branch = git(&f, &["branch", "--show-current"]);
+    let tight = Script::new("tight", &[write("answer", "42\n"), done(), done(), done()]);
+    let record = solve(
+        &f.worlds,
+        &f.project,
+        &task(&[]),
+        &[&tight as &dyn Model],
+        10,
+        None,
+    )
+    .unwrap();
+    let winner = record["winner"].as_str().unwrap().to_string();
+    (f, winner, branch)
+}
+
+/// The project's branch moves while the folder holds the world: a commit
+/// made elsewhere (another worktree), as when the human works on main.
+fn move_x(f: &Fixture, branch: &str, x: &str) {
+    let wt = f.dir.join("elsewhere");
+    git(f, &["worktree", "add", "-q", &wt.to_string_lossy(), branch]);
+    std::fs::write(wt.join("x"), x).unwrap();
+    let wt = wt.to_string_lossy().to_string();
+    git(f, &["-C", &wt, "commit", "-qam", "x moves"]);
+    git(f, &["worktree", "remove", &wt]);
+}
+
+#[test]
+fn a_step_taken_back_later_does_not_stop_the_landing() {
+    let (f, winner, branch) = moved_under_a_run("land-net");
+    let world = f.worlds.open(&winner).unwrap();
+    // A checkpoint changes `x`; a later edit takes it back.
+    std::fs::write(world.path.join("x"), "agent\n").unwrap();
+    f.worlds.commit(&world, "a step").unwrap();
+    std::fs::write(world.path.join("x"), "base\n").unwrap();
+    move_x(&f, &branch, "main\n");
+    land(&f.worlds, &winner, None, Some("feat: the answer")).unwrap();
+    assert_eq!(
+        std::fs::read_to_string(f.project.join("x")).unwrap(),
+        "main\n"
+    );
+    assert_eq!(
+        std::fs::read_to_string(f.project.join("answer")).unwrap(),
+        "42\n"
+    );
+}
+
+#[test]
+fn a_landing_that_conflicts_leaves_the_world_as_it_was() {
+    let (f, winner, branch) = moved_under_a_run("land-conflict");
+    let world = f.worlds.open(&winner).unwrap();
+    std::fs::write(world.path.join("x"), "agent\n").unwrap();
+    let before = f.worlds.commit(&world, "a step").unwrap();
+    move_x(&f, &branch, "main\n");
+    let err = land(&f.worlds, &winner, None, None)
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("conflicts with the project"), "{err}");
+    // Not left mid-rebase, on its own checkpoints still.
+    assert_eq!(
+        f.worlds.git(&world, &["rev-parse", "HEAD"]).unwrap(),
+        before
+    );
+    assert!(f.worlds.status(&world).unwrap().is_empty());
+}
+
 #[test]
 fn a_run_lands_on_the_branch_the_rules_ask_for_and_is_pushed() {
     let f = fixture("branch");

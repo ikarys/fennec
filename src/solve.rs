@@ -1159,12 +1159,14 @@ pub fn land(
     if moved {
         // The verdict no longer holds for any tree but the old one. Edits
         // alone keep it: the human may fix what broke the checks and retry.
-        std::fs::remove_file(&marker)?;
+        // A rebase that failed was aborted: the old tree, and its verdict,
+        // stand.
         commit = worlds.rebase(&world, &head).map_err(|e| {
             io::Error::other(format!(
                 "{e}\nworld {id} conflicts with the project; solve again"
             ))
         })?;
+        std::fs::remove_file(&marker)?;
     }
     if moved || edited {
         let commands: Vec<Rule> = verdict["verify"]
