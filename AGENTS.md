@@ -26,7 +26,7 @@ src/chat.rs      a plain conversation in a folder the person chose (git or not):
                  a turn that changed the folder runs the approved plan's checks and the rules' commands, failures sent back twice
 src/outside.rs   the literal host paths a chat tool call names outside its folder: the chat asks, an opened folder stays read-write
 src/agent.rs     the engine every agent runs on (task attempts, chat turns): criteria kept by the harness and checked
-                 by commands, a reminder as the last message of every call, `done` refused while criteria are open,
+                 by commands, a reminder kept in the conversation when it says something new (append-only, so the server caches it; reasoning sent back), `done` refused while criteria are open,
                  compaction into the model's notes, cut replies continued; loops, idle runs and hung commands stopped
 src/guard.rs     the person's rules on what agents run, read and write (`~/.config/fennec/guard.json`, never in a project;
                  defaults seeded once): deny, ask (a chat asks, a task does without and records it), allow; commands
@@ -80,7 +80,7 @@ the agent is told which tools the sandbox finds; package managers' caches go in 
 `FENNEC_OS_MEMORY_MB` (memory cap per sandboxed command, `ulimit -d`, default 8192, 0 = none),
 `FENNEC_OS_BASE_URL`, `FENNEC_OS_MODELS` (comma-separated; default: what the server lists), `FENNEC_OS_API_KEY`,
 `FENNEC_OS_MAX_TOKENS` (a reply's budget, reasoning included; default 32768, 0 = the server's),
-`FENNEC_OS_CONTEXT` (the model's context window in tokens, default 65536; a conversation past 70 % of it is compacted)
+`FENNEC_OS_CONTEXT` (the model's context window in tokens; default the server's `max_model_len` for the models in use, else 65536; a conversation past 70 % of it is compacted)
 (each overrides `~/.config/fennec/model.json`, which fennec-lead's settings write),
 `FENNEC_OS_BROWSER` (headless browser for proof screenshots, default `chromium`).
 
