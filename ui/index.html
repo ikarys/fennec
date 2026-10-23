@@ -277,6 +277,10 @@
   .title { font-size: 16px; margin: 4px 0 10px; overflow-wrap: anywhere; }
   /* The one thing to read before deciding. */
   .focus { background: var(--soft); border-radius: 6px; padding: 8px 10px; overflow-wrap: anywhere; }
+  /* What was asked opens the page: plain reading text, its paragraphs tight. */
+  .asked { overflow-wrap: anywhere; margin-bottom: 10px; }
+  .asked > :first-child { margin-top: 0; }
+  .asked > :last-child { margin-bottom: 0; }
   .focus p, .focus ul { margin: 2px 0; }
   .focus ul { padding-left: 20px; }
   .focus .label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 2px; }
