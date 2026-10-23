@@ -211,7 +211,8 @@ pub fn link(worlds: &Worlds, id: &str, request: &str) -> io::Result<Value> {
 /// A task's conversation brought up to the task's record of it before its
 /// turn: the person's new messages are added; a record that no longer
 /// follows the conversation (the task reworded) starts it over from the
-/// record. Returns how many turns the chat had, so the caller can tell
+/// record, as does a chat that has none of the person's words yet. Returns
+/// how many turns the chat had, so the caller can tell
 /// this turn's cost.
 pub fn follow(worlds: &Worlds, id: &str, thread: &[Value]) -> io::Result<usize> {
     let (mut refused, mut before) = (None, 0);
@@ -234,7 +235,9 @@ pub fn follow(worlds: &Worlds, id: &str, thread: &[Value]) -> io::Result<usize> 
             .filter(|t| human(t))
             .map(|t| t["text"].clone())
             .collect();
-        if asked.starts_with(&said) {
+        // A chat that has heard nothing yet takes the record whole: a task
+        // talked about before it had a chat keeps fennec's earlier replies.
+        if !said.is_empty() && asked.starts_with(&said) {
             for text in &asked[said.len()..] {
                 push(&mut c["messages"], json!({"role": "user", "content": text}));
             }
@@ -908,6 +911,40 @@ mod tests {
             apart: false,
             base: None,
         }
+    }
+
+    #[test]
+    fn a_task_talked_about_before_its_chat_keeps_fennecs_replies() {
+        let dir =
+            std::env::temp_dir().join(format!("fennec-os-chat-follow-{}", std::process::id()));
+        let folder = dir.join("proj");
+        std::fs::create_dir_all(&folder).unwrap();
+        let w = worlds(&dir);
+        let id = start(&w, &folder).unwrap()["id"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        let thread = [
+            json!({"who": "human", "text": "token stats"}),
+            json!({"who": "fennec", "text": "split by what?"}),
+            json!({"who": "human", "text": "all of it"}),
+        ];
+        follow(&w, &id, &thread).unwrap();
+        let said: Vec<Value> = load(&w, &id).unwrap()["messages"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|m| m["content"].clone())
+            .collect();
+        assert_eq!(
+            said,
+            [
+                json!("token stats"),
+                json!("split by what?"),
+                json!("all of it")
+            ]
+        );
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
