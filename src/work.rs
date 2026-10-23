@@ -257,10 +257,11 @@ fn talk_now(store: &Store, id: &str) -> io::Result<()> {
             say_in(r, "fennec", &text);
             r["status"] = json!("talk");
         }),
-        spec::Discussed::Brief(brief, skills, roles) => {
+        spec::Discussed::Brief(brief, skills, roles, title) => {
             let brief = with_images(&brief, &thread);
             store.update(id, |r| {
                 note(r, step);
+                titled(r, title);
                 r["brief"] = json!(brief);
                 r["picked"] = json!(skills);
                 if let Some(roles) = roles {
@@ -275,6 +276,15 @@ fn talk_now(store: &Store, id: &str) -> io::Result<()> {
 
 /// The model restates the request in words: the images the human attached go
 /// with them, for the work to see.
+/// The short title framing found, kept unless the human wrote one.
+fn titled(r: &mut Value, title: Option<String>) {
+    if let Some(title) = title
+        && r["title"].as_str().is_none_or(|t| t.trim().is_empty())
+    {
+        r["title"] = json!(title);
+    }
+}
+
 fn with_images(brief: &str, thread: &[Value]) -> String {
     let images = thread
         .iter()
@@ -323,7 +333,8 @@ fn prepare_now(store: &Store, id: &str) -> io::Result<()> {
                 say_in(r, "fennec", text);
                 r["asked"] = json!(true);
             }
-            spec::Discussed::Brief(brief, skills, roles) => {
+            spec::Discussed::Brief(brief, skills, roles, title) => {
+                titled(r, title.clone());
                 r["ahead"] = json!(with_images(brief, &thread));
                 r["picked"] = json!(skills);
                 if let Some(roles) = roles {
