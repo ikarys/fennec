@@ -8,9 +8,10 @@
 //! - criteria: what must hold when the work is done, kept by the harness,
 //!   each with a check command when one can prove it; the model marks them,
 //!   the check decides (the model never judges);
-//! - a reminder, the last message of every call: the step, the criteria and
-//!   what to do next. It is never kept: the conversation stays an
-//!   append-only prefix the server caches;
+//! - a reminder of the step, the criteria and what to do next, added when
+//!   it says something new and kept: the conversation stays append-only,
+//!   the one shape a server caching exact checkpoints (ninfer) reuses; a
+//!   reminder replaced at every call cached nothing (measured);
 //! - `done` is refused while criteria are open or their checks fail (twice,
 //!   then the outer verification judges);
 //! - the context is compacted into the model's own summary when it grows
@@ -220,14 +221,8 @@ pub(crate) fn harness(text: &str) -> Value {
 
 /// The tokens past which the conversation is compacted: most of the
 /// server's window, leaving room for the reply.
-/// ponytail: one window for every model (`FENNEC_OS_CONTEXT`, default 64k
-/// tokens); ask the server (`max_model_len`) if models differ widely.
 fn compact_at() -> u64 {
-    let window = std::env::var("FENNEC_OS_CONTEXT")
-        .ok()
-        .and_then(|v| v.parse::<u64>().ok())
-        .unwrap_or(65_536);
-    window * 7 / 10
+    crate::provider::context_window() * 7 / 10
 }
 
 /// One loop's state, the same for a task and a chat.
@@ -278,11 +273,14 @@ pub(crate) struct Engine<'a> {
     pub(crate) asked: Vec<Value>,
     /// The role's tools line: `None` runs with every tool.
     pub(crate) tools: Option<Vec<crate::team::Tool>>,
+    /// The last reminder added, its step line aside.
+    reminded: String,
 }
 
 impl<'a> Engine<'a> {
     pub(crate) fn new(model: &'a dyn Model, criteria: Vec<Value>) -> Self {
         Self {
+            reminded: String::new(),
             model,
             criteria,
             watch: Watch::default(),
@@ -715,8 +713,23 @@ impl<'a> Engine<'a> {
         out
     }
 
-    /// The reminder sent as the last message of a call; `None` when there
-    /// is nothing to frame (a chat without a plan).
+    /// The reminder to add before a call, kept in the conversation; `None`
+    /// when it would only repeat the last one but for its step number, so
+    /// the conversation does not grow by one per step.
+    pub(crate) fn remind(&mut self, step: usize, max: usize, mode: &str) -> Option<Value> {
+        let mut reminder = self.reminder(step, max, mode);
+        let text = reminder["content"].as_str().unwrap_or("");
+        let said: String = text.lines().filter(|l| !l.starts_with("Step ")).collect();
+        if said == self.reminded {
+            return None;
+        }
+        self.reminded = said;
+        // Hidden from the person's page, like every message the harness adds.
+        reminder["harness"] = json!(true);
+        Some(reminder)
+    }
+
+    /// The reminder: the step, the criteria and what to do next.
     pub(crate) fn reminder(&self, step: usize, max: usize, mode: &str) -> Value {
         let mut text = format!("<system-reminder>\nStep {step} of at most {max}. {mode}\n");
         let next = self.criteria.iter().position(|c| !met(c));
@@ -1078,10 +1091,12 @@ fn drive(
         let calls: Vec<Value> = match pending.take() {
             Some(c) => c,
             None => {
-                let mut window: Vec<Value> = std::iter::once(system.clone())
+                if let Some(r) = engine.remind(step, max_steps, MODE) {
+                    log.push(r);
+                }
+                let window: Vec<Value> = std::iter::once(system.clone())
                     .chain(log[from..].iter().cloned())
                     .collect();
-                window.push(engine.reminder(step, max_steps, MODE));
                 let (reply, cut) = match engine.ask(&window, &defs) {
                     Ok(r) => r,
                     Err(e) => return end(engine, log, step, None, None, Some(e.to_string())),
@@ -1470,6 +1485,11 @@ mod tests {
         );
         assert!(e.finish(&sandbox).is_none(), "the check now passes");
         assert_eq!(e.criteria[1]["state"], "passed");
+        assert!(e.remind(1, 10, "Build.").is_some());
+        assert!(
+            e.remind(2, 10, "Build.").is_none(),
+            "the same reminder is not added twice"
+        );
         let reminder = e.reminder(9, 10, "Build.");
         let text = reminder["content"].as_str().unwrap();
         assert!(
