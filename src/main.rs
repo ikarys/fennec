@@ -664,7 +664,20 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
                 .into_iter()
                 .find(|p| p == folder)
                 .ok_or_else(|| io::Error::other("this folder is not a project"))?;
-            let id = store.add_request(&project, &transcript(&chat)?, "", &[], true)?;
+            // Its description is the person's first message: the exchange
+            // that followed is the task's conversation, shown under it.
+            let first = chat["messages"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .find(|m| m["role"] == "user" && m["harness"] != true)
+                .and_then(|m| m["content"].as_str())
+                .map(str::to_string);
+            let text = match first {
+                Some(f) if !f.trim().is_empty() => f,
+                _ => transcript(&chat)?,
+            };
+            let id = store.add_request(&project, &text, "", &[], true)?;
             // The task's conversation is this one: it goes on there, with
             // all it read, and the task's record of it is what was said.
             let chat_id = chat["id"].as_str().unwrap_or("").to_string();

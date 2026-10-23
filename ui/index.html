@@ -255,7 +255,8 @@
                    color: var(--accent); font-weight: 600; }
   button.primary:hover { background: color-mix(in srgb, var(--accent) 10%, transparent);
                          border-color: var(--accent); }
-  button.link { border: none; background: none; color: var(--accent); padding: 0; }
+  :is(button, a).link { border: none; background: none; color: var(--accent); padding: 0; text-decoration: none; }
+  a.link:hover { text-decoration: underline; }
   button.stop { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, transparent); }
   button.stop:hover, button.stop.sure { background: color-mix(in srgb, var(--bad) 12%, transparent); border-color: var(--bad); }
   button.quiet { border: none; background: none; color: var(--muted); padding: 4px; }
