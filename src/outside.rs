@@ -118,7 +118,8 @@ fn tokens(command: &str) -> Vec<String> {
             (Some(q), ch) if q == ch => quote = None,
             (Some(_), ch) => cur.push(ch),
             (None, c @ ('\'' | '"')) => quote = Some(c),
-            (None, c) if c.is_whitespace() => {
+            // An operator ends a word as a space does: `ls /x; pwd` names `/x`.
+            (None, c) if c.is_whitespace() || ";|&<>()".contains(c) => {
                 if !cur.is_empty() {
                     out.push(std::mem::take(&mut cur));
                 }
@@ -294,6 +295,14 @@ mod tests {
             &json!({"command": "cat $HOME/ws/proj/x"}),
         );
         assert_eq!(got, Vec::<PathBuf>::new());
+    }
+
+    #[test]
+    fn an_operator_after_a_path_is_not_part_of_it() {
+        assert_eq!(
+            tokens("ls /a/b; cat /c|wc && x>/d 2>/dev/null (cd /e)"),
+            ["/a/b", "/c", "/d", "/dev/null", "/e"]
+        );
     }
 
     #[test]
