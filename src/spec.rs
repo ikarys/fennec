@@ -1007,7 +1007,25 @@ pub fn discuss(
         };
         messages.push(json!({"role": role, "content": turn["text"]}));
     }
-    let (content, mut exchange) = crate::provider::ask(model, &messages)?;
+    let (mut content, mut exchange) = crate::provider::ask(model, &messages)?;
+    // A model trained on tools reaches for them here, where it has none
+    // (seen: `<tool_call><function=Read>` as its whole reply, shown to the
+    // person as a question). That is no message for them: asked once more.
+    if calls_as_text(&content) {
+        let mut again = messages.clone();
+        again.push(json!({"role": "assistant", "content": content}));
+        again.push(json!({"role": "user", "content": NO_TOOLS}));
+        let (said, mut second) = crate::provider::ask(model, &again)?;
+        let mut turns = exchange["turns"].as_array().cloned().unwrap_or_default();
+        turns.extend(second["turns"].as_array().cloned().unwrap_or_default());
+        second["turns"] = json!(turns);
+        (content, exchange) = (said, second);
+        if calls_as_text(&content) {
+            return Err(io::Error::other(
+                "the model tried to read the project instead of answering",
+            ));
+        }
+    }
     exchange["team"] = json!(team);
     if content.is_empty() {
         return Err(io::Error::other("the model gave no answer"));
@@ -1028,6 +1046,16 @@ pub fn discuss(
         None => Discussed::Reply(content),
     };
     Ok((said, exchange))
+}
+
+/// Said when the model wrote tool calls in a conversation that has none.
+const NO_TOOLS: &str = "You have no tools in this conversation: you cannot read files or run \
+anything. Answer from what you were told: the brief line if the request is clear, otherwise \
+your question.";
+
+/// Tool calls written as text, the way Qwen-style templates spell them.
+fn calls_as_text(content: &str) -> bool {
+    content.contains("<tool_call>") || content.contains("<function=")
 }
 
 /// The `skills:` line of a reply, kept to the names the person keeps.
@@ -1226,6 +1254,26 @@ mod tests {
             )
         );
         assert!(discuss(&empty, &thread, &Fixed("<think>only this</think>")).is_err());
+        // Tool calls written as text are asked again, without tools.
+        struct Seq(std::sync::Mutex<Vec<&'static str>>);
+        impl Model for Seq {
+            fn chat(&self, _: &[Value], _: &Value) -> io::Result<Value> {
+                Ok(json!({"content": self.0.lock().unwrap().remove(0)}))
+            }
+            fn label(&self) -> String {
+                "seq".into()
+            }
+            fn variant<'s>(&'s self, _: &str) -> Box<dyn Model + 's> {
+                unreachable!()
+            }
+        }
+        let read = "Je regarde.\n<tool_call>\n<function=Read>\n</function>\n</tool_call>";
+        let seq = Seq(std::sync::Mutex::new(vec![read, "`brief: un script`"]));
+        let (said, exchange) = discuss(&empty, &thread, &seq).unwrap();
+        assert_eq!(said, Discussed::Brief("un script".into(), None, None, None));
+        assert_eq!(exchange["turns"].as_array().unwrap().len(), 2);
+        let stubborn = Seq(std::sync::Mutex::new(vec![read, read]));
+        assert!(discuss(&empty, &thread, &stubborn).is_err());
     }
 
     #[test]
