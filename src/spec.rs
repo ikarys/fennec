@@ -910,7 +910,9 @@ invent the product. Layout, style, update rate, file names and other details are
 developer's to settle, not questions. Once it is clear, a clear first message included, reply \
 with exactly one line and nothing else:\n\
 `brief: <the whole request restated precisely, with everything agreed in this conversation, \
-in their language>`";
+in their language>`\n\
+then one more line naming it the way a person titles a ticket:\n\
+`title: <a short label, at most eight words, in their language>`";
 
 /// Asked after `DISCUSS` when the person keeps skills: the work then sees
 /// only the ones that serve this request.
@@ -927,11 +929,16 @@ the ones this request needs, or none:\n`roles: <keys, comma separated>`\n";
 /// A brief comes with the skills picked for it; `None` when the person
 /// keeps none or the model did not say, and the work then sees them all.
 /// It also marks the solve roles the work needs; `None` runs the team's
-/// usual chain.
+/// usual chain. Last, its short title; `None` when the model gave none.
 #[derive(Debug, PartialEq)]
 pub enum Discussed {
     Reply(String),
-    Brief(String, Option<Vec<String>>, Option<Vec<String>>),
+    Brief(
+        String,
+        Option<Vec<String>>,
+        Option<Vec<String>>,
+        Option<String>,
+    ),
 }
 
 /// `thread`: `{"who": "human" | "fennec", "text"}` in order. One model call,
@@ -994,9 +1001,14 @@ pub fn discuss(
         .find_map(|l| l.trim().trim_matches('`').strip_prefix("brief:"))
         .map(|b| b.trim().trim_matches('`').trim().to_string())
         .filter(|b| !b.is_empty());
+    let title = content
+        .lines()
+        .find_map(|l| l.trim().trim_matches('`').strip_prefix("title:"))
+        .map(|t| t.trim().trim_matches('`').trim().to_string())
+        .filter(|t| !t.is_empty());
     let names: Vec<String> = kept.into_iter().map(|s| s.name).collect();
     let said = match brief {
-        Some(b) => Discussed::Brief(b, picked(&content, &names), marked(&content, &keys)),
+        Some(b) => Discussed::Brief(b, picked(&content, &names), marked(&content, &keys), title),
         None => Discussed::Reply(content),
     };
     Ok((said, exchange))
@@ -1176,7 +1188,25 @@ mod tests {
             Discussed::Brief(
                 "un script bonjour.py qui affiche Bonjour".into(),
                 None,
+                None,
                 None
+            )
+        );
+        assert_eq!(
+            discuss(
+                &empty,
+                &thread,
+                &Fixed(
+                    "`brief: un script bonjour.py qui affiche Bonjour`\n`title: Script bonjour`"
+                )
+            )
+            .unwrap()
+            .0,
+            Discussed::Brief(
+                "un script bonjour.py qui affiche Bonjour".into(),
+                None,
+                None,
+                Some("Script bonjour".into())
             )
         );
         assert!(discuss(&empty, &thread, &Fixed("<think>only this</think>")).is_err());
