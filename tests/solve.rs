@@ -10,7 +10,7 @@ use std::sync::Mutex;
 
 use common::Fixture;
 use fennec_os::provider::Model;
-use fennec_os::solve::{Task, land, plan, push, solve};
+use fennec_os::solve::{Follow, Task, land, plan, push, solve};
 use fennec_os::{grant, proof, review, rules, skill, sleep, spec, team};
 use serde_json::{Value, json};
 
@@ -45,8 +45,8 @@ impl Script {
 
 impl Model for Script {
     fn chat(&self, messages: &[Value], _tools: &Value) -> io::Result<Value> {
-        // Reasoning stays in the exchange for the journal; the provider
-        // leaves it out of what it sends (`provider::outgoing`).
+        // Reasoning stays in the exchange, and the provider sends it back
+        // (`provider::outgoing`): the server's cache needs the same prefix.
         assert!(
             messages
                 .iter()
@@ -103,6 +103,7 @@ fn task(protect: &[&str]) -> Task {
         skills: None,
         roles: None,
         discussion: None,
+        follow: None,
     }
 }
 
@@ -237,6 +238,73 @@ fn a_crashed_attempt_goes_on_in_its_own_world() {
     // A run that goes on keeps its log only if it crashes again.
     assert!(!log_path.exists());
     assert_eq!(f.worlds.list().unwrap(), vec![world.id]);
+}
+
+/// Keeps every window it is sent, then calls `done`.
+struct Recorder(Mutex<Vec<Vec<Value>>>);
+
+impl Model for Recorder {
+    fn chat(&self, messages: &[Value], _tools: &Value) -> io::Result<Value> {
+        self.0.lock().unwrap().push(messages.to_vec());
+        let (tool, args) = done();
+        Ok(
+            json!({"tool_calls": [{"id": "r", "function": {"name": tool, "arguments": args.to_string()}}]}),
+        )
+    }
+    fn label(&self) -> String {
+        "recorder".into()
+    }
+    fn variant<'s>(&'s self, _: &str) -> Box<dyn Model + 's> {
+        Box::new(Recorder(Mutex::new(Vec::new())))
+    }
+}
+
+#[test]
+fn a_run_going_on_from_an_earlier_one_continues_its_conversation() {
+    let f = fixture("follow");
+    let first = Script::new("first", &[write("answer", "42\n"), done(), done(), done()]);
+    let record = solve(
+        &f.worlds,
+        &f.project,
+        &task(&[]),
+        &[&first as &dyn Model],
+        10,
+        None,
+    )
+    .unwrap();
+    assert_eq!(record["status"], "ready", "{record:#}");
+    let roles = record["attempts"][0]["roles"].as_array().unwrap().clone();
+    let earlier = roles[0]["messages"].as_array().unwrap().clone();
+
+    let mut again = task(&[]);
+    again.follow = Some(Follow {
+        ask: "The proof failed: say why.".into(),
+        roles,
+    });
+    let recorder = Recorder(Mutex::new(Vec::new()));
+    solve(
+        &f.worlds,
+        &f.project,
+        &again,
+        &[&recorder as &dyn Model],
+        10,
+        None,
+    )
+    .unwrap();
+    let sent = recorder.0.lock().unwrap()[0].clone();
+    // The earlier conversation, as it was, is the prefix: the server's
+    // cache serves it, and the project is not read again.
+    assert_eq!(sent[..earlier.len()], earlier[..], "{sent:#?}");
+    // Its accepted `done` got its result, then the ask came, once.
+    let rest = &sent[earlier.len()..];
+    assert!(rest[0]["role"] == "tool" && rest[0]["content"].as_str().unwrap().starts_with("done"));
+    assert_eq!(
+        rest.iter()
+            .filter(|m| m["content"] == "The proof failed: say why.")
+            .count(),
+        1
+    );
+    assert_eq!(sent.iter().filter(|m| m["role"] == "system").count(), 1);
 }
 
 #[test]
@@ -1666,6 +1734,7 @@ fn host_task(f: &Fixture) -> (std::path::PathBuf, Task) {
         skills: None,
         roles: None,
         discussion: None,
+        follow: None,
     };
     (conf, task)
 }

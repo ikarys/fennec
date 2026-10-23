@@ -41,6 +41,28 @@ pub struct Task {
     /// began: it goes to the roles that produce, never to the ones that
     /// judge. Set by the harness, read from a task file.
     pub discussion: Option<String>,
+    /// An earlier run this one goes on from (a fix, an amend, a restart):
+    /// each of its roles continues its own conversation, told `ask`, instead
+    /// of reading the project again. Set by the harness.
+    pub follow: Option<Follow>,
+}
+
+/// What a run going on from an earlier one needs.
+#[derive(Debug, Clone)]
+pub struct Follow {
+    /// What the earlier run is asked now.
+    pub ask: String,
+    /// The earlier run's attempt, its `roles` as the run record keeps them.
+    pub roles: Vec<Value>,
+}
+
+impl Follow {
+    /// The earlier conversation of a role (`None`: the one agent of a run
+    /// without a chain).
+    fn of(&self, goal: &str, role: Option<&str>) -> Option<agent::Resume> {
+        let found = self.roles.iter().find(|r| r["name"].as_str() == role)?;
+        agent::Resume::of_record(goal, found)
+    }
 }
 
 impl Task {
@@ -72,6 +94,7 @@ impl Task {
                         .collect()
                 })
                 .filter(|a: &Vec<String>| !a.is_empty()),
+            follow: None,
         };
         if task.goal.is_empty() {
             return Err(io::Error::other("task has no goal"));
@@ -542,6 +565,13 @@ fn attempt_inner(
         "" => task.goal.clone(),
         _ => format!("{}\n\n{lessons}", task.goal),
     };
+    // What a role going on from an earlier run is told: the ask, and what
+    // this run's failed attempts taught.
+    let follow_ask = task.follow.as_ref().map(|f| match lessons {
+        "" => f.ask.clone(),
+        _ => format!("{}\n\n{lessons}", f.ask),
+    });
+    let follow_ask = follow_ask.as_deref().unwrap_or("");
     // The attempt's roles, in order: the chain's, or one agent when it is
     // empty. A recipe replayed its recorded trajectory whole: it runs as
     // one agent too, the chain would re-play it once per role.
@@ -555,22 +585,33 @@ fn attempt_inner(
     // changes (and its relay notes), its conversation is where it left off;
     // the chain is not run again, it ran to the crash.
     if let Some(state) = resumed {
-        let outcome = agent::resume(worlds, world, model, state, remaining, None, brief.log)?;
+        let outcome = agent::resume(
+            worlds, world, model, state, &context, remaining, None, brief.log,
+        )?;
         outcomes.push((None, model.label(), outcome));
     } else if solo {
-        let outcome = agent::run(
-            worlds,
-            world,
-            model,
-            &goal,
-            criteria.clone(),
-            &context,
-            remaining,
-            None,
-            false,
-            brief.log,
-            agent::Watch::default(),
-        )?;
+        let outcome = match task
+            .follow
+            .as_ref()
+            .and_then(|f| Some((f, f.of(&goal, None)?)))
+        {
+            Some((_, state)) => agent::proceed(
+                worlds, world, model, state, follow_ask, &context, remaining, None, brief.log,
+            )?,
+            None => agent::run(
+                worlds,
+                world,
+                model,
+                &goal,
+                criteria.clone(),
+                &context,
+                remaining,
+                None,
+                false,
+                brief.log,
+                agent::Watch::default(),
+            )?,
+        };
         outcomes.push((None, model.label(), outcome));
     } else {
         for role in chain {
@@ -591,19 +632,38 @@ fn attempt_inner(
             } else {
                 Vec::new()
             };
-            let outcome = agent::run(
-                worlds,
-                world,
-                role_model,
-                &role_goal,
-                role_criteria,
-                &role_context,
-                remaining,
-                Some(&role.tools),
-                false,
-                brief.log,
-                agent::Watch::default(),
-            )?;
+            // Going on from an earlier run: the role continues its own
+            // conversation, told what is asked now.
+            let earlier = task
+                .follow
+                .as_ref()
+                .and_then(|f| Some((f, f.of(&goal, Some(&role.name))?)));
+            let outcome = match earlier {
+                Some((_, state)) => agent::proceed(
+                    worlds,
+                    world,
+                    role_model,
+                    state,
+                    &goal_for(world, follow_ask, &outcomes),
+                    &role_context,
+                    remaining,
+                    Some(&role.tools),
+                    brief.log,
+                )?,
+                None => agent::run(
+                    worlds,
+                    world,
+                    role_model,
+                    &role_goal,
+                    role_criteria,
+                    &role_context,
+                    remaining,
+                    Some(&role.tools),
+                    false,
+                    brief.log,
+                    agent::Watch::default(),
+                )?,
+            };
             remaining = remaining.saturating_sub(outcome.steps);
             outcomes.push((Some(role), role_model.label(), outcome));
         }
@@ -617,7 +677,7 @@ fn attempt_inner(
             && let Some(builder) = chain.iter().rev().find(|r| buildable(r))
         {
             let ask = format!(
-                "{goal}\n\nThe team's reviewer found the work à refaire. Its report \
+                "The team's reviewer found the work à refaire. Its report \
                  (relay/review.md):\n{text}\n\
                  For each point of the report: apply it, or reject it with a reason. Write \
                  your decisions to relay/dev.md, one line per point, each line \
@@ -626,23 +686,47 @@ fn attempt_inner(
             let boxed = builder.model.as_ref().map(|m| model.variant(m));
             let role_model = boxed.as_deref().unwrap_or(model);
             let role_context = role_context(&context, builder);
-            let outcome = agent::run(
-                worlds,
-                world,
-                role_model,
-                &ask,
-                if buildable(builder) {
-                    criteria.clone()
-                } else {
-                    Vec::new()
-                },
-                &role_context,
-                remaining,
-                Some(&builder.tools),
-                false,
-                brief.log,
-                agent::Watch::default(),
-            )?;
+            // The builder answers in its own conversation: it knows the work
+            // it did, and the server still holds its prefix.
+            let earlier = outcomes
+                .iter()
+                .rev()
+                .find(|(r, _, _)| r.is_some_and(|r| r.name == builder.name))
+                .map(|(_, _, o)| {
+                    agent::Resume::of(
+                        &goal,
+                        &o.messages,
+                        o.from,
+                        o.criteria.clone(),
+                        o.read.clone(),
+                    )
+                });
+            let outcome = match earlier {
+                Some(state) => agent::proceed(
+                    worlds,
+                    world,
+                    role_model,
+                    state,
+                    &ask,
+                    &role_context,
+                    remaining,
+                    Some(&builder.tools),
+                    brief.log,
+                )?,
+                None => agent::run(
+                    worlds,
+                    world,
+                    role_model,
+                    &format!("{goal}\n\n{ask}"),
+                    criteria.clone(),
+                    &role_context,
+                    remaining,
+                    Some(&builder.tools),
+                    false,
+                    brief.log,
+                    agent::Watch::default(),
+                )?,
+            };
             outcomes.push((Some(builder), role_model.label(), outcome));
             disagreements = std::fs::read_to_string(world.path.join("relay").join("dev.md"))
                 .ok()
@@ -670,6 +754,8 @@ fn attempt_inner(
                     "asked": o.asked.clone(),
                     "turns": o.turns.clone(),
                     "messages": o.messages.clone(),
+                    "from": o.from,
+                    "read": o.read.clone(),
                     "error": o.error.clone(),
                 })
             })
