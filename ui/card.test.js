@@ -44,6 +44,7 @@ eval(src.match(/const el = \(tag, props = \{\}, \.\.\.children\) => \{[\s\S]*?\n
   // card's collaborators, stubbed: they only shape the structure under test.
   + `
   const conversation = () => null;
+  const askedOf = () => null;
   const thumbs = () => null;
   const attach = () => ({ node: new Node("div"), value: () => "" });
   const focus = () => new Node("div");

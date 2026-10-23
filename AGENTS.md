@@ -49,9 +49,10 @@ The home is plain JSON, seedable by a script for a demo (`try.sh` does it):
 `project` (a path from the list), `title` (its short label) and `text` (its
 content), and `status` (`later`: Backlog, `ready`, `running`, `landed`,
 `failed`). `fleet.json` keeps the Ready queue. The page opens on the For you tab; a
-Backlog task is only visible after clicking the Backlog tab. In the details of
-a Backlog task the title and description fields sit behind the Edit button;
-the Save button writes each as it stands, the other untouched.
+Backlog task is only visible after clicking the Backlog tab. A task's page
+shows its title in the head and its description first, above the conversation;
+on a Backlog task the Edit button turns them into fields, and Save writes each
+as it stands, the other untouched.
 
 ## Non-negotiable rules
 

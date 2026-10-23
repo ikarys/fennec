@@ -513,12 +513,9 @@ function details(item) {
   const box = el("details", { className: "more", open: true }, el("summary", { textContent: t("Details") }));
   box.dataset.key = item.id;
   const part = (title, ...nodes) => box.append(el("h3", { textContent: title }), ...nodes);
-  // The short label and the content are apart: each is read on its own.
-  if (item.title) part(t("Title"), el("div", {}, ...md(item.title)));
   // A plan step carries the discussion's whole plan after "---": the same in
   // every step, so it is named as shared, apart from the step itself.
-  const [step, plan] = (item.description ?? "").split("\n\n---\n");
-  if (step) part(t("Description"), el("div", {}, ...md(step)));
+  const plan = (item.description ?? "").split("\n\n---\n")[1];
   if (plan) part(t("The discussion's plan, shared by its tasks"), el("div", {}, ...md(plan)));
   const errors = [item.reason, item.land_error].filter(Boolean);
   if (errors.length) part(t("Error"), ...errors.map((e) => el("pre", { className: "failed", textContent: e })));
@@ -937,9 +934,16 @@ function diffView(diff) {
   return pre;
 }
 
+// What was asked, first on the page: the title is the head above, so only
+// the description is here, the plan a step shares left to the details.
+function askedOf(item) {
+  const step = (item.description ?? "").split("\n\n---\n")[0];
+  return step ? el("div", { className: "asked" }, ...md(step)) : null;
+}
+
 // The conversation that shaped the request, the human's words on the right.
 function conversation(item) {
-  // The opening message is the card's title already.
+  // The opening message is the description, shown above it.
   const said = (item.thread ?? []).filter((m, i) => i > 0 || m.who !== "human");
   if (!said.length) return null;
   return el("div", { className: "thread" }, ...said.map((m) =>
@@ -962,7 +966,7 @@ function landTitle({ branch, remote, committed }) {
 let saved = "";
 function card(item) {
   // The head above the tabs says the title and the status: the card does not repeat it.
-  const node = el("div", { className: "card" }, thumbs(item.images));
+  const node = el("div", { className: "card" }, askedOf(item), thumbs(item.images));
   const actions = el("div", { className: "actions" });
   const add = (...nodes) => node.append(...nodes.filter(Boolean));
 
@@ -1091,12 +1095,9 @@ function card(item) {
       const reply = el("div", { className: "reply" },
         el("label", { className: "muted", textContent: t("Title") }), titleField,
         el("label", { className: "muted", textContent: t("Description") }), text, images.node);
-      // The fields take the place of the task as the details read it.
-      const more = node.querySelector("details.more");
-      const read = [...(more?.querySelectorAll("h3") ?? [])].find((h) => h.textContent === t("Title") || h.textContent === t("Description"));
-      read?.nextElementSibling?.remove();
-      read?.remove();
-      if (more) { more.open = true; more.firstChild.after(reply); } else node.prepend(reply);
+      // The fields take the place of the task as the page reads it.
+      const read = node.querySelector(".asked");
+      if (read) read.replaceWith(reply); else node.prepend(reply);
       edit.hidden = true;
       save.hidden = false;
       titleField.focus();
@@ -1224,6 +1225,8 @@ function past(item) {
   const steps = stages(item);
   if (steps) box.append(steps);
   if (item.kind === "dropped" && item.reason) box.append(el("div", { className: "muted", textContent: explain(item.reason) }));
+  const said = askedOf(item);
+  if (said) box.append(said);
   const talk = conversation(item);
   if (talk) box.append(talk);
   const done = doneWhen(item);
