@@ -780,6 +780,9 @@ fn frame_now(store: &Store, id: &str) -> io::Result<()> {
             // A sensitive task: its tests are written first, from the design,
             // and protected once the human validates them.
             note_frame(store, id, &spec_id)?;
+            // Released first: where worlds go in the project folder itself,
+            // the framing's world would hold it and the tests' world be refused.
+            worlds.drop(worlds.open(&spec_id)?)?;
             let t = spec::compile(
                 &worlds,
                 project,
@@ -787,7 +790,6 @@ fn frame_now(store: &Store, id: &str) -> io::Result<()> {
                 &model,
                 MAX_STEPS,
             )?;
-            worlds.drop(worlds.open(&spec_id)?)?;
             s = with_design(t, &s);
             spec_id = s["world"].as_str().unwrap_or("").to_string();
             tests_diff = s["diff"].clone();
