@@ -1020,13 +1020,15 @@ fn solve_now(store: &Store, id: &str) -> io::Result<()> {
     };
     let tests = spec::load(&worlds, spec_id)?;
     if amend.is_some() && !record["winner"].is_string() {
-        // The change did not pass: the ready work is still there, untouched.
+        // The change did not pass: the work is still there, untouched.
         return store.update(id, |r| {
+            let from = r["amend_from"].as_str().unwrap_or("ready").to_string();
             if let Some(m) = r.as_object_mut() {
                 m.remove("amend");
+                m.remove("amend_from");
             }
             note(r, json!({"stage": "solve", "run": record["id"]}));
-            r["status"] = json!("ready");
+            r["status"] = json!(from);
             r["amend_error"] = json!(failure(&record));
         });
     }
@@ -1035,6 +1037,7 @@ fn solve_now(store: &Store, id: &str) -> io::Result<()> {
         if let Some(m) = r.as_object_mut() {
             m.remove("retry");
             m.remove("amend");
+            m.remove("amend_from");
         }
         note(r, json!({"stage": "solve", "run": record["id"]}));
         apply_run(r, &record);
@@ -1545,11 +1548,13 @@ fn failure(record: &Value) -> String {
         .to_string()
 }
 
-/// "Corriger" on a ready request: the human tried it and asks for a change.
-/// fennec starts from the ready work, not from scratch, then proves it again.
+/// "Corriger" on a ready request, or on one stopped after the code: the human
+/// looked at it and asks for a change. fennec starts from the work, not from
+/// scratch, then reviews and proves it again.
 pub fn amend(store: &Store, id: &str, text: &str) -> io::Result<()> {
     let request = store.load(id)?;
-    if request["status"] != "ready" || request["commit"].is_string() {
+    let from = request["status"].as_str().unwrap_or("");
+    if !matches!(from, "ready" | "paused") || request["commit"].is_string() {
         return Err(io::Error::other(
             "this task does not wait for your decision",
         ));
@@ -1562,6 +1567,8 @@ pub fn amend(store: &Store, id: &str, text: &str) -> io::Result<()> {
         say_in(r, "human", text);
         r["status"] = json!("running");
         r["amend"] = json!(text);
+        // A change that does not pass gives the work back where it was.
+        r["amend_from"] = json!(from);
         r["heard"] = json!(text);
         if let Some(m) = r.as_object_mut() {
             m.remove("amend_error");
@@ -2748,6 +2755,16 @@ mod tests {
         store.update(&id, |r| r["commit"] = json!("c1")).unwrap();
         assert!(amend(&store, &id, "plus haut").is_err());
         assert_eq!(store.load(&id).unwrap()["status"], "ready");
+        // Stopped after the code, the dev may ask for a change before the rest.
+        store
+            .update(&id, |r| {
+                r["status"] = json!("paused");
+                r.as_object_mut().map(|m| m.remove("commit"));
+            })
+            .unwrap();
+        // (Words alone are missing: a real change would start a worker.)
+        let e = amend(&store, &id, "  ").unwrap_err();
+        assert_eq!(e.to_string(), "say what is wrong");
         std::fs::remove_dir_all(tmp).unwrap();
     }
 
