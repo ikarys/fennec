@@ -413,6 +413,21 @@
              font: 12px ui-monospace, monospace; overflow-x: auto; }
   .said blockquote { margin-left: 0; border-left: 3px solid var(--line); padding-left: 10px; color: var(--muted); }
   .files { font-size: 13px; color: var(--muted); margin-top: 8px; overflow-wrap: anywhere; }
+  /* Provenance: checked by code, or said by a model. */
+  .prov { display: inline-block; font-size: 11px; font-weight: 600; padding: 0 6px; border-radius: 8px;
+          border: 1px solid currentColor; vertical-align: 1px; text-transform: lowercase; }
+  .prov.verified { color: var(--ok); }
+  .prov.model { color: var(--info); }
+  .risk { font-size: 14px; margin-top: 10px; }
+  .risk.sensitive { color: var(--warn); }
+  .plan-steps { margin: 4px 0 0; padding-left: 20px; }
+  .partial { margin: 6px 0 0; }
+  #page-stops { list-style: none; padding: 0; margin: 6px 0 0; }
+  #page-stops li { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 10px; align-items: center;
+                   padding: 6px 8px; margin-bottom: 4px; border-radius: 6px; background: var(--soft); }
+  #page-stops li .what { grid-column: 1; font-size: 13px; color: var(--muted); }
+  #page-stops li .switch { grid-column: 2; grid-row: 1 / span 2; }
+  #page-stops li.muted { background: none; font-size: 13px; }
   /* Inline here, though they sit inside a details box that blocks its code. */
   details .focus code, details .files code, details .warn code, details .said code { display: inline; white-space: normal; margin: 0; }
   .files code { font: 12px ui-monospace, monospace; }
@@ -706,6 +721,7 @@
   </div>
   <div id="reqs">
   <button type="button" class="primary" id="compose-open" data-icon="plus" data-t>New task</button>
+  <p class="partial muted small" data-t>Partial guarantees: sensitive zones and tests are enforced, but the guard and the decision registry are not hardened yet.</p>
   <p class="error" id="error" role="alert"></p>
 
 
@@ -773,6 +789,8 @@
     <div class="tiles" id="page-tiles"></div>
     <div class="sub"><h3 data-icon="shield" data-t>Where fennec works</h3>
       <select id="page-place" aria-label="Where fennec works"></select></div>
+    <div class="sub"><h3 data-icon="stop" data-t>Where your loop stops</h3>
+      <ul class="stops" id="page-stops"></ul></div>
     <div class="sub rules" id="page-rules"><h3 data-icon="rule"><span data-t>Project rules</span> <span class="count" hidden></span></h3>
       <p class="muted small"><span data-t>Instructions every agent follows on each task of this project, written in its AGENTS.md. The ones for all your projects are in</span>
         <button type="button" class="link" id="to-user-rules" data-t>Settings</button>. <span data-t>When you correct a task, you may give one too: fennec offers to keep it.</span></p>

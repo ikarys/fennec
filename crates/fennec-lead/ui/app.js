@@ -246,12 +246,56 @@ const TAGS = {
   blocked: ["Question", "var(--accent)"],
   rule: ["Rule?", "var(--accent)"],
   ready: ["Ready", "var(--ok)"],
+  paused: ["Stopped after the code", "var(--accent)"],
   later: ["Backlog", "var(--muted)"],
   failed: ["Failed", "var(--bad)"],
 };
 
 function focus(label, text) {
   return el("div", { className: "focus" }, el("span", { className: "label", textContent: label }), ...md(text));
+}
+
+// Where a thing shown comes from: checked by code ("verified") or said by a
+// model (indicative). Shown next to what the human decides on.
+function prov(kind) {
+  return el("span", { className: `prov ${kind}`, textContent: kind === "verified" ? t("verified") : t("model"),
+    title: kind === "verified" ? t("Checked by code: you can rely on it.") : t("Written by a model: indicative, read it.") });
+}
+function focusBy(label, text, kind) {
+  const node = focus(label, text);
+  node.querySelector(".label").append(" ", prov(kind));
+  return node;
+}
+
+// The task in the cycle: its risk (verified), its design and plan (the
+// model's), the tests written first, and what the human skipped.
+function cycleView(item, { tests = false } = {}) {
+  const c = item.cycle ?? {};
+  const nodes = [];
+  const zones = c.risk?.zones ?? [];
+  if (c.risk) {
+    nodes.push(el("div", { className: c.sensitive ? "risk sensitive" : "risk" }, prov("verified"), " ",
+      c.sensitive
+        ? t("Sensitive: it touches {0}. Design and tests must be validated, the review marked done before the commit.",
+          zones.map((z) => `${z.name} (${t(z.kind)})`).join(", "))
+        : t("Outside the sensitive zones: validation and review are up to you; the work may not enter a zone.")));
+  }
+  if (c.architecture) nodes.push(focusBy(t("Architecture of the change"), c.architecture, "model"));
+  if (c.plan?.length) {
+    nodes.push(el("div", { className: "focus" }, el("span", { className: "label" }, t("Plan"), " ", prov("model")),
+      el("ol", { className: "plan-steps" }, ...c.plan.map((s) => el("li", {}, ...rich(s))))));
+  }
+  if (c.planned?.length) {
+    nodes.push(el("div", { className: "files" }, t("Files it expects to touch: "), ...c.planned.map((f) => el("code", { textContent: f }))));
+  }
+  if (tests && c.tests_first && c.tests) {
+    nodes.push(el("div", { className: "focus" }, el("span", { className: "label" }, t("Tests written first, to validate"), " ", prov("model")),
+      diffView(c.tests)));
+  }
+  const marks = [c.unvalidated ? pill("!", t("not validated"), "warn", t("Started without the design being validated.")) : null,
+    c.unreviewed ? pill("!", t("not reviewed"), "warn", t("Committed without the review being marked done.")) : null].filter(Boolean);
+  if (marks.length) nodes.push(el("div", { className: "pills" }, ...marks));
+  return nodes;
 }
 
 // `command` spans as code, **words** in bold, the rest as plain text.
@@ -996,7 +1040,7 @@ function card(item) {
           ? t("fennec reads your answer when the model is free; the task stays in the Backlog")
           : t("fennec reads your answer: it asks again if it must, otherwise it starts the work") }));
   } else if (item.kind === "validate") {
-    add(conversation(item), focus(t("Done when"), item.done_when));
+    add(conversation(item), focusBy(t("Done when"), item.done_when, "model"), ...cycleView(item, { tests: true }));
     const correction = el("textarea", { placeholder: t("What is wrong, or a detail"), hidden: true });
     const fix = el("button", { type: "button", textContent: t("Correct") });
     fix.onclick = () => {
@@ -1008,8 +1052,20 @@ function card(item) {
     };
     const images = attach(correction);
     add(el("div", { className: "reply" }, correction, images.node));
-    actions.append(dropButton(item.id), el("span", { className: "spacer" }), fix,
+    // Outside the zones, the dev may go on without reading: marked so.
+    const unread = item.cycle?.sensitive ? null
+      : Object.assign(action(t("Start without validating"), "/api/start", { id: item.id }),
+        { title: t("The work starts on this design as it is; the task is marked \"not validated\"") });
+    actions.append(dropButton(item.id), el("span", { className: "spacer" }), fix, ...(unread ? [unread] : []),
       action(t("Validate"), "/api/answer", { id: item.id, accept: true, correction: "" }, { primary: true }));
+  } else if (item.kind === "paused") {
+    // A stop of the dev's loop: the code is done, they look before the rest.
+    add(el("div", { className: "muted", textContent: t("Stopped after the code, as your loop asks: look at the work, then continue with the review and the proof.") }),
+      ...cycleView(item), ...work(item));
+    actions.append(action(t("Continue"), "/api/continue", { id: item.id }, { primary: true }),
+      changesButton(item, () => node.querySelector(".changes-slot")),
+      codeButton(item, () => node.querySelector(".changes-slot")), el("span", { className: "spacer" }), dropButton(item.id, true));
+    add(actions, el("div", { className: "error", role: "alert" }), el("div", { className: "changes-slot" }));
   } else if (item.kind === "blocked") {
     // Requests from before the conversation have the question alone.
     const last = item.thread?.at(-1);
@@ -1069,13 +1125,28 @@ function card(item) {
       fix.replaceWith(action(t("Send"), "/api/amend", () => ({ id: item.id, text: images.value() })));
     };
     const images = attach(change);
-    if (item.land) actions.append(Object.assign(action(landLabel(item.land), "/api/land", { id: item.id }, { primary: true }), { title: landTitle(item.land) }));
+    // The human review: a sensitive task commits only once it is marked done;
+    // another may commit without it, marked "not reviewed".
+    const c = item.cycle ?? {};
+    const mustReview = c.sensitive && !c.reviewed;
+    if (item.land) {
+      const land = Object.assign(action(landLabel(item.land), "/api/land", { id: item.id }, { primary: !mustReview }), { title: landTitle(item.land) });
+      if (mustReview) {
+        land.disabled = true;
+        land.title = t("Sensitive task: mark the review done first");
+      }
+      actions.append(land);
+    }
+    actions.append(Object.assign(action(c.reviewed ? t("Reviewed ✓") : t("Mark as reviewed"), "/api/reviewed",
+      { id: item.id, on: !c.reviewed }, { primary: mustReview }),
+      { title: c.reviewed ? t("Take the review mark back") : t("You read the changes against the design and the plan") }));
     if (item.page) actions.append(pageButton(item));
     actions.append(changesButton(item, () => node.querySelector(".changes-slot")),
       codeButton(item, () => node.querySelector(".changes-slot")), fix,
       action(t("Pass"), "/api/pass", { id: item.id }), el("span", { className: "spacer" }), dropButton(item.id, true));
     add(el("div", { className: "reply" }, change, images.node), actions, el("div", { className: "error", role: "alert" }),
-      el("div", { className: "changes-slot" }), doneWhen(item), ...work(item), shots(item), ...facts(item));
+      el("div", { className: "changes-slot" }), doneWhen(item), ...cycleView(item),
+      c.review ? focusBy(t("What the AI review said"), c.review, "model") : null, ...work(item), shots(item), ...facts(item));
   } else if (item.kind === "later") {
     // Kept, not started: read in the details, said again there if need be,
     // then launched.
@@ -1242,7 +1313,8 @@ function past(item) {
   if (talk) box.append(talk);
   const done = doneWhen(item);
   if (done) box.append(done);
-  box.append(...work(item));
+  // What was decided before the code, and what the human skipped.
+  box.append(...cycleView(item), ...work(item));
   const tried = item.tries?.length ?? 0;
   if (tried) box.append(el("div", { className: "proved", textContent: tried > 1 ? t("✓ fennec tried it: {0} tries passed", tried) : t("✓ fennec tried it: {0} try passed", tried) }));
   if (item.unverified?.length) {
@@ -2876,6 +2948,31 @@ async function showPage(path) {
   place.onchange = () => api("/api/projects", { path, place: place.value })
     .catch((e) => { $("page-error").textContent = e.message; place.value = p.place; });
   showRules($("page-rules"), path, "project", rules);
+  showStops(path, await api("/api/stops", { project: path }));
+}
+
+// The dev's loop on the project: where its tasks stop and wait for them.
+// A sensitive task stops after its design whatever this says; the commit
+// always waits.
+function showStops(path, stops) {
+  const row = (stop, label, help) => {
+    const b = el("button", { type: "button", className: "switch" });
+    b.setAttribute("role", "switch");
+    b.setAttribute("aria-checked", String(stops[stop]));
+    b.setAttribute("aria-label", label);
+    b.onclick = async () => {
+      try {
+        showStops(path, await api("/api/stops", { project: path, stop, on: !stops[stop] }));
+      } catch (e) {
+        $("page-error").textContent = e.message;
+      }
+    };
+    return el("li", {}, el("strong", { textContent: label }), el("span", { className: "what", textContent: help }), b);
+  };
+  $("page-stops").replaceChildren(
+    row("design", t("After the design"), t("Wait for your validation of the design and plan. A sensitive task always waits.")),
+    row("code", t("After the code"), t("Wait before the AI review and the proof, so you look at the work first.")),
+    el("li", { className: "muted", textContent: t("Before the commit: always.") }));
 }
 
 // The skills of the machine, valid for every project: chosen from the
