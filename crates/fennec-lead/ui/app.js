@@ -331,6 +331,34 @@ function reportView(item, live) {
   return out;
 }
 
+// The end of the cycle: what this work may change in the project's
+// knowledge, proposed by a model. Accepted as edited, it goes into this
+// task's commit; fennec numbers a new decision and writes nothing else.
+function capitaliseView(item) {
+  const list = item.capitalise ?? [];
+  if (!list.length) return [];
+  return [el("div", { className: "label report-label", textContent: t("Knowledge to update with this commit") }), ...list.map((p, i) => {
+    const box = el("div", { className: "proposal" }, el("div", { className: "row" }, el("code", { textContent: p.file }), prov("model"),
+      el("span", { className: "muted small", textContent: p.before == null ? t("new file") : t("replaces the current file") })),
+    p.why ? el("div", { className: "muted" }, ...md(p.why)) : null);
+    if (p.allowed === false) {
+      box.append(el("div", { className: "bad", textContent: t("fennec will not write it: not a knowledge file") }));
+      return box;
+    }
+    const text = el("textarea", { className: "mono", value: p.content, ariaLabel: t("Proposed text"),
+      rows: Math.min(18, Math.max(4, p.content.split("\n").length)) });
+    const now = p.before == null ? null
+      : el("details", {}, el("summary", { textContent: t("As it is now") }), el("pre", { textContent: p.before }));
+    const state = p.accepted ? el("span", { className: "proved", textContent: t("✓ goes into the commit") })
+      : p.rejected ? el("span", { className: "muted", textContent: t("left out") }) : null;
+    box.append(text, ...(now ? [now] : []), el("div", { className: "row" }, ...[state, el("span", { className: "spacer" }),
+      action(t("Leave out"), "/api/capitalise", { id: item.id, index: i, accept: false }, { quiet: true }),
+      action(p.accepted ? t("Save the text") : t("Put in the commit"), "/api/capitalise",
+        () => ({ id: item.id, index: i, accept: true, content: text.value }), { primary: !p.accepted && !p.rejected })].filter(Boolean)));
+    return box;
+  })];
+}
+
 function cycleView(item, { tests = false } = {}) {
   const c = item.cycle ?? {};
   const nodes = [];
@@ -1236,7 +1264,8 @@ function card(item) {
       action(t("Pass"), "/api/pass", { id: item.id }), el("span", { className: "spacer" }), dropButton(item.id, true));
     add(el("div", { className: "reply" }, change, images.node), actions, el("div", { className: "error", role: "alert" }),
       el("div", { className: "changes-slot" }), doneWhen(item), ...cycleView(item),
-      c.review ? focusBy(t("What the AI review said"), c.review, "model") : null, ...work(item), shots(item), ...facts(item));
+      c.review ? focusBy(t("What the AI review said"), c.review, "model") : null, ...capitaliseView(item),
+      ...work(item), shots(item), ...facts(item));
   } else if (item.kind === "later") {
     // Kept, not started: read in the details, said again there if need be,
     // then launched.

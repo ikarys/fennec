@@ -1252,6 +1252,99 @@ fn solve_now(store: &Store, id: &str) -> io::Result<()> {
     check_from(store, id, &worlds, run, &variants)
 }
 
+/// The end of the cycle: what the reviewed work may change in the project's
+/// knowledge, proposed for the human next to the review (fennec-os
+/// `analysis::capitalise`). Never in the way of the work: a failed ask
+/// proposes nothing, and says so in the Journal.
+fn capitalise(
+    store: &Store,
+    id: &str,
+    worlds: &Worlds,
+    run: &str,
+    model: &dyn Model,
+) -> io::Result<()> {
+    match analysis::capitalise(worlds, run, model) {
+        Ok((proposals, exchange)) => store.update(id, |r| {
+            r["capitalise"] = json!(proposals);
+            if !exchange.is_null() {
+                note(r, json!({"stage": "capitalise", "exchange": exchange}));
+            }
+        }),
+        Err(e) => store.update(id, |r| {
+            r["capitalise"] = json!([]);
+            note(r, json!({"stage": "capitalise", "error": e.to_string()}));
+        }),
+    }
+}
+
+/// The human's call on one knowledge proposal of a ready task: accepted as
+/// they left its text, it goes into the task's commit; rejected, it stays
+/// out. Either can be changed until the commit.
+pub fn decide_knowledge(
+    store: &Store,
+    id: &str,
+    index: usize,
+    accept: bool,
+    content: Option<&str>,
+) -> io::Result<()> {
+    let request = store.load(id)?;
+    if request["status"] != "ready" || request["commit"].is_string() {
+        return Err(io::Error::other(
+            "this task does not wait for your decision",
+        ));
+    }
+    let p = &request["capitalise"][index];
+    if !p.is_object() {
+        return Err(io::Error::other("no such proposal"));
+    }
+    if accept {
+        let file = p["file"].as_str().unwrap_or("");
+        let text = content.or(p["content"].as_str()).unwrap_or("");
+        // Checked now, so a refusal is said before the commit.
+        knowledge::check(
+            Path::new(request["project"].as_str().unwrap_or("")),
+            &[json!({"file": file, "content": text})],
+        )?;
+    }
+    store.update(id, |r| {
+        let p = &mut r["capitalise"][index];
+        p["accepted"] = json!(accept);
+        p["rejected"] = json!(!accept);
+        if let Some(c) = content.filter(|_| accept) {
+            p["content"] = json!(c);
+        }
+        let file = p["file"].clone();
+        note(
+            r,
+            json!({"stage": "knowledge", if accept { "accepted" } else { "rejected" }: file}),
+        );
+    })
+}
+
+/// The accepted knowledge proposals, written into the task's world before
+/// it lands: the kernel numbers new records against HEAD and writes the
+/// knowledge paths only. The landing commits them with the work.
+fn write_knowledge(worlds: &Worlds, request: &Value) -> io::Result<()> {
+    let accepted: Vec<Value> = request["capitalise"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|p| p["accepted"] == true)
+        .cloned()
+        .collect();
+    if accepted.is_empty() {
+        return Ok(());
+    }
+    let project = Path::new(request["project"].as_str().unwrap_or(""));
+    let checked = knowledge::check(project, &accepted)?;
+    let world = worlds.open(request["run"].as_str().unwrap_or(""))?;
+    knowledge::write(
+        &world.path,
+        checked["files"].as_array().map_or(&[][..], |v| v),
+    )?;
+    Ok(())
+}
+
 /// The worlds a task's work runs in. The Fleet's work goes apart: ready and
 /// waiting for the human, it must not hold the folder the next task of the
 /// queue needs. Committed on the Fleet's branch, it builds on what landed
@@ -1323,6 +1416,7 @@ fn check_from(
             store.update(id, |r| r["review_report"] = review["report"].clone())?;
         }
         if review["skipped"] == true || review["passed"] == true {
+            capitalise(store, id, worlds, &run, &reviewer)?;
             break;
         }
         let found = review["findings"].as_str().unwrap_or("").to_string();
@@ -2094,6 +2188,9 @@ pub fn journal(store: &Store, id: &str) -> io::Result<Value> {
                 step("Discussion", &e["exchange"]),
                 &e["exchange"]["team"],
             )),
+            Some("capitalise") if e["exchange"].is_object() => {
+                steps.push(step("Review: knowledge", &e["exchange"]))
+            }
             Some("frame") => {
                 if let Ok(s) = spec::load(&worlds, e["spec"].as_str().unwrap_or("")) {
                     steps.push(roles(
@@ -2538,6 +2635,9 @@ fn land_now(store: &Store, id: &str) -> io::Result<()> {
                     r["land_error"] = json!(format!("not verified: plugin {name} refuses ({e})"));
                 });
             }
+        }
+        if let Err(e) = write_knowledge(&worlds, &request) {
+            return fail_landing(store, id, e);
         }
         match solve::land(
             &worlds,
@@ -3006,6 +3106,46 @@ mod tests {
         close(&store, "1").unwrap();
         assert_eq!(store.view().unwrap()["history"][0]["kind"], "analysed");
         assert!(frame_anyway(&store, "1").is_err());
+        std::fs::remove_dir_all(tmp).unwrap();
+    }
+
+    #[test]
+    fn a_ready_tasks_knowledge_proposals_are_put_in_or_left_out_of_its_commit() {
+        let tmp =
+            std::env::temp_dir().join(format!("fennec-lead-capitalise-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(tmp.join("requests")).unwrap();
+        let store = Store { root: tmp.clone() };
+        std::fs::write(
+            tmp.join("requests/1.json"),
+            json!({"project": tmp.join("proj"), "status": "ready",
+                   "capitalise": [{"file": "ARCHITECTURE.md", "content": "# v"},
+                                  {"file": "src/main.rs", "content": "x"}]})
+            .to_string(),
+        )
+        .unwrap();
+        decide_knowledge(&store, "1", 0, true, Some("# v, edited")).unwrap();
+        let r = store.load("1").unwrap();
+        assert_eq!(r["capitalise"][0]["accepted"], true);
+        assert_eq!(r["capitalise"][0]["content"], "# v, edited");
+        // The kernel refuses a path outside the knowledge, before the commit.
+        assert!(decide_knowledge(&store, "1", 1, true, None).is_err());
+        decide_knowledge(&store, "1", 1, false, None).unwrap();
+        decide_knowledge(&store, "1", 0, false, None).unwrap();
+        let r = store.load("1").unwrap();
+        assert_eq!(
+            (
+                &r["capitalise"][0]["rejected"],
+                &r["capitalise"][1]["rejected"]
+            ),
+            (&json!(true), &json!(true))
+        );
+        assert!(decide_knowledge(&store, "1", 5, true, None).is_err());
+        store.update("1", |r| r["commit"] = json!("c1")).unwrap();
+        assert!(
+            decide_knowledge(&store, "1", 0, true, None).is_err(),
+            "committed already"
+        );
         std::fs::remove_dir_all(tmp).unwrap();
     }
 

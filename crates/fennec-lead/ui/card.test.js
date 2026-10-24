@@ -60,6 +60,8 @@ eval(src.match(/const el = \(tag, props = \{\}, \.\.\.children\) => \{[\s\S]*?\n
   const facts = () => [];
   const doneWhen = () => null;
   const cycleView = () => [];
+  const capitaliseView = () => [];
+  const reportView = () => [];
   const focusBy = () => new Node("div");
   const rich = () => [new Node("span")];
   const explain = (r) => r;
