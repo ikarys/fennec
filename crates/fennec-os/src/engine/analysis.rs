@@ -102,6 +102,33 @@ pub fn mode(project: &Path, kind: &str) -> io::Result<String> {
     ))
 }
 
+/// What a report of `kind` lacks, said back to the model, which goes on: an
+/// adoption is its proposals for the vision and the zones (seen: a fine
+/// report on the project that proposed nothing). Code decides, not the model.
+pub fn lacking(kind: &str, report: &Value) -> Option<String> {
+    if kind != "adopt" {
+        return None;
+    }
+    let files: Vec<&str> = report["proposals"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|p| p["content"].as_str().is_some_and(|c| !c.trim().is_empty()))
+        .filter_map(|p| p["file"].as_str())
+        .collect();
+    let missing: Vec<&str> = [crate::zones::VISION_FILE, crate::zones::ZONES_FILE]
+        .into_iter()
+        .filter(|f| !files.contains(f))
+        .collect();
+    (!missing.is_empty()).then(|| {
+        format!(
+            "refused: an adoption report must carry `proposals` with the whole text of {}; \
+             call `report` again with them (and the decisions you see), keeping your findings",
+            missing.join(" and ")
+        )
+    })
+}
+
 /// An analysis turn: a question back to the person, or the report.
 pub enum Analysed {
     Reply(String),
@@ -292,6 +319,20 @@ mod tests {
             (p[0]["allowed"].clone(), p[1]["allowed"].clone()),
             (json!(true), json!(false))
         );
+    }
+
+    #[test]
+    fn an_adoption_without_its_vision_and_zones_is_sent_back() {
+        let bare = json!({"summary": "ok", "proposals": []});
+        let why = lacking("adopt", &bare).unwrap();
+        assert!(
+            why.contains("ARCHITECTURE.md and .fennec-os/zones.json"),
+            "{why}"
+        );
+        assert!(lacking("audit", &bare).is_none());
+        let full = json!({"proposals": [{"file": "ARCHITECTURE.md", "content": "# v"},
+                                        {"file": ".fennec-os/zones.json", "content": "{}"}]});
+        assert!(lacking("adopt", &full).is_none());
     }
 
     #[test]
