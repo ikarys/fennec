@@ -402,6 +402,7 @@ const FR = {
   "fennec changes the folder directly.": "fennec modifie le dossier directement.",
   "fennec is answering…": "fennec répond…",
   "fennec is still answering": "fennec répond encore",
+  "fennec is still preparing this task: launch it in a moment": "fennec prépare encore cette tâche : lance-la dans un instant",
   "fennec no longer waits for an answer": "fennec n'attend plus de réponse",
   "fennec no longer works on this task": "fennec ne travaille plus sur cette tâche",
   "fennec proposes this plan and asks to change the folder": "fennec propose ce plan et demande à modifier le dossier",
