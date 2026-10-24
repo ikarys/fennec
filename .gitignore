@@ -1,0 +1,4 @@
+/target
+.fennec/
+.fennec-os/
+.playwright-cli/
