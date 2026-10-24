@@ -178,9 +178,16 @@ fn until_waiting(f: &Fixture, id: &str) -> Value {
 
 /// The fixture's home must not sit under a path the sandbox hides (its
 /// /tmp and friends are private tmpfs): the question is about host paths.
+/// `/var/tmp` when it can be written; inside a fennec world it is read-only,
+/// and cargo's own scratch folder under the target dir stands in.
 fn var_tmp() -> std::path::PathBuf {
     let p = std::path::PathBuf::from("/var/tmp");
-    if p.is_dir() { p } else { std::env::temp_dir() }
+    let probe = p.join(format!(".fennec-os-probe-{}", std::process::id()));
+    if std::fs::write(&probe, "").is_ok() {
+        let _ = std::fs::remove_file(&probe);
+        return p;
+    }
+    std::path::PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
 }
 
 #[test]
