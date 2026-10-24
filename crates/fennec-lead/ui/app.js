@@ -1068,7 +1068,18 @@ function card(item) {
     // A stop of the dev's loop: the code is done, they look before the rest.
     add(el("div", { className: "muted", textContent: t("Stopped after the code, as your loop asks: look at the work, then continue with the review and the proof.") }),
       ...cycleView(item), ...work(item));
-    actions.append(action(t("Continue"), "/api/continue", { id: item.id }, { primary: true }),
+    if (item.amend_error) add(el("div", { className: "bad", textContent: t("Correction not done, the work stayed as it was: {0}", t(firstLine(item.amend_error))) }));
+    // A change asked here goes on to the review and the proof once done.
+    const change = el("textarea", { placeholder: t("What to change"), ariaLabel: t("What to change"), hidden: true });
+    const fix = el("button", { type: "button", textContent: t("Correct") });
+    fix.onclick = () => {
+      change.hidden = false;
+      change.focus();
+      fix.replaceWith(action(t("Send"), "/api/amend", () => ({ id: item.id, text: images.value() })));
+    };
+    const images = attach(change);
+    add(el("div", { className: "reply" }, change, images.node));
+    actions.append(action(t("Continue"), "/api/continue", { id: item.id }, { primary: true }), fix,
       changesButton(item, () => node.querySelector(".changes-slot")),
       codeButton(item, () => node.querySelector(".changes-slot")), el("span", { className: "spacer" }), dropButton(item.id, true));
     add(actions, el("div", { className: "error", role: "alert" }), el("div", { className: "changes-slot" }));
