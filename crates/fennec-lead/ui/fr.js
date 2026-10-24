@@ -663,4 +663,5 @@ const FR = {
   "this task is not ready for review": "cette tâche n'est pas prête pour la revue",
   "this task is not stopped": "cette tâche n'est pas arrêtée",
   "unknown stop point": "point d'arrêt inconnu",
+  "Design": "Conception",
 };

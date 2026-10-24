@@ -286,7 +286,8 @@ function cycleView(item, { tests = false } = {}) {
       el("ol", { className: "plan-steps" }, ...c.plan.map((s) => el("li", {}, ...rich(s))))));
   }
   if (c.planned?.length) {
-    nodes.push(el("div", { className: "files" }, t("Files it expects to touch: "), ...c.planned.map((f) => el("code", { textContent: f }))));
+    nodes.push(el("div", { className: "files" }, t("Files it expects to touch: "),
+      ...c.planned.flatMap((f, i) => [i ? ", " : "", el("code", { textContent: f })])));
   }
   if (tests && c.tests_first && c.tests) {
     nodes.push(el("div", { className: "focus" }, el("span", { className: "label" }, t("Tests written first, to validate"), " ", prov("model")),
@@ -867,7 +868,8 @@ const stageOf = (name) => {
 // A step's name in the chosen language: "Work, try 2" keeps its number.
 const stageName = (name) => {
   const n = stageKey(name);
-  if (n.startsWith("Framing")) return t("Tests first");
+  // The framing is the design now; tests come first only in a sensitive zone.
+  if (n.startsWith("Framing")) return t("Design");
   const m = n.match(/^(Work|Proof|Starting|Review) \((?:running|en cours)\)$/);
   if (m) return t("{0} (running)", t(m[1]));
   const tried = n.match(/^Work, try (\d+)$/);
