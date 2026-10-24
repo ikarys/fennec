@@ -2,6 +2,7 @@
 //! and runs only inside a world.
 
 pub mod agent;
+pub mod analysis;
 pub mod chat;
 pub mod proof;
 pub mod provider;
