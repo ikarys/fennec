@@ -222,11 +222,21 @@ fn slug(title: &str) -> String {
             s.push('-');
         }
     }
-    let s: String = s.trim_end_matches('-').chars().take(50).collect();
-    if s.is_empty() {
+    // Whole words up to 50 characters: a file name never ends mid-word.
+    let mut cut = String::new();
+    for word in s.split('-').filter(|w| !w.is_empty()) {
+        if !cut.is_empty() && cut.len() + 1 + word.len() > 50 {
+            break;
+        }
+        if !cut.is_empty() {
+            cut.push('-');
+        }
+        cut.push_str(word);
+    }
+    if cut.is_empty() {
         "decision".to_string()
     } else {
-        s.trim_end_matches('-').to_string()
+        cut.chars().take(50).collect()
     }
 }
 
@@ -433,6 +443,16 @@ mod tests {
         assert!(commit(&dir, &files, "again").is_err());
         assert!(write(&dir, &[json!({"file": "src/x.rs", "content": ""})]).is_err());
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_record_name_keeps_whole_words() {
+        // Seen on hominfer: "...-for-syst.md".
+        let s = slug("Layered package: web → services → domain, infra for system access");
+        assert_eq!(s, "layered-package-web-services-domain-infra-for");
+        assert_eq!(slug("No web framework"), "no-web-framework");
+        assert_eq!(slug("→ !"), "decision");
+        assert_eq!(slug(&"x".repeat(80)).len(), 50);
     }
 
     #[test]
