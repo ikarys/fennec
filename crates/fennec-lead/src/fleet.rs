@@ -18,7 +18,9 @@ fn path(store: &Store) -> std::path::PathBuf {
     store.root.join("fleet.json")
 }
 
-/// Run by default: only tasks the human put in the queue start. One at a
+/// Stopped by default: tasks running on their own while the human is away
+/// belong to supervised night work (C25), which needs the stop points and
+/// the decision registry first; the human may still start it. One at a
 /// time by default: a local model server answers one request well.
 fn load(store: &Store) -> io::Result<Value> {
     let mut v = match std::fs::read_to_string(path(store)) {
@@ -27,7 +29,7 @@ fn load(store: &Store) -> io::Result<Value> {
         Err(e) => return Err(e),
     };
     if !v["on"].is_boolean() {
-        v["on"] = json!(true);
+        v["on"] = json!(false);
     }
     if !v["at_once"].is_u64() {
         v["at_once"] = json!(1);
@@ -457,7 +459,11 @@ mod tests {
         place(&store, &b, "add").unwrap();
         // The human moves b first; "kept" stays for later, out of the Fleet.
         place(&store, &b, "up").unwrap();
-        set(&store, None, Some(2), None, None).unwrap();
+        assert!(
+            !running(&store).unwrap(),
+            "stopped until the human starts it"
+        );
+        set(&store, Some(true), Some(2), None, None).unwrap();
         tick(&store, |_| {}, |_, _| Ok(()), |_| {}).unwrap();
         assert_eq!(store.load(&b).unwrap()["status"], "thinking");
         assert_eq!(store.load(&a).unwrap()["status"], "later");
@@ -567,7 +573,7 @@ mod tests {
         framed(&store, &b);
         place(&store, &a, "add").unwrap();
         place(&store, &b, "add").unwrap();
-        set(&store, None, Some(2), None, Some("branch")).unwrap();
+        set(&store, Some(true), Some(2), None, Some("branch")).unwrap();
         assert!(set(&store, None, None, None, Some("main")).is_err());
         let landing = |s: &Store, id: &str| s.update(id, |r| r["status"] = json!("landing"));
         tick(&store, |_| {}, landing, |_| {}).unwrap();
