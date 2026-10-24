@@ -1,0 +1,1023 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fennec</title>
+<style>
+  :root { --bg: #f6f5f2; --card: #fff; --text: #1d1d1b; --muted: #6b6a66; --line: #e2e0da; --soft: #efede8;
+          --accent: #c4622d; --ok: #2f7d4f; --warn: #9a6a12; --bad: #a33a3a; --info: #4a6fa5; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #171716; --card: #222220; --text: #ecebe7; --muted: #9a988f; --line: #33322f; --soft: #2b2a28;
+            --accent: #e08050; --ok: #5fb383; --warn: #d9a441; --bad: #d46a6a; --info: #7d9ccc; }
+  }
+  * { box-sizing: border-box; }
+  /* A display rule on an element would otherwise beat its hidden attribute. */
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  /* Projects on the left, always in view; the chosen one's page on the right. */
+  .app { display: grid; grid-template-columns: 210px minmax(0, 1fr); min-height: 100vh; }
+  #side { position: sticky; top: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column; gap: 2px;
+          padding: 20px 12px; border-right: 1px solid var(--line); background: var(--card); }
+  /* The middle is what scrolls; the header above and the tools below never
+     leave the screen, no matter how short the window is. */
+  #side .mid { overflow: auto; flex: 1; min-height: 0; }
+  /* The left bar folds to the edge; its icon reopens it from the top of the list. */
+  #open-side, #open-side-2 { display: none; margin: 4px 0 10px; }
+  body.side-off .app { grid-template-columns: minmax(0, 1fr); }
+  body.side-off #side { display: none; }
+  body.side-off #open-side { display: inline-flex; }
+  /* The right bar (decisions and figures) folds away; its icon stays in the head. */
+  body.facts-off .split > aside { display: none; }
+  .side-top { display: flex; align-items: center; justify-content: space-between; margin: 0 8px 14px; }
+  .side-top h1 { margin: 0; }
+  #side ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 2px; }
+  #side .item { width: 100%; display: flex; gap: 8px; align-items: center; text-align: left; border: none;
+                background: none; border-radius: 6px; padding: 6px 8px; }
+  #side .item:hover { background: var(--soft); }
+  #side .item[aria-current=true] { background: var(--soft); font-weight: 600; }
+  #side .item .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .count { background: var(--accent); color: #fff; border-radius: 999px; font-size: 11px; font-weight: 600;
+                 padding: 0 7px; }
+  #side .label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+                 margin: 14px 8px 4px; display: flex; align-items: center; justify-content: space-between; }
+  #side .label button { color: var(--muted); padding: 2px; }
+  #side .label button:hover { color: var(--text); }
+  /* A project's two exits, on its right: shown on the project, or on focus. */
+  #side .project { display: flex; align-items: center; gap: 2px; }
+  #side .project > .item { flex: 1; min-width: 0; }
+  #side .project .icon { border: none; background: none; color: var(--muted); padding: 4px; border-radius: 5px;
+                         opacity: 0; flex: none; }
+  #side .project:hover .icon, #side .project:focus-within .icon { opacity: 1; }
+  #side .project .icon:hover { color: var(--text); background: var(--soft); }
+  #side .project .quiet { border: none; background: none; color: var(--bad); padding: 4px 2px; font-size: 12px; }
+  #side-archived { list-style: none; padding: 0; margin: 0 0 0 8px; display: grid; gap: 2px; }
+  #side-archived li { display: flex; align-items: center; gap: 2px; padding: 2px; }
+  #side-archived .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                         font-size: 13px; color: var(--muted); }
+  #side-archived .icon { border: none; background: none; color: var(--muted); padding: 4px; border-radius: 5px; }
+  #side-archived .icon:hover { color: var(--text); background: var(--soft); }
+  #side-archived .quiet { border: none; background: none; color: var(--bad); padding: 4px 2px; font-size: 12px; }
+  #side-error { margin: 4px 8px; }
+  /* Team, figures and settings: one row of icons, named on hover. */
+  #side .tools { display: flex; gap: 4px; border-top: 1px solid var(--line); padding-top: 10px; }
+  #side .tools button { flex: 1; justify-content: center; color: var(--muted); padding: 8px; border-radius: 6px; }
+  #version { font: 11px ui-monospace, monospace; color: var(--muted); text-align: center; margin-top: 6px; }
+  #version .dirty { color: var(--warn); }
+  #version .stale { color: var(--accent); font-family: system-ui, sans-serif; margin-top: 2px; }
+  #side .tools button:hover, #side .tools button[aria-current=true] { color: var(--text); background: var(--soft); }
+  #side .link.ic { color: var(--text); }
+  #side .spacer { flex: 1; }
+  #side .link { text-align: left; padding: 6px 8px; }
+  #side .link[aria-current=true] { background: var(--soft); font-weight: 600; }
+  /* Three panes, each scrolled on its own, like a mail client: projects, the
+     requests of the chosen one, and the request (or the project's page) read in full. */
+  /* Explicit minmax(0, 1fr) rows: an auto row grows to its content in Firefox,
+     which pushed the panes (and the side's tools) below the window. */
+  /* The window itself never scrolls on a wide screen, only the three panes:
+     sized on the real window (100%), not 100vh, which a root scrollbar or a
+     zoom rounding can make taller than what is visible. */
+  html, body { height: 100%; }
+  body { overflow: hidden; }
+  .app { height: 100%; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+  #side { height: 100%; }
+  main { display: grid; grid-template-columns: 370px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr);
+         min-height: 0; min-width: 0; height: 100%; }
+  #list { overflow: auto; min-height: 0; padding: 16px 14px 40px; border-right: 1px solid var(--line); }
+  #detail { overflow: auto; min-height: 0; padding: 16px 20px 40px; }
+  #detail { container-type: inline-size; }
+  #detail > * { max-width: 1240px; }
+  /* A request read in full: what to read and decide on the left, what it cost
+     and how it was kept safe on the right, once there is room for both. */
+  .split { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  /* Packed from the left, decision first: a spacer only leaves holes once they wrap. */
+  #detail .actions { justify-content: flex-start; }
+  #detail .actions .spacer { display: none; }
+  .split > aside h2 { margin: 4px 0 8px; }
+  .split > aside .facts { margin-top: 0; }
+  .split > aside .metrics { display: grid; grid-template-columns: 1fr 1fr; }
+  .split > aside .timeline { flex-direction: column; height: auto; gap: 3px; background: none; }
+  .split > aside .seg { flex: none !important; padding: 3px 8px; border-radius: 4px; }
+  .split > aside .pills { flex-direction: column; align-items: flex-start; }
+  .guard { margin-top: 18px; }
+  #guard-list { list-style: none; padding: 0; margin: 8px 0; display: flex; flex-direction: column; gap: 4px; }
+  #guard-list li { display: grid; grid-template-columns: 92px 110px minmax(0, 1fr) auto; gap: 10px; align-items: center; font-size: 13px; }
+  #guard-list li code { font: 12px ui-monospace, monospace; overflow-wrap: anywhere; }
+  #guard-list li .why { color: var(--muted); }
+  #guard-list .effect { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  #guard-list .effect.deny { color: var(--bad); }
+  #guard-list .effect.ask { color: var(--warn); }
+  #guard-list .effect.allow { color: var(--ok); }
+  #guard-form { display: grid; grid-template-columns: auto auto minmax(0, 1fr) minmax(0, 1fr) auto; gap: 6px; }
+  .split > aside ul.plan { list-style: none; padding: 0; margin: 0 0 12px; display: flex; flex-direction: column; gap: 4px; }
+  .split > aside ul.plan li { display: flex; justify-content: flex-start; align-items: flex-start; gap: 7px; font-size: 13px; text-align: left; }
+  .split > aside ul.plan li .what { flex: 1; min-width: 0; }
+  .split > aside ul.plan li:not(.ic)::before { content: ""; flex: none; width: 11px; height: 11px; margin: 3px 3px 0 3px;
+    border: 1.5px solid var(--muted); border-radius: 50%; }
+  .split > aside ul.plan li.ok { color: var(--muted); }
+  .split > aside ul.plan li.ok::before { color: var(--ok); }
+  .split > aside ul.plan li.bad:not(.ic)::before { border-color: var(--bad); }
+  .split > aside ul.plan li.out::before { display: none; }
+  .split > aside ul.plan li.out pre { margin: 0 0 4px 21px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; color: var(--muted); }
+  /* Narrow: the decision goes first, the figures after the request. */
+  .split > aside { display: contents; }
+  .split .decide { order: -1; }
+  @container (min-width: 740px) {
+    .split { grid-template-columns: minmax(0, 1fr) 280px; }
+    .split > aside { display: block; position: sticky; top: 0; align-self: start; }
+  }
+  /* The request read in full: its title in whole and where it stands, above
+     what it holds; the list says the same per row, this says it once. */
+  .req-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; margin-bottom: 12px; }
+  .req-head strong { font-size: 16px; overflow-wrap: anywhere; }
+  .req-head .muted { font-size: 12px; }
+  .status { font-size: 12px; font-weight: 600; padding: 1px 9px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
+  .status.bad { color: var(--bad); border-color: var(--bad); }
+  .status.ok { color: var(--ok); border-color: var(--ok); }
+  .saved { color: var(--ok); align-self: center; }
+  .status.warn { color: var(--warn); border-color: var(--warn); }
+  .status.accent { color: var(--accent); border-color: var(--accent); }
+  .status.muted { color: var(--muted); border-color: var(--line); }
+  .status.info { color: var(--info); border-color: var(--info); }
+  /* The tabs wrap instead of scrolling: History must never sit behind an invisible scrollbar. */
+  .tabs { display: flex; flex-wrap: wrap; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
+  .tabs button { border: none; border-radius: 0; background: none; color: var(--muted); padding: 5px 12px; font-size: 13px;
+                 border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tabs button:hover { color: var(--text); }
+  .tabs button[aria-selected=true] { color: var(--text); font-weight: 600; border-bottom-color: var(--accent); }
+  .switch { position: relative; width: 34px; height: 20px; border: none; border-radius: 10px;
+            background: var(--line); cursor: pointer; flex: none; padding: 0; transition: background .15s; }
+  .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+                   border-radius: 50%; background: var(--card); transition: transform .15s; }
+  .switch[aria-checked=true] { background: var(--ok); }
+  .switch[aria-checked=true]::after { transform: translateX(14px); }
+  .tab-panel table.grid { font-size: 13px; }
+  .decide { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px;
+            margin-bottom: 14px; }
+  .decide .actions { display: flex; flex-direction: column; align-items: stretch; gap: 6px; margin: 0; }
+  .decide .actions button { display: flex; align-items: center; gap: 10px; text-align: left; padding: 5px 10px;
+            border-color: transparent; background: var(--soft); }
+  .decide .actions button:hover:not(:disabled) { border-color: var(--line); background: var(--bg); }
+  .decide .actions button.primary { margin-bottom: 4px; }
+  .decide .actions button.primary:hover { filter: brightness(1.08); background: var(--accent); }
+  .decide .actions button.quiet { color: var(--bad); margin-top: 4px; }
+  .decide .actions button.quiet:hover:not(:disabled) { background: color-mix(in srgb, var(--bad) 12%, transparent); }
+  /* An icon drawn in the element's own colour; alone, the button is square. */
+  .ic { display: inline-flex; align-items: center; gap: 7px; }
+  .ic::before { content: ""; flex: none; width: 17px; height: 17px; background: currentColor;
+            -webkit-mask: var(--icon) center / contain no-repeat; mask: var(--icon) center / contain no-repeat; }
+  button.ic:empty { padding: 5px; }
+  h2.ic::before, h3.ic::before { width: 15px; height: 15px; }
+  .decide .actions .primary { order: -1; }
+  .decide .actions .quiet { order: 99; }
+  .decide .reply { margin: 0 0 8px; }
+  .decide .reply:has(textarea[hidden]) { display: none; }
+  .decide .error:not(:empty) { margin-top: 8px; }
+  .decide .past-actions .actions { margin: 0; }
+  #back { display: none; margin-bottom: 10px; }
+  /* Which project is on screen: the focused rows hide it, the list says it.
+     The detail repeats it only where the list is gone (narrow, request open). */
+  #list-head, #detail-head { gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  #list-head { display: flex; margin-bottom: 12px; }
+  #detail-head { display: none; }
+  #list-head strong, #detail-head strong { font-size: 15px; }
+  #list-head .muted, #detail-head .muted { font-size: 12px; }
+  #hint .tiles { grid-template-columns: repeat(auto-fit, minmax(115px, 1fr)); }
+  #hint .hint-text { text-align: center; padding: 16px 0; }
+  #hint .row.fresh .what { font-weight: 600; }
+  #compose-open { width: 100%; justify-content: center; padding: 6px 12px; margin-bottom: 4px; }
+  /* Each part of the list in its own box: what waits for the human stands out. */
+  #list .box, #hint .box { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px 4px;
+               margin-top: 14px; }
+  #list .box h2, #hint .box h2 { margin: 0 0 4px; display: flex; gap: 8px; align-items: center; }
+  #list .box .count, #hint .box .count { text-transform: none; letter-spacing: 0; }
+  #list .box .empty, #hint .box .empty { padding: 4px 0 8px; font-size: 13px; }
+  /* The Fleet, from the Ready tab: its state and its switch, one line. */
+  #fleet-bar { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 6px 12px;
+               border: 1px solid var(--line); border-radius: 8px; background: var(--card); font-size: 13px; }
+  #fleet-bar button { padding: 3px 10px; }
+  #fleet-bar.on { border-color: var(--info); }
+  /* The backlog's boxes to tick, and what to do with the ticked ones. */
+  .pick-row { display: flex; align-items: center; gap: 6px; }
+  .pick-row > input { flex: none; margin: 0 0 0 2px; accent-color: var(--accent); }
+  .pick-row > .row-wrap { flex: 1; min-width: 0; }
+  .pick { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 4px 0 6px; font-size: 13px; }
+  .pick button { padding: 3px 10px; white-space: nowrap; }
+  #fleet-bar .spacer, .pick .spacer { flex: 1; }
+  .fleet-settings { display: flex; gap: 24px; flex-wrap: wrap; padding: 4px 0 10px; font-size: 13px; }
+  .fleet-settings label { display: flex; align-items: center; gap: 8px; }
+  .warn-line { color: var(--warn); }
+  #todo-box:has(a.row) { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+  #n-others { margin-left: auto; }
+  #list .cost, #detail summary .cost { display: none; }
+  /* In the narrow list, the state goes under the title. */
+  #reqs .line { flex-wrap: wrap; row-gap: 0; }
+  #reqs .line .state { flex-basis: 100%; order: 3; white-space: normal; text-align: left; font-size: 12px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  a.row { display: block; color: inherit; text-decoration: none; border-radius: 6px; padding: 0 8px; margin: 0 -8px; }
+  a.row:hover { background: var(--soft); }
+  a.row[aria-current=true] { background: var(--soft); box-shadow: inset 3px 0 0 var(--accent); }
+  a.row .line { border-bottom: none; }
+  a.row .tag { font-size: 11px; }
+  #detail details.past > summary { font-size: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+  /* Narrower: the list, or the request chosen in it, with a way back. */
+  @media (max-width: 1099px) {
+    body { overflow: visible; }
+    .app, main { height: auto; }
+    .app { min-height: 100vh; }
+    #side { height: 100vh; }
+    main { display: block; }
+    #list, #detail { overflow: visible; border-right: none; }
+    body.picked #list { display: none; }
+    /* Team, Stats and Réglages have no list to go back to: the bar leads away. */
+    body.picked:not(.paged) #back { display: inline-block; }
+    body.chats #back .to-reqs, body:not(.chats) #back .to-chats { display: none; }
+    body.picked #detail-head { display: flex; margin-bottom: 12px; }
+    body:not(.picked) #hint { display: none; }
+    /* The list hides when a request is picked: the open icon follows it to the detail. */
+    body.side-off #open-side { display: none; }
+    body.side-off.picked #open-side-2 { display: inline-flex; }
+  }
+  h1 { font-size: 20px; margin: 0; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+       margin: 24px 0 8px; font-weight: 600; }
+  .muted { color: var(--muted); }
+  /* The compact control family, on the first fennec's spec: small padding,
+     small face, and a primary set apart by accent text and hairline, never a
+     bright solid block. */
+  select, textarea, button, input { font-size: 13px; color: inherit; background: var(--card);
+         border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; }
+  textarea { resize: vertical; min-height: 44px; width: 100%; }
+  button { cursor: pointer; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.primary { background: var(--card); border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+                   color: var(--accent); font-weight: 600; }
+  button.primary:hover { background: color-mix(in srgb, var(--accent) 10%, transparent);
+                         border-color: var(--accent); }
+  :is(button, a).link { border: none; background: none; color: var(--accent); padding: 0; text-decoration: none; }
+  a.link:hover { text-decoration: underline; }
+  button.stop { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, transparent); }
+  button.stop:hover, button.stop.sure { background: color-mix(in srgb, var(--bad) 12%, transparent); border-color: var(--bad); }
+  button.quiet { border: none; background: none; color: var(--muted); padding: 4px; }
+  #compose { width: min(640px, calc(100vw - 32px)); }
+  #new-request { display: grid; gap: 10px; }
+  #new-request .head { align-items: center; }
+  #new-request .head strong { font-size: 16px; }
+  dialog::backdrop { background: rgb(0 0 0 / .45); }
+  .later-text { width: 100%; min-height: 40vh; margin: 4px 0 0; }
+  .later-title { width: 100%; margin: 4px 0 10px; }
+  /* The left list already says which project: the request goes there. */
+  body.focused #project { display: none; }
+  .error { color: var(--bad); font-size: 13px; min-height: 0; margin: 4px 0 0; }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px;
+          margin-bottom: 10px; }
+  .meta { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); }
+  .tag { font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--c); }
+  .title { font-size: 16px; margin: 4px 0 10px; overflow-wrap: anywhere; }
+  /* The one thing to read before deciding. */
+  .focus { background: var(--soft); border-radius: 6px; padding: 8px 10px; overflow-wrap: anywhere; }
+  /* What was asked opens the page: plain reading text, its paragraphs tight. */
+  .asked { overflow-wrap: anywhere; margin-bottom: 10px; }
+  .asked > :first-child { margin-top: 0; }
+  .asked > :last-child { margin-bottom: 0; }
+  .focus p, .focus ul { margin: 2px 0; }
+  .focus ul { padding-left: 20px; }
+  .focus .label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 2px; }
+  .focus code, .warn code { font: 13px ui-monospace, monospace; background: var(--card); border-radius: 4px; padding: 0 4px; }
+  .proved { color: var(--ok); font-size: 14px; margin-top: 10px; }
+  .warn { color: var(--warn); font-size: 14px; margin: 8px 0 0; padding-left: 18px; }
+  .bad { color: var(--bad); font-size: 14px; margin-top: 8px; overflow-wrap: anywhere; }
+  .shots { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+  .shot { color: var(--muted); text-decoration: none; font-size: 12px; }
+  /* The whole width of the page, scaled to the card: a corner at real size hid
+     most of what the proof showed. Long pages are cut at the bottom. */
+  .shot img { display: block; width: 100%; height: auto; max-height: 520px; object-fit: cover;
+              object-position: left top; background: #fff; border: 1px solid var(--line);
+              border-radius: 6px; margin-bottom: 2px; }
+  .steps { font: 12px ui-monospace, monospace; color: var(--muted); }
+  .actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+  .actions .spacer { flex: 1; }
+  .reply { margin-top: 10px; }
+  /* Images joined to what the human writes, and shown back in the thread. */
+  .attach { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px; min-width: 0; }
+  .reply:has(> textarea[hidden]) .attach { display: none; }
+  .thumbs { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+  .attach .thumbs { margin: 0; }
+  .thumb img { display: block; height: 64px; max-width: 160px; object-fit: cover; border: 1px solid var(--line);
+               border-radius: 6px; background: var(--soft); }
+  .said .thumb img { height: 96px; max-width: 240px; }
+  .thumb-wrap { position: relative; }
+  .thumb-wrap .drop { position: absolute; top: -6px; right: -6px; padding: 2px; border-radius: 50%;
+                      background: var(--card); border: 1px solid var(--line); }
+  .thumb-wrap .drop::before { width: 12px; height: 12px; }
+  details { margin-top: 10px; font-size: 13px; color: var(--muted); }
+  summary { cursor: pointer; }
+  :is(details, .more) code, :is(details, .more) pre { display: block; font: 12px ui-monospace, monospace; overflow-wrap: anywhere;
+              white-space: pre-wrap; margin: 4px 0; }
+  :is(details, .more) pre { background: var(--soft); border-radius: 6px; padding: 6px 8px; max-height: 240px; overflow: auto; }
+  :is(details, .more) p { margin: 6px 0; }
+  .more { font-size: 13px; }
+  .more > h3 { margin: 18px 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+  .more > h3:first-child, details.more > summary + h3 { margin-top: 4px; }
+  .more ul { margin: 0; padding-left: 18px; }
+  .more :is(li, p) code { display: inline; margin: 0; }
+  .more pre.failed { color: var(--text); border-left: 3px solid var(--bad); }
+  .more tbody.sub th { border-top: 1px solid var(--line); padding-top: 12px; }
+  .more tbody.sub tr:first-child th { color: var(--muted); font-weight: 600; }
+  /* Numbers right-aligned so they read down a column; tight enough to fit beside the side panel. */
+  .more table.grid :is(th, td) { padding: 3px 6px; }
+  .more table.grid :is(th, td):nth-child(n+3) { text-align: right; }
+  details.try { margin: 2px 0; }
+  details.message.try > summary b { width: 7em; color: var(--ok); }
+  details.try > summary::before { width: 1em; text-align: center; }
+  details.message.try.failed > summary b { color: var(--bad); }
+  details.try > summary .head { font: 12px ui-monospace, monospace; color: var(--text); }
+  details.try[open] > summary .head { white-space: pre-wrap; overflow-wrap: anywhere; }
+  details.try > pre { margin: 2px 0 8px 1.2em; max-height: 360px; }
+  .past { margin: 0; font-size: 14px; color: inherit; }
+  details.past > summary { list-style: none; }
+  details.past > summary::-webkit-details-marker { display: none; }
+  details.past > summary .what::before { content: "▸ "; color: var(--muted); }
+  details.past[open] > summary .what::before { content: "▾ "; }
+  details.past[open] { padding-bottom: 12px; }
+  .past .focus { margin-top: 8px; }
+  .diff { font: 12px/1.45 ui-monospace, monospace; background: var(--soft); border-radius: 6px; padding: 8px 10px;
+          max-height: 520px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; margin: 10px 0 0; }
+  .diff .add { color: var(--ok); }
+  .diff .del { color: var(--bad); }
+  .diff .hunk { color: var(--info); }
+  .diff .file { display: block; font-weight: 600; color: var(--text); margin-top: 8px; }
+  /* A step of the journal: its own box, the stage colour on the left edge. */
+  .step { margin-top: 12px; font-size: 13px; border: 1px solid var(--line); border-left: 3px solid var(--frame);
+          border-radius: 8px; padding: 8px 12px 10px; background: var(--card); }
+  .step.talk { border-left-color: var(--talk); }
+  .step.solve { border-left-color: var(--solve); }
+  .step.review { border-left-color: var(--review); }
+  .step.prove { border-left-color: var(--prove); }
+  .step-name { font-weight: 600; font-size: 14px; display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 8px;
+               padding-bottom: 6px; margin-bottom: 4px; border-bottom: 1px solid var(--line); }
+  .step-name .spacer { flex: 1; }
+  .step-name .cost { font-weight: 400; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .roles { font-size: 13px; color: var(--text); margin-top: 2px; }
+  /* One line per message: who in a fixed column, then the start of what was said. */
+  details.message { margin: 0; color: var(--text); border-radius: 6px; }
+  details.message > summary { display: flex; gap: 8px; align-items: baseline; padding: 3px 6px; border-radius: 6px;
+                              list-style: none; color: var(--muted); }
+  details.message > summary::-webkit-details-marker { display: none; }
+  details.message > summary::before { content: "▸"; flex: none; transition: transform .15s; }
+  details.message[open] > summary::before { transform: rotate(90deg); }
+  details.message > summary:hover { background: var(--soft); }
+  details.message > summary b { flex: none; width: 9.5em; font-weight: 600; color: var(--text);
+                               white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  details.message > summary .head { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  details.message.assistant > summary b { color: var(--accent); }
+  details.message.user > summary b { color: var(--info); }
+  details.message.tool > summary b, details.message.system > summary b { color: var(--muted); font-weight: 500; }
+  details.message.call > summary .head, details.message.tool > summary .head { font: 12px ui-monospace, monospace; }
+  details.message.tool { margin-left: 1.2em; }
+  details.message > pre { margin: 2px 0 6px 1.2em; }
+  details.message pre { max-height: 420px; }
+  details.message pre.thought { color: var(--muted); border-left: 3px solid var(--warn); }
+  details.message pre.thought::before { content: attr(data-label); display: block; font: 600 11px system-ui, sans-serif;
+                                        text-transform: uppercase; letter-spacing: .06em; color: var(--warn); margin-bottom: 4px; }
+  details.message > summary .thinks { flex: none; color: var(--warn); align-self: center; }
+  details.message > summary .thinks::before { width: 13px; height: 13px; }
+  .thread { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+  .said { background: var(--soft); border-radius: 8px; padding: 8px 12px; max-width: 85%; min-width: 0;
+          overflow-wrap: anywhere; white-space: pre-wrap; font-size: 14px; }
+  .said.human { align-self: flex-end; background: transparent; border: 1px solid var(--line); }
+  .said .label { display: block; font-size: 12px; color: var(--muted); }
+  .msg { display: flex; flex-direction: column; align-items: flex-start; max-width: 85%; min-width: 0; }
+  .msg.human { align-self: flex-end; align-items: flex-end; }
+  .msg > .said { max-width: 100%; }
+  .msg-actions { display: flex; gap: 2px; opacity: 0; transition: opacity .15s; }
+  .msg:hover .msg-actions, .msg:focus-within .msg-actions, .msg.last .msg-actions { opacity: 1; }
+  .msg-actions .ic::before { width: 15px; height: 15px; }
+  .msg-actions button { padding: 3px 5px; border: 0; background: transparent; color: var(--muted); }
+  .msg-actions button:hover { color: var(--text); }
+  .replaying { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; font-size: 12px; }
+  .replaying[hidden] { display: none; }
+  .said code { font: 13px ui-monospace, monospace; }
+  /* Markdown the model writes in a discussion. */
+  .said p, .said ul, .said ol, .said pre, .said table, .said blockquote { margin: 6px 0; }
+  .said table.grid { display: block; overflow-x: auto; max-width: 100%; }
+  .said pre { overflow-x: auto; }
+  .said li { margin: 2px 0; }
+  .said ul, .said ol { padding-left: 20px; }
+  .said h1 { font-size: 16px; margin: 10px 0 4px; }
+  .said h2 { margin: 10px 0 4px; }
+  .said h3, .said h4, .said h5, .said h6 { font-size: 14px; font-weight: 600; margin: 8px 0 4px; }
+  .said pre { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px;
+             font: 12px ui-monospace, monospace; overflow-x: auto; }
+  .said blockquote { margin-left: 0; border-left: 3px solid var(--line); padding-left: 10px; color: var(--muted); }
+  .files { font-size: 13px; color: var(--muted); margin-top: 8px; overflow-wrap: anywhere; }
+  /* Inline here, though they sit inside a details box that blocks its code. */
+  details .focus code, details .files code, details .warn code, details .said code { display: inline; white-space: normal; margin: 0; }
+  .files code { font: 12px ui-monospace, monospace; }
+  .files code:not(:last-of-type)::after { content: ", "; }
+  .files details { display: inline; }
+  .files details[open] { display: block; }
+  .files summary { display: inline; cursor: pointer; color: var(--accent); margin-left: 6px; }
+  #how { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px;
+         margin-top: 16px; font-size: 14px; }
+  #how ol { margin: 6px 0 0; padding-left: 20px; }
+  .empty { color: var(--muted); padding: 12px 0; }
+  .line { display: flex; gap: 10px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--line);
+          font-size: 14px; overflow-wrap: anywhere; }
+  .line .what { flex: 1; min-width: 0; }
+  /* A request or a discussion in a list: one line, the whole text on hover. */
+  .line .clip { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* One project on screen: its name on every line is noise. */
+  body.focused .proj { display: none; }
+  #n-others { font-size: 12px; text-transform: none; letter-spacing: 0; font-weight: 400; }
+  .line .state { color: var(--muted); font-size: 13px; white-space: nowrap; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--info); flex: none; align-self: center;
+         animation: pulse 1.6s ease-in-out infinite; }
+  .dot.idle { animation: none; opacity: .45; }
+  @keyframes pulse { 50% { opacity: .3; } }
+  dialog { background: var(--card); color: var(--text); border: 1px solid var(--line); border-radius: 10px;
+           width: min(600px, calc(100vw - 32px)); padding: 16px; }
+  dialog form.go { display: flex; gap: 8px; margin: 10px 0; }
+  dialog form.go input { flex: 1; min-width: 0; }
+  #picker-list { list-style: none; padding: 0; margin: 10px 0; max-height: 45vh; overflow: auto; }
+  #picker-list li button { width: 100%; text-align: left; border: none; border-radius: 6px; }
+  #picker-list li button:hover { background: var(--bg); }
+  .repo { color: var(--ok); font-size: 12px; margin-left: 6px; }
+  .row { display: flex; gap: 8px; justify-content: flex-end; }
+  .team-pick { display: flex; gap: 8px; align-items: center; margin: 12px 0 4px; font-size: 14px; }
+  .team-pick select, #team-catalog { flex: 1; min-width: 0; }
+  #team-roles li { display: flex; gap: 10px; align-items: baseline; padding: 4px; }
+  #team-roles li button { width: auto; padding: 2px 4px; color: inherit; }
+  #team-roles .out button { color: var(--muted); text-decoration: line-through; }
+  #team-role { display: grid; gap: 8px; margin: 10px 0; }
+  .row .spacer { flex: 1; }
+  .field { display: grid; gap: 4px; margin: 12px 0 4px; font-size: 14px; }
+  .field .go { display: flex; gap: 8px; }
+  .field .go input { flex: 1; min-width: 0; }
+  #settings-models li { display: flex; gap: 8px; align-items: center; padding: 2px 4px; }
+  /* The theme picker: one tile per theme, its palette as a preview. */
+  #theme-picker { list-style: none; padding: 0; margin: 10px 0 18px; display: grid;
+                  grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .theme { display: grid; gap: 6px; padding: 8px; border: 1px solid var(--line); border-radius: 8px;
+           background: none; cursor: pointer; text-align: left; }
+  .theme:hover { background: var(--soft); }
+  .theme[aria-pressed=true] { border-color: var(--accent); }
+  .theme .preview { display: flex; height: 26px; border-radius: 4px; overflow: hidden; border: 1px solid var(--line); }
+  .theme .preview .bg { flex: 1; }
+  .theme .preview .accent { width: 18px; }
+  .theme .name { font-size: 13px; }
+  #font-scale { width: 90px; }
+  :root { --talk: var(--warn); --frame: var(--accent); --solve: var(--info); --review: color-mix(in oklab, var(--accent) 45%, var(--info) 55%); --prove: var(--ok); }
+  .facts { margin-top: 12px; display: grid; gap: 8px; }
+  .facts h3 { margin: 0; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+  .metrics { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .metric { display: inline-grid; grid-auto-flow: row; background: var(--soft); border-radius: 8px; padding: 4px 10px;
+            min-width: 84px; line-height: 1.25; }
+  .metric small { font-size: 11px; color: var(--muted); }
+  .metric b { font-size: 15px; font-variant-numeric: tabular-nums; color: var(--text); }
+  .meter { display: block; width: 100%; height: 4px; border-radius: 2px; margin: 2px 0;
+           background: linear-gradient(90deg, var(--ok) var(--p), var(--line) var(--p)); }
+  .timeline { display: flex; gap: 2px; height: 22px; border-radius: 6px; overflow: hidden; font-size: 11px; }
+  .seg { display: flex; align-items: center; padding: 0 6px; color: #fff; white-space: nowrap; overflow: hidden; min-width: 4px; }
+  .seg.talk, .dotc.talk { background: var(--talk); }
+  .seg.frame, .dotc.frame { background: var(--frame); }
+  .seg.solve, .dotc.solve { background: var(--solve); }
+  .seg.review, .dotc.review { background: var(--review); }
+  .seg.prove, .dotc.prove { background: var(--prove); }
+  .who { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+  .rtag { display: inline-block; font-size: 12px; line-height: 1.4; padding: 1px 8px; border-radius: 999px; font-weight: 500;
+          border: 1px solid; margin-right: 2px; }
+  .rtag.talk { color: var(--talk); border-color: var(--talk); }
+  .rtag.frame { color: var(--frame); border-color: var(--frame); }
+  .rtag.solve { color: var(--solve); border-color: var(--solve); }
+  .rtag.review { color: var(--review); border-color: var(--review); }
+  .rtag.prove { color: var(--prove); border-color: var(--prove); }
+  .rtag.chip { cursor: pointer; background: transparent; }
+  .rtag.chip[aria-pressed=false] { color: var(--muted); border-color: var(--line); text-decoration: line-through; }
+  #chips:empty { display: none; }
+  #chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; }
+  .pills { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pill { font-size: 12px; color: var(--muted); background: var(--soft); border-radius: 999px; padding: 2px 10px; }
+  .pill .icon { margin-right: 4px; }
+  .pill.warn { color: var(--warn); }
+  .dotc { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+  .step-name .model { font-weight: 400; font-size: 12px; color: var(--muted); }
+  .mini { display: inline-block; background: var(--soft); border-radius: 999px; padding: 0 7px; margin-left: 4px; font-size: 12px; }
+  table.grid { border-collapse: collapse; font-size: 12px; margin: 6px 0; width: 100%; }
+  table.grid th, table.grid td { text-align: left; padding: 3px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  table.grid thead th { color: var(--muted); font-weight: 600; }
+  table.grid .meter { display: inline-block; width: 40px; vertical-align: middle; margin-right: 6px; }
+  .scroll { overflow-x: auto; }
+  .page-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .page-head strong { font-size: 18px; }
+  .page-head .spacer { flex: 1; }
+  #page { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; background: var(--card); }
+  .page-head { align-items: center; }
+  .page-head button { color: var(--muted); }
+  .page-head button:hover { color: var(--text); background: var(--soft); }
+  /* The project's settings, one block each under its figures. */
+  #page .sub { border-top: 1px solid var(--line); padding-top: 4px; margin-top: 14px; }
+  #page .sub h3 { display: flex; gap: 8px; align-items: center; margin: 10px 0 8px; font-size: 13px;
+                  text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .rules ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; }
+  .rules li { display: flex; gap: 6px; align-items: center; background: var(--soft); border-radius: 6px; padding: 4px 4px 4px 10px; }
+  .rules li > span:first-child { flex: 1; }
+  .rules li.empty { background: none; padding-left: 0; font-size: 12px; }
+  .rules h3 .count { text-transform: none; letter-spacing: 0; background: var(--soft); color: var(--muted); }
+  .small { font-size: 12px; }
+  #page .tiles { margin: 10px 0; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
+  .rule-form { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 4px; }
+  .rule-form input { flex: 1; min-width: 220px; }
+  .rules li button { padding: 4px; }
+  /* The global pages: the team, the figures, the settings — same place as
+     the project's page, the address names them. */
+  #detail > section { margin-top: 0; }
+  #detail > section .muted.hint { margin-top: 10px; }
+  form.go { display: flex; gap: 8px; margin: 10px 0; }
+  form.go input, form.go select { flex: 1; min-width: 0; }
+  #team ul, #settings ul { list-style: none; padding: 0; margin: 10px 0; }
+  #skills-list { margin-top: 6px; }
+  #skills-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 10px; align-items: center;
+                    padding: 6px 8px; margin-bottom: 4px; border-radius: 6px; background: var(--soft); }
+  #skills-list li strong { overflow-wrap: anywhere; }
+  #skills-list li .what { grid-column: 1; font-size: 13px; color: var(--muted); overflow-wrap: anywhere;
+                          display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
+                          overflow: hidden; }
+  #skills-list li button { grid-column: 2; grid-row: 1 / span 2; padding: 2px 10px; font-size: 13px; }
+  #skill-search { width: 100%; margin-top: 6px; }
+  #plugins-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; column-gap: 8px; align-items: center;
+                     padding: 6px 8px; margin-bottom: 4px; border-radius: 6px; background: var(--soft); }
+  #plugins-list li .what { grid-column: 1; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+  #plugins-list li .what.error { color: var(--bad); }
+  #plugins-list li strong { grid-column: 1; overflow-wrap: anywhere; }
+  #plugins-list li button { grid-row: 1 / span 2; grid-column: 2; padding: 2px 10px; font-size: 13px; }
+  #plugins-list li button.switch { grid-column: 3; }
+  #leftovers li label { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; align-items: baseline;
+                        padding: 8px 10px; margin-bottom: 4px; border-radius: 6px; background: var(--soft); cursor: pointer; }
+  #leftovers li .what { grid-column: 2; font-size: 13px; color: var(--muted); }
+  #leftovers li .what code { font: 12px ui-monospace, monospace; color: var(--text); }
+  #leftovers li .what.held { color: var(--warn); }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 12px 0; }
+  .tile { background: var(--soft); border-radius: 8px; padding: 10px 12px; display: grid; align-content: start; }
+  .tile.bad b { color: var(--bad); }
+  .tile b { font-size: 20px; }
+  .tile span { font-size: 12px; color: var(--muted); }
+  a.tile { color: inherit; text-decoration: none; }
+  a.tile:hover { box-shadow: inset 0 0 0 1px var(--line); }
+  .scroll { overflow-x: auto; }
+  #stats table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  #stats th, #stats td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  #stats thead th { font-weight: 600; color: var(--muted); font-size: 12px; }
+  #stats tbody th { font-weight: 500; }
+  #stats td.bad { color: var(--bad); }
+  #stats select { padding: 2px 6px; }
+  h3 { font-size: 13px; margin: 16px 0 4px; }
+  .bar { display: inline-block; width: 44px; height: 6px; border-radius: 3px; margin-right: 6px; vertical-align: middle;
+         background: linear-gradient(90deg, var(--info) var(--p), var(--line) var(--p)); }
+  body.chats #reqs { display: none; }
+  /* A page owns the width: the list pane is empty there, so it goes away and
+     the grid collapses to one column. */
+  body.paged #list { display: none; }
+  body.paged main { grid-template-columns: minmax(0, 1fr); }
+  #chats { margin-bottom: 12px; }
+  #new-chat { width: 100%; }
+  /* The discussions of one folder sit under its name, a project marked.
+     The name is a button: a click unfolds the folder's discussions. */
+  .chat-group { margin-top: 6px; }
+  .chat-group-head { display: flex; gap: 8px; align-items: center; padding: 6px 8px; margin: 0 0 2px;
+                     border: none; background: none; border-radius: 6px; text-align: left; }
+  .chat-group-head:hover { background: var(--soft); }
+  .chat-group-head::before { transition: transform .12s; transform: rotate(-90deg); }
+  .chat-group-head[aria-expanded=true]::before { transform: none; }
+  .chat-group-head .what { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                           font-size: 13px; font-weight: 600; }
+  .chat-group-head .tag { font-size: 10px; }
+  .chat-group-head .count { margin-left: auto; background: none; padding: 0; border-radius: 0;
+                            font-size: 12px; font-weight: 500; color: var(--muted);
+                            font-variant-numeric: tabular-nums; }
+  .chat-group-body { border-left: 2px solid var(--line); margin-left: 14px; padding-left: 10px; }
+  .chat-archived { margin-top: 14px; }
+  /* A list row's own actions, on its right: shown on the row, or when it
+     holds focus; an error, if any, takes their place. */
+  .row-wrap { position: relative; }
+  .row-actions { position: absolute; right: 4px; top: 3px; display: flex; gap: 2px; align-items: center;
+                opacity: 0; pointer-events: none; }
+  .row-wrap:hover .row-actions, .row-wrap:focus-within .row-actions { opacity: 1; pointer-events: auto; }
+  .row-actions .icon { border: none; background: var(--card); color: var(--muted); padding: 4px; border-radius: 5px; }
+  .row-actions .icon:hover { color: var(--text); background: var(--soft); }
+  .row-actions .quiet { border: none; background: none; color: var(--bad); padding: 4px; font-size: 12px; }
+  .row-actions .error { display: none; font-size: 11px; }
+  .row-actions .error:not(:empty) { display: block; }
+  /* The stop on the work under way: below its line, above the journal. */
+  .run-actions { display: flex; gap: 8px; align-items: center; margin: 12px 0 8px; }
+  .run-actions .error { margin: 0; }
+  .step.said { border-left: 3px solid var(--accent); }
+  pre.why { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; margin: 6px 0 12px; }
+  .stages { display: flex; flex-wrap: wrap; gap: 4px; list-style: none; padding: 0; margin: 0 0 10px; font-size: 12px; }
+  .stages li { padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+  .stages li.done { color: var(--text); }
+  .stages li.done::before { content: "✓ "; color: var(--ok); }
+  .stages li.stop { color: var(--bad); border-color: var(--bad); font-weight: 600; }
+  .stages li.stop::before { content: "✕ "; }
+  .stages li.now { color: var(--accent); border-color: var(--accent); font-weight: 600; }
+  .past.run > .state { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+  .step.said p { margin: 6px 0 0; white-space: pre-wrap; }
+  .chat .thinking { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px;
+                    padding: 2px 0 6px; }
+  :is(.chat, .thread) .ask { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 2px 0 6px;
+               padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); }
+  .chat .ask code { font-size: 13px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chat .ask .muted { font-size: 12px; }
+  /* A check is a command: shown whole, to be read before approving. */
+  .chat .ask.plan code, .chat-side ul.plan li .what { max-width: none; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .chat .ask.plan code { flex-basis: 100%; }
+  .chat .ask button { padding: 3px 10px; font-size: 13px; }
+  /* One line: wrapped, a column takes its widest child's width and a long
+     code block would push past the page. */
+  .chat .ask.plan { flex-direction: column; flex-wrap: nowrap; align-items: stretch; }
+  .chat .ask.plan .said { max-width: none; }
+  .chat-composer { margin-top: 10px; }
+  .chat-actions { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+  .chat-actions .spacer { flex: 1; }
+  .chat-side h2 { margin: 14px 0 6px; }
+  .chat-side ul { list-style: none; padding: 0; margin: 6px 0; }
+  .chat-side li { display: flex; gap: 8px; align-items: center; justify-content: space-between;
+                  padding: 4px 2px; font-size: 13px; }
+  .chat-side li .what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chat-side li button { padding: 2px 10px; font-size: 13px; flex: none; }
+  .chat-side .convert { width: 100%; }
+  @media (max-width: 760px) {
+    .app { display: block; }
+    #side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center;
+            border-right: none; border-bottom: 1px solid var(--line); padding: 10px 16px; }
+    /* Title and tools share the first line; the projects take the next one. */
+    #side .side-top { flex: 1; margin: 0; }
+    #side ul { display: flex; flex-wrap: wrap; }
+    #side .item, #side .project > .item { width: auto; flex: none; }
+    #side-archived:empty, #side-error:empty { display: none; }
+    #side .label span, #side .spacer { display: none; }
+    #side .label { margin: 0; }
+    #side .tools { border-top: none; padding-top: 0; }
+    /* The bar wraps instead of scrolling: nothing in it, Discussions
+       included, may disappear behind an invisible scrollbar. */
+    #side .mid { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; overflow: visible;
+                 order: 1; flex-basis: 100%; margin-top: 6px; }
+    #list, #detail { padding: 16px; }
+    .tabs button { padding: 8px 7px; font-size: 14px; }
+    .line .cost { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+<nav id="side" aria-label="Projects">
+  <div class="side-top">
+    <h1>fennec</h1>
+    <button type="button" class="link" id="close-side" data-icon="panelLeft" aria-label="Close the projects bar" title="Close the projects bar"></button>
+  </div>
+  <div class="mid">
+    <ul><li><button type="button" class="item" id="side-all" data-icon="inbox"><span class="name" data-t>Tasks</span></button></li>
+      <li><button type="button" class="item" id="side-chats" data-icon="chat"><span class="name">Agent</span></button></li></ul>
+    <div class="label"><span data-t>Projects</span> <button class="link" id="add-project" data-icon="plus" aria-label="Add a project" title="Add a project"></button></div>
+    <ul id="side-projects"></ul>
+    <div class="label" id="side-archived-label" hidden><span data-t>Archived projects</span></div>
+    <ul id="side-archived"></ul>
+    <p class="error" id="side-error" role="alert"></p>
+  </div>
+  <span class="spacer"></span>
+  <div class="tools">
+    <button class="link" id="open-team" data-icon="team" aria-label="Team" title="Team"></button>
+    <button class="link" id="open-stats" data-icon="stats" aria-label="Stats" title="Stats"></button>
+    <button class="link" id="open-settings" data-icon="gear" aria-label="Settings" title="Settings"></button>
+  </div>
+  <div id="version"></div>
+</nav>
+<main>
+  <section id="list" aria-label="Tasks">
+  <button type="button" class="link" id="open-side" data-icon="panelLeft" aria-label="Open the projects bar" title="Open the projects bar"></button>
+  <div id="list-head" hidden><strong id="list-head-name"></strong> <span class="muted" id="list-head-path"></span></div>
+  <div id="chats" hidden>
+    <button type="button" class="primary" id="new-chat" data-icon="plus" data-t>New discussion</button>
+    <h2>Agent</h2>
+    <div id="chat-list"></div>
+    <p class="muted" data-t>fennec reads and runs commands in the folder you pick, git or not, with your home folder hidden (the network stays open to install what is needed). It changes nothing until you allow it. The discussion's cost is on the right.</p>
+  </div>
+  <div id="reqs">
+  <button type="button" class="primary" id="compose-open" data-icon="plus" data-t>New task</button>
+  <p class="error" id="error" role="alert"></p>
+
+
+  <section id="how" hidden>
+    <strong data-t>How it works</strong>
+    <ol>
+      <li data-t>Pick a project: a folder on your disk ("+ project").</li>
+      <li data-t>Describe your task, as to a colleague, then "Start". If it is vague, fennec discusses it with you.</li>
+      <li data-t>Once it is clear, fennec answers with "done when": what you will be able to see once it is finished. Validate it or correct it.</li>
+      <li data-t>fennec works alone, then tries the result and shows you the proof.</li>
+      <li data-t>You look at the proof and the changes, then choose: commit, or pass (the work is set aside).</li>
+      <li data-t>Everything stays in the history: click a task to see again what was asked, done and proven.</li>
+    </ol>
+    <p class="muted" data-t>The team ("Team") picks the roles that work on the project; "Settings" picks the model.</p>
+  </section>
+
+  <!-- Where tasks stand, one step at a time: the active tab names itself,
+     the others show their icon and count. -->
+  <div class="tabs" role="tablist" id="list-tabs">
+    <button type="button" role="tab" data-tab="todo" data-icon="inbox" title="For you"><span class="label" data-t>For you</span> <span class="count" id="n-todo"></span></button>
+    <button type="button" role="tab" data-tab="later" data-icon="clock" title="Backlog"><span class="label" data-t>Backlog</span> <span class="count" id="n-later"></span></button>
+    <button type="button" role="tab" data-tab="ready" data-icon="fleet" title="Ready to run"><span class="label" data-t>Ready to run</span> <span class="count" id="n-ready"></span></button>
+    <button type="button" role="tab" data-tab="running" data-icon="work" title="Running"><span class="label" data-t>Running</span> <span class="count" id="n-running"></span></button>
+    <button type="button" role="tab" data-tab="history" data-icon="history" title="History"><span class="label" data-t>History</span> <span class="count" id="n-history"></span></button>
+  </div>
+
+  <div class="box" id="todo-box" data-tab="todo"><button class="link" id="n-others" type="button"></button>
+  <div id="todo"></div></div>
+
+  <div class="box" data-tab="later"><div id="later-pick" class="pick" hidden></div>
+  <div id="later"></div></div>
+
+  <!-- Ready is the Fleet's queue: its switch on top, the tasks in the order it starts them. -->
+  <div class="box" data-tab="ready"><div id="fleet-bar"></div>
+  <p class="warn-line" id="fleet-stopped" hidden></p>
+  <div id="ready-pick" class="pick" hidden></div>
+  <div id="ready"></div></div>
+
+  <div class="box" data-tab="running"><div id="running"></div></div>
+
+  <div class="box" data-tab="history"><div id="history"></div></div>
+
+  <div class="box" id="archived-box" data-tab="history" hidden><h2 data-icon="inbox"><span data-t>Archived</span> <span class="count" id="n-archived"></span></h2>
+  <div id="archived"></div></div>
+  </div>
+  </section>
+  <section id="detail">
+  <button type="button" class="link" id="open-side-2" data-icon="panelLeft" aria-label="Open the projects bar" title="Open the projects bar"></button>
+  <div id="detail-head" hidden><strong id="detail-head-name"></strong> <span class="muted" id="detail-head-path"></span></div>
+  <button type="button" class="link" id="back"><span class="to-reqs" data-t>← Back to the tasks</span><span class="to-chats" data-t>← Back to the discussions</span></button>
+  <div id="pick"></div>
+  <!-- Home: what moved since the last visit, what runs and what it takes,
+     what can run next. For leading the work, not watching it. -->
+  <div id="hint" hidden>
+    <div class="tiles" id="home-tiles"></div>
+    <div class="box"><h2 data-icon="history"><span data-t>Since your last visit</span> <span class="count" id="n-home-news"></span></h2>
+    <div id="home-news"></div></div>
+    <p class="muted hint-text" data-t>Pick a task on the left to read it in full, or a project to see its page.</p>
+  </div>
+  <!-- The chosen project's own page: what it cost, how it is worked on, its rules. -->
+  <aside id="page" hidden>
+    <div class="page-head"><span class="spacer"></span>
+      <button type="button" id="page-team" data-icon="team" aria-label="Team" title="Team"></button>
+      <button type="button" id="page-open" data-icon="folder" aria-label="Open the folder" title="Open the folder"></button></div>
+    <div class="tiles" id="page-tiles"></div>
+    <div class="sub"><h3 data-icon="shield" data-t>Where fennec works</h3>
+      <select id="page-place" aria-label="Where fennec works"></select></div>
+    <div class="sub rules" id="page-rules"><h3 data-icon="rule"><span data-t>Project rules</span> <span class="count" hidden></span></h3>
+      <p class="muted small"><span data-t>Instructions every agent follows on each task of this project, written in its AGENTS.md. The ones for all your projects are in</span>
+        <button type="button" class="link" id="to-user-rules" data-t>Settings</button>. <span data-t>When you correct a task, you may give one too: fennec offers to keep it.</span></p>
+      <ul></ul>
+      <form class="rule-form">
+        <input aria-label="New rule" placeholder="New rule, e.g. &quot;run cargo test before finishing&quot;" required>
+        <button data-icon="plus" aria-label="Add the rule" title="Add the rule"></button>
+      </form></div>
+    <p class="error" id="page-error" role="alert"></p>
+  </aside>
+  <!-- The team, the figures and the settings: pages the address names,
+     not dialogs. -->
+  <section id="team" hidden>
+    <div class="page-head"><strong id="team-title" data-t>Team</strong></div>
+    <div id="team-body">
+    <label class="team-pick"><span id="team-label" data-t>The project's team</span>
+      <select id="team-name"></select>
+    </label>
+    <ul id="team-roles"></ul>
+    <form class="go" id="team-add">
+      <select id="team-catalog" aria-label="Role to add"></select>
+      <button data-t>Add</button>
+    </form>
+    <form id="team-role" hidden>
+      <input id="role-name" aria-label="Role name" placeholder="Role name" required>
+      <select id="role-stage" aria-label="Step"></select>
+      <select id="role-model" aria-label="Model"></select>
+      <input id="role-tools" aria-label="Tools" placeholder="Tools, comma separated: read, write:relay/ — empty, all">
+      <textarea id="role-brief" aria-label="What this role does" rows="6"
+        placeholder="What this role demands, in a handful of sentences" required></textarea>
+      <textarea id="role-checks" aria-label="Commands run at each proof" rows="2"
+        placeholder="Commands run at each proof, one per line: if one fails, it is not ready"></textarea>
+      <div class="row"><button type="button" id="role-cancel" data-t>Cancel</button>
+        <button class="primary" data-t>Save</button></div>
+    </form>
+    <form class="go" id="team-save" hidden>
+      <input id="team-new-name" aria-label="Name of the new team" placeholder="Name of the new team" required>
+      <button class="primary" data-t>Save</button>
+    </form>
+    </div>
+    <p class="error" id="team-error" role="alert"></p>
+    <div class="row">
+      <button type="button" class="quiet" id="role-new" data-t>+ new role</button>
+      <button type="button" class="quiet" id="team-save-open" data-t>Save as a team…</button>
+    </div>
+  </section>
+  <section id="stats" hidden>
+    <div class="page-head"><strong>Stats</strong></div>
+    <div class="row" style="justify-content: flex-start">
+      <select id="stats-range" aria-label="Period">
+        <option value="0" data-t>All time</option>
+        <option value="7" data-t>Last 7 days</option>
+        <option value="30" data-t>Last 30 days</option>
+      </select>
+      <select id="stats-project" aria-label="Project"></select>
+    </div>
+    <div class="tiles" id="stats-tiles"></div>
+    <h3 data-t>By day</h3>
+    <div class="scroll"><table>
+      <thead><tr><th data-t>Date</th><th data-t>Sent</th><th data-t>Generated</th></tr></thead>
+      <tbody id="stats-days"></tbody>
+    </table></div>
+    <h3 data-t>By model</h3>
+    <div class="scroll"><table>
+      <thead><tr><th data-t>Model</th><th data-t>Calls</th><th data-t>Sent</th><th data-t>Cached</th><th data-t>Generated</th><th data-t>Speed</th><th data-t>Time</th></tr></thead>
+      <tbody id="stats-models"></tbody>
+    </table></div>
+    <h3 data-t>By step: where the time goes</h3>
+    <div class="scroll"><table>
+      <thead><tr><th data-t>Step</th><th data-t>Calls</th><th data-t>Time</th><th data-t>Share</th><th data-t>Sent</th><th data-t>Generated</th><th data-t>Speed</th></tr></thead>
+      <tbody id="stats-stages"></tbody>
+    </table></div>
+    <h3 data-t>By project</h3>
+    <div class="scroll"><table>
+      <thead><tr><th data-t>Project</th><th data-t>Where fennec works</th><th data-t>Tasks</th><th data-t>Commits</th><th data-t>Failures</th><th data-t>Undone tries</th><th data-t>Time</th><th data-t>Sent</th></tr></thead>
+      <tbody id="stats-projects"></tbody>
+    </table></div>
+    <h3 data-t>By task</h3>
+    <div class="scroll"><table>
+      <thead><tr><th data-t>Task</th><th data-t>Project</th><th data-t>Models</th><th data-t>Sent</th><th data-t>Generated</th><th data-t>Cached</th><th data-t>Time</th></tr></thead>
+      <tbody id="stats-tasks"></tbody>
+    </table></div>
+    <p class="muted" data-t>"In the folder": you see the work live, on a work branch. "Apart": your folder changes only at commit. The change applies to the next tasks. Each work's isolation: network to install dependencies, offline verification, no access to your home folder, read-only git history, capped memory; a failed try is undone without a trace.</p>
+    <p class="error" id="stats-error" role="alert"></p>
+  </section>
+  <section id="settings" hidden>
+    <div class="page-head"><strong data-t>Settings</strong></div>
+    <div class="tabs" role="tablist" id="settings-tabs">
+      <button type="button" role="tab" aria-selected="true" data-panel="settings-general" data-t>General</button>
+      <button type="button" role="tab" aria-selected="false" data-panel="settings-appearance" data-t>Appearance</button>
+      <button type="button" role="tab" aria-selected="false" data-panel="settings-rules" data-t>Rules</button>
+      <button type="button" role="tab" aria-selected="false" data-panel="settings-fleet">Fleet</button>
+      <button type="button" role="tab" aria-selected="false" data-panel="settings-skills">Skills</button>
+      <button type="button" role="tab" aria-selected="false" data-panel="settings-plugins">Plugins</button>
+      <button type="button" role="tab" aria-selected="false" data-panel="settings-clean" data-t>Cleaning</button>
+    </div>
+    <div id="settings-general">
+      <form id="settings-form">
+        <label class="field"><span data-t>Model server</span>
+          <span class="go"><input id="settings-url" required placeholder="http://localhost:8000/v1">
+            <button type="button" id="settings-test" data-t>Test</button></span>
+        </label>
+        <div class="muted" id="settings-status"></div>
+        <ul id="settings-models"></ul>
+        <label class="field"><span data-t>Tokens per answer, reasoning included (0: the server's value)</span>
+          <input id="settings-tokens" type="number" min="0" step="1024" required>
+        </label>
+        <label class="field"><span data-t>Reasoning before each answer</span>
+          <select id="settings-effort">
+            <option value="" data-t>The model's own</option>
+            <option value="none" data-t>None: faster</option>
+            <option value="low" data-t>Low</option>
+            <option value="medium" data-t>Medium</option>
+            <option value="xhigh" data-t>Highest: slower</option>
+          </select>
+        </label>
+        <label class="field"><span data-t>When the model reasons</span>
+          <select id="settings-think">
+            <option value="always" data-t>Always: most reasoning, slowest</option>
+            <option value="adaptive" data-t>Adaptive: only after a tool error</option>
+            <option value="never" data-t>Never: fastest</option>
+          </select>
+        </label>
+        <label class="field"><span data-t>Access key (optional)</span>
+          <input id="settings-key" type="password" autocomplete="off">
+        </label>
+        <p class="muted" id="settings-env" hidden></p>
+        <p class="error" id="settings-error" role="alert"></p>
+        <div class="row">
+          <span class="saved" id="settings-saved" role="status"></span>
+          <button type="button" id="settings-cancel" data-t>Cancel</button>
+          <button class="primary" data-t>Save</button>
+        </div>
+      </form>
+    </div>
+    <div id="settings-appearance" hidden>
+      <label class="field"><span data-t>Language</span>
+        <select id="language"></select>
+      </label>
+      <ul id="theme-picker"></ul>
+      <label class="field"><span data-t>Text size</span>
+        <input id="font-scale" type="number" min="12" max="21" step="1" required>
+      </label>
+    </div>
+    <div id="settings-rules" class="rules" hidden>
+      <p class="muted" data-t>Instructions every agent follows on each task, in all your projects, written in ~/.config/fennec/rules.md. The ones for a single project are on the project's page.</p>
+      <ul></ul>
+      <form class="rule-form">
+        <input aria-label="New rule" placeholder="New rule, e.g. &quot;commits in English, Conventional Commits format&quot;" required>
+        <button data-icon="plus" aria-label="Add the rule" title="Add the rule"></button>
+      </form>
+      <p class="error" role="alert"></p>
+      <div class="box guard">
+        <h2 data-icon="shield"><span data-t>Commands and files</span> <span class="count" id="guard-count"></span></h2>
+        <p class="muted" data-t>Checked before each command, read or write of an agent, whatever the model. "Deny" refuses; "Ask" waits for your answer in a discussion, and a task does without; "Allow" lifts an ask, never a deny. Kept in ~/.config/fennec/guard.json, never in a project.</p>
+        <ul id="guard-list"></ul>
+        <form id="guard-form">
+          <select id="guard-effect" aria-label="Effect">
+            <option value="deny" data-t>Deny</option><option value="ask" data-t>Ask</option><option value="allow" data-t>Allow</option>
+          </select>
+          <select id="guard-on" aria-label="On">
+            <option value="command" data-t>the command</option><option value="read" data-t>reading</option>
+            <option value="write" data-t>writing</option><option value="file" data-t>access to</option>
+          </select>
+          <input id="guard-pattern" aria-label="Pattern" placeholder="rm -rf /   or   **/.env" required>
+          <input id="guard-why" aria-label="Why" placeholder="Why (optional)">
+          <button data-icon="plus" aria-label="Add the rule" title="Add the rule"></button>
+        </form>
+        <p class="error" id="guard-error" role="alert"></p>
+      </div>
+    </div>
+    <div id="settings-fleet" hidden>
+      <p class="muted" data-t>fennec starts the Fleet's tasks on its own, in this order, as soon as a slot is free. Each works apart: once ready, it waits for you without holding up the next. When nothing works, fennec prepares the next ones: if it has a question, it comes in "For you". Stopping it does not cut what runs.</p>
+      <div class="fleet-settings">
+        <label><span data-t>Tasks at once</span> <select id="fleet-at-once"></select></label>
+        <label><span data-t>After a failure</span> <select id="fleet-on-fail">
+          <option value="stop" data-t>stop the Fleet</option><option value="go on" data-t>go on</option></select></label>
+        <label title="On each project's fleet branch, never on your branch: the next task starts from there, and you merge when you want."><span data-t>After a success</span> <select id="fleet-on-success">
+          <option value="wait" data-t>wait for my validation</option><option value="branch" data-t>commit on the fleet branch</option></select></label>
+      </div>
+      <p class="error" id="fleet-error" role="alert"></p>
+    </div>
+    <div id="settings-skills" hidden>
+      <p class="muted" data-t>They apply to all your projects: the team sees the name and goal of each enabled skill, and reads it when the task needs it. They come from ~/.claude/skills and your plugins, from ~/.config/fennec/skills or from a project's .claude/skills folder.</p>
+      <input id="skill-search" type="search" aria-label="Search a skill" placeholder="Search the skills on your machine…">
+      <ul id="skills-list"></ul>
+      <p class="error" id="skills-error" role="alert"></p>
+    </div>
+    <div id="settings-plugins" hidden>
+      <p class="muted" data-t>A plugin tells you elsewhere (Discord, Telegram, Teams, ntfy…) when a task has a question, is ready or fails. Each is a folder of ~/.config/fennec/plugins with a plugin.json; it runs on your machine with your rights, only once enabled. A plugin that relays (the bundled Telegram bot) also lets you validate, drop or answer from the chat, for the senders in its "allow" list only; each decision is written in the Journal.</p>
+      <ul id="plugins-list"></ul>
+      <p class="error" id="plugins-error" role="alert"></p>
+      <p class="saved" id="plugins-saved" role="status"></p>
+    </div>
+    <div id="settings-clean" hidden>
+      <p class="muted" data-t>What fennec left behind when a work was cut short (a restart, a stop at the wrong time): no task uses it anymore. Tick what you want to delete.</p>
+      <ul id="leftovers"></ul>
+      <p class="error" id="leftovers-error" role="alert"></p>
+      <div class="row"><button type="button" class="stop" id="leftovers-clear" data-icon="trash" disabled data-t>Delete the selection</button></div>
+    </div>
+  </section>
+  </section>
+</main>
+</div>
+
+<!-- Written on demand, not spread over the list: the list is for what waits. -->
+<dialog id="compose">
+  <form id="new-request">
+    <div class="row head"><strong data-t>New task</strong><span class="spacer"></span>
+      <button type="button" class="quiet" id="compose-close" data-icon="close" aria-label="Close" title="Close"></button></div>
+    <select id="project" aria-label="Project" required></select>
+    <input id="title" aria-label="Title" placeholder="A short title (optional)" maxlength="120">
+    <textarea id="text" aria-label="Description" placeholder="What you want, as to a colleague…" rows="6" required></textarea>
+    <div id="chips"></div>
+    <p class="error" id="compose-error" role="alert"></p>
+    <div class="row">
+      <button type="button" id="later-add" data-icon="clock" title="Keep it in the Backlog: fennec restates it, you validate it, then the Fleet runs it" data-t>Backlog</button>
+      <button class="primary" data-icon="send" data-t>Start</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="picker">
+  <strong id="picker-title" data-t>Add a project</strong>
+  <form class="go" id="picker-go">
+    <input id="picker-input" aria-label="Folder path" placeholder="Paste a path, or browse below">
+    <button type="submit" data-t>Go</button>
+  </form>
+  <div class="muted" id="picker-path"></div>
+  <ul id="picker-list"></ul>
+  <form class="go" id="picker-new">
+    <input id="picker-new-name" aria-label="New folder" placeholder="Or a new folder here: its name" required>
+    <button data-t>Create the folder</button>
+  </form>
+  <label id="picker-place-wrap"><span data-t>Where fennec works</span>
+    <select id="picker-place" aria-label="Where fennec works">
+      <option value="here" data-t>In this folder: you see the work live</option>
+      <option value="apart" data-t>In a folder apart, next to it: this folder changes only at commit</option>
+    </select>
+  </label>
+  <div class="row">
+    <button type="button" id="picker-cancel" data-t>Cancel</button>
+    <button type="button" class="primary" id="picker-choose" data-t>Add</button>
+  </div>
+</dialog>
+
+<script src="/fr.js"></script>
+<script src="/app.js"></script>
