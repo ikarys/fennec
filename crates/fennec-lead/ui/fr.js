@@ -664,4 +664,5 @@ const FR = {
   "this task is not stopped": "cette tâche n'est pas arrêtée",
   "unknown stop point": "point d'arrêt inconnu",
   "Design": "Conception",
+  "Outside the plan: ": "Hors du plan : ",
 };
