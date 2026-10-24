@@ -48,12 +48,14 @@ a summary in exactly this form:\n\
 goal: <the defect and the expected behaviour, for whoever fixes it, naming the failing test>\n\
 verify: <a shell command that runs the new test; one line per command>";
 
-/// Framing without tests: one model call, no world to explore. The person \
-/// validates "done when"; the work is judged by the project's own tests, \
-/// named here. `compile` keeps the full path (a sparring finding still \
-/// needs its failing test).
+/// The design: one model call, no world to explore. The person validates
+/// "done when", how the change fits the architecture vision and the plan;
+/// the files it names are matched against the sensitive zones, in code, to
+/// decide the task's risk. `compile` writes the tests first when it is
+/// sensitive (a sparring finding still needs its failing test too).
 const FRAME: &str = "Turn the request below into the words the person will check it with, \
-before anyone implements it. Read the project first: what it is, and how its tests are run. \
+and into the design they validate before anyone implements it. Read the project first: what \
+it is, its architecture vision when it has one, and how its tests are run. \
 Write nothing. \
 A careful project lead does not invent the product: when the request does not say what to \
 build or change, or the project is empty and the request leaves open what kind of program it \
@@ -65,7 +67,112 @@ one or two sentences, in the request's language; product terms only, no file, ta
 or test names, and never the state of git (a diff, a commit): the work is committed as it \
 goes>\n\
 verify: <the shell command that runs the project's whole test suite, from its root; one line \
-per command, at most two; `none` if the project has no tests>";
+per command, at most two; `none` if the project has no tests>\n\
+architecture: <in two to five sentences, in the request's language: which parts of the \
+project the change goes in and why, how it fits the architecture vision, and any new part or \
+dependency it needs; say plainly where it departs from the vision>\n\
+plan:\n\
+- <one step of the implementation, in order; three to eight steps>\n\
+files:\n\
+- <a path the work will create or change, relative to the project root; every one of them>";
+
+/// The design's parts beyond "done when" and verify.
+#[derive(Debug, Default, PartialEq)]
+struct Design {
+    architecture: String,
+    plan: Vec<String>,
+    files: Vec<String>,
+}
+
+/// Reads `architecture:` (its line and the lines after it), `plan:` and
+/// `files:` (one `- ` item per line) out of the design's reply.
+fn design_parse(content: &str) -> Design {
+    let mut d = Design::default();
+    let mut section = "";
+    for line in content.lines() {
+        let trimmed = line.trim();
+        let mut opened = None;
+        for k in [
+            "architecture",
+            "plan",
+            "files",
+            "done_when",
+            "verify",
+            "question",
+        ] {
+            if let Some(rest) = key(trimmed, k) {
+                opened = Some((k, rest));
+                break;
+            }
+        }
+        if let Some((k, rest)) = opened {
+            section = k;
+            if k == "architecture" && !rest.is_empty() {
+                d.architecture = rest.to_string();
+            }
+            continue;
+        }
+        if trimmed.is_empty() || trimmed.starts_with("```") {
+            continue;
+        }
+        let item = trimmed
+            .trim_start_matches("- ")
+            .trim_start_matches("* ")
+            .trim_start_matches(|c: char| c.is_ascii_digit() || c == '.' || c == ')')
+            .trim();
+        match section {
+            "architecture" => {
+                if !d.architecture.is_empty() {
+                    d.architecture.push(' ');
+                }
+                d.architecture.push_str(trimmed);
+            }
+            "plan" if !item.is_empty() => d.plan.push(item.to_string()),
+            "files" => {
+                // Only the list mark goes: a path may start with a digit.
+                let path = trimmed
+                    .trim_start_matches("- ")
+                    .trim_start_matches("* ")
+                    .trim_matches('`')
+                    .trim_start_matches("./");
+                if !path.is_empty() && !d.files.iter().any(|f| f == path) {
+                    d.files.push(path.to_string());
+                }
+            }
+            _ => {}
+        }
+    }
+    d
+}
+
+/// The request with the design under it, as the work reads it.
+fn designed_goal(request: &str, d: &Design) -> String {
+    let mut goal = request.to_string();
+    if !d.architecture.is_empty() {
+        goal.push_str(&format!("\n\nArchitecture (design):\n{}", d.architecture));
+    }
+    if !d.plan.is_empty() {
+        goal.push_str("\n\nPlan:\n");
+        for (i, s) in d.plan.iter().enumerate() {
+            goal.push_str(&format!("{}. {s}\n", i + 1));
+        }
+    }
+    goal
+}
+
+/// The vision and the zones, for the design and the review to read.
+pub(crate) fn vision_context(project: &Path) -> io::Result<String> {
+    let mut out = String::new();
+    if let Some(v) = crate::zones::vision(project) {
+        let v: String = v.chars().take(6000).collect();
+        out.push_str(&format!(
+            "\n\nArchitecture vision ({}):\n{v}\n",
+            crate::zones::VISION_FILE
+        ));
+    }
+    out.push_str(&crate::zones::brief(&crate::zones::load(project)?));
+    Ok(out)
+}
 
 fn spec_path(worlds: &Worlds, id: &str) -> io::Result<PathBuf> {
     if id.is_empty() || id.contains('/') {
@@ -195,12 +302,14 @@ pub fn frame(
     context.push_str(&rules::brief(&said));
     let (roles, team) = team::brief(&project, "frame")?;
     context.push_str(&roles);
+    context.push_str(&vision_context(&project)?);
     let messages = vec![
         json!({"role": "system", "content": format!("{FRAME}\n\n{files}\n\n{context}")}),
         json!({"role": "user", "content": answered(&answers) + request}),
     ];
     let (content, exchange) = crate::provider::ask(model, &messages)?;
     let (done, verify, question) = frame_parse(&content);
+    let design = design_parse(&content);
     let world = worlds.fork(&name)?;
     let id = world.id.clone();
     let mut spec = json!({
@@ -219,9 +328,14 @@ pub fn frame(
     });
     match (done, question) {
         (Some(d), _) => {
-            // The goal the work builds to: the request itself, no one
-            // restating it; the tests the developer writes are its own.
-            spec["goal"] = json!(request);
+            // The goal the work builds to: the request itself, with the
+            // design the human validates, so the work and the review read it.
+            spec["goal"] = json!(designed_goal(request, &design));
+            spec["architecture"] = json!(design.architecture);
+            spec["plan"] = json!(design.plan);
+            spec["files"] = json!(design.files);
+            // Verified, not the model's opinion: its files against the zones.
+            spec["risk"] = crate::zones::classify(&crate::zones::load(&project)?, &design.files);
             spec["done_when"] = json!(d);
             spec["verify"] = json!(verify);
             spec["protect"] = json!(Vec::<String>::new());
@@ -630,6 +744,12 @@ fn frame_parse(content: &str) -> (Option<String>, Vec<String>, Option<String>) {
             if !cmd.is_empty() && !cmd.eq_ignore_ascii_case("none") {
                 verify.push(cmd.trim_matches('`').to_string());
             }
+        } else if ["architecture", "plan", "files"]
+            .iter()
+            .any(|k| key(trimmed, k).is_some())
+        {
+            // The design's sections end the verify lines.
+            in_verify = false;
         } else if in_verify {
             if trimmed.is_empty() && !verify.is_empty() {
                 in_verify = false;
@@ -1294,6 +1414,34 @@ mod tests {
         let (done, _, question) = frame_parse("question: une page ou un script ?\n");
         assert_eq!(done, None);
         assert_eq!(question.as_deref(), Some("une page ou un script ?"));
+    }
+
+    #[test]
+    fn the_design_reads_architecture_plan_and_files() {
+        use super::{Design, design_parse, frame_parse};
+        let reply = "done_when: on peut soustraire\nverify:\npython3 -m unittest\n\
+                     architecture: Dans calc.py, à côté de add.\nAucune dépendance.\n\
+                     plan:\n1. Ajouter subtract\n- Tester subtract\n\
+                     files:\n- `calc.py`\n- ./test_calc.py\n- 2024/notes.md\n- calc.py\n";
+        assert_eq!(
+            design_parse(reply),
+            Design {
+                architecture: "Dans calc.py, à côté de add. Aucune dépendance.".to_string(),
+                plan: vec![
+                    "Ajouter subtract".to_string(),
+                    "Tester subtract".to_string()
+                ],
+                files: vec![
+                    "calc.py".to_string(),
+                    "test_calc.py".to_string(),
+                    "2024/notes.md".to_string()
+                ],
+            }
+        );
+        // The design's sections end the verify lines.
+        let (_, verify, _) = frame_parse(reply);
+        assert_eq!(verify, ["python3 -m unittest"]);
+        assert_eq!(design_parse("done_when: ok\n"), Design::default());
     }
 
     #[test]

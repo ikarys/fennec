@@ -47,11 +47,12 @@ pub fn run(
     let diff = agent::truncate(diff);
     let ask = format!(
         "{done}Goal:\n{}\n\nThe change to review (diff):\n{diff}\n\n\
-         Review the work in this world against its goal and the done when; where the diff \
-         is cut, read the changed files.",
+         Review the work in this world against its goal, its design and plan when it has \
+         them, the architecture vision and the done when; say where it departs from the \
+         vision. Where the diff is cut, read the changed files.",
         record["goal"].as_str().unwrap_or("")
     );
-    let mut context = String::new();
+    let mut context = crate::spec::vision_context(project)?;
     let names: Vec<String> = roles.iter().map(|r| r.name.clone()).collect();
     for r in &roles {
         context.push_str(&format!("\n\nAs {} on the team:\n{}\n", r.name, r.brief));
@@ -113,6 +114,8 @@ pub fn run(
         "passed": passed,
         "skipped": false,
         "findings": findings,
+        // What the reviewer wrote, passed or not: the human review reads it.
+        "report": report.as_deref().or(summary.as_deref()).unwrap_or(""),
         "question": question,
         "team": names,
         "steps": steps,
