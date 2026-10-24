@@ -38,4 +38,4 @@ printf '%s' "{\"project\":\"$PROJ_A\",\"title\":\"Fix the project filter\",\"tex
 echo "fennec : http://127.0.0.1:$PORT (home: $HOME_DIR)"
 echo "Stats page: http://127.0.0.1:$PORT/#stats"
 exec env FENNEC_LEAD_HOME="$HOME_DIR" FENNEC_LEAD_ADDR="127.0.0.1:$PORT" \
-  ./target/release/fennec
+  ../../target/release/fennec
