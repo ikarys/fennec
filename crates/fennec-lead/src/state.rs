@@ -778,6 +778,7 @@ fn classify(requests: &[(String, Value)], projects_all: &[Value]) -> Value {
             // and the proof wait for them.
             Some("paused") => {
                 let mut c = card("paused");
+                c["amend_error"] = r["amend_error"].clone();
                 c["summary"] = r["summary"].clone();
                 c["files"] = r["files"].clone();
                 todo.push((1, c));
