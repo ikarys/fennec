@@ -10,7 +10,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use fennec_os::provider::{Live, Model, OpenAi};
 use fennec_os::world::{self, Worlds};
-use fennec_os::{proof, review, review_stage, rules, solve, spec, zones};
+use fennec_os::{analysis, knowledge, proof, review, review_stage, rules, solve, spec, zones};
 use serde_json::{Value, json};
 
 use crate::state::Store;
@@ -240,6 +240,9 @@ fn staffed(mut model: OpenAi, project: &Path, stage: &str) -> io::Result<OpenAi>
 
 fn talk_now(store: &Store, id: &str) -> io::Result<()> {
     let request = store.load(id)?;
+    if request["analysis"].is_string() {
+        return analyse_now(store, id);
+    }
     // Framed while it waited: the conversation already took place.
     if let Some(brief) = request["ahead"].as_str() {
         let brief = brief.to_string();
@@ -296,6 +299,168 @@ fn talk_now(store: &Store, id: &str) -> io::Result<()> {
             frame_now(store, id)
         }
     }
+}
+
+/// An analysis task's turn: its conversation reads the project, read-only,
+/// and ends on a report (fennec-os `analysis`), or asks the human back. The
+/// report waits for them: suggestions to turn into tasks, proposals for the
+/// project's knowledge to accept or reject.
+fn analyse_now(store: &Store, id: &str) -> io::Result<()> {
+    let request = store.load(id)?;
+    let project = Path::new(request["project"].as_str().unwrap_or(""));
+    let model = staffed(OpenAi::variants_from_env(1)?.remove(0), project, "frame")?;
+    let worlds = Worlds::from_env()?;
+    let chat = chat_of(store, id, &request)?;
+    let kind = request["analysis"].as_str().unwrap_or("question");
+    fennec_os::chat::analyse_as(&worlds, &chat, kind)?;
+    let thread = request["thread"].as_array().cloned().unwrap_or_default();
+    let (said, exchange) = analysis::analyse(&worlds, &chat, &thread, &model)?;
+    // The cost of an analysis is a discussion's: the Journal and the stats
+    // read it as one.
+    let step = json!({"stage": "talk", "exchange": exchange});
+    match said {
+        analysis::Analysed::Reply(text) => store.update(id, |r| {
+            note(r, step);
+            say_in(r, "fennec", &text);
+            r["status"] = json!("talk");
+        }),
+        analysis::Analysed::Report(mut report) => {
+            // Each proposal next to the file as it stands, for the diff.
+            for p in report["proposals"].as_array_mut().into_iter().flatten() {
+                let file = p["file"].as_str().unwrap_or("").to_string();
+                p["before"] = json!(analysis::current(project, &file));
+                p["allowed"] = json!(knowledge::is_knowledge(&file));
+            }
+            store.update(id, |r| {
+                note(r, step);
+                r["report"] = report;
+                r["status"] = json!("reported");
+            })
+        }
+    }
+}
+
+/// What the knowledge commit of an analysis says, shown before the click.
+pub fn knowledge_message(request: &Value) -> String {
+    if request["analysis"] == "adopt" {
+        "docs: adopt the project in fennec".to_string()
+    } else {
+        "docs: update the project's architecture knowledge".to_string()
+    }
+}
+
+/// "Make it a task": a suggestion of a report goes to the Backlog, where it
+/// is framed and validated as any task.
+pub fn suggest(store: &Store, id: &str, index: usize) -> io::Result<String> {
+    let request = store.load(id)?;
+    let s = request["report"]["suggestions"]
+        .get(index)
+        .cloned()
+        .ok_or_else(|| io::Error::other("no such suggestion"))?;
+    if s["kind"] != "task" {
+        return Err(io::Error::other(
+            "this suggestion changes the project's knowledge: accept its proposals instead",
+        ));
+    }
+    if s["made"].is_string() {
+        return Err(io::Error::other("this suggestion is already a task"));
+    }
+    let title = s["title"].as_str().unwrap_or("").to_string();
+    let text = s["task"]
+        .as_str()
+        .filter(|t| !t.trim().is_empty())
+        .map(str::to_string)
+        .unwrap_or_else(|| format!("{title}\n\n{}", s["why"].as_str().unwrap_or("")));
+    let made = store.add_request(
+        request["project"].as_str().unwrap_or(""),
+        &text,
+        &title,
+        &[],
+        true,
+    )?;
+    store.update(&made, |m| m["from"] = json!(id))?;
+    store.update(id, |r| {
+        r["report"]["suggestions"][index]["made"] = json!(made);
+        note(r, json!({"stage": "suggested", "task": made}));
+    })?;
+    Ok(made)
+}
+
+/// The human's call on a report's proposals: the accepted ones, with their
+/// text as the human left it, are checked and committed by fennec-os's
+/// kernel (`knowledge`). Which file each one writes is the report's, never
+/// the page's.
+pub fn accept_knowledge(store: &Store, id: &str, accepted: &[Value]) -> io::Result<Value> {
+    let request = store.load(id)?;
+    if request["status"] != "reported" {
+        return Err(io::Error::other("this task has no report waiting"));
+    }
+    let proposals = request["report"]["proposals"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    let mut files = Vec::new();
+    let mut indexes = Vec::new();
+    for a in accepted {
+        let i = a["index"].as_u64().unwrap_or(u64::MAX) as usize;
+        let p = proposals
+            .get(i)
+            .ok_or_else(|| io::Error::other("no such proposal"))?;
+        if p["accepted"] == true || p["rejected"] == true {
+            return Err(io::Error::other("this proposal was already decided"));
+        }
+        let content = a["content"]
+            .as_str()
+            .or(p["content"].as_str())
+            .unwrap_or("");
+        files.push(json!({"file": p["file"], "content": content, "why": p["why"]}));
+        indexes.push(i);
+    }
+    if files.is_empty() {
+        return Err(io::Error::other("accept at least one proposal"));
+    }
+    let project = Path::new(request["project"].as_str().unwrap_or(""));
+    let checked = knowledge::check(project, &files)?;
+    let written: Vec<Value> = checked["files"].as_array().cloned().unwrap_or_default();
+    let commit = knowledge::commit(project, &written, &knowledge_message(&request))?;
+    let names: Vec<Value> = written.iter().map(|f| f["file"].clone()).collect();
+    store.update(id, |r| {
+        for i in &indexes {
+            r["report"]["proposals"][*i]["accepted"] = json!(true);
+            r["report"]["proposals"][*i]["commit"] = json!(commit);
+        }
+        r["knowledge_checks"] = checked["checks"].clone();
+        note(
+            r,
+            json!({"stage": "knowledge", "commit": commit, "files": names}),
+        );
+    })?;
+    Ok(json!({"commit": commit, "checks": checked["checks"]}))
+}
+
+/// A proposal the human does not want: kept on the report, marked.
+pub fn reject_knowledge(store: &Store, id: &str, index: usize) -> io::Result<()> {
+    let request = store.load(id)?;
+    let p = &request["report"]["proposals"][index];
+    if !p.is_object() {
+        return Err(io::Error::other("no such proposal"));
+    }
+    if p["accepted"] == true {
+        return Err(io::Error::other("this proposal is already committed"));
+    }
+    let file = p["file"].clone();
+    store.update(id, |r| {
+        r["report"]["proposals"][index]["rejected"] = json!(true);
+        note(r, json!({"stage": "knowledge", "rejected": file}));
+    })
+}
+
+/// The human is done with a report: the analysis goes to the history.
+pub fn close(store: &Store, id: &str) -> io::Result<()> {
+    if store.load(id)?["status"] != "reported" {
+        return Err(io::Error::other("this task has no report waiting"));
+    }
+    store.update(id, |r| r["status"] = json!("analysed"))
 }
 
 /// The model restates the request in words: the images the human attached go
@@ -471,6 +636,8 @@ pub fn say(store: &Store, id: &str, text: &str) -> io::Result<()> {
     let request = store.load(id)?;
     let open = match request["status"].as_str() {
         Some("talk" | "question") => true,
+        // A report read: the analysis may go on.
+        Some("reported") => request["analysis"].is_string(),
         // In the Backlog: an answer, or a correction of what fennec understood.
         Some("later") => request["asked"] == true || request["ahead"].is_string(),
         Some("blocked") => request["stage"] == "framing",
@@ -523,6 +690,11 @@ pub fn say(store: &Store, id: &str, text: &str) -> io::Result<()> {
 /// conversation becomes the brief.
 pub fn frame_anyway(store: &Store, id: &str) -> io::Result<()> {
     let request = store.load(id)?;
+    if request["analysis"].is_string() {
+        return Err(io::Error::other(
+            "an analysis ends on its report, not on work",
+        ));
+    }
     let brief = transcript(&request);
     if request["status"] == "later" && request["asked"] == true {
         return store.update(id, |r| {
@@ -1734,7 +1906,7 @@ pub fn drop(store: &Store, id: &str) -> io::Result<()> {
     let status = store.load(id)?["status"].as_str().unwrap_or("").to_string();
     if !matches!(
         status.as_str(),
-        "talk" | "question" | "blocked" | "ready" | "failed" | "later"
+        "talk" | "question" | "blocked" | "ready" | "failed" | "later" | "reported"
     ) {
         return Err(io::Error::other("fennec still works on this task"));
     }
@@ -2734,6 +2906,106 @@ mod tests {
         assert!(r["reason"].is_null() && r["fleet"].is_null());
         // Back for later, it can be reworded.
         store.rewrite(&id, "add two filters", "").unwrap();
+        std::fs::remove_dir_all(tmp).unwrap();
+    }
+
+    #[test]
+    fn a_report_turns_suggestions_into_tasks_and_commits_accepted_knowledge() {
+        let tmp = std::env::temp_dir().join(format!("fennec-lead-report-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        let project = tmp.join("proj");
+        std::fs::create_dir_all(project.join("src")).unwrap();
+        std::fs::write(project.join("src/main.rs"), "fn main() {}").unwrap();
+        for args in [
+            &["init", "-q", "-b", "main"][..],
+            &["config", "user.email", "t@t"],
+            &["config", "user.name", "t"],
+            &["add", "-A"],
+            &["commit", "-qm", "init"],
+        ] {
+            assert!(
+                std::process::Command::new("git")
+                    .args(args)
+                    .current_dir(&project)
+                    .status()
+                    .unwrap()
+                    .success()
+            );
+        }
+        let home = tmp.join("home");
+        std::fs::create_dir_all(home.join("requests")).unwrap();
+        let path = project.to_string_lossy().to_string();
+        std::fs::write(
+            home.join("projects.json"),
+            json!([{"path": path, "archived": false}]).to_string(),
+        )
+        .unwrap();
+        let store = Store { root: home.clone() };
+        std::fs::write(
+            home.join("requests/1.json"),
+            json!({"project": path, "status": "reported", "analysis": "adopt", "text": "adopt",
+                   "report": {"summary": "a small binary",
+                     "suggestions": [{"title": "Add tests", "kind": "task", "task": "add a test for main"},
+                                     {"title": "Record the layout", "kind": "knowledge"}],
+                     "proposals": [{"file": "ARCHITECTURE.md", "content": "# proj\n"},
+                                   {"file": "docs/adr/new-use-rust.md", "content": "# Use Rust\n\nStatus: accepted\n"},
+                                   {"file": "src/main.rs", "content": "evil"}]}})
+            .to_string(),
+        )
+        .unwrap();
+        // A task suggestion goes to the Backlog, once.
+        let made = suggest(&store, "1", 0).unwrap();
+        let task = store.load(&made).unwrap();
+        assert_eq!(
+            (&task["status"], &task["text"]),
+            (&json!("later"), &json!("add a test for main"))
+        );
+        assert!(suggest(&store, "1", 0).is_err(), "already a task");
+        assert!(
+            suggest(&store, "1", 1).is_err(),
+            "a knowledge suggestion is no task"
+        );
+        // A proposal outside the knowledge is refused by the kernel, nothing written.
+        assert!(accept_knowledge(&store, "1", &[json!({"index": 2})]).is_err());
+        assert!(
+            !std::fs::read_to_string(project.join("src/main.rs"))
+                .unwrap()
+                .contains("evil")
+        );
+        // The vision as the dev edited it, and a decision numbered by the kernel.
+        let done = accept_knowledge(
+            &store,
+            "1",
+            &[
+                json!({"index": 0, "content": "# proj, edited\n"}),
+                json!({"index": 1}),
+            ],
+        )
+        .unwrap();
+        assert_eq!(done["commit"].as_str().unwrap().len(), 40);
+        assert_eq!(
+            std::fs::read_to_string(project.join("ARCHITECTURE.md")).unwrap(),
+            "# proj, edited\n"
+        );
+        assert!(project.join("docs/adr/0001-use-rust.md").exists());
+        let log = std::process::Command::new("git")
+            .args(["log", "-1", "--format=%s"])
+            .current_dir(&project)
+            .output()
+            .unwrap();
+        let log = String::from_utf8_lossy(&log.stdout).trim().to_string();
+        assert_eq!(log, "docs: adopt the project in fennec");
+        assert!(
+            accept_knowledge(&store, "1", &[json!({"index": 0})]).is_err(),
+            "decided"
+        );
+        reject_knowledge(&store, "1", 2).unwrap();
+        let r = store.load("1").unwrap();
+        assert_eq!(r["report"]["proposals"][2]["rejected"], true);
+        assert_eq!(store.view().unwrap()["todo"][0]["kind"], "report");
+        close(&store, "1").unwrap();
+        assert_eq!(store.view().unwrap()["history"][0]["kind"], "analysed");
+        assert!(frame_anyway(&store, "1").is_err());
         std::fs::remove_dir_all(tmp).unwrap();
     }
 

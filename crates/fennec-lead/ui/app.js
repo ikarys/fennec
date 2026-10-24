@@ -247,6 +247,7 @@ const TAGS = {
   rule: ["Rule?", "var(--accent)"],
   ready: ["Ready", "var(--ok)"],
   paused: ["Stopped after the code", "var(--accent)"],
+  report: ["Report", "var(--ok)"],
   later: ["Backlog", "var(--muted)"],
   failed: ["Failed", "var(--bad)"],
 };
@@ -269,6 +270,67 @@ function focusBy(label, text, kind) {
 
 // The task in the cycle: its risk (verified), its design and plan (the
 // model's), the tests written first, and what the human skipped.
+// An analysis' report: the model's reading of the project (findings,
+// suggestions) and its proposals for the project's knowledge. Only the human
+// accepts a proposal, as written or edited; fennec checks it and commits it.
+// `live`: the report waits for the human, its buttons act.
+function reportView(item, live) {
+  const r = item.report ?? {};
+  const out = [focusBy(t("Report"), r.summary ?? "", "model")];
+  const label = (text) => el("div", { className: "label report-label", textContent: text });
+  if (r.findings?.length) {
+    out.push(label(t("Findings")), el("ul", { className: "findings" }, ...r.findings.map((f) =>
+      el("li", { className: `sev-${f.severity}` },
+        el("strong", { textContent: f.title }), el("span", { className: "muted small", textContent: " · " + t(f.severity) }),
+        f.detail ? el("div", {}, ...md(f.detail)) : null,
+        f.files?.length ? el("div", { className: "muted small mono", textContent: f.files.join(", ") }) : null))));
+  }
+  if (r.suggestions?.length) {
+    out.push(label(t("Suggestions")), el("ol", { className: "suggestions" }, ...r.suggestions.map((s, i) => {
+      const act = s.kind === "knowledge"
+        ? el("span", { className: "muted small", textContent: t("A change to the project's knowledge: see the proposals") })
+        : s.made ? el("a", { className: "link", href: hashOf(item.path, s.made), textContent: t("✓ in the Backlog") })
+        : live ? action(t("Make it a task"), "/api/suggest", { id: item.id, index: i }) : null;
+      return el("li", {}, el("strong", { textContent: s.title }), s.why ? el("div", {}, ...md(s.why)) : null, act);
+    })));
+  }
+  const pending = [];
+  if (r.proposals?.length) {
+    out.push(label(t("Proposals for the project's knowledge")), ...r.proposals.map((p, i) => {
+      const head = el("div", { className: "row" }, el("code", { textContent: p.file }), prov("model"),
+        el("span", { className: "muted small", textContent: p.before == null ? t("new file") : t("replaces the current file") }));
+      const box = el("div", { className: "proposal" }, head, p.why ? el("div", { className: "muted" }, ...md(p.why)) : null);
+      const now = p.before == null ? null
+        : el("details", {}, el("summary", { textContent: t("As it is now") }), el("pre", { textContent: p.before }));
+      if (p.accepted) box.append(el("div", { className: "proved", textContent: t("✓ committed {0}", (p.commit ?? "").slice(0, 7)) }));
+      else if (p.rejected) box.append(el("div", { className: "muted", textContent: t("rejected") }));
+      else if (p.allowed === false) box.append(el("div", { className: "bad", textContent: t("fennec will not write it: not a knowledge file") }));
+      if (p.accepted || p.rejected || p.allowed === false || !live) {
+        box.append(el("details", {}, el("summary", { textContent: t("Proposed text") }), el("pre", { textContent: p.content })));
+        return box;
+      }
+      const take = el("input", { type: "checkbox", checked: true, ariaLabel: t("Accept {0}", p.file) });
+      const text = el("textarea", { className: "mono", value: p.content, ariaLabel: t("Proposed text"),
+        rows: Math.min(18, Math.max(4, p.content.split("\n").length)) });
+      pending.push({ i, take, text });
+      box.append(el("label", { className: "row" }, take, el("span", { textContent: t("Accept, as edited below") })), text, ...(now ? [now] : []),
+        el("div", { className: "row" }, action(t("Reject"), "/api/knowledge/reject", { id: item.id, index: i }, { quiet: true })));
+      return box;
+    }));
+  }
+  if (pending.length) {
+    out.push(el("div", { className: "row" }, Object.assign(
+      action(t("Commit the accepted proposals"), "/api/knowledge/accept", () => ({ id: item.id,
+        accepted: pending.filter((x) => x.take.checked).map((x) => ({ index: x.i, content: x.text.value })) }), { primary: true }),
+      { title: t("fennec checks them, then commits them alone on your branch: \"{0}\"", item.message ?? "") })));
+  }
+  if (item.knowledge_checks?.length) {
+    out.push(label(t("Checks on what was committed")), el("ul", { className: "checks" }, ...item.knowledge_checks.map((c) =>
+      el("li", {}, prov("verified"), " ", el("span", { className: c.ok ? "" : "bad", textContent: (c.ok ? "✓ " : "⚠ ") + c.text })))));
+  }
+  return out;
+}
+
 function cycleView(item, { tests = false } = {}) {
   const c = item.cycle ?? {};
   const nodes = [];
@@ -1036,13 +1098,14 @@ function card(item) {
     add(el("div", { className: "reply" }, text, images.node));
     // Framed ahead while it waits in the Backlog: answering does not start it.
     actions.append(dropButton(item.id), el("span", { className: "spacer" }),
-      item.later
+      item.analysis ? null : item.later
         ? Object.assign(action(t("Clear enough"), "/api/frame", { id: item.id }),
           { title: t("Keep the conversation as it is: the task waits in the Backlog for you to validate it") })
         : Object.assign(action(t("Start"), "/api/frame", { id: item.id }),
           { title: t("Start the work on the conversation as it is, without another question") }),
       Object.assign(action(t("Send"), "/api/say", () => ({ id: item.id, text: images.value() }), { primary: true }),
-        { title: item.later
+        { title: item.analysis ? t("fennec reads your answer and goes on with its analysis")
+          : item.later
           ? t("fennec reads your answer when the model is free; the task stays in the Backlog")
           : t("fennec reads your answer: it asks again if it must, otherwise it starts the work") }));
   } else if (item.kind === "validate") {
@@ -1064,6 +1127,16 @@ function card(item) {
         { title: t("The work starts on this design as it is; the task is marked \"not validated\"") });
     actions.append(dropButton(item.id), el("span", { className: "spacer" }), fix, ...(unread ? [unread] : []),
       action(t("Validate"), "/api/answer", { id: item.id, accept: true, correction: "" }, { primary: true }));
+  } else if (item.kind === "report") {
+    add(conversation(item), ...reportView(item, true));
+    const text = el("textarea", { placeholder: t("Ask more, or ask for another report"), ariaLabel: t("Ask more, or ask for another report"), rows: 2 });
+    const images = attach(text);
+    add(el("div", { className: "reply" }, text, images.node));
+    actions.append(dropButton(item.id), el("span", { className: "spacer" }),
+      Object.assign(action(t("Send"), "/api/say", () => ({ id: item.id, text: images.value() })),
+        { title: t("fennec reads your answer and goes on with its analysis") }),
+      Object.assign(action(t("Close"), "/api/close", { id: item.id }, { primary: true }),
+        { title: t("Done with this report: it goes to the history") }));
   } else if (item.kind === "paused") {
     // A stop of the dev's loop: the code is done, they look before the rest.
     add(el("div", { className: "muted", textContent: t("Stopped after the code, as your loop asks: look at the work, then continue with the review and the proof.") }),
@@ -1330,6 +1403,7 @@ function past(item) {
   if (talk) box.append(talk);
   const done = doneWhen(item);
   if (done) box.append(done);
+  if (item.kind === "analysed") box.append(...reportView(item, false));
   // What was decided before the code, and what the human skipped.
   box.append(...cycleView(item), ...work(item));
   const tried = item.tries?.length ?? 0;
@@ -1354,6 +1428,7 @@ function past(item) {
 }
 
 function pastState(item) {
+  if (item.kind === "analysed") return "✓ " + t("analysed");
   if (item.kind === "passed") return t("set aside");
   if (item.kind === "dropped") return t("dropped");
   if (item.files?.length === 0) return "✓ " + t("nothing to change");
@@ -2287,6 +2362,8 @@ function showDetail(found) {
 
 // Lucide-style strokes (24 × 24), drawn by CSS as a mask in the button's colour.
 const ICONS = {
+  search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  book: '<path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>',
   commit: '<circle cx="12" cy="12" r="3"/><path d="M3 12h6M15 12h6"/>',
   page: '<path d="M15 3h6v6M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
   diff: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M9 10h6M12 7v6M9 17h6"/>',
@@ -2439,6 +2516,19 @@ $("later-add").onclick = async () => {
     composed.clear();
     $("compose").close();
     refresh(true);
+  } catch (e) {
+    $("compose-error").textContent = e.message;
+  }
+};
+
+// A question: fennec reads the project and reports, nothing is changed.
+$("ask-add").onclick = async () => {
+  $("compose-error").textContent = "";
+  try {
+    const made = await api("/api/requests", { project: $("project").value, title: $("title").value, text: composed.value(), analysis: "question" });
+    composed.clear();
+    $("compose").close();
+    location.hash = hashOf($("project").value, made.id);
   } catch (e) {
     $("compose-error").textContent = e.message;
   }
@@ -2966,6 +3056,34 @@ async function showPage(path) {
     .catch((e) => { $("page-error").textContent = e.message; place.value = p.place; });
   showRules($("page-rules"), path, "project", rules);
   showStops(path, await api("/api/stops", { project: path }));
+  showKnowledge(path, await api("/api/knowledge", { project: path }));
+}
+
+// What the project knows of itself (vision, zones, decisions) and the
+// analyses that propose it: adopt a project without a vision, audit one with.
+function showKnowledge(path, k) {
+  $("page-knowledge").replaceChildren(k.vision
+    ? t("Vision written · {0} sensitive zones · {1} decisions", k.zones ?? 0, k.decisions)
+    : t("No architecture vision yet: fennec can read the project and propose one, with its sensitive zones and first decisions."),
+  ...(k.zones_error ? [el("div", { className: "bad", textContent: k.zones_error })] : []));
+  const start = (kind, label, title, text) => {
+    const b = el("button", { type: "button", textContent: label, title, className: kind === "adopt" ? "primary" : "" });
+    b.onclick = async () => {
+      $("page-error").textContent = "";
+      try {
+        const made = await api("/api/requests", { project: path, analysis: kind, title: label, text });
+        location.hash = hashOf(path, made.id);
+      } catch (e) {
+        $("page-error").textContent = e.message;
+      }
+    };
+    return b;
+  };
+  $("page-knowledge-actions").replaceChildren(k.vision
+    ? start("audit", t("Audit the architecture"), t("fennec reads the code, sets it against the vision and the decisions, and suggests improvements"),
+      t("Audit the architecture of this project and suggest improvements."))
+    : start("adopt", t("Adopt this project"), t("fennec reads the project and proposes its vision, sensitive zones and first decisions; you correct and accept them"),
+      t("Adopt this project: propose its architecture vision, its sensitive zones and its first decisions.")));
 }
 
 // The dev's loop on the project: where its tasks stop and wait for them.

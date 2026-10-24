@@ -259,8 +259,15 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
                 .flatten()
                 .filter_map(|k| k.as_str().map(str::to_string))
                 .collect();
+            // An analysis changes nothing: it reports now, never from the Backlog.
+            let kind = v["analysis"].as_str().filter(|k| !k.is_empty());
+            if let Some(k) = kind
+                && !fennec_os::analysis::KINDS.contains(&k)
+            {
+                return Err(io::Error::other(format!("no analysis of kind {k}")));
+            }
             // Kept in the Backlog: framed ahead, Ready once the human validates.
-            let later = v["later"] == true;
+            let later = v["later"] == true && kind.is_none();
             // The task's content: the page sends it as the description, older
             // clients as the text.
             let text = v["description"]
@@ -276,6 +283,9 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
                 &off,
                 later,
             )?;
+            if let Some(k) = kind {
+                store.update(&id, |r| r["analysis"] = json!(k))?;
+            }
             // The tasks it builds on: the Fleet starts it once they are committed.
             if v["after"].is_array() {
                 store.update(&id, |r| r["after"] = v["after"].clone())?;
@@ -364,6 +374,41 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
             Ok(json!({}))
         }
         // The dev's loop on a project: its stop points, read or one changed.
+        // An analysis' report: a suggestion into a task, the proposals for
+        // the project's knowledge accepted (committed) or rejected, closed.
+        ("POST", "/api/suggest") => {
+            let v = input()?;
+            let index = v["index"].as_u64().unwrap_or(u64::MAX) as usize;
+            Ok(json!({"id": work::suggest(&store, &field(&v, "id"), index)?}))
+        }
+        ("POST", "/api/knowledge/accept") => {
+            let v = input()?;
+            let accepted = v["accepted"].as_array().cloned().unwrap_or_default();
+            work::accept_knowledge(&store, &field(&v, "id"), &accepted)
+        }
+        ("POST", "/api/knowledge/reject") => {
+            let v = input()?;
+            let index = v["index"].as_u64().unwrap_or(u64::MAX) as usize;
+            work::reject_knowledge(&store, &field(&v, "id"), index)?;
+            Ok(json!({}))
+        }
+        ("POST", "/api/close") => {
+            work::close(&store, &field(&input()?, "id"))?;
+            Ok(json!({}))
+        }
+        // What the project knows of itself, for its page: a vision, zones,
+        // decisions, read at HEAD.
+        ("POST", "/api/knowledge") => {
+            let path = field(&input()?, "project");
+            let project = Path::new(&path);
+            let zones = fennec_os::zones::load(project).map(|z| z.len().saturating_sub(1));
+            Ok(json!({
+                "vision": fennec_os::zones::vision(project).is_some(),
+                "zones": zones.as_ref().ok(),
+                "zones_error": zones.err().map(|e| e.to_string()),
+                "decisions": fennec_os::knowledge::adrs(project)?.len(),
+            }))
+        }
         ("POST", "/api/stops") => {
             let v = input()?;
             let project = field(&v, "project");
