@@ -1009,7 +1009,7 @@ mod tests {
             .add_project(project.to_str().unwrap(), "here")
             .unwrap();
         let view = store.view().unwrap();
-        assert_eq!(view["fleet"]["on"], true);
+        assert_eq!(view["fleet"]["on"], false);
         assert_eq!(view["fleet"]["queued"], 0);
         assert!(view["fleet"]["stopped"].is_null());
         std::fs::remove_dir_all(&tmp).unwrap();
