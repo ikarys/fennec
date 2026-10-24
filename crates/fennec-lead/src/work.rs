@@ -10,7 +10,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use fennec_os::provider::{Live, Model, OpenAi};
 use fennec_os::world::{self, Worlds};
-use fennec_os::{proof, review, review_stage, rules, solve, spec};
+use fennec_os::{proof, review, review_stage, rules, solve, spec, zones};
 use serde_json::{Value, json};
 
 use crate::state::Store;
@@ -600,7 +600,37 @@ fn frame_now(store: &Store, id: &str) -> io::Result<()> {
     let worlds = Worlds::from_env()?;
     let model = staffed(OpenAi::variants_from_env(1)?.remove(0), project, "frame")?;
     let mut s = spec::frame(&worlds, project, &brief, &model)?;
-    let spec_id = s["world"].as_str().unwrap_or("").to_string();
+    let mut spec_id = s["world"].as_str().unwrap_or("").to_string();
+    let sensitive = s["risk"]["sensitive"] == true;
+    let mut tests_diff = Value::Null;
+    if s["status"] == "proposed" {
+        if sensitive {
+            // A sensitive task: its tests are written first, from the design,
+            // and protected once the human validates them.
+            note_frame(store, id, &spec_id)?;
+            let t = spec::compile(
+                &worlds,
+                project,
+                s["goal"].as_str().unwrap_or(&brief),
+                &model,
+                MAX_STEPS,
+            )?;
+            worlds.drop(worlds.open(&spec_id)?)?;
+            s = with_design(t, &s);
+            spec_id = s["world"].as_str().unwrap_or("").to_string();
+            tests_diff = s["diff"].clone();
+        } else {
+            // Outside the zones, the work may not enter them: every zone is a
+            // protected path of its solve. Needing one means it was mis-framed.
+            s["protect"] = json!(zones::protected(&zones::load(project)?));
+        }
+    }
+    let design = json!({
+        "architecture": s["architecture"],
+        "plan": s["plan"],
+        "files": s["files"],
+        "risk": s["risk"],
+    });
     match s["status"].as_str() {
         Some("proposed") => {
             // The framing's picks ride on the spec the human validates.
@@ -611,15 +641,28 @@ fn frame_now(store: &Store, id: &str) -> io::Result<()> {
                 s["roles"] = json!(roles);
             }
             spec::save(&worlds, &spec_id, &s)?;
+            // The dev's loop: a task outside the zones goes straight to the
+            // work when they took the design stop out, marked so.
+            let stop = sensitive
+                || store.stops(request["project"].as_str().unwrap_or(""))?["design"] != false;
             store.update(id, |r| {
                 r["spec"] = json!(spec_id);
                 // The solve forks from this world; naming it keeps wait_turn
                 // from dropping it while the human answers.
                 r["run"] = json!(spec_id);
                 r["done_when"] = s["done_when"].clone();
-                r["status"] = json!("question");
+                r["design"] = design.clone();
+                r["tests_first"] = json!(sensitive);
+                r["tests_diff"] = tests_diff.clone();
                 note(r, json!({"stage": "frame", "spec": spec_id}));
-            })
+                if stop {
+                    r["status"] = json!("question");
+                } else {
+                    r["status"] = json!("running");
+                    r["unvalidated"] = json!(true);
+                }
+            })?;
+            if stop { Ok(()) } else { solve_now(store, id) }
         }
         _ if s["question"].is_string() => {
             let q = s["question"].as_str().unwrap_or("").to_string();
@@ -647,6 +690,78 @@ fn frame_now(store: &Store, id: &str) -> io::Result<()> {
     }
 }
 
+/// The design step in the journal, before the tests are written from it.
+fn note_frame(store: &Store, id: &str, spec_id: &str) -> io::Result<()> {
+    store.update(id, |r| note(r, json!({"stage": "frame", "spec": spec_id})))
+}
+
+/// The tests-first spec carries the design it was written from; its goal is
+/// the implementer's, with the design under it, and the project's own suite
+/// still runs beside the new tests.
+fn with_design(mut t: Value, design: &Value) -> Value {
+    for k in ["architecture", "plan", "files", "risk"] {
+        t[k] = design[k].clone();
+    }
+    let block = design["goal"]
+        .as_str()
+        .and_then(|g| g.find("\n\nArchitecture").map(|at| &g[at..]))
+        .unwrap_or("");
+    if let Some(g) = t["goal"].as_str() {
+        t["goal"] = json!(format!("{g}{block}"));
+    }
+    let mut verify: Vec<Value> = t["verify"].as_array().cloned().unwrap_or_default();
+    for c in design["verify"].as_array().into_iter().flatten() {
+        if !verify.contains(c) {
+            verify.push(c.clone());
+        }
+    }
+    t["verify"] = json!(verify);
+    t
+}
+
+/// "Start without validating": a task outside the zones goes to the work
+/// with its design unread, marked "not validated". A sensitive one cannot.
+pub fn start_unvalidated(store: &Store, id: &str) -> io::Result<()> {
+    let request = store.load(id)?;
+    if request["status"] != "question" {
+        return Err(io::Error::other("this task does not wait for an answer"));
+    }
+    if crate::state::sensitive(&request) {
+        return Err(io::Error::other(
+            "this task touches a sensitive zone: its design and tests must be validated",
+        ));
+    }
+    store.update(id, |r| {
+        r["status"] = json!("running");
+        r["unvalidated"] = json!(true);
+    })?;
+    spawn(id.to_string(), solve_now);
+    Ok(())
+}
+
+/// The human marks the ready work reviewed, or takes the mark back.
+pub fn reviewed(store: &Store, id: &str, on: bool) -> io::Result<()> {
+    let request = store.load(id)?;
+    if request["status"] != "ready" {
+        return Err(io::Error::other("this task is not ready for review"));
+    }
+    store.update(id, |r| {
+        r["reviewed"] = json!(on);
+        note(r, json!({"stage": "reviewed", "on": on}));
+    })
+}
+
+/// "Continue" at the code stop: the review and the proof run.
+pub fn proceed(store: &Store, id: &str) -> io::Result<()> {
+    let request = store.load(id)?;
+    if request["status"] != "paused" {
+        return Err(io::Error::other("this task is not stopped"));
+    }
+    store.update(id, |r| r["status"] = json!("reviewing"))?;
+    spawn(id.to_string(), check_now);
+    Ok(())
+}
+
 /// The human's one answer: validate starts the work, a correction re-frames.
 pub fn answer(store: &Store, id: &str, accept: bool, correction: &str) -> io::Result<()> {
     let request = store.load(id)?;
@@ -654,7 +769,11 @@ pub fn answer(store: &Store, id: &str, accept: bool, correction: &str) -> io::Re
         return Err(io::Error::other("this task does not wait for an answer"));
     }
     if accept {
-        store.update(id, |r| r["status"] = json!("running"))?;
+        store.update(id, |r| {
+            r["status"] = json!("running");
+            r["validated"] = json!(true);
+            note(r, json!({"stage": "validated"}));
+        })?;
         spawn(id.to_string(), solve_now);
     } else {
         let correction = correction.trim();
@@ -866,18 +985,8 @@ fn after_branch(store: &Store, request: &Value) -> Option<String> {
 
 fn solve_now(store: &Store, id: &str) -> io::Result<()> {
     let request = store.load(id)?;
-    let mut worlds = Worlds::from_env()?;
-    // The Fleet's work goes apart: ready and waiting for the human, it must
-    // not hold the folder the next task of the queue needs.
     let fleet = request["fleet"] == true;
-    worlds.apart = fleet;
-    // Committed on the Fleet's branch, it builds on what landed there; else
-    // on the branch the tasks it comes after were committed on, or it would
-    // redo or undo their work.
-    worlds.base = request["fleet_branch"]
-        .as_str()
-        .map(str::to_string)
-        .or(after_branch(store, &request));
+    let worlds = worlds_for(store, &request)?;
     let project = Path::new(request["project"].as_str().unwrap_or(""));
     // A correction works on the ready work, which already holds the folder.
     let _turn = match request["amend"].is_string() || fleet {
@@ -941,10 +1050,78 @@ fn solve_now(store: &Store, id: &str) -> io::Result<()> {
             }
         }
     })?;
-    let Some(mut run) = record["winner"].as_str().map(str::to_string) else {
+    let Some(run) = record["winner"].as_str().map(str::to_string) else {
         return Ok(());
     };
+    // The work's own files against the zones: verified, whatever the design
+    // foresaw.
+    let zs = zones::load(project)?;
+    store.update(id, |r| {
+        let files: Vec<String> = r["files"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|f| f.as_str().map(str::to_string))
+            .collect();
+        r["risk_done"] = zones::classify(&zs, &files);
+    })?;
+    // The dev's loop: stopped after the code, the review and the proof wait
+    // for them. A correction they asked for goes on.
+    if amend.is_none() && store.stops(request["project"].as_str().unwrap_or(""))?["code"] == true {
+        return store.update(id, |r| r["status"] = json!("paused"));
+    }
+    check_from(store, id, &worlds, run, &variants)
+}
+
+/// The worlds a task's work runs in. The Fleet's work goes apart: ready and
+/// waiting for the human, it must not hold the folder the next task of the
+/// queue needs. Committed on the Fleet's branch, it builds on what landed
+/// there; else on the branch the tasks it comes after were committed on, or
+/// it would redo or undo their work.
+fn worlds_for(store: &Store, request: &Value) -> io::Result<Worlds> {
+    let mut worlds = Worlds::from_env()?;
+    worlds.apart = request["fleet"] == true;
+    worlds.base = request["fleet_branch"]
+        .as_str()
+        .map(str::to_string)
+        .or(after_branch(store, request));
+    Ok(worlds)
+}
+
+/// After the code stop: the review and the proof of the work as it stands.
+fn check_now(store: &Store, id: &str) -> io::Result<()> {
+    let request = store.load(id)?;
+    let worlds = worlds_for(store, &request)?;
+    let project = Path::new(request["project"].as_str().unwrap_or(""));
+    let variants = OpenAi::variants_from_env(attempts())?
+        .into_iter()
+        .map(|m| staffed(m, project, "solve"))
+        .collect::<io::Result<Vec<_>>>()?;
+    let run = request["run"]
+        .as_str()
+        .ok_or_else(|| io::Error::other("this task has no work to check"))?
+        .to_string();
+    check_from(store, id, &worlds, run, &variants)
+}
+
+/// The AI review, then the proof; what either finds goes back to the
+/// builder, a few times at most, before the work is ready for the human.
+fn check_from(
+    store: &Store,
+    id: &str,
+    worlds: &Worlds,
+    mut run: String,
+    variants: &[OpenAi],
+) -> io::Result<()> {
     let r = store.load(id)?;
+    let project = Path::new(r["project"].as_str().unwrap_or(""));
+    let spec_id = r["spec"].as_str().unwrap_or("").to_string();
+    let spec_id = spec_id.as_str();
+    let live: Vec<Live> = variants
+        .iter()
+        .map(|m| Ok(Live::new(m, store.live_path(id)?)))
+        .collect::<io::Result<_>>()?;
+    let models: Vec<&dyn Model> = live.iter().map(|m| m as &dyn Model).collect();
     let done_when = [&r["done_when"], &r["brief"], &r["text"]]
         .into_iter()
         .find_map(Value::as_str)
@@ -962,6 +1139,10 @@ fn solve_now(store: &Store, id: &str) -> io::Result<()> {
             &reviewer,
             MAX_REVIEW_STEPS,
         )?;
+        // What the reviewer wrote, for the human review: the model's view.
+        if review["skipped"] != true {
+            store.update(id, |r| r["review_report"] = review["report"].clone())?;
+        }
         if review["skipped"] == true || review["passed"] == true {
             break;
         }
@@ -1317,6 +1498,8 @@ fn apply_run(request: &mut Value, record: &Value) {
     if record["winner"].is_string() {
         request["status"] = json!("ready");
         request["run"] = record["winner"].clone();
+        // New work is unread: a review mark was for the work before it.
+        request["reviewed"] = json!(false);
         // What fennec did, kept with the request: the run record is internal.
         if let Some(t) = record["attempts"]
             .as_array()
@@ -2111,7 +2294,16 @@ pub fn land(store: &Store, id: &str) -> io::Result<()> {
     if request["status"] != "ready" || !request["run"].is_string() {
         return Err(io::Error::other("this task is not ready for a commit"));
     }
+    // Risk-proportional: a sensitive task lands only once the human marked
+    // it reviewed; another lands either way, marked "not reviewed".
+    let reviewed = request["reviewed"] == true;
+    if crate::state::sensitive(&request) && !reviewed {
+        return Err(io::Error::other(
+            "this task touches a sensitive zone: review it and mark it reviewed first",
+        ));
+    }
     store.update(id, |r| {
+        r["unreviewed"] = json!(!reviewed);
         r["status"] = json!("landing");
         if let Some(m) = r.as_object_mut() {
             m.remove("land_error");
@@ -2435,6 +2627,64 @@ mod tests {
         talk_now(&store, "1").unwrap();
         assert_eq!(store.load("1").unwrap()["status"], "talk");
         std::fs::remove_dir_all(tmp).unwrap();
+    }
+
+    #[test]
+    fn a_sensitive_task_needs_its_validation_and_its_review() {
+        let tmp = std::env::temp_dir().join(format!("fennec-lead-risk-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        let store = Store { root: tmp.clone() };
+        std::fs::create_dir_all(tmp.join("requests")).unwrap();
+        std::fs::write(
+            tmp.join("requests/1.json"),
+            r#"{"project": "/p", "text": "auth", "status": "question",
+                "design": {"risk": {"sensitive": true, "zones": [{"name": "auth"}]}}}"#,
+        )
+        .unwrap();
+        let id = "1".to_string();
+        assert!(
+            start_unvalidated(&store, &id).is_err(),
+            "validation is mandatory"
+        );
+        // Ready and unreviewed: the commit waits for the review mark.
+        store
+            .update(&id, |r| {
+                r["status"] = json!("ready");
+                r["run"] = json!("w");
+            })
+            .unwrap();
+        let refused = land(&store, &id).unwrap_err().to_string();
+        assert!(refused.contains("reviewed"), "{refused}");
+        reviewed(&store, &id, true).unwrap();
+        assert_eq!(store.load(&id).unwrap()["reviewed"], true);
+        // Outside the zones, it may start unread and is marked so.
+        store
+            .update(&id, |r| {
+                r["status"] = json!("question");
+                r["design"]["risk"] = json!({"sensitive": false, "zones": []});
+            })
+            .unwrap();
+        assert!(!crate::state::sensitive(&store.load(&id).unwrap()));
+        std::fs::remove_dir_all(tmp).unwrap();
+    }
+
+    #[test]
+    fn tests_written_first_carry_the_design_and_keep_the_suite() {
+        let design = json!({"architecture": "in calc", "plan": ["add"], "files": ["calc.py"],
+            "risk": {"sensitive": true}, "verify": ["python3 -m unittest"],
+            "goal": "subtract\n\nArchitecture (design):\nin calc\n\nPlan:\n1. add\n"});
+        let t = json!({"goal": "make test_sub pass", "verify": ["python3 -m unittest test_sub"]});
+        let s = with_design(t, &design);
+        assert_eq!(s["files"], json!(["calc.py"]));
+        assert_eq!(s["risk"]["sensitive"], true);
+        assert_eq!(
+            s["goal"],
+            "make test_sub pass\n\nArchitecture (design):\nin calc\n\nPlan:\n1. add\n"
+        );
+        assert_eq!(
+            s["verify"],
+            json!(["python3 -m unittest test_sub", "python3 -m unittest"])
+        );
     }
 
     #[test]

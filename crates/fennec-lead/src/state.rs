@@ -82,6 +82,38 @@ impl Store {
 
     /// Out of view, or back: the folder and its requests are untouched, only
     /// the list the page reads moves. A project fennec works on stays put.
+    /// The dev's loop on a project: where its tasks stop and wait for them.
+    /// `design` (on by default): after the design, for its validation; a
+    /// sensitive task stops there whatever this says. `code` (off by
+    /// default): after the code, before the review and the proof.
+    pub fn stops(&self, path: &str) -> io::Result<Value> {
+        let all = self.projects_all()?;
+        let s = all
+            .iter()
+            .find(|p| p["path"] == path)
+            .map(|p| p["stops"].clone())
+            .unwrap_or(Value::Null);
+        Ok(json!({
+            "design": s["design"].as_bool().unwrap_or(true),
+            "code": s["code"].as_bool().unwrap_or(false),
+        }))
+    }
+
+    pub fn set_stop(&self, path: &str, stop: &str, on: bool) -> io::Result<()> {
+        if !matches!(stop, "design" | "code") {
+            return Err(io::Error::other("unknown stop point"));
+        }
+        let mut all = self.projects_all()?;
+        let Some(p) = all.iter_mut().find(|p| p["path"] == path) else {
+            return Err(io::Error::other("unknown project"));
+        };
+        if !p["stops"].is_object() {
+            p["stops"] = json!({});
+        }
+        p["stops"][stop] = json!(on);
+        write_json(&self.root.join("projects.json"), &json!(all))
+    }
+
     pub fn set_project_archived(&self, path: &str, on: bool) -> io::Result<()> {
         let mut all = self.projects_all()?;
         let Some(p) = all.iter_mut().find(|p| p["path"] == path) else {
@@ -687,6 +719,7 @@ fn classify(requests: &[(String, Value)], projects_all: &[Value]) -> Value {
                    "title": label, "description": body,
                    "images": image_lines(r["text"].as_str().unwrap_or("")).collect::<Vec<_>>(), "rules": r["rules"], "checks": r["verify"], "team": r["team"],
                    "thread": r["thread"], "chat": r["chat"], "asks": asks(r), "stats": r["stats"], "since": r["since"], "picked": r["picked"],
+                   "cycle": cycle(r),
                    // As the work reads it: said in the conversation, else
                    // the request as fennec restated it.
                    "done_when": ([&r["done_when"], &r["brief"], &r["ahead"]].into_iter().find(|v| v.is_string()))})
@@ -741,6 +774,14 @@ fn classify(requests: &[(String, Value)], projects_all: &[Value]) -> Value {
             Some("reviewing") => running.push(card_step(card("running"), "reviews the work")),
             Some("proving") => running.push(card_step(card("running"), "tries the product")),
             Some("landing") => running.push(card_step(card("running"), "makes the commit")),
+            // A stop point of the dev's loop: the code is done, the review
+            // and the proof wait for them.
+            Some("paused") => {
+                let mut c = card("paused");
+                c["summary"] = r["summary"].clone();
+                c["files"] = r["files"].clone();
+                todo.push((1, c));
+            }
             Some("question") => {
                 let c = card("validate");
                 todo.push((0, c));
@@ -842,6 +883,34 @@ fn classify(requests: &[(String, Value)], projects_all: &[Value]) -> Value {
         .collect();
     json!({"todo": todo, "running": running, "history": history, "later": later,
            "archived": archived, "projects": projects, "projectsArchived": projects_archived})
+}
+
+/// Where a task stands in the cycle, for the human: its design and plan
+/// (the model's), its risk (verified: its files against the zones), the
+/// tests written first, and the marks of what the human validated, reviewed
+/// or skipped.
+fn cycle(r: &Value) -> Value {
+    let d = &r["design"];
+    json!({
+        "architecture": d["architecture"],
+        "plan": d["plan"],
+        "planned": d["files"],
+        "risk": d["risk"],
+        "tests_first": r["tests_first"] == true,
+        "tests": r["tests_diff"],
+        "validated": r["validated"] == true,
+        "unvalidated": r["unvalidated"] == true,
+        "reviewed": r["reviewed"] == true,
+        "unreviewed": r["unreviewed"] == true,
+        "review": r["review_report"],
+        "sensitive": sensitive(r),
+    })
+}
+
+/// A task is sensitive when its design or its work touches a zone; the
+/// work's own files are classified at the end of the solve (`risk_done`).
+pub fn sensitive(r: &Value) -> bool {
+    r["design"]["risk"]["sensitive"] == true || r["risk_done"]["sensitive"] == true
 }
 
 fn card_step(mut card: Value, step: &str) -> Value {
@@ -991,6 +1060,36 @@ mod tests {
                 .as_array()
                 .unwrap()
                 .is_empty()
+        );
+        std::fs::remove_dir_all(&tmp).unwrap();
+    }
+
+    #[test]
+    fn a_project_stops_after_the_design_until_the_dev_says_otherwise() {
+        let tmp = std::env::temp_dir().join(format!("fennec-lead-stops-{}", std::process::id()));
+        let project = tmp.join("p");
+        std::fs::create_dir_all(&project).unwrap();
+        let store = Store {
+            root: tmp.join("home"),
+        };
+        std::fs::create_dir_all(store.root.join("requests")).unwrap();
+        store
+            .add_project(project.to_str().unwrap(), "here")
+            .unwrap();
+        let p = store.projects().unwrap()[0].clone();
+        assert_eq!(
+            store.stops(&p).unwrap(),
+            json!({"design": true, "code": false})
+        );
+        store.set_stop(&p, "code", true).unwrap();
+        store.set_stop(&p, "design", false).unwrap();
+        assert_eq!(
+            store.stops(&p).unwrap(),
+            json!({"design": false, "code": true})
+        );
+        assert!(
+            store.set_stop(&p, "land", false).is_err(),
+            "integration always stops"
         );
         std::fs::remove_dir_all(&tmp).unwrap();
     }
