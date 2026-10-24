@@ -289,6 +289,10 @@ function cycleView(item, { tests = false } = {}) {
     nodes.push(el("div", { className: "files" }, t("Files it expects to touch: "),
       ...c.planned.flatMap((f, i) => [i ? ", " : "", el("code", { textContent: f })])));
   }
+  if (c.unplanned?.length) {
+    nodes.push(el("div", { className: "risk sensitive" }, prov("verified"), " ", t("Outside the plan: "),
+      ...c.unplanned.flatMap((f, i) => [i ? ", " : "", el("code", { textContent: f })])));
+  }
   if (tests && c.tests_first && c.tests) {
     nodes.push(el("div", { className: "focus" }, el("span", { className: "label" }, t("Tests written first, to validate"), " ", prov("model")),
       diffView(c.tests)));
