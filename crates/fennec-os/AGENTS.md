@@ -55,6 +55,7 @@ src/engine/skill.rs     skills (Agent Skills folders, `SKILL.md`) read where the
 src/kernel/plugin.rs    plugins the person keeps (~/.config/fennec/plugins/<name>/plugin.json, enabled in plugins.json): run on the
                  host with an event on stdin (a question, work ready...), 10 s at most; `before_<step>` ones are hooks;
                  a `serve` program runs while enabled with `FENNEC_URL`/`FENNEC_TOKEN`, for the senders `allow` names
+src/kernel/zones.rs     the architecture vision (ARCHITECTURE.md) and sensitive zones (`.fennec-os/zones.json`) at HEAD; `classify` a change's paths
 src/kernel/review.rs    review queue, rejections, corrections said twice, agenda
 src/engine/sleep.rs     landed runs → candidate know-how (`.fennec-os/knowhow.md`)
 src/kernel/schedule.rs  background work (sleep) waits while interactive work (solve) runs
