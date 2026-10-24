@@ -49,32 +49,38 @@ pub const DEFAULT_TEAM: &str = "Développement";
 /// Every built-in role, in or out of a built-in team: what the human picks
 /// from to build their own.
 const CATALOG: [(&str, &str); 14] = [
-    ("architect", include_str!("../catalog/architect.md")),
+    ("architect", include_str!("../../catalog/architect.md")),
     (
         "critical-reviewer",
-        include_str!("../catalog/critical-reviewer.md"),
+        include_str!("../../catalog/critical-reviewer.md"),
     ),
-    ("devops", include_str!("../catalog/devops.md")),
-    ("devsecops", include_str!("../catalog/devsecops.md")),
-    ("maintainer", include_str!("../catalog/maintainer.md")),
+    ("devops", include_str!("../../catalog/devops.md")),
+    ("devsecops", include_str!("../../catalog/devsecops.md")),
+    ("maintainer", include_str!("../../catalog/maintainer.md")),
     (
         "project-manager",
-        include_str!("../catalog/project-manager.md"),
+        include_str!("../../catalog/project-manager.md"),
     ),
-    ("qa", include_str!("../catalog/qa.md")),
-    ("research-lead", include_str!("../catalog/research-lead.md")),
-    ("researcher", include_str!("../catalog/researcher.md")),
-    ("reviewer", include_str!("../catalog/reviewer.md")),
+    ("qa", include_str!("../../catalog/qa.md")),
+    (
+        "research-lead",
+        include_str!("../../catalog/research-lead.md"),
+    ),
+    ("researcher", include_str!("../../catalog/researcher.md")),
+    ("reviewer", include_str!("../../catalog/reviewer.md")),
     (
         "senior-developer",
-        include_str!("../catalog/senior-developer.md"),
+        include_str!("../../catalog/senior-developer.md"),
     ),
     (
         "sources-specialist",
-        include_str!("../catalog/sources-specialist.md"),
+        include_str!("../../catalog/sources-specialist.md"),
     ),
-    ("ux-specialist", include_str!("../catalog/ux-specialist.md")),
-    ("writer", include_str!("../catalog/writer.md")),
+    (
+        "ux-specialist",
+        include_str!("../../catalog/ux-specialist.md"),
+    ),
+    ("writer", include_str!("../../catalog/writer.md")),
 ];
 
 /// Built-in teams, by catalogue key. Each covers framing, solving and

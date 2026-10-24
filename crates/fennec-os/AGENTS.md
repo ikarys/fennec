@@ -2,62 +2,62 @@
 
 ## What this repository is
 
-**fennec's purpose** (the human, 2026-10-19): an assistant to build things with
-AI **fast**, but **efficiently** and **safely**. Every feature is weighed against
-these three; one that serves none of them is not built.
+fennec's thesis, trust zones and non-negotiable rules are in the repository's
+root `AGENTS.md`; where this file disagrees with it, the root wins (since
+2026-10-24, fennec's v1 definition).
 
-A local cognitive OS for coding agents. Its primitive is the **world**: a
-reversible, forkable sandbox an agent runs in. Everything else (repeated
-attempts, deterministic verification, memory, sleep) plugs into worlds.
-Roadmap: `docs/roadmap.md`. Origin (French R&D transcripts, reasoning record,
+fennec's library. Its primitive is the **world**: a reversible, forkable
+sandbox an agent runs in. Modules are split by trust zone: `src/kernel/`
+decides and holds the boundary, `src/engine/` drives the models.
+Earlier roadmap (before the v1 definition, kept as a record): `docs/roadmap.md`. Origin (French R&D transcripts, reasoning record,
 not binding): `docs/history/`; synthesis note in the `iatraining` repo,
 `notes/agent-architecture-reflexion.md`.
 
 ## Layout
 
 ```
-src/world.rs     worlds: fork, sandbox (bubblewrap; a world apart sees its project's `.fennec/` caches and Cargo target), diff, commit, rollback, drop; facts and forget for what a cut-short start or drop left;
+src/kernel/world.rs     worlds: fork, sandbox (bubblewrap; a world apart sees its project's `.fennec/` caches and Cargo target), diff, commit, rollback, drop; facts and forget for what a cut-short start or drop left;
                  park/unpark (work set aside gives the folder back); `Worlds::apart` forks apart whatever the project chose,
                  `Worlds::base` from a named branch when it exists
-src/grant.rs     human-issued grant: a world writes named host paths, backed up until keep/revert
-src/provider.rs  `Model` trait + OpenAI-compatible client; `ask` (one question), `Live` (the exchange so far, in a file)
-src/recipe.rs    replay a landed run's tool calls when the same goal returns
-src/chat.rs      a plain conversation in a folder the person chose (git or not): same sandbox, folder read-only until the person allows changes
+src/kernel/grant.rs     human-issued grant: a world writes named host paths, backed up until keep/revert
+src/engine/provider.rs  `Model` trait + OpenAI-compatible client; `ask` (one question), `Live` (the exchange so far, in a file)
+src/engine/recipe.rs    replay a landed run's tool calls when the same goal returns
+src/engine/chat.rs      a plain conversation in a folder the person chose (git or not): same sandbox, folder read-only until the person allows changes
                  (said in the conversation, the system message and tools the same in both modes), skills; no world;
                  a task's conversation is a chat too (`link`, `follow`): always read-only, it ends on `brief`;
                  a turn that changed the folder runs the approved plan's checks and the rules' commands, failures sent back twice
-src/outside.rs   the literal host paths a chat tool call names outside its folder: the chat asks, an opened folder stays read-write
-src/agent.rs     the engine every agent runs on (task attempts, chat turns): criteria kept by the harness and checked
+src/kernel/outside.rs   the literal host paths a chat tool call names outside its folder: the chat asks, an opened folder stays read-write
+src/engine/agent.rs     the engine every agent runs on (task attempts, chat turns): criteria kept by the harness and checked
                  by commands, a reminder kept in the conversation when it says something new (append-only, so the server caches it; reasoning sent back), `done` refused while criteria are open,
                  compaction into the model's notes, cut replies continued; loops, idle runs and hung commands stopped;
                  a read the model already has word for word comes back as a pointer; `proceed` goes on in a finished
                  conversation (a fix, an amend, a restart, an answer to a review) instead of a new one
-src/guard.rs     the person's rules on what agents run, read and write (`~/.config/fennec/guard.json`, never in a project;
+src/kernel/guard.rs     the person's rules on what agents run, read and write (`~/.config/fennec/guard.json`, never in a project;
                  defaults seeded once): deny, ask (a chat asks, a task does without and records it), allow; commands
                  split and normalized, paths resolved; checked by the engine before every call and every criterion check
-src/tools.rs     the agent's tools, run in the sandbox: shell, read_file (numbered), edit_file (exact replace, read first), write_file
-src/solve.rs     task → worlds in turn until one passes verify → land (rebase + re-verify, one commit by the human) on the branch the rules ask for → push
-src/spec.rs      request → conversation (`discuss`: a chat of its own in the project, read-only, ending on the `brief` tool, which also picks the skills and roles), or cut into smaller tasks (`split`) → `direct` work (no tests first, proof decides) or acceptance tests + task (`compile`, CLI and sparring); retry from the tests; amend a ready run from its work, or `fix` it from what its proof found; sparring findings
-src/proof.rs     a ready run used as its user would: model proposes tries, pages and clicks/typing; harness runs them, captures before/after (proof.py)
+src/engine/tools.rs     the agent's tools, run in the sandbox: shell, read_file (numbered), edit_file (exact replace, read first), write_file
+src/engine/solve.rs     task → worlds in turn until one passes verify → land (rebase + re-verify, one commit by the human) on the branch the rules ask for → push
+src/engine/spec.rs      request → conversation (`discuss`: a chat of its own in the project, read-only, ending on the `brief` tool, which also picks the skills and roles), or cut into smaller tasks (`split`) → `direct` work (no tests first, proof decides) or acceptance tests + task (`compile`, CLI and sparring); retry from the tests; amend a ready run from its work, or `fix` it from what its proof found; sparring findings
+src/engine/proof.rs     a ready run used as its user would: model proposes tries, pages and clicks/typing; harness runs them, captures before/after (proof.py)
                  `page`: the same product started for the human's browser (host network, a free port, 30 min)
-src/rules.rs     project rules (`.fennec-os/rules.json` at HEAD), glob matching; rules said in words
+src/kernel/rules.rs     project rules (`.fennec-os/rules.json` at HEAD), glob matching; rules said in words
                  (`~/.config/fennec/rules.md`, AGENTS.md `## Rules`): proposed, written once or taken back, given to agents;
                  AGENTS.md is committed alone where worlds go in the folder (`world::keep`), so it never holds it
-src/team.rs      named teams of roles that brief the agent per stage (frame = the conversation and `compile`, solve, prove):
+src/engine/team.rs      named teams of roles that brief the agent per stage (frame = the conversation and `compile`, solve, prove):
                  `~/.config/fennec/teams/<team>/*.md` or built-in teams (`Développement`, `Études`) drawn
                  from `catalog/`; a project picks one in `.fennec-os/team.json`, overrides in `.fennec-os/team/`
                  a `prove` role's `check:` lines run on every proof: a failure is a veto
                  a role's `model:` is the model its stage runs on instead of the settings'
-src/skill.rs     skills (Agent Skills folders, `SKILL.md`) read where the person keeps them (~/.config/fennec/skills,
+src/engine/skill.rs     skills (Agent Skills folders, `SKILL.md`) read where the person keeps them (~/.config/fennec/skills,
                  ~/.claude/skills and plugins, the project's .claude/skills); enabled once for every project
                  (`~/.config/fennec/skills.json`, the old `git config fennec.skill` migrated); listed to the agent,
                  mounted read-only at ~/.skills/<name>, traced from the reads
-src/plugin.rs    plugins the person keeps (~/.config/fennec/plugins/<name>/plugin.json, enabled in plugins.json): run on the
+src/kernel/plugin.rs    plugins the person keeps (~/.config/fennec/plugins/<name>/plugin.json, enabled in plugins.json): run on the
                  host with an event on stdin (a question, work ready...), 10 s at most; `before_<step>` ones are hooks;
                  a `serve` program runs while enabled with `FENNEC_URL`/`FENNEC_TOKEN`, for the senders `allow` names
-src/review.rs    review queue, rejections, corrections said twice, agenda
-src/sleep.rs     landed runs → candidate know-how (`.fennec-os/knowhow.md`)
-src/schedule.rs  background work (sleep) waits while interactive work (solve) runs
+src/kernel/review.rs    review queue, rejections, corrections said twice, agenda
+src/engine/sleep.rs     landed runs → candidate know-how (`.fennec-os/knowhow.md`)
+src/kernel/schedule.rs  background work (sleep) waits while interactive work (solve) runs
 src/serve.rs     review page on 127.0.0.1: specs, runs, know-how; decisions run as jobs
 src/main.rs      `fennec-os` CLI
 tests/         integration tests against a real sandbox
