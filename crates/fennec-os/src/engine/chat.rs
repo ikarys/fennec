@@ -655,6 +655,15 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
             // A task's conversation ends on its brief: kept for the task,
             // which frames it. An analysis ends on its report the same way.
             if task && name == ending {
+                // A report missing what its kind needs goes back to the model.
+                if let Some(why) = analysis
+                    .as_deref()
+                    .and_then(|k| crate::analysis::lacking(k, &args))
+                {
+                    push(&mut record["tools"], timed(name));
+                    said.push(json!({"role": "tool", "tool_call_id": call["id"], "content": why}));
+                    continue;
+                }
                 briefed = Some(args.clone());
                 push(&mut record["tools"], timed(name));
                 said.push(json!({"role": "tool", "tool_call_id": call["id"],
