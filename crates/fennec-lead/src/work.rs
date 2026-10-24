@@ -699,8 +699,12 @@ fn note_frame(store: &Store, id: &str, spec_id: &str) -> io::Result<()> {
 /// the implementer's, with the design under it, and the project's own suite
 /// still runs beside the new tests.
 fn with_design(mut t: Value, design: &Value) -> Value {
-    for k in ["architecture", "plan", "files", "risk"] {
-        t[k] = design[k].clone();
+    // The design's "done when" is in product terms; the tests' own speaks
+    // of the tests, which the human reads below it.
+    for k in ["architecture", "plan", "files", "risk", "done_when"] {
+        if !design[k].is_null() {
+            t[k] = design[k].clone();
+        }
     }
     let block = design["goal"]
         .as_str()
@@ -2671,11 +2675,16 @@ mod tests {
     #[test]
     fn tests_written_first_carry_the_design_and_keep_the_suite() {
         let design = json!({"architecture": "in calc", "plan": ["add"], "files": ["calc.py"],
-            "risk": {"sensitive": true}, "verify": ["python3 -m unittest"],
+            "risk": {"sensitive": true}, "done_when": "on peut remiser", "verify": ["python3 -m unittest"],
             "goal": "subtract\n\nArchitecture (design):\nin calc\n\nPlan:\n1. add\n"});
-        let t = json!({"goal": "make test_sub pass", "verify": ["python3 -m unittest test_sub"]});
+        let t = json!({"goal": "make test_sub pass", "verify": ["python3 -m unittest test_sub"],
+            "done_when": "test_sub passes"});
         let s = with_design(t, &design);
         assert_eq!(s["files"], json!(["calc.py"]));
+        assert_eq!(
+            s["done_when"], "on peut remiser",
+            "the design's words, not the tests'"
+        );
         assert_eq!(s["risk"]["sensitive"], true);
         assert_eq!(
             s["goal"],
