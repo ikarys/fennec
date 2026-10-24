@@ -184,6 +184,73 @@ pub fn tidy(report: &Value) -> Value {
            "findings": findings, "suggestions": suggestions, "proposals": proposals})
 }
 
+const CAPITALISE: &str = "You keep this project's architecture knowledge up to date: its \
+vision (ARCHITECTURE.md), its sensitive zones and its decision records. A change was just made \
+(below). Most changes need nothing: then answer {\"proposals\": []}. Propose only when the \
+change alters what the vision says (a new module or boundary, a dependency's direction, a \
+convention, where things go), or embodies a decision worth recording (a new dependency, a \
+pattern chosen over another). Answer with JSON only: {\"proposals\": [{\"file\": \"...\", \
+\"content\": \"the file's whole new text\", \"why\": \"...\"}]}. Keep what is still true; \
+the developer decides.";
+
+/// The end of a change task's cycle: one ask, without tools, on the work
+/// that passed its review. Its proposals for the knowledge, often none,
+/// wait for the human next to the review; nothing is written here.
+pub fn capitalise(
+    worlds: &Worlds,
+    run: &str,
+    model: &dyn Model,
+) -> io::Result<(Vec<Value>, Value)> {
+    let record = crate::review::load(worlds, run)?;
+    let diff = record["attempts"]
+        .as_array()
+        .and_then(|a| a.iter().find(|t| t["world"] == run))
+        .and_then(|t| t["diff"].as_str())
+        .unwrap_or("");
+    if diff.trim().is_empty() {
+        return Ok((Vec::new(), Value::Null));
+    }
+    let project = PathBuf::from(record["project"].as_str().unwrap_or(""));
+    let system = format!(
+        "{CAPITALISE}\n\n{ADR_FORMAT}\n\n{ZONES_FORMAT}{}",
+        crate::spec::vision_context(&project)?
+    );
+    let ask = format!(
+        "The task (its goal, design and plan):\n{}\n\nThe change (diff):\n{}",
+        record["goal"].as_str().unwrap_or(""),
+        crate::agent::truncate(diff)
+    );
+    let messages = [
+        json!({"role": "system", "content": system}),
+        json!({"role": "user", "content": ask}),
+    ];
+    let (answer, exchange) = crate::provider::ask(model, &messages)?;
+    Ok((proposals_of(&answer, &project), exchange))
+}
+
+/// The proposals in a reply, each next to its file as it stands. A reply
+/// that is not the asked JSON proposes nothing: the knowledge stays.
+fn proposals_of(answer: &str, project: &Path) -> Vec<Value> {
+    let (Some(from), Some(to)) = (answer.find('{'), answer.rfind('}')) else {
+        return Vec::new();
+    };
+    let Ok(v) = serde_json::from_str::<Value>(&answer[from..=to]) else {
+        return Vec::new();
+    };
+    tidy(&v)["proposals"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .map(|mut p| {
+            let file = p["file"].as_str().unwrap_or("").to_string();
+            p["before"] = json!(current(project, &file));
+            p["allowed"] = json!(crate::knowledge::is_knowledge(&file));
+            p
+        })
+        .collect()
+}
+
 /// A knowledge file at HEAD, for the page to show a proposal as a diff.
 pub fn current(project: &Path, file: &str) -> Option<String> {
     if !crate::knowledge::is_knowledge(file) {
@@ -208,6 +275,23 @@ mod tests {
         assert_eq!(r["suggestions"][1]["kind"], "knowledge");
         assert_eq!(r["proposals"].as_array().unwrap().len(), 1);
         assert_eq!(tidy(&json!({}))["findings"], json!([]));
+    }
+
+    #[test]
+    fn a_capitalisation_reply_is_read_as_json_or_proposes_nothing() {
+        let here = Path::new("/nonexistent");
+        assert!(proposals_of("nothing to add", here).is_empty());
+        assert!(proposals_of("{\"proposals\": []}", here).is_empty());
+        let p = proposals_of(
+            "```json\n{\"proposals\": [{\"file\": \"docs/adr/new-x.md\", \"content\": \"# X\"},\
+             {\"file\": \"src/a.rs\", \"content\": \"y\"}]}\n```",
+            here,
+        );
+        assert_eq!(p.len(), 2);
+        assert_eq!(
+            (p[0]["allowed"].clone(), p[1]["allowed"].clone()),
+            (json!(true), json!(false))
+        );
     }
 
     #[test]

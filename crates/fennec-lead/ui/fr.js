@@ -701,4 +701,10 @@ const FR = {
   "Adopt this project: propose its architecture vision, its sensitive zones and its first decisions.": "Adopte ce projet : propose sa vision d'architecture, ses zones sensibles et ses premières décisions.",
   "A question: fennec reads the project and reports, nothing is changed": "Une question : fennec lit le projet et fait un rapport, rien n'est modifié",
   "Project knowledge": "Savoir du projet",
+  "Knowledge to update with this commit": "Savoir à mettre à jour avec ce commit",
+  "✓ goes into the commit": "✓ part dans le commit",
+  "left out": "laissée de côté",
+  "Leave out": "Laisser de côté",
+  "Save the text": "Enregistrer le texte",
+  "Put in the commit": "Mettre dans le commit",
 };
