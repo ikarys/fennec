@@ -1,0 +1,8 @@
+{
+  "zones": [
+    {"name": "kernel", "kind": "security", "paths": ["crates/fennec-os/src/kernel/**"]},
+    {"name": "landing", "kind": "security", "paths": ["crates/fennec-os/src/engine/solve.rs"]},
+    {"name": "dependencies", "kind": "sensitive", "paths": ["Cargo.lock", "Cargo.toml", "crates/fennec-os/Cargo.toml", "crates/fennec-lead/Cargo.toml"]},
+    {"name": "rules", "kind": "architecture", "paths": ["AGENTS.md", "crates/fennec-os/AGENTS.md", "crates/fennec-lead/AGENTS.md", "LICENSE"]}
+  ]
+}
