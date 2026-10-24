@@ -59,6 +59,8 @@ eval(src.match(/const el = \(tag, props = \{\}, \.\.\.children\) => \{[\s\S]*?\n
   const shots = () => null;
   const facts = () => [];
   const doneWhen = () => null;
+  const cycleView = () => [];
+  const focusBy = () => new Node("div");
   const rich = () => [new Node("span")];
   const explain = (r) => r;
   let saved = "";

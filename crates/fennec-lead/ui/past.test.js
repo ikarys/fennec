@@ -41,6 +41,7 @@ eval(src.match(/const el = \(tag, props = \{\}, \.\.\.children\) => \{[\s\S]*?\n
   + grab("rich") + grab("inline") + grab("md") + grab("isImage") + grab("focus") + grab("firstLine")
   + grab("conversation") + grab("askedOf") + grab("doneWhen") + grab("work") + grab("shots")
   + grab("stepText") + grab("line") + grab("headline") + grab("pastState") + grab("pill")
+  + grab("prov") + grab("focusBy") + grab("cycleView")
   + src.match(/const METRIC_TIP = \{[\s\S]*?\n\};\n/)[0]
   + grab("metrics") + grab("metric")
   + grab("timeline")
