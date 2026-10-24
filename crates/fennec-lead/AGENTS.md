@@ -5,9 +5,10 @@
 fennec's thesis, trust zones and non-negotiable rules are in the repository's
 root `AGENTS.md`; where this file disagrees with it, the root wins (since
 2026-10-24, fennec's v1 definition). Known gaps with it, closed by the build
-steps: work goes from a request to a proof without the v1 cycle (architecture,
-plan, validated tests, review, comprehension dialogue: step 1), and rule 2
-below hides internals the v1 wants shown with their provenance.
+steps: the comprehension dialogue (step 5) is not built yet, and rule 2 below
+hides internals the v1 wants shown with their provenance (the cycle's design,
+risk and review are shown with it since step 1). The cycle is described in
+`docs/design/step-1-cycle.md` at the root.
 
 The `fennec` binary, fennec's human surface: a developer leads one or several
 projects from a local web UI. Execution lives in `../fennec-os` (library);
