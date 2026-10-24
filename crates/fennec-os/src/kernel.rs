@@ -8,3 +8,4 @@ pub mod review;
 pub mod rules;
 pub mod schedule;
 pub mod world;
+pub mod zones;

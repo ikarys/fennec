@@ -383,6 +383,8 @@ pub fn matches(pattern: &str, path: &str) -> bool {
 fn glob(p: &[u8], s: &[u8]) -> bool {
     match p {
         [] => s.is_empty(),
+        // A trailing `**` is everything below: `src/auth/**` covers its files.
+        [b'*', b'*'] => true,
         [b'*', b'*', rest @ ..] => {
             let rest = rest.strip_prefix(b"/").unwrap_or(rest);
             (0..=s.len()).any(|i| (i == 0 || s[i - 1] == b'/') && glob(rest, &s[i..]))
@@ -457,6 +459,8 @@ mod tests {
         assert!(!matches("src/*.rs", "src/x/a.rs"));
         assert!(matches("src/**/*.rs", "src/x/y/a.rs"));
         assert!(matches("src/**/*.rs", "src/a.rs"));
+        assert!(matches("src/auth/**", "src/auth/a/b.rs"));
+        assert!(!matches("src/auth/**", "src/authz.rs"));
         assert!(matches("**/*.sql", "db/m/1.sql"));
         assert!(matches(".fennec-os", ".fennec-os/rules.json"));
         assert!(!matches("a?c", "a/c"));
