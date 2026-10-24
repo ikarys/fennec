@@ -56,6 +56,7 @@ src/kernel/plugin.rs    plugins the person keeps (~/.config/fennec/plugins/<name
                  host with an event on stdin (a question, work ready...), 10 s at most; `before_<step>` ones are hooks;
                  a `serve` program runs while enabled with `FENNEC_URL`/`FENNEC_TOKEN`, for the senders `allow` names
 src/kernel/zones.rs     the architecture vision (ARCHITECTURE.md) and sensitive zones (`.fennec-os/zones.json`) at HEAD; `classify` a change's paths
+src/kernel/knowledge.rs the project's knowledge (vision, zones, decision records `docs/adr/NNNN-title.md`): the records at HEAD, a model's proposal checked (knowledge paths only, the kernel numbers records), accepted files committed alone or written into a world
 src/kernel/review.rs    review queue, rejections, corrections said twice, agenda
 src/engine/sleep.rs     landed runs → candidate know-how (`.fennec-os/knowhow.md`)
 src/kernel/schedule.rs  background work (sleep) waits while interactive work (solve) runs

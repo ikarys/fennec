@@ -17,7 +17,7 @@ pub mod serve;
 pub use engine::{
     agent, chat, proof, provider, recipe, review_stage, skill, sleep, solve, spec, team, tools,
 };
-pub use kernel::{grant, guard, outside, plugin, review, rules, schedule, world, zones};
+pub use kernel::{grant, guard, knowledge, outside, plugin, review, rules, schedule, world, zones};
 
 /// Tests that move process-wide variables (`HOME`, `XDG_CONFIG_HOME`) hold
 /// this while they do, whichever module they are in.
