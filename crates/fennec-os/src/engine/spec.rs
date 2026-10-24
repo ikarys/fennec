@@ -36,7 +36,7 @@ is a new file at the root, which the tests read or run as the project's tests ca
 When finished, call `done` with a summary in exactly this form:\n\
 done_when: <what the person using the product will see or be able to do once it is done, in one or two sentences, in the request's language; product terms only, no file, tag, function or test names; it describes what your tests check, not what the request says: where you chose a reading, it states that reading>\n\
 goal: <the request restated precisely for an implementer, naming the tests that must pass>\n\
-verify: <a shell command that runs the new tests; one line per command>\n\nRequest:\n";
+verify: <a shell command that runs the new tests; one line per command; it runs again on the finished work, where the project's dependencies may already be installed, so it never creates what may exist already (prefer the project's own test command)>\n\nRequest:\n";
 
 const SPAR: &str = "You are a sparring partner for this project: find one real defect, a behaviour \
 that contradicts its documentation, its names or the plain intent of its code (invalid input, \
@@ -46,7 +46,7 @@ change existing files. A style issue or a missing feature is not a defect. If yo
 no real defect, call `done` with the summary `none` and write nothing. Otherwise call `done` with \
 a summary in exactly this form:\n\
 goal: <the defect and the expected behaviour, for whoever fixes it, naming the failing test>\n\
-verify: <a shell command that runs the new test; one line per command>";
+verify: <a shell command that runs the new test; one line per command; it runs again on the finished work, where the project's dependencies may already be installed, so it never creates what may exist already (prefer the project's own test command)>";
 
 /// The design: one model call, no world to explore. The person validates
 /// "done when", how the change fits the architecture vision and the plan;
@@ -629,7 +629,7 @@ fn reformat(
          Reply in exactly this form, nothing else:\n\
          done_when: <what the person using the product will see or be able to do once it is done, in one or two sentences, in the request's language; product terms only, no file, tag, function or test names; it describes what your tests check, not what the request says: where you chose a reading, it states that reading>\n\
          goal: <the request restated precisely for an implementer, naming the tests that must pass>\n\
-         verify: <a shell command that runs the new tests; one line per command>",
+         verify: <a shell command that runs the new tests; one line per command; it runs again on the finished work, where the project's dependencies may already be installed, so it never creates what may exist already (prefer the project's own test command)>",
         changed.join("\n"),
         if summary.trim().is_empty() {
             "(none)"
