@@ -1,0 +1,5 @@
+{
+  "run": "notify.py",
+  "description": "Prévient par Apprise (Discord, Telegram, Teams, ntfy…)",
+  "events": ["question", "ready", "failed"]
+}

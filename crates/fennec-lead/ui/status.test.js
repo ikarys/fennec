@@ -1,0 +1,90 @@
+// node ui/status.test.js — the request's head: the title in whole above the
+// tabs, one coloured pill for where it stands; every status has a tone.
+const assert = require("assert");
+const src = require("fs").readFileSync(__dirname + "/app.js", "utf8");
+// `t` in English, as app.js shows it by default.
+globalThis.t = (s, ...a) => s.replace(/\{(\d+)\}/g, (_, i) => String(a[i] ?? ""));
+globalThis.lang = () => "en";
+const grab = (name) => src.match(new RegExp(`function ${name}\\([\\s\\S]*?\\n}\\n`))[0];
+const arrow = (name) => src.match(new RegExp(`const ${name} = [^\\n]*\\n`))[0];
+
+class Node {
+  constructor(tag) {
+    this.tag = tag; this.children = []; this.textContent = ""; this.className = "";
+    this.dataset = {}; this.style = { setProperty() {} }; this.classList = { add() {} };
+  }
+  append(...cs) { this.children.push(...cs); }
+  setAttribute(k, v) { this[k] = v; }
+}
+global.document = {
+  createElement: (t) => new Node(t),
+  body: { classList: { contains: () => false } },
+};
+
+eval(src.match(/const el = \(tag, props = \{\}, \.\.\.children\) => \{[\s\S]*?\n\};/)[0]
+  + src.match(/const TAGS = \{[\s\S]*?\n\};/)[0]
+  + src.match(/const ICONS = \{[\s\S]*?\n\};/)[0]
+  + src.match(/const ICON_OF = \[[\s\S]*?\];/)[0]
+  + grab("pastState") + grab("duration") + arrow("compact")
+  + grab("setIcon") + grab("statusOf") + arrow("lead") + grab("reqHead")
+  + grab("iconize") + arrow("errorOf") + grab("action") + src.match(/async function follow\([\s\S]*?\n\}\n/)[0] + grab("stepText") + grab("underway") + src.match(/const STEPS = \[[\s\S]*?\]\];\n/)[0] + src.match(/const LEGACY_STEPS = [\s\S]*?\n};\n/)[0] + grab("stages") + grab("ended") + grab("conversation") + grab("doneWhen") + grab("facts")
+  + "globalThis.statusOf = statusOf; globalThis.reqHead = reqHead; globalThis.underway = underway;");
+global.api = async () => [];
+global.refresh = () => {};
+
+// Every status, in every view, has a label and a tone.
+assert.deepEqual(statusOf({ kind: "talk" }, "todo"), ["Discussion", "accent"]);
+assert.deepEqual(statusOf({ kind: "validate" }, "todo"), ["To validate", "accent"]);
+assert.deepEqual(statusOf({ kind: "blocked" }, "todo"), ["Question", "accent"]);
+assert.deepEqual(statusOf({ kind: "rule" }, "todo"), ["Rule?", "accent"]);
+assert.deepEqual(statusOf({ kind: "ready" }, "todo"), ["Ready", "ok"]);
+assert.deepEqual(statusOf({ kind: "later" }, "todo"), ["Backlog", "muted"]);
+assert.deepEqual(statusOf({ kind: "later", fleet: true }, "todo"), ["Ready to run", "info"]);
+assert.deepEqual(statusOf({ kind: "failed" }, "todo"), ["Failed", "bad"]);
+assert.deepEqual(statusOf({ kind: "dropped" }, "past"), ["dropped", "bad"]);
+assert.deepEqual(statusOf({ kind: "passed" }, "past"), ["set aside", "warn"]);
+assert.deepEqual(statusOf({ kind: "landed", branch: "main", commit: "abc1234" }, "past"), ["✓ commit main · abc1234", "ok"]);
+assert.deepEqual(statusOf({}, "run"), ["running", "info"]);
+assert.deepEqual(statusOf({ waiting: true }, "run"), ["waiting", "muted"], "en file, pas en cours");
+
+// The head: the title in whole, the coloured pill beside it.
+const item = { id: "x", title: "rend l'interface plus jolie", kind: "passed", stats: { turns: 1, ms: 1000, sent: 10, received: 5 } };
+const head = reqHead(item, "past");
+assert.equal(head.children[0].tag, "strong");
+assert.equal(head.children[0].textContent, "rend l'interface plus jolie", "le titre, en entier");
+assert.equal(head.children[1].className, "status warn", "le status coloré");
+assert.equal(head.children[1].textContent, "set aside");
+assert.ok(head.children[2].textContent.includes("⏱"), "le coût, pour le passé");
+
+// A running request: no cost, an "running" pill, the right bar's toggle.
+const run = reqHead({ id: "r", title: "t" }, "run");
+assert.equal(run.children[1].className, "status info");
+assert.equal(run.children.length, 3, "pas de coût sur ce qui tourne");
+assert.equal(run.children[2].id, "toggle-facts", "le toggle de la barre de droite");
+
+// Work under way: "Stop" always; "Retry" only when the worker can be
+// dead — queued, or mid-commit.
+const barOf = (box) => box.children.find((n) => n.className === "past-actions run-actions");
+const busy = { id: "w", title: "t", kind: "run", step: "works", since: 1000 };
+assert.ok(barOf(underway(busy)).children.some((b) => b.textContent === "Stop"));
+assert.ok(!barOf(underway(busy)).children.some((b) => b.textContent === "Retry"), "rien à réessayer tant que ça tourne");
+assert.ok(barOf(underway({ ...busy, waiting: true, step: "waits its turn: the folder has changes not committed yet" }))
+  .children.some((b) => b.textContent === "Retry"), "en attente : on peut réessayer");
+assert.ok(barOf(underway({ ...busy, step: "makes the commit" }))
+  .children.some((b) => b.textContent === "Retry"), "en train du commit : on peut réessayer");
+assert.ok(!barOf(underway({ ...busy, waiting: true, alive: true }))
+  .children.some((b) => b.textContent === "Retry"), "en attente, worker vivant : rien à réessayer");
+
+// Where the work stands, as steps: before it done, it highlighted.
+const steps = underway(busy).children[0].children;
+assert.deepEqual(steps.map((li) => li.className), ["done", "done", "now", "", "", ""], "travaille = Travail en cours");
+
+// Finished: what the figures show reached, and where it broke.
+const failed = ended({ kind: "failed", stats: { stages: { Discussion: {}, Travail: {}, Preuve: {} } } }).children;
+assert.deepEqual(failed.map((li) => li.className), ["done", "", "done", "", "stop", ""], "échoué à l'essai, sans cadrage");
+const landed = ended({ kind: "landed", stats: { stages: { Discussion: {}, Travail: {}, Preuve: {} } } }).children;
+assert.equal(landed.at(-1).className, "done", "commité : Commit fait");
+
+console.log("OK");
+// A plan step's head is its first paragraph, not the plan it carries.
+assert.equal(reqHead({ id: "p", title: "Scaffolding\n\n---\n## Plan\n- a" }, "run").children[0].textContent, "Scaffolding");

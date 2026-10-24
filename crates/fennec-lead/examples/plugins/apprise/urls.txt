@@ -1,0 +1,4 @@
+# One Apprise URL per line, for example:
+# discord://webhook_id/webhook_token
+# tgram://bot_token/chat_id
+# ntfy://ntfy.sh/my-topic
