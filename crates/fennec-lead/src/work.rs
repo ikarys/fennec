@@ -1133,7 +1133,7 @@ fn check_from(
     loop {
         store.update(id, |r| r["status"] = json!("reviewing"))?;
         let review = review_stage::run(
-            &worlds,
+            worlds,
             &run,
             done_when.as_deref(),
             &reviewer,
@@ -1167,7 +1167,7 @@ fn check_from(
             note(r, json!({"stage": "review", "findings": found}));
             r["status"] = json!("running");
         })?;
-        let fixed = spec::fix(&worlds, spec_id, &found, &models, MAX_STEPS, None)?;
+        let fixed = spec::fix(worlds, spec_id, &found, &models, MAX_STEPS, None)?;
         if let Some(w) = fixed["winner"].as_str() {
             run = w.to_string();
             store.update(id, |r| {
@@ -1199,7 +1199,7 @@ fn check_from(
     loop {
         // Tests passing is not "ready": the product is tried first.
         store.update(id, |r| r["status"] = json!("proving"))?;
-        let proof = proof::gather(&worlds, &run, done_when.as_deref(), &watched)?;
+        let proof = proof::gather(worlds, &run, done_when.as_deref(), &watched)?;
         let mut probe = store.load(id)?;
         apply_proof(&mut probe, &proof);
         // What the proof found goes back to the builder, which starts from
@@ -1211,7 +1211,7 @@ fn check_from(
                 note(r, json!({"stage": "qa", "findings": found}));
                 r["status"] = json!("running");
             })?;
-            let fixed = spec::fix(&worlds, spec_id, &found, &models, MAX_STEPS, None)?;
+            let fixed = spec::fix(worlds, spec_id, &found, &models, MAX_STEPS, None)?;
             if let Some(w) = fixed["winner"].as_str() {
                 run = w.to_string();
                 // The fix stands with what it proved — even when it changed
@@ -1242,7 +1242,7 @@ fn check_from(
         // Where it will land is decided before "ready", so the card never shows
         // a branch the click would not use.
         let target = (probe["status"] == "ready")
-            .then(|| solve::plan(&worlds, &run, &variants[0]).ok())
+            .then(|| solve::plan(worlds, &run, &variants[0]).ok())
             .flatten();
         return store.update(id, |r| {
             apply_proof(r, &proof);
