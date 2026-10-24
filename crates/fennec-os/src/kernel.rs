@@ -2,6 +2,7 @@
 
 pub mod grant;
 pub mod guard;
+pub mod knowledge;
 pub mod outside;
 pub mod plugin;
 pub mod review;

@@ -160,7 +160,8 @@ fn designed_goal(request: &str, d: &Design) -> String {
     goal
 }
 
-/// The vision and the zones, for the design and the review to read.
+/// The vision, the decisions' index and the zones, for the design and the
+/// review to read.
 pub(crate) fn vision_context(project: &Path) -> io::Result<String> {
     let mut out = String::new();
     if let Some(v) = crate::zones::vision(project) {
@@ -170,6 +171,7 @@ pub(crate) fn vision_context(project: &Path) -> io::Result<String> {
             crate::zones::VISION_FILE
         ));
     }
+    out.push_str(&crate::knowledge::index(&crate::knowledge::adrs(project)?));
     out.push_str(&crate::zones::brief(&crate::zones::load(project)?));
     Ok(out)
 }

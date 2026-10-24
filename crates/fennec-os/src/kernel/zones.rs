@@ -6,7 +6,8 @@
 //! `.fennec-os/zones.json`:
 //! `{"zones": [{"name": "auth", "kind": "security", "paths": ["src/auth/**"]}]}`
 //! where `kind` is `architecture`, `security` or `sensitive`. The vision and
-//! the zones file are themselves always an architecture zone.
+//! the zones file are themselves always an architecture zone, and so are the
+//! decision records (see `knowledge`).
 
 use std::io;
 use std::path::Path;
@@ -34,7 +35,11 @@ pub fn load(project: &Path) -> io::Result<Vec<Zone>> {
     let mut zones = vec![Zone {
         name: "vision".to_string(),
         kind: "architecture".to_string(),
-        paths: vec![VISION_FILE.to_string(), ZONES_FILE.to_string()],
+        paths: vec![
+            VISION_FILE.to_string(),
+            ZONES_FILE.to_string(),
+            format!("{}/**", crate::knowledge::ADR_DIR),
+        ],
     }];
     let Ok(text) = git(project, &["show", &format!("HEAD:{ZONES_FILE}")]) else {
         return Ok(zones);
@@ -43,7 +48,7 @@ pub fn load(project: &Path) -> io::Result<Vec<Zone>> {
     Ok(zones)
 }
 
-fn parse(text: &str) -> io::Result<Vec<Zone>> {
+pub(crate) fn parse(text: &str) -> io::Result<Vec<Zone>> {
     let bad = |why: &str| io::Error::other(format!("{ZONES_FILE}: {why}"));
     let v: Value = serde_json::from_str(text).map_err(|e| bad(&e.to_string()))?;
     let list = v["zones"]
