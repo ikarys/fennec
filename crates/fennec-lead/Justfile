@@ -24,7 +24,7 @@ service-install: build
 
   [Service]
   Type=simple
-  ExecStart={{justfile_directory()}}/target/release/fennec
+  ExecStart={{justfile_directory()}}/../../target/release/fennec
   Environment="PATH=$PATH"
   Restart=on-failure
 
