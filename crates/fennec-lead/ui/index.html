@@ -420,6 +420,19 @@
   .prov.model { color: var(--info); }
   .risk { font-size: 14px; margin-top: 10px; }
   .risk.sensitive { color: var(--warn); }
+  .report-label { margin-top: 12px; }
+  .findings, .suggestions { margin: 4px 0 0; padding-left: 20px; }
+  .findings li, .suggestions li { margin: 6px 0; }
+  .findings li { border-left: 3px solid var(--muted); padding-left: 8px; list-style: none; margin-left: -20px; }
+  .findings li.sev-high { border-left-color: var(--bad); }
+  .findings li.sev-medium { border-left-color: var(--accent); }
+  .proposal { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; margin-top: 8px; }
+  .proposal .row { justify-content: flex-start; align-items: center; margin-top: 4px; }
+  .proposal .row:last-child { justify-content: flex-end; }
+  .proposal textarea { width: 100%; box-sizing: border-box; margin-top: 6px; }
+  .proposal pre { white-space: pre-wrap; max-height: 320px; overflow: auto; }
+  .mono { font-family: ui-monospace, monospace; font-size: 12px; }
+  .checks { list-style: none; padding-left: 0; }
   .plan-steps { margin: 4px 0 0; padding-left: 20px; }
   .partial { margin: 6px 0 0; }
   #page-stops { list-style: none; padding: 0; margin: 6px 0 0; }
@@ -789,6 +802,9 @@
     <div class="tiles" id="page-tiles"></div>
     <div class="sub"><h3 data-icon="shield" data-t>Where fennec works</h3>
       <select id="page-place" aria-label="Where fennec works"></select></div>
+    <div class="sub"><h3 data-icon="book" data-t>Project knowledge</h3>
+      <p class="muted small" id="page-knowledge"></p>
+      <div class="row" id="page-knowledge-actions"></div></div>
     <div class="sub"><h3 data-icon="stop" data-t>Where your loop stops</h3>
       <ul class="stops" id="page-stops"></ul></div>
     <div class="sub rules" id="page-rules"><h3 data-icon="rule"><span data-t>Project rules</span> <span class="count" hidden></span></h3>
@@ -1007,6 +1023,7 @@
     <div id="chips"></div>
     <p class="error" id="compose-error" role="alert"></p>
     <div class="row">
+      <button type="button" id="ask-add" data-icon="search" title="A question: fennec reads the project and reports, nothing is changed" data-t>Question</button>
       <button type="button" id="later-add" data-icon="clock" title="Keep it in the Backlog: fennec restates it, you validate it, then the Fleet runs it" data-t>Backlog</button>
       <button class="primary" data-icon="send" data-t>Start</button>
     </div>

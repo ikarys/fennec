@@ -15,7 +15,8 @@ pub mod serve;
 // Flat paths (`fennec_os::guard`, `crate::world`) stay valid while modules
 // still mix zones; the kernel's surface narrows when it is hardened (step 3).
 pub use engine::{
-    agent, chat, proof, provider, recipe, review_stage, skill, sleep, solve, spec, team, tools,
+    agent, analysis, chat, proof, provider, recipe, review_stage, skill, sleep, solve, spec, team,
+    tools,
 };
 pub use kernel::{grant, guard, knowledge, outside, plugin, review, rules, schedule, world, zones};
 

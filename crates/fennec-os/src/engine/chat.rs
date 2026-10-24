@@ -208,6 +208,15 @@ pub fn link(worlds: &Worlds, id: &str, request: &str) -> io::Result<Value> {
     })
 }
 
+/// The task's conversation is an analysis of `kind` (see
+/// [`crate::analysis`]): it ends on a report instead of a brief.
+pub fn analyse_as(worlds: &Worlds, id: &str, kind: &str) -> io::Result<Value> {
+    if !crate::analysis::KINDS.contains(&kind) {
+        return Err(io::Error::other(format!("no analysis of kind {kind}")));
+    }
+    update(worlds, id, |c| c["analysis"] = json!(kind))
+}
+
 /// A task's conversation brought up to the task's record of it before its
 /// turn: the person's new messages are added; a record that no longer
 /// follows the conversation (the task reworded) starts it over from the
@@ -256,6 +265,7 @@ pub fn follow(worlds: &Worlds, id: &str, thread: &[Value]) -> io::Result<usize> 
         c["task"] = json!(true);
         c["write"] = json!(false);
         c["brief"] = Value::Null;
+        c["report"] = Value::Null;
         c["status"] = json!("thinking");
         c["since"] = json!(now());
         c["stop"] = json!(false);
@@ -485,8 +495,18 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
             .iter()
             .map(|s| (s.name.clone(), s.dir.clone()))
             .collect();
-        // A task's conversation: read-only, it ends on `brief`.
+        // A task's conversation: read-only, it ends on `brief`, or on
+        // `report` for an analysis.
         let task = chat["task"] == true;
+        let analysis = chat["analysis"]
+            .as_str()
+            .filter(|_| task)
+            .map(str::to_string);
+        let ending = if analysis.is_some() {
+            "report"
+        } else {
+            "brief"
+        };
         // Read at each call: the person may allow changes while the turn runs.
         let write = !task && chat["write"] == true;
         // The same tools and system message in both modes: allowing changes
@@ -495,7 +515,10 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
         // and a write while it is read-only is refused below.
         let tools = Value::Array(if task {
             let mut t = tools::definitions(false);
-            t.push(crate::spec::brief_tool());
+            t.push(match analysis {
+                Some(_) => crate::analysis::report_tool(),
+                None => crate::spec::brief_tool(),
+            });
             t
         } else {
             let mut t = tools::definitions(true);
@@ -503,7 +526,9 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
             t.push(propose_plan());
             t
         });
-        let mode = if task {
+        let mode = if let Some(kind) = &analysis {
+            crate::analysis::mode(&folder, kind)?
+        } else if task {
             crate::spec::task_mode(&folder)?
         } else {
             if write { WRITE } else { READ }.trim().to_string()
@@ -628,12 +653,12 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
             let timed =
                 |name: &str| json!({"name": name, "ms": started.elapsed().as_millis() as u64});
             // A task's conversation ends on its brief: kept for the task,
-            // which frames it.
-            if task && name == "brief" {
+            // which frames it. An analysis ends on its report the same way.
+            if task && name == ending {
                 briefed = Some(args.clone());
                 push(&mut record["tools"], timed(name));
                 said.push(json!({"role": "tool", "tool_call_id": call["id"],
-                                 "content": "handed to the team"}));
+                                 "content": if ending == "report" { "handed to the developer" } else { "handed to the team" }}));
                 continue;
             }
             // The plan is the question: approved, the rest of the turn writes.
@@ -788,7 +813,7 @@ fn turn(worlds: &Worlds, id: &str, model: &dyn Model, max_steps: usize) -> io::R
             c["allowed"] = json!(allowed);
             push(&mut c["turns"], record);
             if let Some(b) = briefed {
-                c["brief"] = b;
+                c[ending] = b;
             }
         })?;
         if let Some(why) = stuck {

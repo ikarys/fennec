@@ -489,6 +489,7 @@ fn event(was: &str, id: &str, r: &Value) -> Option<Value> {
         // Back from a commit tried: the human is the one who just clicked.
         "ready" if was == "landing" => return None,
         "ready" => ("ready", format!("\"{title}\" is ready to validate")),
+        "reported" => ("ready", format!("the report on \"{title}\" is ready")),
         "failed" => (
             "failed",
             format!("\"{title}\" failed: {}", r["reason"].as_str().unwrap_or("")),
@@ -719,7 +720,7 @@ fn classify(requests: &[(String, Value)], projects_all: &[Value]) -> Value {
                    "title": label, "description": body,
                    "images": image_lines(r["text"].as_str().unwrap_or("")).collect::<Vec<_>>(), "rules": r["rules"], "checks": r["verify"], "team": r["team"],
                    "thread": r["thread"], "chat": r["chat"], "asks": asks(r), "stats": r["stats"], "since": r["since"], "picked": r["picked"],
-                   "cycle": cycle(r),
+                   "cycle": cycle(r), "analysis": r["analysis"],
                    // As the work reads it: said in the conversation, else
                    // the request as fennec restated it.
                    "done_when": ([&r["done_when"], &r["brief"], &r["ahead"]].into_iter().find(|v| v.is_string()))})
@@ -783,6 +784,14 @@ fn classify(requests: &[(String, Value)], projects_all: &[Value]) -> Value {
                 c["files"] = r["files"].clone();
                 todo.push((1, c));
             }
+            // An analysis' report waits for the human's reading and calls.
+            Some("reported") => {
+                let mut c = card("report");
+                c["report"] = r["report"].clone();
+                c["knowledge_checks"] = r["knowledge_checks"].clone();
+                c["message"] = json!(crate::work::knowledge_message(r));
+                todo.push((2, c));
+            }
             Some("question") => {
                 let c = card("validate");
                 todo.push((0, c));
@@ -837,6 +846,16 @@ fn classify(requests: &[(String, Value)], projects_all: &[Value]) -> Value {
             }
             // Finished one way or another: kept, so the human is never blind
             // to what was asked, done and proven.
+            Some("analysed") => {
+                let mut c = card("analysed");
+                c["report"] = r["report"].clone();
+                c["knowledge_checks"] = r["knowledge_checks"].clone();
+                if r["archived"] == true {
+                    archived.push(c);
+                } else {
+                    history.push(c);
+                }
+            }
             Some(outcome @ ("landed" | "passed" | "dropped")) => {
                 let mut c = card(outcome);
                 c["branch"] = r["target"]["branch"].clone();

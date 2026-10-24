@@ -697,3 +697,53 @@ fn a_task_conversation_reads_asks_then_hands_its_brief() {
 fn said_of(c: &Value) -> Vec<Value> {
     said(c)
 }
+
+#[test]
+fn an_analysis_reads_then_ends_on_its_report_and_never_on_a_brief() {
+    use fennec_os::analysis::{Analysed, analyse};
+    let f = Fixture::new("chat-analysis");
+    let folder = f.worlds.home.join("proj");
+    std::fs::create_dir_all(&folder).unwrap();
+    std::fs::write(folder.join("a.txt"), "alpha\n").unwrap();
+    let id = chat::start(&f.worlds, &folder).unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    chat::link(&f.worlds, &id, "task1").unwrap();
+    assert!(chat::analyse_as(&f.worlds, &id, "guess").is_err());
+    chat::analyse_as(&f.worlds, &id, "audit").unwrap();
+    let thread = vec![json!({"who": "human", "text": "audite"})];
+    let model = Replies(Mutex::new(VecDeque::from([
+        call("c0", "read_file", json!({"path": "a.txt"})),
+        // A brief is not this conversation's end: it is refused as unknown.
+        call("c1", "brief", json!({"brief": "x", "title": "x"})),
+        call(
+            "c2",
+            "report",
+            json!({"summary": "un seul fichier",
+                   "suggestions": [{"title": "ajouter b.txt", "kind": "task", "task": "ajoute b.txt"}],
+                   "proposals": [{"file": "ARCHITECTURE.md", "content": "# vision\n"}]}),
+        ),
+    ])));
+    let (said, exchange) = analyse(&f.worlds, &id, &thread, &model).unwrap();
+    let Analysed::Report(r) = said else {
+        panic!("no report")
+    };
+    assert_eq!(r["summary"], "un seul fichier");
+    assert_eq!(r["suggestions"][0]["kind"], "task");
+    assert_eq!(r["proposals"][0]["file"], "ARCHITECTURE.md");
+    assert!(exchange["turns"].as_array().unwrap().len() >= 3);
+    let c = chat::load(&f.worlds, &id).unwrap();
+    assert!(c["brief"].is_null(), "an analysis never briefs");
+    assert!(!folder.join("ARCHITECTURE.md").exists(), "nothing written");
+    // The next turn starts without the old report: a question back is a reply.
+    let model = Replies(Mutex::new(VecDeque::from([
+        json!({"content": "Quel module ?"}),
+    ])));
+    let thread = vec![
+        json!({"who": "human", "text": "audite"}),
+        json!({"who": "human", "text": "encore"}),
+    ];
+    let (said, _) = analyse(&f.worlds, &id, &thread, &model).unwrap();
+    assert!(matches!(said, Analysed::Reply(t) if t == "Quel module ?"));
+}
