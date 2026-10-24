@@ -1,24 +1,23 @@
-pub mod agent;
-pub mod chat;
-pub mod grant;
-pub mod guard;
-pub mod outside;
-pub mod plugin;
-pub mod proof;
-pub mod provider;
-pub mod recipe;
-pub mod review;
-pub mod review_stage;
-pub mod rules;
-pub mod schedule;
+//! fennec's library, split by trust zone (see the repository's AGENTS.md).
+//!
+//! `kernel`: runs on the host and decides — what agents may run, read and
+//! write, the worlds' boundary, rules, plugins, the review queue. It never
+//! runs what a model wrote.
+//!
+//! `engine`: drives the models — the agent loop, its tools, the gateway,
+//! framing, solving, proof, roles. The code is trusted; everything it gets
+//! from a model is not, and runs only inside a world.
+
+pub mod engine;
+pub mod kernel;
 pub mod serve;
-pub mod skill;
-pub mod sleep;
-pub mod solve;
-pub mod spec;
-pub mod team;
-pub mod tools;
-pub mod world;
+
+// Flat paths (`fennec_os::guard`, `crate::world`) stay valid while modules
+// still mix zones; the kernel's surface narrows when it is hardened (step 3).
+pub use engine::{
+    agent, chat, proof, provider, recipe, review_stage, skill, sleep, solve, spec, team, tools,
+};
+pub use kernel::{grant, guard, outside, plugin, review, rules, schedule, world};
 
 /// Tests that move process-wide variables (`HOME`, `XDG_CONFIG_HOME`) hold
 /// this while they do, whichever module they are in.
