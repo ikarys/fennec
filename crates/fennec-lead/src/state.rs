@@ -891,7 +891,20 @@ fn classify(requests: &[(String, Value)], projects_all: &[Value]) -> Value {
 /// or skipped.
 fn cycle(r: &Value) -> Value {
     let d = &r["design"];
+    // The files the work touched that its plan did not name: verified, a
+    // place the human review looks first.
+    let planned = d["files"].as_array();
+    let unplanned: Vec<&Value> = match planned {
+        Some(p) if !p.is_empty() => r["files"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|f| !p.contains(f))
+            .collect(),
+        _ => Vec::new(),
+    };
     json!({
+        "unplanned": unplanned,
         "architecture": d["architecture"],
         "plan": d["plan"],
         "planned": d["files"],
