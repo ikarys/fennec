@@ -298,6 +298,11 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
         // The Backlog: a task kept for later, started, reworded or forgotten.
         ("POST", "/api/launch") => {
             let id = field(&input()?, "id");
+            // Framed ahead right now: its turn holds the task's chat, and the
+            // brief it is writing is what the launch will start on.
+            if work::working(&id) {
+                return Err(io::Error::other("fennec is still preparing this task: launch it in a moment"));
+            }
             store.launch(&id)?;
             work::talk(id);
             Ok(json!({}))
