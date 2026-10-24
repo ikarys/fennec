@@ -392,6 +392,19 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
             work::reject_knowledge(&store, &field(&v, "id"), index)?;
             Ok(json!({}))
         }
+        // A knowledge proposal of a ready task: in its commit, or out.
+        ("POST", "/api/capitalise") => {
+            let v = input()?;
+            let index = v["index"].as_u64().unwrap_or(u64::MAX) as usize;
+            work::decide_knowledge(
+                &store,
+                &field(&v, "id"),
+                index,
+                v["accept"] == true,
+                v["content"].as_str(),
+            )?;
+            Ok(json!({}))
+        }
         ("POST", "/api/close") => {
             work::close(&store, &field(&input()?, "id"))?;
             Ok(json!({}))
