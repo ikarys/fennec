@@ -350,6 +350,28 @@ fn api(method: &str, path: &str, body: &[u8]) -> io::Result<Value> {
             work::reply(&store, &field(&v, "id"), &field(&v, "text"))?;
             Ok(json!({}))
         }
+        ("POST", "/api/start") => {
+            work::start_unvalidated(&store, &field(&input()?, "id"))?;
+            Ok(json!({}))
+        }
+        ("POST", "/api/reviewed") => {
+            let v = input()?;
+            work::reviewed(&store, &field(&v, "id"), v["on"] != false)?;
+            Ok(json!({}))
+        }
+        ("POST", "/api/continue") => {
+            work::proceed(&store, &field(&input()?, "id"))?;
+            Ok(json!({}))
+        }
+        // The dev's loop on a project: its stop points, read or one changed.
+        ("POST", "/api/stops") => {
+            let v = input()?;
+            let project = field(&v, "project");
+            if let (Some(stop), Some(on)) = (v["stop"].as_str(), v["on"].as_bool()) {
+                store.set_stop(&project, stop, on)?;
+            }
+            store.stops(&project)
+        }
         ("POST", "/api/land") => {
             work::land(&store, &field(&input()?, "id"))?;
             Ok(json!({}))
