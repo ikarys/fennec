@@ -2,17 +2,18 @@
 
 ## What this repository is
 
-**fennec's purpose** (the human, 2026-10-19): an assistant to build things with
-AI **fast**, but **efficiently** and **safely**. Every feature is weighed against
-these three; one that serves none of them is not built.
+fennec's thesis, trust zones and non-negotiable rules are in the repository's
+root `AGENTS.md`; where this file disagrees with it, the root wins (since
+2026-10-24, fennec's v1 definition). Known gaps with it, closed by the build
+steps: work goes from a request to a proof without the v1 cycle (architecture,
+plan, validated tests, review, comprehension dialogue: step 1), and rule 2
+below hides internals the v1 wants shown with their provenance.
 
-The lead layer of fennec: a developer leads one or several projects the way
-they would lead a team. They state a request (fennec asks only when it could not
-start at all), leave, and come back to a single view of what needs them. No tests
-are written before the code by default: test-first is a rule the human says, and
-what makes a request ready is the proof of the product. Execution lives in
-`../fennec-os` (library); this repository only adds the human surface.
-Scenarios: `../lead-scenarios.md`. Inventory and decisions: `../inventory.md`.
+The `fennec` binary, fennec's human surface: a developer leads one or several
+projects from a local web UI. Execution lives in `../fennec-os` (library);
+this crate only adds the human surface. The Fleet (tasks started on their own)
+is stopped by default until supervised night work (C25) is built.
+Earlier design notes, kept as a record: `docs/design/` (scenarios, inventory).
 
 ## Layout
 
