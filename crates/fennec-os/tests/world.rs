@@ -279,8 +279,16 @@ fn a_command_runs_under_the_memory_cap() {
     let reserve =
         "python3 -c 'import mmap; mmap.mmap(-1, 1 << 36, flags=mmap.MAP_PRIVATE, prot=0)'";
     assert!(f.sh(&w, reserve).0);
+    // Without a cap, the sandbox adds none: the command keeps the limit the
+    // test itself runs under ("unlimited" on a bare host, the outer world's
+    // cap when fennec's own tests run inside a fennec world).
     f.worlds.memory_mb = None;
-    assert_eq!(f.sh(&w, "ulimit -d"), (true, "unlimited".to_string()));
+    let own = std::process::Command::new("sh")
+        .args(["-c", "ulimit -d"])
+        .output()
+        .unwrap();
+    let own = String::from_utf8_lossy(&own.stdout).trim().to_string();
+    assert_eq!(f.sh(&w, "ulimit -d"), (true, own));
 }
 
 #[test]
