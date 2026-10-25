@@ -71,6 +71,39 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return JSON.parse(text) as T;
 }
 
+/** `message.done` stats of one model call (openfox `MessageStats` subset). */
+export interface MessageStats {
+  model: string;
+  /** Seconds. */
+  totalTime: number;
+  prefillTokens: number;
+  cachedPromptTokens: number;
+  generationTokens: number;
+  /** New prompt tokens per second. */
+  prefillSpeed: number;
+  generationSpeed: number;
+}
+
+export interface Folder {
+  name: string;
+  path: string;
+  hidden: boolean;
+  /** A git repository (has a `.git`). */
+  repo: boolean;
+}
+
+export interface FolderListing {
+  path: string;
+  parent: string | null;
+  folders: Folder[];
+}
+
+/** The folders inside `path` (the home directory when omitted). */
+export function listFolders(path?: string): Promise<FolderListing> {
+  const query = path ? `?path=${encodeURIComponent(path)}` : '';
+  return request<FolderListing>(`/api/folders${query}`);
+}
+
 export function getConfig(): Promise<Config> {
   return request<Config>('/api/config');
 }

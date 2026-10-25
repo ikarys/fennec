@@ -1,5 +1,5 @@
 import type { ThreadView } from '../../lib/fold';
-import { formatTokens } from '../../lib/format';
+import { cachePercent, formatSpeed, formatTokens } from '../../lib/format';
 
 interface ContextPanelProps {
   view: ThreadView;
@@ -22,6 +22,31 @@ export function ContextPanel({ view, currentTokens, contextPercent }: ContextPan
             <span>{formatTokens(currentTokens)} tokens</span>
             <span>{contextPercent} %</span>
           </div>
+        </section>
+
+        <section className="flex flex-col gap-1.5">
+          <h2 className="text-[11px] font-semibold tracking-[0.06em] text-muted uppercase">Tokens de la session</h2>
+          {view.usage.calls === 0 && <div className="text-xs text-muted">Aucun appel mesuré.</div>}
+          {view.usage.calls > 0 && (
+            <dl className="m-0 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-xs tabular-nums">
+              <dt className="text-muted">Entrée</dt>
+              <dd className="m-0 text-right">{formatTokens(view.usage.prefillTokens)}</dd>
+              <dt className="text-muted">dont cache</dt>
+              <dd className="m-0 text-right">
+                {formatTokens(view.usage.cachedPromptTokens)} · {cachePercent(view.usage.cachedPromptTokens, view.usage.prefillTokens)} %
+              </dd>
+              <dt className="text-muted">Sortie</dt>
+              <dd className="m-0 text-right">{formatTokens(view.usage.generationTokens)}</dd>
+              {view.usage.last && (
+                <>
+                  <dt className="text-muted">Dernier appel</dt>
+                  <dd className="m-0 text-right">{formatSpeed(view.usage.last.generationSpeed)}</dd>
+                </>
+              )}
+              <dt className="text-muted">Appels</dt>
+              <dd className="m-0 text-right">{view.usage.calls}</dd>
+            </dl>
+          )}
         </section>
 
         <section className="flex flex-col gap-1.5">

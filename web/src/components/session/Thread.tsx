@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { AssistantItem, Segment, ThreadItem } from '../../lib/fold';
 import { BulbIcon } from '../Icons';
+import { MessageStatsLine } from './MessageStats';
 import { ToolCard } from './ToolCard';
 
 const markdownComponents = {
@@ -25,7 +26,10 @@ const markdownComponents = {
     </a>
   ),
   table: ({ children }: { children?: React.ReactNode }) => (
-    <table className="my-2 w-full border-collapse text-sm">{children}</table>
+    // Wide tables scroll inside the thread instead of being cut by it.
+    <div className="my-2 overflow-x-auto">
+      <table className="w-full border-collapse text-sm">{children}</table>
+    </div>
   ),
   th: ({ children }: { children?: React.ReactNode }) => (
     <th className="border border-border bg-raised px-2 py-1 text-left">{children}</th>
@@ -33,7 +37,9 @@ const markdownComponents = {
   td: ({ children }: { children?: React.ReactNode }) => <td className="border border-border px-2 py-1">{children}</td>
 };
 
-function ThinkingSegment({ content }: { content: string }) {
+// Memoised on their text: while one message streams, the others are not
+// parsed again on every frame.
+const ThinkingSegment = memo(function ThinkingSegment({ content }: { content: string }) {
   const [open, setOpen] = useState(false);
   if (!content) return null;
   return (
@@ -52,22 +58,24 @@ function ThinkingSegment({ content }: { content: string }) {
       )}
     </div>
   );
-}
+});
 
-function TextSegment({ content, running, showCaret }: { content: string; running: boolean; showCaret: boolean }) {
+const REMARK_PLUGINS = [remarkGfm];
+
+const TextSegment = memo(function TextSegment({ content, caret }: { content: string; caret: boolean }) {
   return (
-    <div className="text-[14px] leading-relaxed">
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+    <div className="min-w-0 text-[14px] leading-relaxed [overflow-wrap:break-word]">
+      <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={markdownComponents}>
         {content}
       </ReactMarkdown>
-      {running && showCaret && <span className="caret ml-0.5 inline-block h-4 w-2 bg-accent align-text-bottom" />}
+      {caret && <span className="caret ml-0.5 inline-block h-4 w-2 bg-accent align-text-bottom" />}
     </div>
   );
-}
-
+});
 
 function AssistantItemView({ item, model, running, showHeader }: { item: AssistantItem; model: string; running: boolean; showHeader: boolean }) {
   const lastTextId = [...item.segments].reverse().find((segment): segment is Extract<Segment, { kind: 'text' }> => segment.kind === 'text')?.id;
+  const streaming = running && !item.done;
 
   return (
     <div className="flex flex-col gap-2.5">
@@ -82,10 +90,11 @@ function AssistantItemView({ item, model, running, showHeader }: { item: Assista
           return <ThinkingSegment key={segment.id} content={segment.content} />;
         }
         if (segment.kind === 'text') {
-          return <TextSegment key={segment.id} content={segment.content} running={running} showCaret={segment.id === lastTextId} />;
+          return <TextSegment key={segment.id} content={segment.content} caret={streaming && segment.id === lastTextId} />;
         }
         return <ToolCard key={segment.id} tool={segment.tool} />;
       })}
+      <MessageStatsLine item={item} streaming={streaming} />
     </div>
   );
 }
@@ -96,7 +105,7 @@ export function ThreadItemView({ item, model, running, showHeader }: { item: Thr
       return <div className="text-center text-xs text-muted">{item.content}</div>;
     }
     return (
-      <div className="max-w-[85%] self-end rounded-xl rounded-br-sm border border-border bg-raised px-3.5 py-2.5">
+      <div className="max-w-[85%] self-end rounded-xl rounded-br-sm border border-border bg-raised px-3.5 py-2.5 whitespace-pre-wrap [overflow-wrap:break-word]">
         {item.content}
       </div>
     );

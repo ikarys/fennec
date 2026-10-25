@@ -1,6 +1,7 @@
 //! Turns started from the UI: each runs on its own thread, reports through
 //! the event log, and can be stopped. One turn at a time per session.
 
+use super::notifier::{Notifier, NotifyingLog};
 use crate::agent::turn::{Turn, run_turn};
 use crate::config::Settings;
 use crate::domain::event::Event;
@@ -14,15 +15,17 @@ use std::sync::{Arc, Mutex};
 
 pub struct Turns {
     settings: Settings,
+    notifier: Arc<Notifier>,
     /// Sessions with a turn running, and the flag that stops it. Shared with
     /// each turn's thread, which removes its entry when it ends.
     running: Arc<Mutex<HashMap<String, Arc<AtomicBool>>>>,
 }
 
 impl Turns {
-    pub fn new(settings: Settings) -> Turns {
+    pub fn new(settings: Settings, notifier: Arc<Notifier>) -> Turns {
         Turns {
             settings,
+            notifier,
             running: Arc::default(),
         }
     }
@@ -48,10 +51,11 @@ impl Turns {
             running.insert(session_id.to_string(), stop.clone());
         }
         let settings = self.settings.clone();
+        let notifier = self.notifier.clone();
         let running = self.running.clone();
         let (session_id, workdir) = (session_id.to_string(), PathBuf::from(workdir));
         std::thread::spawn(move || {
-            if let Err(e) = run(&settings, &session_id, workdir, &prompt, &stop) {
+            if let Err(e) = run(&settings, &notifier, &session_id, workdir, &prompt, &stop) {
                 eprintln!("fennec: session {session_id}: {e}");
             }
             running.lock().unwrap().remove(&session_id);
@@ -62,18 +66,23 @@ impl Turns {
 
 fn run(
     settings: &Settings,
+    notifier: &Notifier,
     session_id: &str,
     workdir: PathBuf,
     prompt: &str,
     stop: &AtomicBool,
 ) -> Result<(), String> {
     let store = SqliteStore::open(&settings.db_path)?;
+    let log = NotifyingLog {
+        log: &store,
+        notifier,
+    };
     let model = OpenAiClient::new(&settings.llm);
     let tools = LocalTools::new(workdir.clone());
     let mut on_event = |_: &Event| {};
     let mut turn = Turn {
         model: &model,
-        log: &store,
+        log: &log,
         tools: &tools,
         session_id,
         workdir: &workdir,

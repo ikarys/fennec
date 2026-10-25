@@ -70,7 +70,10 @@ impl SqliteStore {
     pub fn open(path: &Path) -> Result<SqliteStore> {
         let db = Connection::open(path)?;
         // WAL: the web server reads a log while a turn's thread appends to it.
-        db.execute_batch("PRAGMA journal_mode = WAL;")?;
+        // NORMAL is durable in WAL mode except across a power loss, where
+        // the last events may be lost: one fsync per checkpoint instead of
+        // one per event.
+        db.execute_batch("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;")?;
         db.busy_timeout(std::time::Duration::from_secs(5))?;
         SqliteStore::init(db)
     }

@@ -45,6 +45,21 @@ pub fn fold_messages(events: &[Event]) -> Vec<Value> {
                     messages[i]["content"] = json!(text);
                 }
             }
+            // Sent back as the server streamed it: the prompt then extends the
+            // exact tokens of the previous call, which the prompt cache holds.
+            Event::MessageThinking {
+                message_id,
+                content,
+            } => {
+                if let Some(i) = find(&index, message_id) {
+                    let text = messages[i]["reasoning_content"]
+                        .as_str()
+                        .unwrap_or("")
+                        .to_string()
+                        + content;
+                    messages[i]["reasoning_content"] = json!(text);
+                }
+            }
             Event::ToolCall {
                 message_id,
                 tool_call,
@@ -92,6 +107,10 @@ mod tests {
         let events = vec![
             start("u", Role::User, Some("do it")),
             start("a", Role::Assistant, None),
+            Event::MessageThinking {
+                message_id: "a".into(),
+                content: "hmm".into(),
+            },
             Event::MessageDelta {
                 message_id: "a".into(),
                 content: "ok".into(),
@@ -107,6 +126,7 @@ mod tests {
             },
             Event::MessageDone {
                 message_id: "a".into(),
+                stats: None,
                 partial: false,
             },
             Event::ToolResult {
@@ -124,6 +144,7 @@ mod tests {
         let msgs = fold_messages(&events);
         assert_eq!(msgs.len(), 3);
         assert_eq!(msgs[1]["content"], "ok");
+        assert_eq!(msgs[1]["reasoning_content"], "hmm");
         assert_eq!(
             msgs[1]["tool_calls"][0]["function"]["arguments"],
             r#"{"path":"x"}"#

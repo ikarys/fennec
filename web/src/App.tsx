@@ -6,7 +6,7 @@ import { TopBar, type TabInfo } from './components/layout/TopBar';
 import { HomePage } from './pages/HomePage';
 import { SessionPage } from './pages/SessionPage';
 import { Palette } from './components/Palette';
-import { ProjectDialog } from './components/ProjectDialog';
+import { ProjectDialog } from './components/project/ProjectDialog';
 
 type Route =
   | { name: 'home' }
@@ -90,8 +90,9 @@ export default function App() {
     }
   }, [activeTabId]);
 
+  // `projectsLoading` is only the first load: a refresh keeps the list on
+  // screen instead of flashing a loading state.
   const refreshProjects = useCallback(async () => {
-    setProjectsLoading(true);
     try {
       const data = await getProjects();
       setProjects(data);
@@ -113,11 +114,11 @@ export default function App() {
       .catch(() => setConfig(null));
   }, []);
 
+  // No polling: the list refreshes when the human looks at it (home, palette)
+  // and when a turn starts or ends; F5 does the rest.
   const homeVisible = route.name === 'home' || paletteOpen;
   useEffect(() => {
-    if (!homeVisible) return;
-    const timer = window.setInterval(() => refreshProjects(), 5000);
-    return () => window.clearInterval(timer);
+    if (homeVisible) refreshProjects();
   }, [homeVisible, refreshProjects]);
 
   useEffect(() => {
