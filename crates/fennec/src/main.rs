@@ -24,7 +24,8 @@ const USAGE: &str = "usage:
 
 env: FENNEC_LLM_URL (default http://127.0.0.1:8000/v1), FENNEC_MODEL (default: first of /models),
      FENNEC_API_KEY, FENNEC_MAX_TOKENS (default 32000), FENNEC_COMPACT_AT (default 0.85),
-     FENNEC_DB (default ~/.local/share/fennec/fennec.db)";
+     FENNEC_DB (default ~/.local/share/fennec/fennec.db);
+     these are defaults; the Settings page overrides them";
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();

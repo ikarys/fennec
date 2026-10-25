@@ -14,10 +14,10 @@ pub struct OpenAiClient {
 }
 
 impl OpenAiClient {
-    pub fn new(settings: &LlmSettings) -> OpenAiClient {
+    pub fn new(settings: &LlmSettings, model: &str) -> OpenAiClient {
         OpenAiClient {
             base_url: settings.base_url.clone(),
-            model: settings.model.clone(),
+            model: model.to_string(),
             api_key: settings.api_key.clone(),
         }
     }

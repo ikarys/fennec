@@ -83,7 +83,8 @@ fn run(
         log: &store,
         notifier,
     };
-    let model = OpenAiClient::new(&settings.llm);
+    let params = settings.llm.for_turn(&store.preferences()?);
+    let model = OpenAiClient::new(&settings.llm, &params.model);
     let tools = LocalTools::new(workdir.clone());
     let mut on_event = |_: &Event| {};
     let mut turn = Turn {
@@ -92,9 +93,9 @@ fn run(
         tools: &tools,
         session_id,
         workdir: &workdir,
-        max_tokens: settings.llm.max_tokens,
-        context_window: settings.llm.context_window,
-        compact_at: settings.llm.compact_at,
+        max_tokens: params.max_tokens,
+        context_window: params.context_window,
+        compact_at: params.compact_at,
         stop,
         on_event: &mut on_event,
     };

@@ -7,5 +7,6 @@ pub mod conversation;
 pub mod event;
 pub mod id;
 pub mod open_calls;
+pub mod preferences;
 pub mod project;
 pub mod stats;

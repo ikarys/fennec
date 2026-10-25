@@ -4,7 +4,9 @@ use super::App;
 use super::http::{Request, error, send, send_json};
 use super::turns::TurnInput;
 use super::{assets, event_stream};
+use crate::domain::preferences::Preferences;
 use crate::domain::project::{Project, SessionSummary};
+use crate::llm::list_models;
 use crate::store::SqliteStore;
 use crate::{folders, git};
 use serde_json::{Value, json};
@@ -15,10 +17,17 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
     let segments: Vec<&str> = req.path.trim_matches('/').split('/').collect();
     match (req.method.as_str(), segments.as_slice()) {
         ("GET", ["api", "config"]) => {
-            let llm = &app.settings.llm;
-            let config = json!({ "model": llm.model, "contextWindow": llm.context_window });
-            send_json(stream, 200, &config)
+            let store = app.store()?;
+            let prefs = store.preferences()?;
+            let params = app.settings.llm.for_turn(&prefs);
+            send_json(
+                stream,
+                200,
+                &json!({ "model": params.model, "contextWindow": params.context_window }),
+            )
         }
+        ("GET", ["api", "settings"]) => get_settings(app, stream),
+        ("POST", ["api", "settings"]) => save_settings(app, req, stream),
         ("GET", ["api", "folders"]) => list_folders(req, stream),
         ("GET", ["api", "projects"]) => list_projects(app, stream),
         ("POST", ["api", "projects"]) => open_project(app, req, stream),
@@ -40,6 +49,37 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
         }
         _ => error(stream, 404, "not found"),
     }
+}
+
+fn get_settings(app: &App, stream: &mut TcpStream) -> Result<(), String> {
+    let store = app.store()?;
+    let prefs = store.preferences()?;
+    // The endpoint may have loaded another model since start; fall back to
+    // the startup listing when it cannot be reached now.
+    let models = list_models(
+        &app.settings.llm.base_url,
+        app.settings.llm.api_key.as_deref(),
+    )
+    .unwrap_or_else(|_| app.settings.llm.listed.clone());
+    let body = json!({
+        "preferences": prefs,
+        "models": models,
+        "defaults": app.settings.llm.defaults,
+    });
+    send_json(stream, 200, &body)
+}
+
+fn save_settings(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
+    let body = req.json()?;
+    let prefs: Preferences = match serde_json::from_value(body) {
+        Ok(prefs) => prefs,
+        Err(e) => return error(stream, 400, &format!("invalid preferences: {e}")),
+    };
+    if let Err(e) = prefs.validate() {
+        return error(stream, 400, &e);
+    }
+    app.store()?.save_preferences(&prefs)?;
+    get_settings(app, stream)
 }
 
 fn list_folders(req: &Request, stream: &mut TcpStream) -> Result<(), String> {

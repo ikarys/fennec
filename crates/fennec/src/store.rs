@@ -2,6 +2,8 @@
 //! same `projects`/`sessions`/`events` schema minus the columns fennec does
 //! not use yet. Implements the agent's `EventLog`.
 
+mod settings;
+
 use crate::agent::ports::EventLog;
 use crate::domain::clock::now_ms;
 use crate::domain::event::{DoneReason, Event};
@@ -12,17 +14,23 @@ use std::fmt;
 use std::path::Path;
 
 #[derive(Debug)]
-pub struct StoreError(rusqlite::Error);
+pub enum StoreError {
+    Sqlite(rusqlite::Error),
+    Json(String),
+}
 
 impl From<rusqlite::Error> for StoreError {
     fn from(e: rusqlite::Error) -> StoreError {
-        StoreError(e)
+        StoreError::Sqlite(e)
     }
 }
 
 impl fmt::Display for StoreError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "event store: {}", self.0)
+        match self {
+            StoreError::Sqlite(e) => write!(f, "event store: {e}"),
+            StoreError::Json(e) => write!(f, "settings: {e}"),
+        }
     }
 }
 
@@ -64,7 +72,12 @@ const SCHEMA: &str = "PRAGMA foreign_keys = ON;
        UNIQUE(session_id, seq),
        FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
      );
-     CREATE INDEX IF NOT EXISTS idx_events_session_seq ON events(session_id, seq);";
+     CREATE INDEX IF NOT EXISTS idx_events_session_seq ON events(session_id, seq);
+     CREATE TABLE IF NOT EXISTS settings (
+       key TEXT PRIMARY KEY,
+       value TEXT NOT NULL,
+       updated_at TEXT NOT NULL
+     );";
 
 impl SqliteStore {
     pub fn open(path: &Path) -> Result<SqliteStore> {
