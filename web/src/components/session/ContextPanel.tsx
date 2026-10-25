@@ -74,7 +74,7 @@ export function ContextPanel({ view, currentTokens, contextPercent }: ContextPan
 
         <div className="grow" />
         <p className="m-0 rounded-lg bg-raised px-3 py-2.5 text-xs text-muted">
-          Rien n'est intégré sans ta décision. Les outils tournent sur l'hôte : dépôt jetable conseillé.
+          Rien n'est intégré sans ta décision.
         </p>
       </aside>
   );

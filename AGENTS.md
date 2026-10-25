@@ -82,8 +82,7 @@ docs/api.md        the HTTP API and event wire format, shared by server and UI
    It never runs what a model wrote.
 3. **The untrusted zone**: everything a model outputs. **Known gap**: tools
    run on the host with only a working-directory path guard (as in openfox);
-   the bwrap world comes back as an early component. Until then, run fennec
-   on throwaway repositories only.
+   the bwrap world comes back as an early component.
 
 ## Build, test, run
 
