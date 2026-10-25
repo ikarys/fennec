@@ -245,6 +245,9 @@ Not in the CLI yet: a run needs the UI for its pauses.
     output ports;
   - the side panel edits the selected edge: `maxPasses` and `pause` (a
     paused edge is drawn dashed with a pause icon);
+  - edges styled by role, with a legend: forward edges grey, loops (an
+    edge back up the graph) orange and routed in a lane beside every node
+    they pass, `exhausted` edges red and dotted, paused edges dashed;
   - zoom, pan, minimap, and validation errors marked on the graph.
 - **Session**: a workflow picker next to the mode picker, with a step by
   step toggle; the message typed is the task. A strip above the thread shows the run's nodes with

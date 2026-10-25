@@ -13,6 +13,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import type { WorkflowDef, WorkflowNode } from '../../lib/workflow';
 import { EditorHeader } from './EditorHeader';
+import { EdgeLegend } from './EdgeLegend';
 import { EdgePanel } from './EdgePanel';
 import { workflowEdgeTypes } from './edges';
 import { NodePanel } from './NodePanel';
@@ -56,7 +57,7 @@ const nodeTypes = {
 
 const edgeTypes = {
   default: (props: EdgeProps<FlowEdge>) => <Fragment>{workflowEdgeTypes.default(props)}</Fragment>,
-  smoothstep: (props: EdgeProps<FlowEdge>) => <Fragment>{workflowEdgeTypes.smoothstep(props)}</Fragment>
+  loop: (props: EdgeProps<FlowEdge>) => <Fragment>{workflowEdgeTypes.loop(props)}</Fragment>
 } satisfies EdgeTypes;
 
 interface WorkflowEditorProps {
@@ -100,6 +101,7 @@ function WorkflowEditorInner({ initialDef, initialOrigin, projectId }: WorkflowE
             onDragOver={editor.onDragOver}
           >
             <Background color="var(--faint)" />
+            <EdgeLegend />
             <Controls />
             <MiniMap bgColor="var(--panel)" nodeColor="var(--raised)" maskColor="var(--scrim)" pannable zoomable />
           </ReactFlow>
