@@ -125,6 +125,10 @@ turn.
 - `GET /api/sessions/{id}` → `{id, title, state, mode, project: {id, name, workdir}}`;
   `mode` is the id of the agent the session resolves to from its event log
   (null when there is no top-level agent)
+- `GET /api/sessions/{id}/skills` → `{loaded: [ids], active: [ids]}`: the
+  skills the session loaded (successful `load_skill` calls and `/<skill>`
+  messages it typed, first-seen order) and those still in the model's view
+  (not dropped by a compaction, not cut by a replay); 404 if no session
 - `POST /api/sessions` `{projectId, prompt, mode?, attachments?}` → `{id}`;
   the turn starts at once; `mode` is optional, validated against the
   project's agents before the session is created (400 if unknown) and applied
