@@ -1,12 +1,24 @@
+//! Port of openfox `chat/prompts.ts` (`buildBasePrompt`), with the
+//! portable skills section (`buildSkillsSection`).
+//!
+//! Not ported: sub-agents, modes, and caveman thinking.
+
 use crate::domain::clock;
+use crate::domain::skill::Skill;
 use std::path::Path;
 
 /// Port of openfox `buildBasePrompt`, without the sections for features
-/// not ported yet (skills, sub-agents, modes, caveman thinking).
+/// not ported yet (sub-agents, modes, caveman thinking).
 ///
 /// `instructions` (openfox `instructionsSection`) is appended at the end
-/// when non-empty.
-pub fn system_prompt(workdir: &Path, model_name: &str, instructions: &str) -> String {
+/// when non-empty, then `skills` (openfox `buildSkillsSection`) when
+/// non-empty.
+pub fn system_prompt(
+    workdir: &Path,
+    model_name: &str,
+    instructions: &str,
+    skills: &[Skill],
+) -> String {
     let (y, m, d) = clock::today();
     let mut prompt = format!(
         "You are fennec, an agentic assistant.
@@ -68,28 +80,78 @@ You have the capability to call multiple tools in a single response. When multip
         os = std::env::consts::OS,
         arch = std::env::consts::ARCH,
     );
+
     if !instructions.is_empty() {
         prompt.push_str("\n## CUSTOM INSTRUCTIONS\n\n");
         prompt.push_str(instructions);
         prompt.push('\n');
     }
+
+    prompt.push_str(&skills_section(skills));
     prompt
+}
+
+fn skills_section(skills: &[Skill]) -> String {
+    if skills.is_empty() {
+        return String::new();
+    }
+
+    let listing = skills
+        .iter()
+        .enumerate()
+        .map(|(index, skill)| format!("{}. **{}** - {}", index + 1, skill.id, skill.description))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    format!(
+        "\n## AVAILABLE SKILLS\n\nYou can load specialized knowledge using the load_skill tool. Only load a skill when you need its instructions for the current task.\n\n{listing}\n\nTo load a skill, call load_skill with the skill ID. The skill's detailed instructions will be returned as a tool result.\n"
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::system_prompt;
-    use std::path::Path;
+    use crate::domain::skill::Skill;
+    use std::path::{Path, PathBuf};
+
+    fn skill(id: &str, description: &str) -> Skill {
+        Skill {
+            id: id.to_string(),
+            description: description.to_string(),
+            prompt: String::new(),
+            directory: PathBuf::from("/tmp"),
+        }
+    }
 
     #[test]
     fn empty_instructions_add_no_custom_section() {
-        let prompt = system_prompt(Path::new("/tmp"), "m", "");
+        let prompt = system_prompt(Path::new("/tmp"), "m", "", &[]);
         assert!(!prompt.contains("CUSTOM INSTRUCTIONS"));
     }
 
     #[test]
     fn non_empty_instructions_are_appended_at_the_end() {
-        let prompt = system_prompt(Path::new("/tmp"), "m", "Be terse.");
+        let prompt = system_prompt(Path::new("/tmp"), "m", "Be terse.", &[]);
         assert!(prompt.ends_with("## CUSTOM INSTRUCTIONS\n\nBe terse.\n"));
+    }
+
+    #[test]
+    fn no_skills_add_no_skills_section() {
+        let prompt = system_prompt(Path::new("/tmp"), "m", "", &[]);
+        assert!(!prompt.contains("AVAILABLE SKILLS"));
+    }
+
+    #[test]
+    fn two_skills_add_numbered_listing_after_custom_instructions() {
+        let skills = vec![skill("alpha", "A"), skill("beta", "B")];
+        let prompt = system_prompt(Path::new("/tmp"), "m", "Custom.", &skills);
+
+        assert!(prompt.contains("## CUSTOM INSTRUCTIONS\n\nCustom.\n\n## AVAILABLE SKILLS"));
+        assert!(prompt.contains("1. **alpha** - A\n2. **beta** - B"));
+        assert!(
+            prompt.ends_with(
+                "The skill's detailed instructions will be returned as a tool result.\n"
+            )
+        );
     }
 }

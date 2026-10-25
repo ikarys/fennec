@@ -1,9 +1,10 @@
 //! The host toolbox: openfox's `read_file`, `write_file`, `edit_file` and
-//! `run_command`, run directly on the host inside one working directory.
+//! `run_command`, plus `load_skill`, run directly on the host inside one working directory.
 //! The bwrap world will be a second `Toolbox` that runs them sandboxed.
 
 mod args;
 mod edit_file;
+mod load_skill;
 mod path_guard;
 mod read_file;
 mod run_command;
@@ -35,6 +36,7 @@ impl Toolbox for LocalTools {
             write_file::definition(),
             edit_file::definition(),
             run_command::definition(),
+            load_skill::definition(),
         ])
     }
 
@@ -52,6 +54,7 @@ impl Toolbox for LocalTools {
             "write_file" => write_file::run(args, workdir),
             "edit_file" => edit_file::run(args, workdir),
             "run_command" => run_command::run(args, workdir, stop, on_output),
+            "load_skill" => load_skill::run(args, workdir),
             _ => ToolResult::failure(format!("Unknown tool: {name}")),
         };
         result.duration_ms = start.elapsed().as_millis() as u64;

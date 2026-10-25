@@ -23,10 +23,13 @@ clean stop, open tool calls closed after a stop or a crash.
 Compaction, done: automatic at a threshold and manual; the new window opens
 from the model's summary plus facts taken from the log (files changed, the
 last request verbatim); the log keeps everything.
+Settings page, done: per-model parameters, display defaults, a thread loaded
+lazily beyond the last exchanges.
+Shared conventions, done (nothing tool-specific): global instructions and the
+AGENTS.md files in a new session's prompt; skills from `~/.agents/skills` and
+the project's `.agents/skills` (SKILL.md packages), listed in the prompt and
+read with `load_skill`.
 Next, one PR each, so that the minimal agent works before security layers:
-settings page (display defaults,
-thread loaded lazily beyond the last exchanges) → conventions shared by
-agents, nothing tool-specific (AGENTS.md, .agents/skills with SKILL.md) →
 agents as files + planner/builder modes (planner read-only by construction)
 → custom workflows (agent/shell/human steps, deterministic transitions,
 state folded from the event log) → dogfooding → bwrap world for tool
@@ -54,6 +57,7 @@ crates/fennec/src/
     open_calls.rs      tool calls left without a result (ask_user, stop, crash)
     compaction.rs      where the model's view starts, when to compact, the resume message
     preferences.rs     what the human chose on the Settings page; resolves a turn's model parameters
+    skill.rs           openfox skills/types: a SKILL.md package, its frontmatter, the text load_skill returns
     id.rs, clock.rs
   agent/             application layer: the agent loop
     ports.rs           Model, EventLog, Toolbox: what the loop needs from outside
@@ -71,6 +75,8 @@ crates/fennec/src/
   git.rs             what fennec reads from a repository
   instructions.rs    openfox context/instructions: Settings' global instructions + the
                      AGENTS.md files above the workdir, for a new session's prompt
+  skills.rs          openfox skills/registry: the SKILL.md packages in ~/.agents/skills and the
+                     project's .agents/skills (the project wins)
   folders.rs         the folders the human browses to open a project
   web/               HTTP adapter: http, guard (who may call), routes, event_stream (SSE),
                      notifier (wakes streams on append, no polling), turns, assets
