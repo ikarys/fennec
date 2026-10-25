@@ -9,6 +9,7 @@ mod folders;
 mod git;
 mod instructions;
 mod llm;
+mod skills;
 mod store;
 mod tools;
 mod web;

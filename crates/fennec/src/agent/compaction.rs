@@ -154,6 +154,7 @@ mod tests {
             session_id: "s",
             workdir: Path::new("/tmp"),
             instructions: "",
+            skills: &[],
             max_tokens: 100,
             context_window: 10_000,
             compact_at: 0.85,
