@@ -3,9 +3,12 @@ use std::path::Path;
 
 /// Port of openfox `buildBasePrompt`, without the sections for features
 /// not ported yet (skills, sub-agents, modes, caveman thinking).
-pub fn system_prompt(workdir: &Path, model_name: &str) -> String {
+///
+/// `instructions` (openfox `instructionsSection`) is appended at the end
+/// when non-empty.
+pub fn system_prompt(workdir: &Path, model_name: &str, instructions: &str) -> String {
     let (y, m, d) = clock::today();
-    format!(
+    let mut prompt = format!(
         "You are fennec, an agentic assistant.
 
 Today's date is {y:04}/{m:02}/{d:02}
@@ -64,5 +67,29 @@ You have the capability to call multiple tools in a single response. When multip
         workdir = workdir.display(),
         os = std::env::consts::OS,
         arch = std::env::consts::ARCH,
-    )
+    );
+    if !instructions.is_empty() {
+        prompt.push_str("\n## CUSTOM INSTRUCTIONS\n\n");
+        prompt.push_str(instructions);
+        prompt.push('\n');
+    }
+    prompt
+}
+
+#[cfg(test)]
+mod tests {
+    use super::system_prompt;
+    use std::path::Path;
+
+    #[test]
+    fn empty_instructions_add_no_custom_section() {
+        let prompt = system_prompt(Path::new("/tmp"), "m", "");
+        assert!(!prompt.contains("CUSTOM INSTRUCTIONS"));
+    }
+
+    #[test]
+    fn non_empty_instructions_are_appended_at_the_end() {
+        let prompt = system_prompt(Path::new("/tmp"), "m", "Be terse.");
+        assert!(prompt.ends_with("## CUSTOM INSTRUCTIONS\n\nBe terse.\n"));
+    }
 }

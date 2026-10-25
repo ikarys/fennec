@@ -153,6 +153,7 @@ mod tests {
             tools: &tools,
             session_id: "s",
             workdir: Path::new("/tmp"),
+            instructions: "",
             max_tokens: 100,
             context_window: 10_000,
             compact_at: 0.85,

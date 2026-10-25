@@ -4,6 +4,7 @@ import { saveSettings } from '../lib/api';
 import { ModelSection } from '../components/settings/ModelSection';
 import { ModelPrefsSection, percentFromFraction, type ModelForm } from '../components/settings/ModelPrefsSection';
 import { DisplaySection } from '../components/settings/DisplaySection';
+import { InstructionsSection } from '../components/settings/InstructionsSection';
 
 interface SettingsPageProps {
   settings: SettingsResponse | null;
@@ -14,6 +15,7 @@ interface SettingsForm {
   model: string;
   models: Record<string, ModelForm>;
   display: DisplayPrefs;
+  instructions: string;
 }
 
 const emptyModelForm: ModelForm = {
@@ -37,7 +39,8 @@ function toForm(preferences: Preferences, models: SettingsModel[]): SettingsForm
   return {
     model: preferences.model ?? '',
     models: modelForms,
-    display: preferences.display
+    display: preferences.display,
+    instructions: preferences.globalInstructions ?? ''
   };
 }
 
@@ -84,7 +87,8 @@ function buildPreferences(form: SettingsForm, settings: SettingsResponse): Prefe
   return {
     model: form.model === '' ? null : form.model,
     models,
-    display: form.display
+    display: form.display,
+    globalInstructions: form.instructions.trim() === '' ? null : form.instructions
   };
 }
 
@@ -128,6 +132,11 @@ export function SettingsPage({ settings, onSaved }: SettingsPageProps) {
   function updateDisplay(display: DisplayPrefs) {
     markDirty();
     setForm((previous) => (previous ? { ...previous, display } : previous));
+  }
+
+  function updateInstructions(instructions: string) {
+    markDirty();
+    setForm((previous) => (previous ? { ...previous, instructions } : previous));
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -183,6 +192,7 @@ export function SettingsPage({ settings, onSaved }: SettingsPageProps) {
             defaults={settings.defaults}
             onChange={updateModelField}
           />
+          <InstructionsSection value={form.instructions} onChange={updateInstructions} />
           <DisplaySection value={form.display} onChange={updateDisplay} />
 
           <div className="flex items-center gap-3">
