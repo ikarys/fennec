@@ -20,6 +20,7 @@ with camelCase fields.
 | `tool.output` | `{messageId, toolCallId, stream: "stdout"\|"stderr", content}` |
 | `tool.result` | `{messageId, toolCallId, result: {success, output?, error?, durationMs, truncated}}` |
 | `context.state` | `{currentTokens, maxTokens}` |
+| `context.compacted` | `{beforeTokens, afterTokens, summary}`: the cut where a new context window started from `summary`; `afterTokens` is an estimate until the next model call reports the real count |
 | `running.changed` | `{isRunning}` |
 | `chat.done` | `{messageId, reason: "complete"\|"stopped"\|"error"\|"truncated"\|"waiting_for_user"}` |
 | `chat.error` | `{error, recoverable}` |
@@ -52,6 +53,8 @@ or `"idle"` if none.
 - `POST /api/sessions/{id}/messages` `{content}` → 202; 409 if a turn is running;
   when the session waits for the user, `content` is the answer to the pending
   question
+- `POST /api/sessions/{id}/compact` → 202; 404 if no session; 409 if a turn is
+  running; summarises the history and opens a new context window
 - `POST /api/sessions/{id}/stop` → 202; the turn ends with `chat.done` reason `"stopped"`
 - `GET /api/sessions/{id}/events` → Server-Sent Events. Each stored event is sent as
 

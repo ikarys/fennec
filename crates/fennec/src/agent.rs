@@ -2,9 +2,12 @@
 //! `ports` so that storage, model and tools stay replaceable.
 
 mod ask_user;
+mod compaction;
 mod delta_buffer;
 pub mod ports;
 mod prompt;
 mod round;
+#[cfg(test)]
+mod test_support;
 mod tool_calls;
 pub mod turn;

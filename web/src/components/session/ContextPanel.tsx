@@ -5,9 +5,12 @@ interface ContextPanelProps {
   view: ThreadView;
   currentTokens: number;
   contextPercent: number;
+  compactDisabled: boolean;
+  onCompact: () => void;
+  compactError: string | null;
 }
 
-export function ContextPanel({ view, currentTokens, contextPercent }: ContextPanelProps) {
+export function ContextPanel({ view, currentTokens, contextPercent, compactDisabled, onCompact, compactError }: ContextPanelProps) {
   return (
       <aside
         aria-label="Contexte de la session"
@@ -22,6 +25,15 @@ export function ContextPanel({ view, currentTokens, contextPercent }: ContextPan
             <span>{formatTokens(currentTokens)} tokens</span>
             <span>{contextPercent} %</span>
           </div>
+          <button
+            type="button"
+            onClick={onCompact}
+            disabled={compactDisabled}
+            className="self-start rounded-lg border border-border bg-raised px-2.5 py-1 text-xs text-text disabled:opacity-60"
+          >
+            Compacter
+          </button>
+          {compactError && <div className="text-xs text-err">{compactError}</div>}
         </section>
 
         <section className="flex flex-col gap-1.5">

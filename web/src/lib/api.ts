@@ -143,3 +143,9 @@ export function stopSession(id: string): Promise<void> {
     method: 'POST'
   });
 }
+
+export function compactSession(id: string): Promise<void> {
+  return request<void>(`/api/sessions/${encodeURIComponent(id)}/compact`, {
+    method: 'POST'
+  });
+}

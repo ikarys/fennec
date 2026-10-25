@@ -1,10 +1,10 @@
 //! Terminal adapter: run a turn in the current directory, list sessions,
-//! replay one.
+//! replay one, compact one.
 
 mod transcript;
 
 use crate::agent::ports::EventLog;
-use crate::agent::turn::{Turn, run_turn};
+use crate::agent::turn::{Turn, compact_session, run_turn};
 use crate::config::Settings;
 use crate::domain::event::{ChoiceOption, DoneReason, Event};
 use crate::domain::open_calls;
@@ -36,6 +36,47 @@ pub fn run(settings: &Settings, session: Option<String>, prompt: &str) -> Result
         Some(id) => id,
         None => store.create_session(&project, &prompt.chars().take(80).collect::<String>())?,
     };
+    let reason = with_turn(settings, &store, &session_id, |turn| {
+        let mut reason = run_turn(turn, prompt)?;
+        // The turn ended waiting for the human: read the answer and run the
+        // next turn, whose input is that answer.
+        while reason == DoneReason::WaitingForUser {
+            let options = pending_options(&store.events(&session_id)?)
+                .ok_or_else(|| "turn ended: waiting_for_user".to_string())?;
+            let Some(line) = read_answer()? else {
+                return Err("turn ended: waiting_for_user".to_string());
+            };
+            reason = run_turn(turn, &answer_from_line(&line, &options))?;
+        }
+        Ok(reason)
+    })?;
+    match reason {
+        DoneReason::Complete => Ok(()),
+        reason => Err(format!("turn ended: {reason}")),
+    }
+}
+
+/// Compacts `session` on demand, in the current directory (the CLI has no
+/// project lookup by session).
+pub fn compact(settings: &Settings, session: &str) -> Result<(), String> {
+    let store = SqliteStore::open(&settings.db_path)?;
+    if store.session(session)?.is_none() {
+        return Err(format!("no session {session}"));
+    }
+    match with_turn(settings, &store, session, compact_session)? {
+        DoneReason::Complete => Ok(()),
+        reason => Err(format!("compaction ended: {reason}")),
+    }
+}
+
+/// Builds a turn on `session` in the current directory, printing its events.
+fn with_turn(
+    settings: &Settings,
+    store: &SqliteStore,
+    session_id: &str,
+    work: impl FnOnce(&mut Turn) -> Result<DoneReason, String>,
+) -> Result<DoneReason, String> {
+    let workdir = std::env::current_dir().map_err(|e| e.to_string())?;
     eprintln!(
         "session {session_id} · {} · {}",
         settings.llm.model,
@@ -48,42 +89,30 @@ pub fn run(settings: &Settings, session: Option<String>, prompt: &str) -> Result
     let stop = AtomicBool::new(false);
     let mut transcript = Transcript::default();
     let mut on_event = |e: &Event| transcript.print(e);
-    let mut turn = Turn {
+    work(&mut Turn {
         model: &model,
-        log: &store,
+        log: store,
         tools: &tools,
-        session_id: &session_id,
+        session_id,
         workdir: &workdir,
         max_tokens: settings.llm.max_tokens,
         context_window: settings.llm.context_window,
+        compact_at: settings.llm.compact_at,
         stop: &stop,
         on_event: &mut on_event,
-    };
-    let mut reason = run_turn(&mut turn, prompt)?;
-    // The turn ended waiting for the human: read the answer and run the next
-    // turn, whose input is that answer.
-    while reason == DoneReason::WaitingForUser {
-        let options = pending_options(&store.events(&session_id)?)
-            .ok_or_else(|| "turn ended: waiting_for_user".to_string())?;
-        eprint!("answer> ");
-        let _ = std::io::stderr().flush();
-        let mut line = String::new();
-        if std::io::stdin()
-            .lock()
-            .read_line(&mut line)
-            .map_err(|e| e.to_string())?
-            == 0
-            || line.trim().is_empty()
-        {
-            return Err("turn ended: waiting_for_user".to_string());
-        }
-        let answer = answer_from_line(&line, &options);
-        reason = run_turn(&mut turn, &answer)?;
-    }
-    match reason {
-        DoneReason::Complete => Ok(()),
-        reason => Err(format!("turn ended: {reason}")),
-    }
+    })
+}
+
+/// The human's answer from stdin; `None` on end of input or an empty line.
+fn read_answer() -> Result<Option<String>, String> {
+    eprint!("answer> ");
+    let _ = std::io::stderr().flush();
+    let mut line = String::new();
+    let read = std::io::stdin()
+        .lock()
+        .read_line(&mut line)
+        .map_err(|e| e.to_string())?;
+    Ok((read > 0 && !line.trim().is_empty()).then_some(line))
 }
 
 /// The options of the `chat.ask_user` whose call is still open, if any.

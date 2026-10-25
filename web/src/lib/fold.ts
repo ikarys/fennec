@@ -1,4 +1,5 @@
 import type { MessageStats } from './api';
+import { formatTokens } from './format';
 
 export interface FennecEvent {
   type: string;
@@ -369,6 +370,18 @@ export function createThreadFold(): ThreadFold {
       case 'context.state': {
         contextTokens = typeof data.currentTokens === 'number' ? data.currentTokens : contextTokens;
         contextMax = typeof data.maxTokens === 'number' ? data.maxTokens : contextMax;
+        break;
+      }
+
+      case 'context.compacted': {
+        const beforeTokens = typeof data.beforeTokens === 'number' ? data.beforeTokens : 0;
+        const afterTokens = typeof data.afterTokens === 'number' ? data.afterTokens : 0;
+        contextTokens = afterTokens;
+        items.push({
+          kind: 'note',
+          id: `compacted-${index}`,
+          text: `Contexte compacté · ${formatTokens(beforeTokens)} → ~${formatTokens(afterTokens)} tokens`
+        });
         break;
       }
 

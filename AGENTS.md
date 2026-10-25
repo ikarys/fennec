@@ -20,9 +20,11 @@ Component 1, done: the agent loop on the command line.
 Component 2, done: the web UI (session tabs, ⌘K palette, home, themes).
 Human pause, done: ask_user (the turn ends, the answer is the next input),
 clean stop, open tool calls closed after a stop or a crash.
+Compaction, done: automatic at a threshold and manual; the new window opens
+from the model's summary plus facts taken from the log (files changed, the
+last request verbatim); the log keeps everything.
 Next, one PR each, so that the minimal agent works before security layers:
-compaction (auto at a threshold
-and manual) → settings page (display defaults,
+settings page (display defaults,
 thread loaded lazily beyond the last exchanges) → conventions shared by
 agents, nothing tool-specific (AGENTS.md, .agents/skills with SKILL.md) →
 agents as files + planner/builder modes (planner read-only by construction)
@@ -50,6 +52,7 @@ crates/fennec/src/
     project.rs         Project, SessionSummary, SessionState
     conversation.rs    openfox events/fold-messages: the log read back as model messages
     open_calls.rs      tool calls left without a result (ask_user, stop, crash)
+    compaction.rs      where the model's view starts, when to compact, the resume message
     id.rs, clock.rs
   agent/             application layer: the agent loop
     ports.rs           Model, EventLog, Toolbox: what the loop needs from outside
@@ -58,6 +61,7 @@ crates/fennec/src/
     delta_buffer.rs    coalesces streamed chunks into one event per 100 ms
     tool_calls.rs      openfox chat/execute-tools: runs and records tool calls
     ask_user.rs        openfox tools/ask: the loop's own tool; the turn ends waiting for the human
+    compaction.rs      openfox context/compactor: the summary round and the new window
     prompt.rs          openfox chat/prompts: the system prompt
   tools/             Toolbox adapter on the host: one file per tool, path_guard, args
   llm/               Model adapter: openai.rs (client), sse.rs (stream parser)
@@ -117,7 +121,7 @@ target/debug/fennec run "<prompt>"   # CLI, in the repository to work on
 ```
 
 Env: `FENNEC_LLM_URL`, `FENNEC_MODEL`, `FENNEC_API_KEY`, `FENNEC_MAX_TOKENS`,
-`FENNEC_DB` (default `~/.local/share/fennec/fennec.db`).
+`FENNEC_COMPACT_AT` (default 0.85, 0 disables), `FENNEC_DB` (default `~/.local/share/fennec/fennec.db`).
 
 ## Non-negotiable rules
 
