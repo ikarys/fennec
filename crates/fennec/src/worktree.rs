@@ -1,0 +1,314 @@
+//! A session's own git worktree.
+//!
+//! An agent run used to write straight into the human's working tree and
+//! erased uncommitted human work. A session that runs a workflow now works in
+//! its own worktree, on its own branch: the human's tree and branch are never
+//! written, and the human later cherry-picks the agent's commits.
+
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
+
+/// A session's worktree.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Worktree {
+    /// The worktree's top directory: `<root>/<session_id>`.
+    pub path: PathBuf,
+    /// Where the session's tools run: `path` joined with the project's
+    /// prefix inside its repository (empty when the project is the repo's top).
+    pub workdir: PathBuf,
+    /// `fennec/<session_id>`.
+    pub branch: String,
+    /// `refs/fennec/base/<session_id>`: the commit the agent's work starts from
+    /// (after the snapshot of the human's uncommitted work), so
+    /// `git cherry-pick <base>..<branch>` replays only the agent's commits.
+    pub base: String,
+}
+
+/// The directory holding every worktree: `worktrees/` next to the database file.
+pub fn root(db_path: &Path) -> PathBuf {
+    db_path.parent().unwrap_or(Path::new(".")).join("worktrees")
+}
+
+/// The session's worktree if it was already created; `None` otherwise, or when
+/// `project_dir` is not inside a git repository. Never creates anything.
+pub fn find(root: &Path, project_dir: &Path, session_id: &str) -> Option<Worktree> {
+    let (_, prefix) = repository(project_dir)?;
+    let path = root.join(session_id);
+    path.is_dir().then(|| build(path, &prefix, session_id))
+}
+
+/// The session's worktree, created on first call; `Ok(None)` when `project_dir`
+/// is not inside a git repository (the caller then runs in place).
+pub fn open(root: &Path, project_dir: &Path, session_id: &str) -> Result<Option<Worktree>, String> {
+    let Some((top, prefix)) = repository(project_dir) else {
+        return Ok(None);
+    };
+    if let Some(existing) = find(root, project_dir, session_id) {
+        return Ok(Some(existing));
+    }
+    std::fs::create_dir_all(root).map_err(|e| format!("create {}: {e}", root.display()))?;
+    let path = root.join(session_id);
+    let branch = format!("fennec/{session_id}");
+    let path_arg = path.to_string_lossy().into_owned();
+    git(
+        &top,
+        &["worktree", "add", "-b", &branch, &path_arg, "HEAD"],
+        None,
+    )?;
+    let wt = build(path, &prefix, session_id);
+    // A half-built worktree must not survive: `find` would hand it out.
+    fill(&top, &wt).inspect_err(|_| {
+        let _ = git(&top, &["worktree", "remove", "--force", &path_arg], None);
+        let _ = git(&top, &["branch", "-D", &branch], None);
+    })?;
+    Ok(Some(wt))
+}
+
+/// Copies the human's uncommitted work into the fresh worktree and records
+/// the base ref.
+fn fill(top: &Path, wt: &Worktree) -> Result<(), String> {
+    // The human's uncommitted work is copied, never moved: their tree stays as is.
+    let mut copied = false;
+    let diff = git(top, &["diff", "HEAD", "--binary"], None)?;
+    if !diff.is_empty() {
+        git(&wt.path, &["apply", "--binary"], Some(&diff))?;
+        copied = true;
+    }
+    let untracked = git(
+        top,
+        &["ls-files", "--others", "--exclude-standard", "-z"],
+        None,
+    )?;
+    for rel in untracked.split(|b| *b == 0).filter(|p| !p.is_empty()) {
+        let rel = String::from_utf8_lossy(rel).into_owned();
+        let target = wt.path.join(&rel);
+        if let Some(parent) = target.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("create {}: {e}", parent.display()))?;
+        }
+        std::fs::copy(top.join(&rel), &target).map_err(|e| format!("copy {rel}: {e}"))?;
+        copied = true;
+    }
+    if copied {
+        commit(
+            wt,
+            "fennec: the human's uncommitted work at the run's start",
+        )?;
+    }
+    git(&wt.path, &["update-ref", &wt.base, "HEAD"], None)?;
+    Ok(())
+}
+
+/// Commits everything in the worktree (`git add -A`), authored and committed
+/// by fennec, with `message`; `Ok(false)` when there was nothing to commit.
+pub fn commit(worktree: &Worktree, message: &str) -> Result<bool, String> {
+    let dir = &worktree.path;
+    git(dir, &["add", "-A"], None)?;
+    if git(dir, &["status", "--porcelain"], None)?.is_empty() {
+        return Ok(false);
+    }
+    // The fennec identity is deliberate: provenance (a commit made by
+    // fennec's code, not by the human).
+    git(
+        dir,
+        &[
+            "-c",
+            "user.name=fennec",
+            "-c",
+            "user.email=fennec@localhost",
+            "commit",
+            "-q",
+            "-m",
+            message,
+        ],
+        None,
+    )?;
+    Ok(true)
+}
+
+fn build(path: PathBuf, prefix: &str, session_id: &str) -> Worktree {
+    Worktree {
+        workdir: path.join(prefix),
+        path,
+        branch: format!("fennec/{session_id}"),
+        base: format!("refs/fennec/base/{session_id}"),
+    }
+}
+
+/// The repository's top directory and the project's prefix inside it.
+fn repository(project_dir: &Path) -> Option<(PathBuf, String)> {
+    let text = |args: &[&str]| {
+        let out = git(project_dir, args, None).ok()?;
+        Some(String::from_utf8_lossy(&out).trim().to_string())
+    };
+    let top = text(&["rev-parse", "--show-toplevel"])?;
+    let prefix = text(&["rev-parse", "--show-prefix"])?;
+    Some((PathBuf::from(top), prefix))
+}
+
+/// Runs `git -C dir args...`; a non-zero exit is an `Err` with the command
+/// and its trimmed stderr.
+fn git(dir: &Path, args: &[&str], stdin: Option<&[u8]>) -> Result<Vec<u8>, String> {
+    let command = format!("git -C {} {}", dir.display(), args.join(" "));
+    let mut child = Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .args(args)
+        .stdin(if stdin.is_some() {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        })
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("{command}: {e}"))?;
+    if let (Some(input), Some(mut pipe)) = (stdin, child.stdin.take()) {
+        pipe.write_all(input)
+            .map_err(|e| format!("{command}: {e}"))?;
+    }
+    let out = child
+        .wait_with_output()
+        .map_err(|e| format!("{command}: {e}"))?;
+    if out.status.success() {
+        Ok(out.stdout)
+    } else {
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        Err(format!("{command}: {}", stderr.trim()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::id::new_id;
+
+    fn text(dir: &Path, args: &[&str]) -> String {
+        String::from_utf8_lossy(&git(dir, args, None).unwrap()).into_owned()
+    }
+
+    /// A temp directory with a repository inside (`repo/`), one commit.
+    fn setup() -> (PathBuf, PathBuf) {
+        let base = std::env::temp_dir().join(format!("fennec-worktree-{}", new_id()));
+        let repo = base.join("repo");
+        std::fs::create_dir_all(&repo).unwrap();
+        git(&repo, &["init", "-q"], None).unwrap();
+        git(&repo, &["config", "user.name", "human"], None).unwrap();
+        git(&repo, &["config", "user.email", "human@example.com"], None).unwrap();
+        std::fs::write(repo.join("a.txt"), "one\n").unwrap();
+        git(&repo, &["add", "-A"], None).unwrap();
+        git(&repo, &["commit", "-q", "-m", "init"], None).unwrap();
+        (base, repo)
+    }
+
+    #[test]
+    fn open_copies_uncommitted_work_and_leaves_the_human_tree_alone() {
+        let (base, repo) = setup();
+        std::fs::write(repo.join("a.txt"), "two\n").unwrap();
+        std::fs::create_dir_all(repo.join("new")).unwrap();
+        std::fs::write(repo.join("new/b.txt"), "b\n").unwrap();
+        let status = text(&repo, &["status", "--porcelain"]);
+        let head = text(&repo, &["rev-parse", "HEAD"]);
+
+        let wt = open(&base.join("wt"), &repo, "s1").unwrap().unwrap();
+
+        assert_eq!(
+            std::fs::read_to_string(wt.path.join("a.txt")).unwrap(),
+            "two\n"
+        );
+        assert_eq!(
+            std::fs::read_to_string(wt.path.join("new/b.txt")).unwrap(),
+            "b\n"
+        );
+        assert!(text(&repo, &["branch", "--list", "fennec/s1"]).contains("fennec/s1"));
+        assert_eq!(
+            text(&repo, &["rev-parse", &wt.base]),
+            text(&wt.path, &["rev-parse", "HEAD"])
+        );
+        assert_eq!(text(&repo, &["status", "--porcelain"]), status);
+        assert!(status.contains(" M a.txt") && status.contains("?? new/"));
+        assert_eq!(text(&repo, &["rev-parse", "HEAD"]), head);
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn open_is_idempotent_and_find_sees_it() {
+        let (base, repo) = setup();
+        let root = base.join("wt");
+        assert_eq!(find(&root, &repo, "s1"), None);
+        let first = open(&root, &repo, "s1").unwrap().unwrap();
+        let second = open(&root, &repo, "s1").unwrap().unwrap();
+        assert_eq!(first, second);
+        assert_eq!(find(&root, &repo, "s1"), Some(first));
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn commit_records_the_agents_work_as_fennec() {
+        let (base, repo) = setup();
+        let wt = open(&base.join("wt"), &repo, "s1").unwrap().unwrap();
+        std::fs::write(wt.workdir.join("agent.txt"), "x\n").unwrap();
+
+        assert_eq!(commit(&wt, "agent work"), Ok(true));
+        assert_eq!(
+            text(&wt.path, &["log", "-1", "--format=%an"]).trim(),
+            "fennec"
+        );
+        assert_eq!(commit(&wt, "again"), Ok(false));
+        let range = format!("{}..{}", wt.base, wt.branch);
+        assert_eq!(
+            text(&wt.path, &["log", "--format=%s", &range]).trim(),
+            "agent work"
+        );
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn a_project_in_a_subdirectory_maps_to_the_same_subdirectory() {
+        let (base, repo) = setup();
+        std::fs::create_dir_all(repo.join("sub")).unwrap();
+        std::fs::write(repo.join("sub/c.txt"), "c\n").unwrap();
+        git(&repo, &["add", "-A"], None).unwrap();
+        git(&repo, &["commit", "-q", "-m", "sub"], None).unwrap();
+
+        let wt = open(&base.join("wt"), &repo.join("sub"), "s1")
+            .unwrap()
+            .unwrap();
+
+        assert!(wt.workdir.ends_with("sub"));
+        assert!(wt.workdir.join("c.txt").is_file());
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn a_failed_open_leaves_no_worktree_behind() {
+        use std::os::unix::fs::PermissionsExt;
+        let (base, repo) = setup();
+        let secret = repo.join("secret.txt");
+        std::fs::write(&secret, "s\n").unwrap();
+        std::fs::set_permissions(&secret, std::fs::Permissions::from_mode(0o000)).unwrap();
+        if std::fs::read(&secret).is_ok() {
+            // Running as root: nothing is unreadable, the copy cannot fail.
+            let _ = std::fs::remove_dir_all(&base);
+            return;
+        }
+        let root = base.join("wt");
+
+        assert!(open(&root, &repo, "s1").is_err());
+
+        assert_eq!(find(&root, &repo, "s1"), None);
+        assert!(text(&repo, &["branch", "--list", "fennec/s1"]).is_empty());
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn outside_a_repository_runs_in_place() {
+        let base = std::env::temp_dir().join(format!("fennec-worktree-{}", new_id()));
+        std::fs::create_dir_all(&base).unwrap();
+        let root = base.join("wt");
+        assert_eq!(open(&root, &base, "s1"), Ok(None));
+        assert_eq!(find(&root, &base, "s1"), None);
+        let _ = std::fs::remove_dir_all(&base);
+    }
+}

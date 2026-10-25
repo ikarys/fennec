@@ -465,6 +465,7 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
             onCompact={handleCompact}
             compactError={compactError}
             partial={hasMore}
+            worktree={detail?.worktree ?? null}
           />
           {preview && sessionId && (
             <PreviewPane sessionId={sessionId} target={preview} onClose={() => setPreview(null)} />
