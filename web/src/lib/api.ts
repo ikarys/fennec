@@ -28,6 +28,41 @@ export interface Config {
   contextWindow: number;
 }
 
+export interface ModelPrefs {
+  maxTokens?: number;
+  contextWindow?: number;
+  compactionThreshold?: number;
+}
+
+export interface DisplayPrefs {
+  reasoningOpen: boolean;
+  toolResultsOpen: boolean;
+}
+
+export interface Preferences {
+  model: string | null;
+  models: Record<string, ModelPrefs>;
+  display: DisplayPrefs;
+}
+
+export interface SettingsModel {
+  id: string;
+  contextWindow: number | null;
+}
+
+export interface SettingsDefaults {
+  model: string;
+  maxTokens: number;
+  contextWindow: number;
+  compactAt: number;
+}
+
+export interface SettingsResponse {
+  preferences: Preferences;
+  models: SettingsModel[];
+  defaults: SettingsDefaults;
+}
+
 export interface SessionDetail {
   id: string;
   title: string;
@@ -107,6 +142,17 @@ export function listFolders(path?: string): Promise<FolderListing> {
 
 export function getConfig(): Promise<Config> {
   return request<Config>('/api/config');
+}
+
+export function getSettings(): Promise<SettingsResponse> {
+  return request<SettingsResponse>('/api/settings');
+}
+
+export function saveSettings(preferences: Preferences): Promise<SettingsResponse> {
+  return request<SettingsResponse>('/api/settings', {
+    method: 'POST',
+    body: JSON.stringify(preferences)
+  });
 }
 
 export function getProjects(): Promise<Project[]> {

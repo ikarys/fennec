@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import type { ToolCallView } from '../../lib/fold';
+import { useDisplayPrefs } from '../../lib/display';
 import { formatDuration } from '../../lib/format';
 import { EditIcon, FileIcon, SpinnerIcon, TerminalIcon } from '../Icons';
 
 export function ToolCard({ tool }: { tool: ToolCallView }) {
-  const [open, setOpen] = useState(tool.name === 'edit_file' || tool.name === 'run_command');
+  const display = useDisplayPrefs();
+  const [open, setOpen] = useState(display.toolResultsOpen);
 
   useEffect(() => {
     if (tool.name === 'run_command' && tool.status === 'running') {

@@ -1,23 +1,29 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { Config, Project } from './lib/api';
-import { createProject, getConfig, getProjects } from './lib/api';
+import type { Config, Project, SettingsResponse } from './lib/api';
+import { createProject, getConfig, getProjects, getSettings } from './lib/api';
 import { applyTheme, getStoredTheme, type ThemeId } from './lib/theme';
 import { TopBar, type TabInfo } from './components/layout/TopBar';
 import { HomePage } from './pages/HomePage';
 import { SessionPage } from './pages/SessionPage';
+import { SettingsPage } from './pages/SettingsPage';
 import { Palette } from './components/Palette';
 import { ProjectDialog } from './components/project/ProjectDialog';
+import { DisplayPrefsProvider, defaultDisplayPrefs } from './lib/display';
 
 type Route =
   | { name: 'home' }
   | { name: 'session'; id: string }
-  | { name: 'new'; id: string };
+  | { name: 'new'; id: string }
+  | { name: 'settings' };
 
 const TABS_KEY = 'fennec.tabs';
 const ACTIVE_TAB_KEY = 'fennec.activeTab';
 
 function parseRoute(): Route {
   const hash = window.location.hash;
+  if (hash === '#/settings') {
+    return { name: 'settings' };
+  }
   if (hash.startsWith('#/s/')) {
     return { name: 'session', id: decodeURIComponent(hash.slice(4)) };
   }
@@ -52,6 +58,7 @@ export default function App() {
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [projectsError, setProjectsError] = useState<string | null>(null);
   const [config, setConfig] = useState<Config | null>(null);
+  const [settings, setSettings] = useState<SettingsResponse | null>(null);
   const [tabs, setTabs] = useState<string[]>(() => loadTabs());
   const [activeTabId, setActiveTabId] = useState<string | null>(() => loadActiveTab());
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -109,6 +116,20 @@ export default function App() {
   }, [refreshProjects]);
 
   useEffect(() => {
+    getConfig()
+      .then(setConfig)
+      .catch(() => setConfig(null));
+  }, []);
+
+  useEffect(() => {
+    getSettings()
+      .then(setSettings)
+      .catch(() => setSettings(null));
+  }, []);
+
+  const handleSettingsSaved = useCallback((next: SettingsResponse) => {
+    setSettings(next);
+    // The resolved model and window shown in the context panel may change.
     getConfig()
       .then(setConfig)
       .catch(() => setConfig(null));
@@ -241,67 +262,72 @@ export default function App() {
   );
 
   const pseudoTabId = route.name === 'new' ? `new:${route.id}` : null;
+  const displayPrefs = settings?.preferences.display ?? defaultDisplayPrefs;
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-bg text-text">
-      <TopBar
-        tabs={tabInfos}
-        activeTabId={activeTabId}
-        theme={theme}
-        onPickTab={(id) => {
-          setActiveTabId(id);
-          if (id.startsWith('new:')) {
-            navigate(`#/new/${encodeURIComponent(id.slice(4))}`);
-          } else {
-            navigate(`#/s/${encodeURIComponent(id)}`);
-          }
-        }}
-        onCloseTab={closeTab}
-        onNewSession={() => startNewSession()}
-        onOpenPalette={() => setPaletteOpen(true)}
-        onThemeChange={setTheme}
-      />
+    <DisplayPrefsProvider value={displayPrefs}>
+      <div className="flex h-dvh flex-col overflow-hidden bg-bg text-text">
+        <TopBar
+          tabs={tabInfos}
+          activeTabId={activeTabId}
+          theme={theme}
+          onPickTab={(id) => {
+            setActiveTabId(id);
+            if (id.startsWith('new:')) {
+              navigate(`#/new/${encodeURIComponent(id.slice(4))}`);
+            } else {
+              navigate(`#/s/${encodeURIComponent(id)}`);
+            }
+          }}
+          onCloseTab={closeTab}
+          onNewSession={() => startNewSession()}
+          onOpenPalette={() => setPaletteOpen(true)}
+          onThemeChange={setTheme}
+        />
 
-      <div className="flex min-h-0 grow">
-        {route.name === 'home' ? (
-          <HomePage
-            projects={projects}
-            loading={projectsLoading}
-            error={projectsError}
-            onOpenProjectDialog={() => setProjectDialogOpen(true)}
-            onNewSession={(projectId) => startNewSession(projectId)}
-            onOpenSession={openSession}
-          />
-        ) : (
-          <SessionPage
-            sessionId={route.name === 'session' ? route.id : null}
-            projectId={route.name === 'new' ? route.id : null}
-            pseudoTabId={pseudoTabId}
-            projects={projects}
-            config={config}
-            onSessionCreated={handleSessionCreated}
-            onRunningChanged={refreshProjects}
-          />
-        )}
+        <div className="flex min-h-0 grow">
+          {route.name === 'home' ? (
+            <HomePage
+              projects={projects}
+              loading={projectsLoading}
+              error={projectsError}
+              onOpenProjectDialog={() => setProjectDialogOpen(true)}
+              onNewSession={(projectId) => startNewSession(projectId)}
+              onOpenSession={openSession}
+            />
+          ) : route.name === 'settings' ? (
+            <SettingsPage settings={settings} onSaved={handleSettingsSaved} />
+          ) : (
+            <SessionPage
+              sessionId={route.name === 'session' ? route.id : null}
+              projectId={route.name === 'new' ? route.id : null}
+              pseudoTabId={pseudoTabId}
+              projects={projects}
+              config={config}
+              onSessionCreated={handleSessionCreated}
+              onRunningChanged={refreshProjects}
+            />
+          )}
+        </div>
+
+        <Palette
+          open={paletteOpen}
+          projects={projects}
+          onClose={() => setPaletteOpen(false)}
+          onOpenSession={openSession}
+          onNewSession={(projectId) => startNewSession(projectId)}
+          onOpenProjectDialog={() => setProjectDialogOpen(true)}
+          onHome={() => navigate('#/')}
+        />
+
+        <ProjectDialog
+          open={projectDialogOpen}
+          submitting={projectSubmitting}
+          error={projectError}
+          onClose={() => setProjectDialogOpen(false)}
+          onSubmit={handleCreateProject}
+        />
       </div>
-
-      <Palette
-        open={paletteOpen}
-        projects={projects}
-        onClose={() => setPaletteOpen(false)}
-        onOpenSession={openSession}
-        onNewSession={(projectId) => startNewSession(projectId)}
-        onOpenProjectDialog={() => setProjectDialogOpen(true)}
-        onHome={() => navigate('#/')}
-      />
-
-      <ProjectDialog
-        open={projectDialogOpen}
-        submitting={projectSubmitting}
-        error={projectError}
-        onClose={() => setProjectDialogOpen(false)}
-        onSubmit={handleCreateProject}
-      />
-    </div>
+    </DisplayPrefsProvider>
   );
 }

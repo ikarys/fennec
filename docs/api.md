@@ -39,9 +39,51 @@ waiting for the human).
 (`"complete"`, `"stopped"`, `"error"`, `"truncated"`, `"waiting_for_user"`),
 or `"idle"` if none.
 
+## Settings
+
+The Settings page stores `Preferences` in SQLite. Environment variables are
+defaults; stored preferences override them per turn, without a restart.
+
+Precedence for a turn:
+
+1. stored per-model value in `models[model]`
+2. for `contextWindow` only, the endpoint's current `/models` listing
+3. the environment/built-in default (`FENNEC_*`, or 128 000 tokens)
+
+`Preferences` JSON (camelCase, all fields optional on read):
+
+```json
+{
+  "model": "string | null",
+  "models": {
+    "<model id>": {
+      "maxTokens": "number | null",
+      "contextWindow": "number | null",
+      "compactionThreshold": "number | null"
+    }
+  },
+  "display": {
+    "reasoningOpen": true,
+    "toolResultsOpen": false
+  }
+}
+```
+
+Validation: `maxTokens >= 1`, `contextWindow >= 1024`,
+`compactionThreshold` in `0.0..=1.0` (NaN rejected), model ids non-empty.
+
 ## Endpoints
 
-- `GET /api/config` → `{model, contextWindow}`
+- `GET /api/config` → `{model, contextWindow}`: the resolved parameters of the
+  stored preferences
+- `GET /api/settings` → `{preferences, models, defaults}`
+  - `preferences`: the stored `Preferences`
+  - `models`: `[{id, contextWindow}]` from a fresh `/models` call; on failure
+    the startup listing
+  - `defaults`: `{model, maxTokens, contextWindow, compactAt}` from the
+    environment/built-in defaults
+- `POST /api/settings` with a full `Preferences` body → 200 with the same body
+  as `GET /api/settings`; 400 with the validation message if invalid
 - `GET /api/projects` → `[{id, name, workdir, branch, sessions: [{id, title, state, createdAt, updatedAt}]}]`
   (sessions newest first; `createdAt`/`updatedAt` are Unix milliseconds; `branch` may be `null`)
 - `POST /api/projects` `{workdir}` → the project (400 if not a directory)

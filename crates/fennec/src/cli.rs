@@ -77,12 +77,13 @@ fn with_turn(
     work: impl FnOnce(&mut Turn) -> Result<DoneReason, String>,
 ) -> Result<DoneReason, String> {
     let workdir = std::env::current_dir().map_err(|e| e.to_string())?;
+    let params = settings.llm.for_turn(&store.preferences()?);
     eprintln!(
         "session {session_id} · {} · {}",
-        settings.llm.model,
+        params.model,
         workdir.display()
     );
-    let model = OpenAiClient::new(&settings.llm);
+    let model = OpenAiClient::new(&settings.llm, &params.model);
     let tools = LocalTools::new(workdir.clone());
     // ponytail: no Ctrl-C handling, the process just dies; a signal handler
     // setting `stop` when an interrupted turn must end cleanly.
@@ -95,9 +96,9 @@ fn with_turn(
         tools: &tools,
         session_id,
         workdir: &workdir,
-        max_tokens: settings.llm.max_tokens,
-        context_window: settings.llm.context_window,
-        compact_at: settings.llm.compact_at,
+        max_tokens: params.max_tokens,
+        context_window: params.context_window,
+        compact_at: params.compact_at,
         stop: &stop,
         on_event: &mut on_event,
     })
