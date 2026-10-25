@@ -6,8 +6,8 @@
   "nodes": [
     { "id": "start", "kind": "start", "position": { "x": 0, "y": 0 } },
     { "id": "plan", "kind": "agent", "name": "Plan", "agent": "plan",
-      "prompt": "{{task}}",
-      "retryPrompt": "Revise the plan with this feedback:\n\n{{comment}}",
+      "prompt": "{{task}}\n\nEnd with the complete plan, even if you gave it earlier in this conversation: the next steps read only your last message.",
+      "retryPrompt": "Revise the plan with this feedback:\n\n{{comment}}\n\nEnd with the complete revised plan.",
       "position": { "x": 0, "y": 140 } },
     { "id": "approve", "kind": "human", "name": "Approve the plan",
       "question": "Go with this plan?", "choices": ["Go", "Revise"],
