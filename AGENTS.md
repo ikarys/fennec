@@ -40,6 +40,10 @@ custom workflows (agent/shell/human steps, deterministic transitions,
 state folded from the event log) → dogfooding → bwrap world for tool
 execution → verifier + sub-agents → criteria → fennec's own
 layer (human-only integration, provenance, review gate).
+Backlog, outside that chain: the skills of a session in the context panel,
+those loaded so far and those still active (in the model's view: not
+dropped by a compaction, not cut by a replay), folded from the log
+(`load_skill` calls, `/<skill>` messages).
 
 ## Layout
 
