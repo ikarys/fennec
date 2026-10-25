@@ -28,6 +28,11 @@ export interface Config {
   contextWindow: number;
 }
 
+export interface SlashCommand {
+  name: string;
+  description: string;
+}
+
 /** openfox `ReasoningEffort`: how much a model may think. */
 export type ReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
@@ -173,6 +178,10 @@ export function createProject(workdir: string): Promise<Project> {
     method: 'POST',
     body: JSON.stringify({ workdir })
   });
+}
+
+export function listCommands(projectId: string): Promise<SlashCommand[]> {
+  return request<SlashCommand[]>(`/api/projects/${encodeURIComponent(projectId)}/commands`);
 }
 
 export function getSession(id: string): Promise<SessionDetail> {

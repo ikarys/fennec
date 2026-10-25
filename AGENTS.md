@@ -28,7 +28,8 @@ lazily beyond the last exchanges.
 Shared conventions, done (nothing tool-specific): global instructions and the
 AGENTS.md files in a new session's prompt; skills from `~/.agents/skills` and
 the project's `.agents/skills` (SKILL.md packages), listed in the prompt and
-read with `load_skill`.
+read with `load_skill`; `/compact` and `/<skill>` typed in a message, with
+a composer menu.
 Next, one PR each, so that the minimal agent works before security layers:
 agents as files + planner/builder modes (planner read-only by construction)
 → custom workflows (agent/shell/human steps, deterministic transitions,
@@ -58,6 +59,7 @@ crates/fennec/src/
     compaction.rs      where the model's view starts, when to compact, the resume message
     preferences.rs     what the human chose on the Settings page; resolves a turn's model parameters
     skill.rs           openfox skills/types: a SKILL.md package, its frontmatter, the text load_skill returns
+    slash.rs           openfox tasks/slash: what a typed /compact or /<skill> stands for
     id.rs, clock.rs
   agent/             application layer: the agent loop
     ports.rs           Model, EventLog, Toolbox: what the loop needs from outside
