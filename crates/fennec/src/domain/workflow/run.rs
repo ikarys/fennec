@@ -183,6 +183,16 @@ impl RunState {
     }
 }
 
+/// The log from the latest `workflow.started` on: what the current run did,
+/// so `{{filesChanged}}` does not list an earlier run's files.
+pub fn current_run_events(events: &[Event]) -> &[Event] {
+    let start = events
+        .iter()
+        .rposition(|event| matches!(event, Event::WorkflowStarted { .. }))
+        .unwrap_or(0);
+    &events[start..]
+}
+
 pub fn current_run(events: &[Event]) -> Option<RunState> {
     let start_index = events
         .iter()
@@ -609,6 +619,23 @@ mod tests {
         assert!(state.open.is_empty());
         assert!(state.paused.is_none());
         assert!(!state.is_active());
+    }
+
+    #[test]
+    fn current_run_events_start_at_the_last_run() {
+        let started = |run_id: &str| Event::WorkflowStarted {
+            run_id: run_id.into(),
+            workflow: simple_workflow(),
+            task: String::new(),
+            step_by_step: false,
+        };
+        let events = vec![
+            started("old"),
+            Event::RunningChanged { is_running: true },
+            started("new"),
+        ];
+        assert_eq!(current_run_events(&events).len(), 1);
+        assert_eq!(current_run_events(&events[..2]).len(), 2);
     }
 
     #[test]
