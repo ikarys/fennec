@@ -40,7 +40,11 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
             send_json(stream, 202, &json!({}))
         }
         ("GET", ["api", "sessions", id, "events"]) => {
-            event_stream::serve(&app.store()?, &app.notifier, req, stream, id)
+            if req.query_param("limit").is_some() {
+                serve_events_page(app, req, stream, id)
+            } else {
+                event_stream::serve(&app.store()?, &app.notifier, req, stream, id)
+            }
         }
         ("GET", ["api", ..]) | ("POST", _) => error(stream, 404, "not found"),
         ("GET", _) => {
@@ -169,6 +173,37 @@ fn compact_session(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), St
         Ok(()) => send_json(stream, 202, &json!({})),
         Err(e) => error(stream, 409, &e),
     }
+}
+
+/// One page of a session's log as JSON, newest-first boundary: the last
+/// `limit` events before `before` (the log's end when omitted), ascending.
+/// `GET /api/sessions/{id}/events?limit=N&before=M`.
+fn serve_events_page(
+    app: &App,
+    req: &Request,
+    stream: &mut TcpStream,
+    id: &str,
+) -> Result<(), String> {
+    let Some(limit) = req.query_param("limit").and_then(|v| v.parse::<u64>().ok()) else {
+        return error(stream, 400, "limit is not a number");
+    };
+    if !(1..=10_000).contains(&limit) {
+        return error(stream, 400, "limit must be in 1..=10000");
+    }
+    let before = req
+        .query_param("before")
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(u64::MAX);
+    let store = app.store()?;
+    if store.session(id)?.is_none() {
+        return error(stream, 404, "no such session");
+    }
+    let page = store.events_before(id, before, limit)?;
+    let out: Vec<Value> = page
+        .into_iter()
+        .map(|(seq, event)| json!({ "seq": seq, "event": event }))
+        .collect();
+    send_json(stream, 200, &Value::Array(out))
 }
 
 fn session_and_project(

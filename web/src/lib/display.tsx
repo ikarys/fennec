@@ -5,7 +5,8 @@ import type { DisplayPrefs } from './api';
 // Matches the server's defaults, used until the settings are loaded.
 export const defaultDisplayPrefs: DisplayPrefs = {
   reasoningOpen: true,
-  toolResultsOpen: false
+  toolResultsOpen: false,
+  fontSize: 14
 };
 
 const DisplayPrefsContext = createContext<DisplayPrefs>(defaultDisplayPrefs);

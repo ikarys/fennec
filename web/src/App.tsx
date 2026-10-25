@@ -156,6 +156,14 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
+  const displayPrefs = settings?.preferences.display ?? defaultDisplayPrefs;
+
+  // The UI is laid out on the default size (the CSS body size); the chosen
+  // size zooms the whole page around it.
+  useEffect(() => {
+    document.documentElement.style.zoom = String(displayPrefs.fontSize / defaultDisplayPrefs.fontSize);
+  }, [displayPrefs.fontSize]);
+
   const navigate = useCallback((path: string) => {
     if (window.location.hash !== path) {
       window.location.hash = path;
@@ -262,7 +270,6 @@ export default function App() {
   );
 
   const pseudoTabId = route.name === 'new' ? `new:${route.id}` : null;
-  const displayPrefs = settings?.preferences.display ?? defaultDisplayPrefs;
 
   return (
     <DisplayPrefsProvider value={displayPrefs}>

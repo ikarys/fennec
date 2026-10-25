@@ -156,6 +156,7 @@ mod tests {
             max_tokens: 100,
             context_window: 10_000,
             compact_at: 0.85,
+            reasoning_effort: None,
             stop: &stop,
             on_event: &mut on_event,
         };
@@ -164,6 +165,7 @@ mod tests {
             system_prompt: "system",
             tools: &tools,
             max_tokens: 100,
+            reasoning_effort: None,
         };
         compact(&mut turn, &prompt).unwrap()
     }

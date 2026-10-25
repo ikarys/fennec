@@ -59,18 +59,22 @@ Precedence for a turn:
     "<model id>": {
       "maxTokens": "number | null",
       "contextWindow": "number | null",
-      "compactionThreshold": "number | null"
+      "compactionThreshold": "number | null",
+      "reasoningEffort": "\"none\" | \"minimal\" | \"low\" | \"medium\" | \"high\" | \"xhigh\" | \"max\" | null"
     }
   },
   "display": {
     "reasoningOpen": true,
-    "toolResultsOpen": false
+    "toolResultsOpen": false,
+    "fontSize": 14
   }
 }
 ```
 
 Validation: `maxTokens >= 1`, `contextWindow >= 1024`,
-`compactionThreshold` in `0.0..=1.0` (NaN rejected), model ids non-empty.
+`compactionThreshold` in `0.0..=1.0` (NaN rejected), model ids non-empty,
+`fontSize` in `13..=16` (default 14). `reasoningEffort` is sent as the
+`reasoning_effort` field of the model request when set; `null` omits it.
 
 ## Endpoints
 
@@ -106,5 +110,13 @@ Validation: `maxTokens >= 1`, `contextWindow >= 1024`,
 
   ```
 
-  from the start of the log, then live. On reconnect the browser sends
-  `Last-Event-ID` and the stream resumes after it.
+  from `?after=<seq>` (the start of the log when omitted), then live. On
+  reconnect the browser sends `Last-Event-ID` and the stream resumes after
+  it.
+- `GET /api/sessions/{id}/events?limit=<n>&before=<seq>` → JSON
+  `[{seq, event}]`, ascending: at least the last `n` events before `before`
+  (the log's end when omitted), extended back to the `running.changed` that
+  started their turn, so a page never starts mid-turn and can exceed `n`.
+  Older history exists while the first `seq` is above 1. `limit` must be in
+  `1..=10000` (400 otherwise); 404 if no session; an empty array when there
+  is nothing before `before`.

@@ -154,6 +154,49 @@ impl SqliteStore {
         Ok(id)
     }
 
+    /// One page of the log before `seq`, ascending, with sequence numbers: at
+    /// least the last `limit` events, extended back to the start of the turn
+    /// they begin in, so the UI never folds half a message or misses that a
+    /// turn is running. A page can exceed `limit` when a turn is long.
+    pub fn events_before(
+        &self,
+        session_id: &str,
+        seq: u64,
+        limit: u64,
+    ) -> Result<Vec<(u64, Event)>> {
+        let mut stmt = self.db.prepare_cached(
+            "SELECT seq, payload FROM events
+                 WHERE session_id = ?1 AND seq < ?2 AND seq >= COALESCE((
+                   SELECT MAX(t.seq) FROM events t
+                   WHERE t.session_id = ?1 AND t.event_type = 'running.changed'
+                     AND json_extract(t.payload, '$.data.isRunning') = 1
+                     AND t.seq <= (
+                       SELECT MIN(seq) FROM (
+                         SELECT seq FROM events
+                         WHERE session_id = ?1 AND seq < ?2
+                         ORDER BY seq DESC LIMIT ?3
+                       )
+                     )
+                 ), 1)
+                 ORDER BY seq",
+        )?;
+        // `u64::MAX` (no `before`) would cast to a negative i64 and match
+        // nothing; the log's seqs fit in i64.
+        let bound = seq.min(i64::MAX as u64) as i64;
+        let rows = stmt.query_map(params![session_id, bound, limit as i64], |r| {
+            Ok((r.get::<_, i64>(0)? as u64, r.get::<_, String>(1)?))
+        })?;
+        Ok(rows
+            .collect::<rusqlite::Result<Vec<(u64, String)>>>()?
+            .into_iter()
+            .filter_map(|(s, payload)| {
+                // A payload this version cannot read is skipped, not fatal,
+                // as in `events`.
+                serde_json::from_str(&payload).ok().map(|e| (s, e))
+            })
+            .collect())
+    }
+
     /// Raw stored payloads after `seq`, for streaming them as they are.
     pub fn events_after(&self, session_id: &str, seq: u64) -> Result<Vec<(u64, String)>> {
         let mut stmt = self.db.prepare_cached(
@@ -267,5 +310,56 @@ mod tests {
         let row = store.session(&sid).unwrap().unwrap();
         assert_eq!(row.last_done, Some(DoneReason::Stopped));
         assert_eq!(store.events_after(&sid, 2).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn events_before_starts_pages_at_a_turn_start() {
+        let store = SqliteStore::in_memory().unwrap();
+        let project = store.project_for("/w").unwrap();
+        let sid = store.create_session(&project, "t").unwrap();
+        for turn in 0..2 {
+            store
+                .append(&sid, &Event::RunningChanged { is_running: true })
+                .unwrap();
+            for i in 0..3 {
+                store
+                    .append(
+                        &sid,
+                        &Event::MessageDelta {
+                            message_id: "m".into(),
+                            content: format!("t{turn}c{i}"),
+                        },
+                    )
+                    .unwrap();
+            }
+            store
+                .append(&sid, &Event::RunningChanged { is_running: false })
+                .unwrap();
+        }
+
+        let page = store.events_before(&sid, u64::MAX, 2).unwrap();
+        assert_eq!(
+            page.iter().map(|(s, _)| *s).collect::<Vec<_>>(),
+            vec![7, 8, 9, 10, 11]
+        );
+
+        let page = store.events_before(&sid, 7, 2).unwrap();
+        assert_eq!(
+            page.iter().map(|(s, _)| *s).collect::<Vec<_>>(),
+            vec![2, 3, 4, 5, 6]
+        );
+
+        let page = store.events_before(&sid, 2, 10).unwrap();
+        assert_eq!(page.iter().map(|(s, _)| *s).collect::<Vec<_>>(), vec![1]);
+
+        let page = store.events_before(&sid, u64::MAX, 100).unwrap();
+        assert_eq!(page.len(), 11);
+        assert_eq!(
+            page.iter().map(|(s, _)| *s).collect::<Vec<_>>(),
+            (1..=11).collect::<Vec<_>>()
+        );
+
+        assert!(store.events_before(&sid, 1, 10).unwrap().is_empty());
+        assert!(store.events_before("missing", 10, 10).unwrap().is_empty());
     }
 }
