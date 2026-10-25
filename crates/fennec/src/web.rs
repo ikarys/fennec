@@ -46,8 +46,10 @@ impl App {
 
     /// The session's skills fold, cached against the log's max seq (see
     /// `skill_folds`): the O(log) re-read runs only when a new event has
-    /// followed. `skills` is the project's registry — discovery I/O stays with
-    /// the caller, so a cache hit re-reads neither the log nor the skills dirs.
+    /// followed. `skills` is the project's registry, discovered by the caller
+    /// on every request: a cache hit saves the log re-read, not the discovery,
+    /// and the key ignores the registry (a skill added or removed shows on the
+    /// next event).
     fn folded_skills(
         &self,
         store: &SqliteStore,
