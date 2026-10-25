@@ -1,5 +1,17 @@
 export type NodeKind = 'start' | 'agent' | 'shell' | 'human' | 'condition' | 'parallel' | 'join' | 'end';
 
+/** How the editor names each kind, in the palette and the node panel. */
+export const NODE_KIND_LABELS: Record<NodeKind, string> = {
+  start: 'Démarrage',
+  end: 'Fin',
+  agent: 'Agent',
+  shell: 'Shell',
+  human: 'Humain',
+  condition: 'Condition',
+  parallel: 'Parallèle',
+  join: 'Convergence'
+};
+
 export type Origin = 'project' | 'global' | 'default';
 
 export interface WorkflowDef {
@@ -75,8 +87,11 @@ export function outputPorts(node: WorkflowNode, edges: WorkflowEdge[]): string[]
       ports = [];
       break;
   }
+  // First, so it sits on the left: its label then spills out of the node
+  // instead of over its neighbour's, and its exit (usually to a side end)
+  // does not cross the loop that leaves on the right.
   if (edges.some((edge) => edge.from === node.id && edge.maxPasses != null)) {
-    ports = [...ports, 'exhausted'];
+    ports = ['exhausted', ...ports];
   }
   return ports;
 }
