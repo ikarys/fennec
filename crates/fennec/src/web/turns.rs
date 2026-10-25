@@ -5,6 +5,7 @@ use super::notifier::{Notifier, NotifyingLog};
 use crate::agent::turn::{Turn, compact_session, run_turn};
 use crate::config::Settings;
 use crate::domain::event::Event;
+use crate::instructions::all_instructions;
 use crate::llm::OpenAiClient;
 use crate::store::SqliteStore;
 use crate::tools::LocalTools;
@@ -83,7 +84,9 @@ fn run(
         log: &store,
         notifier,
     };
-    let params = settings.llm.for_turn(&store.preferences()?);
+    let prefs = store.preferences()?;
+    let params = settings.llm.for_turn(&prefs);
+    let instructions = all_instructions(prefs.global_instructions.as_deref(), &workdir);
     let model = OpenAiClient::new(&settings.llm, &params.model);
     let tools = LocalTools::new(workdir.clone());
     let mut on_event = |_: &Event| {};
@@ -93,6 +96,7 @@ fn run(
         tools: &tools,
         session_id,
         workdir: &workdir,
+        instructions: &instructions,
         max_tokens: params.max_tokens,
         context_window: params.context_window,
         compact_at: params.compact_at,
