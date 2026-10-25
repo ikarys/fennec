@@ -315,6 +315,16 @@ export function getEventPage(id: string, before: number, limit: number): Promise
   return request<EventPageEntry[]>(`/api/sessions/${encodeURIComponent(id)}/events?${params}`);
 }
 
+/**
+ * The `workflow.*` events of the latest run started before `before`
+ * (the log's end when 0), ascending, from its `workflow.started`.
+ */
+export function getRunEventsBefore(id: string, before: number): Promise<EventPageEntry[]> {
+  const params = new URLSearchParams();
+  if (before > 0) params.set('before', String(before));
+  return request<EventPageEntry[]>(`/api/sessions/${encodeURIComponent(id)}/workflow/run?${params}`);
+}
+
 export function listWorkflows(projectId: string): Promise<WorkflowSummary[]> {
   return request<WorkflowSummary[]>(`/api/projects/${encodeURIComponent(projectId)}/workflows`);
 }

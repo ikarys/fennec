@@ -79,6 +79,9 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
                 event_stream::serve(&app.store()?, &app.notifier, req, stream, id)
             }
         }
+        ("GET", ["api", "sessions", id, "workflow", "run"]) => {
+            serve_run_events(app, req, stream, id)
+        }
         ("GET", ["api", "sessions", id, "preview", rest @ ..]) => {
             super::preview::serve(app, stream, id, rest)
         }
@@ -443,6 +446,31 @@ fn serve_events_page(
         return error(stream, 404, "no such session");
     }
     let page = store.events_before(id, before, limit)?;
+    let out: Vec<Value> = page
+        .into_iter()
+        .map(|(seq, event)| json!({ "seq": seq, "event": event }))
+        .collect();
+    send_json(stream, 200, &Value::Array(out))
+}
+
+/// The `workflow.*` events of the latest run started before `before`
+/// (the log's end when omitted), ascending.
+/// `GET /api/sessions/{id}/workflow/run?before=<seq>`.
+fn serve_run_events(
+    app: &App,
+    req: &Request,
+    stream: &mut TcpStream,
+    id: &str,
+) -> Result<(), String> {
+    let before = req
+        .query_param("before")
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(u64::MAX);
+    let store = app.store()?;
+    if store.session(id)?.is_none() {
+        return error(stream, 404, "no such session");
+    }
+    let page = store.workflow_run_before(id, before)?;
     let out: Vec<Value> = page
         .into_iter()
         .map(|(seq, event)| json!({ "seq": seq, "event": event }))

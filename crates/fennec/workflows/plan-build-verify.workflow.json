@@ -1,7 +1,7 @@
 {
   "id": "plan-build-verify",
   "name": "Plan, build, verify",
-  "description": "Plan, wait for approval, build, verify in a fresh context and send the findings back to the builder until it passes, then review the diff and fix what the review found.",
+  "description": "Plan, wait for approval, build, verify in a fresh context and send the findings back to the builder until it passes, then review the diff and send the findings back, verified again, for at most two rounds before the human decides.",
   "maxSteps": 50,
   "nodes": [
     { "id": "start", "kind": "start", "position": { "x": 0, "y": 0 } },
@@ -26,8 +26,12 @@
       "position": { "x": 0, "y": 700 } },
     { "id": "fix-review", "kind": "agent", "name": "Address the review", "agent": "builder",
       "prompt": "A code review of your changes found:\n\n{{nodes.review.output}}\n\nFix the findings you agree with and say which ones you dismiss and why. Run the checks again, then end with the report.",
-      "position": { "x": 280, "y": 840 } },
-    { "id": "done", "kind": "end", "outcome": "done", "position": { "x": 0, "y": 980 } },
+      "position": { "x": 280, "y": 980 } },
+    { "id": "accept", "kind": "human", "name": "Remaining findings",
+      "question": "Findings remain after two rounds. Accept or fix again?",
+      "choices": ["Accept", "Fix again"],
+      "position": { "x": -280, "y": 840 } },
+    { "id": "done", "kind": "end", "outcome": "done", "position": { "x": 0, "y": 1120 } },
     { "id": "stuck", "kind": "end", "outcome": "blocked", "position": { "x": -280, "y": 700 } }
   ],
   "edges": [
@@ -40,7 +44,10 @@
     { "from": "verify", "port": "exhausted", "to": "stuck" },
     { "from": "verify", "port": "pass", "to": "review" },
     { "from": "review", "port": "clean", "to": "done" },
-    { "from": "review", "port": "findings", "to": "fix-review" },
-    { "from": "fix-review", "port": "done", "to": "done" }
+    { "from": "review", "port": "findings", "to": "fix-review", "maxPasses": 2 },
+    { "from": "review", "port": "exhausted", "to": "accept" },
+    { "from": "fix-review", "port": "done", "to": "verify" },
+    { "from": "accept", "port": "Accept", "to": "done" },
+    { "from": "accept", "port": "Fix again", "to": "fix-review" }
   ]
 }

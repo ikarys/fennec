@@ -191,6 +191,18 @@ impl SqliteStore {
         Ok(id)
     }
 
+    fn decode_events(rows: Vec<(u64, String)>) -> Vec<(u64, Event)> {
+        rows.into_iter()
+            .filter_map(|(seq, payload)| {
+                // A payload this version cannot read is skipped, not fatal,
+                // as in `events`.
+                serde_json::from_str(&payload)
+                    .ok()
+                    .map(|event| (seq, event))
+            })
+            .collect()
+    }
+
     /// One page of the log before `seq`, ascending, with sequence numbers: at
     /// least the last `limit` events, extended back to the start of the turn
     /// they begin in, so the UI never folds half a message or misses that a
@@ -223,15 +235,37 @@ impl SqliteStore {
         let rows = stmt.query_map(params![session_id, bound, limit as i64], |r| {
             Ok((r.get::<_, i64>(0)? as u64, r.get::<_, String>(1)?))
         })?;
-        Ok(rows
-            .collect::<rusqlite::Result<Vec<(u64, String)>>>()?
-            .into_iter()
-            .filter_map(|(s, payload)| {
-                // A payload this version cannot read is skipped, not fatal,
-                // as in `events`.
-                serde_json::from_str(&payload).ok().map(|e| (s, e))
-            })
-            .collect())
+        Ok(Self::decode_events(
+            rows.collect::<rusqlite::Result<Vec<(u64, String)>>>()?,
+        ))
+    }
+
+    /// The `workflow.*` events of the latest run started before `seq`
+    /// (inclusive of its `workflow.started`), ascending; empty when there is
+    /// no `workflow.started` before `seq`.
+    pub fn workflow_run_before(&self, session_id: &str, seq: u64) -> Result<Vec<(u64, Event)>> {
+        let mut stmt = self.db.prepare_cached(
+            "SELECT seq, payload FROM events
+                 WHERE session_id = ?1
+                   AND seq < ?2
+                   AND event_type LIKE 'workflow.%'
+                   AND seq >= (
+                     SELECT MAX(seq) FROM events
+                     WHERE session_id = ?1
+                       AND event_type = 'workflow.started'
+                       AND seq < ?2
+                   )
+                 ORDER BY seq",
+        )?;
+        // `u64::MAX` (no `before`) would cast to a negative i64 and match
+        // nothing; the log's seqs fit in i64.
+        let bound = seq.min(i64::MAX as u64) as i64;
+        let rows = stmt.query_map(params![session_id, bound], |r| {
+            Ok((r.get::<_, i64>(0)? as u64, r.get::<_, String>(1)?))
+        })?;
+        Ok(Self::decode_events(
+            rows.collect::<rusqlite::Result<Vec<(u64, String)>>>()?,
+        ))
     }
 
     /// Raw stored payloads after `seq`, for streaming them as they are.
@@ -409,6 +443,60 @@ mod tests {
 
         assert!(store.events_before(&sid, 1, 10).unwrap().is_empty());
         assert!(store.events_before("missing", 10, 10).unwrap().is_empty());
+    }
+
+    #[test]
+    fn workflow_run_before_returns_only_the_latest_run_before_seq() {
+        let store = SqliteStore::in_memory().unwrap();
+        let project = store.project_for("/w").unwrap();
+        let sid = store.create_session(&project, "t").unwrap();
+
+        fn workflow_started(run_id: &str) -> Event {
+            let workflow: crate::domain::workflow::definition::Workflow =
+                serde_json::from_value(serde_json::json!({
+                    "id": "w",
+                    "name": "w",
+                    "nodes": [],
+                    "edges": []
+                }))
+                .unwrap();
+            Event::WorkflowStarted {
+                run_id: run_id.into(),
+                workflow,
+                task: "task".into(),
+                step_by_step: false,
+            }
+        }
+
+        store.append(&sid, &workflow_started("r1")).unwrap();
+        store
+            .append(
+                &sid,
+                &Event::MessageDelta {
+                    message_id: "m".into(),
+                    content: "between".into(),
+                },
+            )
+            .unwrap();
+        store.append(&sid, &workflow_started("r2")).unwrap();
+        store
+            .append(
+                &sid,
+                &Event::MessageDelta {
+                    message_id: "m".into(),
+                    content: "after".into(),
+                },
+            )
+            .unwrap();
+
+        // seqs: 1 from create_session, 2 r1, 3 delta, 4 r2, 5 delta.
+        let run = store.workflow_run_before(&sid, u64::MAX).unwrap();
+        assert_eq!(run.iter().map(|(s, _)| *s).collect::<Vec<_>>(), vec![4]);
+
+        let run = store.workflow_run_before(&sid, 4).unwrap();
+        assert_eq!(run.iter().map(|(s, _)| *s).collect::<Vec<_>>(), vec![2]);
+
+        assert!(store.workflow_run_before(&sid, 2).unwrap().is_empty());
     }
 
     #[test]

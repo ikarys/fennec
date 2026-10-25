@@ -26,7 +26,7 @@ pub(super) enum NodeEnd {
 }
 
 /// What every node runner reads: the folded run (its start already applied),
-/// the files changed in the session, the stop flag.
+/// the files changed since the run started, the stop flag.
 pub(super) struct NodeInput<'a> {
     pub state: &'a run::RunState,
     pub node: &'a Node,

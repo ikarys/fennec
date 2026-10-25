@@ -430,7 +430,7 @@ fn session_send(
 fn folded_after_start(turn: &mut Turn) -> Result<(RunState, Vec<String>), String> {
     let events = turn.log.events(turn.session_id)?;
     let state = run::current_run(&events).ok_or("no active run")?;
-    let files = files_changed(&events);
+    let files = files_changed(run::current_run_events(&events));
     Ok((state, files))
 }
 

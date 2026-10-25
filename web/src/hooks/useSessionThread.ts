@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getEventPage } from '../lib/api';
+import { getEventPage, getRunEventsBefore, type EventPageEntry } from '../lib/api';
 import { createThreadFold, type FennecEvent, type ThreadFold, type ThreadView } from '../lib/fold';
 
 const PAGE_SIZE = 200;
@@ -20,7 +20,8 @@ export interface SessionThread {
  * from the start of a turn) is loaded as JSON, the rest follows on the SSE
  * stream, and older pages are fetched on demand. The raw events of the loaded
  * pages are kept so an older page can be prepended by re-folding; the unloaded
- * history costs no memory.
+ * history costs no memory. A run that started before the loaded page keeps its
+ * strip: its `workflow.*` events are fetched once and fed to the run fold only.
  */
 export function useSessionThread(sessionId: string | null): SessionThread {
   const [view, setView] = useState<ThreadView>(EMPTY);
@@ -30,9 +31,16 @@ export function useSessionThread(sessionId: string | null): SessionThread {
   const foldRef = useRef<ThreadFold>(createThreadFold());
   const firstSeqRef = useRef(0);
   const lastSeqRef = useRef(0);
+  const runPrefixRef = useRef<EventPageEntry[]>([]);
 
   const foldAll = useCallback(() => {
     const fresh = createThreadFold();
+    const firstSeq = firstSeqRef.current;
+    for (const entry of runPrefixRef.current) {
+      if (entry.seq < firstSeq) {
+        fresh.applyRunOnly(entry.event);
+      }
+    }
     for (const event of eventsRef.current) {
       fresh.apply(event);
     }
@@ -45,6 +53,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
     foldRef.current = createThreadFold();
     firstSeqRef.current = 0;
     lastSeqRef.current = 0;
+    runPrefixRef.current = [];
     setView(EMPTY);
     setHasMore(false);
     if (!sessionId) return;
@@ -93,6 +102,17 @@ export function useSessionThread(sessionId: string | null): SessionThread {
         foldAll();
         setHasMore(page.length > 0 && page[0].seq > 1);
         openStream(lastSeqRef.current);
+        if (page.length > 0 && page[0].seq > 1) {
+          getRunEventsBefore(sessionId, page[0].seq)
+            .then((prefix) => {
+              if (cancelled) return;
+              runPrefixRef.current = prefix;
+              foldAll();
+            })
+            .catch(() => {
+              // The run strip is a convenience; the thread keeps working.
+            });
+        }
       })
       .catch(() => {
         // The page fetch failed: follow the stream from the start instead.

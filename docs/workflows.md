@@ -134,7 +134,7 @@ Prompts, commands, condition values and questions may use:
 - `{{task}}`: the message the workflow was started with
 - `{{nodes.<id>.output}}`, `{{nodes.<id>.port}}`: the latest run of a node
 - `{{nodes.<id>.exitCode}}`: for a shell node
-- `{{filesChanged}}`: the files changed in the session, one per line
+- `{{filesChanged}}`: the files changed since the run started, one per line
 - `{{pass}}`: how many times the current node has run, from 1
 - `{{comment}}`: the latest comment typed at a pause or a human node
 
