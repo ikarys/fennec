@@ -17,19 +17,49 @@ rebuilt as a **Rust port of openfox** (https://github.com/co-l/openfox, MIT),
 Ported from openfox commit `0694574d` (v2.0.161); see THIRD_PARTY.md.
 
 Component 1, done: the agent loop on the command line.
-Next, one PR each: web UI (port `web/`) → bwrap world for tool execution →
+Component 2, done: the web UI (session tabs, ⌘K palette, home, themes).
+Next, one PR each: bwrap world for tool execution →
 planner/builder modes + verifier → criteria → compaction → sub-agents →
 fennec's own layer (human-only integration, provenance, review gate).
 
 ## Layout
 
+Clean architecture, applied where it pays: dependencies point inward
+(adapters → agent → domain). The agent loop only knows the ports in
+`agent/ports.rs`; a port exists because it decouples a layer or has a
+second implementation (a test double, the coming bwrap toolbox), not for
+show. One responsibility per file; no catch-all module (`utils`, `misc`,
+`common`).
+
 ```
 crates/fennec/src/
-  main.rs     CLI: run / sessions / log
-  events.rs   openfox events/{types,store,fold-messages}: SQLite event log, the single source of truth
-  llm.rs      openfox llm/{client,streaming}: OpenAI-compatible streaming client
-  chat.rs     openfox chat/{agent-loop,execute-tools,prompts}: the multi-turn loop
-  tools.rs    openfox tools/{read,write,edit,shell,path-security}
+  main.rs            composition root: command line → settings → web or cli adapter
+  config.rs          settings from the environment (model endpoint, store path)
+  domain/            the vocabulary, no I/O
+    event.rs           openfox events/types: Event, ToolCall, ToolResult, Role, DoneReason
+    project.rs         Project, SessionSummary, SessionState
+    conversation.rs    openfox events/fold-messages: the log read back as model messages
+    id.rs, clock.rs
+  agent/             application layer: the agent loop
+    ports.rs           Model, EventLog, Toolbox: what the loop needs from outside
+    turn.rs            openfox chat/agent-loop: the multi-turn loop
+    round.rs           one model round: streaming, retries, continuation
+    tool_calls.rs      openfox chat/execute-tools: runs and records tool calls
+    prompt.rs          openfox chat/prompts: the system prompt
+  tools/             Toolbox adapter on the host: one file per tool, path_guard, args
+  llm/               Model adapter: openai.rs (client), sse.rs (stream parser)
+  store.rs           EventLog adapter: SQLite (openfox's schema), projects and sessions
+  git.rs             what fennec reads from a repository
+  web/               HTTP adapter: http, guard (who may call), routes, event_stream (SSE), turns, assets
+  cli/               terminal adapter: commands, transcript
+crates/fennec/build.rs   embeds web/dist (placeholder page when not built)
+web/src/           React + Vite + Tailwind v4 UI (same layout as openfox's web/src)
+  pages/             one component per route: HomePage, SessionPage
+  components/        shared UI; components/session/ the thread, tool cards, composer, context panel
+  hooks/             useSessionEvents: the SSE stream of a session
+  lib/               api (typed fetch), fold (events → thread view), format, theme
+  styles/app.css     theme tokens: one CSS variable block per theme, mapped into Tailwind
+docs/api.md        the HTTP API and event wire format, shared by server and UI
 ```
 
 ## Porting rules
@@ -57,7 +87,10 @@ cargo build
 cargo test
 cargo clippy --all-targets   # must be clean
 cargo fmt --all
-target/debug/fennec run "<prompt>"   # in the repository to work on
+(cd web && npm ci && npm run build)  # before cargo build, to embed the UI
+target/debug/fennec                  # http://127.0.0.1:7777
+target/debug/fennec run "<prompt>"   # CLI, in the repository to work on
+(cd web && npm run dev)              # UI dev server on :5173, proxies /api to :7777
 ```
 
 Env: `FENNEC_LLM_URL`, `FENNEC_MODEL`, `FENNEC_API_KEY`, `FENNEC_MAX_TOKENS`,
@@ -71,9 +104,12 @@ Env: `FENNEC_LLM_URL`, `FENNEC_MODEL`, `FENNEC_API_KEY`, `FENNEC_MAX_TOKENS`,
    enable a plugin.
 3. **Provenance is shown.** What the UI shows is marked as verified
    (deterministic) or produced by a model (indicative).
-4. **Storage is SQLite** (`rusqlite`, bundled), as in openfox. No other new
+4. **The server only answers local pages**: `Host` and `Origin` must be
+   127.0.0.1/localhost (DNS rebinding, CSRF) and POST bodies must be JSON.
+   Never relax this: any web page could otherwise drive the agent.
+5. **Storage is SQLite** (`rusqlite`, bundled), as in openfox. No other new
    dependency without a stated reason in the commit body. Stdlib first.
-5. Licence: AGPL-3.0-only; openfox's MIT notice is kept in THIRD_PARTY.md.
+6. Licence: AGPL-3.0-only; openfox's MIT notice is kept in THIRD_PARTY.md.
    The repository stays private until contribution terms are decided.
 
 ## Style

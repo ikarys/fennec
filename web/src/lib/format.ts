@@ -1,0 +1,79 @@
+import type { SessionState } from './api';
+
+export function formatRelative(ms: number): string {
+  const diff = Date.now() - ms;
+  const seconds = Math.floor(diff / 1000);
+  if (seconds < 60) return "à l'instant";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `il y a ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `il y a ${hours} h`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `il y a ${days} j`;
+  return new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' }).format(new Date(ms));
+}
+
+export function formatDuration(ms?: number): string {
+  if (ms == null) return '';
+  if (ms < 1000) return `${ms} ms`;
+  return `${(ms / 1000).toFixed(1).replace('.', ',')} s`;
+}
+
+export function formatTokens(value?: number): string {
+  if (value == null) return '0';
+  if (value >= 1000) {
+    return `${(value / 1000).toFixed(1).replace('.', ',')}k`;
+  }
+  return String(value);
+}
+
+export function stateLabel(state: SessionState): string {
+  switch (state) {
+    case 'running':
+      return 'En cours';
+    case 'complete':
+      return 'Terminée';
+    case 'stopped':
+      return 'Arrêtée';
+    case 'error':
+      return 'Erreur';
+    case 'truncated':
+      return 'Tronquée';
+    case 'idle':
+      return 'Inactive';
+  }
+}
+
+export function stateTextClass(state: SessionState): string {
+  switch (state) {
+    case 'running':
+      return 'text-accent';
+    case 'complete':
+      return 'text-ok';
+    case 'stopped':
+      return 'text-muted';
+    case 'error':
+      return 'text-err';
+    case 'truncated':
+      return 'text-muted';
+    case 'idle':
+      return 'text-faint';
+  }
+}
+
+export function stateDotClass(state: SessionState): string {
+  switch (state) {
+    case 'running':
+      return 'bg-accent';
+    case 'complete':
+      return 'bg-ok';
+    case 'stopped':
+      return 'bg-muted';
+    case 'error':
+      return 'bg-err';
+    case 'truncated':
+      return 'bg-muted';
+    case 'idle':
+      return 'bg-faint';
+  }
+}
