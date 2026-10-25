@@ -72,10 +72,17 @@ export function ContextPanel({ view, currentTokens, contextPercent, compactDisab
           {view.modifiedFiles.length === 0 && <div className="text-xs text-muted">Aucun fichier modifié.</div>}
           {view.modifiedFiles.map((file) => {
             const kind = previewKindOfPath(file.path);
-            const relative = kind && workdir ? relativeToWorkdir(file.path, workdir) : undefined;
+            const relative = workdir ? relativeToWorkdir(file.path, workdir) : undefined;
             return (
               <div key={file.path} className="flex items-center gap-2 py-1.5 font-mono text-xs">
-                <span className="grow overflow-hidden text-ellipsis whitespace-nowrap">{file.path}</span>
+                {/* Cut on the left: the file name is what tells files apart. */}
+                <span
+                  dir="rtl"
+                  title={file.path}
+                  className="grow overflow-hidden text-left text-ellipsis whitespace-nowrap"
+                >
+                  <bdi>{relative ?? file.path}</bdi>
+                </span>
                 <span className="text-ok">+{file.added}</span>
                 <span className="text-muted">−{file.removed}</span>
                 {kind && relative && opener && (
