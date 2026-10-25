@@ -38,12 +38,20 @@ impl LlmSettings {
         let base_url =
             std::env::var("FENNEC_LLM_URL").unwrap_or_else(|_| "http://127.0.0.1:8000/v1".into());
         let api_key = std::env::var("FENNEC_API_KEY").ok();
-        let listed = list_models(&base_url, api_key.as_deref())?;
+        // fennec still starts when the endpoint is down: the human reaches
+        // the UI, and the model chosen in Settings (or FENNEC_MODEL) is used
+        // once the endpoint is back.
+        let listed = list_models(&base_url, api_key.as_deref()).unwrap_or_else(|e| {
+            eprintln!(
+                "fennec: the model endpoint did not answer ({e}); starting without its listing"
+            );
+            Vec::new()
+        });
         let model = std::env::var("FENNEC_MODEL")
             .ok()
             .filter(|m| !m.is_empty())
             .or_else(|| listed.first().map(|m| m.id.clone()))
-            .ok_or_else(|| format!("{base_url}/models lists no model; set FENNEC_MODEL"))?;
+            .unwrap_or_default();
         let context_window = listed
             .iter()
             .find(|m| m.id == model)

@@ -2,6 +2,7 @@
 //! web API can refresh it without environment settings.
 
 use serde::Serialize;
+use std::time::Duration;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -13,7 +14,13 @@ pub struct ListedModel {
 /// Lists the models the endpoint serves. `max_model_len` is vLLM's field.
 pub fn list_models(base_url: &str, api_key: Option<&str>) -> Result<Vec<ListedModel>, String> {
     let url = format!("{}/models", base_url.trim_end_matches('/'));
-    let mut req = ureq::get(&url);
+    // Bounded: fennec asks at startup and on the Settings page, and an
+    // endpoint that drops packets would otherwise hang both.
+    let agent: ureq::Agent = ureq::Agent::config_builder()
+        .timeout_global(Some(Duration::from_secs(5)))
+        .build()
+        .into();
+    let mut req = agent.get(&url);
     if let Some(key) = api_key {
         req = req.header("Authorization", &format!("Bearer {key}"));
     }
