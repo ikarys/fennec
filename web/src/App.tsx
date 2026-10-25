@@ -25,12 +25,23 @@ function parseRoute(): Route {
     return { name: 'settings' };
   }
   if (hash.startsWith('#/s/')) {
-    return { name: 'session', id: decodeURIComponent(hash.slice(4)) };
+    const id = decodeURIComponent(hash.slice(4));
+    if (id.startsWith('new:')) {
+      return { name: 'new', id: id.slice(4) };
+    }
+    return { name: 'session', id };
   }
   if (hash.startsWith('#/new/')) {
     return { name: 'new', id: decodeURIComponent(hash.slice(6)) };
   }
   return { name: 'home' };
+}
+
+/** The route of a tab: a pseudo `new:` tab opens the new-session page. */
+function tabPath(tabId: string): string {
+  return tabId.startsWith('new:')
+    ? `#/new/${encodeURIComponent(tabId.slice(4))}`
+    : `#/s/${encodeURIComponent(tabId)}`;
 }
 
 function loadTabs(): string[] {
@@ -211,7 +222,7 @@ export default function App() {
           const fallback = next.length > 0 ? next[next.length - 1] : null;
           setActiveTabId(fallback);
           if (fallback) {
-            navigate(`#/s/${encodeURIComponent(fallback)}`);
+            navigate(tabPath(fallback));
           } else {
             navigate('#/');
           }
@@ -280,11 +291,7 @@ export default function App() {
           theme={theme}
           onPickTab={(id) => {
             setActiveTabId(id);
-            if (id.startsWith('new:')) {
-              navigate(`#/new/${encodeURIComponent(id.slice(4))}`);
-            } else {
-              navigate(`#/s/${encodeURIComponent(id)}`);
-            }
+            navigate(tabPath(id));
           }}
           onCloseTab={closeTab}
           onNewSession={() => startNewSession()}
