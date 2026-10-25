@@ -7,6 +7,7 @@ mod config;
 mod domain;
 mod folders;
 mod git;
+mod instructions;
 mod llm;
 mod store;
 mod tools;

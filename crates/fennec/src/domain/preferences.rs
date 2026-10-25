@@ -14,6 +14,9 @@ pub struct Preferences {
     /// Per-model overrides, keyed by model id (openfox `ModelConfig` subset).
     pub models: BTreeMap<String, ModelPrefs>,
     pub display: Display,
+    /// openfox `globalInstructions`: the human's instructions for every new
+    /// session; `None` or blank adds nothing.
+    pub global_instructions: Option<String>,
 }
 
 /// openfox `ReasoningEffort`: how much a model may think.
@@ -350,11 +353,13 @@ mod tests {
         );
         p.display.reasoning_open = false;
         p.display.font_size = 15;
+        p.global_instructions = Some("Be terse.".into());
 
         let json = serde_json::to_string(&p).unwrap();
         assert!(json.contains("\"maxTokens\""));
         assert!(json.contains("\"reasoningEffort\""));
         assert!(json.contains("\"fontSize\""));
+        assert!(json.contains("\"globalInstructions\""));
         assert_eq!(serde_json::from_str::<Preferences>(&json).unwrap(), p);
         assert_eq!(
             serde_json::from_str::<Preferences>("{}").unwrap(),

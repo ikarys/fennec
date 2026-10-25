@@ -8,6 +8,7 @@ use crate::agent::turn::{Turn, compact_session, run_turn};
 use crate::config::Settings;
 use crate::domain::event::{ChoiceOption, DoneReason, Event};
 use crate::domain::open_calls;
+use crate::instructions::all_instructions;
 use crate::llm::OpenAiClient;
 use crate::store::SqliteStore;
 use crate::tools::LocalTools;
@@ -77,7 +78,9 @@ fn with_turn(
     work: impl FnOnce(&mut Turn) -> Result<DoneReason, String>,
 ) -> Result<DoneReason, String> {
     let workdir = std::env::current_dir().map_err(|e| e.to_string())?;
-    let params = settings.llm.for_turn(&store.preferences()?);
+    let prefs = store.preferences()?;
+    let params = settings.llm.for_turn(&prefs);
+    let instructions = all_instructions(prefs.global_instructions.as_deref(), &workdir);
     eprintln!(
         "session {session_id} · {} · {}",
         params.model,
@@ -96,6 +99,7 @@ fn with_turn(
         tools: &tools,
         session_id,
         workdir: &workdir,
+        instructions: &instructions,
         max_tokens: params.max_tokens,
         context_window: params.context_window,
         compact_at: params.compact_at,

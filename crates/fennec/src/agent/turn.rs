@@ -42,6 +42,9 @@ pub struct Turn<'a> {
     pub tools: &'a dyn Toolbox,
     pub session_id: &'a str,
     pub workdir: &'a Path,
+    /// openfox `customInstructions`, assembled by the adapter. Only a
+    /// session's first turn uses them: the system prompt is frozen then.
+    pub instructions: &'a str,
     pub max_tokens: u32,
     /// The model's context window, reported in `context.state`.
     pub context_window: u64,
@@ -196,7 +199,7 @@ fn cached_system_prompt(turn: &mut Turn) -> Result<String, String> {
     if let Some(prompt) = cached {
         return Ok(prompt);
     }
-    let prompt = system_prompt(turn.workdir, turn.model.name());
+    let prompt = system_prompt(turn.workdir, turn.model.name(), turn.instructions);
     turn.append(Event::TurnSnapshot {
         cached_system_prompt: prompt.clone(),
     })?;
@@ -339,6 +342,7 @@ mod tests {
                 tools: &self.tools,
                 session_id: "s",
                 workdir: &self.workdir,
+                instructions: "",
                 max_tokens: 100,
                 context_window: 1000,
                 compact_at: 0.0,
@@ -360,6 +364,7 @@ mod tests {
             tools: &tools,
             session_id: "s",
             workdir,
+            instructions: "",
             max_tokens: 100,
             context_window: 1000,
             compact_at: 0.0,
@@ -540,6 +545,7 @@ mod tests {
             tools: &tools,
             session_id: "s",
             workdir: &workdir,
+            instructions: "",
             max_tokens: 100,
             context_window: 1000,
             compact_at: 0.0,

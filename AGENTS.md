@@ -69,6 +69,8 @@ crates/fennec/src/
   store.rs           EventLog adapter: SQLite (openfox's schema), projects and sessions;
                      store/settings.rs the stored preferences
   git.rs             what fennec reads from a repository
+  instructions.rs    openfox context/instructions: Settings' global instructions + the
+                     AGENTS.md files above the workdir, for a new session's prompt
   folders.rs         the folders the human browses to open a project
   web/               HTTP adapter: http, guard (who may call), routes, event_stream (SSE),
                      notifier (wakes streams on append, no polling), turns, assets

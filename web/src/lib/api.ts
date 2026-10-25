@@ -49,6 +49,8 @@ export interface Preferences {
   model: string | null;
   models: Record<string, ModelPrefs>;
   display: DisplayPrefs;
+  /** openfox `globalInstructions`: added to the system prompt of new sessions. */
+  globalInstructions?: string | null;
 }
 
 export interface SettingsModel {
