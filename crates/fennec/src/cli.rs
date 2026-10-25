@@ -10,6 +10,7 @@ use crate::domain::event::{ChoiceOption, DoneReason, Event};
 use crate::domain::open_calls;
 use crate::instructions::all_instructions;
 use crate::llm::OpenAiClient;
+use crate::skills;
 use crate::store::SqliteStore;
 use crate::tools::LocalTools;
 use std::io::{BufRead, Write};
@@ -86,6 +87,7 @@ fn with_turn(
         params.model,
         workdir.display()
     );
+    let skills = skills::discover(&workdir);
     let model = OpenAiClient::new(&settings.llm, &params.model);
     let tools = LocalTools::new(workdir.clone());
     // ponytail: no Ctrl-C handling, the process just dies; a signal handler
@@ -100,6 +102,7 @@ fn with_turn(
         session_id,
         workdir: &workdir,
         instructions: &instructions,
+        skills: &skills,
         max_tokens: params.max_tokens,
         context_window: params.context_window,
         compact_at: params.compact_at,

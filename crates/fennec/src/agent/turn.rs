@@ -24,6 +24,7 @@ use crate::domain::event::{DoneReason, Event, Role, ToolResult};
 use crate::domain::id::new_id;
 use crate::domain::open_calls;
 use crate::domain::preferences::ReasoningEffort;
+use crate::domain::skill::Skill;
 use serde_json::Value;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -45,6 +46,8 @@ pub struct Turn<'a> {
     /// openfox `customInstructions`, assembled by the adapter. Only a
     /// session's first turn uses them: the system prompt is frozen then.
     pub instructions: &'a str,
+    /// openfox `skills`: listed in the system prompt, frozen with it.
+    pub skills: &'a [Skill],
     pub max_tokens: u32,
     /// The model's context window, reported in `context.state`.
     pub context_window: u64,
@@ -199,7 +202,12 @@ fn cached_system_prompt(turn: &mut Turn) -> Result<String, String> {
     if let Some(prompt) = cached {
         return Ok(prompt);
     }
-    let prompt = system_prompt(turn.workdir, turn.model.name(), turn.instructions);
+    let prompt = system_prompt(
+        turn.workdir,
+        turn.model.name(),
+        turn.instructions,
+        turn.skills,
+    );
     turn.append(Event::TurnSnapshot {
         cached_system_prompt: prompt.clone(),
     })?;
@@ -343,6 +351,7 @@ mod tests {
                 session_id: "s",
                 workdir: &self.workdir,
                 instructions: "",
+                skills: &[],
                 max_tokens: 100,
                 context_window: 1000,
                 compact_at: 0.0,
@@ -365,6 +374,7 @@ mod tests {
             session_id: "s",
             workdir,
             instructions: "",
+            skills: &[],
             max_tokens: 100,
             context_window: 1000,
             compact_at: 0.0,
@@ -546,6 +556,7 @@ mod tests {
             session_id: "s",
             workdir: &workdir,
             instructions: "",
+            skills: &[],
             max_tokens: 100,
             context_window: 1000,
             compact_at: 0.0,

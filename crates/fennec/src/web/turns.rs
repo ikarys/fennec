@@ -7,6 +7,7 @@ use crate::config::Settings;
 use crate::domain::event::Event;
 use crate::instructions::all_instructions;
 use crate::llm::OpenAiClient;
+use crate::skills;
 use crate::store::SqliteStore;
 use crate::tools::LocalTools;
 use std::collections::HashMap;
@@ -87,6 +88,7 @@ fn run(
     let prefs = store.preferences()?;
     let params = settings.llm.for_turn(&prefs);
     let instructions = all_instructions(prefs.global_instructions.as_deref(), &workdir);
+    let skills = skills::discover(&workdir);
     let model = OpenAiClient::new(&settings.llm, &params.model);
     let tools = LocalTools::new(workdir.clone());
     let mut on_event = |_: &Event| {};
@@ -97,6 +99,7 @@ fn run(
         session_id,
         workdir: &workdir,
         instructions: &instructions,
+        skills: &skills,
         max_tokens: params.max_tokens,
         context_window: params.context_window,
         compact_at: params.compact_at,
