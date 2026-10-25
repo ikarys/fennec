@@ -261,7 +261,7 @@ export function useWorkflowEditor({ initialDef, initialOrigin, projectId }: UseW
   }, []);
 
   const flowNodes = useMemo(() => toFlowNodes(def, issues, selection, measured), [def, issues, selection, measured]);
-  const flowEdges = useMemo(() => toFlowEdges(def, issues, selection), [def, issues, selection]);
+  const flowEdges = useMemo(() => toFlowEdges(def, issues, selection, measured), [def, issues, selection, measured]);
 
   const selectedNode = def.nodes.find((node) => node.id === selection.nodeId) ?? null;
   const selectedEdge = def.edges.find((edge) => edgeId(edge) === selection.edgeId) ?? null;

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Agent } from '../../lib/api';
 import type { WorkflowDef, WorkflowIssue, WorkflowNode } from '../../lib/workflow';
-import { templateNames } from '../../lib/workflow';
+import { NODE_KIND_LABELS, templateNames } from '../../lib/workflow';
 import { AgentFields } from './fields/AgentFields';
 import { ConditionFields } from './fields/ConditionFields';
 import { HumanFields } from './fields/HumanFields';
@@ -46,6 +46,10 @@ export function NodePanel({ def, node, agents, issues, onChange, onRename, onDel
 
   return (
     <div className="flex flex-col gap-3 p-3">
+      <div className="flex items-center gap-2 text-[13px] text-muted">
+        Type
+        <span className="rounded-md bg-raised px-2 py-0.5 text-[12px] font-medium text-text">{NODE_KIND_LABELS[node.kind]}</span>
+      </div>
       <div>
         <label className="mb-1 block text-[13px] text-muted">Identifiant</label>
         <input
