@@ -80,8 +80,12 @@ pub fn serve(port: u16, settings: Settings) -> Result<(), String> {
         notifier,
         skill_folds: Mutex::new(HashMap::new()),
     });
-    // Fail now rather than on the first request.
-    app.store()?;
+    // Fail now rather than on the first request. No turn runs yet, so a log
+    // still marked running was cut by a crash.
+    let closed = app.store()?.close_dangling_turns()?;
+    if closed > 0 {
+        eprintln!("fennec · closed {closed} turn(s) left open by a crash");
+    }
     for stream in listener.incoming().flatten() {
         let app = app.clone();
         std::thread::spawn(move || {
