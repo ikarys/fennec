@@ -42,7 +42,7 @@ pub(super) fn run_fork(
 
     let events = turn.log.events(turn.session_id)?;
     let state = run::current_run(&events).ok_or("no active run")?;
-    let files = files_changed(&events);
+    let files = files_changed(run::current_run_events(&events));
     let parent_session_id = turn.session_id.to_string();
     let stop = turn.stop;
 

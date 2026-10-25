@@ -180,6 +180,11 @@ function updateToolStats(tool: ToolCallView, modified: Map<string, ModifiedFile>
 
 export interface ThreadFold {
   apply(event: FennecEvent): void;
+  /**
+   * The events of a run older than the loaded page: they feed the run,
+   * not the thread.
+   */
+  applyRunOnly(event: FennecEvent): void;
   /** A new view object per call, for React; the items inside are shared. */
   view(): ThreadView;
 }
@@ -597,6 +602,10 @@ export function createThreadFold(): ThreadFold {
     }
   };
 
+  const applyRunOnly = (event: FennecEvent): void => {
+    runFold.apply(event);
+  };
+
   const view = (): ThreadView => ({
     items: [...items],
     contextTokens,
@@ -611,5 +620,5 @@ export function createThreadFold(): ThreadFold {
     run: runFold.view()
   });
 
-  return { apply, view };
+  return { apply, view, applyRunOnly };
 }

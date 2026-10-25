@@ -173,6 +173,11 @@ turn.
   Older history exists while the first `seq` is above 1. `limit` must be in
   `1..=10000` (400 otherwise); 404 if no session; an empty array when there
   is nothing before `before`.
+- `GET /api/sessions/{id}/workflow/run?before=<seq>` → JSON `[{seq, event}]`,
+  ascending: the `workflow.*` events of the latest run started before
+  `before` (the log's end when omitted), from its `workflow.started`; empty
+  when none. The UI loads it once with the first page's first `seq`, so a run
+  that started before the loaded page keeps its strip.
 - `GET /api/sessions/{id}/preview/<path>` → the file at `<path>` relative to
   the session's project, for the preview; 404 outside the project or for a
   missing file, 413 above 10 MiB; always sent with
