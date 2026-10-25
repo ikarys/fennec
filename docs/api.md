@@ -1,7 +1,8 @@
 # fennec HTTP API (web UI ↔ server)
 
 The server listens on `127.0.0.1:7777`. JSON in, JSON out. Errors are
-`{"error": "<message>"}` with a 4xx/5xx status.
+`{"error": "<message>"}` with a 4xx/5xx status. Request bodies are limited to
+32 MiB.
 
 ## Events
 
@@ -12,13 +13,13 @@ with camelCase fields.
 | type | data |
 |---|---|
 | `session.initialized` | `{workdir}` |
-| `message.start` | `{messageId, role: "user"\|"assistant", content?, isSystemGenerated?}` |
+| `message.start` | `{messageId, role: "user"\|"assistant", content?, isSystemGenerated?, metadata?: {type: "agent", name, color, kind: "definition"}, attachments?: [{id, filename, mimeType, size, data}]}` (metadata set on the agent reminder the loop injects as a system-generated user message when the agent changes; attachments are images the human sent: png/jpeg/gif/webp/bmp/svg, 5 MB each, at most 10 per message, `data` is a base64 data URL) |
 | `message.delta` | `{messageId, content}` (text chunk) |
 | `message.thinking` | `{messageId, content}` (reasoning chunk) |
 | `message.done` | `{messageId, partial?, stats?}`; `stats` (assistant messages): `{model, totalTime (s), prefillTokens, cachedPromptTokens, generationTokens, prefillSpeed, generationSpeed}`, speeds in tokens/s, prefill speed over new (non-cached) tokens |
 | `tool.call` | `{messageId, toolCall: {id, name, arguments, parseError?}}` |
 | `tool.output` | `{messageId, toolCallId, stream: "stdout"\|"stderr", content}` |
-| `tool.result` | `{messageId, toolCallId, result: {success, output?, error?, durationMs, truncated}}` |
+| `tool.result` | `{messageId, toolCallId, result: {success, output?, error?, durationMs, truncated, metadata?: {mimeType, dataUrl, path, size}}}` (`metadata` when `read_file` returned an image) |
 | `context.state` | `{currentTokens, maxTokens}` |
 | `context.compacted` | `{beforeTokens, afterTokens, summary}`: the cut where a new context window started from `summary`; `afterTokens` is an estimate until the next model call reports the real count |
 | `running.changed` | `{isRunning}` |
@@ -26,12 +27,22 @@ with camelCase fields.
 | `chat.error` | `{error, recoverable}` |
 | `chat.ask_user` | `{callId, question, type?: "text"\|"confirm"\|"choice", options?: [{value, label, description?}]}`: the model asked the human a question; the turn ends and the answer arrives as the next turn's input |
 | `turn.snapshot` | `{cachedSystemPrompt}`: the session's system prompt, frozen at its first turn |
+| `mode.changed` | `{mode, auto, reason?}`: the human switched the session's agent; it applies from the next turn |
+| `session.rewound` | `{messageId}`: fennec's replay cut; the model's view drops that message and everything after it, the log keeps them |
 
 Tools: `read_file {path, offset?, limit?}`, `write_file {path, content}`,
 `edit_file {path, old_string, new_string, replace_all?}`,
 `run_command {command, cwd?, timeout?}`,
 `ask_user {question, type?, options?}` (handled by the loop, the turn ends
 waiting for the human).
+
+Agents: the session runs as one top-level agent, `plan` (`read_file`,
+`load_skill`, `ask_user`: read-only) by default or `builder` (every tool),
+defined by `*.agent.md` files (embedded defaults, `~/.agents/agents`, the
+project's `.agents/agents`, later overriding by `id`); every tool definition
+is always sent so the prompt prefix stays cached, and a call the agent does
+not allow fails with `Tool '<name>' is not available in '<mode>' mode.
+Available: ...`.
 
 ## Session state
 
@@ -98,19 +109,44 @@ turn.
   (sessions newest first; `createdAt`/`updatedAt` are Unix milliseconds; `branch` may be `null`)
 - `POST /api/projects` `{workdir}` → the project (400 if not a directory)
 - `GET /api/projects/{id}/commands` → `[{name, description}]`: the slash commands the composer offers (`compact`, then the project's skills); 404 if no project
+- `GET /api/projects/{id}/agents` → `[{id, name, description, color}]`: the
+  project's top-level agents in discovery order (`color` null when unset);
+  404 if no project
 - `GET /api/folders?path=<absolute path>` → `{path, parent, folders: [{name, path, hidden, repo}]}`,
   the sub-folders of `path` (the home directory when omitted), sorted by name;
   `repo` marks a git repository; 400 if `path` cannot be read
-- `GET /api/sessions/{id}` → `{id, title, state, project: {id, name, workdir}}`
-- `POST /api/sessions` `{projectId, prompt}` → `{id}`; the turn starts at once
-- `POST /api/sessions/{id}/messages` `{content}` → 202; 409 if a turn is running;
-  when the session waits for the user, `content` is the answer to the pending
-  question
+- `GET /api/sessions/{id}` → `{id, title, state, mode, project: {id, name, workdir}}`;
+  `mode` is the id of the agent the session resolves to from its event log
+  (null when there is no top-level agent)
+- `POST /api/sessions` `{projectId, prompt, mode?, attachments?}` → `{id}`;
+  the turn starts at once; `mode` is optional, validated against the
+  project's agents before the session is created (400 if unknown) and applied
+  before the first turn; `attachments` is `[{filename, data}]` (data a
+  base64 data URL; images only, 5 MB each, at most 10); `prompt` may be empty
+  when attachments are present (400 `empty prompt` only if both are empty); a
+  new session's title is the first attachment's filename when the prompt is
+  empty; `/compact` takes no attachments (400)
+- `POST /api/sessions/{id}/messages` `{content, attachments?}` → 202; 409 if a
+  turn is running; when the session waits for the user, `content` is the
+  answer to the pending question; `attachments` is `[{filename, data}]` (data
+  a base64 data URL; images only, 5 MB each, at most 10); `content` may be
+  empty when attachments are present (400 `empty message` only if both are
+  empty); when answering a pending question, attachments ride a user message
+  after the answer
   A prompt or message starting with `/compact` alone compacts the session
   instead; `/<skill> [text]` asks the model to load that skill; any other text
-  is sent as typed.
+  is sent as typed. `/compact` takes no attachments (400).
+- `POST /api/sessions/{id}/replay` `{messageId}` → 202; 404 if no session;
+  409 if a turn is running; 400 `only a message you typed in the current
+  window can be replayed` when the id is not a user-typed message in the
+  model's current view; appends `session.rewound` and re-sends that message
+  with its images. The model's view drops the message and everything after
+  it, the log keeps them; files the agent changed meanwhile are not reverted
 - `POST /api/sessions/{id}/compact` → 202; 404 if no session; 409 if a turn is
   running; summarises the history and opens a new context window
+- `POST /api/sessions/{id}/mode` `{mode}` → 200 `{mode}`; 404 if no session;
+  400 with `unknown mode: <mode>` if the id is not a top-level agent; appends
+  `mode.changed` when the mode changes; allowed while a turn runs
 - `POST /api/sessions/{id}/stop` → 202; the turn ends with `chat.done` reason `"stopped"`
 - `GET /api/sessions/{id}/events` → Server-Sent Events. Each stored event is sent as
 

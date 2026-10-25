@@ -5,7 +5,8 @@ use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpStream;
 use std::time::Duration;
 
-const MAX_BODY: usize = 1 << 20;
+// Images travel as base64 data URLs in JSON bodies (10 × 5 MB, plus base64 overhead).
+const MAX_BODY: usize = 32 << 20;
 
 pub struct Request {
     pub method: String,

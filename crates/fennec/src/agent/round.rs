@@ -59,7 +59,7 @@ pub fn stream(turn: &mut Turn, message_id: &str, prompt: &RoundPrompt) -> Result
                 error,
                 recoverable: true,
             })?;
-            turn.append_user(CONTINUE_AFTER_STREAM_ERROR_PROMPT, true)?;
+            turn.append_user(CONTINUE_AFTER_STREAM_ERROR_PROMPT, true, None, Vec::new())?;
             return Ok(Round::Interrupted);
         }
         failures += 1;
@@ -151,5 +151,7 @@ fn assistant_start(message_id: &str) -> Event {
         role: Role::Assistant,
         content: None,
         is_system_generated: false,
+        metadata: None,
+        attachments: Vec::new(),
     }
 }

@@ -2,6 +2,7 @@
 //! in-memory log, so each test module keeps one copy.
 
 use crate::agent::ports::{Completion, Delta, EventLog, Model, Request};
+use crate::domain::agent::AgentDefinition;
 use crate::domain::event::{Event, ToolCall};
 use std::cell::RefCell;
 
@@ -52,4 +53,37 @@ pub fn reply(content: &str, calls: Vec<ToolCall>) -> Result<Completion, String> 
         tool_calls: calls,
         ..Completion::default()
     })
+}
+
+/// A top-level builder agent that allows every tool used by the agent tests.
+pub fn builder() -> Vec<AgentDefinition> {
+    vec![AgentDefinition {
+        id: "builder".into(),
+        name: "Builder".into(),
+        description: String::new(),
+        subagent: false,
+        allowed_tools: vec![
+            "read_file".into(),
+            "write_file".into(),
+            "edit_file".into(),
+            "run_command".into(),
+            "ask_user".into(),
+            "load_skill".into(),
+        ],
+        color: None,
+        prompt: "Build.".into(),
+    }]
+}
+
+/// A top-level plan agent: read-only by construction.
+pub fn plan() -> AgentDefinition {
+    AgentDefinition {
+        id: "plan".into(),
+        name: "Plan".into(),
+        description: String::new(),
+        subagent: false,
+        allowed_tools: vec!["read_file".into(), "ask_user".into(), "load_skill".into()],
+        color: None,
+        prompt: "Plan.".into(),
+    }
 }

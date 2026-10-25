@@ -2,8 +2,10 @@
 //! the event log, and can be stopped. One turn at a time per session.
 
 use super::notifier::{Notifier, NotifyingLog};
-use crate::agent::turn::{Turn, compact_session, run_turn};
+use crate::agent::turn::{Turn, compact_session, replay_turn, run_turn};
+use crate::agents;
 use crate::config::Settings;
+use crate::domain::attachment::Attachment;
 use crate::domain::event::Event;
 use crate::domain::slash::TurnInput;
 use crate::instructions::all_instructions;
@@ -15,6 +17,14 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+
+/// What a turn started from the UI does.
+pub enum Job {
+    /// A message typed in the composer (or the answer to a question).
+    Input(TurnInput, Vec<Attachment>),
+    /// The human replays one of their messages.
+    Replay(String),
+}
 
 pub struct Turns {
     settings: Settings,
@@ -44,7 +54,7 @@ impl Turns {
     }
 
     /// Starts a turn; refuses while one runs on the session.
-    pub fn start(&self, session_id: &str, workdir: &str, input: TurnInput) -> Result<(), String> {
+    pub fn start(&self, session_id: &str, workdir: &str, job: Job) -> Result<(), String> {
         let stop = Arc::new(AtomicBool::new(false));
         {
             let mut running = self.running.lock().unwrap();
@@ -58,7 +68,7 @@ impl Turns {
         let running = self.running.clone();
         let (session_id, workdir) = (session_id.to_string(), PathBuf::from(workdir));
         std::thread::spawn(move || {
-            if let Err(e) = run(&settings, &notifier, &session_id, workdir, &input, &stop) {
+            if let Err(e) = run(&settings, &notifier, &session_id, workdir, &job, &stop) {
                 eprintln!("fennec: session {session_id}: {e}");
             }
             running.lock().unwrap().remove(&session_id);
@@ -72,7 +82,7 @@ fn run(
     notifier: &Notifier,
     session_id: &str,
     workdir: PathBuf,
-    input: &TurnInput,
+    job: &Job,
     stop: &AtomicBool,
 ) -> Result<(), String> {
     let store = SqliteStore::open(&settings.db_path)?;
@@ -84,6 +94,7 @@ fn run(
     let params = settings.llm.for_turn(&prefs);
     let instructions = all_instructions(prefs.global_instructions.as_deref(), &workdir);
     let skills = skills::discover(&workdir);
+    let agents = agents::discover(&workdir);
     let model = OpenAiClient::new(&settings.llm, &params.model);
     let tools = LocalTools::new(workdir.clone());
     let mut on_event = |_: &Event| {};
@@ -95,6 +106,7 @@ fn run(
         workdir: &workdir,
         instructions: &instructions,
         skills: &skills,
+        agents: &agents,
         max_tokens: params.max_tokens,
         context_window: params.context_window,
         compact_at: params.compact_at,
@@ -102,8 +114,11 @@ fn run(
         stop,
         on_event: &mut on_event,
     };
-    match input {
-        TurnInput::Prompt(prompt) => run_turn(&mut turn, prompt).map(|_| ()),
-        TurnInput::Compact => compact_session(&mut turn).map(|_| ()),
+    match job {
+        Job::Input(TurnInput::Prompt(prompt), attachments) => {
+            run_turn(&mut turn, prompt, attachments).map(|_| ())
+        }
+        Job::Input(TurnInput::Compact, _) => compact_session(&mut turn).map(|_| ()),
+        Job::Replay(message_id) => replay_turn(&mut turn, message_id).map(|_| ()),
     }
 }

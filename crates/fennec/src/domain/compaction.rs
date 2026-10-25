@@ -23,10 +23,36 @@ pub fn since_last_compaction(events: &[Event]) -> &[Event] {
     }
 }
 
+/// The events the model sees: those after the last compaction, minus what a
+/// later `session.rewound` cut off (its message and everything after it, up
+/// to the rewind itself). The rewind events are not part of the view.
+pub fn model_view(events: &[Event]) -> Vec<&Event> {
+    let mut view: Vec<&Event> = Vec::new();
+    for event in since_last_compaction(events) {
+        match event {
+            Event::SessionRewound { message_id } => {
+                if let Some(i) = view.iter().rposition(|e| {
+                    matches!(
+                        e,
+                        Event::MessageStart {
+                            message_id: id,
+                            ..
+                        } if id.as_str() == message_id.as_str()
+                    )
+                }) {
+                    view.truncate(i);
+                }
+            }
+            _ => view.push(event),
+        }
+    }
+    view
+}
+
 /// `current_tokens` of the last `ContextState` in the model's view, 0 if
 /// none has been measured yet.
 pub fn context_tokens(events: &[Event]) -> u64 {
-    since_last_compaction(events)
+    model_view(events)
         .iter()
         .rev()
         .find_map(|e| match e {
@@ -133,6 +159,8 @@ mod tests {
             role: Role::User,
             content: Some(content.into()),
             is_system_generated: system_generated,
+            metadata: None,
+            attachments: Vec::new(),
         }
     }
 
@@ -186,6 +214,54 @@ mod tests {
         let after = since_last_compaction(&events);
         assert_eq!(after.len(), 1);
         assert!(matches!(&after[0], Event::MessageStart { content: Some(c), .. } if c == "c"));
+    }
+
+    fn user_id(id: &str, content: &str) -> Event {
+        Event::MessageStart {
+            message_id: id.into(),
+            role: Role::User,
+            content: Some(content.into()),
+            is_system_generated: false,
+            metadata: None,
+            attachments: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn model_view_is_the_same_as_since_last_compaction_without_a_rewind() {
+        let events = vec![user_id("u1", "a"), user_id("u2", "b")];
+        assert_eq!(model_view(&events), events.iter().collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn model_view_drops_the_rewound_message_and_what_follows() {
+        let events = vec![
+            user_id("u1", "first"),
+            user_id("u2", "second"),
+            Event::SessionRewound {
+                message_id: "u1".into(),
+            },
+            user_id("u3", "after"),
+        ];
+        assert_eq!(model_view(&events), vec![&events[3]]);
+    }
+
+    #[test]
+    fn model_view_ignores_a_rewind_target_before_the_last_compaction() {
+        let events = vec![
+            user_id("u0", "old"),
+            Event::ContextCompacted {
+                before_tokens: 1,
+                after_tokens: 2,
+                summary: "s".into(),
+            },
+            user_id("u1", "new"),
+            Event::SessionRewound {
+                message_id: "u0".into(),
+            },
+            user_id("u2", "after"),
+        ];
+        assert_eq!(model_view(&events), vec![&events[2], &events[4]]);
     }
 
     #[test]

@@ -1,7 +1,7 @@
 //! Port of openfox `events/fold-messages.ts`: the event log read back as the
 //! OpenAI chat messages sent to the model.
 
-use super::compaction::since_last_compaction;
+use super::compaction::model_view;
 use super::event::{Event, ToolResult};
 use serde_json::{Value, json};
 
@@ -18,10 +18,10 @@ pub fn render_tool_result(result: &ToolResult) -> String {
 }
 
 /// Folds the log into OpenAI chat messages (without the system prompt). Only
-/// the events after the last `context.compacted` are folded: the model's view
-/// of the log starts after the last cut.
+/// the model's view is folded: the events after the last `context.compacted`,
+/// minus what a later `session.rewound` cut off.
 pub fn fold_messages(events: &[Event]) -> Vec<Value> {
-    let events = since_last_compaction(events);
+    let events = model_view(events);
     let mut messages: Vec<Value> = Vec::new();
     // Index in `messages` of each assistant/user message, by message id.
     let mut index: Vec<(String, usize)> = Vec::new();
@@ -34,11 +34,27 @@ pub fn fold_messages(events: &[Event]) -> Vec<Value> {
                 message_id,
                 role,
                 content,
+                attachments,
                 ..
             } => {
                 index.push((message_id.clone(), messages.len()));
-                messages
-                    .push(json!({"role": role, "content": content.clone().unwrap_or_default()}));
+                let content = if attachments.is_empty() {
+                    json!(content.clone().unwrap_or_default())
+                } else {
+                    let mut parts = Vec::new();
+                    let text = content.clone().unwrap_or_default();
+                    if !text.is_empty() {
+                        parts.push(json!({"type": "text", "text": text}));
+                    }
+                    for attachment in attachments {
+                        parts.push(json!({
+                            "type": "image_url",
+                            "image_url": {"url": attachment.data},
+                        }));
+                    }
+                    json!(parts)
+                };
+                messages.push(json!({"role": role, "content": content}));
             }
             Event::MessageDelta {
                 message_id,
@@ -84,11 +100,23 @@ pub fn fold_messages(events: &[Event]) -> Vec<Value> {
                 tool_call_id,
                 result,
                 ..
-            } => messages.push(json!({
-                "role": "tool",
-                "tool_call_id": tool_call_id,
-                "content": render_tool_result(result),
-            })),
+            } => {
+                let content = if let Some(metadata) = &result.metadata
+                    && metadata.mime_type.starts_with("image/")
+                {
+                    json!([
+                        {"type": "text", "text": render_tool_result(result)},
+                        {"type": "image_url", "image_url": {"url": metadata.data_url}},
+                    ])
+                } else {
+                    json!(render_tool_result(result))
+                };
+                messages.push(json!({
+                    "role": "tool",
+                    "tool_call_id": tool_call_id,
+                    "content": content,
+                }));
+            }
             _ => {}
         }
     }
@@ -98,6 +126,7 @@ pub fn fold_messages(events: &[Event]) -> Vec<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::attachment::Attachment;
     use crate::domain::event::{Role, ToolCall, ToolResult};
 
     fn start(id: &str, role: Role, content: Option<&str>, system_generated: bool) -> Event {
@@ -106,6 +135,8 @@ mod tests {
             role,
             content: content.map(Into::into),
             is_system_generated: system_generated,
+            metadata: None,
+            attachments: Vec::new(),
         }
     }
 
@@ -145,6 +176,7 @@ mod tests {
                     error: Some("nope".into()),
                     duration_ms: 1,
                     truncated: false,
+                    metadata: None,
                 },
             },
         ];
@@ -160,6 +192,83 @@ mod tests {
             msgs[2],
             json!({"role": "tool", "tool_call_id": "c1", "content": "Error: nope"})
         );
+    }
+
+    #[test]
+    fn a_message_with_attachments_folds_to_text_and_image_parts() {
+        let events = vec![Event::MessageStart {
+            message_id: "u".into(),
+            role: Role::User,
+            content: Some("look".into()),
+            is_system_generated: false,
+            metadata: None,
+            attachments: vec![Attachment {
+                id: "a".into(),
+                filename: "a.png".into(),
+                mime_type: "image/png".into(),
+                size: 1,
+                data: "data:image/png;base64,AAAA".into(),
+            }],
+        }];
+        let msgs = fold_messages(&events);
+        assert_eq!(
+            msgs[0]["content"][0],
+            json!({"type": "text", "text": "look"})
+        );
+        assert_eq!(
+            msgs[0]["content"][1],
+            json!({"type": "image_url", "image_url": {"url": "data:image/png;base64,AAAA"}})
+        );
+    }
+
+    #[test]
+    fn a_message_without_attachments_stays_a_plain_string() {
+        let events = vec![start("u", Role::User, Some("plain"), false)];
+        let msgs = fold_messages(&events);
+        assert_eq!(msgs[0]["content"], "plain");
+    }
+
+    #[test]
+    fn an_image_tool_result_folds_to_text_and_image_parts() {
+        let events = vec![Event::ToolResult {
+            message_id: "a".into(),
+            tool_call_id: "c1".into(),
+            result: ToolResult::image(
+                "img".into(),
+                crate::domain::event::ToolResultMetadata {
+                    mime_type: "image/png".into(),
+                    data_url: "data:image/png;base64,AAAA".into(),
+                    path: "a.png".into(),
+                    size: 1,
+                },
+            ),
+        }];
+        let msgs = fold_messages(&events);
+        assert_eq!(
+            msgs[0]["content"][0],
+            json!({"type": "text", "text": "img"})
+        );
+        assert_eq!(
+            msgs[0]["content"][1],
+            json!({"type": "image_url", "image_url": {"url": "data:image/png;base64,AAAA"}})
+        );
+    }
+
+    #[test]
+    fn fold_drops_the_rewound_message_and_what_follows() {
+        let events = vec![
+            start("u1", Role::User, Some("first"), false),
+            start("a1", Role::Assistant, Some("first"), false),
+            Event::SessionRewound {
+                message_id: "u1".into(),
+            },
+            start("u2", Role::User, Some("again"), false),
+            start("a2", Role::Assistant, Some("second"), false),
+        ];
+        let msgs = fold_messages(&events);
+        assert_eq!(msgs.len(), 2);
+        assert_eq!(msgs[0]["content"], "again");
+        assert_eq!(msgs[1]["content"], "second");
     }
 
     #[test]

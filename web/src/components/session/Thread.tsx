@@ -1,10 +1,13 @@
-import { memo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { AssistantItem, Segment, ThreadItem } from '../../lib/fold';
 import { useDisplayPrefs } from '../../lib/display';
-import { BulbIcon } from '../Icons';
+import { splitContract } from '../../lib/plan';
+import { BulbIcon, ReplayIcon } from '../Icons';
+import { CopyButton } from './CopyButton';
 import { MessageStatsLine } from './MessageStats';
+import { PlanCard, ReportCard } from './PlanCard';
 import { ToolCard } from './ToolCard';
 
 const markdownComponents = {
@@ -21,6 +24,10 @@ const markdownComponents = {
     );
   },
   p: ({ children }: { children?: React.ReactNode }) => <p className="my-2 leading-relaxed">{children}</p>,
+  // Tailwind's preflight removes list markers; plans are lists of lists.
+  ul: ({ children }: { children?: React.ReactNode }) => <ul className="my-2 list-disc pl-5">{children}</ul>,
+  ol: ({ children }: { children?: React.ReactNode }) => <ol className="my-2 list-decimal pl-5">{children}</ol>,
+  li: ({ children }: { children?: React.ReactNode }) => <li className="my-0.5 leading-relaxed">{children}</li>,
   a: ({ children, href }: { children?: React.ReactNode; href?: string }) => (
     <a href={href} className="text-accent-strong underline" target="_blank" rel="noreferrer">
       {children}
@@ -65,11 +72,23 @@ const ThinkingSegment = memo(function ThinkingSegment({ content }: { content: st
 const REMARK_PLUGINS = [remarkGfm];
 
 const TextSegment = memo(function TextSegment({ content, caret }: { content: string; caret: boolean }) {
+  // Parsed only when settled: a half-written contract would flicker between the
+  // two renderings while the message streams.
+  const contract = useMemo(() => (caret ? null : splitContract(content)), [content, caret]);
   return (
     <div className="min-w-0 text-[14px] leading-relaxed [overflow-wrap:break-word]">
-      <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={markdownComponents}>
-        {content}
-      </ReactMarkdown>
+      {contract ? (
+        <>
+          {contract.before && (
+            <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={markdownComponents}>
+              {contract.before}
+            </ReactMarkdown>
+          )}
+          {contract.contract.kind === 'plan' ? <PlanCard plan={contract.contract} /> : <ReportCard report={contract.contract} />}
+        </>
+      ) : (
+        <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={markdownComponents}>{content}</ReactMarkdown>
+      )}
       {caret && <span className="caret ml-0.5 inline-block h-4 w-2 bg-accent align-text-bottom" />}
     </div>
   );
@@ -78,6 +97,14 @@ const TextSegment = memo(function TextSegment({ content, caret }: { content: str
 function AssistantItemView({ item, model, running, showHeader }: { item: AssistantItem; model: string; running: boolean; showHeader: boolean }) {
   const lastTextId = [...item.segments].reverse().find((segment): segment is Extract<Segment, { kind: 'text' }> => segment.kind === 'text')?.id;
   const streaming = running && !item.done;
+  const copyText = item.done
+    ? item.segments
+        .filter((segment): segment is Extract<Segment, { kind: 'text' }> => segment.kind === 'text')
+        .map((segment) => segment.content)
+        .join('\n\n')
+    : '';
+  const showCopy = item.done && copyText.length > 0;
+  const showStats = streaming ? item.liveSpeed != null : item.stats != null;
 
   return (
     <div className="flex flex-col gap-2.5">
@@ -96,12 +123,41 @@ function AssistantItemView({ item, model, running, showHeader }: { item: Assista
         }
         return <ToolCard key={segment.id} tool={segment.tool} />;
       })}
-      <MessageStatsLine item={item} streaming={streaming} />
+      {showCopy && showStats ? (
+        <div className="flex items-center justify-between gap-3">
+          <MessageStatsLine item={item} streaming={streaming} />
+          <CopyButton text={copyText} />
+        </div>
+      ) : (
+        <>
+          <MessageStatsLine item={item} streaming={streaming} />
+          {showCopy && (
+            <div className="flex justify-end">
+              <CopyButton text={copyText} />
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
 
-export function ThreadItemView({ item, model, running, showHeader }: { item: ThreadItem; model: string; running: boolean; showHeader: boolean }) {
+export function ThreadItemView({ item, model, running, showHeader, onReplay }: { item: ThreadItem; model: string; running: boolean; showHeader: boolean; onReplay?: (messageId: string) => void }) {
+  if (item.kind === 'mode') {
+    // A mode change is a divider, not a message: the agent's color marks the
+    // switch without taking bubble space.
+    const color = item.color;
+    const textStyle = color ? { color } : undefined;
+    const lineStyle = color ? { backgroundColor: color } : undefined;
+    return (
+      <div className="flex items-center gap-2 text-[11px] text-muted">
+        <span className="h-px grow bg-border" style={lineStyle} />
+        <span style={textStyle}>{item.name} mode</span>
+        <span className="h-px grow bg-border" style={lineStyle} />
+      </div>
+    );
+  }
+
   if (item.kind === 'user') {
     if (item.isSystemGenerated) {
       // fennec's own prompts to the model (compaction, resume, continue): the
@@ -109,8 +165,32 @@ export function ThreadItemView({ item, model, running, showHeader }: { item: Thr
       return null;
     }
     return (
-      <div className="max-w-[85%] self-end rounded-xl rounded-br-sm border border-border bg-raised px-3.5 py-2.5 whitespace-pre-wrap [overflow-wrap:break-word]">
-        {item.content}
+      <div className="group flex max-w-[85%] flex-col self-end">
+        <div className="rounded-xl rounded-br-sm border border-border bg-raised px-3.5 py-2.5 [overflow-wrap:break-word]">
+          {item.attachments.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {item.attachments.map((a) => (
+                <img key={a.id} src={a.data} alt={a.filename} className="max-h-48 rounded-lg border border-border" />
+              ))}
+            </div>
+          )}
+          {item.content && <div className="whitespace-pre-wrap">{item.content}</div>}
+        </div>
+        <div className="mt-1 flex justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+          <CopyButton text={item.content} />
+          {onReplay && (
+            <button
+              type="button"
+              aria-label="Rejouer"
+              title="Rejouer"
+              disabled={running}
+              onClick={() => onReplay(item.id)}
+              className="rounded-md p-1 text-muted transition-colors hover:text-text disabled:opacity-60"
+            >
+              <ReplayIcon className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
       </div>
     );
   }
