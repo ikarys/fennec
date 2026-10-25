@@ -2,6 +2,10 @@
 //! streams the model (`round`), then runs its tool calls, until it answers
 //! without one.
 //!
+//! Agents/modes are ported: the turn resolves one top-level agent from the
+//! log's last `mode.changed`, injects its reminder when the current window
+//! lacks it, and enforces its tool allow-list at execution.
+//!
 //! `ask_user` is ported: the turn ends with `waiting_for_user` and the
 //! answer arrives as the next turn's input, so a pending question survives a
 //! restart.
@@ -19,11 +23,16 @@ use super::ports::{EventLog, Model, Toolbox};
 use super::prompt::system_prompt;
 use super::round::{self, Round, RoundPrompt};
 use super::tool_calls::{Flow, INTERRUPTED_ERROR, execute_tools};
+use crate::domain::agent::{AgentDefinition, DEFAULT_COLOR, last_reminder, resolve};
+use crate::domain::attachment::Attachment;
 use crate::domain::compaction::{context_tokens, should_compact};
-use crate::domain::event::{DoneReason, Event, Role, ToolResult};
+use crate::domain::event::{
+    DoneReason, Event, MessageMetadata, MetadataSource, ReminderKind, Role, ToolResult,
+};
 use crate::domain::id::new_id;
 use crate::domain::open_calls;
 use crate::domain::preferences::ReasoningEffort;
+use crate::domain::replay::replayable;
 use crate::domain::skill::Skill;
 use serde_json::Value;
 use std::path::Path;
@@ -48,6 +57,9 @@ pub struct Turn<'a> {
     pub instructions: &'a str,
     /// openfox `skills`: listed in the system prompt, frozen with it.
     pub skills: &'a [Skill],
+    /// The agents the session can run as; the log's last `mode.changed`
+    /// picks one.
+    pub agents: &'a [AgentDefinition],
     pub max_tokens: u32,
     /// The model's context window, reported in `context.state`.
     pub context_window: u64,
@@ -73,6 +85,8 @@ impl Turn<'_> {
         &mut self,
         content: &str,
         system_generated: bool,
+        metadata: Option<MessageMetadata>,
+        attachments: Vec<Attachment>,
     ) -> Result<(), String> {
         let message_id = new_id();
         self.append(Event::MessageStart {
@@ -80,6 +94,8 @@ impl Turn<'_> {
             role: Role::User,
             content: Some(content.into()),
             is_system_generated: system_generated,
+            metadata,
+            attachments,
         })?;
         self.append(Event::MessageDone {
             message_id,
@@ -91,20 +107,51 @@ impl Turn<'_> {
 
 /// Appends the user's prompt and runs the loop to completion. Returns the
 /// `chat.done` reason.
-pub fn run_turn(turn: &mut Turn, prompt: &str) -> Result<DoneReason, String> {
+pub fn run_turn(
+    turn: &mut Turn,
+    prompt: &str,
+    attachments: &[Attachment],
+) -> Result<DoneReason, String> {
+    with_running(turn, |turn| answer_or_prompt(turn, prompt, attachments))
+}
+
+/// The human's replay: cut the model's view back to before `message_id`
+/// and send that message again, with its images.
+pub fn replay_turn(turn: &mut Turn, message_id: &str) -> Result<DoneReason, String> {
     with_running(turn, |turn| {
-        // Close tool calls left open by a previous turn before writing the
-        // prompt: the model API rejects an assistant tool call without its
-        // tool message. When the open call awaits an answer, the human's
-        // input *is* that answer, so no user message is appended on top of it.
-        let answered = close_open_calls(turn, prompt)?;
-        if answered {
-            run_top_level_agent_loop(turn)
-        } else {
-            turn.append_user(prompt, false)
-                .and_then(|()| run_top_level_agent_loop(turn))
-        }
+        let events = turn.log.events(turn.session_id)?;
+        let (content, attachments) = replayable(&events, message_id).ok_or_else(|| {
+            "only a message you typed in the current window can be replayed".to_string()
+        })?;
+        turn.append(Event::SessionRewound {
+            message_id: message_id.to_string(),
+        })?;
+        answer_or_prompt(turn, &content, &attachments)
     })
+}
+
+fn answer_or_prompt(
+    turn: &mut Turn,
+    prompt: &str,
+    attachments: &[Attachment],
+) -> Result<DoneReason, String> {
+    let events = turn.log.events(turn.session_id)?;
+    let agents = turn.agents;
+    let agent = resolve(agents, &events).ok_or_else(|| "no top-level agent".to_string())?;
+    // Close tool calls left open by a previous turn before writing the
+    // prompt: the model API rejects an assistant tool call without its
+    // tool message. When the open call awaits an answer, the human's
+    // input *is* that answer, so no user message is appended on top of it.
+    let answered = close_open_calls(turn, prompt)?;
+    ensure_agent_reminder(turn, agent)?;
+    if !answered {
+        turn.append_user(prompt, false, None, attachments.to_vec())?;
+    } else if !attachments.is_empty() {
+        // A tool result only carries text from the human, so the images
+        // ride a user message of their own.
+        turn.append_user("", false, None, attachments.to_vec())?;
+    }
+    run_top_level_agent_loop(turn, agent)
 }
 
 /// The human's manual compaction: summarise the history and open a new
@@ -214,7 +261,30 @@ fn cached_system_prompt(turn: &mut Turn) -> Result<String, String> {
     Ok(prompt)
 }
 
-fn run_top_level_agent_loop(turn: &mut Turn) -> Result<DoneReason, String> {
+/// Injects the agent's definition when the last reminder in the model's
+/// current window is another agent's, or there is none: at the first turn,
+/// after a mode switch, after a compaction. Nothing is re-sent otherwise.
+fn ensure_agent_reminder(turn: &mut Turn, agent: &AgentDefinition) -> Result<(), String> {
+    if last_reminder(&turn.log.events(turn.session_id)?) == Some(agent.name.as_str()) {
+        return Ok(());
+    }
+
+    let metadata = MessageMetadata {
+        source: MetadataSource::Agent,
+        name: agent.name.clone(),
+        color: agent
+            .color
+            .clone()
+            .unwrap_or_else(|| DEFAULT_COLOR.to_string()),
+        kind: ReminderKind::Definition,
+    };
+    turn.append_user(&agent.reminder(), true, Some(metadata), Vec::new())
+}
+
+fn run_top_level_agent_loop(
+    turn: &mut Turn,
+    agent: &AgentDefinition,
+) -> Result<DoneReason, String> {
     let (system_prompt, tool_defs) = round_prompt_parts(turn)?;
     let mut max_tokens = turn.max_tokens;
     let mut truncation_retries = 0;
@@ -242,7 +312,8 @@ fn run_top_level_agent_loop(turn: &mut Turn) -> Result<DoneReason, String> {
         {
             match compaction::compact(turn, &prompt)? {
                 Compacted::Ended(reason) => return finish(turn, message_id, reason),
-                Compacted::Done | Compacted::Skipped => {}
+                Compacted::Done => ensure_agent_reminder(turn, agent)?,
+                Compacted::Skipped => {}
             }
             compacted_last_round = true;
             continue;
@@ -270,7 +341,7 @@ fn run_top_level_agent_loop(turn: &mut Turn) -> Result<DoneReason, String> {
             }
             truncation_retries += 1;
             max_tokens = max_tokens.saturating_mul(3) / 2;
-            turn.append_user(CONTINUE_AFTER_TRUNCATION_PROMPT, true)?;
+            turn.append_user(CONTINUE_AFTER_TRUNCATION_PROMPT, true, None, Vec::new())?;
             continue;
         }
 
@@ -288,7 +359,7 @@ fn run_top_level_agent_loop(turn: &mut Turn) -> Result<DoneReason, String> {
         if answer.tool_calls.is_empty() {
             return finish(turn, message_id, DoneReason::Complete);
         }
-        match execute_tools(turn, &message_id, &answer.tool_calls)? {
+        match execute_tools(turn, agent, &message_id, &answer.tool_calls)? {
             Flow::WaitingForUser => return finish(turn, message_id, DoneReason::WaitingForUser),
             Flow::Continue => {}
         }
@@ -312,11 +383,11 @@ mod tests {
     use super::*;
     use crate::agent::ports::{Completion, Delta, Request};
     use crate::agent::round::CONTINUE_AFTER_STREAM_ERROR_PROMPT;
-    use crate::agent::test_support::{MemoryLog, Scripted, reply};
+    use crate::agent::test_support::{MemoryLog, Scripted, builder, plan, reply};
     use crate::domain::conversation::fold_messages;
     use crate::domain::event::ToolCall;
     use crate::tools::LocalTools;
-    use serde_json::json;
+    use serde_json::{Value, json};
     use std::cell::RefCell;
     use std::path::PathBuf;
 
@@ -329,6 +400,7 @@ mod tests {
         stop: &'a AtomicBool,
         workdir: PathBuf,
         on_event: Box<dyn FnMut(&Event) + 'a>,
+        agents: Vec<AgentDefinition>,
     }
 
     impl<'a> Harness<'a> {
@@ -340,6 +412,7 @@ mod tests {
                 stop,
                 workdir,
                 on_event: Box::new(|_: &Event| {}),
+                agents: builder(),
             }
         }
 
@@ -352,6 +425,7 @@ mod tests {
                 workdir: &self.workdir,
                 instructions: "",
                 skills: &[],
+                agents: &self.agents,
                 max_tokens: 100,
                 context_window: 1000,
                 compact_at: 0.0,
@@ -367,6 +441,7 @@ mod tests {
         let tools = LocalTools::new(workdir.to_path_buf());
         let stop = AtomicBool::new(false);
         let mut on_event = |_: &Event| {};
+        let agents = builder();
         let mut turn = Turn {
             model,
             log: &log,
@@ -375,6 +450,7 @@ mod tests {
             workdir,
             instructions: "",
             skills: &[],
+            agents: &agents,
             max_tokens: 100,
             context_window: 1000,
             compact_at: 0.0,
@@ -382,7 +458,7 @@ mod tests {
             stop: &stop,
             on_event: &mut on_event,
         };
-        let reason = run_turn(&mut turn, "go").unwrap();
+        let reason = run_turn(&mut turn, "go", &[]).unwrap();
         (reason, log.0.into_inner())
     }
 
@@ -421,7 +497,7 @@ mod tests {
         assert_eq!(results, [true]);
         let msgs = fold_messages(&events);
         assert_eq!(msgs.last().unwrap()["content"], "done");
-        assert_eq!(msgs[2]["role"], "tool");
+        assert_eq!(msgs[3]["role"], "tool");
         std::fs::remove_dir_all(dir).ok();
     }
 
@@ -447,7 +523,10 @@ mod tests {
         let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
         let mut turn = h.turn();
         turn.compact_at = 0.85;
-        assert_eq!(run_turn(&mut turn, "go").unwrap(), DoneReason::Complete);
+        assert_eq!(
+            run_turn(&mut turn, "go", &[]).unwrap(),
+            DoneReason::Complete
+        );
         let events = h.log.0.into_inner();
         let compacted = events
             .iter()
@@ -508,6 +587,7 @@ mod tests {
         }
         let (reason, events) = run(&FailsMidStream(RefCell::new(0)), Path::new("/tmp"));
         assert_eq!(reason, DoneReason::Complete);
+        let agent = builder().into_iter().next().unwrap();
         let msgs = fold_messages(&events);
         let contents: Vec<_> = msgs
             .iter()
@@ -515,7 +595,13 @@ mod tests {
             .collect();
         assert_eq!(
             contents,
-            ["go", "part", CONTINUE_AFTER_STREAM_ERROR_PROMPT, "part"]
+            [
+                agent.reminder().as_str(),
+                "go",
+                "part",
+                CONTINUE_AFTER_STREAM_ERROR_PROMPT,
+                "part"
+            ]
         );
     }
 
@@ -549,6 +635,7 @@ mod tests {
         let tools = LocalTools::new(workdir.clone());
         let stop = AtomicBool::new(false);
         let mut on_event = |_: &Event| {};
+        let agents = builder();
         let mut turn = Turn {
             model: &model,
             log: &log,
@@ -557,6 +644,7 @@ mod tests {
             workdir: &workdir,
             instructions: "",
             skills: &[],
+            agents: &agents,
             max_tokens: 100,
             context_window: 1000,
             compact_at: 0.0,
@@ -564,8 +652,8 @@ mod tests {
             stop: &stop,
             on_event: &mut on_event,
         };
-        run_turn(&mut turn, "one").unwrap();
-        run_turn(&mut turn, "two").unwrap();
+        run_turn(&mut turn, "one", &[]).unwrap();
+        run_turn(&mut turn, "two", &[]).unwrap();
         assert_eq!(*model.0.borrow(), ["frozen", "frozen"]);
         let snapshots = log
             .0
@@ -596,7 +684,7 @@ mod tests {
         ]));
         let stop = AtomicBool::new(false);
         let mut h = Harness::new(Box::new(model), dir.clone(), &stop);
-        let reason = run_turn(&mut h.turn(), "go").unwrap();
+        let reason = run_turn(&mut h.turn(), "go", &[]).unwrap();
         assert_eq!(reason, DoneReason::WaitingForUser);
         let events = h.log.0.borrow().clone();
         assert!(
@@ -609,7 +697,7 @@ mod tests {
                 |e| matches!(e, Event::ToolResult { tool_call_id, .. } if tool_call_id == "c1")
             )
         );
-        let reason2 = run_turn(&mut h.turn(), "blue").unwrap();
+        let reason2 = run_turn(&mut h.turn(), "blue", &[]).unwrap();
         assert_eq!(reason2, DoneReason::Complete);
         let events = h.log.0.borrow().clone();
         // The answer is a tool result, not a user message.
@@ -646,7 +734,7 @@ mod tests {
         let model = Scripted(RefCell::new(vec![reply("", vec![ask, read])]));
         let stop = AtomicBool::new(false);
         let mut h = Harness::new(Box::new(model), dir.clone(), &stop);
-        let reason = run_turn(&mut h.turn(), "go").unwrap();
+        let reason = run_turn(&mut h.turn(), "go", &[]).unwrap();
         assert_eq!(reason, DoneReason::WaitingForUser);
         let events = h.log.0.borrow().clone();
         assert!(events.iter().any(|e| matches!(e, Event::ToolResult { tool_call_id, result, .. } if tool_call_id == "c2" && result.error.as_deref().unwrap().starts_with("Not run"))));
@@ -675,7 +763,7 @@ mod tests {
                 stop.store(true, Ordering::Relaxed);
             }
         });
-        let reason = run_turn(&mut h.turn(), "go").unwrap();
+        let reason = run_turn(&mut h.turn(), "go", &[]).unwrap();
         assert_eq!(reason, DoneReason::Stopped);
         let events = h.log.0.borrow().clone();
         assert!(events.iter().any(|e| matches!(e, Event::ToolResult { tool_call_id, result, .. } if tool_call_id == "c1" && result.error.as_deref().unwrap() == INTERRUPTED_ERROR)));
@@ -704,7 +792,7 @@ mod tests {
                 },
             )
             .unwrap();
-        let reason = run_turn(&mut h.turn(), "hi").unwrap();
+        let reason = run_turn(&mut h.turn(), "hi", &[]).unwrap();
         assert_eq!(reason, DoneReason::Complete);
         let events = h.log.0.borrow().clone();
         // The interrupted result is appended before the user message "hi".
@@ -740,7 +828,7 @@ mod tests {
         ]));
         let stop = AtomicBool::new(false);
         let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
-        let reason = run_turn(&mut h.turn(), "go").unwrap();
+        let reason = run_turn(&mut h.turn(), "go", &[]).unwrap();
         assert_eq!(reason, DoneReason::Complete);
         let events = h.log.0.borrow().clone();
         assert!(
@@ -749,5 +837,329 @@ mod tests {
                 .any(|e| matches!(e, Event::ChatAskUser { .. }))
         );
         assert!(events.iter().any(|e| matches!(e, Event::ToolResult { tool_call_id, result, .. } if tool_call_id == "c1" && result.error.is_some())));
+    }
+
+    #[test]
+    fn plan_mode_refuses_write_file() {
+        let dir = scratch_dir();
+        let call = ToolCall {
+            id: "c1".into(),
+            name: "write_file".into(),
+            arguments: json!({"path": "hello.txt", "content": "hi"}),
+            parse_error: None,
+        };
+        let model = Scripted(RefCell::new(vec![
+            reply("", vec![call]),
+            reply("done", vec![]),
+        ]));
+        let stop = AtomicBool::new(false);
+        let mut h = Harness::new(Box::new(model), dir.clone(), &stop);
+        h.agents = vec![plan()];
+        let reason = run_turn(&mut h.turn(), "go", &[]).unwrap();
+        assert_eq!(reason, DoneReason::Complete);
+        let events = h.log.0.borrow().clone();
+        assert!(events.iter().any(|e| matches!(e,
+            Event::ToolResult { tool_call_id, result, .. }
+                if tool_call_id == "c1"
+                    && result.error.as_deref() == Some(
+                        "Tool 'write_file' is not available in 'plan' mode. Available: ask_user, load_skill, read_file"
+                    )
+        )));
+        assert!(!dir.join("hello.txt").exists());
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn the_first_turn_appends_the_agent_reminder_before_the_prompt() {
+        let agent = builder().into_iter().next().unwrap();
+        let model = Scripted(RefCell::new(vec![reply("done", vec![])]));
+        let stop = AtomicBool::new(false);
+        let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
+        run_turn(&mut h.turn(), "go", &[]).unwrap();
+        let events = h.log.0.borrow().clone();
+        let reminder_idx = events
+            .iter()
+            .position(|e| {
+                matches!(e, Event::MessageStart {
+                content: Some(c),
+                is_system_generated: true,
+                metadata: Some(MessageMetadata {
+                    source: MetadataSource::Agent,
+                    name,
+                    kind: ReminderKind::Definition,
+                    ..
+                }),
+                ..
+            } if c == &agent.reminder() && name == &agent.name)
+            })
+            .unwrap();
+        let prompt_idx = events
+            .iter()
+            .position(|e| {
+                matches!(e, Event::MessageStart {
+                role: Role::User,
+                content: Some(c),
+                is_system_generated: false,
+                metadata: None,
+                ..
+            } if c == "go")
+            })
+            .unwrap();
+        assert!(reminder_idx < prompt_idx);
+        assert!(matches!(
+            &events[reminder_idx + 1],
+            Event::MessageDone { .. }
+        ));
+        assert!(matches!(
+            &events[reminder_idx + 2],
+            Event::MessageStart {
+                role: Role::User,
+                content: Some(c),
+                ..
+            } if c == "go"
+        ));
+    }
+
+    #[test]
+    fn a_second_turn_in_the_same_mode_appends_no_reminder() {
+        let model = Scripted(RefCell::new(vec![
+            reply("one", vec![]),
+            reply("two", vec![]),
+        ]));
+        let stop = AtomicBool::new(false);
+        let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
+        run_turn(&mut h.turn(), "one", &[]).unwrap();
+        run_turn(&mut h.turn(), "two", &[]).unwrap();
+        let events = h.log.0.borrow().clone();
+        let reminders = events
+            .iter()
+            .filter(|e| {
+                matches!(
+                    e,
+                    Event::MessageStart {
+                        is_system_generated: true,
+                        metadata: Some(MessageMetadata {
+                            source: MetadataSource::Agent,
+                            ..
+                        }),
+                        ..
+                    }
+                )
+            })
+            .count();
+        assert_eq!(reminders, 1);
+    }
+
+    #[test]
+    fn a_mode_change_appends_the_new_agents_reminder_before_the_prompt() {
+        let plan_agent = plan();
+        let mut agents = vec![plan_agent.clone()];
+        agents.extend(builder());
+        let model = Scripted(RefCell::new(vec![
+            reply("one", vec![]),
+            reply("two", vec![]),
+        ]));
+        let stop = AtomicBool::new(false);
+        let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
+        h.agents = agents;
+        h.log
+            .append(
+                "s",
+                &Event::ModeChanged {
+                    mode: "builder".into(),
+                    auto: false,
+                    reason: None,
+                },
+            )
+            .unwrap();
+        run_turn(&mut h.turn(), "one", &[]).unwrap();
+        h.log
+            .append(
+                "s",
+                &Event::ModeChanged {
+                    mode: "plan".into(),
+                    auto: false,
+                    reason: None,
+                },
+            )
+            .unwrap();
+        run_turn(&mut h.turn(), "two", &[]).unwrap();
+        let events = h.log.0.borrow().clone();
+        let reminder_idx = events
+            .iter()
+            .position(|e| {
+                matches!(e, Event::MessageStart {
+                content: Some(c),
+                is_system_generated: true,
+                metadata: Some(MessageMetadata {
+                    source: MetadataSource::Agent,
+                    name,
+                    kind: ReminderKind::Definition,
+                    ..
+                }),
+                ..
+            } if c == &plan_agent.reminder() && name == "Plan")
+            })
+            .unwrap();
+        let prompt_idx = events
+            .iter()
+            .position(|e| {
+                matches!(e, Event::MessageStart {
+                role: Role::User,
+                content: Some(c),
+                is_system_generated: false,
+                metadata: None,
+                ..
+            } if c == "two")
+            })
+            .unwrap();
+        assert!(reminder_idx < prompt_idx);
+    }
+
+    /// Answers at once and keeps the tool definitions of each request.
+    /// Shares what it saw with the test, which keeps a handle after the
+    /// harness takes the model.
+    #[derive(Default, Clone)]
+    struct RecordingTools(std::rc::Rc<RefCell<Vec<Value>>>);
+
+    impl Model for RecordingTools {
+        fn name(&self) -> &str {
+            "recording-tools"
+        }
+
+        fn stream(&self, req: &Request, _: &mut dyn FnMut(Delta)) -> Result<Completion, String> {
+            self.0.borrow_mut().push(req.tools.clone());
+            reply("done", vec![])
+        }
+    }
+
+    /// Records the chat messages of each request and answers from a scripted
+    /// model.
+    struct RecordingMessages {
+        seen: std::rc::Rc<RefCell<Vec<Vec<Value>>>>,
+        inner: Box<dyn Model>,
+    }
+
+    impl Model for RecordingMessages {
+        fn name(&self) -> &str {
+            self.inner.name()
+        }
+
+        fn stream(&self, req: &Request, on: &mut dyn FnMut(Delta)) -> Result<Completion, String> {
+            self.seen.borrow_mut().push(req.messages.to_vec());
+            self.inner.stream(req, on)
+        }
+    }
+
+    #[test]
+    fn replaying_a_message_resends_it_without_the_dropped_answer() {
+        let seen = std::rc::Rc::new(RefCell::new(Vec::new()));
+        let model = RecordingMessages {
+            seen: seen.clone(),
+            inner: Box::new(Scripted(RefCell::new(vec![
+                reply("first", vec![]),
+                reply("again", vec![]),
+            ]))),
+        };
+        let stop = AtomicBool::new(false);
+        let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
+        run_turn(&mut h.turn(), "go", &[]).unwrap();
+
+        let events = h.log.0.borrow().clone();
+        let prompt_id = events
+            .iter()
+            .find_map(|e| match e {
+                Event::MessageStart {
+                    message_id,
+                    role: Role::User,
+                    content: Some(c),
+                    is_system_generated: false,
+                    ..
+                } if c == "go" => Some(message_id.clone()),
+                _ => None,
+            })
+            .unwrap();
+        replay_turn(&mut h.turn(), &prompt_id).unwrap();
+
+        let requests = seen.borrow();
+        assert_eq!(requests.len(), 2);
+        let contents: Vec<String> = requests[1]
+            .iter()
+            .filter_map(|m| m["content"].as_str().map(str::to_string))
+            .collect();
+        assert_eq!(contents.iter().filter(|c| *c == "go").count(), 1);
+        assert!(!contents.iter().any(|c| *c == "first"));
+
+        let events = h.log.0.borrow().clone();
+        // The dropped answer stays in the log.
+        assert!(events.iter().any(|e| matches!(
+            e,
+            Event::MessageDelta { content, .. } if content == "first"
+        )));
+        assert_eq!(
+            events
+                .iter()
+                .filter(|e| matches!(e, Event::SessionRewound { .. }))
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn replaying_an_unknown_message_fails() {
+        let model = Scripted(RefCell::new(vec![reply("done", vec![])]));
+        let stop = AtomicBool::new(false);
+        let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
+        let err = replay_turn(&mut h.turn(), "missing").unwrap_err();
+        assert_eq!(
+            err,
+            "only a message you typed in the current window can be replayed"
+        );
+    }
+
+    #[test]
+    fn a_prompt_with_an_attachment_sends_text_and_image_parts() {
+        let model = Scripted(RefCell::new(vec![reply("done", vec![])]));
+        let stop = AtomicBool::new(false);
+        let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
+        let attachment = Attachment {
+            id: "a".into(),
+            filename: "a.png".into(),
+            mime_type: "image/png".into(),
+            size: 1,
+            data: "data:image/png;base64,AAAA".into(),
+        };
+        run_turn(&mut h.turn(), "look", &[attachment]).unwrap();
+        let events = h.log.0.borrow().clone();
+        let msgs = fold_messages(&events);
+        let user = msgs
+            .iter()
+            .find(|m| m["role"] == "user" && m["content"].as_array().is_some())
+            .unwrap();
+        assert_eq!(user["content"][0], json!({"type": "text", "text": "look"}));
+        assert_eq!(
+            user["content"][1],
+            json!({"type": "image_url", "image_url": {"url": "data:image/png;base64,AAAA"}})
+        );
+    }
+
+    #[test]
+    fn the_tool_definitions_are_identical_in_plan_and_builder_modes() {
+        let plan_model = RecordingTools::default();
+        let builder_model = RecordingTools::default();
+        let stop = AtomicBool::new(false);
+
+        let mut plan_h = Harness::new(Box::new(plan_model.clone()), PathBuf::from("/tmp"), &stop);
+        plan_h.agents = vec![plan()];
+        run_turn(&mut plan_h.turn(), "go", &[]).unwrap();
+
+        let mut builder_h = Harness::new(
+            Box::new(builder_model.clone()),
+            PathBuf::from("/tmp"),
+            &stop,
+        );
+        run_turn(&mut builder_h.turn(), "go", &[]).unwrap();
+
+        assert_eq!(*plan_model.0.borrow(), *builder_model.0.borrow());
     }
 }

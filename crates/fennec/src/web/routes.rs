@@ -2,9 +2,17 @@
 
 use super::App;
 use super::http::{Request, error, send, send_json};
-use super::{assets, event_stream};
+use super::notifier::NotifyingLog;
+use super::{assets, event_stream, turns::Job};
+use crate::agent::ports::EventLog;
+use crate::agents;
+use crate::domain::agent::{resolve as agent_resolve, switch_to};
+use crate::domain::attachment::{Attachment, from_data_url};
+use crate::domain::event::Event;
+use crate::domain::id::new_id;
 use crate::domain::preferences::Preferences;
 use crate::domain::project::{Project, SessionSummary};
+use crate::domain::replay::replayable;
 use crate::domain::slash::{TurnInput, commands, resolve};
 use crate::llm::list_models;
 use crate::skills;
@@ -33,10 +41,13 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
         ("GET", ["api", "projects"]) => list_projects(app, stream),
         ("POST", ["api", "projects"]) => open_project(app, req, stream),
         ("GET", ["api", "projects", id, "commands"]) => list_commands(app, stream, id),
+        ("GET", ["api", "projects", id, "agents"]) => list_agents(app, stream, id),
         ("POST", ["api", "sessions"]) => create_session(app, req, stream),
         ("GET", ["api", "sessions", id]) => get_session(app, stream, id),
         ("POST", ["api", "sessions", id, "messages"]) => send_message(app, req, stream, id),
+        ("POST", ["api", "sessions", id, "replay"]) => replay_message(app, req, stream, id),
         ("POST", ["api", "sessions", id, "compact"]) => compact_session(app, stream, id),
+        ("POST", ["api", "sessions", id, "mode"]) => set_session_mode(app, req, stream, id),
         ("POST", ["api", "sessions", id, "stop"]) => {
             app.turns.stop(id);
             send_json(stream, 202, &json!({}))
@@ -139,43 +150,176 @@ fn list_commands(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), Stri
     send_json(stream, 200, &Value::Array(out))
 }
 
+fn list_agents(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+    let store = app.store()?;
+    let Some(project) = store.project(id)? else {
+        return error(stream, 404, "no such project");
+    };
+    let list = agents::discover(Path::new(&project.workdir));
+    let out: Vec<Value> = list
+        .iter()
+        .filter(|agent| !agent.subagent)
+        .map(|agent| {
+            json!({
+                "id": agent.id,
+                "name": agent.name,
+                "description": agent.description,
+                "color": agent.color,
+            })
+        })
+        .collect();
+    send_json(stream, 200, &Value::Array(out))
+}
+
+fn parse_attachments(body: &Value) -> Result<Vec<Attachment>, String> {
+    let Some(attachments) = body.get("attachments").filter(|v| !v.is_null()) else {
+        return Ok(Vec::new());
+    };
+    let Some(items) = attachments.as_array() else {
+        return Err("attachments must be an array".into());
+    };
+    if items.len() > 10 {
+        return Err("at most 10 attachments".into());
+    }
+    let mut out = Vec::new();
+    for item in items {
+        let filename = item["filename"].as_str().unwrap_or("").to_string();
+        let data = item["data"].as_str().unwrap_or("");
+        out.push(from_data_url(new_id(), filename, data)?);
+    }
+    Ok(out)
+}
+
 fn create_session(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
     let body = req.json()?;
     let prompt = body["prompt"].as_str().unwrap_or("").trim().to_string();
-    if prompt.is_empty() {
+    let attachments = match parse_attachments(&body) {
+        Ok(attachments) => attachments,
+        Err(e) => return error(stream, 400, &e),
+    };
+    if prompt.is_empty() && attachments.is_empty() {
         return error(stream, 400, "empty prompt");
     }
     let store = app.store()?;
     let Some(project) = store.project(body["projectId"].as_str().unwrap_or(""))? else {
         return error(stream, 404, "no such project");
     };
-    let title: String = prompt.chars().take(80).collect();
+    let mode = body.get("mode").and_then(Value::as_str).map(str::to_string);
+    let mode_event = match &mode {
+        Some(mode) => {
+            let list = agents::discover(Path::new(&project.workdir));
+            match switch_to(&list, &[], mode) {
+                Ok(event) => event,
+                Err(e) => return error(stream, 400, &e),
+            }
+        }
+        None => None,
+    };
+    let title: String = if prompt.is_empty() {
+        attachments
+            .first()
+            .map(|attachment| attachment.filename.clone())
+            .unwrap_or_default()
+    } else {
+        prompt.chars().take(80).collect()
+    };
     let id = store.create_session(&project, &title)?;
+    append_mode_event(app, &store, &id, mode_event)?;
     let input = resolve(&prompt, &skills::discover(Path::new(&project.workdir)));
-    app.turns.start(&id, &project.workdir, input)?;
+    if matches!(input, TurnInput::Compact) && !attachments.is_empty() {
+        return error(stream, 400, "/compact takes no attachments");
+    }
+    app.turns
+        .start(&id, &project.workdir, Job::Input(input, attachments))?;
     send_json(stream, 200, &json!({ "id": id }))
 }
 
 fn get_session(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
-    let Some((s, p)) = session_and_project(&app.store()?, id)? else {
+    let store = app.store()?;
+    let Some((s, p)) = session_and_project(&store, id)? else {
         return error(stream, 404, "no such session");
     };
+    let events = store.events(&s.id)?;
+    let list = agents::discover(Path::new(&p.workdir));
+    let mode = agent_resolve(&list, &events).map(|agent| agent.id.clone());
     let mut v = session_json(app, &s);
     v["project"] = project_json(&p);
+    v["mode"] = json!(mode);
     send_json(stream, 200, &v)
+}
+
+fn set_session_mode(
+    app: &App,
+    req: &Request,
+    stream: &mut TcpStream,
+    id: &str,
+) -> Result<(), String> {
+    let body = req.json()?;
+    let mode = body["mode"].as_str().unwrap_or("").to_string();
+    let store = app.store()?;
+    let Some((_, p)) = session_and_project(&store, id)? else {
+        return error(stream, 404, "no such session");
+    };
+    let list = agents::discover(Path::new(&p.workdir));
+    let events = store.events(id)?;
+    let event = match switch_to(&list, &events, &mode) {
+        Ok(event) => event,
+        Err(e) => return error(stream, 400, &e),
+    };
+    append_mode_event(app, &store, id, event)?;
+    send_json(stream, 200, &json!({ "mode": mode }))
 }
 
 fn send_message(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Result<(), String> {
     let body = req.json()?;
     let content = body["content"].as_str().unwrap_or("").trim().to_string();
-    if content.is_empty() {
+    let attachments = match parse_attachments(&body) {
+        Ok(attachments) => attachments,
+        Err(e) => return error(stream, 400, &e),
+    };
+    if content.is_empty() && attachments.is_empty() {
         return error(stream, 400, "empty message");
     }
     let Some((_, p)) = session_and_project(&app.store()?, id)? else {
         return error(stream, 404, "no such session");
     };
     let input = resolve(&content, &skills::discover(Path::new(&p.workdir)));
-    match app.turns.start(id, &p.workdir, input) {
+    if matches!(input, TurnInput::Compact) && !attachments.is_empty() {
+        return error(stream, 400, "/compact takes no attachments");
+    }
+    match app
+        .turns
+        .start(id, &p.workdir, Job::Input(input, attachments))
+    {
+        Ok(()) => send_json(stream, 202, &json!({})),
+        Err(e) => error(stream, 409, &e),
+    }
+}
+
+fn replay_message(
+    app: &App,
+    req: &Request,
+    stream: &mut TcpStream,
+    id: &str,
+) -> Result<(), String> {
+    let body = req.json()?;
+    let message_id = body["messageId"].as_str().unwrap_or("").to_string();
+    let store = app.store()?;
+    let Some((_, p)) = session_and_project(&store, id)? else {
+        return error(stream, 404, "no such session");
+    };
+    if app.turns.is_running(id) {
+        return error(stream, 409, "a turn is already running");
+    }
+    let events = store.events(id)?;
+    if replayable(&events, &message_id).is_none() {
+        return error(
+            stream,
+            400,
+            "only a message you typed in the current window can be replayed",
+        );
+    }
+    match app.turns.start(id, &p.workdir, Job::Replay(message_id)) {
         Ok(()) => send_json(stream, 202, &json!({})),
         Err(e) => error(stream, 409, &e),
     }
@@ -185,7 +329,10 @@ fn compact_session(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), St
     let Some((_, p)) = session_and_project(&app.store()?, id)? else {
         return error(stream, 404, "no such session");
     };
-    match app.turns.start(id, &p.workdir, TurnInput::Compact) {
+    match app
+        .turns
+        .start(id, &p.workdir, Job::Input(TurnInput::Compact, Vec::new()))
+    {
         Ok(()) => send_json(stream, 202, &json!({})),
         Err(e) => error(stream, 409, &e),
     }
@@ -241,4 +388,20 @@ fn session_json(app: &App, s: &SessionSummary) -> Value {
 
 fn project_json(p: &Project) -> Value {
     json!({ "id": p.id, "name": p.name, "workdir": p.workdir })
+}
+
+fn append_mode_event(
+    app: &App,
+    store: &SqliteStore,
+    session_id: &str,
+    event: Option<Event>,
+) -> Result<(), String> {
+    if let Some(event) = event {
+        let log = NotifyingLog {
+            log: store,
+            notifier: &app.notifier,
+        };
+        log.append(session_id, &event)?;
+    }
+    Ok(())
 }

@@ -23,6 +23,36 @@ impl Transcript {
         let _ = match event {
             Event::MessageStart {
                 role,
+                content,
+                attachments,
+                ..
+            } if !attachments.is_empty() => {
+                let mut result = if let Some(c) = content {
+                    writeln!(out, "\n\x1b[1m{role}>\x1b[0m {c}")
+                } else {
+                    writeln!(out, "\n\x1b[1m{role}>\x1b[0m")
+                };
+                if result.is_ok() {
+                    for attachment in attachments {
+                        result = writeln!(
+                            out,
+                            "{DIM}[image: {}, {} bytes]",
+                            attachment.filename, attachment.size
+                        );
+                        if result.is_err() {
+                            break;
+                        }
+                    }
+                }
+                result
+            }
+            // The agent's prompt is fennec's, not the human's: show the mode only.
+            Event::MessageStart {
+                metadata: Some(meta),
+                ..
+            } => writeln!(out, "\n— {} mode", meta.name),
+            Event::MessageStart {
+                role,
                 content: Some(c),
                 ..
             } => writeln!(out, "\n\x1b[1m{role}>\x1b[0m {c}"),
@@ -93,7 +123,10 @@ impl Transcript {
             | Event::MessageDone { .. }
             | Event::TurnSnapshot { .. }
             | Event::ContextState { .. }
-            | Event::RunningChanged { .. } => Ok(()),
+            | Event::RunningChanged { .. }
+            // The reminder that follows names the mode.
+            | Event::ModeChanged { .. }
+            | Event::SessionRewound { .. } => Ok(()),
         };
         let _ = out.flush();
     }

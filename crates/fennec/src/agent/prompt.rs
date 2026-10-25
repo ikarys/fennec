@@ -1,14 +1,14 @@
 //! Port of openfox `chat/prompts.ts` (`buildBasePrompt`), with the
 //! portable skills section (`buildSkillsSection`).
 //!
-//! Not ported: sub-agents, modes, and caveman thinking.
+//! Not ported: sub-agents and caveman thinking.
 
 use crate::domain::clock;
 use crate::domain::skill::Skill;
 use std::path::Path;
 
 /// Port of openfox `buildBasePrompt`, without the sections for features
-/// not ported yet (sub-agents, modes, caveman thinking).
+/// not ported yet (sub-agents, caveman thinking).
 ///
 /// `instructions` (openfox `instructionsSection`) is appended at the end
 /// when non-empty, then `skills` (openfox `buildSkillsSection`) when
@@ -40,6 +40,15 @@ Use available tools when needed.
 Explain tradeoffs clearly when requirements are ambiguous.
 Follow repository and project instructions exactly.
 Commands run from your working directory — do not prepend \"cd /path/\" to change to a directory you are already in.
+
+## MODE CONTROL
+fennec appends runtime control as USER-role messages wrapped in <system-reminder>...</system-reminder>.
+These reminders are authoritative, treat them as higher-priority operational constraints.
+Never say \"user reminded me\"; they are runtime mode injected by fennec.
+
+## WORKFLOW
+Reminder = plan mode: focus on understanding, exploration, clarification, the plan's quality.
+Reminder = build mode: focus on implementation, verification, completing the approved plan.
 
 ## TONE AND STYLE
 Be concise, direct, and to the point.

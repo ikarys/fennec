@@ -33,6 +33,14 @@ export interface SlashCommand {
   description: string;
 }
 
+/** A top-level agent the session can run as (`plan`, `builder`, …). */
+export interface Agent {
+  id: string;
+  name: string;
+  description: string;
+  color: string | null;
+}
+
 /** openfox `ReasoningEffort`: how much a model may think. */
 export type ReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
@@ -81,6 +89,8 @@ export interface SessionDetail {
   id: string;
   title: string;
   state: SessionState;
+  /** The agent id the session resolves to, or null when it has none. */
+  mode: string | null;
   project: {
     id: string;
     name: string;
@@ -184,21 +194,56 @@ export function listCommands(projectId: string): Promise<SlashCommand[]> {
   return request<SlashCommand[]>(`/api/projects/${encodeURIComponent(projectId)}/commands`);
 }
 
+export function listAgents(projectId: string): Promise<Agent[]> {
+  return request<Agent[]>(`/api/projects/${encodeURIComponent(projectId)}/agents`);
+}
+
 export function getSession(id: string): Promise<SessionDetail> {
   return request<SessionDetail>(`/api/sessions/${encodeURIComponent(id)}`);
 }
 
-export function createSession(projectId: string, prompt: string): Promise<{ id: string }> {
+export interface AttachmentInput {
+  filename: string;
+  data: string;
+}
+
+export function createSession(projectId: string, prompt: string, mode?: string, attachments?: AttachmentInput[]): Promise<{ id: string }> {
+  // `mode` is optional: omit it so the server applies its default resolution.
+  const body: { projectId: string; prompt: string; mode?: string; attachments?: AttachmentInput[] } = { projectId, prompt };
+  if (mode != null) {
+    body.mode = mode;
+  }
+  if (attachments && attachments.length > 0) {
+    body.attachments = attachments;
+  }
   return request<{ id: string }>('/api/sessions', {
     method: 'POST',
-    body: JSON.stringify({ projectId, prompt })
+    body: JSON.stringify(body)
   });
 }
 
-export function sendMessage(id: string, content: string): Promise<void> {
+export function sendMessage(id: string, content: string, attachments?: AttachmentInput[]): Promise<void> {
+  const body: { content: string; attachments?: AttachmentInput[] } = { content };
+  if (attachments && attachments.length > 0) {
+    body.attachments = attachments;
+  }
   return request<void>(`/api/sessions/${encodeURIComponent(id)}/messages`, {
     method: 'POST',
-    body: JSON.stringify({ content })
+    body: JSON.stringify(body)
+  });
+}
+
+export function replayMessage(id: string, messageId: string): Promise<void> {
+  return request<void>(`/api/sessions/${encodeURIComponent(id)}/replay`, {
+    method: 'POST',
+    body: JSON.stringify({ messageId })
+  });
+}
+
+export function setSessionMode(id: string, mode: string): Promise<void> {
+  return request<void>(`/api/sessions/${encodeURIComponent(id)}/mode`, {
+    method: 'POST',
+    body: JSON.stringify({ mode })
   });
 }
 

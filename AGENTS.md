@@ -30,9 +30,13 @@ AGENTS.md files in a new session's prompt; skills from `~/.agents/skills` and
 the project's `.agents/skills` (SKILL.md packages), listed in the prompt and
 read with `load_skill`; `/compact` and `/<skill>` typed in a message, with
 a composer menu.
+Agents, done: `*.agent.md` files (embedded defaults, `~/.agents/agents`,
+the project's `.agents/agents`); two modes, plan (read-only by construction,
+the default) and builder, with a fixed plan and report format rendered as
+cards. Vision: images attached to a message, and read_file returns images.
+Replay: a typed message sent again, through an append-only `session.rewound`.
 Next, one PR each, so that the minimal agent works before security layers:
-agents as files + planner/builder modes (planner read-only by construction)
-→ custom workflows (agent/shell/human steps, deterministic transitions,
+custom workflows (agent/shell/human steps, deterministic transitions,
 state folded from the event log) → dogfooding → bwrap world for tool
 execution → verifier + sub-agents → criteria → fennec's own
 layer (human-only integration, provenance, review gate).
@@ -60,6 +64,9 @@ crates/fennec/src/
     preferences.rs     what the human chose on the Settings page; resolves a turn's model parameters
     skill.rs           openfox skills/types: a SKILL.md package, its frontmatter, the text load_skill returns
     slash.rs           openfox tasks/slash: what a typed /compact or /<skill> stands for
+    agent.rs           an agent (mode) and its reminder; frontmatter.rs the shared YAML header
+    attachment.rs      images sent to the model: sniffing, data URLs, limits
+    replay.rs          which message the human may replay
     id.rs, clock.rs
   agent/             application layer: the agent loop
     ports.rs           Model, EventLog, Toolbox: what the loop needs from outside
@@ -77,6 +84,8 @@ crates/fennec/src/
   git.rs             what fennec reads from a repository
   instructions.rs    openfox context/instructions: Settings' global instructions + the
                      AGENTS.md files above the workdir, for a new session's prompt
+  agents.rs          the *.agent.md files: embedded defaults (crates/fennec/agents/), ~/.agents/agents,
+                     the project's .agents/agents (the project wins)
   skills.rs          openfox skills/registry: the SKILL.md packages in ~/.agents/skills and the
                      project's .agents/skills (the project wins)
   folders.rs         the folders the human browses to open a project
@@ -89,7 +98,8 @@ web/src/           React + Vite + Tailwind v4 UI (same layout as openfox's web/s
   components/        shared UI; session/ the thread, tool cards, question card, message stats, composer,
                      context panel; project/ the folder browser; layout/ the top bar
   hooks/             useSessionThread: the SSE stream of a session, folded
-  lib/               api (typed fetch), fold (events → thread view), format, theme
+  lib/               api (typed fetch), fold (events → thread view), format, theme,
+                     attachments (images read in the browser), plan (the plan/report contract)
   styles/app.css     theme tokens: one CSS variable block per theme, mapped into Tailwind
 docs/api.md        the HTTP API and event wire format, shared by server and UI
 ```
