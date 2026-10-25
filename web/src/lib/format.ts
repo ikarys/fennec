@@ -41,6 +41,8 @@ export function stateLabel(state: SessionState): string {
       return 'Tronquée';
     case 'idle':
       return 'Inactive';
+    case 'waiting_for_user':
+      return 'En attente de toi';
   }
 }
 
@@ -58,6 +60,8 @@ export function stateTextClass(state: SessionState): string {
       return 'text-muted';
     case 'idle':
       return 'text-faint';
+    case 'waiting_for_user':
+      return 'text-accent';
   }
 }
 
@@ -75,6 +79,8 @@ export function stateDotClass(state: SessionState): string {
       return 'bg-muted';
     case 'idle':
       return 'bg-faint';
+    case 'waiting_for_user':
+      return 'bg-accent';
   }
 }
 

@@ -27,6 +27,8 @@ pub enum SessionState {
     Stopped,
     Error,
     Truncated,
+    #[serde(rename = "waiting_for_user")]
+    WaitingForUser,
 }
 
 impl SessionSummary {
@@ -39,6 +41,18 @@ impl SessionSummary {
             (false, Some(DoneReason::Stopped)) => SessionState::Stopped,
             (false, Some(DoneReason::Error)) => SessionState::Error,
             (false, Some(DoneReason::Truncated)) => SessionState::Truncated,
+            (false, Some(DoneReason::WaitingForUser)) => SessionState::WaitingForUser,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SessionState;
+
+    #[test]
+    fn waiting_for_user_keeps_openfox_wire_name() {
+        let wire = serde_json::to_value(SessionState::WaitingForUser).unwrap();
+        assert_eq!(wire, "waiting_for_user");
     }
 }

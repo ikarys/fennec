@@ -4,7 +4,8 @@ export type SessionState =
   | 'stopped'
   | 'error'
   | 'truncated'
-  | 'idle';
+  | 'idle'
+  | 'waiting_for_user';
 
 export interface SessionSummary {
   id: string;

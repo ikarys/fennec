@@ -21,18 +21,22 @@ with camelCase fields.
 | `tool.result` | `{messageId, toolCallId, result: {success, output?, error?, durationMs, truncated}}` |
 | `context.state` | `{currentTokens, maxTokens}` |
 | `running.changed` | `{isRunning}` |
-| `chat.done` | `{messageId, reason: "complete"\|"stopped"\|"error"\|"truncated"}` |
+| `chat.done` | `{messageId, reason: "complete"\|"stopped"\|"error"\|"truncated"\|"waiting_for_user"}` |
 | `chat.error` | `{error, recoverable}` |
+| `chat.ask_user` | `{callId, question, type?: "text"\|"confirm"\|"choice", options?: [{value, label, description?}]}`: the model asked the human a question; the turn ends and the answer arrives as the next turn's input |
 | `turn.snapshot` | `{cachedSystemPrompt}`: the session's system prompt, frozen at its first turn |
 
 Tools: `read_file {path, offset?, limit?}`, `write_file {path, content}`,
 `edit_file {path, old_string, new_string, replace_all?}`,
-`run_command {command, cwd?, timeout?}`.
+`run_command {command, cwd?, timeout?}`,
+`ask_user {question, type?, options?}` (handled by the loop, the turn ends
+waiting for the human).
 
 ## Session state
 
 `"running"` while a turn runs, else the reason of the last `chat.done`
-(`"complete"`, `"stopped"`, `"error"`, `"truncated"`), or `"idle"` if none.
+(`"complete"`, `"stopped"`, `"error"`, `"truncated"`, `"waiting_for_user"`),
+or `"idle"` if none.
 
 ## Endpoints
 
@@ -45,7 +49,9 @@ Tools: `read_file {path, offset?, limit?}`, `write_file {path, content}`,
   `repo` marks a git repository; 400 if `path` cannot be read
 - `GET /api/sessions/{id}` → `{id, title, state, project: {id, name, workdir}}`
 - `POST /api/sessions` `{projectId, prompt}` → `{id}`; the turn starts at once
-- `POST /api/sessions/{id}/messages` `{content}` → 202; 409 if a turn is running
+- `POST /api/sessions/{id}/messages` `{content}` → 202; 409 if a turn is running;
+  when the session waits for the user, `content` is the answer to the pending
+  question
 - `POST /api/sessions/{id}/stop` → 202; the turn ends with `chat.done` reason `"stopped"`
 - `GET /api/sessions/{id}/events` → Server-Sent Events. Each stored event is sent as
 

@@ -2,15 +2,21 @@
 //! streams the model (`round`), then runs its tool calls, until it answers
 //! without one.
 //!
+//! `ask_user` is ported: the turn ends with `waiting_for_user` and the
+//! answer arrives as the next turn's input, so a pending question survives a
+//! restart.
+//!
 //! Not ported yet: compaction, auto-retry patterns, vision fallback, queue,
 //! pause gate, sub-agents, return_value/step_done, parallel tool batches.
 
+use super::ask_user;
 use super::ports::{EventLog, Model, Toolbox};
 use super::prompt::system_prompt;
 use super::round::{self, Round, RoundPrompt};
-use super::tool_calls::execute_tools;
-use crate::domain::event::{DoneReason, Event, Role};
+use super::tool_calls::{Flow, INTERRUPTED_ERROR, execute_tools};
+use crate::domain::event::{DoneReason, Event, Role, ToolResult};
 use crate::domain::id::new_id;
+use crate::domain::open_calls;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -69,9 +75,17 @@ impl Turn<'_> {
 /// `chat.done` reason.
 pub fn run_turn(turn: &mut Turn, prompt: &str) -> Result<DoneReason, String> {
     turn.append(Event::RunningChanged { is_running: true })?;
-    let result = turn
-        .append_user(prompt, false)
-        .and_then(|()| run_top_level_agent_loop(turn));
+    // Close tool calls left open by a previous turn before writing the
+    // prompt: the model API rejects an assistant tool call without its tool
+    // message. When the open call awaits an answer, the human's input *is*
+    // that answer, so no user message is appended on top of it.
+    let answered = close_open_calls(turn, prompt)?;
+    let result = if answered {
+        run_top_level_agent_loop(turn)
+    } else {
+        turn.append_user(prompt, false)
+            .and_then(|()| run_top_level_agent_loop(turn))
+    };
     if let Err(e) = &result {
         // Best effort: the store itself may be what failed.
         let _ = turn.append(Event::ChatError {
@@ -81,6 +95,30 @@ pub fn run_turn(turn: &mut Turn, prompt: &str) -> Result<DoneReason, String> {
     }
     turn.append(Event::RunningChanged { is_running: false })?;
     result
+}
+
+/// Closes the open calls of a previous turn. The open call that awaits an
+/// answer gets the human's input as its result; every other open call gets
+/// the interrupted error. Returns true when an answer was given, so the
+/// caller does not append a user message on top of it.
+fn close_open_calls(turn: &mut Turn, prompt: &str) -> Result<bool, String> {
+    let events = turn.log.events(turn.session_id)?;
+    let open = open_calls::open_calls(&events);
+    let mut answered = false;
+    for call in open {
+        let result = if call.awaits_answer && !answered {
+            answered = true;
+            ToolResult::success(prompt.to_string(), false)
+        } else {
+            ToolResult::failure(INTERRUPTED_ERROR.into())
+        };
+        turn.append(Event::ToolResult {
+            message_id: call.message_id,
+            tool_call_id: call.call_id,
+            result,
+        })?;
+    }
+    Ok(answered)
 }
 
 /// openfox `cachedSystemPrompt`: built at the session's first turn, then
@@ -109,7 +147,12 @@ fn cached_system_prompt(turn: &mut Turn) -> Result<String, String> {
 
 fn run_top_level_agent_loop(turn: &mut Turn) -> Result<DoneReason, String> {
     let system_prompt = cached_system_prompt(turn)?;
-    let tool_defs = turn.tools.definitions();
+    // The loop owns `ask_user`; it is not a host tool, so its definition is
+    // added to the toolbox's.
+    let mut tool_defs = turn.tools.definitions();
+    if let Some(arr) = tool_defs.as_array_mut() {
+        arr.push(ask_user::definition());
+    }
     let mut max_tokens = turn.max_tokens;
     let mut truncation_retries = 0;
 
@@ -163,7 +206,10 @@ fn run_top_level_agent_loop(turn: &mut Turn) -> Result<DoneReason, String> {
         if answer.tool_calls.is_empty() {
             return finish(turn, message_id, DoneReason::Complete);
         }
-        execute_tools(turn, &message_id, &answer.tool_calls)?;
+        match execute_tools(turn, &message_id, &answer.tool_calls)? {
+            Flow::WaitingForUser => return finish(turn, message_id, DoneReason::WaitingForUser),
+            Flow::Continue => {}
+        }
     }
 
     turn.append(Event::ChatError {
@@ -237,6 +283,44 @@ mod tests {
             tool_calls: calls,
             ..Completion::default()
         })
+    }
+
+    /// Owns a turn's dependencies so a test can run several turns on the
+    /// same session and inspect the log between them.
+    struct Harness<'a> {
+        log: MemoryLog,
+        model: Box<dyn Model>,
+        tools: LocalTools,
+        stop: &'a AtomicBool,
+        workdir: PathBuf,
+        on_event: Box<dyn FnMut(&Event) + 'a>,
+    }
+
+    impl<'a> Harness<'a> {
+        fn new(model: Box<dyn Model>, workdir: PathBuf, stop: &'a AtomicBool) -> Self {
+            Harness {
+                log: MemoryLog::default(),
+                model,
+                tools: LocalTools::new(workdir.clone()),
+                stop,
+                workdir,
+                on_event: Box::new(|_: &Event| {}),
+            }
+        }
+
+        fn turn(&mut self) -> Turn<'_> {
+            Turn {
+                model: &*self.model,
+                log: &self.log,
+                tools: &self.tools,
+                session_id: "s",
+                workdir: &self.workdir,
+                max_tokens: 100,
+                context_window: 1000,
+                stop: self.stop,
+                on_event: &mut self.on_event,
+            }
+        }
     }
 
     fn run(model: &dyn Model, workdir: &Path) -> (DoneReason, Vec<Event>) {
@@ -401,5 +485,175 @@ mod tests {
             _ => None,
         });
         assert_eq!(stats.map(|s| s.model), Some("recording".into()));
+    }
+
+    #[test]
+    fn ask_user_ends_the_turn_and_the_answer_is_the_next_turns_input() {
+        let dir = scratch_dir();
+        let call = ToolCall {
+            id: "c1".into(),
+            name: "ask_user".into(),
+            arguments: json!({"question": "Which color?"}),
+            parse_error: None,
+        };
+        let model = Scripted(RefCell::new(vec![
+            reply("", vec![call]),
+            reply("done", vec![]),
+        ]));
+        let stop = AtomicBool::new(false);
+        let mut h = Harness::new(Box::new(model), dir.clone(), &stop);
+        let reason = run_turn(&mut h.turn(), "go").unwrap();
+        assert_eq!(reason, DoneReason::WaitingForUser);
+        let events = h.log.0.borrow().clone();
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, Event::ChatAskUser { call_id, .. } if call_id == "c1"))
+        );
+        assert!(
+            !events.iter().any(
+                |e| matches!(e, Event::ToolResult { tool_call_id, .. } if tool_call_id == "c1")
+            )
+        );
+        let reason2 = run_turn(&mut h.turn(), "blue").unwrap();
+        assert_eq!(reason2, DoneReason::Complete);
+        let events = h.log.0.borrow().clone();
+        // The answer is a tool result, not a user message.
+        assert!(events.iter().any(|e| matches!(e, Event::ToolResult { tool_call_id, result, .. } if tool_call_id == "c1" && result.output.as_deref() == Some("blue"))));
+        assert!(!events
+            .iter()
+            .any(|e| matches!(e, Event::MessageStart { role: Role::User, content: Some(c), .. } if c == "blue")));
+        let msgs = fold_messages(&events);
+        let tool_idx = msgs
+            .iter()
+            .position(|m| m["role"] == "tool" && m["tool_call_id"] == "c1")
+            .unwrap();
+        assert_eq!(msgs[tool_idx]["content"], "blue");
+        assert_eq!(msgs[tool_idx - 1]["role"], "assistant");
+        assert_eq!(msgs[tool_idx - 1]["tool_calls"][0]["id"], "c1");
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn a_tool_after_ask_user_in_the_same_batch_is_not_run() {
+        let dir = scratch_dir();
+        let ask = ToolCall {
+            id: "c1".into(),
+            name: "ask_user".into(),
+            arguments: json!({"question": "Proceed?"}),
+            parse_error: None,
+        };
+        let read = ToolCall {
+            id: "c2".into(),
+            name: "read_file".into(),
+            arguments: json!({"path": "x.txt"}),
+            parse_error: None,
+        };
+        let model = Scripted(RefCell::new(vec![reply("", vec![ask, read])]));
+        let stop = AtomicBool::new(false);
+        let mut h = Harness::new(Box::new(model), dir.clone(), &stop);
+        let reason = run_turn(&mut h.turn(), "go").unwrap();
+        assert_eq!(reason, DoneReason::WaitingForUser);
+        let events = h.log.0.borrow().clone();
+        assert!(events.iter().any(|e| matches!(e, Event::ToolResult { tool_call_id, result, .. } if tool_call_id == "c2" && result.error.as_deref().unwrap().starts_with("Not run"))));
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn a_stopped_batch_records_interrupted_results_without_running() {
+        let dir = scratch_dir();
+        let write = ToolCall {
+            id: "c1".into(),
+            name: "write_file".into(),
+            arguments: json!({"path": "hello.txt", "content": "hi"}),
+            parse_error: None,
+        };
+        let model = Scripted(RefCell::new(vec![
+            reply("", vec![write]),
+            reply("done", vec![]),
+        ]));
+        let stop = AtomicBool::new(false);
+        let mut h = Harness::new(Box::new(model), dir.clone(), &stop);
+        // Stop the turn as soon as the model's tool call is recorded, so the
+        // batch sees it before running.
+        h.on_event = Box::new(|e: &Event| {
+            if matches!(e, Event::ToolCall { .. }) {
+                stop.store(true, Ordering::Relaxed);
+            }
+        });
+        let reason = run_turn(&mut h.turn(), "go").unwrap();
+        assert_eq!(reason, DoneReason::Stopped);
+        let events = h.log.0.borrow().clone();
+        assert!(events.iter().any(|e| matches!(e, Event::ToolResult { tool_call_id, result, .. } if tool_call_id == "c1" && result.error.as_deref().unwrap() == INTERRUPTED_ERROR)));
+        assert!(!dir.join("hello.txt").exists());
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn a_crashed_turns_open_call_is_closed_before_the_next_prompt() {
+        let dir = scratch_dir();
+        let model = Scripted(RefCell::new(vec![reply("done", vec![])]));
+        let stop = AtomicBool::new(false);
+        let mut h = Harness::new(Box::new(model), dir.clone(), &stop);
+        // A previous turn recorded a tool call and died before its result.
+        h.log
+            .append(
+                "s",
+                &Event::ToolCall {
+                    message_id: "m".into(),
+                    tool_call: ToolCall {
+                        id: "c1".into(),
+                        name: "write_file".into(),
+                        arguments: json!({}),
+                        parse_error: None,
+                    },
+                },
+            )
+            .unwrap();
+        let reason = run_turn(&mut h.turn(), "hi").unwrap();
+        assert_eq!(reason, DoneReason::Complete);
+        let events = h.log.0.borrow().clone();
+        // The interrupted result is appended before the user message "hi".
+        let result_idx = events
+            .iter()
+            .position(
+                |e| matches!(e, Event::ToolResult { tool_call_id, .. } if tool_call_id == "c1"),
+            )
+            .unwrap();
+        let user_idx = events
+            .iter()
+            .position(|e| matches!(e, Event::MessageStart { role: Role::User, content: Some(c), .. } if c == "hi"))
+            .unwrap();
+        assert!(result_idx < user_idx);
+        assert!(matches!(
+            &events[result_idx],
+            Event::ToolResult { result, .. } if result.error.as_deref() == Some(INTERRUPTED_ERROR)
+        ));
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn ask_user_without_a_question_fails_and_the_loop_continues() {
+        let call = ToolCall {
+            id: "c1".into(),
+            name: "ask_user".into(),
+            arguments: json!({}),
+            parse_error: None,
+        };
+        let model = Scripted(RefCell::new(vec![
+            reply("", vec![call]),
+            reply("done", vec![]),
+        ]));
+        let stop = AtomicBool::new(false);
+        let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
+        let reason = run_turn(&mut h.turn(), "go").unwrap();
+        assert_eq!(reason, DoneReason::Complete);
+        let events = h.log.0.borrow().clone();
+        assert!(
+            !events
+                .iter()
+                .any(|e| matches!(e, Event::ChatAskUser { .. }))
+        );
+        assert!(events.iter().any(|e| matches!(e, Event::ToolResult { tool_call_id, result, .. } if tool_call_id == "c1" && result.error.is_some())));
     }
 }
