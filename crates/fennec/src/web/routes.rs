@@ -2,6 +2,7 @@
 
 use super::App;
 use super::http::{Request, error, send, send_json};
+use super::turns::TurnInput;
 use super::{assets, event_stream};
 use crate::domain::project::{Project, SessionSummary};
 use crate::store::SqliteStore;
@@ -24,6 +25,7 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
         ("POST", ["api", "sessions"]) => create_session(app, req, stream),
         ("GET", ["api", "sessions", id]) => get_session(app, stream, id),
         ("POST", ["api", "sessions", id, "messages"]) => send_message(app, req, stream, id),
+        ("POST", ["api", "sessions", id, "compact"]) => compact_session(app, stream, id),
         ("POST", ["api", "sessions", id, "stop"]) => {
             app.turns.stop(id);
             send_json(stream, 202, &json!({}))
@@ -90,7 +92,8 @@ fn create_session(app: &App, req: &Request, stream: &mut TcpStream) -> Result<()
     };
     let title: String = prompt.chars().take(80).collect();
     let id = store.create_session(&project, &title)?;
-    app.turns.start(&id, &project.workdir, prompt)?;
+    app.turns
+        .start(&id, &project.workdir, TurnInput::Prompt(prompt))?;
     send_json(stream, 200, &json!({ "id": id }))
 }
 
@@ -112,7 +115,17 @@ fn send_message(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> R
     let Some((_, p)) = session_and_project(&app.store()?, id)? else {
         return error(stream, 404, "no such session");
     };
-    match app.turns.start(id, &p.workdir, content) {
+    match app.turns.start(id, &p.workdir, TurnInput::Prompt(content)) {
+        Ok(()) => send_json(stream, 202, &json!({})),
+        Err(e) => error(stream, 409, &e),
+    }
+}
+
+fn compact_session(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+    let Some((_, p)) = session_and_project(&app.store()?, id)? else {
+        return error(stream, 404, "no such session");
+    };
+    match app.turns.start(id, &p.workdir, TurnInput::Compact) {
         Ok(()) => send_json(stream, 202, &json!({})),
         Err(e) => error(stream, 409, &e),
     }

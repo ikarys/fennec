@@ -49,6 +49,14 @@ impl Transcript {
                 }
                 writeln!(out, "{mark} {first} ({} ms)", result.duration_ms)
             }
+            Event::ContextCompacted {
+                before_tokens,
+                after_tokens,
+                ..
+            } => writeln!(
+                out,
+                "\n— context compacted: {before_tokens} → ~{after_tokens} tokens"
+            ),
             Event::ChatAskUser {
                 question,
                 ask_type,

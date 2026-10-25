@@ -2,7 +2,7 @@
 //! the event log, and can be stopped. One turn at a time per session.
 
 use super::notifier::{Notifier, NotifyingLog};
-use crate::agent::turn::{Turn, run_turn};
+use crate::agent::turn::{Turn, compact_session, run_turn};
 use crate::config::Settings;
 use crate::domain::event::Event;
 use crate::llm::OpenAiClient;
@@ -12,6 +12,12 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+
+/// What a started turn does: run a prompt, or compact the session on demand.
+pub enum TurnInput {
+    Prompt(String),
+    Compact,
+}
 
 pub struct Turns {
     settings: Settings,
@@ -40,8 +46,8 @@ impl Turns {
         }
     }
 
-    /// Starts a turn with `prompt`; refuses while one runs on the session.
-    pub fn start(&self, session_id: &str, workdir: &str, prompt: String) -> Result<(), String> {
+    /// Starts a turn; refuses while one runs on the session.
+    pub fn start(&self, session_id: &str, workdir: &str, input: TurnInput) -> Result<(), String> {
         let stop = Arc::new(AtomicBool::new(false));
         {
             let mut running = self.running.lock().unwrap();
@@ -55,7 +61,7 @@ impl Turns {
         let running = self.running.clone();
         let (session_id, workdir) = (session_id.to_string(), PathBuf::from(workdir));
         std::thread::spawn(move || {
-            if let Err(e) = run(&settings, &notifier, &session_id, workdir, &prompt, &stop) {
+            if let Err(e) = run(&settings, &notifier, &session_id, workdir, &input, &stop) {
                 eprintln!("fennec: session {session_id}: {e}");
             }
             running.lock().unwrap().remove(&session_id);
@@ -69,7 +75,7 @@ fn run(
     notifier: &Notifier,
     session_id: &str,
     workdir: PathBuf,
-    prompt: &str,
+    input: &TurnInput,
     stop: &AtomicBool,
 ) -> Result<(), String> {
     let store = SqliteStore::open(&settings.db_path)?;
@@ -88,8 +94,12 @@ fn run(
         workdir: &workdir,
         max_tokens: settings.llm.max_tokens,
         context_window: settings.llm.context_window,
+        compact_at: settings.llm.compact_at,
         stop,
         on_event: &mut on_event,
     };
-    run_turn(&mut turn, prompt).map(|_| ())
+    match input {
+        TurnInput::Prompt(prompt) => run_turn(&mut turn, prompt).map(|_| ()),
+        TurnInput::Compact => compact_session(&mut turn).map(|_| ()),
+    }
 }

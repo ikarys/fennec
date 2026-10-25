@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Config, Project, SessionDetail, SessionState } from '../lib/api';
-import { createSession, getSession, sendMessage, stopSession } from '../lib/api';
+import { compactSession, createSession, getSession, sendMessage, stopSession } from '../lib/api';
 import { stateLabel } from '../lib/format';
 import { useSessionThread } from '../hooks/useSessionThread';
 import { Composer } from '../components/session/Composer';
@@ -24,6 +24,7 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [text, setText] = useState('');
   const [sendError, setSendError] = useState<string | null>(null);
+  const [compactError, setCompactError] = useState<string | null>(null);
   const view = useSessionThread(sessionId);
   const running = view.running;
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -108,6 +109,16 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
     }
   }
 
+  async function handleCompact() {
+    if (!sessionId) return;
+    setCompactError(null);
+    try {
+      await compactSession(sessionId);
+    } catch (error) {
+      setCompactError(error instanceof Error ? error.message : 'Erreur lors de la compaction');
+    }
+  }
+
   return (
     <div className="flex min-h-0 min-w-0 grow">
       <main className="flex min-h-0 min-w-0 flex-[999_1_560px] flex-col">
@@ -168,7 +179,14 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
         />
       </main>
 
-      <ContextPanel view={view} currentTokens={currentTokens} contextPercent={contextPercent} />
+      <ContextPanel
+        view={view}
+        currentTokens={currentTokens}
+        contextPercent={contextPercent}
+        compactDisabled={!sessionId || state === 'running' || state === 'waiting_for_user'}
+        onCompact={handleCompact}
+        compactError={compactError}
+      />
     </div>
   );
 }
