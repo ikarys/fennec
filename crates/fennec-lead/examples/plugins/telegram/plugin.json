@@ -1,7 +1,0 @@
-{
-  "run": "telegram.py",
-  "serve": "telegram.py",
-  "description": "Prévient sur Telegram ; tu y valides, abandonnes ou réponds",
-  "events": ["question", "ready", "failed"],
-  "allow": []
-}
