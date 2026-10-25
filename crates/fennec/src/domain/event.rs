@@ -1,6 +1,7 @@
 //! The session log's vocabulary: port of openfox `events/types.ts`, the
 //! subset fennec produces. Wire names match openfox.
 
+use super::stats::MessageStats;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fmt;
@@ -97,6 +98,8 @@ pub enum Event {
     #[serde(rename = "message.done", rename_all = "camelCase")]
     MessageDone {
         message_id: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        stats: Option<MessageStats>,
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         partial: bool,
     },
@@ -132,6 +135,10 @@ pub enum Event {
     },
     #[serde(rename = "chat.error", rename_all = "camelCase")]
     ChatError { error: String, recoverable: bool },
+    /// openfox keeps more in a snapshot; fennec only needs the system
+    /// prompt, frozen for the session so the server's prompt cache holds.
+    #[serde(rename = "turn.snapshot", rename_all = "camelCase")]
+    TurnSnapshot { cached_system_prompt: String },
 }
 
 impl Event {
@@ -149,6 +156,7 @@ impl Event {
             Event::RunningChanged { .. } => "running.changed",
             Event::ChatDone { .. } => "chat.done",
             Event::ChatError { .. } => "chat.error",
+            Event::TurnSnapshot { .. } => "turn.snapshot",
         }
     }
 }

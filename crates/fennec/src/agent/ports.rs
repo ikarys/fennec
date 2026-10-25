@@ -34,6 +34,8 @@ pub struct Completion {
     pub tool_calls: Vec<ToolCall>,
     pub finish_reason: String,
     pub prompt_tokens: u64,
+    /// The part of the prompt served from the server's cache.
+    pub cached_tokens: u64,
     pub completion_tokens: u64,
 }
 

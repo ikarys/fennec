@@ -4,8 +4,8 @@ use super::App;
 use super::http::{Request, error, send, send_json};
 use super::{assets, event_stream};
 use crate::domain::project::{Project, SessionSummary};
-use crate::git;
 use crate::store::SqliteStore;
+use crate::{folders, git};
 use serde_json::{Value, json};
 use std::net::TcpStream;
 use std::path::Path;
@@ -18,6 +18,7 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
             let config = json!({ "model": llm.model, "contextWindow": llm.context_window });
             send_json(stream, 200, &config)
         }
+        ("GET", ["api", "folders"]) => list_folders(req, stream),
         ("GET", ["api", "projects"]) => list_projects(app, stream),
         ("POST", ["api", "projects"]) => open_project(app, req, stream),
         ("POST", ["api", "sessions"]) => create_session(app, req, stream),
@@ -28,7 +29,7 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
             send_json(stream, 202, &json!({}))
         }
         ("GET", ["api", "sessions", id, "events"]) => {
-            event_stream::serve(&app.store()?, req, stream, id)
+            event_stream::serve(&app.store()?, &app.notifier, req, stream, id)
         }
         ("GET", ["api", ..]) | ("POST", _) => error(stream, 404, "not found"),
         ("GET", _) => {
@@ -36,6 +37,17 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
             send(stream, 200, asset.content_type, asset.body)
         }
         _ => error(stream, 404, "not found"),
+    }
+}
+
+fn list_folders(req: &Request, stream: &mut TcpStream) -> Result<(), String> {
+    let dir = req
+        .query_param("path")
+        .filter(|p| !p.is_empty())
+        .map_or_else(folders::home, Into::into);
+    match folders::list(&dir) {
+        Ok(listing) => send_json(stream, 200, &json!(listing)),
+        Err(e) => error(stream, 400, &e),
     }
 }
 

@@ -5,3 +5,10 @@ members = ["crates/fennec"]
 [workspace.package]
 edition = "2024"
 license = "AGPL-3.0-only"
+
+# fennec stays light: one optimised, stripped binary. Panics still unwind:
+# a bug in one request must not take running turns down with it.
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

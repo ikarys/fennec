@@ -77,3 +77,12 @@ export function stateDotClass(state: SessionState): string {
       return 'bg-faint';
   }
 }
+
+export function formatSpeed(tokensPerSecond: number): string {
+  return `${Math.round(tokensPerSecond)} tok/s`;
+}
+
+/** Share of the prompt the server took from its cache, in percent. */
+export function cachePercent(cached: number, prompt: number): number {
+  return prompt > 0 ? Math.round((cached / prompt) * 100) : 0;
+}

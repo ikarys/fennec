@@ -5,11 +5,13 @@ mod assets;
 mod event_stream;
 mod guard;
 mod http;
+mod notifier;
 mod routes;
 mod turns;
 
 use crate::config::Settings;
 use crate::store::SqliteStore;
+use notifier::Notifier;
 use serde_json::json;
 use std::net::{TcpListener, TcpStream};
 use std::sync::Arc;
@@ -20,6 +22,7 @@ struct App {
     settings: Settings,
     port: u16,
     turns: Turns,
+    notifier: Arc<Notifier>,
 }
 
 impl App {
@@ -34,10 +37,12 @@ pub fn serve(port: u16, settings: Settings) -> Result<(), String> {
     let listener =
         TcpListener::bind(("127.0.0.1", port)).map_err(|e| format!("127.0.0.1:{port}: {e}"))?;
     eprintln!("fennec · {} · http://127.0.0.1:{port}", settings.llm.model);
+    let notifier = Arc::new(Notifier::default());
     let app = Arc::new(App {
-        turns: Turns::new(settings.clone()),
+        turns: Turns::new(settings.clone(), notifier.clone()),
         settings,
         port,
+        notifier,
     });
     // Fail now rather than on the first request.
     app.store()?;
