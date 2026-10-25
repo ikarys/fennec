@@ -35,6 +35,9 @@ the project's `.agents/agents`); two modes, plan (read-only by construction,
 the default) and builder, with a fixed plan and report format rendered as
 cards. Vision: images attached to a message, and read_file returns images.
 Replay: a typed message sent again, through an append-only `session.rewound`.
+Skills panel, done: the skills of a session in the context panel, those
+loaded so far and those still active (in the model's view: not dropped by
+a compaction, not cut by a replay), folded from the log.
 Workflows, done (`docs/workflows.md`): graphs of agent, shell, human,
 condition, parallel/join nodes wired by named ports, drawn in a React Flow
 editor; loops capped per edge, pauses on edges or step by step; the run is
@@ -47,10 +50,6 @@ Next, one PR each, so that the minimal agent works before security layers:
 dogfooding → bwrap world for tool
 execution → sub-agents as tools → criteria → fennec's own
 layer (human-only integration, provenance, review gate).
-Backlog, outside that chain: the skills of a session in the context panel,
-those loaded so far and those still active (in the model's view: not
-dropped by a compaction, not cut by a replay), folded from the log
-(`load_skill` calls, `/<skill>` messages).
 
 ## Layout
 
