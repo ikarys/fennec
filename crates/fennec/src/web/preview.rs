@@ -17,14 +17,17 @@ pub(super) fn serve(
     segments: &[&str],
 ) -> Result<(), String> {
     let store = app.store()?;
-    let Some((_, project)) = session_and_project(&store, session_id)? else {
+    let Some((session, project)) = session_and_project(&store, session_id)? else {
         return error(stream, 404, "no such session");
     };
     let Some(relative) = relative_path_from_segments(segments) else {
         return error(stream, 404, "not found");
     };
-    // Canonical paths: a symlink out of the project is refused like `..`.
-    let workdir = Path::new(&project.workdir).canonicalize();
+    // Canonical paths: a symlink out of the place is refused like `..`.
+    let workdir = app
+        .place(&store, &session, &project)?
+        .workdir
+        .canonicalize();
     let full = workdir
         .as_ref()
         .ok()

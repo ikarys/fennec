@@ -15,10 +15,29 @@ use crate::llm::OpenAiClient;
 use crate::skills;
 use crate::store::SqliteStore;
 use crate::tools::LocalTools;
+use crate::worktree::{self, Worktree};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+
+/// Where a session's turns run: its worktree when it has one, the project's
+/// directory otherwise.
+pub struct Place {
+    pub workdir: PathBuf,
+    pub worktree: Option<Worktree>,
+}
+
+impl Place {
+    pub fn new(project_dir: &str, worktree: Option<Worktree>) -> Place {
+        Place {
+            workdir: worktree
+                .as_ref()
+                .map_or_else(|| PathBuf::from(project_dir), |wt| wt.workdir.clone()),
+            worktree,
+        }
+    }
+}
 
 /// What a turn started from the UI does.
 pub enum Job {
@@ -58,7 +77,7 @@ impl Turns {
     }
 
     /// Starts a turn; refuses while one runs on the session.
-    pub fn start(&self, session_id: &str, workdir: &str, job: Job) -> Result<(), String> {
+    pub fn start(&self, session_id: &str, place: Place, job: Job) -> Result<(), String> {
         let stop = Arc::new(AtomicBool::new(false));
         {
             let mut running = self.running.lock().unwrap();
@@ -70,10 +89,25 @@ impl Turns {
         let settings = self.settings.clone();
         let notifier = self.notifier.clone();
         let running = self.running.clone();
-        let (session_id, workdir) = (session_id.to_string(), PathBuf::from(workdir));
+        let session_id = session_id.to_string();
         std::thread::spawn(move || {
-            if let Err(e) = run(&settings, &notifier, &session_id, workdir, &job, &stop) {
+            if let Err(e) = run(
+                &settings,
+                &notifier,
+                &session_id,
+                &place.workdir,
+                &job,
+                &stop,
+            ) {
                 eprintln!("fennec: session {session_id}: {e}");
+            }
+            // Whatever the job did, what the agent wrote is recorded as
+            // fennec's commits for the human to cherry-pick.
+            if let Some(wt) = &place.worktree {
+                let message = format!("fennec: agent work in session {session_id}");
+                if let Err(e) = worktree::commit(wt, &message) {
+                    eprintln!("fennec: session {session_id}: commit: {e}");
+                }
             }
             running.lock().unwrap().remove(&session_id);
         });
@@ -128,7 +162,7 @@ fn run(
     settings: &Settings,
     notifier: &Notifier,
     session_id: &str,
-    workdir: PathBuf,
+    workdir: &Path,
     job: &Job,
     stop: &AtomicBool,
 ) -> Result<(), String> {
@@ -136,7 +170,7 @@ fn run(
         settings,
         notifier,
         session_id,
-        &workdir,
+        workdir,
         stop,
         |turn, tools| match job {
             Job::Input(TurnInput::Prompt(prompt), attachments) => {
@@ -148,7 +182,7 @@ fn run(
                 let children = Children {
                     settings,
                     notifier,
-                    workdir: &workdir,
+                    workdir,
                 };
                 run_workflow(
                     turn,

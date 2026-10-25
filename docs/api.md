@@ -122,7 +122,10 @@ turn.
 - `GET /api/folders?path=<absolute path>` → `{path, parent, folders: [{name, path, hidden, repo}]}`,
   the sub-folders of `path` (the home directory when omitted), sorted by name;
   `repo` marks a git repository; 400 if `path` cannot be read
-- `GET /api/sessions/{id}` → `{id, title, state, mode, project: {id, name, workdir}}`;
+- `GET /api/sessions/{id}` → `{id, title, state, mode, project: {id, name, workdir}, worktree}`;
+  `worktree` is `{path, branch, base}` when the session (or its root session) runs a workflow in
+  its own git worktree, else null; the human takes the agent's work with
+  `git cherry-pick <base>..<branch>`;
   `mode` is the id of the agent the session resolves to from its event log
   (null when there is no top-level agent)
 - `GET /api/sessions/{id}/skills` → `{loaded: [ids], active: [ids]}`: the
