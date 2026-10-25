@@ -37,7 +37,7 @@ impl Request {
     }
 }
 
-fn percent_decode(s: &str) -> String {
+pub(super) fn percent_decode(s: &str) -> String {
     let bytes = s.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
     let mut i = 0;
@@ -116,6 +116,16 @@ pub fn send(
     content_type: &str,
     body: &[u8],
 ) -> Result<(), String> {
+    send_with(stream, status, content_type, &[], body)
+}
+
+pub fn send_with(
+    stream: &mut TcpStream,
+    status: u16,
+    content_type: &str,
+    extra_headers: &[(&str, &str)],
+    body: &[u8],
+) -> Result<(), String> {
     let reason = match status {
         200 => "OK",
         202 => "Accepted",
@@ -123,12 +133,20 @@ pub fn send(
         403 => "Forbidden",
         404 => "Not Found",
         409 => "Conflict",
+        413 => "Payload Too Large",
         _ => "Error",
     };
-    let head = format!(
-        "HTTP/1.1 {status} {reason}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nConnection: close\r\n\r\n",
+    let mut head = format!(
+        "HTTP/1.1 {status} {reason}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nConnection: close\r\n",
         body.len()
     );
+    for (name, value) in extra_headers {
+        head.push_str(name);
+        head.push_str(": ");
+        head.push_str(value);
+        head.push_str("\r\n");
+    }
+    head.push_str("\r\n");
     stream
         .write_all(head.as_bytes())
         .and_then(|()| stream.write_all(body))

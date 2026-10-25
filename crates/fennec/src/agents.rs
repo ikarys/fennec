@@ -13,9 +13,11 @@ use std::path::{Path, PathBuf};
 
 use crate::domain::agent::{AgentDefinition, parse_agent_md};
 
-const DEFAULTS: [&str; 2] = [
+const DEFAULTS: [&str; 4] = [
     include_str!("../agents/plan.agent.md"),
     include_str!("../agents/builder.agent.md"),
+    include_str!("../agents/verify.agent.md"),
+    include_str!("../agents/review.agent.md"),
 ];
 
 /// openfox `loadAllAgents`: the agents a session in `workdir` can use.
@@ -120,7 +122,7 @@ mod tests {
         let (_root, _home, workdir) = fixture();
         let agents = discover_in(None, &workdir);
 
-        assert_eq!(agents.len(), 2);
+        assert_eq!(agents.len(), DEFAULTS.len());
 
         let plan = &agents[0];
         assert_eq!(plan.id, "plan");
@@ -182,7 +184,7 @@ mod tests {
         );
 
         let found = discover_in(Some(&home), &workdir);
-        assert_eq!(found.len(), 2);
+        assert_eq!(found.len(), DEFAULTS.len());
         assert_eq!(found[0].id, "plan");
         assert_eq!(found[0].name, "Custom Plan");
         assert_eq!(found[0].prompt, "Custom body");
@@ -201,7 +203,7 @@ mod tests {
         );
 
         let found = discover_in(Some(&home), &workdir);
-        assert_eq!(found.len(), 3);
+        assert_eq!(found.len(), DEFAULTS.len() + 1);
         assert!(found.iter().any(|agent| agent.id == "custom"));
         let _ = std::fs::remove_dir_all(&root);
     }
@@ -233,8 +235,8 @@ mod tests {
     #[test]
     fn missing_dirs_load_defaults_only() {
         let (root, home, workdir) = fixture();
-        assert_eq!(discover_in(Some(&home), &workdir).len(), 2);
-        assert_eq!(discover_in(None, &workdir).len(), 2);
+        assert_eq!(discover_in(Some(&home), &workdir).len(), DEFAULTS.len());
+        assert_eq!(discover_in(None, &workdir).len(), DEFAULTS.len());
         let _ = std::fs::remove_dir_all(&root);
     }
 
@@ -246,7 +248,7 @@ mod tests {
         std::fs::write(agents.join("notes.txt"), "not an agent").unwrap();
 
         let found = discover_in(Some(&home), &workdir);
-        assert_eq!(found.len(), 2);
+        assert_eq!(found.len(), DEFAULTS.len());
         let _ = std::fs::remove_dir_all(&root);
     }
 }

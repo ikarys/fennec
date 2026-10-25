@@ -107,7 +107,8 @@ human switches), the prompt is appended as a user message marked as coming
 from the workflow, and the agent loop runs. The conversation carries over
 from node to node, so the cached prefix keeps growing. `context: "fresh"`
 runs the node in a child session that starts from the prompt only (see
-Child sessions). With one output port, the node ends when the agent ends
+Child sessions). A sub-agent (`subagent: true`, as `verify` and `review`)
+is never a mode of the session: it runs only with `context: "fresh"`. With one output port, the node ends when the agent ends
 its turn. With several ports, the prompt asks the agent to end its last
 message with one line `Outcome: <port>`. A tool would change the tool list,
 which is part of the cached prefix, and force a re-read of the session.

@@ -39,9 +39,13 @@ Workflows, done (`docs/workflows.md`): graphs of agent, shell, human,
 condition, parallel/join nodes wired by named ports, drawn in a React Flow
 editor; loops capped per edge, pauses on edges or step by step; the run is
 folded from `workflow.*` events; fresh agents and branches in child sessions.
+The default workflow verifies in a fresh context (`verify`, `review` sub-agents)
+and sends the findings back to the builder.
+Preview: ```html and ```md blocks of a message, and the .html/.md files an
+agent wrote, rendered in fennec (a sandboxed origin for model HTML).
 Next, one PR each, so that the minimal agent works before security layers:
 dogfooding → bwrap world for tool
-execution → verifier + sub-agents → criteria → fennec's own
+execution → sub-agents as tools → criteria → fennec's own
 layer (human-only integration, provenance, review gate).
 Backlog, outside that chain: the skills of a session in the context panel,
 those loaded so far and those still active (in the model's view: not
@@ -104,18 +108,21 @@ crates/fennec/src/
   folders.rs         the folders the human browses to open a project
   web/               HTTP adapter: http, guard (who may call), routes, event_stream (SSE),
                      notifier (wakes streams on append, no polling), turns, assets,
-                     workflow_routes, children (child sessions for workflow nodes)
+                     workflow_routes, children (child sessions for workflow nodes),
+                     preview (a project's files in a sandboxed origin)
   cli/               terminal adapter: commands, transcript
 crates/fennec/build.rs   embeds web/dist (placeholder page when not built)
 web/src/           React + Vite + Tailwind v4 UI (same layout as openfox's web/src)
   pages/             one component per route: HomePage, SessionPage, SettingsPage, WorkflowsPage (lazy)
   components/        shared UI; session/ the thread, tool cards, question card, message stats, composer,
                      context panel; project/ the folder browser; layout/ the top bar;
-                     workflow/ the editor (canvas, node shapes, panels) and session/ a run in the thread
+                     workflow/ the editor (canvas, node shapes, panels) and session/ a run in the thread;
+                     preview/ the preview pane and previewable code blocks
   hooks/             useSessionThread: the SSE stream of a session, folded
   lib/               api (typed fetch), fold (events → thread view), format, theme,
                      attachments (images read in the browser), plan (the plan/report contract),
-                     workflow (definition types and edits), workflowRun (a run folded from its events)
+                     workflow (definition types and edits), workflowRun (a run folded from its events),
+                     preview (what can be previewed, its URL)
   styles/app.css     theme tokens: one CSS variable block per theme, mapped into Tailwind
 docs/api.md        the HTTP API and event wire format, shared by server and UI
 docs/workflows.md  the workflow format, run semantics and editor

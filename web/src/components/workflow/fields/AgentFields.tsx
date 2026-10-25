@@ -27,7 +27,7 @@ export function AgentFields({ node, agents, names, onChange }: AgentFieldsProps)
         >
           {agents.map((agent) => (
             <option key={agent.id} value={agent.id}>
-              {agent.name}
+              {agent.subagent ? `${agent.name} (sous-agent)` : agent.name}
             </option>
           ))}
         </select>
