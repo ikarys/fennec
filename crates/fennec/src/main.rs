@@ -2,6 +2,7 @@
 //! settings and hands them to the web or terminal adapter.
 
 mod agent;
+mod agents;
 mod cli;
 mod config;
 mod domain;
@@ -19,7 +20,9 @@ use store::SqliteStore;
 
 const USAGE: &str = "usage:
   fennec [serve] [--port <n>]              web UI on http://127.0.0.1:7777
-  fennec run [--session <id>] <prompt>     run the agent loop in the current directory
+  fennec run [--session <id>] [--agent <id>] [--image <path>]... <prompt>
+                                           run the agent loop in the current directory;
+                                           agent: plan (default, read-only) or builder
   fennec compact <session>                 compact a session in the current directory
   fennec sessions                          list sessions
   fennec log <session>                     replay a session from the event store
@@ -53,14 +56,29 @@ fn run(args: &[String]) -> Result<(), String> {
             web::serve(port, Settings::from_env()?)
         }
         Some("run") => {
-            let (session, prompt) = match args.get(1).map(String::as_str) {
-                Some("--session") => (args.get(2).cloned(), args[3.min(args.len())..].join(" ")),
-                _ => (None, args[1..].join(" ")),
-            };
+            let mut session = None;
+            let mut agent = None;
+            let mut images = Vec::new();
+            let mut i = 1;
+            while i < args.len() {
+                let flag = &args[i];
+                if !flag.starts_with("--") {
+                    break;
+                }
+                let value = args.get(i + 1).ok_or(USAGE)?.clone();
+                match flag.as_str() {
+                    "--session" => session = Some(value),
+                    "--agent" => agent = Some(value),
+                    "--image" => images.push(value),
+                    _ => return Err(USAGE.into()),
+                }
+                i += 2;
+            }
+            let prompt = args[i..].join(" ");
             if prompt.trim().is_empty() {
                 return Err(USAGE.into());
             }
-            cli::run(&Settings::from_env()?, session, &prompt)
+            cli::run(&Settings::from_env()?, session, agent, &images, &prompt)
         }
         Some("compact") => cli::compact(&Settings::from_env()?, args.get(1).ok_or(USAGE)?),
         Some("sessions") => cli::list_sessions(&open_store()?),

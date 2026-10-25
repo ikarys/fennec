@@ -3,6 +3,7 @@
 //! open; the model API rejects an assistant tool call without its tool
 //! message, so the next turn closes them first.
 
+use super::compaction::model_view;
 use super::event::Event;
 use std::collections::HashSet;
 
@@ -12,26 +13,28 @@ pub struct OpenCall {
     pub awaits_answer: bool,
 }
 
-/// The `tool.call` events with no matching `tool.result`, in log order.
-/// `awaits_answer` is true when a `chat.ask_user` event with the same
-/// `call_id` exists: that call's result is the human's answer.
+/// The `tool.call` events with no matching `tool.result` in the model's view,
+/// in log order. A call cut off by a `session.rewound` is not open: its
+/// assistant message is no longer sent. `awaits_answer` is true when a
+/// `chat.ask_user` event with the same `call_id` exists: that call's result
+/// is the human's answer.
 pub fn open_calls(events: &[Event]) -> Vec<OpenCall> {
-    let resolved: HashSet<&str> = events
+    let view = model_view(events);
+    let resolved: HashSet<&str> = view
         .iter()
         .filter_map(|e| match e {
             Event::ToolResult { tool_call_id, .. } => Some(tool_call_id.as_str()),
             _ => None,
         })
         .collect();
-    let asked: HashSet<&str> = events
+    let asked: HashSet<&str> = view
         .iter()
         .filter_map(|e| match e {
             Event::ChatAskUser { call_id, .. } => Some(call_id.as_str()),
             _ => None,
         })
         .collect();
-    events
-        .iter()
+    view.iter()
         .filter_map(|e| match e {
             Event::ToolCall {
                 message_id,
@@ -49,7 +52,7 @@ pub fn open_calls(events: &[Event]) -> Vec<OpenCall> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::event::{AskType, ToolCall};
+    use crate::domain::event::{AskType, Role, ToolCall};
     use serde_json::json;
 
     fn call(id: &str, name: &str) -> Event {
@@ -129,6 +132,25 @@ mod tests {
             open.iter().map(|c| c.call_id.as_str()).collect::<Vec<_>>(),
             ["c2", "c3"]
         );
+    }
+
+    #[test]
+    fn a_call_cut_off_by_a_rewind_is_not_open() {
+        let events = vec![
+            Event::MessageStart {
+                message_id: "u".into(),
+                role: Role::User,
+                content: Some("go".into()),
+                is_system_generated: false,
+                metadata: None,
+                attachments: Vec::new(),
+            },
+            call("c1", "read_file"),
+            Event::SessionRewound {
+                message_id: "u".into(),
+            },
+        ];
+        assert!(open_calls(&events).is_empty());
     }
 
     #[test]

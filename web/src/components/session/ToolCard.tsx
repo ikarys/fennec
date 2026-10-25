@@ -77,9 +77,13 @@ export function ToolCard({ tool }: { tool: ToolCallView }) {
       {open && (
         <div className="border-t border-border">
           {tool.name === 'read_file' && (
-            <pre className="overflow-x-auto bg-code p-2.5 font-mono text-xs text-muted whitespace-pre">
-              {tool.output || 'Aucune sortie'}
-            </pre>
+            tool.image ? (
+              <img src={tool.image.dataUrl} alt={tool.output} className="max-h-80 p-2.5" />
+            ) : (
+              <pre className="overflow-x-auto bg-code p-2.5 font-mono text-xs text-muted whitespace-pre">
+                {tool.output || 'Aucune sortie'}
+              </pre>
+            )
           )}
 
           {tool.name === 'edit_file' && (

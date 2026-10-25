@@ -5,8 +5,12 @@ mod transcript;
 
 use crate::agent::ports::EventLog;
 use crate::agent::turn::{Turn, compact_session, run_turn};
+use crate::agents;
 use crate::config::Settings;
+use crate::domain::agent::switch_to;
+use crate::domain::attachment::{Attachment, from_bytes};
 use crate::domain::event::{ChoiceOption, DoneReason, Event};
+use crate::domain::id::new_id;
 use crate::domain::open_calls;
 use crate::domain::slash::{TurnInput, resolve};
 use crate::instructions::all_instructions;
@@ -31,20 +35,43 @@ fn answer_from_line(line: &str, options: &[ChoiceOption]) -> String {
 }
 
 /// Runs one turn in the current directory, in `session` or a new one.
-pub fn run(settings: &Settings, session: Option<String>, prompt: &str) -> Result<(), String> {
+pub fn run(
+    settings: &Settings,
+    session: Option<String>,
+    agent: Option<String>,
+    images: &[String],
+    prompt: &str,
+) -> Result<(), String> {
     let store = SqliteStore::open(&settings.db_path)?;
     let workdir = std::env::current_dir().map_err(|e| e.to_string())?;
     let project = store.project_for(&workdir.display().to_string())?;
+    // Validated before a new session is created, so a mistyped agent leaves
+    // no empty session behind.
+    let events = match &session {
+        Some(id) => store.events(id)?,
+        None => Vec::new(),
+    };
+    let switch = match agent {
+        Some(agent) => switch_to(&agents::discover(&workdir), &events, &agent)?,
+        None => None,
+    };
+    let attachments = read_images(images)?;
     let session_id = match session {
         Some(id) => id,
         None => store.create_session(&project, &prompt.chars().take(80).collect::<String>())?,
     };
+    if let Some(event) = switch {
+        store.append(&session_id, &event)?;
+    }
     let skills = skills::discover(&workdir);
     let input = resolve(prompt, &skills);
+    if matches!(input, TurnInput::Compact) && !attachments.is_empty() {
+        return Err("/compact takes no attachments".into());
+    }
     let reason = with_turn(settings, &store, &session_id, |turn| {
         let mut reason = match &input {
             TurnInput::Compact => compact_session(turn)?,
-            TurnInput::Prompt(prompt) => run_turn(turn, prompt)?,
+            TurnInput::Prompt(prompt) => run_turn(turn, prompt, &attachments)?,
         };
         // The turn ended waiting for the human: read the answer and run the
         // next turn, whose input is that answer.
@@ -54,7 +81,7 @@ pub fn run(settings: &Settings, session: Option<String>, prompt: &str) -> Result
             let Some(line) = read_answer()? else {
                 return Err("turn ended: waiting_for_user".to_string());
             };
-            reason = run_turn(turn, &answer_from_line(&line, &options))?;
+            reason = run_turn(turn, &answer_from_line(&line, &options), &[])?;
         }
         Ok(reason)
     })?;
@@ -62,6 +89,19 @@ pub fn run(settings: &Settings, session: Option<String>, prompt: &str) -> Result
         DoneReason::Complete => Ok(()),
         reason => Err(format!("turn ended: {reason}")),
     }
+}
+
+fn read_images(images: &[String]) -> Result<Vec<Attachment>, String> {
+    let mut attachments = Vec::new();
+    for path in images {
+        let bytes = std::fs::read(path).map_err(|e| format!("{path}: {e}"))?;
+        let filename = std::path::Path::new(path)
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_else(|| path.clone());
+        attachments.push(from_bytes(new_id(), filename, &bytes)?);
+    }
+    Ok(attachments)
 }
 
 /// Compacts `session` on demand, in the current directory (the CLI has no
@@ -94,6 +134,7 @@ fn with_turn(
         workdir.display()
     );
     let skills = skills::discover(&workdir);
+    let agents = agents::discover(&workdir);
     let model = OpenAiClient::new(&settings.llm, &params.model);
     let tools = LocalTools::new(workdir.clone());
     // ponytail: no Ctrl-C handling, the process just dies; a signal handler
@@ -109,6 +150,7 @@ fn with_turn(
         workdir: &workdir,
         instructions: &instructions,
         skills: &skills,
+        agents: &agents,
         max_tokens: params.max_tokens,
         context_window: params.context_window,
         compact_at: params.compact_at,

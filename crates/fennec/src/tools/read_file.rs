@@ -1,21 +1,25 @@
-//! Port of openfox `tools/read.ts` (text files only).
+//! Port of openfox `tools/read.ts` (text files and images).
+//!
+//! Not ported: PDF files, directories.
 
 use super::args;
 use super::path_guard::resolve_in_workdir;
-use crate::domain::event::ToolResult;
+use crate::domain::attachment::{data_url, sniff_image};
+use crate::domain::event::{ToolResult, ToolResultMetadata};
 use serde_json::{Value, json};
 use std::path::Path;
 
 const READ_MAX_LINES: i64 = 2000;
 const READ_MAX_BYTES: usize = 100_000;
 const READ_MAX_FILE_BYTES: u64 = 20_971_520;
+const READ_MAX_IMAGE_BYTES: u64 = 2_097_152;
 
 pub(super) fn definition() -> Value {
     json!({
         "type": "function",
         "function": {
             "name": "read_file",
-            "description": "Read a text file. Returns its lines numbered, from `offset` (1-based) for at most `limit` lines.",
+            "description": "Read a file. Text files: returns its lines numbered, from `offset` (1-based) for at most `limit` lines. Images (PNG, JPEG, GIF, WebP, BMP, SVG): returned to you as an image you can see.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -79,6 +83,24 @@ pub(super) fn run(args: &Value, workdir: &Path) -> ToolResult {
         Ok(value) => value,
         Err(error) => return ToolResult::failure(format!("Failed to read file: {error}")),
     };
+
+    if let Some(mime) = sniff_image(&bytes, path) {
+        if bytes.len() as u64 > READ_MAX_IMAGE_BYTES {
+            return ToolResult::failure(format!(
+                "File size ({} bytes) exceeds image size limit (2MB). Use shell command to process large files.",
+                bytes.len()
+            ));
+        }
+        return ToolResult::image(
+            format!("[Image: {path} ({mime}, {} bytes)]", bytes.len()),
+            ToolResultMetadata {
+                mime_type: mime.to_string(),
+                data_url: data_url(mime, &bytes),
+                path: full_path.display().to_string(),
+                size: bytes.len() as u64,
+            },
+        );
+    }
 
     let content = match String::from_utf8(bytes) {
         Ok(value) => value,
@@ -155,6 +177,32 @@ mod tests {
         let output = read_result.output.unwrap();
         assert!(output.contains("1\thello"));
         assert!(output.contains("2\tworld"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn reading_a_tiny_png_returns_image_metadata() {
+        let dir = temp_dir();
+        let mut on_output = no_output();
+        std::fs::write(
+            dir.join("a.png"),
+            [0x89, b'P', b'N', b'G', b'\r', b'\n', 0x1a, b'\n', 0, 0, 0],
+        )
+        .unwrap();
+
+        let read_args = serde_json::json!({"path": "a.png"});
+        let read_result = run_tool("read_file", &read_args, &dir, &mut on_output);
+        assert!(read_result.success);
+        let metadata = read_result.metadata.as_ref().unwrap();
+        assert_eq!(metadata.mime_type, "image/png");
+        assert!(metadata.data_url.starts_with("data:image/png;base64,"));
+        assert!(
+            read_result
+                .output
+                .unwrap()
+                .starts_with("[Image: a.png (image/png,")
+        );
 
         let _ = std::fs::remove_dir_all(&dir);
     }

@@ -29,6 +29,7 @@ export interface ToolCallView {
   };
   /** The question asked by `ask_user`, shown instead of raw arguments. */
   question?: string;
+  image?: { dataUrl: string; mimeType: string };
 }
 
 export type Segment =
@@ -59,8 +60,9 @@ export interface SessionUsage {
 }
 
 export type ThreadItem =
-  | { kind: 'user'; id: string; content: string; isSystemGenerated: boolean }
+  | { kind: 'user'; id: string; content: string; isSystemGenerated: boolean; attachments: { id: string; filename: string; data: string }[] }
   | AssistantItem
+  | { kind: 'mode'; id: string; name: string; color: string }
   | { kind: 'error'; id: string; message: string }
   | { kind: 'note'; id: string; text: string; detail?: string };
 
@@ -98,6 +100,11 @@ export interface ThreadView {
   modifiedFiles: ModifiedFile[];
   toolCounts: ToolCount[];
   usage: SessionUsage;
+  /**
+   * The last `mode.changed` value, or null when the session detail should
+   * provide the server's resolved mode.
+   */
+  mode: string | null;
 }
 
 // The live speed is estimated from characters over the last few seconds;
@@ -193,6 +200,8 @@ export function createThreadFold(): ThreadFold {
   // [arrival time, chars] of the streaming message, oldest first.
   let samples: [number, number][] = [];
   let index = 0;
+  // Null means "no live change yet": the session detail owns the mode.
+  let mode: string | null = null;
 
   const newAssistant = (id: string): AssistantItem => {
     const assistant: AssistantItem = { kind: 'assistant', id, segments: [], done: false, chars: 0 };
@@ -221,12 +230,32 @@ export function createThreadFold(): ThreadFold {
     switch (event.type) {
       case 'message.start': {
         const messageId = String(data.messageId ?? `message-${index}`);
+        const metadata = data.metadata as { type?: string; name?: string; color?: string } | undefined;
+
+        // An agent reminder is a mode marker, not a user message: its content
+        // is the agent prompt and must not be rendered as a bubble.
+        if (metadata?.type === 'agent') {
+          items.push({
+            kind: 'mode',
+            id: messageId,
+            name: String(metadata.name ?? ''),
+            color: String(metadata.color ?? '')
+          });
+          break;
+        }
+
         if (data.role === 'user') {
+          const rawAttachments = Array.isArray(data.attachments) ? data.attachments : [];
           items.push({
             kind: 'user',
             id: messageId,
             content: String(data.content ?? ''),
-            isSystemGenerated: Boolean(data.isSystemGenerated)
+            isSystemGenerated: Boolean(data.isSystemGenerated),
+            attachments: rawAttachments.map((a: any) => ({
+              id: String(a?.id ?? ''),
+              filename: String(a?.filename ?? ''),
+              data: String(a?.data ?? '')
+            }))
           });
         } else if (data.role === 'assistant') {
           const assistant = newAssistant(messageId);
@@ -307,6 +336,9 @@ export function createThreadFold(): ThreadFold {
         updateToolStats(tool, modified, toolCounts);
 
         const assistant = assistants.get(messageId) ?? newAssistant(messageId);
+        // The arguments are generated tokens too: without them a message that
+        // is mostly a write_file calibrates tokens per char far too high.
+        assistant.chars += JSON.stringify(toolCall.arguments ?? '').length;
         assistant.segments.push({ kind: 'tool', id: toolId, tool });
         tools.set(toolId, tool);
         break;
@@ -341,6 +373,10 @@ export function createThreadFold(): ThreadFold {
         tool.truncated = Boolean(result.truncated);
         if (tool.name === 'run_command') {
           tool.exitCode = parseExitCode(tool.output);
+        }
+        const metadata = result.metadata as { dataUrl?: string; mimeType?: string } | undefined;
+        if (typeof metadata?.dataUrl === 'string' && typeof metadata?.mimeType === 'string' && metadata.mimeType.startsWith('image/')) {
+          tool.image = { dataUrl: metadata.dataUrl, mimeType: metadata.mimeType };
         }
         break;
       }
@@ -410,6 +446,14 @@ export function createThreadFold(): ThreadFold {
         break;
       }
 
+      case 'mode.changed': {
+        // The live event wins over the session detail until the next change.
+        if (typeof data.mode === 'string') {
+          mode = data.mode;
+        }
+        break;
+      }
+
       case 'chat.done': {
         const reason = String(data.reason ?? 'complete');
         lastDone = reason;
@@ -431,6 +475,28 @@ export function createThreadFold(): ThreadFold {
         break;
       }
 
+      case 'session.rewound': {
+        const messageId = String(data.messageId ?? '');
+        const index = items.findIndex((item) => item.id === messageId);
+        if (index >= 0) {
+          items.splice(index);
+        } else {
+          items.length = 0;
+        }
+        if (pendingQuestion) {
+          const callId = pendingQuestion.callId;
+          const remains = items.some(
+            (item) =>
+              item.kind === 'assistant' &&
+              item.segments.some((segment) => segment.kind === 'tool' && segment.tool.id === callId)
+          );
+          if (!remains) {
+            pendingQuestion = undefined;
+          }
+        }
+        break;
+      }
+
       default:
         break;
     }
@@ -445,7 +511,8 @@ export function createThreadFold(): ThreadFold {
     pendingQuestion,
     modifiedFiles: Array.from(modified.values()),
     toolCounts: Array.from(toolCounts.entries()).map(([name, count]) => ({ name, count })),
-    usage: { ...usage }
+    usage: { ...usage },
+    mode
   });
 
   return { apply, view };

@@ -73,7 +73,7 @@ fn stream_summary(turn: &mut Turn, prompt: &RoundPrompt) -> Result<SummaryRound,
 pub(super) fn compact(turn: &mut Turn, prompt: &RoundPrompt) -> Result<Compacted, String> {
     let events = turn.log.events(turn.session_id)?;
     let before = compaction::context_tokens(&events);
-    turn.append_user(COMPACTION_PROMPT, true)?;
+    turn.append_user(COMPACTION_PROMPT, true, None, Vec::new())?;
 
     let mut summary = None;
     for _ in 0..3 {
@@ -92,7 +92,7 @@ pub(super) fn compact(turn: &mut Turn, prompt: &RoundPrompt) -> Result<Compacted
 
     // The model only tried tools: nudge it to summarise, once.
     let summary = if summary.trim().is_empty() {
-        turn.append_user(NO_TOOLS_PROMPT, true)?;
+        turn.append_user(NO_TOOLS_PROMPT, true, None, Vec::new())?;
         match stream_summary(turn, prompt)? {
             SummaryRound::Answered(content) => content,
             SummaryRound::Interrupted => return Ok(Compacted::Skipped),
@@ -121,7 +121,7 @@ pub(super) fn compact(turn: &mut Turn, prompt: &RoundPrompt) -> Result<Compacted
         after_tokens: after,
         summary: summary.clone(),
     })?;
-    turn.append_user(&resume, true)?;
+    turn.append_user(&resume, true, None, Vec::new())?;
     turn.append(Event::ContextState {
         current_tokens: after,
         max_tokens: turn.context_window,
@@ -133,7 +133,7 @@ pub(super) fn compact(turn: &mut Turn, prompt: &RoundPrompt) -> Result<Compacted
 mod tests {
     use super::*;
     use crate::agent::ports::{Completion, EventLog};
-    use crate::agent::test_support::{MemoryLog, Scripted, reply};
+    use crate::agent::test_support::{MemoryLog, Scripted, builder, reply};
     use crate::domain::conversation::fold_messages;
     use crate::domain::event::{Role, ToolCall, ToolResult};
     use crate::tools::LocalTools;
@@ -147,6 +147,7 @@ mod tests {
         let tools = LocalTools::new(Path::new("/tmp").to_path_buf());
         let stop = AtomicBool::new(false);
         let mut on_event = |_: &Event| {};
+        let agents = builder();
         let mut turn = Turn {
             model: &model,
             log,
@@ -155,6 +156,7 @@ mod tests {
             workdir: Path::new("/tmp"),
             instructions: "",
             skills: &[],
+            agents: &agents,
             max_tokens: 100,
             context_window: 10_000,
             compact_at: 0.85,
@@ -196,6 +198,8 @@ mod tests {
                 role: Role::User,
                 content: Some("do the thing".into()),
                 is_system_generated: false,
+                metadata: None,
+                attachments: Vec::new(),
             },
         );
         append(

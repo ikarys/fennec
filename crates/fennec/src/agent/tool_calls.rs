@@ -4,6 +4,7 @@
 
 use super::ask_user;
 use super::turn::Turn;
+use crate::domain::agent::AgentDefinition;
 use crate::domain::event::{Event, ToolCall, ToolResult};
 use std::sync::atomic::Ordering;
 
@@ -34,6 +35,7 @@ fn record(
 /// Port of openfox `executeTools`, sequential for now.
 pub(super) fn execute_tools(
     turn: &mut Turn,
+    agent: &AgentDefinition,
     message_id: &str,
     calls: &[ToolCall],
 ) -> Result<Flow, String> {
@@ -68,6 +70,17 @@ pub(super) fn execute_tools(
                 ToolResult::failure(format!(
                     "Failed to parse tool call arguments: {pe}. Please ensure your JSON function call arguments are valid."
                 )),
+            )?;
+            continue;
+        }
+        // openfox `createRegistryFromTools` permission check: the mode is
+        // enforced here, at execution, so plan stays read-only.
+        if !agent.allows(&call.name) {
+            record(
+                turn,
+                message_id,
+                call,
+                ToolResult::failure(agent.denied(&call.name)),
             )?;
             continue;
         }

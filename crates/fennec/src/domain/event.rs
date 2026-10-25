@@ -1,6 +1,7 @@
 //! The session log's vocabulary: port of openfox `events/types.ts`, the
 //! subset fennec produces. Wire names match openfox.
 
+use super::attachment::Attachment;
 use super::stats::MessageStats;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -26,6 +27,8 @@ pub struct ToolResult {
     pub error: Option<String>,
     pub duration_ms: u64,
     pub truncated: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<ToolResultMetadata>,
 }
 
 impl ToolResult {
@@ -37,6 +40,7 @@ impl ToolResult {
             error: None,
             duration_ms: 0,
             truncated,
+            metadata: None,
         }
     }
 
@@ -47,8 +51,30 @@ impl ToolResult {
             error: Some(error),
             duration_ms: 0,
             truncated: false,
+            metadata: None,
         }
     }
+
+    pub fn image(output: String, metadata: ToolResultMetadata) -> ToolResult {
+        ToolResult {
+            success: true,
+            output: Some(output),
+            error: None,
+            duration_ms: 0,
+            truncated: false,
+            metadata: Some(metadata),
+        }
+    }
+}
+
+/// openfox tool result `metadata` for an image read_file returned.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ToolResultMetadata {
+    pub mime_type: String,
+    pub data_url: String,
+    pub path: String,
+    pub size: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -97,6 +123,31 @@ pub struct ChoiceOption {
     pub description: Option<String>,
 }
 
+/// openfox message `metadata` for an agent reminder: `{type: "agent", name, color, kind}`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MessageMetadata {
+    #[serde(rename = "type")]
+    pub source: MetadataSource,
+    pub name: String,
+    pub color: String,
+    pub kind: ReminderKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum MetadataSource {
+    Agent,
+}
+
+/// openfox writes `definition` (the full agent prompt) or `reminder` (a short
+/// nudge each turn); fennec only re-sends the definition when the agent changes.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ReminderKind {
+    Definition,
+    Reminder,
+}
+
 /// The subset of openfox's `TurnEvent` union the agent loop needs. Wire
 /// names and field names match openfox so stored payloads stay comparable.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -112,6 +163,12 @@ pub enum Event {
         content: Option<String>,
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         is_system_generated: bool,
+        /// Set on the agent reminders the loop injects (openfox `metadata`).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        metadata: Option<MessageMetadata>,
+        /// openfox `attachments`: images the human sent with the message.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        attachments: Vec<Attachment>,
     },
     #[serde(rename = "message.delta", rename_all = "camelCase")]
     MessageDelta { message_id: String, content: String },
@@ -159,6 +216,19 @@ pub enum Event {
     },
     #[serde(rename = "running.changed", rename_all = "camelCase")]
     RunningChanged { is_running: bool },
+    /// The human switched the session's agent (openfox `mode.changed`).
+    #[serde(rename = "mode.changed", rename_all = "camelCase")]
+    ModeChanged {
+        mode: String,
+        auto: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        reason: Option<String>,
+    },
+    /// fennec's own (openfox deletes the events instead): the human replayed
+    /// `message_id`; the model's view drops that message and everything after
+    /// it, the log keeps them.
+    #[serde(rename = "session.rewound", rename_all = "camelCase")]
+    SessionRewound { message_id: String },
     #[serde(rename = "chat.done", rename_all = "camelCase")]
     ChatDone {
         message_id: String,
@@ -197,6 +267,8 @@ impl Event {
             Event::ContextState { .. } => "context.state",
             Event::ContextCompacted { .. } => "context.compacted",
             Event::RunningChanged { .. } => "running.changed",
+            Event::ModeChanged { .. } => "mode.changed",
+            Event::SessionRewound { .. } => "session.rewound",
             Event::ChatDone { .. } => "chat.done",
             Event::ChatError { .. } => "chat.error",
             Event::ChatAskUser { .. } => "chat.ask_user",
@@ -224,5 +296,127 @@ impl fmt::Display for DoneReason {
             DoneReason::Truncated => "truncated",
             DoneReason::WaitingForUser => "waiting_for_user",
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn mode_changed_round_trips() {
+        let wire = json!({
+            "type": "mode.changed",
+            "data": {
+                "mode": "builder",
+                "auto": false
+            }
+        });
+
+        let event: Event = serde_json::from_value(wire.clone()).unwrap();
+        assert!(matches!(
+            &event,
+            Event::ModeChanged {
+                mode,
+                auto: false,
+                reason: None
+            } if mode == "builder"
+        ));
+
+        assert_eq!(serde_json::to_value(&event).unwrap(), wire);
+    }
+
+    #[test]
+    fn session_rewound_round_trips() {
+        let wire = json!({
+            "type": "session.rewound",
+            "data": {
+                "messageId": "m"
+            }
+        });
+
+        let event: Event = serde_json::from_value(wire.clone()).unwrap();
+        assert!(matches!(
+            &event,
+            Event::SessionRewound { message_id } if message_id == "m"
+        ));
+
+        assert_eq!(serde_json::to_value(&event).unwrap(), wire);
+    }
+
+    #[test]
+    fn message_start_metadata_round_trips() {
+        let wire = json!({
+            "type": "message.start",
+            "data": {
+                "messageId": "m",
+                "role": "user",
+                "content": "reminder",
+                "isSystemGenerated": true,
+                "metadata": {
+                    "type": "agent",
+                    "name": "Builder",
+                    "color": "#3b82f6",
+                    "kind": "definition"
+                }
+            }
+        });
+
+        let event: Event = serde_json::from_value(wire.clone()).unwrap();
+        assert!(matches!(
+            &event,
+            Event::MessageStart {
+                message_id,
+                role: Role::User,
+                content: Some(content),
+                is_system_generated: true,
+                metadata: Some(MessageMetadata {
+                    source: MetadataSource::Agent,
+                    name,
+                    color,
+                    kind: ReminderKind::Definition,
+                }),
+                ..
+            } if message_id == "m"
+                && content == "reminder"
+                && name == "Builder"
+                && color == "#3b82f6"
+        ));
+
+        assert_eq!(serde_json::to_value(&event).unwrap(), wire);
+    }
+
+    #[test]
+    fn message_start_attachments_round_trip_and_omit_when_empty() {
+        let with = Event::MessageStart {
+            message_id: "m".into(),
+            role: Role::User,
+            content: Some("hi".into()),
+            is_system_generated: false,
+            metadata: None,
+            attachments: vec![Attachment {
+                id: "a".into(),
+                filename: "a.png".into(),
+                mime_type: "image/png".into(),
+                size: 1,
+                data: "data:image/png;base64,AAAA".into(),
+            }],
+        };
+        let wire = serde_json::to_value(&with).unwrap();
+        assert_eq!(wire["data"]["attachments"][0]["mimeType"], "image/png");
+        assert_eq!(serde_json::from_value::<Event>(wire).unwrap(), with);
+
+        let without = Event::MessageStart {
+            message_id: "m".into(),
+            role: Role::User,
+            content: Some("hi".into()),
+            is_system_generated: false,
+            metadata: None,
+            attachments: Vec::new(),
+        };
+        let wire = serde_json::to_value(&without).unwrap();
+        assert!(wire["data"].get("attachments").is_none());
+        assert_eq!(serde_json::from_value::<Event>(wire).unwrap(), without);
     }
 }
