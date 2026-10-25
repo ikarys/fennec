@@ -1,5 +1,5 @@
 use crate::domain::conversation::render_tool_result;
-use crate::domain::event::Event;
+use crate::domain::event::{AskType, Event};
 use std::io::Write;
 
 /// Renders events as a terminal transcript: answer text plain, thinking
@@ -48,6 +48,36 @@ impl Transcript {
                     let _ = writeln!(out);
                 }
                 writeln!(out, "{mark} {first} ({} ms)", result.duration_ms)
+            }
+            Event::ChatAskUser {
+                question,
+                ask_type,
+                options,
+                ..
+            } => {
+                let mut result = writeln!(out, "\n? {question}");
+                if result.is_ok() {
+                    match ask_type {
+                        AskType::Confirm => {
+                            result = writeln!(out, "  (yes/no)");
+                        }
+                        AskType::Choice => {
+                            for (i, opt) in options.iter().flatten().enumerate() {
+                                let desc = match &opt.description {
+                                    Some(d) => format!(" — {d}"),
+                                    None => String::new(),
+                                };
+                                result =
+                                    writeln!(out, "  {}. {label}{desc}", i + 1, label = opt.label);
+                                if result.is_err() {
+                                    break;
+                                }
+                            }
+                        }
+                        AskType::Text => {}
+                    }
+                }
+                result
             }
             Event::ChatError { error, .. } => writeln!(out, "\n\x1b[31merror: {error}\x1b[0m"),
             Event::ChatDone { reason, .. } => writeln!(out, "\n— {reason}"),

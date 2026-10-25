@@ -26,6 +26,8 @@ export interface ToolCallView {
     removed: string[];
     added: string[];
   };
+  /** The question asked by `ask_user`, shown instead of raw arguments. */
+  question?: string;
 }
 
 export type Segment =
@@ -72,6 +74,17 @@ export interface ToolCount {
   count: number;
 }
 
+export interface PendingQuestion {
+  callId: string;
+  question: string;
+  type: 'text' | 'confirm' | 'choice';
+  options: {
+    value: string;
+    label: string;
+    description?: string;
+  }[];
+}
+
 export interface ThreadView {
   items: ThreadItem[];
   contextTokens?: number;
@@ -79,6 +92,8 @@ export interface ThreadView {
   running: boolean;
   /** Reason of the last `chat.done`: the session state once a turn ends. */
   lastDone?: string;
+  /** The unanswered `ask_user` question, if any. */
+  pendingQuestion?: PendingQuestion;
   modifiedFiles: ModifiedFile[];
   toolCounts: ToolCount[];
   usage: SessionUsage;
@@ -167,6 +182,7 @@ export function createThreadFold(): ThreadFold {
   let contextMax: number | undefined;
   let running = false;
   let lastDone: string | undefined;
+  let pendingQuestion: PendingQuestion | undefined;
   const modified = new Map<string, ModifiedFile>();
   const toolCounts = new Map<string, number>();
   const assistants = new Map<string, AssistantItem>();
@@ -284,6 +300,9 @@ export function createThreadFold(): ThreadFold {
           stderr: '',
           output: ''
         };
+        if (name === 'ask_user' && typeof args.question === 'string') {
+          tool.question = args.question;
+        }
         updateToolStats(tool, modified, toolCounts);
 
         const assistant = assistants.get(messageId) ?? newAssistant(messageId);
@@ -307,6 +326,10 @@ export function createThreadFold(): ThreadFold {
 
       case 'tool.result': {
         const toolCallId = String(data.toolCallId ?? '');
+        // The answer ends the pending question even if the tool view is missing.
+        if (pendingQuestion?.callId === toolCallId) {
+          pendingQuestion = undefined;
+        }
         const tool = tools.get(toolCallId);
         if (!tool) break;
         const result = data.result ?? {};
@@ -321,6 +344,28 @@ export function createThreadFold(): ThreadFold {
         break;
       }
 
+      case 'chat.ask_user': {
+        const callId = String(data.callId ?? `tool-${index}`);
+        const question = String(data.question ?? '');
+        const type: PendingQuestion['type'] =
+          data.type === 'confirm' ? 'confirm' : data.type === 'choice' ? 'choice' : 'text';
+        const rawOptions = Array.isArray(data.options) ? data.options : [];
+        const options: PendingQuestion['options'] = rawOptions.map((option: any) => {
+          const value = String(option?.value ?? '');
+          return {
+            value,
+            label: String(option?.label ?? value),
+            description: option?.description != null ? String(option.description) : undefined
+          };
+        });
+        pendingQuestion = { callId, question, type, options };
+        const tool = tools.get(callId);
+        if (tool && tool.name === 'ask_user') {
+          tool.question = question;
+        }
+        break;
+      }
+
       case 'context.state': {
         contextTokens = typeof data.currentTokens === 'number' ? data.currentTokens : contextTokens;
         contextMax = typeof data.maxTokens === 'number' ? data.maxTokens : contextMax;
@@ -329,13 +374,18 @@ export function createThreadFold(): ThreadFold {
 
       case 'running.changed': {
         running = Boolean(data.isRunning);
+        // A new turn supersedes any unanswered question.
+        if (running) {
+          pendingQuestion = undefined;
+        }
         break;
       }
 
       case 'chat.done': {
         const reason = String(data.reason ?? 'complete');
         lastDone = reason;
-        if (reason !== 'complete') {
+        // The question card is the signal for `waiting_for_user`; no note is needed.
+        if (reason !== 'complete' && reason !== 'waiting_for_user') {
           const text =
             reason === 'stopped' ? 'Arrêtée' : reason === 'truncated' ? 'Tronquée' : reason === 'error' ? 'Erreur' : 'Terminée';
           items.push({ kind: 'note', id: `done-${index}`, text });
@@ -363,6 +413,7 @@ export function createThreadFold(): ThreadFold {
     contextMax,
     running,
     lastDone,
+    pendingQuestion,
     modifiedFiles: Array.from(modified.values()),
     toolCounts: Array.from(toolCounts.entries()).map(([name, count]) => ({ name, count })),
     usage: { ...usage }

@@ -13,7 +13,11 @@ export function ToolCard({ tool }: { tool: ToolCallView }) {
   }, [tool.name, tool.status]);
 
   const arg =
-    tool.name === 'run_command' ? String(tool.args.command ?? '') : String(tool.args.path ?? '');
+    tool.name === 'ask_user'
+      ? String(tool.question ?? tool.args.question ?? '')
+      : tool.name === 'run_command'
+        ? String(tool.args.command ?? '')
+        : String(tool.args.path ?? '');
   const lineCount = tool.output ? tool.output.split('\n').length : 0;
 
   const icon =
@@ -60,7 +64,10 @@ export function ToolCard({ tool }: { tool: ToolCallView }) {
         {tool.durationMs != null && (
           <span className="shrink-0 text-xs whitespace-nowrap text-muted">{formatDuration(tool.durationMs)}</span>
         )}
-        {tool.status === 'running' && <SpinnerIcon className="h-4 w-4 text-accent" />}
+        {tool.status === 'running' && tool.name !== 'ask_user' && <SpinnerIcon className="h-4 w-4 text-accent" />}
+        {tool.status === 'running' && tool.name === 'ask_user' && (
+          <span className="shrink-0 text-xs whitespace-nowrap text-muted">en attente</span>
+        )}
         {tool.status === 'success' && <span className="text-xs font-semibold text-ok">✓</span>}
         {tool.status === 'error' && <span className="text-xs font-semibold text-err">✗</span>}
       </button>
@@ -114,9 +121,14 @@ export function ToolCard({ tool }: { tool: ToolCallView }) {
               )}
             </div>
           )}
+
+          {tool.name === 'ask_user' && (
+            <pre className="overflow-x-auto bg-code p-2.5 font-mono text-xs text-muted whitespace-pre">
+              {tool.output || tool.error || 'En attente de réponse'}
+            </pre>
+          )}
         </div>
       )}
     </div>
   );
 }
-
