@@ -62,7 +62,7 @@ export type ThreadItem =
   | { kind: 'user'; id: string; content: string; isSystemGenerated: boolean }
   | AssistantItem
   | { kind: 'error'; id: string; message: string }
-  | { kind: 'note'; id: string; text: string };
+  | { kind: 'note'; id: string; text: string; detail?: string };
 
 export interface ModifiedFile {
   path: string;
@@ -376,11 +376,27 @@ export function createThreadFold(): ThreadFold {
       case 'context.compacted': {
         const beforeTokens = typeof data.beforeTokens === 'number' ? data.beforeTokens : 0;
         const afterTokens = typeof data.afterTokens === 'number' ? data.afterTokens : 0;
+        const summary = String(data.summary ?? '');
         contextTokens = afterTokens;
+        const summaryTrimmed = summary.trim();
+        for (let i = items.length - 1; i >= 0; i -= 1) {
+          const item = items[i];
+          if (item.kind !== 'assistant') continue;
+          const text = item.segments
+            .filter((segment): segment is Extract<Segment, { kind: 'text' }> => segment.kind === 'text')
+            .map((segment) => segment.content)
+            .join('')
+            .trim();
+          if (text === summaryTrimmed) {
+            items.splice(i, 1);
+            break;
+          }
+        }
         items.push({
           kind: 'note',
           id: `compacted-${index}`,
-          text: `Contexte compacté · ${formatTokens(beforeTokens)} → ~${formatTokens(afterTokens)} tokens`
+          text: `Contexte compacté · ${formatTokens(beforeTokens)} → ~${formatTokens(afterTokens)} tokens`,
+          detail: summary
         });
         break;
       }
