@@ -386,7 +386,7 @@ pub fn run_agent_node(turn: &mut Turn, agent_id: &str, prompt: &str) -> Result<D
     let agent = turn
         .agents
         .iter()
-        .find(|a| a.id == agent_id && !a.subagent)
+        .find(|a| a.id == agent_id)
         .ok_or_else(|| format!("unknown agent: {agent_id}"))?;
 
     if resolve(turn.agents, &events).is_none_or(|a| a.id != agent_id) {

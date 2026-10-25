@@ -1,6 +1,6 @@
 //! Workflow validation: the issues the editor shows next to a node or edge.
 
-use super::definition::{BRANCH, ConditionTest, EXHAUSTED, Edge, NodeKind, Workflow};
+use super::definition::{AgentContext, BRANCH, ConditionTest, EXHAUSTED, Edge, NodeKind, Workflow};
 use super::template::{check_name, names};
 use crate::domain::agent::AgentDefinition;
 use serde::Serialize;
@@ -112,13 +112,29 @@ fn check_basic(workflow: &Workflow, issues: &mut Vec<Issue>) {
 fn check_node_fields(workflow: &Workflow, agents: &[AgentDefinition], issues: &mut Vec<Issue>) {
     for node in &workflow.nodes {
         match &node.kind {
-            NodeKind::Agent { agent, outputs, .. } => {
-                if !agents.iter().any(|definition| &definition.id == agent) {
-                    issues.push(issue(
+            NodeKind::Agent {
+                agent,
+                outputs,
+                context,
+                ..
+            } => {
+                match agents.iter().find(|definition| &definition.id == agent) {
+                    None => issues.push(issue(
                         Some(node.id.clone()),
                         None,
                         format!("unknown agent {agent}"),
-                    ));
+                    )),
+                    // A sub-agent is never a mode of the human's session.
+                    Some(definition)
+                        if definition.subagent && *context == AgentContext::Session =>
+                    {
+                        issues.push(issue(
+                            Some(node.id.clone()),
+                            None,
+                            format!("sub-agent {agent} runs only in a fresh context"),
+                        ))
+                    }
+                    Some(_) => {}
                 }
 
                 if outputs.is_empty() {
@@ -785,6 +801,16 @@ mod tests {
 
         let issues = validate(&workflow, &agents());
         assert!(messages(&issues).contains(&"unknown agent missing".into()));
+    }
+
+    #[test]
+    fn sub_agent_in_the_session_context_is_an_issue() {
+        let mut agents = agents();
+        agents[1].subagent = true;
+        let issues = validate(&example_workflow(), &agents);
+        assert!(
+            messages(&issues).contains(&"sub-agent builder runs only in a fresh context".into())
+        );
     }
 
     #[test]

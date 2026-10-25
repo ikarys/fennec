@@ -36,12 +36,13 @@ export interface SlashCommand {
   description: string;
 }
 
-/** A top-level agent the session can run as (`plan`, `builder`, …). */
+/** An agent: a mode of the session (`plan`, `builder`, …), or a sub-agent that workflow nodes run in a fresh context. */
 export interface Agent {
   id: string;
   name: string;
   description: string;
   color: string | null;
+  subagent: boolean;
 }
 
 /** openfox `ReasoningEffort`: how much a model may think. */

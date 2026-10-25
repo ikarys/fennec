@@ -79,6 +79,9 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
                 event_stream::serve(&app.store()?, &app.notifier, req, stream, id)
             }
         }
+        ("GET", ["api", "sessions", id, "preview", rest @ ..]) => {
+            super::preview::serve(app, stream, id, rest)
+        }
         ("GET", ["api", ..]) | ("POST", _) => error(stream, 404, "not found"),
         ("GET", _) => {
             let asset = assets::get(&req.path);
@@ -178,13 +181,13 @@ fn list_agents(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String
     let list = agents::discover(Path::new(&project.workdir));
     let out: Vec<Value> = list
         .iter()
-        .filter(|agent| !agent.subagent)
         .map(|agent| {
             json!({
                 "id": agent.id,
                 "name": agent.name,
                 "description": agent.description,
                 "color": agent.color,
+                "subagent": agent.subagent,
             })
         })
         .collect();

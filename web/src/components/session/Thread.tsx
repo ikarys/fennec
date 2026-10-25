@@ -10,41 +10,9 @@ import { MessageStatsLine } from './MessageStats';
 import { PlanCard, ReportCard } from './PlanCard';
 import { ToolCard } from './ToolCard';
 import { NodeDivider } from '../workflow/session/NodeDivider';
+import { markdownComponents } from './markdownComponents';
 
-const markdownComponents = {
-  pre: ({ children }: { children?: React.ReactNode }) => (
-    <pre className="my-2 overflow-x-auto rounded-md bg-code p-3 font-mono text-xs text-muted">{children}</pre>
-  ),
-  code: ({ className, children }: { className?: string; children?: React.ReactNode }) => {
-    const isBlock = className?.includes('language-');
-    if (isBlock) {
-      return <code className="font-mono text-xs">{children}</code>;
-    }
-    return (
-      <code className="rounded bg-raised px-1 py-0.5 font-mono text-[12.5px] text-text">{children}</code>
-    );
-  },
-  p: ({ children }: { children?: React.ReactNode }) => <p className="my-2 leading-relaxed">{children}</p>,
-  // Tailwind's preflight removes list markers; plans are lists of lists.
-  ul: ({ children }: { children?: React.ReactNode }) => <ul className="my-2 list-disc pl-5">{children}</ul>,
-  ol: ({ children }: { children?: React.ReactNode }) => <ol className="my-2 list-decimal pl-5">{children}</ol>,
-  li: ({ children }: { children?: React.ReactNode }) => <li className="my-0.5 leading-relaxed">{children}</li>,
-  a: ({ children, href }: { children?: React.ReactNode; href?: string }) => (
-    <a href={href} className="text-accent-strong underline" target="_blank" rel="noreferrer">
-      {children}
-    </a>
-  ),
-  table: ({ children }: { children?: React.ReactNode }) => (
-    // Wide tables scroll inside the thread instead of being cut by it.
-    <div className="my-2 overflow-x-auto">
-      <table className="w-full border-collapse text-sm">{children}</table>
-    </div>
-  ),
-  th: ({ children }: { children?: React.ReactNode }) => (
-    <th className="border border-border bg-raised px-2 py-1 text-left">{children}</th>
-  ),
-  td: ({ children }: { children?: React.ReactNode }) => <td className="border border-border px-2 py-1">{children}</td>
-};
+
 
 // Memoised on their text: while one message streams, the others are not
 // parsed again on every frame.

@@ -26,6 +26,8 @@ import { Composer } from '../components/session/Composer';
 import { ContextPanel } from '../components/session/ContextPanel';
 import { QuestionCard } from '../components/session/QuestionCard';
 import { ThreadItemView } from '../components/session/Thread';
+import { PreviewContext, PreviewWorkdirContext, type PreviewTarget } from '../components/preview/PreviewContext';
+import { PreviewPane } from '../components/preview/PreviewPane';
 import { RunStrip } from '../components/workflow/session/RunStrip';
 import { RunActionCard } from '../components/workflow/session/RunActionCard';
 import type { WorkflowSelection } from '../components/workflow/session/WorkflowPicker';
@@ -55,6 +57,7 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
   // Optimistic mode while `setSessionMode` is in flight; cleared once the
   // server's mode (event stream or detail) matches it.
   const [pendingMode, setPendingMode] = useState<string | null>(null);
+  const [preview, setPreview] = useState<PreviewTarget | null>(null);
   const { view, hasMore, loadingOlder, loadOlder } = useSessionThread(sessionId);
   const running = view.running;
   const run = view.run;
@@ -146,7 +149,7 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
     let ignore = false;
     listAgents(commandProjectId)
       .then((data) => {
-        if (!ignore) setAgents(data);
+        if (!ignore) setAgents(data.filter((agent) => !agent.subagent));
       })
       .catch(() => {
         if (!ignore) setAgents([]);
@@ -174,9 +177,11 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
     };
   }, [commandProjectId]);
 
-  // A pending choice belongs to one session; do not leak it across tabs.
+  // A pending choice and preview belong to one session; do not leak them
+  // across tabs.
   useEffect(() => {
     setPendingMode(null);
+    setPreview(null);
   }, [sessionId]);
 
   // A new-session tab has no detail yet: the server lists its default agent
@@ -339,8 +344,10 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
   }
 
   return (
-    <div className="flex min-h-0 min-w-0 grow">
-      <main className="flex min-h-0 min-w-0 flex-[999_1_560px] flex-col">
+    <PreviewContext.Provider value={setPreview}>
+      <PreviewWorkdirContext.Provider value={detail?.project.workdir}>
+        <div className="flex min-h-0 min-w-0 grow">
+          <main className="flex min-h-0 min-w-0 flex-[999_1_560px] flex-col">
         <div className="flex flex-wrap items-center gap-2.5 px-6 pt-3.5">
           <div className="mx-auto flex w-full max-w-[820px] flex-wrap items-center gap-2.5">
             <h1 className="text-base font-semibold tracking-[-0.01em]">{title}</h1>
@@ -448,15 +455,20 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
         )}
       </main>
 
-      <ContextPanel
-        view={view}
-        currentTokens={currentTokens}
-        contextPercent={contextPercent}
-        compactDisabled={!sessionId || state === 'running' || state === 'waiting_for_user'}
-        onCompact={handleCompact}
-        compactError={compactError}
-        partial={hasMore}
-      />
-    </div>
+          <ContextPanel
+            view={view}
+            currentTokens={currentTokens}
+            contextPercent={contextPercent}
+            compactDisabled={!sessionId || state === 'running' || state === 'waiting_for_user'}
+            onCompact={handleCompact}
+            compactError={compactError}
+            partial={hasMore}
+          />
+          {preview && sessionId && (
+            <PreviewPane sessionId={sessionId} target={preview} onClose={() => setPreview(null)} />
+          )}
+        </div>
+      </PreviewWorkdirContext.Provider>
+    </PreviewContext.Provider>
   );
 }

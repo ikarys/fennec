@@ -115,8 +115,9 @@ turn.
   (sessions newest first; `createdAt`/`updatedAt` are Unix milliseconds; `branch` may be `null`)
 - `POST /api/projects` `{workdir}` → the project (400 if not a directory)
 - `GET /api/projects/{id}/commands` → `[{name, description}]`: the slash commands the composer offers (`compact`, then the project's skills); 404 if no project
-- `GET /api/projects/{id}/agents` → `[{id, name, description, color}]`: the
-  project's top-level agents in discovery order (`color` null when unset);
+- `GET /api/projects/{id}/agents` → `[{id, name, description, color, subagent}]`: the
+  project's agents in discovery order (`color` null when unset); the modes are the
+  ones with `subagent` false, the others only run in a workflow node's fresh context;
   404 if no project
 - `GET /api/folders?path=<absolute path>` → `{path, parent, folders: [{name, path, hidden, repo}]}`,
   the sub-folders of `path` (the home directory when omitted), sorted by name;
@@ -172,6 +173,11 @@ turn.
   Older history exists while the first `seq` is above 1. `limit` must be in
   `1..=10000` (400 otherwise); 404 if no session; an empty array when there
   is nothing before `before`.
+- `GET /api/sessions/{id}/preview/<path>` → the file at `<path>` relative to
+  the session's project, for the preview; 404 outside the project or for a
+  missing file, 413 above 10 MiB; always sent with
+  `Content-Security-Policy: sandbox allow-scripts`, so a page runs in an
+  opaque origin whose requests the guard refuses.
 
 ## Workflows
 

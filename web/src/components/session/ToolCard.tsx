@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import type { ToolCallView } from '../../lib/fold';
 import { useDisplayPrefs } from '../../lib/display';
 import { formatDuration } from '../../lib/format';
+import { previewKindOfPath, relativeToWorkdir } from '../../lib/preview';
+import { usePreviewOpener, usePreviewWorkdir } from '../preview/PreviewContext';
 import { EditIcon, FileIcon, SpinnerIcon, TerminalIcon } from '../Icons';
 
 export function ToolCard({ tool }: { tool: ToolCallView }) {
@@ -21,6 +23,13 @@ export function ToolCard({ tool }: { tool: ToolCallView }) {
         ? String(tool.args.command ?? '')
         : String(tool.args.path ?? '');
   const lineCount = tool.output ? tool.output.split('\n').length : 0;
+  const opener = usePreviewOpener();
+  const workdir = usePreviewWorkdir();
+  const previewPath = String(tool.args.path ?? '');
+  const previewKind =
+    tool.name === 'write_file' || tool.name === 'edit_file' ? previewKindOfPath(previewPath) : undefined;
+  const previewRelative =
+    previewKind && workdir ? relativeToWorkdir(previewPath, workdir) : undefined;
 
   const icon =
     tool.name === 'run_command' ? (
@@ -33,18 +42,32 @@ export function ToolCard({ tool }: { tool: ToolCallView }) {
 
   return (
     <div className="overflow-hidden rounded-[10px] border border-border bg-panel">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-        className="flex min-h-10 w-full items-center gap-2.5 px-3 text-left text-text"
-      >
-        {icon}
-        <span className="shrink-0 font-mono text-[12.5px] font-medium">{tool.name}</span>
-        <span title={arg} className="min-w-0 truncate font-mono text-[12.5px] text-muted">
-          {arg}
-        </span>
-        <span className="grow" />
+      <div className="flex min-h-10 items-center gap-2.5 px-3 text-left text-text">
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpen((value) => !value)}
+          className="flex min-w-0 grow items-center gap-2.5"
+        >
+          {icon}
+          <span className="shrink-0 font-mono text-[12.5px] font-medium">{tool.name}</span>
+          <span title={arg} className="min-w-0 truncate font-mono text-[12.5px] text-muted">
+            {arg}
+          </span>
+          <span className="grow" />
+        </button>
+        {tool.status === 'success' && previewKind && previewRelative && opener && (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              opener({ path: previewRelative, kind: previewKind });
+            }}
+            className="shrink-0 rounded-md border border-border bg-raised px-1.5 py-0.5 text-xs text-muted hover:text-text"
+          >
+            Aperçu
+          </button>
+        )}
         {tool.name === 'edit_file' && (
           <>
             <span className="font-mono text-xs text-ok">+{tool.addedLines ?? 0}</span>
@@ -72,7 +95,7 @@ export function ToolCard({ tool }: { tool: ToolCallView }) {
         )}
         {tool.status === 'success' && <span className="text-xs font-semibold text-ok">✓</span>}
         {tool.status === 'error' && <span className="text-xs font-semibold text-err">✗</span>}
-      </button>
+      </div>
 
       {open && (
         <div className="border-t border-border">
