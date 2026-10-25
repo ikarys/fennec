@@ -50,6 +50,25 @@ pub(super) fn resolve_in_workdir(workdir: &Path, p: &str) -> Result<PathBuf, Str
     Ok(resolved)
 }
 
+/// A read may also reach into a skill package by absolute path: a loaded
+/// skill tells the model to read its own reference files from its directory,
+/// which usually lies outside the project (`~/.agents/skills`).
+pub(super) fn resolve_for_reading(
+    workdir: &Path,
+    packages: impl FnOnce() -> Vec<PathBuf>,
+    p: &str,
+) -> Result<PathBuf, String> {
+    resolve_in_workdir(workdir, p).or_else(|denied| {
+        if !Path::new(p).is_absolute() {
+            return Err(denied);
+        }
+        packages()
+            .iter()
+            .find_map(|dir| resolve_in_workdir(dir, p).ok())
+            .ok_or(denied)
+    })
+}
+
 fn lexical_normalize(workdir: &Path, p: &str) -> PathBuf {
     let path = Path::new(p);
     let mut normalized = if path.is_absolute() {
@@ -83,7 +102,28 @@ fn lexical_normalize(workdir: &Path, p: &str) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
+    use super::resolve_for_reading;
     use crate::tools::test_support::{no_output, run_tool, temp_dir};
+
+    #[test]
+    fn a_skill_package_is_readable_by_absolute_path_only() {
+        let dir = temp_dir();
+        let package = temp_dir();
+        let outside = temp_dir();
+        std::fs::write(package.join("ref.md"), "ref").unwrap();
+        let packages = || vec![package.clone()];
+
+        let absolute = package.join("ref.md");
+        assert!(resolve_for_reading(&dir, packages, absolute.to_str().unwrap()).is_ok());
+        let relative = resolve_for_reading(&dir, packages, "ref.md").unwrap();
+        assert!(relative.starts_with(dir.canonicalize().unwrap()));
+        let elsewhere = outside.join("secret.md");
+        assert!(resolve_for_reading(&dir, packages, elsewhere.to_str().unwrap()).is_err());
+
+        for d in [dir, package, outside] {
+            let _ = std::fs::remove_dir_all(d);
+        }
+    }
 
     #[test]
     fn path_escape_via_parent_dir_denied() {
