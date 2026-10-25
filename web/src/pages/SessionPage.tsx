@@ -5,6 +5,7 @@ import { stateLabel } from '../lib/format';
 import { useSessionThread } from '../hooks/useSessionThread';
 import { Composer } from '../components/session/Composer';
 import { ContextPanel } from '../components/session/ContextPanel';
+import { QuestionCard } from '../components/session/QuestionCard';
 import { ThreadItemView } from '../components/session/Thread';
 
 interface SessionPageProps {
@@ -58,6 +59,12 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
   }, [sessionId]);
 
   useEffect(() => {
+    if (view.pendingQuestion && !running) {
+      textareaRef.current?.focus();
+    }
+  }, [view.pendingQuestion, running]);
+
+  useEffect(() => {
     const element = scrollRef.current;
     if (element && stickToBottom.current) {
       element.scrollTop = element.scrollHeight;
@@ -73,19 +80,19 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
   const maxTokens = view.contextMax ?? config?.contextWindow ?? 0;
   const contextPercent = maxTokens > 0 ? Math.min(100, Math.round((currentTokens / maxTokens) * 100)) : 0;
 
-  async function handleSend() {
-    const content = text.trim();
-    if (!content || running) return;
+  async function handleSend(content?: string) {
+    const value = (content ?? text).trim();
+    if (!value || running) return;
     setSendError(null);
 
     try {
       if (sessionId) {
-        await sendMessage(sessionId, content);
-        setText('');
+        await sendMessage(sessionId, value);
+        if (content === undefined) setText('');
       } else if (projectId) {
-        const created = await createSession(projectId, content);
+        const created = await createSession(projectId, value);
         onSessionCreated(created.id, pseudoTabId);
-        setText('');
+        if (content === undefined) setText('');
       }
     } catch (error) {
       setSendError(error instanceof Error ? error.message : 'Erreur lors de l’envoi');
@@ -139,10 +146,17 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
           </div>
         </div>
 
+        {view.pendingQuestion && !running && (
+          <QuestionCard
+            question={view.pendingQuestion}
+            onAnswer={(answer) => handleSend(answer)}
+            disabled={running}
+          />
+        )}
         <Composer
           text={text}
           onTextChange={setText}
-          onSend={handleSend}
+          onSend={() => handleSend()}
           onStop={handleStop}
           running={running}
           model={config?.model}
@@ -150,6 +164,7 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
           maxTokens={maxTokens}
           error={sendError}
           textareaRef={textareaRef}
+          placeholder={view.pendingQuestion && !running ? 'Ta réponse…' : undefined}
         />
       </main>
 

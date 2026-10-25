@@ -73,6 +73,28 @@ pub enum DoneReason {
     Stopped,
     Error,
     Truncated,
+    #[serde(rename = "waiting_for_user")]
+    WaitingForUser,
+}
+
+/// The kind of question `ask_user` asks (openfox `type`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AskType {
+    #[default]
+    Text,
+    Confirm,
+    Choice,
+}
+
+/// One option of a `choice` question (openfox `ChoiceOption`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChoiceOption {
+    pub value: String,
+    pub label: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
 }
 
 /// The subset of openfox's `TurnEvent` union the agent loop needs. Wire
@@ -135,6 +157,17 @@ pub enum Event {
     },
     #[serde(rename = "chat.error", rename_all = "camelCase")]
     ChatError { error: String, recoverable: bool },
+    /// The model asked the human a question; the turn ends and the answer
+    /// arrives as the next turn's input.
+    #[serde(rename = "chat.ask_user", rename_all = "camelCase")]
+    ChatAskUser {
+        call_id: String,
+        question: String,
+        #[serde(rename = "type", default)]
+        ask_type: AskType,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        options: Option<Vec<ChoiceOption>>,
+    },
     /// openfox keeps more in a snapshot; fennec only needs the system
     /// prompt, frozen for the session so the server's prompt cache holds.
     #[serde(rename = "turn.snapshot", rename_all = "camelCase")]
@@ -156,6 +189,7 @@ impl Event {
             Event::RunningChanged { .. } => "running.changed",
             Event::ChatDone { .. } => "chat.done",
             Event::ChatError { .. } => "chat.error",
+            Event::ChatAskUser { .. } => "chat.ask_user",
             Event::TurnSnapshot { .. } => "turn.snapshot",
         }
     }
@@ -178,6 +212,7 @@ impl fmt::Display for DoneReason {
             DoneReason::Stopped => "stopped",
             DoneReason::Error => "error",
             DoneReason::Truncated => "truncated",
+            DoneReason::WaitingForUser => "waiting_for_user",
         })
     }
 }

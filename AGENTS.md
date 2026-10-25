@@ -18,8 +18,10 @@ Ported from openfox commit `0694574d` (v2.0.161); see THIRD_PARTY.md.
 
 Component 1, done: the agent loop on the command line.
 Component 2, done: the web UI (session tabs, ⌘K palette, home, themes).
+Human pause, done: ask_user (the turn ends, the answer is the next input),
+clean stop, open tool calls closed after a stop or a crash.
 Next, one PR each, so that the minimal agent works before security layers:
-human pause (ask_user, stop/resume) → compaction (auto at a threshold
+compaction (auto at a threshold
 and manual) → settings page (display defaults,
 thread loaded lazily beyond the last exchanges) → conventions shared by
 agents, nothing tool-specific (AGENTS.md, .agents/skills with SKILL.md) →
@@ -47,6 +49,7 @@ crates/fennec/src/
     stats.rs           openfox MessageStats: tokens (in, cached, out) and speeds of a call
     project.rs         Project, SessionSummary, SessionState
     conversation.rs    openfox events/fold-messages: the log read back as model messages
+    open_calls.rs      tool calls left without a result (ask_user, stop, crash)
     id.rs, clock.rs
   agent/             application layer: the agent loop
     ports.rs           Model, EventLog, Toolbox: what the loop needs from outside
@@ -54,6 +57,7 @@ crates/fennec/src/
     round.rs           one model round: streaming, retries, continuation, timing
     delta_buffer.rs    coalesces streamed chunks into one event per 100 ms
     tool_calls.rs      openfox chat/execute-tools: runs and records tool calls
+    ask_user.rs        openfox tools/ask: the loop's own tool; the turn ends waiting for the human
     prompt.rs          openfox chat/prompts: the system prompt
   tools/             Toolbox adapter on the host: one file per tool, path_guard, args
   llm/               Model adapter: openai.rs (client), sse.rs (stream parser)
@@ -66,7 +70,7 @@ crates/fennec/src/
 crates/fennec/build.rs   embeds web/dist (placeholder page when not built)
 web/src/           React + Vite + Tailwind v4 UI (same layout as openfox's web/src)
   pages/             one component per route: HomePage, SessionPage
-  components/        shared UI; session/ the thread, tool cards, message stats, composer,
+  components/        shared UI; session/ the thread, tool cards, question card, message stats, composer,
                      context panel; project/ the folder browser; layout/ the top bar
   hooks/             useSessionThread: the SSE stream of a session, folded
   lib/               api (typed fetch), fold (events → thread view), format, theme
