@@ -6,17 +6,24 @@
 //! answer arrives as the next turn's input, so a pending question survives a
 //! restart.
 //!
-//! Not ported yet: compaction, auto-retry patterns, vision fallback, queue,
-//! pause gate, sub-agents, return_value/step_done, parallel tool batches.
+//! Compaction is ported: at a threshold the loop asks the model for a
+//! summary and opens a new window from it (`compaction`), and
+//! `compact_session` runs it on demand.
+//!
+//! Not ported yet: auto-retry patterns, vision fallback, queue, pause gate,
+//! sub-agents, return_value/step_done, parallel tool batches.
 
 use super::ask_user;
+use super::compaction::{self, Compacted};
 use super::ports::{EventLog, Model, Toolbox};
 use super::prompt::system_prompt;
 use super::round::{self, Round, RoundPrompt};
 use super::tool_calls::{Flow, INTERRUPTED_ERROR, execute_tools};
+use crate::domain::compaction::{context_tokens, should_compact};
 use crate::domain::event::{DoneReason, Event, Role, ToolResult};
 use crate::domain::id::new_id;
 use crate::domain::open_calls;
+use serde_json::Value;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -37,6 +44,8 @@ pub struct Turn<'a> {
     pub max_tokens: u32,
     /// The model's context window, reported in `context.state`.
     pub context_window: u64,
+    /// The compaction threshold as a fraction of the window; 0 disables it.
+    pub compact_at: f64,
     /// Set by the human to stop the turn: checked between rounds, while
     /// streaming and while a command runs.
     pub stop: &'a AtomicBool,
@@ -74,18 +83,50 @@ impl Turn<'_> {
 /// Appends the user's prompt and runs the loop to completion. Returns the
 /// `chat.done` reason.
 pub fn run_turn(turn: &mut Turn, prompt: &str) -> Result<DoneReason, String> {
+    with_running(turn, |turn| {
+        // Close tool calls left open by a previous turn before writing the
+        // prompt: the model API rejects an assistant tool call without its
+        // tool message. When the open call awaits an answer, the human's
+        // input *is* that answer, so no user message is appended on top of it.
+        let answered = close_open_calls(turn, prompt)?;
+        if answered {
+            run_top_level_agent_loop(turn)
+        } else {
+            turn.append_user(prompt, false)
+                .and_then(|()| run_top_level_agent_loop(turn))
+        }
+    })
+}
+
+/// The human's manual compaction: summarise the history and open a new
+/// window, then end the turn. Refuses while a question is pending.
+pub fn compact_session(turn: &mut Turn) -> Result<DoneReason, String> {
+    with_running(turn, |turn| {
+        let events = turn.log.events(turn.session_id)?;
+        if !open_calls::open_calls(&events).is_empty() {
+            return Err("answer the pending question or send a message first".into());
+        }
+        let (system_prompt, tool_defs) = round_prompt_parts(turn)?;
+        let prompt = RoundPrompt {
+            system_prompt: &system_prompt,
+            tools: &tool_defs,
+            max_tokens: turn.max_tokens,
+        };
+        match compaction::compact(turn, &prompt)? {
+            Compacted::Done | Compacted::Skipped => finish(turn, new_id(), DoneReason::Complete),
+            Compacted::Ended(reason) => finish(turn, new_id(), reason),
+        }
+    })
+}
+
+/// Wraps a turn: mark it running, record a `chat.error` on failure, then
+/// mark it not running. Shared by `run_turn` and `compact_session`.
+fn with_running(
+    turn: &mut Turn,
+    work: impl FnOnce(&mut Turn) -> Result<DoneReason, String>,
+) -> Result<DoneReason, String> {
     turn.append(Event::RunningChanged { is_running: true })?;
-    // Close tool calls left open by a previous turn before writing the
-    // prompt: the model API rejects an assistant tool call without its tool
-    // message. When the open call awaits an answer, the human's input *is*
-    // that answer, so no user message is appended on top of it.
-    let answered = close_open_calls(turn, prompt)?;
-    let result = if answered {
-        run_top_level_agent_loop(turn)
-    } else {
-        turn.append_user(prompt, false)
-            .and_then(|()| run_top_level_agent_loop(turn))
-    };
+    let result = work(turn);
     if let Err(e) = &result {
         // Best effort: the store itself may be what failed.
         let _ = turn.append(Event::ChatError {
@@ -95,6 +136,19 @@ pub fn run_turn(turn: &mut Turn, prompt: &str) -> Result<DoneReason, String> {
     }
     turn.append(Event::RunningChanged { is_running: false })?;
     result
+}
+
+/// The system prompt and tool definitions a round is sent with, built once
+/// so the loop and a manual compaction use an identical cached prefix.
+fn round_prompt_parts(turn: &mut Turn) -> Result<(String, Value), String> {
+    let system_prompt = cached_system_prompt(turn)?;
+    // The loop owns `ask_user`; it is not a host tool, so its definition is
+    // added to the toolbox's.
+    let mut tool_defs = turn.tools.definitions();
+    if let Some(arr) = tool_defs.as_array_mut() {
+        arr.push(ask_user::definition());
+    }
+    Ok((system_prompt, tool_defs))
 }
 
 /// Closes the open calls of a previous turn. The open call that awaits an
@@ -146,15 +200,12 @@ fn cached_system_prompt(turn: &mut Turn) -> Result<String, String> {
 }
 
 fn run_top_level_agent_loop(turn: &mut Turn) -> Result<DoneReason, String> {
-    let system_prompt = cached_system_prompt(turn)?;
-    // The loop owns `ask_user`; it is not a host tool, so its definition is
-    // added to the toolbox's.
-    let mut tool_defs = turn.tools.definitions();
-    if let Some(arr) = tool_defs.as_array_mut() {
-        arr.push(ask_user::definition());
-    }
+    let (system_prompt, tool_defs) = round_prompt_parts(turn)?;
     let mut max_tokens = turn.max_tokens;
     let mut truncation_retries = 0;
+    // Guards against compacting again before a real round has measured the
+    // new window.
+    let mut compacted_last_round = false;
 
     for _ in 0..MAX_ROUNDS {
         let message_id = new_id();
@@ -166,6 +217,21 @@ fn run_top_level_agent_loop(turn: &mut Turn) -> Result<DoneReason, String> {
             tools: &tool_defs,
             max_tokens,
         };
+        if !compacted_last_round
+            && should_compact(
+                context_tokens(&turn.log.events(turn.session_id)?),
+                turn.context_window,
+                turn.compact_at,
+            )
+        {
+            match compaction::compact(turn, &prompt)? {
+                Compacted::Ended(reason) => return finish(turn, message_id, reason),
+                Compacted::Done | Compacted::Skipped => {}
+            }
+            compacted_last_round = true;
+            continue;
+        }
+        compacted_last_round = false;
         let (answer, stats) = match round::stream(turn, &message_id, &prompt)? {
             Round::Answered(answer, stats) => (answer, stats),
             Round::Interrupted => continue,
@@ -230,60 +296,13 @@ mod tests {
     use super::*;
     use crate::agent::ports::{Completion, Delta, Request};
     use crate::agent::round::CONTINUE_AFTER_STREAM_ERROR_PROMPT;
+    use crate::agent::test_support::{MemoryLog, Scripted, reply};
     use crate::domain::conversation::fold_messages;
     use crate::domain::event::ToolCall;
     use crate::tools::LocalTools;
     use serde_json::json;
     use std::cell::RefCell;
     use std::path::PathBuf;
-
-    /// Plays back one scripted reply per call, like openfox's mock LLM.
-    struct Scripted(RefCell<Vec<Result<Completion, String>>>);
-
-    impl Model for Scripted {
-        fn name(&self) -> &str {
-            "scripted"
-        }
-
-        fn stream(&self, _: &Request, on: &mut dyn FnMut(Delta)) -> Result<Completion, String> {
-            let next = self.0.borrow_mut().remove(0);
-            if let Ok(c) = &next
-                && !c.content.is_empty()
-            {
-                on(Delta::Text(c.content.clone()));
-            }
-            next
-        }
-    }
-
-    /// An in-memory log: the loop's tests do not need SQLite.
-    #[derive(Default)]
-    struct MemoryLog(RefCell<Vec<Event>>);
-
-    impl EventLog for MemoryLog {
-        fn append(&self, _: &str, event: &Event) -> Result<u64, String> {
-            self.0.borrow_mut().push(event.clone());
-            Ok(self.0.borrow().len() as u64)
-        }
-
-        fn events(&self, _: &str) -> Result<Vec<Event>, String> {
-            Ok(self.0.borrow().clone())
-        }
-    }
-
-    fn reply(content: &str, calls: Vec<ToolCall>) -> Result<Completion, String> {
-        Ok(Completion {
-            content: content.into(),
-            finish_reason: if calls.is_empty() {
-                "stop"
-            } else {
-                "tool_calls"
-            }
-            .into(),
-            tool_calls: calls,
-            ..Completion::default()
-        })
-    }
 
     /// Owns a turn's dependencies so a test can run several turns on the
     /// same session and inspect the log between them.
@@ -317,6 +336,7 @@ mod tests {
                 workdir: &self.workdir,
                 max_tokens: 100,
                 context_window: 1000,
+                compact_at: 0.0,
                 stop: self.stop,
                 on_event: &mut self.on_event,
             }
@@ -336,6 +356,7 @@ mod tests {
             workdir,
             max_tokens: 100,
             context_window: 1000,
+            compact_at: 0.0,
             stop: &stop,
             on_event: &mut on_event,
         };
@@ -380,6 +401,53 @@ mod tests {
         assert_eq!(msgs.last().unwrap()["content"], "done");
         assert_eq!(msgs[2]["role"], "tool");
         std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn the_loop_compacts_past_the_threshold_then_goes_on() {
+        let call = ToolCall {
+            id: "c1".into(),
+            name: "run_command".into(),
+            arguments: json!({}),
+            parse_error: Some("bad".into()),
+        };
+        // A 1000-token window leaves no headroom: any measured context fills it.
+        let full = Completion {
+            prompt_tokens: 500,
+            ..reply("", vec![call]).unwrap()
+        };
+        let model = Scripted(RefCell::new(vec![
+            Ok(full),
+            reply("the summary", vec![]),
+            reply("done", vec![]),
+        ]));
+        let stop = AtomicBool::new(false);
+        let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
+        let mut turn = h.turn();
+        turn.compact_at = 0.85;
+        assert_eq!(run_turn(&mut turn, "go").unwrap(), DoneReason::Complete);
+        let events = h.log.0.into_inner();
+        let compacted = events
+            .iter()
+            .position(|e| {
+                matches!(
+                    e,
+                    Event::ContextCompacted {
+                        before_tokens: 500,
+                        ..
+                    }
+                )
+            })
+            .expect("context.compacted");
+        // The round after the cut sees only the resume message.
+        let messages = fold_messages(&events[..compacted + 2]);
+        assert_eq!(messages.len(), 1);
+        assert!(
+            messages[0]["content"]
+                .as_str()
+                .unwrap()
+                .contains("the summary")
+        );
     }
 
     #[test]
@@ -467,6 +535,7 @@ mod tests {
             workdir: &workdir,
             max_tokens: 100,
             context_window: 1000,
+            compact_at: 0.0,
             stop: &stop,
             on_event: &mut on_event,
         };

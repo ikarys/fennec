@@ -2,6 +2,7 @@
 //! made of and how its log reads back as a conversation.
 
 pub mod clock;
+pub mod compaction;
 pub mod conversation;
 pub mod event;
 pub mod id;

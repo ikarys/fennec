@@ -18,11 +18,13 @@ use store::SqliteStore;
 const USAGE: &str = "usage:
   fennec [serve] [--port <n>]              web UI on http://127.0.0.1:7777
   fennec run [--session <id>] <prompt>     run the agent loop in the current directory
+  fennec compact <session>                 compact a session in the current directory
   fennec sessions                          list sessions
   fennec log <session>                     replay a session from the event store
 
 env: FENNEC_LLM_URL (default http://127.0.0.1:8000/v1), FENNEC_MODEL (default: first of /models),
-     FENNEC_API_KEY, FENNEC_MAX_TOKENS (default 32000), FENNEC_DB (default ~/.local/share/fennec/fennec.db)";
+     FENNEC_API_KEY, FENNEC_MAX_TOKENS (default 32000), FENNEC_COMPACT_AT (default 0.85),
+     FENNEC_DB (default ~/.local/share/fennec/fennec.db)";
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -57,6 +59,7 @@ fn run(args: &[String]) -> Result<(), String> {
             }
             cli::run(&Settings::from_env()?, session, &prompt)
         }
+        Some("compact") => cli::compact(&Settings::from_env()?, args.get(1).ok_or(USAGE)?),
         Some("sessions") => cli::list_sessions(&open_store()?),
         Some("log") => cli::replay(&open_store()?, args.get(1).ok_or(USAGE)?),
         _ => Err(USAGE.into()),

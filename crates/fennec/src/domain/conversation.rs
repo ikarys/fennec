@@ -1,6 +1,7 @@
 //! Port of openfox `events/fold-messages.ts`: the event log read back as the
 //! OpenAI chat messages sent to the model.
 
+use super::compaction::since_last_compaction;
 use super::event::{Event, ToolResult};
 use serde_json::{Value, json};
 
@@ -16,8 +17,11 @@ pub fn render_tool_result(result: &ToolResult) -> String {
     }
 }
 
-/// Folds the log into OpenAI chat messages (without the system prompt).
+/// Folds the log into OpenAI chat messages (without the system prompt). Only
+/// the events after the last `context.compacted` are folded: the model's view
+/// of the log starts after the last cut.
 pub fn fold_messages(events: &[Event]) -> Vec<Value> {
+    let events = since_last_compaction(events);
     let mut messages: Vec<Value> = Vec::new();
     // Index in `messages` of each assistant/user message, by message id.
     let mut index: Vec<(String, usize)> = Vec::new();
@@ -96,17 +100,20 @@ mod tests {
     use super::*;
     use crate::domain::event::{Role, ToolCall, ToolResult};
 
-    #[test]
-    fn fold_rebuilds_assistant_tool_calls_and_tool_results() {
-        let start = |id: &str, role: Role, content: Option<&str>| Event::MessageStart {
+    fn start(id: &str, role: Role, content: Option<&str>, system_generated: bool) -> Event {
+        Event::MessageStart {
             message_id: id.into(),
             role,
             content: content.map(Into::into),
-            is_system_generated: false,
-        };
+            is_system_generated: system_generated,
+        }
+    }
+
+    #[test]
+    fn fold_rebuilds_assistant_tool_calls_and_tool_results() {
         let events = vec![
-            start("u", Role::User, Some("do it")),
-            start("a", Role::Assistant, None),
+            start("u", Role::User, Some("do it"), false),
+            start("a", Role::Assistant, None, false),
             Event::MessageThinking {
                 message_id: "a".into(),
                 content: "hmm".into(),
@@ -153,5 +160,25 @@ mod tests {
             msgs[2],
             json!({"role": "tool", "tool_call_id": "c1", "content": "Error: nope"})
         );
+    }
+
+    #[test]
+    fn fold_starts_after_the_last_compaction_with_the_resume_message() {
+        let events = vec![
+            start("u0", Role::User, Some("old request"), false),
+            start("a0", Role::Assistant, Some("old answer"), false),
+            Event::ContextCompacted {
+                before_tokens: 9000,
+                after_tokens: 100,
+                summary: "the summary".into(),
+            },
+            start("resume", Role::User, Some("the resume message"), true),
+            start("a1", Role::Assistant, Some("new answer"), false),
+        ];
+        let msgs = fold_messages(&events);
+        // The events before the cut are gone; the first message is the resume.
+        assert_eq!(msgs.len(), 2);
+        assert_eq!(msgs[0]["content"], "the resume message");
+        assert_eq!(msgs[1]["content"], "new answer");
     }
 }

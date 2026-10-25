@@ -15,12 +15,15 @@ pub struct LlmSettings {
     pub api_key: Option<String>,
     pub max_tokens: u32,
     pub context_window: u64,
+    /// The compaction threshold as a fraction of the context window
+    /// (openfox `compactionThreshold`); 0 disables it.
+    pub compact_at: f64,
 }
 
 impl Settings {
     /// `FENNEC_LLM_URL`, `FENNEC_MODEL`, `FENNEC_API_KEY`, `FENNEC_MAX_TOKENS`,
-    /// `FENNEC_DB`. The model and its context window default to what the
-    /// endpoint's `/models` lists first.
+    /// `FENNEC_COMPACT_AT`, `FENNEC_DB`. The model and its context window
+    /// default to what the endpoint's `/models` lists first.
     pub fn from_env() -> Result<Settings, String> {
         Ok(Settings {
             llm: LlmSettings::from_env()?,
@@ -53,12 +56,17 @@ impl LlmSettings {
             .ok()
             .and_then(|v| v.parse().ok())
             .unwrap_or(32_000);
+        let compact_at = std::env::var("FENNEC_COMPACT_AT")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(0.85);
         Ok(LlmSettings {
             base_url,
             model,
             api_key,
             max_tokens,
             context_window,
+            compact_at,
         })
     }
 }

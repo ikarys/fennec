@@ -148,6 +148,15 @@ pub enum Event {
         current_tokens: u64,
         max_tokens: u64,
     },
+    /// Marks the cut where a new context window started from a summary.
+    /// openfox also carries `closedWindowId`/`newWindowId`; fennec has no
+    /// window ids, so the cut is just this event in the log.
+    #[serde(rename = "context.compacted", rename_all = "camelCase")]
+    ContextCompacted {
+        before_tokens: u64,
+        after_tokens: u64,
+        summary: String,
+    },
     #[serde(rename = "running.changed", rename_all = "camelCase")]
     RunningChanged { is_running: bool },
     #[serde(rename = "chat.done", rename_all = "camelCase")]
@@ -186,6 +195,7 @@ impl Event {
             Event::ToolOutput { .. } => "tool.output",
             Event::ToolResult { .. } => "tool.result",
             Event::ContextState { .. } => "context.state",
+            Event::ContextCompacted { .. } => "context.compacted",
             Event::RunningChanged { .. } => "running.changed",
             Event::ChatDone { .. } => "chat.done",
             Event::ChatError { .. } => "chat.error",
