@@ -4,15 +4,17 @@
 
 use std::path::Path;
 
+/// Vite's fixed output names (`web/vite.config.ts`); the workflow editor is
+/// its own chunk so React Flow loads only on that page.
+const FILES: [&str; 4] = ["index.html", "app.js", "app.css", "app-WorkflowsPage.js"];
+
 fn main() {
     let dist = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../web/dist");
     let out = Path::new(&std::env::var("OUT_DIR").unwrap()).join("web");
     std::fs::create_dir_all(&out).unwrap();
     println!("cargo:rerun-if-changed={}", dist.display());
-    let built = ["index.html", "app.js", "app.css"]
-        .iter()
-        .all(|f| dist.join(f).is_file());
-    for f in ["index.html", "app.js", "app.css"] {
+    let built = FILES.iter().all(|f| dist.join(f).is_file());
+    for f in FILES {
         println!("cargo:rerun-if-changed={}", dist.join(f).display());
         let content = if built {
             std::fs::read(dist.join(f)).unwrap()

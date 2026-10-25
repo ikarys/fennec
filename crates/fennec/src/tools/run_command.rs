@@ -1,6 +1,6 @@
 //! Port of openfox `tools/shell.ts`: `run_command`.
 
-mod process;
+pub(super) mod process;
 mod report;
 
 use super::args;

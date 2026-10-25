@@ -2,12 +2,14 @@
 //! connection, bound to 127.0.0.1.
 
 mod assets;
+mod children;
 mod event_stream;
 mod guard;
 mod http;
 mod notifier;
 mod routes;
 mod turns;
+mod workflow_routes;
 
 use crate::config::Settings;
 use crate::store::SqliteStore;

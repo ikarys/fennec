@@ -35,9 +35,12 @@ the project's `.agents/agents`); two modes, plan (read-only by construction,
 the default) and builder, with a fixed plan and report format rendered as
 cards. Vision: images attached to a message, and read_file returns images.
 Replay: a typed message sent again, through an append-only `session.rewound`.
+Workflows, done (`docs/workflows.md`): graphs of agent, shell, human,
+condition, parallel/join nodes wired by named ports, drawn in a React Flow
+editor; loops capped per edge, pauses on edges or step by step; the run is
+folded from `workflow.*` events; fresh agents and branches in child sessions.
 Next, one PR each, so that the minimal agent works before security layers:
-custom workflows (agent/shell/human steps, deterministic transitions,
-state folded from the event log) → dogfooding → bwrap world for tool
+dogfooding → bwrap world for tool
 execution → verifier + sub-agents → criteria → fennec's own
 layer (human-only integration, provenance, review gate).
 Backlog, outside that chain: the skills of a session in the context panel,
@@ -71,9 +74,11 @@ crates/fennec/src/
     agent.rs           an agent (mode) and its reminder; frontmatter.rs the shared YAML header
     attachment.rs      images sent to the model: sniffing, data URLs, limits
     replay.rs          which message the human may replay
+    workflow/          a workflow: definition (nodes, ports, edges), template ({{…}} names),
+                       validate (the graph rules), run (the run folded from its events, the next step)
     id.rs, clock.rs
   agent/             application layer: the agent loop
-    ports.rs           Model, EventLog, Toolbox: what the loop needs from outside
+    ports.rs           Model, EventLog, Toolbox, ChildSessions, Commands: what the loop needs from outside
     turn.rs            openfox chat/agent-loop: the multi-turn loop
     round.rs           one model round: streaming, retries, continuation, timing
     delta_buffer.rs    coalesces streamed chunks into one event per 100 ms
@@ -81,6 +86,8 @@ crates/fennec/src/
     ask_user.rs        openfox tools/ask: the loop's own tool; the turn ends waiting for the human
     compaction.rs      openfox context/compactor: the summary round and the new window
     prompt.rs          openfox chat/prompts: the system prompt
+    workflow.rs        the workflow walk and its jobs (start, answer, continue, resume, stop);
+                       workflow/ nodes (one node run), fork (parallel branches), outcome (`Outcome:` line)
   tools/             Toolbox adapter on the host: one file per tool, path_guard, args
   llm/               Model adapter: openai.rs (client), sse.rs (stream parser), models.rs (/models listing)
   store.rs           EventLog adapter: SQLite (openfox's schema), projects and sessions;
@@ -92,20 +99,26 @@ crates/fennec/src/
                      the project's .agents/agents (the project wins)
   skills.rs          openfox skills/registry: the SKILL.md packages in ~/.agents/skills and the
                      project's .agents/skills (the project wins)
+  workflows.rs       the *.workflow.json files: embedded defaults (crates/fennec/workflows/),
+                     ~/.agents/workflows, the project's .agents/workflows (the project wins)
   folders.rs         the folders the human browses to open a project
   web/               HTTP adapter: http, guard (who may call), routes, event_stream (SSE),
-                     notifier (wakes streams on append, no polling), turns, assets
+                     notifier (wakes streams on append, no polling), turns, assets,
+                     workflow_routes, children (child sessions for workflow nodes)
   cli/               terminal adapter: commands, transcript
 crates/fennec/build.rs   embeds web/dist (placeholder page when not built)
 web/src/           React + Vite + Tailwind v4 UI (same layout as openfox's web/src)
-  pages/             one component per route: HomePage, SessionPage
+  pages/             one component per route: HomePage, SessionPage, SettingsPage, WorkflowsPage (lazy)
   components/        shared UI; session/ the thread, tool cards, question card, message stats, composer,
-                     context panel; project/ the folder browser; layout/ the top bar
+                     context panel; project/ the folder browser; layout/ the top bar;
+                     workflow/ the editor (canvas, node shapes, panels) and session/ a run in the thread
   hooks/             useSessionThread: the SSE stream of a session, folded
   lib/               api (typed fetch), fold (events → thread view), format, theme,
-                     attachments (images read in the browser), plan (the plan/report contract)
+                     attachments (images read in the browser), plan (the plan/report contract),
+                     workflow (definition types and edits), workflowRun (a run folded from its events)
   styles/app.css     theme tokens: one CSS variable block per theme, mapped into Tailwind
 docs/api.md        the HTTP API and event wire format, shared by server and UI
+docs/workflows.md  the workflow format, run semantics and editor
 ```
 
 ## Porting rules

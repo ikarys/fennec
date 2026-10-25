@@ -1,5 +1,7 @@
 import type { MessageStats } from './api';
 import { formatTokens } from './format';
+import type { NodeKind } from './workflow';
+import { createRunFold, type RunView } from './workflowRun';
 
 export interface FennecEvent {
   type: string;
@@ -64,7 +66,8 @@ export type ThreadItem =
   | AssistantItem
   | { kind: 'mode'; id: string; name: string; color: string }
   | { kind: 'error'; id: string; message: string }
-  | { kind: 'note'; id: string; text: string; detail?: string };
+  | { kind: 'note'; id: string; text: string; detail?: string }
+  | { kind: 'workflow-node'; id: string; nodeId: string; label: string; nodeKind: NodeKind; pass: number; port?: string; output?: string; exitCode?: number; childSessionId?: string; prompt?: string };
 
 export interface ModifiedFile {
   path: string;
@@ -105,6 +108,8 @@ export interface ThreadView {
    * provide the server's resolved mode.
    */
   mode: string | null;
+  /** The latest workflow run, if any. */
+  run?: RunView;
 }
 
 // The live speed is estimated from characters over the last few seconds;
@@ -202,10 +207,27 @@ export function createThreadFold(): ThreadFold {
   let index = 0;
   // Null means "no live change yet": the session detail owns the mode.
   let mode: string | null = null;
+  const runFold = createRunFold();
+  type WorkflowNodeItem = Extract<ThreadItem, { kind: 'workflow-node' }>;
+  const openWorkflowItems = new Map<string, WorkflowNodeItem>();
+  let pendingPromptFor: WorkflowNodeItem | null = null;
+
+  const pushItem = (item: ThreadItem) => {
+    // The node's prompt is the last of fennec's messages after its divider:
+    // an agent's mode reminder may come first.
+    if (pendingPromptFor) {
+      if (item.kind === 'user' && item.isSystemGenerated) {
+        pendingPromptFor.prompt = item.content;
+      } else {
+        pendingPromptFor = null;
+      }
+    }
+    items.push(item);
+  };
 
   const newAssistant = (id: string): AssistantItem => {
     const assistant: AssistantItem = { kind: 'assistant', id, segments: [], done: false, chars: 0 };
-    items.push(assistant);
+    pushItem(assistant);
     assistants.set(id, assistant);
     samples = [];
     return assistant;
@@ -226,6 +248,7 @@ export function createThreadFold(): ThreadFold {
   const apply = (event: FennecEvent) => {
     index += 1;
     const data = event.data ?? {};
+    runFold.apply(event);
 
     switch (event.type) {
       case 'message.start': {
@@ -235,7 +258,7 @@ export function createThreadFold(): ThreadFold {
         // An agent reminder is a mode marker, not a user message: its content
         // is the agent prompt and must not be rendered as a bubble.
         if (metadata?.type === 'agent') {
-          items.push({
+          pushItem({
             kind: 'mode',
             id: messageId,
             name: String(metadata.name ?? ''),
@@ -246,7 +269,7 @@ export function createThreadFold(): ThreadFold {
 
         if (data.role === 'user') {
           const rawAttachments = Array.isArray(data.attachments) ? data.attachments : [];
-          items.push({
+          pushItem({
             kind: 'user',
             id: messageId,
             content: String(data.content ?? ''),
@@ -428,7 +451,7 @@ export function createThreadFold(): ThreadFold {
             break;
           }
         }
-        items.push({
+        pushItem({
           kind: 'note',
           id: `compacted-${index}`,
           text: `Contexte compacté · ${formatTokens(beforeTokens)} → ~${formatTokens(afterTokens)} tokens`,
@@ -461,13 +484,13 @@ export function createThreadFold(): ThreadFold {
         if (reason !== 'complete' && reason !== 'waiting_for_user') {
           const text =
             reason === 'stopped' ? 'Arrêtée' : reason === 'truncated' ? 'Tronquée' : reason === 'error' ? 'Erreur' : 'Terminée';
-          items.push({ kind: 'note', id: `done-${index}`, text });
+          pushItem({ kind: 'note', id: `done-${index}`, text });
         }
         break;
       }
 
       case 'chat.error': {
-        items.push({
+        pushItem({
           kind: 'error',
           id: `error-${index}`,
           message: String(data.error ?? 'Erreur inconnue')
@@ -497,6 +520,78 @@ export function createThreadFold(): ThreadFold {
         break;
       }
 
+      case 'workflow.started': {
+        const workflow = runFold.view()?.workflow;
+        if (workflow) {
+          pushItem({
+            kind: 'note',
+            id: `workflow-started-${index}`,
+            text: `Workflow « ${workflow.name} »`,
+            detail: String(data.task ?? '')
+          });
+        }
+        break;
+      }
+
+      case 'workflow.node.started': {
+        const runId = String(data.runId ?? '');
+        const nodeId = String(data.nodeId ?? '');
+        const pass = typeof data.pass === 'number' ? data.pass : 1;
+        const node = runFold.view()?.workflow.nodes.find((n) => n.id === nodeId);
+        const kind = node?.kind ?? 'agent';
+        if (kind === 'parallel' || kind === 'join' || kind === 'start') {
+          break;
+        }
+        const item: WorkflowNodeItem = {
+          kind: 'workflow-node',
+          id: `wf-${runId}-${nodeId}-${pass}`,
+          nodeId,
+          label: node?.name ?? nodeId,
+          nodeKind: kind,
+          pass
+        };
+        if (typeof data.childSessionId === 'string') {
+          item.childSessionId = data.childSessionId;
+        }
+        pushItem(item);
+        openWorkflowItems.set(`${runId}:${nodeId}`, item);
+        if (kind === 'agent') {
+          pendingPromptFor = item;
+        }
+        break;
+      }
+
+      case 'workflow.node.finished': {
+        const runId = String(data.runId ?? '');
+        const nodeId = String(data.nodeId ?? '');
+        const item = openWorkflowItems.get(`${runId}:${nodeId}`);
+        if (item) {
+          item.port = String(data.port ?? '');
+          item.output = String(data.output ?? '');
+          if (typeof data.exitCode === 'number') {
+            item.exitCode = data.exitCode;
+          }
+          openWorkflowItems.delete(`${runId}:${nodeId}`);
+        }
+        break;
+      }
+
+      case 'workflow.finished': {
+        const outcome = data.outcome as string;
+        const text =
+          outcome === 'done' ? 'Workflow terminé' :
+          outcome === 'blocked' ? 'Workflow bloqué' :
+          outcome === 'stopped' ? 'Workflow arrêté' :
+          'Workflow en erreur';
+        pushItem({
+          kind: 'note',
+          id: `workflow-finished-${index}`,
+          text,
+          detail: typeof data.reason === 'string' ? data.reason : undefined
+        });
+        break;
+      }
+
       default:
         break;
     }
@@ -512,7 +607,8 @@ export function createThreadFold(): ThreadFold {
     modifiedFiles: Array.from(modified.values()),
     toolCounts: Array.from(toolCounts.entries()).map(([name, count]) => ({ name, count })),
     usage: { ...usage },
-    mode
+    mode,
+    run: runFold.view()
   });
 
   return { apply, view };

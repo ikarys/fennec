@@ -17,6 +17,7 @@ use std::path::Path;
 pub enum StoreError {
     Sqlite(rusqlite::Error),
     Json(String),
+    NoParent(String),
 }
 
 impl From<rusqlite::Error> for StoreError {
@@ -30,6 +31,7 @@ impl fmt::Display for StoreError {
         match self {
             StoreError::Sqlite(e) => write!(f, "event store: {e}"),
             StoreError::Json(e) => write!(f, "settings: {e}"),
+            StoreError::NoParent(id) => write!(f, "no such session: {id}"),
         }
     }
 }
@@ -59,6 +61,7 @@ const SCHEMA: &str = "PRAGMA foreign_keys = ON;
        project_id TEXT NOT NULL,
        workdir TEXT NOT NULL,
        title TEXT,
+       parent_id TEXT,
        created_at TEXT NOT NULL,
        updated_at TEXT NOT NULL
      );
@@ -98,6 +101,15 @@ impl SqliteStore {
 
     fn init(db: Connection) -> Result<SqliteStore> {
         db.execute_batch(SCHEMA)?;
+        // Old databases predate child sessions; add the column then.
+        let has_parent = db
+            .prepare("PRAGMA table_info(sessions)")?
+            .query_map([], |r| r.get::<_, String>(1))?
+            .into_iter()
+            .any(|name| name.is_ok_and(|n| n == "parent_id"));
+        if !has_parent {
+            db.execute("ALTER TABLE sessions ADD COLUMN parent_id TEXT", [])?;
+        }
         Ok(SqliteStore { db })
     }
 
@@ -139,16 +151,41 @@ impl SqliteStore {
     }
 
     pub fn create_session(&self, project: &Project, title: &str) -> Result<String> {
+        self.insert_session(&project.id, &project.workdir, title, None)
+    }
+
+    /// A child session of `parent_id`: same project and workdir, hidden from
+    /// the lists.
+    pub fn create_child_session(&self, parent_id: &str, title: &str) -> Result<String> {
+        let (project_id, workdir) = self
+            .db
+            .query_row(
+                "SELECT project_id, workdir FROM sessions WHERE id = ?1",
+                [parent_id],
+                |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)),
+            )
+            .optional()?
+            .ok_or(StoreError::NoParent(parent_id.to_string()))?;
+        self.insert_session(&project_id, &workdir, title, Some(parent_id))
+    }
+
+    fn insert_session(
+        &self,
+        project_id: &str,
+        workdir: &str,
+        title: &str,
+        parent_id: Option<&str>,
+    ) -> Result<String> {
         let id = new_id();
         let now = now_ms().to_string();
         self.db.execute(
-            "INSERT INTO sessions (id, project_id, workdir, title, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?5)",
-            params![id, project.id, project.workdir, title, now],
+            "INSERT INTO sessions (id, project_id, workdir, title, parent_id, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6)",
+            params![id, project_id, workdir, title, parent_id, now],
         )?;
         self.insert_event(
             &id,
             &Event::SessionInitialized {
-                workdir: project.workdir.clone(),
+                workdir: workdir.to_string(),
             },
         )?;
         Ok(id)
@@ -208,34 +245,24 @@ impl SqliteStore {
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
-    /// Sessions, newest first; `project_id` filters when given.
+    /// Top-level sessions, newest first; `project_id` filters when given.
+    /// Child sessions are hidden from the lists.
     pub fn sessions(&self, project_id: Option<&str>) -> Result<Vec<SessionSummary>> {
-        let mut stmt = self.db.prepare(
-            "SELECT s.id, s.project_id, COALESCE(s.title, ''), CAST(s.created_at AS INTEGER),
-               COALESCE((SELECT MAX(timestamp) FROM events e WHERE e.session_id = s.id), CAST(s.created_at AS INTEGER)),
-               (SELECT json_extract(payload, '$.data.reason') FROM events e
-                  WHERE e.session_id = s.id AND e.event_type = 'chat.done' ORDER BY seq DESC LIMIT 1)
-             FROM sessions s WHERE ?1 IS NULL OR s.project_id = ?1
-             ORDER BY CAST(s.created_at AS INTEGER) DESC",
-        )?;
-        let rows = stmt.query_map([project_id], |r| {
-            let last_done: Option<String> = r.get(5)?;
-            Ok(SessionSummary {
-                id: r.get(0)?,
-                project_id: r.get(1)?,
-                title: r.get(2)?,
-                created_at: r.get::<_, i64>(3)? as u64,
-                updated_at: r.get::<_, i64>(4)? as u64,
-                last_done: last_done.and_then(|s| {
-                    serde_json::from_value::<DoneReason>(serde_json::Value::String(s)).ok()
-                }),
-            })
-        })?;
+        let mut stmt = self.db.prepare(&format!(
+            "{SESSION_SELECT} WHERE s.parent_id IS NULL AND (?1 IS NULL OR s.project_id = ?1)
+             ORDER BY CAST(s.created_at AS INTEGER) DESC"
+        ))?;
+        let rows = stmt.query_map([project_id], session_row)?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
+    /// Any session by id, children included.
     pub fn session(&self, id: &str) -> Result<Option<SessionSummary>> {
-        Ok(self.sessions(None)?.into_iter().find(|s| s.id == id))
+        let mut stmt = self
+            .db
+            .prepare(&format!("{SESSION_SELECT} WHERE s.id = ?1"))?;
+        let mut rows = stmt.query_map([id], session_row)?;
+        Ok(rows.next().transpose()?)
     }
 
     fn insert_event(&self, session_id: &str, event: &Event) -> Result<u64> {
@@ -266,6 +293,27 @@ impl EventLog for SqliteStore {
         }
         Ok(out)
     }
+}
+
+const SESSION_SELECT: &str = "SELECT s.id, s.project_id, COALESCE(s.title, ''), CAST(s.created_at AS INTEGER),
+    COALESCE((SELECT MAX(timestamp) FROM events e WHERE e.session_id = s.id), CAST(s.created_at AS INTEGER)),
+    (SELECT json_extract(payload, '$.data.reason') FROM events e
+       WHERE e.session_id = s.id AND e.event_type = 'chat.done' ORDER BY seq DESC LIMIT 1),
+    s.parent_id
+  FROM sessions s";
+
+fn session_row(r: &rusqlite::Row) -> rusqlite::Result<SessionSummary> {
+    let last_done: Option<String> = r.get(5)?;
+    Ok(SessionSummary {
+        id: r.get(0)?,
+        project_id: r.get(1)?,
+        title: r.get(2)?,
+        created_at: r.get::<_, i64>(3)? as u64,
+        updated_at: r.get::<_, i64>(4)? as u64,
+        last_done: last_done
+            .and_then(|s| serde_json::from_value::<DoneReason>(serde_json::Value::String(s)).ok()),
+        parent_id: r.get(6)?,
+    })
 }
 
 fn project_row(r: &rusqlite::Row) -> rusqlite::Result<Project> {
@@ -361,5 +409,49 @@ mod tests {
 
         assert!(store.events_before(&sid, 1, 10).unwrap().is_empty());
         assert!(store.events_before("missing", 10, 10).unwrap().is_empty());
+    }
+
+    #[test]
+    fn child_sessions_are_hidden_from_lists_but_found_by_id() {
+        let store = SqliteStore::in_memory().unwrap();
+        let project = store.project_for("/w").unwrap();
+        let parent = store.create_session(&project, "parent").unwrap();
+        let child = store.create_child_session(&parent, "child").unwrap();
+
+        let listed = store.sessions(Some(&project.id)).unwrap();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].id, parent);
+        assert!(listed[0].parent_id.is_none());
+
+        let found = store.session(&child).unwrap().unwrap();
+        assert_eq!(found.parent_id.as_deref(), Some(parent.as_str()));
+        assert_eq!(found.project_id, project.id);
+
+        assert!(store.create_child_session("missing", "x").is_err());
+    }
+
+    #[test]
+    fn opening_an_old_database_adds_the_parent_id_column() {
+        let path = std::env::temp_dir().join(format!("fennec-store-{}", new_id()));
+        {
+            let db = rusqlite::Connection::open(&path).unwrap();
+            db.execute_batch(
+                "CREATE TABLE sessions (
+                   id TEXT PRIMARY KEY,
+                   project_id TEXT NOT NULL,
+                   workdir TEXT NOT NULL,
+                   title TEXT,
+                   created_at TEXT NOT NULL,
+                   updated_at TEXT NOT NULL
+                 );",
+            )
+            .unwrap();
+        }
+        let store = SqliteStore::open(&path).unwrap();
+        let project = store.project_for("/w").unwrap();
+        let parent = store.create_session(&project, "p").unwrap();
+        let child = store.create_child_session(&parent, "c").unwrap();
+        assert!(store.session(&child).unwrap().unwrap().parent_id.is_some());
+        let _ = std::fs::remove_file(&path);
     }
 }

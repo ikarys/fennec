@@ -165,3 +165,15 @@ textarea {
 .caret {
   animation: caret-blink 1s step-end infinite;
 }
+
+.react-flow {
+  --xy-background-color: var(--bg);
+  --xy-edge-stroke: var(--muted);
+  --xy-node-border: var(--border);
+  --xy-minimap-background-color: var(--panel);
+  --xy-controls-button-background-color: var(--raised);
+  --xy-controls-button-hover-background-color: var(--border);
+  --xy-node-color: var(--panel);
+  --xy-edge-label-background-color: var(--panel);
+  --xy-edge-label-color: var(--muted);
+}

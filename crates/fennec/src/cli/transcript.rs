@@ -126,7 +126,14 @@ impl Transcript {
             | Event::RunningChanged { .. }
             // The reminder that follows names the mode.
             | Event::ModeChanged { .. }
-            | Event::SessionRewound { .. } => Ok(()),
+            | Event::SessionRewound { .. }
+            // The CLI does not run workflows.
+            | Event::WorkflowStarted { .. }
+            | Event::WorkflowNodeStarted { .. }
+            | Event::WorkflowNodeFinished { .. }
+            | Event::WorkflowPaused { .. }
+            | Event::WorkflowResumed { .. }
+            | Event::WorkflowFinished { .. } => Ok(()),
         };
         let _ = out.flush();
     }

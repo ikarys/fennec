@@ -1,13 +1,34 @@
+import type { WorkflowSummary } from '../lib/workflow';
 import { useEffect, useRef, useState } from 'react';
 import type { Agent, AttachmentInput, Config, Project, SessionDetail, SessionState, SlashCommand } from '../lib/api';
-import { compactSession, createSession, getSession, listAgents, listCommands, replayMessage, sendMessage, setSessionMode, stopSession } from '../lib/api';
+import {
+  answerWorkflow,
+  compactSession,
+  continueWorkflow,
+  createSession,
+  getSession,
+  listAgents,
+  listCommands,
+  listWorkflows,
+  replayMessage,
+  resumeWorkflow,
+  sendMessage,
+  setSessionMode,
+  startWorkflow,
+  stopSession,
+  stopWorkflow
+} from '../lib/api';
 import { readImages } from '../lib/attachments';
 import { stateLabel } from '../lib/format';
+import { runWaiting } from '../lib/workflowRun';
 import { useSessionThread } from '../hooks/useSessionThread';
 import { Composer } from '../components/session/Composer';
 import { ContextPanel } from '../components/session/ContextPanel';
 import { QuestionCard } from '../components/session/QuestionCard';
 import { ThreadItemView } from '../components/session/Thread';
+import { RunStrip } from '../components/workflow/session/RunStrip';
+import { RunActionCard } from '../components/workflow/session/RunActionCard';
+import type { WorkflowSelection } from '../components/workflow/session/WorkflowPicker';
 
 interface SessionPageProps {
   sessionId: string | null;
@@ -29,11 +50,15 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
   const [compactError, setCompactError] = useState<string | null>(null);
   const [commands, setCommands] = useState<SlashCommand[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [workflows, setWorkflows] = useState<WorkflowSummary[]>([]);
+  const [workflowSelection, setWorkflowSelection] = useState<WorkflowSelection>({ workflowId: null, stepByStep: false });
   // Optimistic mode while `setSessionMode` is in flight; cleared once the
   // server's mode (event stream or detail) matches it.
   const [pendingMode, setPendingMode] = useState<string | null>(null);
   const { view, hasMore, loadingOlder, loadOlder } = useSessionThread(sessionId);
   const running = view.running;
+  const run = view.run;
+  const waiting = runWaiting(run, running, view.lastDone);
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
   // Set by `handleLoadOlder`: the distance from the bottom when the older
@@ -131,6 +156,24 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
     };
   }, [commandProjectId]);
 
+  useEffect(() => {
+    if (!commandProjectId) {
+      setWorkflows([]);
+      return;
+    }
+    let ignore = false;
+    listWorkflows(commandProjectId)
+      .then((data) => {
+        if (!ignore) setWorkflows(data);
+      })
+      .catch(() => {
+        if (!ignore) setWorkflows([]);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [commandProjectId]);
+
   // A pending choice belongs to one session; do not leak it across tabs.
   useEffect(() => {
     setPendingMode(null);
@@ -166,8 +209,26 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
     if ((!value && images.length === 0) || running) return;
     setSendError(null);
 
+    // A workflow start refuses attachments.
+    if (workflowSelection.workflowId && images.length > 0) {
+      setSendError('Les pièces jointes ne sont pas acceptées pour un workflow.');
+      return;
+    }
+
     try {
-      if (sessionId) {
+      if (workflowSelection.workflowId) {
+        if (sessionId) {
+          await startWorkflow(sessionId, workflowSelection.workflowId, value, workflowSelection.stepByStep);
+        } else if (projectId) {
+          const created = await createSession(projectId, value, mode ?? undefined, images, {
+            workflowId: workflowSelection.workflowId,
+            stepByStep: workflowSelection.stepByStep
+          });
+          onSessionCreated(created.id, pseudoTabId);
+        }
+        // The next message is an ordinary one again.
+        setWorkflowSelection({ workflowId: null, stepByStep: false });
+      } else if (sessionId) {
         await sendMessage(sessionId, value, images);
       } else if (projectId) {
         // A mode chosen before creation is applied to the first turn.
@@ -224,6 +285,30 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
     }
   }
 
+  async function handleStopWorkflow() {
+    if (!sessionId || !run) return;
+    try {
+      await stopWorkflow(sessionId, run.runId);
+    } catch {
+      // Stop is best-effort; the event stream reports the final state.
+    }
+  }
+
+  async function handleAnswerWorkflow(choice: string, comment: string) {
+    if (!sessionId || !run) return;
+    await answerWorkflow(sessionId, run.runId, choice, comment);
+  }
+
+  async function handleContinueWorkflow(comment: string) {
+    if (!sessionId || !run) return;
+    await continueWorkflow(sessionId, run.runId, comment);
+  }
+
+  async function handleResumeWorkflow() {
+    if (!sessionId || !run) return;
+    await resumeWorkflow(sessionId, run.runId);
+  }
+
   async function handleCompact() {
     if (!sessionId) return;
     setCompactError(null);
@@ -267,6 +352,9 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
           </div>
         </div>
 
+        {run && (
+          <RunStrip run={run} running={running} onStop={handleStopWorkflow} />
+        )}
         <div
           ref={scrollRef}
           onScroll={(event) => {
@@ -276,6 +364,14 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
           className="min-h-0 grow overflow-y-auto p-6"
         >
           <div className="mx-auto flex max-w-[820px] flex-col gap-4.5">
+            {detail?.parentId && (
+              <div className="rounded-lg border border-border bg-raised px-3 py-2 text-sm">
+                <span className="text-muted">Session d'un nœud de workflow · </span>
+                <a href={`#/s/${detail.parentId}`} className="text-accent-strong underline">
+                  Session parente
+                </a>
+              </div>
+            )}
             {sessionId && hasMore && (
               <button
                 type="button"
@@ -302,33 +398,54 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
           </div>
         </div>
 
-        {view.pendingQuestion && !running && (
+        {view.pendingQuestion && !running && !waiting && !detail?.parentId && (
           <QuestionCard
             question={view.pendingQuestion}
             onAnswer={(answer) => handleSend(answer)}
             disabled={running}
           />
         )}
-        <Composer
-          text={text}
-          onTextChange={setText}
-          onSend={() => handleSend()}
-          onStop={handleStop}
-          running={running}
-          model={config?.model}
-          currentTokens={currentTokens}
-          maxTokens={maxTokens}
-          error={sendError}
-          textareaRef={textareaRef}
-          placeholder={view.pendingQuestion && !running ? 'Ta réponse…' : undefined}
-          commands={commands}
-          agents={agents}
-          mode={mode}
-          onModeChange={handleModeChange}
-          attachments={attachments}
-          onAttach={handleAttach}
-          onRemoveAttachment={handleRemoveAttachment}
-        />
+        {waiting && !detail?.parentId && (
+          <RunActionCard
+            waiting={waiting}
+            onAnswer={handleAnswerWorkflow}
+            onContinue={handleContinueWorkflow}
+            onResume={handleResumeWorkflow}
+            onStop={handleStopWorkflow}
+            disabled={running}
+          />
+        )}
+        {!detail?.parentId && (
+          <Composer
+            text={text}
+            onTextChange={setText}
+            onSend={() => handleSend()}
+            onStop={handleStop}
+            running={running}
+            model={config?.model}
+            currentTokens={currentTokens}
+            maxTokens={maxTokens}
+            error={sendError}
+            textareaRef={textareaRef}
+            placeholder={
+              workflowSelection.workflowId
+                ? 'Décris la tâche du workflow…'
+                : view.pendingQuestion && !running
+                  ? 'Ta réponse…'
+                  : undefined
+            }
+            commands={commands}
+            agents={agents}
+            mode={mode}
+            onModeChange={handleModeChange}
+            attachments={attachments}
+            onAttach={handleAttach}
+            onRemoveAttachment={handleRemoveAttachment}
+            workflows={workflows}
+            workflowSelection={workflowSelection}
+            onWorkflowSelectionChange={setWorkflowSelection}
+          />
+        )}
       </main>
 
       <ContextPanel

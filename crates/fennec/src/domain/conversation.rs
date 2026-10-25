@@ -2,7 +2,7 @@
 //! OpenAI chat messages sent to the model.
 
 use super::compaction::model_view;
-use super::event::{Event, ToolResult};
+use super::event::{Event, Role, ToolResult};
 use serde_json::{Value, json};
 
 /// Port of openfox `renderToolResultContent`: the single LLM-facing
@@ -15,6 +15,38 @@ pub fn render_tool_result(result: &ToolResult) -> String {
         (Some(out), false) => format!("{out}\n\nError: {error}"),
         (None, false) => format!("Error: {error}"),
     }
+}
+
+/// The text of the last assistant message that has any, among `events`
+/// (its start content plus its deltas); "" when none. A workflow node's
+/// output.
+pub fn last_assistant_text(events: &[Event]) -> String {
+    let mut texts: Vec<(&str, String)> = Vec::new();
+    for event in events {
+        match event {
+            Event::MessageStart {
+                message_id,
+                role: Role::Assistant,
+                content,
+                ..
+            } => texts.push((message_id, content.clone().unwrap_or_default())),
+            Event::MessageDelta {
+                message_id,
+                content,
+            } => {
+                if let Some((_, text)) = texts.iter_mut().rev().find(|(id, _)| id == message_id) {
+                    text.push_str(content);
+                }
+            }
+            _ => {}
+        }
+    }
+    texts
+        .into_iter()
+        .rev()
+        .map(|(_, text)| text)
+        .find(|text| !text.trim().is_empty())
+        .unwrap_or_default()
 }
 
 /// Folds the log into OpenAI chat messages (without the system prompt). Only
@@ -127,7 +159,25 @@ pub fn fold_messages(events: &[Event]) -> Vec<Value> {
 mod tests {
     use super::*;
     use crate::domain::attachment::Attachment;
-    use crate::domain::event::{Role, ToolCall, ToolResult};
+    use crate::domain::event::{ToolCall, ToolResult};
+
+    #[test]
+    fn last_assistant_text_skips_messages_without_text() {
+        let delta = |id: &str, text: &str| Event::MessageDelta {
+            message_id: id.into(),
+            content: text.into(),
+        };
+        let events = vec![
+            start("a", Role::Assistant, None, false),
+            delta("a", "first "),
+            delta("a", "answer"),
+            start("u", Role::User, Some("go on"), false),
+            delta("u", "ignored"),
+            start("b", Role::Assistant, None, false),
+        ];
+        assert_eq!(last_assistant_text(&events), "first answer");
+        assert_eq!(last_assistant_text(&events[3..]), "");
+    }
 
     fn start(id: &str, role: Role, content: Option<&str>, system_generated: bool) -> Event {
         Event::MessageStart {
