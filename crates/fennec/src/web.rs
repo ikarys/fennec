@@ -7,6 +7,7 @@ mod event_stream;
 mod guard;
 mod http;
 mod notifier;
+mod preview;
 mod routes;
 mod turns;
 mod workflow_routes;

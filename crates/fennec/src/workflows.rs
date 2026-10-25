@@ -24,7 +24,7 @@ pub struct Found {
     pub raw: Value,
 }
 
-const DEFAULTS: [&str; 1] = [include_str!("../workflows/plan-build-check.workflow.json")];
+const DEFAULTS: [&str; 1] = [include_str!("../workflows/plan-build-verify.workflow.json")];
 
 /// The workflows a session in `workdir` can use.
 pub fn discover(workdir: &Path) -> Vec<Found> {
@@ -37,7 +37,7 @@ fn discover_in(home: Option<&Path>, workdir: &Path) -> Vec<Found> {
 
     for content in DEFAULTS {
         if let Some(workflow) =
-            load_workflow("plan-build-check.workflow.json", content, Origin::Default)
+            load_workflow("plan-build-verify.workflow.json", content, Origin::Default)
         {
             insert_or_override(&mut found, workflow);
         }
@@ -222,14 +222,14 @@ mod tests {
         let (root, home, workdir) = fixture();
         let home_dir = workflows_dir(&home);
         let work_dir = workflows_dir(&workdir);
-        write_workflow(&home_dir, "plan-build-check", "Global PBC");
-        write_workflow(&work_dir, "plan-build-check", "Project PBC");
+        write_workflow(&home_dir, "plan-build-verify", "Global PBC");
+        write_workflow(&work_dir, "plan-build-verify", "Project PBC");
         write_workflow(&work_dir, "custom", "Custom");
 
         let found = discover_in(Some(&home), &workdir);
         let pbc = found
             .iter()
-            .find(|f| f.workflow.id == "plan-build-check")
+            .find(|f| f.workflow.id == "plan-build-verify")
             .unwrap();
         assert_eq!(pbc.origin, Origin::Project);
         assert_eq!(pbc.workflow.name, "Project PBC");
@@ -244,12 +244,12 @@ mod tests {
     fn global_overrides_default() {
         let (root, home, workdir) = fixture();
         let home_dir = workflows_dir(&home);
-        write_workflow(&home_dir, "plan-build-check", "Global PBC");
+        write_workflow(&home_dir, "plan-build-verify", "Global PBC");
 
         let found = discover_in(Some(&home), &workdir);
         let pbc = found
             .iter()
-            .find(|f| f.workflow.id == "plan-build-check")
+            .find(|f| f.workflow.id == "plan-build-verify")
             .unwrap();
         assert_eq!(pbc.origin, Origin::Global);
         assert_eq!(pbc.workflow.name, "Global PBC");
@@ -304,7 +304,7 @@ mod tests {
         let found = discover_in(None, &workdir);
         let default = found
             .iter()
-            .find(|f| f.workflow.id == "plan-build-check")
+            .find(|f| f.workflow.id == "plan-build-verify")
             .unwrap();
         let agents = crate::agents::discover(&workdir);
         let issues = crate::domain::workflow::validate::validate(&default.workflow, &agents);
