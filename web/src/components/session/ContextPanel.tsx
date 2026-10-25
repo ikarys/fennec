@@ -1,5 +1,5 @@
 import type { ThreadView } from '../../lib/fold';
-import type { SessionSkills } from '../../lib/api';
+import type { SessionDetail, SessionSkills } from '../../lib/api';
 import { cachePercent, formatSpeed, formatTokens } from '../../lib/format';
 import { previewKindOfPath, relativeToWorkdir } from '../../lib/preview';
 import { usePreviewOpener, usePreviewWorkdir } from '../preview/PreviewContext';
@@ -17,9 +17,11 @@ interface ContextPanelProps {
   compactError: string | null;
   /** Older pages are not loaded: the totals cover the loaded messages only. */
   partial: boolean;
+  /** Where the agent's work lands; null when the session runs in place. */
+  worktree: SessionDetail['worktree'];
 }
 
-export function ContextPanel({ view, currentTokens, contextPercent, skills, hasSession, compactDisabled, onCompact, compactError, partial }: ContextPanelProps) {
+export function ContextPanel({ view, currentTokens, contextPercent, skills, hasSession, compactDisabled, onCompact, compactError, partial, worktree }: ContextPanelProps) {
   const opener = usePreviewOpener();
   const workdir = usePreviewWorkdir();
   return (
@@ -124,6 +126,22 @@ export function ContextPanel({ view, currentTokens, contextPercent, skills, hasS
             );
           })}
         </section>
+
+        {worktree && (
+          <section className="flex flex-col gap-1.5">
+            <h2 className="text-[11px] font-semibold tracking-[0.06em] text-muted uppercase">Worktree</h2>
+            <div className="font-mono text-xs">{worktree.branch}</div>
+            <div title={worktree.path} className="overflow-hidden font-mono text-xs text-muted text-ellipsis whitespace-nowrap">{worktree.path}</div>
+            <button
+              type="button"
+              title="Copier la commande"
+              onClick={() => void navigator.clipboard.writeText(`git cherry-pick ${worktree.base}..${worktree.branch}`)}
+              className="rounded-lg border border-border bg-raised px-2 py-1.5 text-left font-mono text-xs break-all text-text"
+            >
+              <code>git cherry-pick {worktree.base}..{worktree.branch}</code>
+            </button>
+          </section>
+        )}
 
         <section className="flex flex-col gap-2">
           <h2 className="text-[11px] font-semibold tracking-[0.06em] text-muted uppercase">Outils de ce tour</h2>

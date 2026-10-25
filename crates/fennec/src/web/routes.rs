@@ -267,6 +267,7 @@ fn create_session(app: &App, req: &Request, stream: &mut TcpStream) -> Result<()
     };
     let id = store.create_session(&project, &title)?;
     append_mode_event(app, &store, &id, mode_event)?;
+    let session = store.session(&id)?.ok_or("the new session vanished")?;
     match workflow {
         Some(found) => {
             let job = Job::Workflow(WorkflowJob::Start {
@@ -274,15 +275,18 @@ fn create_session(app: &App, req: &Request, stream: &mut TcpStream) -> Result<()
                 task: prompt,
                 step_by_step,
             });
-            app.turns.start(&id, &project.workdir, job)?;
+            // A workflow session gets its worktree; discovery stays on the project.
+            let place = app.open_place(&store, &session, &project)?;
+            app.turns.start(&id, place, job)?;
         }
         None => {
             let input = resolve(&prompt, &skills::discover(Path::new(&project.workdir)));
             if matches!(input, TurnInput::Compact) && !attachments.is_empty() {
                 return error(stream, 400, "/compact takes no attachments");
             }
+            let place = app.place(&store, &session, &project)?;
             app.turns
-                .start(&id, &project.workdir, Job::Input(input, attachments))?;
+                .start(&id, place, Job::Input(input, attachments))?;
         }
     }
     send_json(stream, 200, &json!({ "id": id }))
@@ -299,6 +303,10 @@ fn get_session(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String
     let mut v = session_json(app, &s);
     v["project"] = project_json(&p);
     v["mode"] = json!(mode);
+    v["worktree"] = match app.place(&store, &s, &p)?.worktree {
+        Some(wt) => json!({ "path": wt.path, "branch": wt.branch, "base": wt.base }),
+        None => Value::Null,
+    };
     send_json(stream, 200, &v)
 }
 
@@ -354,12 +362,14 @@ fn send_message(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> R
     if content.is_empty() && attachments.is_empty() {
         return error(stream, 400, "empty message");
     }
-    let Some((_, p)) = session_and_project(&app.store()?, id)? else {
+    let store = app.store()?;
+    let Some((session, p)) = session_and_project(&store, id)? else {
         return error(stream, 404, "no such session");
     };
     if app.turns.is_running(id) {
         return error(stream, 409, "a turn is already running");
     }
+    let place = app.place(&store, &session, &p)?;
     // While a run is active the typed message answers where it waits.
     if let Some(waiting) = workflow_routes::waiting_for(app, id)? {
         return match waiting {
@@ -368,7 +378,7 @@ fn send_message(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> R
                     prompt: content,
                     attachments,
                 });
-                match app.turns.start(id, &p.workdir, job) {
+                match app.turns.start(id, place, job) {
                     Ok(()) => send_json(stream, 202, &json!({})),
                     Err(e) => error(stream, 409, &e),
                 }
@@ -386,10 +396,7 @@ fn send_message(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> R
     if matches!(input, TurnInput::Compact) && !attachments.is_empty() {
         return error(stream, 400, "/compact takes no attachments");
     }
-    match app
-        .turns
-        .start(id, &p.workdir, Job::Input(input, attachments))
-    {
+    match app.turns.start(id, place, Job::Input(input, attachments)) {
         Ok(()) => send_json(stream, 202, &json!({})),
         Err(e) => error(stream, 409, &e),
     }
@@ -404,7 +411,7 @@ fn replay_message(
     let body = req.json()?;
     let message_id = body["messageId"].as_str().unwrap_or("").to_string();
     let store = app.store()?;
-    let Some((_, p)) = session_and_project(&store, id)? else {
+    let Some((session, p)) = session_and_project(&store, id)? else {
         return error(stream, 404, "no such session");
     };
     if app.turns.is_running(id) {
@@ -418,22 +425,25 @@ fn replay_message(
             "only a message you typed in the current window can be replayed",
         );
     }
-    match app.turns.start(id, &p.workdir, Job::Replay(message_id)) {
+    let place = app.place(&store, &session, &p)?;
+    match app.turns.start(id, place, Job::Replay(message_id)) {
         Ok(()) => send_json(stream, 202, &json!({})),
         Err(e) => error(stream, 409, &e),
     }
 }
 
 fn compact_session(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
-    let Some((_, p)) = session_and_project(&app.store()?, id)? else {
+    let store = app.store()?;
+    let Some((session, p)) = session_and_project(&store, id)? else {
         return error(stream, 404, "no such session");
     };
     if workflow_routes::waiting_for(app, id)?.is_some() {
         return error(stream, 409, "a workflow is running in this session");
     }
+    let place = app.place(&store, &session, &p)?;
     match app
         .turns
-        .start(id, &p.workdir, Job::Input(TurnInput::Compact, Vec::new()))
+        .start(id, place, Job::Input(TurnInput::Compact, Vec::new()))
     {
         Ok(()) => send_json(stream, 202, &json!({})),
         Err(e) => error(stream, 409, &e),

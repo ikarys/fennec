@@ -46,8 +46,10 @@ The default workflow verifies in a fresh context (`verify`, `review` sub-agents)
 and sends the findings back to the builder.
 Preview: ```html and ```md blocks of a message, and the .html/.md files an
 agent wrote, rendered in fennec (a sandboxed origin for model HTML).
+Dogfooding, started (`docs/dogfooding.md`): a session that runs a workflow
+works in its own git worktree and branch; the human cherry-picks.
 Next, one PR each, so that the minimal agent works before security layers:
-dogfooding → bwrap world for tool
+bwrap world for tool
 execution → sub-agents as tools → criteria → fennec's own
 layer (human-only integration, provenance, review gate).
 
@@ -96,6 +98,7 @@ crates/fennec/src/
   store.rs           EventLog adapter: SQLite (openfox's schema), projects and sessions;
                      store/settings.rs the stored preferences
   git.rs             what fennec reads from a repository
+  worktree.rs        a session's git worktree: a workflow never writes the human's tree
   instructions.rs    openfox context/instructions: Settings' global instructions + the
                      AGENTS.md files above the workdir, for a new session's prompt
   agents.rs          the *.agent.md files: embedded defaults (crates/fennec/agents/), ~/.agents/agents,
@@ -125,6 +128,7 @@ web/src/           React + Vite + Tailwind v4 UI (same layout as openfox's web/s
   styles/app.css     theme tokens: one CSS variable block per theme, mapped into Tailwind
 docs/api.md        the HTTP API and event wire format, shared by server and UI
 docs/workflows.md  the workflow format, run semantics and editor
+docs/dogfooding.md the frictions met while fennec builds fennec, and their status
 ```
 
 ## Porting rules

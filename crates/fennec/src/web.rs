@@ -14,15 +14,18 @@ mod workflow_routes;
 
 use crate::agent::ports::EventLog;
 use crate::config::Settings;
+use crate::domain::project::{Project, SessionSummary};
 use crate::domain::session_skills::{SessionSkills, fold_skills};
 use crate::domain::skill::Skill;
 use crate::store::SqliteStore;
+use crate::worktree;
 use notifier::Notifier;
 use serde_json::json;
 use std::collections::HashMap;
 use std::net::{TcpListener, TcpStream};
+use std::path::Path;
 use std::sync::{Arc, Mutex};
-use turns::Turns;
+use turns::{Place, Turns};
 
 /// What every request handler shares.
 struct App {
@@ -42,6 +45,50 @@ impl App {
     /// threads.
     fn store(&self) -> Result<SqliteStore, String> {
         Ok(SqliteStore::open(&self.settings.db_path)?)
+    }
+
+    /// Where the session's turns run (see `Place`). A child session shares
+    /// its root session's worktree.
+    fn place(
+        &self,
+        store: &SqliteStore,
+        session: &SessionSummary,
+        project: &Project,
+    ) -> Result<Place, String> {
+        let root = self.root_id(store, session)?;
+        let found = worktree::find(&self.worktrees(), Path::new(&project.workdir), &root);
+        Ok(Place::new(&project.workdir, found))
+    }
+
+    /// Like `place`, but creates the root session's worktree on first call:
+    /// a session that starts a workflow gets one (`None` outside a git
+    /// repository: it then runs in place).
+    fn open_place(
+        &self,
+        store: &SqliteStore,
+        session: &SessionSummary,
+        project: &Project,
+    ) -> Result<Place, String> {
+        let root = self.root_id(store, session)?;
+        let opened = worktree::open(&self.worktrees(), Path::new(&project.workdir), &root)?;
+        Ok(Place::new(&project.workdir, opened))
+    }
+
+    fn worktrees(&self) -> std::path::PathBuf {
+        worktree::root(&self.settings.db_path)
+    }
+
+    /// The top of the session's `parent_id` chain.
+    fn root_id(&self, store: &SqliteStore, session: &SessionSummary) -> Result<String, String> {
+        let mut id = session.id.clone();
+        let mut parent = session.parent_id.clone();
+        while let Some(parent_id) = parent {
+            let s = store
+                .session(&parent_id)?
+                .ok_or_else(|| format!("no parent session {parent_id}"))?;
+            (id, parent) = (s.id, s.parent_id);
+        }
+        Ok(id)
     }
 
     /// The session's skills fold, cached against the log's max seq (see
@@ -122,6 +169,10 @@ mod tests {
     /// A minimal `App`; `folded_skills` takes the store, so its settings are
     /// unused here.
     fn app() -> App {
+        app_with_db(PathBuf::from(":memory:"))
+    }
+
+    fn app_with_db(db_path: PathBuf) -> App {
         let settings = Settings {
             llm: LlmSettings {
                 base_url: "http://localhost".into(),
@@ -135,7 +186,7 @@ mod tests {
                 },
                 listed: Vec::new(),
             },
-            db_path: PathBuf::from(":memory:"),
+            db_path,
         };
         let notifier = Arc::new(Notifier::default());
         App {
@@ -198,5 +249,53 @@ mod tests {
         store.append(&sid, &load_result("c2")).unwrap();
         let third = app.folded_skills(&store, &sid, &skills).unwrap();
         assert_eq!(third.loaded, vec!["alpha", "beta"]);
+    }
+
+    #[test]
+    fn a_child_session_runs_in_its_roots_worktree() {
+        let base =
+            std::env::temp_dir().join(format!("fennec-place-{}", crate::domain::id::new_id()));
+        let repo = base.join("repo");
+        std::fs::create_dir_all(&repo).unwrap();
+        for args in [
+            &["init", "-q"][..],
+            &[
+                "-c",
+                "user.name=t",
+                "-c",
+                "user.email=t@e",
+                "commit",
+                "-q",
+                "--allow-empty",
+                "-m",
+                "init",
+            ],
+        ] {
+            let ok = std::process::Command::new("git")
+                .arg("-C")
+                .arg(&repo)
+                .args(args)
+                .status();
+            assert!(ok.unwrap().success());
+        }
+        let app = app_with_db(base.join("fennec.db"));
+        let store = SqliteStore::in_memory().unwrap();
+        let project = store.project_for(repo.to_str().unwrap()).unwrap();
+        let root_id = store.create_session(&project, "root").unwrap();
+        let child_id = store.create_child_session(&root_id, "child").unwrap();
+        let root = store.session(&root_id).unwrap().unwrap();
+        let child = store.session(&child_id).unwrap().unwrap();
+
+        let before = app.place(&store, &child, &project).unwrap();
+        assert!(before.worktree.is_none());
+        assert_eq!(before.workdir, repo);
+
+        let opened = app.open_place(&store, &root, &project).unwrap();
+        let wt = opened.worktree.clone().unwrap();
+        assert_eq!(opened.workdir, wt.workdir);
+        let from_child = app.place(&store, &child, &project).unwrap();
+        assert_eq!(from_child.worktree, Some(wt));
+        assert_eq!(from_child.workdir, opened.workdir);
+        let _ = std::fs::remove_dir_all(&base);
     }
 }

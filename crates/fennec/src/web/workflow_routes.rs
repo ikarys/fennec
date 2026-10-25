@@ -4,7 +4,7 @@
 use super::App;
 use super::http::{Request, error, send_json};
 use super::routes::session_and_project;
-use super::turns::Job;
+use super::turns::{Job, Place};
 use crate::agent::ports::EventLog;
 use crate::agent::workflow::WorkflowJob;
 use crate::agents;
@@ -146,7 +146,8 @@ pub fn start_workflow(
     id: &str,
 ) -> Result<(), String> {
     let body = req.json()?;
-    let Some((_, project)) = session_and_project(&app.store()?, id)? else {
+    let store = app.store()?;
+    let Some((session, project)) = session_and_project(&store, id)? else {
         return error(stream, 404, "no such session");
     };
     let workflow_id = body["workflowId"].as_str().unwrap_or("");
@@ -162,7 +163,9 @@ pub fn start_workflow(
         task,
         step_by_step: body["stepByStep"].as_bool().unwrap_or(false),
     };
-    start_job(app, stream, id, &project.workdir, job)
+    // The workflow definition is the human's: found in the project, not the worktree.
+    let place = app.open_place(&store, &session, &project)?;
+    start_job(app, stream, id, place, job)
 }
 
 /// The run controls `/workflow/{answer,continue,resume,stop}`.
@@ -188,7 +191,7 @@ pub fn control_workflow(
         _ => return error(stream, 404, "not found"),
     };
     let store = app.store()?;
-    let Some((_, project)) = session_and_project(&store, id)? else {
+    let Some((session, project)) = session_and_project(&store, id)? else {
         return error(stream, 404, "no such session");
     };
     if app.turns.is_running(id) {
@@ -198,17 +201,18 @@ pub fn control_workflow(
     if current.is_none_or(|state| state.run_id != text("runId")) {
         return error(stream, 409, "not the session's current run");
     }
-    start_job(app, stream, id, &project.workdir, job)
+    let place = app.place(&store, &session, &project)?;
+    start_job(app, stream, id, place, job)
 }
 
 fn start_job(
     app: &App,
     stream: &mut TcpStream,
     id: &str,
-    workdir: &str,
+    place: Place,
     job: WorkflowJob,
 ) -> Result<(), String> {
-    match app.turns.start(id, workdir, Job::Workflow(job)) {
+    match app.turns.start(id, place, Job::Workflow(job)) {
         Ok(()) => send_json(stream, 202, &json!({})),
         Err(e) => error(stream, 409, &e),
     }

@@ -15,6 +15,7 @@ mod store;
 mod tools;
 mod web;
 mod workflows;
+mod worktree;
 
 use config::Settings;
 use store::SqliteStore;
