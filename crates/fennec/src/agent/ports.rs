@@ -2,10 +2,11 @@
 //! the session log and the tools. Adapters implement them; the loop never
 //! sees HTTP, SQL or processes.
 
-use crate::domain::event::{Event, OutputStream, ToolCall, ToolResult};
+use crate::domain::event::{DoneReason, Event, OutputStream, ToolCall, ToolResult};
 use crate::domain::preferences::ReasoningEffort;
 use serde_json::Value;
 use std::sync::atomic::AtomicBool;
+use std::time::Duration;
 
 pub struct Request<'a> {
     pub system_prompt: &'a str,
@@ -68,4 +69,42 @@ pub trait Toolbox {
         stop: &AtomicBool,
         on_output: &mut dyn FnMut(OutputStream, &str),
     ) -> ToolResult;
+}
+
+/// What an agent node run in a child session reports back.
+pub struct AgentRun {
+    pub reason: DoneReason,
+    /// the agent's last text
+    pub text: String,
+}
+
+/// Child sessions for `fresh` agent nodes and parallel branches (adapter:
+/// web; tests use a double). Sync: parallel branches call it from threads.
+pub trait ChildSessions: Sync {
+    /// Creates a child session of `parent_session_id`; returns its id.
+    fn create(&self, parent_session_id: &str, title: &str) -> Result<String, String>;
+    /// Sends `prompt` to agent `agent_id` in that child session and runs the
+    /// loop to the end of its turn. Calling it again continues the same session.
+    fn send(
+        &self,
+        child_session_id: &str,
+        agent_id: &str,
+        prompt: &str,
+        stop: &AtomicBool,
+    ) -> Result<AgentRun, String>;
+}
+
+/// How a workflow shell node ended.
+pub struct CommandRun {
+    /// None when it timed out, was stopped or could not start
+    pub exit_code: Option<i32>,
+    pub stopped: bool,
+    /// stdout then stderr
+    pub output: String,
+}
+
+/// Runs a workflow's shell nodes in the working directory (adapter:
+/// tools::LocalTools, the process runner of run_command).
+pub trait Commands: Sync {
+    fn run(&self, command: &str, timeout: Duration, stop: &AtomicBool) -> CommandRun;
 }

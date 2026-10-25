@@ -14,6 +14,7 @@ mod skills;
 mod store;
 mod tools;
 mod web;
+mod workflows;
 
 use config::Settings;
 use store::SqliteStore;

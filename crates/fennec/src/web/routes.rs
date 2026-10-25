@@ -3,8 +3,9 @@
 use super::App;
 use super::http::{Request, error, send, send_json};
 use super::notifier::NotifyingLog;
-use super::{assets, event_stream, turns::Job};
+use super::{assets, event_stream, turns::Job, workflow_routes};
 use crate::agent::ports::EventLog;
+use crate::agent::workflow::WorkflowJob;
 use crate::agents;
 use crate::domain::agent::{resolve as agent_resolve, switch_to};
 use crate::domain::attachment::{Attachment, from_data_url};
@@ -14,10 +15,11 @@ use crate::domain::preferences::Preferences;
 use crate::domain::project::{Project, SessionSummary};
 use crate::domain::replay::replayable;
 use crate::domain::slash::{TurnInput, commands, resolve};
+use crate::domain::workflow::run::Waiting;
 use crate::llm::list_models;
 use crate::skills;
 use crate::store::SqliteStore;
-use crate::{folders, git};
+use crate::{folders, git, workflows};
 use serde_json::{Value, json};
 use std::net::TcpStream;
 use std::path::Path;
@@ -42,12 +44,30 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
         ("POST", ["api", "projects"]) => open_project(app, req, stream),
         ("GET", ["api", "projects", id, "commands"]) => list_commands(app, stream, id),
         ("GET", ["api", "projects", id, "agents"]) => list_agents(app, stream, id),
+        ("GET", ["api", "projects", id, "workflows"]) => {
+            workflow_routes::list_workflows(app, stream, id)
+        }
+        ("GET", ["api", "projects", id, "workflows", wid]) => {
+            workflow_routes::get_workflow(app, stream, id, wid)
+        }
+        ("PUT", ["api", "projects", id, "workflows", wid]) => {
+            workflow_routes::save_workflow(app, req, stream, id, wid)
+        }
+        ("POST", ["api", "workflows", "validate"]) => {
+            workflow_routes::validate_workflow_route(app, req, stream)
+        }
         ("POST", ["api", "sessions"]) => create_session(app, req, stream),
         ("GET", ["api", "sessions", id]) => get_session(app, stream, id),
         ("POST", ["api", "sessions", id, "messages"]) => send_message(app, req, stream, id),
         ("POST", ["api", "sessions", id, "replay"]) => replay_message(app, req, stream, id),
         ("POST", ["api", "sessions", id, "compact"]) => compact_session(app, stream, id),
         ("POST", ["api", "sessions", id, "mode"]) => set_session_mode(app, req, stream, id),
+        ("POST", ["api", "sessions", id, "workflow"]) => {
+            workflow_routes::start_workflow(app, req, stream, id)
+        }
+        ("POST", ["api", "sessions", id, "workflow", control]) => {
+            workflow_routes::control_workflow(app, req, stream, id, control)
+        }
         ("POST", ["api", "sessions", id, "stop"]) => {
             app.turns.stop(id);
             send_json(stream, 202, &json!({}))
@@ -197,12 +217,27 @@ fn create_session(app: &App, req: &Request, stream: &mut TcpStream) -> Result<()
         Ok(attachments) => attachments,
         Err(e) => return error(stream, 400, &e),
     };
-    if prompt.is_empty() && attachments.is_empty() {
+    let workflow_id = body
+        .get("workflowId")
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    let step_by_step = body["stepByStep"].as_bool().unwrap_or(false);
+    if prompt.is_empty() && attachments.is_empty() && workflow_id.is_none() {
         return error(stream, 400, "empty prompt");
     }
     let store = app.store()?;
     let Some(project) = store.project(body["projectId"].as_str().unwrap_or(""))? else {
         return error(stream, 404, "no such project");
+    };
+    // A workflow start is validated before the session is created.
+    let workflow = match &workflow_id {
+        Some(id) => {
+            let Some(found) = workflows::find(Path::new(&project.workdir), id) else {
+                return error(stream, 404, "no such workflow");
+            };
+            Some(found)
+        }
+        None => None,
     };
     let mode = body.get("mode").and_then(Value::as_str).map(str::to_string);
     let mode_event = match &mode {
@@ -225,12 +260,24 @@ fn create_session(app: &App, req: &Request, stream: &mut TcpStream) -> Result<()
     };
     let id = store.create_session(&project, &title)?;
     append_mode_event(app, &store, &id, mode_event)?;
-    let input = resolve(&prompt, &skills::discover(Path::new(&project.workdir)));
-    if matches!(input, TurnInput::Compact) && !attachments.is_empty() {
-        return error(stream, 400, "/compact takes no attachments");
+    match workflow {
+        Some(found) => {
+            let job = Job::Workflow(WorkflowJob::Start {
+                workflow: found.workflow,
+                task: prompt,
+                step_by_step,
+            });
+            app.turns.start(&id, &project.workdir, job)?;
+        }
+        None => {
+            let input = resolve(&prompt, &skills::discover(Path::new(&project.workdir)));
+            if matches!(input, TurnInput::Compact) && !attachments.is_empty() {
+                return error(stream, 400, "/compact takes no attachments");
+            }
+            app.turns
+                .start(&id, &project.workdir, Job::Input(input, attachments))?;
+        }
     }
-    app.turns
-        .start(&id, &project.workdir, Job::Input(input, attachments))?;
     send_json(stream, 200, &json!({ "id": id }))
 }
 
@@ -260,6 +307,9 @@ fn set_session_mode(
     let Some((_, p)) = session_and_project(&store, id)? else {
         return error(stream, 404, "no such session");
     };
+    if workflow_routes::waiting_for(app, id)?.is_some() {
+        return error(stream, 409, "a workflow is running in this session");
+    }
     let list = agents::discover(Path::new(&p.workdir));
     let events = store.events(id)?;
     let event = match switch_to(&list, &events, &mode) {
@@ -283,6 +333,31 @@ fn send_message(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> R
     let Some((_, p)) = session_and_project(&app.store()?, id)? else {
         return error(stream, 404, "no such session");
     };
+    if app.turns.is_running(id) {
+        return error(stream, 409, "a turn is already running");
+    }
+    // While a run is active the typed message answers where it waits.
+    if let Some(waiting) = workflow_routes::waiting_for(app, id)? {
+        return match waiting {
+            Waiting::AgentQuestion => {
+                let job = Job::Workflow(WorkflowJob::AgentInput {
+                    prompt: content,
+                    attachments,
+                });
+                match app.turns.start(id, &p.workdir, job) {
+                    Ok(()) => send_json(stream, 202, &json!({})),
+                    Err(e) => error(stream, 409, &e),
+                }
+            }
+            Waiting::Human => error(stream, 409, "the workflow waits for a choice"),
+            Waiting::Pause => error(stream, 409, "the workflow is paused: continue or stop it"),
+            Waiting::Interrupted => error(
+                stream,
+                409,
+                "the workflow was interrupted: resume or stop it",
+            ),
+        };
+    }
     let input = resolve(&content, &skills::discover(Path::new(&p.workdir)));
     if matches!(input, TurnInput::Compact) && !attachments.is_empty() {
         return error(stream, 400, "/compact takes no attachments");
@@ -329,6 +404,9 @@ fn compact_session(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), St
     let Some((_, p)) = session_and_project(&app.store()?, id)? else {
         return error(stream, 404, "no such session");
     };
+    if workflow_routes::waiting_for(app, id)?.is_some() {
+        return error(stream, 409, "a workflow is running in this session");
+    }
     match app
         .turns
         .start(id, &p.workdir, Job::Input(TurnInput::Compact, Vec::new()))
@@ -369,7 +447,7 @@ fn serve_events_page(
     send_json(stream, 200, &Value::Array(out))
 }
 
-fn session_and_project(
+pub(super) fn session_and_project(
     store: &SqliteStore,
     id: &str,
 ) -> Result<Option<(SessionSummary, Project)>, String> {
@@ -382,7 +460,7 @@ fn session_and_project(
 fn session_json(app: &App, s: &SessionSummary) -> Value {
     json!({
         "id": s.id, "title": s.title, "state": s.state(app.turns.is_running(&s.id)),
-        "createdAt": s.created_at, "updatedAt": s.updated_at,
+        "createdAt": s.created_at, "updatedAt": s.updated_at, "parentId": s.parent_id,
     })
 }
 

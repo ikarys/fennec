@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, lazy, Suspense } from 'react';
 import type { Config, Project, SettingsResponse } from './lib/api';
 import { createProject, getConfig, getProjects, getSettings } from './lib/api';
 import { applyTheme, getStoredTheme, type ThemeId } from './lib/theme';
@@ -10,11 +10,14 @@ import { Palette } from './components/Palette';
 import { ProjectDialog } from './components/project/ProjectDialog';
 import { DisplayPrefsProvider, defaultDisplayPrefs } from './lib/display';
 
+const WorkflowsPage = lazy(() => import('./pages/WorkflowsPage'));
+
 type Route =
   | { name: 'home' }
   | { name: 'session'; id: string }
   | { name: 'new'; id: string }
-  | { name: 'settings' };
+  | { name: 'settings' }
+  | { name: 'workflows'; projectId: string | null; workflowId: string | null; isNew: boolean };
 
 const TABS_KEY = 'fennec.tabs';
 const ACTIVE_TAB_KEY = 'fennec.activeTab';
@@ -23,6 +26,18 @@ function parseRoute(): Route {
   const hash = window.location.hash;
   if (hash === '#/settings') {
     return { name: 'settings' };
+  }
+  if (hash.startsWith('#/workflows')) {
+    const path = hash.slice(12); // Remove '#/workflows'
+    const segments = path.split('/').filter((s) => s.length > 0);
+    let isNew = false;
+    if (segments.length > 0 && segments[segments.length - 1].includes('?new')) {
+      isNew = true;
+      segments[segments.length - 1] = segments[segments.length - 1].split('?')[0];
+    }
+    const projectId = segments.length >= 1 ? decodeURIComponent(segments[0]) : null;
+    const workflowId = segments.length >= 2 ? decodeURIComponent(segments[1]) : null;
+    return { name: 'workflows', projectId, workflowId, isNew };
   }
   if (hash.startsWith('#/s/')) {
     const id = decodeURIComponent(hash.slice(4));
@@ -311,6 +326,15 @@ export default function App() {
             />
           ) : route.name === 'settings' ? (
             <SettingsPage settings={settings} onSaved={handleSettingsSaved} />
+          ) : route.name === 'workflows' ? (
+            <Suspense fallback={<div className="flex grow items-center justify-center text-muted">Chargement…</div>}>
+              <WorkflowsPage
+                projects={projects}
+                projectId={route.projectId}
+                workflowId={route.workflowId}
+                isNew={route.isNew}
+              />
+            </Suspense>
           ) : (
             <SessionPage
               sessionId={route.name === 'session' ? route.id : null}
@@ -332,6 +356,7 @@ export default function App() {
           onNewSession={(projectId) => startNewSession(projectId)}
           onOpenProjectDialog={() => setProjectDialogOpen(true)}
           onHome={() => navigate('#/')}
+          onWorkflows={() => navigate('#/workflows')}
         />
 
         <ProjectDialog
