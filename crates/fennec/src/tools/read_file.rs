@@ -3,7 +3,7 @@
 //! Not ported: PDF files, directories.
 
 use super::args;
-use super::path_guard::resolve_in_workdir;
+use super::path_guard::resolve_for_reading;
 use crate::domain::attachment::{data_url, sniff_image};
 use crate::domain::event::{ToolResult, ToolResultMetadata};
 use serde_json::{Value, json};
@@ -58,7 +58,13 @@ pub(super) fn run(args: &Value, workdir: &Path) -> ToolResult {
         Err(error) => return ToolResult::failure(error),
     };
 
-    let full_path = match resolve_in_workdir(workdir, path) {
+    let packages = || {
+        crate::skills::discover(workdir)
+            .into_iter()
+            .map(|skill| skill.directory)
+            .collect()
+    };
+    let full_path = match resolve_for_reading(workdir, packages, path) {
         Ok(value) => value,
         Err(error) => return ToolResult::failure(error),
     };
