@@ -3,7 +3,7 @@ export function InstructionsSection({ value, onChange }: { value: string; onChan
     <section className="rounded-xl border border-border bg-panel px-5 py-4">
       <h2 className="text-[15px] font-semibold">Instructions globales</h2>
       <textarea
-        rows={6}
+        rows={16}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder="Ex. : Réponds en français, en quelques lignes, sans récapitulatif."

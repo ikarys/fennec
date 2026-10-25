@@ -18,6 +18,14 @@ interface SettingsForm {
   instructions: string;
 }
 
+type SettingsTab = 'models' | 'instructions' | 'display';
+
+const TABS: { id: SettingsTab; label: string }[] = [
+  { id: 'models', label: 'Modèles' },
+  { id: 'instructions', label: 'Instructions' },
+  { id: 'display', label: 'Affichage' }
+];
+
 const emptyModelForm: ModelForm = {
   maxTokens: '',
   contextWindow: '',
@@ -97,6 +105,7 @@ export function SettingsPage({ settings, onSaved }: SettingsPageProps) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<SettingsTab>('models');
 
   useEffect(() => {
     if (settings && form === null) {
@@ -172,41 +181,70 @@ export function SettingsPage({ settings, onSaved }: SettingsPageProps) {
 
   return (
     <main className="grow overflow-y-auto px-6 py-8">
-      <div className="mx-auto flex max-w-[720px] flex-col gap-6">
+      <div className="mx-auto flex max-w-[960px] flex-col gap-6">
         <div>
           <h1 className="text-[22px] font-semibold tracking-[-0.02em]">Réglages</h1>
           <p className="mt-0.5 text-muted">S'applique au prochain tour, sans redémarrage.</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-          <ModelSection
-            value={form.model}
-            models={settings.models}
-            storedModel={settings.preferences.model}
-            defaultModel={settings.defaults.model}
-            onChange={updateModel}
-          />
-          <ModelPrefsSection
-            models={settings.models}
-            values={form.models}
-            defaults={settings.defaults}
-            onChange={updateModelField}
-          />
-          <InstructionsSection value={form.instructions} onChange={updateInstructions} />
-          <DisplaySection value={form.display} onChange={updateDisplay} />
+        <div className="flex gap-6">
+          {/* One form across the tabs: an edit on one tab is kept when switching. */}
+          <nav aria-label="Sections des réglages" className="flex w-44 shrink-0 flex-col gap-0.5">
+            {TABS.map(({ id, label }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setTab(id)}
+                aria-current={tab === id ? 'page' : undefined}
+                className={`rounded-lg px-3 py-1.5 text-left text-[13px] transition-colors ${
+                  tab === id ? 'bg-raised text-text font-medium' : 'text-muted hover:bg-raised hover:text-text'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </nav>
 
-          <div className="flex items-center gap-3">
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex min-h-9 items-center gap-2 rounded-lg bg-accent px-4 text-[13px] font-medium text-on-accent disabled:opacity-60"
-            >
-              {saving ? 'Enregistrement…' : 'Enregistrer'}
-            </button>
-            {saved && <span className="text-[13px] text-ok">Enregistré</span>}
-            {error && <span className="text-[13px] text-err">{error}</span>}
-          </div>
-        </form>
+          <form onSubmit={handleSubmit} className="flex min-w-0 grow flex-col gap-6">
+            {tab === 'models' && (
+              <>
+                <ModelSection
+                  value={form.model}
+                  models={settings.models}
+                  storedModel={settings.preferences.model}
+                  defaultModel={settings.defaults.model}
+                  onChange={updateModel}
+                />
+                <ModelPrefsSection
+                  models={settings.models}
+                  values={form.models}
+                  defaults={settings.defaults}
+                  onChange={updateModelField}
+                />
+              </>
+            )}
+
+            {tab === 'instructions' && (
+              <InstructionsSection value={form.instructions} onChange={updateInstructions} />
+            )}
+
+            {tab === 'display' && (
+              <DisplaySection value={form.display} onChange={updateDisplay} />
+            )}
+
+            <div className="flex items-center gap-3">
+              <button
+                type="submit"
+                disabled={saving}
+                className="flex min-h-9 items-center gap-2 rounded-lg bg-accent px-4 text-[13px] font-medium text-on-accent disabled:opacity-60"
+              >
+                {saving ? 'Enregistrement…' : 'Enregistrer'}
+              </button>
+              {saved && <span className="text-[13px] text-ok">Enregistré</span>}
+              {error && <span className="text-[13px] text-err">{error}</span>}
+            </div>
+          </form>
+        </div>
       </div>
     </main>
   );
