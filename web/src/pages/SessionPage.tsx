@@ -58,7 +58,7 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
   // server's mode (event stream or detail) matches it.
   const [pendingMode, setPendingMode] = useState<string | null>(null);
   const [preview, setPreview] = useState<PreviewTarget | null>(null);
-  const { view, hasMore, loadingOlder, loadOlder } = useSessionThread(sessionId);
+  const { view, hasMore, loadingOlder, loadOlder, skills } = useSessionThread(sessionId);
   const running = view.running;
   const run = view.run;
   const waiting = runWaiting(run, running, view.lastDone);
@@ -459,6 +459,8 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
             view={view}
             currentTokens={currentTokens}
             contextPercent={contextPercent}
+            skills={skills}
+            hasSession={sessionId !== null}
             compactDisabled={!sessionId || state === 'running' || state === 'waiting_for_user'}
             onCompact={handleCompact}
             compactError={compactError}

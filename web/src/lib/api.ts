@@ -225,6 +225,16 @@ export function getSession(id: string): Promise<SessionDetail> {
   return request<SessionDetail>(`/api/sessions/${encodeURIComponent(id)}`);
 }
 
+/** A session's skills folded from its log: loaded so far, and still in the model's view. */
+export interface SessionSkills {
+  loaded: string[];
+  active: string[];
+}
+
+export function getSkills(id: string): Promise<SessionSkills> {
+  return request<SessionSkills>(`/api/sessions/${encodeURIComponent(id)}/skills`);
+}
+
 export interface AttachmentInput {
   filename: string;
   data: string;

@@ -1,4 +1,5 @@
 import type { ThreadView } from '../../lib/fold';
+import type { SessionSkills } from '../../lib/api';
 import { cachePercent, formatSpeed, formatTokens } from '../../lib/format';
 import { previewKindOfPath, relativeToWorkdir } from '../../lib/preview';
 import { usePreviewOpener, usePreviewWorkdir } from '../preview/PreviewContext';
@@ -7,6 +8,10 @@ interface ContextPanelProps {
   view: ThreadView;
   currentTokens: number;
   contextPercent: number;
+  /** The session's skills, folded server-side; null while the first fetch is in flight. */
+  skills: SessionSkills | null;
+  /** False on the « Nouvelle session » tab, where there is no log to fold. */
+  hasSession: boolean;
   compactDisabled: boolean;
   onCompact: () => void;
   compactError: string | null;
@@ -14,7 +19,7 @@ interface ContextPanelProps {
   partial: boolean;
 }
 
-export function ContextPanel({ view, currentTokens, contextPercent, compactDisabled, onCompact, compactError, partial }: ContextPanelProps) {
+export function ContextPanel({ view, currentTokens, contextPercent, skills, hasSession, compactDisabled, onCompact, compactError, partial }: ContextPanelProps) {
   const opener = usePreviewOpener();
   const workdir = usePreviewWorkdir();
   return (
@@ -94,6 +99,27 @@ export function ContextPanel({ view, currentTokens, contextPercent, compactDisab
                     Aperçu
                   </button>
                 )}
+              </div>
+            );
+          })}
+        </section>
+
+        <section className="flex flex-col gap-1.5">
+          <h2 className="text-[11px] font-semibold tracking-[0.06em] text-muted uppercase">Skills</h2>
+          {(!hasSession || (skills !== null && skills.loaded.length === 0)) && (
+            <div className="text-xs text-muted">Aucun skill chargé.</div>
+          )}
+          {hasSession && skills === null && <div className="text-xs text-muted">Chargement…</div>}
+          {hasSession && skills !== null && skills.loaded.length > 0 && skills.loaded.map((id) => {
+            const active = skills.active.includes(id);
+            return (
+              <div
+                key={id}
+                title={active ? id : 'Plus dans le contexte du modèle'}
+                className="flex items-center gap-2 py-1.5 font-mono text-xs"
+              >
+                <span className={active ? undefined : 'text-muted'}>{id}</span>
+                {active && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ok" />}
               </div>
             );
           })}

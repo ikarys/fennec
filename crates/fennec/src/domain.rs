@@ -13,6 +13,7 @@ pub mod open_calls;
 pub mod preferences;
 pub mod project;
 pub mod replay;
+pub mod session_skills;
 pub mod skill;
 pub mod slash;
 pub mod stats;
