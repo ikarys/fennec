@@ -37,26 +37,31 @@ crates/fennec/src/
   config.rs          settings from the environment (model endpoint, store path)
   domain/            the vocabulary, no I/O
     event.rs           openfox events/types: Event, ToolCall, ToolResult, Role, DoneReason
+    stats.rs           openfox MessageStats: tokens (in, cached, out) and speeds of a call
     project.rs         Project, SessionSummary, SessionState
     conversation.rs    openfox events/fold-messages: the log read back as model messages
     id.rs, clock.rs
   agent/             application layer: the agent loop
     ports.rs           Model, EventLog, Toolbox: what the loop needs from outside
     turn.rs            openfox chat/agent-loop: the multi-turn loop
-    round.rs           one model round: streaming, retries, continuation
+    round.rs           one model round: streaming, retries, continuation, timing
+    delta_buffer.rs    coalesces streamed chunks into one event per 100 ms
     tool_calls.rs      openfox chat/execute-tools: runs and records tool calls
     prompt.rs          openfox chat/prompts: the system prompt
   tools/             Toolbox adapter on the host: one file per tool, path_guard, args
   llm/               Model adapter: openai.rs (client), sse.rs (stream parser)
   store.rs           EventLog adapter: SQLite (openfox's schema), projects and sessions
   git.rs             what fennec reads from a repository
-  web/               HTTP adapter: http, guard (who may call), routes, event_stream (SSE), turns, assets
+  folders.rs         the folders the human browses to open a project
+  web/               HTTP adapter: http, guard (who may call), routes, event_stream (SSE),
+                     notifier (wakes streams on append, no polling), turns, assets
   cli/               terminal adapter: commands, transcript
 crates/fennec/build.rs   embeds web/dist (placeholder page when not built)
 web/src/           React + Vite + Tailwind v4 UI (same layout as openfox's web/src)
   pages/             one component per route: HomePage, SessionPage
-  components/        shared UI; components/session/ the thread, tool cards, composer, context panel
-  hooks/             useSessionEvents: the SSE stream of a session
+  components/        shared UI; session/ the thread, tool cards, message stats, composer,
+                     context panel; project/ the folder browser; layout/ the top bar
+  hooks/             useSessionThread: the SSE stream of a session, folded
   lib/               api (typed fetch), fold (events → thread view), format, theme
   styles/app.css     theme tokens: one CSS variable block per theme, mapped into Tailwind
 docs/api.md        the HTTP API and event wire format, shared by server and UI
@@ -81,6 +86,14 @@ docs/api.md        the HTTP API and event wire format, shared by server and UI
    on throwaway repositories only.
 
 ## Build, test, run
+
+```bash
+just                # build the UI and run the release server on :7777
+just check          # the gate before any commit: fmt, clippy -D warnings, tests, UI build
+just dev            # server + Vite dev server on :5173
+```
+
+Without just:
 
 ```bash
 cargo build
@@ -116,6 +129,32 @@ Env: `FENNEC_LLM_URL`, `FENNEC_MODEL`, `FENNEC_API_KEY`, `FENNEC_MAX_TOKENS`,
 
 Rust 2024, rustfmt defaults, clippy clean. English for code, comments, docs
 and commit messages. Comments explain *why*.
+
+**Keep the architecture and the code clean — every change, not in a later
+clean-up.** DDD, KISS, clean code, clean architecture and SOLID, applied as
+far as they help, never blindly:
+
+- Every change leaves the structure at least as clean as it found it. When
+  a file takes a second responsibility or a function stops fitting on a
+  screen, split it in the same change.
+- Respect the layers in "Layout": the domain does no I/O, the agent sees
+  only its ports, adapters never reach into each other's internals.
+- Name things after the domain; prefer types (enums, newtypes) to strings
+  and flags.
+- No god file, no catch-all module (`utils`, `misc`, `common`, `helpers`),
+  no file loose at a source root (Rust or web).
+- Code written by a model (the local LLM included) is reviewed against
+  these rules before it is committed, not only against the tests.
+- Resources are a feature: fennec must stay light in RAM and CPU (openfox
+  is not). Measure before and after a change that could cost them.
+
+**The prompt only grows.** The local inference server reuses its cache only
+for an exact prefix of an earlier request. Within a session, never rewrite
+what was already sent: the system prompt is frozen at the first turn
+(`turn.snapshot`), earlier messages fold back byte for byte, reasoning is
+sent back as streamed. Anything that edits history (compaction, a changed
+prompt) costs a full re-read of the session: do it deliberately, measured
+with the per-message stats.
 
 ## Commit format
 

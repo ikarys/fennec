@@ -15,7 +15,7 @@ with camelCase fields.
 | `message.start` | `{messageId, role: "user"\|"assistant", content?, isSystemGenerated?}` |
 | `message.delta` | `{messageId, content}` (text chunk) |
 | `message.thinking` | `{messageId, content}` (reasoning chunk) |
-| `message.done` | `{messageId, partial?}` |
+| `message.done` | `{messageId, partial?, stats?}`; `stats` (assistant messages): `{model, totalTime (s), prefillTokens, cachedPromptTokens, generationTokens, prefillSpeed, generationSpeed}`, speeds in tokens/s, prefill speed over new (non-cached) tokens |
 | `tool.call` | `{messageId, toolCall: {id, name, arguments, parseError?}}` |
 | `tool.output` | `{messageId, toolCallId, stream: "stdout"\|"stderr", content}` |
 | `tool.result` | `{messageId, toolCallId, result: {success, output?, error?, durationMs, truncated}}` |
@@ -23,6 +23,7 @@ with camelCase fields.
 | `running.changed` | `{isRunning}` |
 | `chat.done` | `{messageId, reason: "complete"\|"stopped"\|"error"\|"truncated"}` |
 | `chat.error` | `{error, recoverable}` |
+| `turn.snapshot` | `{cachedSystemPrompt}`: the session's system prompt, frozen at its first turn |
 
 Tools: `read_file {path, offset?, limit?}`, `write_file {path, content}`,
 `edit_file {path, old_string, new_string, replace_all?}`,
@@ -39,6 +40,9 @@ Tools: `read_file {path, offset?, limit?}`, `write_file {path, content}`,
 - `GET /api/projects` → `[{id, name, workdir, branch, sessions: [{id, title, state, createdAt, updatedAt}]}]`
   (sessions newest first; `createdAt`/`updatedAt` are Unix milliseconds; `branch` may be `null`)
 - `POST /api/projects` `{workdir}` → the project (400 if not a directory)
+- `GET /api/folders?path=<absolute path>` → `{path, parent, folders: [{name, path, hidden, repo}]}`,
+  the sub-folders of `path` (the home directory when omitted), sorted by name;
+  `repo` marks a git repository; 400 if `path` cannot be read
 - `GET /api/sessions/{id}` → `{id, title, state, project: {id, name, workdir}}`
 - `POST /api/sessions` `{projectId, prompt}` → `{id}`; the turn starts at once
 - `POST /api/sessions/{id}/messages` `{content}` → 202; 409 if a turn is running

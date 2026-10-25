@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Config, Project, SessionDetail, SessionState } from '../lib/api';
 import { createSession, getSession, sendMessage, stopSession } from '../lib/api';
-import { fold } from '../lib/fold';
 import { stateLabel } from '../lib/format';
-import { useSessionEvents } from '../hooks/useSessionEvents';
+import { useSessionThread } from '../hooks/useSessionThread';
 import { Composer } from '../components/session/Composer';
 import { ContextPanel } from '../components/session/ContextPanel';
 import { ThreadItemView } from '../components/session/Thread';
@@ -24,8 +23,8 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [text, setText] = useState('');
   const [sendError, setSendError] = useState<string | null>(null);
-  const { events, running } = useSessionEvents(sessionId);
-  const view = useMemo(() => fold(events), [events]);
+  const view = useSessionThread(sessionId);
+  const running = view.running;
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -63,7 +62,7 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
     if (element && stickToBottom.current) {
       element.scrollTop = element.scrollHeight;
     }
-  }, [events, detail]);
+  }, [view, detail]);
 
   // The detail is fetched once; the event stream says how a turn ended.
   const state: SessionState = running ? 'running' : ((view.lastDone as SessionState | undefined) ?? detail?.state ?? 'idle');

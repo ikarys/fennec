@@ -42,6 +42,9 @@ pub fn parse(
         if let Some(usage) = chunk.get("usage").filter(|u| u.is_object()) {
             out.prompt_tokens = usage["prompt_tokens"].as_u64().unwrap_or(0);
             out.completion_tokens = usage["completion_tokens"].as_u64().unwrap_or(0);
+            out.cached_tokens = usage["prompt_tokens_details"]["cached_tokens"]
+                .as_u64()
+                .unwrap_or(0);
         }
         let Some(choice) = chunk["choices"].get(0) else {
             continue;
@@ -121,7 +124,7 @@ mod tests {
 data: {"choices":[{"delta":{"content":"Hi"}}]}
 data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c1","function":{"name":"read_file","arguments":"{\"pa"}}]}}]}
 data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"th\":\"a\"}"}}]},"finish_reason":"tool_calls"}]}
-data: {"choices":[],"usage":{"prompt_tokens":10,"completion_tokens":5}}
+data: {"choices":[],"usage":{"prompt_tokens":10,"completion_tokens":5,"prompt_tokens_details":{"cached_tokens":8}}}
 data: [DONE]
 "#;
         let mut deltas = Vec::new();
@@ -132,7 +135,10 @@ data: [DONE]
         assert_eq!(c.content, "Hi");
         assert_eq!(c.thinking, "hmm");
         assert_eq!(c.finish_reason, "tool_calls");
-        assert_eq!((c.prompt_tokens, c.completion_tokens), (10, 5));
+        assert_eq!(
+            (c.prompt_tokens, c.cached_tokens, c.completion_tokens),
+            (10, 8, 5)
+        );
         assert_eq!(c.tool_calls.len(), 1);
         assert_eq!(c.tool_calls[0].id, "c1");
         assert_eq!(c.tool_calls[0].arguments, json!({"path": "a"}));

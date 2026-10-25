@@ -53,6 +53,7 @@ impl Transcript {
             Event::ChatDone { reason, .. } => writeln!(out, "\n— {reason}"),
             Event::SessionInitialized { .. }
             | Event::MessageDone { .. }
+            | Event::TurnSnapshot { .. }
             | Event::ContextState { .. }
             | Event::RunningChanged { .. } => Ok(()),
         };

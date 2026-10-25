@@ -1,5 +1,6 @@
+import type { MessageStats } from './api';
+
 export interface FennecEvent {
-  seq?: number;
   type: string;
   data: any;
 }
@@ -36,6 +37,22 @@ export interface AssistantItem {
   kind: 'assistant';
   id: string;
   segments: Segment[];
+  done: boolean;
+  /** Measured by the server once the message is done. */
+  stats?: MessageStats;
+  /** Characters streamed (text and reasoning), for the live estimate. */
+  chars: number;
+  /** Estimated tokens per second while the message streams. */
+  liveSpeed?: number;
+}
+
+/** What the session's model calls cost so far. */
+export interface SessionUsage {
+  calls: number;
+  prefillTokens: number;
+  cachedPromptTokens: number;
+  generationTokens: number;
+  last?: MessageStats;
 }
 
 export type ThreadItem =
@@ -64,7 +81,13 @@ export interface ThreadView {
   lastDone?: string;
   modifiedFiles: ModifiedFile[];
   toolCounts: ToolCount[];
+  usage: SessionUsage;
 }
+
+// The live speed is estimated from characters over the last few seconds;
+// the ratio is learnt from the messages the server measured.
+const LIVE_WINDOW_MS = 3000;
+const DEFAULT_TOKENS_PER_CHAR = 0.28;
 
 function splitLines(value: string): string[] {
   return value.split(/\r?\n/);
@@ -127,23 +150,18 @@ function updateToolStats(tool: ToolCallView, modified: Map<string, ModifiedFile>
   }
 }
 
-function findAssistant(items: ThreadItem[], messageId: string): AssistantItem | undefined {
-  return items.find((item): item is AssistantItem => item.kind === 'assistant' && item.id === messageId);
+export interface ThreadFold {
+  apply(event: FennecEvent): void;
+  /** A new view object per call, for React; the items inside are shared. */
+  view(): ThreadView;
 }
 
-function findTool(items: ThreadItem[], toolCallId: string): ToolCallView | undefined {
-  for (const item of items) {
-    if (item.kind !== 'assistant') continue;
-    for (const segment of item.segments) {
-      if (segment.kind === 'tool' && segment.tool.id === toolCallId) {
-        return segment.tool;
-      }
-    }
-  }
-  return undefined;
-}
-
-export function fold(events: FennecEvent[]): ThreadView {
+/**
+ * Builds the thread view event by event. The raw events are not kept, and
+ * messages and tool calls are found through indexes: a long session costs
+ * memory for what is shown, and each event a constant amount of work.
+ */
+export function createThreadFold(): ThreadFold {
   const items: ThreadItem[] = [];
   let contextTokens: number | undefined;
   let contextMax: number | undefined;
@@ -151,8 +169,36 @@ export function fold(events: FennecEvent[]): ThreadView {
   let lastDone: string | undefined;
   const modified = new Map<string, ModifiedFile>();
   const toolCounts = new Map<string, number>();
+  const assistants = new Map<string, AssistantItem>();
+  const tools = new Map<string, ToolCallView>();
+  const usage: SessionUsage = { calls: 0, prefillTokens: 0, cachedPromptTokens: 0, generationTokens: 0 };
+  let tokensPerChar = DEFAULT_TOKENS_PER_CHAR;
+  // [arrival time, chars] of the streaming message, oldest first.
+  let samples: [number, number][] = [];
+  let index = 0;
 
-  events.forEach((event, index) => {
+  const newAssistant = (id: string): AssistantItem => {
+    const assistant: AssistantItem = { kind: 'assistant', id, segments: [], done: false, chars: 0 };
+    items.push(assistant);
+    assistants.set(id, assistant);
+    samples = [];
+    return assistant;
+  };
+
+  const streamed = (assistant: AssistantItem, content: string) => {
+    assistant.chars += content.length;
+    const now = performance.now();
+    samples.push([now, assistant.chars]);
+    while (samples.length > 2 && now - samples[0][0] > LIVE_WINDOW_MS) samples.shift();
+    const [t0, c0] = samples[0];
+    // A replayed burst arrives at once: no speed until there is a span.
+    if (now - t0 >= 500) {
+      assistant.liveSpeed = ((assistant.chars - c0) * tokensPerChar) / ((now - t0) / 1000);
+    }
+  };
+
+  const apply = (event: FennecEvent) => {
+    index += 1;
     const data = event.data ?? {};
 
     switch (event.type) {
@@ -166,12 +212,7 @@ export function fold(events: FennecEvent[]): ThreadView {
             isSystemGenerated: Boolean(data.isSystemGenerated)
           });
         } else if (data.role === 'assistant') {
-          const assistant: AssistantItem = {
-            kind: 'assistant',
-            id: messageId,
-            segments: []
-          };
-          items.push(assistant);
+          const assistant = newAssistant(messageId);
           if (data.content) {
             assistant.segments.push({ kind: 'text', id: `${messageId}-text`, content: String(data.content) });
           }
@@ -181,9 +222,10 @@ export function fold(events: FennecEvent[]): ThreadView {
 
       case 'message.delta': {
         const messageId = String(data.messageId ?? `message-${index}`);
-        const assistant = findAssistant(items, messageId);
+        const assistant = assistants.get(messageId);
         if (!assistant) break;
         const content = String(data.content ?? '');
+        streamed(assistant, content);
         const last = assistant.segments[assistant.segments.length - 1];
         if (last && last.kind === 'text') {
           last.content += content;
@@ -195,14 +237,34 @@ export function fold(events: FennecEvent[]): ThreadView {
 
       case 'message.thinking': {
         const messageId = String(data.messageId ?? `message-${index}`);
-        const assistant = findAssistant(items, messageId);
+        const assistant = assistants.get(messageId);
         if (!assistant) break;
         const content = String(data.content ?? '');
+        streamed(assistant, content);
         const existing = assistant.segments.find((segment): segment is Extract<Segment, { kind: 'thinking' }> => segment.kind === 'thinking');
         if (existing) {
           existing.content += content;
         } else {
           assistant.segments.unshift({ kind: 'thinking', id: `${messageId}-thinking`, content });
+        }
+        break;
+      }
+
+      case 'message.done': {
+        const assistant = assistants.get(String(data.messageId ?? ''));
+        if (!assistant) break;
+        assistant.done = true;
+        assistant.liveSpeed = undefined;
+        const stats = data.stats as MessageStats | undefined;
+        if (!stats) break;
+        assistant.stats = stats;
+        usage.calls += 1;
+        usage.prefillTokens += stats.prefillTokens;
+        usage.cachedPromptTokens += stats.cachedPromptTokens;
+        usage.generationTokens += stats.generationTokens;
+        usage.last = stats;
+        if (assistant.chars > 200 && stats.generationTokens > 0) {
+          tokensPerChar = stats.generationTokens / assistant.chars;
         }
         break;
       }
@@ -224,18 +286,15 @@ export function fold(events: FennecEvent[]): ThreadView {
         };
         updateToolStats(tool, modified, toolCounts);
 
-        let assistant = findAssistant(items, messageId);
-        if (!assistant) {
-          assistant = { kind: 'assistant', id: messageId, segments: [] };
-          items.push(assistant);
-        }
+        const assistant = assistants.get(messageId) ?? newAssistant(messageId);
         assistant.segments.push({ kind: 'tool', id: toolId, tool });
+        tools.set(toolId, tool);
         break;
       }
 
       case 'tool.output': {
         const toolCallId = String(data.toolCallId ?? '');
-        const tool = findTool(items, toolCallId);
+        const tool = tools.get(toolCallId);
         if (!tool) break;
         const content = String(data.content ?? '');
         if (data.stream === 'stderr') {
@@ -248,7 +307,7 @@ export function fold(events: FennecEvent[]): ThreadView {
 
       case 'tool.result': {
         const toolCallId = String(data.toolCallId ?? '');
-        const tool = findTool(items, toolCallId);
+        const tool = tools.get(toolCallId);
         if (!tool) break;
         const result = data.result ?? {};
         tool.status = result.success ? 'success' : 'error';
@@ -296,15 +355,18 @@ export function fold(events: FennecEvent[]): ThreadView {
       default:
         break;
     }
-  });
+  };
 
-  return {
-    items,
+  const view = (): ThreadView => ({
+    items: [...items],
     contextTokens,
     contextMax,
     running,
     lastDone,
     modifiedFiles: Array.from(modified.values()),
-    toolCounts: Array.from(toolCounts.entries()).map(([name, count]) => ({ name, count }))
-  };
+    toolCounts: Array.from(toolCounts.entries()).map(([name, count]) => ({ name, count })),
+    usage: { ...usage }
+  });
+
+  return { apply, view };
 }

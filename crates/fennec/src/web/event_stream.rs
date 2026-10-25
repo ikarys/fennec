@@ -1,20 +1,19 @@
 //! Server-Sent Events: a session's stored log from `Last-Event-ID` (or
-//! `?after=`), then new events as they are appended.
+//! `?after=`), then new events as they are appended, woken by the notifier.
 
 use super::http::{Request, error};
+use super::notifier::Notifier;
 use crate::store::SqliteStore;
 use std::io::Write;
 use std::net::TcpStream;
 use std::time::{Duration, Instant};
 
-/// ponytail: the stream polls SQLite; a per-session notifier if many tabs
-/// stream at once.
-const POLL: Duration = Duration::from_millis(100);
 /// A comment line now and then, so a closed browser tab is noticed.
 const PING: Duration = Duration::from_secs(15);
 
 pub fn serve(
     store: &SqliteStore,
+    notifier: &Notifier,
     req: &Request,
     stream: &mut TcpStream,
     id: &str,
@@ -30,6 +29,9 @@ pub fn serve(
         .map_err(|e| e.to_string())?;
     let mut last_write = Instant::now();
     loop {
+        // Read the generation before the store, so an append in between
+        // still wakes the wait below.
+        let seen = notifier.generation();
         let mut out = String::new();
         for (seq, payload) in store.events_after(id, last)? {
             // Payloads are single-line JSON: serde_json never emits raw newlines.
@@ -45,7 +47,7 @@ pub fn serve(
             }
             last_write = Instant::now();
         }
-        std::thread::sleep(POLL);
+        notifier.wait_past(seen, PING);
     }
 }
 

@@ -5,6 +5,7 @@ mod agent;
 mod cli;
 mod config;
 mod domain;
+mod folders;
 mod git;
 mod llm;
 mod store;

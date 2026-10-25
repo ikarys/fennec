@@ -59,6 +59,7 @@ impl Turn<'_> {
         })?;
         self.append(Event::MessageDone {
             message_id,
+            stats: None,
             partial: false,
         })
     }
@@ -82,8 +83,32 @@ pub fn run_turn(turn: &mut Turn, prompt: &str) -> Result<DoneReason, String> {
     result
 }
 
+/// openfox `cachedSystemPrompt`: built at the session's first turn, then
+/// read back, so a new day or a new fennec build does not change the
+/// prompt's first bytes and void the whole session's prompt cache.
+fn cached_system_prompt(turn: &mut Turn) -> Result<String, String> {
+    let cached = turn
+        .log
+        .events(turn.session_id)?
+        .into_iter()
+        .find_map(|e| match e {
+            Event::TurnSnapshot {
+                cached_system_prompt,
+            } => Some(cached_system_prompt),
+            _ => None,
+        });
+    if let Some(prompt) = cached {
+        return Ok(prompt);
+    }
+    let prompt = system_prompt(turn.workdir, turn.model.name());
+    turn.append(Event::TurnSnapshot {
+        cached_system_prompt: prompt.clone(),
+    })?;
+    Ok(prompt)
+}
+
 fn run_top_level_agent_loop(turn: &mut Turn) -> Result<DoneReason, String> {
-    let system_prompt = system_prompt(turn.workdir, turn.model.name());
+    let system_prompt = cached_system_prompt(turn)?;
     let tool_defs = turn.tools.definitions();
     let mut max_tokens = turn.max_tokens;
     let mut truncation_retries = 0;
@@ -98,8 +123,8 @@ fn run_top_level_agent_loop(turn: &mut Turn) -> Result<DoneReason, String> {
             tools: &tool_defs,
             max_tokens,
         };
-        let answer = match round::stream(turn, &message_id, &prompt)? {
-            Round::Answered(answer) => answer,
+        let (answer, stats) = match round::stream(turn, &message_id, &prompt)? {
+            Round::Answered(answer, stats) => (answer, stats),
             Round::Interrupted => continue,
             Round::Ended(reason) => return finish(turn, message_id, reason),
         };
@@ -112,6 +137,7 @@ fn run_top_level_agent_loop(turn: &mut Turn) -> Result<DoneReason, String> {
             let give_up = truncation_retries >= MAX_TRUNCATION_RETRIES;
             turn.append(Event::MessageDone {
                 message_id: message_id.clone(),
+                stats: Some(stats),
                 partial: give_up,
             })?;
             if give_up {
@@ -131,6 +157,7 @@ fn run_top_level_agent_loop(turn: &mut Turn) -> Result<DoneReason, String> {
         }
         turn.append(Event::MessageDone {
             message_id: message_id.clone(),
+            stats: Some(stats),
             partial: false,
         })?;
         if answer.tool_calls.is_empty() {
@@ -316,5 +343,63 @@ mod tests {
             contents,
             ["go", "part", CONTINUE_AFTER_STREAM_ERROR_PROMPT, "part"]
         );
+    }
+
+    /// Answers at once and keeps the system prompt of each call.
+    #[derive(Default)]
+    struct Recording(RefCell<Vec<String>>);
+
+    impl Model for Recording {
+        fn name(&self) -> &str {
+            "recording"
+        }
+
+        fn stream(&self, req: &Request, _: &mut dyn FnMut(Delta)) -> Result<Completion, String> {
+            self.0.borrow_mut().push(req.system_prompt.to_string());
+            reply("done", vec![])
+        }
+    }
+
+    #[test]
+    fn the_system_prompt_is_frozen_for_the_session() {
+        let log = MemoryLog::default();
+        log.append(
+            "s",
+            &Event::TurnSnapshot {
+                cached_system_prompt: "frozen".into(),
+            },
+        )
+        .unwrap();
+        let model = Recording::default();
+        let workdir = std::env::temp_dir();
+        let tools = LocalTools::new(workdir.clone());
+        let stop = AtomicBool::new(false);
+        let mut on_event = |_: &Event| {};
+        let mut turn = Turn {
+            model: &model,
+            log: &log,
+            tools: &tools,
+            session_id: "s",
+            workdir: &workdir,
+            max_tokens: 100,
+            context_window: 1000,
+            stop: &stop,
+            on_event: &mut on_event,
+        };
+        run_turn(&mut turn, "one").unwrap();
+        run_turn(&mut turn, "two").unwrap();
+        assert_eq!(*model.0.borrow(), ["frozen", "frozen"]);
+        let snapshots = log
+            .0
+            .borrow()
+            .iter()
+            .filter(|e| matches!(e, Event::TurnSnapshot { .. }))
+            .count();
+        assert_eq!(snapshots, 1);
+        let stats = log.0.borrow().iter().find_map(|e| match e {
+            Event::MessageDone { stats, .. } => stats.clone(),
+            _ => None,
+        });
+        assert_eq!(stats.map(|s| s.model), Some("recording".into()));
     }
 }

@@ -54,7 +54,7 @@ export function HomePage({ projects, loading, error, onOpenProjectDialog, onNewS
 
         {!loading && !error && projects.length === 0 && (
           <div className="rounded-xl border border-border bg-panel px-6 py-10 text-center text-sm text-muted">
-            Aucun projet ouvert. Ajoute un chemin absolu pour commencer.
+            Aucun projet ouvert. Ouvre un dossier pour commencer.
           </div>
         )}
 

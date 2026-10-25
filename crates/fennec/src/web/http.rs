@@ -26,6 +26,41 @@ impl Request {
     pub fn json(&self) -> Result<Value, String> {
         serde_json::from_slice(&self.body).map_err(|e| format!("invalid JSON body: {e}"))
     }
+
+    /// A query parameter, percent-decoded (`+` is a space, as browsers send).
+    pub fn query_param(&self, name: &str) -> Option<String> {
+        self.query.split('&').find_map(|kv| {
+            let (k, v) = kv.split_once('=')?;
+            (k == name).then(|| percent_decode(v))
+        })
+    }
+}
+
+fn percent_decode(s: &str) -> String {
+    let bytes = s.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        let hex = bytes
+            .get(i + 1..i + 3)
+            .and_then(|h| std::str::from_utf8(h).ok())
+            .and_then(|h| u8::from_str_radix(h, 16).ok());
+        match (bytes[i], hex) {
+            (b'%', Some(byte)) => {
+                out.push(byte);
+                i += 3;
+            }
+            (b'+', _) => {
+                out.push(b' ');
+                i += 1;
+            }
+            (b, _) => {
+                out.push(b);
+                i += 1;
+            }
+        }
+    }
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 pub fn read_request(stream: &TcpStream) -> Result<Request, String> {
@@ -110,4 +145,26 @@ pub fn send_json(stream: &mut TcpStream, status: u16, value: &Value) -> Result<(
 
 pub fn error(stream: &mut TcpStream, status: u16, message: &str) -> Result<(), String> {
     send_json(stream, status, &json!({ "error": message }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn query_params_are_percent_decoded() {
+        let req = Request {
+            method: "GET".into(),
+            path: "/api/folders".into(),
+            query: "x=1&path=%2Fhome%2Fmy%20dir%2F%C3%A9t%C3%A9+b&bad=%zz".into(),
+            headers: Vec::new(),
+            body: Vec::new(),
+        };
+        assert_eq!(
+            req.query_param("path").as_deref(),
+            Some("/home/my dir/été b")
+        );
+        assert_eq!(req.query_param("bad").as_deref(), Some("%zz"));
+        assert_eq!(req.query_param("none"), None);
+    }
 }
