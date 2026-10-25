@@ -28,15 +28,21 @@ export interface Config {
   contextWindow: number;
 }
 
+/** openfox `ReasoningEffort`: how much a model may think. */
+export type ReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+
 export interface ModelPrefs {
   maxTokens?: number;
   contextWindow?: number;
   compactionThreshold?: number;
+  reasoningEffort?: ReasoningEffort | null;
 }
 
 export interface DisplayPrefs {
   reasoningOpen: boolean;
   toolResultsOpen: boolean;
+  /** The UI's base font size in pixels (server default 14, range 13..=16). */
+  fontSize: number;
 }
 
 export interface Preferences {
@@ -55,6 +61,7 @@ export interface SettingsDefaults {
   maxTokens: number;
   contextWindow: number;
   compactAt: number;
+  reasoningEffort: ReasoningEffort | null;
 }
 
 export interface SettingsResponse {
@@ -194,4 +201,20 @@ export function compactSession(id: string): Promise<void> {
   return request<void>(`/api/sessions/${encodeURIComponent(id)}/compact`, {
     method: 'POST'
   });
+}
+
+export interface EventPageEntry {
+  seq: number;
+  event: { type: string; data: Record<string, unknown> };
+}
+
+/**
+ * At least the last `limit` events before `before` (the log's end when 0),
+ * ascending, from the start of a turn. The thread loads its pages this way;
+ * the live tail comes from the SSE stream.
+ */
+export function getEventPage(id: string, before: number, limit: number): Promise<EventPageEntry[]> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (before > 0) params.set('before', String(before));
+  return request<EventPageEntry[]>(`/api/sessions/${encodeURIComponent(id)}/events?${params}`);
 }

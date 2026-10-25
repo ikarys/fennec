@@ -57,6 +57,7 @@ mod tests {
                 max_tokens: Some(100),
                 context_window: Some(2048),
                 compaction_threshold: Some(0.5),
+                reasoning_effort: None,
             },
         );
         prefs.display.reasoning_open = false;

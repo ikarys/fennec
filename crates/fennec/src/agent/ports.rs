@@ -3,6 +3,7 @@
 //! sees HTTP, SQL or processes.
 
 use crate::domain::event::{Event, OutputStream, ToolCall, ToolResult};
+use crate::domain::preferences::ReasoningEffort;
 use serde_json::Value;
 use std::sync::atomic::AtomicBool;
 
@@ -11,6 +12,8 @@ pub struct Request<'a> {
     pub messages: &'a [Value],
     pub tools: &'a Value,
     pub max_tokens: u32,
+    /// Sent as `reasoning_effort` when set; `None` omits the field.
+    pub reasoning_effort: Option<ReasoningEffort>,
     /// Checked on every streamed line: the stream ends with "Aborted".
     pub stop: &'a AtomicBool,
 }

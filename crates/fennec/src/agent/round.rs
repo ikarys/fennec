@@ -7,6 +7,7 @@ use super::ports::{Completion, Delta, Request};
 use super::turn::Turn;
 use crate::domain::conversation::fold_messages;
 use crate::domain::event::{DoneReason, Event, Role};
+use crate::domain::preferences::ReasoningEffort;
 use crate::domain::stats::{MessageStats, Usage};
 use serde_json::Value;
 use std::sync::atomic::Ordering;
@@ -19,6 +20,7 @@ pub struct RoundPrompt<'a> {
     pub system_prompt: &'a str,
     pub tools: &'a Value,
     pub max_tokens: u32,
+    pub reasoning_effort: Option<ReasoningEffort>,
 }
 
 pub enum Round {
@@ -86,6 +88,7 @@ fn stream_once(
         messages: &messages,
         tools: prompt.tools,
         max_tokens: prompt.max_tokens,
+        reasoning_effort: prompt.reasoning_effort,
         stop: turn.stop,
     };
     let model = turn.model;

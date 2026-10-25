@@ -1,5 +1,9 @@
 //! Port of openfox `llm/client.ts`: one streaming call to an
 //! OpenAI-compatible `/chat/completions` endpoint.
+//!
+//! Not ported yet: the provider shims of openfox `requestBody`
+//! (llama.cpp `chat_template_kwargs.thinking`, Qwen3 `enable_thinking`);
+//! the standard `reasoning_effort` field is sent when set.
 
 use super::sse;
 use crate::agent::ports::{Completion, Delta, Model, Request};
@@ -38,6 +42,9 @@ impl Model for OpenAiClient {
             "stream": true,
             "stream_options": {"include_usage": true},
         });
+        if let Some(effort) = req.reasoning_effort {
+            body["reasoning_effort"] = json!(effort);
+        }
         if req.tools.as_array().is_some_and(|t| !t.is_empty()) {
             body["tools"] = req.tools.clone();
             body["tool_choice"] = json!("auto");

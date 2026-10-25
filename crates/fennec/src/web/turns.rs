@@ -96,6 +96,7 @@ fn run(
         max_tokens: params.max_tokens,
         context_window: params.context_window,
         compact_at: params.compact_at,
+        reasoning_effort: params.reasoning_effort,
         stop,
         on_event: &mut on_event,
     };

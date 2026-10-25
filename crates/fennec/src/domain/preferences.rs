@@ -16,6 +16,20 @@ pub struct Preferences {
     pub display: Display,
 }
 
+/// openfox `ReasoningEffort`: how much a model may think.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReasoningEffort {
+    None,
+    Minimal,
+    Low,
+    Medium,
+    High,
+    #[serde(rename = "xhigh")]
+    XHigh,
+    Max,
+}
+
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct ModelPrefs {
@@ -24,6 +38,17 @@ pub struct ModelPrefs {
     pub context_window: Option<u64>,
     /// openfox `compactionThreshold`; 0 disables compaction.
     pub compaction_threshold: Option<f64>,
+    /// openfox `reasoningEffort`; `None` sends no `reasoning_effort` field.
+    pub reasoning_effort: Option<ReasoningEffort>,
+}
+
+/// The UI's base font size in pixels (the CSS body size); the page zooms around it.
+pub const DEFAULT_FONT_SIZE: u16 = 14;
+/// The sizes the Settings page offers.
+pub const FONT_SIZE_RANGE: std::ops::RangeInclusive<u16> = 13..=16;
+
+fn default_font_size() -> u16 {
+    DEFAULT_FONT_SIZE
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -31,6 +56,8 @@ pub struct ModelPrefs {
 pub struct Display {
     pub reasoning_open: bool,
     pub tool_results_open: bool,
+    #[serde(default = "default_font_size")]
+    pub font_size: u16,
 }
 
 impl Default for Display {
@@ -38,6 +65,7 @@ impl Default for Display {
         Display {
             reasoning_open: true,
             tool_results_open: false,
+            font_size: DEFAULT_FONT_SIZE,
         }
     }
 }
@@ -50,6 +78,7 @@ pub struct ModelParams {
     pub max_tokens: u32,
     pub context_window: u64,
     pub compact_at: f64,
+    pub reasoning_effort: Option<ReasoningEffort>,
 }
 
 impl Preferences {
@@ -79,6 +108,9 @@ impl Preferences {
                     "model {id}: compaction_threshold must be in 0.0..=1.0"
                 ));
             }
+        }
+        if !FONT_SIZE_RANGE.contains(&self.display.font_size) {
+            return Err(format!("font_size must be in {FONT_SIZE_RANGE:?}"));
         }
         Ok(())
     }
@@ -110,6 +142,9 @@ impl Preferences {
             compact_at: prefs
                 .and_then(|p| p.compaction_threshold)
                 .unwrap_or(defaults.compact_at),
+            reasoning_effort: prefs
+                .and_then(|p| p.reasoning_effort)
+                .or(defaults.reasoning_effort),
             model,
         }
     }
@@ -125,6 +160,7 @@ mod tests {
             max_tokens: 32_000,
             context_window: 128_000,
             compact_at: 0.85,
+            reasoning_effort: None,
         }
     }
 
@@ -139,6 +175,7 @@ mod tests {
                 max_tokens: Some(100),
                 context_window: Some(2048),
                 compaction_threshold: Some(0.5),
+                reasoning_effort: Some(ReasoningEffort::High),
             },
         );
         p
@@ -160,8 +197,82 @@ mod tests {
                 max_tokens: 100,
                 context_window: 2048,
                 compact_at: 0.5,
+                reasoning_effort: Some(ReasoningEffort::High),
             }
         );
+    }
+
+    #[test]
+    fn a_reasoning_effort_resolves_per_model() {
+        let mut p = Preferences {
+            model: Some("a".into()),
+            ..Default::default()
+        };
+        p.models.insert(
+            "a".into(),
+            ModelPrefs {
+                reasoning_effort: Some(ReasoningEffort::Minimal),
+                ..Default::default()
+            },
+        );
+        assert_eq!(
+            p.resolve(&defaults(), |_| None).reasoning_effort,
+            Some(ReasoningEffort::Minimal)
+        );
+
+        p.model = Some("b".into());
+        assert_eq!(p.resolve(&defaults(), |_| None).reasoning_effort, None);
+
+        let with_default = ModelParams {
+            reasoning_effort: Some(ReasoningEffort::Low),
+            ..defaults()
+        };
+        assert_eq!(
+            p.resolve(&with_default, |_| None).reasoning_effort,
+            Some(ReasoningEffort::Low)
+        );
+    }
+
+    #[test]
+    fn reasoning_effort_uses_openfox_wire_names() {
+        assert_eq!(
+            serde_json::to_string(&ReasoningEffort::XHigh).unwrap(),
+            "\"xhigh\""
+        );
+        assert_eq!(
+            serde_json::from_str::<ReasoningEffort>("\"xhigh\"").unwrap(),
+            ReasoningEffort::XHigh
+        );
+        assert_eq!(
+            serde_json::to_string(&ReasoningEffort::Minimal).unwrap(),
+            "\"minimal\""
+        );
+    }
+
+    #[test]
+    fn a_model_preference_does_not_leak_to_another_model() {
+        let mut p = Preferences::default();
+        p.models.insert(
+            "a".into(),
+            ModelPrefs {
+                max_tokens: Some(100),
+                context_window: Some(2048),
+                compaction_threshold: Some(0.5),
+                reasoning_effort: None,
+            },
+        );
+
+        p.model = Some("a".into());
+        let a = p.resolve(&defaults(), |_| None);
+        assert_eq!(a.max_tokens, 100);
+        assert_eq!(a.context_window, 2048);
+        assert_eq!(a.compact_at, 0.5);
+
+        p.model = Some("b".into());
+        let b = p.resolve(&defaults(), |_| None);
+        assert_eq!(b.max_tokens, 32_000);
+        assert_eq!(b.context_window, 128_000);
+        assert_eq!(b.compact_at, 0.85);
     }
 
     #[test]
@@ -178,6 +289,7 @@ mod tests {
                 max_tokens: 32_000,
                 context_window: 64_000,
                 compact_at: 0.85,
+                reasoning_effort: None,
             }
         );
     }
@@ -211,6 +323,14 @@ mod tests {
         let mut p = valid();
         p.models.insert(String::new(), ModelPrefs::default());
         assert!(p.validate().unwrap_err().contains("model id"));
+
+        let mut p = valid();
+        p.display.font_size = 12;
+        assert!(p.validate().unwrap_err().contains("font_size"));
+
+        let mut p = valid();
+        p.display.font_size = 17;
+        assert!(p.validate().unwrap_err().contains("font_size"));
     }
 
     #[test]
@@ -225,16 +345,31 @@ mod tests {
                 max_tokens: Some(100),
                 context_window: Some(2048),
                 compaction_threshold: Some(0.25),
+                reasoning_effort: Some(ReasoningEffort::XHigh),
             },
         );
         p.display.reasoning_open = false;
+        p.display.font_size = 15;
 
         let json = serde_json::to_string(&p).unwrap();
         assert!(json.contains("\"maxTokens\""));
+        assert!(json.contains("\"reasoningEffort\""));
+        assert!(json.contains("\"fontSize\""));
         assert_eq!(serde_json::from_str::<Preferences>(&json).unwrap(), p);
         assert_eq!(
             serde_json::from_str::<Preferences>("{}").unwrap(),
             Preferences::default()
         );
+    }
+
+    #[test]
+    fn a_preferences_json_without_the_new_fields_loads() {
+        let p: Preferences = serde_json::from_str(
+            r#"{"models":{"m":{"maxTokens":100}},"display":{"reasoningOpen":true,"toolResultsOpen":false}}"#,
+        )
+        .unwrap();
+        assert_eq!(p.display.font_size, DEFAULT_FONT_SIZE);
+        assert_eq!(p.models.get("m").unwrap().reasoning_effort, None);
+        assert!(p.validate().is_ok());
     }
 }

@@ -1,9 +1,10 @@
-import type { SettingsDefaults, SettingsModel } from '../../lib/api';
+import type { ReasoningEffort, SettingsDefaults, SettingsModel } from '../../lib/api';
 
 export interface ModelForm {
   maxTokens: string;
   contextWindow: string;
   compactionThreshold: string;
+  reasoningEffort: string;
 }
 
 interface ModelPrefsSectionProps {
@@ -12,6 +13,8 @@ interface ModelPrefsSectionProps {
   defaults: SettingsDefaults;
   onChange: (modelId: string, field: keyof ModelForm, value: string) => void;
 }
+
+const REASONING_EFFORTS: ReasoningEffort[] = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
 
 export function percentFromFraction(fraction: number): string {
   return String(Number((fraction * 100).toFixed(2)));
@@ -23,11 +26,11 @@ export function ModelPrefsSection({ models, values, defaults, onChange }: ModelP
       <h2 className="text-[15px] font-semibold">Paramètres par modèle</h2>
       {models.length === 0 && <p className="mt-3 text-sm text-muted">Aucun modèle listé.</p>}
       {models.map((model) => {
-        const value = values[model.id] ?? { maxTokens: '', contextWindow: '', compactionThreshold: '' };
+        const value = values[model.id] ?? { maxTokens: '', contextWindow: '', compactionThreshold: '', reasoningEffort: '' };
         return (
           <div key={model.id} className="mt-4 rounded-lg border border-border bg-raised px-4 py-3">
             <h3 className="font-mono text-[13px] font-medium">{model.id}</h3>
-            <div className="mt-3 grid gap-3 md:grid-cols-3">
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
               <label className="block text-[13px] text-muted">
                 Tokens max par réponse
                 <input
@@ -64,6 +67,21 @@ export function ModelPrefsSection({ models, values, defaults, onChange }: ModelP
                   onChange={(event) => onChange(model.id, 'compactionThreshold', event.target.value)}
                   className="mt-1.5 w-full rounded-lg border border-border bg-panel px-3 py-2 text-[13px] text-text"
                 />
+              </label>
+              <label className="block text-[13px] text-muted">
+                Effort de réflexion
+                <select
+                  value={value.reasoningEffort}
+                  onChange={(event) => onChange(model.id, 'reasoningEffort', event.target.value)}
+                  className="mt-1.5 w-full rounded-lg border border-border bg-panel px-3 py-2 text-[13px] text-text"
+                >
+                  <option value="">Auto (sans effort)</option>
+                  {REASONING_EFFORTS.map((effort) => (
+                    <option key={effort} value={effort}>
+                      {effort}
+                    </option>
+                  ))}
+                </select>
               </label>
             </div>
             <p className="mt-2 text-xs text-muted">0 désactive la compaction automatique.</p>

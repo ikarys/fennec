@@ -65,6 +65,7 @@ impl LlmSettings {
                 max_tokens,
                 context_window,
                 compact_at,
+                reasoning_effort: None,
             },
             listed,
         })
