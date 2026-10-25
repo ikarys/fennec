@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Config, Project, SessionDetail, SessionState } from '../lib/api';
-import { compactSession, createSession, getSession, sendMessage, stopSession } from '../lib/api';
+import type { Config, Project, SessionDetail, SessionState, SlashCommand } from '../lib/api';
+import { compactSession, createSession, getSession, listCommands, sendMessage, stopSession } from '../lib/api';
 import { stateLabel } from '../lib/format';
 import { useSessionThread } from '../hooks/useSessionThread';
 import { Composer } from '../components/session/Composer';
@@ -25,6 +25,7 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
   const [text, setText] = useState('');
   const [sendError, setSendError] = useState<string | null>(null);
   const [compactError, setCompactError] = useState<string | null>(null);
+  const [commands, setCommands] = useState<SlashCommand[]>([]);
   const { view, hasMore, loadingOlder, loadOlder } = useSessionThread(sessionId);
   const running = view.running;
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -84,6 +85,26 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
       restoreScroll.current = null;
     }
   }, [view]);
+
+  const commandProjectId = detail?.project.id ?? projectId;
+
+  useEffect(() => {
+    if (!commandProjectId) {
+      setCommands([]);
+      return;
+    }
+    let ignore = false;
+    listCommands(commandProjectId)
+      .then((data) => {
+        if (!ignore) setCommands(data);
+      })
+      .catch(() => {
+        if (!ignore) setCommands([]);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [commandProjectId]);
 
   // The detail is fetched once; the event stream says how a turn ended.
   const state: SessionState = running ? 'running' : ((view.lastDone as SessionState | undefined) ?? detail?.state ?? 'idle');
@@ -208,6 +229,7 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
           error={sendError}
           textareaRef={textareaRef}
           placeholder={view.pendingQuestion && !running ? 'Ta réponse…' : undefined}
+          commands={commands}
         />
       </main>
 

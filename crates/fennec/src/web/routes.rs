@@ -2,11 +2,12 @@
 
 use super::App;
 use super::http::{Request, error, send, send_json};
-use super::turns::TurnInput;
 use super::{assets, event_stream};
 use crate::domain::preferences::Preferences;
 use crate::domain::project::{Project, SessionSummary};
+use crate::domain::slash::{TurnInput, commands, resolve};
 use crate::llm::list_models;
+use crate::skills;
 use crate::store::SqliteStore;
 use crate::{folders, git};
 use serde_json::{Value, json};
@@ -31,6 +32,7 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
         ("GET", ["api", "folders"]) => list_folders(req, stream),
         ("GET", ["api", "projects"]) => list_projects(app, stream),
         ("POST", ["api", "projects"]) => open_project(app, req, stream),
+        ("GET", ["api", "projects", id, "commands"]) => list_commands(app, stream, id),
         ("POST", ["api", "sessions"]) => create_session(app, req, stream),
         ("GET", ["api", "sessions", id]) => get_session(app, stream, id),
         ("POST", ["api", "sessions", id, "messages"]) => send_message(app, req, stream, id),
@@ -124,6 +126,19 @@ fn open_project(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), 
     send_json(stream, 200, &project_json(&p))
 }
 
+fn list_commands(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+    let store = app.store()?;
+    let Some(project) = store.project(id)? else {
+        return error(stream, 404, "no such project");
+    };
+    let list = commands(&skills::discover(Path::new(&project.workdir)));
+    let out: Vec<Value> = list
+        .into_iter()
+        .map(|command| json!({ "name": command.name, "description": command.description }))
+        .collect();
+    send_json(stream, 200, &Value::Array(out))
+}
+
 fn create_session(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
     let body = req.json()?;
     let prompt = body["prompt"].as_str().unwrap_or("").trim().to_string();
@@ -136,8 +151,8 @@ fn create_session(app: &App, req: &Request, stream: &mut TcpStream) -> Result<()
     };
     let title: String = prompt.chars().take(80).collect();
     let id = store.create_session(&project, &title)?;
-    app.turns
-        .start(&id, &project.workdir, TurnInput::Prompt(prompt))?;
+    let input = resolve(&prompt, &skills::discover(Path::new(&project.workdir)));
+    app.turns.start(&id, &project.workdir, input)?;
     send_json(stream, 200, &json!({ "id": id }))
 }
 
@@ -159,7 +174,8 @@ fn send_message(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> R
     let Some((_, p)) = session_and_project(&app.store()?, id)? else {
         return error(stream, 404, "no such session");
     };
-    match app.turns.start(id, &p.workdir, TurnInput::Prompt(content)) {
+    let input = resolve(&content, &skills::discover(Path::new(&p.workdir)));
+    match app.turns.start(id, &p.workdir, input) {
         Ok(()) => send_json(stream, 202, &json!({})),
         Err(e) => error(stream, 409, &e),
     }

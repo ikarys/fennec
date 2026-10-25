@@ -5,6 +5,7 @@ use super::notifier::{Notifier, NotifyingLog};
 use crate::agent::turn::{Turn, compact_session, run_turn};
 use crate::config::Settings;
 use crate::domain::event::Event;
+use crate::domain::slash::TurnInput;
 use crate::instructions::all_instructions;
 use crate::llm::OpenAiClient;
 use crate::skills;
@@ -14,12 +15,6 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-
-/// What a started turn does: run a prompt, or compact the session on demand.
-pub enum TurnInput {
-    Prompt(String),
-    Compact,
-}
 
 pub struct Turns {
     settings: Settings,

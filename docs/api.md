@@ -97,6 +97,7 @@ turn.
 - `GET /api/projects` → `[{id, name, workdir, branch, sessions: [{id, title, state, createdAt, updatedAt}]}]`
   (sessions newest first; `createdAt`/`updatedAt` are Unix milliseconds; `branch` may be `null`)
 - `POST /api/projects` `{workdir}` → the project (400 if not a directory)
+- `GET /api/projects/{id}/commands` → `[{name, description}]`: the slash commands the composer offers (`compact`, then the project's skills); 404 if no project
 - `GET /api/folders?path=<absolute path>` → `{path, parent, folders: [{name, path, hidden, repo}]}`,
   the sub-folders of `path` (the home directory when omitted), sorted by name;
   `repo` marks a git repository; 400 if `path` cannot be read
@@ -105,6 +106,9 @@ turn.
 - `POST /api/sessions/{id}/messages` `{content}` → 202; 409 if a turn is running;
   when the session waits for the user, `content` is the answer to the pending
   question
+  A prompt or message starting with `/compact` alone compacts the session
+  instead; `/<skill> [text]` asks the model to load that skill; any other text
+  is sent as typed.
 - `POST /api/sessions/{id}/compact` → 202; 404 if no session; 409 if a turn is
   running; summarises the history and opens a new context window
 - `POST /api/sessions/{id}/stop` → 202; the turn ends with `chat.done` reason `"stopped"`
