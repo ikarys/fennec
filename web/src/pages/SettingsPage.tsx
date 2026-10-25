@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import type { DisplayPrefs, ModelPrefs, Preferences, SettingsModel, SettingsResponse } from '../lib/api';
+import type { DisplayPrefs, ModelPrefs, Preferences, ReasoningEffort, SettingsModel, SettingsResponse } from '../lib/api';
 import { saveSettings } from '../lib/api';
 import { ModelSection } from '../components/settings/ModelSection';
 import { ModelPrefsSection, percentFromFraction, type ModelForm } from '../components/settings/ModelPrefsSection';
@@ -19,7 +19,8 @@ interface SettingsForm {
 const emptyModelForm: ModelForm = {
   maxTokens: '',
   contextWindow: '',
-  compactionThreshold: ''
+  compactionThreshold: '',
+  reasoningEffort: ''
 };
 
 function toForm(preferences: Preferences, models: SettingsModel[]): SettingsForm {
@@ -29,7 +30,8 @@ function toForm(preferences: Preferences, models: SettingsModel[]): SettingsForm
     modelForms[model.id] = {
       maxTokens: prefs.maxTokens == null ? '' : String(prefs.maxTokens),
       contextWindow: prefs.contextWindow == null ? '' : String(prefs.contextWindow),
-      compactionThreshold: prefs.compactionThreshold == null ? '' : percentFromFraction(prefs.compactionThreshold)
+      compactionThreshold: prefs.compactionThreshold == null ? '' : percentFromFraction(prefs.compactionThreshold),
+      reasoningEffort: prefs.reasoningEffort ?? ''
     };
   }
   return {
@@ -70,11 +72,12 @@ function buildPreferences(form: SettingsForm, settings: SettingsResponse): Prefe
     const maxTokens = parseNumber(entry.maxTokens);
     const contextWindow = parseNumber(entry.contextWindow);
     const compactionThreshold = parsePercent(entry.compactionThreshold);
-    if (maxTokens == null && contextWindow == null && compactionThreshold == null) continue;
+    if (maxTokens == null && contextWindow == null && compactionThreshold == null && entry.reasoningEffort === '') continue;
     const prefs: ModelPrefs = {};
     if (maxTokens != null) prefs.maxTokens = maxTokens;
     if (contextWindow != null) prefs.contextWindow = contextWindow;
     if (compactionThreshold != null) prefs.compactionThreshold = compactionThreshold;
+    if (entry.reasoningEffort !== '') prefs.reasoningEffort = entry.reasoningEffort as ReasoningEffort;
     models[model.id] = prefs;
   }
 

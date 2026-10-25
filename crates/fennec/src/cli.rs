@@ -99,6 +99,7 @@ fn with_turn(
         max_tokens: params.max_tokens,
         context_window: params.context_window,
         compact_at: params.compact_at,
+        reasoning_effort: params.reasoning_effort,
         stop: &stop,
         on_event: &mut on_event,
     })

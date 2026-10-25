@@ -23,6 +23,7 @@ use crate::domain::compaction::{context_tokens, should_compact};
 use crate::domain::event::{DoneReason, Event, Role, ToolResult};
 use crate::domain::id::new_id;
 use crate::domain::open_calls;
+use crate::domain::preferences::ReasoningEffort;
 use serde_json::Value;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -46,6 +47,8 @@ pub struct Turn<'a> {
     pub context_window: u64,
     /// The compaction threshold as a fraction of the window; 0 disables it.
     pub compact_at: f64,
+    /// openfox `reasoningEffort`; `None` sends no `reasoning_effort` field.
+    pub reasoning_effort: Option<ReasoningEffort>,
     /// Set by the human to stop the turn: checked between rounds, while
     /// streaming and while a command runs.
     pub stop: &'a AtomicBool,
@@ -111,6 +114,7 @@ pub fn compact_session(turn: &mut Turn) -> Result<DoneReason, String> {
             system_prompt: &system_prompt,
             tools: &tool_defs,
             max_tokens: turn.max_tokens,
+            reasoning_effort: turn.reasoning_effort,
         };
         match compaction::compact(turn, &prompt)? {
             Compacted::Done | Compacted::Skipped => finish(turn, new_id(), DoneReason::Complete),
@@ -216,6 +220,7 @@ fn run_top_level_agent_loop(turn: &mut Turn) -> Result<DoneReason, String> {
             system_prompt: &system_prompt,
             tools: &tool_defs,
             max_tokens,
+            reasoning_effort: turn.reasoning_effort,
         };
         if !compacted_last_round
             && should_compact(
@@ -337,6 +342,7 @@ mod tests {
                 max_tokens: 100,
                 context_window: 1000,
                 compact_at: 0.0,
+                reasoning_effort: None,
                 stop: self.stop,
                 on_event: &mut self.on_event,
             }
@@ -357,6 +363,7 @@ mod tests {
             max_tokens: 100,
             context_window: 1000,
             compact_at: 0.0,
+            reasoning_effort: None,
             stop: &stop,
             on_event: &mut on_event,
         };
@@ -536,6 +543,7 @@ mod tests {
             max_tokens: 100,
             context_window: 1000,
             compact_at: 0.0,
+            reasoning_effort: None,
             stop: &stop,
             on_event: &mut on_event,
         };

@@ -25,10 +25,14 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
   const [text, setText] = useState('');
   const [sendError, setSendError] = useState<string | null>(null);
   const [compactError, setCompactError] = useState<string | null>(null);
-  const view = useSessionThread(sessionId);
+  const { view, hasMore, loadingOlder, loadOlder } = useSessionThread(sessionId);
   const running = view.running;
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
+  // Set by `handleLoadOlder`: the distance from the bottom when the older
+  // page is requested. Prepending changes scrollHeight but not this
+  // distance, so restoring it keeps the same messages in view.
+  const restoreScroll = useRef<number | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -71,6 +75,15 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
       element.scrollTop = element.scrollHeight;
     }
   }, [view, detail]);
+
+  useEffect(() => {
+    const element = scrollRef.current;
+    const previous = restoreScroll.current;
+    if (element && previous != null) {
+      element.scrollTop = element.scrollHeight - previous;
+      restoreScroll.current = null;
+    }
+  }, [view]);
 
   // The detail is fetched once; the event stream says how a turn ended.
   const state: SessionState = running ? 'running' : ((view.lastDone as SessionState | undefined) ?? detail?.state ?? 'idle');
@@ -119,6 +132,15 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
     }
   }
 
+  async function handleLoadOlder() {
+    const element = scrollRef.current;
+    if (!element) return;
+    restoreScroll.current = element.scrollHeight - element.scrollTop;
+    // Clear the armed restore when the view did not change (failed or empty
+    // page), so a later unrelated view change cannot apply a stale distance.
+    if (!(await loadOlder())) restoreScroll.current = null;
+  }
+
   return (
     <div className="flex min-h-0 min-w-0 grow">
       <main className="flex min-h-0 min-w-0 flex-[999_1_560px] flex-col">
@@ -142,6 +164,16 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
           className="min-h-0 grow overflow-y-auto p-6"
         >
           <div className="mx-auto flex max-w-[820px] flex-col gap-4.5">
+            {sessionId && hasMore && (
+              <button
+                type="button"
+                onClick={handleLoadOlder}
+                disabled={loadingOlder}
+                className="sticky top-0 z-10 mx-auto rounded-lg border border-border bg-raised px-3 py-1.5 text-xs text-muted transition-colors hover:text-text disabled:opacity-60"
+              >
+                {loadingOlder ? 'Chargement…' : 'Charger les messages précédents'}
+              </button>
+            )}
             {view.items.length === 0 && !sessionId && (
               <div className="py-10 text-center text-sm text-muted">Nouvelle session · écris ton premier message.</div>
             )}
@@ -186,6 +218,7 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
         compactDisabled={!sessionId || state === 'running' || state === 'waiting_for_user'}
         onCompact={handleCompact}
         compactError={compactError}
+        partial={hasMore}
       />
     </div>
   );
