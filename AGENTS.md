@@ -18,9 +18,16 @@ Ported from openfox commit `0694574d` (v2.0.161); see THIRD_PARTY.md.
 
 Component 1, done: the agent loop on the command line.
 Component 2, done: the web UI (session tabs, ⌘K palette, home, themes).
-Next, one PR each: bwrap world for tool execution →
-planner/builder modes + verifier → criteria → compaction → sub-agents →
-fennec's own layer (human-only integration, provenance, review gate).
+Next, one PR each, so that the minimal agent works before security layers:
+human pause (ask_user, stop/resume) → compaction (auto at a threshold
+and manual) → settings page (display defaults,
+thread loaded lazily beyond the last exchanges) → conventions shared by
+agents, nothing tool-specific (AGENTS.md, .agents/skills with SKILL.md) →
+agents as files + planner/builder modes (planner read-only by construction)
+→ custom workflows (agent/shell/human steps, deterministic transitions,
+state folded from the event log) → dogfooding → bwrap world for tool
+execution → verifier + sub-agents → criteria → fennec's own
+layer (human-only integration, provenance, review gate).
 
 ## Layout
 
