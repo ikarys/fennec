@@ -1,8 +1,10 @@
 //! Turns started from the UI: each runs on its own thread, reports through
 //! the event log, and can be stopped. One turn at a time per session.
 
+use super::children::Children;
 use super::notifier::{Notifier, NotifyingLog};
 use crate::agent::turn::{Turn, compact_session, replay_turn, run_turn};
+use crate::agent::workflow::{WorkflowEnv, WorkflowJob, run_workflow};
 use crate::agents;
 use crate::config::Settings;
 use crate::domain::attachment::Attachment;
@@ -14,7 +16,7 @@ use crate::skills;
 use crate::store::SqliteStore;
 use crate::tools::LocalTools;
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -24,6 +26,8 @@ pub enum Job {
     Input(TurnInput, Vec<Attachment>),
     /// The human replays one of their messages.
     Replay(String),
+    /// A workflow run (start, answer, continue, resume, stop).
+    Workflow(WorkflowJob),
 }
 
 pub struct Turns {
@@ -77,14 +81,17 @@ impl Turns {
     }
 }
 
-fn run(
+/// Builds the turn's dependencies and hands the turn (and its tools) to
+/// `body`. The store, log, prefs, instructions, skills, agents, model and
+/// tools stay locals here.
+pub(super) fn with_turn<R>(
     settings: &Settings,
     notifier: &Notifier,
     session_id: &str,
-    workdir: PathBuf,
-    job: &Job,
+    workdir: &Path,
     stop: &AtomicBool,
-) -> Result<(), String> {
+    body: impl FnOnce(&mut Turn, &LocalTools) -> Result<R, String>,
+) -> Result<R, String> {
     let store = SqliteStore::open(&settings.db_path)?;
     let log = NotifyingLog {
         log: &store,
@@ -92,18 +99,18 @@ fn run(
     };
     let prefs = store.preferences()?;
     let params = settings.llm.for_turn(&prefs);
-    let instructions = all_instructions(prefs.global_instructions.as_deref(), &workdir);
-    let skills = skills::discover(&workdir);
-    let agents = agents::discover(&workdir);
+    let instructions = all_instructions(prefs.global_instructions.as_deref(), workdir);
+    let skills = skills::discover(workdir);
+    let agents = agents::discover(workdir);
     let model = OpenAiClient::new(&settings.llm, &params.model);
-    let tools = LocalTools::new(workdir.clone());
+    let tools = LocalTools::new(workdir.to_path_buf());
     let mut on_event = |_: &Event| {};
     let mut turn = Turn {
         model: &model,
         log: &log,
         tools: &tools,
         session_id,
-        workdir: &workdir,
+        workdir,
         instructions: &instructions,
         skills: &skills,
         agents: &agents,
@@ -114,11 +121,45 @@ fn run(
         stop,
         on_event: &mut on_event,
     };
-    match job {
-        Job::Input(TurnInput::Prompt(prompt), attachments) => {
-            run_turn(&mut turn, prompt, attachments).map(|_| ())
-        }
-        Job::Input(TurnInput::Compact, _) => compact_session(&mut turn).map(|_| ()),
-        Job::Replay(message_id) => replay_turn(&mut turn, message_id).map(|_| ()),
-    }
+    body(&mut turn, &tools)
+}
+
+fn run(
+    settings: &Settings,
+    notifier: &Notifier,
+    session_id: &str,
+    workdir: PathBuf,
+    job: &Job,
+    stop: &AtomicBool,
+) -> Result<(), String> {
+    with_turn(
+        settings,
+        notifier,
+        session_id,
+        &workdir,
+        stop,
+        |turn, tools| match job {
+            Job::Input(TurnInput::Prompt(prompt), attachments) => {
+                run_turn(turn, prompt, attachments).map(|_| ())
+            }
+            Job::Input(TurnInput::Compact, _) => compact_session(turn).map(|_| ()),
+            Job::Replay(message_id) => replay_turn(turn, message_id).map(|_| ()),
+            Job::Workflow(workflow_job) => {
+                let children = Children {
+                    settings,
+                    notifier,
+                    workdir: &workdir,
+                };
+                run_workflow(
+                    turn,
+                    &WorkflowEnv {
+                        children: &children,
+                        commands: tools,
+                    },
+                    workflow_job.clone(),
+                )
+                .map(|_| ())
+            }
+        },
+    )
 }

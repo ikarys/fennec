@@ -1,3 +1,5 @@
+import type { Origin, WorkflowDef, WorkflowIssue, WorkflowSummary } from './workflow';
+
 export type SessionState =
   | 'running'
   | 'complete'
@@ -13,6 +15,7 @@ export interface SessionSummary {
   state: SessionState;
   createdAt: number;
   updatedAt: number;
+  parentId: string | null;
 }
 
 export interface Project {
@@ -91,11 +94,22 @@ export interface SessionDetail {
   state: SessionState;
   /** The agent id the session resolves to, or null when it has none. */
   mode: string | null;
+  /** The parent session id, or null for a top-level session. */
+  parentId: string | null;
   project: {
     id: string;
     name: string;
     workdir: string;
   };
+}
+
+export class WorkflowSaveError extends Error {
+  issues: WorkflowIssue[];
+  constructor(message: string, issues: WorkflowIssue[]) {
+    super(message);
+    this.name = 'WorkflowSaveError';
+    this.issues = issues;
+  }
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -108,15 +122,23 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!response.ok) {
     let message = response.statusText;
+    let errors: WorkflowIssue[] | undefined;
     try {
-      const body = (await response.json()) as { error?: string };
+      const body = (await response.json()) as { error?: string; errors?: WorkflowIssue[] };
       if (body.error) {
         message = body.error;
+      }
+      if (Array.isArray(body.errors)) {
+        errors = body.errors;
       }
     } catch {
       // Keep the status text when the error body is not JSON.
     }
-    throw new Error(message);
+    const error = new Error(message);
+    if (errors) {
+      (error as { issues?: WorkflowIssue[] }).issues = errors;
+    }
+    throw error;
   }
 
   if (response.status === 204) {
@@ -207,14 +229,31 @@ export interface AttachmentInput {
   data: string;
 }
 
-export function createSession(projectId: string, prompt: string, mode?: string, attachments?: AttachmentInput[]): Promise<{ id: string }> {
+export function createSession(
+  projectId: string,
+  prompt: string,
+  mode?: string,
+  attachments?: AttachmentInput[],
+  workflow?: { workflowId: string; stepByStep: boolean }
+): Promise<{ id: string }> {
   // `mode` is optional: omit it so the server applies its default resolution.
-  const body: { projectId: string; prompt: string; mode?: string; attachments?: AttachmentInput[] } = { projectId, prompt };
+  const body: {
+    projectId: string;
+    prompt: string;
+    mode?: string;
+    attachments?: AttachmentInput[];
+    workflowId?: string;
+    stepByStep?: boolean;
+  } = { projectId, prompt };
   if (mode != null) {
     body.mode = mode;
   }
   if (attachments && attachments.length > 0) {
     body.attachments = attachments;
+  }
+  if (workflow) {
+    body.workflowId = workflow.workflowId;
+    body.stepByStep = workflow.stepByStep;
   }
   return request<{ id: string }>('/api/sessions', {
     method: 'POST',
@@ -273,4 +312,79 @@ export function getEventPage(id: string, before: number, limit: number): Promise
   const params = new URLSearchParams({ limit: String(limit) });
   if (before > 0) params.set('before', String(before));
   return request<EventPageEntry[]>(`/api/sessions/${encodeURIComponent(id)}/events?${params}`);
+}
+
+export function listWorkflows(projectId: string): Promise<WorkflowSummary[]> {
+  return request<WorkflowSummary[]>(`/api/projects/${encodeURIComponent(projectId)}/workflows`);
+}
+
+export function getWorkflow(projectId: string, wid: string): Promise<{ origin: Origin; workflow: WorkflowDef }> {
+  return request<{ origin: Origin; workflow: WorkflowDef }>(
+    `/api/projects/${encodeURIComponent(projectId)}/workflows/${encodeURIComponent(wid)}`
+  );
+}
+
+export async function saveWorkflow(
+  projectId: string,
+  wid: string,
+  scope: 'project' | 'global',
+  workflow: WorkflowDef
+): Promise<{ origin: Origin; workflow: WorkflowDef }> {
+  try {
+    return await request<{ origin: Origin; workflow: WorkflowDef }>(
+      `/api/projects/${encodeURIComponent(projectId)}/workflows/${encodeURIComponent(wid)}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ scope, workflow })
+      }
+    );
+  } catch (error) {
+    if (error instanceof Error) {
+      const issues = (error as { issues?: WorkflowIssue[] }).issues ?? [];
+      throw new WorkflowSaveError(error.message, issues);
+    }
+    throw error;
+  }
+}
+
+export function validateWorkflow(projectId: string, workflow: WorkflowDef): Promise<WorkflowIssue[]> {
+  return request<{ errors: WorkflowIssue[] }>('/api/workflows/validate', {
+    method: 'POST',
+    body: JSON.stringify({ projectId, workflow })
+  }).then((result) => result.errors);
+}
+
+export function startWorkflow(sessionId: string, workflowId: string, task: string, stepByStep: boolean): Promise<void> {
+  return request<void>(`/api/sessions/${encodeURIComponent(sessionId)}/workflow`, {
+    method: 'POST',
+    body: JSON.stringify({ workflowId, task, stepByStep })
+  });
+}
+
+export function answerWorkflow(sessionId: string, runId: string, choice: string, comment: string): Promise<void> {
+  return request<void>(`/api/sessions/${encodeURIComponent(sessionId)}/workflow/answer`, {
+    method: 'POST',
+    body: JSON.stringify({ runId, choice, comment })
+  });
+}
+
+export function continueWorkflow(sessionId: string, runId: string, comment: string): Promise<void> {
+  return request<void>(`/api/sessions/${encodeURIComponent(sessionId)}/workflow/continue`, {
+    method: 'POST',
+    body: JSON.stringify({ runId, comment })
+  });
+}
+
+export function resumeWorkflow(sessionId: string, runId: string): Promise<void> {
+  return request<void>(`/api/sessions/${encodeURIComponent(sessionId)}/workflow/resume`, {
+    method: 'POST',
+    body: JSON.stringify({ runId })
+  });
+}
+
+export function stopWorkflow(sessionId: string, runId: string): Promise<void> {
+  return request<void>(`/api/sessions/${encodeURIComponent(sessionId)}/workflow/stop`, {
+    method: 'POST',
+    body: JSON.stringify({ runId })
+  });
 }

@@ -1,0 +1,32 @@
+{
+  "id": "plan-build-check",
+  "name": "Plan, build, check",
+  "description": "Plan, wait for approval, build, run the checks, loop on failure.",
+  "maxSteps": 50,
+  "nodes": [
+    { "id": "start", "kind": "start", "position": { "x": 0, "y": 0 } },
+    { "id": "plan", "kind": "agent", "name": "Plan", "agent": "plan",
+      "prompt": "{{task}}", "position": { "x": 0, "y": 140 } },
+    { "id": "approve", "kind": "human", "name": "Approve the plan",
+      "question": "Go with this plan?", "choices": ["Go", "Revise"],
+      "position": { "x": 0, "y": 280 } },
+    { "id": "build", "kind": "agent", "name": "Build", "agent": "builder",
+      "prompt": "Execute the plan above.",
+      "retryPrompt": "The checks failed:\n\n{{nodes.check.output}}\n\nFix it.",
+      "position": { "x": 0, "y": 420 } },
+    { "id": "check", "kind": "shell", "name": "Checks", "command": "just check",
+      "timeoutSecs": 900, "position": { "x": 0, "y": 560 } },
+    { "id": "done", "kind": "end", "outcome": "done", "position": { "x": 0, "y": 700 } },
+    { "id": "stuck", "kind": "end", "outcome": "blocked", "position": { "x": 280, "y": 700 } }
+  ],
+  "edges": [
+    { "from": "start", "port": "next", "to": "plan" },
+    { "from": "plan", "port": "done", "to": "approve" },
+    { "from": "approve", "port": "Go", "to": "build" },
+    { "from": "approve", "port": "Revise", "to": "plan" },
+    { "from": "build", "port": "done", "to": "check" },
+    { "from": "check", "port": "success", "to": "done", "pause": true },
+    { "from": "check", "port": "failure", "to": "build", "maxPasses": 3 },
+    { "from": "check", "port": "exhausted", "to": "stuck" }
+  ]
+}

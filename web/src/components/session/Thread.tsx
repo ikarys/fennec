@@ -9,6 +9,7 @@ import { CopyButton } from './CopyButton';
 import { MessageStatsLine } from './MessageStats';
 import { PlanCard, ReportCard } from './PlanCard';
 import { ToolCard } from './ToolCard';
+import { NodeDivider } from '../workflow/session/NodeDivider';
 
 const markdownComponents = {
   pre: ({ children }: { children?: React.ReactNode }) => (
@@ -215,5 +216,9 @@ export function ThreadItemView({ item, model, running, showHeader, onReplay }: {
       );
     }
     return <div className="text-center text-xs text-muted">{item.text}</div>;
+  }
+
+  if (item.kind === 'workflow-node') {
+    return <NodeDivider item={item} />;
   }
 }

@@ -3,6 +3,8 @@
 
 use super::attachment::Attachment;
 use super::stats::MessageStats;
+use super::workflow::definition::Workflow;
+use super::workflow::run::{RunOutcome, Via};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fmt;
@@ -229,6 +231,56 @@ pub enum Event {
     /// it, the log keeps them.
     #[serde(rename = "session.rewound", rename_all = "camelCase")]
     SessionRewound { message_id: String },
+    /// fennec's own: a workflow run starts; the definition is frozen for the run.
+    #[serde(rename = "workflow.started", rename_all = "camelCase")]
+    WorkflowStarted {
+        run_id: String,
+        workflow: Workflow,
+        task: String,
+        #[serde(default)]
+        step_by_step: bool,
+    },
+    #[serde(rename = "workflow.node.started", rename_all = "camelCase")]
+    WorkflowNodeStarted {
+        run_id: String,
+        node_id: String,
+        pass: u32,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        via: Option<Via>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        child_session_id: Option<String>,
+    },
+    #[serde(rename = "workflow.node.finished", rename_all = "camelCase")]
+    WorkflowNodeFinished {
+        run_id: String,
+        node_id: String,
+        port: String,
+        output: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        exit_code: Option<i32>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        comment: Option<String>,
+    },
+    #[serde(rename = "workflow.paused", rename_all = "camelCase")]
+    WorkflowPaused {
+        run_id: String,
+        from: String,
+        port: String,
+        to: String,
+    },
+    #[serde(rename = "workflow.resumed", rename_all = "camelCase")]
+    WorkflowResumed {
+        run_id: String,
+        #[serde(default)]
+        comment: String,
+    },
+    #[serde(rename = "workflow.finished", rename_all = "camelCase")]
+    WorkflowFinished {
+        run_id: String,
+        outcome: RunOutcome,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        reason: Option<String>,
+    },
     #[serde(rename = "chat.done", rename_all = "camelCase")]
     ChatDone {
         message_id: String,
@@ -269,6 +321,12 @@ impl Event {
             Event::RunningChanged { .. } => "running.changed",
             Event::ModeChanged { .. } => "mode.changed",
             Event::SessionRewound { .. } => "session.rewound",
+            Event::WorkflowStarted { .. } => "workflow.started",
+            Event::WorkflowNodeStarted { .. } => "workflow.node.started",
+            Event::WorkflowNodeFinished { .. } => "workflow.node.finished",
+            Event::WorkflowPaused { .. } => "workflow.paused",
+            Event::WorkflowResumed { .. } => "workflow.resumed",
+            Event::WorkflowFinished { .. } => "workflow.finished",
             Event::ChatDone { .. } => "chat.done",
             Event::ChatError { .. } => "chat.error",
             Event::ChatAskUser { .. } => "chat.ask_user",
@@ -418,5 +476,38 @@ mod tests {
         let wire = serde_json::to_value(&without).unwrap();
         assert!(wire["data"].get("attachments").is_none());
         assert_eq!(serde_json::from_value::<Event>(wire).unwrap(), without);
+    }
+
+    #[test]
+    fn workflow_node_started_with_via_round_trips() {
+        let wire = json!({
+            "type": "workflow.node.started",
+            "data": {
+                "runId": "r",
+                "nodeId": "n",
+                "pass": 1,
+                "via": {
+                    "from": "f",
+                    "port": "done"
+                }
+            }
+        });
+
+        let event: Event = serde_json::from_value(wire.clone()).unwrap();
+        assert!(matches!(
+            &event,
+            Event::WorkflowNodeStarted {
+                run_id,
+                node_id,
+                pass: 1,
+                via: Some(via),
+                child_session_id: None,
+            } if run_id == "r"
+                && node_id == "n"
+                && via.from == "f"
+                && via.port == "done"
+        ));
+
+        assert_eq!(serde_json::to_value(&event).unwrap(), wire);
     }
 }

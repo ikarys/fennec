@@ -130,7 +130,7 @@ pub fn replay_turn(turn: &mut Turn, message_id: &str) -> Result<DoneReason, Stri
     })
 }
 
-fn answer_or_prompt(
+pub(super) fn answer_or_prompt(
     turn: &mut Turn,
     prompt: &str,
     attachments: &[Attachment],
@@ -178,7 +178,7 @@ pub fn compact_session(turn: &mut Turn) -> Result<DoneReason, String> {
 
 /// Wraps a turn: mark it running, record a `chat.error` on failure, then
 /// mark it not running. Shared by `run_turn` and `compact_session`.
-fn with_running(
+pub(super) fn with_running(
     turn: &mut Turn,
     work: impl FnOnce(&mut Turn) -> Result<DoneReason, String>,
 ) -> Result<DoneReason, String> {
@@ -376,6 +376,30 @@ fn run_top_level_agent_loop(
 fn finish(turn: &mut Turn, message_id: String, reason: DoneReason) -> Result<DoneReason, String> {
     turn.append(Event::ChatDone { message_id, reason })?;
     Ok(reason)
+}
+
+/// Runs `agent` on `prompt` in this session, as a workflow node: switches
+/// the mode when needed (as the human would), injects the agent's reminder,
+/// appends the prompt as a system-generated user message, runs the loop.
+pub fn run_agent_node(turn: &mut Turn, agent_id: &str, prompt: &str) -> Result<DoneReason, String> {
+    let events = turn.log.events(turn.session_id)?;
+    let agent = turn
+        .agents
+        .iter()
+        .find(|a| a.id == agent_id && !a.subagent)
+        .ok_or_else(|| format!("unknown agent: {agent_id}"))?;
+
+    if resolve(turn.agents, &events).is_none_or(|a| a.id != agent_id) {
+        turn.append(Event::ModeChanged {
+            mode: agent_id.to_string(),
+            auto: true,
+            reason: Some("workflow".into()),
+        })?;
+    }
+
+    ensure_agent_reminder(turn, agent)?;
+    turn.append_user(prompt, true, None, Vec::new())?;
+    run_top_level_agent_loop(turn, agent)
 }
 
 #[cfg(test)]

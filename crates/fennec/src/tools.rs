@@ -12,12 +12,12 @@ mod run_command;
 mod test_support;
 mod write_file;
 
-use crate::agent::ports::Toolbox;
+use crate::agent::ports::{CommandRun, Commands, Toolbox};
 use crate::domain::event::{OutputStream, ToolResult};
 use serde_json::Value;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 pub struct LocalTools {
     workdir: PathBuf,
@@ -59,5 +59,44 @@ impl Toolbox for LocalTools {
         };
         result.duration_ms = start.elapsed().as_millis() as u64;
         result
+    }
+}
+
+impl Commands for LocalTools {
+    fn run(&self, command: &str, timeout: Duration, stop: &AtomicBool) -> CommandRun {
+        let mut on_output = |_: OutputStream, _: &str| {};
+        match run_command::process::execute(command, &self.workdir, timeout, stop, &mut on_output) {
+            Ok(execution) => command_run(execution),
+            Err(error) => CommandRun {
+                exit_code: None,
+                stopped: false,
+                output: error,
+            },
+        }
+    }
+}
+
+fn command_run(execution: run_command::process::Execution) -> CommandRun {
+    let mut output = execution.stdout;
+    if !execution.stderr.is_empty() {
+        output.push('\n');
+        output.push_str(&execution.stderr);
+    }
+    match execution.ending {
+        run_command::process::Ending::Exited(status) => CommandRun {
+            exit_code: status.code(),
+            stopped: false,
+            output,
+        },
+        run_command::process::Ending::TimedOut => CommandRun {
+            exit_code: None,
+            stopped: false,
+            output: format!("{output}\n[timed out]"),
+        },
+        run_command::process::Ending::Stopped => CommandRun {
+            exit_code: None,
+            stopped: true,
+            output,
+        },
     }
 }

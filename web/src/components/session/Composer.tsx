@@ -1,3 +1,4 @@
+import type { WorkflowSummary } from '../../lib/workflow';
 import { useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import type { Agent, AttachmentInput, SlashCommand } from '../../lib/api';
@@ -6,6 +7,7 @@ import { IMAGE_TYPES } from '../../lib/attachments';
 import { CloseIcon, PaperclipIcon, SendIcon, StopIcon } from '../Icons';
 import { matchCommands, SlashMenu } from './SlashMenu';
 import { ModePicker } from './ModePicker';
+import { WorkflowPicker, type WorkflowSelection } from '../workflow/session/WorkflowPicker';
 
 interface ComposerProps {
   text: string;
@@ -26,6 +28,9 @@ interface ComposerProps {
   attachments?: AttachmentInput[];
   onAttach?: (files: File[]) => void;
   onRemoveAttachment?: (index: number) => void;
+  workflows?: WorkflowSummary[];
+  workflowSelection?: WorkflowSelection;
+  onWorkflowSelectionChange?: (selection: WorkflowSelection) => void;
 }
 
 export function Composer({
@@ -46,7 +51,10 @@ export function Composer({
   onModeChange,
   attachments,
   onAttach,
-  onRemoveAttachment
+  onRemoveAttachment,
+  workflows,
+  workflowSelection,
+  onWorkflowSelectionChange
 }: ComposerProps) {
   const [selected, setSelected] = useState(0);
   const [dismissed, setDismissed] = useState(false);
@@ -191,6 +199,13 @@ export function Composer({
             </>
           )}
           {agents && onModeChange && <ModePicker agents={agents} mode={mode ?? null} onChange={onModeChange} />}
+          {workflows && onWorkflowSelectionChange && workflowSelection && (
+            <WorkflowPicker
+              workflows={workflows}
+              selection={workflowSelection}
+              onChange={onWorkflowSelectionChange}
+            />
+          )}
           <button
             type="button"
             disabled

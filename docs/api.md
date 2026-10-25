@@ -29,6 +29,12 @@ with camelCase fields.
 | `turn.snapshot` | `{cachedSystemPrompt}`: the session's system prompt, frozen at its first turn |
 | `mode.changed` | `{mode, auto, reason?}`: the human switched the session's agent; it applies from the next turn |
 | `session.rewound` | `{messageId}`: fennec's replay cut; the model's view drops that message and everything after it, the log keeps them |
+| `workflow.started` | `{runId, workflow, task, stepByStep}`: `workflow` is the whole definition, frozen for the run |
+| `workflow.node.started` | `{runId, nodeId, pass, via?, childSessionId?}`: `via` is `{from, port}`, the edge taken |
+| `workflow.node.finished` | `{runId, nodeId, port, output, exitCode?}` |
+| `workflow.paused` | `{runId, from, port, to}`: waiting before `to` |
+| `workflow.resumed` | `{runId, comment}` |
+| `workflow.finished` | `{runId, outcome, reason?}`: `outcome` is `done`, `blocked`, `stopped` or `error` |
 
 Tools: `read_file {path, offset?, limit?}`, `write_file {path, content}`,
 `edit_file {path, old_string, new_string, replace_all?}`,
@@ -166,3 +172,45 @@ turn.
   Older history exists while the first `seq` is above 1. `limit` must be in
   `1..=10000` (400 otherwise); 404 if no session; an empty array when there
   is nothing before `before`.
+
+## Workflows
+
+A session's `parentId` is the id of its parent session (null for a
+top-level session); child sessions are hidden from the lists and opened
+from the parent's thread.
+
+- `GET /api/projects/{id}/workflows` → `[{id, name, description, origin}]`:
+  the workflows found for the project, `origin` is `project`, `global` or
+  `default`; 404 if no project
+- `GET /api/projects/{id}/workflows/{wid}` → `{origin, workflow}`: one
+  definition (`workflow` is the file as read, unknown fields included);
+  404 if no project or no such workflow
+- `PUT /api/projects/{id}/workflows/{wid}` `{scope: "project"|"global",
+  workflow}` → saves after validation and answers `{origin, workflow}`;
+  400 with `{error, errors: [{nodeId?, edge?, message}]}` on issues; 404 if
+  no project
+- `POST /api/workflows/validate` `{projectId, workflow}` → 200
+  `{errors: [...]}` (empty when valid); 404 if no project
+- `POST /api/sessions/{id}/workflow` `{workflowId, task, stepByStep?}` →
+  202 `{}`; 404 if no session or no such workflow; 400 `empty task`; 409
+  while a turn or a run is active
+- `POST /api/sessions` accepts `workflowId` and `stepByStep` too: when
+  `workflowId` is set the prompt is the task and a run starts instead of a
+  turn; an unknown workflow is a 404 before the session is created
+- `POST /api/sessions/{id}/workflow/answer` `{runId, choice, comment}` → a
+  human node; 202 `{}`; 409 while a turn runs or when `runId` is not the
+  session's current run
+- `POST /api/sessions/{id}/workflow/continue` `{runId, comment}` → a pause;
+  same statuses
+- `POST /api/sessions/{id}/workflow/resume` `{runId}` → an interrupted run;
+  same statuses
+- `POST /api/sessions/{id}/workflow/stop` `{runId}` → ends a run that is
+  waiting or interrupted; same statuses
+
+While a run is active, a typed message is refused with a 409 that names
+where the run waits: `the workflow waits for a choice` at a human node,
+`the workflow is paused: continue or stop it` at a pause, `the workflow was
+interrupted: resume or stop it` when interrupted. Only when the run waits
+on an agent's `ask_user` is the message accepted as the answer to that
+question. `/compact` and a mode change are refused with `a workflow is
+running in this session` while a run is active.

@@ -2,6 +2,7 @@
 
 const INDEX_HTML: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/web/index.html"));
 const APP_JS: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/web/app.js"));
+const WORKFLOWS_JS: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/web/app-WorkflowsPage.js"));
 const APP_CSS: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/web/app.css"));
 
 pub struct Asset {
@@ -16,6 +17,10 @@ pub fn get(path: &str) -> Asset {
         "/app.js" => Asset {
             content_type: "text/javascript; charset=utf-8",
             body: APP_JS,
+        },
+        "/app-WorkflowsPage.js" => Asset {
+            content_type: "text/javascript; charset=utf-8",
+            body: WORKFLOWS_JS,
         },
         "/app.css" => Asset {
             content_type: "text/css; charset=utf-8",

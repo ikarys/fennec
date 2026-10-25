@@ -16,6 +16,7 @@ pub struct SessionSummary {
     pub created_at: u64,
     pub updated_at: u64,
     pub last_done: Option<DoneReason>,
+    pub parent_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
