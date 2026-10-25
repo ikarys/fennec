@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/fennec-os", "crates/fennec-lead"]
+members = ["crates/fennec"]
 
 [workspace.package]
 edition = "2024"

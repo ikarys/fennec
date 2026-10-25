@@ -5,77 +5,76 @@
 **fennec's thesis** (the human, 2026-10-24): code written by AI is abundant;
 understanding, mastery and responsibility are rare. fennec tools what is rare.
 It is for professional developers who work with AI and want to stay the
-authors of their software: they frame the work, the agent loop runs the steps
-their loop plans, then waits for their review. Nothing is integrated without
-a human decision.
+authors of their software: they frame the work, the agent loop runs the steps,
+then waits for their review. Nothing is integrated without a human decision.
 
-The full definition (needs, principles, capabilities C1–C26, conceptual
-architecture, what is out of scope) lives in the Notion page "Définition de
-Fennec (v1)"; the build steps in "Étapes de construction de la première
-version". This repository is at **step 0** (foundation): the two earlier
-repositories brought together, nothing of the v1 cycle built yet.
+The full definition lives in the Notion page "Définition de Fennec (v1)".
+
+**Approach since 2026-10-25**: the earlier code (fennec-os, fennec-lead) is
+removed (git history and `~/workspace/fennec_project` keep it). fennec is
+rebuilt as a **Rust port of openfox** (https://github.com/co-l/openfox, MIT),
+**one component at a time**, each one working end to end before the next.
+Ported from openfox commit `0694574d` (v2.0.161); see THIRD_PARTY.md.
+
+Component 1, done: the agent loop on the command line.
+Next, one PR each: web UI (port `web/`) → bwrap world for tool execution →
+planner/builder modes + verifier → criteria → compaction → sub-agents →
+fennec's own layer (human-only integration, provenance, review gate).
 
 ## Layout
 
 ```
-crates/fennec-os/    the library: worlds (sandbox), agent engine, model gateway, guard, rules, roles
-                     — its own AGENTS.md describes every module
-crates/fennec-lead/  the `fennec` binary: local web UI on 127.0.0.1:7777, tasks, Fleet, plugins relay
-                     — its own AGENTS.md describes the UI and its rules
+crates/fennec/src/
+  main.rs     CLI: run / sessions / log
+  events.rs   openfox events/{types,store,fold-messages}: SQLite event log, the single source of truth
+  llm.rs      openfox llm/{client,streaming}: OpenAI-compatible streaming client
+  chat.rs     openfox chat/{agent-loop,execute-tools,prompts}: the multi-turn loop
+  tools.rs    openfox tools/{read,write,edit,shell,path-security}
 ```
 
-`fennec-lead` depends on `fennec-os` only. Both histories were imported with
-`git subtree` (2026-10-24) from `ikarys/fennec-os` and `ikarys/fennec-lead`.
+## Porting rules
+
+- Each module's header comment names the openfox files it ports and what is
+  not ported yet. Keep openfox's names (events, fields, tool names, prompts)
+  so a later port maps 1:1.
+- Port only what the current component needs; skip the rest explicitly.
+- Port the matching openfox `*.test.ts` cases with the code.
 
 ## Trust zones
 
-Every change is weighed against these three zones (the definition's
-conceptual architecture):
-
-1. **The human**: the UI, the configuration, the signing key. The human is
-   free; fennec never blocks them, it only shows what they did.
-2. **The trusted kernel**: code that runs on the host and decides — the guard,
-   the decision registry, protected files, plugin activation, the decision to
-   integrate. It never runs what a model wrote. In `fennec-os` it lives in
-   `src/kernel/`.
-3. **The untrusted zone**: everything a model outputs. It runs only inside a
-   world (bubblewrap sandbox). The code that drives models lives in
-   `src/engine/`; it is trusted code, but what it handles is not.
-
-Modules that still mix zones (`engine::solve` lands work, `engine::spec` keeps
-records) are split when the kernel is hardened (step 3).
+1. **The human**: the CLI/UI, the configuration. fennec never blocks them.
+2. **The trusted kernel**: code that decides (integration, plugin activation).
+   It never runs what a model wrote.
+3. **The untrusted zone**: everything a model outputs. **Known gap**: tools
+   run on the host with only a working-directory path guard (as in openfox);
+   the bwrap world comes back as an early component. Until then, run fennec
+   on throwaway repositories only.
 
 ## Build, test, run
 
-Linux only (bubblewrap). From the repository root:
-
 ```bash
 cargo build
-cargo test --workspace          # needs bwrap and unprivileged user namespaces
-cargo clippy --workspace --all-targets   # must be clean
+cargo test
+cargo clippy --all-targets   # must be clean
 cargo fmt --all
-cargo run -p fennec-lead        # http://127.0.0.1:7777
+target/debug/fennec run "<prompt>"   # in the repository to work on
 ```
 
-UI tests: see `crates/fennec-lead/AGENTS.md`.
+Env: `FENNEC_LLM_URL`, `FENNEC_MODEL`, `FENNEC_API_KEY`, `FENNEC_MAX_TOKENS`,
+`FENNEC_DB` (default `~/.local/share/fennec/fennec.db`).
 
 ## Non-negotiable rules
 
 1. **Integration is always a human decision.** No agent, plugin or schedule
    commits to the human's branch on its own.
-2. **Zero trust applies to models only.** What a model outputs is untrusted;
-   the human and the plugins they enable do what they want with their tool.
-   An agent can never install or enable a plugin.
-3. **Risk-proportional control.** Review, validated tests and the
-   comprehension dialogue are mandatory for architecture, security and
-   sensitive zones, optional elsewhere; what was skipped is marked "not
-   reviewed" / "not validated".
-4. **Provenance is shown.** What the UI shows is marked as verified
+2. **Zero trust applies to models only.** An agent can never install or
+   enable a plugin.
+3. **Provenance is shown.** What the UI shows is marked as verified
    (deterministic) or produced by a model (indicative).
-5. **No database; no new dependency without a stated reason** in the commit
-   body. Stdlib first.
-6. Licence: AGPL-3.0-only. The repository stays private until the plugin SDK
-   licence and contribution terms (DCO or CLA) are decided.
+4. **Storage is SQLite** (`rusqlite`, bundled), as in openfox. No other new
+   dependency without a stated reason in the commit body. Stdlib first.
+5. Licence: AGPL-3.0-only; openfox's MIT notice is kept in THIRD_PARTY.md.
+   The repository stays private until contribution terms are decided.
 
 ## Style
 

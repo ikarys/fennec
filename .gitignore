@@ -1,7 +1,2 @@
 /target
 .fennec/
-# fennec's local state stays out; what judges the work is committed.
-.fennec-os/*
-!.fennec-os/zones.json
-!.fennec-os/rules.json
-.playwright-cli/
