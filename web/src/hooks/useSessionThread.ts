@@ -6,6 +6,17 @@ const PAGE_SIZE = 200;
 
 const EMPTY: ThreadView = createThreadFold().view();
 
+// A page is folded without `apply`: a load_skill call still in flight in it
+// must be tracked too, so its result, arriving by SSE, refetches the skills.
+function trackLoadSkillCalls(entries: EventPageEntry[], tracked: Set<string>): void {
+  for (const entry of entries) {
+    const data: FennecEvent['data'] = entry.event.data ?? {};
+    if (entry.event.type === 'tool.call' && data.toolCall?.name === 'load_skill') {
+      tracked.add(String(data.toolCall?.id ?? ''));
+    }
+  }
+}
+
 export interface SessionThread {
   view: ThreadView;
   /** The log has events older than the loaded pages. */
@@ -142,6 +153,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
           lastSeqRef.current = entry.seq;
         }
         if (page.length > 0) firstSeqRef.current = page[0].seq;
+        trackLoadSkillCalls(page, loadSkillCallsRef.current);
         foldAll();
         refreshSkills();
         setHasMore(page.length > 0 && page[0].seq > 1);
@@ -183,6 +195,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
       }
       eventsRef.current = [...page.map((entry) => entry.event), ...eventsRef.current];
       firstSeqRef.current = page[0].seq;
+      trackLoadSkillCalls(page, loadSkillCallsRef.current);
       foldAll();
       // Older pages may hold loads the panel has not seen yet.
       refreshSkills();
