@@ -2,6 +2,7 @@ import { memo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { AssistantItem, Segment, ThreadItem } from '../../lib/fold';
+import { useDisplayPrefs } from '../../lib/display';
 import { BulbIcon } from '../Icons';
 import { MessageStatsLine } from './MessageStats';
 import { ToolCard } from './ToolCard';
@@ -40,7 +41,8 @@ const markdownComponents = {
 // Memoised on their text: while one message streams, the others are not
 // parsed again on every frame.
 const ThinkingSegment = memo(function ThinkingSegment({ content }: { content: string }) {
-  const [open, setOpen] = useState(false);
+  const display = useDisplayPrefs();
+  const [open, setOpen] = useState(display.reasoningOpen);
   if (!content) return null;
   return (
     <div className="flex flex-col gap-2">
@@ -121,4 +123,3 @@ export function ThreadItemView({ item, model, running, showHeader }: { item: Thr
 
   return <div className="text-center text-xs text-muted">{item.text}</div>;
 }
-

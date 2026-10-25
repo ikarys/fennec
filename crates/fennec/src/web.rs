@@ -36,7 +36,10 @@ impl App {
 pub fn serve(port: u16, settings: Settings) -> Result<(), String> {
     let listener =
         TcpListener::bind(("127.0.0.1", port)).map_err(|e| format!("127.0.0.1:{port}: {e}"))?;
-    eprintln!("fennec · {} · http://127.0.0.1:{port}", settings.llm.model);
+    eprintln!(
+        "fennec · {} · http://127.0.0.1:{port}",
+        settings.llm.defaults.model
+    );
     let notifier = Arc::new(Notifier::default());
     let app = Arc::new(App {
         turns: Turns::new(settings.clone(), notifier.clone()),

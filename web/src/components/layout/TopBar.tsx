@@ -124,15 +124,14 @@ export function TopBar({
           })}
         </div>
 
-        <button
-          type="button"
-          disabled
-          title="Bientôt"
-          aria-label="Réglages et fournisseurs"
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-muted"
+        <a
+          href="#/settings"
+          title="Réglages"
+          aria-label="Réglages"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:text-text"
         >
           <SettingsIcon className="h-4 w-4" />
-        </button>
+        </a>
       </div>
     </header>
   );

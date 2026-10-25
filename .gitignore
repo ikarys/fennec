@@ -2,3 +2,4 @@
 .fennec/
 web/node_modules/
 web/dist/
+*.tsbuildinfo

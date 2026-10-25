@@ -45,7 +45,7 @@ show. One responsibility per file; no catch-all module (`utils`, `misc`,
 ```
 crates/fennec/src/
   main.rs            composition root: command line → settings → web or cli adapter
-  config.rs          settings from the environment (model endpoint, store path)
+  config.rs          settings from the environment (model endpoint, store path): the defaults
   domain/            the vocabulary, no I/O
     event.rs           openfox events/types: Event, ToolCall, ToolResult, Role, DoneReason
     stats.rs           openfox MessageStats: tokens (in, cached, out) and speeds of a call
@@ -53,6 +53,7 @@ crates/fennec/src/
     conversation.rs    openfox events/fold-messages: the log read back as model messages
     open_calls.rs      tool calls left without a result (ask_user, stop, crash)
     compaction.rs      where the model's view starts, when to compact, the resume message
+    preferences.rs     what the human chose on the Settings page; resolves a turn's model parameters
     id.rs, clock.rs
   agent/             application layer: the agent loop
     ports.rs           Model, EventLog, Toolbox: what the loop needs from outside
@@ -64,8 +65,9 @@ crates/fennec/src/
     compaction.rs      openfox context/compactor: the summary round and the new window
     prompt.rs          openfox chat/prompts: the system prompt
   tools/             Toolbox adapter on the host: one file per tool, path_guard, args
-  llm/               Model adapter: openai.rs (client), sse.rs (stream parser)
-  store.rs           EventLog adapter: SQLite (openfox's schema), projects and sessions
+  llm/               Model adapter: openai.rs (client), sse.rs (stream parser), models.rs (/models listing)
+  store.rs           EventLog adapter: SQLite (openfox's schema), projects and sessions;
+                     store/settings.rs the stored preferences
   git.rs             what fennec reads from a repository
   folders.rs         the folders the human browses to open a project
   web/               HTTP adapter: http, guard (who may call), routes, event_stream (SSE),
@@ -122,6 +124,8 @@ target/debug/fennec run "<prompt>"   # CLI, in the repository to work on
 
 Env: `FENNEC_LLM_URL`, `FENNEC_MODEL`, `FENNEC_API_KEY`, `FENNEC_MAX_TOKENS`,
 `FENNEC_COMPACT_AT` (default 0.85, 0 disables), `FENNEC_DB` (default `~/.local/share/fennec/fennec.db`).
+The model variables are defaults: the Settings page (stored in SQLite) overrides them
+per model, from the next turn on.
 
 ## Non-negotiable rules
 
