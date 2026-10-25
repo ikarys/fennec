@@ -279,6 +279,17 @@ impl SqliteStore {
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
+    /// The session's newest sequence number, 0 when the log is empty. The log
+    /// is append-only, so it watermarks a fold: an unchanged max seq means an
+    /// unchanged log.
+    pub fn last_seq(&self, session_id: &str) -> Result<u64> {
+        Ok(self.db.query_row(
+            "SELECT COALESCE(MAX(seq), 0) FROM events WHERE session_id = ?1",
+            [session_id],
+            |r| r.get::<_, i64>(0),
+        )? as u64)
+    }
+
     /// Top-level sessions, newest first; `project_id` filters when given.
     /// Child sessions are hidden from the lists.
     pub fn sessions(&self, project_id: Option<&str>) -> Result<Vec<SessionSummary>> {
@@ -392,6 +403,22 @@ mod tests {
         let row = store.session(&sid).unwrap().unwrap();
         assert_eq!(row.last_done, Some(DoneReason::Stopped));
         assert_eq!(store.events_after(&sid, 2).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn last_seq_tracks_the_newest_event() {
+        let store = SqliteStore::in_memory().unwrap();
+        let project = store.project_for("/w").unwrap();
+        let sid = store.create_session(&project, "s").unwrap();
+        // A new session holds its init event at seq 1.
+        assert_eq!(store.last_seq(&sid).unwrap(), 1);
+        store
+            .append(&sid, &Event::RunningChanged { is_running: true })
+            .unwrap();
+        store
+            .append(&sid, &Event::RunningChanged { is_running: false })
+            .unwrap();
+        assert_eq!(store.last_seq(&sid).unwrap(), 3);
     }
 
     #[test]

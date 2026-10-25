@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getEventPage, getRunEventsBefore, type EventPageEntry } from '../lib/api';
+import { getEventPage, getRunEventsBefore, getSkills, type EventPageEntry, type SessionSkills } from '../lib/api';
 import { createThreadFold, type FennecEvent, type ThreadFold, type ThreadView } from '../lib/fold';
 
 const PAGE_SIZE = 200;
@@ -13,6 +13,8 @@ export interface SessionThread {
   loadingOlder: boolean;
   /** Prepend the previous batch; resolves true when the view changed. */
   loadOlder: () => Promise<boolean>;
+  /** The session's skills folded server-side; null while the first fetch is in flight. */
+  skills: SessionSkills | null;
 }
 
 /**
@@ -27,11 +29,33 @@ export function useSessionThread(sessionId: string | null): SessionThread {
   const [view, setView] = useState<ThreadView>(EMPTY);
   const [hasMore, setHasMore] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
+  const [skills, setSkills] = useState<SessionSkills | null>(null);
   const eventsRef = useRef<FennecEvent[]>([]);
   const foldRef = useRef<ThreadFold>(createThreadFold());
   const firstSeqRef = useRef(0);
   const lastSeqRef = useRef(0);
   const runPrefixRef = useRef<EventPageEntry[]>([]);
+  const loadSkillCallsRef = useRef(new Set<string>());
+  // A counter: only the latest fetch may answer, so out-of-order responses
+  // cannot regress the panel.
+  const skillsReqRef = useRef(0);
+
+  const refreshSkills = useCallback(() => {
+    if (!sessionId) return;
+    const request = ++skillsReqRef.current;
+    getSkills(sessionId)
+      .then((data) => {
+        if (request === skillsReqRef.current) setSkills(data);
+      })
+      .catch(() => {
+        // A stale failure must not clobber a newer answer. With no data yet,
+        // fall back to the empty state instead of a perpetual spinner; with
+        // data, keep the last skills.
+        if (request === skillsReqRef.current) {
+          setSkills((prev) => prev ?? { loaded: [], active: [] });
+        }
+      });
+  }, [sessionId]);
 
   const foldAll = useCallback(() => {
     const fresh = createThreadFold();
@@ -54,8 +78,11 @@ export function useSessionThread(sessionId: string | null): SessionThread {
     firstSeqRef.current = 0;
     lastSeqRef.current = 0;
     runPrefixRef.current = [];
+    loadSkillCallsRef.current = new Set();
+    skillsReqRef.current += 1; // a fetch of the previous session may not answer
     setView(EMPTY);
     setHasMore(false);
+    setSkills(null);
     if (!sessionId) return;
 
     let cancelled = false;
@@ -65,6 +92,22 @@ export function useSessionThread(sessionId: string | null): SessionThread {
     let frame = 0;
     const apply = (event: FennecEvent) => {
       foldRef.current.apply(event);
+      const data = event.data ?? {};
+      // Refetch only when the fold can change: a skill load succeeds (a
+      // tool.result for a tracked load_skill), a user message requests a skill,
+      // or the model's view is cut (compaction, replay). An in-flight load_skill
+      // call loads nothing until it succeeds, so it is tracked, not refetched;
+      // an assistant message can't request a skill, so it is skipped.
+      if ((event.type === 'message.start' && data.role === 'user')
+        || event.type === 'context.compacted'
+        || event.type === 'session.rewound') {
+        refreshSkills();
+      } else if (event.type === 'tool.call' && data.toolCall?.name === 'load_skill') {
+        // Track the call so its result refetches; the call itself loads nothing.
+        loadSkillCallsRef.current.add(String(data.toolCall?.id ?? ''));
+      } else if (event.type === 'tool.result' && loadSkillCallsRef.current.has(String(data.toolCallId ?? ''))) {
+        refreshSkills();
+      }
       if (!frame) {
         frame = requestAnimationFrame(() => {
           frame = 0;
@@ -100,6 +143,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
         }
         if (page.length > 0) firstSeqRef.current = page[0].seq;
         foldAll();
+        refreshSkills();
         setHasMore(page.length > 0 && page[0].seq > 1);
         openStream(lastSeqRef.current);
         if (page.length > 0 && page[0].seq > 1) {
@@ -124,7 +168,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
       source?.close();
       cancelAnimationFrame(frame);
     };
-  }, [sessionId, foldAll]);
+  }, [sessionId, foldAll, refreshSkills]);
 
   // Returns true when the view was updated, so the caller knows whether a
   // scroll restore is armed for the upcoming view change.
@@ -140,6 +184,8 @@ export function useSessionThread(sessionId: string | null): SessionThread {
       eventsRef.current = [...page.map((entry) => entry.event), ...eventsRef.current];
       firstSeqRef.current = page[0].seq;
       foldAll();
+      // Older pages may hold loads the panel has not seen yet.
+      refreshSkills();
       setHasMore(page.length > 0 && page[0].seq > 1);
       return true;
     } catch {
@@ -148,7 +194,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
     } finally {
       setLoadingOlder(false);
     }
-  }, [sessionId, loadingOlder, foldAll]);
+  }, [sessionId, loadingOlder, foldAll, refreshSkills]);
 
-  return { view, hasMore, loadingOlder, loadOlder };
+  return { view, hasMore, loadingOlder, loadOlder, skills };
 }

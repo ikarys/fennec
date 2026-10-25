@@ -58,6 +58,7 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
         }
         ("POST", ["api", "sessions"]) => create_session(app, req, stream),
         ("GET", ["api", "sessions", id]) => get_session(app, stream, id),
+        ("GET", ["api", "sessions", id, "skills"]) => serve_skills(app, stream, id),
         ("POST", ["api", "sessions", id, "messages"]) => send_message(app, req, stream, id),
         ("POST", ["api", "sessions", id, "replay"]) => replay_message(app, req, stream, id),
         ("POST", ["api", "sessions", id, "compact"]) => compact_session(app, stream, id),
@@ -299,6 +300,23 @@ fn get_session(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String
     v["project"] = project_json(&p);
     v["mode"] = json!(mode);
     send_json(stream, 200, &v)
+}
+
+/// The session's skills folded from its log: loaded so far, and those
+/// still in the model's view (not dropped by a compaction, not cut by a
+/// replay). `GET /api/sessions/{id}/skills`.
+fn serve_skills(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+    let store = app.store()?;
+    let Some((_, p)) = session_and_project(&store, id)? else {
+        return error(stream, 404, "no such session");
+    };
+    let skills = skills::discover(Path::new(&p.workdir));
+    let folded = app.folded_skills(&store, id, &skills)?;
+    send_json(
+        stream,
+        200,
+        &json!({ "loaded": folded.loaded, "active": folded.active }),
+    )
 }
 
 fn set_session_mode(
