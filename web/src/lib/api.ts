@@ -1,0 +1,111 @@
+export type SessionState =
+  | 'running'
+  | 'complete'
+  | 'stopped'
+  | 'error'
+  | 'truncated'
+  | 'idle';
+
+export interface SessionSummary {
+  id: string;
+  title: string;
+  state: SessionState;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  workdir: string;
+  branch: string | null;
+  sessions: SessionSummary[];
+}
+
+export interface Config {
+  model: string;
+  contextWindow: number;
+}
+
+export interface SessionDetail {
+  id: string;
+  title: string;
+  state: SessionState;
+  project: {
+    id: string;
+    name: string;
+    workdir: string;
+  };
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(path, {
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    ...init
+  });
+
+  if (!response.ok) {
+    let message = response.statusText;
+    try {
+      const body = (await response.json()) as { error?: string };
+      if (body.error) {
+        message = body.error;
+      }
+    } catch {
+      // Keep the status text when the error body is not JSON.
+    }
+    throw new Error(message);
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  const text = await response.text();
+  if (!text) {
+    return undefined as T;
+  }
+
+  return JSON.parse(text) as T;
+}
+
+export function getConfig(): Promise<Config> {
+  return request<Config>('/api/config');
+}
+
+export function getProjects(): Promise<Project[]> {
+  return request<Project[]>('/api/projects');
+}
+
+export function createProject(workdir: string): Promise<Project> {
+  return request<Project>('/api/projects', {
+    method: 'POST',
+    body: JSON.stringify({ workdir })
+  });
+}
+
+export function getSession(id: string): Promise<SessionDetail> {
+  return request<SessionDetail>(`/api/sessions/${encodeURIComponent(id)}`);
+}
+
+export function createSession(projectId: string, prompt: string): Promise<{ id: string }> {
+  return request<{ id: string }>('/api/sessions', {
+    method: 'POST',
+    body: JSON.stringify({ projectId, prompt })
+  });
+}
+
+export function sendMessage(id: string, content: string): Promise<void> {
+  return request<void>(`/api/sessions/${encodeURIComponent(id)}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({ content })
+  });
+}
+
+export function stopSession(id: string): Promise<void> {
+  return request<void>(`/api/sessions/${encodeURIComponent(id)}/stop`, {
+    method: 'POST'
+  });
+}

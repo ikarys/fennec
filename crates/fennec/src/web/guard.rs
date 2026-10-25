@@ -1,0 +1,94 @@
+//! Who may talk to the server. It drives an agent that runs commands, so only
+//! the human's own pages may: `Host` must name this server (DNS rebinding),
+//! `Origin`, when a browser sends one, must be its pages or Vite's dev server
+//! (CSRF), and a POST must carry JSON, which a cross-site form cannot send
+//! without a CORS preflight this server never grants.
+
+use super::http::Request;
+
+/// Vite's dev server proxies `/api` to fennec during `npm run dev`.
+const DEV_PORT: u16 = 5173;
+
+pub struct Refusal {
+    pub status: u16,
+    pub message: &'static str,
+}
+
+pub fn check(req: &Request, port: u16) -> Result<(), Refusal> {
+    let local = |hostport: &str| {
+        [port, DEV_PORT]
+            .iter()
+            .any(|p| hostport == format!("127.0.0.1:{p}") || hostport == format!("localhost:{p}"))
+    };
+    let host_ok = req.header("host").is_some_and(local);
+    let origin_ok = req
+        .header("origin")
+        .is_none_or(|o| o.strip_prefix("http://").is_some_and(local));
+    if !(host_ok && origin_ok) {
+        return Err(Refusal {
+            status: 403,
+            message: "forbidden origin",
+        });
+    }
+    let json = req
+        .header("content-type")
+        .is_some_and(|c| c.starts_with("application/json"));
+    if req.method == "POST" && !json {
+        return Err(Refusal {
+            status: 400,
+            message: "content-type must be application/json",
+        });
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn post(headers: &[(&str, &str)]) -> Request {
+        Request {
+            method: "POST".into(),
+            path: "/api/sessions".into(),
+            query: String::new(),
+            headers: headers
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
+            body: Vec::new(),
+        }
+    }
+
+    fn status(headers: &[(&str, &str)]) -> Option<u16> {
+        check(&post(headers), 7777).err().map(|r| r.status)
+    }
+
+    const JSON: (&str, &str) = ("Content-Type", "application/json");
+
+    #[test]
+    fn only_local_pages_may_post_json() {
+        assert_eq!(status(&[("Host", "127.0.0.1:7777"), JSON]), None);
+        assert_eq!(
+            status(&[
+                ("Host", "localhost:5173"),
+                ("Origin", "http://localhost:5173"),
+                JSON
+            ]),
+            None
+        );
+        // DNS rebinding: a foreign name resolving to 127.0.0.1.
+        assert_eq!(status(&[("Host", "evil.example:7777"), JSON]), Some(403));
+        // CSRF: a foreign page posting to the local server.
+        assert_eq!(
+            status(&[
+                ("Host", "127.0.0.1:7777"),
+                ("Origin", "https://evil.example"),
+                JSON
+            ]),
+            Some(403)
+        );
+        assert_eq!(status(&[JSON]), Some(403));
+        // A cross-site form posts text/plain or form data.
+        assert_eq!(status(&[("Host", "127.0.0.1:7777")]), Some(400));
+    }
+}
