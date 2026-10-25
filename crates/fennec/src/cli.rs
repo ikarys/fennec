@@ -8,6 +8,7 @@ use crate::agent::turn::{Turn, compact_session, run_turn};
 use crate::config::Settings;
 use crate::domain::event::{ChoiceOption, DoneReason, Event};
 use crate::domain::open_calls;
+use crate::domain::slash::{TurnInput, resolve};
 use crate::instructions::all_instructions;
 use crate::llm::OpenAiClient;
 use crate::skills;
@@ -38,8 +39,13 @@ pub fn run(settings: &Settings, session: Option<String>, prompt: &str) -> Result
         Some(id) => id,
         None => store.create_session(&project, &prompt.chars().take(80).collect::<String>())?,
     };
+    let skills = skills::discover(&workdir);
+    let input = resolve(prompt, &skills);
     let reason = with_turn(settings, &store, &session_id, |turn| {
-        let mut reason = run_turn(turn, prompt)?;
+        let mut reason = match &input {
+            TurnInput::Compact => compact_session(turn)?,
+            TurnInput::Prompt(prompt) => run_turn(turn, prompt)?,
+        };
         // The turn ended waiting for the human: read the answer and run the
         // next turn, whose input is that answer.
         while reason == DoneReason::WaitingForUser {

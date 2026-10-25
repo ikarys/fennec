@@ -1,6 +1,9 @@
+import { useEffect, useState } from 'react';
 import type { RefObject } from 'react';
+import type { SlashCommand } from '../../lib/api';
 import { formatTokens } from '../../lib/format';
 import { SendIcon, StopIcon } from '../Icons';
+import { matchCommands, SlashMenu } from './SlashMenu';
 
 interface ComposerProps {
   text: string;
@@ -14,6 +17,7 @@ interface ComposerProps {
   error: string | null;
   textareaRef: RefObject<HTMLTextAreaElement | null>;
   placeholder?: string;
+  commands?: SlashCommand[];
 }
 
 export function Composer({
@@ -27,11 +31,34 @@ export function Composer({
   maxTokens,
   error,
   textareaRef,
-  placeholder
+  placeholder,
+  commands
 }: ComposerProps) {
+  const [selected, setSelected] = useState(0);
+  const [dismissed, setDismissed] = useState(false);
+  const matches = matchCommands(text, commands ?? []);
+  const menuOpen = matches.length > 0 && !dismissed;
+  const matchKey = matches.map((command) => command.name).join('\n');
+
+  useEffect(() => {
+    setDismissed(false);
+  }, [text]);
+
+  useEffect(() => {
+    setSelected(0);
+  }, [matchKey]);
+
+  function selectCommand(index: number) {
+    const command = matches[index];
+    if (command) {
+      onTextChange(`/${command.name} `);
+    }
+  }
+
   return (
     <div className="px-6 py-3 pb-5">
       <div className="mx-auto max-w-[820px] rounded-[14px] border border-border-strong bg-panel focus-within:border-accent">
+        {menuOpen && <SlashMenu commands={matches} selected={selected} onSelect={selectCommand} />}
         <label htmlFor="prompt" className="absolute h-px w-px overflow-hidden clip-[rect(0_0_0_0)]">
           Message
         </label>
@@ -42,6 +69,28 @@ export function Composer({
           value={text}
           onChange={(event) => onTextChange(event.target.value)}
           onKeyDown={(event) => {
+            if (menuOpen) {
+              if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                setSelected((current) => Math.min(current + 1, matches.length - 1));
+                return;
+              }
+              if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                setSelected((current) => Math.max(current - 1, 0));
+                return;
+              }
+              if (event.key === 'Enter' || event.key === 'Tab') {
+                event.preventDefault();
+                selectCommand(selected);
+                return;
+              }
+              if (event.key === 'Escape') {
+                event.preventDefault();
+                setDismissed(true);
+                return;
+              }
+            }
             if (event.key === 'Enter' && !event.shiftKey) {
               event.preventDefault();
               onSend();
