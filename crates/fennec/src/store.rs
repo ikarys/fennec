@@ -310,6 +310,29 @@ impl SqliteStore {
         Ok(rows.next().transpose()?)
     }
 
+    /// Ends the turns a crash left open: sessions whose last `running.changed`
+    /// says running get `isRunning: false`, so the UI stops waiting on a turn
+    /// no process runs. Called at server start, before any turn exists.
+    /// Returns how many were closed.
+    // ponytail: a CLI turn running in another process at that moment is closed too.
+    pub fn close_dangling_turns(&self) -> Result<usize> {
+        let ids = self
+            .db
+            .prepare(
+                "SELECT e.session_id FROM events e
+                 WHERE e.event_type = 'running.changed'
+                   AND json_extract(e.payload, '$.data.isRunning') = 1
+                   AND e.seq = (SELECT MAX(seq) FROM events
+                                WHERE session_id = e.session_id AND event_type = 'running.changed')",
+            )?
+            .query_map([], |r| r.get::<_, String>(0))?
+            .collect::<rusqlite::Result<Vec<String>>>()?;
+        for id in &ids {
+            self.insert_event(id, &Event::RunningChanged { is_running: false })?;
+        }
+        Ok(ids.len())
+    }
+
     fn insert_event(&self, session_id: &str, event: &Event) -> Result<u64> {
         let payload = serde_json::to_string(event).expect("events always serialize");
         Ok(self.db.query_row(
@@ -419,6 +442,32 @@ mod tests {
             .append(&sid, &Event::RunningChanged { is_running: false })
             .unwrap();
         assert_eq!(store.last_seq(&sid).unwrap(), 3);
+    }
+
+    #[test]
+    fn close_dangling_turns_ends_only_open_turns() {
+        let store = SqliteStore::in_memory().unwrap();
+        let project = store.project_for("/w").unwrap();
+        let open = store.create_session(&project, "open").unwrap();
+        let ended = store.create_session(&project, "ended").unwrap();
+        store
+            .append(&open, &Event::RunningChanged { is_running: true })
+            .unwrap();
+        for running in [true, false] {
+            store
+                .append(
+                    &ended,
+                    &Event::RunningChanged {
+                        is_running: running,
+                    },
+                )
+                .unwrap();
+        }
+
+        assert_eq!(store.close_dangling_turns().unwrap(), 1);
+        assert_eq!(store.last_seq(&open).unwrap(), 3);
+        assert_eq!(store.last_seq(&ended).unwrap(), 3);
+        assert_eq!(store.close_dangling_turns().unwrap(), 0);
     }
 
     #[test]
