@@ -104,7 +104,9 @@ function AssistantItemView({ item, model, running, showHeader }: { item: Assista
 export function ThreadItemView({ item, model, running, showHeader }: { item: ThreadItem; model: string; running: boolean; showHeader: boolean }) {
   if (item.kind === 'user') {
     if (item.isSystemGenerated) {
-      return <div className="text-center text-xs text-muted">{item.content}</div>;
+      // fennec's own prompts to the model (compaction, resume, continue): the
+      // thread keeps the `context.compacted` line, not their text.
+      return null;
     }
     return (
       <div className="max-w-[85%] self-end rounded-xl rounded-br-sm border border-border bg-raised px-3.5 py-2.5 whitespace-pre-wrap [overflow-wrap:break-word]">
@@ -121,5 +123,17 @@ export function ThreadItemView({ item, model, running, showHeader }: { item: Thr
     return <div className="rounded-md border border-border bg-raised px-3 py-2 text-sm text-err">{item.message}</div>;
   }
 
-  return <div className="text-center text-xs text-muted">{item.text}</div>;
+  if (item.kind === 'note') {
+    if (item.detail !== undefined) {
+      return (
+        <details>
+          <summary className="cursor-pointer text-center text-xs text-muted">{item.text}</summary>
+          <div className="mt-2 rounded-md border border-border bg-raised px-3 py-2 text-left text-sm">
+            <TextSegment content={item.detail} caret={false} />
+          </div>
+        </details>
+      );
+    }
+    return <div className="text-center text-xs text-muted">{item.text}</div>;
+  }
 }
