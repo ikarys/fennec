@@ -89,7 +89,7 @@ export function RunEndCard({ item }: { item: WorkflowEndItem }) {
 
             {stats.nodes.length > 0 && (
               <details className="group rounded-lg border border-border">
-                <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-1.5 text-xs text-muted select-none">
+                <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-1.5 text-xs text-muted select-none [&::-webkit-details-marker]:hidden">
                   <span aria-hidden className="text-[0.625rem] transition-transform group-open:rotate-90">
                     ▶
                   </span>
@@ -128,7 +128,7 @@ export function RunEndCard({ item }: { item: WorkflowEndItem }) {
                                 width:
                                   node.workingMs > 0 && nodeTotalMs > 0
                                     ? `${Math.max((node.workingMs / nodeTotalMs) * 100, 1)}%`
-                                    : '2px',
+                                    : '0%',
                               }}
                             />
                           </div>
