@@ -37,7 +37,7 @@ with camelCase fields.
 | `criteria.set` | `{criteria: [{id, description, check?}]}`: the criteria, all pending: the approved plan's, or a proposal the human accepted |
 | `criteria.proposed` | `{callId, criteria: [{id, description, check?}], reason}`: an agent's corrected criteria (`propose_criteria`), shown with a `chat.ask_user` of the same `callId`; the human's `Accept` answer records them as `criteria.set` |
 | `criterion.updated` | `{criterionId, status}`; `status` is `{type: "pending"}` or `{type: "passed" \| "failed", provenance}`, `provenance` `{kind: "verified", command, exitCode?, output}` (fennec ran the check) or `{kind: "indicative", agent, reason}` (an agent's verdict) |
-| `integration.applied` | `{branch, base, commits, head, acknowledged}`: the human integrated the session's branch; `acknowledged` lists the blockers they accepted |
+| `integration.applied` | `{branch, base, commits, head, message, acknowledged}`: the human integrated the session's branch; `message` is the integration commit message, `acknowledged` lists the blockers they accepted |
 | `worktree.discarded` | `{branch, commits}`: the human discarded the session's worktree and branch; `commits` are the agent's commits that were dropped |
 | `workflow.paused` | `{runId, from, port, to}`: waiting before `to` |
 | `workflow.resumed` | `{runId, comment}` |
@@ -169,22 +169,28 @@ read-only. The human edits them as usual.
   `git cherry-pick <base>..<branch>`;
   `mode` is the id of the agent the session resolves to from its event log
   (null when there is no top-level agent)
-- `GET /api/sessions/{id}/integration` → `{branch, base, originBranch, humanBranch, commits: [{sha, subject}], files: [{path, protected}], criteria, blockers}`:
+- `GET /api/sessions/{id}/integration` → `{branch, base, originBranch, humanBranch, defaultMessage, commits: [{sha, subject}], files: [{path, protected}], criteria, blockers}`:
   what integrating the session's worktree branch would do (409 without a
   worktree). `originBranch` is the branch the run started from (null for
-  older worktrees or a detached HEAD). `blockers` is the review gate, each
+  older worktrees or a detached HEAD). `defaultMessage` is fennec's starting
+  commit message (`feat: <title>`, an empty title gives `feat: integrate the
+  agent's work`); the human edits it. `blockers` is the review gate, each
   `{kind, …}`: `noCommits`, `branchChanged {from, to}`, `criteriaNotPassed
   {criteria}`, `noCriteria`, `protectedTouched {paths}`; `branchChanged.to`
   is null for a detached HEAD; protection is read from the project's tree, not
   the worktree's.
-- `POST /api/sessions/{id}/integrate` `{acknowledged: [kind]}` → `{head, commits}`:
-  the human's decision. The server recomputes the gate and answers 409 while a
-  turn runs, while a blocker is not acknowledged (`noCommits` never is), or when
-  git fails; then it runs `git cherry-pick <base>..<branch>` in the human's
-  repository. A conflict is aborted, the tree left as it was, and answers 409
+- `POST /api/sessions/{id}/integrate` `{acknowledged: [kind], message}` → `{head, commits}`:
+  the human's decision. The server recomputes the gate and answers 400 on a
+  blank `message`, 409 while a turn runs, while the human has staged changes,
+  while a blocker is not acknowledged (`noCommits` never is), or when git
+  fails; then it runs `git cherry-pick --no-commit <base>..<branch>` in the
+  human's repository and one `git commit` with `message` plus a
+  `Fennec-Session: <session id>` trailer, under the human's git identity. A
+  conflict is aborted, the tree left as it was, and answers 409
   `{error: "conflict", conflict: {kind: "conflict", files, command}}`. On
-  success it moves the base ref to the branch head and appends `integration.applied`. Nothing else in
-  fennec integrates: no agent, workflow or schedule calls it.
+  success it moves the base ref to the branch head and appends
+  `integration.applied`. Nothing else in fennec integrates: no agent, workflow
+  or schedule calls it.
 - `POST /api/sessions/{id}/discard` `{}` → `{commits}`:
   the human's decision; 409 while a turn runs or without a worktree; removes the
   worktree, its branch and base ref in the human's repository and appends
