@@ -149,29 +149,92 @@ pub fn accepted_proposal(events: &[Event], call_id: &str, answer: &str) -> Optio
 }
 
 /// The question shown to the human (the UI speaks French) for a proposed criteria list.
-pub fn proposal_question(criteria: &[Criterion], reason: &str) -> String {
+pub fn proposal_question(current: &[Criterion], proposed: &[Criterion], reason: &str) -> String {
+    if current.is_empty() {
+        let mut lines = vec![
+            "L'agent propose de remplacer les critères :".to_string(),
+            String::new(),
+            reason.to_string(),
+            String::new(),
+        ];
+
+        for criterion in proposed {
+            lines.push(format!(
+                "{}: {}",
+                criterion.id,
+                criterion_description_and_check(criterion)
+            ));
+        }
+
+        return lines.join("\n");
+    }
+
+    let mut changes = Vec::new();
+    let mut unchanged = Vec::new();
+
+    for criterion in proposed {
+        match current.iter().find(|c| c.id == criterion.id) {
+            None => {
+                changes.push(format!(
+                    "{} ajouté : {}",
+                    criterion.id,
+                    criterion_description_and_check(criterion)
+                ));
+            }
+            Some(old) if old != criterion => {
+                changes.push(format!(
+                    "{} modifié : {}",
+                    criterion.id,
+                    criterion_description_and_check(criterion)
+                ));
+                changes.push(format!(
+                    "  avant : {}",
+                    criterion_description_and_check(old)
+                ));
+            }
+            Some(_) => unchanged.push(criterion.id.clone()),
+        }
+    }
+
+    for criterion in current {
+        if !proposed
+            .iter()
+            .any(|candidate| candidate.id == criterion.id)
+        {
+            changes.push(format!(
+                "{} retiré : {}",
+                criterion.id,
+                criterion_description_and_check(criterion)
+            ));
+        }
+    }
+
     let mut lines = vec![
-        "L'agent propose de remplacer les critères :".to_string(),
+        "L'agent propose de modifier les critères :".to_string(),
         String::new(),
         reason.to_string(),
         String::new(),
     ];
 
-    for criterion in criteria {
-        let line = match &criterion.check {
-            Some(command) => format!(
-                "{}: {} — check `{command}`",
-                criterion.id, criterion.description
-            ),
-            None => format!(
-                "{}: {} — sans check, à juger",
-                criterion.id, criterion.description
-            ),
-        };
-        lines.push(line);
+    if changes.is_empty() {
+        lines.push("Aucun changement par rapport aux critères en vigueur.".to_string());
+    } else {
+        lines.extend(changes);
+        if !unchanged.is_empty() {
+            lines.push(String::new());
+            lines.push(format!("Inchangés : {}.", unchanged.join(", ")));
+        }
     }
 
     lines.join("\n")
+}
+
+fn criterion_description_and_check(criterion: &Criterion) -> String {
+    let check = match &criterion.check {
+        Some(command) => format!("check `{command}`"),
+        None => "sans check, à juger".to_string(),
+    };
+    format!("{} — {}", criterion.description, check)
 }
 
 /// The agent's judgement lines: `C<n>: pass|fail — <reason>`.
@@ -625,24 +688,92 @@ C3: pass
         assert_eq!(accepted_proposal(&events, "c2", "accept"), None);
     }
 
+    fn criterion(id: &str, description: &str, check: Option<&str>) -> Criterion {
+        Criterion {
+            id: id.into(),
+            description: description.into(),
+            check: check.map(str::to_string),
+        }
+    }
+
     #[test]
-    fn proposal_question_lists_the_criteria() {
-        let criteria = vec![
-            Criterion {
-                id: "C1".into(),
-                description: "builds".into(),
-                check: Some("true".into()),
-            },
-            Criterion {
-                id: "C2".into(),
-                description: "docs".into(),
-                check: None,
-            },
+    fn proposal_question_empty_current_keeps_old_wording() {
+        let proposed = vec![
+            criterion("C1", "builds", Some("true")),
+            criterion("C2", "docs", None),
         ];
 
         assert_eq!(
-            proposal_question(&criteria, "the old check cannot run"),
+            proposal_question(&[], &proposed, "the old check cannot run"),
             "L'agent propose de remplacer les critères :\n\nthe old check cannot run\n\nC1: builds — check `true`\nC2: docs — sans check, à juger"
+        );
+    }
+
+    #[test]
+    fn proposal_question_shows_only_the_modified_criterion() {
+        let current = vec![
+            criterion("C1", "builds", Some("true")),
+            criterion("C2", "docs", None),
+            criterion("C3", "logs", Some("ls")),
+        ];
+        let proposed = vec![
+            criterion("C1", "builds faster", Some("fast")),
+            criterion("C2", "docs", None),
+            criterion("C3", "logs", Some("ls")),
+        ];
+
+        assert_eq!(
+            proposal_question(&current, &proposed, "the old check cannot run"),
+            "L'agent propose de modifier les critères :\n\nthe old check cannot run\n\nC1 modifié : builds faster — check `fast`\n  avant : builds — check `true`\n\nInchangés : C2, C3."
+        );
+    }
+
+    #[test]
+    fn proposal_question_shows_added_criterion() {
+        let current = vec![
+            criterion("C1", "builds", Some("true")),
+            criterion("C2", "docs", None),
+        ];
+        let proposed = vec![
+            criterion("C1", "builds", Some("true")),
+            criterion("C2", "docs", None),
+            criterion("C3", "logs", Some("ls")),
+        ];
+
+        assert_eq!(
+            proposal_question(&current, &proposed, "the old check cannot run"),
+            "L'agent propose de modifier les critères :\n\nthe old check cannot run\n\nC3 ajouté : logs — check `ls`\n\nInchangés : C1, C2."
+        );
+    }
+
+    #[test]
+    fn proposal_question_shows_removed_criterion() {
+        let current = vec![
+            criterion("C1", "builds", Some("true")),
+            criterion("C2", "docs", None),
+            criterion("C3", "logs", Some("ls")),
+        ];
+        let proposed = vec![
+            criterion("C1", "builds", Some("true")),
+            criterion("C2", "docs", None),
+        ];
+
+        assert_eq!(
+            proposal_question(&current, &proposed, "the old check cannot run"),
+            "L'agent propose de modifier les critères :\n\nthe old check cannot run\n\nC3 retiré : logs — check `ls`\n\nInchangés : C1, C2."
+        );
+    }
+
+    #[test]
+    fn proposal_question_identical_lists_says_no_change() {
+        let criteria = vec![
+            criterion("C1", "builds", Some("true")),
+            criterion("C2", "docs", None),
+        ];
+
+        assert_eq!(
+            proposal_question(&criteria, &criteria, "the old check cannot run"),
+            "L'agent propose de modifier les critères :\n\nthe old check cannot run\n\nAucun changement par rapport aux critères en vigueur."
         );
     }
 }

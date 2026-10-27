@@ -7,6 +7,7 @@ use super::propose_criteria;
 use super::turn::Turn;
 use crate::domain::agent::AgentDefinition;
 use crate::domain::event::{Event, ToolCall, ToolResult};
+use crate::domain::workflow::run;
 use std::sync::atomic::Ordering;
 
 /// openfox `INTERRUPTED_ERROR`: a call the human stopped before it ran.
@@ -108,7 +109,9 @@ pub(super) fn execute_tools(
                 Err(e) => record(turn, message_id, call, ToolResult::failure(e))?,
                 // No result is recorded: the answer will be the result.
                 Ok(proposal) => {
-                    for event in propose_criteria::events(&call.id, proposal) {
+                    // The question shows the delta against the criteria in force.
+                    let in_force = run::criteria_in_force(&turn.log.events(turn.session_id)?);
+                    for event in propose_criteria::events(&call.id, proposal, &in_force) {
                         turn.append(event)?;
                     }
                     waiting = true;
