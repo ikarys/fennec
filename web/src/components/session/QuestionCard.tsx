@@ -14,40 +14,40 @@ export function QuestionCard({
   disabled: boolean;
 }) {
   return (
-    <div className="px-6 py-3">
-      <div className="mx-auto max-w-[820px] rounded-[14px] border border-border bg-panel">
-        <div className="flex items-center gap-2 px-3.5 pt-3 text-sm font-semibold">
+    <div className="px-6 py-2">
+      <div className="mx-auto max-w-[820px] rounded-xl border border-border bg-panel px-3 py-2">
+        <div className="flex items-center gap-1.5 text-xs font-semibold">
           <span className="text-accent">?</span>
           <span className="text-accent-strong">Question</span>
         </div>
-        <div className="px-3.5 pb-3 pt-2 text-sm leading-relaxed whitespace-pre-wrap [overflow-wrap:break-word]">
+        <div className="mt-1 max-h-48 overflow-y-auto text-sm leading-snug whitespace-pre-wrap [overflow-wrap:break-word]">
           {question.question}
         </div>
         {question.type === 'choice' && question.options.length > 0 && (
-          <div className="flex flex-col gap-2 px-3.5 pb-3">
+          <div className="mt-2 flex flex-wrap gap-1.5">
             {question.options.map((option, index) => (
               <button
                 key={option.value || index}
                 type="button"
                 disabled={disabled}
                 onClick={() => onAnswer(option.value)}
-                className="rounded-lg border border-border bg-raised px-3 py-2 text-left text-sm text-text disabled:opacity-60"
+                className="rounded-md border border-border bg-raised px-2.5 py-1 text-left text-xs text-text hover:border-border-strong disabled:opacity-60"
               >
-                <span className="block font-medium">{option.label}</span>
+                <span className="font-medium">{option.label}</span>
                 {option.description && (
-                  <span className="mt-0.5 block text-xs text-muted">{option.description}</span>
+                  <span className="ml-1.5 text-muted">{option.description}</span>
                 )}
               </button>
             ))}
           </div>
         )}
         {question.type === 'confirm' && (
-          <div className="flex gap-2 px-3.5 pb-3">
+          <div className="mt-2 flex flex-wrap gap-1.5">
             <button
               type="button"
               disabled={disabled}
               onClick={() => onAnswer('yes')}
-              className="rounded-lg border border-border bg-raised px-3 py-2 text-sm text-text disabled:opacity-60"
+              className="rounded-md border border-border bg-raised px-2.5 py-1 text-xs text-text hover:border-border-strong disabled:opacity-60"
             >
               Oui
             </button>
@@ -55,13 +55,13 @@ export function QuestionCard({
               type="button"
               disabled={disabled}
               onClick={() => onAnswer('no')}
-              className="rounded-lg border border-border bg-raised px-3 py-2 text-sm text-text disabled:opacity-60"
+              className="rounded-md border border-border bg-raised px-2.5 py-1 text-xs text-text hover:border-border-strong disabled:opacity-60"
             >
               Non
             </button>
           </div>
         )}
-        <div className="border-t border-border px-3.5 py-2 text-xs text-muted">
+        <div className="mt-1.5 text-[11px] text-faint">
           Ou réponds librement dans la zone de saisie.
         </div>
       </div>

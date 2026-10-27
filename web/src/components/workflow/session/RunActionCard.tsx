@@ -37,55 +37,65 @@ export function RunActionCard({
   const isBusy = busy || disabled;
 
   return (
-    <div className="px-6 py-3">
-      <div className="mx-auto max-w-[820px] rounded-[14px] border border-border bg-panel">
-        <div className="flex items-center gap-2 px-3.5 pt-3 text-sm font-semibold">
+    <div className="px-6 py-2">
+      <div className="mx-auto max-w-[820px] rounded-xl border border-border bg-panel px-3 py-2">
+        <div className="flex items-center gap-1.5 text-xs font-semibold">
           <span className="text-accent">⚡</span>
           <span className="text-accent-strong">Workflow</span>
         </div>
 
         {waiting.kind === 'human' && (
           <>
-            <div className="px-3.5 pb-2 pt-2 text-sm leading-relaxed whitespace-pre-wrap [overflow-wrap:break-word]">
+            <div className="mt-1 max-h-48 overflow-y-auto text-sm leading-snug whitespace-pre-wrap [overflow-wrap:break-word]">
               {waiting.question}
             </div>
-            <div className="flex flex-col gap-2 px-3.5 pb-3">
-              {waiting.choices.map((choice) => (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <input
+                type="text"
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                placeholder="Commentaire (optionnel)…"
+                disabled={isBusy}
+                className="min-w-40 flex-1 rounded-md border border-border bg-transparent px-2 py-1 text-xs outline-none focus:border-accent disabled:opacity-60"
+              />
+              {waiting.choices.map((choice, index) => (
                 <button
                   key={choice}
                   type="button"
                   disabled={isBusy}
                   onClick={() => handleAction(() => onAnswer(choice, comment))}
-                  className="rounded-lg border border-border bg-raised px-3 py-2 text-left text-sm text-text disabled:opacity-60"
+                  className={
+                    index === 0
+                      ? 'rounded-md bg-accent px-2.5 py-1 text-xs font-medium text-on-accent hover:opacity-90 disabled:opacity-60'
+                      : 'rounded-md border border-border bg-raised px-2.5 py-1 text-xs text-text hover:border-border-strong disabled:opacity-60'
+                  }
                 >
                   {choice}
                 </button>
               ))}
-            </div>
-            <div className="border-t border-border px-3.5 py-2">
-              <textarea
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                placeholder="Commentaire (optionnel)…"
-                rows={2}
-                disabled={isBusy}
-                className="w-full resize-none rounded-md border border-border bg-transparent p-2 text-sm outline-none focus:border-accent disabled:opacity-60"
-              />
             </div>
           </>
         )}
 
         {waiting.kind === 'pause' && (
           <>
-            <div className="px-3.5 pb-2 pt-2 text-sm text-muted">
+            <div className="mt-1 text-sm leading-snug text-muted">
               En pause avant « {waiting.toLabel} »
             </div>
-            <div className="flex gap-2 px-3.5 pb-3">
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <input
+                type="text"
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                placeholder="Commentaire (optionnel)…"
+                disabled={isBusy}
+                className="min-w-40 flex-1 rounded-md border border-border bg-transparent px-2 py-1 text-xs outline-none focus:border-accent disabled:opacity-60"
+              />
               <button
                 type="button"
                 disabled={isBusy}
                 onClick={() => handleAction(() => onContinue(comment))}
-                className="rounded-lg border border-border bg-raised px-3 py-2 text-sm text-text disabled:opacity-60"
+                className="rounded-md border border-border bg-raised px-2.5 py-1 text-xs text-text hover:border-border-strong disabled:opacity-60"
               >
                 Continuer
               </button>
@@ -93,35 +103,25 @@ export function RunActionCard({
                 type="button"
                 disabled={isBusy}
                 onClick={() => handleAction(onStop)}
-                className="rounded-lg border border-border bg-raised px-3 py-2 text-sm text-text hover:text-err disabled:opacity-60"
+                className="rounded-md border border-border bg-raised px-2.5 py-1 text-xs text-text hover:border-border-strong hover:text-err disabled:opacity-60"
               >
                 Arrêter
               </button>
-            </div>
-            <div className="border-t border-border px-3.5 py-2">
-              <textarea
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                placeholder="Commentaire (optionnel)…"
-                rows={2}
-                disabled={isBusy}
-                className="w-full resize-none rounded-md border border-border bg-transparent p-2 text-sm outline-none focus:border-accent disabled:opacity-60"
-              />
             </div>
           </>
         )}
 
         {waiting.kind === 'interrupted' && (
           <>
-            <div className="px-3.5 pb-2 pt-2 text-sm text-muted">
+            <div className="mt-1 text-sm leading-snug text-muted">
               Workflow interrompu
             </div>
-            <div className="flex gap-2 px-3.5 pb-3">
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
               <button
                 type="button"
                 disabled={isBusy}
                 onClick={() => handleAction(onResume)}
-                className="rounded-lg border border-border bg-raised px-3 py-2 text-sm text-text disabled:opacity-60"
+                className="rounded-md border border-border bg-raised px-2.5 py-1 text-xs text-text hover:border-border-strong disabled:opacity-60"
               >
                 Reprendre
               </button>
@@ -129,7 +129,7 @@ export function RunActionCard({
                 type="button"
                 disabled={isBusy}
                 onClick={() => handleAction(onStop)}
-                className="rounded-lg border border-border bg-raised px-3 py-2 text-sm text-text hover:text-err disabled:opacity-60"
+                className="rounded-md border border-border bg-raised px-2.5 py-1 text-xs text-text hover:border-border-strong hover:text-err disabled:opacity-60"
               >
                 Arrêter
               </button>
@@ -137,7 +137,7 @@ export function RunActionCard({
           </>
         )}
 
-        {error && <div className="border-t border-border px-3.5 py-2 text-xs text-err">{error}</div>}
+        {error && <div className="mt-1.5 text-xs text-err">{error}</div>}
       </div>
     </div>
   );

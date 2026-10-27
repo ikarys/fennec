@@ -500,7 +500,7 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
           className="min-h-0 grow overflow-y-auto p-6"
         >
           {awayFromBottom && (
-            <div className="pointer-events-none sticky top-[calc(100%-3rem)] z-10 flex h-0 items-start justify-center">
+            <div className="pointer-events-none sticky top-[calc(100%-2.5rem)] z-10 flex h-0 items-start justify-end">
               <button
                 type="button"
                 title="Aller en bas et suivre la suite"
@@ -508,9 +508,10 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
                   const element = scrollRef.current;
                   if (element) element.scrollTo({ top: element.scrollHeight, behavior: 'smooth' });
                 }}
-                className="pointer-events-auto rounded-full bg-accent px-3.5 py-1.5 text-xs font-medium text-on-accent shadow-lg hover:opacity-90"
+                aria-label="Aller en bas"
+                className="pointer-events-auto flex size-8 items-center justify-center rounded-full border border-border-strong bg-raised text-sm text-muted shadow-md hover:text-text"
               >
-                ↓ En bas
+                ↓
               </button>
             </div>
           )}
