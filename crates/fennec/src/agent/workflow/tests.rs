@@ -186,6 +186,7 @@ fn start_agent_end() {
             workflow: simple_workflow(),
             task: "do it".into(),
             step_by_step: false,
+            attachments: Vec::new(),
         },
     )
     .unwrap();
@@ -416,6 +417,7 @@ fn criteria_node_runs_checks_and_reports_failures() {
             workflow: criteria_workflow(),
             task: "do it".into(),
             step_by_step: false,
+            attachments: Vec::new(),
         },
     )
     .unwrap();
@@ -485,6 +487,7 @@ fn verdicts_record_indicative_only_for_unchecked_criteria() {
             workflow: verdicts_workflow(),
             task: "do it".into(),
             step_by_step: false,
+            attachments: Vec::new(),
         },
     )
     .unwrap();
@@ -633,6 +636,7 @@ fn shell_success_and_failure() {
             workflow: workflow.clone(),
             task: "go".into(),
             step_by_step: false,
+            attachments: Vec::new(),
         },
     )
     .unwrap();
@@ -670,6 +674,7 @@ fn shell_success_and_failure() {
             workflow,
             task: "go".into(),
             step_by_step: false,
+            attachments: Vec::new(),
         },
     )
     .unwrap();
@@ -777,6 +782,7 @@ fn human_node() {
             workflow,
             task: "go".into(),
             step_by_step: false,
+            attachments: Vec::new(),
         },
     )
     .unwrap();
@@ -841,6 +847,7 @@ fn paused_edge() {
             workflow,
             task: "go".into(),
             step_by_step: false,
+            attachments: Vec::new(),
         },
     )
     .unwrap();
@@ -952,6 +959,7 @@ fn agent_outcome() {
             workflow: workflow.clone(),
             task: "go".into(),
             step_by_step: false,
+            attachments: Vec::new(),
         },
     )
     .unwrap();
@@ -994,6 +1002,7 @@ fn agent_outcome() {
             workflow,
             task: "go".into(),
             step_by_step: false,
+            attachments: Vec::new(),
         },
     )
     .unwrap();
@@ -1136,6 +1145,7 @@ fn parallel_branches() {
             workflow,
             task: "go".into(),
             step_by_step: false,
+            attachments: Vec::new(),
         },
     )
     .unwrap();
@@ -1184,6 +1194,7 @@ fn stop_paused_run() {
             workflow,
             task: "go".into(),
             step_by_step: false,
+            attachments: Vec::new(),
         },
     )
     .unwrap();
@@ -1243,6 +1254,7 @@ fn invalid_workflow_refused() {
             workflow,
             task: "go".into(),
             step_by_step: false,
+            attachments: Vec::new(),
         },
     )
     .unwrap_err();
@@ -1392,4 +1404,55 @@ fn start_from_plan_answers_the_approval_node() {
             ..
         } if node_id == "criteria" && port == "pass"
     )));
+}
+
+#[test]
+fn start_with_attachments_puts_them_in_the_session_before_the_run() {
+    use crate::domain::attachment::Attachment;
+    use crate::domain::event::Role;
+
+    let attachment = Attachment {
+        id: "a".into(),
+        filename: "a.png".into(),
+        mime_type: "image/png".into(),
+        size: 8,
+        data: "data:image/png;base64,AAAA".into(),
+    };
+    let expected = vec![attachment.clone()];
+    let model = Scripted(RefCell::new(vec![reply("done", vec![])]));
+    let stop = AtomicBool::new(false);
+    let children = FakeChildren::default();
+    let commands = FakeCommands::default();
+    let env = WorkflowEnv {
+        children: &children,
+        commands: &commands,
+    };
+    let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
+    h.agents = vec![plan()];
+
+    let reason = run_workflow(
+        &mut h.turn(),
+        &env,
+        WorkflowJob::Start {
+            workflow: simple_workflow(),
+            task: "do it".into(),
+            step_by_step: false,
+            attachments: expected.clone(),
+        },
+    )
+    .unwrap();
+    assert_eq!(reason, DoneReason::Complete);
+
+    let events = h.log.0.into_inner();
+    let message_index = events
+        .iter()
+        .position(|e| {
+            matches!(e, Event::MessageStart { role: Role::User, attachments, .. } if *attachments == expected)
+        })
+        .unwrap();
+    let started_index = events
+        .iter()
+        .position(|e| matches!(e, Event::WorkflowStarted { .. }))
+        .unwrap();
+    assert!(message_index < started_index);
 }
