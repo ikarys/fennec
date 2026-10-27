@@ -38,6 +38,8 @@ pub enum WorkflowJob {
         workflow: Workflow,
         task: String,
         step_by_step: bool,
+        /// The composer's images, appended to the session before the run starts.
+        attachments: Vec<Attachment>,
     },
     /// A run that starts from a plan the human already approved (the plan
     /// card's button): the plan node and the approval are recorded, not run.
@@ -87,7 +89,8 @@ fn walk(turn: &mut Turn, env: &WorkflowEnv, job: WorkflowJob) -> Result<DoneReas
             workflow,
             task,
             step_by_step,
-        } => start_run(turn, &workflow, &task, step_by_step)?,
+            attachments,
+        } => start_run(turn, &workflow, &task, step_by_step, &attachments)?,
         WorkflowJob::StartFromPlan {
             workflow,
             task,
@@ -165,6 +168,7 @@ fn start_run(
     workflow: &Workflow,
     task: &str,
     step_by_step: bool,
+    attachments: &[Attachment],
 ) -> Result<Cursor, String> {
     let issues = validate::validate(workflow, turn.agents);
     if !issues.is_empty() {
@@ -180,6 +184,11 @@ fn start_run(
         && state.is_active()
     {
         return Err("a workflow is already running in this session".into());
+    }
+
+    // Session-context nodes see them in the conversation; fresh-context nodes do not.
+    if !attachments.is_empty() {
+        turn.append_user("", false, None, attachments.to_vec())?;
     }
 
     let run_id = new_id();
@@ -234,7 +243,7 @@ fn start_from_plan(
         return Err("the workflow does not start with its plan node".into());
     }
 
-    start_run(turn, workflow, task, false)?;
+    start_run(turn, workflow, task, false, &[])?;
     let events = turn.log.events(turn.session_id)?;
     let run_id = run::current_run(&events)
         .ok_or("no active workflow run")?
