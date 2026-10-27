@@ -267,6 +267,14 @@ pub enum Event {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         duration_ms: Option<u64>,
     },
+    /// A human node's question with its `{{…}}` names filled in, as the
+    /// human reads it (fennec's own event, right after the node starts).
+    #[serde(rename = "workflow.human.asked", rename_all = "camelCase")]
+    WorkflowHumanAsked {
+        run_id: String,
+        node_id: String,
+        question: String,
+    },
     #[serde(rename = "workflow.paused", rename_all = "camelCase")]
     WorkflowPaused {
         run_id: String,
@@ -363,6 +371,7 @@ impl Event {
             Event::WorkflowStarted { .. } => "workflow.started",
             Event::WorkflowNodeStarted { .. } => "workflow.node.started",
             Event::WorkflowNodeFinished { .. } => "workflow.node.finished",
+            Event::WorkflowHumanAsked { .. } => "workflow.human.asked",
             Event::WorkflowPaused { .. } => "workflow.paused",
             Event::WorkflowResumed { .. } => "workflow.resumed",
             Event::WorkflowFinished { .. } => "workflow.finished",

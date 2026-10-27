@@ -23,6 +23,8 @@ export interface RunView {
   /** Nodes started and not finished. */
   open: string[];
   paused?: { from: string; port: string; to: string };
+  /** Human nodes' questions with their {{…}} names filled in by the server. */
+  questions: Record<string, string>;
   finished?: { outcome: 'done' | 'blocked' | 'stopped' | 'error'; reason?: string };
   lastComment?: string;
 }
@@ -60,7 +62,8 @@ export function createRunFold(): RunFold {
           task: String(data.task ?? ''),
           stepByStep: Boolean(data.stepByStep),
           runs: [],
-          open: []
+          open: [],
+          questions: {}
         };
         return true;
       }
@@ -99,6 +102,12 @@ export function createRunFold(): RunFold {
         }
         return true;
       }
+      case 'workflow.human.asked': {
+        if (!run) return true;
+        run.questions[String(data.nodeId ?? '')] = String(data.question ?? '');
+        return true;
+      }
+
       case 'workflow.paused': {
         if (!run) return true;
         run.paused = {
@@ -165,7 +174,8 @@ export function runWaiting(run: RunView | undefined, running: boolean, lastDone:
       return {
         kind: 'human',
         nodeId,
-        question: typeof node.question === 'string' ? node.question : '',
+        // Runs from before workflow.human.asked show the raw question.
+        question: run.questions[nodeId] ?? (typeof node.question === 'string' ? node.question : ''),
         choices: choicesOf(node)
       };
     }

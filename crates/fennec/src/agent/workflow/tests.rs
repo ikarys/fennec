@@ -708,7 +708,7 @@ fn human_node() {
                 name: Some("Approve".into()),
                 position: Position::default(),
                 kind: NodeKind::Human {
-                    question: "Go?".into(),
+                    question: "Go on {{task}}?".into(),
                     choices: vec!["Go".into()],
                 },
             },
@@ -781,6 +781,16 @@ fn human_node() {
     )
     .unwrap();
     assert_eq!(reason, DoneReason::WaitingForUser);
+    // The human reads the question with its names filled in.
+    assert!(
+        h.log
+            .0
+            .borrow()
+            .iter()
+            .any(|e| matches!(e, Event::WorkflowHumanAsked {
+            node_id, question, ..
+        } if node_id == "approve" && question == "Go on go?"))
+    );
 
     let reason = run_workflow(
         &mut h.turn(),

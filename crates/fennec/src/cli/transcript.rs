@@ -133,6 +133,7 @@ impl Transcript {
             | Event::WorkflowNodeFinished { .. }
             | Event::WorkflowPaused { .. }
             | Event::WorkflowResumed { .. }
+            | Event::WorkflowHumanAsked { .. }
             | Event::WorkflowFinished { .. }
             | Event::CriteriaSet { .. }
             | Event::CriteriaProposed { .. }

@@ -20,6 +20,7 @@ use crate::domain::id::new_id;
 use crate::domain::workflow::definition::{AgentContext, NodeKind, Workflow};
 use crate::domain::workflow::run::{self as run, Next, RunOutcome, RunState, Via};
 use crate::domain::workflow::stats::{RunStats, run_stats};
+use crate::domain::workflow::template::render;
 use crate::domain::workflow::validate;
 use nodes::NodeInput;
 use std::sync::atomic::Ordering;
@@ -486,7 +487,17 @@ fn run_node(
     };
     let started = Instant::now();
     append_node_started(turn, state, node_id, pass, &via, child.as_deref())?;
-    if matches!(node.kind, NodeKind::Human { .. }) {
+    if let NodeKind::Human { question, .. } = &node.kind {
+        let (state, files) = folded_after_start(turn)?;
+        turn.append(Event::WorkflowHumanAsked {
+            run_id: state.run_id.clone(),
+            node_id: node_id.to_string(),
+            question: render(
+                question,
+                &|name| run::variable(&state, node_id, &files, name),
+                false,
+            ),
+        })?;
         return Ok(Step::Exit(DoneReason::WaitingForUser));
     }
 
