@@ -73,6 +73,8 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
   const waiting = runWaiting(run, running, view.lastDone);
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
+  // Mirrors stickToBottom for rendering: the button that resumes it.
+  const [awayFromBottom, setAwayFromBottom] = useState(false);
   // Set by `handleLoadOlder`: the distance from the bottom when the older
   // page is requested. Prepending changes scrollHeight but not this
   // distance, so restoring it keeps the same messages in view.
@@ -493,9 +495,25 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
           onScroll={(event) => {
             const element = event.currentTarget;
             stickToBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80;
+            setAwayFromBottom(!stickToBottom.current);
           }}
           className="min-h-0 grow overflow-y-auto p-6"
         >
+          {awayFromBottom && (
+            <div className="pointer-events-none sticky top-[calc(100%-3rem)] z-10 flex h-0 items-start justify-center">
+              <button
+                type="button"
+                title="Aller en bas et suivre la suite"
+                onClick={() => {
+                  const element = scrollRef.current;
+                  if (element) element.scrollTo({ top: element.scrollHeight, behavior: 'smooth' });
+                }}
+                className="pointer-events-auto rounded-full bg-accent px-3.5 py-1.5 text-xs font-medium text-on-accent shadow-lg hover:opacity-90"
+              >
+                ↓ En bas
+              </button>
+            </div>
+          )}
           <div className="mx-auto flex max-w-[820px] flex-col gap-4.5">
             {sessionId && hasMore && (
               <button
