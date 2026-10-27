@@ -1,5 +1,6 @@
 /target
 .fennec/
-web/node_modules/
+# No trailing slash: a symlinked node_modules (a git worktree) is ignored too.
+web/node_modules
 web/dist/
 *.tsbuildinfo
