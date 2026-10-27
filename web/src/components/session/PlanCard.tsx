@@ -115,7 +115,7 @@ export function PlanCard({ plan, actions }: { plan: Plan; actions?: PlanActions 
         </div>
       )}
       {actions && (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
           <Button
             type="button"
             variant="primary"
@@ -126,27 +126,8 @@ export function PlanCard({ plan, actions }: { plan: Plan; actions?: PlanActions 
           >
             Construire
           </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={actions.onRevise}
-            disabled={actions.disabled}
-          >
-            Revoir
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={actions.onBuildAlone}
-            disabled={actions.disabled}
-            title="Exécute le plan avec l'agent Builder seul, sans critères ni review."
-          >
-            Sans workflow
-          </Button>
           <label
-            className="ml-auto flex items-center gap-1.5 self-center text-xs text-muted"
+            className="flex items-center gap-1.5 text-xs text-muted"
             title="Coché, l'agent travaille dans sa propre copie du dépôt (worktree) et tu intègres ensuite ; décoché, il écrit directement dans ton dossier."
           >
             <input
@@ -157,6 +138,26 @@ export function PlanCard({ plan, actions }: { plan: Plan; actions?: PlanActions 
             />
             Espace séparé
           </label>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={actions.onBuildAlone}
+            disabled={actions.disabled}
+            title="Exécute le plan avec l'agent Builder seul, sans critères ni review."
+          >
+            Sans workflow
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={actions.onRevise}
+            disabled={actions.disabled}
+            className="ml-auto"
+          >
+            Revoir
+          </Button>
         </div>
       )}
     </Card>
