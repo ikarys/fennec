@@ -58,8 +58,8 @@ export function RunStrip({
   return (
     <div className="border-b border-border bg-panel px-6 py-2">
       <div className="mx-auto flex max-w-[820px] items-center gap-3">
-        <span className="text-xs font-medium text-text">{run.workflow.name}</span>
-        <div ref={chips} className="flex flex-1 items-center gap-1.5 overflow-x-auto pb-1.5 [scrollbar-width:thin]">
+        <span className="shrink-0 whitespace-nowrap text-xs font-medium text-text">{run.workflow.name}</span>
+        <div ref={chips} className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto py-0.5 [scrollbar-width:none] [mask-image:linear-gradient(to_right,transparent,black_2rem)]">
           {run.runs.map((nodeRun, index) => (
             <span
               key={`${nodeRun.nodeId}-${nodeRun.pass}-${index}`}

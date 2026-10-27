@@ -77,7 +77,7 @@ export function NodeDivider({ item, running }: { item: WorkflowNodeItem; running
         <span className="h-px grow bg-border" />
       </div>
       {(item.prompt || item.output || item.childSessionId) && (
-        <details className="mx-auto">
+        <details className="w-full min-w-0">
           <summary className="cursor-pointer text-center text-[0.6875rem] text-muted hover:text-text">détails</summary>
           <div className="mt-1.5 flex flex-col gap-2 rounded-md border border-border bg-raised px-3 py-2 text-left text-xs">
             {item.prompt && (
@@ -90,7 +90,7 @@ export function NodeDivider({ item, running }: { item: WorkflowNodeItem; running
               <div>
                 <div className="mb-1 text-[0.625rem] uppercase tracking-wide text-muted">Sortie</div>
                 {(item.nodeKind === 'shell' || item.nodeKind === 'criteria') ? (
-                  <pre className="overflow-x-auto rounded bg-code p-2 font-mono text-[0.6875rem] text-muted">{item.output}</pre>
+                  <pre className="whitespace-pre-wrap break-words rounded bg-code p-2 font-mono text-[0.6875rem] text-muted">{item.output}</pre>
                 ) : (
                   <div className="whitespace-pre-wrap text-text">{item.output}</div>
                 )}
