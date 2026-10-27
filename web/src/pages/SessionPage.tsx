@@ -497,14 +497,6 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
           className="min-h-0 grow overflow-y-auto p-6"
         >
           <div className="mx-auto flex max-w-[820px] flex-col gap-4.5">
-            {detail?.parentId && (
-              <div className="rounded-lg border border-border bg-raised px-3 py-2 text-sm">
-                <span className="text-muted">Session d'un nœud de workflow · </span>
-                <a href={`#/s/${detail.parentId}`} className="text-accent-strong underline">
-                  Session parente
-                </a>
-              </div>
-            )}
             {sessionId && hasMore && (
               <button
                 type="button"
@@ -547,6 +539,30 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
             onStop={handleStopWorkflow}
             disabled={running}
           />
+        )}
+        {/* A node's session is driven by its workflow: the human answers in the parent. */}
+        {detail?.parentId && (
+          <div className="px-6 py-3">
+            <div className="mx-auto flex max-w-[820px] items-center gap-3 rounded-[14px] border border-border bg-panel px-4 py-3">
+              <span
+                className={`h-2 w-2 shrink-0 rounded-full ${running ? 'animate-pulse bg-accent' : 'bg-ok'}`}
+              />
+              <div className="min-w-0 grow">
+                <div className="text-sm font-medium text-text">
+                  {running ? 'Ce nœud du workflow tourne…' : 'Ce nœud du workflow est terminé.'}
+                </div>
+                <div className="text-xs text-muted">
+                  Session pilotée par le workflow, en lecture seule : la suite se passe dans la session parente.
+                </div>
+              </div>
+              <a
+                href={`#/s/${detail.parentId}`}
+                className="shrink-0 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-on-accent hover:opacity-90"
+              >
+                ← Retour au workflow
+              </a>
+            </div>
+          </div>
         )}
         {!detail?.parentId && (
           <Composer
