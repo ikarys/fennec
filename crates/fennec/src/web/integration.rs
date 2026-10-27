@@ -54,7 +54,13 @@ fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Result<Gate, (u16, S
     let criteria = run::current_run(&store.events(&session.id)?)
         .map(|state| state.criteria)
         .unwrap_or_default();
-    let blockers = blockers(preview.commits.len(), &criteria, &protected_touched);
+    let blockers = blockers(
+        preview.commits.len(),
+        &criteria,
+        &protected_touched,
+        preview.origin_branch.as_deref(),
+        preview.human_branch.as_deref(),
+    );
     Ok(Ok(Gate {
         session_id: session.id,
         wt,
@@ -87,6 +93,7 @@ pub fn get_integration(app: &App, stream: &mut TcpStream, id: &str) -> Result<()
         &json!({
             "branch": gate.wt.branch,
             "base": gate.wt.base,
+            "originBranch": gate.preview.origin_branch,
             "humanBranch": gate.preview.human_branch,
             "commits": gate.preview.commits,
             "files": files,
