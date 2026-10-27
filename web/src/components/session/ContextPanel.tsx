@@ -1,12 +1,30 @@
 import type { ThreadView } from '../../lib/fold';
 import type { SessionDetail, SessionSkills } from '../../lib/api';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { cachePercent, formatSpeed, formatTokens } from '../../lib/format';
 import { previewKindOfPath, relativeToWorkdir, type PreviewKind } from '../../lib/preview';
 import { usePreviewOpener, usePreviewWorkdir } from '../preview/PreviewContext';
 import { AgentWorkspaceSection } from './AgentWorkspaceSection';
 import { CriteriaSection } from './CriteriaSection';
 import { VisionSection } from './VisionSection';
+
+const WIDTH_KEY = 'fennec.contextPanelWidth';
+const MIN_WIDTH = 240;
+const MAX_WIDTH = 560;
+const DEFAULT_WIDTH = 300;
+
+function clampWidth(width: number): number {
+  return Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Math.round(width)));
+}
+
+function loadWidth(): number {
+  try {
+    const stored = Number(localStorage.getItem(WIDTH_KEY));
+    return stored ? clampWidth(stored) : DEFAULT_WIDTH;
+  } catch {
+    return DEFAULT_WIDTH;
+  }
+}
 
 interface ContextPanelProps {
   view: ThreadView;
@@ -33,6 +51,33 @@ export function ContextPanel({ view, currentTokens, contextPercent, skills, hasS
   const opener = usePreviewOpener();
   const workdir = usePreviewWorkdir();
   const [filesExpanded, setFilesExpanded] = useState(false);
+  const [width, setWidth] = useState(loadWidth);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(WIDTH_KEY, String(width));
+    } catch {
+      // A blocked storage only loses the width on reload.
+    }
+  }, [width]);
+
+  const startResize = (event: PointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = width;
+    // The panel is on the right: dragging left widens it.
+    const move = (moveEvent: globalThis.PointerEvent) => setWidth(clampWidth(startWidth + startX - moveEvent.clientX));
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', () => window.removeEventListener('pointermove', move), { once: true });
+  };
+
+  const resizeWithKeys = (event: KeyboardEvent<HTMLDivElement>) => {
+    const step = event.key === 'ArrowLeft' ? 16 : event.key === 'ArrowRight' ? -16 : 0;
+    if (step !== 0) {
+      event.preventDefault();
+      setWidth((current) => clampWidth(current + step));
+    }
+  };
 
   useEffect(() => {
     // A tab change collapses the file list; the workspace section owns its dialog.
@@ -58,9 +103,24 @@ export function ContextPanel({ view, currentTokens, contextPercent, skills, hasS
   const visibleModifiedFiles = filesExpanded ? modifiedFiles : modifiedFiles.slice(0, 6);
   const hiddenModifiedCount = modifiedFiles.length - 6;
   return (
+    <div className="relative hidden min-h-0 shrink-0 min-[1100px]:flex" style={{ width }}>
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Largeur du panneau"
+        aria-valuemin={MIN_WIDTH}
+        aria-valuemax={MAX_WIDTH}
+        aria-valuenow={width}
+        tabIndex={0}
+        title="Glisser pour élargir · double-clic : largeur par défaut"
+        onPointerDown={startResize}
+        onDoubleClick={() => setWidth(DEFAULT_WIDTH)}
+        onKeyDown={resizeWithKeys}
+        className="absolute inset-y-0 -left-1 z-10 w-2 cursor-col-resize touch-none hover:bg-accent/40 focus-visible:bg-accent/40 focus-visible:outline-none"
+      />
       <aside
         aria-label="Contexte de la session"
-        className="hidden min-[1100px]:flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto border-l border-border bg-panel px-4 py-4.5 max-w-[300px] min-w-[240px] [scrollbar-width:thin]"
+        className="flex min-h-0 w-full flex-col gap-5 overflow-y-auto border-l border-border bg-panel px-4 py-4.5 [scrollbar-width:thin]"
       >
         <section className="flex flex-col gap-2">
           <h2 className="text-[0.6875rem] font-semibold tracking-[0.06em] text-muted uppercase">Contexte</h2>
@@ -194,5 +254,6 @@ export function ContextPanel({ view, currentTokens, contextPercent, skills, hasS
           Rien n'est intégré sans ta décision.
         </p>
       </aside>
+    </div>
   );
 }
