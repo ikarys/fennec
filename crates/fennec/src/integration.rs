@@ -1,5 +1,6 @@
 //! The human's integration of a session's branch: preview what the agent
-//! committed and cherry-pick it into the human's repository on confirmation.
+//! committed and integrate it as one commit into the human's repository on
+//! confirmation.
 
 use std::path::Path;
 
@@ -87,42 +88,62 @@ pub fn protected_touched(files: &[String], prefix: &str, protection: &Protection
         .collect()
 }
 
-/// Cherry-picks the agent's commits onto the human's branch and moves the
-/// base ref to the branch head, so a later integration only takes newer
-/// commits.
+/// Stages the agent's changes and commits them as one commit on the human's
+/// branch, then moves the base ref to the branch head, so a later
+/// integration only takes newer commits.
 ///
-/// No dirty-tree pre-check: git refuses on its own when the human's
-/// uncommitted changes would be overwritten, and the common case (the same
-/// uncommitted work copied into the worktree at the run's start, see
-/// worktree.rs) must not be blocked.
-pub fn apply(top: &Path, wt: &Worktree) -> Result<String, ApplyError> {
-    let range = format!("{}..{}", wt.base, wt.branch);
-    let command = format!("git cherry-pick {range}");
+/// Staged changes in the human's repository are refused: `cherry-pick
+/// --no-commit` puts the agent's changes in the index, and the following
+/// commit would sweep the human's staged work in too.
+///
+/// No dirty-tree pre-check for unstaged changes: git refuses on its own when
+/// the human's uncommitted changes would be overwritten, and the common case
+/// (the same uncommitted work copied into the worktree at the run's start,
+/// see worktree.rs) must not be blocked.
+pub fn apply(top: &Path, wt: &Worktree, message: &str) -> Result<String, ApplyError> {
+    // `cherry-pick --no-commit` stages the agent's changes; a following
+    // commit would also take whatever the human staged.
+    if git(top, &["diff", "--cached", "--quiet"], None).is_err() {
+        return Err(ApplyError::Git {
+            message: "you have staged changes: commit or unstage them first, they would go into the integration commit"
+                .into(),
+        });
+    }
 
-    if let Err(message) = git(top, &["cherry-pick", &range], None) {
-        // A conflict leaves a cherry-pick in progress; abort it so the
-        // human's tree is left as it was.
-        if git(
-            top,
-            &["rev-parse", "-q", "--verify", "CHERRY_PICK_HEAD"],
-            None,
-        )
-        .is_ok()
-        {
-            let files = git(top, &["diff", "--name-only", "--diff-filter=U"], None)
-                .map(|out| {
-                    String::from_utf8_lossy(&out)
-                        .lines()
-                        .filter(|line| !line.is_empty())
-                        .map(String::from)
-                        .collect()
-                })
-                .unwrap_or_default();
-            let _ = git(top, &["cherry-pick", "--abort"], None);
+    let range = format!("{}..{}", wt.base, wt.branch);
+    let command = format!("git cherry-pick --no-commit {range}");
+
+    if let Err(message) = git(top, &["cherry-pick", "--no-commit", &range], None) {
+        // With --no-commit a single commit leaves no CHERRY_PICK_HEAD: the
+        // unmerged files are what tells a conflict.
+        let files: Vec<String> = git(top, &["diff", "--name-only", "--diff-filter=U"], None)
+            .map(|out| {
+                String::from_utf8_lossy(&out)
+                    .lines()
+                    .filter(|line| !line.is_empty())
+                    .map(String::from)
+                    .collect()
+            })
+            .unwrap_or_default();
+        if !files.is_empty() {
+            // A range leaves a sequencer to abort; a single commit does not.
+            // `reset --merge` only undoes what the cherry-pick staged: the
+            // index was clean before it.
+            if git(top, &["cherry-pick", "--abort"], None).is_err() {
+                let _ = git(top, &["reset", "-q", "--merge"], None);
+            }
             return Err(ApplyError::Conflict { files, command });
         }
         return Err(ApplyError::Git {
             message: format!("{message}\nresolve it by hand: {command}"),
+        });
+    }
+
+    if let Err(e) = git(top, &["commit", "-q", "-m", message], None) {
+        return Err(ApplyError::Git {
+            message: format!(
+                "{e}\nthe agent's changes are staged in your repository: commit them by hand"
+            ),
         });
     }
 
@@ -220,9 +241,20 @@ mod tests {
 
         let top = top(&repo).unwrap().0;
         let before_head = text(&repo, &["rev-parse", "HEAD"]);
-        let head = apply(&top, &wt).unwrap();
+        let message = "integrate the agent's work\n\nFennec-Session: s1";
+        let head = apply(&top, &wt, message).unwrap();
 
         assert_ne!(head, before_head);
+        assert_eq!(
+            text(
+                &repo,
+                &["rev-list", "--count", &format!("{before_head}..HEAD")]
+            ),
+            "1"
+        );
+        let log = text(&repo, &["log", "-1", "--format=%B"]);
+        assert!(log.contains("integrate the agent's work"));
+        assert!(log.contains("Fennec-Session: s1"));
         assert_eq!(
             std::fs::read_to_string(repo.join("agent.txt")).unwrap(),
             "x\n"
@@ -253,7 +285,7 @@ mod tests {
         let before_head = text(&repo, &["rev-parse", "HEAD"]);
         let before_status = text(&repo, &["status", "--porcelain"]);
 
-        let Err(ApplyError::Conflict { files, .. }) = apply(&top, &wt) else {
+        let Err(ApplyError::Conflict { files, .. }) = apply(&top, &wt, "integrate") else {
             panic!("expected a conflict");
         };
         assert_eq!(files, vec!["a.txt".to_string()]);
@@ -272,6 +304,24 @@ mod tests {
             )
             .is_err()
         );
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn a_staged_change_in_the_human_repository_blocks_the_integration() {
+        let (base, repo) = setup();
+        let wt = open(&base.join("wt"), &repo, "s1").unwrap().unwrap();
+
+        std::fs::write(repo.join("staged.txt"), "x\n").unwrap();
+        git(&repo, &["add", "staged.txt"], None).unwrap();
+        let top = top(&repo).unwrap().0;
+        let before_head = text(&repo, &["rev-parse", "HEAD"]);
+
+        let Err(ApplyError::Git { message }) = apply(&top, &wt, "integrate") else {
+            panic!("expected a staged-changes error");
+        };
+        assert!(message.contains("staged changes"));
+        assert_eq!(text(&repo, &["rev-parse", "HEAD"]), before_head);
         let _ = std::fs::remove_dir_all(&base);
     }
 
