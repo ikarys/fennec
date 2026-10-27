@@ -8,9 +8,9 @@ interface SandboxSectionProps {
 export function SandboxSection({ value, onChange }: SandboxSectionProps) {
   return (
     <section className="rounded-xl border border-border bg-panel px-5 py-4">
-      <h2 className="text-[15px] font-semibold">Bac à sable</h2>
+      <h2 className="text-[0.9375rem] font-semibold">Bac à sable</h2>
       <div className="mt-3">
-        <label className="flex items-center gap-2 text-[13px] text-text">
+        <label className="flex items-center gap-2 text-[0.8125rem] text-text">
           <input
             type="checkbox"
             checked={value.enabled}
@@ -26,7 +26,7 @@ export function SandboxSection({ value, onChange }: SandboxSectionProps) {
         </p>
       </div>
       <div className="mt-3">
-        <label className={`flex items-center gap-2 text-[13px] ${value.enabled ? 'text-text' : 'text-muted'}`}>
+        <label className={`flex items-center gap-2 text-[0.8125rem] ${value.enabled ? 'text-text' : 'text-muted'}`}>
           <input
             type="checkbox"
             checked={value.network}

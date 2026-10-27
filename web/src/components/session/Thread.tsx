@@ -29,13 +29,13 @@ const ThinkingSegment = memo(function ThinkingSegment({ content }: { content: st
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
-        className="flex min-h-8 items-center gap-2 self-start rounded-lg border border-dashed border-border bg-transparent px-2.5 text-[13px] text-muted"
+        className="flex min-h-8 items-center gap-2 self-start rounded-lg border border-dashed border-border bg-transparent px-2.5 text-[0.8125rem] text-muted"
       >
         <BulbIcon className="h-3.5 w-3.5" />
         Réflexion · {open ? 'masquer' : 'afficher'}
       </button>
       {open && (
-        <div className="border-l-2 border-border pl-3.5 text-[13px] whitespace-pre-line text-muted">{content}</div>
+        <div className="border-l-2 border-border pl-3.5 text-[0.8125rem] whitespace-pre-line text-muted">{content}</div>
       )}
     </div>
   );
@@ -53,7 +53,7 @@ const TextSegment = memo(function TextSegment({ content, caret, id }: { content:
       ? actions
       : null;
   return (
-    <div className="min-w-0 text-[14px] leading-relaxed [overflow-wrap:break-word]">
+    <div className="min-w-0 text-[0.875rem] leading-relaxed [overflow-wrap:break-word]">
       {contract ? (
         <>
           {contract.before && (
@@ -88,7 +88,7 @@ function AssistantItemView({ item, model, running, showHeader }: { item: Assista
       {showHeader && (
         <div className="flex items-center gap-2 text-xs text-muted">
           <span className="font-semibold text-text">{model}</span>
-          <span className="rounded border border-border px-1.5 text-[11px]">produit par le modèle</span>
+          <span className="rounded border border-border px-1.5 text-[0.6875rem]">produit par le modèle</span>
         </div>
       )}
       {item.segments.map((segment) => {
@@ -127,7 +127,7 @@ export function ThreadItemView({ item, model, running, showHeader, onReplay }: {
     const textStyle = color ? { color } : undefined;
     const lineStyle = color ? { backgroundColor: color } : undefined;
     return (
-      <div className="flex items-center gap-2 text-[11px] text-muted">
+      <div className="flex items-center gap-2 text-[0.6875rem] text-muted">
         <span className="h-px grow bg-border" style={lineStyle} />
         <span style={textStyle}>{item.name} mode</span>
         <span className="h-px grow bg-border" style={lineStyle} />

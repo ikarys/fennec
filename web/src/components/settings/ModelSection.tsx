@@ -14,13 +14,13 @@ export function ModelSection({ value, models, storedModel, defaultModel, onChang
 
   return (
     <section className="rounded-xl border border-border bg-panel px-5 py-4">
-      <h2 className="text-[15px] font-semibold">Modèle</h2>
-      <label className="mt-3 block text-[13px] text-muted">
+      <h2 className="text-[0.9375rem] font-semibold">Modèle</h2>
+      <label className="mt-3 block text-[0.8125rem] text-muted">
         Modèle
         <select
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className="mt-1.5 w-full rounded-lg border border-border bg-raised px-3 py-2 text-[13px] text-text"
+          className="mt-1.5 w-full rounded-lg border border-border bg-raised px-3 py-2 text-[0.8125rem] text-text"
         >
           <option value="">Défaut de l'environnement ({defaultModel})</option>
           {models.map((model) => (

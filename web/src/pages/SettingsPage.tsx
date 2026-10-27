@@ -208,7 +208,7 @@ export function SettingsPage({ settings, onSaved }: SettingsPageProps) {
     return (
       <main className="grow overflow-y-auto px-6 py-8">
         <div className="mx-auto max-w-[720px]">
-          <h1 className="text-[22px] font-semibold tracking-[-0.02em]">Réglages</h1>
+          <h1 className="text-[1.375rem] font-semibold tracking-[-0.02em]">Réglages</h1>
           <p className="mt-0.5 text-muted">S'applique au prochain tour, sans redémarrage.</p>
           <div className="mt-6 text-sm text-muted">Chargement…</div>
         </div>
@@ -220,7 +220,7 @@ export function SettingsPage({ settings, onSaved }: SettingsPageProps) {
     <main className="grow overflow-y-auto px-6 py-8">
       <div className="mx-auto flex max-w-[960px] flex-col gap-6">
         <div>
-          <h1 className="text-[22px] font-semibold tracking-[-0.02em]">Réglages</h1>
+          <h1 className="text-[1.375rem] font-semibold tracking-[-0.02em]">Réglages</h1>
           <p className="mt-0.5 text-muted">S'applique au prochain tour, sans redémarrage.</p>
         </div>
 
@@ -233,7 +233,7 @@ export function SettingsPage({ settings, onSaved }: SettingsPageProps) {
                 type="button"
                 onClick={() => setTab(id)}
                 aria-current={tab === id ? 'page' : undefined}
-                className={`rounded-lg px-3 py-1.5 text-left text-[13px] transition-colors ${
+                className={`rounded-lg px-3 py-1.5 text-left text-[0.8125rem] transition-colors ${
                   tab === id ? 'bg-raised text-text font-medium' : 'text-muted hover:bg-raised hover:text-text'
                 }`}
               >
@@ -281,12 +281,12 @@ export function SettingsPage({ settings, onSaved }: SettingsPageProps) {
               <button
                 type="submit"
                 disabled={saving}
-                className="flex min-h-9 items-center gap-2 rounded-lg bg-accent px-4 text-[13px] font-medium text-on-accent disabled:opacity-60"
+                className="flex min-h-9 items-center gap-2 rounded-lg bg-accent px-4 text-[0.8125rem] font-medium text-on-accent disabled:opacity-60"
               >
                 {saving ? 'Enregistrement…' : 'Enregistrer'}
               </button>
-              {saved && <span className="text-[13px] text-ok">Enregistré</span>}
-              {error && <span className="text-[13px] text-err">{error}</span>}
+              {saved && <span className="text-[0.8125rem] text-ok">Enregistré</span>}
+              {error && <span className="text-[0.8125rem] text-err">{error}</span>}
             </div>
           </form>
         </div>

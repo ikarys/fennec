@@ -3,12 +3,12 @@ export interface SearchForm {
   apiKey: string;
 }
 
-const inputClass = 'mt-1 w-full rounded-lg border border-border bg-panel px-3 py-2 font-mono text-[13px] text-text';
+const inputClass = 'mt-1 w-full rounded-lg border border-border bg-panel px-3 py-2 font-mono text-[0.8125rem] text-text';
 
 export function SearchSection({ value, onChange }: { value: SearchForm; onChange: (value: SearchForm) => void }) {
   return (
     <section className="rounded-xl border border-border bg-panel px-5 py-4">
-      <h2 className="text-[15px] font-semibold">Recherche web</h2>
+      <h2 className="text-[0.9375rem] font-semibold">Recherche web</h2>
       <label className="mt-3 block text-xs text-muted">
         URL de l’instance SearXNG
         <input

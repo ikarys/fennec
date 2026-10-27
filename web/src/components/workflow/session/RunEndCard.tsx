@@ -19,7 +19,7 @@ function outcomeTitle(outcome: WorkflowEndItem['outcome']): { text: string; clas
 function StatTile({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border border-border bg-panel px-2.5 py-2">
-      <div className="text-[10px] uppercase tracking-wide text-muted">{label}</div>
+      <div className="text-[0.625rem] uppercase tracking-wide text-muted">{label}</div>
       <div className="mt-0.5 text-sm font-medium text-text">{value}</div>
     </div>
   );
@@ -73,9 +73,9 @@ export function RunEndCard({ item }: { item: WorkflowEndItem }) {
             </table>
           )}
 
-          <div className="flex items-center gap-2 text-[11px] text-muted">
+          <div className="flex items-center gap-2 text-[0.6875rem] text-muted">
             <span>Calculé par fennec à partir du journal</span>
-            <span className="rounded bg-ok/10 px-1.5 py-0.5 text-[10px] font-semibold text-ok">vérifié</span>
+            <span className="rounded bg-ok/10 px-1.5 py-0.5 text-[0.625rem] font-semibold text-ok">vérifié</span>
           </div>
         </div>
       )}

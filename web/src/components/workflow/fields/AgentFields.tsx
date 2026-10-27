@@ -19,11 +19,11 @@ export function AgentFields({ node, agents, names, onChange }: AgentFieldsProps)
   return (
     <>
       <div>
-        <label className="mb-1 block text-[13px] text-muted">Agent</label>
+        <label className="mb-1 block text-[0.8125rem] text-muted">Agent</label>
         <select
           value={(node.agent as string) ?? ''}
           onChange={(event) => onChange('agent', event.target.value)}
-          className="w-full rounded-md border border-border bg-panel px-2 py-1 text-[13px]"
+          className="w-full rounded-md border border-border bg-panel px-2 py-1 text-[0.8125rem]"
         >
           {agents.map((agent) => (
             <option key={agent.id} value={agent.id}>
@@ -33,33 +33,33 @@ export function AgentFields({ node, agents, names, onChange }: AgentFieldsProps)
         </select>
       </div>
       <div>
-        <label className="mb-1 block text-[13px] text-muted">Contexte</label>
+        <label className="mb-1 block text-[0.8125rem] text-muted">Contexte</label>
         <select
           value={(node.context as string) ?? 'session'}
           onChange={(event) => onChange('context', event.target.value)}
-          className="w-full rounded-md border border-border bg-panel px-2 py-1 text-[13px]"
+          className="w-full rounded-md border border-border bg-panel px-2 py-1 text-[0.8125rem]"
         >
           <option value="session">session</option>
           <option value="fresh">nouvelle session</option>
         </select>
       </div>
       <div>
-        <label className="mb-1 block text-[13px] text-muted">Prompt</label>
+        <label className="mb-1 block text-[0.8125rem] text-muted">Prompt</label>
         <textarea
           value={(node.prompt as string) ?? ''}
           onChange={(event) => onChange('prompt', event.target.value)}
           rows={3}
-          className="w-full rounded-md border border-border bg-panel px-2 py-1 text-[13px]"
+          className="w-full rounded-md border border-border bg-panel px-2 py-1 text-[0.8125rem]"
         />
         <TemplateChips names={names} onInsert={(name) => insertTemplate(name, 'prompt')} />
       </div>
       <div>
-        <label className="mb-1 block text-[13px] text-muted">Prompt de nouvelle tentative</label>
+        <label className="mb-1 block text-[0.8125rem] text-muted">Prompt de nouvelle tentative</label>
         <textarea
           value={(node.retryPrompt as string) ?? ''}
           onChange={(event) => onChange('retryPrompt', event.target.value)}
           rows={3}
-          className="w-full rounded-md border border-border bg-panel px-2 py-1 text-[13px]"
+          className="w-full rounded-md border border-border bg-panel px-2 py-1 text-[0.8125rem]"
         />
         <TemplateChips names={names} onInsert={(name) => insertTemplate(name, 'retryPrompt')} />
       </div>
@@ -77,7 +77,7 @@ export function AgentFields({ node, agents, names, onChange }: AgentFieldsProps)
         }}
       />
       <div>
-        <label className="flex items-center gap-2 text-[13px] text-muted">
+        <label className="flex items-center gap-2 text-[0.8125rem] text-muted">
           <input
             type="checkbox"
             checked={Boolean(node.verdicts)}

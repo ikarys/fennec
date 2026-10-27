@@ -184,10 +184,11 @@ export default function App() {
 
   const displayPrefs = settings?.preferences.display ?? defaultDisplayPrefs;
 
-  // The UI is laid out on the default size (the CSS body size); the chosen
-  // size zooms the whole page around it.
+  // The chosen size scales the text only: every text size is in rem, set
+  // from the root font size (16px for the default 14px body), while the
+  // layout's spacing stays in px (styles/app.css).
   useEffect(() => {
-    document.documentElement.style.zoom = String(displayPrefs.fontSize / defaultDisplayPrefs.fontSize);
+    document.documentElement.style.fontSize = `${(16 * displayPrefs.fontSize) / defaultDisplayPrefs.fontSize}px`;
   }, [displayPrefs.fontSize]);
 
   const navigate = useCallback((path: string) => {
@@ -299,9 +300,8 @@ export default function App() {
 
   return (
     <DisplayPrefsProvider value={displayPrefs}>
-      {/* h-full, not h-dvh: the text size zooms <html>, and browsers scale
-          viewport units by that zoom (the page then overflows the window);
-          the html/body/#root percentages are not scaled. */}
+      {/* h-full: the html/body/#root chain is 100%, which no page-level
+          scaling can push past the window. */}
       <div className="flex h-full flex-col overflow-hidden bg-bg text-text">
         <TopBar
           tabs={tabInfos}

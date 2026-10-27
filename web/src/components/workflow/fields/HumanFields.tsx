@@ -17,12 +17,12 @@ export function HumanFields({ node, names, onChange }: HumanFieldsProps) {
   return (
     <>
       <div>
-        <label className="mb-1 block text-[13px] text-muted">Question</label>
+        <label className="mb-1 block text-[0.8125rem] text-muted">Question</label>
         <textarea
           value={(node.question as string) ?? ''}
           onChange={(event) => onChange('question', event.target.value)}
           rows={2}
-          className="w-full rounded-md border border-border bg-panel px-2 py-1 text-[13px]"
+          className="w-full rounded-md border border-border bg-panel px-2 py-1 text-[0.8125rem]"
         />
         <TemplateChips names={names} onInsert={insertTemplate} />
       </div>

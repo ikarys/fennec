@@ -15,7 +15,7 @@ export function CriterionProvenanceBadge({ provenance }: { provenance: Provenanc
           className: 'border-accent bg-accent-soft text-accent-strong'
         };
   return (
-    <span title={badge.title} className={`shrink-0 rounded border px-1 py-0.5 text-[10px] ${badge.className}`}>
+    <span title={badge.title} className={`shrink-0 rounded border px-1 py-0.5 text-[0.625rem] ${badge.className}`}>
       {badge.label}
     </span>
   );
@@ -26,7 +26,7 @@ export function CriteriaSection({ criteria }: { criteria: CriterionView[] }) {
 
   return (
     <section className="flex flex-col gap-1.5">
-      <h2 className="text-[11px] font-semibold tracking-[0.06em] text-muted uppercase">
+      <h2 className="text-[0.6875rem] font-semibold tracking-[0.06em] text-muted uppercase">
         Critères{criteria.length > 0 && <span className="ml-1 tabular-nums">{passed}/{criteria.length}</span>}
       </h2>
       {criteria.length === 0 ? (
@@ -54,9 +54,9 @@ export function CriteriaSection({ criteria }: { criteria: CriterionView[] }) {
                       <>
                         <div className="font-mono text-muted">$ {provenance.command}</div>
                         {typeof provenance.exitCode === 'number' && (
-                          <div className="text-[11px] text-muted">Code de sortie : {provenance.exitCode}</div>
+                          <div className="text-[0.6875rem] text-muted">Code de sortie : {provenance.exitCode}</div>
                         )}
-                        <pre className="max-h-40 overflow-auto rounded bg-code p-2 font-mono text-[11px] text-muted">
+                        <pre className="max-h-40 overflow-auto rounded bg-code p-2 font-mono text-[0.6875rem] text-muted">
                           {provenance.output}
                         </pre>
                       </>

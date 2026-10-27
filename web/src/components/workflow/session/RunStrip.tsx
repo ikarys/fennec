@@ -18,7 +18,7 @@ function PortBadge({ port }: { port: string }) {
       </span>
     );
   }
-  return <span className="text-[10px] text-muted" title={port} aria-label={port}>{port}</span>;
+  return <span className="text-[0.625rem] text-muted" title={port} aria-label={port}>{port}</span>;
 }
 
 function outcomeLabel(outcome: string): string {
@@ -63,7 +63,7 @@ export function RunStrip({
           {run.runs.map((nodeRun, index) => (
             <span
               key={`${nodeRun.nodeId}-${nodeRun.pass}-${index}`}
-              className={`flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] ${
+              className={`flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[0.6875rem] ${
                 nodeRun.state === 'running'
                   ? 'border-accent bg-accent-soft text-accent-strong'
                   : nodeRun.state === 'done'

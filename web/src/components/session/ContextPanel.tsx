@@ -61,7 +61,7 @@ export function ContextPanel({ view, currentTokens, contextPercent, skills, hasS
         className="hidden min-[1100px]:flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto border-l border-border bg-panel px-4 py-4.5 max-w-[300px] min-w-[240px] [scrollbar-width:thin]"
       >
         <section className="flex flex-col gap-2">
-          <h2 className="text-[11px] font-semibold tracking-[0.06em] text-muted uppercase">Contexte</h2>
+          <h2 className="text-[0.6875rem] font-semibold tracking-[0.06em] text-muted uppercase">Contexte</h2>
           <div className="h-1.5 overflow-hidden rounded-full bg-raised">
             <div className="h-full bg-accent" style={{ width: `${contextPercent}%` }} />
           </div>
@@ -81,7 +81,7 @@ export function ContextPanel({ view, currentTokens, contextPercent, skills, hasS
         </section>
 
         <section className="flex flex-col gap-1.5">
-          <h2 className="text-[11px] font-semibold tracking-[0.06em] text-muted uppercase">{partial ? 'Tokens des messages chargés' : 'Tokens de la session'}</h2>
+          <h2 className="text-[0.6875rem] font-semibold tracking-[0.06em] text-muted uppercase">{partial ? 'Tokens des messages chargés' : 'Tokens de la session'}</h2>
           {view.usage.calls === 0 && <div className="text-xs text-muted">Aucun appel mesuré.</div>}
           {view.usage.calls > 0 && (
             <dl className="m-0 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-xs tabular-nums">
@@ -106,7 +106,7 @@ export function ContextPanel({ view, currentTokens, contextPercent, skills, hasS
         </section>
 
         <section className="flex flex-col gap-1.5">
-          <h2 className="text-[11px] font-semibold tracking-[0.06em] text-muted uppercase">Fichiers modifiés</h2>
+          <h2 className="text-[0.6875rem] font-semibold tracking-[0.06em] text-muted uppercase">Fichiers modifiés</h2>
           {modifiedFiles.length === 0 && <div className="text-xs text-muted">Aucun fichier modifié.</div>}
           {visibleModifiedFiles.map((file) => {
             const relative = workdir ? file.key : undefined;
@@ -151,8 +151,8 @@ export function ContextPanel({ view, currentTokens, contextPercent, skills, hasS
         <VisionSection items={view.items} partial={partial} />
 
         <section className="flex flex-col gap-1.5">
-          <h2 className="text-[11px] font-semibold tracking-[0.06em] text-muted uppercase">Skills</h2>
-          <p className="m-0 text-[11px] text-muted">Les instructions spécialisées que le modèle a chargées. Point vert : encore dans son contexte.</p>
+          <h2 className="text-[0.6875rem] font-semibold tracking-[0.06em] text-muted uppercase">Skills</h2>
+          <p className="m-0 text-[0.6875rem] text-muted">Les instructions spécialisées que le modèle a chargées. Point vert : encore dans son contexte.</p>
           {(!hasSession || (skills !== null && skills.loaded.length === 0)) && (
             <div className="text-xs text-muted">Aucun skill chargé.</div>
           )}
@@ -177,7 +177,7 @@ export function ContextPanel({ view, currentTokens, contextPercent, skills, hasS
         )}
 
         <section className="flex flex-col gap-2">
-          <h2 className="text-[11px] font-semibold tracking-[0.06em] text-muted uppercase">Outils de ce tour</h2>
+          <h2 className="text-[0.6875rem] font-semibold tracking-[0.06em] text-muted uppercase">Outils de ce tour</h2>
           {view.toolCounts.length === 0 && <div className="text-xs text-muted">Aucun outil appelé.</div>}
           {view.toolCounts.map((tool) => (
             <div key={tool.name} className="flex justify-between text-xs">

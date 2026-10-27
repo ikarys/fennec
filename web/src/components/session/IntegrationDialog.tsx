@@ -121,7 +121,7 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
         {preview && !loading && !result && (
           <div className="flex flex-col gap-3">
             <section className="flex flex-col gap-1.5">
-              <h3 className="m-0 text-[11px] font-semibold tracking-[0.06em] text-muted uppercase">
+              <h3 className="m-0 text-[0.6875rem] font-semibold tracking-[0.06em] text-muted uppercase">
                 Commits{preview.commits.length > 0 && <span className="ml-1 tabular-nums">{preview.commits.length}</span>}
               </h3>
               {preview.commits.length === 0 ? (
@@ -139,7 +139,7 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
             </section>
 
             <section className="flex flex-col gap-1.5">
-              <h3 className="m-0 text-[11px] font-semibold tracking-[0.06em] text-muted uppercase">
+              <h3 className="m-0 text-[0.6875rem] font-semibold tracking-[0.06em] text-muted uppercase">
                 Fichiers{preview.files.length > 0 && <span className="ml-1 tabular-nums">{preview.files.length}</span>}
               </h3>
               {preview.files.length === 0 ? (
@@ -152,7 +152,7 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
                         {file.path}
                       </span>
                       {file.protected && (
-                        <span className="shrink-0 rounded border border-err bg-err/10 px-1 py-0.5 text-[10px] text-err">
+                        <span className="shrink-0 rounded border border-err bg-err/10 px-1 py-0.5 text-[0.625rem] text-err">
                           protégé
                         </span>
                       )}
@@ -163,7 +163,7 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
             </section>
 
             <section className="flex flex-col gap-1.5">
-              <h3 className="m-0 text-[11px] font-semibold tracking-[0.06em] text-muted uppercase">Critères</h3>
+              <h3 className="m-0 text-[0.6875rem] font-semibold tracking-[0.06em] text-muted uppercase">Critères</h3>
               {preview.criteria.length === 0 ? (
                 <div className="text-xs text-muted">Aucun critère.</div>
               ) : (
@@ -189,7 +189,7 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
 
             {preview.blockers.length > 0 && (
               <section className="flex flex-col gap-1.5">
-                <h3 className="m-0 text-[11px] font-semibold tracking-[0.06em] text-muted uppercase">À accepter</h3>
+                <h3 className="m-0 text-[0.6875rem] font-semibold tracking-[0.06em] text-muted uppercase">À accepter</h3>
                 <div className="flex flex-col gap-1.5">
                   {preview.blockers.map((blocker) => (
                     <div key={blocker.kind} className="flex items-start justify-between gap-2 text-xs">

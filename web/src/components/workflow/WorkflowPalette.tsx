@@ -19,7 +19,7 @@ const KINDS: { kind: NodeKind; shape: string }[] = [
 export function WorkflowPalette({ onAddNode }: WorkflowPaletteProps) {
   return (
     <aside className="flex w-40 shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-panel p-2">
-      <div className="px-1 pb-1 text-[11px] font-semibold tracking-[0.06em] text-muted uppercase">Nœuds</div>
+      <div className="px-1 pb-1 text-[0.6875rem] font-semibold tracking-[0.06em] text-muted uppercase">Nœuds</div>
       {KINDS.map(({ kind, shape }) => (
         <button
           key={kind}
@@ -30,7 +30,7 @@ export function WorkflowPalette({ onAddNode }: WorkflowPaletteProps) {
             event.dataTransfer.effectAllowed = 'move';
           }}
           onClick={() => onAddNode(kind)}
-          className={`flex h-10 items-center gap-2 rounded-lg px-2 text-left text-[13px] text-text hover:bg-raised ${shape}`}
+          className={`flex h-10 items-center gap-2 rounded-lg px-2 text-left text-[0.8125rem] text-text hover:bg-raised ${shape}`}
         >
           <span className="h-3 w-3 rounded-full bg-current opacity-30" />
           {NODE_KIND_LABELS[kind]}

@@ -56,7 +56,7 @@ export function TopBar({
       <a
         href="#/"
         aria-label="Accueil fennec"
-        className="flex items-center gap-2 py-2 pl-1 pr-3 text-[15px] font-semibold tracking-[-0.01em] text-text"
+        className="flex items-center gap-2 py-2 pl-1 pr-3 text-[0.9375rem] font-semibold tracking-[-0.01em] text-text"
       >
         <FoxIcon className="h-5 w-5 text-accent" />
         <span>fennec</span>
@@ -82,11 +82,11 @@ export function TopBar({
               <button
                 type="button"
                 onClick={() => onPickTab(tab.id)}
-                className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-medium"
+                className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[0.8125rem] font-medium"
               >
                 {tab.title}
               </button>
-              <span className="whitespace-nowrap text-[11px] text-muted">{tab.project}</span>
+              <span className="whitespace-nowrap text-[0.6875rem] text-muted">{tab.project}</span>
               <button
                 type="button"
                 aria-label="Fermer l'onglet"
@@ -113,11 +113,11 @@ export function TopBar({
           type="button"
           onClick={onOpenPalette}
           aria-label="Sessions, projets, commandes"
-          className="flex min-h-8 items-center md:min-w-[220px] gap-2.5 rounded-lg border border-border bg-raised px-2.5 py-1 text-[13px] text-muted"
+          className="flex min-h-8 items-center md:min-w-[220px] gap-2.5 rounded-lg border border-border bg-raised px-2.5 py-1 text-[0.8125rem] text-muted"
         >
           <SearchIcon className="h-3.5 w-3.5" />
           <span className="hidden grow text-left md:inline">Sessions, projets, commandes</span>
-          <kbd className="rounded-md border border-border px-1.5 py-px text-[11px] text-muted">⌘K</kbd>
+          <kbd className="rounded-md border border-border px-1.5 py-px text-[0.6875rem] text-muted">⌘K</kbd>
         </button>
 
         <div role="group" aria-label="Thème" className="flex gap-0.5 rounded-[10px] border border-border bg-raised p-0.5">

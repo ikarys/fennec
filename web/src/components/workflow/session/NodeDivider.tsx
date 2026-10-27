@@ -46,14 +46,14 @@ export function NodeDivider({ item, running }: { item: WorkflowNodeItem; running
 
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="flex items-center gap-2 text-[11px] text-muted">
+      <div className="flex items-center gap-2 text-[0.6875rem] text-muted">
         <span className="h-px grow bg-border" />
         <span className="flex items-center gap-1.5">
-          <span className="rounded border border-border bg-raised px-1.5 text-[10px] uppercase tracking-wide">{item.nodeKind}</span>
+          <span className="rounded border border-border bg-raised px-1.5 text-[0.625rem] uppercase tracking-wide">{item.nodeKind}</span>
           <span className="text-text">{item.label}{passLabel}</span>
           {badge && (
             <span
-              className={`inline-flex items-center rounded-full border px-1.5 text-[10px] ${badge.className}`}
+              className={`inline-flex items-center rounded-full border px-1.5 text-[0.625rem] ${badge.className}`}
               title={badge.title}
               aria-label={badge.title}
             >
@@ -78,24 +78,24 @@ export function NodeDivider({ item, running }: { item: WorkflowNodeItem; running
       </div>
       {(item.prompt || item.output || item.childSessionId) && (
         <details className="mx-auto">
-          <summary className="cursor-pointer text-center text-[11px] text-muted hover:text-text">détails</summary>
+          <summary className="cursor-pointer text-center text-[0.6875rem] text-muted hover:text-text">détails</summary>
           <div className="mt-1.5 flex flex-col gap-2 rounded-md border border-border bg-raised px-3 py-2 text-left text-xs">
             {item.prompt && (
               <div>
-                <div className="mb-1 text-[10px] uppercase tracking-wide text-muted">Prompt</div>
+                <div className="mb-1 text-[0.625rem] uppercase tracking-wide text-muted">Prompt</div>
                 <div className="whitespace-pre-wrap text-text">{item.prompt}</div>
               </div>
             )}
             {item.output && (
               <div>
-                <div className="mb-1 text-[10px] uppercase tracking-wide text-muted">Sortie</div>
+                <div className="mb-1 text-[0.625rem] uppercase tracking-wide text-muted">Sortie</div>
                 {(item.nodeKind === 'shell' || item.nodeKind === 'criteria') ? (
-                  <pre className="overflow-x-auto rounded bg-code p-2 font-mono text-[11px] text-muted">{item.output}</pre>
+                  <pre className="overflow-x-auto rounded bg-code p-2 font-mono text-[0.6875rem] text-muted">{item.output}</pre>
                 ) : (
                   <div className="whitespace-pre-wrap text-text">{item.output}</div>
                 )}
                 {item.nodeKind === 'shell' && item.exitCode !== undefined && (
-                  <div className="mt-1 text-[11px] text-muted">Code de sortie : {item.exitCode}</div>
+                  <div className="mt-1 text-[0.6875rem] text-muted">Code de sortie : {item.exitCode}</div>
                 )}
               </div>
             )}

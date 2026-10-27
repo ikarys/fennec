@@ -167,13 +167,13 @@ export function Palette({ open, projects, onClose, onOpenSession, onNewSession, 
               }
             }}
             placeholder="Rechercher une session, un projet, une commande…"
-            className="grow min-h-[50px] bg-transparent text-[15px] outline-none"
+            className="grow min-h-[50px] bg-transparent text-[0.9375rem] outline-none"
           />
           <button
             type="button"
             onClick={onClose}
             aria-label="Fermer la palette"
-            className="rounded-md border border-border px-2 py-0.5 text-[11px] text-muted"
+            className="rounded-md border border-border px-2 py-0.5 text-[0.6875rem] text-muted"
           >
             Échap
           </button>
@@ -183,7 +183,7 @@ export function Palette({ open, projects, onClose, onOpenSession, onNewSession, 
           {flatItems.length === 0 && <div className="px-2.5 py-6 text-center text-sm text-muted">Aucun résultat</div>}
           {groups.map((group) => (
             <div key={group.label}>
-              <div className="px-2.5 pt-2.5 pb-1 text-[11px] font-semibold tracking-[0.06em] text-muted uppercase">
+              <div className="px-2.5 pt-2.5 pb-1 text-[0.6875rem] font-semibold tracking-[0.06em] text-muted uppercase">
                 {group.label}
               </div>
               {group.items.map((item) => {

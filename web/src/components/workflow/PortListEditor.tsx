@@ -37,7 +37,7 @@ export function PortListEditor({ values, onChange, onRename, onRemove, label }: 
 
   return (
     <div>
-      {label && <div className="mb-1 text-[13px] text-muted">{label}</div>}
+      {label && <div className="mb-1 text-[0.8125rem] text-muted">{label}</div>}
       <div className="flex flex-col gap-1">
         {values.map((value, index) => (
           <div key={index} className="flex items-center gap-1">
@@ -45,7 +45,7 @@ export function PortListEditor({ values, onChange, onRename, onRemove, label }: 
               type="text"
               value={value}
               onChange={(event) => renameValue(index, event.target.value)}
-              className="grow rounded-md border border-border bg-panel px-2 py-1 text-[13px]"
+              className="grow rounded-md border border-border bg-panel px-2 py-1 text-[0.8125rem]"
             />
             <button
               type="button"
@@ -70,7 +70,7 @@ export function PortListEditor({ values, onChange, onRename, onRemove, label }: 
             }
           }}
           placeholder="Ajouter…"
-          className="grow rounded-md border border-border bg-panel px-2 py-1 text-[13px]"
+          className="grow rounded-md border border-border bg-panel px-2 py-1 text-[0.8125rem]"
         />
         <button
           type="button"

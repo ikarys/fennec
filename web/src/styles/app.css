@@ -89,6 +89,14 @@
 }
 
 @theme inline {
+  /* The text size setting scales the root font size: text in rem follows it,
+     while spacing and radii stay in px so the layout does not move. */
+  --spacing: 4px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
   --color-bg: var(--bg);
   --color-panel: var(--panel);
   --color-raised: var(--raised);
@@ -121,7 +129,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.5;
 }
 

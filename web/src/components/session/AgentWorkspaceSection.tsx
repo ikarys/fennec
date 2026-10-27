@@ -74,7 +74,7 @@ export function AgentWorkspaceSection({ sessionId, worktree, running }: { sessio
 
   return (
     <section className="flex flex-col gap-2">
-      <h2 className="text-[11px] font-semibold tracking-[0.06em] text-muted uppercase">Espace de l'agent</h2>
+      <h2 className="text-[0.6875rem] font-semibold tracking-[0.06em] text-muted uppercase">Espace de l'agent</h2>
       <p className="m-0 text-xs text-muted">
         L'agent travaille dans sa propre copie du dépôt. Ton dossier et ta branche ne changent pas tant que tu n'intègres pas.
       </p>
@@ -143,7 +143,7 @@ export function AgentWorkspaceSection({ sessionId, worktree, running }: { sessio
                             <bdi>{file.path}</bdi>
                           </span>
                           {file.protected && (
-                            <span className="shrink-0 rounded border border-err bg-err/10 px-1 py-0.5 text-[10px] text-err">
+                            <span className="shrink-0 rounded border border-err bg-err/10 px-1 py-0.5 text-[0.625rem] text-err">
                               protégé
                             </span>
                           )}

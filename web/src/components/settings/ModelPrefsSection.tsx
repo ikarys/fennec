@@ -23,15 +23,15 @@ export function percentFromFraction(fraction: number): string {
 export function ModelPrefsSection({ models, values, defaults, onChange }: ModelPrefsSectionProps) {
   return (
     <section className="rounded-xl border border-border bg-panel px-5 py-4">
-      <h2 className="text-[15px] font-semibold">Paramètres par modèle</h2>
+      <h2 className="text-[0.9375rem] font-semibold">Paramètres par modèle</h2>
       {models.length === 0 && <p className="mt-3 text-sm text-muted">Aucun modèle listé.</p>}
       {models.map((model) => {
         const value = values[model.id] ?? { maxTokens: '', contextWindow: '', compactionThreshold: '', reasoningEffort: '' };
         return (
           <div key={model.id} className="mt-4 rounded-lg border border-border bg-raised px-4 py-3">
-            <h3 className="font-mono text-[13px] font-medium">{model.id}</h3>
+            <h3 className="font-mono text-[0.8125rem] font-medium">{model.id}</h3>
             <div className="mt-3 grid gap-3 md:grid-cols-2">
-              <label className="block text-[13px] text-muted">
+              <label className="block text-[0.8125rem] text-muted">
                 Tokens max par réponse
                 <input
                   type="number"
@@ -40,10 +40,10 @@ export function ModelPrefsSection({ models, values, defaults, onChange }: ModelP
                   value={value.maxTokens}
                   placeholder={String(defaults.maxTokens)}
                   onChange={(event) => onChange(model.id, 'maxTokens', event.target.value)}
-                  className="mt-1.5 w-full rounded-lg border border-border bg-panel px-3 py-2 text-[13px] text-text"
+                  className="mt-1.5 w-full rounded-lg border border-border bg-panel px-3 py-2 text-[0.8125rem] text-text"
                 />
               </label>
-              <label className="block text-[13px] text-muted">
+              <label className="block text-[0.8125rem] text-muted">
                 Fenêtre de contexte
                 <input
                   type="number"
@@ -52,10 +52,10 @@ export function ModelPrefsSection({ models, values, defaults, onChange }: ModelP
                   value={value.contextWindow}
                   placeholder={String(model.contextWindow ?? defaults.contextWindow)}
                   onChange={(event) => onChange(model.id, 'contextWindow', event.target.value)}
-                  className="mt-1.5 w-full rounded-lg border border-border bg-panel px-3 py-2 text-[13px] text-text"
+                  className="mt-1.5 w-full rounded-lg border border-border bg-panel px-3 py-2 text-[0.8125rem] text-text"
                 />
               </label>
-              <label className="block text-[13px] text-muted">
+              <label className="block text-[0.8125rem] text-muted">
                 Compaction à (%)
                 <input
                   type="number"
@@ -65,15 +65,15 @@ export function ModelPrefsSection({ models, values, defaults, onChange }: ModelP
                   value={value.compactionThreshold}
                   placeholder={percentFromFraction(defaults.compactAt)}
                   onChange={(event) => onChange(model.id, 'compactionThreshold', event.target.value)}
-                  className="mt-1.5 w-full rounded-lg border border-border bg-panel px-3 py-2 text-[13px] text-text"
+                  className="mt-1.5 w-full rounded-lg border border-border bg-panel px-3 py-2 text-[0.8125rem] text-text"
                 />
               </label>
-              <label className="block text-[13px] text-muted">
+              <label className="block text-[0.8125rem] text-muted">
                 Effort de réflexion
                 <select
                   value={value.reasoningEffort}
                   onChange={(event) => onChange(model.id, 'reasoningEffort', event.target.value)}
-                  className="mt-1.5 w-full rounded-lg border border-border bg-panel px-3 py-2 text-[13px] text-text"
+                  className="mt-1.5 w-full rounded-lg border border-border bg-panel px-3 py-2 text-[0.8125rem] text-text"
                 >
                   <option value="">Auto (sans effort)</option>
                   {REASONING_EFFORTS.map((effort) => (

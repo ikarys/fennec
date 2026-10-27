@@ -55,8 +55,8 @@ export function ToolCard({ tool }: { tool: ToolCallView }) {
           className="flex min-w-0 grow items-center gap-2.5"
         >
           {icon}
-          <span className="shrink-0 font-mono text-[12.5px] font-medium">{tool.name}</span>
-          <span title={arg} className="min-w-0 truncate font-mono text-[12.5px] text-muted">
+          <span className="shrink-0 font-mono text-[0.7812rem] font-medium">{tool.name}</span>
+          <span title={arg} className="min-w-0 truncate font-mono text-[0.7812rem] text-muted">
             {arg}
           </span>
           <span className="grow" />
@@ -84,7 +84,7 @@ export function ToolCard({ tool }: { tool: ToolCallView }) {
         )}
         {tool.name === 'run_command' && tool.status !== 'running' && tool.exitCode != null && (
           <span
-            className={`shrink-0 whitespace-nowrap rounded px-1.5 py-px text-[11px] ${
+            className={`shrink-0 whitespace-nowrap rounded px-1.5 py-px text-[0.6875rem] ${
               tool.exitCode === 0 ? 'bg-ok-soft text-ok' : 'bg-raised text-err'
             }`}
           >

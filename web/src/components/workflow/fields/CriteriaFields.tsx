@@ -13,11 +13,11 @@ export function CriteriaFields({ node, def, onChange }: CriteriaFieldsProps) {
   return (
     <>
       <div>
-        <label className="mb-1 block text-[13px] text-muted">Nœud du plan</label>
+        <label className="mb-1 block text-[0.8125rem] text-muted">Nœud du plan</label>
         <select
           value={(node.plan as string) ?? ''}
           onChange={(event) => onChange('plan', event.target.value)}
-          className="w-full rounded-md border border-border bg-panel px-2 py-1 text-[13px]"
+          className="w-full rounded-md border border-border bg-panel px-2 py-1 text-[0.8125rem]"
         >
           <option value="">—</option>
           {agentNodes.map((agentNode) => (
