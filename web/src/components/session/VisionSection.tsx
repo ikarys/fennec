@@ -21,9 +21,9 @@ export function VisionSection({ items, partial }: { items: ThreadItem[]; partial
 
   return (
     <section className="flex flex-col gap-1.5">
-      <h2 className="text-[11px] font-semibold tracking-[0.06em] text-muted uppercase">
-        {partial ? 'Vision des messages chargés' : 'Vision'}
-      </h2>
+      <h2 className="text-[11px] font-semibold tracking-[0.06em] text-muted uppercase">Vision</h2>
+      <p className="m-0 text-[11px] text-muted">Les images que le modèle a vues : captures, images lues ou jointes. Grisées : sorties de son contexte.</p>
+      {partial && <div className="text-[11px] text-muted">(messages chargés seulement)</div>}
       {images.length === 0 ? (
         <div className="text-xs text-muted">Aucune image vue.</div>
       ) : (

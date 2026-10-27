@@ -31,13 +31,13 @@ with camelCase fields.
 | `session.rewound` | `{messageId}`: fennec's replay cut; the model's view drops that message and everything after it, the log keeps them |
 | `workflow.started` | `{runId, workflow, task, stepByStep}`: `workflow` is the whole definition, frozen for the run |
 | `workflow.node.started` | `{runId, nodeId, pass, via?, childSessionId?}`: `via` is `{from, port}`, the edge taken |
-| `workflow.node.finished` | `{runId, nodeId, port, output, exitCode?}` |
+| `workflow.node.finished` | `{runId, nodeId, port, output, exitCode?, durationMs?}`: `durationMs` is the node's working time measured by fennec (none for a human node) |
 | `criteria.set` | `{criteria: [{id, description, check?}]}`: the approved plan's criteria, all pending |
 | `criterion.updated` | `{criterionId, status}`; `status` is `{type: "pending"}` or `{type: "passed" \| "failed", provenance}`, `provenance` `{kind: "verified", command, exitCode?, output}` (fennec ran the check) or `{kind: "indicative", agent, reason}` (an agent's verdict) |
 | `integration.applied` | `{branch, base, commits, head, acknowledged}`: the human integrated the session's branch; `acknowledged` lists the blockers they accepted |
 | `workflow.paused` | `{runId, from, port, to}`: waiting before `to` |
 | `workflow.resumed` | `{runId, comment}` |
-| `workflow.finished` | `{runId, outcome, reason?}`: `outcome` is `done`, `blocked`, `stopped` or `error` |
+| `workflow.finished` | `{runId, outcome, reason?, stats?}`: `outcome` is `done`, `blocked`, `stopped` or `error`; `stats` are facts fennec computed from the log: `{workingMs, nodes: [{nodeId, label, runs, workingMs}], reruns, calls, prefillTokens, cachedPromptTokens, generationTokens, filesChanged, criteriaTotal, criteriaPassed, criteriaVerified}` (child sessions' model calls included, the time waiting for the human excluded) |
 
 Tools: `read_file {path, offset?, limit?}`, `write_file {path, content}`,
 `edit_file {path, old_string, new_string, replace_all?}`,

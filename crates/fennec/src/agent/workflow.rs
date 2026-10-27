@@ -19,9 +19,11 @@ use crate::domain::event::{DoneReason, Event};
 use crate::domain::id::new_id;
 use crate::domain::workflow::definition::{AgentContext, NodeKind, Workflow};
 use crate::domain::workflow::run::{self as run, Next, RunOutcome, RunState, Via};
+use crate::domain::workflow::stats::{RunStats, run_stats};
 use crate::domain::workflow::validate;
 use nodes::NodeInput;
 use std::sync::atomic::Ordering;
+use std::time::Instant;
 
 pub struct WorkflowEnv<'a> {
     pub children: &'a dyn ChildSessions,
@@ -190,6 +192,7 @@ fn start_run(
         output: task.to_string(),
         exit_code: None,
         comment: None,
+        duration_ms: None,
     })?;
 
     Ok(Cursor::After {
@@ -228,6 +231,7 @@ fn answer_human(turn: &mut Turn, choice: &str, comment: &str) -> Result<Cursor, 
         output: choice.to_string(),
         exit_code: None,
         comment,
+        duration_ms: None,
     })?;
 
     Ok(Cursor::After {
@@ -340,7 +344,7 @@ fn agent_input(
     let end = nodes::agent_end(label, outputs, reason, text, |reminder| {
         session_send(turn, agent, reminder)
     })?;
-    let step = record(turn, &state, &node.id, end)?;
+    let step = record(turn, &state, &node.id, end, None)?;
 
     match step {
         Step::Go(cursor) => walk_from(turn, env, cursor),
@@ -371,6 +375,7 @@ fn run_node(
         ),
         _ => None,
     };
+    let started = Instant::now();
     append_node_started(turn, state, node_id, pass, &via, child.as_deref())?;
     if matches!(node.kind, NodeKind::Human { .. }) {
         return Ok(Step::Exit(DoneReason::WaitingForUser));
@@ -405,7 +410,13 @@ fn run_node(
     if verdicts && let nodes::NodeEnd::Finished { output, .. } = &end {
         criteria::record_verdicts(turn, &state, &agent_id, output)?;
     }
-    record(turn, &state, node_id, end)
+    record(
+        turn,
+        &state,
+        node_id,
+        end,
+        Some(started.elapsed().as_millis() as u64),
+    )
 }
 
 fn session_agent(
@@ -467,6 +478,7 @@ fn record(
     state: &RunState,
     node_id: &str,
     end: nodes::NodeEnd,
+    duration_ms: Option<u64>,
 ) -> Result<Step, String> {
     match end {
         nodes::NodeEnd::Finished {
@@ -481,6 +493,7 @@ fn record(
                 output,
                 exit_code,
                 comment: None,
+                duration_ms,
             })?;
             Ok(Step::Go(Cursor::After {
                 from: node_id.to_string(),
@@ -494,16 +507,47 @@ fn record(
     }
 }
 
+/// The facts of the run that ends now, read back from the log: its own
+/// events, its child sessions' and its criteria as last recorded.
+fn finished_run_stats(turn: &Turn) -> Result<RunStats, String> {
+    let events = turn.log.events(turn.session_id)?;
+    let run_events = run::current_run_events(&events);
+    let mut child_ids: Vec<&String> = Vec::new();
+    for event in run_events {
+        if let Event::WorkflowNodeStarted {
+            child_session_id: Some(child),
+            ..
+        } = event
+            && !child_ids.contains(&child)
+        {
+            child_ids.push(child);
+        }
+    }
+    // A child log that cannot be read is skipped: the run must still finish.
+    let children: Vec<Vec<Event>> = child_ids
+        .iter()
+        .filter_map(|id| turn.log.events(id).ok())
+        .collect();
+    let criteria = run::current_run(&events)
+        .map(|state| state.criteria)
+        .unwrap_or_default();
+    let files = files_changed(run_events);
+    Ok(run_stats(run_events, &children, &criteria, files.len()))
+}
+
 fn finish_run(
     turn: &mut Turn,
     state: &RunState,
     outcome: RunOutcome,
     reason: Option<String>,
 ) -> Result<DoneReason, String> {
+    let stats = finished_run_stats(turn)?;
+
     turn.append(Event::WorkflowFinished {
         run_id: state.run_id.clone(),
         outcome,
         reason,
+        stats: Some(stats),
     })?;
     end_turn(turn, map_outcome(outcome))
 }

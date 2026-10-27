@@ -132,6 +132,7 @@ impl RunState {
                 output,
                 exit_code,
                 comment,
+                ..
             } if run_id == &self.run_id => {
                 self.open.retain(|open| &open.node_id != node_id);
                 self.results.insert(
@@ -174,6 +175,7 @@ impl RunState {
                 run_id,
                 outcome,
                 reason,
+                ..
             } if run_id == &self.run_id => {
                 self.finished = Some((*outcome, reason.clone()));
             }
@@ -607,6 +609,7 @@ mod tests {
             output: "out".into(),
             exit_code: None,
             comment: None,
+            duration_ms: None,
         });
         state.apply(&Event::WorkflowPaused {
             run_id: "r".into(),
@@ -622,6 +625,7 @@ mod tests {
             run_id: "r".into(),
             outcome: RunOutcome::Done,
             reason: None,
+            stats: None,
         });
 
         assert_eq!(state.steps, 1);
@@ -1152,6 +1156,7 @@ mod tests {
             run_id: "r".into(),
             outcome: RunOutcome::Done,
             reason: None,
+            stats: None,
         });
         assert_eq!(waiting(&state, &[]), None);
     }

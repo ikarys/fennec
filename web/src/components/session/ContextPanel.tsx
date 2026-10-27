@@ -1,8 +1,8 @@
 import type { ThreadView } from '../../lib/fold';
 import type { SessionDetail, SessionSkills } from '../../lib/api';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { cachePercent, formatSpeed, formatTokens } from '../../lib/format';
-import { previewKindOfPath, relativeToWorkdir } from '../../lib/preview';
+import { previewKindOfPath, relativeToWorkdir, type PreviewKind } from '../../lib/preview';
 import { usePreviewOpener, usePreviewWorkdir } from '../preview/PreviewContext';
 import { CriteriaSection } from './CriteriaSection';
 import { IntegrationDialog } from './IntegrationDialog';
@@ -31,11 +31,32 @@ export function ContextPanel({ view, currentTokens, contextPercent, skills, hasS
   const opener = usePreviewOpener();
   const workdir = usePreviewWorkdir();
   const [integrationOpen, setIntegrationOpen] = useState(false);
+  const [filesExpanded, setFilesExpanded] = useState(false);
 
   useEffect(() => {
     // The dialog belongs to one session; a tab change closes it.
     setIntegrationOpen(false);
+    setFilesExpanded(false);
   }, [sessionId]);
+
+  const modifiedFiles = useMemo(() => {
+    const merged = new Map<string, { key: string; added: number; removed: number; kind?: PreviewKind }>();
+    for (const file of view.modifiedFiles) {
+      // The same file arrives absolute and relative: one entry per project path.
+      const key = (workdir ? relativeToWorkdir(file.path, workdir) : undefined) ?? file.path;
+      const entry: { key: string; added: number; removed: number; kind?: PreviewKind } = merged.get(key) ?? { key, added: 0, removed: 0 };
+      entry.added += file.added;
+      entry.removed += file.removed;
+      if (!entry.kind) {
+        entry.kind = previewKindOfPath(file.path);
+      }
+      merged.set(key, entry);
+    }
+    return Array.from(merged.values()).sort((a, b) => a.key.localeCompare(b.key));
+  }, [view.modifiedFiles, workdir]);
+
+  const visibleModifiedFiles = filesExpanded ? modifiedFiles : modifiedFiles.slice(0, 6);
+  const hiddenModifiedCount = modifiedFiles.length - 6;
   return (
       <aside
         aria-label="Contexte de la session"
@@ -88,19 +109,19 @@ export function ContextPanel({ view, currentTokens, contextPercent, skills, hasS
 
         <section className="flex flex-col gap-1.5">
           <h2 className="text-[11px] font-semibold tracking-[0.06em] text-muted uppercase">Fichiers modifiés</h2>
-          {view.modifiedFiles.length === 0 && <div className="text-xs text-muted">Aucun fichier modifié.</div>}
-          {view.modifiedFiles.map((file) => {
-            const kind = previewKindOfPath(file.path);
-            const relative = workdir ? relativeToWorkdir(file.path, workdir) : undefined;
+          {modifiedFiles.length === 0 && <div className="text-xs text-muted">Aucun fichier modifié.</div>}
+          {visibleModifiedFiles.map((file) => {
+            const relative = workdir ? file.key : undefined;
+            const kind = file.kind;
             return (
-              <div key={file.path} className="flex items-center gap-2 py-1.5 font-mono text-xs">
+              <div key={file.key} className="flex items-center gap-2 py-1.5 font-mono text-xs">
                 {/* Cut on the left: the file name is what tells files apart. */}
                 <span
                   dir="rtl"
-                  title={file.path}
+                  title={file.key}
                   className="grow overflow-hidden text-left text-ellipsis whitespace-nowrap"
                 >
-                  <bdi>{relative ?? file.path}</bdi>
+                  <bdi>{file.key}</bdi>
                 </span>
                 <span className="text-ok">+{file.added}</span>
                 <span className="text-muted">−{file.removed}</span>
@@ -116,6 +137,15 @@ export function ContextPanel({ view, currentTokens, contextPercent, skills, hasS
               </div>
             );
           })}
+          {hiddenModifiedCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setFilesExpanded((value) => !value)}
+              className="self-start text-xs text-muted hover:text-text"
+            >
+              {filesExpanded ? 'Réduire' : `+ ${hiddenModifiedCount} autres`}
+            </button>
+          )}
         </section>
 
         <CriteriaSection criteria={view.criteria} />
@@ -124,6 +154,7 @@ export function ContextPanel({ view, currentTokens, contextPercent, skills, hasS
 
         <section className="flex flex-col gap-1.5">
           <h2 className="text-[11px] font-semibold tracking-[0.06em] text-muted uppercase">Skills</h2>
+          <p className="m-0 text-[11px] text-muted">Les instructions spécialisées que le modèle a chargées. Point vert : encore dans son contexte.</p>
           {(!hasSession || (skills !== null && skills.loaded.length === 0)) && (
             <div className="text-xs text-muted">Aucun skill chargé.</div>
           )}

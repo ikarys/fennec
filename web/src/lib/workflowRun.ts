@@ -178,3 +178,34 @@ export function runWaiting(run: RunView | undefined, running: boolean, lastDone:
   }
   return { kind: 'interrupted' };
 }
+
+const POSITIVE_PORTS = new Set([
+  'next',
+  'done',
+  'pass',
+  'success',
+  'clean',
+  'true',
+  'go',
+  'ok',
+  'accept',
+  'minor'
+]);
+
+const NEGATIVE_PORTS = new Set([
+  'fail',
+  'failure',
+  'findings',
+  'false',
+  'exhausted',
+  'blocked',
+  'stop',
+  'revise'
+]);
+
+export function portTone(port: string): 'positive' | 'negative' | 'other' {
+  const normalized = port.trim().toLowerCase();
+  if (POSITIVE_PORTS.has(normalized)) return 'positive';
+  if (NEGATIVE_PORTS.has(normalized)) return 'negative';
+  return 'other';
+}

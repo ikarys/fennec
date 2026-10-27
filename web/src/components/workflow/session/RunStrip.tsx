@@ -1,5 +1,25 @@
 import { useEffect, useRef } from 'react';
-import type { RunView } from '../../../lib/workflowRun';
+import { portTone, type RunView } from '../../../lib/workflowRun';
+import { CheckIcon, CloseIcon } from '../../Icons';
+
+function PortBadge({ port }: { port: string }) {
+  const tone = portTone(port);
+  if (tone === 'positive') {
+    return (
+      <span className="text-ok" title={port} aria-label={port}>
+        <CheckIcon className="h-3 w-3" />
+      </span>
+    );
+  }
+  if (tone === 'negative') {
+    return (
+      <span className="text-err" title={port} aria-label={port}>
+        <CloseIcon className="h-3 w-3" />
+      </span>
+    );
+  }
+  return <span className="text-[10px] text-muted" title={port} aria-label={port}>{port}</span>;
+}
 
 function outcomeLabel(outcome: string): string {
   switch (outcome) {
@@ -53,9 +73,7 @@ export function RunStrip({
             >
               {nodeRun.state === 'running' && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />}
               {nodeRun.label}
-              {nodeRun.state === 'done' && nodeRun.port && (
-                <span className="text-[10px] text-muted">{nodeRun.port}</span>
-              )}
+              {nodeRun.state === 'done' && nodeRun.port && <PortBadge port={nodeRun.port} />}
             </span>
           ))}
         </div>

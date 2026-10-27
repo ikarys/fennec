@@ -1,6 +1,8 @@
 import type { WorkflowSummary } from '../lib/workflow';
 import { useEffect, useRef, useState } from 'react';
 import type { Agent, AttachmentInput, Config, Project, SessionDetail, SessionState, SlashCommand } from '../lib/api';
+import type { AssistantItem, Segment } from '../lib/fold';
+import { splitContract } from '../lib/plan';
 import {
   answerWorkflow,
   compactSession,
@@ -26,6 +28,7 @@ import { Composer } from '../components/session/Composer';
 import { ContextPanel } from '../components/session/ContextPanel';
 import { QuestionCard } from '../components/session/QuestionCard';
 import { ThreadItemView } from '../components/session/Thread';
+import { PlanActionsContext } from '../components/session/PlanActions';
 import { PreviewContext, PreviewWorkdirContext, type PreviewTarget } from '../components/preview/PreviewContext';
 import { PreviewPane } from '../components/preview/PreviewPane';
 import { RunStrip } from '../components/workflow/session/RunStrip';
@@ -57,6 +60,7 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
   // Optimistic mode while `setSessionMode` is in flight; cleared once the
   // server's mode (event stream or detail) matches it.
   const [pendingMode, setPendingMode] = useState<string | null>(null);
+  const [planBuildInFlight, setPlanBuildInFlight] = useState(false);
   const [preview, setPreview] = useState<PreviewTarget | null>(null);
   const { view, hasMore, loadingOlder, loadOlder, skills } = useSessionThread(sessionId);
   const running = view.running;
@@ -200,6 +204,26 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
   // The detail is fetched once; the event stream says how a turn ended.
   const state: SessionState = running ? 'running' : ((view.lastDone as SessionState | undefined) ?? detail?.state ?? 'idle');
   const title = detail?.title ?? (sessionId ? 'Session' : 'Nouvelle session');
+
+  const lastAssistant = [...view.items].reverse().find((item): item is AssistantItem => item.kind === 'assistant');
+  const lastTextSegment = lastAssistant
+    ? [...lastAssistant.segments].reverse().find((segment): segment is Extract<Segment, { kind: 'text' }> => segment.kind === 'text')
+    : undefined;
+  const planContract = lastTextSegment ? splitContract(lastTextSegment.content) : null;
+  const planActions =
+    planContract?.contract.kind === 'plan' &&
+    lastTextSegment &&
+    !running &&
+    !view.pendingQuestion &&
+    (!run || run.finished) &&
+    mode === 'plan'
+      ? {
+          segmentId: lastTextSegment.id,
+          onBuild: handlePlanBuild,
+          onRevise: handlePlanRevise,
+          disabled: running || planBuildInFlight
+        }
+      : null;
   const projectName =
     detail?.project.name ?? projects.find((project) => project.id === projectId)?.name ?? projectId ?? '—';
   const currentTokens = view.contextTokens ?? 0;
@@ -259,12 +283,12 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
     setAttachments((current) => current.filter((_, i) => i !== index));
   }
 
-  async function handleModeChange(id: string) {
+  async function handleModeChange(id: string): Promise<boolean> {
     // A not-yet-created session keeps the choice locally; `handleSend` passes
     // it to `createSession`.
     if (!sessionId) {
       setPendingMode(id);
-      return;
+      return true;
     }
 
     const request = ++modeRequestRef.current;
@@ -273,12 +297,36 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
 
     try {
       await setSessionMode(sessionId, id);
+      return true;
     } catch (error) {
       // A newer request supersedes this one; only the latest may revert.
-      if (request !== modeRequestRef.current) return;
+      if (request !== modeRequestRef.current) return true;
       setPendingMode(null);
       setSendError(error instanceof Error ? error.message : 'Erreur lors du changement de mode');
+      return false;
     }
+  }
+
+  async function handlePlanBuild() {
+    if (planBuildInFlight) return;
+    setPlanBuildInFlight(true);
+    setSendError(null);
+    try {
+      const modeChanged = await handleModeChange('builder');
+      // Sent directly, not through handleSend: a workflow picked in the
+      // composer would otherwise take this message as its task.
+      if (modeChanged && sessionId) {
+        await sendMessage(sessionId, 'Exécute le plan ci-dessus.');
+      }
+    } catch (err) {
+      setSendError(err instanceof Error ? err.message : 'Impossible d’envoyer le message');
+    } finally {
+      setPlanBuildInFlight(false);
+    }
+  }
+
+  function handlePlanRevise() {
+    textareaRef.current?.focus();
   }
 
   async function handleStop() {
@@ -346,6 +394,7 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
   return (
     <PreviewContext.Provider value={setPreview}>
       <PreviewWorkdirContext.Provider value={detail?.project.workdir}>
+        <PlanActionsContext.Provider value={planActions}>
         <div className="flex min-h-0 min-w-0 grow">
           <main className="flex min-h-0 min-w-0 flex-[999_1_560px] flex-col">
         <div className="flex flex-wrap items-center gap-2.5 px-6 pt-3.5">
@@ -472,6 +521,7 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
             <PreviewPane sessionId={sessionId} target={preview} onClose={() => setPreview(null)} />
           )}
         </div>
+        </PlanActionsContext.Provider>
       </PreviewWorkdirContext.Provider>
     </PreviewContext.Provider>
   );

@@ -10,8 +10,10 @@ import { MessageStatsLine } from './MessageStats';
 import { PlanCard, ReportCard } from './PlanCard';
 import { ToolCard } from './ToolCard';
 import { NodeDivider } from '../workflow/session/NodeDivider';
+import { RunEndCard } from '../workflow/session/RunEndCard';
 import { markdownComponents } from './markdownComponents';
 import { attachmentAnchorId } from '../../lib/vision';
+import { usePlanActions } from './PlanActions';
 
 
 
@@ -41,10 +43,15 @@ const ThinkingSegment = memo(function ThinkingSegment({ content }: { content: st
 
 const REMARK_PLUGINS = [remarkGfm];
 
-const TextSegment = memo(function TextSegment({ content, caret }: { content: string; caret: boolean }) {
+const TextSegment = memo(function TextSegment({ content, caret, id }: { content: string; caret: boolean; id?: string }) {
+  const actions = usePlanActions();
   // Parsed only when settled: a half-written contract would flicker between the
   // two renderings while the message streams.
   const contract = useMemo(() => (caret ? null : splitContract(content)), [content, caret]);
+  const planActions =
+    actions && id !== undefined && actions.segmentId === id && contract?.contract.kind === 'plan'
+      ? actions
+      : null;
   return (
     <div className="min-w-0 text-[14px] leading-relaxed [overflow-wrap:break-word]">
       {contract ? (
@@ -54,7 +61,7 @@ const TextSegment = memo(function TextSegment({ content, caret }: { content: str
               {contract.before}
             </ReactMarkdown>
           )}
-          {contract.contract.kind === 'plan' ? <PlanCard plan={contract.contract} /> : <ReportCard report={contract.contract} />}
+          {contract.contract.kind === 'plan' ? <PlanCard plan={contract.contract} actions={planActions} /> : <ReportCard report={contract.contract} />}
         </>
       ) : (
         <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={markdownComponents}>{content}</ReactMarkdown>
@@ -89,7 +96,7 @@ function AssistantItemView({ item, model, running, showHeader }: { item: Assista
           return <ThinkingSegment key={segment.id} content={segment.content} />;
         }
         if (segment.kind === 'text') {
-          return <TextSegment key={segment.id} content={segment.content} caret={streaming && segment.id === lastTextId} />;
+          return <TextSegment key={segment.id} id={segment.id} content={segment.content} caret={streaming && segment.id === lastTextId} />;
         }
         return <ToolCard key={segment.id} tool={segment.tool} />;
       })}
@@ -188,6 +195,10 @@ export function ThreadItemView({ item, model, running, showHeader, onReplay }: {
   }
 
   if (item.kind === 'workflow-node') {
-    return <NodeDivider item={item} />;
+    return <NodeDivider item={item} running={running} />;
+  }
+
+  if (item.kind === 'workflow-end') {
+    return <RunEndCard item={item} />;
   }
 }

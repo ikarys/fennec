@@ -6,6 +6,7 @@ use super::criteria::{Criterion, CriterionStatus};
 use super::stats::MessageStats;
 use super::workflow::definition::Workflow;
 use super::workflow::run::{RunOutcome, Via};
+use super::workflow::stats::RunStats;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fmt;
@@ -261,6 +262,10 @@ pub enum Event {
         exit_code: Option<i32>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         comment: Option<String>,
+        /// The node's working time, measured by fennec; None for a human
+        /// node, whose time is the human's.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        duration_ms: Option<u64>,
     },
     #[serde(rename = "workflow.paused", rename_all = "camelCase")]
     WorkflowPaused {
@@ -281,6 +286,8 @@ pub enum Event {
         outcome: RunOutcome,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         reason: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        stats: Option<RunStats>,
     },
     #[serde(rename = "chat.done", rename_all = "camelCase")]
     ChatDone {

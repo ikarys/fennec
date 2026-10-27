@@ -61,13 +61,35 @@ export interface SessionUsage {
   last?: MessageStats;
 }
 
+export interface WorkflowNodeStat {
+  nodeId: string;
+  label: string;
+  runs: number;
+  workingMs: number;
+}
+
+export interface WorkflowStats {
+  workingMs: number;
+  nodes: WorkflowNodeStat[];
+  reruns: number;
+  calls: number;
+  prefillTokens: number;
+  cachedPromptTokens: number;
+  generationTokens: number;
+  filesChanged: number;
+  criteriaTotal: number;
+  criteriaPassed: number;
+  criteriaVerified: number;
+}
+
 export type ThreadItem =
   | { kind: 'user'; id: string; content: string; isSystemGenerated: boolean; attachments: { id: string; filename: string; data: string }[] }
   | AssistantItem
   | { kind: 'mode'; id: string; name: string; color: string }
   | { kind: 'error'; id: string; message: string }
   | { kind: 'note'; id: string; text: string; detail?: string }
-  | { kind: 'workflow-node'; id: string; nodeId: string; label: string; nodeKind: NodeKind; pass: number; port?: string; output?: string; exitCode?: number; childSessionId?: string; prompt?: string };
+  | { kind: 'workflow-node'; id: string; nodeId: string; label: string; nodeKind: NodeKind; pass: number; port?: string; output?: string; exitCode?: number; childSessionId?: string; prompt?: string; durationMs?: number }
+  | { kind: 'workflow-end'; id: string; outcome: 'done' | 'blocked' | 'stopped' | 'error'; reason?: string; stats?: WorkflowStats };
 
 export interface ModifiedFile {
   path: string;
@@ -198,6 +220,43 @@ function parseCriteria(value: unknown): CriterionView[] | null {
     criteria.push({ id, description, check, status: 'pending' });
   }
   return criteria;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function parseWorkflowStats(value: unknown): WorkflowStats | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const stats = value as Record<string, unknown>;
+  const rawNodes = Array.isArray(stats.nodes) ? stats.nodes : [];
+  const nodes: WorkflowNodeStat[] = [];
+  for (const raw of rawNodes) {
+    if (typeof raw !== 'object' || raw === null) continue;
+    const node = raw as Record<string, unknown>;
+    const nodeId = typeof node.nodeId === 'string' ? node.nodeId : undefined;
+    const label = typeof node.label === 'string' ? node.label : undefined;
+    if (nodeId === undefined || label === undefined) continue;
+    nodes.push({
+      nodeId,
+      label,
+      runs: isFiniteNumber(node.runs) ? node.runs : 0,
+      workingMs: isFiniteNumber(node.workingMs) ? node.workingMs : 0
+    });
+  }
+  return {
+    workingMs: isFiniteNumber(stats.workingMs) ? stats.workingMs : 0,
+    nodes,
+    reruns: isFiniteNumber(stats.reruns) ? stats.reruns : 0,
+    calls: isFiniteNumber(stats.calls) ? stats.calls : 0,
+    prefillTokens: isFiniteNumber(stats.prefillTokens) ? stats.prefillTokens : 0,
+    cachedPromptTokens: isFiniteNumber(stats.cachedPromptTokens) ? stats.cachedPromptTokens : 0,
+    generationTokens: isFiniteNumber(stats.generationTokens) ? stats.generationTokens : 0,
+    filesChanged: isFiniteNumber(stats.filesChanged) ? stats.filesChanged : 0,
+    criteriaTotal: isFiniteNumber(stats.criteriaTotal) ? stats.criteriaTotal : 0,
+    criteriaPassed: isFiniteNumber(stats.criteriaPassed) ? stats.criteriaPassed : 0,
+    criteriaVerified: isFiniteNumber(stats.criteriaVerified) ? stats.criteriaVerified : 0
+  };
 }
 
 function updateToolStats(tool: ToolCallView, modified: Map<string, ModifiedFile>, toolCounts: Map<string, number>): void {
@@ -679,23 +738,22 @@ export function createThreadFold(): ThreadFold {
           if (typeof data.exitCode === 'number') {
             item.exitCode = data.exitCode;
           }
+          if (typeof data.durationMs === 'number') {
+            item.durationMs = data.durationMs;
+          }
           openWorkflowItems.delete(`${runId}:${nodeId}`);
         }
         break;
       }
 
       case 'workflow.finished': {
-        const outcome = data.outcome as string;
-        const text =
-          outcome === 'done' ? 'Workflow terminé' :
-          outcome === 'blocked' ? 'Workflow bloqué' :
-          outcome === 'stopped' ? 'Workflow arrêté' :
-          'Workflow en erreur';
+        const outcome = (data.outcome as 'done' | 'blocked' | 'stopped' | 'error') ?? 'error';
         pushItem({
-          kind: 'note',
+          kind: 'workflow-end',
           id: `workflow-finished-${index}`,
-          text,
-          detail: typeof data.reason === 'string' ? data.reason : undefined
+          outcome,
+          reason: typeof data.reason === 'string' ? data.reason : undefined,
+          stats: parseWorkflowStats(data.stats)
         });
         break;
       }

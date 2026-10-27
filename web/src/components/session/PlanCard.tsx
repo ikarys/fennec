@@ -2,6 +2,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Plan, Report } from '../../lib/plan';
 import { CheckIcon, CloseIcon } from '../Icons';
+import type { PlanActions } from './PlanActions';
 
 const REMARK_PLUGINS = [remarkGfm];
 
@@ -35,7 +36,7 @@ function PathChip({ path }: { path: string }) {
   return <code className="rounded bg-code px-1.5 py-0.5 font-mono text-[11.5px] text-text">{path}</code>;
 }
 
-export function PlanCard({ plan }: { plan: Plan }) {
+export function PlanCard({ plan, actions }: { plan: Plan; actions?: PlanActions | null }) {
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-border bg-raised p-4">
       <div className="flex items-center gap-2">
@@ -112,6 +113,26 @@ export function PlanCard({ plan }: { plan: Plan }) {
               </li>
             ))}
           </ul>
+        </div>
+      )}
+      {actions && (
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={actions.onBuild}
+            disabled={actions.disabled}
+            className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-on-accent disabled:opacity-60"
+          >
+            Construire
+          </button>
+          <button
+            type="button"
+            onClick={actions.onRevise}
+            disabled={actions.disabled}
+            className="rounded-lg border border-border bg-raised px-3 py-1.5 text-xs text-text disabled:opacity-60"
+          >
+            Revoir
+          </button>
         </div>
       )}
     </div>
