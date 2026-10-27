@@ -158,13 +158,14 @@ pub fn start_workflow(
     if task.is_empty() {
         return error(stream, 400, "empty task");
     }
+    let worktree = body["worktree"].as_bool().unwrap_or(true);
     let job = WorkflowJob::Start {
         workflow: found.workflow,
         task,
         step_by_step: body["stepByStep"].as_bool().unwrap_or(false),
     };
     // The workflow definition is the human's: found in the project, not the worktree.
-    let place = app.open_place(&store, &session, &project)?;
+    let place = app.open_place(&store, &session, &project, worktree)?;
     start_job(app, stream, id, place, job)
 }
 

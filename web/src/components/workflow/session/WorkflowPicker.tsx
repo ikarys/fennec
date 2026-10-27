@@ -3,6 +3,7 @@ import type { WorkflowSummary } from '../../../lib/workflow';
 export interface WorkflowSelection {
   workflowId: string | null;
   stepByStep: boolean;
+  worktree: boolean;
 }
 
 export function WorkflowPicker({
@@ -24,7 +25,11 @@ export function WorkflowPicker({
         value={selection.workflowId ?? ''}
         onChange={(e) => {
           const workflowId = e.target.value || null;
-          onChange({ workflowId, stepByStep: workflowId ? selection.stepByStep : false });
+          onChange({
+            workflowId,
+            stepByStep: workflowId ? selection.stepByStep : false,
+            worktree: selection.worktree
+          });
         }}
         className="rounded-lg border border-border bg-raised px-2 py-1 text-xs text-text outline-none focus:border-accent"
       >
@@ -36,15 +41,29 @@ export function WorkflowPicker({
         ))}
       </select>
       {selection.workflowId && (
-        <label className="flex items-center gap-1.5 text-xs text-muted">
-          <input
-            type="checkbox"
-            checked={selection.stepByStep}
-            onChange={(e) => onChange({ ...selection, stepByStep: e.target.checked })}
-            className="rounded border-border"
-          />
-          Pas à pas
-        </label>
+        <>
+          <label className="flex items-center gap-1.5 text-xs text-muted">
+            <input
+              type="checkbox"
+              checked={selection.stepByStep}
+              onChange={(e) => onChange({ ...selection, stepByStep: e.target.checked })}
+              className="rounded border-border"
+            />
+            Pas à pas
+          </label>
+          <label
+            className="flex items-center gap-1.5 text-xs text-muted"
+            title="L'agent travaille dans sa propre copie du dépôt (worktree) ; décoché, il écrit directement dans ton dossier."
+          >
+            <input
+              type="checkbox"
+              checked={selection.worktree}
+              onChange={(e) => onChange({ ...selection, worktree: e.target.checked })}
+              className="rounded border-border"
+            />
+            Espace séparé
+          </label>
+        </>
       )}
     </div>
   );

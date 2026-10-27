@@ -237,6 +237,7 @@ fn create_session(app: &App, req: &Request, stream: &mut TcpStream) -> Result<()
         .and_then(Value::as_str)
         .map(str::to_string);
     let step_by_step = body["stepByStep"].as_bool().unwrap_or(false);
+    let worktree = body["worktree"].as_bool().unwrap_or(true);
     if prompt.is_empty() && attachments.is_empty() && workflow_id.is_none() {
         return error(stream, 400, "empty prompt");
     }
@@ -283,8 +284,7 @@ fn create_session(app: &App, req: &Request, stream: &mut TcpStream) -> Result<()
                 task: prompt,
                 step_by_step,
             });
-            // A workflow session gets its worktree; discovery stays on the project.
-            let place = app.open_place(&store, &session, &project)?;
+            let place = app.open_place(&store, &session, &project, worktree)?;
             app.turns.start(&id, place, job)?;
         }
         None => {

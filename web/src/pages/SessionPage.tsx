@@ -56,7 +56,7 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
   const [commands, setCommands] = useState<SlashCommand[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [workflows, setWorkflows] = useState<WorkflowSummary[]>([]);
-  const [workflowSelection, setWorkflowSelection] = useState<WorkflowSelection>({ workflowId: null, stepByStep: false });
+  const [workflowSelection, setWorkflowSelection] = useState<WorkflowSelection>({ workflowId: null, stepByStep: false, worktree: true });
   // Optimistic mode while `setSessionMode` is in flight; cleared once the
   // server's mode (event stream or detail) matches it.
   const [pendingMode, setPendingMode] = useState<string | null>(null);
@@ -258,16 +258,23 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
     try {
       if (workflowSelection.workflowId) {
         if (sessionId) {
-          await startWorkflow(sessionId, workflowSelection.workflowId, value, workflowSelection.stepByStep);
+          await startWorkflow(
+            sessionId,
+            workflowSelection.workflowId,
+            value,
+            workflowSelection.stepByStep,
+            workflowSelection.worktree
+          );
         } else if (projectId) {
           const created = await createSession(projectId, value, mode ?? undefined, images, {
             workflowId: workflowSelection.workflowId,
-            stepByStep: workflowSelection.stepByStep
+            stepByStep: workflowSelection.stepByStep,
+            worktree: workflowSelection.worktree
           });
           onSessionCreated(created.id, pseudoTabId);
         }
         // The next message is an ordinary one again.
-        setWorkflowSelection({ workflowId: null, stepByStep: false });
+        setWorkflowSelection({ workflowId: null, stepByStep: false, worktree: true });
       } else if (sessionId) {
         await sendMessage(sessionId, value, images);
       } else if (projectId) {

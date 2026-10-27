@@ -324,7 +324,7 @@ export function createSession(
   prompt: string,
   mode?: string,
   attachments?: AttachmentInput[],
-  workflow?: { workflowId: string; stepByStep: boolean }
+  workflow?: { workflowId: string; stepByStep: boolean; worktree: boolean }
 ): Promise<{ id: string }> {
   // `mode` is optional: omit it so the server applies its default resolution.
   const body: {
@@ -334,6 +334,7 @@ export function createSession(
     attachments?: AttachmentInput[];
     workflowId?: string;
     stepByStep?: boolean;
+    worktree?: boolean;
   } = { projectId, prompt };
   if (mode != null) {
     body.mode = mode;
@@ -344,6 +345,7 @@ export function createSession(
   if (workflow) {
     body.workflowId = workflow.workflowId;
     body.stepByStep = workflow.stepByStep;
+    body.worktree = workflow.worktree;
   }
   return request<{ id: string }>('/api/sessions', {
     method: 'POST',
@@ -454,10 +456,16 @@ export function validateWorkflow(projectId: string, workflow: WorkflowDef): Prom
   }).then((result) => result.errors);
 }
 
-export function startWorkflow(sessionId: string, workflowId: string, task: string, stepByStep: boolean): Promise<void> {
+export function startWorkflow(
+  sessionId: string,
+  workflowId: string,
+  task: string,
+  stepByStep: boolean,
+  worktree: boolean
+): Promise<void> {
   return request<void>(`/api/sessions/${encodeURIComponent(sessionId)}/workflow`, {
     method: 'POST',
-    body: JSON.stringify({ workflowId, task, stepByStep })
+    body: JSON.stringify({ workflowId, task, stepByStep, worktree })
   });
 }
 
