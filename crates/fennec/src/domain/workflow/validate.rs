@@ -666,6 +666,7 @@ mod tests {
             description: String::new(),
             subagent: false,
             allowed_tools: tools.iter().map(|tool| tool.to_string()).collect(),
+            commands: crate::domain::agent::CommandAccess::ReadWrite,
             color: None,
             prompt: "prompt".to_string(),
         }

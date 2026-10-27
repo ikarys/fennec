@@ -96,6 +96,7 @@ fn insert_or_override(agents: &mut Vec<AgentDefinition>, agent: AgentDefinition)
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::agent::CommandAccess;
     use crate::domain::id::new_id;
 
     fn fixture() -> (PathBuf, PathBuf, PathBuf) {
@@ -134,8 +135,15 @@ mod tests {
         assert!(!plan.subagent);
         assert_eq!(
             plan.allowed_tools,
-            vec!["read_file", "ask_user", "load_skill", "web_search"]
+            vec![
+                "read_file",
+                "run_command",
+                "ask_user",
+                "load_skill",
+                "web_search"
+            ]
         );
+        assert_eq!(plan.commands, CommandAccess::ReadOnly);
         assert_eq!(plan.color.as_deref(), Some("#a855f7"));
         assert!(plan.prompt.contains("Plan Mode"));
 
@@ -159,6 +167,7 @@ mod tests {
                 "web_search"
             ]
         );
+        assert_eq!(builder.commands, CommandAccess::ReadWrite);
         assert_eq!(builder.color.as_deref(), Some("#3b82f6"));
         assert!(builder.prompt.contains("Build Mode"));
     }
@@ -171,7 +180,7 @@ mod tests {
 
         assert!(!plan.allows("write_file"));
         assert!(!plan.allows("edit_file"));
-        assert!(!plan.allows("run_command"));
+        assert!(plan.allows("run_command"));
     }
 
     #[test]

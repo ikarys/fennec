@@ -4,7 +4,8 @@
 //! chooses the query.
 //! Commands run in the bwrap world when the human enabled it; the file tools
 //! keep the in-process path guard. Writes to protected paths are refused;
-//! commands see them read-only.
+//! commands see them read-only. A read-only agent's commands see the workdir
+//! read-only.
 
 mod args;
 mod edit_file;
@@ -21,6 +22,7 @@ mod write_file;
 pub use sandbox::Sandbox;
 
 use crate::agent::ports::{CommandRun, Commands, Toolbox};
+use crate::domain::agent::CommandAccess;
 use crate::domain::event::{OutputStream, ToolResult};
 use crate::domain::preferences::SearchPrefs;
 use crate::domain::protection::Protection;
@@ -81,6 +83,7 @@ impl Toolbox for LocalTools {
         &self,
         name: &str,
         args: &Value,
+        access: CommandAccess,
         stop: &AtomicBool,
         on_output: &mut dyn FnMut(OutputStream, &str),
     ) -> ToolResult {
@@ -90,7 +93,18 @@ impl Toolbox for LocalTools {
             "read_file" => read_file::run(args, workdir),
             "write_file" => write_file::run(args, workdir, &self.protection),
             "edit_file" => edit_file::run(args, workdir, &self.protection),
-            "run_command" => run_command::run(args, workdir, &self.sandbox, stop, on_output),
+            "run_command" => match access {
+                CommandAccess::ReadWrite => {
+                    run_command::run(args, workdir, &self.sandbox, stop, on_output)
+                }
+                CommandAccess::ReadOnly => match self.sandbox.read_only(workdir) {
+                    Some(sandbox) => run_command::run(args, workdir, &sandbox, stop, on_output),
+                    None => ToolResult::failure(
+                        "run_command is read-only in this mode and needs fennec's sandbox, which is turned off on the Settings page."
+                            .to_string(),
+                    ),
+                },
+            },
             "load_skill" => load_skill::run(args, workdir),
             "web_search" => web_search::run(args, &self.search),
             _ => ToolResult::failure(format!("Unknown tool: {name}")),

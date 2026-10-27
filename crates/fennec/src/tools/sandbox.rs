@@ -113,6 +113,18 @@ impl Sandbox {
         }
     }
 
+    /// The same sandbox with `workdir` itself read-only (later mounts win over
+    /// its writable bind); `None` when the human turned the sandbox off, since
+    /// nothing could then keep a command from writing.
+    pub fn read_only(&self, workdir: &Path) -> Option<Sandbox> {
+        let mut sandbox = self.clone();
+        match &mut sandbox {
+            Sandbox::Off => return None,
+            Sandbox::Bwrap { read_only, .. } => read_only.push(workdir.to_path_buf()),
+        }
+        Some(sandbox)
+    }
+
     /// `sh -c command` in `cwd`, wrapped in bwrap unless Off; `workdir` is the writable root.
     pub(super) fn command(&self, command: &str, workdir: &Path, cwd: &Path) -> Command {
         match self {
@@ -389,6 +401,59 @@ mod tests {
                 "echo hi",
             ]
         );
+    }
+
+    #[test]
+    fn read_only_puts_the_workdir_read_only_bind_after_the_writable_bind() {
+        let workdir = Path::new("/work");
+        let sandbox = Sandbox::Bwrap {
+            network: false,
+            hidden_dirs: vec![],
+            hidden_files: vec![],
+            writable: vec![],
+            read_only: vec![],
+        }
+        .read_only(workdir)
+        .expect("a bwrap sandbox");
+        let args = bwrap_args(&sandbox, workdir, Path::new("/cwd"), "echo hi");
+
+        assert_eq!(
+            args_as_strings(&args),
+            vec![
+                "--ro-bind",
+                "/",
+                "/",
+                "--dev",
+                "/dev",
+                "--proc",
+                "/proc",
+                "--tmpfs",
+                "/tmp",
+                "--bind",
+                "/work",
+                "/work",
+                "--ro-bind",
+                "/work",
+                "/work",
+                "--unshare-all",
+                "--die-with-parent",
+                "--new-session",
+                "--setenv",
+                "npm_config_offline",
+                "true",
+                "--setenv",
+                "CARGO_NET_OFFLINE",
+                "true",
+                "--chdir",
+                "/cwd",
+                "--",
+                "sh",
+                "-c",
+                "echo hi",
+            ]
+        );
+
+        assert_eq!(Sandbox::Off.read_only(workdir), None);
     }
 
     #[test]

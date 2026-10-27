@@ -103,18 +103,24 @@ pub(super) fn execute_tools(
         }
         let (tools, stop) = (turn.tools, turn.stop);
         let mut log_error = None;
-        let r = tools.execute(&call.name, &call.arguments, stop, &mut |stream, chunk| {
-            if log_error.is_none() {
-                log_error = turn
-                    .append(Event::ToolOutput {
-                        message_id: message_id.into(),
-                        tool_call_id: call.id.clone(),
-                        stream,
-                        content: chunk.into(),
-                    })
-                    .err();
-            }
-        });
+        let r = tools.execute(
+            &call.name,
+            &call.arguments,
+            agent.commands,
+            stop,
+            &mut |stream, chunk| {
+                if log_error.is_none() {
+                    log_error = turn
+                        .append(Event::ToolOutput {
+                            message_id: message_id.into(),
+                            tool_call_id: call.id.clone(),
+                            stream,
+                            content: chunk.into(),
+                        })
+                        .err();
+                }
+            },
+        );
         if let Some(e) = log_error {
             return Err(e);
         }
