@@ -148,9 +148,13 @@ export function createRunFold(): RunFold {
       }
       case 'workflow.finished': {
         if (!run) return true;
+        const outcome = typeof data.outcome === 'string' ? data.outcome : 'error';
         for (const nodeRun of run.runs) {
+          // A node still running when the run finishes is the one that ended it
+          // (a criteria node blocking, a stop): its port is the run's outcome.
           if (nodeRun.state === 'running') {
-            nodeRun.state = 'interrupted';
+            nodeRun.state = 'ended';
+            nodeRun.port = outcome;
           }
         }
         run.open = [];
