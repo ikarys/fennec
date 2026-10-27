@@ -38,6 +38,13 @@ pub enum WorkflowJob {
         task: String,
         step_by_step: bool,
     },
+    /// A run that starts from a plan the human already approved (the plan
+    /// card's button): the plan node and the approval are recorded, not run.
+    StartFromPlan {
+        workflow: Workflow,
+        task: String,
+        plan: String,
+    },
     /// The choice at a human node, with an optional comment.
     Answer { choice: String, comment: String },
     /// Past a pause.
@@ -80,6 +87,11 @@ fn walk(turn: &mut Turn, env: &WorkflowEnv, job: WorkflowJob) -> Result<DoneReas
             task,
             step_by_step,
         } => start_run(turn, &workflow, &task, step_by_step)?,
+        WorkflowJob::StartFromPlan {
+            workflow,
+            task,
+            plan,
+        } => start_from_plan(turn, &workflow, &task, &plan)?,
         WorkflowJob::Answer { choice, comment } => answer_human(turn, &choice, &comment)?,
         WorkflowJob::Continue { comment } => continue_paused(turn, &comment)?,
         WorkflowJob::AgentInput {
@@ -198,6 +210,103 @@ fn start_run(
     Ok(Cursor::After {
         from: start_node.id.clone(),
         port: "next".into(),
+    })
+}
+
+fn start_from_plan(
+    turn: &mut Turn,
+    workflow: &Workflow,
+    task: &str,
+    plan: &str,
+) -> Result<Cursor, String> {
+    // Checked before the run starts: a refusal leaves no half-recorded run.
+    let plan_id = workflow
+        .nodes
+        .iter()
+        .find_map(|node| match &node.kind {
+            NodeKind::Criteria { plan } => Some(plan.clone()),
+            _ => None,
+        })
+        .ok_or("the workflow has no criteria node naming its plan")?;
+    let start_id = workflow.start().ok_or("no start node")?.id.clone();
+    if workflow.edge(&start_id, "next").map(|edge| &edge.to) != Some(&plan_id) {
+        return Err("the workflow does not start with its plan node".into());
+    }
+
+    start_run(turn, workflow, task, false)?;
+    let events = turn.log.events(turn.session_id)?;
+    let run_id = run::current_run(&events)
+        .ok_or("no active workflow run")?
+        .run_id;
+    let via = |from: &str, port: &str| Via {
+        from: from.to_string(),
+        port: port.to_string(),
+    };
+    record_given(
+        turn,
+        &run_id,
+        &plan_id,
+        via(&start_id, "next"),
+        "done",
+        plan,
+        None,
+    )?;
+
+    // The card's button is the human's approval: the human node right after
+    // the plan is answered with its first choice.
+    if let Some(human) = workflow
+        .edge(&plan_id, "done")
+        .and_then(|edge| workflow.node(&edge.to))
+        && let NodeKind::Human { choices, .. } = &human.kind
+        && let Some(choice) = choices.first()
+    {
+        let comment = Some("approved from the plan card".to_string());
+        record_given(
+            turn,
+            &run_id,
+            &human.id,
+            via(&plan_id, "done"),
+            choice,
+            choice,
+            comment,
+        )?;
+        return Ok(Cursor::After {
+            from: human.id.clone(),
+            port: choice.clone(),
+        });
+    }
+    Ok(Cursor::After {
+        from: plan_id,
+        port: "done".into(),
+    })
+}
+
+/// Records a node as run and finished with an outcome the human gave, not
+/// one fennec computed.
+fn record_given(
+    turn: &mut Turn,
+    run_id: &str,
+    node_id: &str,
+    via: Via,
+    port: &str,
+    output: &str,
+    comment: Option<String>,
+) -> Result<(), String> {
+    turn.append(Event::WorkflowNodeStarted {
+        run_id: run_id.to_string(),
+        node_id: node_id.to_string(),
+        pass: 1,
+        via: Some(via),
+        child_session_id: None,
+    })?;
+    turn.append(Event::WorkflowNodeFinished {
+        run_id: run_id.to_string(),
+        node_id: node_id.to_string(),
+        port: port.to_string(),
+        output: output.to_string(),
+        exit_code: None,
+        comment,
+        duration_ms: None,
     })
 }
 

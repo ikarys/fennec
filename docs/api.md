@@ -260,11 +260,14 @@ from the parent's thread.
   no project
 - `POST /api/workflows/validate` `{projectId, workflow}` → 200
   `{errors: [...]}` (empty when valid); 404 if no project
-- `POST /api/sessions/{id}/workflow` `{workflowId, task, stepByStep?, worktree?}` →
+- `POST /api/sessions/{id}/workflow` `{workflowId, task, stepByStep?, worktree?, plan?}` →
   202 `{}`; 404 if no session or no such workflow; 400 `empty task`; 409
   while a turn or a run is active; `worktree` defaults to true (the session
   gets its own worktree; false makes the agent work in the project's folder;
-  an existing worktree is kept)
+  an existing worktree is kept); `plan` is the approved plan to start from:
+  fennec records it as the output of the plan node (the one the workflow's
+  criteria node names) and answers the human node right after it with its
+  first choice, then runs on
 - `POST /api/sessions` accepts `workflowId`, `stepByStep` and `worktree` too:
   when `workflowId` is set the prompt is the task and a run starts instead of
   a turn; an unknown workflow is a 404 before the session is created

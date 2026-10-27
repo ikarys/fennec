@@ -121,6 +121,7 @@ export function PlanCard({ plan, actions }: { plan: Plan; actions?: PlanActions 
             type="button"
             onClick={actions.onBuild}
             disabled={actions.disabled}
+            title="Lance Plan, build, verify à partir de ce plan : critères vérifiés, vérification et review."
             className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-on-accent disabled:opacity-60"
           >
             Construire
@@ -132,6 +133,15 @@ export function PlanCard({ plan, actions }: { plan: Plan; actions?: PlanActions 
             className="rounded-lg border border-border bg-raised px-3 py-1.5 text-xs text-text disabled:opacity-60"
           >
             Revoir
+          </button>
+          <button
+            type="button"
+            onClick={actions.onBuildAlone}
+            disabled={actions.disabled}
+            title="Exécute le plan avec l'agent Builder seul, sans critères ni review."
+            className="self-center text-xs text-muted hover:text-text hover:underline disabled:opacity-60"
+          >
+            Sans workflow
           </button>
         </div>
       )}

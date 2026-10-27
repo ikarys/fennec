@@ -6,6 +6,18 @@ export interface WorkflowSelection {
   worktree: boolean;
 }
 
+export const DEFAULT_WORKFLOW_ID = 'plan-build-verify';
+
+export function defaultWorkflowSelection(workflows: WorkflowSummary[]): WorkflowSelection {
+  return {
+    workflowId: workflows.some((workflow) => workflow.id === DEFAULT_WORKFLOW_ID)
+      ? DEFAULT_WORKFLOW_ID
+      : null,
+    stepByStep: false,
+    worktree: true
+  };
+}
+
 export function WorkflowPicker({
   workflows,
   selection,

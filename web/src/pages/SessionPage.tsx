@@ -33,7 +33,11 @@ import { PreviewContext, PreviewWorkdirContext, type PreviewTarget } from '../co
 import { PreviewPane } from '../components/preview/PreviewPane';
 import { RunStrip } from '../components/workflow/session/RunStrip';
 import { RunActionCard } from '../components/workflow/session/RunActionCard';
-import type { WorkflowSelection } from '../components/workflow/session/WorkflowPicker';
+import {
+  DEFAULT_WORKFLOW_ID,
+  defaultWorkflowSelection,
+  type WorkflowSelection
+} from '../components/workflow/session/WorkflowPicker';
 
 interface SessionPageProps {
   sessionId: string | null;
@@ -182,7 +186,10 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
     let ignore = false;
     listWorkflows(commandProjectId)
       .then((data) => {
-        if (!ignore) setWorkflows(data);
+        if (!ignore) {
+          setWorkflows(data);
+          setWorkflowSelection(defaultWorkflowSelection(data));
+        }
       })
       .catch(() => {
         if (!ignore) setWorkflows([]);
@@ -231,6 +238,7 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
       ? {
           segmentId: lastTextSegment.id,
           onBuild: handlePlanBuild,
+          onBuildAlone: handlePlanBuildAlone,
           onRevise: handlePlanRevise,
           disabled: running || planBuildInFlight
         }
@@ -249,32 +257,42 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
     if ((!value && images.length === 0) || running) return;
     setSendError(null);
 
+    // A quick answer or a message to a running/waiting run is an ordinary
+    // message, not a workflow start.
+    const workflowId =
+      fromComposer &&
+      workflowSelection.workflowId &&
+      (!run || run.finished) &&
+      !view.pendingQuestion
+        ? workflowSelection.workflowId
+        : null;
+
     // A workflow start refuses attachments.
-    if (workflowSelection.workflowId && images.length > 0) {
+    if (workflowId && images.length > 0) {
       setSendError('Les pièces jointes ne sont pas acceptées pour un workflow.');
       return;
     }
 
     try {
-      if (workflowSelection.workflowId) {
+      if (workflowId) {
         if (sessionId) {
           await startWorkflow(
             sessionId,
-            workflowSelection.workflowId,
+            workflowId,
             value,
             workflowSelection.stepByStep,
             workflowSelection.worktree
           );
         } else if (projectId) {
           const created = await createSession(projectId, value, mode ?? undefined, images, {
-            workflowId: workflowSelection.workflowId,
+            workflowId,
             stepByStep: workflowSelection.stepByStep,
             worktree: workflowSelection.worktree
           });
           onSessionCreated(created.id, pseudoTabId);
         }
-        // The next message is an ordinary one again.
-        setWorkflowSelection({ workflowId: null, stepByStep: false, worktree: true });
+        // The next message gets the default workflow again.
+        setWorkflowSelection(defaultWorkflowSelection(workflows));
       } else if (sessionId) {
         await sendMessage(sessionId, value, images);
       } else if (projectId) {
@@ -325,16 +343,42 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
     }
   }
 
+  async function runPlanBuildAlone() {
+    const modeChanged = await handleModeChange('builder');
+    // Sent directly, not through handleSend: a workflow picked in the
+    // composer would otherwise take this message as its task.
+    if (modeChanged && sessionId) {
+      await sendMessage(sessionId, 'Exécute le plan ci-dessus.');
+    }
+  }
+
   async function handlePlanBuild() {
     if (planBuildInFlight) return;
     setPlanBuildInFlight(true);
     setSendError(null);
     try {
-      const modeChanged = await handleModeChange('builder');
-      // Sent directly, not through handleSend: a workflow picked in the
-      // composer would otherwise take this message as its task.
-      if (modeChanged && sessionId) {
-        await sendMessage(sessionId, 'Exécute le plan ci-dessus.');
+      if (
+        sessionId &&
+        workflows.some((workflow) => workflow.id === DEFAULT_WORKFLOW_ID) &&
+        lastTextSegment
+      ) {
+        const task =
+          [...view.items]
+            .reverse()
+            .find((item): item is Extract<typeof item, { kind: 'user' }> => item.kind === 'user' && !item.isSystemGenerated)
+            ?.content ?? 'Exécute le plan approuvé.';
+        await startWorkflow(
+          sessionId,
+          DEFAULT_WORKFLOW_ID,
+          task,
+          false,
+          workflowSelection.worktree,
+          lastTextSegment.content
+        );
+        // The next message gets the default workflow again.
+        setWorkflowSelection(defaultWorkflowSelection(workflows));
+      } else {
+        await runPlanBuildAlone();
       }
     } catch (err) {
       setSendError(err instanceof Error ? err.message : 'Impossible d’envoyer le message');
@@ -343,7 +387,22 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
     }
   }
 
+  async function handlePlanBuildAlone() {
+    if (planBuildInFlight) return;
+    setPlanBuildInFlight(true);
+    setSendError(null);
+    try {
+      await runPlanBuildAlone();
+    } catch (err) {
+      setSendError(err instanceof Error ? err.message : 'Impossible d’envoyer le message');
+    } finally {
+      setPlanBuildInFlight(false);
+    }
+  }
+
   function handlePlanRevise() {
+    // The revision is an ordinary message to the planner, not a workflow start.
+    setWorkflowSelection((selection) => ({ ...selection, workflowId: null }));
     textareaRef.current?.focus();
   }
 

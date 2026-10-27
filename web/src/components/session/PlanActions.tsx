@@ -3,6 +3,7 @@ import { createContext, useContext } from 'react';
 export interface PlanActions {
   segmentId: string;
   onBuild: () => void;
+  onBuildAlone: () => void;
   onRevise: () => void;
   disabled?: boolean;
 }

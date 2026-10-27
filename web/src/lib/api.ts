@@ -461,11 +461,18 @@ export function startWorkflow(
   workflowId: string,
   task: string,
   stepByStep: boolean,
-  worktree: boolean
+  worktree: boolean,
+  plan?: string
 ): Promise<void> {
   return request<void>(`/api/sessions/${encodeURIComponent(sessionId)}/workflow`, {
     method: 'POST',
-    body: JSON.stringify({ workflowId, task, stepByStep, worktree })
+    body: JSON.stringify({
+      workflowId,
+      task,
+      stepByStep,
+      worktree,
+      ...(plan ? { plan } : {})
+    })
   });
 }
 

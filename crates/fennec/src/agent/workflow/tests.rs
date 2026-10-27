@@ -1245,3 +1245,141 @@ fn invalid_workflow_refused() {
             .any(|e| matches!(e, Event::WorkflowStarted { .. }))
     );
 }
+
+#[test]
+fn start_from_plan_records_the_plan_and_runs_the_criteria() {
+    let model = Scripted(RefCell::new(vec![]));
+    let stop = AtomicBool::new(false);
+    let children = FakeChildren::default();
+    let commands = FakeCommands::default();
+    *commands.exit_codes.lock().unwrap() = vec![0];
+    let env = WorkflowEnv {
+        children: &children,
+        commands: &commands,
+    };
+    let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
+    h.agents = vec![plan()];
+
+    let reason = run_workflow(
+        &mut h.turn(),
+        &env,
+        WorkflowJob::StartFromPlan {
+            workflow: criteria_workflow(),
+            task: "do it".into(),
+            plan: "## Done when\n- C1 — check: `true`".into(),
+        },
+    )
+    .unwrap();
+    assert_eq!(reason, DoneReason::Complete);
+
+    let events = h.log.0.into_inner();
+    assert!(events.iter().any(|e| matches!(
+        e,
+        Event::WorkflowNodeFinished {
+            node_id,
+            port,
+            output,
+            ..
+        } if node_id == "plan"
+            && port == "done"
+            && output == "## Done when\n- C1 — check: `true`"
+    )));
+    assert_eq!(
+        events
+            .iter()
+            .filter(|e| matches!(e, Event::CriteriaSet { .. }))
+            .count(),
+        1
+    );
+    assert!(events.iter().any(|e| matches!(
+        e,
+        Event::WorkflowNodeFinished {
+            node_id,
+            port,
+            ..
+        } if node_id == "criteria" && port == "pass"
+    )));
+}
+
+#[test]
+fn start_from_plan_answers_the_approval_node() {
+    let mut workflow = criteria_workflow();
+    workflow.nodes.push(Node {
+        id: "approve".into(),
+        name: Some("Approve".into()),
+        position: Position::default(),
+        kind: NodeKind::Human {
+            question: "Go?".into(),
+            choices: vec!["Go".into(), "Revise".into()],
+        },
+    });
+    workflow
+        .edges
+        .retain(|edge| !(edge.from == "plan" && edge.port == "done"));
+    workflow.edges.push(Edge {
+        from: "plan".into(),
+        port: "done".into(),
+        to: "approve".into(),
+        max_passes: None,
+        pause: false,
+    });
+    workflow.edges.push(Edge {
+        from: "approve".into(),
+        port: "Go".into(),
+        to: "criteria".into(),
+        max_passes: None,
+        pause: false,
+    });
+    workflow.edges.push(Edge {
+        from: "approve".into(),
+        port: "Revise".into(),
+        to: "plan".into(),
+        max_passes: None,
+        pause: false,
+    });
+
+    let model = Scripted(RefCell::new(vec![]));
+    let stop = AtomicBool::new(false);
+    let children = FakeChildren::default();
+    let commands = FakeCommands::default();
+    *commands.exit_codes.lock().unwrap() = vec![0];
+    let env = WorkflowEnv {
+        children: &children,
+        commands: &commands,
+    };
+    let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
+    h.agents = vec![plan()];
+
+    let reason = run_workflow(
+        &mut h.turn(),
+        &env,
+        WorkflowJob::StartFromPlan {
+            workflow,
+            task: "do it".into(),
+            plan: "## Done when\n- C1 — check: `true`".into(),
+        },
+    )
+    .unwrap();
+    assert_eq!(reason, DoneReason::Complete);
+
+    let events = h.log.0.into_inner();
+    assert!(events.iter().any(|e| matches!(
+        e,
+        Event::WorkflowNodeFinished {
+            node_id,
+            port,
+            comment,
+            ..
+        } if node_id == "approve"
+            && port == "Go"
+            && comment.as_deref() == Some("approved from the plan card")
+    )));
+    assert!(events.iter().any(|e| matches!(
+        e,
+        Event::WorkflowNodeFinished {
+            node_id,
+            port,
+            ..
+        } if node_id == "criteria" && port == "pass"
+    )));
+}
