@@ -101,6 +101,28 @@ pub fn unacknowledged<'a>(blockers: &'a [Blocker], acknowledged: &[String]) -> V
         .collect()
 }
 
+/// A starting commit message for the integration: `feat: <title>`. Fennec
+/// cannot tell a `feat` from a `fix`; the human edits it before confirming.
+pub fn default_message(session_title: &str) -> String {
+    let title = session_title.trim();
+    if title.is_empty() {
+        return "feat: integrate the agent's work".to_string();
+    }
+    let mut chars = title.chars();
+    let first = chars.next().unwrap().to_lowercase().to_string();
+    format!("feat: {first}{}", chars.collect::<String>())
+}
+
+/// The integration commit message: the human's message plus the session's
+/// provenance trailer.
+pub fn commit_message(message: &str, session_id: &str) -> Result<String, String> {
+    let message = message.trim();
+    if message.is_empty() {
+        return Err("empty commit message".to_string());
+    }
+    Ok(format!("{message}\n\nFennec-Session: {session_id}"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -320,6 +342,32 @@ mod tests {
                     paths: vec!["AGENTS.md".into()]
                 }
             ]
+        );
+    }
+
+    #[test]
+    fn default_message_uses_the_session_title() {
+        assert_eq!(default_message("  Fix login "), "feat: fix login");
+    }
+
+    #[test]
+    fn default_message_for_an_empty_title_is_a_plain_integrate() {
+        assert_eq!(default_message("   "), "feat: integrate the agent's work");
+    }
+
+    #[test]
+    fn commit_message_adds_the_session_trailer() {
+        assert_eq!(
+            commit_message("  Fix login \n", "s1"),
+            Ok("Fix login\n\nFennec-Session: s1".to_string())
+        );
+    }
+
+    #[test]
+    fn commit_message_refuses_a_blank_message() {
+        assert_eq!(
+            commit_message("   ", "s1"),
+            Err("empty commit message".to_string())
         );
     }
 }

@@ -9,7 +9,9 @@ use super::routes::session_and_project;
 use crate::agent::ports::EventLog;
 use crate::domain::criteria::{CriterionState, CriterionStatus};
 use crate::domain::event::Event;
-use crate::domain::integration::{Blocker, blockers, unacknowledged};
+use crate::domain::integration::{
+    Blocker, blockers, commit_message, default_message, unacknowledged,
+};
 use crate::domain::workflow::run;
 use crate::integration::{self, ApplyError, Preview};
 use crate::protected;
@@ -24,6 +26,7 @@ use std::path::{Path, PathBuf};
 /// client's view of it).
 struct Gate {
     session_id: String,
+    title: String,
     wt: Worktree,
     top: PathBuf,
     preview: Preview,
@@ -61,8 +64,10 @@ fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Result<Gate, (u16, S
         preview.origin_branch.as_deref(),
         preview.human_branch.as_deref(),
     );
+    let title = session.title.clone();
     Ok(Ok(Gate {
         session_id: session.id,
+        title,
         wt,
         top,
         preview,
@@ -95,6 +100,7 @@ pub fn get_integration(app: &App, stream: &mut TcpStream, id: &str) -> Result<()
             "base": gate.wt.base,
             "originBranch": gate.preview.origin_branch,
             "humanBranch": gate.preview.human_branch,
+            "defaultMessage": default_message(&gate.title),
             "commits": gate.preview.commits,
             "files": files,
             "criteria": criteria,
@@ -126,6 +132,13 @@ pub fn integrate(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> 
         Ok(gate) => gate,
         Err((status, message)) => return error(stream, status, &message),
     };
+    let message = match commit_message(
+        body.get("message").and_then(Value::as_str).unwrap_or(""),
+        &gate.session_id,
+    ) {
+        Ok(message) => message,
+        Err(e) => return error(stream, 400, &e),
+    };
     let missing = unacknowledged(&gate.blockers, &acknowledged);
     if !missing.is_empty() {
         return send_json(
@@ -135,7 +148,7 @@ pub fn integrate(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> 
         );
     }
 
-    let head = match integration::apply(&gate.top, &gate.wt) {
+    let head = match integration::apply(&gate.top, &gate.wt, &message) {
         Ok(head) => head,
         Err(e @ ApplyError::Conflict { .. }) => {
             return send_json(stream, 409, &json!({ "error": "conflict", "conflict": e }));
@@ -154,6 +167,7 @@ pub fn integrate(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> 
             base: gate.wt.base.clone(),
             commits: commits.clone(),
             head: head.clone(),
+            message,
             acknowledged,
         },
     )?;

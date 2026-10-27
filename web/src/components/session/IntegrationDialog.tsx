@@ -5,6 +5,7 @@ import { CriterionProvenanceBadge } from './CriteriaSection';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Card } from '../ui/Card';
+import { FieldRow, TextArea } from '../ui/Field';
 import { SectionLabel } from '../ui/SectionLabel';
 
 type BlockerKind = Blocker['kind'];
@@ -33,6 +34,7 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
   const [posting, setPosting] = useState(false);
   const [result, setResult] = useState<{ head: string; commits: string[] } | null>(null);
   const [acknowledged, setAcknowledged] = useState<Partial<Record<BlockerKind, boolean>>>({});
+  const [message, setMessage] = useState('');
 
   useEffect(() => {
     if (!open) {
@@ -47,11 +49,13 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
     setConflict(null);
     setResult(null);
     setAcknowledged({});
+    setMessage('');
     let active = true;
     getIntegration(sessionId)
       .then((data) => {
         if (!active) return;
         setPreview(data);
+        setMessage(data.defaultMessage);
         setLoading(false);
       })
       .catch((fetchError: unknown) => {
@@ -73,7 +77,8 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
   const hasCommits = (preview?.commits.length ?? 0) > 0;
   const hasUncheckedBlocker =
     preview?.blockers.some((blocker) => blocker.kind !== 'noCommits' && !acknowledged[blocker.kind]) ?? false;
-  const integrateDisabled = loading || posting || (result === null && (!hasCommits || hasUncheckedBlocker));
+  const integrateDisabled =
+    loading || posting || (result === null && (!hasCommits || hasUncheckedBlocker || message.trim() === ''));
 
   const handleIntegrate = async () => {
     if (!preview) return;
@@ -84,7 +89,7 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
       .filter((blocker) => blocker.kind !== 'noCommits' && acknowledged[blocker.kind])
       .map((blocker) => blocker.kind);
     try {
-      const response = await integrate(sessionId, acknowledgedKinds);
+      const response = await integrate(sessionId, acknowledgedKinds, message);
       setResult(response);
     } catch (integrateError) {
       // A 409 keeps the dialog open: the message says what to do.
@@ -118,7 +123,7 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
           </h2>
           {preview && (
             <p className="m-0 text-xs text-muted">
-              Les commits de {preview.branch} seront rejoués par cherry-pick dans ton dépôt. Rien n'est intégré sans ton clic.
+              Les changements de l'agent deviennent un commit sur ta branche. Rien n'est intégré sans ton clic.
             </p>
           )}
         </div>
@@ -220,6 +225,10 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
                 </div>
               )}
             </section>
+
+            <FieldRow label="Message du commit" hint="Un seul commit, à ton nom, avec la session en provenance (Fennec-Session).">
+              <TextArea rows={3} className="w-full font-mono" value={message} onChange={(event) => setMessage(event.target.value)} />
+            </FieldRow>
 
             {preview.blockers.length > 0 && (
               <section className="flex flex-col gap-1.5">

@@ -302,6 +302,8 @@ export interface IntegrationPreview {
   files: { path: string; protected: boolean }[];
   criteria: IntegrationCriterion[];
   blockers: Blocker[];
+  /** A starting commit message (feat: <session title>); the human edits it. */
+  defaultMessage: string;
 }
 
 /** The worktree's integration preview: what a cherry-pick would bring and what needs acceptance. */
@@ -309,11 +311,11 @@ export function getIntegration(sessionId: string): Promise<IntegrationPreview> {
   return request<IntegrationPreview>(`/api/sessions/${encodeURIComponent(sessionId)}/integration`);
 }
 
-/** Cherry-picks the worktree's commits into the human's branch after the accepted blockers. */
-export function integrate(sessionId: string, acknowledged: string[]): Promise<{ head: string; commits: string[] }> {
+/** Creates one commit with the worktree's changes on the human's branch after the accepted blockers. */
+export function integrate(sessionId: string, acknowledged: string[], message: string): Promise<{ head: string; commits: string[] }> {
   return request<{ head: string; commits: string[] }>(`/api/sessions/${encodeURIComponent(sessionId)}/integrate`, {
     method: 'POST',
-    body: JSON.stringify({ acknowledged })
+    body: JSON.stringify({ acknowledged, message })
   });
 }
 
