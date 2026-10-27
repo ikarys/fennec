@@ -58,7 +58,7 @@ export function ContextPanel({ view, currentTokens, contextPercent, skills, hasS
   return (
       <aside
         aria-label="Contexte de la session"
-        className="hidden min-[1100px]:flex flex-1 flex-col gap-5 border-l border-border bg-panel px-4 py-4.5 max-w-[300px] min-w-[240px]"
+        className="hidden min-[1100px]:flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto border-l border-border bg-panel px-4 py-4.5 max-w-[300px] min-w-[240px] [scrollbar-width:thin]"
       >
         <section className="flex flex-col gap-2">
           <h2 className="text-[11px] font-semibold tracking-[0.06em] text-muted uppercase">Contexte</h2>

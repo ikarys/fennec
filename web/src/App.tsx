@@ -299,7 +299,10 @@ export default function App() {
 
   return (
     <DisplayPrefsProvider value={displayPrefs}>
-      <div className="flex h-dvh flex-col overflow-hidden bg-bg text-text">
+      {/* h-full, not h-dvh: the text size zooms <html>, and browsers scale
+          viewport units by that zoom (the page then overflows the window);
+          the html/body/#root percentages are not scaled. */}
+      <div className="flex h-full flex-col overflow-hidden bg-bg text-text">
         <TopBar
           tabs={tabInfos}
           activeTabId={activeTabId}
