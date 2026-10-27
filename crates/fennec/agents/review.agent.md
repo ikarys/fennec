@@ -8,6 +8,7 @@ allowedTools:
   - read_file
   - run_command
   - load_skill
+  - web_search
 ---
 
 # Review

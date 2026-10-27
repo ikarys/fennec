@@ -17,6 +17,16 @@ pub struct Preferences {
     /// openfox `globalInstructions`: the human's instructions for every new
     /// session; `None` or blank adds nothing.
     pub global_instructions: Option<String>,
+    /// The web_search tool's SearXNG instance.
+    pub search: SearchPrefs,
+}
+
+/// openfox `search.searxngUrl` / `search.searxngApiKey`.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct SearchPrefs {
+    pub searxng_url: Option<String>,
+    pub searxng_api_key: Option<String>,
 }
 
 /// openfox `ReasoningEffort`: how much a model may think.
@@ -114,6 +124,13 @@ impl Preferences {
         }
         if !FONT_SIZE_RANGE.contains(&self.display.font_size) {
             return Err(format!("font_size must be in {FONT_SIZE_RANGE:?}"));
+        }
+        if let Some(url) = self.search.searxng_url.as_deref().map(str::trim)
+            && !url.is_empty()
+            && !url.starts_with("http://")
+            && !url.starts_with("https://")
+        {
+            return Err("searxng_url must start with http:// or https://".into());
         }
         Ok(())
     }
@@ -334,6 +351,10 @@ mod tests {
         let mut p = valid();
         p.display.font_size = 17;
         assert!(p.validate().unwrap_err().contains("font_size"));
+
+        let mut p = valid();
+        p.search.searxng_url = Some("ftp://example.com".into());
+        assert!(p.validate().unwrap_err().contains("searxng_url"));
     }
 
     #[test]

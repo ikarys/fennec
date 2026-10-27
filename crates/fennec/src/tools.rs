@@ -1,5 +1,7 @@
 //! The host toolbox: openfox's `read_file`, `write_file`, `edit_file` and
-//! `run_command`, plus `load_skill`, run directly on the host inside one working directory.
+//! `run_command`, plus `load_skill`, run directly on the host inside one working
+//! directory, and `web_search`, which queries the human's SearXNG instance: the
+//! model only chooses the query.
 //! The bwrap world will be a second `Toolbox` that runs them sandboxed.
 
 mod args;
@@ -10,10 +12,12 @@ mod read_file;
 mod run_command;
 #[cfg(test)]
 mod test_support;
+mod web_search;
 mod write_file;
 
 use crate::agent::ports::{CommandRun, Commands, Toolbox};
 use crate::domain::event::{OutputStream, ToolResult};
+use crate::domain::preferences::SearchPrefs;
 use serde_json::Value;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
@@ -21,11 +25,20 @@ use std::time::{Duration, Instant};
 
 pub struct LocalTools {
     workdir: PathBuf,
+    search: SearchPrefs,
 }
 
 impl LocalTools {
     pub fn new(workdir: PathBuf) -> LocalTools {
-        LocalTools { workdir }
+        LocalTools {
+            workdir,
+            search: SearchPrefs::default(),
+        }
+    }
+
+    pub fn with_search(mut self, search: SearchPrefs) -> LocalTools {
+        self.search = search;
+        self
     }
 }
 
@@ -37,6 +50,7 @@ impl Toolbox for LocalTools {
             edit_file::definition(),
             run_command::definition(),
             load_skill::definition(),
+            web_search::definition(),
         ])
     }
 
@@ -55,6 +69,7 @@ impl Toolbox for LocalTools {
             "edit_file" => edit_file::run(args, workdir),
             "run_command" => run_command::run(args, workdir, stop, on_output),
             "load_skill" => load_skill::run(args, workdir),
+            "web_search" => web_search::run(args, &self.search),
             _ => ToolResult::failure(format!("Unknown tool: {name}")),
         };
         result.duration_ms = start.elapsed().as_millis() as u64;

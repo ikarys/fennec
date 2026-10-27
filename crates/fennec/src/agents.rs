@@ -134,7 +134,7 @@ mod tests {
         assert!(!plan.subagent);
         assert_eq!(
             plan.allowed_tools,
-            vec!["read_file", "ask_user", "load_skill"]
+            vec!["read_file", "ask_user", "load_skill", "web_search"]
         );
         assert_eq!(plan.color.as_deref(), Some("#a855f7"));
         assert!(plan.prompt.contains("Plan Mode"));
@@ -155,7 +155,8 @@ mod tests {
                 "edit_file",
                 "run_command",
                 "ask_user",
-                "load_skill"
+                "load_skill",
+                "web_search"
             ]
         );
         assert_eq!(builder.color.as_deref(), Some("#3b82f6"));

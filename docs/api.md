@@ -85,19 +85,28 @@ Precedence for a turn:
     "toolResultsOpen": false,
     "fontSize": 14
   },
-  "globalInstructions": "string | null"
+  "globalInstructions": "string | null",
+  "search": {
+    "searxngUrl": "string | null",
+    "searxngApiKey": "string | null"
+  }
 }
 ```
 
 Validation: `maxTokens >= 1`, `contextWindow >= 1024`,
 `compactionThreshold` in `0.0..=1.0` (NaN rejected), model ids non-empty,
-`fontSize` in `13..=16` (default 14). `reasoningEffort` is sent as the
+`fontSize` in `13..=16` (default 14), `searxngUrl` blank or starting with `http://` or `https://`. `reasoningEffort` is sent as the
 `reasoning_effort` field of the model request when set; `null` omits it.
 
 `globalInstructions` (openfox name) and the AGENTS.md files from the
 filesystem root down to the session's working directory go into the system
 prompt of a new session; an existing session keeps the prompt of its first
 turn.
+
+`search` (openfox `search.*`, SearXNG only) is the instance the `web_search`
+tool queries (`GET {searxngUrl}/search?format=json&q=…`, with
+`Authorization: Bearer {searxngApiKey}` when set). The tool runs in fennec,
+not in a command: the model only chooses the query.
 
 ## Endpoints
 

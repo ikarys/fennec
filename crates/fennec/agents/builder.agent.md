@@ -11,6 +11,7 @@ allowedTools:
   - run_command
   - ask_user
   - load_skill
+  - web_search
 ---
 
 # Build Mode

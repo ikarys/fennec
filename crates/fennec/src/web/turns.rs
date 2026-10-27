@@ -137,7 +137,7 @@ pub(super) fn with_turn<R>(
     let skills = skills::discover(workdir);
     let agents = agents::discover(workdir);
     let model = OpenAiClient::new(&settings.llm, &params.model);
-    let tools = LocalTools::new(workdir.to_path_buf());
+    let tools = LocalTools::new(workdir.to_path_buf()).with_search(prefs.search.clone());
     let mut on_event = |_: &Event| {};
     let mut turn = Turn {
         model: &model,

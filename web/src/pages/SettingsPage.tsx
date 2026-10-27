@@ -5,6 +5,7 @@ import { ModelSection } from '../components/settings/ModelSection';
 import { ModelPrefsSection, percentFromFraction, type ModelForm } from '../components/settings/ModelPrefsSection';
 import { DisplaySection } from '../components/settings/DisplaySection';
 import { InstructionsSection } from '../components/settings/InstructionsSection';
+import { SearchSection, type SearchForm } from '../components/settings/SearchSection';
 
 interface SettingsPageProps {
   settings: SettingsResponse | null;
@@ -16,13 +17,15 @@ interface SettingsForm {
   models: Record<string, ModelForm>;
   display: DisplayPrefs;
   instructions: string;
+  search: SearchForm;
 }
 
-type SettingsTab = 'models' | 'instructions' | 'display';
+type SettingsTab = 'models' | 'instructions' | 'search' | 'display';
 
 const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'models', label: 'Modèles' },
   { id: 'instructions', label: 'Instructions' },
+  { id: 'search', label: 'Recherche web' },
   { id: 'display', label: 'Affichage' }
 ];
 
@@ -48,7 +51,11 @@ function toForm(preferences: Preferences, models: SettingsModel[]): SettingsForm
     model: preferences.model ?? '',
     models: modelForms,
     display: preferences.display,
-    instructions: preferences.globalInstructions ?? ''
+    instructions: preferences.globalInstructions ?? '',
+    search: {
+      url: preferences.search?.searxngUrl ?? '',
+      apiKey: preferences.search?.searxngApiKey ?? ''
+    }
   };
 }
 
@@ -92,11 +99,18 @@ function buildPreferences(form: SettingsForm, settings: SettingsResponse): Prefe
     models[model.id] = prefs;
   }
 
+  const searxngUrl = form.search.url.trim();
+  const searxngApiKey = form.search.apiKey.trim();
+
   return {
     model: form.model === '' ? null : form.model,
     models,
     display: form.display,
-    globalInstructions: form.instructions.trim() === '' ? null : form.instructions
+    globalInstructions: form.instructions.trim() === '' ? null : form.instructions,
+    search: {
+      searxngUrl: searxngUrl === '' ? null : searxngUrl,
+      searxngApiKey: searxngApiKey === '' ? null : searxngApiKey
+    }
   };
 }
 
@@ -146,6 +160,11 @@ export function SettingsPage({ settings, onSaved }: SettingsPageProps) {
   function updateInstructions(instructions: string) {
     markDirty();
     setForm((previous) => (previous ? { ...previous, instructions } : previous));
+  }
+
+  function updateSearch(search: SearchForm) {
+    markDirty();
+    setForm((previous) => (previous ? { ...previous, search } : previous));
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -226,6 +245,10 @@ export function SettingsPage({ settings, onSaved }: SettingsPageProps) {
 
             {tab === 'instructions' && (
               <InstructionsSection value={form.instructions} onChange={updateInstructions} />
+            )}
+
+            {tab === 'search' && (
+              <SearchSection value={form.search} onChange={updateSearch} />
             )}
 
             {tab === 'display' && (

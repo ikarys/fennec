@@ -62,12 +62,19 @@ export interface DisplayPrefs {
   fontSize: number;
 }
 
+export interface SearchPrefs {
+  searxngUrl?: string | null;
+  searxngApiKey?: string | null;
+}
+
 export interface Preferences {
   model: string | null;
   models: Record<string, ModelPrefs>;
   display: DisplayPrefs;
   /** openfox `globalInstructions`: added to the system prompt of new sessions. */
   globalInstructions?: string | null;
+  /** openfox search.*: the web_search tool's SearXNG instance. */
+  search?: SearchPrefs;
 }
 
 export interface SettingsModel {

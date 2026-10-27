@@ -136,7 +136,7 @@ fn with_turn(
     let skills = skills::discover(&workdir);
     let agents = agents::discover(&workdir);
     let model = OpenAiClient::new(&settings.llm, &params.model);
-    let tools = LocalTools::new(workdir.clone());
+    let tools = LocalTools::new(workdir.clone()).with_search(prefs.search.clone());
     // ponytail: no Ctrl-C handling, the process just dies; a signal handler
     // setting `stop` when an interrupted turn must end cleanly.
     let stop = AtomicBool::new(false);

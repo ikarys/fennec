@@ -48,9 +48,12 @@ Preview: ```html and ```md blocks of a message, and the .html/.md files an
 agent wrote, rendered in fennec (a sandboxed origin for model HTML).
 Dogfooding, started (`docs/dogfooding.md`): a session that runs a workflow
 works in its own git worktree and branch; the human cherry-picks.
+Web search, done: openfox's `web_search` (SearXNG only), its instance set on
+the Settings page.
 Next, one PR each, so that the minimal agent works before security layers:
-bwrap world for tool
-execution → sub-agents as tools → criteria → fennec's own
+browser captures (openfox's `browser` skill) and a vision panel of the images
+the model saw → bwrap world for tool
+execution (network off by default) → sub-agents as tools → criteria → fennec's own
 layer (human-only integration, provenance, review gate).
 
 ## Layout
@@ -93,7 +96,8 @@ crates/fennec/src/
     prompt.rs          openfox chat/prompts: the system prompt
     workflow.rs        the workflow walk and its jobs (start, answer, continue, resume, stop);
                        workflow/ nodes (one node run), fork (parallel branches), outcome (`Outcome:` line)
-  tools/             Toolbox adapter on the host: one file per tool, path_guard, args
+  tools/             Toolbox adapter on the host: one file per tool, path_guard, args;
+                     web_search queries the SearXNG instance from the Settings page
   llm/               Model adapter: openai.rs (client), sse.rs (stream parser), models.rs (/models listing)
   store.rs           EventLog adapter: SQLite (openfox's schema), projects and sessions;
                      store/settings.rs the stored preferences

@@ -4,7 +4,7 @@ import { useDisplayPrefs } from '../../lib/display';
 import { formatDuration } from '../../lib/format';
 import { previewKindOfPath, relativeToWorkdir } from '../../lib/preview';
 import { usePreviewOpener, usePreviewWorkdir } from '../preview/PreviewContext';
-import { EditIcon, FileIcon, SpinnerIcon, TerminalIcon } from '../Icons';
+import { EditIcon, FileIcon, SearchIcon, SpinnerIcon, TerminalIcon } from '../Icons';
 
 export function ToolCard({ tool }: { tool: ToolCallView }) {
   const display = useDisplayPrefs();
@@ -21,7 +21,9 @@ export function ToolCard({ tool }: { tool: ToolCallView }) {
       ? String(tool.question ?? tool.args.question ?? '')
       : tool.name === 'run_command'
         ? String(tool.args.command ?? '')
-        : String(tool.args.path ?? '');
+        : tool.name === 'web_search'
+          ? String(tool.args.query ?? '')
+          : String(tool.args.path ?? '');
   const lineCount = tool.output ? tool.output.split('\n').length : 0;
   const opener = usePreviewOpener();
   const workdir = usePreviewWorkdir();
@@ -36,6 +38,8 @@ export function ToolCard({ tool }: { tool: ToolCallView }) {
       <TerminalIcon className="h-[15px] w-[15px] text-muted" />
     ) : tool.name === 'edit_file' ? (
       <EditIcon className="h-[15px] w-[15px] text-muted" />
+    ) : tool.name === 'web_search' ? (
+      <SearchIcon className="h-[15px] w-[15px] text-muted" />
     ) : (
       <FileIcon className="h-[15px] w-[15px] text-muted" />
     );

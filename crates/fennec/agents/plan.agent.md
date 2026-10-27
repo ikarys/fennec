@@ -8,6 +8,7 @@ allowedTools:
   - read_file
   - ask_user
   - load_skill
+  - web_search
 ---
 
 # Plan Mode
