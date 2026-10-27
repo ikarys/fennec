@@ -2,6 +2,7 @@
 //! the session log and the tools. Adapters implement them; the loop never
 //! sees HTTP, SQL or processes.
 
+use crate::domain::agent::CommandAccess;
 use crate::domain::event::{DoneReason, Event, OutputStream, ToolCall, ToolResult};
 use crate::domain::preferences::ReasoningEffort;
 use serde_json::Value;
@@ -58,6 +59,7 @@ pub trait EventLog {
 }
 
 /// The tools a model can call (adapter: `tools::LocalTools`, on the host).
+/// `access` is what the calling agent's commands may do to the workdir.
 pub trait Toolbox {
     /// OpenAI-compatible tool definitions.
     fn definitions(&self) -> Value;
@@ -66,6 +68,7 @@ pub trait Toolbox {
         &self,
         name: &str,
         args: &Value,
+        access: CommandAccess,
         stop: &AtomicBool,
         on_output: &mut dyn FnMut(OutputStream, &str),
     ) -> ToolResult;

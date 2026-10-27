@@ -15,7 +15,7 @@ const WorkflowsPage = lazy(() => import('./pages/WorkflowsPage'));
 type Route =
   | { name: 'home' }
   | { name: 'session'; id: string }
-  | { name: 'new'; id: string }
+  | { name: 'new'; id: string; testWorkflowId: string | null }
   | { name: 'settings' }
   | { name: 'workflows'; projectId: string | null; workflowId: string | null; isNew: boolean };
 
@@ -42,12 +42,14 @@ function parseRoute(): Route {
   if (hash.startsWith('#/s/')) {
     const id = decodeURIComponent(hash.slice(4));
     if (id.startsWith('new:')) {
-      return { name: 'new', id: id.slice(4) };
+      return { name: 'new', id: id.slice(4), testWorkflowId: null };
     }
     return { name: 'session', id };
   }
   if (hash.startsWith('#/new/')) {
-    return { name: 'new', id: decodeURIComponent(hash.slice(6)) };
+    const [rawId, query] = hash.slice(6).split('?');
+    const testWorkflowId = query ? new URLSearchParams(query).get('test') : null;
+    return { name: 'new', id: decodeURIComponent(rawId), testWorkflowId };
   }
   return { name: 'home' };
 }
@@ -184,10 +186,11 @@ export default function App() {
 
   const displayPrefs = settings?.preferences.display ?? defaultDisplayPrefs;
 
-  // The UI is laid out on the default size (the CSS body size); the chosen
-  // size zooms the whole page around it.
+  // The chosen size scales the text only: every text size is in rem, set
+  // from the root font size (16px for the default 14px body), while the
+  // layout's spacing stays in px (styles/app.css).
   useEffect(() => {
-    document.documentElement.style.zoom = String(displayPrefs.fontSize / defaultDisplayPrefs.fontSize);
+    document.documentElement.style.fontSize = `${(16 * displayPrefs.fontSize) / defaultDisplayPrefs.fontSize}px`;
   }, [displayPrefs.fontSize]);
 
   const navigate = useCallback((path: string) => {
@@ -299,7 +302,9 @@ export default function App() {
 
   return (
     <DisplayPrefsProvider value={displayPrefs}>
-      <div className="flex h-dvh flex-col overflow-hidden bg-bg text-text">
+      {/* h-full: the html/body/#root chain is 100%, which no page-level
+          scaling can push past the window. */}
+      <div className="flex h-full flex-col overflow-hidden bg-bg text-text">
         <TopBar
           tabs={tabInfos}
           activeTabId={activeTabId}
@@ -339,11 +344,13 @@ export default function App() {
             <SessionPage
               sessionId={route.name === 'session' ? route.id : null}
               projectId={route.name === 'new' ? route.id : null}
+              testWorkflowId={route.name === 'new' ? route.testWorkflowId : null}
               pseudoTabId={pseudoTabId}
               projects={projects}
               config={config}
               onSessionCreated={handleSessionCreated}
               onRunningChanged={refreshProjects}
+              onRenamed={refreshProjects}
             />
           )}
         </div>

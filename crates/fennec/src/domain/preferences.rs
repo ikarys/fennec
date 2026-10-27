@@ -17,6 +17,37 @@ pub struct Preferences {
     /// openfox `globalInstructions`: the human's instructions for every new
     /// session; `None` or blank adds nothing.
     pub global_instructions: Option<String>,
+    /// The web_search tool's SearXNG instance.
+    pub search: SearchPrefs,
+    /// How commands run: in bwrap or on the host.
+    pub sandbox: SandboxPrefs,
+}
+
+/// openfox `search.searxngUrl` / `search.searxngApiKey`.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct SearchPrefs {
+    pub searxng_url: Option<String>,
+    pub searxng_api_key: Option<String>,
+}
+
+/// fennec's own (openfox runs commands on the host): the bwrap world of commands.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct SandboxPrefs {
+    /// Off runs commands on the host, as openfox does: the human's call.
+    pub enabled: bool,
+    /// Lets commands reach the network (package installs, a dev server on the host).
+    pub network: bool,
+}
+
+impl Default for SandboxPrefs {
+    fn default() -> Self {
+        SandboxPrefs {
+            enabled: true,
+            network: false,
+        }
+    }
 }
 
 /// openfox `ReasoningEffort`: how much a model may think.
@@ -49,6 +80,10 @@ pub struct ModelPrefs {
 pub const DEFAULT_FONT_SIZE: u16 = 14;
 /// The sizes the Settings page offers.
 pub const FONT_SIZE_RANGE: std::ops::RangeInclusive<u16> = 13..=16;
+/// The most context panel pages the UI can store.
+pub const MAX_PANEL_PAGES: usize = 12;
+/// The longest panel page name, in characters.
+pub const MAX_PANEL_PAGE_NAME: usize = 40;
 
 fn default_font_size() -> u16 {
     DEFAULT_FONT_SIZE
@@ -61,6 +96,16 @@ pub struct Display {
     pub tool_results_open: bool,
     #[serde(default = "default_font_size")]
     pub font_size: u16,
+    /// `None` means the UI's default pages.
+    pub panel_pages: Option<Vec<PanelPage>>,
+}
+
+/// fennec's own: a named list of the context panel's blocks; the UI owns the block ids.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PanelPage {
+    pub name: String,
+    pub blocks: Vec<String>,
 }
 
 impl Default for Display {
@@ -69,6 +114,7 @@ impl Default for Display {
             reasoning_open: true,
             tool_results_open: false,
             font_size: DEFAULT_FONT_SIZE,
+            panel_pages: None,
         }
     }
 }
@@ -114,6 +160,49 @@ impl Preferences {
         }
         if !FONT_SIZE_RANGE.contains(&self.display.font_size) {
             return Err(format!("font_size must be in {FONT_SIZE_RANGE:?}"));
+        }
+        if let Some(pages) = &self.display.panel_pages {
+            Self::validate_panel_pages(pages)?;
+        }
+        if let Some(url) = self.search.searxng_url.as_deref().map(str::trim)
+            && !url.is_empty()
+            && !url.starts_with("http://")
+            && !url.starts_with("https://")
+        {
+            return Err("searxng_url must start with http:// or https://".into());
+        }
+        Ok(())
+    }
+
+    fn validate_panel_pages(pages: &[PanelPage]) -> Result<(), String> {
+        if pages.is_empty() {
+            return Err("panel pages must not be empty".into());
+        }
+        if pages.len() > MAX_PANEL_PAGES {
+            return Err(format!("panel pages must be <= {MAX_PANEL_PAGES}"));
+        }
+
+        let mut seen = Vec::new();
+        for page in pages {
+            let name = page.name.trim();
+            if name.is_empty() {
+                return Err("panel page name must not be empty".into());
+            }
+            if name.chars().count() > MAX_PANEL_PAGE_NAME {
+                return Err(format!(
+                    "panel page name must be <= {MAX_PANEL_PAGE_NAME} characters"
+                ));
+            }
+            if seen.iter().any(|existing| existing == name) {
+                return Err("panel page names must be unique".into());
+            }
+            seen.push(name.to_owned());
+
+            for block in &page.blocks {
+                if block.trim().is_empty() {
+                    return Err("panel page block id must not be empty".into());
+                }
+            }
         }
         Ok(())
     }
@@ -334,6 +423,10 @@ mod tests {
         let mut p = valid();
         p.display.font_size = 17;
         assert!(p.validate().unwrap_err().contains("font_size"));
+
+        let mut p = valid();
+        p.search.searxng_url = Some("ftp://example.com".into());
+        assert!(p.validate().unwrap_err().contains("searxng_url"));
     }
 
     #[test]
@@ -354,12 +447,17 @@ mod tests {
         p.display.reasoning_open = false;
         p.display.font_size = 15;
         p.global_instructions = Some("Be terse.".into());
+        p.sandbox = SandboxPrefs {
+            enabled: false,
+            network: true,
+        };
 
         let json = serde_json::to_string(&p).unwrap();
         assert!(json.contains("\"maxTokens\""));
         assert!(json.contains("\"reasoningEffort\""));
         assert!(json.contains("\"fontSize\""));
         assert!(json.contains("\"globalInstructions\""));
+        assert!(json.contains("\"sandbox\""));
         assert_eq!(serde_json::from_str::<Preferences>(&json).unwrap(), p);
         assert_eq!(
             serde_json::from_str::<Preferences>("{}").unwrap(),
@@ -375,6 +473,103 @@ mod tests {
         .unwrap();
         assert_eq!(p.display.font_size, DEFAULT_FONT_SIZE);
         assert_eq!(p.models.get("m").unwrap().reasoning_effort, None);
+        assert_eq!(p.sandbox, SandboxPrefs::default());
+        assert!(p.sandbox.enabled);
+        assert!(!p.sandbox.network);
         assert!(p.validate().is_ok());
+    }
+
+    #[test]
+    fn a_preferences_json_without_panel_pages_loads_none() {
+        let p: Preferences = serde_json::from_str(
+            r#"{"display":{"reasoningOpen":true,"toolResultsOpen":false,"fontSize":14}}"#,
+        )
+        .unwrap();
+        assert_eq!(p.display.panel_pages, None);
+        assert!(p.validate().is_ok());
+    }
+
+    #[test]
+    fn valid_panel_pages_pass_and_round_trip() {
+        let mut p = valid();
+        p.display.panel_pages = Some(vec![PanelPage {
+            name: "main".into(),
+            blocks: vec!["file".into(), "terminal".into()],
+        }]);
+        assert!(p.validate().is_ok());
+        let json = serde_json::to_string(&p).unwrap();
+        assert!(json.contains("\"panelPages\""));
+        assert_eq!(serde_json::from_str::<Preferences>(&json).unwrap(), p);
+    }
+
+    #[test]
+    fn validate_rejects_an_empty_panel_page_name() {
+        let mut p = valid();
+        p.display.panel_pages = Some(vec![PanelPage {
+            name: "   ".into(),
+            blocks: vec!["block".into()],
+        }]);
+        assert!(p.validate().unwrap_err().contains("panel page name"));
+    }
+
+    #[test]
+    fn validate_rejects_duplicate_panel_page_names() {
+        let mut p = valid();
+        p.display.panel_pages = Some(vec![
+            PanelPage {
+                name: "a".into(),
+                blocks: vec!["x".into()],
+            },
+            PanelPage {
+                name: "  a  ".into(),
+                blocks: vec!["y".into()],
+            },
+        ]);
+        assert!(
+            p.validate()
+                .unwrap_err()
+                .contains("panel page names must be unique")
+        );
+    }
+
+    #[test]
+    fn validate_rejects_an_empty_panel_page_list() {
+        let mut p = valid();
+        p.display.panel_pages = Some(vec![]);
+        assert!(p.validate().unwrap_err().contains("panel pages"));
+    }
+
+    #[test]
+    fn validate_rejects_too_many_panel_pages() {
+        let mut p = valid();
+        p.display.panel_pages = Some(
+            (0..=MAX_PANEL_PAGES)
+                .map(|i| PanelPage {
+                    name: format!("{i}"),
+                    blocks: vec!["b".into()],
+                })
+                .collect(),
+        );
+        assert!(p.validate().unwrap_err().contains("panel pages"));
+    }
+
+    #[test]
+    fn validate_rejects_a_long_panel_page_name() {
+        let mut p = valid();
+        p.display.panel_pages = Some(vec![PanelPage {
+            name: "a".repeat(MAX_PANEL_PAGE_NAME + 1),
+            blocks: vec!["block".into()],
+        }]);
+        assert!(p.validate().unwrap_err().contains("panel page name"));
+    }
+
+    #[test]
+    fn validate_rejects_an_empty_panel_page_block_id() {
+        let mut p = valid();
+        p.display.panel_pages = Some(vec![PanelPage {
+            name: "main".into(),
+            blocks: vec!["  ".into()],
+        }]);
+        assert!(p.validate().unwrap_err().contains("panel page block id"));
     }
 }

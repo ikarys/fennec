@@ -1,55 +1,90 @@
+import { useEffect, useRef, useState } from 'react';
 import type { ThreadItem } from '../../../lib/fold';
+import { formatClock, formatDuration } from '../../../lib/format';
+import { portTone } from '../../../lib/workflowRun';
+import { CheckIcon, CloseIcon, SpinnerIcon } from '../../Icons';
+import { Badge } from '../../ui/Badge';
+import { SectionLabel } from '../../ui/SectionLabel';
 
 type WorkflowNodeItem = Extract<ThreadItem, { kind: 'workflow-node' }>;
 
-function portBadge(port: string): { label: string; className: string } {
-  if (port === 'success' || port === 'done' || port === 'true') {
-    return { label: 'ok', className: 'text-ok border-ok bg-ok/10' };
-  }
-  if (port === 'failure' || port === 'false' || port === 'exhausted') {
-    return { label: 'err', className: 'text-err border-err bg-err/10' };
-  }
-  return { label: port, className: 'text-accent-strong border-accent bg-accent-soft' };
+function portBadgeTone(port: string): 'ok' | 'err' | 'accent' {
+  const tone = portTone(port);
+  if (tone === 'positive') return 'ok';
+  if (tone === 'negative') return 'err';
+  return 'accent';
 }
 
-export function NodeDivider({ item }: { item: WorkflowNodeItem }) {
+export function NodeDivider({ item, running }: { item: WorkflowNodeItem; running: boolean }) {
   const finished = item.port !== undefined;
-  const badge = finished ? portBadge(item.port!) : null;
+  const badge = finished ? { port: item.port!, tone: portBadgeTone(item.port!) } : null;
   const passLabel = item.pass > 1 ? ` · passage ${item.pass}` : '';
+  // Measured in the browser from the first render while the node is running.
+  const startRef = useRef<number | null>(null);
+  const [elapsedMs, setElapsedMs] = useState(0);
+
+  useEffect(() => {
+    if (!running || finished) return;
+    if (startRef.current === null) {
+      startRef.current = Date.now();
+    }
+    setElapsedMs(Date.now() - startRef.current);
+    const interval = window.setInterval(() => {
+      setElapsedMs(Date.now() - (startRef.current ?? Date.now()));
+    }, 1000);
+    return () => window.clearInterval(interval);
+  }, [running, finished]);
 
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="flex items-center gap-2 text-[11px] text-muted">
+      <div className="flex items-center gap-2 text-[0.6875rem] text-muted">
         <span className="h-px grow bg-border" />
         <span className="flex items-center gap-1.5">
-          <span className="rounded border border-border bg-raised px-1.5 text-[10px] uppercase tracking-wide">{item.nodeKind}</span>
+          <span className="rounded border border-border bg-raised px-1.5 text-[0.625rem] uppercase tracking-wide">{item.nodeKind}</span>
           <span className="text-text">{item.label}{passLabel}</span>
           {badge && (
-            <span className={`rounded-full border px-1.5 text-[10px] ${badge.className}`}>{badge.label}</span>
+            <span className="shrink-0" aria-label={badge.port}>
+              <Badge tone={badge.tone} title={badge.port}>
+                {badge.tone === 'ok' && <CheckIcon className="h-3 w-3" />}
+                {badge.tone === 'err' && <CloseIcon className="h-3 w-3" />}
+                {badge.tone === 'accent' && badge.port}
+              </Badge>
+            </span>
           )}
+          {finished && item.durationMs != null && (
+            <span className="text-muted">{formatDuration(item.durationMs)}</span>
+          )}
+          {!finished && running && (
+            <span className="flex items-center gap-1 text-accent-strong">
+              <SpinnerIcon className="h-3 w-3" />
+              en cours…
+              <span className="tabular-nums">{formatClock(elapsedMs)}</span>
+            </span>
+          )}
+          {!finished && !running && <span className="text-muted">interrompu</span>}
         </span>
         <span className="h-px grow bg-border" />
       </div>
       {(item.prompt || item.output || item.childSessionId) && (
-        <details className="mx-auto">
-          <summary className="cursor-pointer text-center text-[11px] text-muted hover:text-text">détails</summary>
-          <div className="mt-1.5 flex flex-col gap-2 rounded-md border border-border bg-raised px-3 py-2 text-left text-xs">
+        <details className="w-full min-w-0">
+          <summary className="cursor-pointer text-center text-[0.6875rem] text-muted hover:text-text">détails</summary>
+          <div className="flex flex-col gap-2 rounded-md border border-border bg-raised px-3 py-2 text-left text-xs">
             {item.prompt && (
-              <div>
-                <div className="mb-1 text-[10px] uppercase tracking-wide text-muted">Prompt</div>
+              <div className="flex flex-col gap-1.5">
+                <SectionLabel>Prompt</SectionLabel>
                 <div className="whitespace-pre-wrap text-text">{item.prompt}</div>
               </div>
             )}
             {item.output && (
-              <div>
-                <div className="mb-1 text-[10px] uppercase tracking-wide text-muted">Sortie</div>
-                {item.nodeKind === 'shell' ? (
-                  <pre className="overflow-x-auto rounded bg-code p-2 font-mono text-[11px] text-muted">{item.output}</pre>
+              <div className="flex flex-col gap-1.5">
+                <SectionLabel>Sortie</SectionLabel>
+                {(item.nodeKind === 'shell' || item.nodeKind === 'criteria') ? (
+                  <pre className="whitespace-pre-wrap break-words rounded bg-code p-2 font-mono text-[0.6875rem] text-muted">{item.output}</pre>
                 ) : (
                   <div className="whitespace-pre-wrap text-text">{item.output}</div>
                 )}
-                {item.exitCode !== undefined && (
-                  <div className="mt-1 text-[11px] text-muted">Code de sortie : {item.exitCode}</div>
+                {item.nodeKind === 'shell' && item.exitCode !== undefined && (
+                  <div className="text-[0.6875rem] text-muted">Code de sortie : {item.exitCode}</div>
                 )}
               </div>
             )}

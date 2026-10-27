@@ -1,6 +1,7 @@
 import { useRef, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { Folder } from '../../lib/api';
 import { FolderIcon, RepoIcon, SpinnerIcon } from '../Icons';
+import { Badge } from '../ui/Badge';
 
 interface FolderListProps {
   folders: Folder[];
@@ -90,9 +91,9 @@ export function FolderList({ folders, parent, selected, loading, loadError, onSe
                       )}
                       <span className="min-w-0 flex-1 truncate">{folder.name}</span>
                       {folder.repo && (
-                        <span className="shrink-0 rounded bg-accent-soft px-1.5 py-0.5 text-xs text-accent">
+                        <Badge tone="accent" className="shrink-0">
                           git
-                        </span>
+                        </Badge>
                       )}
                     </button>
                   </li>

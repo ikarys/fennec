@@ -90,8 +90,9 @@ Unknown fields are kept on save (the editor round-trips them).
 | kind | fields | output ports | output value |
 |---|---|---|---|
 | `start` | (exactly one per workflow) | `next` | the task |
-| `agent` | `agent` (agent id), `prompt`, `retryPrompt?`, `outputs?` (default `["done"]`), `context?` (`"session"` default, or `"fresh"`) | each of `outputs` | the agent's last text |
+| `agent` | `agent` (agent id), `prompt`, `retryPrompt?`, `outputs?` (default `["done"]`), `context?` (`"session"` default, or `"fresh"`), `verdicts?` (default false) | each of `outputs` | the agent's last text |
 | `shell` | `command`, `timeoutSecs?` (default 600), `successCodes?` (default `[0]`) | `success`, `failure` | stdout and stderr, last 8 KiB |
+| `criteria` | `plan` (the id of the agent node whose output holds the plan) | `pass`, `fail` | the failed checks: command, exit code, output |
 | `human` | `question`, `choices` (at least one) | one per choice | the choice, plus the comment typed with it |
 | `condition` | `value` (a template), `test` (`equals`, `contains`, `empty`), `against?` | `true`, `false` | the evaluated `value` |
 | `parallel` | | `branch` (several edges allowed) | |
@@ -124,6 +125,22 @@ or a pause, a typed message is refused: the human answers, or stops the
 run. An ask_user inside an agent node is answered as usual, then the run
 goes on.
 
+**Criteria node.** No model. It reads the "Done when" list of the plan
+node's latest output: each bullet is a criterion (`C1`, `C2`…), and one that
+ends with `— check: \`<command>\`` carries a check. When the list differs
+from the run's current criteria, it records it (`criteria.set`): the plan the
+human approved is the contract, and no tool lets a model change it. Then it
+runs each check itself, as a shell node does (in the sandbox), and records
+the result (`criterion.updated`) as **verified**. The node takes `pass` when
+every checked criterion passed; criteria without a check do not count here.
+It runs in the main walk only, not in a parallel branch.
+
+**Verdicts.** An agent node with `verdicts: true` judges the criteria
+without a check: each line `C<n>: pass — <why>` or `C<n>: fail — <why>` of
+its output is recorded as that criterion's status, marked **indicative**. A
+verdict on a criterion that has a check is ignored: a model never overrides
+a verified fact. Main walk only.
+
 **Condition node.** No model. `value` is a template, `against` a literal.
 `empty` is true for an empty or whitespace-only value.
 
@@ -137,6 +154,7 @@ Prompts, commands, condition values and questions may use:
 - `{{filesChanged}}`: the files changed since the run started, one per line
 - `{{pass}}`: how many times the current node has run, from 1
 - `{{comment}}`: the latest comment typed at a pause or a human node
+- `{{criteria}}`: the run's criteria, one per line, with their check and status
 
 A reference to a node that has not run yet expands to an empty string. An
 unknown name is a validation error. Shell commands receive the values

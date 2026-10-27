@@ -65,6 +65,8 @@ pub enum NodeKind {
         outputs: Vec<String>,
         #[serde(default)]
         context: AgentContext,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        verdicts: bool,
     },
     Shell {
         command: String,
@@ -72,6 +74,9 @@ pub enum NodeKind {
         timeout_secs: Option<u64>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         success_codes: Option<Vec<i32>>,
+    },
+    Criteria {
+        plan: String,
     },
     Human {
         question: String,
@@ -161,6 +166,7 @@ impl Workflow {
             NodeKind::Start => vec!["next".to_string()],
             NodeKind::Agent { outputs, .. } => outputs.clone(),
             NodeKind::Shell { .. } => vec!["success".to_string(), "failure".to_string()],
+            NodeKind::Criteria { .. } => vec!["pass".to_string(), "fail".to_string()],
             NodeKind::Human { choices, .. } => choices.clone(),
             NodeKind::Condition { .. } => vec!["true".to_string(), "false".to_string()],
             NodeKind::Parallel => vec![BRANCH.to_string()],

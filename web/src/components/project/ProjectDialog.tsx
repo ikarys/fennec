@@ -10,6 +10,9 @@ import { listFolders, type FolderListing } from '../../lib/api';
 import { CloseIcon } from '../Icons';
 import { FolderList } from './FolderList';
 import { PathBreadcrumb } from './PathBreadcrumb';
+import { Button } from '../ui/Button';
+import { Card } from '../ui/Card';
+import { TextInput } from '../ui/Field';
 
 interface ProjectDialogProps {
   open: boolean;
@@ -27,7 +30,6 @@ export function ProjectDialog({ open, submitting, error, onClose, onSubmit }: Pr
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const requestRef = useRef(0);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async (target?: string) => {
     const requestId = ++requestRef.current;
@@ -60,7 +62,7 @@ export function ProjectDialog({ open, submitting, error, onClose, onSubmit }: Pr
     setLoading(true);
     load();
 
-    const timer = window.setTimeout(() => inputRef.current?.focus(), 0);
+    const timer = window.setTimeout(() => document.getElementById('project-dialog-path')?.focus(), 0);
     return () => window.clearTimeout(timer);
   }, [open, load]);
 
@@ -117,47 +119,42 @@ export function ProjectDialog({ open, submitting, error, onClose, onSubmit }: Pr
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-xl border border-border-strong bg-panel shadow-2xl">
+      <Card className="flex max-h-[85vh] w-full max-w-2xl flex-col shadow-2xl">
         <header className="flex shrink-0 items-start justify-between gap-3 border-b border-border p-4">
-          <div className="min-w-0">
+          <div className="flex min-w-0 flex-col gap-1">
             <h2 className="truncate text-base font-semibold text-text">Ouvrir un projet</h2>
-            <p className="mt-1 truncate text-sm text-muted">Choisissez le dossier du projet.</p>
+            <p className="truncate text-sm text-muted">Choisissez le dossier du projet.</p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Fermer"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-raised text-muted hover:text-text"
-          >
+          <Button variant="secondary" size="sm" iconOnly onClick={onClose} aria-label="Fermer">
             <CloseIcon className="h-4 w-4" />
-          </button>
+          </Button>
         </header>
 
-        <div className="shrink-0 space-y-3 border-b border-border p-4">
+        <div className="flex shrink-0 flex-col gap-3 border-b border-border p-4">
           <div className="flex items-center gap-2">
             <label htmlFor="project-dialog-path" className="sr-only">
               Chemin du dossier
             </label>
-            <input
+            <TextInput
               id="project-dialog-path"
-              ref={inputRef}
               value={pathInput}
               onChange={(event) => setPathInput(event.target.value)}
               onKeyDown={handlePathKeyDown}
               placeholder="/"
-              className="min-w-0 flex-1 rounded-lg border border-border bg-code px-3 py-2 font-mono text-sm text-text"
+              className="min-w-0 flex-1"
             />
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="sm"
+              iconOnly
               aria-label="Dossier parent"
               disabled={!listing?.parent}
               onClick={() => {
                 if (listing?.parent) navigateTo(listing.parent);
               }}
-              className="min-h-9 shrink-0 rounded-lg border border-border bg-raised px-3 text-sm text-text disabled:opacity-50"
             >
               ↑
-            </button>
+            </Button>
           </div>
 
           {currentPath && <PathBreadcrumb path={currentPath} onNavigate={navigateTo} />}
@@ -185,35 +182,31 @@ export function ProjectDialog({ open, submitting, error, onClose, onSubmit }: Pr
           />
         </div>
 
-        <footer className="shrink-0 border-t border-border p-4">
-          {error && <div className="mb-2 text-sm text-err">{error}</div>}
-          <div className="mb-3 flex items-center gap-2 text-sm text-muted">
+        <footer className="flex shrink-0 flex-col gap-3 border-t border-border p-4">
+          {error && <div className="text-sm text-err">{error}</div>}
+          <div className="flex items-center gap-2 text-sm text-muted">
             <span className="shrink-0">Dossier :</span>
             <span className="min-w-0 truncate font-mono text-text" title={targetPath}>
               {targetPath || '—'}
             </span>
           </div>
           <div className="flex flex-wrap justify-end gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="min-h-9 rounded-lg border border-border bg-transparent px-3 text-sm text-muted"
-            >
+            <Button variant="secondary" size="sm" onClick={onClose}>
               Annuler
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
               disabled={submitting || !targetPath}
               onClick={() => {
                 if (targetPath) onSubmit(targetPath);
               }}
-              className="min-h-9 rounded-lg bg-accent px-3 text-sm font-medium text-on-accent disabled:opacity-60"
             >
               {submitting ? 'Ouverture…' : 'Ouvrir ce dossier'}
-            </button>
+            </Button>
           </div>
         </footer>
-      </div>
+      </Card>
     </div>
   );
 }

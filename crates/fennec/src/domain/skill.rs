@@ -1,7 +1,8 @@
 //! Port of openfox `skills/types.ts` and the `SKILL.md` parsing of
-//! `skills/registry.ts` (gray-matter there), for portable packages.
+//! `skills/registry.ts` (gray-matter there), for portable and embedded
+//! packages.
 //!
-//! Not ported: bundled defaults, openfox's own config/`.openfox/skills`
+//! Not ported: openfox's own config/`.openfox/skills`
 //! dirs, legacy `.skill.md` files, selected directories, enable/disable
 //! settings, name warnings, installer, HTTP routes/UI, edit/delete.
 
@@ -9,13 +10,14 @@ use std::path::PathBuf;
 
 use crate::domain::frontmatter::split;
 
-/// openfox `SkillDefinition`, portable packages only.
+/// openfox `SkillDefinition`, portable and embedded packages.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Skill {
     pub id: String,
     pub description: String,
     pub prompt: String,
-    pub directory: PathBuf,
+    /// The package directory; None for a skill embedded in fennec (no files beside it).
+    pub directory: Option<PathBuf>,
 }
 
 /// Parses a SKILL.md: (name, description, body), None when the frontmatter
@@ -34,13 +36,16 @@ pub fn parse_skill_md(content: &str) -> Option<(String, String, String)> {
     Some((name.to_string(), description.to_string(), body))
 }
 
-/// openfox `formatSkillPrompt` for a portable skill.
+/// openfox `formatSkillPrompt` for a skill.
 pub fn format_skill_prompt(skill: &Skill) -> String {
-    format!(
-        "Skill package directory: {}\nResolve relative paths in these instructions from that directory.\n\n{}",
-        skill.directory.display(),
-        skill.prompt
-    )
+    match &skill.directory {
+        Some(directory) => format!(
+            "Skill package directory: {}\nResolve relative paths in these instructions from that directory.\n\n{}",
+            directory.display(),
+            skill.prompt
+        ),
+        None => skill.prompt.clone(),
+    }
 }
 
 #[cfg(test)]
@@ -70,11 +75,22 @@ mod tests {
             id: "test".to_string(),
             description: "desc".to_string(),
             prompt: "Run scripts/check.sh.".to_string(),
-            directory: PathBuf::from("/shared skills/test"),
+            directory: Some(PathBuf::from("/shared skills/test")),
         };
         assert_eq!(
             format_skill_prompt(&skill),
             "Skill package directory: /shared skills/test\nResolve relative paths in these instructions from that directory.\n\nRun scripts/check.sh."
         );
+    }
+
+    #[test]
+    fn embedded_skill_formats_to_prompt_alone() {
+        let skill = Skill {
+            id: "test".to_string(),
+            description: "desc".to_string(),
+            prompt: "Run scripts/check.sh.".to_string(),
+            directory: None,
+        };
+        assert_eq!(format_skill_prompt(&skill), "Run scripts/check.sh.");
     }
 }
