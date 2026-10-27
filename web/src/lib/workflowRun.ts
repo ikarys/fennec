@@ -1,7 +1,7 @@
 import type { FennecEvent } from './fold';
 import type { NodeKind, WorkflowDef, WorkflowNode } from './workflow';
 
-export type NodeRunState = 'running' | 'done' | 'ended';
+export type NodeRunState = 'running' | 'done' | 'ended' | 'interrupted';
 
 export interface NodeRun {
   nodeId: string;
@@ -70,12 +70,29 @@ export function createRunFold(): RunFold {
       case 'workflow.node.started': {
         if (!run) return true;
         const nodeId = String(data.nodeId ?? '');
+        const pass = typeof data.pass === 'number' ? data.pass : 1;
+        const existing = run.runs.find(
+          // A resume restarts an interrupted node on its own pass: same row.
+          (candidate) =>
+            candidate.nodeId === nodeId &&
+            candidate.pass === pass &&
+            (candidate.state === 'running' || candidate.state === 'interrupted')
+        );
+        if (existing) {
+          existing.state = 'running';
+          if (typeof data.childSessionId === 'string') {
+            existing.childSessionId = data.childSessionId;
+          }
+          // workflow.resumed emptied open; the restarted node is open again.
+          if (!run.open.includes(nodeId)) run.open.push(nodeId);
+          return true;
+        }
         const node = nodeById(run.workflow, nodeId);
         const nodeRun: NodeRun = {
           nodeId,
           label: labelOf(node, nodeId),
           kind: node?.kind ?? 'agent',
-          pass: typeof data.pass === 'number' ? data.pass : 1,
+          pass,
           state: 'running'
         };
         if (typeof data.childSessionId === 'string') {
@@ -119,6 +136,11 @@ export function createRunFold(): RunFold {
       }
       case 'workflow.resumed': {
         if (!run) return true;
+        for (const nodeRun of run.runs) {
+          if (nodeRun.state === 'running') {
+            nodeRun.state = 'interrupted';
+          }
+        }
         run.paused = undefined;
         run.open = [];
         run.lastComment = typeof data.comment === 'string' ? data.comment : undefined;
@@ -128,7 +150,7 @@ export function createRunFold(): RunFold {
         if (!run) return true;
         for (const nodeRun of run.runs) {
           if (nodeRun.state === 'running') {
-            nodeRun.state = 'ended';
+            nodeRun.state = 'interrupted';
           }
         }
         run.open = [];
@@ -218,4 +240,63 @@ export function portTone(port: string): 'positive' | 'negative' | 'other' {
   if (POSITIVE_PORTS.has(normalized)) return 'positive';
   if (NEGATIVE_PORTS.has(normalized)) return 'negative';
   return 'other';
+}
+
+/** A step the run has not reached yet, on its nominal path. */
+export interface UpcomingStep { nodeId: string; label: string; }
+
+/**
+ * The nodes still to come after the current one, following at each node its
+ * nominal edge: a positive port first (portTone), else the first edge whose
+ * port is not negative, in the definition's order. Stops at an end node (not
+ * listed), at a node already listed (a loop), or when nothing leads on. A
+ * finished run has none.
+ */
+export function upcomingSteps(run: RunView): UpcomingStep[] {
+  if (run.finished) return [];
+  const nodes = run.workflow.nodes;
+  if (nodes.length === 0) return [];
+  const edges = run.workflow.edges;
+  const steps: UpcomingStep[] = [];
+  const seen = new Set<string>();
+
+  const nextNode = (nodeId: string): string | undefined => {
+    const outgoing = edges.filter((edge) => edge.from === nodeId);
+    return outgoing.find((edge) => portTone(edge.port) === 'positive')?.to ??
+      outgoing.find((edge) => portTone(edge.port) !== 'negative')?.to;
+  };
+
+  const addStep = (nodeId: string): void => {
+    const node = nodeById(run.workflow, nodeId);
+    // Terminal nodes are not steps to come.
+    if (node?.kind === 'end') return;
+    if (seen.has(nodeId)) return;
+    seen.add(nodeId);
+    steps.push({ nodeId, label: labelOf(node, nodeId) });
+  };
+
+  const start = run.paused?.to ?? run.open[run.open.length - 1] ?? run.runs[run.runs.length - 1]?.nodeId;
+  if (!start) return [];
+
+  if (run.paused?.to) {
+    addStep(start);
+  } else {
+    // The current node is already a row; only mark it so a loop does not relist it.
+    seen.add(start);
+  }
+
+  let current = start;
+  // One guard per node, so a malformed cycle cannot run the walk forever.
+  for (let i = 0; i < nodes.length && steps.length < nodes.length; i += 1) {
+    const next = nextNode(current);
+    if (!next) break;
+    const node = nodeById(run.workflow, next);
+    if (node?.kind === 'end') break;
+    if (seen.has(next)) break;
+    seen.add(next);
+    steps.push({ nodeId: next, label: labelOf(node, next) });
+    current = next;
+  }
+
+  return steps;
 }
