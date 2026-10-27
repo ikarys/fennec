@@ -346,6 +346,9 @@ pub enum Event {
         base: String,
         commits: Vec<String>,
         head: String,
+        /// The integration commit message; older logs have none.
+        #[serde(default)]
+        message: String,
         acknowledged: Vec<String>,
     },
     /// The human discarded the session's worktree and branch (fennec's own event).
