@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 :root {
+  color-scheme: dark;
   --bg: #0E1013;
   --panel: #15181D;
   --raised: #1D2128;
@@ -23,6 +24,7 @@
 }
 
 :root[data-theme="nuit"] {
+  color-scheme: dark;
   --bg: #0E1013;
   --panel: #15181D;
   --raised: #1D2128;
@@ -45,6 +47,7 @@
 }
 
 :root[data-theme="jour"] {
+  color-scheme: light;
   --bg: #F6F6F3;
   --panel: #FFFFFF;
   --raised: #EFEFEB;
@@ -67,6 +70,7 @@
 }
 
 :root[data-theme="brume"] {
+  color-scheme: dark;
   --bg: #0F1420;
   --panel: #151B29;
   --raised: #1D2536;
@@ -139,6 +143,11 @@ a {
 
 /* In the base layer, so a utility such as text-xs on a button wins. */
 @layer base {
+  /* The select popup is drawn by the browser: give its options the theme's colours. */
+  option {
+    background-color: var(--panel);
+    color: var(--text);
+  }
   button {
     font: inherit;
     cursor: pointer;

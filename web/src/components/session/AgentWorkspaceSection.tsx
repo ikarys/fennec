@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { IntegrationPreview, SessionDetail } from '../../lib/api';
 import { discardWorktree, getIntegration } from '../../lib/api';
 import { BranchIcon, CheckIcon, CopyIcon, EditIcon, FolderIcon, SpinnerIcon } from '../Icons';
-import { IntegrationDialog } from './IntegrationDialog';
+import { useIntegrationInvite } from './IntegrationInvite';
 import { Button, buttonClass } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { panelBlock } from '../../lib/panelBlocks';
@@ -22,11 +22,11 @@ function shortAgentBranch(branch: string): string {
   return sessionPart.length > 8 ? `${prefix}${sessionPart.slice(0, 8)}…` : branch;
 }
 
-export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarded }: { sessionId: string | null; worktree: NonNullable<SessionDetail['worktree']>; running: boolean; onDiscarded: () => void }) {
+export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarded, integrationVersion }: { sessionId: string | null; worktree: NonNullable<SessionDetail['worktree']>; running: boolean; onDiscarded: () => void; integrationVersion: number }) {
   const [preview, setPreview] = useState<IntegrationPreview | null>(null);
   const [loading, setLoading] = useState(false);
-  const [dialogOpen, setDialogOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const invite = useIntegrationInvite();
   const [discarding, setDiscarding] = useState(false);
   const [discardError, setDiscardError] = useState<string | null>(null);
   const previousRunning = useRef(running);
@@ -51,7 +51,7 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
 
   useEffect(() => {
     void fetchPreview();
-  }, [fetchPreview]);
+  }, [fetchPreview, integrationVersion]);
 
   useEffect(() => {
     // The preview is only meaningful once the agent's turn has finished.
@@ -95,14 +95,12 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
 
   const humanBranch = preview?.humanBranch ?? 'ta branche';
   const hasCommits = (preview?.commits.length ?? 0) > 0;
-  const integrateDisabled = sessionId === null || running || !hasCommits;
+  // The file list lives in the Fichiers modifiés block; here only what blocks the review.
+  const protectedCount = preview?.files.filter((file) => file.protected).length ?? 0;
+  const integrateDisabled = sessionId === null || running || !hasCommits || invite === null;
 
   return (
     <Panel id="workspace" title={panelBlock('workspace').title} pinned>
-      <p className="m-0 text-xs text-muted">
-        L'agent travaille dans sa propre copie du dépôt. Ton dossier et ta branche ne changent pas tant que tu n'intègres pas.
-      </p>
-
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center gap-2">
           <FolderIcon className="h-4 w-4 shrink-0 text-muted" />
@@ -154,24 +152,8 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
                 <>
                   <div className="text-xs text-muted">
                     {hasCommits ? `${preview.commits.length} commits · ${preview.files.length} fichiers` : "Rien à intégrer pour l'instant."}
+                    {protectedCount > 0 && <Badge tone="err" className="ml-2">{protectedCount} protégé{protectedCount > 1 ? 's' : ''}</Badge>}
                   </div>
-                  {preview.files.length > 0 && (
-                    <div className="max-h-[150px] overflow-y-auto">
-                      {preview.files.map((file) => (
-                        <div key={file.path} className="flex items-center gap-2 py-1 font-mono text-xs">
-                          {/* Cut on the left: the file name is what tells files apart. */}
-                          <span
-                            dir="rtl"
-                            title={file.path}
-                            className="grow overflow-hidden text-left text-ellipsis whitespace-nowrap"
-                          >
-                            <bdi>{file.path}</bdi>
-                          </span>
-                          {file.protected && <Badge tone="err">protégé</Badge>}
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </>
               )
             )}
@@ -181,7 +163,7 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
         <Button
           variant="secondary"
           size="sm"
-          onClick={() => setDialogOpen(true)}
+          onClick={() => invite?.open()}
           disabled={integrateDisabled}
           title={running ? 'Attends la fin du tour' : undefined}
           className="w-full"
@@ -215,17 +197,6 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
         </details>
       </div>
 
-      {sessionId && dialogOpen && (
-        <IntegrationDialog
-          sessionId={sessionId}
-          open={dialogOpen}
-          onClose={() => {
-            setDialogOpen(false);
-            // The dialog may have integrated commits; the preview is stale.
-            void fetchPreview();
-          }}
-        />
-      )}
     </Panel>
   );
 }

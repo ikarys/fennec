@@ -35,7 +35,7 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
             send_json(
                 stream,
                 200,
-                &json!({ "model": params.model, "contextWindow": params.context_window }),
+                &json!({ "model": params.model, "contextWindow": params.context_window, "compactAt": params.compact_at }),
             )
         }
         ("GET", ["api", "settings"]) => get_settings(app, stream),

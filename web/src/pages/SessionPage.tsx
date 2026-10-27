@@ -1,5 +1,5 @@
 import type { WorkflowSummary } from '../lib/workflow';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Agent, AttachmentInput, Config, Project, SessionDetail, SessionState, SlashCommand } from '../lib/api';
 import type { AssistantItem, Segment } from '../lib/fold';
 import { splitContract } from '../lib/plan';
@@ -26,9 +26,12 @@ import { runWaiting } from '../lib/workflowRun';
 import { useSessionThread } from '../hooks/useSessionThread';
 import { Composer } from '../components/session/Composer';
 import { ContextPanel } from '../components/session/ContextPanel';
+import { ContextGauge } from '../components/session/ContextGauge';
 import { QuestionCard } from '../components/session/QuestionCard';
 import { ThreadItemView } from '../components/session/Thread';
 import { PlanActionsContext } from '../components/session/PlanActions';
+import { IntegrationInviteContext, type IntegrationInvite } from '../components/session/IntegrationInvite';
+import { IntegrationDialog } from '../components/session/IntegrationDialog';
 import { PreviewContext, PreviewWorkdirContext, type PreviewTarget } from '../components/preview/PreviewContext';
 import { PreviewPane } from '../components/preview/PreviewPane';
 import { RunRail } from '../components/workflow/session/RunRail';
@@ -72,6 +75,8 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
   const [planBuildInFlight, setPlanBuildInFlight] = useState(false);
   const [preview, setPreview] = useState<PreviewTarget | null>(null);
   const [detailVersion, setDetailVersion] = useState(0);
+  const [integrationOpen, setIntegrationOpen] = useState(false);
+  const [integrationVersion, setIntegrationVersion] = useState(0);
   const { view, hasMore, loadingOlder, loadOlder, skills } = useSessionThread(sessionId);
   const running = view.running;
   const run = view.run;
@@ -263,6 +268,19 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
           disabled: running || planBuildInFlight
         }
       : null;
+  const lastRunEndId = useMemo(() => {
+    for (let i = view.items.length - 1; i >= 0; i -= 1) {
+      const item = view.items[i];
+      // Once integrated, the run's work is in the human's branch: no invite left.
+      if (item?.id.startsWith('integration-applied-')) return null;
+      if (item && item.kind === 'workflow-end') return item.id;
+    }
+    return null;
+  }, [view.items]);
+  const integrationInvite = useMemo<IntegrationInvite | null>(() => {
+    if (!sessionId || !detail?.worktree) return null;
+    return { lastRunEndId, open: () => setIntegrationOpen(true) };
+  }, [sessionId, detail?.worktree, lastRunEndId]);
   const projectName =
     detail?.project.name ?? projects.find((project) => project.id === projectId)?.name ?? projectId ?? '—';
   const currentTokens = view.contextTokens ?? 0;
@@ -488,6 +506,7 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
     <PreviewContext.Provider value={setPreview}>
       <PreviewWorkdirContext.Provider value={detail?.project.workdir}>
         <PlanActionsContext.Provider value={planActions}>
+          <IntegrationInviteContext.Provider value={integrationInvite}>
         <div className="flex min-h-0 min-w-0 grow">
           {run && <RunRail run={run} running={running} onStop={handleStopWorkflow} />}
           <main className="flex min-h-0 min-w-0 flex-[999_1_560px] flex-col">
@@ -499,6 +518,17 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
               {stateLabel(state)}
             </span>
             <span className="shrink-0 text-xs text-muted" title={detail?.project.workdir}>{projectName}</span>
+            <div className="ml-auto">
+              <ContextGauge
+                currentTokens={currentTokens}
+                maxTokens={maxTokens}
+                contextPercent={contextPercent}
+                compactAt={config?.compactAt ?? 0.85}
+                compactDisabled={!sessionId || state === 'running' || state === 'waiting_for_user'}
+                onCompact={handleCompact}
+                compactError={compactError}
+              />
+            </div>
           </div>
         </div>
 
@@ -626,23 +656,29 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
 
           <ContextPanel
             view={view}
-            currentTokens={currentTokens}
-            maxTokens={maxTokens}
-            contextPercent={contextPercent}
             skills={skills}
             hasSession={sessionId !== null}
-            compactDisabled={!sessionId || state === 'running' || state === 'waiting_for_user'}
-            onCompact={handleCompact}
-            compactError={compactError}
             partial={hasMore}
             worktree={detail?.worktree ?? null}
             sessionId={sessionId}
             onWorktreeChanged={() => setDetailVersion((version) => version + 1)}
+            integrationVersion={integrationVersion}
           />
+          {sessionId && integrationOpen && (
+            <IntegrationDialog
+              sessionId={sessionId}
+              open
+              onClose={() => {
+                setIntegrationOpen(false);
+                setIntegrationVersion((version) => version + 1);
+              }}
+            />
+          )}
           {preview && sessionId && (
             <PreviewPane sessionId={sessionId} target={preview} onClose={() => setPreview(null)} />
           )}
         </div>
+          </IntegrationInviteContext.Provider>
         </PlanActionsContext.Provider>
       </PreviewWorkdirContext.Provider>
     </PreviewContext.Provider>
