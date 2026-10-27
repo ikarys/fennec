@@ -65,7 +65,12 @@ itself (verified), an agent node with `verdicts` judges the others
 Protected files, done: fennec's defaults (`.agents`, AGENTS.md, lockfiles, CI)
 and the project's `.agents/protected`; the file tools refuse them, the
 sandbox mounts them read-only (`domain/protection.rs`, `protected.rs`).
-Next, one PR each: fennec's own layer (human-only integration, review gate) → sub-agents as tools, when dogfooding shows sessions
+Integration, done: an "Intégrer" button runs the cherry-pick of a session's
+worktree branch into the human's repository, on the human's click only, after
+a review gate (commits, files, criteria, protected files touched) whose
+blockers the human must accept one by one (`integration.applied` records it).
+Next, one PR each: the rest of fennec's own layer (decision registry,
+tests protected once validated) → sub-agents as tools, when dogfooding shows sessions
 saturating their context while exploring.
 
 ## Layout
@@ -95,6 +100,7 @@ crates/fennec/src/
     replay.rs          which message the human may replay
     criteria.rs        acceptance criteria: the plan's "Done when", checks, verdicts, provenance
     protection.rs      protected files: the defaults, the gitignore-like patterns, the matcher
+    integration.rs     the review gate: what blocks an integration until the human accepts it
     workflow/          a workflow: definition (nodes, ports, edges), template ({{…}} names),
                        validate (the graph rules), run (the run folded from its events, the next step)
     id.rs, clock.rs
@@ -118,6 +124,7 @@ crates/fennec/src/
                      store/settings.rs the stored preferences
   git.rs             what fennec reads from a repository
   worktree.rs        a session's git worktree: a workflow never writes the human's tree
+  integration.rs     the human's integration: preview of a worktree branch, cherry-pick, conflict abort
   instructions.rs    openfox context/instructions: Settings' global instructions + the
                      AGENTS.md files above the workdir, for a new session's prompt
   agents.rs          the *.agent.md files: embedded defaults (crates/fennec/agents/), ~/.agents/agents,

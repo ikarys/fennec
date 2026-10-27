@@ -9,6 +9,7 @@ mod domain;
 mod folders;
 mod git;
 mod instructions;
+mod integration;
 mod llm;
 mod protected;
 mod skills;

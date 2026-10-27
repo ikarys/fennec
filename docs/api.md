@@ -34,6 +34,7 @@ with camelCase fields.
 | `workflow.node.finished` | `{runId, nodeId, port, output, exitCode?}` |
 | `criteria.set` | `{criteria: [{id, description, check?}]}`: the approved plan's criteria, all pending |
 | `criterion.updated` | `{criterionId, status}`; `status` is `{type: "pending"}` or `{type: "passed" \| "failed", provenance}`, `provenance` `{kind: "verified", command, exitCode?, output}` (fennec ran the check) or `{kind: "indicative", agent, reason}` (an agent's verdict) |
+| `integration.applied` | `{branch, base, commits, head, acknowledged}`: the human integrated the session's branch; `acknowledged` lists the blockers they accepted |
 | `workflow.paused` | `{runId, from, port, to}`: waiting before `to` |
 | `workflow.resumed` | `{runId, comment}` |
 | `workflow.finished` | `{runId, outcome, reason?}`: `outcome` is `done`, `blocked`, `stopped` or `error` |
@@ -160,6 +161,18 @@ read-only. The human edits them as usual.
   `git cherry-pick <base>..<branch>`;
   `mode` is the id of the agent the session resolves to from its event log
   (null when there is no top-level agent)
+- `GET /api/sessions/{id}/integration` → `{branch, base, humanBranch, commits: [{sha, subject}], files: [{path, protected}], criteria, blockers}`:
+  what integrating the session's worktree branch would do (409 without a
+  worktree). `blockers` is the review gate, each `{kind, …}`: `noCommits`,
+  `criteriaNotPassed {criteria}`, `noCriteria`, `protectedTouched {paths}`;
+  protection is read from the project's tree, not the worktree's.
+- `POST /api/sessions/{id}/integrate` `{acknowledged: [kind]}` → `{head, commits}`:
+  the human's decision. The server recomputes the gate and answers 409 while a
+  turn runs, while a blocker is not acknowledged (`noCommits` never is), or when
+  git fails; then it runs `git cherry-pick <base>..<branch>` in the human's
+  repository (a conflict is aborted, the tree left as it was), moves the base
+  ref to the branch head and appends `integration.applied`. Nothing else in
+  fennec integrates: no agent, workflow or schedule calls it.
 - `GET /api/sessions/{id}/skills` → `{loaded: [ids], active: [ids]}`: the
   skills the session loaded (successful `load_skill` calls and `/<skill>`
   messages it typed, first-seen order) and those still in the model's view

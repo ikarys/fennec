@@ -1,9 +1,11 @@
 import type { ThreadView } from '../../lib/fold';
 import type { SessionDetail, SessionSkills } from '../../lib/api';
+import { useEffect, useState } from 'react';
 import { cachePercent, formatSpeed, formatTokens } from '../../lib/format';
 import { previewKindOfPath, relativeToWorkdir } from '../../lib/preview';
 import { usePreviewOpener, usePreviewWorkdir } from '../preview/PreviewContext';
 import { CriteriaSection } from './CriteriaSection';
+import { IntegrationDialog } from './IntegrationDialog';
 import { VisionSection } from './VisionSection';
 
 interface ContextPanelProps {
@@ -21,11 +23,19 @@ interface ContextPanelProps {
   partial: boolean;
   /** Where the agent's work lands; null when the session runs in place. */
   worktree: SessionDetail['worktree'];
+  /** The session id, for the integration dialog; null on a new-session tab. */
+  sessionId: string | null;
 }
 
-export function ContextPanel({ view, currentTokens, contextPercent, skills, hasSession, compactDisabled, onCompact, compactError, partial, worktree }: ContextPanelProps) {
+export function ContextPanel({ view, currentTokens, contextPercent, skills, hasSession, compactDisabled, onCompact, compactError, partial, worktree, sessionId }: ContextPanelProps) {
   const opener = usePreviewOpener();
   const workdir = usePreviewWorkdir();
+  const [integrationOpen, setIntegrationOpen] = useState(false);
+
+  useEffect(() => {
+    // The dialog belongs to one session; a tab change closes it.
+    setIntegrationOpen(false);
+  }, [sessionId]);
   return (
       <aside
         aria-label="Contexte de la session"
@@ -138,6 +148,15 @@ export function ContextPanel({ view, currentTokens, contextPercent, skills, hasS
             <h2 className="text-[11px] font-semibold tracking-[0.06em] text-muted uppercase">Worktree</h2>
             <div className="font-mono text-xs">{worktree.branch}</div>
             <div title={worktree.path} className="overflow-hidden font-mono text-xs text-muted text-ellipsis whitespace-nowrap">{worktree.path}</div>
+            {sessionId && (
+              <button
+                type="button"
+                onClick={() => setIntegrationOpen(true)}
+                className="self-start rounded-lg bg-accent px-2.5 py-1 text-xs font-medium text-on-accent"
+              >
+                Intégrer…
+              </button>
+            )}
             <button
               type="button"
               title="Copier la commande"
@@ -147,6 +166,13 @@ export function ContextPanel({ view, currentTokens, contextPercent, skills, hasS
               <code>git cherry-pick {worktree.base}..{worktree.branch}</code>
             </button>
           </section>
+        )}
+        {sessionId && (
+          <IntegrationDialog
+            sessionId={sessionId}
+            open={integrationOpen}
+            onClose={() => setIntegrationOpen(false)}
+          />
         )}
 
         <section className="flex flex-col gap-2">

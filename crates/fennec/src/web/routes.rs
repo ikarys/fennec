@@ -3,7 +3,7 @@
 use super::App;
 use super::http::{Request, error, send, send_json};
 use super::notifier::NotifyingLog;
-use super::{assets, event_stream, turns::Job, workflow_routes};
+use super::{assets, event_stream, integration, turns::Job, workflow_routes};
 use crate::agent::ports::EventLog;
 use crate::agent::workflow::WorkflowJob;
 use crate::agents;
@@ -68,6 +68,12 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
         }
         ("POST", ["api", "sessions", id, "workflow", control]) => {
             workflow_routes::control_workflow(app, req, stream, id, control)
+        }
+        ("GET", ["api", "sessions", id, "integration"]) => {
+            integration::get_integration(app, stream, id)
+        }
+        ("POST", ["api", "sessions", id, "integrate"]) => {
+            integration::integrate(app, req, stream, id)
         }
         ("POST", ["api", "sessions", id, "stop"]) => {
             app.turns.stop(id);

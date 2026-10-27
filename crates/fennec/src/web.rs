@@ -6,6 +6,7 @@ mod children;
 mod event_stream;
 mod guard;
 mod http;
+mod integration;
 mod notifier;
 mod preview;
 mod routes;

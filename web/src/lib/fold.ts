@@ -586,6 +586,26 @@ export function createThreadFold(): ThreadFold {
         break;
       }
 
+      case 'integration.applied': {
+        const commits = Array.isArray(data.commits) ? data.commits.map((commit: unknown) => String(commit)) : [];
+        const head = String(data.head ?? '');
+        const acknowledged = Array.isArray(data.acknowledged) ? data.acknowledged.map((kind: unknown) => String(kind)) : [];
+        const detailParts: string[] = [];
+        if (commits.length > 0) {
+          detailParts.push(commits.join(' '));
+        }
+        if (acknowledged.length > 0) {
+          detailParts.push(`Accepté malgré : ${acknowledged.join(', ')}`);
+        }
+        pushItem({
+          kind: 'note',
+          id: `integration-applied-${index}`,
+          text: `Intégré par toi · ${commits.length} commit${commits.length === 1 ? '' : 's'} dans HEAD ${head.slice(0, 8)}`,
+          detail: detailParts.length > 0 ? detailParts.join('\n') : undefined
+        });
+        break;
+      }
+
       case 'session.rewound': {
         const messageId = String(data.messageId ?? '');
         const index = items.findIndex((item) => item.id === messageId);

@@ -145,6 +145,12 @@ fn build(path: PathBuf, prefix: &str, session_id: &str) -> Worktree {
 }
 
 /// The repository's top directory and the project's prefix inside it.
+/// `integration.rs` reuses it instead of duplicating the lookup.
+pub fn top(project_dir: &Path) -> Option<(PathBuf, String)> {
+    repository(project_dir)
+}
+
+/// The repository's top directory and the project's prefix inside it.
 fn repository(project_dir: &Path) -> Option<(PathBuf, String)> {
     let text = |args: &[&str]| {
         let out = git(project_dir, args, None).ok()?;
@@ -157,7 +163,8 @@ fn repository(project_dir: &Path) -> Option<(PathBuf, String)> {
 
 /// Runs `git -C dir args...`; a non-zero exit is an `Err` with the command
 /// and its trimmed stderr.
-fn git(dir: &Path, args: &[&str], stdin: Option<&[u8]>) -> Result<Vec<u8>, String> {
+/// `integration.rs` reuses it to run the cherry-pick in the human's repository.
+pub(crate) fn git(dir: &Path, args: &[&str], stdin: Option<&[u8]>) -> Result<Vec<u8>, String> {
     let command = format!("git -C {} {}", dir.display(), args.join(" "));
     let mut child = Command::new("git")
         .arg("-C")

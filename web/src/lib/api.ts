@@ -252,6 +252,51 @@ export function getSkills(id: string): Promise<SessionSkills> {
   return request<SessionSkills>(`/api/sessions/${encodeURIComponent(id)}/skills`);
 }
 
+/** How a criterion's status was established, as reported by the integration preview. */
+export type IntegrationProvenance =
+  | { kind: 'verified'; command: string; exitCode?: number; output: string }
+  | { kind: 'indicative'; agent: string; reason: string };
+
+export type IntegrationCriterionStatus =
+  | { type: 'pending' }
+  | { type: 'passed' | 'failed'; provenance: IntegrationProvenance };
+
+export interface IntegrationCriterion {
+  id: string;
+  description: string;
+  check?: string;
+  status: IntegrationCriterionStatus;
+}
+
+export type Blocker =
+  | { kind: 'noCommits' }
+  | { kind: 'criteriaNotPassed'; criteria: string[] }
+  | { kind: 'noCriteria' }
+  | { kind: 'protectedTouched'; paths: string[] };
+
+export interface IntegrationPreview {
+  branch: string;
+  base: string;
+  humanBranch: string | null;
+  commits: { sha: string; subject: string }[];
+  files: { path: string; protected: boolean }[];
+  criteria: IntegrationCriterion[];
+  blockers: Blocker[];
+}
+
+/** The worktree's integration preview: what a cherry-pick would bring and what needs acceptance. */
+export function getIntegration(sessionId: string): Promise<IntegrationPreview> {
+  return request<IntegrationPreview>(`/api/sessions/${encodeURIComponent(sessionId)}/integration`);
+}
+
+/** Cherry-picks the worktree's commits into the human's branch after the accepted blockers. */
+export function integrate(sessionId: string, acknowledged: string[]): Promise<{ head: string; commits: string[] }> {
+  return request<{ head: string; commits: string[] }>(`/api/sessions/${encodeURIComponent(sessionId)}/integrate`, {
+    method: 'POST',
+    body: JSON.stringify({ acknowledged })
+  });
+}
+
 export interface AttachmentInput {
   filename: string;
   data: string;

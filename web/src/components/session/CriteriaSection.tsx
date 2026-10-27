@@ -1,4 +1,25 @@
-import type { CriterionView } from '../../lib/fold';
+import type { CriterionView, Provenance } from '../../lib/fold';
+
+export function CriterionProvenanceBadge({ provenance }: { provenance: Provenance | undefined }) {
+  if (!provenance) return null;
+  const badge =
+    provenance.kind === 'verified'
+      ? {
+          label: 'vérifié',
+          title: 'Fait établi par fennec : la commande a tourné',
+          className: 'border-ok bg-ok/10 text-ok'
+        }
+      : {
+          label: 'indicatif',
+          title: `Jugement d'un agent (${provenance.agent}) : à relire`,
+          className: 'border-accent bg-accent-soft text-accent-strong'
+        };
+  return (
+    <span title={badge.title} className={`shrink-0 rounded border px-1 py-0.5 text-[10px] ${badge.className}`}>
+      {badge.label}
+    </span>
+  );
+}
 
 export function CriteriaSection({ criteria }: { criteria: CriterionView[] }) {
   const passed = criteria.filter((criterion) => criterion.status === 'passed').length;
@@ -18,19 +39,6 @@ export function CriteriaSection({ criteria }: { criteria: CriterionView[] }) {
               criterion.status === 'failed' ? 'bg-err' :
               'bg-muted';
             const provenance = criterion.provenance;
-            const badge = provenance
-              ? provenance.kind === 'verified'
-                ? {
-                    label: 'vérifié',
-                    title: 'Fait établi par fennec : la commande a tourné',
-                    className: 'border-ok bg-ok/10 text-ok'
-                  }
-                : {
-                    label: 'indicatif',
-                    title: `Jugement d'un agent (${provenance.agent}) : à relire`,
-                    className: 'border-accent bg-accent-soft text-accent-strong'
-                  }
-              : null;
 
             return (
               <details key={criterion.id}>
@@ -38,14 +46,7 @@ export function CriteriaSection({ criteria }: { criteria: CriterionView[] }) {
                   <span aria-hidden className={`mt-1 h-2 w-2 shrink-0 rounded-full ${dotClass}`} />
                   <span className="shrink-0 font-mono text-muted">{criterion.id}</span>
                   <span className="grow break-words text-text">{criterion.description}</span>
-                  {badge && (
-                    <span
-                      title={badge.title}
-                      className={`shrink-0 rounded border px-1 py-0.5 text-[10px] ${badge.className}`}
-                    >
-                      {badge.label}
-                    </span>
-                  )}
+                  <CriterionProvenanceBadge provenance={provenance} />
                 </summary>
                 {(provenance || (criterion.status === 'pending' && criterion.check)) && (
                   <div className="flex flex-col gap-1.5 pb-1 pl-4 pr-1 text-xs">

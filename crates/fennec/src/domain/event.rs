@@ -311,6 +311,15 @@ pub enum Event {
         criterion_id: String,
         status: CriterionStatus,
     },
+    /// The human integrated the session's branch (fennec's own event).
+    #[serde(rename = "integration.applied", rename_all = "camelCase")]
+    IntegrationApplied {
+        branch: String,
+        base: String,
+        commits: Vec<String>,
+        head: String,
+        acknowledged: Vec<String>,
+    },
 }
 
 impl Event {
@@ -341,6 +350,7 @@ impl Event {
             Event::TurnSnapshot { .. } => "turn.snapshot",
             Event::CriteriaSet { .. } => "criteria.set",
             Event::CriterionUpdated { .. } => "criterion.updated",
+            Event::IntegrationApplied { .. } => "integration.applied",
         }
     }
 }

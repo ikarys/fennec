@@ -127,7 +127,7 @@ impl Transcript {
             // The reminder that follows names the mode.
             | Event::ModeChanged { .. }
             | Event::SessionRewound { .. }
-            // The CLI does not run workflows.
+            // The CLI does not run workflows or integrate.
             | Event::WorkflowStarted { .. }
             | Event::WorkflowNodeStarted { .. }
             | Event::WorkflowNodeFinished { .. }
@@ -135,7 +135,8 @@ impl Transcript {
             | Event::WorkflowResumed { .. }
             | Event::WorkflowFinished { .. }
             | Event::CriteriaSet { .. }
-            | Event::CriterionUpdated { .. } => Ok(()),
+            | Event::CriterionUpdated { .. }
+            | Event::IntegrationApplied { .. } => Ok(()),
         };
         let _ = out.flush();
     }
