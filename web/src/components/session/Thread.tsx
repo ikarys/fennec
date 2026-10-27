@@ -11,6 +11,7 @@ import { PlanCard, ReportCard } from './PlanCard';
 import { ToolCard } from './ToolCard';
 import { NodeDivider } from '../workflow/session/NodeDivider';
 import { markdownComponents } from './markdownComponents';
+import { attachmentAnchorId } from '../../lib/vision';
 
 
 
@@ -139,7 +140,7 @@ export function ThreadItemView({ item, model, running, showHeader, onReplay }: {
           {item.attachments.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {item.attachments.map((a) => (
-                <img key={a.id} src={a.data} alt={a.filename} className="max-h-48 rounded-lg border border-border" />
+                <img key={a.id} id={attachmentAnchorId(a.id)} src={a.data} alt={a.filename} className="max-h-48 rounded-lg border border-border" />
               ))}
             </div>
           )}

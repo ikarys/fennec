@@ -5,6 +5,7 @@ import { formatDuration } from '../../lib/format';
 import { previewKindOfPath, relativeToWorkdir } from '../../lib/preview';
 import { usePreviewOpener, usePreviewWorkdir } from '../preview/PreviewContext';
 import { EditIcon, FileIcon, SearchIcon, SpinnerIcon, TerminalIcon } from '../Icons';
+import { toolAnchorId } from '../../lib/vision';
 
 export function ToolCard({ tool }: { tool: ToolCallView }) {
   const display = useDisplayPrefs();
@@ -45,7 +46,7 @@ export function ToolCard({ tool }: { tool: ToolCallView }) {
     );
 
   return (
-    <div className="overflow-hidden rounded-[10px] border border-border bg-panel">
+    <div id={toolAnchorId(tool.id)} className="overflow-hidden rounded-[10px] border border-border bg-panel">
       <div className="flex min-h-10 items-center gap-2.5 px-3 text-left text-text">
         <button
           type="button"

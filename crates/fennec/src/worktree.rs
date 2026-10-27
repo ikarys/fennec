@@ -100,12 +100,20 @@ fn fill(top: &Path, wt: &Worktree) -> Result<(), String> {
     Ok(())
 }
 
-/// Commits everything in the worktree (`git add -A`), authored and committed
-/// by fennec, with `message`; `Ok(false)` when there was nothing to commit.
+/// Where `@playwright/cli` writes its screenshots: `.playwright-cli/` in the
+/// workdir, which may be a subdirectory of the worktree.
+const CAPTURES_EXCLUDED: &str = ":(exclude,glob)**/.playwright-cli/**";
+
+/// Commits everything in the worktree (`git add -A`) but the browser's
+/// captures, authored and committed by fennec, with `message`; `Ok(false)`
+/// when there was nothing to commit.
 pub fn commit(worktree: &Worktree, message: &str) -> Result<bool, String> {
     let dir = &worktree.path;
-    git(dir, &["add", "-A"], None)?;
-    if git(dir, &["status", "--porcelain"], None)?.is_empty() {
+    // The browser skill's screenshots are what the model looked at, not work
+    // to integrate: the human would cherry-pick them otherwise.
+    git(dir, &["add", "-A", "--", ".", CAPTURES_EXCLUDED], None)?;
+    // The staged changes, not `git status`: the excluded captures stay untracked.
+    if git(dir, &["diff", "--cached", "--name-only"], None)?.is_empty() {
         return Ok(false);
     }
     // The fennec identity is deliberate: provenance (a commit made by
@@ -256,6 +264,9 @@ mod tests {
             "fennec"
         );
         assert_eq!(commit(&wt, "again"), Ok(false));
+        std::fs::create_dir_all(wt.workdir.join(".playwright-cli")).unwrap();
+        std::fs::write(wt.workdir.join(".playwright-cli/page.png"), "png").unwrap();
+        assert_eq!(commit(&wt, "captures only"), Ok(false));
         let range = format!("{}..{}", wt.base, wt.branch);
         assert_eq!(
             text(&wt.path, &["log", "--format=%s", &range]).trim(),

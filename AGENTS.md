@@ -50,9 +50,12 @@ Dogfooding, started (`docs/dogfooding.md`): a session that runs a workflow
 works in its own git worktree and branch; the human cherry-picks.
 Web search, done: openfox's `web_search` (SearXNG only), its instance set on
 the Settings page.
+Browser and vision, done: openfox's `browser` skill embedded as a default
+(`@playwright/cli` through run_command, screenshots read back with read_file,
+kept out of the worktree's commits), and a Vision section in the context panel:
+the images the model saw, those a compaction dropped dimmed.
 Next, one PR each, so that the minimal agent works before security layers:
-browser captures (openfox's `browser` skill) and a vision panel of the images
-the model saw → bwrap world for tool
+bwrap world for tool
 execution (network off by default) → sub-agents as tools → criteria → fennec's own
 layer (human-only integration, provenance, review gate).
 
@@ -107,8 +110,8 @@ crates/fennec/src/
                      AGENTS.md files above the workdir, for a new session's prompt
   agents.rs          the *.agent.md files: embedded defaults (crates/fennec/agents/), ~/.agents/agents,
                      the project's .agents/agents (the project wins)
-  skills.rs          openfox skills/registry: the SKILL.md packages in ~/.agents/skills and the
-                     project's .agents/skills (the project wins)
+  skills.rs          openfox skills/registry: embedded defaults (crates/fennec/skills/), the SKILL.md
+                     packages in ~/.agents/skills and the project's .agents/skills (the project wins)
   workflows.rs       the *.workflow.json files: embedded defaults (crates/fennec/workflows/),
                      ~/.agents/workflows, the project's .agents/workflows (the project wins)
   folders.rs         the folders the human browses to open a project
@@ -128,7 +131,7 @@ web/src/           React + Vite + Tailwind v4 UI (same layout as openfox's web/s
   lib/               api (typed fetch), fold (events → thread view), format, theme,
                      attachments (images read in the browser), plan (the plan/report contract),
                      workflow (definition types and edits), workflowRun (a run folded from its events),
-                     preview (what can be previewed, its URL)
+                     preview (what can be previewed, its URL), vision (the images the model saw)
   styles/app.css     theme tokens: one CSS variable block per theme, mapped into Tailwind
 docs/api.md        the HTTP API and event wire format, shared by server and UI
 docs/workflows.md  the workflow format, run semantics and editor

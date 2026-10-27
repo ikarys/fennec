@@ -128,7 +128,7 @@ mod tests {
             id: id.to_string(),
             description: description.to_string(),
             prompt: String::new(),
-            directory: PathBuf::from("/tmp"),
+            directory: Some(PathBuf::from("/tmp")),
         }
     }
 

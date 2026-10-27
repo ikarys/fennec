@@ -3,6 +3,7 @@ import type { SessionDetail, SessionSkills } from '../../lib/api';
 import { cachePercent, formatSpeed, formatTokens } from '../../lib/format';
 import { previewKindOfPath, relativeToWorkdir } from '../../lib/preview';
 import { usePreviewOpener, usePreviewWorkdir } from '../preview/PreviewContext';
+import { VisionSection } from './VisionSection';
 
 interface ContextPanelProps {
   view: ThreadView;
@@ -105,6 +106,8 @@ export function ContextPanel({ view, currentTokens, contextPercent, skills, hasS
             );
           })}
         </section>
+
+        <VisionSection items={view.items} partial={partial} />
 
         <section className="flex flex-col gap-1.5">
           <h2 className="text-[11px] font-semibold tracking-[0.06em] text-muted uppercase">Skills</h2>

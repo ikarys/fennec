@@ -1,15 +1,20 @@
 //! Port of openfox `skills/registry.ts` discovery (`loadAllSkills`,
-//! `loadPortableSkills`): `~/.agents/skills`, then the project's
-//! `.agents/skills`, which overrides a skill of the same id.
+//! `loadPortableSkills`): embedded bundled defaults, then `~/.agents/skills`,
+//! then the project's `.agents/skills`, which overrides a skill of the same id.
 //!
-//! Not ported: bundled defaults, openfox's own config/`.openfox/skills`
-//! dirs, legacy `.skill.md` files, selected directories, enable/disable
-//! settings, name warnings, installer, HTTP routes/UI, edit/delete.
+//! Bundled defaults are embedded in the binary, never copied to the user's
+//! config, as in openfox.
+//!
+//! Not ported: openfox's own config/`.openfox/skills` dirs, legacy
+//! `.skill.md` files, selected directories, enable/disable settings, name
+//! warnings, installer, HTTP routes/UI, edit/delete.
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::domain::skill::{Skill, parse_skill_md};
+
+const DEFAULTS: [&str; 1] = [include_str!("../skills/browser/SKILL.md")];
 
 /// openfox `loadAllSkills`: the skills a session in `workdir` can load.
 pub fn discover(workdir: &Path) -> Vec<Skill> {
@@ -19,6 +24,20 @@ pub fn discover(workdir: &Path) -> Vec<Skill> {
 
 fn discover_in(home: Option<&Path>, workdir: &Path) -> Vec<Skill> {
     let mut skills = Vec::new();
+
+    for content in DEFAULTS {
+        let (id, description, prompt) =
+            parse_skill_md(content).expect("embedded default skill must parse");
+        insert_or_override(
+            &mut skills,
+            Skill {
+                id,
+                description,
+                prompt,
+                directory: None,
+            },
+        );
+    }
 
     if let Some(home) = home {
         let dir = home.join(".agents").join("skills");
@@ -72,7 +91,7 @@ fn load_skills_directory(dir: &Path) -> Vec<Skill> {
             id,
             description,
             prompt,
-            directory,
+            directory: Some(directory),
         });
     }
 
@@ -114,10 +133,21 @@ mod tests {
     }
 
     #[test]
-    fn missing_dirs_load_nothing() {
+    fn missing_dirs_load_defaults_only() {
         let (root, home, workdir) = fixture();
-        assert!(discover_in(Some(&home), &workdir).is_empty());
-        assert!(discover_in(None, &workdir).is_empty());
+        assert_eq!(discover_in(Some(&home), &workdir).len(), DEFAULTS.len());
+        assert_eq!(discover_in(None, &workdir).len(), DEFAULTS.len());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn embedded_browser_skill_is_discovered_with_no_directory() {
+        let (root, _home, workdir) = fixture();
+        let found = discover_in(None, &workdir);
+        assert_eq!(found.len(), DEFAULTS.len());
+        assert_eq!(found[0].id, "browser");
+        assert_eq!(found[0].directory, None);
+        assert!(found[0].prompt.contains("@playwright/cli"));
         let _ = std::fs::remove_dir_all(&root);
     }
 
@@ -132,11 +162,11 @@ mod tests {
         );
 
         let found = discover_in(Some(&home), &workdir);
-        assert_eq!(found.len(), 1);
-        assert_eq!(found[0].id, "pkg");
+        assert_eq!(found.len(), DEFAULTS.len() + 1);
+        let pkg = found.iter().find(|skill| skill.id == "pkg").unwrap();
         assert_eq!(
-            found[0].directory,
-            skills.join("pkg").canonicalize().unwrap()
+            pkg.directory,
+            Some(skills.join("pkg").canonicalize().unwrap())
         );
         let _ = std::fs::remove_dir_all(&root);
     }
@@ -149,7 +179,9 @@ mod tests {
         write_skill(&skills, "invalid", "---\nname: invalid\n---\nbody\n");
         std::fs::write(skills.join("plain.txt"), "not a package").unwrap();
 
-        assert!(discover_in(Some(&home), &workdir).is_empty());
+        let found = discover_in(Some(&home), &workdir);
+        assert_eq!(found.len(), DEFAULTS.len());
+        assert!(found.iter().all(|skill| skill.id == "browser"));
         let _ = std::fs::remove_dir_all(&root);
     }
 
@@ -176,10 +208,33 @@ mod tests {
         );
 
         let found = discover_in(Some(&home), &workdir);
-        assert_eq!(found.len(), 2);
-        assert_eq!(found[0].id, "alpha");
+        assert_eq!(found.len(), DEFAULTS.len() + 2);
+        assert_eq!(found[0].id, "browser");
+        assert_eq!(found[1].id, "alpha");
+        assert_eq!(found[1].description, "project");
+        assert_eq!(found[2].id, "beta");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn project_skill_overrides_embedded_browser() {
+        let (root, _home, workdir) = fixture();
+        let skills = skills_dir(&workdir);
+        write_skill(
+            &skills,
+            "browser",
+            "---\nname: browser\ndescription: project\n---\nproject body\n",
+        );
+
+        let found = discover_in(None, &workdir);
+        assert_eq!(found.len(), DEFAULTS.len());
+        assert_eq!(found[0].id, "browser");
         assert_eq!(found[0].description, "project");
-        assert_eq!(found[1].id, "beta");
+        assert_eq!(found[0].prompt, "project body");
+        assert_eq!(
+            found[0].directory,
+            Some(skills.join("browser").canonicalize().unwrap())
+        );
         let _ = std::fs::remove_dir_all(&root);
     }
 
@@ -192,7 +247,7 @@ mod tests {
 
         let found = discover_in(None, &workdir);
         let ids: Vec<&str> = found.iter().map(|skill| skill.id.as_str()).collect();
-        assert_eq!(ids, vec!["a", "b"]);
+        assert_eq!(ids, vec!["browser", "a", "b"]);
         let _ = std::fs::remove_dir_all(&root);
     }
 }
