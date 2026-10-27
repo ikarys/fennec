@@ -350,6 +350,7 @@ export default function App() {
               config={config}
               onSessionCreated={handleSessionCreated}
               onRunningChanged={refreshProjects}
+              onRenamed={refreshProjects}
             />
           )}
         </div>

@@ -145,6 +145,8 @@ export interface ThreadView {
   mode: string | null;
   /** The latest workflow run, if any. */
   run?: RunView;
+  /** The last generated session name, if any (last one wins). */
+  name?: string;
 }
 
 // The live speed is estimated from characters over the last few seconds;
@@ -331,6 +333,7 @@ export function createThreadFold(): ThreadFold {
   // Null means "no live change yet": the session detail owns the mode.
   let mode: string | null = null;
   let criteria: CriterionView[] = [];
+  let name: string | undefined;
   const runFold = createRunFold();
   type WorkflowNodeItem = Extract<ThreadItem, { kind: 'workflow-node' }>;
   const openWorkflowItems = new Map<string, WorkflowNodeItem>();
@@ -698,6 +701,13 @@ export function createThreadFold(): ThreadFold {
         break;
       }
 
+      case 'session.name_generated': {
+        if (typeof data.name === 'string') {
+          name = data.name;
+        }
+        break;
+      }
+
       case 'workflow.started': {
         const workflow = runFold.view()?.workflow;
         if (workflow) {
@@ -790,6 +800,7 @@ export function createThreadFold(): ThreadFold {
     toolCounts: Array.from(toolCounts.entries()).map(([name, count]) => ({ name, count })),
     usage: { ...usage },
     mode,
+    name,
     run: runFold.view()
   });
 

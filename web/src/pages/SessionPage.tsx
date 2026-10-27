@@ -51,10 +51,12 @@ interface SessionPageProps {
   onSessionCreated: (newId: string, pseudoId: string | null) => void;
   /** Tabs and the palette show session states from the projects list. */
   onRunningChanged: () => void;
+  /** The generated session name changed; the tabs read titles from projects. */
+  onRenamed: () => void;
 }
 
 
-export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId, projects, config, onSessionCreated, onRunningChanged }: SessionPageProps) {
+export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId, projects, config, onSessionCreated, onRunningChanged, onRenamed }: SessionPageProps) {
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [text, setText] = useState('');
   const [attachments, setAttachments] = useState<AttachmentInput[]>([]);
@@ -89,6 +91,15 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
   useEffect(() => {
     onRunningChanged();
   }, [running, onRunningChanged]);
+
+  const previousName = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (view.name && view.name !== previousName.current) {
+      onRenamed();
+    }
+    previousName.current = view.name;
+  }, [view.name, onRenamed]);
 
   useEffect(() => {
     if (!sessionId) {
@@ -230,7 +241,7 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
 
   // The detail is fetched once; the event stream says how a turn ended.
   const state: SessionState = running ? 'running' : ((view.lastDone as SessionState | undefined) ?? detail?.state ?? 'idle');
-  const title = detail?.title ?? (sessionId ? 'Session' : 'Nouvelle session');
+  const title = view.name ?? detail?.title ?? (sessionId ? 'Session' : 'Nouvelle session');
 
   const lastAssistant = [...view.items].reverse().find((item): item is AssistantItem => item.kind === 'assistant');
   const lastTextSegment = lastAssistant

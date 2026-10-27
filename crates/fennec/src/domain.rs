@@ -16,6 +16,7 @@ pub mod preferences;
 pub mod project;
 pub mod protection;
 pub mod replay;
+pub mod session_name;
 pub mod session_skills;
 pub mod skill;
 pub mod slash;

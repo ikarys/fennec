@@ -11,6 +11,7 @@ mod integration;
 mod notifier;
 mod preview;
 mod routes;
+mod session_name;
 mod turns;
 mod workflow_routes;
 

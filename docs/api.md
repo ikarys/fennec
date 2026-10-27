@@ -29,6 +29,7 @@ with camelCase fields.
 | `turn.snapshot` | `{cachedSystemPrompt}`: the session's system prompt, frozen at its first turn |
 | `mode.changed` | `{mode, auto, reason?}`: the human switched the session's agent; it applies from the next turn |
 | `session.rewound` | `{messageId}`: fennec's replay cut; the model's view drops that message and everything after it, the log keeps them |
+| `session.name_generated` | `{name}`: the model-generated session title; the server renames the session and wakes the event stream |
 | `workflow.started` | `{runId, workflow, task, stepByStep}`: `workflow` is the whole definition, frozen for the run |
 | `workflow.node.started` | `{runId, nodeId, pass, via?, childSessionId?}`: `via` is `{from, port}`, the edge taken |
 | `workflow.human.asked` | `{runId, nodeId, question}`: a human node's question with its `{{…}}` names filled in, right after the node starts |

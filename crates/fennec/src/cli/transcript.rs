@@ -127,6 +127,7 @@ impl Transcript {
             // The reminder that follows names the mode.
             | Event::ModeChanged { .. }
             | Event::SessionRewound { .. }
+            | Event::SessionNameGenerated { .. }
             // The CLI does not run workflows or integrate.
             | Event::WorkflowStarted { .. }
             | Event::WorkflowNodeStarted { .. }

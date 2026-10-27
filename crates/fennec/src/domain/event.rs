@@ -233,6 +233,10 @@ pub enum Event {
     /// it, the log keeps them.
     #[serde(rename = "session.rewound", rename_all = "camelCase")]
     SessionRewound { message_id: String },
+    /// The model generated a short title for the session (openfox
+    /// `session.name_generated`).
+    #[serde(rename = "session.name_generated", rename_all = "camelCase")]
+    SessionNameGenerated { name: String },
     /// fennec's own: a workflow run starts; the definition is frozen for the run.
     #[serde(rename = "workflow.started", rename_all = "camelCase")]
     WorkflowStarted {
@@ -368,6 +372,7 @@ impl Event {
             Event::RunningChanged { .. } => "running.changed",
             Event::ModeChanged { .. } => "mode.changed",
             Event::SessionRewound { .. } => "session.rewound",
+            Event::SessionNameGenerated { .. } => "session.name_generated",
             Event::WorkflowStarted { .. } => "workflow.started",
             Event::WorkflowNodeStarted { .. } => "workflow.node.started",
             Event::WorkflowNodeFinished { .. } => "workflow.node.finished",
@@ -451,6 +456,24 @@ mod tests {
         assert!(matches!(
             &event,
             Event::SessionRewound { message_id } if message_id == "m"
+        ));
+
+        assert_eq!(serde_json::to_value(&event).unwrap(), wire);
+    }
+
+    #[test]
+    fn session_name_generated_round_trips() {
+        let wire = json!({
+            "type": "session.name_generated",
+            "data": {
+                "name": "React setup"
+            }
+        });
+
+        let event: Event = serde_json::from_value(wire.clone()).unwrap();
+        assert!(matches!(
+            &event,
+            Event::SessionNameGenerated { name } if name == "React setup"
         ));
 
         assert_eq!(serde_json::to_value(&event).unwrap(), wire);

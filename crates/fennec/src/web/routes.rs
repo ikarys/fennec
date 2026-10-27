@@ -4,7 +4,7 @@ use super::App;
 use super::editor;
 use super::http::{Request, error, send, send_json};
 use super::notifier::NotifyingLog;
-use super::{assets, event_stream, integration, turns::Job, workflow_routes};
+use super::{assets, event_stream, integration, session_name, turns::Job, workflow_routes};
 use crate::agent::ports::EventLog;
 use crate::agent::workflow::WorkflowJob;
 use crate::agents;
@@ -275,6 +275,14 @@ fn create_session(app: &App, req: &Request, stream: &mut TcpStream) -> Result<()
         prompt.chars().take(80).collect()
     };
     let id = store.create_session(&project, &title)?;
+    if !prompt.is_empty() {
+        session_name::spawn(
+            app.settings.clone(),
+            app.notifier.clone(),
+            id.clone(),
+            prompt.clone(),
+        );
+    }
     append_mode_event(app, &store, &id, mode_event)?;
     let session = store.session(&id)?.ok_or("the new session vanished")?;
     match workflow {
