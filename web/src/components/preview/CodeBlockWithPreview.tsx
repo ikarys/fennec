@@ -1,13 +1,27 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { markdownComponents } from '../session/markdownComponents';
 import type { PreviewKind } from '../../lib/preview';
 
 const REMARK_PLUGINS = [remarkGfm];
+/** How long the source must stay still before the iframe reloads it. */
+const SETTLE_MS = 400;
+
+/** The source once it stopped changing: a streamed block would reload the iframe at every chunk. */
+function useSettled(source: string): string {
+  const [settled, setSettled] = useState(source);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSettled(source), SETTLE_MS);
+    return () => window.clearTimeout(timer);
+  }, [source]);
+  return settled;
+}
 
 export function CodeBlockWithPreview({ kind, source }: { kind: PreviewKind; source: string }) {
-  const [showPreview, setShowPreview] = useState(false);
+  // An HTML block is mostly a page to look at; its source stays one click away.
+  const [showPreview, setShowPreview] = useState(kind === 'html');
+  const settledSource = useSettled(source);
 
   return (
     <div className="my-2 overflow-hidden rounded-md border border-border">
@@ -40,7 +54,7 @@ export function CodeBlockWithPreview({ kind, source }: { kind: PreviewKind; sour
         kind === 'html' ? (
           <iframe
             sandbox="allow-scripts"
-            srcDoc={source}
+            srcDoc={settledSource}
             title="Aperçu HTML"
             className="block h-[60vh] w-full bg-white"
           />
