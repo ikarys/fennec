@@ -38,12 +38,15 @@ Fixed: the server closes such turns at start (`close_dangling_turns`).
 Open edge: a CLI turn running in another process while the server starts is
 closed too.
 
-## The review loop runs on minor findings — open
+## The review loop runs on minor findings — fixed
 
 2026-10-25. The default workflow sent minor findings back to the builder five
 times before `accept` was reached on `exhausted`. Each pass costs a full
 verify and review round on the local GPU. Wanted: a review that reports only
 minor findings goes to `accept` directly, the findings listed for the human.
+
+Fixed: the review node has a third outcome, `minor`, wired straight to the
+human node; its question lists the review's findings.
 
 ## The local inference server takes the machine down — open
 

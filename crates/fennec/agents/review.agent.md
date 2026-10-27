@@ -24,3 +24,9 @@ You are not after perfection: only what is worth fixing now. Do not change anyth
 ## Answer
 
 One finding per line: the file and line, the problem, the fix you suggest. No findings worth fixing is a fine answer.
+
+Then pick the outcome:
+
+- `clean`: nothing to report.
+- `minor`: only nits the human may take or leave (naming, wording, small style points). They go to the human, not back to the builder.
+- `findings`: at least one finding worth another build round (a bug, a broken convention, needless complexity).
