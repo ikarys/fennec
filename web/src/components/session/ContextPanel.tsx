@@ -61,9 +61,11 @@ interface ContextPanelProps {
   sessionId: string | null;
   /** Re-fetch the session detail after the worktree changed (discard). */
   onWorktreeChanged: () => void;
+  /** Bumped when the review dialog closes: the workspace block re-reads the preview. */
+  integrationVersion: number;
 }
 
-export function ContextPanel({ view, skills, hasSession, partial, worktree, sessionId, onWorktreeChanged }: ContextPanelProps) {
+export function ContextPanel({ view, skills, hasSession, partial, worktree, sessionId, onWorktreeChanged, integrationVersion }: ContextPanelProps) {
   const [width, setWidth] = useState(loadWidth);
   const [selectedPageName, setSelectedPageName] = useState(loadPageName);
   const pages = panelPages(useDisplayPrefs().panelPages);
@@ -103,7 +105,7 @@ export function ContextPanel({ view, skills, hasSession, partial, worktree, sess
         return <ModifiedFilesSection key={id} modifiedFiles={view.modifiedFiles} sessionId={sessionId} />;
       case 'workspace':
         return worktree ? (
-          <AgentWorkspaceSection key={id} sessionId={sessionId} worktree={worktree} running={view.running} onDiscarded={onWorktreeChanged} />
+          <AgentWorkspaceSection key={id} sessionId={sessionId} worktree={worktree} running={view.running} onDiscarded={onWorktreeChanged} integrationVersion={integrationVersion} />
         ) : null;
       case 'tokens':
         return <TokensSection key={id} usage={view.usage} partial={partial} />;
