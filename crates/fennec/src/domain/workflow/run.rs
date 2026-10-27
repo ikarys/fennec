@@ -2,7 +2,7 @@
 
 use super::definition::{BRANCH, ConditionTest, EXHAUSTED, EndOutcome, Node, NodeKind, Workflow};
 use super::template;
-use crate::domain::criteria::{CriterionState, CriterionStatus, render_for_prompt};
+use crate::domain::criteria::{Criterion, CriterionState, CriterionStatus, render_for_prompt};
 use crate::domain::event::{DoneReason, Event};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -218,6 +218,14 @@ impl RunState {
     pub fn is_active(&self) -> bool {
         self.finished.is_none()
     }
+}
+
+/// The current run's criteria, without their status: the contract a
+/// proposal is compared with; none outside a run.
+pub fn criteria_in_force(events: &[Event]) -> Vec<Criterion> {
+    current_run(events)
+        .map(|state| state.criteria.into_iter().map(|c| c.criterion).collect())
+        .unwrap_or_default()
 }
 
 /// The log from the latest `workflow.started` on: what the current run did,

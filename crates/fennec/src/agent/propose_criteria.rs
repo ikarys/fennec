@@ -101,10 +101,10 @@ pub fn parse(args: &Value) -> Result<Proposal, String> {
     Ok(Proposal { criteria, reason })
 }
 
-/// The proposal, then the question the human answers: the list shown is the
-/// list recorded, both built by fennec from the same arguments.
-pub fn events(call_id: &str, proposal: Proposal) -> [Event; 2] {
-    let question = proposal_question(&proposal.criteria, &proposal.reason);
+/// The proposal, then the question the human answers: the question compares
+/// the proposal with the criteria in force.
+pub fn events(call_id: &str, proposal: Proposal, current: &[Criterion]) -> [Event; 2] {
+    let question = proposal_question(current, &proposal.criteria, &proposal.reason);
     let option = |value: &str, label: &str| ChoiceOption {
         value: value.into(),
         label: label.into(),
