@@ -6,7 +6,7 @@ use std::path::Path;
 use serde::Serialize;
 
 use crate::domain::protection::Protection;
-use crate::worktree::{Worktree, git};
+use crate::worktree::{Worktree, git, origin_branch};
 
 /// One agent commit to integrate.
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -23,6 +23,9 @@ pub struct Preview {
     /// Paths relative to the repository top.
     pub files: Vec<String>,
     pub human_branch: Option<String>,
+    /// The branch the run started from; `None` for older worktrees or a
+    /// detached HEAD.
+    pub origin_branch: Option<String>,
 }
 
 /// Why an integration failed.
@@ -64,6 +67,7 @@ pub fn preview(top: &Path, wt: &Worktree) -> Result<Preview, String> {
         commits,
         files,
         human_branch: crate::git::current_branch(top),
+        origin_branch: origin_branch(top, wt),
     })
 }
 
@@ -133,7 +137,7 @@ pub fn apply(top: &Path, wt: &Worktree) -> Result<String, ApplyError> {
 mod tests {
     use super::*;
     use crate::domain::id::new_id;
-    use crate::worktree::{commit, open, top};
+    use crate::worktree::{commit, open, remove, top};
     use std::path::PathBuf;
 
     fn text(dir: &Path, args: &[&str]) -> String {
@@ -186,6 +190,24 @@ mod tests {
             vec!["agent.txt".to_string(), "agent2.txt".to_string()]
         );
         assert!(preview.human_branch.is_some());
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn preview_records_the_origin_branch_and_remove_deletes_it() {
+        let (base, repo) = setup();
+        let wt = open(&base.join("wt"), &repo, "s1").unwrap().unwrap();
+        let top = top(&repo).unwrap().0;
+        let human_branch = text(&repo, &["rev-parse", "--abbrev-ref", "HEAD"]);
+        let preview = preview(&top, &wt).unwrap();
+
+        assert_eq!(
+            preview.origin_branch.as_deref(),
+            Some(human_branch.as_str())
+        );
+
+        assert_eq!(remove(&top, &wt), Ok(()));
+        assert!(!text(&repo, &["for-each-ref", "refs/fennec/"]).contains("origin"));
         let _ = std::fs::remove_dir_all(&base);
     }
 

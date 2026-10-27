@@ -1,7 +1,9 @@
 import type { ThreadItem } from '../../../lib/fold';
 import { cachePercent, formatDuration, formatTokens } from '../../../lib/format';
 import { Badge } from '../../ui/Badge';
+import { Button } from '../../ui/Button';
 import { Card } from '../../ui/Card';
+import { useIntegrationInvite } from '../../session/IntegrationInvite';
 
 type WorkflowEndItem = Extract<ThreadItem, { kind: 'workflow-end' }>;
 
@@ -35,6 +37,7 @@ function StatCell({ stat }: { stat: Stat }) {
 export function RunEndCard({ item }: { item: WorkflowEndItem }) {
   const outcome = outcomeTitle(item.outcome);
   const stats = item.stats;
+  const invite = useIntegrationInvite();
 
   const statRows: [Stat, Stat][] = stats
     ? [
@@ -145,6 +148,14 @@ export function RunEndCard({ item }: { item: WorkflowEndItem }) {
               <span>Calculé par fennec à partir du journal</span>
               <Badge tone="ok">vérifié</Badge>
             </div>
+          </div>
+        )}
+        {item.outcome === 'done' && invite && invite.lastRunEndId === item.id && (
+          <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
+            <span className="text-sm text-muted">Le travail est prêt dans l'espace de l'agent.</span>
+            <Button variant="primary" size="sm" onClick={invite.open}>
+              Relire et intégrer…
+            </Button>
           </div>
         )}
       </div>

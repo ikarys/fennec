@@ -29,6 +29,8 @@ export interface Project {
 export interface Config {
   model: string;
   contextWindow: number;
+  /** The fraction of the window at which a session compacts; 0 disables. */
+  compactAt: number;
 }
 
 export interface SlashCommand {
@@ -288,12 +290,14 @@ export type Blocker =
   | { kind: 'noCommits' }
   | { kind: 'criteriaNotPassed'; criteria: string[] }
   | { kind: 'noCriteria' }
-  | { kind: 'protectedTouched'; paths: string[] };
+  | { kind: 'protectedTouched'; paths: string[] }
+  | { kind: 'branchChanged'; from: string; to: string | null };
 
 export interface IntegrationPreview {
   branch: string;
   base: string;
   humanBranch: string | null;
+  originBranch: string | null;
   commits: { sha: string; subject: string }[];
   files: { path: string; protected: boolean }[];
   criteria: IntegrationCriterion[];

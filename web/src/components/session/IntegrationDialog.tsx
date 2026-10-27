@@ -19,6 +19,8 @@ function blockerSentence(blocker: Blocker): string {
       return 'Aucun critère : rien n\'a été vérifié.';
     case 'protectedTouched':
       return `Fichiers protégés modifiés : ${blocker.paths.join(', ')}.`;
+    case 'branchChanged':
+      return `Le run est parti de ${blocker.from}, tu es maintenant sur ${blocker.to ?? 'un HEAD détaché'} : les commits iraient ailleurs.`;
   }
 }
 

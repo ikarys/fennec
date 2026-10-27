@@ -142,8 +142,8 @@ read-only. The human edits them as usual.
 
 ## Endpoints
 
-- `GET /api/config` → `{model, contextWindow}`: the resolved parameters of the
-  stored preferences
+- `GET /api/config` → `{model, contextWindow, compactAt}`: the resolved parameters of the
+  stored preferences; `compactAt` is the fraction at which the session compacts (0 disables)
 - `GET /api/settings` → `{preferences, models, defaults}`
   - `preferences`: the stored `Preferences`
   - `models`: `[{id, contextWindow}]` from a fresh `/models` call; on failure
@@ -169,11 +169,14 @@ read-only. The human edits them as usual.
   `git cherry-pick <base>..<branch>`;
   `mode` is the id of the agent the session resolves to from its event log
   (null when there is no top-level agent)
-- `GET /api/sessions/{id}/integration` → `{branch, base, humanBranch, commits: [{sha, subject}], files: [{path, protected}], criteria, blockers}`:
+- `GET /api/sessions/{id}/integration` → `{branch, base, originBranch, humanBranch, commits: [{sha, subject}], files: [{path, protected}], criteria, blockers}`:
   what integrating the session's worktree branch would do (409 without a
-  worktree). `blockers` is the review gate, each `{kind, …}`: `noCommits`,
-  `criteriaNotPassed {criteria}`, `noCriteria`, `protectedTouched {paths}`;
-  protection is read from the project's tree, not the worktree's.
+  worktree). `originBranch` is the branch the run started from (null for
+  older worktrees or a detached HEAD). `blockers` is the review gate, each
+  `{kind, …}`: `noCommits`, `branchChanged {from, to}`, `criteriaNotPassed
+  {criteria}`, `noCriteria`, `protectedTouched {paths}`; `branchChanged.to`
+  is null for a detached HEAD; protection is read from the project's tree, not
+  the worktree's.
 - `POST /api/sessions/{id}/integrate` `{acknowledged: [kind]}` → `{head, commits}`:
   the human's decision. The server recomputes the gate and answers 409 while a
   turn runs, while a blocker is not acknowledged (`noCommits` never is), or when
