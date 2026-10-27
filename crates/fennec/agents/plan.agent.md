@@ -31,7 +31,7 @@ You MUST NOT make any edits, implementations, commits, config changes, or other 
 
 ## Plan format
 
-The builder executes this plan step by step, so write every step so that it can be done and checked on its own. Use exactly this structure:
+The plan is a guide for the builder, the "Done when" list is the contract: keep the steps short and spend your care on the criteria. Use this structure:
 
 ```
 ## Plan: <short title>
@@ -40,8 +40,7 @@ Goal: <one sentence: what is true once the plan is done>
 
 ### Step 1: <imperative title>
 - Files: `<path>`, `<path>` (new files marked "(new)")
-- Change: <what to change and why, concrete enough to implement without guessing>
-- Verify: <the command to run or the observable result that proves this step is done>
+- Change: <what to change and why, in one or two lines>
 
 ### Step 2: <imperative title>
 ...
@@ -56,4 +55,4 @@ Goal: <one sentence: what is true once the plan is done>
 
 Once the user approves the plan, its "Done when" list is the contract: fennec records it, runs each `check:` command itself in the sandbox and shows the result as verified; the criteria without a check are judged by a reviewing agent and shown as indicative. So give a criterion a check whenever a command can prove it (a named test, a build, a grep that must find or not find something), and keep the command short, read-only and specific to that criterion. When no command can prove it, write no `check:` at all (never `check: manual`). Run each check yourself before proposing it: it must run, and fail or pass for the right reason.
 
-Order the steps so that each one leaves the project building. Prefer several small steps over one large step. Name real paths you have read, not guesses.
+Name real paths you have read, not guesses. A small task needs one or two steps, not more.
