@@ -19,6 +19,8 @@ pub struct Preferences {
     pub global_instructions: Option<String>,
     /// The web_search tool's SearXNG instance.
     pub search: SearchPrefs,
+    /// How commands run: in bwrap or on the host.
+    pub sandbox: SandboxPrefs,
 }
 
 /// openfox `search.searxngUrl` / `search.searxngApiKey`.
@@ -27,6 +29,25 @@ pub struct Preferences {
 pub struct SearchPrefs {
     pub searxng_url: Option<String>,
     pub searxng_api_key: Option<String>,
+}
+
+/// fennec's own (openfox runs commands on the host): the bwrap world of commands.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct SandboxPrefs {
+    /// Off runs commands on the host, as openfox does: the human's call.
+    pub enabled: bool,
+    /// Lets commands reach the network (package installs, a dev server on the host).
+    pub network: bool,
+}
+
+impl Default for SandboxPrefs {
+    fn default() -> Self {
+        SandboxPrefs {
+            enabled: true,
+            network: false,
+        }
+    }
 }
 
 /// openfox `ReasoningEffort`: how much a model may think.
@@ -375,12 +396,17 @@ mod tests {
         p.display.reasoning_open = false;
         p.display.font_size = 15;
         p.global_instructions = Some("Be terse.".into());
+        p.sandbox = SandboxPrefs {
+            enabled: false,
+            network: true,
+        };
 
         let json = serde_json::to_string(&p).unwrap();
         assert!(json.contains("\"maxTokens\""));
         assert!(json.contains("\"reasoningEffort\""));
         assert!(json.contains("\"fontSize\""));
         assert!(json.contains("\"globalInstructions\""));
+        assert!(json.contains("\"sandbox\""));
         assert_eq!(serde_json::from_str::<Preferences>(&json).unwrap(), p);
         assert_eq!(
             serde_json::from_str::<Preferences>("{}").unwrap(),
@@ -396,6 +422,9 @@ mod tests {
         .unwrap();
         assert_eq!(p.display.font_size, DEFAULT_FONT_SIZE);
         assert_eq!(p.models.get("m").unwrap().reasoning_effort, None);
+        assert_eq!(p.sandbox, SandboxPrefs::default());
+        assert!(p.sandbox.enabled);
+        assert!(!p.sandbox.network);
         assert!(p.validate().is_ok());
     }
 }

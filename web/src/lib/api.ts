@@ -67,6 +67,12 @@ export interface SearchPrefs {
   searxngApiKey?: string | null;
 }
 
+/** fennec's bwrap world: how commands run. */
+export interface SandboxPrefs {
+  enabled: boolean;
+  network: boolean;
+}
+
 export interface Preferences {
   model: string | null;
   models: Record<string, ModelPrefs>;
@@ -75,6 +81,8 @@ export interface Preferences {
   globalInstructions?: string | null;
   /** openfox search.*: the web_search tool's SearXNG instance. */
   search?: SearchPrefs;
+  /** fennec's bwrap world: how commands run. */
+  sandbox?: SandboxPrefs;
 }
 
 export interface SettingsModel {

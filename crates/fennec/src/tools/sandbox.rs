@@ -1,0 +1,524 @@
+//! fennec's bwrap world for commands: what a model runs sees the system read-only, its workdir writable, the human's secrets hidden and, by default, no network.
+//! The file tools keep the in-process path guard; this only wraps commands.
+
+use crate::domain::preferences::SandboxPrefs;
+use std::ffi::OsString;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Sandbox {
+    /// Commands run on the host (the human turned the sandbox off).
+    Off,
+    Bwrap {
+        network: bool,
+        hidden_dirs: Vec<PathBuf>,
+        hidden_files: Vec<PathBuf>,
+        writable: Vec<PathBuf>,
+    },
+}
+
+impl Sandbox {
+    /// The sandbox the human chose, hiding `data_dir` (fennec's store) and the secrets under `home`
+    /// that exist on this machine (bwrap cannot mount over a missing path).
+    pub fn from_prefs(prefs: &SandboxPrefs, home: Option<&Path>, data_dir: &Path) -> Sandbox {
+        if !prefs.enabled {
+            return Sandbox::Off;
+        }
+
+        let mut hidden_dirs = Vec::new();
+        let mut hidden_files = Vec::new();
+        let mut writable = Vec::new();
+
+        if let Some(home) = home {
+            for name in [
+                ".ssh",
+                ".gnupg",
+                ".aws",
+                ".azure",
+                ".config/gcloud",
+                ".config/gh",
+                ".docker",
+                ".kube",
+                ".password-store",
+            ] {
+                let path = home.join(name);
+                if path.is_dir() {
+                    hidden_dirs.push(path);
+                }
+            }
+
+            for name in [".netrc", ".git-credentials", ".npmrc", ".pypirc"] {
+                let path = home.join(name);
+                if path.is_file() {
+                    hidden_files.push(path);
+                }
+            }
+
+            // ponytail: a writable cache can be poisoned for the human's later runs; per-session
+            // overlays (bwrap >= 0.10 `--overlay`) when that matters.
+            for name in [".npm", ".cache"] {
+                let path = home.join(name);
+                if path.is_dir() {
+                    writable.push(path);
+                }
+            }
+        }
+
+        if data_dir.is_dir() {
+            hidden_dirs.push(data_dir.to_path_buf());
+        }
+
+        Sandbox::Bwrap {
+            network: prefs.network,
+            hidden_dirs,
+            hidden_files,
+            writable,
+        }
+    }
+
+    /// The composition root's sandbox: the human's choice, hiding the
+    /// directory of fennec's store (`db_path`) and the secrets under `$HOME`.
+    pub fn for_store(prefs: &SandboxPrefs, db_path: &Path) -> Sandbox {
+        let home = std::env::var_os("HOME").map(PathBuf::from);
+        // A store at the filesystem root would hide `/` itself: hide nothing then.
+        let data_dir = db_path
+            .canonicalize()
+            .ok()
+            .and_then(|path| path.parent().map(Path::to_path_buf))
+            .filter(|dir| dir.parent().is_some())
+            .unwrap_or_default();
+        Sandbox::from_prefs(prefs, home.as_deref(), &data_dir)
+    }
+
+    /// `sh -c command` in `cwd`, wrapped in bwrap unless Off; `workdir` is the writable root.
+    pub(super) fn command(&self, command: &str, workdir: &Path, cwd: &Path) -> Command {
+        match self {
+            Sandbox::Off => {
+                let mut sh = Command::new("sh");
+                sh.arg("-c").arg(command).current_dir(cwd);
+                sh
+            }
+            Sandbox::Bwrap {
+                network,
+                hidden_dirs,
+                hidden_files,
+                writable,
+            } => {
+                let mut bwrap = Command::new("bwrap");
+                bwrap.args(bwrap_args(
+                    *network,
+                    hidden_dirs,
+                    hidden_files,
+                    writable,
+                    workdir,
+                    cwd,
+                    command,
+                ));
+                // bwrap passes fennec's environment through: the model would
+                // read the endpoint key or a token with `env`.
+                for (name, _) in std::env::vars_os() {
+                    if is_secret_name(&name.to_string_lossy()) {
+                        bwrap.env_remove(name);
+                    }
+                }
+                bwrap
+            }
+        }
+    }
+}
+
+/// An environment variable that likely holds a credential.
+// ponytail: a name heuristic; an allow-list of variables if one slips through.
+fn is_secret_name(name: &str) -> bool {
+    const MARKERS: [&str; 7] = [
+        "TOKEN",
+        "SECRET",
+        "PASSWORD",
+        "PASSWD",
+        "API_KEY",
+        "APIKEY",
+        "CREDENTIAL",
+    ];
+    let upper = name.to_uppercase();
+    MARKERS.iter().any(|marker| upper.contains(marker)) || upper.starts_with("AWS_")
+}
+
+fn bwrap_args(
+    network: bool,
+    hidden_dirs: &[PathBuf],
+    hidden_files: &[PathBuf],
+    writable: &[PathBuf],
+    workdir: &Path,
+    cwd: &Path,
+    command: &str,
+) -> Vec<OsString> {
+    let mut args = vec![
+        OsString::from("--ro-bind"),
+        OsString::from("/"),
+        OsString::from("/"),
+        OsString::from("--dev"),
+        OsString::from("/dev"),
+        OsString::from("--proc"),
+        OsString::from("/proc"),
+        OsString::from("--tmpfs"),
+        OsString::from("/tmp"),
+    ];
+
+    for dir in hidden_dirs {
+        args.push(OsString::from("--tmpfs"));
+        args.push(dir.as_os_str().to_os_string());
+    }
+
+    for file in hidden_files {
+        args.push(OsString::from("--ro-bind"));
+        args.push(OsString::from("/dev/null"));
+        args.push(file.as_os_str().to_os_string());
+    }
+
+    for dir in writable {
+        args.push(OsString::from("--bind"));
+        args.push(dir.as_os_str().to_os_string());
+        args.push(dir.as_os_str().to_os_string());
+    }
+
+    args.push(OsString::from("--bind"));
+    args.push(workdir.as_os_str().to_os_string());
+    args.push(workdir.as_os_str().to_os_string());
+
+    args.push(OsString::from("--unshare-all"));
+    if network {
+        args.push(OsString::from("--share-net"));
+    }
+    args.push(OsString::from("--die-with-parent"));
+    args.push(OsString::from("--new-session"));
+
+    if !network {
+        args.push(OsString::from("--setenv"));
+        args.push(OsString::from("npm_config_offline"));
+        args.push(OsString::from("true"));
+        args.push(OsString::from("--setenv"));
+        args.push(OsString::from("CARGO_NET_OFFLINE"));
+        args.push(OsString::from("true"));
+    }
+
+    args.push(OsString::from("--chdir"));
+    args.push(cwd.as_os_str().to_os_string());
+    args.push(OsString::from("--"));
+    args.push(OsString::from("sh"));
+    args.push(OsString::from("-c"));
+    args.push(OsString::from(command));
+
+    args
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tools::test_support::temp_dir;
+    use std::path::Path;
+
+    fn args_as_strings(args: &[OsString]) -> Vec<String> {
+        args.iter()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect()
+    }
+
+    #[test]
+    fn bwrap_args_keep_the_mount_order_and_offline_env() {
+        let args = bwrap_args(
+            false,
+            &[PathBuf::from("/home/user/.ssh")],
+            &[PathBuf::from("/home/user/.netrc")],
+            &[PathBuf::from("/home/user/.npm")],
+            Path::new("/work"),
+            Path::new("/cwd"),
+            "echo hi",
+        );
+
+        assert_eq!(
+            args_as_strings(&args),
+            vec![
+                "--ro-bind",
+                "/",
+                "/",
+                "--dev",
+                "/dev",
+                "--proc",
+                "/proc",
+                "--tmpfs",
+                "/tmp",
+                "--tmpfs",
+                "/home/user/.ssh",
+                "--ro-bind",
+                "/dev/null",
+                "/home/user/.netrc",
+                "--bind",
+                "/home/user/.npm",
+                "/home/user/.npm",
+                "--bind",
+                "/work",
+                "/work",
+                "--unshare-all",
+                "--die-with-parent",
+                "--new-session",
+                "--setenv",
+                "npm_config_offline",
+                "true",
+                "--setenv",
+                "CARGO_NET_OFFLINE",
+                "true",
+                "--chdir",
+                "/cwd",
+                "--",
+                "sh",
+                "-c",
+                "echo hi",
+            ]
+        );
+    }
+
+    #[test]
+    fn bwrap_args_share_net_only_when_network_is_on() {
+        let offline = bwrap_args(
+            false,
+            &[],
+            &[],
+            &[],
+            Path::new("/work"),
+            Path::new("/cwd"),
+            "echo hi",
+        );
+        let offline = args_as_strings(&offline);
+        assert!(!offline.contains(&"--share-net".to_string()));
+        assert!(offline.contains(&"npm_config_offline".to_string()));
+        assert!(offline.contains(&"CARGO_NET_OFFLINE".to_string()));
+
+        let online = bwrap_args(
+            true,
+            &[],
+            &[],
+            &[],
+            Path::new("/work"),
+            Path::new("/cwd"),
+            "echo hi",
+        );
+        let online = args_as_strings(&online);
+        assert!(online.contains(&"--share-net".to_string()));
+        assert!(!online.contains(&"npm_config_offline".to_string()));
+        assert!(!online.contains(&"CARGO_NET_OFFLINE".to_string()));
+    }
+
+    #[test]
+    fn off_runs_sh_directly() {
+        let workdir = Path::new("/work");
+        let cwd = Path::new("/cwd");
+        let command = Sandbox::Off.command("echo hi", workdir, cwd);
+
+        assert_eq!(command.get_program().to_string_lossy(), "sh");
+        let args: Vec<_> = command.get_args().collect();
+        assert_eq!(args, vec!["-c", "echo hi"]);
+        assert_eq!(command.get_current_dir(), Some(cwd));
+    }
+
+    #[test]
+    fn from_prefs_lists_only_paths_that_exist() {
+        let home = temp_dir();
+        let data_dir = temp_dir();
+        std::fs::create_dir_all(home.join(".ssh")).unwrap();
+        std::fs::write(home.join(".netrc"), "token").unwrap();
+
+        let prefs = SandboxPrefs {
+            enabled: true,
+            network: true,
+        };
+        let sandbox = Sandbox::from_prefs(&prefs, Some(&home), &data_dir);
+
+        let Sandbox::Bwrap {
+            network,
+            hidden_dirs,
+            hidden_files,
+            writable,
+        } = sandbox
+        else {
+            panic!("expected bwrap sandbox");
+        };
+
+        assert!(network);
+        assert!(hidden_dirs.contains(&home.join(".ssh")));
+        assert!(hidden_dirs.contains(&data_dir));
+        assert!(!hidden_dirs.contains(&home.join(".aws")));
+        assert!(hidden_files.contains(&home.join(".netrc")));
+        assert!(!hidden_files.contains(&home.join(".npmrc")));
+        assert!(writable.is_empty());
+
+        let _ = std::fs::remove_dir_all(&home);
+        let _ = std::fs::remove_dir_all(&data_dir);
+    }
+
+    #[test]
+    fn secret_names_are_recognised() {
+        for name in [
+            "FENNEC_API_KEY",
+            "GITHUB_TOKEN",
+            "AWS_PROFILE",
+            "db_password",
+        ] {
+            assert!(is_secret_name(name), "{name}");
+        }
+        for name in ["PATH", "HOME", "FENNEC_MODEL", "LANG"] {
+            assert!(!is_secret_name(name), "{name}");
+        }
+    }
+
+    #[test]
+    fn from_prefs_gives_off_when_disabled() {
+        let home = temp_dir();
+        let data_dir = temp_dir();
+        std::fs::create_dir_all(home.join(".ssh")).unwrap();
+
+        let prefs = SandboxPrefs {
+            enabled: false,
+            network: true,
+        };
+        assert_eq!(
+            Sandbox::from_prefs(&prefs, Some(&home), &data_dir),
+            Sandbox::Off
+        );
+
+        let _ = std::fs::remove_dir_all(&home);
+        let _ = std::fs::remove_dir_all(&data_dir);
+    }
+
+    fn bwrap_available() -> bool {
+        Command::new("bwrap")
+            .arg("--version")
+            .output()
+            .is_ok_and(|output| output.status.success())
+    }
+
+    #[test]
+    fn e2e_writing_in_the_workdir_succeeds() {
+        // End-to-end tests need a real bwrap; skip on machines without it.
+        if !bwrap_available() {
+            return;
+        }
+
+        let workdir = temp_dir();
+        let sandbox = Sandbox::Bwrap {
+            network: false,
+            hidden_dirs: vec![],
+            hidden_files: vec![],
+            writable: vec![],
+        };
+
+        let output = sandbox
+            .command("echo hello > probe.txt", &workdir, &workdir)
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{:?}", output);
+        assert_eq!(
+            std::fs::read_to_string(workdir.join("probe.txt")).unwrap(),
+            "hello\n"
+        );
+
+        let _ = std::fs::remove_dir_all(&workdir);
+    }
+
+    #[test]
+    fn e2e_the_root_filesystem_is_read_only() {
+        // End-to-end tests need a real bwrap; skip on machines without it.
+        if !bwrap_available() {
+            return;
+        }
+
+        let workdir = temp_dir();
+        let sandbox = Sandbox::Bwrap {
+            network: false,
+            hidden_dirs: vec![],
+            hidden_files: vec![],
+            writable: vec![],
+        };
+
+        let output = sandbox
+            .command("touch /etc/fennec-probe", &workdir, &workdir)
+            .output()
+            .unwrap();
+        assert!(!output.status.success(), "{:?}", output);
+
+        let _ = std::fs::remove_dir_all(&workdir);
+    }
+
+    #[test]
+    fn e2e_a_hidden_dir_is_not_readable() {
+        // End-to-end tests need a real bwrap; skip on machines without it.
+        if !bwrap_available() {
+            return;
+        }
+
+        // /var/tmp is under the read-only root bind, unlike /tmp which bwrap replaces.
+        if !Path::new("/var/tmp").is_dir() {
+            return;
+        }
+
+        let hidden =
+            Path::new("/var/tmp").join(format!("fennec-sandbox-hidden-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&hidden);
+        if !hidden.is_dir() {
+            return;
+        }
+        std::fs::write(hidden.join("secret"), "top secret").unwrap();
+
+        let workdir = temp_dir();
+        let sandbox = Sandbox::Bwrap {
+            network: false,
+            hidden_dirs: vec![hidden.clone()],
+            hidden_files: vec![],
+            writable: vec![],
+        };
+
+        let output = sandbox
+            .command(
+                &format!("cat {}", hidden.join("secret").display()),
+                &workdir,
+                &workdir,
+            )
+            .output()
+            .unwrap();
+        assert!(!output.status.success(), "{:?}", output);
+
+        let _ = std::fs::remove_dir_all(&hidden);
+        let _ = std::fs::remove_dir_all(&workdir);
+    }
+
+    #[test]
+    fn e2e_without_network_only_lo_exists() {
+        // End-to-end tests need a real bwrap; skip on machines without it.
+        if !bwrap_available() {
+            return;
+        }
+
+        let workdir = temp_dir();
+        let sandbox = Sandbox::Bwrap {
+            network: false,
+            hidden_dirs: vec![],
+            hidden_files: vec![],
+            writable: vec![],
+        };
+
+        let output = sandbox
+            .command(
+                // /sys is the host's sysfs under `--ro-bind /`; /proc/net
+                // follows the sandbox's network namespace.
+                "tail -n +3 /proc/net/dev | cut -d: -f1 | tr -d ' '",
+                &workdir,
+                &workdir,
+            )
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{:?}", output);
+        assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "lo");
+
+        let _ = std::fs::remove_dir_all(&workdir);
+    }
+}

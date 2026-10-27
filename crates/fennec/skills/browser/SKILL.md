@@ -16,6 +16,13 @@ npx -y @playwright/cli <command>
 
 > `-y` auto-confirms npx's one-time package download (cached afterwards). If you already installed it globally (`npm install -g @playwright/cli@latest`), the plain `playwright-cli` command works the same.
 
+## In fennec's sandbox
+
+fennec may run your commands in a sandbox (bwrap). Two consequences:
+
+- Every process a command started ends with that command: the browser and any server you started do not survive to the next `run_command`. Chain a whole browser session in one command: `npx -y @playwright/cli open <url> && npx -y @playwright/cli snapshot && npx -y @playwright/cli screenshot; npx -y @playwright/cli close`. For several steps, put the commands in a script in the working directory and run it.
+- Without network (the default), npx works from its cache only, and the browser reaches only servers started inside the same command, not one on the human's machine. If a command fails for lack of network, say so: the human can turn the network on in Settings > Bac à sable.
+
 ## Core Workflow
 
 open a page -> snapshot to get element refs -> interact using refs -> snapshot again. Every command echoes the latest snapshot.
@@ -38,7 +45,7 @@ npx -y @playwright/cli close
 
 `@playwright/cli` cannot open `file://` URLs — `open file:///path/to/index.html` will not work. To inspect a local HTML file, serve it over HTTP from a detached process, then open the URL.
 
-`run_command` waits for the command's output to close, so detach the server from it so the command returns:
+Outside a sandbox, `run_command` waits for the command's output to close, so detach the server from it so the command returns (in the sandbox, start it in the same command as the browser instead):
 
 ```bash
 # Serve a specific folder on a custom port

@@ -54,9 +54,12 @@ Browser and vision, done: openfox's `browser` skill embedded as a default
 (`@playwright/cli` through run_command, screenshots read back with read_file,
 kept out of the worktree's commits), and a Vision section in the context panel:
 the images the model saw, those a compaction dropped dimmed.
+Sandbox, done: every command (run_command, workflow shell nodes) runs in a bwrap
+world (`tools/sandbox.rs`): the system read-only, the workdir writable, secrets
+and fennec's store hidden, no network by default; the Settings page turns it or
+the network off.
 Next, one PR each, so that the minimal agent works before security layers:
-bwrap world for tool
-execution (network off by default) → sub-agents as tools → criteria → fennec's own
+sub-agents as tools → criteria → fennec's own
 layer (human-only integration, provenance, review gate).
 
 ## Layout
@@ -64,8 +67,7 @@ layer (human-only integration, provenance, review gate).
 Clean architecture, applied where it pays: dependencies point inward
 (adapters → agent → domain). The agent loop only knows the ports in
 `agent/ports.rs`; a port exists because it decouples a layer or has a
-second implementation (a test double, the coming bwrap toolbox), not for
-show. One responsibility per file; no catch-all module (`utils`, `misc`,
+second implementation (a test double), not for show. One responsibility per file; no catch-all module (`utils`, `misc`,
 `common`).
 
 ```
@@ -99,7 +101,8 @@ crates/fennec/src/
     prompt.rs          openfox chat/prompts: the system prompt
     workflow.rs        the workflow walk and its jobs (start, answer, continue, resume, stop);
                        workflow/ nodes (one node run), fork (parallel branches), outcome (`Outcome:` line)
-  tools/             Toolbox adapter on the host: one file per tool, path_guard, args;
+  tools/             Toolbox adapter: one file per tool, path_guard, args; sandbox (the bwrap
+                     world of commands);
                      web_search queries the SearXNG instance from the Settings page
   llm/               Model adapter: openai.rs (client), sse.rs (stream parser), models.rs (/models listing)
   store.rs           EventLog adapter: SQLite (openfox's schema), projects and sessions;
@@ -151,9 +154,10 @@ docs/dogfooding.md the frictions met while fennec builds fennec, and their statu
 1. **The human**: the CLI/UI, the configuration. fennec never blocks them.
 2. **The trusted kernel**: code that decides (integration, plugin activation).
    It never runs what a model wrote.
-3. **The untrusted zone**: everything a model outputs. **Known gap**: tools
-   run on the host with only a working-directory path guard (as in openfox);
-   the bwrap world comes back as an early component.
+3. **The untrusted zone**: everything a model outputs. Commands run in the
+   bwrap world (`tools/sandbox.rs`) unless the human turns it off. **Known
+   gap**: the file tools run in fennec's process with only a working-directory
+   path guard (as in openfox).
 
 ## Build, test, run
 

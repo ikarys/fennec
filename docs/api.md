@@ -89,6 +89,10 @@ Precedence for a turn:
   "search": {
     "searxngUrl": "string | null",
     "searxngApiKey": "string | null"
+  },
+  "sandbox": {
+    "enabled": true,
+    "network": false
   }
 }
 ```
@@ -107,6 +111,14 @@ turn.
 tool queries (`GET {searxngUrl}/search?format=json&q=…`, with
 `Authorization: Bearer {searxngApiKey}` when set). The tool runs in fennec,
 not in a command: the model only chooses the query.
+
+`sandbox` (fennec's own) is how commands run: the `run_command` tool and the
+workflow shell nodes. Enabled (the default), each command runs in bwrap: the
+system read-only, the working directory writable, `/tmp` private, the secrets
+under `$HOME` (`.ssh`, `.aws`, `.netrc`…) and fennec's data directory hidden,
+the environment's credential-looking variables removed, every process ended
+with the command, and no network unless `network` is true (npm and cargo are
+then set offline). Disabled, commands run on the host, as in openfox.
 
 ## Endpoints
 

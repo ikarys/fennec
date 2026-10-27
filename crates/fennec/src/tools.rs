@@ -1,8 +1,9 @@
 //! The host toolbox: openfox's `read_file`, `write_file`, `edit_file` and
-//! `run_command`, plus `load_skill`, run directly on the host inside one working
-//! directory, and `web_search`, which queries the human's SearXNG instance: the
-//! model only chooses the query.
-//! The bwrap world will be a second `Toolbox` that runs them sandboxed.
+//! `run_command`, plus `load_skill`, run inside one working directory, and
+//! `web_search`, which queries the human's SearXNG instance: the model only
+//! chooses the query.
+//! Commands run in the bwrap world when the human enabled it; the file tools
+//! keep the in-process path guard.
 
 mod args;
 mod edit_file;
@@ -10,10 +11,13 @@ mod load_skill;
 mod path_guard;
 mod read_file;
 mod run_command;
+mod sandbox;
 #[cfg(test)]
 mod test_support;
 mod web_search;
 mod write_file;
+
+pub use sandbox::Sandbox;
 
 use crate::agent::ports::{CommandRun, Commands, Toolbox};
 use crate::domain::event::{OutputStream, ToolResult};
@@ -26,18 +30,26 @@ use std::time::{Duration, Instant};
 pub struct LocalTools {
     workdir: PathBuf,
     search: SearchPrefs,
+    sandbox: Sandbox,
 }
 
 impl LocalTools {
     pub fn new(workdir: PathBuf) -> LocalTools {
+        // The composition root sets the human's choice; tests run on the host.
         LocalTools {
             workdir,
             search: SearchPrefs::default(),
+            sandbox: Sandbox::Off,
         }
     }
 
     pub fn with_search(mut self, search: SearchPrefs) -> LocalTools {
         self.search = search;
+        self
+    }
+
+    pub fn with_sandbox(mut self, sandbox: Sandbox) -> LocalTools {
+        self.sandbox = sandbox;
         self
     }
 }
@@ -67,7 +79,7 @@ impl Toolbox for LocalTools {
             "read_file" => read_file::run(args, workdir),
             "write_file" => write_file::run(args, workdir),
             "edit_file" => edit_file::run(args, workdir),
-            "run_command" => run_command::run(args, workdir, stop, on_output),
+            "run_command" => run_command::run(args, workdir, &self.sandbox, stop, on_output),
             "load_skill" => load_skill::run(args, workdir),
             "web_search" => web_search::run(args, &self.search),
             _ => ToolResult::failure(format!("Unknown tool: {name}")),
@@ -80,7 +92,15 @@ impl Toolbox for LocalTools {
 impl Commands for LocalTools {
     fn run(&self, command: &str, timeout: Duration, stop: &AtomicBool) -> CommandRun {
         let mut on_output = |_: OutputStream, _: &str| {};
-        match run_command::process::execute(command, &self.workdir, timeout, stop, &mut on_output) {
+        match run_command::process::execute(
+            command,
+            &self.workdir,
+            &self.workdir,
+            timeout,
+            stop,
+            &mut on_output,
+            &self.sandbox,
+        ) {
             Ok(execution) => command_run(execution),
             Err(error) => CommandRun {
                 exit_code: None,

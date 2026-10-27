@@ -1,11 +1,20 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import type { DisplayPrefs, ModelPrefs, Preferences, ReasoningEffort, SettingsModel, SettingsResponse } from '../lib/api';
+import type {
+  DisplayPrefs,
+  ModelPrefs,
+  Preferences,
+  ReasoningEffort,
+  SandboxPrefs,
+  SettingsModel,
+  SettingsResponse
+} from '../lib/api';
 import { saveSettings } from '../lib/api';
 import { ModelSection } from '../components/settings/ModelSection';
 import { ModelPrefsSection, percentFromFraction, type ModelForm } from '../components/settings/ModelPrefsSection';
 import { DisplaySection } from '../components/settings/DisplaySection';
 import { InstructionsSection } from '../components/settings/InstructionsSection';
 import { SearchSection, type SearchForm } from '../components/settings/SearchSection';
+import { SandboxSection } from '../components/settings/SandboxSection';
 
 interface SettingsPageProps {
   settings: SettingsResponse | null;
@@ -18,14 +27,16 @@ interface SettingsForm {
   display: DisplayPrefs;
   instructions: string;
   search: SearchForm;
+  sandbox: SandboxPrefs;
 }
 
-type SettingsTab = 'models' | 'instructions' | 'search' | 'display';
+type SettingsTab = 'models' | 'instructions' | 'search' | 'sandbox' | 'display';
 
 const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'models', label: 'Modèles' },
   { id: 'instructions', label: 'Instructions' },
   { id: 'search', label: 'Recherche web' },
+  { id: 'sandbox', label: 'Bac à sable' },
   { id: 'display', label: 'Affichage' }
 ];
 
@@ -55,7 +66,8 @@ function toForm(preferences: Preferences, models: SettingsModel[]): SettingsForm
     search: {
       url: preferences.search?.searxngUrl ?? '',
       apiKey: preferences.search?.searxngApiKey ?? ''
-    }
+    },
+    sandbox: preferences.sandbox ?? { enabled: true, network: false }
   };
 }
 
@@ -110,7 +122,8 @@ function buildPreferences(form: SettingsForm, settings: SettingsResponse): Prefe
     search: {
       searxngUrl: searxngUrl === '' ? null : searxngUrl,
       searxngApiKey: searxngApiKey === '' ? null : searxngApiKey
-    }
+    },
+    sandbox: form.sandbox
   };
 }
 
@@ -165,6 +178,11 @@ export function SettingsPage({ settings, onSaved }: SettingsPageProps) {
   function updateSearch(search: SearchForm) {
     markDirty();
     setForm((previous) => (previous ? { ...previous, search } : previous));
+  }
+
+  function updateSandbox(sandbox: SandboxPrefs) {
+    markDirty();
+    setForm((previous) => (previous ? { ...previous, sandbox } : previous));
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -249,6 +267,10 @@ export function SettingsPage({ settings, onSaved }: SettingsPageProps) {
 
             {tab === 'search' && (
               <SearchSection value={form.search} onChange={updateSearch} />
+            )}
+
+            {tab === 'sandbox' && (
+              <SandboxSection value={form.sandbox} onChange={updateSandbox} />
             )}
 
             {tab === 'display' && (
