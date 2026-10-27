@@ -112,7 +112,7 @@ crates/fennec/src/
     tool_calls.rs      openfox chat/execute-tools: runs and records tool calls
     ask_user.rs        openfox tools/ask: the loop's own tool; the turn ends waiting for the human
     compaction.rs      openfox context/compactor: the summary round and the new window
-    prompt.rs          openfox chat/prompts: the system prompt
+    prompt.rs          openfox chat/prompts: the system prompt, plus fennec's working method
     workflow.rs        the workflow walk and its jobs (start, answer, continue, resume, stop);
                        workflow/ nodes (one node run), fork (parallel branches), outcome (`Outcome:` line),
                        criteria (the criteria node and the agents' verdicts)

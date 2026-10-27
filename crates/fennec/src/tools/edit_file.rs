@@ -1,5 +1,6 @@
 //! Port of openfox `tools/edit.ts`: exact string replacement that keeps the
 //! file's line endings.
+//! The guidance in its errors (where to look, what to run) is fennec's own.
 
 use super::args;
 use super::path_guard::resolve_for_writing;
@@ -13,7 +14,7 @@ pub(super) fn definition() -> Value {
         "type": "function",
         "function": {
             "name": "edit_file",
-            "description": "Replace specific text in a file. Use this for surgical edits. The old_string must match exactly (including whitespace and indentation).",
+            "description": "Replace specific text in a file. Use this for surgical edits; prefer it to write_file for an existing file. Read the file first. The old_string must match exactly (including whitespace and indentation) and be unique: include enough surrounding lines. If the edit fails, read the region again before retrying.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -68,7 +69,15 @@ pub(super) fn run(args: &Value, workdir: &Path, protection: &Protection) -> Tool
 
     let bytes = match std::fs::read(&full_path) {
         Ok(value) => value,
-        Err(_) => return ToolResult::failure(format!("File not found: {path}")),
+        Err(_) => {
+            let name = Path::new(path)
+                .file_name()
+                .map(|name| name.to_string_lossy().into_owned())
+                .unwrap_or_else(|| path.to_string());
+            return ToolResult::failure(format!(
+                "File not found: {path}. Find it with: rg --files | rg '{name}'"
+            ));
+        }
     };
 
     let content = match String::from_utf8(bytes) {
@@ -89,9 +98,24 @@ pub(super) fn run(args: &Value, workdir: &Path, protection: &Protection) -> Tool
 
     if occurrences == 0 {
         let preview = preview_string(old_string);
-        return ToolResult::failure(format!(
-            "old_string not found in file.\n\nSearched for:\n{preview}\n\nMake sure whitespace and indentation match exactly."
-        ));
+        let hits = first_line_hits(&normalized_content, &normalized_old);
+        let message = if let Some(first) = hits.first().copied() {
+            let list = hits
+                .iter()
+                .take(3)
+                .map(|line| line.to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
+            let offset = first.saturating_sub(5).max(1);
+            format!(
+                "old_string not found in file.\n\nSearched for:\n{preview}\n\nIts first line appears at line(s) {list}, with different surrounding text or indentation: read_file that range (offset {offset}, limit 20) and retry with the exact text."
+            )
+        } else {
+            format!(
+                "old_string not found in file.\n\nSearched for:\n{preview}\n\nIts first line does not appear in the file either: read the file again (rg -n to locate) before retrying."
+            )
+        };
+        return ToolResult::failure(message);
     }
 
     if occurrences > 1 && !replace_all {
@@ -159,6 +183,23 @@ fn preview_string(value: &str) -> String {
     } else {
         value.to_string()
     }
+}
+
+fn first_line_hits(content: &str, old: &str) -> Vec<usize> {
+    let target = old
+        .lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .unwrap_or("");
+    if target.is_empty() {
+        return Vec::new();
+    }
+
+    content
+        .lines()
+        .enumerate()
+        .filter_map(|(index, line)| (line.trim() == target).then_some(index + 1))
+        .collect()
 }
 
 #[cfg(test)]
@@ -284,6 +325,59 @@ mod tests {
 
         let content = std::fs::read_to_string(dir.join("crlf.txt")).unwrap();
         assert_eq!(content, "lineX\r\nline2\r\n");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn edit_not_found_reports_first_line_hits_when_indented_differently() {
+        let dir = temp_dir();
+        let mut on_output = no_output();
+
+        let write_args = serde_json::json!({
+            "path": "indent.txt",
+            "content": "hello world\n  hello world\n"
+        });
+        let write_result = run_tool("write_file", &write_args, &dir, &mut on_output);
+        assert!(write_result.success);
+
+        let edit_args = serde_json::json!({
+            "path": "indent.txt",
+            "old_string": "    hello world",
+            "new_string": "value"
+        });
+        let edit_result = run_tool("edit_file", &edit_args, &dir, &mut on_output);
+        assert!(!edit_result.success);
+        let error = edit_result.error.unwrap();
+        assert!(error.contains("old_string not found"));
+        assert!(error.contains("line(s) 1, 2"));
+        assert!(error.contains("offset 1"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn edit_not_found_says_first_line_missing_when_absent() {
+        let dir = temp_dir();
+        let mut on_output = no_output();
+
+        let write_args = serde_json::json!({
+            "path": "absent.txt",
+            "content": "hello\nworld\n"
+        });
+        let write_result = run_tool("write_file", &write_args, &dir, &mut on_output);
+        assert!(write_result.success);
+
+        let edit_args = serde_json::json!({
+            "path": "absent.txt",
+            "old_string": "missing",
+            "new_string": "value"
+        });
+        let edit_result = run_tool("edit_file", &edit_args, &dir, &mut on_output);
+        assert!(!edit_result.success);
+        let error = edit_result.error.unwrap();
+        assert!(error.contains("old_string not found"));
+        assert!(error.contains("Its first line does not appear in the file either"));
 
         let _ = std::fs::remove_dir_all(&dir);
     }
