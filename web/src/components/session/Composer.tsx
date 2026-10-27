@@ -67,6 +67,14 @@ export function Composer({
     setDismissed(false);
   }, [text]);
 
+  // The box grows with the text, up to its max height, then scrolls.
+  useEffect(() => {
+    const element = textareaRef.current;
+    if (!element) return;
+    element.style.height = 'auto';
+    element.style.height = `${element.scrollHeight}px`;
+  }, [text, textareaRef]);
+
   useEffect(() => {
     setSelected(0);
   }, [matchKey]);
@@ -111,10 +119,14 @@ export function Composer({
     event.preventDefault();
   }
 
+  const contextPercent = maxTokens > 0 ? Math.min(100, Math.round((currentTokens / maxTokens) * 100)) : 0;
+  // The gauge turns warm as compaction nears (it triggers at 85 % by default).
+  const gaugeColor = contextPercent < 70 ? 'bg-ok' : contextPercent < 85 ? 'bg-accent' : 'bg-err';
+
   return (
-    <div className="px-6 pt-2 pb-3">
+    <div className="px-6 pt-2 pb-4">
       <div
-        className="mx-auto max-w-[820px] rounded-xl border border-border-strong bg-panel focus-within:border-accent"
+        className="mx-auto max-w-[820px] rounded-2xl border border-border-strong bg-panel shadow-[0_8px_24px_-12px_rgb(0_0_0/0.5)] transition-[border-color,box-shadow] focus-within:border-accent focus-within:ring-4 focus-within:ring-accent-soft"
         onDragOver={handleDragOver}
         onDrop={handleDrop}
       >
@@ -139,52 +151,79 @@ export function Composer({
             ))}
           </div>
         )}
-        <textarea
-          id="prompt"
-          ref={textareaRef}
-          rows={2}
-          value={text}
-          onChange={(event) => onTextChange(event.target.value)}
-          onPaste={handlePaste}
-          onKeyDown={(event) => {
-            if (menuOpen) {
-              if (event.key === 'ArrowDown') {
-                event.preventDefault();
-                setSelected((current) => Math.min(current + 1, matches.length - 1));
-                return;
+        {/* The text is the primary surface; send sits beside it so the options below never move it. */}
+        <div className="flex items-start gap-3 py-2.5 pr-2.5 pl-4">
+          <textarea
+            id="prompt"
+            ref={textareaRef}
+            rows={2}
+            value={text}
+            onChange={(event) => onTextChange(event.target.value)}
+            onPaste={handlePaste}
+            onKeyDown={(event) => {
+              if (menuOpen) {
+                if (event.key === 'ArrowDown') {
+                  event.preventDefault();
+                  setSelected((current) => Math.min(current + 1, matches.length - 1));
+                  return;
+                }
+                if (event.key === 'ArrowUp') {
+                  event.preventDefault();
+                  setSelected((current) => Math.max(current - 1, 0));
+                  return;
+                }
+                if (event.key === 'Enter' || event.key === 'Tab') {
+                  event.preventDefault();
+                  selectCommand(selected);
+                  return;
+                }
+                if (event.key === 'Escape') {
+                  event.preventDefault();
+                  setDismissed(true);
+                  return;
+                }
               }
-              if (event.key === 'ArrowUp') {
+              if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault();
-                setSelected((current) => Math.max(current - 1, 0));
-                return;
+                onSend();
               }
-              if (event.key === 'Enter' || event.key === 'Tab') {
-                event.preventDefault();
-                selectCommand(selected);
-                return;
-              }
-              if (event.key === 'Escape') {
-                event.preventDefault();
-                setDismissed(true);
-                return;
-              }
-            }
-            if (event.key === 'Enter' && !event.shiftKey) {
-              event.preventDefault();
-              onSend();
-            }
-          }}
-          placeholder={placeholder ?? "Demande quelque chose… (@ pour un fichier, / pour une commande)"}
-          className="w-full resize-none bg-transparent px-3 pt-2.5 pb-1 text-sm outline-none"
-        />
-        <div className="flex flex-wrap items-center gap-1.5 px-2 pb-2">
+            }}
+            placeholder={placeholder ?? "Demande quelque chose… (@ pour un fichier, / pour une commande)"}
+            className="max-h-60 min-w-0 grow resize-none bg-transparent py-1.5 text-[0.9375rem] leading-relaxed outline-none placeholder:text-faint"
+          />
+          {running ? (
+            <button
+              type="button"
+              aria-label="Arrêter"
+              title="Arrêter le tour"
+              onClick={onStop}
+              className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border-strong bg-raised text-text transition-colors hover:border-err hover:text-err"
+            >
+              <StopIcon className="h-4 w-4" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              aria-label="Envoyer"
+              title="Envoyer (Entrée) · nouvelle ligne : Maj+Entrée"
+              onClick={onSend}
+              disabled={!canSend}
+              className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent text-on-accent shadow-[0_4px_14px_-4px_var(--accent)] transition-[background-color,box-shadow,transform] hover:bg-accent-strong active:scale-95 disabled:bg-raised disabled:text-faint disabled:shadow-none"
+            >
+              <SendIcon className="h-[18px] w-[18px]" />
+            </button>
+          )}
+        </div>
+        {/* Left: what will run. Right: what it runs on. */}
+        <div className="flex flex-wrap items-center gap-1 rounded-b-2xl border-t border-border bg-bg/60 px-2 py-1.5">
           {onAttach && (
             <>
               <button
                 type="button"
                 aria-label="Joindre une image"
+                title="Joindre une image (ou colle-la, ou glisse-la)"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-raised text-muted hover:text-text"
+                className="flex size-7 items-center justify-center rounded-md text-muted transition-colors hover:bg-raised hover:text-text"
               >
                 <PaperclipIcon className="h-3.5 w-3.5" />
               </button>
@@ -206,37 +245,21 @@ export function Composer({
               onChange={onWorkflowSelectionChange}
             />
           )}
-          <button
-            type="button"
-            disabled
-            className="flex min-h-7 items-center gap-1.5 rounded-lg border border-border bg-raised px-2.5 text-xs text-text"
+          <div
+            className="ml-auto flex items-center gap-2.5 px-1.5 text-xs text-muted"
+            title={`${formatTokens(currentTokens)} / ${formatTokens(maxTokens)} tokens de contexte`}
           >
-            <span className="h-1.5 w-1.5 rounded-full bg-ok" />
-            {model ?? '…'} · local
-          </button>
-          <span className="text-xs text-muted">
-            {formatTokens(currentTokens)} / {formatTokens(maxTokens)} tokens
-          </span>
-          <span className="grow" />
-          {running && (
-            <button
-              type="button"
-              aria-label="Arrêter"
-              onClick={onStop}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-transparent text-text"
-            >
-              <StopIcon className="h-3.5 w-3.5" />
-            </button>
-          )}
-          <button
-            type="button"
-            aria-label="Envoyer"
-            onClick={onSend}
-            disabled={!canSend}
-            className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-on-accent disabled:opacity-60"
-          >
-            <SendIcon className="h-4 w-4" />
-          </button>
+            <span className="flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-ok" />
+              {model ?? '…'}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-1 w-12 overflow-hidden rounded-full bg-raised">
+                <span className={`block h-full rounded-full ${gaugeColor}`} style={{ width: `${contextPercent}%` }} />
+              </span>
+              <span className="tabular-nums">{contextPercent} %</span>
+            </span>
+          </div>
         </div>
         {error && <div className="px-3 pb-2 text-xs text-err">{error}</div>}
       </div>

@@ -32,18 +32,22 @@ export function WorkflowPicker({
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1">
       <select
         value={selection.workflowId ?? ''}
         onChange={(e) => {
           const workflowId = e.target.value || null;
           onChange({
             workflowId,
-            stepByStep: workflowId ? selection.stepByStep : false,
+            stepByStep: false,
             worktree: selection.worktree
           });
         }}
-        className="rounded-lg border border-border bg-raised px-2 py-1 text-xs text-text outline-none focus:border-accent"
+        aria-label="Workflow"
+        title="Le workflow qui prend ta demande ; « Aucun » parle directement à l'agent."
+        className={`h-7 rounded-md bg-transparent px-1.5 text-xs outline-none transition-colors hover:bg-raised ${
+          selection.workflowId ? 'text-accent-strong' : 'text-muted hover:text-text'
+        }`}
       >
         <option value="">Aucun workflow</option>
         {workflows.map((workflow) => (
@@ -52,30 +56,15 @@ export function WorkflowPicker({
           </option>
         ))}
       </select>
-      {selection.workflowId && (
-        <>
-          <label className="flex items-center gap-1.5 text-xs text-muted">
-            <input
-              type="checkbox"
-              checked={selection.stepByStep}
-              onChange={(e) => onChange({ ...selection, stepByStep: e.target.checked })}
-              className="rounded border-border"
-            />
-            Pas à pas
-          </label>
-          <label
-            className="flex items-center gap-1.5 text-xs text-muted"
-            title="L'agent travaille dans sa propre copie du dépôt (worktree) ; décoché, il écrit directement dans ton dossier."
-          >
-            <input
-              type="checkbox"
-              checked={selection.worktree}
-              onChange={(e) => onChange({ ...selection, worktree: e.target.checked })}
-              className="rounded border-border"
-            />
-            Espace séparé
-          </label>
-        </>
+      {selection.stepByStep && (
+        <button
+          type="button"
+          title="Le run s'arrête avant chaque nœud. Clique pour l'enlever."
+          onClick={() => onChange({ ...selection, stepByStep: false })}
+          className="rounded-md border border-accent px-1.5 py-0.5 text-xs text-accent"
+        >
+          Pas à pas ✕
+        </button>
       )}
     </div>
   );

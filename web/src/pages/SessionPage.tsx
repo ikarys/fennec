@@ -42,6 +42,8 @@ import {
 interface SessionPageProps {
   sessionId: string | null;
   projectId: string | null;
+  /** A workflow opened from the editor's test button: preselected, step by step. */
+  testWorkflowId: string | null;
   pseudoTabId: string | null;
   projects: Project[];
   config: Config | null;
@@ -51,7 +53,7 @@ interface SessionPageProps {
 }
 
 
-export function SessionPage({ sessionId, projectId, pseudoTabId, projects, config, onSessionCreated, onRunningChanged }: SessionPageProps) {
+export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId, projects, config, onSessionCreated, onRunningChanged }: SessionPageProps) {
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [text, setText] = useState('');
   const [attachments, setAttachments] = useState<AttachmentInput[]>([]);
@@ -190,7 +192,11 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
       .then((data) => {
         if (!ignore) {
           setWorkflows(data);
-          setWorkflowSelection(defaultWorkflowSelection(data));
+          if (testWorkflowId && data.some((workflow) => workflow.id === testWorkflowId)) {
+            setWorkflowSelection({ workflowId: testWorkflowId, stepByStep: true, worktree: true });
+          } else {
+            setWorkflowSelection(defaultWorkflowSelection(data));
+          }
         }
       })
       .catch(() => {
@@ -199,7 +205,7 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
     return () => {
       ignore = true;
     };
-  }, [commandProjectId]);
+  }, [commandProjectId, testWorkflowId]);
 
   // A pending choice and preview belong to one session; do not leak them
   // across tabs.
@@ -354,7 +360,7 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
     }
   }
 
-  async function handlePlanBuild() {
+  async function handlePlanBuild(worktree: boolean) {
     if (planBuildInFlight) return;
     setPlanBuildInFlight(true);
     setSendError(null);
@@ -374,7 +380,7 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
           DEFAULT_WORKFLOW_ID,
           task,
           false,
-          workflowSelection.worktree,
+          worktree,
           lastTextSegment.content
         );
         // The next message gets the default workflow again.

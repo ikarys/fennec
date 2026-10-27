@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Plan, Report } from '../../lib/plan';
@@ -37,6 +38,8 @@ function PathChip({ path }: { path: string }) {
 }
 
 export function PlanCard({ plan, actions }: { plan: Plan; actions?: PlanActions | null }) {
+  // The worktree decision is made when building a plan, not in the composer.
+  const [worktree, setWorktree] = useState(true);
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-border bg-raised p-4">
       <div className="flex items-center gap-2">
@@ -119,7 +122,7 @@ export function PlanCard({ plan, actions }: { plan: Plan; actions?: PlanActions 
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={actions.onBuild}
+            onClick={() => actions.onBuild(worktree)}
             disabled={actions.disabled}
             title="Lance Plan, build, verify à partir de ce plan : critères vérifiés, vérification et review."
             className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-on-accent disabled:opacity-60"
@@ -143,6 +146,18 @@ export function PlanCard({ plan, actions }: { plan: Plan; actions?: PlanActions 
           >
             Sans workflow
           </button>
+          <label
+            className="ml-auto flex items-center gap-1.5 self-center text-xs text-muted"
+            title="Coché, l'agent travaille dans sa propre copie du dépôt (worktree) et tu intègres ensuite ; décoché, il écrit directement dans ton dossier."
+          >
+            <input
+              type="checkbox"
+              checked={worktree}
+              onChange={(e) => setWorktree(e.target.checked)}
+              disabled={actions.disabled}
+            />
+            Espace séparé
+          </label>
         </div>
       )}
     </div>

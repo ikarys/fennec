@@ -15,7 +15,7 @@ const WorkflowsPage = lazy(() => import('./pages/WorkflowsPage'));
 type Route =
   | { name: 'home' }
   | { name: 'session'; id: string }
-  | { name: 'new'; id: string }
+  | { name: 'new'; id: string; testWorkflowId: string | null }
   | { name: 'settings' }
   | { name: 'workflows'; projectId: string | null; workflowId: string | null; isNew: boolean };
 
@@ -42,12 +42,14 @@ function parseRoute(): Route {
   if (hash.startsWith('#/s/')) {
     const id = decodeURIComponent(hash.slice(4));
     if (id.startsWith('new:')) {
-      return { name: 'new', id: id.slice(4) };
+      return { name: 'new', id: id.slice(4), testWorkflowId: null };
     }
     return { name: 'session', id };
   }
   if (hash.startsWith('#/new/')) {
-    return { name: 'new', id: decodeURIComponent(hash.slice(6)) };
+    const [rawId, query] = hash.slice(6).split('?');
+    const testWorkflowId = query ? new URLSearchParams(query).get('test') : null;
+    return { name: 'new', id: decodeURIComponent(rawId), testWorkflowId };
   }
   return { name: 'home' };
 }
@@ -342,6 +344,7 @@ export default function App() {
             <SessionPage
               sessionId={route.name === 'session' ? route.id : null}
               projectId={route.name === 'new' ? route.id : null}
+              testWorkflowId={route.name === 'new' ? route.testWorkflowId : null}
               pseudoTabId={pseudoTabId}
               projects={projects}
               config={config}

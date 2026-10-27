@@ -11,6 +11,8 @@ interface EditorHeaderProps {
   onDescriptionChange: (description: string) => void;
   onScopeChange: (scope: 'project' | 'global') => void;
   onSave: () => void;
+  onTest: (() => void) | null;
+  canTest: boolean;
 }
 
 const ORIGIN_LABELS: Record<Origin, string> = {
@@ -29,7 +31,9 @@ export function EditorHeader({
   onNameChange,
   onDescriptionChange,
   onScopeChange,
-  onSave
+  onSave,
+  onTest,
+  canTest
 }: EditorHeaderProps) {
   return (
     <header className="flex shrink-0 items-center gap-3 border-b border-border bg-panel px-4 py-2">
@@ -60,6 +64,17 @@ export function EditorHeader({
       </select>
       {dirty && <span className="text-[0.8125rem] text-accent" title="Modifications non enregistrées">●</span>}
       {issueCount > 0 && <span className="text-[0.8125rem] text-err">{issueCount} problème(s)</span>}
+      {onTest && (
+        <button
+          type="button"
+          onClick={onTest}
+          disabled={!canTest}
+          title={canTest ? "Ouvre une nouvelle session avec ce workflow, en pas à pas." : "Enregistre le workflow avant de le tester."}
+          className="rounded-md border border-border bg-raised px-3 py-1 text-[0.8125rem] text-text disabled:opacity-60"
+        >
+          Tester pas à pas
+        </button>
+      )}
       <button
         type="button"
         onClick={onSave}
