@@ -84,7 +84,7 @@ mod tests {
             id: id.into(),
             description: format!("{id} description"),
             prompt: "prompt".into(),
-            directory: PathBuf::from(id),
+            directory: Some(PathBuf::from(id)),
         }
     }
 

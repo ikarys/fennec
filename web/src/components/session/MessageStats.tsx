@@ -6,7 +6,7 @@ export function MessageStatsLine({ item, streaming }: { item: AssistantItem; str
   if (streaming) {
     if (item.liveSpeed == null) return null;
     return (
-      <div className="text-[11px] text-muted tabular-nums" title="Estimé d'après le texte reçu, mesuré à la fin du message">
+      <div className="text-[0.6875rem] text-muted tabular-nums" title="Estimé d'après le texte reçu, mesuré à la fin du message">
         ≈ {formatSpeed(item.liveSpeed)}
       </div>
     );
@@ -16,7 +16,7 @@ export function MessageStatsLine({ item, streaming }: { item: AssistantItem; str
   const fresh = stats.prefillTokens - stats.cachedPromptTokens;
   return (
     <div
-      className="flex min-w-0 gap-x-3 overflow-hidden text-[11px] whitespace-nowrap text-muted tabular-nums"
+      className="flex min-w-0 gap-x-3 overflow-hidden text-[0.6875rem] whitespace-nowrap text-muted tabular-nums"
       title={`Entrée ${stats.prefillTokens} tokens dont ${stats.cachedPromptTokens} en cache, ${fresh} nouveaux à ${formatSpeed(stats.prefillSpeed)} · sortie ${stats.generationTokens} tokens`}
     >
       <span>↑ {formatTokens(stats.prefillTokens)}</span>

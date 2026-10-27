@@ -61,7 +61,7 @@ pub(super) fn run(args: &Value, workdir: &Path) -> ToolResult {
     let packages = || {
         crate::skills::discover(workdir)
             .into_iter()
-            .map(|skill| skill.directory)
+            .filter_map(|skill| skill.directory)
             .collect()
     };
     let full_path = match resolve_for_reading(workdir, packages, path) {

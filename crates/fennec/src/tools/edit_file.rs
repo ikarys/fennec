@@ -2,8 +2,9 @@
 //! file's line endings.
 
 use super::args;
-use super::path_guard::resolve_in_workdir;
+use super::path_guard::resolve_for_writing;
 use crate::domain::event::ToolResult;
+use crate::domain::protection::Protection;
 use serde_json::{Value, json};
 use std::path::Path;
 
@@ -39,7 +40,7 @@ pub(super) fn definition() -> Value {
     })
 }
 
-pub(super) fn run(args: &Value, workdir: &Path) -> ToolResult {
+pub(super) fn run(args: &Value, workdir: &Path, protection: &Protection) -> ToolResult {
     let path = match args::string(args, "path") {
         Ok(value) => value,
         Err(error) => return ToolResult::failure(error),
@@ -60,7 +61,7 @@ pub(super) fn run(args: &Value, workdir: &Path) -> ToolResult {
         Err(error) => return ToolResult::failure(error),
     };
 
-    let full_path = match resolve_in_workdir(workdir, path) {
+    let full_path = match resolve_for_writing(workdir, protection, path) {
         Ok(value) => value,
         Err(error) => return ToolResult::failure(error),
     };
@@ -162,6 +163,8 @@ fn preview_string(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    use super::run;
+    use crate::domain::protection::Protection;
     use crate::tools::test_support::{no_output, run_tool, temp_dir};
 
     #[test]
@@ -232,6 +235,28 @@ mod tests {
         assert_eq!(
             std::fs::read_to_string(dir.join("multi.txt")).unwrap(),
             "x\nx\n"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn edit_to_protected_file_is_refused_and_file_unchanged() {
+        let dir = temp_dir();
+        std::fs::write(dir.join("Cargo.lock"), "original").unwrap();
+
+        let args = serde_json::json!({
+            "path": "Cargo.lock",
+            "old_string": "original",
+            "new_string": "changed"
+        });
+        let result = run(&args, &dir, &Protection::new(None));
+
+        assert!(!result.success);
+        assert!(result.error.unwrap().contains("is protected"));
+        assert_eq!(
+            std::fs::read_to_string(dir.join("Cargo.lock")).unwrap(),
+            "original"
         );
 
         let _ = std::fs::remove_dir_all(&dir);

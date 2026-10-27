@@ -29,18 +29,25 @@ with camelCase fields.
 | `turn.snapshot` | `{cachedSystemPrompt}`: the session's system prompt, frozen at its first turn |
 | `mode.changed` | `{mode, auto, reason?}`: the human switched the session's agent; it applies from the next turn |
 | `session.rewound` | `{messageId}`: fennec's replay cut; the model's view drops that message and everything after it, the log keeps them |
+| `session.name_generated` | `{name}`: the model-generated session title; the server renames the session and wakes the event stream |
 | `workflow.started` | `{runId, workflow, task, stepByStep}`: `workflow` is the whole definition, frozen for the run |
 | `workflow.node.started` | `{runId, nodeId, pass, via?, childSessionId?}`: `via` is `{from, port}`, the edge taken |
-| `workflow.node.finished` | `{runId, nodeId, port, output, exitCode?}` |
+| `workflow.human.asked` | `{runId, nodeId, question}`: a human node's question with its `{{…}}` names filled in, right after the node starts |
+| `workflow.node.finished` | `{runId, nodeId, port, output, exitCode?, durationMs?}`: `durationMs` is the node's working time measured by fennec (none for a human node) |
+| `criteria.set` | `{criteria: [{id, description, check?}]}`: the criteria, all pending: the approved plan's, or a proposal the human accepted |
+| `criteria.proposed` | `{callId, criteria: [{id, description, check?}], reason}`: an agent's corrected criteria (`propose_criteria`), shown with a `chat.ask_user` of the same `callId`; the human's `Accept` answer records them as `criteria.set` |
+| `criterion.updated` | `{criterionId, status}`; `status` is `{type: "pending"}` or `{type: "passed" \| "failed", provenance}`, `provenance` `{kind: "verified", command, exitCode?, output}` (fennec ran the check) or `{kind: "indicative", agent, reason}` (an agent's verdict) |
+| `integration.applied` | `{branch, base, commits, head, acknowledged}`: the human integrated the session's branch; `acknowledged` lists the blockers they accepted |
+| `worktree.discarded` | `{branch, commits}`: the human discarded the session's worktree and branch; `commits` are the agent's commits that were dropped |
 | `workflow.paused` | `{runId, from, port, to}`: waiting before `to` |
 | `workflow.resumed` | `{runId, comment}` |
-| `workflow.finished` | `{runId, outcome, reason?}`: `outcome` is `done`, `blocked`, `stopped` or `error` |
+| `workflow.finished` | `{runId, outcome, reason?, stats?}`: `outcome` is `done`, `blocked`, `stopped` or `error`; `stats` are facts fennec computed from the log: `{workingMs, nodes: [{nodeId, label, runs, workingMs}], reruns, calls, prefillTokens, cachedPromptTokens, generationTokens, filesChanged, criteriaTotal, criteriaPassed, criteriaVerified}` (child sessions' model calls included, the time waiting for the human excluded) |
 
 Tools: `read_file {path, offset?, limit?}`, `write_file {path, content}`,
 `edit_file {path, old_string, new_string, replace_all?}`,
 `run_command {command, cwd?, timeout?}`,
-`ask_user {question, type?, options?}` (handled by the loop, the turn ends
-waiting for the human).
+`ask_user {question, type?, options?}` and `propose_criteria {criteria, reason}`
+(handled by the loop, the turn ends waiting for the human).
 
 Agents: the session runs as one top-level agent, `plan` (`read_file`,
 `load_skill`, `ask_user`: read-only) by default or `builder` (every tool),
@@ -83,21 +90,55 @@ Precedence for a turn:
   "display": {
     "reasoningOpen": true,
     "toolResultsOpen": false,
-    "fontSize": 14
+    "fontSize": 14,
+    "panelPages": null
   },
-  "globalInstructions": "string | null"
+  "globalInstructions": "string | null",
+  "search": {
+    "searxngUrl": "string | null",
+    "searxngApiKey": "string | null"
+  },
+  "sandbox": {
+    "enabled": true,
+    "network": false
+  }
 }
 ```
 
 Validation: `maxTokens >= 1`, `contextWindow >= 1024`,
 `compactionThreshold` in `0.0..=1.0` (NaN rejected), model ids non-empty,
-`fontSize` in `13..=16` (default 14). `reasoningEffort` is sent as the
+`fontSize` in `13..=16` (default 14), `panelPages` 1..=12 pages with
+non-empty names ≤40 chars, unique names, and non-empty block ids (`null`
+means the UI's default pages), `searxngUrl` blank or starting with `http://`
+or `https://`. `reasoningEffort` is sent as the
 `reasoning_effort` field of the model request when set; `null` omits it.
 
 `globalInstructions` (openfox name) and the AGENTS.md files from the
 filesystem root down to the session's working directory go into the system
 prompt of a new session; an existing session keeps the prompt of its first
 turn.
+
+`search` (openfox `search.*`, SearXNG only) is the instance the `web_search`
+tool queries (`GET {searxngUrl}/search?format=json&q=…`, with
+`Authorization: Bearer {searxngApiKey}` when set). The tool runs in fennec,
+not in a command: the model only chooses the query.
+
+`sandbox` (fennec's own) is how commands run: the `run_command` tool and the
+workflow shell nodes. Enabled (the default), each command runs in bwrap: the
+system read-only, the working directory writable, `/tmp` private, the secrets
+under `$HOME` (`.ssh`, `.aws`, `.netrc`…) and fennec's data directory hidden,
+the environment's credential-looking variables removed, every process ended
+with the command, and no network unless `network` is true (npm and cargo are
+then set offline). Disabled, commands run on the host, as in openfox.
+
+Protected files: a model may read them, never write them. They are fennec's
+defaults (`.agents`, `AGENTS.md`, `CLAUDE.md`, the lockfiles `Cargo.lock`,
+`package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, and the CI `.github`,
+`.gitlab-ci.yml`) plus the lines of the project's `.agents/protected`
+(gitignore-like: `#` comments, `*`, `?`, `**`, a leading `/` anchors, a
+pattern without `/` matches at any depth, a directory protects its content).
+`write_file` and `edit_file` refuse them; in the sandbox they are mounted
+read-only. The human edits them as usual.
 
 ## Endpoints
 
@@ -123,11 +164,28 @@ turn.
   the sub-folders of `path` (the home directory when omitted), sorted by name;
   `repo` marks a git repository; 400 if `path` cannot be read
 - `GET /api/sessions/{id}` → `{id, title, state, mode, project: {id, name, workdir}, worktree}`;
-  `worktree` is `{path, branch, base}` when the session (or its root session) runs a workflow in
+  `worktree` is `{path, branch, base, editorUrl}` (`editorUrl` opens the copy in VS Code, through the WSL remote under WSL) when the session (or its root session) runs a workflow in
   its own git worktree, else null; the human takes the agent's work with
   `git cherry-pick <base>..<branch>`;
   `mode` is the id of the agent the session resolves to from its event log
   (null when there is no top-level agent)
+- `GET /api/sessions/{id}/integration` → `{branch, base, humanBranch, commits: [{sha, subject}], files: [{path, protected}], criteria, blockers}`:
+  what integrating the session's worktree branch would do (409 without a
+  worktree). `blockers` is the review gate, each `{kind, …}`: `noCommits`,
+  `criteriaNotPassed {criteria}`, `noCriteria`, `protectedTouched {paths}`;
+  protection is read from the project's tree, not the worktree's.
+- `POST /api/sessions/{id}/integrate` `{acknowledged: [kind]}` → `{head, commits}`:
+  the human's decision. The server recomputes the gate and answers 409 while a
+  turn runs, while a blocker is not acknowledged (`noCommits` never is), or when
+  git fails; then it runs `git cherry-pick <base>..<branch>` in the human's
+  repository. A conflict is aborted, the tree left as it was, and answers 409
+  `{error: "conflict", conflict: {kind: "conflict", files, command}}`. On
+  success it moves the base ref to the branch head and appends `integration.applied`. Nothing else in
+  fennec integrates: no agent, workflow or schedule calls it.
+- `POST /api/sessions/{id}/discard` `{}` → `{commits}`:
+  the human's decision; 409 while a turn runs or without a worktree; removes the
+  worktree, its branch and base ref in the human's repository and appends
+  `worktree.discarded`. A later workflow in the session opens a fresh worktree.
 - `GET /api/sessions/{id}/skills` → `{loaded: [ids], active: [ids]}`: the
   skills the session loaded (successful `load_skill` calls and `/<skill>`
   messages it typed, first-seen order) and those still in the model's view
@@ -209,12 +267,17 @@ from the parent's thread.
   no project
 - `POST /api/workflows/validate` `{projectId, workflow}` → 200
   `{errors: [...]}` (empty when valid); 404 if no project
-- `POST /api/sessions/{id}/workflow` `{workflowId, task, stepByStep?}` →
+- `POST /api/sessions/{id}/workflow` `{workflowId, task, stepByStep?, worktree?, plan?}` →
   202 `{}`; 404 if no session or no such workflow; 400 `empty task`; 409
-  while a turn or a run is active
-- `POST /api/sessions` accepts `workflowId` and `stepByStep` too: when
-  `workflowId` is set the prompt is the task and a run starts instead of a
-  turn; an unknown workflow is a 404 before the session is created
+  while a turn or a run is active; `worktree` defaults to true (the session
+  gets its own worktree; false makes the agent work in the project's folder;
+  an existing worktree is kept); `plan` is the approved plan to start from:
+  fennec records it as the output of the plan node (the one the workflow's
+  criteria node names) and answers the human node right after it with its
+  first choice, then runs on
+- `POST /api/sessions` accepts `workflowId`, `stepByStep` and `worktree` too:
+  when `workflowId` is set the prompt is the task and a run starts instead of
+  a turn; an unknown workflow is a 404 before the session is created
 - `POST /api/sessions/{id}/workflow/answer` `{runId, choice, comment}` → a
   human node; 202 `{}`; 409 while a turn runs or when `runId` is not the
   session's current run

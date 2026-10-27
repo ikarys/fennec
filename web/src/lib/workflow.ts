@@ -1,4 +1,4 @@
-export type NodeKind = 'start' | 'agent' | 'shell' | 'human' | 'condition' | 'parallel' | 'join' | 'end';
+export type NodeKind = 'start' | 'agent' | 'shell' | 'human' | 'condition' | 'parallel' | 'join' | 'end' | 'criteria';
 
 /** How the editor names each kind, in the palette and the node panel. */
 export const NODE_KIND_LABELS: Record<NodeKind, string> = {
@@ -9,7 +9,8 @@ export const NODE_KIND_LABELS: Record<NodeKind, string> = {
   human: 'Humain',
   condition: 'Condition',
   parallel: 'Parallèle',
-  join: 'Convergence'
+  join: 'Convergence',
+  criteria: 'Critères'
 };
 
 export type Origin = 'project' | 'global' | 'default';
@@ -70,6 +71,9 @@ export function outputPorts(node: WorkflowNode, edges: WorkflowEdge[]): string[]
     case 'shell':
       ports = ['success', 'failure'];
       break;
+    case 'criteria':
+      ports = ['pass', 'fail'];
+      break;
     case 'human':
       ports = asStringArray(node.choices);
       break;
@@ -101,7 +105,7 @@ export function hasInput(kind: NodeKind): boolean {
 }
 
 export function templateNames(def: WorkflowDef, nodeId: string): string[] {
-  const names = ['task', 'filesChanged', 'pass', 'comment'];
+  const names = ['task', 'filesChanged', 'pass', 'comment', 'criteria'];
   for (const node of def.nodes) {
     if (node.id === nodeId) continue;
     names.push(`nodes.${node.id}.output`, `nodes.${node.id}.port`);
@@ -130,6 +134,12 @@ export function newNode(kind: NodeKind, def: WorkflowDef, position: { x: number;
       break;
     case 'shell':
       node.command = '';
+      break;
+    case 'criteria':
+      node.plan =
+        def.nodes.find((n) => n.kind === 'agent' && n.agent === 'plan')?.id ??
+        def.nodes.find((n) => n.kind === 'agent')?.id ??
+        '';
       break;
     case 'human':
       node.question = '';

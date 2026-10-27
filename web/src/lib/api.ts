@@ -55,11 +55,29 @@ export interface ModelPrefs {
   reasoningEffort?: ReasoningEffort | null;
 }
 
+export interface PanelPage {
+  name: string;
+  blocks: string[];
+}
+
 export interface DisplayPrefs {
   reasoningOpen: boolean;
   toolResultsOpen: boolean;
   /** The UI's base font size in pixels (server default 14, range 13..=16). */
   fontSize: number;
+  /** The context panel's pages; null means the UI's defaults (lib/panelBlocks). */
+  panelPages: PanelPage[] | null;
+}
+
+export interface SearchPrefs {
+  searxngUrl?: string | null;
+  searxngApiKey?: string | null;
+}
+
+/** fennec's bwrap world: how commands run. */
+export interface SandboxPrefs {
+  enabled: boolean;
+  network: boolean;
 }
 
 export interface Preferences {
@@ -68,6 +86,10 @@ export interface Preferences {
   display: DisplayPrefs;
   /** openfox `globalInstructions`: added to the system prompt of new sessions. */
   globalInstructions?: string | null;
+  /** openfox search.*: the web_search tool's SearXNG instance. */
+  search?: SearchPrefs;
+  /** fennec's bwrap world: how commands run. */
+  sandbox?: SandboxPrefs;
 }
 
 export interface SettingsModel {
@@ -98,7 +120,7 @@ export interface SessionDetail {
   /** The parent session id, or null for a top-level session. */
   parentId: string | null;
   /** The git worktree the session's agent works in, or null when it runs in place. */
-  worktree: { path: string; branch: string; base: string } | null;
+  worktree: { path: string; branch: string; base: string; /** Opens the copy in VS Code (through the WSL remote under WSL). */ editorUrl: string } | null;
   project: {
     id: string;
     name: string;
@@ -115,6 +137,8 @@ export class WorkflowSaveError extends Error {
   }
 }
 
+export type IntegrationConflict = { files: string[]; command: string };
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     headers: {
@@ -126,13 +150,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!response.ok) {
     let message = response.statusText;
     let errors: WorkflowIssue[] | undefined;
+    let conflict: IntegrationConflict | undefined;
     try {
-      const body = (await response.json()) as { error?: string; errors?: WorkflowIssue[] };
+      const body = (await response.json()) as { error?: string; errors?: WorkflowIssue[]; conflict?: IntegrationConflict };
       if (body.error) {
         message = body.error;
       }
       if (Array.isArray(body.errors)) {
         errors = body.errors;
+      }
+      if (body.conflict) {
+        conflict = body.conflict;
       }
     } catch {
       // Keep the status text when the error body is not JSON.
@@ -140,6 +168,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const error = new Error(message);
     if (errors) {
       (error as { issues?: WorkflowIssue[] }).issues = errors;
+    }
+    if (conflict) {
+      (error as { conflict?: IntegrationConflict }).conflict = conflict;
     }
     throw error;
   }
@@ -237,6 +268,59 @@ export function getSkills(id: string): Promise<SessionSkills> {
   return request<SessionSkills>(`/api/sessions/${encodeURIComponent(id)}/skills`);
 }
 
+/** How a criterion's status was established, as reported by the integration preview. */
+export type IntegrationProvenance =
+  | { kind: 'verified'; command: string; exitCode?: number; output: string }
+  | { kind: 'indicative'; agent: string; reason: string };
+
+export type IntegrationCriterionStatus =
+  | { type: 'pending' }
+  | { type: 'passed' | 'failed'; provenance: IntegrationProvenance };
+
+export interface IntegrationCriterion {
+  id: string;
+  description: string;
+  check?: string;
+  status: IntegrationCriterionStatus;
+}
+
+export type Blocker =
+  | { kind: 'noCommits' }
+  | { kind: 'criteriaNotPassed'; criteria: string[] }
+  | { kind: 'noCriteria' }
+  | { kind: 'protectedTouched'; paths: string[] };
+
+export interface IntegrationPreview {
+  branch: string;
+  base: string;
+  humanBranch: string | null;
+  commits: { sha: string; subject: string }[];
+  files: { path: string; protected: boolean }[];
+  criteria: IntegrationCriterion[];
+  blockers: Blocker[];
+}
+
+/** The worktree's integration preview: what a cherry-pick would bring and what needs acceptance. */
+export function getIntegration(sessionId: string): Promise<IntegrationPreview> {
+  return request<IntegrationPreview>(`/api/sessions/${encodeURIComponent(sessionId)}/integration`);
+}
+
+/** Cherry-picks the worktree's commits into the human's branch after the accepted blockers. */
+export function integrate(sessionId: string, acknowledged: string[]): Promise<{ head: string; commits: string[] }> {
+  return request<{ head: string; commits: string[] }>(`/api/sessions/${encodeURIComponent(sessionId)}/integrate`, {
+    method: 'POST',
+    body: JSON.stringify({ acknowledged })
+  });
+}
+
+/** Drops the session's worktree, branch and base ref; the human's decision. */
+export function discardWorktree(sessionId: string): Promise<{ commits: string[] }> {
+  return request<{ commits: string[] }>(`/api/sessions/${encodeURIComponent(sessionId)}/discard`, {
+    method: 'POST',
+    body: '{}'
+  });
+}
+
 export interface AttachmentInput {
   filename: string;
   data: string;
@@ -247,7 +331,7 @@ export function createSession(
   prompt: string,
   mode?: string,
   attachments?: AttachmentInput[],
-  workflow?: { workflowId: string; stepByStep: boolean }
+  workflow?: { workflowId: string; stepByStep: boolean; worktree: boolean }
 ): Promise<{ id: string }> {
   // `mode` is optional: omit it so the server applies its default resolution.
   const body: {
@@ -257,6 +341,7 @@ export function createSession(
     attachments?: AttachmentInput[];
     workflowId?: string;
     stepByStep?: boolean;
+    worktree?: boolean;
   } = { projectId, prompt };
   if (mode != null) {
     body.mode = mode;
@@ -267,6 +352,7 @@ export function createSession(
   if (workflow) {
     body.workflowId = workflow.workflowId;
     body.stepByStep = workflow.stepByStep;
+    body.worktree = workflow.worktree;
   }
   return request<{ id: string }>('/api/sessions', {
     method: 'POST',
@@ -377,10 +463,23 @@ export function validateWorkflow(projectId: string, workflow: WorkflowDef): Prom
   }).then((result) => result.errors);
 }
 
-export function startWorkflow(sessionId: string, workflowId: string, task: string, stepByStep: boolean): Promise<void> {
+export function startWorkflow(
+  sessionId: string,
+  workflowId: string,
+  task: string,
+  stepByStep: boolean,
+  worktree: boolean,
+  plan?: string
+): Promise<void> {
   return request<void>(`/api/sessions/${encodeURIComponent(sessionId)}/workflow`, {
     method: 'POST',
-    body: JSON.stringify({ workflowId, task, stepByStep })
+    body: JSON.stringify({
+      workflowId,
+      task,
+      stepByStep,
+      worktree,
+      ...(plan ? { plan } : {})
+    })
   });
 }
 
