@@ -4,7 +4,8 @@ import remarkGfm from 'remark-gfm';
 import type { AssistantItem, Segment, ThreadItem } from '../../lib/fold';
 import { useDisplayPrefs } from '../../lib/display';
 import { splitContract } from '../../lib/plan';
-import { BulbIcon, ReplayIcon } from '../Icons';
+import { BulbIcon, ChevronRightIcon, ReplayIcon } from '../Icons';
+import { buttonClass } from '../ui/Button';
 import { CopyButton } from './CopyButton';
 import { MessageStatsLine } from './MessageStats';
 import { PlanCard, ReportCard } from './PlanCard';
@@ -67,6 +68,30 @@ const TextSegment = memo(function TextSegment({ content, caret, id }: { content:
         <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={markdownComponents}>{content}</ReactMarkdown>
       )}
       {caret && <span className="caret ml-0.5 inline-block h-4 w-2 bg-accent align-text-bottom" />}
+    </div>
+  );
+});
+
+// A centered note that carries a detail (a compaction, a replay): the detail
+// opens under it as a card, in the same muted tone.
+const NoteDetail = memo(function NoteDetail({ text, detail }: { text: string; detail: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="flex flex-col gap-2">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        className={buttonClass({ variant: 'ghost', size: 'sm' }, 'self-center')}
+      >
+        <ChevronRightIcon className={`h-3 w-3 transition-transform ${open ? 'rotate-90' : ''}`} />
+        {text}
+      </button>
+      {open && (
+        <div className="rounded-md border border-border bg-raised px-3 py-2 text-left text-sm">
+          <TextSegment content={detail} caret={false} />
+        </div>
+      )}
     </div>
   );
 });
@@ -182,14 +207,7 @@ export function ThreadItemView({ item, model, running, showHeader, onReplay }: {
 
   if (item.kind === 'note') {
     if (item.detail !== undefined) {
-      return (
-        <details>
-          <summary className="cursor-pointer text-center text-xs text-muted">{item.text}</summary>
-          <div className="mt-2 rounded-md border border-border bg-raised px-3 py-2 text-left text-sm">
-            <TextSegment content={item.detail} caret={false} />
-          </div>
-        </details>
-      );
+      return <NoteDetail text={item.text} detail={item.detail} />;
     }
     return <div className="text-center text-xs text-muted">{item.text}</div>;
   }
