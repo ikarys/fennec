@@ -241,3 +241,62 @@ export function portTone(port: string): 'positive' | 'negative' | 'other' {
   if (NEGATIVE_PORTS.has(normalized)) return 'negative';
   return 'other';
 }
+
+/** A step the run has not reached yet, on its nominal path. */
+export interface UpcomingStep { nodeId: string; label: string; }
+
+/**
+ * The nodes still to come after the current one, following at each node its
+ * nominal edge: a positive port first (portTone), else the first edge whose
+ * port is not negative, in the definition's order. Stops at an end node (not
+ * listed), at a node already listed (a loop), or when nothing leads on. A
+ * finished run has none.
+ */
+export function upcomingSteps(run: RunView): UpcomingStep[] {
+  if (run.finished) return [];
+  const nodes = run.workflow.nodes;
+  if (nodes.length === 0) return [];
+  const edges = run.workflow.edges;
+  const steps: UpcomingStep[] = [];
+  const seen = new Set<string>();
+
+  const nextNode = (nodeId: string): string | undefined => {
+    const outgoing = edges.filter((edge) => edge.from === nodeId);
+    return outgoing.find((edge) => portTone(edge.port) === 'positive')?.to ??
+      outgoing.find((edge) => portTone(edge.port) !== 'negative')?.to;
+  };
+
+  const addStep = (nodeId: string): void => {
+    const node = nodeById(run.workflow, nodeId);
+    // Terminal nodes are not steps to come.
+    if (node?.kind === 'end') return;
+    if (seen.has(nodeId)) return;
+    seen.add(nodeId);
+    steps.push({ nodeId, label: labelOf(node, nodeId) });
+  };
+
+  const start = run.paused?.to ?? run.open[run.open.length - 1] ?? run.runs[run.runs.length - 1]?.nodeId;
+  if (!start) return [];
+
+  if (run.paused?.to) {
+    addStep(start);
+  } else {
+    // The current node is already a row; only mark it so a loop does not relist it.
+    seen.add(start);
+  }
+
+  let current = start;
+  // One guard per node, so a malformed cycle cannot run the walk forever.
+  for (let i = 0; i < nodes.length && steps.length < nodes.length; i += 1) {
+    const next = nextNode(current);
+    if (!next) break;
+    const node = nodeById(run.workflow, next);
+    if (node?.kind === 'end') break;
+    if (seen.has(next)) break;
+    seen.add(next);
+    steps.push({ nodeId: next, label: labelOf(node, next) });
+    current = next;
+  }
+
+  return steps;
+}

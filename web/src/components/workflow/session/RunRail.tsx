@@ -1,8 +1,8 @@
 /**
  * The workflow run as a collapsible left rail: vertical, so every step stays visible.
  */
-import { useEffect, useRef, useState } from 'react';
-import { portTone, type NodeRun, type RunView } from '../../../lib/workflowRun';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { portTone, upcomingSteps, type NodeRun, type RunView } from '../../../lib/workflowRun';
 import { CheckIcon, ChevronsLeftIcon, ChevronsRightIcon, CloseIcon, StopIcon } from '../../Icons';
 import { Badge } from '../../ui/Badge';
 import { Button } from '../../ui/Button';
@@ -104,6 +104,7 @@ export function RunRail({
   const [collapsed, setCollapsed] = useState(loadCollapsed);
   const listRef = useRef<HTMLOListElement>(null);
   const count = run.runs.length;
+  const upcoming = useMemo(() => upcomingSteps(run), [run]);
 
   useEffect(() => {
     saveCollapsed(collapsed);
@@ -111,7 +112,10 @@ export function RunRail({
 
   useEffect(() => {
     const element = listRef.current;
-    if (element) element.scrollTop = element.scrollHeight;
+    if (!element) return;
+    const current = element.querySelector('[data-current]');
+    if (current) current.scrollIntoView({ block: 'nearest' });
+    else element.scrollTop = element.scrollHeight;
   }, [count, collapsed]);
 
 
@@ -140,6 +144,13 @@ export function RunRail({
                   : `${nodeRun.label} — ${nodeRun.port || nodeRun.state}`
               }
               className={`h-2 w-2 shrink-0 rounded-full ${dotClass(nodeRun)}`}
+            />
+          ))}
+          {upcoming.map((step) => (
+            <span
+              key={`upcoming-${step.nodeId}`}
+              title={`${step.label} — à venir`}
+              className="h-2 w-2 shrink-0 rounded-full border border-dashed border-faint"
             />
           ))}
         </div>
@@ -185,6 +196,7 @@ export function RunRail({
           return (
             <li
               key={`${nodeRun.nodeId}-${nodeRun.pass}-${index}`}
+              data-current={isRunning ? 'true' : undefined}
               className={`flex items-center gap-2 px-2 py-1 text-xs ${rowClass}`}
             >
               <span className={`h-2 w-2 shrink-0 rounded-full ${dotClass(nodeRun)}`} />
@@ -205,6 +217,17 @@ export function RunRail({
             </li>
           );
         })}
+        {upcoming.map((step) => (
+          <li
+            key={`upcoming-${step.nodeId}`}
+            className="flex items-center gap-2 px-2 py-1 text-xs text-faint"
+          >
+            <span className="h-2 w-2 shrink-0 rounded-full border border-dashed border-faint" />
+            <span className="min-w-0 truncate" title={`${step.label} — à venir`}>
+              {step.label}
+            </span>
+          </li>
+        ))}
       </ol>
       {(run.finished || !running) && (
         <div className="mt-auto border-t border-border p-2">
