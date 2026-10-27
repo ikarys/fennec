@@ -7,7 +7,7 @@ use crate::domain::event::{DoneReason, Event};
 use crate::domain::workflow::definition::{
     AgentContext, Edge, EndOutcome, Node, NodeKind, Position, Workflow,
 };
-use crate::domain::workflow::run::RunOutcome;
+use crate::domain::workflow::run::{RunOutcome, Via};
 use crate::tools::LocalTools;
 use std::cell::RefCell;
 use std::path::PathBuf;
@@ -1455,4 +1455,135 @@ fn start_with_attachments_puts_them_in_the_session_before_the_run() {
         .position(|e| matches!(e, Event::WorkflowStarted { .. }))
         .unwrap();
     assert!(message_index < started_index);
+}
+
+#[test]
+fn resume_interrupted_agent_keeps_its_pass_and_prompt() {
+    let workflow = Workflow {
+        id: "w".into(),
+        name: "w".into(),
+        description: String::new(),
+        max_steps: 50,
+        nodes: vec![
+            Node {
+                id: "start".into(),
+                name: None,
+                position: Position::default(),
+                kind: NodeKind::Start,
+            },
+            Node {
+                id: "a".into(),
+                name: Some("Agent".into()),
+                position: Position::default(),
+                kind: NodeKind::Agent {
+                    agent: "plan".into(),
+                    prompt: "first prompt".into(),
+                    retry_prompt: Some("retry prompt".into()),
+                    outputs: vec!["done".into()],
+                    context: AgentContext::Session,
+                    verdicts: false,
+                },
+            },
+            Node {
+                id: "end".into(),
+                name: None,
+                position: Position::default(),
+                kind: NodeKind::End {
+                    outcome: EndOutcome::Done,
+                },
+            },
+        ],
+        edges: vec![
+            Edge {
+                from: "start".into(),
+                port: "next".into(),
+                to: "a".into(),
+                max_passes: None,
+                pause: false,
+            },
+            Edge {
+                from: "a".into(),
+                port: "done".into(),
+                to: "end".into(),
+                max_passes: None,
+                pause: false,
+            },
+        ],
+    };
+
+    let model = Scripted(RefCell::new(vec![reply("done", vec![])]));
+    let stop = AtomicBool::new(false);
+    let children = FakeChildren::default();
+    let commands = FakeCommands::default();
+    let env = WorkflowEnv {
+        children: &children,
+        commands: &commands,
+    };
+    let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
+    h.agents = vec![plan()];
+
+    h.log.0.borrow_mut().extend([
+        Event::WorkflowStarted {
+            run_id: "r".into(),
+            workflow,
+            task: "do it".into(),
+            step_by_step: false,
+        },
+        Event::WorkflowNodeStarted {
+            run_id: "r".into(),
+            node_id: "start".into(),
+            pass: 1,
+            via: None,
+            child_session_id: None,
+        },
+        Event::WorkflowNodeFinished {
+            run_id: "r".into(),
+            node_id: "start".into(),
+            port: "next".into(),
+            output: "do it".into(),
+            exit_code: None,
+            comment: None,
+            duration_ms: None,
+        },
+        Event::WorkflowNodeStarted {
+            run_id: "r".into(),
+            node_id: "a".into(),
+            pass: 1,
+            via: Some(Via {
+                from: "start".into(),
+                port: "next".into(),
+            }),
+            child_session_id: None,
+        },
+    ]);
+
+    let reason = run_workflow(&mut h.turn(), &env, WorkflowJob::Resume).unwrap();
+    assert_eq!(reason, DoneReason::Complete);
+
+    let events = h.log.0.into_inner();
+    let started = events
+        .iter()
+        .filter(|e| matches!(e, Event::WorkflowNodeStarted { node_id, .. } if node_id == "a"))
+        .collect::<Vec<_>>();
+    assert_eq!(started.len(), 2);
+    assert!(matches!(
+        started.last().unwrap(),
+        Event::WorkflowNodeStarted { pass, .. } if *pass == 1
+    ));
+    assert!(events.iter().any(|e| matches!(
+        e,
+        Event::MessageStart {
+            content: Some(content),
+            is_system_generated: true,
+            ..
+        } if content.contains("first prompt") && !content.contains("retry prompt")
+    )));
+    assert!(!events.iter().any(|e| matches!(
+        e,
+        Event::MessageStart {
+            content: Some(content),
+            is_system_generated: true,
+            ..
+        } if content.contains("retry prompt")
+    )));
 }

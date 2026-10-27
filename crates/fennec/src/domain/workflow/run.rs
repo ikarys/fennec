@@ -55,6 +55,9 @@ pub struct RunState {
     pub edge_passes: HashMap<(String, String), u32>,
     pub steps: u32,
     pub open: Vec<OpenNode>,
+    /// The nodes a resume found open (interrupted): their next start re-runs
+    /// the same pass and is not a new pass on the edge.
+    pub interrupted: Vec<OpenNode>,
     pub paused: Option<Pause>,
     pub comment: String,
     pub finished: Option<(RunOutcome, Option<String>)>,
@@ -94,6 +97,7 @@ impl RunState {
             edge_passes: HashMap::new(),
             steps: 0,
             open: Vec::new(),
+            interrupted: Vec::new(),
             paused: None,
             comment: String::new(),
             finished: None,
@@ -110,14 +114,21 @@ impl RunState {
                 via,
                 child_session_id,
             } if run_id == &self.run_id => {
-                self.steps += 1;
-                self.node_passes.insert(node_id.clone(), *pass);
-
-                if let Some(via) = via {
-                    let key = (via.from.clone(), via.port.clone());
-                    *self.edge_passes.entry(key).or_insert(0) += 1;
+                let resumed = self
+                    .interrupted
+                    .iter()
+                    .position(|open| open.node_id == *node_id && open.pass == *pass);
+                if let Some(index) = resumed {
+                    // A resume re-enters the node on the pass it was interrupted on.
+                    self.interrupted.remove(index);
+                } else {
+                    self.steps += 1;
+                    if let Some(via) = via {
+                        let key = (via.from.clone(), via.port.clone());
+                        *self.edge_passes.entry(key).or_insert(0) += 1;
+                    }
                 }
-
+                self.node_passes.insert(node_id.clone(), *pass);
                 self.open.push(OpenNode {
                     node_id: node_id.clone(),
                     pass: *pass,
@@ -163,9 +174,9 @@ impl RunState {
                 });
             }
             Event::WorkflowResumed { run_id, comment } if run_id == &self.run_id => {
-                // A resumed interrupted run starts its node afresh; a pause has
-                // no open node anyway.
-                self.open.clear();
+                // A resumed interrupted run starts its node afresh (a pause has no
+                // open node): remembered so that start keeps the node's pass.
+                self.interrupted = std::mem::take(&mut self.open);
                 self.paused = None;
                 if !comment.is_empty() {
                     self.comment = comment.clone();
@@ -568,7 +579,7 @@ mod tests {
     }
 
     #[test]
-    fn resumed_clears_open_nodes() {
+    fn resumed_clears_open_nodes_and_remembers_them() {
         let mut state = state(simple_workflow());
         state.apply(&Event::WorkflowNodeStarted {
             run_id: "r".into(),
@@ -586,6 +597,40 @@ mod tests {
             comment: String::new(),
         });
         assert!(state.open.is_empty());
+        assert_eq!(state.interrupted.len(), 1);
+        assert!(state.paused.is_none());
+    }
+
+    #[test]
+    fn resuming_an_interrupted_node_keeps_its_pass() {
+        let mut state = state(simple_workflow());
+        let started = || Event::WorkflowNodeStarted {
+            run_id: "r".into(),
+            node_id: "a".into(),
+            pass: 1,
+            via: Some(Via {
+                from: "start".into(),
+                port: "next".into(),
+            }),
+            child_session_id: None,
+        };
+        state.apply(&started());
+        state.apply(&Event::WorkflowResumed {
+            run_id: "r".into(),
+            comment: String::new(),
+        });
+        state.apply(&started());
+
+        assert_eq!(state.open.len(), 1);
+        assert!(state.interrupted.is_empty());
+        assert_eq!(state.node_passes.get("a"), Some(&1));
+        assert_eq!(state.steps, 1);
+        assert_eq!(
+            state
+                .edge_passes
+                .get(&("start".to_string(), "next".to_string())),
+            Some(&1)
+        );
     }
 
     #[test]

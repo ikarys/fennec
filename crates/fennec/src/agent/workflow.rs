@@ -482,7 +482,13 @@ fn run_node(
         .workflow
         .node(node_id)
         .ok_or_else(|| format!("{node_id}: unknown node"))?;
-    let pass = state.node_passes.get(node_id).copied().unwrap_or(0) + 1;
+    // An interrupted node resumes the pass it was started on, not a new one.
+    let pass = state
+        .interrupted
+        .iter()
+        .find(|open| open.node_id == node_id)
+        .map(|open| open.pass)
+        .unwrap_or_else(|| state.node_passes.get(node_id).copied().unwrap_or(0) + 1);
     // A fresh agent's child is created first, so its start names it.
     let child = match &node.kind {
         NodeKind::Agent {
