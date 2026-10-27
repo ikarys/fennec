@@ -2,7 +2,6 @@ import type { ThreadItem } from '../../../lib/fold';
 import { cachePercent, formatDuration, formatTokens } from '../../../lib/format';
 import { Badge } from '../../ui/Badge';
 import { Card } from '../../ui/Card';
-import { SectionLabel } from '../../ui/SectionLabel';
 
 type WorkflowEndItem = Extract<ThreadItem, { kind: 'workflow-end' }>;
 
@@ -19,17 +18,52 @@ function outcomeTitle(outcome: WorkflowEndItem['outcome']): { text: string; clas
   }
 }
 
-function StatTile({ label, value }: { label: string; value: string }) {
+type Stat = { label: string; value: string; hint?: string };
+
+function StatCell({ stat }: { stat: Stat }) {
   return (
-    <div className="flex flex-col gap-0.5 rounded-lg border border-border bg-panel px-2.5 py-2">
-      <SectionLabel>{label}</SectionLabel>
-      <div className="text-sm font-medium text-text tabular-nums">{value}</div>
+    <div className="flex items-baseline justify-between gap-3 px-3 py-1.5">
+      <span className="text-xs text-muted">{stat.label}</span>
+      <span className="whitespace-nowrap text-right text-[0.8125rem] font-medium tabular-nums text-text">
+        {stat.value}
+        {stat.hint && <span className="ml-1.5 text-[0.6875rem] font-normal text-muted">{stat.hint}</span>}
+      </span>
     </div>
   );
 }
 
 export function RunEndCard({ item }: { item: WorkflowEndItem }) {
   const outcome = outcomeTitle(item.outcome);
+  const stats = item.stats;
+
+  const statRows: [Stat, Stat][] = stats
+    ? [
+        [
+          { label: 'Temps de travail', value: formatDuration(stats.workingMs) },
+          { label: 'Appels au modèle', value: String(stats.calls) },
+        ],
+        [
+          { label: 'Tokens générés', value: formatTokens(stats.generationTokens) },
+          {
+            label: 'Tokens lus',
+            value: formatTokens(stats.prefillTokens),
+            hint: `${cachePercent(stats.cachedPromptTokens, stats.prefillTokens)} % cache`,
+          },
+        ],
+        [
+          { label: 'Fichiers modifiés', value: String(stats.filesChanged) },
+          {
+            label: 'Critères',
+            value: `${stats.criteriaPassed}/${stats.criteriaTotal}`,
+            hint: `${stats.criteriaVerified} vérifiés · ${stats.criteriaTotal - stats.criteriaVerified} indicatif${
+              stats.criteriaTotal - stats.criteriaVerified > 1 ? 's' : ''
+            }`,
+          },
+        ],
+      ]
+    : [];
+
+  const nodeTotalMs = stats ? stats.nodes.reduce((sum, node) => sum + node.workingMs, 0) : 0;
 
   return (
     <Card className="px-3 py-2">
@@ -39,42 +73,72 @@ export function RunEndCard({ item }: { item: WorkflowEndItem }) {
           {item.reason && <div className="text-sm text-muted">{item.reason}</div>}
         </div>
 
-        {item.stats && (
+        {stats && (
           <div className="flex flex-col gap-3">
-            <div className="grid grid-cols-2 gap-2">
-              <StatTile label="Temps de travail" value={formatDuration(item.stats.workingMs)} />
-              <StatTile label="Appels au modèle" value={String(item.stats.calls)} />
-              <StatTile label="Tokens générés" value={formatTokens(item.stats.generationTokens)} />
-              <StatTile
-                label="Tokens lus"
-                value={`${formatTokens(item.stats.prefillTokens)} · ${cachePercent(item.stats.cachedPromptTokens, item.stats.prefillTokens)} % cache`}
-              />
-              <StatTile label="Fichiers modifiés" value={String(item.stats.filesChanged)} />
-              <StatTile
-                label="Critères"
-                value={`${item.stats.criteriaPassed}/${item.stats.criteriaTotal} · dont ${item.stats.criteriaVerified} vérifiés`}
-              />
+            <div className="divide-y divide-border rounded-lg border border-border">
+              {statRows.map((row) => (
+                <div key={row[0].label} className="odd:bg-raised/55">
+                  <div className="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
+                    {row.map((stat) => (
+                      <StatCell key={stat.label} stat={stat} />
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
 
-            {item.stats.nodes.length > 0 && (
-              <table className="w-full border-collapse text-left text-xs tabular-nums">
-                <thead>
-                  <tr className="text-muted">
-                    <th className="py-1 pr-3 font-medium">Nœud</th>
-                    <th className="py-1 pr-3 font-medium">Passages</th>
-                    <th className="py-1 font-medium">Temps</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {item.stats.nodes.map((node) => (
-                    <tr key={node.nodeId} className={node.runs > 1 ? 'bg-accent-soft/60' : undefined}>
-                      <td className="py-1 pr-3 text-text">{node.label}</td>
-                      <td className="py-1 pr-3 text-muted">{node.runs}</td>
-                      <td className="py-1 text-muted">{formatDuration(node.workingMs)}</td>
+            {stats.nodes.length > 0 && (
+              <details className="group rounded-lg border border-border">
+                <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-1.5 text-xs text-muted select-none">
+                  <span aria-hidden className="text-[0.625rem] transition-transform group-open:rotate-90">
+                    ▶
+                  </span>
+                  <span>Détail du temps</span>
+                  <span className="ml-auto tabular-nums">
+                    {formatDuration(stats.workingMs)} · {stats.nodes.length} nœud{stats.nodes.length > 1 ? 's' : ''}
+                  </span>
+                </summary>
+                <table className="w-full border-collapse text-left text-xs tabular-nums">
+                  <thead>
+                    <tr className="border-t border-border text-muted">
+                      <th className="py-1 pl-3 pr-3 font-medium">Nœud</th>
+                      <th className="py-1 pr-3 font-medium" />
+                      <th className="w-16 py-1 pr-3 text-right font-medium">Temps</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {stats.nodes.map((node) => (
+                      <tr key={node.nodeId} className="odd:bg-raised/55">
+                        <td className="py-1 pl-3 pr-3 text-text">
+                          {node.label}
+                          {node.runs > 1 && (
+                            <span
+                              title="boucle"
+                              className="ml-1.5 rounded-full bg-accent-soft px-1.5 py-px text-[0.65625rem] text-accent"
+                            >
+                              ×{node.runs}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-1 pr-3">
+                          <div className="h-1 w-full rounded-full bg-faint/30">
+                            <div
+                              className="h-full rounded-full bg-accent"
+                              style={{
+                                width:
+                                  node.workingMs > 0 && nodeTotalMs > 0
+                                    ? `${Math.max((node.workingMs / nodeTotalMs) * 100, 1)}%`
+                                    : '2px',
+                              }}
+                            />
+                          </div>
+                        </td>
+                        <td className="py-1 pr-3 text-right text-muted">{formatDuration(node.workingMs)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </details>
             )}
 
             <div className="flex items-center gap-2 text-[0.6875rem] text-muted">
