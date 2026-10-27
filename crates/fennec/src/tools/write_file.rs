@@ -12,7 +12,7 @@ pub(super) fn definition() -> Value {
         "type": "function",
         "function": {
             "name": "write_file",
-            "description": "Write content to a file. Creates the file if it does not exist, or overwrites if it does. Creates parent directories as needed.",
+            "description": "Write content to a file. Creates the file if it does not exist, or overwrites if it does. Creates parent directories as needed. For a change to an existing file, use edit_file instead: rewriting the whole file costs more and can drop content.",
             "parameters": {
                 "type": "object",
                 "properties": {

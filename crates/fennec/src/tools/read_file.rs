@@ -1,4 +1,5 @@
 //! Port of openfox `tools/read.ts` (text files and images).
+//! The guidance in its errors (where to look, what to run) is fennec's own.
 //!
 //! Not ported: PDF files, directories.
 
@@ -19,7 +20,7 @@ pub(super) fn definition() -> Value {
         "type": "function",
         "function": {
             "name": "read_file",
-            "description": "Read a file. Text files: returns its lines numbered, from `offset` (1-based) for at most `limit` lines. Images (PNG, JPEG, GIF, WebP, BMP, SVG): returned to you as an image you can see.",
+            "description": "Read a file. Text files: returns its lines numbered, from `offset` (1-based) for at most `limit` lines; in a large file, find the lines first (`rg -n`) and read only that range. Images (PNG, JPEG, GIF, WebP, BMP, SVG): returned to you as an image you can see.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -71,7 +72,15 @@ pub(super) fn run(args: &Value, workdir: &Path) -> ToolResult {
 
     let metadata = match std::fs::metadata(&full_path) {
         Ok(value) => value,
-        Err(_) => return ToolResult::failure(format!("File not found: {path}")),
+        Err(_) => {
+            let name = Path::new(path)
+                .file_name()
+                .map(|name| name.to_string_lossy().into_owned())
+                .unwrap_or_else(|| path.to_string());
+            return ToolResult::failure(format!(
+                "File not found: {path}. Find it with: rg --files | rg '{name}'"
+            ));
+        }
     };
 
     if metadata.is_dir() {
