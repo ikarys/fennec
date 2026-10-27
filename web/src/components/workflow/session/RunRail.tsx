@@ -76,6 +76,9 @@ function dotClass(nodeRun: NodeRun): string {
   if (nodeRun.state === 'running') {
     return 'animate-pulse bg-accent';
   }
+  if (nodeRun.state === 'interrupted') {
+    return 'border border-dashed border-muted bg-transparent';
+  }
   if (nodeRun.state === 'done') {
     const tone = portTone(nodeRun.port ?? '');
     if (tone === 'positive') {
@@ -131,7 +134,11 @@ export function RunRail({
           {run.runs.map((nodeRun, index) => (
             <span
               key={`${nodeRun.nodeId}-${nodeRun.pass}-${index}`}
-              title={`${nodeRun.label} — ${nodeRun.port || nodeRun.state}`}
+              title={
+                nodeRun.state === 'interrupted'
+                  ? `${nodeRun.label} — interrompu`
+                  : `${nodeRun.label} — ${nodeRun.port || nodeRun.state}`
+              }
               className={`h-2 w-2 shrink-0 rounded-full ${dotClass(nodeRun)}`}
             />
           ))}
@@ -181,7 +188,10 @@ export function RunRail({
               className={`flex items-center gap-2 px-2 py-1 text-xs ${rowClass}`}
             >
               <span className={`h-2 w-2 shrink-0 rounded-full ${dotClass(nodeRun)}`} />
-              <span className="min-w-0 truncate" title={nodeRun.label}>
+              <span
+                className="min-w-0 truncate"
+                title={nodeRun.state === 'interrupted' ? `${nodeRun.label} — interrompu` : nodeRun.label}
+              >
                 {nodeRun.label}
               </span>
               {hasTrailing && (

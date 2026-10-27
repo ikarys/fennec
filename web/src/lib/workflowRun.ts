@@ -1,7 +1,7 @@
 import type { FennecEvent } from './fold';
 import type { NodeKind, WorkflowDef, WorkflowNode } from './workflow';
 
-export type NodeRunState = 'running' | 'done' | 'ended';
+export type NodeRunState = 'running' | 'done' | 'ended' | 'interrupted';
 
 export interface NodeRun {
   nodeId: string;
@@ -70,12 +70,29 @@ export function createRunFold(): RunFold {
       case 'workflow.node.started': {
         if (!run) return true;
         const nodeId = String(data.nodeId ?? '');
+        const pass = typeof data.pass === 'number' ? data.pass : 1;
+        const existing = run.runs.find(
+          // A resume restarts an interrupted node on its own pass: same row.
+          (candidate) =>
+            candidate.nodeId === nodeId &&
+            candidate.pass === pass &&
+            (candidate.state === 'running' || candidate.state === 'interrupted')
+        );
+        if (existing) {
+          existing.state = 'running';
+          if (typeof data.childSessionId === 'string') {
+            existing.childSessionId = data.childSessionId;
+          }
+          // workflow.resumed emptied open; the restarted node is open again.
+          if (!run.open.includes(nodeId)) run.open.push(nodeId);
+          return true;
+        }
         const node = nodeById(run.workflow, nodeId);
         const nodeRun: NodeRun = {
           nodeId,
           label: labelOf(node, nodeId),
           kind: node?.kind ?? 'agent',
-          pass: typeof data.pass === 'number' ? data.pass : 1,
+          pass,
           state: 'running'
         };
         if (typeof data.childSessionId === 'string') {
@@ -119,6 +136,11 @@ export function createRunFold(): RunFold {
       }
       case 'workflow.resumed': {
         if (!run) return true;
+        for (const nodeRun of run.runs) {
+          if (nodeRun.state === 'running') {
+            nodeRun.state = 'interrupted';
+          }
+        }
         run.paused = undefined;
         run.open = [];
         run.lastComment = typeof data.comment === 'string' ? data.comment : undefined;
@@ -128,7 +150,7 @@ export function createRunFold(): RunFold {
         if (!run) return true;
         for (const nodeRun of run.runs) {
           if (nodeRun.state === 'running') {
-            nodeRun.state = 'ended';
+            nodeRun.state = 'interrupted';
           }
         }
         run.open = [];
