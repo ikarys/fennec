@@ -1,6 +1,7 @@
 //! The JSON API (contract: `docs/api.md`) and the UI's pages.
 
 use super::App;
+use super::editor;
 use super::http::{Request, error, send, send_json};
 use super::notifier::NotifyingLog;
 use super::{assets, event_stream, integration, turns::Job, workflow_routes};
@@ -310,7 +311,13 @@ fn get_session(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String
     v["project"] = project_json(&p);
     v["mode"] = json!(mode);
     v["worktree"] = match app.place(&store, &s, &p)?.worktree {
-        Some(wt) => json!({ "path": wt.path, "branch": wt.branch, "base": wt.base }),
+        Some(wt) => json!({
+            "path": wt.path, "branch": wt.branch, "base": wt.base,
+            "editorUrl": editor::vscode_link(
+                &wt.path.to_string_lossy(),
+                std::env::var("WSL_DISTRO_NAME").ok().as_deref(),
+            ),
+        }),
         None => Value::Null,
     };
     send_json(stream, 200, &v)

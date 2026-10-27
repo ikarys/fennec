@@ -113,7 +113,7 @@ export interface SessionDetail {
   /** The parent session id, or null for a top-level session. */
   parentId: string | null;
   /** The git worktree the session's agent works in, or null when it runs in place. */
-  worktree: { path: string; branch: string; base: string } | null;
+  worktree: { path: string; branch: string; base: string; /** Opens the copy in VS Code (through the WSL remote under WSL). */ editorUrl: string } | null;
   project: {
     id: string;
     name: string;

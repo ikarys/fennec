@@ -3,6 +3,7 @@
 
 mod assets;
 mod children;
+mod editor;
 mod event_stream;
 mod guard;
 mod http;

@@ -156,7 +156,7 @@ read-only. The human edits them as usual.
   the sub-folders of `path` (the home directory when omitted), sorted by name;
   `repo` marks a git repository; 400 if `path` cannot be read
 - `GET /api/sessions/{id}` → `{id, title, state, mode, project: {id, name, workdir}, worktree}`;
-  `worktree` is `{path, branch, base}` when the session (or its root session) runs a workflow in
+  `worktree` is `{path, branch, base, editorUrl}` (`editorUrl` opens the copy in VS Code, through the WSL remote under WSL) when the session (or its root session) runs a workflow in
   its own git worktree, else null; the human takes the agent's work with
   `git cherry-pick <base>..<branch>`;
   `mode` is the id of the agent the session resolves to from its event log

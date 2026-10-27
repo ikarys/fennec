@@ -211,6 +211,27 @@ export function FolderIcon({ className }: { className?: string }) {
   );
 }
 
+export function BranchIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="6" cy="6" r="2.5" />
+      <circle cx="6" cy="18" r="2.5" />
+      <circle cx="18" cy="6" r="2.5" />
+      <path d="M6 8.5v7" />
+      <path d="M18 8.5a8 8 0 0 1-8 8" />
+    </svg>
+  );
+}
+
 export function RepoIcon({ className }: { className?: string }) {
   return (
     <svg

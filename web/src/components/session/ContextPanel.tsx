@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { cachePercent, formatSpeed, formatTokens } from '../../lib/format';
 import { previewKindOfPath, relativeToWorkdir, type PreviewKind } from '../../lib/preview';
 import { usePreviewOpener, usePreviewWorkdir } from '../preview/PreviewContext';
+import { AgentWorkspaceSection } from './AgentWorkspaceSection';
 import { CriteriaSection } from './CriteriaSection';
-import { IntegrationDialog } from './IntegrationDialog';
 import { VisionSection } from './VisionSection';
 
 interface ContextPanelProps {
@@ -30,12 +30,10 @@ interface ContextPanelProps {
 export function ContextPanel({ view, currentTokens, contextPercent, skills, hasSession, compactDisabled, onCompact, compactError, partial, worktree, sessionId }: ContextPanelProps) {
   const opener = usePreviewOpener();
   const workdir = usePreviewWorkdir();
-  const [integrationOpen, setIntegrationOpen] = useState(false);
   const [filesExpanded, setFilesExpanded] = useState(false);
 
   useEffect(() => {
-    // The dialog belongs to one session; a tab change closes it.
-    setIntegrationOpen(false);
+    // A tab change collapses the file list; the workspace section owns its dialog.
     setFilesExpanded(false);
   }, [sessionId]);
 
@@ -175,35 +173,7 @@ export function ContextPanel({ view, currentTokens, contextPercent, skills, hasS
         </section>
 
         {worktree && (
-          <section className="flex flex-col gap-1.5">
-            <h2 className="text-[11px] font-semibold tracking-[0.06em] text-muted uppercase">Worktree</h2>
-            <div className="font-mono text-xs">{worktree.branch}</div>
-            <div title={worktree.path} className="overflow-hidden font-mono text-xs text-muted text-ellipsis whitespace-nowrap">{worktree.path}</div>
-            {sessionId && (
-              <button
-                type="button"
-                onClick={() => setIntegrationOpen(true)}
-                className="self-start rounded-lg bg-accent px-2.5 py-1 text-xs font-medium text-on-accent"
-              >
-                Intégrer…
-              </button>
-            )}
-            <button
-              type="button"
-              title="Copier la commande"
-              onClick={() => void navigator.clipboard.writeText(`git cherry-pick ${worktree.base}..${worktree.branch}`)}
-              className="rounded-lg border border-border bg-raised px-2 py-1.5 text-left font-mono text-xs break-all text-text"
-            >
-              <code>git cherry-pick {worktree.base}..{worktree.branch}</code>
-            </button>
-          </section>
-        )}
-        {sessionId && (
-          <IntegrationDialog
-            sessionId={sessionId}
-            open={integrationOpen}
-            onClose={() => setIntegrationOpen(false)}
-          />
+          <AgentWorkspaceSection sessionId={sessionId} worktree={worktree} running={view.running} />
         )}
 
         <section className="flex flex-col gap-2">
