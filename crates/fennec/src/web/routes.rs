@@ -206,7 +206,7 @@ fn list_agents(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String
     send_json(stream, 200, &Value::Array(out))
 }
 
-fn parse_attachments(body: &Value) -> Result<Vec<Attachment>, String> {
+pub(super) fn parse_attachments(body: &Value) -> Result<Vec<Attachment>, String> {
     let Some(attachments) = body.get("attachments").filter(|v| !v.is_null()) else {
         return Ok(Vec::new());
     };
@@ -291,6 +291,7 @@ fn create_session(app: &App, req: &Request, stream: &mut TcpStream) -> Result<()
                 workflow: found.workflow,
                 task: prompt,
                 step_by_step,
+                attachments,
             });
             let place = app.open_place(&store, &session, &project, worktree)?;
             app.turns.start(&id, place, job)?;

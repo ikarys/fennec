@@ -154,8 +154,12 @@ pub fn start_workflow(
     let Some(found) = workflows::find(Path::new(&project.workdir), workflow_id) else {
         return error(stream, 404, "no such workflow");
     };
+    let attachments = match super::routes::parse_attachments(&body) {
+        Ok(attachments) => attachments,
+        Err(e) => return error(stream, 400, &e),
+    };
     let task = body["task"].as_str().unwrap_or("").trim().to_string();
-    if task.is_empty() {
+    if task.is_empty() && attachments.is_empty() {
         return error(stream, 400, "empty task");
     }
     let worktree = body["worktree"].as_bool().unwrap_or(true);
@@ -165,6 +169,7 @@ pub fn start_workflow(
             workflow: found.workflow,
             task,
             step_by_step: body["stepByStep"].as_bool().unwrap_or(false),
+            attachments,
         }
     } else {
         WorkflowJob::StartFromPlan {
