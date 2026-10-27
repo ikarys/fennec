@@ -5,7 +5,8 @@ import { BranchIcon, CheckIcon, CopyIcon, EditIcon, FolderIcon, SpinnerIcon } fr
 import { IntegrationDialog } from './IntegrationDialog';
 import { Button, buttonClass } from '../ui/Button';
 import { Badge } from '../ui/Badge';
-import { SectionLabel } from '../ui/SectionLabel';
+import { panelBlock } from '../../lib/panelBlocks';
+import { Panel } from '../ui/Panel';
 
 function shortFolderName(path: string): string {
   const name = path.split(/[\\/]/).filter(Boolean).pop() ?? path;
@@ -97,8 +98,7 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
   const integrateDisabled = sessionId === null || running || !hasCommits;
 
   return (
-    <section className="flex flex-col gap-2">
-      <SectionLabel>Espace de l'agent</SectionLabel>
+    <Panel id="workspace" title={panelBlock('workspace').title} pinned>
       <p className="m-0 text-xs text-muted">
         L'agent travaille dans sa propre copie du dépôt. Ton dossier et ta branche ne changent pas tant que tu n'intègres pas.
       </p>
@@ -226,6 +226,6 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
           }}
         />
       )}
-    </section>
+    </Panel>
   );
 }

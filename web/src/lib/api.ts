@@ -55,11 +55,18 @@ export interface ModelPrefs {
   reasoningEffort?: ReasoningEffort | null;
 }
 
+export interface PanelPage {
+  name: string;
+  blocks: string[];
+}
+
 export interface DisplayPrefs {
   reasoningOpen: boolean;
   toolResultsOpen: boolean;
   /** The UI's base font size in pixels (server default 14, range 13..=16). */
   fontSize: number;
+  /** The context panel's pages; null means the UI's defaults (lib/panelBlocks). */
+  panelPages: PanelPage[] | null;
 }
 
 export interface SearchPrefs {

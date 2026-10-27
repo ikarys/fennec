@@ -1,8 +1,9 @@
 import { useMemo, useRef, useState } from 'react';
 import type { ThreadItem } from '../../lib/fold';
 import { seenImages, type SeenImage } from '../../lib/vision';
+import { panelBlock } from '../../lib/panelBlocks';
 import { Button } from '../ui/Button';
-import { SectionLabel } from '../ui/SectionLabel';
+import { Panel } from '../ui/Panel';
 
 export function VisionSection({ items, partial }: { items: ThreadItem[]; partial: boolean }) {
   const images = useMemo(() => seenImages(items), [items]);
@@ -22,8 +23,7 @@ export function VisionSection({ items, partial }: { items: ThreadItem[]; partial
   };
 
   return (
-    <section className="flex flex-col gap-1.5">
-      <SectionLabel>Vision</SectionLabel>
+    <Panel id="vision" title={panelBlock('vision').title} summary={images.length > 0 ? images.length : undefined}>
       <p className="m-0 text-[0.6875rem] text-muted">Les images que le modèle a vues : captures, images lues ou jointes. Grisées : sorties de son contexte.</p>
       {partial && <div className="text-[0.6875rem] text-muted">(messages chargés seulement)</div>}
       {images.length === 0 ? (
@@ -75,6 +75,6 @@ export function VisionSection({ items, partial }: { items: ThreadItem[]; partial
           </div>
         )}
       </dialog>
-    </section>
+    </Panel>
   );
 }

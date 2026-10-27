@@ -13,6 +13,7 @@ import { Button } from '../components/ui/Button';
 import { ModelSection } from '../components/settings/ModelSection';
 import { ModelPrefsSection, percentFromFraction, type ModelForm } from '../components/settings/ModelPrefsSection';
 import { DisplaySection } from '../components/settings/DisplaySection';
+import { PanelPagesSection } from '../components/settings/PanelPagesSection';
 import { InstructionsSection } from '../components/settings/InstructionsSection';
 import { SearchSection, type SearchForm } from '../components/settings/SearchSection';
 import { SandboxSection } from '../components/settings/SandboxSection';
@@ -275,7 +276,13 @@ export function SettingsPage({ settings, onSaved }: SettingsPageProps) {
             )}
 
             {tab === 'display' && (
-              <DisplaySection value={form.display} onChange={updateDisplay} />
+              <div className="flex flex-col gap-4">
+                <DisplaySection value={form.display} onChange={updateDisplay} />
+                <PanelPagesSection
+                  value={form.display.panelPages ?? null}
+                  onChange={(panelPages) => updateDisplay({ ...form.display, panelPages })}
+                />
+              </div>
             )}
 
             <div className="flex items-center gap-3">

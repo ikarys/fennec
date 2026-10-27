@@ -1,6 +1,7 @@
 import type { CriterionView, Provenance } from '../../lib/fold';
+import { panelBlock } from '../../lib/panelBlocks';
 import { Badge } from '../ui/Badge';
-import { SectionLabel } from '../ui/SectionLabel';
+import { Panel } from '../ui/Panel';
 
 export function CriterionProvenanceBadge({ provenance }: { provenance: Provenance | undefined }) {
   if (!provenance) return null;
@@ -23,10 +24,12 @@ export function CriteriaSection({ criteria }: { criteria: CriterionView[] }) {
   const passed = criteria.filter((criterion) => criterion.status === 'passed').length;
 
   return (
-    <section className="flex flex-col gap-1.5">
-      <SectionLabel>
-        Critères{criteria.length > 0 && <span className="ml-1 tabular-nums">{passed}/{criteria.length}</span>}
-      </SectionLabel>
+    <Panel
+      id="criteria"
+      title={panelBlock('criteria').title}
+      pinned
+      summary={criteria.length > 0 ? `${passed}/${criteria.length}` : undefined}
+    >
       {criteria.length === 0 ? (
         <div className="text-xs text-muted">Aucun critère : ils viennent du plan validé d'un workflow.</div>
       ) : (
@@ -72,6 +75,6 @@ export function CriteriaSection({ criteria }: { criteria: CriterionView[] }) {
           })}
         </div>
       )}
-    </section>
+    </Panel>
   );
 }

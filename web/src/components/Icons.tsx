@@ -340,3 +340,42 @@ export function ChevronsRightIcon({ className }: IconProps) {
     </svg>
   );
 }
+
+
+/** Right chevron: the open/close affordance of a `Panel` header. */
+export function ChevronRightIcon({ className }: IconProps) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M9 18l6-6-6-6" />
+    </svg>
+  );
+}
+
+/** A pushpin: marks a block that is always visible. */
+export function PinIcon({ className }: IconProps) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 17v5" />
+      <path d="M9 10.76V6h6v4.76l2 3.24H7z" />
+      <path d="M8 2h8" />
+    </svg>
+  );
+}

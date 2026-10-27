@@ -90,7 +90,8 @@ Precedence for a turn:
   "display": {
     "reasoningOpen": true,
     "toolResultsOpen": false,
-    "fontSize": 14
+    "fontSize": 14,
+    "panelPages": null
   },
   "globalInstructions": "string | null",
   "search": {
@@ -106,7 +107,10 @@ Precedence for a turn:
 
 Validation: `maxTokens >= 1`, `contextWindow >= 1024`,
 `compactionThreshold` in `0.0..=1.0` (NaN rejected), model ids non-empty,
-`fontSize` in `13..=16` (default 14), `searxngUrl` blank or starting with `http://` or `https://`. `reasoningEffort` is sent as the
+`fontSize` in `13..=16` (default 14), `panelPages` 1..=12 pages with
+non-empty names ≤40 chars, unique names, and non-empty block ids (`null`
+means the UI's default pages), `searxngUrl` blank or starting with `http://`
+or `https://`. `reasoningEffort` is sent as the
 `reasoning_effort` field of the model request when set; `null` omits it.
 
 `globalInstructions` (openfox name) and the AGENTS.md files from the
