@@ -49,7 +49,7 @@ export function ContextGauge({ currentTokens, maxTokens, contextPercent, compact
           : `${formatTokens(currentTokens)} tokens`}
       </span>
       <Button
-        variant="ghost"
+        variant="secondary"
         size="sm"
         disabled={compactDisabled}
         onClick={onCompact}
