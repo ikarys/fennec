@@ -21,11 +21,13 @@ use super::ask_user;
 use super::compaction::{self, Compacted};
 use super::ports::{EventLog, Model, Toolbox};
 use super::prompt::system_prompt;
+use super::propose_criteria;
 use super::round::{self, Round, RoundPrompt};
 use super::tool_calls::{Flow, INTERRUPTED_ERROR, execute_tools};
 use crate::domain::agent::{AgentDefinition, DEFAULT_COLOR, last_reminder, resolve};
 use crate::domain::attachment::Attachment;
 use crate::domain::compaction::{context_tokens, should_compact};
+use crate::domain::criteria::accepted_proposal;
 use crate::domain::event::{
     DoneReason, Event, MessageMetadata, MetadataSource, ReminderKind, Role, ToolResult,
 };
@@ -199,11 +201,12 @@ pub(super) fn with_running(
 /// so the loop and a manual compaction use an identical cached prefix.
 fn round_prompt_parts(turn: &mut Turn) -> Result<(String, Value), String> {
     let system_prompt = cached_system_prompt(turn)?;
-    // The loop owns `ask_user`; it is not a host tool, so its definition is
-    // added to the toolbox's.
+    // The loop owns `ask_user` and `propose_criteria`; they are not host
+    // tools, so their definitions are added to the toolbox's.
     let mut tool_defs = turn.tools.definitions();
     if let Some(arr) = tool_defs.as_array_mut() {
         arr.push(ask_user::definition());
+        arr.push(propose_criteria::definition());
     }
     Ok((system_prompt, tool_defs))
 }
@@ -219,7 +222,13 @@ fn close_open_calls(turn: &mut Turn, prompt: &str) -> Result<bool, String> {
     for call in open {
         let result = if call.awaits_answer && !answered {
             answered = true;
-            ToolResult::success(prompt.to_string(), false)
+            // The human's accept is what applies a proposal, never the agent.
+            if let Some(criteria) = accepted_proposal(&events, &call.call_id, prompt) {
+                turn.append(Event::CriteriaSet { criteria })?;
+                ToolResult::success("Accepted: the criteria are replaced.".into(), false)
+            } else {
+                ToolResult::success(prompt.to_string(), false)
+            }
         } else {
             ToolResult::failure(INTERRUPTED_ERROR.into())
         };
@@ -737,6 +746,80 @@ mod tests {
         assert_eq!(msgs[tool_idx]["content"], "blue");
         assert_eq!(msgs[tool_idx - 1]["role"], "assistant");
         assert_eq!(msgs[tool_idx - 1]["tool_calls"][0]["id"], "c1");
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn propose_criteria_accepts_the_proposed_list() {
+        let dir = scratch_dir();
+        let call = ToolCall {
+            id: "c1".into(),
+            name: "propose_criteria".into(),
+            arguments: json!({"criteria":[{"description":"builds","check":"true"}],"reason":"the old check cannot run"}),
+            parse_error: None,
+        };
+        let model = Scripted(RefCell::new(vec![
+            reply("", vec![call]),
+            reply("done", vec![]),
+        ]));
+        let stop = AtomicBool::new(false);
+        let mut h = Harness::new(Box::new(model), dir.clone(), &stop);
+        let reason = run_turn(&mut h.turn(), "go", &[]).unwrap();
+        assert_eq!(reason, DoneReason::WaitingForUser);
+        let events = h.log.0.borrow().clone();
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, Event::CriteriaProposed { call_id, .. } if call_id == "c1"))
+        );
+        assert!(events.iter().any(|e| matches!(e, Event::ChatAskUser { call_id, question, .. } if call_id == "c1" && question.contains("builds"))));
+
+        let reason2 = run_turn(&mut h.turn(), "Accept", &[]).unwrap();
+        assert_eq!(reason2, DoneReason::Complete);
+        let events = h.log.0.borrow().clone();
+        let set_idx = events
+            .iter()
+            .position(|e| matches!(e, Event::CriteriaSet { .. }))
+            .unwrap();
+        let result_idx = events
+            .iter()
+            .position(
+                |e| matches!(e, Event::ToolResult { tool_call_id, .. } if tool_call_id == "c1"),
+            )
+            .unwrap();
+        assert!(set_idx < result_idx);
+        assert!(events.iter().any(|e| matches!(e, Event::CriteriaSet { criteria } if criteria.len() == 1 && criteria[0].id == "C1" && criteria[0].description == "builds" && criteria[0].check.as_deref() == Some("true"))));
+        assert!(events.iter().any(|e| matches!(e, Event::ToolResult { tool_call_id, result, .. } if tool_call_id == "c1" && result.output.as_deref() == Some("Accepted: the criteria are replaced."))));
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn propose_criteria_refusal_keeps_the_criteria() {
+        let dir = scratch_dir();
+        let call = ToolCall {
+            id: "c1".into(),
+            name: "propose_criteria".into(),
+            arguments: json!({"criteria":[{"description":"builds","check":"true"}],"reason":"the old check cannot run"}),
+            parse_error: None,
+        };
+        let model = Scripted(RefCell::new(vec![
+            reply("", vec![call]),
+            reply("done", vec![]),
+        ]));
+        let stop = AtomicBool::new(false);
+        let mut h = Harness::new(Box::new(model), dir.clone(), &stop);
+        let reason = run_turn(&mut h.turn(), "go", &[]).unwrap();
+        assert_eq!(reason, DoneReason::WaitingForUser);
+
+        let reason2 = run_turn(&mut h.turn(), "Refuse", &[]).unwrap();
+        assert_eq!(reason2, DoneReason::Complete);
+        let events = h.log.0.borrow().clone();
+        assert!(
+            !events
+                .iter()
+                .any(|e| matches!(e, Event::CriteriaSet { .. }))
+        );
+        assert!(events.iter().any(|e| matches!(e, Event::ToolResult { tool_call_id, result, .. } if tool_call_id == "c1" && result.output.as_deref() == Some("Refuse"))));
         std::fs::remove_dir_all(dir).ok();
     }
 

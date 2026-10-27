@@ -163,6 +163,7 @@ mod tests {
                 "edit_file",
                 "run_command",
                 "ask_user",
+                "propose_criteria",
                 "load_skill",
                 "web_search"
             ]

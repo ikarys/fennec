@@ -3,6 +3,7 @@
 //! run, and the turn ends waiting for the human.
 
 use super::ask_user;
+use super::propose_criteria;
 use super::turn::Turn;
 use crate::domain::agent::AgentDefinition;
 use crate::domain::event::{Event, ToolCall, ToolResult};
@@ -96,6 +97,20 @@ pub(super) fn execute_tools(
                         ask_type: q.ask_type,
                         options: q.options,
                     })?;
+                    waiting = true;
+                }
+            }
+            continue;
+        }
+        if call.name == propose_criteria::NAME {
+            match propose_criteria::parse(&call.arguments) {
+                // The model reads the failure and the loop goes on.
+                Err(e) => record(turn, message_id, call, ToolResult::failure(e))?,
+                // No result is recorded: the answer will be the result.
+                Ok(proposal) => {
+                    for event in propose_criteria::events(&call.id, proposal) {
+                        turn.append(event)?;
+                    }
                     waiting = true;
                 }
             }

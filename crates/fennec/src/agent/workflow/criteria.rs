@@ -28,25 +28,29 @@ pub(super) fn run(
         });
     };
 
-    let criteria = parse_done_when(&plan_output);
-    if criteria.is_empty() {
-        return Ok(NodeEnd::EndRun {
-            outcome: RunOutcome::Blocked,
-            reason: Some("the plan has no \"Done when\" criteria".into()),
-        });
-    }
-
-    let current: Vec<_> = input
+    // Once recorded, only the human changes the criteria (an accepted
+    // proposal); re-reading the plan would undo that.
+    let recorded: Vec<_> = input
         .state
         .criteria
         .iter()
         .map(|state| state.criterion.clone())
         .collect();
-    if current != criteria {
+    let criteria = if recorded.is_empty() {
+        let criteria = parse_done_when(&plan_output);
+        if criteria.is_empty() {
+            return Ok(NodeEnd::EndRun {
+                outcome: RunOutcome::Blocked,
+                reason: Some("the plan has no \"Done when\" criteria".into()),
+            });
+        }
         turn.append(Event::CriteriaSet {
             criteria: criteria.clone(),
         })?;
-    }
+        criteria
+    } else {
+        recorded
+    };
 
     let mut states: Vec<CriterionState> = criteria
         .iter()

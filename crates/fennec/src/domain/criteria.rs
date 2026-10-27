@@ -2,7 +2,12 @@
 //! reshaped for fennec: a criterion's status carries its provenance; not
 //! ported: in_progress/completed statuses, attempts history.
 
+use super::event::Event;
 use serde::{Deserialize, Serialize};
+
+/// The choice that accepts a proposal; anything else leaves the criteria as they are.
+pub const ACCEPT_PROPOSAL: &str = "Accept";
+pub const REFUSE_PROPOSAL: &str = "Refuse";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -123,6 +128,50 @@ pub fn parse_done_when(plan: &str) -> Vec<Criterion> {
     }
 
     criteria
+}
+
+/// The criteria a proposal sets when the human's `answer` to its question
+/// accepts it: the latest `criteria.proposed` with this `call_id`.
+pub fn accepted_proposal(events: &[Event], call_id: &str, answer: &str) -> Option<Vec<Criterion>> {
+    let accepted = answer.trim().eq_ignore_ascii_case(ACCEPT_PROPOSAL);
+    if !accepted {
+        return None;
+    }
+
+    events.iter().rev().find_map(|event| match event {
+        Event::CriteriaProposed {
+            call_id: proposed_call_id,
+            criteria,
+            ..
+        } if proposed_call_id == call_id => Some(criteria.clone()),
+        _ => None,
+    })
+}
+
+/// The question shown to the human (the UI speaks French) for a proposed criteria list.
+pub fn proposal_question(criteria: &[Criterion], reason: &str) -> String {
+    let mut lines = vec![
+        "L'agent propose de remplacer les critères :".to_string(),
+        String::new(),
+        reason.to_string(),
+        String::new(),
+    ];
+
+    for criterion in criteria {
+        let line = match &criterion.check {
+            Some(command) => format!(
+                "{}: {} — check `{command}`",
+                criterion.id, criterion.description
+            ),
+            None => format!(
+                "{}: {} — sans check, à juger",
+                criterion.id, criterion.description
+            ),
+        };
+        lines.push(line);
+    }
+
+    lines.join("\n")
 }
 
 /// The agent's judgement lines: `C<n>: pass|fail — <reason>`.
@@ -556,5 +605,44 @@ C3: pass
         }];
 
         assert_eq!(failures_summary(&criteria), "All checks passed.");
+    }
+
+    #[test]
+    fn accepted_proposal_accepts_only_the_matching_call() {
+        let criteria = vec![Criterion {
+            id: "C1".into(),
+            description: "builds".into(),
+            check: Some("true".into()),
+        }];
+        let events = vec![Event::CriteriaProposed {
+            call_id: "c1".into(),
+            criteria: criteria.clone(),
+            reason: "wrong".into(),
+        }];
+
+        assert_eq!(accepted_proposal(&events, "c1", "accept"), Some(criteria));
+        assert_eq!(accepted_proposal(&events, "c1", "Refuse"), None);
+        assert_eq!(accepted_proposal(&events, "c2", "accept"), None);
+    }
+
+    #[test]
+    fn proposal_question_lists_the_criteria() {
+        let criteria = vec![
+            Criterion {
+                id: "C1".into(),
+                description: "builds".into(),
+                check: Some("true".into()),
+            },
+            Criterion {
+                id: "C2".into(),
+                description: "docs".into(),
+                check: None,
+            },
+        ];
+
+        assert_eq!(
+            proposal_question(&criteria, "the old check cannot run"),
+            "L'agent propose de remplacer les critères :\n\nthe old check cannot run\n\nC1: builds — check `true`\nC2: docs — sans check, à juger"
+        );
     }
 }

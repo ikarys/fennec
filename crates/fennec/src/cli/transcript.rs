@@ -135,6 +135,7 @@ impl Transcript {
             | Event::WorkflowResumed { .. }
             | Event::WorkflowFinished { .. }
             | Event::CriteriaSet { .. }
+            | Event::CriteriaProposed { .. }
             | Event::CriterionUpdated { .. }
             | Event::IntegrationApplied { .. }
             | Event::WorktreeDiscarded { .. } => Ok(()),

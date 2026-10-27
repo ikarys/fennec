@@ -313,6 +313,15 @@ pub enum Event {
     TurnSnapshot { cached_system_prompt: String },
     #[serde(rename = "criteria.set", rename_all = "camelCase")]
     CriteriaSet { criteria: Vec<Criterion> },
+    /// An agent proposed a new criteria list (fennec's own event); it applies
+    /// only when the human answers the `chat.ask_user` of the same `call_id`
+    /// with the accept choice.
+    #[serde(rename = "criteria.proposed", rename_all = "camelCase")]
+    CriteriaProposed {
+        call_id: String,
+        criteria: Vec<Criterion>,
+        reason: String,
+    },
     #[serde(rename = "criterion.updated", rename_all = "camelCase")]
     CriterionUpdated {
         criterion_id: String,
@@ -362,6 +371,7 @@ impl Event {
             Event::ChatAskUser { .. } => "chat.ask_user",
             Event::TurnSnapshot { .. } => "turn.snapshot",
             Event::CriteriaSet { .. } => "criteria.set",
+            Event::CriteriaProposed { .. } => "criteria.proposed",
             Event::CriterionUpdated { .. } => "criterion.updated",
             Event::IntegrationApplied { .. } => "integration.applied",
             Event::WorktreeDiscarded { .. } => "worktree.discarded",
