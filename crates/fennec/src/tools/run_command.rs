@@ -19,7 +19,7 @@ pub(super) fn definition() -> Value {
         "type": "function",
         "function": {
             "name": "run_command",
-            "description": "Execute a shell command. Returns stdout, stderr, exit code, and elapsed duration. Does NOT support a trailing \"&\": background commands are not available, run commands in the foreground.\nCommands run from your working directory automatically, so prefer relative paths.",
+            "description": "Execute a shell command. Returns stdout, stderr, exit code, and elapsed duration. Does NOT support a trailing \"&\": background commands are not available, run commands in the foreground.\nCommands run from your working directory automatically, so prefer relative paths.\nSearch with `rg` (content) and `rg --files` (names) rather than grep or find. Keep output short: long output is truncated and fills your context, so pipe it through `tail`/`head` or filter it.",
             "parameters": {
                 "type": "object",
                 "properties": {
