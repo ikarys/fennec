@@ -9,7 +9,7 @@
  */
 import type { PanelPage } from './api';
 
-export type PanelBlockId = 'criteria' | 'modifiedFiles' | 'workspace' | 'context' | 'tokens' | 'skills' | 'tools' | 'vision';
+export type PanelBlockId = 'criteria' | 'modifiedFiles' | 'workspace' | 'tokens' | 'skills' | 'tools' | 'vision';
 
 export interface PanelBlock {
   id: PanelBlockId;
@@ -22,7 +22,6 @@ export const PANEL_BLOCKS: readonly PanelBlock[] = [
   { id: 'criteria', title: 'Critères', core: true },
   { id: 'modifiedFiles', title: 'Fichiers modifiés', core: true },
   { id: 'workspace', title: "Espace de l'agent", core: true },
-  { id: 'context', title: 'Contexte', core: false },
   { id: 'skills', title: 'Skills', core: false },
   { id: 'tokens', title: 'Tokens', core: false },
   { id: 'tools', title: 'Outils de ce tour', core: false },
@@ -32,7 +31,7 @@ export const PANEL_BLOCKS: readonly PanelBlock[] = [
 export const OPTIONAL_BLOCKS: readonly PanelBlock[] = PANEL_BLOCKS.filter((block) => !block.core);
 
 export const DEFAULT_PANEL_PAGES: readonly PanelPage[] = [
-  { name: 'Défaut', blocks: ['context', 'skills'] },
+  { name: 'Défaut', blocks: ['skills'] },
   { name: 'Stats', blocks: ['tokens', 'tools', 'vision'] }
 ];
 

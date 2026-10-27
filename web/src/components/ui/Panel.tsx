@@ -48,7 +48,7 @@ export function Panel({ id, title, summary, pinned = false, defaultOpen = true, 
         setOpen(nextOpen);
         saveOpen(id, nextOpen);
       }}
-      className="group overflow-hidden rounded-xl border border-border bg-panel"
+      className="group shrink-0 overflow-hidden rounded-xl border border-border bg-panel"
     >
       <summary className="flex cursor-pointer list-none items-center gap-2 bg-raised px-3 py-2 select-none [&::-webkit-details-marker]:hidden">
         <ChevronRightIcon className="h-3 w-3 shrink-0 text-muted transition-transform group-open:rotate-90" />
