@@ -12,9 +12,10 @@ use crate::domain::event::Event;
 use crate::domain::slash::TurnInput;
 use crate::instructions::all_instructions;
 use crate::llm::OpenAiClient;
+use crate::protected;
 use crate::skills;
 use crate::store::SqliteStore;
-use crate::tools::LocalTools;
+use crate::tools::{LocalTools, Sandbox};
 use crate::worktree::{self, Worktree};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -137,7 +138,14 @@ pub(super) fn with_turn<R>(
     let skills = skills::discover(workdir);
     let agents = agents::discover(workdir);
     let model = OpenAiClient::new(&settings.llm, &params.model);
-    let tools = LocalTools::new(workdir.to_path_buf());
+    let protection = protected::load(workdir);
+    let tools = LocalTools::new(workdir.to_path_buf())
+        .with_search(prefs.search.clone())
+        .with_sandbox(
+            Sandbox::for_store(&prefs.sandbox, &settings.db_path)
+                .protecting(protected::existing_paths(workdir, &protection)),
+        )
+        .with_protection(protection);
     let mut on_event = |_: &Event| {};
     let mut turn = Turn {
         model: &model,

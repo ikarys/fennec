@@ -2,6 +2,7 @@
 
 use super::definition::{BRANCH, ConditionTest, EXHAUSTED, EndOutcome, Node, NodeKind, Workflow};
 use super::template;
+use crate::domain::criteria::{CriterionState, CriterionStatus, render_for_prompt};
 use crate::domain::event::{DoneReason, Event};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -57,6 +58,7 @@ pub struct RunState {
     pub paused: Option<Pause>,
     pub comment: String,
     pub finished: Option<(RunOutcome, Option<String>)>,
+    pub criteria: Vec<CriterionState>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -95,6 +97,7 @@ impl RunState {
             paused: None,
             comment: String::new(),
             finished: None,
+            criteria: Vec::new(),
         }
     }
 
@@ -129,6 +132,7 @@ impl RunState {
                 output,
                 exit_code,
                 comment,
+                ..
             } if run_id == &self.run_id => {
                 self.open.retain(|open| &open.node_id != node_id);
                 self.results.insert(
@@ -171,8 +175,30 @@ impl RunState {
                 run_id,
                 outcome,
                 reason,
+                ..
             } if run_id == &self.run_id => {
                 self.finished = Some((*outcome, reason.clone()));
+            }
+            Event::CriteriaSet { criteria } => {
+                self.criteria = criteria
+                    .iter()
+                    .map(|criterion| CriterionState {
+                        criterion: criterion.clone(),
+                        status: CriterionStatus::Pending,
+                    })
+                    .collect();
+            }
+            Event::CriterionUpdated {
+                criterion_id,
+                status,
+            } => {
+                if let Some(state) = self
+                    .criteria
+                    .iter_mut()
+                    .find(|state| state.criterion.id == *criterion_id)
+                {
+                    state.status = status.clone();
+                }
             }
             _ => {}
         }
@@ -406,6 +432,7 @@ pub fn variable(
         "filesChanged" => Some(files_changed.join("\n")),
         "pass" => state.node_passes.get(node_id).map(|pass| pass.to_string()),
         "comment" => Some(state.comment.clone()),
+        "criteria" => Some(render_for_prompt(&state.criteria)),
         _ if name.starts_with("nodes.") => {
             let rest = &name["nodes.".len()..];
             let (id, field) = rest.split_once('.')?;
@@ -505,6 +532,7 @@ mod tests {
                         retry_prompt: Some("retry {{pass}}".into()),
                         outputs: vec!["done".into()],
                         context: AgentContext::Session,
+                        verdicts: false,
                     },
                 },
                 Node {
@@ -581,6 +609,7 @@ mod tests {
             output: "out".into(),
             exit_code: None,
             comment: None,
+            duration_ms: None,
         });
         state.apply(&Event::WorkflowPaused {
             run_id: "r".into(),
@@ -596,6 +625,7 @@ mod tests {
             run_id: "r".into(),
             outcome: RunOutcome::Done,
             reason: None,
+            stats: None,
         });
 
         assert_eq!(state.steps, 1);
@@ -619,6 +649,52 @@ mod tests {
         assert!(state.open.is_empty());
         assert!(state.paused.is_none());
         assert!(!state.is_active());
+    }
+
+    #[test]
+    fn apply_folds_criteria_events() {
+        let mut state = state(simple_workflow());
+
+        state.apply(&Event::CriteriaSet {
+            criteria: vec![crate::domain::criteria::Criterion {
+                id: "C1".into(),
+                description: "d".into(),
+                check: None,
+            }],
+        });
+        assert_eq!(state.criteria.len(), 1);
+        assert!(matches!(state.criteria[0].status, CriterionStatus::Pending));
+
+        state.apply(&Event::CriterionUpdated {
+            criterion_id: "C1".into(),
+            status: CriterionStatus::Passed {
+                provenance: crate::domain::criteria::Provenance::Indicative {
+                    agent: "a".into(),
+                    reason: "r".into(),
+                },
+            },
+        });
+        assert!(matches!(
+            state.criteria[0].status,
+            CriterionStatus::Passed { .. }
+        ));
+    }
+
+    #[test]
+    fn variable_renders_criteria() {
+        let mut state = state(simple_workflow());
+        state.apply(&Event::CriteriaSet {
+            criteria: vec![crate::domain::criteria::Criterion {
+                id: "C1".into(),
+                description: "d".into(),
+                check: None,
+            }],
+        });
+
+        assert_eq!(
+            variable(&state, "a", &[], "criteria"),
+            Some("C1: d — no check, to judge: pending".into())
+        );
     }
 
     #[test]
@@ -737,6 +813,7 @@ mod tests {
                         retry_prompt: None,
                         outputs: vec!["done".into()],
                         context: AgentContext::Session,
+                        verdicts: false,
                     },
                 },
             ],
@@ -803,6 +880,7 @@ mod tests {
                         retry_prompt: None,
                         outputs: vec!["done".into()],
                         context: AgentContext::Session,
+                        verdicts: false,
                     },
                 },
             ],
@@ -1078,6 +1156,7 @@ mod tests {
             run_id: "r".into(),
             outcome: RunOutcome::Done,
             reason: None,
+            stats: None,
         });
         assert_eq!(waiting(&state, &[]), None);
     }

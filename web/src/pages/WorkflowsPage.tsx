@@ -4,6 +4,10 @@ import { getWorkflow, listWorkflows } from '../lib/api';
 import type { Origin, WorkflowDef, WorkflowSummary } from '../lib/workflow';
 import { blankWorkflow } from '../lib/workflow';
 import { WorkflowEditor } from '../components/workflow/WorkflowEditor';
+import { Badge } from '../components/ui/Badge';
+import { Button } from '../components/ui/Button';
+import { Card } from '../components/ui/Card';
+import { Select, TextInput } from '../components/ui/Field';
 
 interface WorkflowsPageProps {
   projects: Project[];
@@ -21,12 +25,7 @@ const ORIGIN_LABELS: Record<Origin, string> = {
 };
 
 function OriginBadge({ origin }: { origin: Origin }) {
-  const styles: Record<Origin, string> = {
-    project: 'bg-accent-soft text-accent',
-    global: 'bg-ok-soft text-ok',
-    default: 'bg-raised text-muted'
-  };
-  return <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-medium ${styles[origin]}`}>{ORIGIN_LABELS[origin]}</span>;
+  return <Badge tone="neutral">{ORIGIN_LABELS[origin]}</Badge>;
 }
 
 function WorkflowEditorView({ projectId, workflowId, isNew }: { projectId: string | null; workflowId: string; isNew: boolean }) {
@@ -109,25 +108,25 @@ export default function WorkflowsPage({ projects, projectId, workflowId, isNew }
   return (
     <main className="grow overflow-y-auto px-6 py-8">
       <div className="mx-auto max-w-[720px]">
-        <h1 className="text-[22px] font-semibold tracking-[-0.02em]">Workflows</h1>
+        <h1 className="text-[1.375rem] font-semibold tracking-[-0.02em]">Workflows</h1>
         <p className="mt-0.5 text-muted">Dessinez un graphe, reliez ses ports, enregistrez-le dans le projet ou en global.</p>
 
         <div className="mt-6 flex items-center gap-3">
-          <label htmlFor="wf-project" className="text-[13px] text-muted">
+          <label htmlFor="wf-project" className="text-xs text-muted">
             Projet
           </label>
-          <select
+          <Select
             id="wf-project"
             value={selectedProjectId ?? ''}
             onChange={(event) => setSelectedProjectId(event.target.value || null)}
-            className="rounded-lg border border-border bg-panel px-2 py-1 text-[13px]"
+            className="w-40"
           >
             {projects.map((project) => (
               <option key={project.id} value={project.id}>
                 {project.name}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
 
         {selectedProjectId && (
@@ -136,31 +135,30 @@ export default function WorkflowsPage({ projects, projectId, workflowId, isNew }
             {workflows === null && !listError && <div className="text-muted">Chargement…</div>}
             {workflows && workflows.length === 0 && <div className="text-muted">Aucun workflow pour l’instant.</div>}
             {workflows && workflows.length > 0 && selectedProjectId && (
-              <ul className="flex flex-col gap-1">
-                {workflows.map((wf) => (
-                  <li key={wf.id}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        window.location.hash = `#/workflows/${encodeURIComponent(selectedProjectId)}/${encodeURIComponent(wf.id)}`;
-                      }}
-                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-raised"
-                    >
-                      <span className="min-w-0 grow">
-                        <span className="block text-[13px] font-medium">{wf.name}</span>
-                        {wf.description && <span className="block truncate text-xs text-muted">{wf.description}</span>}
-                      </span>
-                      <OriginBadge origin={wf.origin} />
-                    </button>
-                  </li>
+              <Card>
+                {workflows.map((wf, index) => (
+                  <button
+                    key={wf.id}
+                    type="button"
+                    onClick={() => {
+                      window.location.hash = `#/workflows/${encodeURIComponent(selectedProjectId)}/${encodeURIComponent(wf.id)}`;
+                    }}
+                    className={`flex w-full items-center gap-3 px-4 py-3 text-left text-sm hover:bg-raised ${index > 0 ? 'border-t border-border' : ''}`}
+                  >
+                    <span className="min-w-0 grow">
+                      <span className="block truncate text-sm font-medium">{wf.name}</span>
+                      {wf.description && <span className="block truncate text-xs text-muted">{wf.description}</span>}
+                    </span>
+                    <OriginBadge origin={wf.origin} />
+                  </button>
                 ))}
-              </ul>
+              </Card>
             )}
           </div>
         )}
 
         <form onSubmit={handleNewWorkflow} className="mt-6 flex items-center gap-2">
-          <input
+          <TextInput
             type="text"
             value={newId}
             onChange={(event) => {
@@ -168,15 +166,10 @@ export default function WorkflowsPage({ projects, projectId, workflowId, isNew }
               setNewIdError(null);
             }}
             placeholder="nouveau-workflow"
-            className="rounded-lg border border-border bg-panel px-2 py-1 text-[13px]"
           />
-          <button
-            type="submit"
-            disabled={!selectedProjectId}
-            className="rounded-lg bg-accent px-3 py-1 text-[13px] font-medium text-on-accent disabled:opacity-60"
-          >
+          <Button variant="primary" size="md" type="submit" disabled={!selectedProjectId}>
             Nouveau workflow
-          </button>
+          </Button>
         </form>
         {newIdError && <div className="mt-1 text-xs text-err">{newIdError}</div>}
       </div>

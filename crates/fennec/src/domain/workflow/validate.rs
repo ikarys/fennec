@@ -185,6 +185,18 @@ fn check_node_fields(workflow: &Workflow, agents: &[AgentDefinition], issues: &m
                     ));
                 }
             }
+            NodeKind::Criteria { plan } => {
+                let plan_is_agent = workflow
+                    .node(plan)
+                    .is_some_and(|plan| matches!(plan.kind, NodeKind::Agent { .. }));
+                if !plan_is_agent {
+                    issues.push(issue(
+                        Some(node.id.clone()),
+                        None,
+                        format!("criteria plan {plan} is not an agent node"),
+                    ));
+                }
+            }
             NodeKind::Condition { test, against, .. }
                 if *test != ConditionTest::Empty && against.is_none() =>
             {
@@ -468,6 +480,20 @@ fn check_branch(
                 format!("branch of {parallel_id} contains a forbidden node {id}"),
             ));
         }
+        // Criteria events go to the session log, which only the main walk writes.
+        match workflow.node(id).map(|node| &node.kind) {
+            Some(NodeKind::Criteria { .. }) => issues.push(issue(
+                Some(id.clone()),
+                None,
+                "a criteria node cannot run in a parallel branch".into(),
+            )),
+            Some(NodeKind::Agent { verdicts: true, .. }) => issues.push(issue(
+                Some(id.clone()),
+                None,
+                "verdicts are recorded by the main walk only".into(),
+            )),
+            _ => {}
+        }
     }
 
     for (index, edge) in workflow.edges.iter().enumerate() {
@@ -559,6 +585,7 @@ fn branch_writes(workflow: &Workflow, branch: &[String], agents: &[AgentDefiniti
 
         match &node.kind {
             NodeKind::Shell { .. } => true,
+            NodeKind::Criteria { .. } => true,
             NodeKind::Agent { agent, .. } => agents.iter().any(|definition| {
                 &definition.id == agent
                     && definition.allowed_tools.iter().any(|tool| {
@@ -639,6 +666,7 @@ mod tests {
             description: String::new(),
             subagent: false,
             allowed_tools: tools.iter().map(|tool| tool.to_string()).collect(),
+            commands: crate::domain::agent::CommandAccess::ReadWrite,
             color: None,
             prompt: "prompt".to_string(),
         }
@@ -701,6 +729,7 @@ mod tests {
                         retry_prompt: None,
                         outputs: vec!["done".into()],
                         context: AgentContext::Session,
+                        verdicts: false,
                     },
                 },
                 Node {
@@ -724,6 +753,7 @@ mod tests {
                         ),
                         outputs: vec!["done".into()],
                         context: AgentContext::Session,
+                        verdicts: false,
                     },
                 },
                 Node {
@@ -923,6 +953,122 @@ mod tests {
 
         let issues = validate(&workflow, &agents());
         assert!(messages(&issues).contains(&"only one branch of p may write".into()));
+    }
+
+    #[test]
+    fn criteria_plan_must_name_an_agent_node() {
+        let mut workflow = example_workflow();
+        workflow.nodes.push(node(
+            "criteria",
+            NodeKind::Criteria {
+                plan: "missing".into(),
+            },
+        ));
+
+        let issues = validate(&workflow, &agents());
+        assert!(messages(&issues).contains(&"criteria plan missing is not an agent node".into()));
+    }
+
+    #[test]
+    fn criteria_node_in_a_branch_is_an_issue() {
+        let workflow = Workflow {
+            id: "w".into(),
+            name: "w".into(),
+            description: String::new(),
+            max_steps: 50,
+            nodes: vec![
+                node("start", NodeKind::Start),
+                node("p", NodeKind::Parallel),
+                node(
+                    "a",
+                    NodeKind::Criteria {
+                        plan: "plan".into(),
+                    },
+                ),
+                node(
+                    "b",
+                    NodeKind::Shell {
+                        command: "b".into(),
+                        timeout_secs: None,
+                        success_codes: None,
+                    },
+                ),
+                node("j", NodeKind::Join),
+                node(
+                    "end",
+                    NodeKind::End {
+                        outcome: EndOutcome::Done,
+                    },
+                ),
+            ],
+            edges: vec![
+                edge("start", "next", "p"),
+                edge("p", "branch", "a"),
+                edge("p", "branch", "b"),
+                edge("a", "pass", "j"),
+                edge("a", "fail", "j"),
+                edge("b", "success", "j"),
+                edge("j", "next", "end"),
+            ],
+        };
+
+        let issues = validate(&workflow, &agents());
+        assert!(
+            messages(&issues).contains(&"a criteria node cannot run in a parallel branch".into())
+        );
+    }
+
+    #[test]
+    fn verdicts_agent_in_a_branch_is_an_issue() {
+        let workflow = Workflow {
+            id: "w".into(),
+            name: "w".into(),
+            description: String::new(),
+            max_steps: 50,
+            nodes: vec![
+                node("start", NodeKind::Start),
+                node("p", NodeKind::Parallel),
+                Node {
+                    id: "a".into(),
+                    name: None,
+                    position: Position::default(),
+                    kind: NodeKind::Agent {
+                        agent: "plan".into(),
+                        prompt: "p".into(),
+                        retry_prompt: None,
+                        outputs: vec!["done".into()],
+                        context: AgentContext::Session,
+                        verdicts: true,
+                    },
+                },
+                node(
+                    "b",
+                    NodeKind::Shell {
+                        command: "b".into(),
+                        timeout_secs: None,
+                        success_codes: None,
+                    },
+                ),
+                node("j", NodeKind::Join),
+                node(
+                    "end",
+                    NodeKind::End {
+                        outcome: EndOutcome::Done,
+                    },
+                ),
+            ],
+            edges: vec![
+                edge("start", "next", "p"),
+                edge("p", "branch", "a"),
+                edge("p", "branch", "b"),
+                edge("a", "done", "j"),
+                edge("b", "success", "j"),
+                edge("j", "next", "end"),
+            ],
+        };
+
+        let issues = validate(&workflow, &agents());
+        assert!(messages(&issues).contains(&"verdicts are recorded by the main walk only".into()));
     }
 
     #[test]

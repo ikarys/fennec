@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { CheckIcon, CopyIcon } from '../Icons';
+import { Button } from '../ui/Button';
 
 export function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -27,14 +28,17 @@ export function CopyButton({ text }: { text: string }) {
   };
 
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="sm"
+      iconOnly
       aria-label="Copier"
       title="Copier"
       onClick={handleClick}
-      className="rounded-md p-1 text-muted transition-colors hover:text-text"
+      className="shrink-0"
     >
       {copied ? <CheckIcon className="h-3.5 w-3.5 text-ok" /> : <CopyIcon className="h-3.5 w-3.5" />}
-    </button>
+    </Button>
   );
 }

@@ -1,10 +1,22 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import type { DisplayPrefs, ModelPrefs, Preferences, ReasoningEffort, SettingsModel, SettingsResponse } from '../lib/api';
+import type {
+  DisplayPrefs,
+  ModelPrefs,
+  Preferences,
+  ReasoningEffort,
+  SandboxPrefs,
+  SettingsModel,
+  SettingsResponse
+} from '../lib/api';
 import { saveSettings } from '../lib/api';
+import { Button } from '../components/ui/Button';
 import { ModelSection } from '../components/settings/ModelSection';
 import { ModelPrefsSection, percentFromFraction, type ModelForm } from '../components/settings/ModelPrefsSection';
 import { DisplaySection } from '../components/settings/DisplaySection';
+import { PanelPagesSection } from '../components/settings/PanelPagesSection';
 import { InstructionsSection } from '../components/settings/InstructionsSection';
+import { SearchSection, type SearchForm } from '../components/settings/SearchSection';
+import { SandboxSection } from '../components/settings/SandboxSection';
 
 interface SettingsPageProps {
   settings: SettingsResponse | null;
@@ -16,13 +28,17 @@ interface SettingsForm {
   models: Record<string, ModelForm>;
   display: DisplayPrefs;
   instructions: string;
+  search: SearchForm;
+  sandbox: SandboxPrefs;
 }
 
-type SettingsTab = 'models' | 'instructions' | 'display';
+type SettingsTab = 'models' | 'instructions' | 'search' | 'sandbox' | 'display';
 
 const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'models', label: 'Modèles' },
   { id: 'instructions', label: 'Instructions' },
+  { id: 'search', label: 'Recherche web' },
+  { id: 'sandbox', label: 'Bac à sable' },
   { id: 'display', label: 'Affichage' }
 ];
 
@@ -48,7 +64,12 @@ function toForm(preferences: Preferences, models: SettingsModel[]): SettingsForm
     model: preferences.model ?? '',
     models: modelForms,
     display: preferences.display,
-    instructions: preferences.globalInstructions ?? ''
+    instructions: preferences.globalInstructions ?? '',
+    search: {
+      url: preferences.search?.searxngUrl ?? '',
+      apiKey: preferences.search?.searxngApiKey ?? ''
+    },
+    sandbox: preferences.sandbox ?? { enabled: true, network: false }
   };
 }
 
@@ -92,11 +113,19 @@ function buildPreferences(form: SettingsForm, settings: SettingsResponse): Prefe
     models[model.id] = prefs;
   }
 
+  const searxngUrl = form.search.url.trim();
+  const searxngApiKey = form.search.apiKey.trim();
+
   return {
     model: form.model === '' ? null : form.model,
     models,
     display: form.display,
-    globalInstructions: form.instructions.trim() === '' ? null : form.instructions
+    globalInstructions: form.instructions.trim() === '' ? null : form.instructions,
+    search: {
+      searxngUrl: searxngUrl === '' ? null : searxngUrl,
+      searxngApiKey: searxngApiKey === '' ? null : searxngApiKey
+    },
+    sandbox: form.sandbox
   };
 }
 
@@ -148,6 +177,16 @@ export function SettingsPage({ settings, onSaved }: SettingsPageProps) {
     setForm((previous) => (previous ? { ...previous, instructions } : previous));
   }
 
+  function updateSearch(search: SearchForm) {
+    markDirty();
+    setForm((previous) => (previous ? { ...previous, search } : previous));
+  }
+
+  function updateSandbox(sandbox: SandboxPrefs) {
+    markDirty();
+    setForm((previous) => (previous ? { ...previous, sandbox } : previous));
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!settings || !form || saving) return;
@@ -171,7 +210,7 @@ export function SettingsPage({ settings, onSaved }: SettingsPageProps) {
     return (
       <main className="grow overflow-y-auto px-6 py-8">
         <div className="mx-auto max-w-[720px]">
-          <h1 className="text-[22px] font-semibold tracking-[-0.02em]">Réglages</h1>
+          <h1 className="text-[1.375rem] font-semibold tracking-[-0.02em]">Réglages</h1>
           <p className="mt-0.5 text-muted">S'applique au prochain tour, sans redémarrage.</p>
           <div className="mt-6 text-sm text-muted">Chargement…</div>
         </div>
@@ -183,7 +222,7 @@ export function SettingsPage({ settings, onSaved }: SettingsPageProps) {
     <main className="grow overflow-y-auto px-6 py-8">
       <div className="mx-auto flex max-w-[960px] flex-col gap-6">
         <div>
-          <h1 className="text-[22px] font-semibold tracking-[-0.02em]">Réglages</h1>
+          <h1 className="text-[1.375rem] font-semibold tracking-[-0.02em]">Réglages</h1>
           <p className="mt-0.5 text-muted">S'applique au prochain tour, sans redémarrage.</p>
         </div>
 
@@ -196,8 +235,8 @@ export function SettingsPage({ settings, onSaved }: SettingsPageProps) {
                 type="button"
                 onClick={() => setTab(id)}
                 aria-current={tab === id ? 'page' : undefined}
-                className={`rounded-lg px-3 py-1.5 text-left text-[13px] transition-colors ${
-                  tab === id ? 'bg-raised text-text font-medium' : 'text-muted hover:bg-raised hover:text-text'
+                className={`rounded-lg px-2.5 py-1.5 text-left text-sm ${
+                  tab === id ? 'bg-raised text-text' : 'text-muted hover:text-text'
                 }`}
               >
                 {label}
@@ -228,20 +267,30 @@ export function SettingsPage({ settings, onSaved }: SettingsPageProps) {
               <InstructionsSection value={form.instructions} onChange={updateInstructions} />
             )}
 
+            {tab === 'search' && (
+              <SearchSection value={form.search} onChange={updateSearch} />
+            )}
+
+            {tab === 'sandbox' && (
+              <SandboxSection value={form.sandbox} onChange={updateSandbox} />
+            )}
+
             {tab === 'display' && (
-              <DisplaySection value={form.display} onChange={updateDisplay} />
+              <div className="flex flex-col gap-4">
+                <DisplaySection value={form.display} onChange={updateDisplay} />
+                <PanelPagesSection
+                  value={form.display.panelPages ?? null}
+                  onChange={(panelPages) => updateDisplay({ ...form.display, panelPages })}
+                />
+              </div>
             )}
 
             <div className="flex items-center gap-3">
-              <button
-                type="submit"
-                disabled={saving}
-                className="flex min-h-9 items-center gap-2 rounded-lg bg-accent px-4 text-[13px] font-medium text-on-accent disabled:opacity-60"
-              >
+              <Button type="submit" variant="primary" size="md" disabled={saving}>
                 {saving ? 'Enregistrement…' : 'Enregistrer'}
-              </button>
-              {saved && <span className="text-[13px] text-ok">Enregistré</span>}
-              {error && <span className="text-[13px] text-err">{error}</span>}
+              </Button>
+              {saved && <span className="text-xs text-ok">Enregistré</span>}
+              {error && <span className="text-xs text-err">{error}</span>}
             </div>
           </form>
         </div>

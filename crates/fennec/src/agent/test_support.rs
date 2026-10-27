@@ -2,7 +2,7 @@
 //! in-memory log, so each test module keeps one copy.
 
 use crate::agent::ports::{Completion, Delta, EventLog, Model, Request};
-use crate::domain::agent::AgentDefinition;
+use crate::domain::agent::{AgentDefinition, CommandAccess};
 use crate::domain::event::{Event, ToolCall};
 use std::cell::RefCell;
 
@@ -68,8 +68,10 @@ pub fn builder() -> Vec<AgentDefinition> {
             "edit_file".into(),
             "run_command".into(),
             "ask_user".into(),
+            "propose_criteria".into(),
             "load_skill".into(),
         ],
+        commands: CommandAccess::ReadWrite,
         color: None,
         prompt: "Build.".into(),
     }]
@@ -83,6 +85,7 @@ pub fn plan() -> AgentDefinition {
         description: String::new(),
         subagent: false,
         allowed_tools: vec!["read_file".into(), "ask_user".into(), "load_skill".into()],
+        commands: CommandAccess::ReadOnly,
         color: None,
         prompt: "Plan.".into(),
     }

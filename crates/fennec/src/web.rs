@@ -3,12 +3,15 @@
 
 mod assets;
 mod children;
+mod editor;
 mod event_stream;
 mod guard;
 mod http;
+mod integration;
 mod notifier;
 mod preview;
 mod routes;
+mod session_name;
 mod turns;
 mod workflow_routes;
 
@@ -60,15 +63,21 @@ impl App {
         Ok(Place::new(&project.workdir, found))
     }
 
-    /// Like `place`, but creates the root session's worktree on first call:
-    /// a session that starts a workflow gets one (`None` outside a git
-    /// repository: it then runs in place).
+    /// Where a workflow launch runs: with `worktree`, like `place` but the
+    /// root session's worktree is created on first call (`None` outside a git
+    /// repository: it then runs in place); without, the human chose their own
+    /// folder. An existing worktree is kept either way: the choice applies
+    /// when the session has none.
     fn open_place(
         &self,
         store: &SqliteStore,
         session: &SessionSummary,
         project: &Project,
+        worktree: bool,
     ) -> Result<Place, String> {
+        if !worktree {
+            return self.place(store, session, project);
+        }
         let root = self.root_id(store, session)?;
         let opened = worktree::open(&self.worktrees(), Path::new(&project.workdir), &root)?;
         Ok(Place::new(&project.workdir, opened))
@@ -203,7 +212,7 @@ mod tests {
             id: id.into(),
             description: format!("{id} description"),
             prompt: "prompt".into(),
-            directory: PathBuf::from(id),
+            directory: Some(PathBuf::from(id)),
         }
     }
 
@@ -290,7 +299,7 @@ mod tests {
         assert!(before.worktree.is_none());
         assert_eq!(before.workdir, repo);
 
-        let opened = app.open_place(&store, &root, &project).unwrap();
+        let opened = app.open_place(&store, &root, &project, true).unwrap();
         let wt = opened.worktree.clone().unwrap();
         assert_eq!(opened.workdir, wt.workdir);
         let from_child = app.place(&store, &child, &project).unwrap();

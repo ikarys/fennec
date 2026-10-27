@@ -2,6 +2,7 @@
 
 use super::LocalTools;
 use crate::agent::ports::Toolbox;
+use crate::domain::agent::CommandAccess;
 use crate::domain::event::{OutputStream, ToolResult};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
@@ -33,5 +34,11 @@ pub fn run_tool(
     dir: &Path,
     on_output: &mut dyn FnMut(OutputStream, &str),
 ) -> ToolResult {
-    LocalTools::new(dir.to_path_buf()).execute(name, args, &AtomicBool::new(false), on_output)
+    LocalTools::new(dir.to_path_buf()).execute(
+        name,
+        args,
+        CommandAccess::ReadWrite,
+        &AtomicBool::new(false),
+        on_output,
+    )
 }

@@ -1,9 +1,10 @@
 //! The JSON API (contract: `docs/api.md`) and the UI's pages.
 
 use super::App;
+use super::editor;
 use super::http::{Request, error, send, send_json};
 use super::notifier::NotifyingLog;
-use super::{assets, event_stream, turns::Job, workflow_routes};
+use super::{assets, event_stream, integration, session_name, turns::Job, workflow_routes};
 use crate::agent::ports::EventLog;
 use crate::agent::workflow::WorkflowJob;
 use crate::agents;
@@ -69,6 +70,13 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
         ("POST", ["api", "sessions", id, "workflow", control]) => {
             workflow_routes::control_workflow(app, req, stream, id, control)
         }
+        ("GET", ["api", "sessions", id, "integration"]) => {
+            integration::get_integration(app, stream, id)
+        }
+        ("POST", ["api", "sessions", id, "integrate"]) => {
+            integration::integrate(app, req, stream, id)
+        }
+        ("POST", ["api", "sessions", id, "discard"]) => integration::discard(app, req, stream, id),
         ("POST", ["api", "sessions", id, "stop"]) => {
             app.turns.stop(id);
             send_json(stream, 202, &json!({}))
@@ -229,6 +237,7 @@ fn create_session(app: &App, req: &Request, stream: &mut TcpStream) -> Result<()
         .and_then(Value::as_str)
         .map(str::to_string);
     let step_by_step = body["stepByStep"].as_bool().unwrap_or(false);
+    let worktree = body["worktree"].as_bool().unwrap_or(true);
     if prompt.is_empty() && attachments.is_empty() && workflow_id.is_none() {
         return error(stream, 400, "empty prompt");
     }
@@ -266,6 +275,14 @@ fn create_session(app: &App, req: &Request, stream: &mut TcpStream) -> Result<()
         prompt.chars().take(80).collect()
     };
     let id = store.create_session(&project, &title)?;
+    if !prompt.is_empty() {
+        session_name::spawn(
+            app.settings.clone(),
+            app.notifier.clone(),
+            id.clone(),
+            prompt.clone(),
+        );
+    }
     append_mode_event(app, &store, &id, mode_event)?;
     let session = store.session(&id)?.ok_or("the new session vanished")?;
     match workflow {
@@ -275,8 +292,7 @@ fn create_session(app: &App, req: &Request, stream: &mut TcpStream) -> Result<()
                 task: prompt,
                 step_by_step,
             });
-            // A workflow session gets its worktree; discovery stays on the project.
-            let place = app.open_place(&store, &session, &project)?;
+            let place = app.open_place(&store, &session, &project, worktree)?;
             app.turns.start(&id, place, job)?;
         }
         None => {
@@ -304,7 +320,13 @@ fn get_session(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String
     v["project"] = project_json(&p);
     v["mode"] = json!(mode);
     v["worktree"] = match app.place(&store, &s, &p)?.worktree {
-        Some(wt) => json!({ "path": wt.path, "branch": wt.branch, "base": wt.base }),
+        Some(wt) => json!({
+            "path": wt.path, "branch": wt.branch, "base": wt.base,
+            "editorUrl": editor::vscode_link(
+                &wt.path.to_string_lossy(),
+                std::env::var("WSL_DISTRO_NAME").ok().as_deref(),
+            ),
+        }),
         None => Value::Null,
     };
     send_json(stream, 200, &v)

@@ -127,13 +127,20 @@ impl Transcript {
             // The reminder that follows names the mode.
             | Event::ModeChanged { .. }
             | Event::SessionRewound { .. }
-            // The CLI does not run workflows.
+            | Event::SessionNameGenerated { .. }
+            // The CLI does not run workflows or integrate.
             | Event::WorkflowStarted { .. }
             | Event::WorkflowNodeStarted { .. }
             | Event::WorkflowNodeFinished { .. }
             | Event::WorkflowPaused { .. }
             | Event::WorkflowResumed { .. }
-            | Event::WorkflowFinished { .. } => Ok(()),
+            | Event::WorkflowHumanAsked { .. }
+            | Event::WorkflowFinished { .. }
+            | Event::CriteriaSet { .. }
+            | Event::CriteriaProposed { .. }
+            | Event::CriterionUpdated { .. }
+            | Event::IntegrationApplied { .. }
+            | Event::WorktreeDiscarded { .. } => Ok(()),
         };
         let _ = out.flush();
     }

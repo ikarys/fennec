@@ -3,6 +3,7 @@
 //! run, and the turn ends waiting for the human.
 
 use super::ask_user;
+use super::propose_criteria;
 use super::turn::Turn;
 use crate::domain::agent::AgentDefinition;
 use crate::domain::event::{Event, ToolCall, ToolResult};
@@ -101,20 +102,40 @@ pub(super) fn execute_tools(
             }
             continue;
         }
+        if call.name == propose_criteria::NAME {
+            match propose_criteria::parse(&call.arguments) {
+                // The model reads the failure and the loop goes on.
+                Err(e) => record(turn, message_id, call, ToolResult::failure(e))?,
+                // No result is recorded: the answer will be the result.
+                Ok(proposal) => {
+                    for event in propose_criteria::events(&call.id, proposal) {
+                        turn.append(event)?;
+                    }
+                    waiting = true;
+                }
+            }
+            continue;
+        }
         let (tools, stop) = (turn.tools, turn.stop);
         let mut log_error = None;
-        let r = tools.execute(&call.name, &call.arguments, stop, &mut |stream, chunk| {
-            if log_error.is_none() {
-                log_error = turn
-                    .append(Event::ToolOutput {
-                        message_id: message_id.into(),
-                        tool_call_id: call.id.clone(),
-                        stream,
-                        content: chunk.into(),
-                    })
-                    .err();
-            }
-        });
+        let r = tools.execute(
+            &call.name,
+            &call.arguments,
+            agent.commands,
+            stop,
+            &mut |stream, chunk| {
+                if log_error.is_none() {
+                    log_error = turn
+                        .append(Event::ToolOutput {
+                            message_id: message_id.into(),
+                            tool_call_id: call.id.clone(),
+                            stream,
+                            content: chunk.into(),
+                        })
+                        .err();
+                }
+            },
+        );
         if let Some(e) = log_error {
             return Err(e);
         }

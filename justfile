@@ -24,6 +24,7 @@ dev:
 
 # Everything CI would check
 check: web
+    node web/scripts/check-ui.mjs
     cargo fmt --all --check
     cargo clippy --all-targets -- -D warnings
     cargo test

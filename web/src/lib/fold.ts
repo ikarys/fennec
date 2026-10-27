@@ -61,13 +61,35 @@ export interface SessionUsage {
   last?: MessageStats;
 }
 
+export interface WorkflowNodeStat {
+  nodeId: string;
+  label: string;
+  runs: number;
+  workingMs: number;
+}
+
+export interface WorkflowStats {
+  workingMs: number;
+  nodes: WorkflowNodeStat[];
+  reruns: number;
+  calls: number;
+  prefillTokens: number;
+  cachedPromptTokens: number;
+  generationTokens: number;
+  filesChanged: number;
+  criteriaTotal: number;
+  criteriaPassed: number;
+  criteriaVerified: number;
+}
+
 export type ThreadItem =
   | { kind: 'user'; id: string; content: string; isSystemGenerated: boolean; attachments: { id: string; filename: string; data: string }[] }
   | AssistantItem
   | { kind: 'mode'; id: string; name: string; color: string }
   | { kind: 'error'; id: string; message: string }
   | { kind: 'note'; id: string; text: string; detail?: string }
-  | { kind: 'workflow-node'; id: string; nodeId: string; label: string; nodeKind: NodeKind; pass: number; port?: string; output?: string; exitCode?: number; childSessionId?: string; prompt?: string };
+  | { kind: 'workflow-node'; id: string; nodeId: string; label: string; nodeKind: NodeKind; pass: number; port?: string; output?: string; exitCode?: number; childSessionId?: string; prompt?: string; durationMs?: number }
+  | { kind: 'workflow-end'; id: string; outcome: 'done' | 'blocked' | 'stopped' | 'error'; reason?: string; stats?: WorkflowStats };
 
 export interface ModifiedFile {
   path: string;
@@ -91,8 +113,21 @@ export interface PendingQuestion {
   }[];
 }
 
+export type Provenance =
+  | { kind: 'verified'; command: string; exitCode?: number; output: string }
+  | { kind: 'indicative'; agent: string; reason: string };
+
+export interface CriterionView {
+  id: string;
+  description: string;
+  check?: string;
+  status: 'pending' | 'passed' | 'failed';
+  provenance?: Provenance;
+}
+
 export interface ThreadView {
   items: ThreadItem[];
+  criteria: CriterionView[];
   contextTokens?: number;
   contextMax?: number;
   running: boolean;
@@ -110,6 +145,8 @@ export interface ThreadView {
   mode: string | null;
   /** The latest workflow run, if any. */
   run?: RunView;
+  /** The last generated session name, if any (last one wins). */
+  name?: string;
 }
 
 // The live speed is estimated from characters over the last few seconds;
@@ -139,6 +176,89 @@ function parseArgs(value: unknown): Record<string, unknown> {
 function parseExitCode(output: string): number | undefined {
   const match = output.match(/\[Exit code: (\d+)\]/);
   return match ? Number(match[1]) : undefined;
+}
+
+function parseProvenance(value: unknown): Provenance | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const provenance = value as Record<string, unknown>;
+  if (provenance.kind === 'verified') {
+    const command = typeof provenance.command === 'string' ? provenance.command : undefined;
+    const output = typeof provenance.output === 'string' ? provenance.output : undefined;
+    if (command === undefined || output === undefined) return undefined;
+    return {
+      kind: 'verified',
+      command,
+      exitCode: typeof provenance.exitCode === 'number' ? provenance.exitCode : undefined,
+      output
+    };
+  }
+  if (provenance.kind === 'indicative') {
+    const agent = typeof provenance.agent === 'string' ? provenance.agent : undefined;
+    const reason = typeof provenance.reason === 'string' ? provenance.reason : undefined;
+    if (agent === undefined || reason === undefined) return undefined;
+    return { kind: 'indicative', agent, reason };
+  }
+  return undefined;
+}
+
+function parseCriterionStatus(value: unknown): CriterionView['status'] | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const status = value as Record<string, unknown>;
+  if (status.type === 'pending') return 'pending';
+  if (status.type === 'passed' || status.type === 'failed') return status.type;
+  return undefined;
+}
+
+function parseCriteria(value: unknown): CriterionView[] | null {
+  if (!Array.isArray(value)) return null;
+  let criteria: CriterionView[] = [];
+  for (const raw of value) {
+    if (typeof raw !== 'object' || raw === null) continue;
+    const criterion = raw as Record<string, unknown>;
+    const id = typeof criterion.id === 'string' ? criterion.id : undefined;
+    const description = typeof criterion.description === 'string' ? criterion.description : undefined;
+    if (id === undefined || description === undefined) continue;
+    const check = typeof criterion.check === 'string' ? criterion.check : undefined;
+    criteria.push({ id, description, check, status: 'pending' });
+  }
+  return criteria;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function parseWorkflowStats(value: unknown): WorkflowStats | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const stats = value as Record<string, unknown>;
+  const rawNodes = Array.isArray(stats.nodes) ? stats.nodes : [];
+  const nodes: WorkflowNodeStat[] = [];
+  for (const raw of rawNodes) {
+    if (typeof raw !== 'object' || raw === null) continue;
+    const node = raw as Record<string, unknown>;
+    const nodeId = typeof node.nodeId === 'string' ? node.nodeId : undefined;
+    const label = typeof node.label === 'string' ? node.label : undefined;
+    if (nodeId === undefined || label === undefined) continue;
+    nodes.push({
+      nodeId,
+      label,
+      runs: isFiniteNumber(node.runs) ? node.runs : 0,
+      workingMs: isFiniteNumber(node.workingMs) ? node.workingMs : 0
+    });
+  }
+  return {
+    workingMs: isFiniteNumber(stats.workingMs) ? stats.workingMs : 0,
+    nodes,
+    reruns: isFiniteNumber(stats.reruns) ? stats.reruns : 0,
+    calls: isFiniteNumber(stats.calls) ? stats.calls : 0,
+    prefillTokens: isFiniteNumber(stats.prefillTokens) ? stats.prefillTokens : 0,
+    cachedPromptTokens: isFiniteNumber(stats.cachedPromptTokens) ? stats.cachedPromptTokens : 0,
+    generationTokens: isFiniteNumber(stats.generationTokens) ? stats.generationTokens : 0,
+    filesChanged: isFiniteNumber(stats.filesChanged) ? stats.filesChanged : 0,
+    criteriaTotal: isFiniteNumber(stats.criteriaTotal) ? stats.criteriaTotal : 0,
+    criteriaPassed: isFiniteNumber(stats.criteriaPassed) ? stats.criteriaPassed : 0,
+    criteriaVerified: isFiniteNumber(stats.criteriaVerified) ? stats.criteriaVerified : 0
+  };
 }
 
 function updateToolStats(tool: ToolCallView, modified: Map<string, ModifiedFile>, toolCounts: Map<string, number>): void {
@@ -212,6 +332,8 @@ export function createThreadFold(): ThreadFold {
   let index = 0;
   // Null means "no live change yet": the session detail owns the mode.
   let mode: string | null = null;
+  let criteria: CriterionView[] = [];
+  let name: string | undefined;
   const runFold = createRunFold();
   type WorkflowNodeItem = Extract<ThreadItem, { kind: 'workflow-node' }>;
   const openWorkflowItems = new Map<string, WorkflowNodeItem>();
@@ -482,6 +604,29 @@ export function createThreadFold(): ThreadFold {
         break;
       }
 
+      case 'criteria.set': {
+        const parsed = parseCriteria(data.criteria);
+        if (parsed) {
+          criteria = parsed;
+        }
+        break;
+      }
+
+      case 'criterion.updated': {
+        const criterionId = String(data.criterionId ?? '');
+        const status = parseCriterionStatus(data.status);
+        if (!criterionId || !status) break;
+        const criterion = criteria.find((item) => item.id === criterionId);
+        if (!criterion) break;
+        criterion.status = status;
+        if (status === 'pending') {
+          criterion.provenance = undefined;
+        } else {
+          criterion.provenance = parseProvenance(data.status?.provenance);
+        }
+        break;
+      }
+
       case 'chat.done': {
         const reason = String(data.reason ?? 'complete');
         lastDone = reason;
@@ -499,6 +644,37 @@ export function createThreadFold(): ThreadFold {
           kind: 'error',
           id: `error-${index}`,
           message: String(data.error ?? 'Erreur inconnue')
+        });
+        break;
+      }
+
+      case 'integration.applied': {
+        const commits = Array.isArray(data.commits) ? data.commits.map((commit: unknown) => String(commit)) : [];
+        const head = String(data.head ?? '');
+        const acknowledged = Array.isArray(data.acknowledged) ? data.acknowledged.map((kind: unknown) => String(kind)) : [];
+        const detailParts: string[] = [];
+        if (commits.length > 0) {
+          detailParts.push(commits.join(' '));
+        }
+        if (acknowledged.length > 0) {
+          detailParts.push(`Accepté malgré : ${acknowledged.join(', ')}`);
+        }
+        pushItem({
+          kind: 'note',
+          id: `integration-applied-${index}`,
+          text: `Intégré par toi · ${commits.length} commit${commits.length === 1 ? '' : 's'} dans HEAD ${head.slice(0, 8)}`,
+          detail: detailParts.length > 0 ? detailParts.join('\n') : undefined
+        });
+        break;
+      }
+
+      case 'worktree.discarded': {
+        const commits = Array.isArray(data.commits) ? data.commits.map((commit: unknown) => String(commit)) : [];
+        pushItem({
+          kind: 'note',
+          id: `worktree-discarded-${index}`,
+          text: `Travail de l'agent abandonné · ${commits.length} commit${commits.length === 1 ? '' : 's'}`,
+          detail: commits.length > 0 ? commits.join(' ') : undefined
         });
         break;
       }
@@ -521,6 +697,13 @@ export function createThreadFold(): ThreadFold {
           if (!remains) {
             pendingQuestion = undefined;
           }
+        }
+        break;
+      }
+
+      case 'session.name_generated': {
+        if (typeof data.name === 'string') {
+          name = data.name;
         }
         break;
       }
@@ -576,23 +759,22 @@ export function createThreadFold(): ThreadFold {
           if (typeof data.exitCode === 'number') {
             item.exitCode = data.exitCode;
           }
+          if (typeof data.durationMs === 'number') {
+            item.durationMs = data.durationMs;
+          }
           openWorkflowItems.delete(`${runId}:${nodeId}`);
         }
         break;
       }
 
       case 'workflow.finished': {
-        const outcome = data.outcome as string;
-        const text =
-          outcome === 'done' ? 'Workflow terminé' :
-          outcome === 'blocked' ? 'Workflow bloqué' :
-          outcome === 'stopped' ? 'Workflow arrêté' :
-          'Workflow en erreur';
+        const outcome = (data.outcome as 'done' | 'blocked' | 'stopped' | 'error') ?? 'error';
         pushItem({
-          kind: 'note',
+          kind: 'workflow-end',
           id: `workflow-finished-${index}`,
-          text,
-          detail: typeof data.reason === 'string' ? data.reason : undefined
+          outcome,
+          reason: typeof data.reason === 'string' ? data.reason : undefined,
+          stats: parseWorkflowStats(data.stats)
         });
         break;
       }
@@ -608,6 +790,7 @@ export function createThreadFold(): ThreadFold {
 
   const view = (): ThreadView => ({
     items: [...items],
+    criteria: [...criteria],
     contextTokens,
     contextMax,
     running,
@@ -617,6 +800,7 @@ export function createThreadFold(): ThreadFold {
     toolCounts: Array.from(toolCounts.entries()).map(([name, count]) => ({ name, count })),
     usage: { ...usage },
     mode,
+    name,
     run: runFold.view()
   });
 

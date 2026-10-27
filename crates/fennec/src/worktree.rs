@@ -65,6 +65,17 @@ pub fn open(root: &Path, project_dir: &Path, session_id: &str) -> Result<Option<
     Ok(Some(wt))
 }
 
+/// Removes the session's worktree, its branch and its base ref: the human's
+/// discard. The agent's commits stay in the object store only until git gc,
+/// which is why the route records their shas.
+pub fn remove(top: &Path, wt: &Worktree) -> Result<(), String> {
+    let path_arg = wt.path.to_string_lossy().into_owned();
+    git(top, &["worktree", "remove", "--force", &path_arg], None)?;
+    git(top, &["branch", "-D", &wt.branch], None)?;
+    git(top, &["update-ref", "-d", &wt.base], None)?;
+    Ok(())
+}
+
 /// Copies the human's uncommitted work into the fresh worktree and records
 /// the base ref.
 fn fill(top: &Path, wt: &Worktree) -> Result<(), String> {
@@ -100,12 +111,20 @@ fn fill(top: &Path, wt: &Worktree) -> Result<(), String> {
     Ok(())
 }
 
-/// Commits everything in the worktree (`git add -A`), authored and committed
-/// by fennec, with `message`; `Ok(false)` when there was nothing to commit.
+/// Where `@playwright/cli` writes its screenshots: `.playwright-cli/` in the
+/// workdir, which may be a subdirectory of the worktree.
+const CAPTURES_EXCLUDED: &str = ":(exclude,glob)**/.playwright-cli/**";
+
+/// Commits everything in the worktree (`git add -A`) but the browser's
+/// captures, authored and committed by fennec, with `message`; `Ok(false)`
+/// when there was nothing to commit.
 pub fn commit(worktree: &Worktree, message: &str) -> Result<bool, String> {
     let dir = &worktree.path;
-    git(dir, &["add", "-A"], None)?;
-    if git(dir, &["status", "--porcelain"], None)?.is_empty() {
+    // The browser skill's screenshots are what the model looked at, not work
+    // to integrate: the human would cherry-pick them otherwise.
+    git(dir, &["add", "-A", "--", ".", CAPTURES_EXCLUDED], None)?;
+    // The staged changes, not `git status`: the excluded captures stay untracked.
+    if git(dir, &["diff", "--cached", "--name-only"], None)?.is_empty() {
         return Ok(false);
     }
     // The fennec identity is deliberate: provenance (a commit made by
@@ -137,6 +156,12 @@ fn build(path: PathBuf, prefix: &str, session_id: &str) -> Worktree {
 }
 
 /// The repository's top directory and the project's prefix inside it.
+/// `integration.rs` reuses it instead of duplicating the lookup.
+pub fn top(project_dir: &Path) -> Option<(PathBuf, String)> {
+    repository(project_dir)
+}
+
+/// The repository's top directory and the project's prefix inside it.
 fn repository(project_dir: &Path) -> Option<(PathBuf, String)> {
     let text = |args: &[&str]| {
         let out = git(project_dir, args, None).ok()?;
@@ -149,7 +174,8 @@ fn repository(project_dir: &Path) -> Option<(PathBuf, String)> {
 
 /// Runs `git -C dir args...`; a non-zero exit is an `Err` with the command
 /// and its trimmed stderr.
-fn git(dir: &Path, args: &[&str], stdin: Option<&[u8]>) -> Result<Vec<u8>, String> {
+/// `integration.rs` reuses it to run the cherry-pick in the human's repository.
+pub(crate) fn git(dir: &Path, args: &[&str], stdin: Option<&[u8]>) -> Result<Vec<u8>, String> {
     let command = format!("git -C {} {}", dir.display(), args.join(" "));
     let mut child = Command::new("git")
         .arg("-C")
@@ -245,6 +271,27 @@ mod tests {
     }
 
     #[test]
+    fn remove_deletes_the_worktree_branch_and_base() {
+        let (base, repo) = setup();
+        let root = base.join("wt");
+        let status = text(&repo, &["status", "--porcelain"]);
+        let head = text(&repo, &["rev-parse", "HEAD"]);
+
+        let wt = open(&root, &repo, "s1").unwrap().unwrap();
+        std::fs::write(wt.workdir.join("agent.txt"), "x\n").unwrap();
+        assert_eq!(commit(&wt, "agent work"), Ok(true));
+
+        assert_eq!(remove(&repo, &wt), Ok(()));
+
+        assert_eq!(find(&root, &repo, "s1"), None);
+        assert!(text(&repo, &["branch", "--list", "fennec/s1"]).is_empty());
+        assert!(git(&repo, &["rev-parse", "-q", "--verify", &wt.base], None).is_err());
+        assert_eq!(text(&repo, &["status", "--porcelain"]), status);
+        assert_eq!(text(&repo, &["rev-parse", "HEAD"]), head);
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
     fn commit_records_the_agents_work_as_fennec() {
         let (base, repo) = setup();
         let wt = open(&base.join("wt"), &repo, "s1").unwrap().unwrap();
@@ -256,6 +303,9 @@ mod tests {
             "fennec"
         );
         assert_eq!(commit(&wt, "again"), Ok(false));
+        std::fs::create_dir_all(wt.workdir.join(".playwright-cli")).unwrap();
+        std::fs::write(wt.workdir.join(".playwright-cli/page.png"), "png").unwrap();
+        assert_eq!(commit(&wt, "captures only"), Ok(false));
         let range = format!("{}..{}", wt.base, wt.branch);
         assert_eq!(
             text(&wt.path, &["log", "--format=%s", &range]).trim(),

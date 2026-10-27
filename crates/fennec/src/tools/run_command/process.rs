@@ -2,6 +2,7 @@
 //! killing the whole group on timeout or stop.
 
 use crate::domain::event::OutputStream;
+use crate::tools::sandbox::Sandbox;
 use std::io::BufRead;
 use std::os::unix::process::CommandExt;
 use std::path::Path;
@@ -28,24 +29,34 @@ pub struct Execution {
 
 pub fn execute(
     command: &str,
+    workdir: &Path,
     cwd: &Path,
     timeout: Duration,
     stop: &AtomicBool,
     on_output: &mut dyn FnMut(OutputStream, &str),
+    sandbox: &Sandbox,
 ) -> Result<Execution, String> {
     let started = Instant::now();
-    let mut child = Command::new("sh")
-        // Its own process group, so a stop or timeout kills what the shell
-        // started too: a surviving grandchild keeps the pipes open.
+    let sandbox_on = matches!(sandbox, Sandbox::Bwrap { .. });
+    let mut child = sandbox
+        .command(command, workdir, cwd)
+        // Its own process group, so a stop or timeout kills what the shell started too:
+        // a surviving grandchild keeps the pipes open. Under bwrap, killing the group
+        // kills bwrap; --die-with-parent and the PID namespace then end the rest: when
+        // bwrap's init dies, the kernel kills every process in the namespace.
         .process_group(0)
-        .arg("-c")
-        .arg(command)
-        .current_dir(cwd)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| format!("Failed to start command: {e}"))?;
+        .map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound && sandbox_on {
+                "bwrap is not installed: install bubblewrap, or turn the sandbox off in Settings > Bac à sable."
+                    .to_string()
+            } else {
+                format!("Failed to start command: {e}")
+            }
+        })?;
 
     let (tx, rx) = mpsc::channel();
     let readers = [

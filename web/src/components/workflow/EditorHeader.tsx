@@ -1,4 +1,7 @@
 import type { Origin, WorkflowDef } from '../../lib/workflow';
+import { Badge } from '../ui/Badge';
+import { Button } from '../ui/Button';
+import { Select, TextInput } from '../ui/Field';
 
 interface EditorHeaderProps {
   def: WorkflowDef;
@@ -11,6 +14,8 @@ interface EditorHeaderProps {
   onDescriptionChange: (description: string) => void;
   onScopeChange: (scope: 'project' | 'global') => void;
   onSave: () => void;
+  onTest: (() => void) | null;
+  canTest: boolean;
 }
 
 const ORIGIN_LABELS: Record<Origin, string> = {
@@ -29,45 +34,53 @@ export function EditorHeader({
   onNameChange,
   onDescriptionChange,
   onScopeChange,
-  onSave
+  onSave,
+  onTest,
+  canTest
 }: EditorHeaderProps) {
   return (
     <header className="flex shrink-0 items-center gap-3 border-b border-border bg-panel px-4 py-2">
-      <input
+      <TextInput
         type="text"
         value={def.name}
         onChange={(event) => onNameChange(event.target.value)}
         aria-label="Nom du workflow"
-        className="w-48 rounded-md border border-border bg-transparent px-2 py-1 text-[15px] font-semibold"
+        className="w-48 font-semibold"
       />
-      <input
+      <TextInput
         type="text"
         value={def.description ?? ''}
         onChange={(event) => onDescriptionChange(event.target.value)}
         placeholder="Description"
         aria-label="Description"
-        className="grow rounded-md border border-border bg-transparent px-2 py-1 text-[13px] text-muted"
+        className="grow"
       />
-      <span className="rounded-md bg-raised px-2 py-0.5 text-[11px] text-muted">{ORIGIN_LABELS[origin]}</span>
-      <select
+      <Badge tone="neutral">{ORIGIN_LABELS[origin]}</Badge>
+      <Select
         value={scope}
         onChange={(event) => onScopeChange(event.target.value as 'project' | 'global')}
         aria-label="Portée d’enregistrement"
-        className="rounded-md border border-border bg-panel px-2 py-1 text-[13px]"
       >
         <option value="project">Projet</option>
         <option value="global">Global</option>
-      </select>
-      {dirty && <span className="text-[13px] text-accent" title="Modifications non enregistrées">●</span>}
-      {issueCount > 0 && <span className="text-[13px] text-err">{issueCount} problème(s)</span>}
-      <button
-        type="button"
-        onClick={onSave}
-        disabled={saving}
-        className="rounded-md bg-accent px-3 py-1 text-[13px] font-medium text-on-accent disabled:opacity-60"
-      >
+      </Select>
+      {dirty && <span className="text-xs text-accent" title="Modifications non enregistrées">●</span>}
+      {issueCount > 0 && <span className="text-xs text-err">{issueCount} problème(s)</span>}
+      {onTest && (
+        <Button
+          variant="secondary"
+          size="sm"
+          type="button"
+          onClick={onTest}
+          disabled={!canTest}
+          title={canTest ? "Ouvre une nouvelle session avec ce workflow, en pas à pas." : "Enregistre le workflow avant de le tester."}
+        >
+          Tester pas à pas
+        </Button>
+      )}
+      <Button variant="primary" size="sm" type="button" onClick={onSave} disabled={saving}>
         {saving ? 'Enregistrement…' : 'Enregistrer'}
-      </button>
+      </Button>
     </header>
   );
 }

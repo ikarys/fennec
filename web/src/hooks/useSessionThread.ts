@@ -166,7 +166,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
               foldAll();
             })
             .catch(() => {
-              // The run strip is a convenience; the thread keeps working.
+              // The run rail is a convenience; the thread keeps working.
             });
         }
       })

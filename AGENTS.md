@@ -42,24 +42,43 @@ Workflows, done (`docs/workflows.md`): graphs of agent, shell, human,
 condition, parallel/join nodes wired by named ports, drawn in a React Flow
 editor; loops capped per edge, pauses on edges or step by step; the run is
 folded from `workflow.*` events; fresh agents and branches in child sessions.
-The default workflow verifies in a fresh context (`verify`, `review` sub-agents)
-and sends the findings back to the builder.
+The default workflow runs the criteria checks, verifies in a fresh context
+(`verify`, `review` sub-agents) and sends the findings back to the builder.
 Preview: ```html and ```md blocks of a message, and the .html/.md files an
 agent wrote, rendered in fennec (a sandboxed origin for model HTML).
 Dogfooding, started (`docs/dogfooding.md`): a session that runs a workflow
 works in its own git worktree and branch; the human cherry-picks.
-Next, one PR each, so that the minimal agent works before security layers:
-bwrap world for tool
-execution → sub-agents as tools → criteria → fennec's own
-layer (human-only integration, provenance, review gate).
+Web search, done: openfox's `web_search` (SearXNG only), its instance set on
+the Settings page.
+Browser and vision, done: openfox's `browser` skill embedded as a default
+(`@playwright/cli` through run_command, screenshots read back with read_file,
+kept out of the worktree's commits), and a Vision section in the context panel:
+the images the model saw, those a compaction dropped dimmed.
+Sandbox, done: every command (run_command, workflow shell nodes) runs in a bwrap
+world (`tools/sandbox.rs`): the system read-only, the workdir writable, secrets
+and fennec's store hidden, no network by default; the Settings page turns it or
+the network off.
+Criteria, done: the "Done when" list of the approved plan is the run's contract
+(`criteria.set`); a `criteria` node runs each criterion's `check:` command
+itself (verified), an agent node with `verdicts` judges the others
+(indicative); the context panel shows both, with their provenance.
+Protected files, done: fennec's defaults (`.agents`, AGENTS.md, lockfiles, CI)
+and the project's `.agents/protected`; the file tools refuse them, the
+sandbox mounts them read-only (`domain/protection.rs`, `protected.rs`).
+Integration, done: an "Intégrer" button runs the cherry-pick of a session's
+worktree branch into the human's repository, on the human's click only, after
+a review gate (commits, files, criteria, protected files touched) whose
+blockers the human must accept one by one (`integration.applied` records it).
+Next, one PR each: the rest of fennec's own layer (decision registry,
+tests protected once validated) → sub-agents as tools, when dogfooding shows sessions
+saturating their context while exploring.
 
 ## Layout
 
 Clean architecture, applied where it pays: dependencies point inward
 (adapters → agent → domain). The agent loop only knows the ports in
 `agent/ports.rs`; a port exists because it decouples a layer or has a
-second implementation (a test double, the coming bwrap toolbox), not for
-show. One responsibility per file; no catch-all module (`utils`, `misc`,
+second implementation (a test double), not for show. One responsibility per file; no catch-all module (`utils`, `misc`,
 `common`).
 
 ```
@@ -79,6 +98,9 @@ crates/fennec/src/
     agent.rs           an agent (mode) and its reminder; frontmatter.rs the shared YAML header
     attachment.rs      images sent to the model: sniffing, data URLs, limits
     replay.rs          which message the human may replay
+    criteria.rs        acceptance criteria: the plan's "Done when", checks, verdicts, provenance
+    protection.rs      protected files: the defaults, the gitignore-like patterns, the matcher
+    integration.rs     the review gate: what blocks an integration until the human accepts it
     workflow/          a workflow: definition (nodes, ports, edges), template ({{…}} names),
                        validate (the graph rules), run (the run folded from its events, the next step)
     id.rs, clock.rs
@@ -92,22 +114,27 @@ crates/fennec/src/
     compaction.rs      openfox context/compactor: the summary round and the new window
     prompt.rs          openfox chat/prompts: the system prompt
     workflow.rs        the workflow walk and its jobs (start, answer, continue, resume, stop);
-                       workflow/ nodes (one node run), fork (parallel branches), outcome (`Outcome:` line)
-  tools/             Toolbox adapter on the host: one file per tool, path_guard, args
+                       workflow/ nodes (one node run), fork (parallel branches), outcome (`Outcome:` line),
+                       criteria (the criteria node and the agents' verdicts)
+  tools/             Toolbox adapter: one file per tool, path_guard, args; sandbox (the bwrap
+                     world of commands);
+                     web_search queries the SearXNG instance from the Settings page
   llm/               Model adapter: openai.rs (client), sse.rs (stream parser), models.rs (/models listing)
   store.rs           EventLog adapter: SQLite (openfox's schema), projects and sessions;
                      store/settings.rs the stored preferences
   git.rs             what fennec reads from a repository
   worktree.rs        a session's git worktree: a workflow never writes the human's tree
+  integration.rs     the human's integration: preview of a worktree branch, cherry-pick, conflict abort
   instructions.rs    openfox context/instructions: Settings' global instructions + the
                      AGENTS.md files above the workdir, for a new session's prompt
   agents.rs          the *.agent.md files: embedded defaults (crates/fennec/agents/), ~/.agents/agents,
                      the project's .agents/agents (the project wins)
-  skills.rs          openfox skills/registry: the SKILL.md packages in ~/.agents/skills and the
-                     project's .agents/skills (the project wins)
+  skills.rs          openfox skills/registry: embedded defaults (crates/fennec/skills/), the SKILL.md
+                     packages in ~/.agents/skills and the project's .agents/skills (the project wins)
   workflows.rs       the *.workflow.json files: embedded defaults (crates/fennec/workflows/),
                      ~/.agents/workflows, the project's .agents/workflows (the project wins)
   folders.rs         the folders the human browses to open a project
+  protected.rs       the project's protected files: .agents/protected read, the existing paths found
   web/               HTTP adapter: http, guard (who may call), routes, event_stream (SSE),
                      notifier (wakes streams on append, no polling), turns, assets,
                      workflow_routes, children (child sessions for workflow nodes),
@@ -116,7 +143,8 @@ crates/fennec/src/
 crates/fennec/build.rs   embeds web/dist (placeholder page when not built)
 web/src/           React + Vite + Tailwind v4 UI (same layout as openfox's web/src)
   pages/             one component per route: HomePage, SessionPage, SettingsPage, WorkflowsPage (lazy)
-  components/        shared UI; session/ the thread, tool cards, question card, message stats, composer,
+  components/        ui/ the primitives every screen uses (Button, Badge, SectionLabel, Card, Panel, fields);
+                     shared UI; session/ the thread, tool cards, question card, message stats, composer,
                      context panel; project/ the folder browser; layout/ the top bar;
                      workflow/ the editor (canvas, node shapes, panels) and session/ a run in the thread;
                      preview/ the preview pane and previewable code blocks
@@ -124,10 +152,12 @@ web/src/           React + Vite + Tailwind v4 UI (same layout as openfox's web/s
   lib/               api (typed fetch), fold (events → thread view), format, theme,
                      attachments (images read in the browser), plan (the plan/report contract),
                      workflow (definition types and edits), workflowRun (a run folded from its events),
-                     preview (what can be previewed, its URL)
+                     preview (what can be previewed, its URL), vision (the images the model saw),
+                     panelBlocks (the context panel's blocks and pages)
   styles/app.css     theme tokens: one CSS variable block per theme, mapped into Tailwind
 docs/api.md        the HTTP API and event wire format, shared by server and UI
 docs/workflows.md  the workflow format, run semantics and editor
+docs/ui.md         the UI's design rules: tokens and primitives, never per-file styles
 docs/dogfooding.md the frictions met while fennec builds fennec, and their status
 ```
 
@@ -144,9 +174,12 @@ docs/dogfooding.md the frictions met while fennec builds fennec, and their statu
 1. **The human**: the CLI/UI, the configuration. fennec never blocks them.
 2. **The trusted kernel**: code that decides (integration, plugin activation).
    It never runs what a model wrote.
-3. **The untrusted zone**: everything a model outputs. **Known gap**: tools
-   run on the host with only a working-directory path guard (as in openfox);
-   the bwrap world comes back as an early component.
+3. **The untrusted zone**: everything a model outputs. Commands run in the
+   bwrap world (`tools/sandbox.rs`) unless the human turns it off. Protected
+   files are refused to the file tools and read-only in the sandbox. **Known
+   gaps**: the file tools run in fennec's process with a working-directory
+   path guard; a command can still create a new file matching a protected
+   pattern where none existed (the review gate is to catch it).
 
 ## Build, test, run
 

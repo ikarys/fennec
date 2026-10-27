@@ -21,6 +21,7 @@ import { NodeFrame } from './nodes/NodeFrame';
 import {
   AgentShape,
   ConditionShape,
+  CriteriaShape,
   EndShape,
   HumanShape,
   JoinShape,
@@ -49,6 +50,7 @@ const nodeTypes = {
   end: makeNodeComponent(EndShape),
   agent: makeNodeComponent(AgentShape),
   shell: makeNodeComponent(ShellShape),
+  criteria: makeNodeComponent(CriteriaShape),
   human: makeNodeComponent(HumanShape),
   condition: makeNodeComponent(ConditionShape),
   parallel: makeNodeComponent(ParallelShape),
@@ -82,6 +84,8 @@ function WorkflowEditorInner({ initialDef, initialOrigin, projectId }: WorkflowE
         onDescriptionChange={(description) => editor.updateDef((previous) => ({ ...previous, description }))}
         onScopeChange={editor.setScope}
         onSave={editor.save}
+        onTest={projectId ? () => { window.location.hash = `#/new/${encodeURIComponent(projectId)}?test=${encodeURIComponent(editor.def.id)}`; } : null}
+        canTest={!editor.dirty}
       />
 
       <div className="flex min-h-0 grow">
@@ -127,39 +131,39 @@ function WorkflowEditorInner({ initialDef, initialOrigin, projectId }: WorkflowE
           ) : (
             <div className="flex flex-col gap-3 p-3">
               <div>
-                <label className="mb-1 block text-[13px] text-muted">Nom</label>
+                <label className="mb-1 block text-[0.8125rem] text-muted">Nom</label>
                 <input
                   type="text"
                   value={editor.def.name}
                   onChange={(event) => editor.updateDef((previous) => ({ ...previous, name: event.target.value }))}
-                  className="w-full rounded-md border border-border bg-panel px-2 py-1 text-[13px]"
+                  className="w-full rounded-md border border-border bg-panel px-2 py-1 text-[0.8125rem]"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-[13px] text-muted">Description</label>
+                <label className="mb-1 block text-[0.8125rem] text-muted">Description</label>
                 <textarea
                   value={editor.def.description ?? ''}
                   onChange={(event) =>
                     editor.updateDef((previous) => ({ ...previous, description: event.target.value }))
                   }
                   rows={2}
-                  className="w-full rounded-md border border-border bg-panel px-2 py-1 text-[13px]"
+                  className="w-full rounded-md border border-border bg-panel px-2 py-1 text-[0.8125rem]"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-[13px] text-muted">Passages max</label>
+                <label className="mb-1 block text-[0.8125rem] text-muted">Passages max</label>
                 <input
                   type="number"
                   value={editor.def.maxSteps ?? 50}
                   onChange={(event) =>
                     editor.updateDef((previous) => ({ ...previous, maxSteps: Number(event.target.value) }))
                   }
-                  className="w-full rounded-md border border-border bg-panel px-2 py-1 text-[13px]"
+                  className="w-full rounded-md border border-border bg-panel px-2 py-1 text-[0.8125rem]"
                 />
               </div>
               {editor.issues.length > 0 && (
                 <div className="flex flex-col gap-1">
-                  <div className="text-[13px] font-medium text-err">Problèmes</div>
+                  <div className="text-[0.8125rem] font-medium text-err">Problèmes</div>
                   {editor.issues.map((issue, index) => (
                     <button
                       key={index}

@@ -2,6 +2,7 @@ use super::*;
 use crate::agent::ports::{AgentRun, ChildSessions, CommandRun, Commands, Model};
 use crate::agent::test_support::{MemoryLog, Scripted, builder, plan, reply};
 use crate::domain::agent::AgentDefinition;
+use crate::domain::criteria::{CriterionStatus, Provenance};
 use crate::domain::event::{DoneReason, Event};
 use crate::domain::workflow::definition::{
     AgentContext, Edge, EndOutcome, Node, NodeKind, Position, Workflow,
@@ -96,13 +97,13 @@ struct FakeCommands {
 
 impl Commands for FakeCommands {
     fn run(&self, _command: &str, _timeout: Duration, _stop: &AtomicBool) -> CommandRun {
-        let code = self
-            .exit_codes
-            .lock()
-            .unwrap()
-            .first()
-            .copied()
-            .unwrap_or(0);
+        // One code per call, the last one repeating.
+        let mut codes = self.exit_codes.lock().unwrap();
+        let code = if codes.len() > 1 {
+            codes.remove(0)
+        } else {
+            codes.first().copied().unwrap_or(0)
+        };
         CommandRun {
             exit_code: Some(code),
             stopped: false,
@@ -134,6 +135,7 @@ fn simple_workflow() -> Workflow {
                     retry_prompt: None,
                     outputs: vec!["done".into()],
                     context: AgentContext::Session,
+                    verdicts: false,
                 },
             },
             Node {
@@ -218,6 +220,305 @@ fn start_agent_end() {
     )));
 }
 
+fn criteria_workflow() -> Workflow {
+    Workflow {
+        id: "w".into(),
+        name: "w".into(),
+        description: String::new(),
+        max_steps: 50,
+        nodes: vec![
+            Node {
+                id: "start".into(),
+                name: None,
+                position: Position::default(),
+                kind: NodeKind::Start,
+            },
+            Node {
+                id: "plan".into(),
+                name: Some("Plan".into()),
+                position: Position::default(),
+                kind: NodeKind::Agent {
+                    agent: "plan".into(),
+                    prompt: "{{task}}".into(),
+                    retry_prompt: None,
+                    outputs: vec!["done".into()],
+                    context: AgentContext::Session,
+                    verdicts: false,
+                },
+            },
+            Node {
+                id: "criteria".into(),
+                name: Some("Criteria".into()),
+                position: Position::default(),
+                kind: NodeKind::Criteria {
+                    plan: "plan".into(),
+                },
+            },
+            Node {
+                id: "end".into(),
+                name: None,
+                position: Position::default(),
+                kind: NodeKind::End {
+                    outcome: EndOutcome::Done,
+                },
+            },
+        ],
+        edges: vec![
+            Edge {
+                from: "start".into(),
+                port: "next".into(),
+                to: "plan".into(),
+                max_passes: None,
+                pause: false,
+            },
+            Edge {
+                from: "plan".into(),
+                port: "done".into(),
+                to: "criteria".into(),
+                max_passes: None,
+                pause: false,
+            },
+            Edge {
+                from: "criteria".into(),
+                port: "pass".into(),
+                to: "end".into(),
+                max_passes: None,
+                pause: false,
+            },
+            Edge {
+                from: "criteria".into(),
+                port: "fail".into(),
+                to: "end".into(),
+                max_passes: None,
+                pause: false,
+            },
+        ],
+    }
+}
+
+fn verdicts_workflow() -> Workflow {
+    Workflow {
+        id: "w".into(),
+        name: "w".into(),
+        description: String::new(),
+        max_steps: 50,
+        nodes: vec![
+            Node {
+                id: "start".into(),
+                name: None,
+                position: Position::default(),
+                kind: NodeKind::Start,
+            },
+            Node {
+                id: "plan".into(),
+                name: Some("Plan".into()),
+                position: Position::default(),
+                kind: NodeKind::Agent {
+                    agent: "plan".into(),
+                    prompt: "{{task}}".into(),
+                    retry_prompt: None,
+                    outputs: vec!["done".into()],
+                    context: AgentContext::Session,
+                    verdicts: false,
+                },
+            },
+            Node {
+                id: "criteria".into(),
+                name: Some("Criteria".into()),
+                position: Position::default(),
+                kind: NodeKind::Criteria {
+                    plan: "plan".into(),
+                },
+            },
+            Node {
+                id: "verify".into(),
+                name: Some("Verify".into()),
+                position: Position::default(),
+                kind: NodeKind::Agent {
+                    agent: "plan".into(),
+                    prompt: "judge".into(),
+                    retry_prompt: None,
+                    outputs: vec!["done".into()],
+                    context: AgentContext::Session,
+                    verdicts: true,
+                },
+            },
+            Node {
+                id: "end".into(),
+                name: None,
+                position: Position::default(),
+                kind: NodeKind::End {
+                    outcome: EndOutcome::Done,
+                },
+            },
+        ],
+        edges: vec![
+            Edge {
+                from: "start".into(),
+                port: "next".into(),
+                to: "plan".into(),
+                max_passes: None,
+                pause: false,
+            },
+            Edge {
+                from: "plan".into(),
+                port: "done".into(),
+                to: "criteria".into(),
+                max_passes: None,
+                pause: false,
+            },
+            Edge {
+                from: "criteria".into(),
+                port: "pass".into(),
+                to: "verify".into(),
+                max_passes: None,
+                pause: false,
+            },
+            Edge {
+                from: "criteria".into(),
+                port: "fail".into(),
+                to: "end".into(),
+                max_passes: None,
+                pause: false,
+            },
+            Edge {
+                from: "verify".into(),
+                port: "done".into(),
+                to: "end".into(),
+                max_passes: None,
+                pause: false,
+            },
+        ],
+    }
+}
+
+#[test]
+fn criteria_node_runs_checks_and_reports_failures() {
+    let model = Scripted(RefCell::new(vec![reply(
+        "## Done when\n- C1 — check: `true`\n- C2 — check: `false`\n- C3",
+        vec![],
+    )]));
+    let stop = AtomicBool::new(false);
+    let children = FakeChildren::default();
+    let commands = FakeCommands::default();
+    *commands.exit_codes.lock().unwrap() = vec![0, 1];
+    let env = WorkflowEnv {
+        children: &children,
+        commands: &commands,
+    };
+    let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
+    h.agents = vec![plan()];
+
+    let reason = run_workflow(
+        &mut h.turn(),
+        &env,
+        WorkflowJob::Start {
+            workflow: criteria_workflow(),
+            task: "do it".into(),
+            step_by_step: false,
+        },
+    )
+    .unwrap();
+    assert_eq!(reason, DoneReason::Complete);
+
+    let events = h.log.0.into_inner();
+    assert_eq!(
+        events
+            .iter()
+            .filter(|e| matches!(e, Event::CriteriaSet { .. }))
+            .count(),
+        1
+    );
+    assert_eq!(
+        events
+            .iter()
+            .filter(|e| {
+                matches!(
+                    e,
+                    Event::CriterionUpdated { status, .. }
+                        if matches!(
+                            status,
+                            CriterionStatus::Passed {
+                                provenance: Provenance::Verified { .. }
+                            }
+                                | CriterionStatus::Failed {
+                                    provenance: Provenance::Verified { .. }
+                                }
+                        )
+                )
+            })
+            .count(),
+        2
+    );
+    assert!(events.iter().any(|e| matches!(
+        e,
+        Event::WorkflowNodeFinished {
+            node_id,
+            port,
+            output,
+            ..
+        } if node_id == "criteria" && port == "fail" && output.contains("false")
+    )));
+}
+
+#[test]
+fn verdicts_record_indicative_only_for_unchecked_criteria() {
+    let model = Scripted(RefCell::new(vec![
+        reply("## Done when\n- first — check: `true`\n- second", vec![]),
+        reply("C1: pass — checked\nC2: fail — not done", vec![]),
+    ]));
+    let stop = AtomicBool::new(false);
+    let children = FakeChildren::default();
+    let commands = FakeCommands::default();
+    *commands.exit_codes.lock().unwrap() = vec![0];
+    let env = WorkflowEnv {
+        children: &children,
+        commands: &commands,
+    };
+    let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
+    h.agents = vec![plan()];
+
+    let reason = run_workflow(
+        &mut h.turn(),
+        &env,
+        WorkflowJob::Start {
+            workflow: verdicts_workflow(),
+            task: "do it".into(),
+            step_by_step: false,
+        },
+    )
+    .unwrap();
+    assert_eq!(reason, DoneReason::Complete);
+
+    let events = h.log.0.into_inner();
+    assert!(events.iter().any(|e| matches!(
+        e,
+        Event::CriterionUpdated {
+            criterion_id,
+            status
+        } if criterion_id == "C2"
+            && matches!(
+                status,
+                CriterionStatus::Failed {
+                    provenance: Provenance::Indicative { agent, reason }
+                } if agent == "plan" && reason == "not done"
+            )
+    )));
+    assert!(!events.iter().any(|e| matches!(
+        e,
+        Event::CriterionUpdated {
+            criterion_id,
+            status
+        } if criterion_id == "C1"
+            && matches!(
+                status,
+                CriterionStatus::Passed {
+                    provenance: Provenance::Indicative { .. }
+                }
+            )
+    )));
+}
+
 #[test]
 fn shell_success_and_failure() {
     let workflow = Workflow {
@@ -252,6 +553,7 @@ fn shell_success_and_failure() {
                     retry_prompt: Some("retry: {{nodes.check.output}}".into()),
                     outputs: vec!["done".into()],
                     context: AgentContext::Session,
+                    verdicts: false,
                 },
             },
             Node {
@@ -406,7 +708,7 @@ fn human_node() {
                 name: Some("Approve".into()),
                 position: Position::default(),
                 kind: NodeKind::Human {
-                    question: "Go?".into(),
+                    question: "Go on {{task}}?".into(),
                     choices: vec!["Go".into()],
                 },
             },
@@ -420,6 +722,7 @@ fn human_node() {
                     retry_prompt: None,
                     outputs: vec!["done".into()],
                     context: AgentContext::Session,
+                    verdicts: false,
                 },
             },
             Node {
@@ -478,6 +781,16 @@ fn human_node() {
     )
     .unwrap();
     assert_eq!(reason, DoneReason::WaitingForUser);
+    // The human reads the question with its names filled in.
+    assert!(
+        h.log
+            .0
+            .borrow()
+            .iter()
+            .any(|e| matches!(e, Event::WorkflowHumanAsked {
+            node_id, question, ..
+        } if node_id == "approve" && question == "Go on go?"))
+    );
 
     let reason = run_workflow(
         &mut h.turn(),
@@ -575,6 +888,7 @@ fn agent_outcome() {
                     retry_prompt: None,
                     outputs: vec!["ok".into(), "ko".into()],
                     context: AgentContext::Session,
+                    verdicts: false,
                 },
             },
             Node {
@@ -724,6 +1038,7 @@ fn parallel_branches() {
                     retry_prompt: None,
                     outputs: vec!["done".into()],
                     context: AgentContext::Fresh,
+                    verdicts: false,
                 },
             },
             Node {
@@ -736,6 +1051,7 @@ fn parallel_branches() {
                     retry_prompt: None,
                     outputs: vec!["done".into()],
                     context: AgentContext::Fresh,
+                    verdicts: false,
                 },
             },
             Node {
@@ -903,6 +1219,7 @@ fn invalid_workflow_refused() {
                 retry_prompt: None,
                 outputs: vec!["done".into()],
                 context: AgentContext::Session,
+                verdicts: false,
             },
         }],
         edges: Vec::new(),
@@ -937,4 +1254,142 @@ fn invalid_workflow_refused() {
             .iter()
             .any(|e| matches!(e, Event::WorkflowStarted { .. }))
     );
+}
+
+#[test]
+fn start_from_plan_records_the_plan_and_runs_the_criteria() {
+    let model = Scripted(RefCell::new(vec![]));
+    let stop = AtomicBool::new(false);
+    let children = FakeChildren::default();
+    let commands = FakeCommands::default();
+    *commands.exit_codes.lock().unwrap() = vec![0];
+    let env = WorkflowEnv {
+        children: &children,
+        commands: &commands,
+    };
+    let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
+    h.agents = vec![plan()];
+
+    let reason = run_workflow(
+        &mut h.turn(),
+        &env,
+        WorkflowJob::StartFromPlan {
+            workflow: criteria_workflow(),
+            task: "do it".into(),
+            plan: "## Done when\n- C1 — check: `true`".into(),
+        },
+    )
+    .unwrap();
+    assert_eq!(reason, DoneReason::Complete);
+
+    let events = h.log.0.into_inner();
+    assert!(events.iter().any(|e| matches!(
+        e,
+        Event::WorkflowNodeFinished {
+            node_id,
+            port,
+            output,
+            ..
+        } if node_id == "plan"
+            && port == "done"
+            && output == "## Done when\n- C1 — check: `true`"
+    )));
+    assert_eq!(
+        events
+            .iter()
+            .filter(|e| matches!(e, Event::CriteriaSet { .. }))
+            .count(),
+        1
+    );
+    assert!(events.iter().any(|e| matches!(
+        e,
+        Event::WorkflowNodeFinished {
+            node_id,
+            port,
+            ..
+        } if node_id == "criteria" && port == "pass"
+    )));
+}
+
+#[test]
+fn start_from_plan_answers_the_approval_node() {
+    let mut workflow = criteria_workflow();
+    workflow.nodes.push(Node {
+        id: "approve".into(),
+        name: Some("Approve".into()),
+        position: Position::default(),
+        kind: NodeKind::Human {
+            question: "Go?".into(),
+            choices: vec!["Go".into(), "Revise".into()],
+        },
+    });
+    workflow
+        .edges
+        .retain(|edge| !(edge.from == "plan" && edge.port == "done"));
+    workflow.edges.push(Edge {
+        from: "plan".into(),
+        port: "done".into(),
+        to: "approve".into(),
+        max_passes: None,
+        pause: false,
+    });
+    workflow.edges.push(Edge {
+        from: "approve".into(),
+        port: "Go".into(),
+        to: "criteria".into(),
+        max_passes: None,
+        pause: false,
+    });
+    workflow.edges.push(Edge {
+        from: "approve".into(),
+        port: "Revise".into(),
+        to: "plan".into(),
+        max_passes: None,
+        pause: false,
+    });
+
+    let model = Scripted(RefCell::new(vec![]));
+    let stop = AtomicBool::new(false);
+    let children = FakeChildren::default();
+    let commands = FakeCommands::default();
+    *commands.exit_codes.lock().unwrap() = vec![0];
+    let env = WorkflowEnv {
+        children: &children,
+        commands: &commands,
+    };
+    let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
+    h.agents = vec![plan()];
+
+    let reason = run_workflow(
+        &mut h.turn(),
+        &env,
+        WorkflowJob::StartFromPlan {
+            workflow,
+            task: "do it".into(),
+            plan: "## Done when\n- C1 — check: `true`".into(),
+        },
+    )
+    .unwrap();
+    assert_eq!(reason, DoneReason::Complete);
+
+    let events = h.log.0.into_inner();
+    assert!(events.iter().any(|e| matches!(
+        e,
+        Event::WorkflowNodeFinished {
+            node_id,
+            port,
+            comment,
+            ..
+        } if node_id == "approve"
+            && port == "Go"
+            && comment.as_deref() == Some("approved from the plan card")
+    )));
+    assert!(events.iter().any(|e| matches!(
+        e,
+        Event::WorkflowNodeFinished {
+            node_id,
+            port,
+            ..
+        } if node_id == "criteria" && port == "pass"
+    )));
 }
