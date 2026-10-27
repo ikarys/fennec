@@ -31,7 +31,7 @@ import { ThreadItemView } from '../components/session/Thread';
 import { PlanActionsContext } from '../components/session/PlanActions';
 import { PreviewContext, PreviewWorkdirContext, type PreviewTarget } from '../components/preview/PreviewContext';
 import { PreviewPane } from '../components/preview/PreviewPane';
-import { RunStrip } from '../components/workflow/session/RunStrip';
+import { RunRail } from '../components/workflow/session/RunRail';
 import { RunActionCard } from '../components/workflow/session/RunActionCard';
 import { Button, buttonClass } from '../components/ui/Button';
 import {
@@ -493,6 +493,7 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
       <PreviewWorkdirContext.Provider value={detail?.project.workdir}>
         <PlanActionsContext.Provider value={planActions}>
         <div className="flex min-h-0 min-w-0 grow">
+          {run && <RunRail run={run} running={running} onStop={handleStopWorkflow} />}
           <main className="flex min-h-0 min-w-0 flex-[999_1_560px] flex-col">
         <div className="flex items-center gap-2 px-6 py-2.5">
           <div className="mx-auto flex w-full max-w-[820px] items-center gap-2">
@@ -505,9 +506,6 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
           </div>
         </div>
 
-        {run && (
-          <RunStrip run={run} running={running} onStop={handleStopWorkflow} />
-        )}
         <div
           ref={scrollRef}
           onScroll={(event) => {

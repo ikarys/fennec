@@ -322,3 +322,21 @@ export function ReplayIcon({ className }: IconProps) {
     </svg>
   );
 }
+
+/** Double chevron pointing left: folds a side rail. */
+export function ChevronsLeftIcon({ className }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M11 17l-5-5 5-5M18 17l-5-5 5-5" />
+    </svg>
+  );
+}
+
+/** Double chevron pointing right: unfolds a side rail. */
+export function ChevronsRightIcon({ className }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M13 17l5-5-5-5M6 17l5-5-5-5" />
+    </svg>
+  );
+}
