@@ -38,7 +38,7 @@ export function NodeFrame({ node, edges, selected, hasError, children }: NodeFra
               className="!h-2.5 !w-2.5 !rounded-full !border-2 !border-panel !bg-raised"
             />
             <span
-              className="absolute top-full text-[10px] whitespace-nowrap text-muted"
+              className="absolute top-full text-[0.625rem] whitespace-nowrap text-muted"
               style={{ left: `${percent}%`, transform: 'translateX(-50%)', marginTop: '4px' }}
             >
               {port}

@@ -169,6 +169,16 @@ impl SqliteStore {
         self.insert_session(&project_id, &workdir, title, Some(parent_id))
     }
 
+    /// The generated title replaces the placeholder; `updated_at` is left
+    /// untouched so the list order does not jump.
+    pub fn rename_session(&self, id: &str, title: &str) -> Result<()> {
+        self.db.execute(
+            "UPDATE sessions SET title = ?1 WHERE id = ?2",
+            params![title, id],
+        )?;
+        Ok(())
+    }
+
     fn insert_session(
         &self,
         project_id: &str,

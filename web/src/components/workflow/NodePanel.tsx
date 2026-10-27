@@ -1,9 +1,13 @@
 import { useState } from 'react';
+import { Badge } from '../ui/Badge';
+import { Button } from '../ui/Button';
+import { FieldRow, Select, TextInput } from '../ui/Field';
 import type { Agent } from '../../lib/api';
 import type { WorkflowDef, WorkflowIssue, WorkflowNode } from '../../lib/workflow';
 import { NODE_KIND_LABELS, templateNames } from '../../lib/workflow';
 import { AgentFields } from './fields/AgentFields';
 import { ConditionFields } from './fields/ConditionFields';
+import { CriteriaFields } from './fields/CriteriaFields';
 import { HumanFields } from './fields/HumanFields';
 import { ShellFields } from './fields/ShellFields';
 
@@ -46,54 +50,52 @@ export function NodePanel({ def, node, agents, issues, onChange, onRename, onDel
 
   return (
     <div className="flex flex-col gap-3 p-3">
-      <div className="flex items-center gap-2 text-[13px] text-muted">
+      <div className="flex items-center gap-2 text-xs text-muted">
         Type
-        <span className="rounded-md bg-raised px-2 py-0.5 text-[12px] font-medium text-text">{NODE_KIND_LABELS[node.kind]}</span>
+        <Badge tone="neutral">{NODE_KIND_LABELS[node.kind]}</Badge>
       </div>
-      <div>
-        <label className="mb-1 block text-[13px] text-muted">Identifiant</label>
-        <input
+      <FieldRow label="Identifiant">
+        <TextInput
           type="text"
           value={node.id}
           onChange={(event) => handleIdChange(event.target.value)}
-          className="w-full rounded-md border border-border bg-panel px-2 py-1 text-[13px]"
+          className="w-full"
         />
-        {idError && <div className="mt-1 text-xs text-err">{idError}</div>}
-      </div>
+        {idError && <div className="text-xs text-err">{idError}</div>}
+      </FieldRow>
 
-      <div>
-        <label className="mb-1 block text-[13px] text-muted">Nom</label>
-        <input
+      <FieldRow label="Nom">
+        <TextInput
           type="text"
           value={node.name ?? ''}
           onChange={(event) => updateField('name', event.target.value)}
-          className="w-full rounded-md border border-border bg-panel px-2 py-1 text-[13px]"
+          className="w-full"
         />
-      </div>
+      </FieldRow>
 
       {node.kind === 'agent' && (
         <AgentFields node={node} agents={agents} names={names} onChange={updateField} />
       )}
       {node.kind === 'shell' && <ShellFields node={node} names={names} onChange={updateField} />}
+      {node.kind === 'criteria' && <CriteriaFields node={node} def={def} names={names} onChange={updateField} />}
       {node.kind === 'human' && <HumanFields node={node} names={names} onChange={updateField} />}
       {node.kind === 'condition' && <ConditionFields node={node} names={names} onChange={updateField} />}
       {node.kind === 'end' && (
-        <div>
-          <label className="mb-1 block text-[13px] text-muted">Issue</label>
-          <select
+        <FieldRow label="Issue">
+          <Select
             value={(node.outcome as string) ?? 'done'}
             onChange={(event) => updateField('outcome', event.target.value)}
-            className="w-full rounded-md border border-border bg-panel px-2 py-1 text-[13px]"
+            className="w-full"
           >
             <option value="done">terminé</option>
             <option value="blocked">bloqué</option>
-          </select>
-        </div>
+          </Select>
+        </FieldRow>
       )}
 
       {nodeIssues.length > 0 && (
         <div className="flex flex-col gap-1">
-          <div className="text-[13px] font-medium text-err">Problèmes</div>
+          <div className="text-[0.8125rem] font-medium text-err">Problèmes</div>
           {nodeIssues.map((issue, index) => (
             <div key={index} className="rounded-md bg-del-bg px-2 py-1 text-xs text-err">
               {issue.message}
@@ -102,13 +104,9 @@ export function NodePanel({ def, node, agents, issues, onChange, onRename, onDel
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={onDelete}
-        className="mt-2 rounded-md border border-err px-3 py-1 text-[13px] text-err hover:bg-del-bg"
-      >
+      <Button variant="danger" size="sm" type="button" onClick={onDelete} className="mt-2 self-start">
         Supprimer le nœud
-      </button>
+      </Button>
     </div>
   );
 }

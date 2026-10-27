@@ -2,9 +2,11 @@
 //! subset fennec produces. Wire names match openfox.
 
 use super::attachment::Attachment;
+use super::criteria::{Criterion, CriterionStatus};
 use super::stats::MessageStats;
 use super::workflow::definition::Workflow;
 use super::workflow::run::{RunOutcome, Via};
+use super::workflow::stats::RunStats;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fmt;
@@ -231,6 +233,10 @@ pub enum Event {
     /// it, the log keeps them.
     #[serde(rename = "session.rewound", rename_all = "camelCase")]
     SessionRewound { message_id: String },
+    /// The model generated a short title for the session (openfox
+    /// `session.name_generated`).
+    #[serde(rename = "session.name_generated", rename_all = "camelCase")]
+    SessionNameGenerated { name: String },
     /// fennec's own: a workflow run starts; the definition is frozen for the run.
     #[serde(rename = "workflow.started", rename_all = "camelCase")]
     WorkflowStarted {
@@ -260,6 +266,18 @@ pub enum Event {
         exit_code: Option<i32>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         comment: Option<String>,
+        /// The node's working time, measured by fennec; None for a human
+        /// node, whose time is the human's.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        duration_ms: Option<u64>,
+    },
+    /// A human node's question with its `{{…}}` names filled in, as the
+    /// human reads it (fennec's own event, right after the node starts).
+    #[serde(rename = "workflow.human.asked", rename_all = "camelCase")]
+    WorkflowHumanAsked {
+        run_id: String,
+        node_id: String,
+        question: String,
     },
     #[serde(rename = "workflow.paused", rename_all = "camelCase")]
     WorkflowPaused {
@@ -280,6 +298,8 @@ pub enum Event {
         outcome: RunOutcome,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         reason: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        stats: Option<RunStats>,
     },
     #[serde(rename = "chat.done", rename_all = "camelCase")]
     ChatDone {
@@ -303,6 +323,37 @@ pub enum Event {
     /// prompt, frozen for the session so the server's prompt cache holds.
     #[serde(rename = "turn.snapshot", rename_all = "camelCase")]
     TurnSnapshot { cached_system_prompt: String },
+    #[serde(rename = "criteria.set", rename_all = "camelCase")]
+    CriteriaSet { criteria: Vec<Criterion> },
+    /// An agent proposed a new criteria list (fennec's own event); it applies
+    /// only when the human answers the `chat.ask_user` of the same `call_id`
+    /// with the accept choice.
+    #[serde(rename = "criteria.proposed", rename_all = "camelCase")]
+    CriteriaProposed {
+        call_id: String,
+        criteria: Vec<Criterion>,
+        reason: String,
+    },
+    #[serde(rename = "criterion.updated", rename_all = "camelCase")]
+    CriterionUpdated {
+        criterion_id: String,
+        status: CriterionStatus,
+    },
+    /// The human integrated the session's branch (fennec's own event).
+    #[serde(rename = "integration.applied", rename_all = "camelCase")]
+    IntegrationApplied {
+        branch: String,
+        base: String,
+        commits: Vec<String>,
+        head: String,
+        acknowledged: Vec<String>,
+    },
+    /// The human discarded the session's worktree and branch (fennec's own event).
+    #[serde(rename = "worktree.discarded", rename_all = "camelCase")]
+    WorktreeDiscarded {
+        branch: String,
+        commits: Vec<String>,
+    },
 }
 
 impl Event {
@@ -321,9 +372,11 @@ impl Event {
             Event::RunningChanged { .. } => "running.changed",
             Event::ModeChanged { .. } => "mode.changed",
             Event::SessionRewound { .. } => "session.rewound",
+            Event::SessionNameGenerated { .. } => "session.name_generated",
             Event::WorkflowStarted { .. } => "workflow.started",
             Event::WorkflowNodeStarted { .. } => "workflow.node.started",
             Event::WorkflowNodeFinished { .. } => "workflow.node.finished",
+            Event::WorkflowHumanAsked { .. } => "workflow.human.asked",
             Event::WorkflowPaused { .. } => "workflow.paused",
             Event::WorkflowResumed { .. } => "workflow.resumed",
             Event::WorkflowFinished { .. } => "workflow.finished",
@@ -331,6 +384,11 @@ impl Event {
             Event::ChatError { .. } => "chat.error",
             Event::ChatAskUser { .. } => "chat.ask_user",
             Event::TurnSnapshot { .. } => "turn.snapshot",
+            Event::CriteriaSet { .. } => "criteria.set",
+            Event::CriteriaProposed { .. } => "criteria.proposed",
+            Event::CriterionUpdated { .. } => "criterion.updated",
+            Event::IntegrationApplied { .. } => "integration.applied",
+            Event::WorktreeDiscarded { .. } => "worktree.discarded",
         }
     }
 }
@@ -398,6 +456,24 @@ mod tests {
         assert!(matches!(
             &event,
             Event::SessionRewound { message_id } if message_id == "m"
+        ));
+
+        assert_eq!(serde_json::to_value(&event).unwrap(), wire);
+    }
+
+    #[test]
+    fn session_name_generated_round_trips() {
+        let wire = json!({
+            "type": "session.name_generated",
+            "data": {
+                "name": "React setup"
+            }
+        });
+
+        let event: Event = serde_json::from_value(wire.clone()).unwrap();
+        assert!(matches!(
+            &event,
+            Event::SessionNameGenerated { name } if name == "React setup"
         ));
 
         assert_eq!(serde_json::to_value(&event).unwrap(), wire);

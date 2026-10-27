@@ -1,12 +1,58 @@
 import type { ThreadView } from '../../lib/fold';
 import type { SessionDetail, SessionSkills } from '../../lib/api';
-import { cachePercent, formatSpeed, formatTokens } from '../../lib/format';
-import { previewKindOfPath, relativeToWorkdir } from '../../lib/preview';
-import { usePreviewOpener, usePreviewWorkdir } from '../preview/PreviewContext';
+import { useEffect, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import { useDisplayPrefs } from '../../lib/display';
+import { pageBlocks, panelPages, type PanelBlockId } from '../../lib/panelBlocks';
+import { Select } from '../ui/Field';
+import { AgentWorkspaceSection } from './AgentWorkspaceSection';
+import { CriteriaSection } from './CriteriaSection';
+import { ContextUsageSection } from './ContextUsageSection';
+import { ModifiedFilesSection } from './ModifiedFilesSection';
+import { SkillsSection } from './SkillsSection';
+import { TokensSection } from './TokensSection';
+import { ToolCountsSection } from './ToolCountsSection';
+import { VisionSection } from './VisionSection';
+
+const WIDTH_KEY = 'fennec.contextPanelWidth';
+const PAGE_KEY = 'fennec.contextPanel.page';
+const MIN_WIDTH = 240;
+const MAX_WIDTH = 560;
+const DEFAULT_WIDTH = 300;
+
+function clampWidth(width: number): number {
+  return Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Math.round(width)));
+}
+
+function loadWidth(): number {
+  try {
+    const stored = Number(localStorage.getItem(WIDTH_KEY));
+    return stored ? clampWidth(stored) : DEFAULT_WIDTH;
+  } catch {
+    return DEFAULT_WIDTH;
+  }
+}
+
+function loadPageName(): string {
+  try {
+    return localStorage.getItem(PAGE_KEY) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+function savePageName(name: string): void {
+  try {
+    localStorage.setItem(PAGE_KEY, name);
+  } catch {
+    // A blocked storage only loses the page on reload.
+  }
+}
 
 interface ContextPanelProps {
   view: ThreadView;
   currentTokens: number;
+  /** The model's context window; 0 when unknown. */
+  maxTokens: number;
   contextPercent: number;
   /** The session's skills, folded server-side; null while the first fetch is in flight. */
   skills: SessionSkills | null;
@@ -19,145 +65,125 @@ interface ContextPanelProps {
   partial: boolean;
   /** Where the agent's work lands; null when the session runs in place. */
   worktree: SessionDetail['worktree'];
+  /** The session id, for the integration dialog; null on a new-session tab. */
+  sessionId: string | null;
+  /** Re-fetch the session detail after the worktree changed (discard). */
+  onWorktreeChanged: () => void;
 }
 
-export function ContextPanel({ view, currentTokens, contextPercent, skills, hasSession, compactDisabled, onCompact, compactError, partial, worktree }: ContextPanelProps) {
-  const opener = usePreviewOpener();
-  const workdir = usePreviewWorkdir();
+export function ContextPanel({ view, currentTokens, maxTokens, contextPercent, skills, hasSession, compactDisabled, onCompact, compactError, partial, worktree, sessionId, onWorktreeChanged }: ContextPanelProps) {
+  const [width, setWidth] = useState(loadWidth);
+  const [selectedPageName, setSelectedPageName] = useState(loadPageName);
+  const pages = panelPages(useDisplayPrefs().panelPages);
+  const page = pages.find((candidate) => candidate.name === selectedPageName) ?? pages[0] ?? { name: '', blocks: [] };
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(WIDTH_KEY, String(width));
+    } catch {
+      // A blocked storage only loses the width on reload.
+    }
+  }, [width]);
+
+  const startResize = (event: PointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = width;
+    // The panel is on the right: dragging left widens it.
+    const move = (moveEvent: globalThis.PointerEvent) => setWidth(clampWidth(startWidth + startX - moveEvent.clientX));
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', () => window.removeEventListener('pointermove', move), { once: true });
+  };
+
+  const resizeWithKeys = (event: KeyboardEvent<HTMLDivElement>) => {
+    const step = event.key === 'ArrowLeft' ? 16 : event.key === 'ArrowRight' ? -16 : 0;
+    if (step !== 0) {
+      event.preventDefault();
+      setWidth((current) => clampWidth(current + step));
+    }
+  };
+
+  function renderBlock(id: PanelBlockId) {
+    switch (id) {
+      case 'criteria':
+        return <CriteriaSection key={id} criteria={view.criteria} />;
+      case 'modifiedFiles':
+        return <ModifiedFilesSection key={id} modifiedFiles={view.modifiedFiles} sessionId={sessionId} />;
+      case 'workspace':
+        return worktree ? (
+          <AgentWorkspaceSection key={id} sessionId={sessionId} worktree={worktree} running={view.running} onDiscarded={onWorktreeChanged} />
+        ) : null;
+      case 'context':
+        return (
+          <ContextUsageSection
+            key={id}
+            currentTokens={currentTokens}
+            maxTokens={maxTokens}
+            contextPercent={contextPercent}
+            compactDisabled={compactDisabled}
+            onCompact={onCompact}
+            compactError={compactError}
+          />
+        );
+      case 'tokens':
+        return <TokensSection key={id} usage={view.usage} partial={partial} />;
+      case 'skills':
+        return <SkillsSection key={id} skills={skills} hasSession={hasSession} />;
+      case 'tools':
+        return <ToolCountsSection key={id} toolCounts={view.toolCounts} />;
+      case 'vision':
+        return <VisionSection key={id} items={view.items} partial={partial} />;
+      default: {
+        const exhaustive: never = id;
+        return exhaustive;
+      }
+    }
+  }
+
   return (
+    <div className="relative hidden min-h-0 shrink-0 min-[1100px]:flex" style={{ width }}>
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Largeur du panneau"
+        aria-valuemin={MIN_WIDTH}
+        aria-valuemax={MAX_WIDTH}
+        aria-valuenow={width}
+        tabIndex={0}
+        title="Glisser pour élargir · double-clic : largeur par défaut"
+        onPointerDown={startResize}
+        onDoubleClick={() => setWidth(DEFAULT_WIDTH)}
+        onKeyDown={resizeWithKeys}
+        className="absolute inset-y-0 -left-1 z-10 w-2 cursor-col-resize touch-none hover:bg-accent/40 focus-visible:bg-accent/40 focus-visible:outline-none"
+      />
       <aside
         aria-label="Contexte de la session"
-        className="hidden min-[1100px]:flex flex-1 flex-col gap-5 border-l border-border bg-panel px-4 py-4.5 max-w-[300px] min-w-[240px]"
+        className="flex min-h-0 w-full flex-col gap-2 overflow-y-auto border-l border-border bg-bg px-3 py-3 [scrollbar-width:thin]"
       >
-        <section className="flex flex-col gap-2">
-          <h2 className="text-[11px] font-semibold tracking-[0.06em] text-muted uppercase">Contexte</h2>
-          <div className="h-1.5 overflow-hidden rounded-full bg-raised">
-            <div className="h-full bg-accent" style={{ width: `${contextPercent}%` }} />
-          </div>
-          <div className="flex justify-between text-xs text-muted">
-            <span>{formatTokens(currentTokens)} tokens</span>
-            <span>{contextPercent} %</span>
-          </div>
-          <button
-            type="button"
-            onClick={onCompact}
-            disabled={compactDisabled}
-            className="self-start rounded-lg border border-border bg-raised px-2.5 py-1 text-xs text-text disabled:opacity-60"
+        {pages.length > 1 && (
+          <Select
+            aria-label="Page du panneau"
+            value={page.name}
+            onChange={(event) => {
+              const name = event.target.value;
+              setSelectedPageName(name);
+              savePageName(name);
+            }}
+            className="w-full"
           >
-            Compacter
-          </button>
-          {compactError && <div className="text-xs text-err">{compactError}</div>}
-        </section>
-
-        <section className="flex flex-col gap-1.5">
-          <h2 className="text-[11px] font-semibold tracking-[0.06em] text-muted uppercase">{partial ? 'Tokens des messages chargés' : 'Tokens de la session'}</h2>
-          {view.usage.calls === 0 && <div className="text-xs text-muted">Aucun appel mesuré.</div>}
-          {view.usage.calls > 0 && (
-            <dl className="m-0 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-xs tabular-nums">
-              <dt className="text-muted">Entrée</dt>
-              <dd className="m-0 text-right">{formatTokens(view.usage.prefillTokens)}</dd>
-              <dt className="text-muted">dont cache</dt>
-              <dd className="m-0 text-right">
-                {formatTokens(view.usage.cachedPromptTokens)} · {cachePercent(view.usage.cachedPromptTokens, view.usage.prefillTokens)} %
-              </dd>
-              <dt className="text-muted">Sortie</dt>
-              <dd className="m-0 text-right">{formatTokens(view.usage.generationTokens)}</dd>
-              {view.usage.last && (
-                <>
-                  <dt className="text-muted">Dernier appel</dt>
-                  <dd className="m-0 text-right">{formatSpeed(view.usage.last.generationSpeed)}</dd>
-                </>
-              )}
-              <dt className="text-muted">Appels</dt>
-              <dd className="m-0 text-right">{view.usage.calls}</dd>
-            </dl>
-          )}
-        </section>
-
-        <section className="flex flex-col gap-1.5">
-          <h2 className="text-[11px] font-semibold tracking-[0.06em] text-muted uppercase">Fichiers modifiés</h2>
-          {view.modifiedFiles.length === 0 && <div className="text-xs text-muted">Aucun fichier modifié.</div>}
-          {view.modifiedFiles.map((file) => {
-            const kind = previewKindOfPath(file.path);
-            const relative = workdir ? relativeToWorkdir(file.path, workdir) : undefined;
-            return (
-              <div key={file.path} className="flex items-center gap-2 py-1.5 font-mono text-xs">
-                {/* Cut on the left: the file name is what tells files apart. */}
-                <span
-                  dir="rtl"
-                  title={file.path}
-                  className="grow overflow-hidden text-left text-ellipsis whitespace-nowrap"
-                >
-                  <bdi>{relative ?? file.path}</bdi>
-                </span>
-                <span className="text-ok">+{file.added}</span>
-                <span className="text-muted">−{file.removed}</span>
-                {kind && relative && opener && (
-                  <button
-                    type="button"
-                    onClick={() => opener({ path: relative, kind })}
-                    className="shrink-0 text-xs text-muted hover:text-text"
-                  >
-                    Aperçu
-                  </button>
-                )}
-              </div>
-            );
-          })}
-        </section>
-
-        <section className="flex flex-col gap-1.5">
-          <h2 className="text-[11px] font-semibold tracking-[0.06em] text-muted uppercase">Skills</h2>
-          {(!hasSession || (skills !== null && skills.loaded.length === 0)) && (
-            <div className="text-xs text-muted">Aucun skill chargé.</div>
-          )}
-          {hasSession && skills === null && <div className="text-xs text-muted">Chargement…</div>}
-          {hasSession && skills !== null && skills.loaded.length > 0 && skills.loaded.map((id) => {
-            const active = skills.active.includes(id);
-            return (
-              <div
-                key={id}
-                title={active ? id : 'Plus dans le contexte du modèle'}
-                className="flex items-center gap-2 py-1.5 font-mono text-xs"
-              >
-                <span className={active ? undefined : 'text-muted'}>{id}</span>
-                {active && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ok" />}
-              </div>
-            );
-          })}
-        </section>
-
-        {worktree && (
-          <section className="flex flex-col gap-1.5">
-            <h2 className="text-[11px] font-semibold tracking-[0.06em] text-muted uppercase">Worktree</h2>
-            <div className="font-mono text-xs">{worktree.branch}</div>
-            <div title={worktree.path} className="overflow-hidden font-mono text-xs text-muted text-ellipsis whitespace-nowrap">{worktree.path}</div>
-            <button
-              type="button"
-              title="Copier la commande"
-              onClick={() => void navigator.clipboard.writeText(`git cherry-pick ${worktree.base}..${worktree.branch}`)}
-              className="rounded-lg border border-border bg-raised px-2 py-1.5 text-left font-mono text-xs break-all text-text"
-            >
-              <code>git cherry-pick {worktree.base}..{worktree.branch}</code>
-            </button>
-          </section>
+            {pages.map((candidate) => (
+              <option key={candidate.name} value={candidate.name}>
+                {candidate.name}
+              </option>
+            ))}
+          </Select>
         )}
-
-        <section className="flex flex-col gap-2">
-          <h2 className="text-[11px] font-semibold tracking-[0.06em] text-muted uppercase">Outils de ce tour</h2>
-          {view.toolCounts.length === 0 && <div className="text-xs text-muted">Aucun outil appelé.</div>}
-          {view.toolCounts.map((tool) => (
-            <div key={tool.name} className="flex justify-between text-xs">
-              <span className="font-mono">{tool.name}</span>
-              <span className="text-muted">{tool.count}</span>
-            </div>
-          ))}
-        </section>
-
+        {pageBlocks(page, page === pages[0]).map(renderBlock)}
         <div className="grow" />
         <p className="m-0 rounded-lg bg-raised px-3 py-2.5 text-xs text-muted">
           Rien n'est intégré sans ta décision.
         </p>
       </aside>
+    </div>
   );
 }

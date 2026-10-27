@@ -5,6 +5,7 @@ mod report;
 
 use super::args;
 use super::path_guard::resolve_in_workdir;
+use super::sandbox::Sandbox;
 use crate::domain::event::{OutputStream, ToolResult};
 use serde_json::{Value, json};
 use std::path::Path;
@@ -44,6 +45,7 @@ pub(super) fn definition() -> Value {
 pub(super) fn run(
     args: &Value,
     workdir: &Path,
+    sandbox: &Sandbox,
     stop: &AtomicBool,
     on_output: &mut dyn FnMut(OutputStream, &str),
 ) -> ToolResult {
@@ -52,7 +54,7 @@ pub(super) fn run(
         Err(error) => return ToolResult::failure(error),
     };
     let timeout = Duration::from_millis(timeout_ms);
-    match process::execute(command, &cwd, timeout, stop, on_output) {
+    match process::execute(command, workdir, &cwd, timeout, stop, on_output, sandbox) {
         Ok(execution) => report::report(execution, timeout_ms),
         Err(error) => ToolResult::failure(error),
     }

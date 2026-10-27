@@ -1,6 +1,8 @@
 import type { WorkflowSummary } from '../lib/workflow';
 import { useEffect, useRef, useState } from 'react';
 import type { Agent, AttachmentInput, Config, Project, SessionDetail, SessionState, SlashCommand } from '../lib/api';
+import type { AssistantItem, Segment } from '../lib/fold';
+import { splitContract } from '../lib/plan';
 import {
   answerWorkflow,
   compactSession,
@@ -26,25 +28,35 @@ import { Composer } from '../components/session/Composer';
 import { ContextPanel } from '../components/session/ContextPanel';
 import { QuestionCard } from '../components/session/QuestionCard';
 import { ThreadItemView } from '../components/session/Thread';
+import { PlanActionsContext } from '../components/session/PlanActions';
 import { PreviewContext, PreviewWorkdirContext, type PreviewTarget } from '../components/preview/PreviewContext';
 import { PreviewPane } from '../components/preview/PreviewPane';
-import { RunStrip } from '../components/workflow/session/RunStrip';
+import { RunRail } from '../components/workflow/session/RunRail';
 import { RunActionCard } from '../components/workflow/session/RunActionCard';
-import type { WorkflowSelection } from '../components/workflow/session/WorkflowPicker';
+import { Button, buttonClass } from '../components/ui/Button';
+import {
+  DEFAULT_WORKFLOW_ID,
+  defaultWorkflowSelection,
+  type WorkflowSelection
+} from '../components/workflow/session/WorkflowPicker';
 
 interface SessionPageProps {
   sessionId: string | null;
   projectId: string | null;
+  /** A workflow opened from the editor's test button: preselected, step by step. */
+  testWorkflowId: string | null;
   pseudoTabId: string | null;
   projects: Project[];
   config: Config | null;
   onSessionCreated: (newId: string, pseudoId: string | null) => void;
   /** Tabs and the palette show session states from the projects list. */
   onRunningChanged: () => void;
+  /** The generated session name changed; the tabs read titles from projects. */
+  onRenamed: () => void;
 }
 
 
-export function SessionPage({ sessionId, projectId, pseudoTabId, projects, config, onSessionCreated, onRunningChanged }: SessionPageProps) {
+export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId, projects, config, onSessionCreated, onRunningChanged, onRenamed }: SessionPageProps) {
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [text, setText] = useState('');
   const [attachments, setAttachments] = useState<AttachmentInput[]>([]);
@@ -53,27 +65,41 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
   const [commands, setCommands] = useState<SlashCommand[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [workflows, setWorkflows] = useState<WorkflowSummary[]>([]);
-  const [workflowSelection, setWorkflowSelection] = useState<WorkflowSelection>({ workflowId: null, stepByStep: false });
+  const [workflowSelection, setWorkflowSelection] = useState<WorkflowSelection>({ workflowId: null, stepByStep: false, worktree: true });
   // Optimistic mode while `setSessionMode` is in flight; cleared once the
   // server's mode (event stream or detail) matches it.
   const [pendingMode, setPendingMode] = useState<string | null>(null);
+  const [planBuildInFlight, setPlanBuildInFlight] = useState(false);
   const [preview, setPreview] = useState<PreviewTarget | null>(null);
+  const [detailVersion, setDetailVersion] = useState(0);
   const { view, hasMore, loadingOlder, loadOlder, skills } = useSessionThread(sessionId);
   const running = view.running;
   const run = view.run;
   const waiting = runWaiting(run, running, view.lastDone);
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
+  // Mirrors stickToBottom for rendering: the button that resumes it.
+  const [awayFromBottom, setAwayFromBottom] = useState(false);
   // Set by `handleLoadOlder`: the distance from the bottom when the older
   // page is requested. Prepending changes scrollHeight but not this
   // distance, so restoring it keeps the same messages in view.
   const restoreScroll = useRef<number | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const modeRequestRef = useRef(0);
+  const previousRunning = useRef(running);
 
   useEffect(() => {
     onRunningChanged();
   }, [running, onRunningChanged]);
+
+  const previousName = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (view.name && view.name !== previousName.current) {
+      onRenamed();
+    }
+    previousName.current = view.name;
+  }, [view.name, onRenamed]);
 
   useEffect(() => {
     if (!sessionId) {
@@ -91,7 +117,16 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
     return () => {
       active = false;
     };
-  }, [sessionId]);
+  }, [sessionId, detailVersion]);
+
+  useEffect(() => {
+    // A workflow's first turn creates the worktree: re-read the detail when
+    // a turn ends, not only on a reload.
+    if (previousRunning.current && !running) {
+      setDetailVersion((version) => version + 1);
+    }
+    previousRunning.current = running;
+  }, [running]);
 
   useEffect(() => {
     if (!sessionId) {
@@ -167,7 +202,14 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
     let ignore = false;
     listWorkflows(commandProjectId)
       .then((data) => {
-        if (!ignore) setWorkflows(data);
+        if (!ignore) {
+          setWorkflows(data);
+          if (testWorkflowId && data.some((workflow) => workflow.id === testWorkflowId)) {
+            setWorkflowSelection({ workflowId: testWorkflowId, stepByStep: true, worktree: true });
+          } else {
+            setWorkflowSelection(defaultWorkflowSelection(data));
+          }
+        }
       })
       .catch(() => {
         if (!ignore) setWorkflows([]);
@@ -175,7 +217,7 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
     return () => {
       ignore = true;
     };
-  }, [commandProjectId]);
+  }, [commandProjectId, testWorkflowId]);
 
   // A pending choice and preview belong to one session; do not leak them
   // across tabs.
@@ -199,7 +241,28 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
 
   // The detail is fetched once; the event stream says how a turn ended.
   const state: SessionState = running ? 'running' : ((view.lastDone as SessionState | undefined) ?? detail?.state ?? 'idle');
-  const title = detail?.title ?? (sessionId ? 'Session' : 'Nouvelle session');
+  const title = view.name ?? detail?.title ?? (sessionId ? 'Session' : 'Nouvelle session');
+
+  const lastAssistant = [...view.items].reverse().find((item): item is AssistantItem => item.kind === 'assistant');
+  const lastTextSegment = lastAssistant
+    ? [...lastAssistant.segments].reverse().find((segment): segment is Extract<Segment, { kind: 'text' }> => segment.kind === 'text')
+    : undefined;
+  const planContract = lastTextSegment ? splitContract(lastTextSegment.content) : null;
+  const planActions =
+    planContract?.contract.kind === 'plan' &&
+    lastTextSegment &&
+    !running &&
+    !view.pendingQuestion &&
+    (!run || run.finished) &&
+    mode === 'plan'
+      ? {
+          segmentId: lastTextSegment.id,
+          onBuild: handlePlanBuild,
+          onBuildAlone: handlePlanBuildAlone,
+          onRevise: handlePlanRevise,
+          disabled: running || planBuildInFlight
+        }
+      : null;
   const projectName =
     detail?.project.name ?? projects.find((project) => project.id === projectId)?.name ?? projectId ?? '—';
   const currentTokens = view.contextTokens ?? 0;
@@ -214,25 +277,42 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
     if ((!value && images.length === 0) || running) return;
     setSendError(null);
 
+    // A quick answer or a message to a running/waiting run is an ordinary
+    // message, not a workflow start.
+    const workflowId =
+      fromComposer &&
+      workflowSelection.workflowId &&
+      (!run || run.finished) &&
+      !view.pendingQuestion
+        ? workflowSelection.workflowId
+        : null;
+
     // A workflow start refuses attachments.
-    if (workflowSelection.workflowId && images.length > 0) {
+    if (workflowId && images.length > 0) {
       setSendError('Les pièces jointes ne sont pas acceptées pour un workflow.');
       return;
     }
 
     try {
-      if (workflowSelection.workflowId) {
+      if (workflowId) {
         if (sessionId) {
-          await startWorkflow(sessionId, workflowSelection.workflowId, value, workflowSelection.stepByStep);
+          await startWorkflow(
+            sessionId,
+            workflowId,
+            value,
+            workflowSelection.stepByStep,
+            workflowSelection.worktree
+          );
         } else if (projectId) {
           const created = await createSession(projectId, value, mode ?? undefined, images, {
-            workflowId: workflowSelection.workflowId,
-            stepByStep: workflowSelection.stepByStep
+            workflowId,
+            stepByStep: workflowSelection.stepByStep,
+            worktree: workflowSelection.worktree
           });
           onSessionCreated(created.id, pseudoTabId);
         }
-        // The next message is an ordinary one again.
-        setWorkflowSelection({ workflowId: null, stepByStep: false });
+        // The next message gets the default workflow again.
+        setWorkflowSelection(defaultWorkflowSelection(workflows));
       } else if (sessionId) {
         await sendMessage(sessionId, value, images);
       } else if (projectId) {
@@ -259,12 +339,12 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
     setAttachments((current) => current.filter((_, i) => i !== index));
   }
 
-  async function handleModeChange(id: string) {
+  async function handleModeChange(id: string): Promise<boolean> {
     // A not-yet-created session keeps the choice locally; `handleSend` passes
     // it to `createSession`.
     if (!sessionId) {
       setPendingMode(id);
-      return;
+      return true;
     }
 
     const request = ++modeRequestRef.current;
@@ -273,12 +353,77 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
 
     try {
       await setSessionMode(sessionId, id);
+      return true;
     } catch (error) {
       // A newer request supersedes this one; only the latest may revert.
-      if (request !== modeRequestRef.current) return;
+      if (request !== modeRequestRef.current) return true;
       setPendingMode(null);
       setSendError(error instanceof Error ? error.message : 'Erreur lors du changement de mode');
+      return false;
     }
+  }
+
+  async function runPlanBuildAlone() {
+    const modeChanged = await handleModeChange('builder');
+    // Sent directly, not through handleSend: a workflow picked in the
+    // composer would otherwise take this message as its task.
+    if (modeChanged && sessionId) {
+      await sendMessage(sessionId, 'Exécute le plan ci-dessus.');
+    }
+  }
+
+  async function handlePlanBuild(worktree: boolean) {
+    if (planBuildInFlight) return;
+    setPlanBuildInFlight(true);
+    setSendError(null);
+    try {
+      if (
+        sessionId &&
+        workflows.some((workflow) => workflow.id === DEFAULT_WORKFLOW_ID) &&
+        lastTextSegment
+      ) {
+        const task =
+          [...view.items]
+            .reverse()
+            .find((item): item is Extract<typeof item, { kind: 'user' }> => item.kind === 'user' && !item.isSystemGenerated)
+            ?.content ?? 'Exécute le plan approuvé.';
+        await startWorkflow(
+          sessionId,
+          DEFAULT_WORKFLOW_ID,
+          task,
+          false,
+          worktree,
+          lastTextSegment.content
+        );
+        // The next message gets the default workflow again.
+        setWorkflowSelection(defaultWorkflowSelection(workflows));
+      } else {
+        await runPlanBuildAlone();
+      }
+    } catch (err) {
+      setSendError(err instanceof Error ? err.message : 'Impossible d’envoyer le message');
+    } finally {
+      setPlanBuildInFlight(false);
+    }
+  }
+
+  async function handlePlanBuildAlone() {
+    if (planBuildInFlight) return;
+    setPlanBuildInFlight(true);
+    setSendError(null);
+    try {
+      await runPlanBuildAlone();
+    } catch (err) {
+      setSendError(err instanceof Error ? err.message : 'Impossible d’envoyer le message');
+    } finally {
+      setPlanBuildInFlight(false);
+    }
+  }
+
+  function handlePlanRevise() {
+    // The revision is an ordinary message to the planner, not a workflow start.
+    setWorkflowSelection((selection) => ({ ...selection, workflowId: null }));
+    textareaRef.current?.focus();
   }
 
   async function handleStop() {
@@ -346,48 +491,54 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
   return (
     <PreviewContext.Provider value={setPreview}>
       <PreviewWorkdirContext.Provider value={detail?.project.workdir}>
+        <PlanActionsContext.Provider value={planActions}>
         <div className="flex min-h-0 min-w-0 grow">
+          {run && <RunRail run={run} running={running} onStop={handleStopWorkflow} />}
           <main className="flex min-h-0 min-w-0 flex-[999_1_560px] flex-col">
-        <div className="flex flex-wrap items-center gap-2.5 px-6 pt-3.5">
-          <div className="mx-auto flex w-full max-w-[820px] flex-wrap items-center gap-2.5">
-            <h1 className="text-base font-semibold tracking-[-0.01em]">{title}</h1>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-2.5 py-0.5 text-xs font-medium text-accent-strong">
+        <div className="flex items-center gap-2 px-6 py-2.5">
+          <div className="mx-auto flex w-full max-w-[820px] items-center gap-2">
+            <h1 className="min-w-0 truncate text-sm font-semibold" title={title}>{title}</h1>
+            <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-accent-soft px-2.5 py-0.5 text-xs font-medium text-accent-strong">
               <span className="h-1.5 w-1.5 rounded-full bg-accent" />
               {stateLabel(state)}
             </span>
-            <span className="text-xs text-muted">{projectName}{detail ? ` · ${detail.project.workdir}` : ''}</span>
+            <span className="shrink-0 text-xs text-muted" title={detail?.project.workdir}>{projectName}</span>
           </div>
         </div>
 
-        {run && (
-          <RunStrip run={run} running={running} onStop={handleStopWorkflow} />
-        )}
         <div
           ref={scrollRef}
           onScroll={(event) => {
             const element = event.currentTarget;
             stickToBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80;
+            setAwayFromBottom(!stickToBottom.current);
           }}
           className="min-h-0 grow overflow-y-auto p-6"
         >
-          <div className="mx-auto flex max-w-[820px] flex-col gap-4.5">
-            {detail?.parentId && (
-              <div className="rounded-lg border border-border bg-raised px-3 py-2 text-sm">
-                <span className="text-muted">Session d'un nœud de workflow · </span>
-                <a href={`#/s/${detail.parentId}`} className="text-accent-strong underline">
-                  Session parente
-                </a>
-              </div>
-            )}
-            {sessionId && hasMore && (
-              <button
+          {awayFromBottom && (
+            <div className="pointer-events-none sticky top-[calc(100%-2.5rem)] z-10 flex h-0 items-start justify-end">
+              <Button
                 type="button"
-                onClick={handleLoadOlder}
-                disabled={loadingOlder}
-                className="mx-auto rounded-lg border border-border bg-raised px-3 py-1.5 text-xs text-muted transition-colors hover:text-text disabled:opacity-60"
+                variant="secondary"
+                size="sm"
+                iconOnly
+                title="Aller en bas et suivre la suite"
+                onClick={() => {
+                  const element = scrollRef.current;
+                  if (element) element.scrollTo({ top: element.scrollHeight, behavior: 'smooth' });
+                }}
+                aria-label="Aller en bas"
+                className="pointer-events-auto rounded-full shadow-md"
               >
+                ↓
+              </Button>
+            </div>
+          )}
+          <div className="mx-auto flex max-w-[820px] flex-col gap-4.5">
+            {sessionId && hasMore && (
+              <Button className="mx-auto" onClick={handleLoadOlder} disabled={loadingOlder}>
                 {loadingOlder ? 'Chargement…' : 'Charger les messages précédents'}
-              </button>
+              </Button>
             )}
             {view.items.length === 0 && !sessionId && (
               <div className="py-10 text-center text-sm text-muted">Nouvelle session · écris ton premier message.</div>
@@ -422,6 +573,30 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
             disabled={running}
           />
         )}
+        {/* A node's session is driven by its workflow: the human answers in the parent. */}
+        {detail?.parentId && (
+          <div className="px-6 py-3">
+            <div className="mx-auto flex max-w-[820px] items-center gap-3 rounded-[14px] border border-border bg-panel px-4 py-3">
+              <span
+                className={`h-2 w-2 shrink-0 rounded-full ${running ? 'animate-pulse bg-accent' : 'bg-ok'}`}
+              />
+              <div className="min-w-0 grow">
+                <div className="text-sm font-medium text-text">
+                  {running ? 'Ce nœud du workflow tourne…' : 'Ce nœud du workflow est terminé.'}
+                </div>
+                <div className="text-xs text-muted">
+                  Session pilotée par le workflow, en lecture seule : la suite se passe dans la session parente.
+                </div>
+              </div>
+              <a
+                href={`#/s/${detail.parentId}`}
+                className={buttonClass({ variant: 'primary', size: 'sm' }, 'shrink-0')}
+              >
+                ← Retour au workflow
+              </a>
+            </div>
+          </div>
+        )}
         {!detail?.parentId && (
           <Composer
             text={text}
@@ -430,8 +605,6 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
             onStop={handleStop}
             running={running}
             model={config?.model}
-            currentTokens={currentTokens}
-            maxTokens={maxTokens}
             error={sendError}
             textareaRef={textareaRef}
             placeholder={
@@ -458,6 +631,7 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
           <ContextPanel
             view={view}
             currentTokens={currentTokens}
+            maxTokens={maxTokens}
             contextPercent={contextPercent}
             skills={skills}
             hasSession={sessionId !== null}
@@ -466,11 +640,14 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
             compactError={compactError}
             partial={hasMore}
             worktree={detail?.worktree ?? null}
+            sessionId={sessionId}
+            onWorktreeChanged={() => setDetailVersion((version) => version + 1)}
           />
           {preview && sessionId && (
             <PreviewPane sessionId={sessionId} target={preview} onClose={() => setPreview(null)} />
           )}
         </div>
+        </PlanActionsContext.Provider>
       </PreviewWorkdirContext.Provider>
     </PreviewContext.Provider>
   );

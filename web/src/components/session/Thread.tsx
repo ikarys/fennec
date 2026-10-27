@@ -10,7 +10,10 @@ import { MessageStatsLine } from './MessageStats';
 import { PlanCard, ReportCard } from './PlanCard';
 import { ToolCard } from './ToolCard';
 import { NodeDivider } from '../workflow/session/NodeDivider';
+import { RunEndCard } from '../workflow/session/RunEndCard';
 import { markdownComponents } from './markdownComponents';
+import { attachmentAnchorId } from '../../lib/vision';
+import { usePlanActions } from './PlanActions';
 
 
 
@@ -26,13 +29,13 @@ const ThinkingSegment = memo(function ThinkingSegment({ content }: { content: st
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
-        className="flex min-h-8 items-center gap-2 self-start rounded-lg border border-dashed border-border bg-transparent px-2.5 text-[13px] text-muted"
+        className="flex min-h-8 items-center gap-2 self-start rounded-lg border border-dashed border-border bg-transparent px-2.5 text-[0.8125rem] text-muted"
       >
         <BulbIcon className="h-3.5 w-3.5" />
         Réflexion · {open ? 'masquer' : 'afficher'}
       </button>
       {open && (
-        <div className="border-l-2 border-border pl-3.5 text-[13px] whitespace-pre-line text-muted">{content}</div>
+        <div className="border-l-2 border-border pl-3.5 text-[0.8125rem] whitespace-pre-line text-muted">{content}</div>
       )}
     </div>
   );
@@ -40,12 +43,17 @@ const ThinkingSegment = memo(function ThinkingSegment({ content }: { content: st
 
 const REMARK_PLUGINS = [remarkGfm];
 
-const TextSegment = memo(function TextSegment({ content, caret }: { content: string; caret: boolean }) {
+const TextSegment = memo(function TextSegment({ content, caret, id }: { content: string; caret: boolean; id?: string }) {
+  const actions = usePlanActions();
   // Parsed only when settled: a half-written contract would flicker between the
   // two renderings while the message streams.
   const contract = useMemo(() => (caret ? null : splitContract(content)), [content, caret]);
+  const planActions =
+    actions && id !== undefined && actions.segmentId === id && contract?.contract.kind === 'plan'
+      ? actions
+      : null;
   return (
-    <div className="min-w-0 text-[14px] leading-relaxed [overflow-wrap:break-word]">
+    <div className="min-w-0 text-[0.875rem] leading-relaxed [overflow-wrap:break-word]">
       {contract ? (
         <>
           {contract.before && (
@@ -53,7 +61,7 @@ const TextSegment = memo(function TextSegment({ content, caret }: { content: str
               {contract.before}
             </ReactMarkdown>
           )}
-          {contract.contract.kind === 'plan' ? <PlanCard plan={contract.contract} /> : <ReportCard report={contract.contract} />}
+          {contract.contract.kind === 'plan' ? <PlanCard plan={contract.contract} actions={planActions} /> : <ReportCard report={contract.contract} />}
         </>
       ) : (
         <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={markdownComponents}>{content}</ReactMarkdown>
@@ -80,7 +88,7 @@ function AssistantItemView({ item, model, running, showHeader }: { item: Assista
       {showHeader && (
         <div className="flex items-center gap-2 text-xs text-muted">
           <span className="font-semibold text-text">{model}</span>
-          <span className="rounded border border-border px-1.5 text-[11px]">produit par le modèle</span>
+          <span className="rounded border border-border px-1.5 text-[0.6875rem]">produit par le modèle</span>
         </div>
       )}
       {item.segments.map((segment) => {
@@ -88,7 +96,7 @@ function AssistantItemView({ item, model, running, showHeader }: { item: Assista
           return <ThinkingSegment key={segment.id} content={segment.content} />;
         }
         if (segment.kind === 'text') {
-          return <TextSegment key={segment.id} content={segment.content} caret={streaming && segment.id === lastTextId} />;
+          return <TextSegment key={segment.id} id={segment.id} content={segment.content} caret={streaming && segment.id === lastTextId} />;
         }
         return <ToolCard key={segment.id} tool={segment.tool} />;
       })}
@@ -119,7 +127,7 @@ export function ThreadItemView({ item, model, running, showHeader, onReplay }: {
     const textStyle = color ? { color } : undefined;
     const lineStyle = color ? { backgroundColor: color } : undefined;
     return (
-      <div className="flex items-center gap-2 text-[11px] text-muted">
+      <div className="flex items-center gap-2 text-[0.6875rem] text-muted">
         <span className="h-px grow bg-border" style={lineStyle} />
         <span style={textStyle}>{item.name} mode</span>
         <span className="h-px grow bg-border" style={lineStyle} />
@@ -139,7 +147,7 @@ export function ThreadItemView({ item, model, running, showHeader, onReplay }: {
           {item.attachments.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {item.attachments.map((a) => (
-                <img key={a.id} src={a.data} alt={a.filename} className="max-h-48 rounded-lg border border-border" />
+                <img key={a.id} id={attachmentAnchorId(a.id)} src={a.data} alt={a.filename} className="max-h-48 rounded-lg border border-border" />
               ))}
             </div>
           )}
@@ -187,6 +195,10 @@ export function ThreadItemView({ item, model, running, showHeader, onReplay }: {
   }
 
   if (item.kind === 'workflow-node') {
-    return <NodeDivider item={item} />;
+    return <NodeDivider item={item} running={running} />;
+  }
+
+  if (item.kind === 'workflow-end') {
+    return <RunEndCard item={item} />;
   }
 }

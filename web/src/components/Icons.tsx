@@ -211,6 +211,27 @@ export function FolderIcon({ className }: { className?: string }) {
   );
 }
 
+export function BranchIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="6" cy="6" r="2.5" />
+      <circle cx="6" cy="18" r="2.5" />
+      <circle cx="18" cy="6" r="2.5" />
+      <path d="M6 8.5v7" />
+      <path d="M18 8.5a8 8 0 0 1-8 8" />
+    </svg>
+  );
+}
+
 export function RepoIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -298,6 +319,63 @@ export function ReplayIcon({ className }: IconProps) {
     >
       <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
       <path d="M21 3v5h-5" />
+    </svg>
+  );
+}
+
+/** Double chevron pointing left: folds a side rail. */
+export function ChevronsLeftIcon({ className }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M11 17l-5-5 5-5M18 17l-5-5 5-5" />
+    </svg>
+  );
+}
+
+/** Double chevron pointing right: unfolds a side rail. */
+export function ChevronsRightIcon({ className }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M13 17l5-5-5-5M6 17l5-5-5-5" />
+    </svg>
+  );
+}
+
+
+/** Right chevron: the open/close affordance of a `Panel` header. */
+export function ChevronRightIcon({ className }: IconProps) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M9 18l6-6-6-6" />
+    </svg>
+  );
+}
+
+/** A pushpin: marks a block that is always visible. */
+export function PinIcon({ className }: IconProps) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 17v5" />
+      <path d="M9 10.76V6h6v4.76l2 3.24H7z" />
+      <path d="M8 2h8" />
     </svg>
   );
 }

@@ -2,6 +2,7 @@
 //! The path is decided by domain/workflow/run.rs; this file runs the nodes
 //! and records everything in the session's log.
 
+mod criteria;
 mod fork;
 mod nodes;
 mod outcome;
@@ -18,9 +19,12 @@ use crate::domain::event::{DoneReason, Event};
 use crate::domain::id::new_id;
 use crate::domain::workflow::definition::{AgentContext, NodeKind, Workflow};
 use crate::domain::workflow::run::{self as run, Next, RunOutcome, RunState, Via};
+use crate::domain::workflow::stats::{RunStats, run_stats};
+use crate::domain::workflow::template::render;
 use crate::domain::workflow::validate;
 use nodes::NodeInput;
 use std::sync::atomic::Ordering;
+use std::time::Instant;
 
 pub struct WorkflowEnv<'a> {
     pub children: &'a dyn ChildSessions,
@@ -34,6 +38,13 @@ pub enum WorkflowJob {
         workflow: Workflow,
         task: String,
         step_by_step: bool,
+    },
+    /// A run that starts from a plan the human already approved (the plan
+    /// card's button): the plan node and the approval are recorded, not run.
+    StartFromPlan {
+        workflow: Workflow,
+        task: String,
+        plan: String,
     },
     /// The choice at a human node, with an optional comment.
     Answer { choice: String, comment: String },
@@ -77,6 +88,11 @@ fn walk(turn: &mut Turn, env: &WorkflowEnv, job: WorkflowJob) -> Result<DoneReas
             task,
             step_by_step,
         } => start_run(turn, &workflow, &task, step_by_step)?,
+        WorkflowJob::StartFromPlan {
+            workflow,
+            task,
+            plan,
+        } => start_from_plan(turn, &workflow, &task, &plan)?,
         WorkflowJob::Answer { choice, comment } => answer_human(turn, &choice, &comment)?,
         WorkflowJob::Continue { comment } => continue_paused(turn, &comment)?,
         WorkflowJob::AgentInput {
@@ -189,11 +205,109 @@ fn start_run(
         output: task.to_string(),
         exit_code: None,
         comment: None,
+        duration_ms: None,
     })?;
 
     Ok(Cursor::After {
         from: start_node.id.clone(),
         port: "next".into(),
+    })
+}
+
+fn start_from_plan(
+    turn: &mut Turn,
+    workflow: &Workflow,
+    task: &str,
+    plan: &str,
+) -> Result<Cursor, String> {
+    // Checked before the run starts: a refusal leaves no half-recorded run.
+    let plan_id = workflow
+        .nodes
+        .iter()
+        .find_map(|node| match &node.kind {
+            NodeKind::Criteria { plan } => Some(plan.clone()),
+            _ => None,
+        })
+        .ok_or("the workflow has no criteria node naming its plan")?;
+    let start_id = workflow.start().ok_or("no start node")?.id.clone();
+    if workflow.edge(&start_id, "next").map(|edge| &edge.to) != Some(&plan_id) {
+        return Err("the workflow does not start with its plan node".into());
+    }
+
+    start_run(turn, workflow, task, false)?;
+    let events = turn.log.events(turn.session_id)?;
+    let run_id = run::current_run(&events)
+        .ok_or("no active workflow run")?
+        .run_id;
+    let via = |from: &str, port: &str| Via {
+        from: from.to_string(),
+        port: port.to_string(),
+    };
+    record_given(
+        turn,
+        &run_id,
+        &plan_id,
+        via(&start_id, "next"),
+        "done",
+        plan,
+        None,
+    )?;
+
+    // The card's button is the human's approval: the human node right after
+    // the plan is answered with its first choice.
+    if let Some(human) = workflow
+        .edge(&plan_id, "done")
+        .and_then(|edge| workflow.node(&edge.to))
+        && let NodeKind::Human { choices, .. } = &human.kind
+        && let Some(choice) = choices.first()
+    {
+        let comment = Some("approved from the plan card".to_string());
+        record_given(
+            turn,
+            &run_id,
+            &human.id,
+            via(&plan_id, "done"),
+            choice,
+            choice,
+            comment,
+        )?;
+        return Ok(Cursor::After {
+            from: human.id.clone(),
+            port: choice.clone(),
+        });
+    }
+    Ok(Cursor::After {
+        from: plan_id,
+        port: "done".into(),
+    })
+}
+
+/// Records a node as run and finished with an outcome the human gave, not
+/// one fennec computed.
+fn record_given(
+    turn: &mut Turn,
+    run_id: &str,
+    node_id: &str,
+    via: Via,
+    port: &str,
+    output: &str,
+    comment: Option<String>,
+) -> Result<(), String> {
+    turn.append(Event::WorkflowNodeStarted {
+        run_id: run_id.to_string(),
+        node_id: node_id.to_string(),
+        pass: 1,
+        via: Some(via),
+        child_session_id: None,
+    })?;
+    turn.append(Event::WorkflowNodeFinished {
+        run_id: run_id.to_string(),
+        node_id: node_id.to_string(),
+        port: port.to_string(),
+        output: output.to_string(),
+        exit_code: None,
+        comment,
+        duration_ms: None,
     })
 }
 
@@ -227,6 +341,7 @@ fn answer_human(turn: &mut Turn, choice: &str, comment: &str) -> Result<Cursor, 
         output: choice.to_string(),
         exit_code: None,
         comment,
+        duration_ms: None,
     })?;
 
     Ok(Cursor::After {
@@ -339,7 +454,7 @@ fn agent_input(
     let end = nodes::agent_end(label, outputs, reason, text, |reminder| {
         session_send(turn, agent, reminder)
     })?;
-    let step = record(turn, &state, &node.id, end)?;
+    let step = record(turn, &state, &node.id, end, None)?;
 
     match step {
         Step::Go(cursor) => walk_from(turn, env, cursor),
@@ -370,8 +485,19 @@ fn run_node(
         ),
         _ => None,
     };
+    let started = Instant::now();
     append_node_started(turn, state, node_id, pass, &via, child.as_deref())?;
-    if matches!(node.kind, NodeKind::Human { .. }) {
+    if let NodeKind::Human { question, .. } = &node.kind {
+        let (state, files) = folded_after_start(turn)?;
+        turn.append(Event::WorkflowHumanAsked {
+            run_id: state.run_id.clone(),
+            node_id: node_id.to_string(),
+            question: render(
+                question,
+                &|name| run::variable(&state, node_id, &files, name),
+                false,
+            ),
+        })?;
         return Ok(Step::Exit(DoneReason::WaitingForUser));
     }
 
@@ -383,6 +509,12 @@ fn run_node(
         files: &files,
         stop: turn.stop,
     };
+    let (agent_id, verdicts) = match &node.kind {
+        NodeKind::Agent {
+            agent, verdicts, ..
+        } => (agent.clone(), *verdicts),
+        _ => (String::new(), false),
+    };
     let end = match (&node.kind, child.as_deref()) {
         (NodeKind::Agent { agent, outputs, .. }, Some(child)) => {
             nodes::fresh_agent(env, &input, agent, outputs, child)?
@@ -390,11 +522,21 @@ fn run_node(
         (NodeKind::Agent { agent, outputs, .. }, None) => {
             session_agent(turn, &input, agent, outputs)?
         }
+        (NodeKind::Criteria { plan }, _) => criteria::run(turn, env, &input, plan)?,
         (NodeKind::Shell { .. }, _) => nodes::shell(env, &input),
         (NodeKind::Condition { .. }, _) => nodes::condition(&input),
         _ => return Err(format!("{node_id}: cannot run as a node")),
     };
-    record(turn, &state, node_id, end)
+    if verdicts && let nodes::NodeEnd::Finished { output, .. } = &end {
+        criteria::record_verdicts(turn, &state, &agent_id, output)?;
+    }
+    record(
+        turn,
+        &state,
+        node_id,
+        end,
+        Some(started.elapsed().as_millis() as u64),
+    )
 }
 
 fn session_agent(
@@ -456,6 +598,7 @@ fn record(
     state: &RunState,
     node_id: &str,
     end: nodes::NodeEnd,
+    duration_ms: Option<u64>,
 ) -> Result<Step, String> {
     match end {
         nodes::NodeEnd::Finished {
@@ -470,6 +613,7 @@ fn record(
                 output,
                 exit_code,
                 comment: None,
+                duration_ms,
             })?;
             Ok(Step::Go(Cursor::After {
                 from: node_id.to_string(),
@@ -483,16 +627,47 @@ fn record(
     }
 }
 
+/// The facts of the run that ends now, read back from the log: its own
+/// events, its child sessions' and its criteria as last recorded.
+fn finished_run_stats(turn: &Turn) -> Result<RunStats, String> {
+    let events = turn.log.events(turn.session_id)?;
+    let run_events = run::current_run_events(&events);
+    let mut child_ids: Vec<&String> = Vec::new();
+    for event in run_events {
+        if let Event::WorkflowNodeStarted {
+            child_session_id: Some(child),
+            ..
+        } = event
+            && !child_ids.contains(&child)
+        {
+            child_ids.push(child);
+        }
+    }
+    // A child log that cannot be read is skipped: the run must still finish.
+    let children: Vec<Vec<Event>> = child_ids
+        .iter()
+        .filter_map(|id| turn.log.events(id).ok())
+        .collect();
+    let criteria = run::current_run(&events)
+        .map(|state| state.criteria)
+        .unwrap_or_default();
+    let files = files_changed(run_events);
+    Ok(run_stats(run_events, &children, &criteria, files.len()))
+}
+
 fn finish_run(
     turn: &mut Turn,
     state: &RunState,
     outcome: RunOutcome,
     reason: Option<String>,
 ) -> Result<DoneReason, String> {
+    let stats = finished_run_stats(turn)?;
+
     turn.append(Event::WorkflowFinished {
         run_id: state.run_id.clone(),
         outcome,
         reason,
+        stats: Some(stats),
     })?;
     end_turn(turn, map_outcome(outcome))
 }

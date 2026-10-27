@@ -6,7 +6,8 @@ import type { DisplayPrefs } from './api';
 export const defaultDisplayPrefs: DisplayPrefs = {
   reasoningOpen: true,
   toolResultsOpen: false,
-  fontSize: 14
+  fontSize: 14,
+  panelPages: null
 };
 
 const DisplayPrefsContext = createContext<DisplayPrefs>(defaultDisplayPrefs);

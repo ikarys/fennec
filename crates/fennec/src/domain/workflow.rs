@@ -3,5 +3,6 @@
 
 pub mod definition;
 pub mod run;
+pub mod stats;
 pub mod template;
 pub mod validate;

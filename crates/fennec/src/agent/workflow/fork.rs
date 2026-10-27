@@ -10,6 +10,7 @@ use crate::domain::workflow::definition::{BRANCH, NodeKind};
 use crate::domain::workflow::run::{self as run, Next, RunOutcome, RunState, Via};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Sender};
+use std::time::Instant;
 
 pub(super) struct Fork<'a> {
     pub parallel: &'a str,
@@ -24,6 +25,7 @@ pub(super) fn run_fork(
     fork: Fork<'_>,
 ) -> Result<Step, String> {
     let pass = state.node_passes.get(fork.parallel).copied().unwrap_or(0) + 1;
+    let started = Instant::now();
     turn.append(Event::WorkflowNodeStarted {
         run_id: state.run_id.clone(),
         node_id: fork.parallel.to_string(),
@@ -38,6 +40,7 @@ pub(super) fn run_fork(
         output: String::new(),
         exit_code: None,
         comment: None,
+        duration_ms: Some(started.elapsed().as_millis() as u64),
     })?;
 
     let events = turn.log.events(turn.session_id)?;
@@ -95,6 +98,7 @@ pub(super) fn run_fork(
     }
 
     let join_pass = state.node_passes.get(fork.join).copied().unwrap_or(0) + 1;
+    let started = Instant::now();
     turn.append(Event::WorkflowNodeStarted {
         run_id: state.run_id.clone(),
         node_id: fork.join.to_string(),
@@ -110,6 +114,7 @@ pub(super) fn run_fork(
         output: join_output,
         exit_code: None,
         comment: None,
+        duration_ms: Some(started.elapsed().as_millis() as u64),
     })?;
 
     Ok(Step::Go(Cursor::After {
@@ -187,6 +192,7 @@ fn run_branch_node(
         }
         _ => None,
     };
+    let started_at = Instant::now();
     let started = Event::WorkflowNodeStarted {
         run_id: branch.state.run_id.clone(),
         node_id: node_id.to_string(),
@@ -229,6 +235,7 @@ fn run_branch_node(
             output: output.clone(),
             exit_code: *exit_code,
             comment: None,
+            duration_ms: Some(started_at.elapsed().as_millis() as u64),
         };
         emit(&mut branch.state, tx, finished);
     }

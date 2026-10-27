@@ -12,6 +12,16 @@ use super::compaction::model_view;
 use super::event::{Event, MessageMetadata, MetadataSource};
 use super::frontmatter::split;
 
+/// What the commands of an agent may do to the working directory: the
+/// plan reads only, by construction (its commands see the workdir
+/// read-only), while verify and review run tests that write build output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum CommandAccess {
+    #[default]
+    ReadWrite,
+    ReadOnly,
+}
+
 /// openfox `AgentDefinition` (metadata flattened).
 #[derive(Debug, Clone, PartialEq)]
 pub struct AgentDefinition {
@@ -20,6 +30,8 @@ pub struct AgentDefinition {
     pub description: String,
     pub subagent: bool,
     pub allowed_tools: Vec<String>,
+    /// fennec's own: `commands: read-only` in the frontmatter.
+    pub commands: CommandAccess,
     pub color: Option<String>,
     pub prompt: String,
 }
@@ -47,6 +59,11 @@ pub fn parse_agent_md(content: &str) -> Option<AgentDefinition> {
         .list("allowedTools")
         .map(|tools| tools.to_vec())
         .unwrap_or_default();
+    let commands = if fields.scalar("commands") == Some("read-only") {
+        CommandAccess::ReadOnly
+    } else {
+        CommandAccess::ReadWrite
+    };
     let color = fields
         .scalar("color")
         .filter(|value| !value.is_empty())
@@ -58,6 +75,7 @@ pub fn parse_agent_md(content: &str) -> Option<AgentDefinition> {
         description: description.to_string(),
         subagent,
         allowed_tools,
+        commands,
         color,
         prompt: body,
     })
@@ -183,6 +201,7 @@ mod tests {
             description: String::new(),
             subagent,
             allowed_tools: tools.iter().map(|tool| tool.to_string()).collect(),
+            commands: CommandAccess::ReadWrite,
             color: None,
             prompt: "prompt".to_string(),
         }
@@ -290,6 +309,15 @@ body
 ";
         let agent = parse_agent_md(content).unwrap();
         assert_eq!(agent.allowed_tools, vec!["read_file", "ask_user"]);
+    }
+
+    #[test]
+    fn parses_read_only_commands() {
+        let read_only = parse_agent_md("---\nid: plan\ncommands: read-only\n---\nbody\n").unwrap();
+        assert_eq!(read_only.commands, CommandAccess::ReadOnly);
+
+        let read_write = parse_agent_md("---\nid: plan\n---\nbody\n").unwrap();
+        assert_eq!(read_write.commands, CommandAccess::ReadWrite);
     }
 
     #[test]

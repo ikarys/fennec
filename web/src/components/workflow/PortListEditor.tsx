@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { Button } from '../ui/Button';
+import { FieldRow, TextInput } from '../ui/Field';
 
 interface PortListEditorProps {
   values: string[];
@@ -35,31 +37,32 @@ export function PortListEditor({ values, onChange, onRename, onRemove, label }: 
     onRename?.(old, trimmed);
   };
 
-  return (
-    <div>
-      {label && <div className="mb-1 text-[13px] text-muted">{label}</div>}
+  const content = (
+    <>
       <div className="flex flex-col gap-1">
         {values.map((value, index) => (
           <div key={index} className="flex items-center gap-1">
-            <input
+            <TextInput
               type="text"
               value={value}
               onChange={(event) => renameValue(index, event.target.value)}
-              className="grow rounded-md border border-border bg-panel px-2 py-1 text-[13px]"
+              className="grow"
             />
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
+              iconOnly
               onClick={() => removeValue(value)}
               aria-label="Supprimer"
-              className="rounded-md px-1.5 py-1 text-xs text-muted hover:text-err"
             >
               ×
-            </button>
+            </Button>
           </div>
         ))}
       </div>
-      <div className="mt-1 flex items-center gap-1">
-        <input
+      <div className="flex items-center gap-1">
+        <TextInput
           type="text"
           value={newValue}
           onChange={(event) => setNewValue(event.target.value)}
@@ -70,16 +73,18 @@ export function PortListEditor({ values, onChange, onRename, onRemove, label }: 
             }
           }}
           placeholder="Ajouter…"
-          className="grow rounded-md border border-border bg-panel px-2 py-1 text-[13px]"
+          className="grow"
         />
-        <button
-          type="button"
-          onClick={addValue}
-          className="rounded-md bg-accent px-2 py-1 text-xs font-medium text-on-accent"
-        >
+        <Button type="button" variant="secondary" size="sm" onClick={addValue}>
           Ajouter
-        </button>
+        </Button>
       </div>
-    </div>
+    </>
   );
+
+  if (label) {
+    return <FieldRow label={label}>{content}</FieldRow>;
+  }
+
+  return <div>{content}</div>;
 }

@@ -6,6 +6,7 @@ mod compaction;
 mod delta_buffer;
 pub mod ports;
 mod prompt;
+mod propose_criteria;
 mod round;
 #[cfg(test)]
 mod test_support;
