@@ -142,8 +142,8 @@ read-only. The human edits them as usual.
 
 ## Endpoints
 
-- `GET /api/config` → `{model, contextWindow}`: the resolved parameters of the
-  stored preferences
+- `GET /api/config` → `{model, contextWindow, compactAt}`: the resolved parameters of the
+  stored preferences; `compactAt` is the fraction at which the session compacts (0 disables)
 - `GET /api/settings` → `{preferences, models, defaults}`
   - `preferences`: the stored `Preferences`
   - `models`: `[{id, contextWindow}]` from a fresh `/models` call; on failure

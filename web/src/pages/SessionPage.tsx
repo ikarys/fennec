@@ -26,6 +26,7 @@ import { runWaiting } from '../lib/workflowRun';
 import { useSessionThread } from '../hooks/useSessionThread';
 import { Composer } from '../components/session/Composer';
 import { ContextPanel } from '../components/session/ContextPanel';
+import { ContextGauge } from '../components/session/ContextGauge';
 import { QuestionCard } from '../components/session/QuestionCard';
 import { ThreadItemView } from '../components/session/Thread';
 import { PlanActionsContext } from '../components/session/PlanActions';
@@ -499,6 +500,17 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
               {stateLabel(state)}
             </span>
             <span className="shrink-0 text-xs text-muted" title={detail?.project.workdir}>{projectName}</span>
+            <div className="ml-auto">
+              <ContextGauge
+                currentTokens={currentTokens}
+                maxTokens={maxTokens}
+                contextPercent={contextPercent}
+                compactAt={config?.compactAt ?? 0.85}
+                compactDisabled={!sessionId || state === 'running' || state === 'waiting_for_user'}
+                onCompact={handleCompact}
+                compactError={compactError}
+              />
+            </div>
           </div>
         </div>
 
@@ -626,14 +638,8 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
 
           <ContextPanel
             view={view}
-            currentTokens={currentTokens}
-            maxTokens={maxTokens}
-            contextPercent={contextPercent}
             skills={skills}
             hasSession={sessionId !== null}
-            compactDisabled={!sessionId || state === 'running' || state === 'waiting_for_user'}
-            onCompact={handleCompact}
-            compactError={compactError}
             partial={hasMore}
             worktree={detail?.worktree ?? null}
             sessionId={sessionId}

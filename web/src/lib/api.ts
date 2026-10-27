@@ -29,6 +29,8 @@ export interface Project {
 export interface Config {
   model: string;
   contextWindow: number;
+  /** The fraction of the window at which a session compacts; 0 disables. */
+  compactAt: number;
 }
 
 export interface SlashCommand {

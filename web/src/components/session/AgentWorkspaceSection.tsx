@@ -95,14 +95,12 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
 
   const humanBranch = preview?.humanBranch ?? 'ta branche';
   const hasCommits = (preview?.commits.length ?? 0) > 0;
+  // The file list lives in the Fichiers modifiés block; here only what blocks the review.
+  const protectedCount = preview?.files.filter((file) => file.protected).length ?? 0;
   const integrateDisabled = sessionId === null || running || !hasCommits;
 
   return (
     <Panel id="workspace" title={panelBlock('workspace').title} pinned>
-      <p className="m-0 text-xs text-muted">
-        L'agent travaille dans sa propre copie du dépôt. Ton dossier et ta branche ne changent pas tant que tu n'intègres pas.
-      </p>
-
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center gap-2">
           <FolderIcon className="h-4 w-4 shrink-0 text-muted" />
@@ -154,24 +152,8 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
                 <>
                   <div className="text-xs text-muted">
                     {hasCommits ? `${preview.commits.length} commits · ${preview.files.length} fichiers` : "Rien à intégrer pour l'instant."}
+                    {protectedCount > 0 && <Badge tone="err" className="ml-2">{protectedCount} protégé{protectedCount > 1 ? 's' : ''}</Badge>}
                   </div>
-                  {preview.files.length > 0 && (
-                    <div className="max-h-[150px] overflow-y-auto">
-                      {preview.files.map((file) => (
-                        <div key={file.path} className="flex items-center gap-2 py-1 font-mono text-xs">
-                          {/* Cut on the left: the file name is what tells files apart. */}
-                          <span
-                            dir="rtl"
-                            title={file.path}
-                            className="grow overflow-hidden text-left text-ellipsis whitespace-nowrap"
-                          >
-                            <bdi>{file.path}</bdi>
-                          </span>
-                          {file.protected && <Badge tone="err">protégé</Badge>}
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </>
               )
             )}
