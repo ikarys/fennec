@@ -15,6 +15,7 @@ pub enum Sandbox {
         hidden_dirs: Vec<PathBuf>,
         hidden_files: Vec<PathBuf>,
         writable: Vec<PathBuf>,
+        read_only: Vec<PathBuf>,
     },
 }
 
@@ -74,6 +75,7 @@ impl Sandbox {
             hidden_dirs,
             hidden_files,
             writable,
+            read_only: vec![],
         }
     }
 
@@ -91,6 +93,26 @@ impl Sandbox {
         Sandbox::from_prefs(prefs, home.as_deref(), &data_dir)
     }
 
+    /// The same sandbox with `paths` mounted read-only inside the workdir.
+    pub fn protecting(self, paths: Vec<PathBuf>) -> Sandbox {
+        match self {
+            Sandbox::Off => Sandbox::Off,
+            Sandbox::Bwrap {
+                network,
+                hidden_dirs,
+                hidden_files,
+                writable,
+                ..
+            } => Sandbox::Bwrap {
+                network,
+                hidden_dirs,
+                hidden_files,
+                writable,
+                read_only: paths,
+            },
+        }
+    }
+
     /// `sh -c command` in `cwd`, wrapped in bwrap unless Off; `workdir` is the writable root.
     pub(super) fn command(&self, command: &str, workdir: &Path, cwd: &Path) -> Command {
         match self {
@@ -99,22 +121,9 @@ impl Sandbox {
                 sh.arg("-c").arg(command).current_dir(cwd);
                 sh
             }
-            Sandbox::Bwrap {
-                network,
-                hidden_dirs,
-                hidden_files,
-                writable,
-            } => {
+            Sandbox::Bwrap { .. } => {
                 let mut bwrap = Command::new("bwrap");
-                bwrap.args(bwrap_args(
-                    *network,
-                    hidden_dirs,
-                    hidden_files,
-                    writable,
-                    workdir,
-                    cwd,
-                    command,
-                ));
+                bwrap.args(bwrap_args(self, workdir, cwd, command));
                 // bwrap passes fennec's environment through: the model would
                 // read the endpoint key or a token with `env`.
                 for (name, _) in std::env::vars_os() {
@@ -144,15 +153,19 @@ fn is_secret_name(name: &str) -> bool {
     MARKERS.iter().any(|marker| upper.contains(marker)) || upper.starts_with("AWS_")
 }
 
-fn bwrap_args(
-    network: bool,
-    hidden_dirs: &[PathBuf],
-    hidden_files: &[PathBuf],
-    writable: &[PathBuf],
-    workdir: &Path,
-    cwd: &Path,
-    command: &str,
-) -> Vec<OsString> {
+/// The bwrap arguments of a `Bwrap` sandbox; empty for `Off`.
+fn bwrap_args(sandbox: &Sandbox, workdir: &Path, cwd: &Path, command: &str) -> Vec<OsString> {
+    let Sandbox::Bwrap {
+        network,
+        hidden_dirs,
+        hidden_files,
+        writable,
+        read_only,
+    } = sandbox
+    else {
+        return Vec::new();
+    };
+    let network = *network;
     let mut args = vec![
         OsString::from("--ro-bind"),
         OsString::from("/"),
@@ -185,6 +198,14 @@ fn bwrap_args(
     args.push(OsString::from("--bind"));
     args.push(workdir.as_os_str().to_os_string());
     args.push(workdir.as_os_str().to_os_string());
+
+    // Later mounts win: protected paths stay read-only inside the writable
+    // workdir.
+    for path in read_only {
+        args.push(OsString::from("--ro-bind"));
+        args.push(path.as_os_str().to_os_string());
+        args.push(path.as_os_str().to_os_string());
+    }
 
     args.push(OsString::from("--unshare-all"));
     if network {
@@ -227,10 +248,13 @@ mod tests {
     #[test]
     fn bwrap_args_keep_the_mount_order_and_offline_env() {
         let args = bwrap_args(
-            false,
-            &[PathBuf::from("/home/user/.ssh")],
-            &[PathBuf::from("/home/user/.netrc")],
-            &[PathBuf::from("/home/user/.npm")],
+            &Sandbox::Bwrap {
+                network: false,
+                hidden_dirs: vec![PathBuf::from("/home/user/.ssh")],
+                hidden_files: vec![PathBuf::from("/home/user/.netrc")],
+                writable: vec![PathBuf::from("/home/user/.npm")],
+                read_only: vec![],
+            },
             Path::new("/work"),
             Path::new("/cwd"),
             "echo hi",
@@ -281,10 +305,13 @@ mod tests {
     #[test]
     fn bwrap_args_share_net_only_when_network_is_on() {
         let offline = bwrap_args(
-            false,
-            &[],
-            &[],
-            &[],
+            &Sandbox::Bwrap {
+                network: false,
+                hidden_dirs: vec![],
+                hidden_files: vec![],
+                writable: vec![],
+                read_only: vec![],
+            },
             Path::new("/work"),
             Path::new("/cwd"),
             "echo hi",
@@ -295,10 +322,13 @@ mod tests {
         assert!(offline.contains(&"CARGO_NET_OFFLINE".to_string()));
 
         let online = bwrap_args(
-            true,
-            &[],
-            &[],
-            &[],
+            &Sandbox::Bwrap {
+                network: true,
+                hidden_dirs: vec![],
+                hidden_files: vec![],
+                writable: vec![],
+                read_only: vec![],
+            },
             Path::new("/work"),
             Path::new("/cwd"),
             "echo hi",
@@ -307,6 +337,58 @@ mod tests {
         assert!(online.contains(&"--share-net".to_string()));
         assert!(!online.contains(&"npm_config_offline".to_string()));
         assert!(!online.contains(&"CARGO_NET_OFFLINE".to_string()));
+    }
+
+    #[test]
+    fn bwrap_args_put_read_only_binds_after_the_workdir_bind() {
+        let args = bwrap_args(
+            &Sandbox::Bwrap {
+                network: false,
+                hidden_dirs: vec![],
+                hidden_files: vec![],
+                writable: vec![],
+                read_only: vec![PathBuf::from("/work/protected")],
+            },
+            Path::new("/work"),
+            Path::new("/cwd"),
+            "echo hi",
+        );
+
+        assert_eq!(
+            args_as_strings(&args),
+            vec![
+                "--ro-bind",
+                "/",
+                "/",
+                "--dev",
+                "/dev",
+                "--proc",
+                "/proc",
+                "--tmpfs",
+                "/tmp",
+                "--bind",
+                "/work",
+                "/work",
+                "--ro-bind",
+                "/work/protected",
+                "/work/protected",
+                "--unshare-all",
+                "--die-with-parent",
+                "--new-session",
+                "--setenv",
+                "npm_config_offline",
+                "true",
+                "--setenv",
+                "CARGO_NET_OFFLINE",
+                "true",
+                "--chdir",
+                "/cwd",
+                "--",
+                "sh",
+                "-c",
+                "echo hi",
+            ]
+        );
     }
 
     #[test]
@@ -339,6 +421,7 @@ mod tests {
             hidden_dirs,
             hidden_files,
             writable,
+            read_only,
         } = sandbox
         else {
             panic!("expected bwrap sandbox");
@@ -351,6 +434,7 @@ mod tests {
         assert!(hidden_files.contains(&home.join(".netrc")));
         assert!(!hidden_files.contains(&home.join(".npmrc")));
         assert!(writable.is_empty());
+        assert!(read_only.is_empty());
 
         let _ = std::fs::remove_dir_all(&home);
         let _ = std::fs::remove_dir_all(&data_dir);
@@ -410,6 +494,7 @@ mod tests {
             hidden_dirs: vec![],
             hidden_files: vec![],
             writable: vec![],
+            read_only: vec![],
         };
 
         let output = sandbox
@@ -438,6 +523,7 @@ mod tests {
             hidden_dirs: vec![],
             hidden_files: vec![],
             writable: vec![],
+            read_only: vec![],
         };
 
         let output = sandbox
@@ -475,6 +561,7 @@ mod tests {
             hidden_dirs: vec![hidden.clone()],
             hidden_files: vec![],
             writable: vec![],
+            read_only: vec![],
         };
 
         let output = sandbox
@@ -504,6 +591,7 @@ mod tests {
             hidden_dirs: vec![],
             hidden_files: vec![],
             writable: vec![],
+            read_only: vec![],
         };
 
         let output = sandbox
@@ -518,6 +606,51 @@ mod tests {
             .unwrap();
         assert!(output.status.success(), "{:?}", output);
         assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "lo");
+
+        let _ = std::fs::remove_dir_all(&workdir);
+    }
+
+    #[test]
+    fn e2e_read_only_paths_are_read_only_in_the_workdir() {
+        // End-to-end tests need a real bwrap; skip on machines without it.
+        if !bwrap_available() {
+            return;
+        }
+
+        let workdir = temp_dir();
+        let protected = workdir.join("protected.txt");
+        std::fs::write(&protected, "original").unwrap();
+
+        let sandbox = Sandbox::Bwrap {
+            network: false,
+            hidden_dirs: vec![],
+            hidden_files: vec![],
+            writable: vec![],
+            read_only: vec![protected.clone()],
+        };
+
+        let output = sandbox
+            .command(
+                &format!("echo changed > {}", protected.display()),
+                &workdir,
+                &workdir,
+            )
+            .output()
+            .unwrap();
+        assert!(!output.status.success(), "{:?}", output);
+        assert_eq!(std::fs::read_to_string(&protected).unwrap(), "original");
+
+        let sibling = workdir.join("sibling.txt");
+        let output = sandbox
+            .command(
+                &format!("echo ok > {}", sibling.display()),
+                &workdir,
+                &workdir,
+            )
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{:?}", output);
+        assert_eq!(std::fs::read_to_string(&sibling).unwrap(), "ok\n");
 
         let _ = std::fs::remove_dir_all(&workdir);
     }

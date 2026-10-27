@@ -15,6 +15,7 @@ use crate::domain::open_calls;
 use crate::domain::slash::{TurnInput, resolve};
 use crate::instructions::all_instructions;
 use crate::llm::OpenAiClient;
+use crate::protected;
 use crate::skills;
 use crate::store::SqliteStore;
 use crate::tools::{LocalTools, Sandbox};
@@ -136,9 +137,14 @@ fn with_turn(
     let skills = skills::discover(&workdir);
     let agents = agents::discover(&workdir);
     let model = OpenAiClient::new(&settings.llm, &params.model);
+    let protection = protected::load(&workdir);
     let tools = LocalTools::new(workdir.clone())
         .with_search(prefs.search.clone())
-        .with_sandbox(Sandbox::for_store(&prefs.sandbox, &settings.db_path));
+        .with_sandbox(
+            Sandbox::for_store(&prefs.sandbox, &settings.db_path)
+                .protecting(protected::existing_paths(&workdir, &protection)),
+        )
+        .with_protection(protection);
     // ponytail: no Ctrl-C handling, the process just dies; a signal handler
     // setting `stop` when an interrupted turn must end cleanly.
     let stop = AtomicBool::new(false);

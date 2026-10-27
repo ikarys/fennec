@@ -62,8 +62,10 @@ Criteria, done: the "Done when" list of the approved plan is the run's contract
 (`criteria.set`); a `criteria` node runs each criterion's `check:` command
 itself (verified), an agent node with `verdicts` judges the others
 (indicative); the context panel shows both, with their provenance.
-Next, one PR each: fennec's own layer (human-only integration, protected
-files, review gate) → sub-agents as tools, when dogfooding shows sessions
+Protected files, done: fennec's defaults (`.agents`, AGENTS.md, lockfiles, CI)
+and the project's `.agents/protected`; the file tools refuse them, the
+sandbox mounts them read-only (`domain/protection.rs`, `protected.rs`).
+Next, one PR each: fennec's own layer (human-only integration, review gate) → sub-agents as tools, when dogfooding shows sessions
 saturating their context while exploring.
 
 ## Layout
@@ -92,6 +94,7 @@ crates/fennec/src/
     attachment.rs      images sent to the model: sniffing, data URLs, limits
     replay.rs          which message the human may replay
     criteria.rs        acceptance criteria: the plan's "Done when", checks, verdicts, provenance
+    protection.rs      protected files: the defaults, the gitignore-like patterns, the matcher
     workflow/          a workflow: definition (nodes, ports, edges), template ({{…}} names),
                        validate (the graph rules), run (the run folded from its events, the next step)
     id.rs, clock.rs
@@ -124,6 +127,7 @@ crates/fennec/src/
   workflows.rs       the *.workflow.json files: embedded defaults (crates/fennec/workflows/),
                      ~/.agents/workflows, the project's .agents/workflows (the project wins)
   folders.rs         the folders the human browses to open a project
+  protected.rs       the project's protected files: .agents/protected read, the existing paths found
   web/               HTTP adapter: http, guard (who may call), routes, event_stream (SSE),
                      notifier (wakes streams on append, no polling), turns, assets,
                      workflow_routes, children (child sessions for workflow nodes),
@@ -161,9 +165,11 @@ docs/dogfooding.md the frictions met while fennec builds fennec, and their statu
 2. **The trusted kernel**: code that decides (integration, plugin activation).
    It never runs what a model wrote.
 3. **The untrusted zone**: everything a model outputs. Commands run in the
-   bwrap world (`tools/sandbox.rs`) unless the human turns it off. **Known
-   gap**: the file tools run in fennec's process with only a working-directory
-   path guard (as in openfox).
+   bwrap world (`tools/sandbox.rs`) unless the human turns it off. Protected
+   files are refused to the file tools and read-only in the sandbox. **Known
+   gaps**: the file tools run in fennec's process with a working-directory
+   path guard; a command can still create a new file matching a protected
+   pattern where none existed (the review gate is to catch it).
 
 ## Build, test, run
 

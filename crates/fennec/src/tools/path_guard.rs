@@ -3,6 +3,8 @@
 
 use std::path::{Component, Path, PathBuf};
 
+use crate::domain::protection::Protection;
+
 pub(super) fn resolve_in_workdir(workdir: &Path, p: &str) -> Result<PathBuf, String> {
     let canonical_workdir = workdir
         .canonicalize()
@@ -45,6 +47,31 @@ pub(super) fn resolve_in_workdir(workdir: &Path, p: &str) -> Result<PathBuf, Str
     let mut resolved = canonical_ancestor;
     for component in remaining.iter().rev() {
         resolved.push(component);
+    }
+
+    Ok(resolved)
+}
+
+pub(super) fn resolve_for_writing(
+    workdir: &Path,
+    protection: &Protection,
+    p: &str,
+) -> Result<PathBuf, String> {
+    let resolved = resolve_in_workdir(workdir, p)?;
+    let canonical_workdir = workdir
+        .canonicalize()
+        .unwrap_or_else(|_| workdir.to_path_buf());
+
+    // `resolved` is canonical: a symlink to a protected file is caught too.
+    if let Some(relative) = resolved
+        .strip_prefix(&canonical_workdir)
+        .ok()
+        .map(|relative| relative.to_string_lossy().into_owned().replace('\\', "/"))
+        && protection.is_protected(&relative)
+    {
+        return Err(format!(
+            "{p} is protected by the human (.agents/protected, or a default: fennec's definitions, AGENTS.md, lockfiles, CI). Do not work around it: say in your report what should change there and why."
+        ));
     }
 
     Ok(resolved)
@@ -102,7 +129,8 @@ fn lexical_normalize(workdir: &Path, p: &str) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
-    use super::resolve_for_reading;
+    use super::{resolve_for_reading, resolve_for_writing};
+    use crate::domain::protection::Protection;
     use crate::tools::test_support::{no_output, run_tool, temp_dir};
 
     #[test]
@@ -141,6 +169,50 @@ mod tests {
                 .error
                 .unwrap()
                 .contains("Path outside working directory")
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn writing_to_protected_paths_is_refused() {
+        let dir = temp_dir();
+        std::fs::write(dir.join("Cargo.lock"), "lock").unwrap();
+        std::fs::create_dir_all(dir.join(".agents")).unwrap();
+        std::fs::write(dir.join(".agents").join("protected"), "x").unwrap();
+        let protection = Protection::new(None);
+
+        for path in ["Cargo.lock", ".agents/protected", "./sub/../Cargo.lock"] {
+            let error = resolve_for_writing(&dir, &protection, path).unwrap_err();
+            assert!(error.contains("is protected"), "{path}: {error}");
+        }
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn writing_to_a_symlink_to_a_protected_file_is_refused() {
+        let dir = temp_dir();
+        std::fs::write(dir.join("Cargo.lock"), "lock").unwrap();
+        std::os::unix::fs::symlink(dir.join("Cargo.lock"), dir.join("lock-link")).unwrap();
+        let protection = Protection::new(None);
+
+        let error = resolve_for_writing(&dir, &protection, "lock-link").unwrap_err();
+        assert!(error.contains("is protected"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn writing_to_a_normal_file_is_allowed() {
+        let dir = temp_dir();
+        std::fs::create_dir_all(dir.join("src")).unwrap();
+        let protection = Protection::new(None);
+
+        let resolved = resolve_for_writing(&dir, &protection, "src/main.rs").unwrap();
+        assert_eq!(
+            resolved,
+            dir.canonicalize().unwrap().join("src").join("main.rs")
         );
 
         let _ = std::fs::remove_dir_all(&dir);

@@ -3,7 +3,8 @@
 //! `web_search`, which queries the human's SearXNG instance: the model only
 //! chooses the query.
 //! Commands run in the bwrap world when the human enabled it; the file tools
-//! keep the in-process path guard.
+//! keep the in-process path guard. Writes to protected paths are refused;
+//! commands see them read-only.
 
 mod args;
 mod edit_file;
@@ -22,6 +23,7 @@ pub use sandbox::Sandbox;
 use crate::agent::ports::{CommandRun, Commands, Toolbox};
 use crate::domain::event::{OutputStream, ToolResult};
 use crate::domain::preferences::SearchPrefs;
+use crate::domain::protection::Protection;
 use serde_json::Value;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
@@ -31,6 +33,7 @@ pub struct LocalTools {
     workdir: PathBuf,
     search: SearchPrefs,
     sandbox: Sandbox,
+    protection: Protection,
 }
 
 impl LocalTools {
@@ -40,6 +43,9 @@ impl LocalTools {
             workdir,
             search: SearchPrefs::default(),
             sandbox: Sandbox::Off,
+            // The composition root loads the project's protection; tests run
+            // unprotected.
+            protection: Protection::default(),
         }
     }
 
@@ -50,6 +56,11 @@ impl LocalTools {
 
     pub fn with_sandbox(mut self, sandbox: Sandbox) -> LocalTools {
         self.sandbox = sandbox;
+        self
+    }
+
+    pub fn with_protection(mut self, protection: Protection) -> LocalTools {
+        self.protection = protection;
         self
     }
 }
@@ -77,8 +88,8 @@ impl Toolbox for LocalTools {
         let workdir = &self.workdir;
         let mut result = match name {
             "read_file" => read_file::run(args, workdir),
-            "write_file" => write_file::run(args, workdir),
-            "edit_file" => edit_file::run(args, workdir),
+            "write_file" => write_file::run(args, workdir, &self.protection),
+            "edit_file" => edit_file::run(args, workdir, &self.protection),
             "run_command" => run_command::run(args, workdir, &self.sandbox, stop, on_output),
             "load_skill" => load_skill::run(args, workdir),
             "web_search" => web_search::run(args, &self.search),

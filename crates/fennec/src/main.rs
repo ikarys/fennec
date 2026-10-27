@@ -10,6 +10,7 @@ mod folders;
 mod git;
 mod instructions;
 mod llm;
+mod protected;
 mod skills;
 mod store;
 mod tools;

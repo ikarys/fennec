@@ -25,9 +25,9 @@ Open edges:
 - Worktrees are never removed; remove one with `git worktree remove` and
   delete its branch once integrated.
 - A plain session (no workflow) still writes the human's tree.
-- The session's agents, skills and instructions are read from the worktree:
-  an agent can edit its own definitions there (as it could in the human's
-  tree before).
+- The session's agents, skills and instructions are read from the worktree.
+  An agent can no longer edit them: `.agents/` and `AGENTS.md` are protected
+  by default (see `.agents/protected` in docs/api.md).
 
 ## A crash left a session stuck running — fixed
 

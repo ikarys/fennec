@@ -122,6 +122,15 @@ the environment's credential-looking variables removed, every process ended
 with the command, and no network unless `network` is true (npm and cargo are
 then set offline). Disabled, commands run on the host, as in openfox.
 
+Protected files: a model may read them, never write them. They are fennec's
+defaults (`.agents`, `AGENTS.md`, `CLAUDE.md`, the lockfiles `Cargo.lock`,
+`package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, and the CI `.github`,
+`.gitlab-ci.yml`) plus the lines of the project's `.agents/protected`
+(gitignore-like: `#` comments, `*`, `?`, `**`, a leading `/` anchors, a
+pattern without `/` matches at any depth, a directory protects its content).
+`write_file` and `edit_file` refuse them; in the sandbox they are mounted
+read-only. The human edits them as usual.
+
 ## Endpoints
 
 - `GET /api/config` → `{model, contextWindow}`: the resolved parameters of the
