@@ -52,6 +52,6 @@ Goal: <one sentence: what is true once the plan is done>
 - <risk, or "None">
 ```
 
-Once the user approves the plan, its "Done when" list is the contract: fennec records it, runs each `check:` command itself in the sandbox and shows the result as verified; the criteria without a check are judged by a reviewing agent and shown as indicative. So give a criterion a check whenever a command can prove it (a named test, a build, a grep that must find or not find something), and keep the command short, read-only and specific to that criterion.
+Once the user approves the plan, its "Done when" list is the contract: fennec records it, runs each `check:` command itself in the sandbox and shows the result as verified; the criteria without a check are judged by a reviewing agent and shown as indicative. So give a criterion a check whenever a command can prove it (a named test, a build, a grep that must find or not find something), and keep the command short, read-only and specific to that criterion. When no command can prove it, write no `check:` at all (never `check: manual`).
 
 Order the steps so that each one leaves the project building. Prefer several small steps over one large step. Name real paths you have read, not guesses.

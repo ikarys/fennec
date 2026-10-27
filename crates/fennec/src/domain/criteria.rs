@@ -103,14 +103,14 @@ pub fn parse_done_when(plan: &str) -> Vec<Criterion> {
                     .trim()
                     .trim_matches('`')
                     .trim();
-                (
-                    description.to_string(),
-                    if command.is_empty() {
-                        None
-                    } else {
-                        Some(command.to_string())
-                    },
-                )
+                if command.is_empty() {
+                    (description.to_string(), None)
+                } else if is_manual_check(command) {
+                    // Not a command: the whole text goes to the judging agent.
+                    (text.to_string(), None)
+                } else {
+                    (description.to_string(), Some(command.to_string()))
+                }
             }
             None => (text.to_string(), None),
         };
@@ -235,6 +235,29 @@ fn is_criterion_id(id: &str) -> bool {
         return false;
     };
     !rest.is_empty() && rest.chars().all(|c| c.is_ascii_digit())
+}
+
+/// A model that has no command often writes `check: manual (…)` anyway;
+/// running that in a shell can only fail.
+fn is_manual_check(command: &str) -> bool {
+    let first = command
+        .split(|c: char| c.is_whitespace() || c == '(' || c == ':' || c == ',')
+        .next()
+        .unwrap_or("")
+        .to_lowercase();
+    matches!(
+        first.as_str(),
+        "manual"
+            | "manually"
+            | "manuel"
+            | "manuelle"
+            | "manuellement"
+            | "none"
+            | "aucun"
+            | "aucune"
+            | "n/a"
+            | "-"
+    )
 }
 
 fn last_check_index(text: &str) -> Option<usize> {
@@ -381,6 +404,19 @@ mod tests {
         let criteria = parse_done_when(plan);
         assert_eq!(criteria[0].description, "one");
         assert_eq!(criteria[0].check, None);
+    }
+
+    #[test]
+    fn parse_done_when_manual_check_is_left_to_judge() {
+        let plan = "## Done when\n- a — check: `manuel (ouvrir un onglet)`\n- b — check: manual\n- c — check: `manualtest.sh`";
+        let criteria = parse_done_when(plan);
+        assert_eq!(
+            criteria[0].description,
+            "a — check: `manuel (ouvrir un onglet)`"
+        );
+        assert_eq!(criteria[0].check, None);
+        assert_eq!(criteria[1].check, None);
+        assert_eq!(criteria[2].check.as_deref(), Some("manualtest.sh"));
     }
 
     #[test]
