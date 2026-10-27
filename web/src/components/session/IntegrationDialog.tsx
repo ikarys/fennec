@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Blocker, IntegrationPreview } from '../../lib/api';
+import type { Blocker, IntegrationConflict, IntegrationPreview } from '../../lib/api';
 import { getIntegration, integrate } from '../../lib/api';
 import { CriterionProvenanceBadge } from './CriteriaSection';
 
@@ -23,6 +23,7 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
   const [preview, setPreview] = useState<IntegrationPreview | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [conflict, setConflict] = useState<IntegrationConflict | null>(null);
   const [posting, setPosting] = useState(false);
   const [result, setResult] = useState<{ head: string; commits: string[] } | null>(null);
   const [acknowledged, setAcknowledged] = useState<Partial<Record<BlockerKind, boolean>>>({});
@@ -37,6 +38,7 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
     setPreview(null);
     setLoading(true);
     setError(null);
+    setConflict(null);
     setResult(null);
     setAcknowledged({});
     let active = true;
@@ -71,6 +73,7 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
     if (!preview) return;
     setPosting(true);
     setError(null);
+    setConflict(null);
     const acknowledgedKinds = preview.blockers
       .filter((blocker) => blocker.kind !== 'noCommits' && acknowledged[blocker.kind])
       .map((blocker) => blocker.kind);
@@ -79,7 +82,12 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
       setResult(response);
     } catch (integrateError) {
       // A 409 keeps the dialog open: the message says what to do.
-      setError(integrateError instanceof Error ? integrateError.message : 'Erreur');
+      const conflictValue = integrateError instanceof Error ? (integrateError as { conflict?: IntegrationConflict }).conflict : undefined;
+      if (conflictValue) {
+        setConflict(conflictValue);
+      } else {
+        setError(integrateError instanceof Error ? integrateError.message : 'Erreur');
+      }
     } finally {
       setPosting(false);
     }
@@ -110,7 +118,31 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
         </div>
 
         {loading && <div className="text-xs text-muted">Chargement…</div>}
-        {error && <div className="text-xs text-err">{error}</div>}
+        {conflict ? (
+          <div className="rounded-lg border border-err/40 bg-err/10 p-3 text-xs flex flex-col gap-2">
+            <div className="font-semibold text-err">Conflit : rien n'a été intégré</div>
+            <div>Ta branche a modifié les mêmes lignes que l'agent depuis le début de son travail. Le cherry-pick a été annulé : ton dossier est tel qu'avant.</div>
+            <div className="flex flex-col gap-1">
+              {conflict.files.map((file) => (
+                <div key={file} className="font-mono">{file}</div>
+              ))}
+            </div>
+            <div className="flex flex-col gap-1">
+              <div>Pour résoudre à la main :</div>
+              <button
+                type="button"
+                title="Copier la commande"
+                onClick={() => void navigator.clipboard.writeText(conflict.command)}
+                className="rounded-lg border border-border bg-raised px-2 py-1.5 text-left font-mono text-xs break-all text-text"
+              >
+                <code>{conflict.command}</code>
+              </button>
+              <div className="text-muted">Ou abandonne ce travail s'il n'est plus utile.</div>
+            </div>
+          </div>
+        ) : error ? (
+          <div className="text-xs text-err">{error}</div>
+        ) : null}
 
         {result && (
           <div className="text-xs text-ok">
@@ -232,7 +264,7 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
               }
             }}
             disabled={integrateDisabled}
-            className="rounded-lg bg-accent px-2.5 py-1 text-xs font-medium text-white disabled:opacity-60"
+            className="rounded-lg bg-accent px-2.5 py-1 text-xs font-medium text-on-accent disabled:opacity-60"
           >
             {result ? 'Fermer' : 'Intégrer'}
           </button>

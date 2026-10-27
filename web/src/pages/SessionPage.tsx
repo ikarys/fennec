@@ -62,6 +62,7 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
   const [pendingMode, setPendingMode] = useState<string | null>(null);
   const [planBuildInFlight, setPlanBuildInFlight] = useState(false);
   const [preview, setPreview] = useState<PreviewTarget | null>(null);
+  const [detailVersion, setDetailVersion] = useState(0);
   const { view, hasMore, loadingOlder, loadOlder, skills } = useSessionThread(sessionId);
   const running = view.running;
   const run = view.run;
@@ -74,6 +75,7 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
   const restoreScroll = useRef<number | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const modeRequestRef = useRef(0);
+  const previousRunning = useRef(running);
 
   useEffect(() => {
     onRunningChanged();
@@ -95,7 +97,16 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
     return () => {
       active = false;
     };
-  }, [sessionId]);
+  }, [sessionId, detailVersion]);
+
+  useEffect(() => {
+    // A workflow's first turn creates the worktree: re-read the detail when
+    // a turn ends, not only on a reload.
+    if (previousRunning.current && !running) {
+      setDetailVersion((version) => version + 1);
+    }
+    previousRunning.current = running;
+  }, [running]);
 
   useEffect(() => {
     if (!sessionId) {
@@ -516,6 +527,7 @@ export function SessionPage({ sessionId, projectId, pseudoTabId, projects, confi
             partial={hasMore}
             worktree={detail?.worktree ?? null}
             sessionId={sessionId}
+            onWorktreeChanged={() => setDetailVersion((version) => version + 1)}
           />
           {preview && sessionId && (
             <PreviewPane sessionId={sessionId} target={preview} onClose={() => setPreview(null)} />

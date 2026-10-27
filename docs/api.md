@@ -35,6 +35,7 @@ with camelCase fields.
 | `criteria.set` | `{criteria: [{id, description, check?}]}`: the approved plan's criteria, all pending |
 | `criterion.updated` | `{criterionId, status}`; `status` is `{type: "pending"}` or `{type: "passed" \| "failed", provenance}`, `provenance` `{kind: "verified", command, exitCode?, output}` (fennec ran the check) or `{kind: "indicative", agent, reason}` (an agent's verdict) |
 | `integration.applied` | `{branch, base, commits, head, acknowledged}`: the human integrated the session's branch; `acknowledged` lists the blockers they accepted |
+| `worktree.discarded` | `{branch, commits}`: the human discarded the session's worktree and branch; `commits` are the agent's commits that were dropped |
 | `workflow.paused` | `{runId, from, port, to}`: waiting before `to` |
 | `workflow.resumed` | `{runId, comment}` |
 | `workflow.finished` | `{runId, outcome, reason?, stats?}`: `outcome` is `done`, `blocked`, `stopped` or `error`; `stats` are facts fennec computed from the log: `{workingMs, nodes: [{nodeId, label, runs, workingMs}], reruns, calls, prefillTokens, cachedPromptTokens, generationTokens, filesChanged, criteriaTotal, criteriaPassed, criteriaVerified}` (child sessions' model calls included, the time waiting for the human excluded) |
@@ -170,9 +171,14 @@ read-only. The human edits them as usual.
   the human's decision. The server recomputes the gate and answers 409 while a
   turn runs, while a blocker is not acknowledged (`noCommits` never is), or when
   git fails; then it runs `git cherry-pick <base>..<branch>` in the human's
-  repository (a conflict is aborted, the tree left as it was), moves the base
-  ref to the branch head and appends `integration.applied`. Nothing else in
+  repository. A conflict is aborted, the tree left as it was, and answers 409
+  `{error: "conflict", conflict: {kind: "conflict", files, command}}`. On
+  success it moves the base ref to the branch head and appends `integration.applied`. Nothing else in
   fennec integrates: no agent, workflow or schedule calls it.
+- `POST /api/sessions/{id}/discard` `{}` → `{commits}`:
+  the human's decision; 409 while a turn runs or without a worktree; removes the
+  worktree, its branch and base ref in the human's repository and appends
+  `worktree.discarded`. A later workflow in the session opens a fresh worktree.
 - `GET /api/sessions/{id}/skills` → `{loaded: [ids], active: [ids]}`: the
   skills the session loaded (successful `load_skill` calls and `/<skill>`
   messages it typed, first-seen order) and those still in the model's view

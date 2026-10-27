@@ -136,7 +136,8 @@ impl Transcript {
             | Event::WorkflowFinished { .. }
             | Event::CriteriaSet { .. }
             | Event::CriterionUpdated { .. }
-            | Event::IntegrationApplied { .. } => Ok(()),
+            | Event::IntegrationApplied { .. }
+            | Event::WorktreeDiscarded { .. } => Ok(()),
         };
         let _ = out.flush();
     }

@@ -665,6 +665,17 @@ export function createThreadFold(): ThreadFold {
         break;
       }
 
+      case 'worktree.discarded': {
+        const commits = Array.isArray(data.commits) ? data.commits.map((commit: unknown) => String(commit)) : [];
+        pushItem({
+          kind: 'note',
+          id: `worktree-discarded-${index}`,
+          text: `Travail de l'agent abandonné · ${commits.length} commit${commits.length === 1 ? '' : 's'}`,
+          detail: commits.length > 0 ? commits.join(' ') : undefined
+        });
+        break;
+      }
+
       case 'session.rewound': {
         const messageId = String(data.messageId ?? '');
         const index = items.findIndex((item) => item.id === messageId);

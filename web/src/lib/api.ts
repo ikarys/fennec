@@ -130,6 +130,8 @@ export class WorkflowSaveError extends Error {
   }
 }
 
+export type IntegrationConflict = { files: string[]; command: string };
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     headers: {
@@ -141,13 +143,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!response.ok) {
     let message = response.statusText;
     let errors: WorkflowIssue[] | undefined;
+    let conflict: IntegrationConflict | undefined;
     try {
-      const body = (await response.json()) as { error?: string; errors?: WorkflowIssue[] };
+      const body = (await response.json()) as { error?: string; errors?: WorkflowIssue[]; conflict?: IntegrationConflict };
       if (body.error) {
         message = body.error;
       }
       if (Array.isArray(body.errors)) {
         errors = body.errors;
+      }
+      if (body.conflict) {
+        conflict = body.conflict;
       }
     } catch {
       // Keep the status text when the error body is not JSON.
@@ -155,6 +161,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const error = new Error(message);
     if (errors) {
       (error as { issues?: WorkflowIssue[] }).issues = errors;
+    }
+    if (conflict) {
+      (error as { conflict?: IntegrationConflict }).conflict = conflict;
     }
     throw error;
   }
@@ -294,6 +303,14 @@ export function integrate(sessionId: string, acknowledged: string[]): Promise<{ 
   return request<{ head: string; commits: string[] }>(`/api/sessions/${encodeURIComponent(sessionId)}/integrate`, {
     method: 'POST',
     body: JSON.stringify({ acknowledged })
+  });
+}
+
+/** Drops the session's worktree, branch and base ref; the human's decision. */
+export function discardWorktree(sessionId: string): Promise<{ commits: string[] }> {
+  return request<{ commits: string[] }>(`/api/sessions/${encodeURIComponent(sessionId)}/discard`, {
+    method: 'POST',
+    body: '{}'
   });
 }
 

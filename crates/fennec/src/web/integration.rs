@@ -1,6 +1,6 @@
 //! The integration routes (contract: `docs/api.md`): preview the session's
-//! branch and integrate it on the human's confirmation. `routes.rs` only
-//! dispatches here.
+//! branch, integrate it on the human's confirmation, or discard it.
+//! `routes.rs` only dispatches here.
 
 use super::App;
 use super::http::{Request, error, send_json};
@@ -11,7 +11,7 @@ use crate::domain::criteria::{CriterionState, CriterionStatus};
 use crate::domain::event::Event;
 use crate::domain::integration::{Blocker, blockers, unacknowledged};
 use crate::domain::workflow::run;
-use crate::integration::{self, Preview};
+use crate::integration::{self, ApplyError, Preview};
 use crate::protected;
 use crate::store::SqliteStore;
 use crate::worktree::{self, Worktree};
@@ -130,7 +130,10 @@ pub fn integrate(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> 
 
     let head = match integration::apply(&gate.top, &gate.wt) {
         Ok(head) => head,
-        Err(e) => return error(stream, 409, &e),
+        Err(e @ ApplyError::Conflict { .. }) => {
+            return send_json(stream, 409, &json!({ "error": "conflict", "conflict": e }));
+        }
+        Err(ApplyError::Git { message }) => return error(stream, 409, &message),
     };
     let commits: Vec<String> = gate.preview.commits.iter().map(|c| c.sha.clone()).collect();
     let log = NotifyingLog {
@@ -148,6 +151,36 @@ pub fn integrate(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> 
         },
     )?;
     send_json(stream, 200, &json!({ "head": head, "commits": commits }))
+}
+
+/// `POST /api/sessions/{id}/discard`: the human's decision to drop the
+/// session's worktree, branch and base ref.
+pub fn discard(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+    let _ = req.json()?;
+    if app.turns.is_running(id) {
+        return error(stream, 409, "a turn is already running");
+    }
+    let store = app.store()?;
+    let gate = match gate(&store, app, id)? {
+        Ok(gate) => gate,
+        Err((status, message)) => return error(stream, status, &message),
+    };
+    if let Err(message) = worktree::remove(&gate.top, &gate.wt) {
+        return error(stream, 409, &message);
+    }
+    let commits: Vec<String> = gate.preview.commits.iter().map(|c| c.sha.clone()).collect();
+    let log = NotifyingLog {
+        log: &store,
+        notifier: &app.notifier,
+    };
+    log.append(
+        &gate.session_id,
+        &Event::WorktreeDiscarded {
+            branch: gate.wt.branch.clone(),
+            commits: commits.clone(),
+        },
+    )?;
+    send_json(stream, 200, &json!({ "commits": commits }))
 }
 
 fn criterion_json(state: &CriterionState) -> Value {

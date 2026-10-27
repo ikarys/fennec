@@ -327,6 +327,12 @@ pub enum Event {
         head: String,
         acknowledged: Vec<String>,
     },
+    /// The human discarded the session's worktree and branch (fennec's own event).
+    #[serde(rename = "worktree.discarded", rename_all = "camelCase")]
+    WorktreeDiscarded {
+        branch: String,
+        commits: Vec<String>,
+    },
 }
 
 impl Event {
@@ -358,6 +364,7 @@ impl Event {
             Event::CriteriaSet { .. } => "criteria.set",
             Event::CriterionUpdated { .. } => "criterion.updated",
             Event::IntegrationApplied { .. } => "integration.applied",
+            Event::WorktreeDiscarded { .. } => "worktree.discarded",
         }
     }
 }

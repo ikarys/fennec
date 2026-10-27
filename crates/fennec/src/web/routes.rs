@@ -76,6 +76,7 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
         ("POST", ["api", "sessions", id, "integrate"]) => {
             integration::integrate(app, req, stream, id)
         }
+        ("POST", ["api", "sessions", id, "discard"]) => integration::discard(app, req, stream, id),
         ("POST", ["api", "sessions", id, "stop"]) => {
             app.turns.stop(id);
             send_json(stream, 202, &json!({}))

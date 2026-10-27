@@ -25,9 +25,11 @@ interface ContextPanelProps {
   worktree: SessionDetail['worktree'];
   /** The session id, for the integration dialog; null on a new-session tab. */
   sessionId: string | null;
+  /** Re-fetch the session detail after the worktree changed (discard). */
+  onWorktreeChanged: () => void;
 }
 
-export function ContextPanel({ view, currentTokens, contextPercent, skills, hasSession, compactDisabled, onCompact, compactError, partial, worktree, sessionId }: ContextPanelProps) {
+export function ContextPanel({ view, currentTokens, contextPercent, skills, hasSession, compactDisabled, onCompact, compactError, partial, worktree, sessionId, onWorktreeChanged }: ContextPanelProps) {
   const opener = usePreviewOpener();
   const workdir = usePreviewWorkdir();
   const [filesExpanded, setFilesExpanded] = useState(false);
@@ -173,7 +175,7 @@ export function ContextPanel({ view, currentTokens, contextPercent, skills, hasS
         </section>
 
         {worktree && (
-          <AgentWorkspaceSection sessionId={sessionId} worktree={worktree} running={view.running} />
+          <AgentWorkspaceSection sessionId={sessionId} worktree={worktree} running={view.running} onDiscarded={onWorktreeChanged} />
         )}
 
         <section className="flex flex-col gap-2">

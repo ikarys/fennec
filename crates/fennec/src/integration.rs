@@ -25,6 +25,16 @@ pub struct Preview {
     pub human_branch: Option<String>,
 }
 
+/// Why an integration failed.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum ApplyError {
+    /// The human's branch changed the same lines: the cherry-pick was aborted.
+    Conflict { files: Vec<String>, command: String },
+    /// Anything else git refused (e.g. uncommitted changes in the way).
+    Git { message: String },
+}
+
 /// The agent's commits and files since the base ref, plus the human's branch.
 pub fn preview(top: &Path, wt: &Worktree) -> Result<Preview, String> {
     let range = format!("{}..{}", wt.base, wt.branch);
@@ -81,7 +91,7 @@ pub fn protected_touched(files: &[String], prefix: &str, protection: &Protection
 /// uncommitted changes would be overwritten, and the common case (the same
 /// uncommitted work copied into the worktree at the run's start, see
 /// worktree.rs) must not be blocked.
-pub fn apply(top: &Path, wt: &Worktree) -> Result<String, String> {
+pub fn apply(top: &Path, wt: &Worktree) -> Result<String, ApplyError> {
     let range = format!("{}..{}", wt.base, wt.branch);
     let command = format!("git cherry-pick {range}");
 
@@ -95,13 +105,27 @@ pub fn apply(top: &Path, wt: &Worktree) -> Result<String, String> {
         )
         .is_ok()
         {
+            let files = git(top, &["diff", "--name-only", "--diff-filter=U"], None)
+                .map(|out| {
+                    String::from_utf8_lossy(&out)
+                        .lines()
+                        .filter(|line| !line.is_empty())
+                        .map(String::from)
+                        .collect()
+                })
+                .unwrap_or_default();
             let _ = git(top, &["cherry-pick", "--abort"], None);
+            return Err(ApplyError::Conflict { files, command });
         }
-        return Err(format!("{message}\nresolve it by hand: {command}"));
+        return Err(ApplyError::Git {
+            message: format!("{message}\nresolve it by hand: {command}"),
+        });
     }
 
-    git(top, &["update-ref", &wt.base, &wt.branch], None)?;
-    let head = git(top, &["rev-parse", "HEAD"], None)?;
+    git(top, &["update-ref", &wt.base, &wt.branch], None)
+        .map_err(|message| ApplyError::Git { message })?;
+    let head =
+        git(top, &["rev-parse", "HEAD"], None).map_err(|message| ApplyError::Git { message })?;
     Ok(String::from_utf8_lossy(&head).trim().to_string())
 }
 
@@ -207,7 +231,10 @@ mod tests {
         let before_head = text(&repo, &["rev-parse", "HEAD"]);
         let before_status = text(&repo, &["status", "--porcelain"]);
 
-        assert!(apply(&top, &wt).is_err());
+        let Err(ApplyError::Conflict { files, .. }) = apply(&top, &wt) else {
+            panic!("expected a conflict");
+        };
+        assert_eq!(files, vec!["a.txt".to_string()]);
 
         assert_eq!(text(&repo, &["rev-parse", "HEAD"]), before_head);
         assert_eq!(text(&repo, &["status", "--porcelain"]), before_status);

@@ -65,6 +65,17 @@ pub fn open(root: &Path, project_dir: &Path, session_id: &str) -> Result<Option<
     Ok(Some(wt))
 }
 
+/// Removes the session's worktree, its branch and its base ref: the human's
+/// discard. The agent's commits stay in the object store only until git gc,
+/// which is why the route records their shas.
+pub fn remove(top: &Path, wt: &Worktree) -> Result<(), String> {
+    let path_arg = wt.path.to_string_lossy().into_owned();
+    git(top, &["worktree", "remove", "--force", &path_arg], None)?;
+    git(top, &["branch", "-D", &wt.branch], None)?;
+    git(top, &["update-ref", "-d", &wt.base], None)?;
+    Ok(())
+}
+
 /// Copies the human's uncommitted work into the fresh worktree and records
 /// the base ref.
 fn fill(top: &Path, wt: &Worktree) -> Result<(), String> {
@@ -256,6 +267,27 @@ mod tests {
         let second = open(&root, &repo, "s1").unwrap().unwrap();
         assert_eq!(first, second);
         assert_eq!(find(&root, &repo, "s1"), Some(first));
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn remove_deletes_the_worktree_branch_and_base() {
+        let (base, repo) = setup();
+        let root = base.join("wt");
+        let status = text(&repo, &["status", "--porcelain"]);
+        let head = text(&repo, &["rev-parse", "HEAD"]);
+
+        let wt = open(&root, &repo, "s1").unwrap().unwrap();
+        std::fs::write(wt.workdir.join("agent.txt"), "x\n").unwrap();
+        assert_eq!(commit(&wt, "agent work"), Ok(true));
+
+        assert_eq!(remove(&repo, &wt), Ok(()));
+
+        assert_eq!(find(&root, &repo, "s1"), None);
+        assert!(text(&repo, &["branch", "--list", "fennec/s1"]).is_empty());
+        assert!(git(&repo, &["rev-parse", "-q", "--verify", &wt.base], None).is_err());
+        assert_eq!(text(&repo, &["status", "--porcelain"]), status);
+        assert_eq!(text(&repo, &["rev-parse", "HEAD"]), head);
         let _ = std::fs::remove_dir_all(&base);
     }
 

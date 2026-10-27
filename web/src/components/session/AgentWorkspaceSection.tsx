@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { IntegrationPreview, SessionDetail } from '../../lib/api';
-import { getIntegration } from '../../lib/api';
+import { discardWorktree, getIntegration } from '../../lib/api';
 import { BranchIcon, CheckIcon, CopyIcon, EditIcon, FolderIcon, SpinnerIcon } from '../Icons';
 import { IntegrationDialog } from './IntegrationDialog';
 
@@ -18,11 +18,13 @@ function shortAgentBranch(branch: string): string {
   return sessionPart.length > 8 ? `${prefix}${sessionPart.slice(0, 8)}…` : branch;
 }
 
-export function AgentWorkspaceSection({ sessionId, worktree, running }: { sessionId: string | null; worktree: NonNullable<SessionDetail['worktree']>; running: boolean }) {
+export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarded }: { sessionId: string | null; worktree: NonNullable<SessionDetail['worktree']>; running: boolean; onDiscarded: () => void }) {
   const [preview, setPreview] = useState<IntegrationPreview | null>(null);
   const [loading, setLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
+  const [discardError, setDiscardError] = useState<string | null>(null);
   const previousRunning = useRef(running);
   const fetchId = useRef(0);
   const copiedTimer = useRef<number | null>(null);
@@ -66,6 +68,25 @@ export function AgentWorkspaceSection({ sessionId, worktree, running }: { sessio
     setCopied(true);
     if (copiedTimer.current !== null) window.clearTimeout(copiedTimer.current);
     copiedTimer.current = window.setTimeout(() => setCopied(false), 1500);
+  };
+
+  const handleDiscard = async () => {
+    if (!sessionId) return;
+    const commits = preview?.commits.length ?? 0;
+    const confirmed = window.confirm(
+      `Abandonner ce travail ? Le dossier et la branche de l'agent seront supprimés, ses ${commits} commits perdus. Ton dossier et ta branche ne sont pas touchés.`
+    );
+    if (!confirmed) return;
+    setDiscarding(true);
+    setDiscardError(null);
+    try {
+      await discardWorktree(sessionId);
+      onDiscarded();
+    } catch (discardFailure) {
+      setDiscardError(discardFailure instanceof Error ? discardFailure.message : 'Erreur');
+    } finally {
+      setDiscarding(false);
+    }
   };
 
   const humanBranch = preview?.humanBranch ?? 'ta branche';
@@ -166,6 +187,16 @@ export function AgentWorkspaceSection({ sessionId, worktree, running }: { sessio
         >
           Intégrer dans {humanBranch}
         </button>
+
+        <button
+          type="button"
+          onClick={() => void handleDiscard()}
+          disabled={sessionId === null || running || discarding}
+          className="w-full rounded-lg border border-border bg-raised px-2.5 py-1.5 text-xs text-err disabled:opacity-60"
+        >
+          Abandonner ce travail
+        </button>
+        {discardError && <div className="text-xs text-err">{discardError}</div>}
 
         <details className="text-xs">
           <summary className="cursor-pointer select-none text-muted hover:text-text">Le faire à la main</summary>
