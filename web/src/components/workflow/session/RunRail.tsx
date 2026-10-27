@@ -77,7 +77,11 @@ function dotClass(nodeRun: NodeRun): string {
     return 'animate-pulse bg-accent';
   }
   if (nodeRun.state === 'interrupted') {
-    return 'border border-dashed border-muted bg-transparent';
+    // Solid and faint: dashed is for the steps still to come.
+    return 'bg-border-strong';
+  }
+  if (nodeRun.state === 'ended') {
+    return nodeRun.port === 'done' ? 'bg-ok' : 'bg-err';
   }
   if (nodeRun.state === 'done') {
     const tone = portTone(nodeRun.port ?? '');
@@ -186,13 +190,14 @@ export function RunRail({
       <ol ref={listRef} className="min-h-0 grow space-y-0.5 overflow-y-auto px-2 pb-2 [scrollbar-width:thin]">
         {run.runs.map((nodeRun, index) => {
           const isRunning = nodeRun.state === 'running';
-          const isDone = nodeRun.state === 'done';
+          const isDone = nodeRun.state === 'done' || nodeRun.state === 'ended';
+          const isInterrupted = nodeRun.state === 'interrupted';
           const rowClass = isRunning
             ? 'rounded-md bg-accent-soft text-accent-strong'
             : isDone
               ? 'text-text'
               : 'text-muted';
-          const hasTrailing = nodeRun.pass > 1 || (isDone && Boolean(nodeRun.port));
+          const hasTrailing = nodeRun.pass > 1 || isInterrupted || (isDone && Boolean(nodeRun.port));
           return (
             <li
               key={`${nodeRun.nodeId}-${nodeRun.pass}-${index}`}
@@ -211,6 +216,7 @@ export function RunRail({
                   {nodeRun.pass > 1 && (
                     <span className="text-[0.625rem] text-muted tabular-nums">×{nodeRun.pass}</span>
                   )}
+                  {isInterrupted && <span className="text-[0.625rem] text-muted">interrompu</span>}
                   {isDone && nodeRun.port && <PortBadge port={nodeRun.port} />}
                 </span>
               )}
