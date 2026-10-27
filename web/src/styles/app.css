@@ -137,13 +137,16 @@ a {
   color: inherit;
 }
 
-button {
-  font: inherit;
-  cursor: pointer;
-}
+/* In the base layer, so a utility such as text-xs on a button wins. */
+@layer base {
+  button {
+    font: inherit;
+    cursor: pointer;
+  }
 
-textarea {
-  font: inherit;
+  textarea {
+    font: inherit;
+  }
 }
 
 :where(textarea, input[type='text'], input:not([type])):focus-visible {

@@ -112,9 +112,9 @@ export function Composer({
   }
 
   return (
-    <div className="px-6 py-3 pb-5">
+    <div className="px-6 pt-2 pb-3">
       <div
-        className="mx-auto max-w-[820px] rounded-[14px] border border-border-strong bg-panel focus-within:border-accent"
+        className="mx-auto max-w-[820px] rounded-xl border border-border-strong bg-panel focus-within:border-accent"
         onDragOver={handleDragOver}
         onDrop={handleDrop}
       >
@@ -175,16 +175,16 @@ export function Composer({
             }
           }}
           placeholder={placeholder ?? "Demande quelque chose… (@ pour un fichier, / pour une commande)"}
-          className="w-full resize-none bg-transparent p-3.5 pt-3 text-sm outline-none"
+          className="w-full resize-none bg-transparent px-3 pt-2.5 pb-1 text-sm outline-none"
         />
-        <div className="flex flex-wrap items-center gap-2 px-2.5 pb-2 pt-1.5">
+        <div className="flex flex-wrap items-center gap-1.5 px-2 pb-2">
           {onAttach && (
             <>
               <button
                 type="button"
                 aria-label="Joindre une image"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-raised text-muted hover:text-text"
+                className="flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-raised text-muted hover:text-text"
               >
                 <PaperclipIcon className="h-3.5 w-3.5" />
               </button>
@@ -209,7 +209,7 @@ export function Composer({
           <button
             type="button"
             disabled
-            className="flex min-h-8 items-center gap-1.5 rounded-lg border border-border bg-raised px-2.5 text-xs text-text"
+            className="flex min-h-7 items-center gap-1.5 rounded-lg border border-border bg-raised px-2.5 text-xs text-text"
           >
             <span className="h-1.5 w-1.5 rounded-full bg-ok" />
             {model ?? '…'} · local
@@ -223,7 +223,7 @@ export function Composer({
               type="button"
               aria-label="Arrêter"
               onClick={onStop}
-              className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-border bg-transparent text-text"
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-transparent text-text"
             >
               <StopIcon className="h-3.5 w-3.5" />
             </button>
@@ -233,7 +233,7 @@ export function Composer({
             aria-label="Envoyer"
             onClick={onSend}
             disabled={!canSend}
-            className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-accent text-on-accent disabled:opacity-60"
+            className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-on-accent disabled:opacity-60"
           >
             <SendIcon className="h-4 w-4" />
           </button>
