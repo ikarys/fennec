@@ -42,8 +42,8 @@ Workflows, done (`docs/workflows.md`): graphs of agent, shell, human,
 condition, parallel/join nodes wired by named ports, drawn in a React Flow
 editor; loops capped per edge, pauses on edges or step by step; the run is
 folded from `workflow.*` events; fresh agents and branches in child sessions.
-The default workflow verifies in a fresh context (`verify`, `review` sub-agents)
-and sends the findings back to the builder.
+The default workflow runs the criteria checks, verifies in a fresh context
+(`verify`, `review` sub-agents) and sends the findings back to the builder.
 Preview: ```html and ```md blocks of a message, and the .html/.md files an
 agent wrote, rendered in fennec (a sandboxed origin for model HTML).
 Dogfooding, started (`docs/dogfooding.md`): a session that runs a workflow
@@ -58,9 +58,13 @@ Sandbox, done: every command (run_command, workflow shell nodes) runs in a bwrap
 world (`tools/sandbox.rs`): the system read-only, the workdir writable, secrets
 and fennec's store hidden, no network by default; the Settings page turns it or
 the network off.
-Next, one PR each, so that the minimal agent works before security layers:
-sub-agents as tools → criteria → fennec's own
-layer (human-only integration, provenance, review gate).
+Criteria, done: the "Done when" list of the approved plan is the run's contract
+(`criteria.set`); a `criteria` node runs each criterion's `check:` command
+itself (verified), an agent node with `verdicts` judges the others
+(indicative); the context panel shows both, with their provenance.
+Next, one PR each: fennec's own layer (human-only integration, protected
+files, review gate) → sub-agents as tools, when dogfooding shows sessions
+saturating their context while exploring.
 
 ## Layout
 
@@ -87,6 +91,7 @@ crates/fennec/src/
     agent.rs           an agent (mode) and its reminder; frontmatter.rs the shared YAML header
     attachment.rs      images sent to the model: sniffing, data URLs, limits
     replay.rs          which message the human may replay
+    criteria.rs        acceptance criteria: the plan's "Done when", checks, verdicts, provenance
     workflow/          a workflow: definition (nodes, ports, edges), template ({{…}} names),
                        validate (the graph rules), run (the run folded from its events, the next step)
     id.rs, clock.rs
@@ -100,7 +105,8 @@ crates/fennec/src/
     compaction.rs      openfox context/compactor: the summary round and the new window
     prompt.rs          openfox chat/prompts: the system prompt
     workflow.rs        the workflow walk and its jobs (start, answer, continue, resume, stop);
-                       workflow/ nodes (one node run), fork (parallel branches), outcome (`Outcome:` line)
+                       workflow/ nodes (one node run), fork (parallel branches), outcome (`Outcome:` line),
+                       criteria (the criteria node and the agents' verdicts)
   tools/             Toolbox adapter: one file per tool, path_guard, args; sandbox (the bwrap
                      world of commands);
                      web_search queries the SearXNG instance from the Settings page

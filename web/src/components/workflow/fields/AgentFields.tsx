@@ -76,6 +76,18 @@ export function AgentFields({ node, agents, names, onChange }: AgentFieldsProps)
           onChange('outputs', next);
         }}
       />
+      <div>
+        <label className="flex items-center gap-2 text-[13px] text-muted">
+          <input
+            type="checkbox"
+            checked={Boolean(node.verdicts)}
+            onChange={(event) => onChange('verdicts', event.target.checked)}
+            className="h-4 w-4 rounded border-border bg-panel"
+          />
+          Verdicts sur les critères
+        </label>
+        <p className="mt-1 text-xs text-muted">Ses lignes C&lt;n&gt;: pass|fail jugent les critères sans commande (indicatif).</p>
+      </div>
     </>
   );
 }

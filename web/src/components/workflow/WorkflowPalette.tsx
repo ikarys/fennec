@@ -9,6 +9,7 @@ const KINDS: { kind: NodeKind; shape: string }[] = [
   { kind: 'end', shape: 'rounded-full bg-ok-soft' },
   { kind: 'agent', shape: 'rounded-lg bg-panel border border-border' },
   { kind: 'shell', shape: 'rounded-lg bg-code' },
+  { kind: 'criteria', shape: 'rounded-lg bg-code border border-ok/30' },
   { kind: 'human', shape: 'bg-accent-soft' },
   { kind: 'condition', shape: 'bg-raised' },
   { kind: 'parallel', shape: 'rounded-md bg-raised' },

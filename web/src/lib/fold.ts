@@ -91,8 +91,21 @@ export interface PendingQuestion {
   }[];
 }
 
+export type Provenance =
+  | { kind: 'verified'; command: string; exitCode?: number; output: string }
+  | { kind: 'indicative'; agent: string; reason: string };
+
+export interface CriterionView {
+  id: string;
+  description: string;
+  check?: string;
+  status: 'pending' | 'passed' | 'failed';
+  provenance?: Provenance;
+}
+
 export interface ThreadView {
   items: ThreadItem[];
+  criteria: CriterionView[];
   contextTokens?: number;
   contextMax?: number;
   running: boolean;
@@ -139,6 +152,52 @@ function parseArgs(value: unknown): Record<string, unknown> {
 function parseExitCode(output: string): number | undefined {
   const match = output.match(/\[Exit code: (\d+)\]/);
   return match ? Number(match[1]) : undefined;
+}
+
+function parseProvenance(value: unknown): Provenance | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const provenance = value as Record<string, unknown>;
+  if (provenance.kind === 'verified') {
+    const command = typeof provenance.command === 'string' ? provenance.command : undefined;
+    const output = typeof provenance.output === 'string' ? provenance.output : undefined;
+    if (command === undefined || output === undefined) return undefined;
+    return {
+      kind: 'verified',
+      command,
+      exitCode: typeof provenance.exitCode === 'number' ? provenance.exitCode : undefined,
+      output
+    };
+  }
+  if (provenance.kind === 'indicative') {
+    const agent = typeof provenance.agent === 'string' ? provenance.agent : undefined;
+    const reason = typeof provenance.reason === 'string' ? provenance.reason : undefined;
+    if (agent === undefined || reason === undefined) return undefined;
+    return { kind: 'indicative', agent, reason };
+  }
+  return undefined;
+}
+
+function parseCriterionStatus(value: unknown): CriterionView['status'] | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const status = value as Record<string, unknown>;
+  if (status.type === 'pending') return 'pending';
+  if (status.type === 'passed' || status.type === 'failed') return status.type;
+  return undefined;
+}
+
+function parseCriteria(value: unknown): CriterionView[] | null {
+  if (!Array.isArray(value)) return null;
+  let criteria: CriterionView[] = [];
+  for (const raw of value) {
+    if (typeof raw !== 'object' || raw === null) continue;
+    const criterion = raw as Record<string, unknown>;
+    const id = typeof criterion.id === 'string' ? criterion.id : undefined;
+    const description = typeof criterion.description === 'string' ? criterion.description : undefined;
+    if (id === undefined || description === undefined) continue;
+    const check = typeof criterion.check === 'string' ? criterion.check : undefined;
+    criteria.push({ id, description, check, status: 'pending' });
+  }
+  return criteria;
 }
 
 function updateToolStats(tool: ToolCallView, modified: Map<string, ModifiedFile>, toolCounts: Map<string, number>): void {
@@ -212,6 +271,7 @@ export function createThreadFold(): ThreadFold {
   let index = 0;
   // Null means "no live change yet": the session detail owns the mode.
   let mode: string | null = null;
+  let criteria: CriterionView[] = [];
   const runFold = createRunFold();
   type WorkflowNodeItem = Extract<ThreadItem, { kind: 'workflow-node' }>;
   const openWorkflowItems = new Map<string, WorkflowNodeItem>();
@@ -482,6 +542,29 @@ export function createThreadFold(): ThreadFold {
         break;
       }
 
+      case 'criteria.set': {
+        const parsed = parseCriteria(data.criteria);
+        if (parsed) {
+          criteria = parsed;
+        }
+        break;
+      }
+
+      case 'criterion.updated': {
+        const criterionId = String(data.criterionId ?? '');
+        const status = parseCriterionStatus(data.status);
+        if (!criterionId || !status) break;
+        const criterion = criteria.find((item) => item.id === criterionId);
+        if (!criterion) break;
+        criterion.status = status;
+        if (status === 'pending') {
+          criterion.provenance = undefined;
+        } else {
+          criterion.provenance = parseProvenance(data.status?.provenance);
+        }
+        break;
+      }
+
       case 'chat.done': {
         const reason = String(data.reason ?? 'complete');
         lastDone = reason;
@@ -608,6 +691,7 @@ export function createThreadFold(): ThreadFold {
 
   const view = (): ThreadView => ({
     items: [...items],
+    criteria: [...criteria],
     contextTokens,
     contextMax,
     running,

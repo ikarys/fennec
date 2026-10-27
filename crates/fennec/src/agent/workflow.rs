@@ -2,6 +2,7 @@
 //! The path is decided by domain/workflow/run.rs; this file runs the nodes
 //! and records everything in the session's log.
 
+mod criteria;
 mod fork;
 mod nodes;
 mod outcome;
@@ -383,6 +384,12 @@ fn run_node(
         files: &files,
         stop: turn.stop,
     };
+    let (agent_id, verdicts) = match &node.kind {
+        NodeKind::Agent {
+            agent, verdicts, ..
+        } => (agent.clone(), *verdicts),
+        _ => (String::new(), false),
+    };
     let end = match (&node.kind, child.as_deref()) {
         (NodeKind::Agent { agent, outputs, .. }, Some(child)) => {
             nodes::fresh_agent(env, &input, agent, outputs, child)?
@@ -390,10 +397,14 @@ fn run_node(
         (NodeKind::Agent { agent, outputs, .. }, None) => {
             session_agent(turn, &input, agent, outputs)?
         }
+        (NodeKind::Criteria { plan }, _) => criteria::run(turn, env, &input, plan)?,
         (NodeKind::Shell { .. }, _) => nodes::shell(env, &input),
         (NodeKind::Condition { .. }, _) => nodes::condition(&input),
         _ => return Err(format!("{node_id}: cannot run as a node")),
     };
+    if verdicts && let nodes::NodeEnd::Finished { output, .. } = &end {
+        criteria::record_verdicts(turn, &state, &agent_id, output)?;
+    }
     record(turn, &state, node_id, end)
 }
 

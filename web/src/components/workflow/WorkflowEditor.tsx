@@ -21,6 +21,7 @@ import { NodeFrame } from './nodes/NodeFrame';
 import {
   AgentShape,
   ConditionShape,
+  CriteriaShape,
   EndShape,
   HumanShape,
   JoinShape,
@@ -49,6 +50,7 @@ const nodeTypes = {
   end: makeNodeComponent(EndShape),
   agent: makeNodeComponent(AgentShape),
   shell: makeNodeComponent(ShellShape),
+  criteria: makeNodeComponent(CriteriaShape),
   human: makeNodeComponent(HumanShape),
   condition: makeNodeComponent(ConditionShape),
   parallel: makeNodeComponent(ParallelShape),

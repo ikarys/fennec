@@ -3,6 +3,7 @@ import type { SessionDetail, SessionSkills } from '../../lib/api';
 import { cachePercent, formatSpeed, formatTokens } from '../../lib/format';
 import { previewKindOfPath, relativeToWorkdir } from '../../lib/preview';
 import { usePreviewOpener, usePreviewWorkdir } from '../preview/PreviewContext';
+import { CriteriaSection } from './CriteriaSection';
 import { VisionSection } from './VisionSection';
 
 interface ContextPanelProps {
@@ -106,6 +107,8 @@ export function ContextPanel({ view, currentTokens, contextPercent, skills, hasS
             );
           })}
         </section>
+
+        <CriteriaSection criteria={view.criteria} />
 
         <VisionSection items={view.items} partial={partial} />
 

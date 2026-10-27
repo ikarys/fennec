@@ -40,11 +40,18 @@ pub(super) fn strip_outcome_line(text: &str) -> String {
 
 /// The last 8 KiB of `text`, cut on a char boundary.
 pub(super) fn last_8kib(text: &str) -> String {
-    const MAX: usize = 8 * 1024;
-    if text.len() <= MAX {
+    last_bytes(text, 8 * 1024)
+}
+
+/// The last `max` bytes of `text`, cut on a char boundary.
+pub(super) fn last_bytes(text: &str, max: usize) -> String {
+    if max == 0 {
+        return String::new();
+    }
+    if text.len() <= max {
         return text.to_string();
     }
-    let start = text.len() - MAX;
+    let start = text.len() - max;
     let start = text
         .char_indices()
         .find(|(i, _)| *i >= start)
@@ -112,5 +119,11 @@ mod tests {
         let out = last_8kib(&text);
         assert!(out.len() <= 8 * 1024);
         assert!(out.starts_with('é'));
+    }
+
+    #[test]
+    fn last_bytes_respects_max() {
+        assert_eq!(last_bytes("abcdef", 3), "def");
+        assert_eq!(last_bytes("abc", 0), "");
     }
 }

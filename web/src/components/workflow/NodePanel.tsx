@@ -4,6 +4,7 @@ import type { WorkflowDef, WorkflowIssue, WorkflowNode } from '../../lib/workflo
 import { NODE_KIND_LABELS, templateNames } from '../../lib/workflow';
 import { AgentFields } from './fields/AgentFields';
 import { ConditionFields } from './fields/ConditionFields';
+import { CriteriaFields } from './fields/CriteriaFields';
 import { HumanFields } from './fields/HumanFields';
 import { ShellFields } from './fields/ShellFields';
 
@@ -75,6 +76,7 @@ export function NodePanel({ def, node, agents, issues, onChange, onRename, onDel
         <AgentFields node={node} agents={agents} names={names} onChange={updateField} />
       )}
       {node.kind === 'shell' && <ShellFields node={node} names={names} onChange={updateField} />}
+      {node.kind === 'criteria' && <CriteriaFields node={node} def={def} names={names} onChange={updateField} />}
       {node.kind === 'human' && <HumanFields node={node} names={names} onChange={updateField} />}
       {node.kind === 'condition' && <ConditionFields node={node} names={names} onChange={updateField} />}
       {node.kind === 'end' && (

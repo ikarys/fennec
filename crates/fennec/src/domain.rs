@@ -6,6 +6,7 @@ pub mod attachment;
 pub mod clock;
 pub mod compaction;
 pub mod conversation;
+pub mod criteria;
 pub mod event;
 pub mod frontmatter;
 pub mod id;

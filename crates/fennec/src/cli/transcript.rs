@@ -133,7 +133,9 @@ impl Transcript {
             | Event::WorkflowNodeFinished { .. }
             | Event::WorkflowPaused { .. }
             | Event::WorkflowResumed { .. }
-            | Event::WorkflowFinished { .. } => Ok(()),
+            | Event::WorkflowFinished { .. }
+            | Event::CriteriaSet { .. }
+            | Event::CriterionUpdated { .. } => Ok(()),
         };
         let _ = out.flush();
     }

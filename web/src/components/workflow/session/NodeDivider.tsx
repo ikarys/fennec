@@ -3,10 +3,10 @@ import type { ThreadItem } from '../../../lib/fold';
 type WorkflowNodeItem = Extract<ThreadItem, { kind: 'workflow-node' }>;
 
 function portBadge(port: string): { label: string; className: string } {
-  if (port === 'success' || port === 'done' || port === 'true') {
+  if (port === 'success' || port === 'done' || port === 'true' || port === 'pass') {
     return { label: 'ok', className: 'text-ok border-ok bg-ok/10' };
   }
-  if (port === 'failure' || port === 'false' || port === 'exhausted') {
+  if (port === 'failure' || port === 'false' || port === 'exhausted' || port === 'fail') {
     return { label: 'err', className: 'text-err border-err bg-err/10' };
   }
   return { label: port, className: 'text-accent-strong border-accent bg-accent-soft' };
@@ -43,12 +43,12 @@ export function NodeDivider({ item }: { item: WorkflowNodeItem }) {
             {item.output && (
               <div>
                 <div className="mb-1 text-[10px] uppercase tracking-wide text-muted">Sortie</div>
-                {item.nodeKind === 'shell' ? (
+                {(item.nodeKind === 'shell' || item.nodeKind === 'criteria') ? (
                   <pre className="overflow-x-auto rounded bg-code p-2 font-mono text-[11px] text-muted">{item.output}</pre>
                 ) : (
                   <div className="whitespace-pre-wrap text-text">{item.output}</div>
                 )}
-                {item.exitCode !== undefined && (
+                {item.nodeKind === 'shell' && item.exitCode !== undefined && (
                   <div className="mt-1 text-[11px] text-muted">Code de sortie : {item.exitCode}</div>
                 )}
               </div>

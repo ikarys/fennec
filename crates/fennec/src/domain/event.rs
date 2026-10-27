@@ -2,6 +2,7 @@
 //! subset fennec produces. Wire names match openfox.
 
 use super::attachment::Attachment;
+use super::criteria::{Criterion, CriterionStatus};
 use super::stats::MessageStats;
 use super::workflow::definition::Workflow;
 use super::workflow::run::{RunOutcome, Via};
@@ -303,6 +304,13 @@ pub enum Event {
     /// prompt, frozen for the session so the server's prompt cache holds.
     #[serde(rename = "turn.snapshot", rename_all = "camelCase")]
     TurnSnapshot { cached_system_prompt: String },
+    #[serde(rename = "criteria.set", rename_all = "camelCase")]
+    CriteriaSet { criteria: Vec<Criterion> },
+    #[serde(rename = "criterion.updated", rename_all = "camelCase")]
+    CriterionUpdated {
+        criterion_id: String,
+        status: CriterionStatus,
+    },
 }
 
 impl Event {
@@ -331,6 +339,8 @@ impl Event {
             Event::ChatError { .. } => "chat.error",
             Event::ChatAskUser { .. } => "chat.ask_user",
             Event::TurnSnapshot { .. } => "turn.snapshot",
+            Event::CriteriaSet { .. } => "criteria.set",
+            Event::CriterionUpdated { .. } => "criterion.updated",
         }
     }
 }

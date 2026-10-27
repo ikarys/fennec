@@ -48,6 +48,16 @@ export function ShellShape({ node }: ShapeProps) {
   );
 }
 
+export function CriteriaShape({ node }: ShapeProps) {
+  const plan = node.plan as string | undefined;
+  return (
+    <div className="w-48 rounded-lg border border-ok/30 bg-code px-3 py-2 font-mono">
+      <div className="text-[13px] font-medium text-text">{node.name ?? node.id}</div>
+      <div className="mt-1 truncate text-xs text-muted">plan : {plan ?? ''}</div>
+    </div>
+  );
+}
+
 export function HumanShape({ node }: ShapeProps) {
   const question = node.question as string | undefined;
   return (
