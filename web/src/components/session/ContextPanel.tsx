@@ -106,6 +106,8 @@ export function ContextPanel({ view, currentTokens, maxTokens, contextPercent, s
 
   const visibleModifiedFiles = filesExpanded ? modifiedFiles : modifiedFiles.slice(0, 6);
   const hiddenModifiedCount = modifiedFiles.length - 6;
+  // The gauge turns warm as compaction nears (it triggers at 85 % by default).
+  const gaugeColor = contextPercent < 70 ? 'bg-ok' : contextPercent < 85 ? 'bg-accent' : 'bg-err';
   return (
     <div className="relative hidden min-h-0 shrink-0 min-[1100px]:flex" style={{ width }}>
       <div
@@ -136,7 +138,7 @@ export function ContextPanel({ view, currentTokens, maxTokens, contextPercent, s
                 : `${formatTokens(currentTokens)} tokens`
             }
           >
-            <div className="h-full bg-accent" style={{ width: `${contextPercent}%` }} />
+            <div className={`h-full ${gaugeColor}`} style={{ width: `${contextPercent}%` }} />
           </div>
           <div className="flex justify-between text-xs text-muted tabular-nums">
             <span>{maxTokens > 0 ? `${formatTokens(currentTokens)} / ${formatTokens(maxTokens)}` : formatTokens(currentTokens)} tokens</span>
