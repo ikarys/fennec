@@ -605,8 +605,6 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
             onStop={handleStop}
             running={running}
             model={config?.model}
-            currentTokens={currentTokens}
-            maxTokens={maxTokens}
             error={sendError}
             textareaRef={textareaRef}
             placeholder={
@@ -633,6 +631,7 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
           <ContextPanel
             view={view}
             currentTokens={currentTokens}
+            maxTokens={maxTokens}
             contextPercent={contextPercent}
             skills={skills}
             hasSession={sessionId !== null}

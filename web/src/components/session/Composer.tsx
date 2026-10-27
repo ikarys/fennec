@@ -2,7 +2,6 @@ import type { WorkflowSummary } from '../../lib/workflow';
 import { useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import type { Agent, AttachmentInput, SlashCommand } from '../../lib/api';
-import { formatTokens } from '../../lib/format';
 import { IMAGE_TYPES } from '../../lib/attachments';
 import { CloseIcon, PaperclipIcon, SendIcon, StopIcon } from '../Icons';
 import { matchCommands, SlashMenu } from './SlashMenu';
@@ -17,8 +16,6 @@ interface ComposerProps {
   onStop: () => void;
   running: boolean;
   model: string | undefined;
-  currentTokens: number;
-  maxTokens: number;
   error: string | null;
   textareaRef: RefObject<HTMLTextAreaElement | null>;
   placeholder?: string;
@@ -41,8 +38,6 @@ export function Composer({
   onStop,
   running,
   model,
-  currentTokens,
-  maxTokens,
   error,
   textareaRef,
   placeholder,
@@ -119,10 +114,6 @@ export function Composer({
     if (!onAttach) return;
     event.preventDefault();
   }
-
-  const contextPercent = maxTokens > 0 ? Math.min(100, Math.round((currentTokens / maxTokens) * 100)) : 0;
-  // The gauge turns warm as compaction nears (it triggers at 85 % by default).
-  const gaugeColor = contextPercent < 70 ? 'bg-ok' : contextPercent < 85 ? 'bg-accent' : 'bg-err';
 
   return (
     <div className="px-6 pt-2 pb-4">
@@ -241,19 +232,10 @@ export function Composer({
               onChange={onWorkflowSelectionChange}
             />
           )}
-          <div
-            className="ml-auto flex items-center gap-2.5 px-1.5 text-xs text-muted"
-            title={`${formatTokens(currentTokens)} / ${formatTokens(maxTokens)} tokens de contexte`}
-          >
+          <div className="ml-auto flex items-center px-1.5 text-xs text-muted">
             <span className="flex items-center gap-1.5">
               <span className="h-1.5 w-1.5 rounded-full bg-ok" />
               {model ?? '…'}
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="h-1 w-12 overflow-hidden rounded-full bg-raised">
-                <span className={`block h-full rounded-full ${gaugeColor}`} style={{ width: `${contextPercent}%` }} />
-              </span>
-              <span className="tabular-nums">{contextPercent} %</span>
             </span>
           </div>
         </div>

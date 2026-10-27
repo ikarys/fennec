@@ -31,6 +31,8 @@ function loadWidth(): number {
 interface ContextPanelProps {
   view: ThreadView;
   currentTokens: number;
+  /** The model's context window; 0 when unknown. */
+  maxTokens: number;
   contextPercent: number;
   /** The session's skills, folded server-side; null while the first fetch is in flight. */
   skills: SessionSkills | null;
@@ -49,7 +51,7 @@ interface ContextPanelProps {
   onWorktreeChanged: () => void;
 }
 
-export function ContextPanel({ view, currentTokens, contextPercent, skills, hasSession, compactDisabled, onCompact, compactError, partial, worktree, sessionId, onWorktreeChanged }: ContextPanelProps) {
+export function ContextPanel({ view, currentTokens, maxTokens, contextPercent, skills, hasSession, compactDisabled, onCompact, compactError, partial, worktree, sessionId, onWorktreeChanged }: ContextPanelProps) {
   const opener = usePreviewOpener();
   const workdir = usePreviewWorkdir();
   const [filesExpanded, setFilesExpanded] = useState(false);
@@ -126,11 +128,18 @@ export function ContextPanel({ view, currentTokens, contextPercent, skills, hasS
       >
         <section className="flex flex-col gap-2">
           <SectionLabel>Contexte</SectionLabel>
-          <div className="h-1.5 overflow-hidden rounded-full bg-raised">
+          <div
+            className="h-1.5 overflow-hidden rounded-full bg-raised"
+            title={
+              maxTokens > 0
+                ? `${formatTokens(currentTokens)} pris · ${formatTokens(Math.max(0, maxTokens - currentTokens))} restants · ${formatTokens(maxTokens)} total`
+                : `${formatTokens(currentTokens)} tokens`
+            }
+          >
             <div className="h-full bg-accent" style={{ width: `${contextPercent}%` }} />
           </div>
           <div className="flex justify-between text-xs text-muted tabular-nums">
-            <span>{formatTokens(currentTokens)} tokens</span>
+            <span>{maxTokens > 0 ? `${formatTokens(currentTokens)} / ${formatTokens(maxTokens)}` : formatTokens(currentTokens)} tokens</span>
             <span>{contextPercent} %</span>
           </div>
           <Button
