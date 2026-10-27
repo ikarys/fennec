@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import type { ThreadItem } from '../../../lib/fold';
 import { formatClock, formatDuration } from '../../../lib/format';
 import { portTone } from '../../../lib/workflowRun';
-import { CheckIcon, CloseIcon, SpinnerIcon } from '../../Icons';
+import { CheckIcon, ChevronRightIcon, CloseIcon, ExternalIcon, SpinnerIcon } from '../../Icons';
 import { Badge } from '../../ui/Badge';
+import { buttonClass } from '../../ui/Button';
 import { SectionLabel } from '../../ui/SectionLabel';
 
 type WorkflowNodeItem = Extract<ThreadItem, { kind: 'workflow-node' }>;
@@ -18,7 +19,8 @@ function portBadgeTone(port: string): 'ok' | 'err' | 'accent' {
 export function NodeDivider({ item, running }: { item: WorkflowNodeItem; running: boolean }) {
   const finished = item.port !== undefined;
   const badge = finished ? { port: item.port!, tone: portBadgeTone(item.port!) } : null;
-  const passLabel = item.pass > 1 ? ` · passage ${item.pass}` : '';
+  const hasDetails = Boolean(item.prompt || item.output || item.childSessionId);
+  const [open, setOpen] = useState(false);
   // Measured in the browser from the first render while the node is running.
   const startRef = useRef<number | null>(null);
   const [elapsedMs, setElapsedMs] = useState(0);
@@ -39,9 +41,14 @@ export function NodeDivider({ item, running }: { item: WorkflowNodeItem; running
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-2 text-[0.6875rem] text-muted">
         <span className="h-px grow bg-border" />
-        <span className="flex items-center gap-1.5">
-          <span className="rounded border border-border bg-raised px-1.5 text-[0.625rem] uppercase tracking-wide">{item.nodeKind}</span>
-          <span className="text-text">{item.label}{passLabel}</span>
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="shrink-0 rounded border border-border bg-raised px-1.5 text-[0.625rem] uppercase tracking-wide">
+            {item.nodeKind}
+          </span>
+          <span className="truncate text-text" title={item.label}>
+            {item.label}
+          </span>
+          {item.pass > 1 && <Badge tone="neutral">passage {item.pass}</Badge>}
           {badge && (
             <span className="shrink-0" aria-label={badge.port}>
               <Badge tone={badge.tone} title={badge.port}>
@@ -52,7 +59,7 @@ export function NodeDivider({ item, running }: { item: WorkflowNodeItem; running
             </span>
           )}
           {finished && item.durationMs != null && (
-            <span className="text-muted">{formatDuration(item.durationMs)}</span>
+            <span className="tabular-nums">{formatDuration(item.durationMs)}</span>
           )}
           {!finished && running && (
             <span className="flex items-center gap-1 text-accent-strong">
@@ -61,40 +68,58 @@ export function NodeDivider({ item, running }: { item: WorkflowNodeItem; running
               <span className="tabular-nums">{formatClock(elapsedMs)}</span>
             </span>
           )}
-          {!finished && !running && <span className="text-muted">interrompu</span>}
+          {!finished && !running && <span>interrompu</span>}
         </span>
-        <span className="h-px grow bg-border" />
+        {hasDetails ? (
+          <button
+            type="button"
+            className={buttonClass({ variant: 'ghost', size: 'sm' }, 'ml-1')}
+            aria-expanded={open}
+            onClick={() => setOpen(!open)}
+          >
+            <ChevronRightIcon className={`h-3 w-3 transition-transform ${open ? 'rotate-90' : ''}`} />
+            détails
+          </button>
+        ) : (
+          <span className="h-px grow bg-border" />
+        )}
       </div>
-      {(item.prompt || item.output || item.childSessionId) && (
-        <details className="w-full min-w-0">
-          <summary className="cursor-pointer text-center text-[0.6875rem] text-muted hover:text-text">détails</summary>
-          <div className="flex flex-col gap-2 rounded-md border border-border bg-raised px-3 py-2 text-left text-xs">
+      {hasDetails && open && (
+        <div className="ml-px border-l border-border pl-3">
+          <div className="flex flex-col gap-2.5 rounded-md border border-border bg-raised px-3 py-2 text-left text-xs">
             {item.prompt && (
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-1">
                 <SectionLabel>Prompt</SectionLabel>
-                <div className="whitespace-pre-wrap text-text">{item.prompt}</div>
+                <div className="max-h-48 overflow-y-auto whitespace-pre-wrap text-muted">{item.prompt}</div>
               </div>
             )}
             {item.output && (
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-1">
                 <SectionLabel>Sortie</SectionLabel>
-                {(item.nodeKind === 'shell' || item.nodeKind === 'criteria') ? (
-                  <pre className="whitespace-pre-wrap break-words rounded bg-code p-2 font-mono text-[0.6875rem] text-muted">{item.output}</pre>
+                {item.nodeKind === 'shell' || item.nodeKind === 'criteria' ? (
+                  <pre className="max-h-48 overflow-y-auto whitespace-pre-wrap break-words rounded bg-code p-2 font-mono text-[0.6875rem] text-muted">
+                    {item.output}
+                  </pre>
                 ) : (
-                  <div className="whitespace-pre-wrap text-text">{item.output}</div>
+                  <div className="max-h-48 overflow-y-auto whitespace-pre-wrap text-text">{item.output}</div>
                 )}
                 {item.nodeKind === 'shell' && item.exitCode !== undefined && (
-                  <div className="text-[0.6875rem] text-muted">Code de sortie : {item.exitCode}</div>
+                  <div className="flex justify-end">
+                    <Badge tone={item.exitCode === 0 ? 'ok' : 'err'}>code de sortie : {item.exitCode}</Badge>
+                  </div>
                 )}
               </div>
             )}
             {item.childSessionId && (
-              <a href={`#/s/${item.childSessionId}`} className="text-accent-strong underline">
-                Ouvrir la session
-              </a>
+              <div className="flex justify-end">
+                <a href={`#/s/${item.childSessionId}`} className={buttonClass({ variant: 'ghost', size: 'sm' })}>
+                  <ExternalIcon className="h-3 w-3" />
+                  Ouvrir la session
+                </a>
+              </div>
             )}
           </div>
-        </details>
+        </div>
       )}
     </div>
   );
