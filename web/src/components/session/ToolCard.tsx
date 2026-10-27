@@ -6,6 +6,9 @@ import { previewKindOfPath, relativeToWorkdir } from '../../lib/preview';
 import { usePreviewOpener, usePreviewWorkdir } from '../preview/PreviewContext';
 import { EditIcon, FileIcon, SearchIcon, SpinnerIcon, TerminalIcon } from '../Icons';
 import { toolAnchorId } from '../../lib/vision';
+import { Badge } from '../ui/Badge';
+import { Button } from '../ui/Button';
+import { Card } from '../ui/Card';
 
 export function ToolCard({ tool }: { tool: ToolCallView }) {
   const display = useDisplayPrefs();
@@ -46,7 +49,7 @@ export function ToolCard({ tool }: { tool: ToolCallView }) {
     );
 
   return (
-    <div id={toolAnchorId(tool.id)} className="overflow-hidden rounded-[10px] border border-border bg-panel">
+    <Card id={toolAnchorId(tool.id)} className="overflow-hidden">
       <div className="flex min-h-10 items-center gap-2.5 px-3 text-left text-text">
         <button
           type="button"
@@ -62,16 +65,18 @@ export function ToolCard({ tool }: { tool: ToolCallView }) {
           <span className="grow" />
         </button>
         {tool.status === 'success' && previewKind && previewRelative && opener && (
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={(event) => {
               event.stopPropagation();
               opener({ path: previewRelative, kind: previewKind });
             }}
-            className="shrink-0 rounded-md border border-border bg-raised px-1.5 py-0.5 text-xs text-muted hover:text-text"
+            className="shrink-0"
           >
             Aperçu
-          </button>
+          </Button>
         )}
         {tool.name === 'edit_file' && (
           <>
@@ -83,13 +88,9 @@ export function ToolCard({ tool }: { tool: ToolCallView }) {
           <span className="shrink-0 text-xs whitespace-nowrap text-muted">{lineCount} lignes</span>
         )}
         {tool.name === 'run_command' && tool.status !== 'running' && tool.exitCode != null && (
-          <span
-            className={`shrink-0 whitespace-nowrap rounded px-1.5 py-px text-[0.6875rem] ${
-              tool.exitCode === 0 ? 'bg-ok-soft text-ok' : 'bg-raised text-err'
-            }`}
-          >
+          <Badge tone={tool.exitCode === 0 ? 'ok' : 'err'} className="shrink-0">
             vérifié · exit {tool.exitCode}
-          </span>
+          </Badge>
         )}
         {tool.durationMs != null && (
           <span className="shrink-0 text-xs whitespace-nowrap text-muted">{formatDuration(tool.durationMs)}</span>
@@ -163,6 +164,6 @@ export function ToolCard({ tool }: { tool: ToolCallView }) {
           )}
         </div>
       )}
-    </div>
+    </Card>
   );
 }

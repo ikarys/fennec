@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { Badge } from '../ui/Badge';
+import { Button } from '../ui/Button';
+import { FieldRow, Select, TextInput } from '../ui/Field';
 import type { Agent } from '../../lib/api';
 import type { WorkflowDef, WorkflowIssue, WorkflowNode } from '../../lib/workflow';
 import { NODE_KIND_LABELS, templateNames } from '../../lib/workflow';
@@ -47,30 +50,28 @@ export function NodePanel({ def, node, agents, issues, onChange, onRename, onDel
 
   return (
     <div className="flex flex-col gap-3 p-3">
-      <div className="flex items-center gap-2 text-[0.8125rem] text-muted">
+      <div className="flex items-center gap-2 text-xs text-muted">
         Type
-        <span className="rounded-md bg-raised px-2 py-0.5 text-[0.75rem] font-medium text-text">{NODE_KIND_LABELS[node.kind]}</span>
+        <Badge tone="neutral">{NODE_KIND_LABELS[node.kind]}</Badge>
       </div>
-      <div>
-        <label className="mb-1 block text-[0.8125rem] text-muted">Identifiant</label>
-        <input
+      <FieldRow label="Identifiant">
+        <TextInput
           type="text"
           value={node.id}
           onChange={(event) => handleIdChange(event.target.value)}
-          className="w-full rounded-md border border-border bg-panel px-2 py-1 text-[0.8125rem]"
+          className="w-full"
         />
-        {idError && <div className="mt-1 text-xs text-err">{idError}</div>}
-      </div>
+        {idError && <div className="text-xs text-err">{idError}</div>}
+      </FieldRow>
 
-      <div>
-        <label className="mb-1 block text-[0.8125rem] text-muted">Nom</label>
-        <input
+      <FieldRow label="Nom">
+        <TextInput
           type="text"
           value={node.name ?? ''}
           onChange={(event) => updateField('name', event.target.value)}
-          className="w-full rounded-md border border-border bg-panel px-2 py-1 text-[0.8125rem]"
+          className="w-full"
         />
-      </div>
+      </FieldRow>
 
       {node.kind === 'agent' && (
         <AgentFields node={node} agents={agents} names={names} onChange={updateField} />
@@ -80,17 +81,16 @@ export function NodePanel({ def, node, agents, issues, onChange, onRename, onDel
       {node.kind === 'human' && <HumanFields node={node} names={names} onChange={updateField} />}
       {node.kind === 'condition' && <ConditionFields node={node} names={names} onChange={updateField} />}
       {node.kind === 'end' && (
-        <div>
-          <label className="mb-1 block text-[0.8125rem] text-muted">Issue</label>
-          <select
+        <FieldRow label="Issue">
+          <Select
             value={(node.outcome as string) ?? 'done'}
             onChange={(event) => updateField('outcome', event.target.value)}
-            className="w-full rounded-md border border-border bg-panel px-2 py-1 text-[0.8125rem]"
+            className="w-full"
           >
             <option value="done">terminé</option>
             <option value="blocked">bloqué</option>
-          </select>
-        </div>
+          </Select>
+        </FieldRow>
       )}
 
       {nodeIssues.length > 0 && (
@@ -104,13 +104,9 @@ export function NodePanel({ def, node, agents, issues, onChange, onRename, onDel
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={onDelete}
-        className="mt-2 rounded-md border border-err px-3 py-1 text-[0.8125rem] text-err hover:bg-del-bg"
-      >
+      <Button variant="danger" size="sm" type="button" onClick={onDelete} className="mt-2 self-start">
         Supprimer le nœud
-      </button>
+      </Button>
     </div>
   );
 }

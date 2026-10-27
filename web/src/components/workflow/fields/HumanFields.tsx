@@ -1,6 +1,7 @@
 import type { WorkflowNode } from '../../../lib/workflow';
 import { PortListEditor } from '../PortListEditor';
 import { TemplateChips } from '../TemplateChips';
+import { FieldRow, TextArea } from '../../ui/Field';
 
 interface HumanFieldsProps {
   node: WorkflowNode;
@@ -16,16 +17,15 @@ export function HumanFields({ node, names, onChange }: HumanFieldsProps) {
 
   return (
     <>
-      <div>
-        <label className="mb-1 block text-[0.8125rem] text-muted">Question</label>
-        <textarea
+      <FieldRow label="Question">
+        <TextArea
           value={(node.question as string) ?? ''}
           onChange={(event) => onChange('question', event.target.value)}
           rows={2}
-          className="w-full rounded-md border border-border bg-panel px-2 py-1 text-[0.8125rem]"
+          className="w-full"
         />
         <TemplateChips names={names} onInsert={insertTemplate} />
-      </div>
+      </FieldRow>
       <PortListEditor
         label="Choix"
         values={(node.choices as string[]) ?? []}

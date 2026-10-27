@@ -33,6 +33,7 @@ import { PreviewContext, PreviewWorkdirContext, type PreviewTarget } from '../co
 import { PreviewPane } from '../components/preview/PreviewPane';
 import { RunStrip } from '../components/workflow/session/RunStrip';
 import { RunActionCard } from '../components/workflow/session/RunActionCard';
+import { Button, buttonClass } from '../components/ui/Button';
 import {
   DEFAULT_WORKFLOW_ID,
   defaultWorkflowSelection,
@@ -482,14 +483,14 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
         <PlanActionsContext.Provider value={planActions}>
         <div className="flex min-h-0 min-w-0 grow">
           <main className="flex min-h-0 min-w-0 flex-[999_1_560px] flex-col">
-        <div className="flex flex-wrap items-center gap-2.5 px-6 pt-3.5">
-          <div className="mx-auto flex w-full max-w-[820px] flex-wrap items-center gap-2.5">
-            <h1 className="text-base font-semibold tracking-[-0.01em]">{title}</h1>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-2.5 py-0.5 text-xs font-medium text-accent-strong">
+        <div className="flex items-center gap-2 px-6 py-2.5">
+          <div className="mx-auto flex w-full max-w-[820px] items-center gap-2">
+            <h1 className="min-w-0 truncate text-sm font-semibold" title={title}>{title}</h1>
+            <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-accent-soft px-2.5 py-0.5 text-xs font-medium text-accent-strong">
               <span className="h-1.5 w-1.5 rounded-full bg-accent" />
               {stateLabel(state)}
             </span>
-            <span className="text-xs text-muted">{projectName}{detail ? ` · ${detail.project.workdir}` : ''}</span>
+            <span className="shrink-0 text-xs text-muted" title={detail?.project.workdir}>{projectName}</span>
           </div>
         </div>
 
@@ -507,30 +508,28 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
         >
           {awayFromBottom && (
             <div className="pointer-events-none sticky top-[calc(100%-2.5rem)] z-10 flex h-0 items-start justify-end">
-              <button
+              <Button
                 type="button"
+                variant="secondary"
+                size="sm"
+                iconOnly
                 title="Aller en bas et suivre la suite"
                 onClick={() => {
                   const element = scrollRef.current;
                   if (element) element.scrollTo({ top: element.scrollHeight, behavior: 'smooth' });
                 }}
                 aria-label="Aller en bas"
-                className="pointer-events-auto flex size-8 items-center justify-center rounded-full border border-border-strong bg-raised text-sm text-muted shadow-md hover:text-text"
+                className="pointer-events-auto rounded-full shadow-md"
               >
                 ↓
-              </button>
+              </Button>
             </div>
           )}
           <div className="mx-auto flex max-w-[820px] flex-col gap-4.5">
             {sessionId && hasMore && (
-              <button
-                type="button"
-                onClick={handleLoadOlder}
-                disabled={loadingOlder}
-                className="mx-auto rounded-lg border border-border bg-raised px-3 py-1.5 text-xs text-muted transition-colors hover:text-text disabled:opacity-60"
-              >
+              <Button className="mx-auto" onClick={handleLoadOlder} disabled={loadingOlder}>
                 {loadingOlder ? 'Chargement…' : 'Charger les messages précédents'}
-              </button>
+              </Button>
             )}
             {view.items.length === 0 && !sessionId && (
               <div className="py-10 text-center text-sm text-muted">Nouvelle session · écris ton premier message.</div>
@@ -582,7 +581,7 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
               </div>
               <a
                 href={`#/s/${detail.parentId}`}
-                className="shrink-0 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-on-accent hover:opacity-90"
+                className={buttonClass({ variant: 'primary', size: 'sm' }, 'shrink-0')}
               >
                 ← Retour au workflow
               </a>

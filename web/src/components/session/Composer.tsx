@@ -7,6 +7,7 @@ import { IMAGE_TYPES } from '../../lib/attachments';
 import { CloseIcon, PaperclipIcon, SendIcon, StopIcon } from '../Icons';
 import { matchCommands, SlashMenu } from './SlashMenu';
 import { ModePicker } from './ModePicker';
+import { Button } from '../ui/Button';
 import { WorkflowPicker, type WorkflowSelection } from '../workflow/session/WorkflowPicker';
 
 interface ComposerProps {
@@ -143,7 +144,7 @@ export function Composer({
                   type="button"
                   aria-label={`Retirer ${a.filename}`}
                   onClick={() => onRemoveAttachment?.(i)}
-                  className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full border border-border bg-raised text-muted"
+                  className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full border border-border-strong bg-bg text-muted hover:text-text"
                 >
                   <CloseIcon className="h-2.5 w-2.5" />
                 </button>
@@ -192,41 +193,36 @@ export function Composer({
             className="max-h-60 min-w-0 grow resize-none bg-transparent py-1.5 text-[0.9375rem] leading-relaxed outline-none placeholder:text-faint"
           />
           {running ? (
-            <button
-              type="button"
-              aria-label="Arrêter"
-              title="Arrêter le tour"
-              onClick={onStop}
-              className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border-strong bg-raised text-text transition-colors hover:border-err hover:text-err"
-            >
+            <Button variant="danger" size="lg" iconOnly aria-label="Arrêter" title="Arrêter le tour" onClick={onStop}>
               <StopIcon className="h-4 w-4" />
-            </button>
+            </Button>
           ) : (
-            <button
-              type="button"
+            <Button
+              variant="primary"
+              size="lg"
+              iconOnly
               aria-label="Envoyer"
               title="Envoyer (Entrée) · nouvelle ligne : Maj+Entrée"
               onClick={onSend}
               disabled={!canSend}
-              className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent text-on-accent shadow-[0_4px_14px_-4px_var(--accent)] transition-[background-color,box-shadow,transform] hover:bg-accent-strong active:scale-95 disabled:bg-raised disabled:text-faint disabled:shadow-none"
             >
               <SendIcon className="h-[18px] w-[18px]" />
-            </button>
+            </Button>
           )}
         </div>
         {/* Left: what will run. Right: what it runs on. */}
         <div className="flex flex-wrap items-center gap-1 rounded-b-2xl border-t border-border bg-bg/60 px-2 py-1.5">
           {onAttach && (
             <>
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                iconOnly
                 aria-label="Joindre une image"
                 title="Joindre une image (ou colle-la, ou glisse-la)"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex size-7 items-center justify-center rounded-md text-muted transition-colors hover:bg-raised hover:text-text"
               >
                 <PaperclipIcon className="h-3.5 w-3.5" />
-              </button>
+              </Button>
               <input
                 ref={fileInputRef}
                 type="file"

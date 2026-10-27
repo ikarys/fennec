@@ -2,6 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import type { Blocker, IntegrationConflict, IntegrationPreview } from '../../lib/api';
 import { getIntegration, integrate } from '../../lib/api';
 import { CriterionProvenanceBadge } from './CriteriaSection';
+import { Button } from '../ui/Button';
+import { Badge } from '../ui/Badge';
+import { Card } from '../ui/Card';
+import { SectionLabel } from '../ui/SectionLabel';
 
 type BlockerKind = Blocker['kind'];
 
@@ -103,9 +107,9 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
           closeDialog();
         }
       }}
-      className="m-auto w-[min(92vw,720px)] rounded-xl border border-border bg-panel p-4 text-text backdrop:bg-black/60"
+      className="m-auto w-[min(92vw,720px)] text-text backdrop:bg-black/60"
     >
-      <div className="flex flex-col gap-3">
+      <Card className="flex flex-col gap-3 p-4">
         <div className="flex flex-col gap-1">
           <h2 className="m-0 text-sm font-semibold">
             {preview ? `Intégrer dans ${preview.humanBranch ?? 'ta branche'}` : 'Intégrer'}
@@ -133,7 +137,7 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
                 type="button"
                 title="Copier la commande"
                 onClick={() => void navigator.clipboard.writeText(conflict.command)}
-                className="rounded-lg border border-border bg-raised px-2 py-1.5 text-left font-mono text-xs break-all text-text"
+                className="rounded-lg border border-border bg-code px-2 py-1.5 text-left font-mono text-xs break-all text-text hover:border-border-strong"
               >
                 <code>{conflict.command}</code>
               </button>
@@ -153,9 +157,9 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
         {preview && !loading && !result && (
           <div className="flex flex-col gap-3">
             <section className="flex flex-col gap-1.5">
-              <h3 className="m-0 text-[0.6875rem] font-semibold tracking-[0.06em] text-muted uppercase">
+              <SectionLabel>
                 Commits{preview.commits.length > 0 && <span className="ml-1 tabular-nums">{preview.commits.length}</span>}
-              </h3>
+              </SectionLabel>
               {preview.commits.length === 0 ? (
                 <div className="text-xs text-muted">Aucun commit.</div>
               ) : (
@@ -171,9 +175,9 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
             </section>
 
             <section className="flex flex-col gap-1.5">
-              <h3 className="m-0 text-[0.6875rem] font-semibold tracking-[0.06em] text-muted uppercase">
+              <SectionLabel>
                 Fichiers{preview.files.length > 0 && <span className="ml-1 tabular-nums">{preview.files.length}</span>}
-              </h3>
+              </SectionLabel>
               {preview.files.length === 0 ? (
                 <div className="text-xs text-muted">Aucun fichier.</div>
               ) : (
@@ -183,11 +187,7 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
                       <span className="grow overflow-hidden text-left text-ellipsis whitespace-nowrap" title={file.path}>
                         {file.path}
                       </span>
-                      {file.protected && (
-                        <span className="shrink-0 rounded border border-err bg-err/10 px-1 py-0.5 text-[0.625rem] text-err">
-                          protégé
-                        </span>
-                      )}
+                      {file.protected && <Badge tone="err">protégé</Badge>}
                     </div>
                   ))}
                 </div>
@@ -195,7 +195,7 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
             </section>
 
             <section className="flex flex-col gap-1.5">
-              <h3 className="m-0 text-[0.6875rem] font-semibold tracking-[0.06em] text-muted uppercase">Critères</h3>
+              <SectionLabel>Critères</SectionLabel>
               {preview.criteria.length === 0 ? (
                 <div className="text-xs text-muted">Aucun critère.</div>
               ) : (
@@ -221,7 +221,7 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
 
             {preview.blockers.length > 0 && (
               <section className="flex flex-col gap-1.5">
-                <h3 className="m-0 text-[0.6875rem] font-semibold tracking-[0.06em] text-muted uppercase">À accepter</h3>
+                <SectionLabel>À accepter</SectionLabel>
                 <div className="flex flex-col gap-1.5">
                   {preview.blockers.map((blocker) => (
                     <div key={blocker.kind} className="flex items-start justify-between gap-2 text-xs">
@@ -247,15 +247,12 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
         )}
 
         <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={closeDialog}
-            className="rounded-lg border border-border bg-raised px-2.5 py-1 text-xs text-text"
-          >
+          <Button variant="secondary" size="md" onClick={closeDialog}>
             Annuler
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="primary"
+            size="md"
             onClick={() => {
               if (result) {
                 closeDialog();
@@ -264,12 +261,11 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
               }
             }}
             disabled={integrateDisabled}
-            className="rounded-lg bg-accent px-2.5 py-1 text-xs font-medium text-on-accent disabled:opacity-60"
           >
             {result ? 'Fermer' : 'Intégrer'}
-          </button>
+          </Button>
         </div>
-      </div>
+      </Card>
     </dialog>
   );
 }

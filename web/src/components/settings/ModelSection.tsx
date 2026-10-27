@@ -1,4 +1,6 @@
 import type { SettingsModel } from '../../lib/api';
+import { Card } from '../ui/Card';
+import { FieldRow, Select } from '../ui/Field';
 
 interface ModelSectionProps {
   value: string;
@@ -13,26 +15,23 @@ export function ModelSection({ value, models, storedModel, defaultModel, onChang
   const unlistedStored = storedModel && !listedIds.has(storedModel) ? storedModel : null;
 
   return (
-    <section className="rounded-xl border border-border bg-panel px-5 py-4">
-      <h2 className="text-[0.9375rem] font-semibold">Modèle</h2>
-      <label className="mt-3 block text-[0.8125rem] text-muted">
-        Modèle
-        <select
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          className="mt-1.5 w-full rounded-lg border border-border bg-raised px-3 py-2 text-[0.8125rem] text-text"
-        >
-          <option value="">Défaut de l'environnement ({defaultModel})</option>
-          {models.map((model) => (
-            <option key={model.id} value={model.id}>
-              {model.id}
-            </option>
-          ))}
-          {unlistedStored && (
-            <option value={unlistedStored}>{unlistedStored} (non listé)</option>
-          )}
-        </select>
-      </label>
-    </section>
+    <Card className="p-4">
+      <div className="flex flex-col gap-4">
+        <h2 className="text-sm font-semibold">Modèle</h2>
+        <FieldRow label="Modèle">
+          <Select value={value} onChange={(event) => onChange(event.target.value)} className="w-full">
+            <option value="">Défaut de l'environnement ({defaultModel})</option>
+            {models.map((model) => (
+              <option key={model.id} value={model.id}>
+                {model.id}
+              </option>
+            ))}
+            {unlistedStored && (
+              <option value={unlistedStored}>{unlistedStored} (non listé)</option>
+            )}
+          </Select>
+        </FieldRow>
+      </div>
+    </Card>
   );
 }

@@ -1,3 +1,4 @@
+import { Segmented } from '../ui/Segmented';
 import type { Agent } from '../../lib/api';
 
 interface ModePickerProps {
@@ -44,29 +45,21 @@ export function ModePicker({ agents, mode, onChange, disabled }: ModePickerProps
   }
 
   return (
-    <div role="group" aria-label="Mode" className="flex items-center gap-0.5 rounded-lg bg-raised/60 p-0.5">
-      {agents.map((agent) => {
-        const selected = agent.id === mode;
-        return (
-          <button
-            key={agent.id}
-            type="button"
-            title={agent.description}
-            aria-pressed={selected}
-            disabled={disabled}
-            onClick={() => onChange(agent.id)}
-            className={`flex h-6 items-center gap-1.5 rounded-md px-2 text-xs transition-colors disabled:opacity-60 ${
-              selected ? 'bg-panel text-text shadow-sm' : 'text-muted hover:text-text'
-            }`}
-          >
-            <span
-              className="h-1.5 w-1.5 rounded-full bg-muted"
-              style={agent.color ? { backgroundColor: agent.color } : undefined}
-            />
+    <Segmented
+      label="Mode"
+      value={mode}
+      onChange={onChange}
+      disabled={disabled}
+      segments={agents.map((agent) => ({
+        value: agent.id,
+        title: agent.description,
+        label: (
+          <>
+            <span className="h-1.5 w-1.5 rounded-full bg-muted" style={agent.color ? { backgroundColor: agent.color } : undefined} />
             {agent.name}
-          </button>
-        );
-      })}
-    </div>
+          </>
+        )
+      }))}
+    />
   );
 }

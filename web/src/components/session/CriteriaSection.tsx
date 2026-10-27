@@ -1,4 +1,6 @@
 import type { CriterionView, Provenance } from '../../lib/fold';
+import { Badge } from '../ui/Badge';
+import { SectionLabel } from '../ui/SectionLabel';
 
 export function CriterionProvenanceBadge({ provenance }: { provenance: Provenance | undefined }) {
   if (!provenance) return null;
@@ -7,18 +9,14 @@ export function CriterionProvenanceBadge({ provenance }: { provenance: Provenanc
       ? {
           label: 'vérifié',
           title: 'Fait établi par fennec : la commande a tourné',
-          className: 'border-ok bg-ok/10 text-ok'
+          tone: 'ok' as const
         }
       : {
           label: 'indicatif',
           title: `Jugement d'un agent (${provenance.agent}) : à relire`,
-          className: 'border-accent bg-accent-soft text-accent-strong'
+          tone: 'accent' as const
         };
-  return (
-    <span title={badge.title} className={`shrink-0 rounded border px-1 py-0.5 text-[0.625rem] ${badge.className}`}>
-      {badge.label}
-    </span>
-  );
+  return <Badge tone={badge.tone} title={badge.title}>{badge.label}</Badge>;
 }
 
 export function CriteriaSection({ criteria }: { criteria: CriterionView[] }) {
@@ -26,9 +24,9 @@ export function CriteriaSection({ criteria }: { criteria: CriterionView[] }) {
 
   return (
     <section className="flex flex-col gap-1.5">
-      <h2 className="text-[0.6875rem] font-semibold tracking-[0.06em] text-muted uppercase">
+      <SectionLabel>
         Critères{criteria.length > 0 && <span className="ml-1 tabular-nums">{passed}/{criteria.length}</span>}
-      </h2>
+      </SectionLabel>
       {criteria.length === 0 ? (
         <div className="text-xs text-muted">Aucun critère : ils viennent du plan validé d'un workflow.</div>
       ) : (

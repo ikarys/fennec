@@ -1,5 +1,6 @@
 import type { WorkflowNode } from '../../../lib/workflow';
 import { TemplateChips } from '../TemplateChips';
+import { FieldRow, TextArea, TextInput } from '../../ui/Field';
 
 interface ShellFieldsProps {
   node: WorkflowNode;
@@ -17,28 +18,25 @@ export function ShellFields({ node, names, onChange }: ShellFieldsProps) {
 
   return (
     <>
-      <div>
-        <label className="mb-1 block text-[0.8125rem] text-muted">Commande</label>
-        <textarea
+      <FieldRow label="Commande">
+        <TextArea
           value={(node.command as string) ?? ''}
           onChange={(event) => onChange('command', event.target.value)}
           rows={2}
-          className="w-full rounded-md border border-border bg-panel px-2 py-1 font-mono text-[0.8125rem]"
+          className="w-full font-mono"
         />
         <TemplateChips names={names} onInsert={insertTemplate} />
-      </div>
-      <div>
-        <label className="mb-1 block text-[0.8125rem] text-muted">Délai (s)</label>
-        <input
+      </FieldRow>
+      <FieldRow label="Délai (s)">
+        <TextInput
           type="number"
           value={timeoutSecs}
           onChange={(event) => onChange('timeoutSecs', Number(event.target.value))}
-          className="w-full rounded-md border border-border bg-panel px-2 py-1 text-[0.8125rem]"
+          className="w-full"
         />
-      </div>
-      <div>
-        <label className="mb-1 block text-[0.8125rem] text-muted">Codes de succès</label>
-        <input
+      </FieldRow>
+      <FieldRow label="Codes de succès">
+        <TextInput
           type="text"
           value={((node.successCodes as number[]) ?? [0]).join(',')}
           onChange={(event) => {
@@ -48,9 +46,9 @@ export function ShellFields({ node, names, onChange }: ShellFieldsProps) {
               .filter((n) => !Number.isNaN(n));
             onChange('successCodes', codes);
           }}
-          className="w-full rounded-md border border-border bg-panel px-2 py-1 text-[0.8125rem]"
+          className="w-full"
         />
-      </div>
+      </FieldRow>
     </>
   );
 }

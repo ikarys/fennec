@@ -4,6 +4,10 @@ import remarkGfm from 'remark-gfm';
 import type { Plan, Report } from '../../lib/plan';
 import { CheckIcon, CloseIcon } from '../Icons';
 import type { PlanActions } from './PlanActions';
+import { Badge } from '../ui/Badge';
+import { Button } from '../ui/Button';
+import { Card } from '../ui/Card';
+import { SectionLabel } from '../ui/SectionLabel';
 
 const REMARK_PLUGINS = [remarkGfm];
 
@@ -25,14 +29,6 @@ function Inline({ children }: { children: string }) {
   );
 }
 
-function SectionHeading({ children }: { children: string }) {
-  return <h3 className="m-0 text-[0.6875rem] font-semibold uppercase tracking-wide text-muted">{children}</h3>;
-}
-
-function Pill({ children }: { children: string }) {
-  return <span className="rounded bg-accent-soft px-1.5 py-0.5 text-[0.6875rem] font-semibold text-accent-strong">{children}</span>;
-}
-
 function PathChip({ path }: { path: string }) {
   return <code className="rounded bg-code px-1.5 py-0.5 font-mono text-[0.7188rem] text-text">{path}</code>;
 }
@@ -41,9 +37,9 @@ export function PlanCard({ plan, actions }: { plan: Plan; actions?: PlanActions 
   // The worktree decision is made when building a plan, not in the composer.
   const [worktree, setWorktree] = useState(true);
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-border bg-raised p-4">
+    <Card className="flex flex-col gap-3 p-4">
       <div className="flex items-center gap-2">
-        <Pill>Plan</Pill>
+        <Badge tone="accent">Plan</Badge>
         <span className="min-w-0 font-semibold text-text">
           <Inline>{plan.title}</Inline>
         </span>
@@ -90,7 +86,7 @@ export function PlanCard({ plan, actions }: { plan: Plan; actions?: PlanActions 
       </ol>
       {plan.doneWhen.length > 0 && (
         <div className="flex flex-col gap-1.5">
-          <SectionHeading>Terminé quand</SectionHeading>
+          <SectionLabel>Terminé quand</SectionLabel>
           <ul className="m-0 flex flex-col gap-1">
             {plan.doneWhen.map((criterion, i) => (
               <li key={i} className="flex items-start gap-2 text-sm text-text">
@@ -105,7 +101,7 @@ export function PlanCard({ plan, actions }: { plan: Plan; actions?: PlanActions 
       )}
       {plan.risks.length > 0 && (
         <div className="flex flex-col gap-1.5">
-          <SectionHeading>Risques</SectionHeading>
+          <SectionLabel>Risques</SectionLabel>
           <ul className="m-0 flex flex-col gap-1">
             {plan.risks.map((risk, i) => (
               <li key={i} className="flex items-start gap-2 text-sm text-err">
@@ -119,33 +115,36 @@ export function PlanCard({ plan, actions }: { plan: Plan; actions?: PlanActions 
         </div>
       )}
       {actions && (
-        <div className="flex gap-2">
-          <button
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
             type="button"
+            variant="primary"
+            size="sm"
             onClick={() => actions.onBuild(worktree)}
             disabled={actions.disabled}
             title="Lance Plan, build, verify à partir de ce plan : critères vérifiés, vérification et review."
-            className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-on-accent disabled:opacity-60"
           >
             Construire
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="secondary"
+            size="sm"
             onClick={actions.onRevise}
             disabled={actions.disabled}
-            className="rounded-lg border border-border bg-raised px-3 py-1.5 text-xs text-text disabled:opacity-60"
           >
             Revoir
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={actions.onBuildAlone}
             disabled={actions.disabled}
             title="Exécute le plan avec l'agent Builder seul, sans critères ni review."
-            className="self-center text-xs text-muted hover:text-text hover:underline disabled:opacity-60"
           >
             Sans workflow
-          </button>
+          </Button>
           <label
             className="ml-auto flex items-center gap-1.5 self-center text-xs text-muted"
             title="Coché, l'agent travaille dans sa propre copie du dépôt (worktree) et tu intègres ensuite ; décoché, il écrit directement dans ton dossier."
@@ -160,7 +159,7 @@ export function PlanCard({ plan, actions }: { plan: Plan; actions?: PlanActions 
           </label>
         </div>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -193,9 +192,9 @@ function CheckRow({ checked, text, detail }: { checked: boolean; text: string; d
 export function ReportCard({ report }: { report: Report }) {
   const done = report.steps.filter((s) => s.checked).length;
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-border bg-raised p-4">
+    <Card className="flex flex-col gap-3 p-4">
       <div className="flex items-center gap-2">
-        <Pill>Rapport</Pill>
+        <Badge tone="accent">Rapport</Badge>
         <span className="min-w-0 font-semibold text-text">
           <Inline>{report.title}</Inline>
         </span>
@@ -208,7 +207,7 @@ export function ReportCard({ report }: { report: Report }) {
       )}
       {report.steps.length > 0 && (
         <div className="flex flex-col gap-1.5">
-          <SectionHeading>Étapes</SectionHeading>
+          <SectionLabel>Étapes</SectionLabel>
           <ul className="m-0 flex flex-col gap-1.5">
             {report.steps.map((step, i) => (
               <CheckRow key={i} checked={step.checked} text={`Étape ${step.number} · ${step.text}`} detail={step.detail} />
@@ -218,7 +217,7 @@ export function ReportCard({ report }: { report: Report }) {
       )}
       {report.doneWhen.length > 0 && (
         <div className="flex flex-col gap-1.5">
-          <SectionHeading>Terminé quand</SectionHeading>
+          <SectionLabel>Terminé quand</SectionLabel>
           <ul className="m-0 flex flex-col gap-1.5">
             {report.doneWhen.map((item, i) => (
               <CheckRow key={i} checked={item.checked} text={item.text} detail={item.detail} />
@@ -228,7 +227,7 @@ export function ReportCard({ report }: { report: Report }) {
       )}
       {report.changed.length > 0 && (
         <div className="flex flex-col gap-1.5">
-          <SectionHeading>Fichiers modifiés</SectionHeading>
+          <SectionLabel>Fichiers modifiés</SectionLabel>
           <ul className="m-0 flex flex-col gap-1.5">
             {report.changed.map((c, i) => (
               <li key={i} className="flex items-start gap-2 text-sm">
@@ -245,7 +244,7 @@ export function ReportCard({ report }: { report: Report }) {
       )}
       {report.test && (
         <div className="flex flex-col gap-1.5">
-          <SectionHeading>À tester</SectionHeading>
+          <SectionLabel>À tester</SectionLabel>
           <div className="text-sm text-accent-strong">
             <Inline>{report.test}</Inline>
           </div>
@@ -253,13 +252,13 @@ export function ReportCard({ report }: { report: Report }) {
       )}
       {report.todo && (
         <div className="flex flex-col gap-1.5">
-          <SectionHeading>À faire</SectionHeading>
+          <SectionLabel>À faire</SectionLabel>
           <div className="text-sm text-text">
             <Inline>{report.todo}</Inline>
           </div>
         </div>
       )}
       <p className="m-0 text-[0.6875rem] text-faint">Coches déclarées par le modèle, non vérifiées par fennec.</p>
-    </div>
+    </Card>
   );
 }

@@ -7,6 +7,8 @@ import { usePreviewOpener, usePreviewWorkdir } from '../preview/PreviewContext';
 import { AgentWorkspaceSection } from './AgentWorkspaceSection';
 import { CriteriaSection } from './CriteriaSection';
 import { VisionSection } from './VisionSection';
+import { Button } from '../ui/Button';
+import { SectionLabel } from '../ui/SectionLabel';
 
 const WIDTH_KEY = 'fennec.contextPanelWidth';
 const MIN_WIDTH = 240;
@@ -123,27 +125,28 @@ export function ContextPanel({ view, currentTokens, contextPercent, skills, hasS
         className="flex min-h-0 w-full flex-col gap-5 overflow-y-auto border-l border-border bg-panel px-4 py-4.5 [scrollbar-width:thin]"
       >
         <section className="flex flex-col gap-2">
-          <h2 className="text-[0.6875rem] font-semibold tracking-[0.06em] text-muted uppercase">Contexte</h2>
+          <SectionLabel>Contexte</SectionLabel>
           <div className="h-1.5 overflow-hidden rounded-full bg-raised">
             <div className="h-full bg-accent" style={{ width: `${contextPercent}%` }} />
           </div>
-          <div className="flex justify-between text-xs text-muted">
+          <div className="flex justify-between text-xs text-muted tabular-nums">
             <span>{formatTokens(currentTokens)} tokens</span>
             <span>{contextPercent} %</span>
           </div>
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={onCompact}
             disabled={compactDisabled}
-            className="self-start rounded-lg border border-border bg-raised px-2.5 py-1 text-xs text-text disabled:opacity-60"
+            className="self-start"
           >
             Compacter
-          </button>
+          </Button>
           {compactError && <div className="text-xs text-err">{compactError}</div>}
         </section>
 
         <section className="flex flex-col gap-1.5">
-          <h2 className="text-[0.6875rem] font-semibold tracking-[0.06em] text-muted uppercase">{partial ? 'Tokens des messages chargés' : 'Tokens de la session'}</h2>
+          <SectionLabel>{partial ? 'Tokens des messages chargés' : 'Tokens de la session'}</SectionLabel>
           {view.usage.calls === 0 && <div className="text-xs text-muted">Aucun appel mesuré.</div>}
           {view.usage.calls > 0 && (
             <dl className="m-0 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-xs tabular-nums">
@@ -168,7 +171,7 @@ export function ContextPanel({ view, currentTokens, contextPercent, skills, hasS
         </section>
 
         <section className="flex flex-col gap-1.5">
-          <h2 className="text-[0.6875rem] font-semibold tracking-[0.06em] text-muted uppercase">Fichiers modifiés</h2>
+          <SectionLabel>Fichiers modifiés</SectionLabel>
           {modifiedFiles.length === 0 && <div className="text-xs text-muted">Aucun fichier modifié.</div>}
           {visibleModifiedFiles.map((file) => {
             const relative = workdir ? file.key : undefined;
@@ -183,28 +186,29 @@ export function ContextPanel({ view, currentTokens, contextPercent, skills, hasS
                 >
                   <bdi>{file.key}</bdi>
                 </span>
-                <span className="text-ok">+{file.added}</span>
-                <span className="text-muted">−{file.removed}</span>
+                <span className="text-ok tabular-nums">+{file.added}</span>
+                <span className="text-muted tabular-nums">−{file.removed}</span>
                 {kind && relative && opener && (
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => opener({ path: relative, kind })}
-                    className="shrink-0 text-xs text-muted hover:text-text"
                   >
                     Aperçu
-                  </button>
+                  </Button>
                 )}
               </div>
             );
           })}
           {hiddenModifiedCount > 0 && (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setFilesExpanded((value) => !value)}
-              className="self-start text-xs text-muted hover:text-text"
+              className="self-start"
             >
               {filesExpanded ? 'Réduire' : `+ ${hiddenModifiedCount} autres`}
-            </button>
+            </Button>
           )}
         </section>
 
@@ -213,7 +217,7 @@ export function ContextPanel({ view, currentTokens, contextPercent, skills, hasS
         <VisionSection items={view.items} partial={partial} />
 
         <section className="flex flex-col gap-1.5">
-          <h2 className="text-[0.6875rem] font-semibold tracking-[0.06em] text-muted uppercase">Skills</h2>
+          <SectionLabel>Skills</SectionLabel>
           <p className="m-0 text-[0.6875rem] text-muted">Les instructions spécialisées que le modèle a chargées. Point vert : encore dans son contexte.</p>
           {(!hasSession || (skills !== null && skills.loaded.length === 0)) && (
             <div className="text-xs text-muted">Aucun skill chargé.</div>
@@ -239,12 +243,12 @@ export function ContextPanel({ view, currentTokens, contextPercent, skills, hasS
         )}
 
         <section className="flex flex-col gap-2">
-          <h2 className="text-[0.6875rem] font-semibold tracking-[0.06em] text-muted uppercase">Outils de ce tour</h2>
+          <SectionLabel>Outils de ce tour</SectionLabel>
           {view.toolCounts.length === 0 && <div className="text-xs text-muted">Aucun outil appelé.</div>}
           {view.toolCounts.map((tool) => (
             <div key={tool.name} className="flex justify-between text-xs">
               <span className="font-mono">{tool.name}</span>
-              <span className="text-muted">{tool.count}</span>
+              <span className="text-muted tabular-nums">{tool.count}</span>
             </div>
           ))}
         </section>

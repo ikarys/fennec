@@ -1,7 +1,9 @@
 import type { SessionState } from '../../lib/api';
+import { Segmented } from '../ui/Segmented';
 import { themes, type ThemeId } from '../../lib/theme';
 import { stateDotClass } from '../../lib/format';
 import { CloseIcon, FoxIcon, PlusIcon, SearchIcon, SettingsIcon } from '../Icons';
+import { Button, buttonClass } from '../ui/Button';
 
 function WorkflowsIcon({ className }: { className?: string }) {
   return (
@@ -74,7 +76,7 @@ export function TopBar({
               key={tab.id}
               role="tab"
               aria-selected={selected}
-              className={`-mb-px flex min-h-[38px] max-w-[280px] items-center gap-2 rounded-t-lg border border-b-0 px-2 pl-3 ${
+              className={`-mb-px flex h-7 max-w-[280px] items-center gap-2 rounded-t-lg border border-b-0 px-2 pl-3 ${
                 selected ? 'border-border bg-bg text-text' : 'border-transparent bg-transparent text-muted'
               }`}
             >
@@ -82,30 +84,33 @@ export function TopBar({
               <button
                 type="button"
                 onClick={() => onPickTab(tab.id)}
-                className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[0.8125rem] font-medium"
+                className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-medium"
               >
                 {tab.title}
               </button>
-              <span className="whitespace-nowrap text-[0.6875rem] text-muted">{tab.project}</span>
-              <button
-                type="button"
+              <span className="whitespace-nowrap text-xs text-muted">{tab.project}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
                 aria-label="Fermer l'onglet"
                 onClick={() => onCloseTab(tab.id)}
-                className="flex h-6 w-6 items-center justify-center rounded-md text-muted hover:text-text"
               >
                 <CloseIcon className="h-3 w-3" />
-              </button>
+              </Button>
             </div>
           );
         })}
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
+          iconOnly
           aria-label="Nouvelle session"
           onClick={onNewSession}
-          className="mx-1 flex h-8 w-8 flex-none items-center justify-center self-center rounded-lg text-muted hover:text-text"
+          className="self-center"
         >
           <PlusIcon className="h-4 w-4" />
-        </button>
+        </Button>
       </div>
 
       <div className="flex items-center gap-2 py-1.5">
@@ -113,42 +118,34 @@ export function TopBar({
           type="button"
           onClick={onOpenPalette}
           aria-label="Sessions, projets, commandes"
-          className="flex min-h-8 items-center md:min-w-[220px] gap-2.5 rounded-lg border border-border bg-raised px-2.5 py-1 text-[0.8125rem] text-muted"
+          className="flex h-8 items-center gap-2.5 rounded-lg border border-border px-2.5 text-[0.8125rem] text-muted transition-colors hover:border-border-strong hover:text-text md:min-w-[220px]"
         >
           <SearchIcon className="h-3.5 w-3.5" />
           <span className="hidden grow text-left md:inline">Sessions, projets, commandes</span>
           <kbd className="rounded-md border border-border px-1.5 py-px text-[0.6875rem] text-muted">⌘K</kbd>
         </button>
 
-        <div role="group" aria-label="Thème" className="flex gap-0.5 rounded-[10px] border border-border bg-raised p-0.5">
-          {themes.map((option) => {
-            const pressed = option.id === theme;
-            return (
-              <button
-                key={option.id}
-                type="button"
-                aria-pressed={pressed}
-                aria-label={`Thème ${option.label}`}
-                onClick={() => onThemeChange(option.id)}
-                className={`flex min-h-[26px] items-center gap-1.5 rounded-[7px] border-0 px-2 text-xs font-medium ${
-                  pressed ? 'bg-panel text-text' : 'bg-transparent text-muted'
-                }`}
-              >
-                <span
-                  className="h-3 w-3 rounded-full border border-border"
-                  style={{ background: option.swatch }}
-                />
+        <Segmented
+          label="Thème"
+          value={theme}
+          onChange={onThemeChange}
+          segments={themes.map((option) => ({
+            value: option.id,
+            ariaLabel: `Thème ${option.label}`,
+            label: (
+              <>
+                <span className="h-3 w-3 rounded-full border border-border" style={{ background: option.swatch }} />
                 <span className="hidden md:inline">{option.label}</span>
-              </button>
-            );
-          })}
-        </div>
+              </>
+            )
+          }))}
+        />
 
         <a
           href="#/workflows"
           title="Workflows"
           aria-label="Workflows"
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:text-text"
+          className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
         >
           <WorkflowsIcon className="h-4 w-4" />
         </a>
@@ -156,7 +153,7 @@ export function TopBar({
           href="#/settings"
           title="Réglages"
           aria-label="Réglages"
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:text-text"
+          className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
         >
           <SettingsIcon className="h-4 w-4" />
         </a>

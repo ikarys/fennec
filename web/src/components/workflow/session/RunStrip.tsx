@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { portTone, type RunView } from '../../../lib/workflowRun';
 import { CheckIcon, CloseIcon } from '../../Icons';
+import { Badge } from '../../ui/Badge';
+import { Button } from '../../ui/Button';
 
 function PortBadge({ port }: { port: string }) {
   const tone = portTone(port);
@@ -33,6 +35,19 @@ function outcomeLabel(outcome: string): string {
       return 'en erreur';
     default:
       return outcome;
+  }
+}
+
+function outcomeTone(outcome: string): 'ok' | 'err' | 'neutral' {
+  switch (outcome) {
+    case 'done':
+      return 'ok';
+    case 'blocked':
+    case 'stopped':
+    case 'error':
+      return 'err';
+    default:
+      return 'neutral';
   }
 }
 
@@ -121,16 +136,14 @@ export function RunStrip({
           ))}
         </div>
         {run.finished && (
-          <span className="text-xs text-muted">{outcomeLabel(run.finished.outcome)}</span>
+          <Badge tone={outcomeTone(run.finished.outcome)} className="shrink-0">
+            {outcomeLabel(run.finished.outcome)}
+          </Badge>
         )}
         {active && !running && (
-          <button
-            type="button"
-            onClick={onStop}
-            className="shrink-0 rounded-lg border border-border bg-raised px-2.5 py-1 text-xs text-text hover:text-err"
-          >
+          <Button type="button" variant="danger" size="sm" onClick={onStop} className="shrink-0">
             Arrêter le workflow
-          </button>
+          </Button>
         )}
       </div>
     </div>

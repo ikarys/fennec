@@ -1,6 +1,8 @@
 import { useMemo, useRef, useState } from 'react';
 import type { ThreadItem } from '../../lib/fold';
 import { seenImages, type SeenImage } from '../../lib/vision';
+import { Button } from '../ui/Button';
+import { SectionLabel } from '../ui/SectionLabel';
 
 export function VisionSection({ items, partial }: { items: ThreadItem[]; partial: boolean }) {
   const images = useMemo(() => seenImages(items), [items]);
@@ -21,7 +23,7 @@ export function VisionSection({ items, partial }: { items: ThreadItem[]; partial
 
   return (
     <section className="flex flex-col gap-1.5">
-      <h2 className="text-[0.6875rem] font-semibold tracking-[0.06em] text-muted uppercase">Vision</h2>
+      <SectionLabel>Vision</SectionLabel>
       <p className="m-0 text-[0.6875rem] text-muted">Les images que le modèle a vues : captures, images lues ou jointes. Grisées : sorties de son contexte.</p>
       {partial && <div className="text-[0.6875rem] text-muted">(messages chargés seulement)</div>}
       {images.length === 0 ? (
@@ -63,20 +65,12 @@ export function VisionSection({ items, partial }: { items: ThreadItem[]; partial
               {!selected.inContext && <div className="text-xs text-muted">Plus dans le contexte du modèle</div>}
             </div>
             <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={jumpToThread}
-                className="rounded-lg border border-border bg-raised px-2.5 py-1 text-xs text-text"
-              >
+              <Button variant="secondary" size="sm" onClick={jumpToThread}>
                 Voir dans le fil
-              </button>
-              <button
-                type="button"
-                onClick={closeDialog}
-                className="rounded-lg border border-border bg-raised px-2.5 py-1 text-xs text-text"
-              >
+              </Button>
+              <Button variant="secondary" size="sm" onClick={closeDialog}>
                 Fermer
-              </button>
+              </Button>
             </div>
           </div>
         )}

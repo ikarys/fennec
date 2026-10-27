@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Project } from '../lib/api';
 import { stateDotClass, stateLabel } from '../lib/format';
 import { SearchIcon } from './Icons';
+import { SectionLabel } from './ui/SectionLabel';
 
 interface PaletteItem {
   id: string;
@@ -173,7 +174,7 @@ export function Palette({ open, projects, onClose, onOpenSession, onNewSession, 
             type="button"
             onClick={onClose}
             aria-label="Fermer la palette"
-            className="rounded-md border border-border px-2 py-0.5 text-[0.6875rem] text-muted"
+            className="text-[0.6875rem] rounded border border-border px-1.5 text-faint"
           >
             Échap
           </button>
@@ -183,8 +184,8 @@ export function Palette({ open, projects, onClose, onOpenSession, onNewSession, 
           {flatItems.length === 0 && <div className="px-2.5 py-6 text-center text-sm text-muted">Aucun résultat</div>}
           {groups.map((group) => (
             <div key={group.label}>
-              <div className="px-2.5 pt-2.5 pb-1 text-[0.6875rem] font-semibold tracking-[0.06em] text-muted uppercase">
-                {group.label}
+              <div className="px-2.5 pt-2.5 pb-1">
+                <SectionLabel>{group.label}</SectionLabel>
               </div>
               {group.items.map((item) => {
                 const index = flatItems.findIndex((candidate) => candidate.id === item.id);
@@ -215,10 +216,10 @@ export function Palette({ open, projects, onClose, onOpenSession, onNewSession, 
           ))}
         </div>
 
-        <div className="flex flex-wrap gap-4 border-t border-border px-3.5 py-2 text-xs text-muted">
-          <span>↑↓ naviguer</span>
-          <span>↵ ouvrir dans un onglet</span>
-          <span>⌘↵ nouvelle session ici</span>
+        <div className="flex flex-wrap gap-4 border-t border-border px-3.5 py-2">
+          <span className="text-[0.6875rem] rounded border border-border px-1.5 text-faint">↑↓ naviguer</span>
+          <span className="text-[0.6875rem] rounded border border-border px-1.5 text-faint">↵ ouvrir dans un onglet</span>
+          <span className="text-[0.6875rem] rounded border border-border px-1.5 text-faint">⌘↵ nouvelle session ici</span>
         </div>
       </div>
     </div>

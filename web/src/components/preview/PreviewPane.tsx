@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { Button, buttonClass } from '../ui/Button';
 import { markdownComponents } from '../session/markdownComponents';
 import { previewUrl } from '../../lib/preview';
 import type { PreviewTarget } from './PreviewContext';
@@ -69,28 +70,16 @@ export function PreviewPane({ sessionId, target, onClose }: PreviewPaneProps) {
     <div className="fixed inset-y-0 right-0 z-40 flex w-[min(960px,92vw)] flex-col border-l border-border bg-bg shadow-xl">
       <header className="flex items-center gap-2 border-b border-border px-4 py-3">
         <span className="min-w-0 grow truncate font-mono text-xs text-muted">{target.path}</span>
-        <button
-          type="button"
-          onClick={() => setReloadKey((value) => value + 1)}
-          className="shrink-0 rounded-lg border border-border bg-raised px-2.5 py-1 text-xs text-text hover:bg-accent-soft hover:text-accent-strong"
-        >
-          Recharger
-        </button>
+        <Button onClick={() => setReloadKey((value) => value + 1)}>Recharger</Button>
         <a
           href={previewUrl(sessionId, target.path)}
           target="_blank"
           rel="noreferrer"
-          className="shrink-0 rounded-lg border border-border bg-raised px-2.5 py-1 text-xs text-text hover:bg-accent-soft hover:text-accent-strong"
+          className={buttonClass()}
         >
           Ouvrir dans un onglet
         </a>
-        <button
-          type="button"
-          onClick={onClose}
-          className="shrink-0 rounded-lg border border-border bg-raised px-2.5 py-1 text-xs text-text hover:bg-accent-soft hover:text-accent-strong"
-        >
-          Fermer
-        </button>
+        <Button onClick={onClose}>Fermer</Button>
       </header>
       {target.kind === 'html' ? (
         <iframe

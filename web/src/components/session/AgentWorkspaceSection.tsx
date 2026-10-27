@@ -3,6 +3,9 @@ import type { IntegrationPreview, SessionDetail } from '../../lib/api';
 import { discardWorktree, getIntegration } from '../../lib/api';
 import { BranchIcon, CheckIcon, CopyIcon, EditIcon, FolderIcon, SpinnerIcon } from '../Icons';
 import { IntegrationDialog } from './IntegrationDialog';
+import { Button, buttonClass } from '../ui/Button';
+import { Badge } from '../ui/Badge';
+import { SectionLabel } from '../ui/SectionLabel';
 
 function shortFolderName(path: string): string {
   const name = path.split(/[\\/]/).filter(Boolean).pop() ?? path;
@@ -95,7 +98,7 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
 
   return (
     <section className="flex flex-col gap-2">
-      <h2 className="text-[0.6875rem] font-semibold tracking-[0.06em] text-muted uppercase">Espace de l'agent</h2>
+      <SectionLabel>Espace de l'agent</SectionLabel>
       <p className="m-0 text-xs text-muted">
         L'agent travaille dans sa propre copie du dépôt. Ton dossier et ta branche ne changent pas tant que tu n'intègres pas.
       </p>
@@ -111,19 +114,20 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
               href={worktree.editorUrl}
               title="Ouvrir dans VS Code"
               aria-label="Ouvrir dans VS Code"
-              className="rounded p-1 text-muted hover:text-text"
+              className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
             >
               <EditIcon className="h-3.5 w-3.5" />
             </a>
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="sm"
+              iconOnly
               onClick={handleCopyPath}
               title="Copier le chemin"
               aria-label="Copier le chemin"
-              className="rounded p-1 text-muted hover:text-text"
             >
               {copied ? <CheckIcon className="h-3.5 w-3.5 text-ok" /> : <CopyIcon className="h-3.5 w-3.5" />}
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -163,11 +167,7 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
                           >
                             <bdi>{file.path}</bdi>
                           </span>
-                          {file.protected && (
-                            <span className="shrink-0 rounded border border-err bg-err/10 px-1 py-0.5 text-[0.625rem] text-err">
-                              protégé
-                            </span>
-                          )}
+                          {file.protected && <Badge tone="err">protégé</Badge>}
                         </div>
                       ))}
                     </div>
@@ -178,24 +178,26 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
           </div>
         )}
 
-        <button
-          type="button"
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={() => setDialogOpen(true)}
           disabled={integrateDisabled}
           title={running ? 'Attends la fin du tour' : undefined}
-          className="w-full rounded-lg bg-accent px-2.5 py-1.5 text-xs font-medium text-on-accent disabled:opacity-60"
+          className="w-full"
         >
           Intégrer dans {humanBranch}
-        </button>
+        </Button>
 
-        <button
-          type="button"
+        <Button
+          variant="danger"
+          size="sm"
           onClick={() => void handleDiscard()}
           disabled={sessionId === null || running || discarding}
-          className="w-full rounded-lg border border-border bg-raised px-2.5 py-1.5 text-xs text-err disabled:opacity-60"
+          className="w-full"
         >
           Abandonner ce travail
-        </button>
+        </Button>
         {discardError && <div className="text-xs text-err">{discardError}</div>}
 
         <details className="text-xs">
@@ -205,7 +207,7 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
               type="button"
               title="Copier la commande"
               onClick={() => void navigator.clipboard.writeText(`git cherry-pick ${worktree.base}..${worktree.branch}`)}
-              className="rounded-lg border border-border bg-raised px-2 py-1.5 text-left font-mono text-xs break-all text-text"
+              className="rounded-lg border border-border bg-code px-2 py-1.5 text-left font-mono text-xs break-all text-text hover:border-border-strong"
             >
               <code>git cherry-pick {worktree.base}..{worktree.branch}</code>
             </button>

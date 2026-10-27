@@ -143,7 +143,8 @@ crates/fennec/src/
 crates/fennec/build.rs   embeds web/dist (placeholder page when not built)
 web/src/           React + Vite + Tailwind v4 UI (same layout as openfox's web/src)
   pages/             one component per route: HomePage, SessionPage, SettingsPage, WorkflowsPage (lazy)
-  components/        shared UI; session/ the thread, tool cards, question card, message stats, composer,
+  components/        ui/ the primitives every screen uses (Button, Badge, SectionLabel, Card, fields);
+                     shared UI; session/ the thread, tool cards, question card, message stats, composer,
                      context panel; project/ the folder browser; layout/ the top bar;
                      workflow/ the editor (canvas, node shapes, panels) and session/ a run in the thread;
                      preview/ the preview pane and previewable code blocks
@@ -155,6 +156,7 @@ web/src/           React + Vite + Tailwind v4 UI (same layout as openfox's web/s
   styles/app.css     theme tokens: one CSS variable block per theme, mapped into Tailwind
 docs/api.md        the HTTP API and event wire format, shared by server and UI
 docs/workflows.md  the workflow format, run semantics and editor
+docs/ui.md         the UI's design rules: tokens and primitives, never per-file styles
 docs/dogfooding.md the frictions met while fennec builds fennec, and their status
 ```
 

@@ -1,5 +1,8 @@
 import { useState } from 'react';
 import type { RunWaiting } from '../../../lib/workflowRun';
+import { Button } from '../../ui/Button';
+import { Card } from '../../ui/Card';
+import { TextInput } from '../../ui/Field';
 
 export function RunActionCard({
   waiting,
@@ -38,107 +41,110 @@ export function RunActionCard({
 
   return (
     <div className="px-6 py-2">
-      <div className="mx-auto max-w-[820px] rounded-xl border border-border bg-panel px-3 py-2">
-        <div className="flex items-center gap-1.5 text-xs font-semibold">
-          <span className="text-accent">⚡</span>
-          <span className="text-accent-strong">Workflow</span>
-        </div>
+      <Card className="mx-auto max-w-[820px] px-3 py-2">
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-1.5 text-xs font-semibold">
+            <span className="text-accent">⚡</span>
+            <span className="text-accent-strong">Workflow</span>
+          </div>
 
-        {waiting.kind === 'human' && (
-          <>
-            <div className="mt-1 max-h-48 overflow-y-auto text-sm leading-snug whitespace-pre-wrap [overflow-wrap:break-word]">
-              {waiting.question}
-            </div>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <input
-                type="text"
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                placeholder="Commentaire (optionnel)…"
-                disabled={isBusy}
-                className="min-w-40 flex-1 rounded-md border border-border bg-transparent px-2 py-1 text-xs outline-none focus:border-accent disabled:opacity-60"
-              />
-              {waiting.choices.map((choice, index) => (
-                <button
-                  key={choice}
-                  type="button"
+          {waiting.kind === 'human' && (
+            <>
+              <div className="max-h-48 overflow-y-auto text-sm leading-snug whitespace-pre-wrap [overflow-wrap:break-word]">
+                {waiting.question}
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <TextInput
+                  type="text"
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder="Commentaire (optionnel)…"
                   disabled={isBusy}
-                  onClick={() => handleAction(() => onAnswer(choice, comment))}
-                  className={
-                    index === 0
-                      ? 'rounded-md bg-accent px-2.5 py-1 text-xs font-medium text-on-accent hover:opacity-90 disabled:opacity-60'
-                      : 'rounded-md border border-border bg-raised px-2.5 py-1 text-xs text-text hover:border-border-strong disabled:opacity-60'
-                  }
+                  className="min-w-40 flex-1"
+                />
+                {waiting.choices.map((choice, index) => (
+                  <Button
+                    key={choice}
+                    type="button"
+                    variant={index === 0 ? 'primary' : 'secondary'}
+                    size="sm"
+                    disabled={isBusy}
+                    onClick={() => handleAction(() => onAnswer(choice, comment))}
+                  >
+                    {choice}
+                  </Button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {waiting.kind === 'pause' && (
+            <>
+              <div className="text-sm leading-snug text-muted">
+                En pause avant « {waiting.toLabel} »
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <TextInput
+                  type="text"
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder="Commentaire (optionnel)…"
+                  disabled={isBusy}
+                  className="min-w-40 flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  disabled={isBusy}
+                  onClick={() => handleAction(() => onContinue(comment))}
                 >
-                  {choice}
-                </button>
-              ))}
-            </div>
-          </>
-        )}
+                  Continuer
+                </Button>
+                <Button
+                  type="button"
+                  variant="danger"
+                  size="sm"
+                  disabled={isBusy}
+                  onClick={() => handleAction(onStop)}
+                >
+                  Arrêter
+                </Button>
+              </div>
+            </>
+          )}
 
-        {waiting.kind === 'pause' && (
-          <>
-            <div className="mt-1 text-sm leading-snug text-muted">
-              En pause avant « {waiting.toLabel} »
-            </div>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <input
-                type="text"
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                placeholder="Commentaire (optionnel)…"
-                disabled={isBusy}
-                className="min-w-40 flex-1 rounded-md border border-border bg-transparent px-2 py-1 text-xs outline-none focus:border-accent disabled:opacity-60"
-              />
-              <button
-                type="button"
-                disabled={isBusy}
-                onClick={() => handleAction(() => onContinue(comment))}
-                className="rounded-md border border-border bg-raised px-2.5 py-1 text-xs text-text hover:border-border-strong disabled:opacity-60"
-              >
-                Continuer
-              </button>
-              <button
-                type="button"
-                disabled={isBusy}
-                onClick={() => handleAction(onStop)}
-                className="rounded-md border border-border bg-raised px-2.5 py-1 text-xs text-text hover:border-border-strong hover:text-err disabled:opacity-60"
-              >
-                Arrêter
-              </button>
-            </div>
-          </>
-        )}
+          {waiting.kind === 'interrupted' && (
+            <>
+              <div className="text-sm leading-snug text-muted">
+                Workflow interrompu
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  disabled={isBusy}
+                  onClick={() => handleAction(onResume)}
+                >
+                  Reprendre
+                </Button>
+                <Button
+                  type="button"
+                  variant="danger"
+                  size="sm"
+                  disabled={isBusy}
+                  onClick={() => handleAction(onStop)}
+                >
+                  Arrêter
+                </Button>
+              </div>
+            </>
+          )}
 
-        {waiting.kind === 'interrupted' && (
-          <>
-            <div className="mt-1 text-sm leading-snug text-muted">
-              Workflow interrompu
-            </div>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <button
-                type="button"
-                disabled={isBusy}
-                onClick={() => handleAction(onResume)}
-                className="rounded-md border border-border bg-raised px-2.5 py-1 text-xs text-text hover:border-border-strong disabled:opacity-60"
-              >
-                Reprendre
-              </button>
-              <button
-                type="button"
-                disabled={isBusy}
-                onClick={() => handleAction(onStop)}
-                className="rounded-md border border-border bg-raised px-2.5 py-1 text-xs text-text hover:border-border-strong hover:text-err disabled:opacity-60"
-              >
-                Arrêter
-              </button>
-            </div>
-          </>
-        )}
-
-        {error && <div className="mt-1.5 text-xs text-err">{error}</div>}
-      </div>
+          {error && <div className="text-xs text-err">{error}</div>}
+        </div>
+      </Card>
     </div>
   );
 }

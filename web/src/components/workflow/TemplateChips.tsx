@@ -1,3 +1,4 @@
+import { Button } from '../ui/Button';
 interface TemplateChipsProps {
   names: string[];
   onInsert: (name: string) => void;
@@ -13,14 +14,9 @@ export function TemplateChips({ names, onInsert }: TemplateChipsProps) {
       </summary>
       <div className="mt-1 flex max-h-28 flex-wrap gap-1 overflow-y-auto">
         {names.map((name) => (
-          <button
-            key={name}
-            type="button"
-            onClick={() => onInsert(name)}
-            className="rounded-md border border-border bg-raised px-1.5 py-0.5 text-[0.6875rem] text-muted hover:text-text"
-          >
+          <Button key={name} variant="ghost" className="font-mono" onClick={() => onInsert(name)}>
             {`{{${name}}}`}
-          </button>
+          </Button>
         ))}
       </div>
     </details>

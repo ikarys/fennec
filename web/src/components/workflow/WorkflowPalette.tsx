@@ -1,26 +1,27 @@
 import { NODE_KIND_LABELS, type NodeKind } from '../../lib/workflow';
+import { SectionLabel } from '../ui/SectionLabel';
 
 interface WorkflowPaletteProps {
   onAddNode: (kind: NodeKind) => void;
 }
 
-const KINDS: { kind: NodeKind; shape: string }[] = [
-  { kind: 'start', shape: 'rounded-full bg-raised' },
-  { kind: 'end', shape: 'rounded-full bg-ok-soft' },
-  { kind: 'agent', shape: 'rounded-lg bg-panel border border-border' },
-  { kind: 'shell', shape: 'rounded-lg bg-code' },
-  { kind: 'criteria', shape: 'rounded-lg bg-code border border-ok/30' },
-  { kind: 'human', shape: 'bg-accent-soft' },
-  { kind: 'condition', shape: 'bg-raised' },
-  { kind: 'parallel', shape: 'rounded-md bg-raised' },
-  { kind: 'join', shape: 'rounded-md bg-raised' }
+const KINDS: { kind: NodeKind; dot: string }[] = [
+  { kind: 'start', dot: 'bg-muted' },
+  { kind: 'end', dot: 'bg-ok' },
+  { kind: 'agent', dot: 'bg-accent' },
+  { kind: 'shell', dot: 'bg-text' },
+  { kind: 'criteria', dot: 'bg-ok' },
+  { kind: 'human', dot: 'bg-accent-strong' },
+  { kind: 'condition', dot: 'bg-faint' },
+  { kind: 'parallel', dot: 'bg-faint' },
+  { kind: 'join', dot: 'bg-faint' }
 ];
 
 export function WorkflowPalette({ onAddNode }: WorkflowPaletteProps) {
   return (
     <aside className="flex w-40 shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-panel p-2">
-      <div className="px-1 pb-1 text-[0.6875rem] font-semibold tracking-[0.06em] text-muted uppercase">Nœuds</div>
-      {KINDS.map(({ kind, shape }) => (
+      <SectionLabel className="px-1 pb-1">Nœuds</SectionLabel>
+      {KINDS.map(({ kind, dot }) => (
         <button
           key={kind}
           type="button"
@@ -30,9 +31,9 @@ export function WorkflowPalette({ onAddNode }: WorkflowPaletteProps) {
             event.dataTransfer.effectAllowed = 'move';
           }}
           onClick={() => onAddNode(kind)}
-          className={`flex h-10 items-center gap-2 rounded-lg px-2 text-left text-[0.8125rem] text-text hover:bg-raised ${shape}`}
+          className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-text hover:bg-raised"
         >
-          <span className="h-3 w-3 rounded-full bg-current opacity-30" />
+          <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${dot}`} />
           {NODE_KIND_LABELS[kind]}
         </button>
       ))}

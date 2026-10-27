@@ -9,6 +9,7 @@ import type {
   SettingsResponse
 } from '../lib/api';
 import { saveSettings } from '../lib/api';
+import { Button } from '../components/ui/Button';
 import { ModelSection } from '../components/settings/ModelSection';
 import { ModelPrefsSection, percentFromFraction, type ModelForm } from '../components/settings/ModelPrefsSection';
 import { DisplaySection } from '../components/settings/DisplaySection';
@@ -233,8 +234,8 @@ export function SettingsPage({ settings, onSaved }: SettingsPageProps) {
                 type="button"
                 onClick={() => setTab(id)}
                 aria-current={tab === id ? 'page' : undefined}
-                className={`rounded-lg px-3 py-1.5 text-left text-[0.8125rem] transition-colors ${
-                  tab === id ? 'bg-raised text-text font-medium' : 'text-muted hover:bg-raised hover:text-text'
+                className={`rounded-lg px-2.5 py-1.5 text-left text-sm ${
+                  tab === id ? 'bg-raised text-text' : 'text-muted hover:text-text'
                 }`}
               >
                 {label}
@@ -278,15 +279,11 @@ export function SettingsPage({ settings, onSaved }: SettingsPageProps) {
             )}
 
             <div className="flex items-center gap-3">
-              <button
-                type="submit"
-                disabled={saving}
-                className="flex min-h-9 items-center gap-2 rounded-lg bg-accent px-4 text-[0.8125rem] font-medium text-on-accent disabled:opacity-60"
-              >
+              <Button type="submit" variant="primary" size="md" disabled={saving}>
                 {saving ? 'Enregistrement…' : 'Enregistrer'}
-              </button>
-              {saved && <span className="text-[0.8125rem] text-ok">Enregistré</span>}
-              {error && <span className="text-[0.8125rem] text-err">{error}</span>}
+              </Button>
+              {saved && <span className="text-xs text-ok">Enregistré</span>}
+              {error && <span className="text-xs text-err">{error}</span>}
             </div>
           </form>
         </div>
