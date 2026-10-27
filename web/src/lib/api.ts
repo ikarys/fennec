@@ -469,6 +469,7 @@ export function startWorkflow(
   task: string,
   stepByStep: boolean,
   worktree: boolean,
+  attachments: AttachmentInput[] = [],
   plan?: string
 ): Promise<void> {
   return request<void>(`/api/sessions/${encodeURIComponent(sessionId)}/workflow`, {
@@ -478,6 +479,7 @@ export function startWorkflow(
       task,
       stepByStep,
       worktree,
+      ...(attachments.length > 0 ? { attachments } : {}),
       ...(plan ? { plan } : {})
     })
   });

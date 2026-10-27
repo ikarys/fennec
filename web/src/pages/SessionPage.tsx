@@ -287,12 +287,6 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
         ? workflowSelection.workflowId
         : null;
 
-    // A workflow start refuses attachments.
-    if (workflowId && images.length > 0) {
-      setSendError('Les pièces jointes ne sont pas acceptées pour un workflow.');
-      return;
-    }
-
     try {
       if (workflowId) {
         if (sessionId) {
@@ -301,7 +295,8 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
             workflowId,
             value,
             workflowSelection.stepByStep,
-            workflowSelection.worktree
+            workflowSelection.worktree,
+            images
           );
         } else if (projectId) {
           const created = await createSession(projectId, value, mode ?? undefined, images, {
@@ -393,6 +388,7 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
           task,
           false,
           worktree,
+          [],
           lastTextSegment.content
         );
         // The next message gets the default workflow again.
