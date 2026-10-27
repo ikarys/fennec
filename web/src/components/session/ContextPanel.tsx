@@ -6,7 +6,6 @@ import { pageBlocks, panelPages, type PanelBlockId } from '../../lib/panelBlocks
 import { Select } from '../ui/Field';
 import { AgentWorkspaceSection } from './AgentWorkspaceSection';
 import { CriteriaSection } from './CriteriaSection';
-import { ContextUsageSection } from './ContextUsageSection';
 import { ModifiedFilesSection } from './ModifiedFilesSection';
 import { SkillsSection } from './SkillsSection';
 import { TokensSection } from './TokensSection';
@@ -50,17 +49,10 @@ function savePageName(name: string): void {
 
 interface ContextPanelProps {
   view: ThreadView;
-  currentTokens: number;
-  /** The model's context window; 0 when unknown. */
-  maxTokens: number;
-  contextPercent: number;
   /** The session's skills, folded server-side; null while the first fetch is in flight. */
   skills: SessionSkills | null;
   /** False on the « Nouvelle session » tab, where there is no log to fold. */
   hasSession: boolean;
-  compactDisabled: boolean;
-  onCompact: () => void;
-  compactError: string | null;
   /** Older pages are not loaded: the totals cover the loaded messages only. */
   partial: boolean;
   /** Where the agent's work lands; null when the session runs in place. */
@@ -69,9 +61,11 @@ interface ContextPanelProps {
   sessionId: string | null;
   /** Re-fetch the session detail after the worktree changed (discard). */
   onWorktreeChanged: () => void;
+  /** Bumped when the review dialog closes: the workspace block re-reads the preview. */
+  integrationVersion: number;
 }
 
-export function ContextPanel({ view, currentTokens, maxTokens, contextPercent, skills, hasSession, compactDisabled, onCompact, compactError, partial, worktree, sessionId, onWorktreeChanged }: ContextPanelProps) {
+export function ContextPanel({ view, skills, hasSession, partial, worktree, sessionId, onWorktreeChanged, integrationVersion }: ContextPanelProps) {
   const [width, setWidth] = useState(loadWidth);
   const [selectedPageName, setSelectedPageName] = useState(loadPageName);
   const pages = panelPages(useDisplayPrefs().panelPages);
@@ -111,20 +105,8 @@ export function ContextPanel({ view, currentTokens, maxTokens, contextPercent, s
         return <ModifiedFilesSection key={id} modifiedFiles={view.modifiedFiles} sessionId={sessionId} />;
       case 'workspace':
         return worktree ? (
-          <AgentWorkspaceSection key={id} sessionId={sessionId} worktree={worktree} running={view.running} onDiscarded={onWorktreeChanged} />
+          <AgentWorkspaceSection key={id} sessionId={sessionId} worktree={worktree} running={view.running} onDiscarded={onWorktreeChanged} integrationVersion={integrationVersion} />
         ) : null;
-      case 'context':
-        return (
-          <ContextUsageSection
-            key={id}
-            currentTokens={currentTokens}
-            maxTokens={maxTokens}
-            contextPercent={contextPercent}
-            compactDisabled={compactDisabled}
-            onCompact={onCompact}
-            compactError={compactError}
-          />
-        );
       case 'tokens':
         return <TokensSection key={id} usage={view.usage} partial={partial} />;
       case 'skills':
@@ -179,10 +161,6 @@ export function ContextPanel({ view, currentTokens, maxTokens, contextPercent, s
           </Select>
         )}
         {pageBlocks(page, page === pages[0]).map(renderBlock)}
-        <div className="grow" />
-        <p className="m-0 rounded-lg bg-raised px-3 py-2.5 text-xs text-muted">
-          Rien n'est intégré sans ta décision.
-        </p>
       </aside>
     </div>
   );

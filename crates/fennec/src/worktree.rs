@@ -23,6 +23,10 @@ pub struct Worktree {
     /// (after the snapshot of the human's uncommitted work), so
     /// `git cherry-pick <base>..<branch>` replays only the agent's commits.
     pub base: String,
+    /// `refs/fennec/origin/<session_id>`: a symbolic ref to the branch the
+    /// human had checked out when the worktree was made, so the gate can tell
+    /// a branch switch.
+    pub origin: String,
 }
 
 /// The directory holding every worktree: `worktrees/` next to the database file.
@@ -65,19 +69,29 @@ pub fn open(root: &Path, project_dir: &Path, session_id: &str) -> Result<Option<
     Ok(Some(wt))
 }
 
-/// Removes the session's worktree, its branch and its base ref: the human's
-/// discard. The agent's commits stay in the object store only until git gc,
-/// which is why the route records their shas.
+/// Removes the session's worktree, its branch, and its base and origin refs:
+/// the human's discard. The agent's commits stay in the object store only
+/// until git gc, which is why the route records their shas.
 pub fn remove(top: &Path, wt: &Worktree) -> Result<(), String> {
     let path_arg = wt.path.to_string_lossy().into_owned();
     git(top, &["worktree", "remove", "--force", &path_arg], None)?;
     git(top, &["branch", "-D", &wt.branch], None)?;
     git(top, &["update-ref", "-d", &wt.base], None)?;
+    // Older worktrees have no origin ref; deleting it is optional.
+    let _ = git(top, &["symbolic-ref", "--delete", &wt.origin], None);
     Ok(())
 }
 
+/// The branch the human had checked out when the worktree was made; `None`
+/// for a detached HEAD or worktrees made before this ref existed.
+pub fn origin_branch(top: &Path, wt: &Worktree) -> Option<String> {
+    let out = git(top, &["symbolic-ref", "--short", &wt.origin], None).ok()?;
+    let branch = String::from_utf8_lossy(&out).trim().to_string();
+    (!branch.is_empty()).then_some(branch)
+}
+
 /// Copies the human's uncommitted work into the fresh worktree and records
-/// the base ref.
+/// the base ref and the human's checked-out branch, if it is on one.
 fn fill(top: &Path, wt: &Worktree) -> Result<(), String> {
     // The human's uncommitted work is copied, never moved: their tree stays as is.
     let mut copied = false;
@@ -108,6 +122,12 @@ fn fill(top: &Path, wt: &Worktree) -> Result<(), String> {
         )?;
     }
     git(&wt.path, &["update-ref", &wt.base, "HEAD"], None)?;
+    if let Ok(head) = git(top, &["symbolic-ref", "-q", "HEAD"], None) {
+        let head_ref = String::from_utf8_lossy(&head).trim().to_string();
+        if !head_ref.is_empty() {
+            git(top, &["symbolic-ref", &wt.origin, &head_ref], None)?;
+        }
+    }
     Ok(())
 }
 
@@ -152,6 +172,7 @@ fn build(path: PathBuf, prefix: &str, session_id: &str) -> Worktree {
         path,
         branch: format!("fennec/{session_id}"),
         base: format!("refs/fennec/base/{session_id}"),
+        origin: format!("refs/fennec/origin/{session_id}"),
     }
 }
 
