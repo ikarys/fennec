@@ -22,4 +22,5 @@ pub mod session_skills;
 pub mod skill;
 pub mod slash;
 pub mod stats;
+pub mod test_files;
 pub mod workflow;

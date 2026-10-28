@@ -4,12 +4,28 @@
 use std::path::{Path, PathBuf};
 
 use crate::domain::protection::Protection;
+use crate::domain::test_files;
 
 /// The project's protection: defaults plus `.agents/protected` when present.
 pub fn load(workdir: &Path) -> Protection {
     let path = workdir.join(".agents").join("protected");
     let content = std::fs::read_to_string(path).ok();
     Protection::new(content.as_deref())
+}
+
+/// Protects the tests an integration brought: the new ones among `files`
+/// (relative to the project root) are appended to `.agents/protected`.
+/// Returns the paths added.
+pub fn protect_tests(workdir: &Path, files: &[String]) -> std::io::Result<Vec<String>> {
+    let path = workdir.join(".agents").join("protected");
+    let existing = std::fs::read_to_string(&path).unwrap_or_default();
+    let added = test_files::new_test_patterns(files, &Protection::new(Some(&existing)));
+    if added.is_empty() {
+        return Ok(added);
+    }
+    std::fs::create_dir_all(workdir.join(".agents"))?;
+    std::fs::write(&path, test_files::append_to(&existing, &added))?;
+    Ok(added)
 }
 
 /// Existing protected paths under `workdir`, for the sandbox's read-only mounts.
