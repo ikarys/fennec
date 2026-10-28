@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fmt;
 use std::path::Path;
 use std::sync::Mutex;
@@ -92,12 +93,18 @@ CREATE INDEX IF NOT EXISTS idx_calls_group_at_ms ON calls(group_id, at_ms);
 CREATE INDEX IF NOT EXISTS idx_calls_run_id ON calls(run_id);
 "#;
 
-/// `record` ignores a known `external_id`; `import` fills in its labels if it had none.
-fn insert_sql(fill_labels: bool) -> String {
-    if fill_labels {
+/// `record` ignores a known `external_id`; `insert_sql(true)` fills a stored call's empty
+/// labels and breakdown.
+fn insert_sql(fill_empty: bool) -> String {
+    if fill_empty {
         format!(
-            "INSERT{INSERT_COLUMNS} ON CONFLICT(external_id) DO UPDATE SET labels = excluded.labels \
-             WHERE calls.labels = '{{}}' AND excluded.labels != '{{}}'"
+            "INSERT{INSERT_COLUMNS} ON CONFLICT(external_id) DO UPDATE SET \
+             labels = CASE WHEN calls.labels = '{{}}' THEN excluded.labels \
+             ELSE calls.labels END, \
+             breakdown = CASE WHEN calls.breakdown = '{{}}' THEN excluded.breakdown \
+             ELSE calls.breakdown END \
+             WHERE (calls.labels = '{{}}' AND excluded.labels != '{{}}') \
+             OR (calls.breakdown = '{{}}' AND excluded.breakdown != '{{}}')"
         )
     } else {
         format!("INSERT OR IGNORE{INSERT_COLUMNS}")
@@ -154,9 +161,9 @@ impl Ledger {
         Ok(inserted > 0)
     }
 
-    /// Stores calls not seen yet (by `external_id`). A call already stored without labels gets
-    /// the imported ones, so an importer that learned to label its calls can fill in its past
-    /// rows; nothing else of a stored call ever changes. Returns the rows inserted or labelled.
+    /// Stores calls not seen yet (by `external_id`). A stored call gets the imported labels and
+    /// breakdown it lacked, so an importer that learned to break down its calls can fill in its
+    /// past rows; nothing else of a stored call ever changes. Returns the rows inserted or filled.
     pub fn import<I: IntoIterator<Item = Call>>(&self, calls: I) -> Result<usize, Error> {
         let mut conn = self.db.lock().unwrap();
         let tx = conn.transaction()?;
@@ -168,6 +175,19 @@ impl Ledger {
 
         tx.commit()?;
         Ok(inserted)
+    }
+
+    /// The external ids of `product`'s calls that already have a breakdown, so an
+    /// importer computes breakdowns only for the calls still lacking one.
+    pub fn external_ids_with_breakdown(&self, product: &str) -> Result<HashSet<String>, Error> {
+        let conn = self.db.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT external_id FROM calls WHERE product = ?1 \
+             AND external_id IS NOT NULL AND breakdown != '{}'",
+        )?;
+        let rows = stmt.query_map(params![product], |row| row.get(0))?;
+        let ids = rows.collect::<Result<HashSet<String>, _>>()?;
+        Ok(ids)
     }
 
     fn configure(conn: &Connection) -> Result<(), Error> {
@@ -302,6 +322,52 @@ mod tests {
         assert_eq!(calls.len(), 1);
         assert_eq!(calls[0].labels["messageId"], "m");
         assert_eq!(calls[0].usage.prompt_tokens, 1, "only labels are filled in");
+    }
+
+    #[test]
+    fn import_breakdown_fills_empty_but_never_replaces_non_empty() {
+        let ledger = Ledger::open_in_memory().unwrap();
+        ledger.record(&call_with_id("a")).unwrap();
+
+        let mut filled = call_with_id("a");
+        filled.breakdown.insert("prompt/base".into(), 10);
+        assert_eq!(ledger.import([filled.clone()]).unwrap(), 1);
+
+        let mut other = call_with_id("a");
+        other.breakdown.insert("prompt/other".into(), 20);
+        assert_eq!(ledger.import([other]).unwrap(), 0);
+
+        let summary = ledger.summary(&Filter::default()).unwrap();
+        assert_eq!(summary.calls, 1);
+        assert_eq!(summary.breakdown["prompt/base"], 10);
+        assert!(!summary.breakdown.contains_key("prompt/other"));
+    }
+
+    #[test]
+    fn external_ids_with_breakdown_returns_only_filled_product_ids() {
+        let ledger = Ledger::open_in_memory().unwrap();
+
+        let mut with = call_with_id("with");
+        with.breakdown.insert("prompt/base".into(), 1);
+
+        let without = call_with_id("without");
+
+        let mut other = call_with_id("other");
+        other.product = "other".into();
+        other.breakdown.insert("prompt/base".into(), 1);
+
+        ledger.record(&with).unwrap();
+        ledger.record(&without).unwrap();
+        ledger.record(&other).unwrap();
+
+        assert_eq!(
+            ledger.external_ids_with_breakdown("test").unwrap(),
+            HashSet::from(["with".to_string()])
+        );
+        assert_eq!(
+            ledger.external_ids_with_breakdown("other").unwrap(),
+            HashSet::from(["other".to_string()])
+        );
     }
 
     #[test]

@@ -34,7 +34,7 @@ pub struct ContextView {
 
 /// What the context is made of; token figures are spread pro rata of the
 /// text, so they are indicative.
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CompositionView {
     /// The stacked bar: one segment per kind, in a fixed order.
@@ -44,7 +44,7 @@ pub struct CompositionView {
     pub images: Option<String>,
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct KindView {
     pub kind: PartKind,
@@ -54,7 +54,7 @@ pub struct KindView {
     pub percent: u64,
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PartView {
     /// None for the row that sums the parts past `MAX_PARTS`.
@@ -156,52 +156,63 @@ fn composition(events: &[Event], current: u64) -> Option<CompositionView> {
         return None;
     }
     let shares = spread(&parts.parts, current);
+    let shares: Vec<(PartKind, String, u64)> = parts
+        .parts
+        .into_iter()
+        .zip(shares)
+        .map(|(part, share)| (part.kind, part.label, share))
+        .collect();
+    Some(composition_view(&shares, current, parts.images))
+}
 
+/// A composition ready to draw from shares already in tokens, largest first;
+/// `total` is what the percents are of. Insight draws the ledger's with it too.
+pub fn composition_view(
+    shares: &[(PartKind, String, u64)],
+    total: u64,
+    images: u64,
+) -> CompositionView {
     let mut kinds: Vec<KindView> = Vec::new();
     for kind in [PartKind::Prompt, PartKind::Conversation, PartKind::Tools] {
-        let share: u64 = parts
-            .parts
+        let share: u64 = shares
             .iter()
-            .zip(&shares)
-            .filter(|(part, _)| part.kind == kind)
-            .map(|(_, share)| share)
+            .filter(|(part_kind, _, _)| *part_kind == kind)
+            .map(|(_, _, share)| share)
             .sum();
         if share > 0 {
             kinds.push(KindView {
                 kind,
                 label: kind_label(kind).into(),
                 tokens: tokens(share),
-                percent: display::percent(share, current),
+                percent: display::percent(share, total),
             });
         }
     }
 
-    let mut rows: Vec<PartView> = parts
-        .parts
+    let mut rows: Vec<PartView> = shares
         .iter()
-        .zip(&shares)
         .take(MAX_PARTS)
-        .map(|(part, &share)| part_view(Some(part.kind), part.label.clone(), share, current))
+        .map(|(kind, label, share)| part_view(Some(*kind), label.clone(), *share, total))
         .collect();
     let rest = &shares[rows.len()..];
     if !rest.is_empty() {
         rows.push(part_view(
             None,
             format!("{} autres parts", rest.len()),
-            rest.iter().sum(),
-            current,
+            rest.iter().map(|(_, _, share)| share).sum(),
+            total,
         ));
     }
 
-    Some(CompositionView {
+    CompositionView {
         kinds,
         parts: rows,
-        images: match parts.images {
+        images: match images {
             0 => None,
             1 => Some("+ 1 image, non estimée".into()),
             n => Some(format!("+ {n} images, non estimées")),
         },
-    })
+    }
 }
 
 fn part_view(kind: Option<PartKind>, label: String, share: u64, current: u64) -> PartView {
