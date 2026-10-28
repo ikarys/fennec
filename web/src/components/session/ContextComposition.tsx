@@ -1,6 +1,6 @@
 /**
- * What the context is made of, in the gauge's popover: a stacked bar by kind,
- * then each part with its share. Every figure comes from the server.
+ * What a context is made of (the gauge's popover, Insight's consumers): a
+ * stacked bar by kind, then each part with its share. Every figure comes from the server.
  */
 import type { ContextComposition as Composition, ContextPartKind } from '../../lib/api';
 import { Badge } from '../ui/Badge';
@@ -16,11 +16,11 @@ function kindClass(kind: ContextPartKind | null): string {
   return kind ? KIND_CLASS[kind] : 'bg-border-strong';
 }
 
-export function ContextComposition({ composition }: { composition: Composition }) {
+export function ContextComposition({ composition, title = 'Composition' }: { composition: Composition; title?: string }) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-2">
-        <SectionLabel>Composition</SectionLabel>
+        <SectionLabel>{title}</SectionLabel>
         <Badge title="Le total est mesuré ; la répartition est estimée au prorata du texte">estimée</Badge>
       </div>
 
