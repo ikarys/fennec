@@ -11,6 +11,7 @@
 use super::compaction::model_view;
 use super::event::{Event, MessageMetadata, MetadataSource};
 use super::frontmatter::split;
+use super::preferences::ReasoningEffort;
 
 /// What the commands of an agent may do to the working directory: the
 /// plan reads only, by construction (its commands see the workdir
@@ -32,6 +33,8 @@ pub struct AgentDefinition {
     pub allowed_tools: Vec<String>,
     /// fennec's own: `commands: read-only` in the frontmatter.
     pub commands: CommandAccess,
+    /// fennec's own: `reasoningEffort` in the frontmatter; overrides the model's default effort for this agent's rounds.
+    pub reasoning_effort: Option<ReasoningEffort>,
     pub color: Option<String>,
     pub prompt: String,
 }
@@ -64,6 +67,9 @@ pub fn parse_agent_md(content: &str) -> Option<AgentDefinition> {
     } else {
         CommandAccess::ReadWrite
     };
+    let reasoning_effort = fields.scalar("reasoningEffort").and_then(|value| {
+        serde_json::from_value::<ReasoningEffort>(serde_json::Value::String(value.to_string())).ok()
+    });
     let color = fields
         .scalar("color")
         .filter(|value| !value.is_empty())
@@ -76,6 +82,7 @@ pub fn parse_agent_md(content: &str) -> Option<AgentDefinition> {
         subagent,
         allowed_tools,
         commands,
+        reasoning_effort,
         color,
         prompt: body,
     })
@@ -202,6 +209,7 @@ mod tests {
             subagent,
             allowed_tools: tools.iter().map(|tool| tool.to_string()).collect(),
             commands: CommandAccess::ReadWrite,
+            reasoning_effort: None,
             color: None,
             prompt: "prompt".to_string(),
         }
@@ -318,6 +326,18 @@ body
 
         let read_write = parse_agent_md("---\nid: plan\n---\nbody\n").unwrap();
         assert_eq!(read_write.commands, CommandAccess::ReadWrite);
+    }
+
+    #[test]
+    fn parses_reasoning_effort() {
+        let xhigh = parse_agent_md("---\nid: plan\nreasoningEffort: xhigh\n---\nbody\n").unwrap();
+        assert_eq!(xhigh.reasoning_effort, Some(ReasoningEffort::XHigh));
+
+        let absent = parse_agent_md("---\nid: plan\n---\nbody\n").unwrap();
+        assert_eq!(absent.reasoning_effort, None);
+
+        let bogus = parse_agent_md("---\nid: plan\nreasoningEffort: bogus\n---\nbody\n").unwrap();
+        assert_eq!(bogus.reasoning_effort, None);
     }
 
     #[test]
