@@ -308,7 +308,6 @@ export default function App() {
         <TopBar
           tabs={tabInfos}
           activeTabId={activeTabId}
-          theme={theme}
           onPickTab={(id) => {
             setActiveTabId(id);
             navigate(tabPath(id));
@@ -316,7 +315,6 @@ export default function App() {
           onCloseTab={closeTab}
           onNewSession={() => startNewSession()}
           onOpenPalette={() => setPaletteOpen(true)}
-          onThemeChange={setTheme}
         />
 
         <div className="flex min-h-0 grow">
@@ -330,7 +328,12 @@ export default function App() {
               onOpenSession={openSession}
             />
           ) : route.name === 'settings' ? (
-            <SettingsPage settings={settings} onSaved={handleSettingsSaved} />
+            <SettingsPage
+              settings={settings}
+              theme={theme}
+              onThemeChange={setTheme}
+              onSaved={handleSettingsSaved}
+            />
           ) : route.name === 'workflows' ? (
             <Suspense fallback={<div className="flex grow items-center justify-center text-muted">Chargement…</div>}>
               <WorkflowsPage

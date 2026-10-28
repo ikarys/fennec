@@ -1,6 +1,4 @@
 import type { SessionState } from '../../lib/api';
-import { Segmented } from '../ui/Segmented';
-import { themes, type ThemeId } from '../../lib/theme';
 import { stateDotClass } from '../../lib/format';
 import { CloseIcon, FoxIcon, PlusIcon, SearchIcon, SettingsIcon } from '../Icons';
 import { Button, buttonClass } from '../ui/Button';
@@ -35,23 +33,19 @@ export interface TabInfo {
 interface TopBarProps {
   tabs: TabInfo[];
   activeTabId: string | null;
-  theme: ThemeId;
   onPickTab: (id: string) => void;
   onCloseTab: (id: string) => void;
   onNewSession: () => void;
   onOpenPalette: () => void;
-  onThemeChange: (theme: ThemeId) => void;
 }
 
 export function TopBar({
   tabs,
   activeTabId,
-  theme,
   onPickTab,
   onCloseTab,
   onNewSession,
-  onOpenPalette,
-  onThemeChange
+  onOpenPalette
 }: TopBarProps) {
   return (
     <header className="flex min-h-12 shrink-0 flex-wrap items-stretch gap-1 border-b border-border bg-panel px-3">
@@ -124,22 +118,6 @@ export function TopBar({
           <span className="hidden grow text-left md:inline">Sessions, projets, commandes</span>
           <kbd className="rounded-md border border-border px-1.5 py-px text-[0.6875rem] text-muted">⌘K</kbd>
         </button>
-
-        <Segmented
-          label="Thème"
-          value={theme}
-          onChange={onThemeChange}
-          segments={themes.map((option) => ({
-            value: option.id,
-            ariaLabel: `Thème ${option.label}`,
-            label: (
-              <>
-                <span className="h-3 w-3 rounded-full border border-border" style={{ background: option.swatch }} />
-                <span className="hidden md:inline">{option.label}</span>
-              </>
-            )
-          }))}
-        />
 
         <a
           href="#/workflows"
