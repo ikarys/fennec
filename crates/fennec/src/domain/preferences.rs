@@ -6,6 +6,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
+pub use llm_providers::{ModelParams, ModelPrefs, ReasoningEffort};
+
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Preferences {
@@ -50,32 +52,6 @@ impl Default for SandboxPrefs {
     }
 }
 
-/// openfox `ReasoningEffort`: how much a model may think.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ReasoningEffort {
-    None,
-    Minimal,
-    Low,
-    Medium,
-    High,
-    #[serde(rename = "xhigh")]
-    XHigh,
-    Max,
-}
-
-#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", default)]
-pub struct ModelPrefs {
-    pub max_tokens: Option<u32>,
-    /// openfox `contextWindow`; overrides what the endpoint lists.
-    pub context_window: Option<u64>,
-    /// openfox `compactionThreshold`; 0 disables compaction.
-    pub compaction_threshold: Option<f64>,
-    /// openfox `reasoningEffort`; `None` sends no `reasoning_effort` field.
-    pub reasoning_effort: Option<ReasoningEffort>,
-}
-
 /// The UI's base font size in pixels (the CSS body size); the page zooms around it.
 pub const DEFAULT_FONT_SIZE: u16 = 14;
 /// The sizes the Settings page offers.
@@ -117,17 +93,6 @@ impl Default for Display {
             panel_pages: None,
         }
     }
-}
-
-/// The concrete parameters one turn runs with.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ModelParams {
-    pub model: String,
-    pub max_tokens: u32,
-    pub context_window: u64,
-    pub compact_at: f64,
-    pub reasoning_effort: Option<ReasoningEffort>,
 }
 
 impl Preferences {
@@ -223,22 +188,8 @@ impl Preferences {
             .filter(|m| !m.is_empty())
             .unwrap_or_else(|| defaults.model.clone());
         let prefs = self.models.get(&model);
-        ModelParams {
-            max_tokens: prefs
-                .and_then(|p| p.max_tokens)
-                .unwrap_or(defaults.max_tokens),
-            context_window: prefs
-                .and_then(|p| p.context_window)
-                .or_else(|| listed_window(&model))
-                .unwrap_or(defaults.context_window),
-            compact_at: prefs
-                .and_then(|p| p.compaction_threshold)
-                .unwrap_or(defaults.compact_at),
-            reasoning_effort: prefs
-                .and_then(|p| p.reasoning_effort)
-                .or(defaults.reasoning_effort),
-            model,
-        }
+        let window = listed_window(&model);
+        ModelParams::resolve(defaults, model, prefs, window)
     }
 }
 
@@ -322,22 +273,6 @@ mod tests {
         assert_eq!(
             p.resolve(&with_default, |_| None).reasoning_effort,
             Some(ReasoningEffort::Low)
-        );
-    }
-
-    #[test]
-    fn reasoning_effort_uses_openfox_wire_names() {
-        assert_eq!(
-            serde_json::to_string(&ReasoningEffort::XHigh).unwrap(),
-            "\"xhigh\""
-        );
-        assert_eq!(
-            serde_json::from_str::<ReasoningEffort>("\"xhigh\"").unwrap(),
-            ReasoningEffort::XHigh
-        );
-        assert_eq!(
-            serde_json::to_string(&ReasoningEffort::Minimal).unwrap(),
-            "\"minimal\""
         );
     }
 
