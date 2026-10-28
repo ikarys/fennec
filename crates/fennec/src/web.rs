@@ -10,6 +10,7 @@ mod guard;
 mod http;
 mod insight;
 mod integration;
+mod model_view;
 mod notifier;
 mod preview;
 mod routes;
