@@ -344,7 +344,13 @@ pub enum Event {
     /// openfox keeps more in a snapshot; fennec only needs the system
     /// prompt, frozen for the session so the server's prompt cache holds.
     #[serde(rename = "turn.snapshot", rename_all = "camelCase")]
-    TurnSnapshot { cached_system_prompt: String },
+    TurnSnapshot {
+        cached_system_prompt: String,
+        /// The tool definitions sent with it; none in snapshots stored
+        /// before they were frozen too.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        cached_tools: Option<Value>,
+    },
     #[serde(rename = "criteria.set", rename_all = "camelCase")]
     CriteriaSet { criteria: Vec<Criterion> },
     /// An agent proposed a new criteria list (fennec's own event); it applies

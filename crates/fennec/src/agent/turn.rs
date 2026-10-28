@@ -203,17 +203,55 @@ pub(super) fn with_running(
 
 /// The system prompt and tool definitions a round is sent with, built once
 /// so the loop and a manual compaction use an identical cached prefix.
+/// openfox `cachedSystemPrompt`, tools included: frozen at the session's
+/// first turn and read back, so a new day or a new fennec build (a new tool,
+/// a reworded description) does not change the prompt's first bytes and void
+/// the whole session's prompt cache.
 fn round_prompt_parts(turn: &mut Turn) -> Result<(String, Value), String> {
-    let system_prompt = cached_system_prompt(turn)?;
-    // The loop owns `ask_user`, `propose_criteria` and `record_decision`; they are not host
-    // tools, so their definitions are added to the toolbox's.
+    let events = turn.log.events(turn.session_id)?;
+    let snapshots: Vec<(&String, &Option<Value>)> = events
+        .iter()
+        .filter_map(|e| match e {
+            Event::TurnSnapshot {
+                cached_system_prompt,
+                cached_tools,
+            } => Some((cached_system_prompt, cached_tools)),
+            _ => None,
+        })
+        .collect();
+    let prompt = snapshots.first().map(|(prompt, _)| (*prompt).clone());
+    let tools = snapshots.iter().find_map(|(_, tools)| (*tools).clone());
+    if let (Some(prompt), Some(tools)) = (&prompt, &tools) {
+        return Ok((prompt.clone(), tools.clone()));
+    }
+    // A session from before the tools were frozen keeps its prompt and
+    // freezes the tools now: one cache miss, then none.
+    let prompt = prompt.unwrap_or_else(|| {
+        system_prompt(
+            turn.workdir,
+            turn.model.name(),
+            turn.instructions,
+            turn.skills,
+        )
+    });
+    let tools = tools.unwrap_or_else(|| tool_definitions(turn));
+    turn.append(Event::TurnSnapshot {
+        cached_system_prompt: prompt.clone(),
+        cached_tools: Some(tools.clone()),
+    })?;
+    Ok((prompt, tools))
+}
+
+/// The loop owns `ask_user`, `propose_criteria` and `record_decision`; they
+/// are not host tools, so their definitions are added to the toolbox's.
+fn tool_definitions(turn: &Turn) -> Value {
     let mut tool_defs = turn.tools.definitions();
     if let Some(arr) = tool_defs.as_array_mut() {
         arr.push(ask_user::definition());
         arr.push(propose_criteria::definition());
         arr.push(record_decision::definition());
     }
-    Ok((system_prompt, tool_defs))
+    tool_defs
 }
 
 /// Closes the open calls of a previous turn. The open call that awaits an
@@ -244,35 +282,6 @@ fn close_open_calls(turn: &mut Turn, prompt: &str) -> Result<bool, String> {
         })?;
     }
     Ok(answered)
-}
-
-/// openfox `cachedSystemPrompt`: built at the session's first turn, then
-/// read back, so a new day or a new fennec build does not change the
-/// prompt's first bytes and void the whole session's prompt cache.
-fn cached_system_prompt(turn: &mut Turn) -> Result<String, String> {
-    let cached = turn
-        .log
-        .events(turn.session_id)?
-        .into_iter()
-        .find_map(|e| match e {
-            Event::TurnSnapshot {
-                cached_system_prompt,
-            } => Some(cached_system_prompt),
-            _ => None,
-        });
-    if let Some(prompt) = cached {
-        return Ok(prompt);
-    }
-    let prompt = system_prompt(
-        turn.workdir,
-        turn.model.name(),
-        turn.instructions,
-        turn.skills,
-    );
-    turn.append(Event::TurnSnapshot {
-        cached_system_prompt: prompt.clone(),
-    })?;
-    Ok(prompt)
 }
 
 /// Injects the agent's definition when the last reminder in the model's
@@ -729,6 +738,7 @@ mod tests {
             "s",
             &Event::TurnSnapshot {
                 cached_system_prompt: "frozen".into(),
+                cached_tools: Some(json!([])),
             },
         )
         .unwrap();
@@ -1230,6 +1240,43 @@ mod tests {
             self.0.borrow_mut().push(req.tools.clone());
             reply("done", vec![])
         }
+    }
+
+    #[test]
+    fn tool_definitions_are_frozen_with_the_prompt() {
+        let stop = AtomicBool::new(false);
+        let snapshot = |tools: Option<Value>| Event::TurnSnapshot {
+            cached_system_prompt: "frozen".into(),
+            cached_tools: tools,
+        };
+        let snapshots = |log: &MemoryLog| {
+            log.0
+                .borrow()
+                .iter()
+                .filter(|e| matches!(e, Event::TurnSnapshot { .. }))
+                .count()
+        };
+
+        // A frozen list is sent as is, whatever the toolbox has now.
+        let model = RecordingTools::default();
+        let mut h = Harness::new(Box::new(model.clone()), PathBuf::from("/tmp"), &stop);
+        h.log
+            .append("s", &snapshot(Some(json!([{"name": "old"}]))))
+            .unwrap();
+        run_turn(&mut h.turn(), "go", &[]).unwrap();
+        assert_eq!(*model.0.borrow(), [json!([{"name": "old"}])]);
+        assert_eq!(snapshots(&h.log), 1);
+
+        // A session from before tools were frozen freezes them once.
+        let model = RecordingTools::default();
+        let mut h = Harness::new(Box::new(model.clone()), PathBuf::from("/tmp"), &stop);
+        h.log.append("s", &snapshot(None)).unwrap();
+        run_turn(&mut h.turn(), "one", &[]).unwrap();
+        run_turn(&mut h.turn(), "two", &[]).unwrap();
+        let seen = model.0.borrow();
+        assert_eq!(seen.len(), 2);
+        assert_eq!(seen[0], seen[1]);
+        assert_eq!(snapshots(&h.log), 2);
     }
 
     /// Records the chat messages of each request and answers from a scripted
