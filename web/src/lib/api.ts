@@ -1,4 +1,5 @@
 import type { Origin, WorkflowDef, WorkflowIssue, WorkflowSummary } from './workflow';
+import type { DecisionView } from './fold';
 
 export type SessionState =
   | 'running'
@@ -301,6 +302,8 @@ export interface IntegrationPreview {
   commits: { sha: string; subject: string }[];
   files: { path: string; protected: boolean }[];
   criteria: IntegrationCriterion[];
+  /** Recorded by the agent: indicative, never a blocker. */
+  decisions: DecisionView[];
   blockers: Blocker[];
   /** A starting commit message (feat: <session title>); the human edits it. */
   defaultMessage: string;
