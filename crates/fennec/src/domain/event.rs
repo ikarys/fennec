@@ -19,6 +19,10 @@ pub struct ToolCall {
     pub arguments: Value,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parse_error: Option<String>,
+    /// The arguments as the model streamed them. Sent back as is: `arguments`
+    /// re-serialized sorts the keys, a prefix the server never cached.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub raw_arguments: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

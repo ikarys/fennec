@@ -213,6 +213,7 @@ mod tests {
                     name: "write_file".into(),
                     arguments: json!({"path": "a.txt"}),
                     parse_error: None,
+                    raw_arguments: None,
                 },
             },
         );
@@ -260,6 +261,7 @@ mod tests {
             name: "read_file".into(),
             arguments: json!({}),
             parse_error: None,
+            raw_arguments: None,
         };
         let outcome = run_compact(&log, vec![reply("", vec![tried_a_tool]), reply("", vec![])]);
         assert_eq!(outcome, Compacted::Skipped);

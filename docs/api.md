@@ -17,7 +17,7 @@ with camelCase fields.
 | `message.delta` | `{messageId, content, tokensPerSecond?}` (text chunk; the generation speed so far, estimated by the server from the characters streamed, absent in the first half second) |
 | `message.thinking` | `{messageId, content, tokensPerSecond?}` (reasoning chunk, same estimate) |
 | `message.done` | `{messageId, partial?, stats?}`; `stats` (assistant messages): `{model, totalTime (s), prefillTokens, cachedPromptTokens, generationTokens, prefillSpeed, generationSpeed}`, speeds in tokens/s, prefill speed over new (non-cached) tokens |
-| `tool.call` | `{messageId, toolCall: {id, name, arguments, parseError?}}` |
+| `tool.call` | `{messageId, toolCall: {id, name, arguments, parseError?, rawArguments?}}`; `rawArguments` is the JSON text the model streamed, sent back to it verbatim (re-serialized, the keys would be sorted) |
 | `tool.output` | `{messageId, toolCallId, stream: "stdout"\|"stderr", content}` |
 | `tool.result` | `{messageId, toolCallId, result: {success, output?, error?, durationMs, truncated, metadata?: {mimeType, dataUrl, path, size}}}` (`metadata` when `read_file` returned an image) |
 | `context.state` | `{currentTokens, maxTokens, compactAt?}` (`compactAt`: the turn's compaction threshold, 0 = off; absent in older events) |

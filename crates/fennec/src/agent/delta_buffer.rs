@@ -235,6 +235,7 @@ mod tests {
                     name: "write_file".into(),
                     arguments: serde_json::json!("y".repeat(98)),
                     parse_error: None,
+                    raw_arguments: None,
                 },
             },
             done("a", 100),

@@ -172,6 +172,7 @@ mod tests {
                 name: "write_file".into(),
                 arguments: json!({"path": path}),
                 parse_error: None,
+                raw_arguments: None,
             },
         }
     }
