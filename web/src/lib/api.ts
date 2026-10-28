@@ -375,7 +375,8 @@ export type Blocker =
   | { kind: 'noCriteria' }
   | { kind: 'protectedTouched'; paths: string[] }
   | { kind: 'architectureViolated'; violations: ArchitectureViolation[] }
-  | { kind: 'branchChanged'; from: string; to: string | null };
+  | { kind: 'branchChanged'; from: string; to: string | null }
+  | { kind: 'localChanges'; paths: string[] };
 
 export interface IntegrationPreview {
   branch: string;
