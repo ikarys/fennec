@@ -97,6 +97,7 @@ crates/fennec/src/
     stats.rs           openfox MessageStats: tokens (in, cached, out) and speeds of a call
     project.rs         Project, SessionSummary, SessionState
     conversation.rs    openfox events/fold-messages: the log read back as model messages
+    context_parts.rs   what the model's context is made of, by part (indicative: bytes, pro rata)
     open_calls.rs      tool calls left without a result (ask_user, stop, crash)
     compaction.rs      where the model's view starts, when to compact, the resume message
     preferences.rs     what the human chose on the Settings page; resolves a turn's model parameters
