@@ -7,6 +7,9 @@ use serde_json::Value;
 use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
 
+use crate::domain::conversation::{fold_messages, frozen_prompt};
+use crate::domain::event::Event;
+
 /// Which side of the context a part belongs to, so a view can group them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -17,6 +20,29 @@ pub enum PartKind {
     Conversation,
     /// Tool calls and what they returned.
     Tools,
+}
+
+impl PartKind {
+    /// The kind's name in a ledger breakdown key (`<kind>/<label>`).
+    pub fn key(self) -> &'static str {
+        match self {
+            PartKind::Prompt => "prompt",
+            PartKind::Conversation => "conversation",
+            PartKind::Tools => "tools",
+        }
+    }
+
+    /// A ledger breakdown key read back as its kind and label.
+    pub fn split_key(key: &str) -> Option<(PartKind, &str)> {
+        let (kind, label) = key.split_once('/')?;
+        let kind = match kind {
+            "prompt" => PartKind::Prompt,
+            "conversation" => PartKind::Conversation,
+            "tools" => PartKind::Tools,
+            _ => return None,
+        };
+        Some((kind, label))
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -131,6 +157,41 @@ pub fn spread(parts: &[ContextPart], total: u64) -> Vec<u64> {
         .collect()
 }
 
+/// What a model call's prompt was made of: the prompt as it stood just before
+/// the call's own `message.start`, its tokens spread over the parts.
+///
+/// Keys are `<kind>/<label>`, split on the first `/`. The shares are
+/// indicative, like the parts.
+/// Empty when the message is not in the log.
+pub fn call_breakdown(
+    events: &[Event],
+    message_id: &str,
+    prompt_tokens: u64,
+) -> BTreeMap<String, u64> {
+    let Some(index) = events.iter().position(
+        |event| matches!(event, Event::MessageStart { message_id: m, .. } if m == message_id),
+    ) else {
+        return BTreeMap::new();
+    };
+
+    let before = &events[..index];
+    let (prompt, tools) = frozen_prompt(before);
+    let parts = context_parts(
+        prompt.unwrap_or(""),
+        tools.unwrap_or(&Value::Null),
+        &fold_messages(before),
+    );
+    let shares = spread(&parts.parts, prompt_tokens);
+
+    parts
+        .parts
+        .iter()
+        .zip(shares)
+        .filter(|(_, share)| *share > 0)
+        .map(|(part, share)| (format!("{}/{}", part.kind.key(), part.label), share))
+        .collect()
+}
+
 fn prompt_parts(prompt: &str) -> BTreeMap<String, u64> {
     let mut parts: BTreeMap<String, u64> = BTreeMap::new();
     let mut attributed = 0u64;
@@ -235,6 +296,7 @@ fn add(parts: &mut Parts, kind: PartKind, label: &str, bytes: u64) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::event::Role;
     use serde_json::json;
 
     #[test]
@@ -366,5 +428,45 @@ mod tests {
             },
         ];
         assert_eq!(spread(&parts, 5), vec![0, 0]);
+    }
+
+    #[test]
+    fn call_breakdown_spreads_the_prompt_before_the_call() {
+        let events = vec![
+            Event::TurnSnapshot {
+                cached_system_prompt: "base prompt".into(),
+                cached_tools: None,
+            },
+            Event::MessageStart {
+                message_id: "u1".into(),
+                role: Role::User,
+                content: Some("hello".into()),
+                is_system_generated: false,
+                metadata: None,
+                attachments: vec![],
+            },
+            Event::MessageStart {
+                message_id: "a1".into(),
+                role: Role::Assistant,
+                content: None,
+                is_system_generated: false,
+                metadata: None,
+                attachments: vec![],
+            },
+        ];
+
+        let breakdown = call_breakdown(&events, "a1", 100);
+
+        assert!(breakdown.keys().any(|key| key.starts_with("prompt/")));
+        assert!(breakdown.contains_key("conversation/Messages humains"));
+        let total: u64 = breakdown.values().sum();
+        assert!((98..=102).contains(&total));
+
+        assert!(call_breakdown(&events, "unknown", 100).is_empty());
+
+        for kind in [PartKind::Prompt, PartKind::Conversation, PartKind::Tools] {
+            let key = format!("{}/A/B", kind.key());
+            assert_eq!(PartKind::split_key(&key), Some((kind, "A/B")));
+        }
     }
 }
