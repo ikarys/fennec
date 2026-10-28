@@ -69,6 +69,7 @@ pub fn builder() -> Vec<AgentDefinition> {
             "run_command".into(),
             "ask_user".into(),
             "propose_criteria".into(),
+            "record_decision".into(),
             "load_skill".into(),
         ],
         commands: CommandAccess::ReadWrite,

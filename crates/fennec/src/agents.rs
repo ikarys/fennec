@@ -139,6 +139,7 @@ mod tests {
                 "read_file",
                 "run_command",
                 "ask_user",
+                "record_decision",
                 "load_skill",
                 "web_search"
             ]
@@ -164,6 +165,7 @@ mod tests {
                 "run_command",
                 "ask_user",
                 "propose_criteria",
+                "record_decision",
                 "load_skill",
                 "web_search"
             ]

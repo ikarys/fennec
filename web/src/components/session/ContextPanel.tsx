@@ -6,6 +6,7 @@ import { pageBlocks, panelPages, type PanelBlockId } from '../../lib/panelBlocks
 import { Select } from '../ui/Field';
 import { AgentWorkspaceSection } from './AgentWorkspaceSection';
 import { CriteriaSection } from './CriteriaSection';
+import { DecisionsSection } from './DecisionsSection';
 import { ModifiedFilesSection } from './ModifiedFilesSection';
 import { SkillsSection } from './SkillsSection';
 import { TokensSection } from './TokensSection';
@@ -111,6 +112,8 @@ export function ContextPanel({ view, skills, hasSession, partial, worktree, sess
         return <TokensSection key={id} usage={view.usage} partial={partial} />;
       case 'skills':
         return <SkillsSection key={id} skills={skills} hasSession={hasSession} />;
+      case 'decisions':
+        return <DecisionsSection key={id} decisions={view.decisions} />;
       case 'tools':
         return <ToolCountsSection key={id} toolCounts={view.toolCounts} />;
       case 'vision':

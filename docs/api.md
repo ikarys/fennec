@@ -36,6 +36,7 @@ with camelCase fields.
 | `workflow.node.finished` | `{runId, nodeId, port, output, exitCode?, durationMs?}`: `durationMs` is the node's working time measured by fennec (none for a human node) |
 | `criteria.set` | `{criteria: [{id, description, check?}]}`: the criteria, all pending: the approved plan's, or a proposal the human accepted |
 | `criteria.proposed` | `{callId, criteria: [{id, description, check?}], reason}`: an agent's corrected criteria (`propose_criteria`), shown with a `chat.ask_user` of the same `callId` whose question lists only what changes against the criteria in force (modified, added, removed, then the unchanged ids); the human's `Accept` answer records them as `criteria.set` |
+| `decision.recorded` | `{callId, title, choice, reason, alternatives}`: a design decision an agent recorded with `record_decision` (indicative: produced by a model); the turn goes on |
 | `criterion.updated` | `{criterionId, status}`; `status` is `{type: "pending"}` or `{type: "passed" \| "failed", provenance}`, `provenance` `{kind: "verified", command, exitCode?, output}` (fennec ran the check) or `{kind: "indicative", agent, reason}` (an agent's verdict) |
 | `integration.applied` | `{branch, base, commits, head, message, acknowledged}`: the human integrated the session's branch; `message` is the integration commit message, `acknowledged` lists the blockers they accepted |
 | `worktree.discarded` | `{branch, commits}`: the human discarded the session's worktree and branch; `commits` are the agent's commits that were dropped |
@@ -47,7 +48,9 @@ Tools: `read_file {path, offset?, limit?}`, `write_file {path, content}`,
 `edit_file {path, old_string, new_string, replace_all?}`,
 `run_command {command, cwd?, timeout?}`,
 `ask_user {question, type?, options?}` and `propose_criteria {criteria, reason}`
-(handled by the loop, the turn ends waiting for the human).
+(handled by the loop, the turn ends waiting for the human), and
+`record_decision {title, choice, reason, alternatives?}` (handled by the loop,
+the turn goes on; the result is `Decision recorded.`).
 
 Agents: the session runs as one top-level agent, `plan` (`read_file`,
 `load_skill`, `ask_user`: read-only) by default or `builder` (every tool),
