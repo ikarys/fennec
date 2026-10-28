@@ -7,6 +7,7 @@ use super::http::{Request, error, send_json};
 use super::notifier::NotifyingLog;
 use super::routes::session_and_project;
 use crate::agent::ports::EventLog;
+use crate::architecture;
 use crate::domain::criteria::{CriterionState, CriterionStatus};
 use crate::domain::decision::{Decision, decisions_in_force};
 use crate::domain::event::Event;
@@ -66,6 +67,8 @@ fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Result<Gate, (u16, S
         .filter_map(|file| file.strip_prefix(prefix.as_str()).map(String::from))
         .collect();
     let test_files = new_test_patterns(&in_project, &protection);
+    let rules = architecture::load(Path::new(&project.workdir));
+    let violations = architecture::violations(&top, &wt, &preview.files, &prefix, &rules);
     let events = store.events(&session.id)?;
     let decisions = decisions_in_force(&events);
     let criteria = run::current_run(&events)
@@ -75,6 +78,7 @@ fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Result<Gate, (u16, S
         preview.commits.len(),
         &criteria,
         &protected_touched,
+        &violations,
         preview.origin_branch.as_deref(),
         preview.human_branch.as_deref(),
     );
