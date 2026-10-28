@@ -5,7 +5,6 @@
 //! the standard `reasoning_effort` field is sent when set.
 
 use crate::agent::ports::{Completion, Delta, Model, Request};
-use crate::config::LlmSettings;
 use crate::domain::event::ToolCall;
 use crate::domain::id::new_id;
 use llm_providers::{ChatRequest, Endpoint, StreamedToolCall};
@@ -17,9 +16,9 @@ pub struct OpenAiClient {
 }
 
 impl OpenAiClient {
-    pub fn new(settings: &LlmSettings, model: &str) -> OpenAiClient {
+    pub fn new(endpoint: Endpoint, model: &str) -> OpenAiClient {
         OpenAiClient {
-            endpoint: settings.endpoint(),
+            endpoint,
             model: model.to_string(),
         }
     }
