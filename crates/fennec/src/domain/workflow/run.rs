@@ -113,6 +113,7 @@ impl RunState {
                 pass,
                 via,
                 child_session_id,
+                ..
             } if run_id == &self.run_id => {
                 let resumed = self
                     .interrupted
@@ -598,6 +599,7 @@ mod tests {
                 port: "next".into(),
             }),
             child_session_id: None,
+            started_at: None,
         });
         assert_eq!(state.open.len(), 1);
         state.apply(&Event::WorkflowResumed {
@@ -621,6 +623,7 @@ mod tests {
                 port: "next".into(),
             }),
             child_session_id: None,
+            started_at: None,
         };
         state.apply(&started());
         state.apply(&Event::WorkflowResumed {
@@ -654,6 +657,7 @@ mod tests {
                 port: "next".into(),
             }),
             child_session_id: None,
+            started_at: None,
         });
         state.apply(&Event::WorkflowNodeFinished {
             run_id: "r".into(),
@@ -1238,6 +1242,7 @@ mod tests {
                 port: "next".into(),
             }),
             child_session_id: None,
+            started_at: None,
         });
         assert_eq!(waiting(&state, &[]), Some(Waiting::Human));
     }
@@ -1254,6 +1259,7 @@ mod tests {
                 port: "next".into(),
             }),
             child_session_id: None,
+            started_at: None,
         });
         let events = vec![Event::ChatDone {
             message_id: "m".into(),

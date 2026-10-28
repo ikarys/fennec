@@ -4,6 +4,7 @@
 use super::nodes::{self, NodeEnd};
 use super::{Cursor, Step, WorkflowEnv};
 use crate::agent::turn::Turn;
+use crate::domain::clock::now_ms;
 use crate::domain::compaction::files_changed;
 use crate::domain::event::Event;
 use crate::domain::workflow::definition::{BRANCH, NodeKind};
@@ -32,6 +33,7 @@ pub(super) fn run_fork(
         pass,
         via: None,
         child_session_id: None,
+        started_at: Some(now_ms()),
     })?;
     turn.append(Event::WorkflowNodeFinished {
         run_id: state.run_id.clone(),
@@ -105,6 +107,7 @@ pub(super) fn run_fork(
         pass: join_pass,
         via: None,
         child_session_id: None,
+        started_at: Some(now_ms()),
     })?;
     let join_output = join_output(&state, fork.entries, &results);
     turn.append(Event::WorkflowNodeFinished {
@@ -199,6 +202,7 @@ fn run_branch_node(
         pass,
         via: Some(via.clone()),
         child_session_id: child_session_id.clone(),
+        started_at: Some(now_ms()),
     };
     emit(&mut branch.state, tx, started);
 

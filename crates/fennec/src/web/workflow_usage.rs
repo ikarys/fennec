@@ -239,6 +239,7 @@ mod tests {
             pass: 1,
             via: None,
             child_session_id: child.map(str::to_string),
+            started_at: None,
         }
     }
 

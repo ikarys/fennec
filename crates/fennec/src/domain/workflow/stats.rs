@@ -115,6 +115,7 @@ mod tests {
                 pass: 1,
                 via: None,
                 child_session_id: Some("child".into()),
+                started_at: None,
             },
             Event::WorkflowNodeFinished {
                 run_id: "r".into(),
@@ -131,6 +132,7 @@ mod tests {
                 pass: 1,
                 via: None,
                 child_session_id: None,
+                started_at: None,
             },
             Event::WorkflowNodeFinished {
                 run_id: "r".into(),
@@ -147,6 +149,7 @@ mod tests {
                 pass: 2,
                 via: None,
                 child_session_id: None,
+                started_at: None,
             },
             Event::WorkflowNodeFinished {
                 run_id: "r".into(),
