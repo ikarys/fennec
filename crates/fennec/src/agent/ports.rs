@@ -5,6 +5,7 @@
 use crate::domain::agent::CommandAccess;
 use crate::domain::event::{DoneReason, Event, OutputStream, ToolCall, ToolResult};
 use crate::domain::preferences::ReasoningEffort;
+use crate::domain::stats::NodeTokens;
 use serde_json::Value;
 use std::sync::atomic::AtomicBool;
 use std::time::Duration;
@@ -95,6 +96,8 @@ pub trait ChildSessions: Sync {
         prompt: &str,
         stop: &AtomicBool,
     ) -> Result<AgentRun, String>;
+    /// The model cost of that child session so far: the sum of its calls.
+    fn model_tokens(&self, child_session_id: &str) -> Option<NodeTokens>;
 }
 
 /// How a workflow shell node ended.

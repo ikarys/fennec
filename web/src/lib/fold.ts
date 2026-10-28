@@ -68,6 +68,13 @@ export interface WorkflowNodeStat {
   workingMs: number;
 }
 
+/** The model cost of one workflow node run, as the server sums its calls. */
+export interface NodeModelStats {
+  prefillTokens: number;
+  generationTokens: number;
+  generationSpeed: number;
+}
+
 export interface WorkflowStats {
   workingMs: number;
   nodes: WorkflowNodeStat[];
@@ -89,7 +96,7 @@ export type ThreadItem =
   | { kind: 'error'; id: string; message: string }
   | { kind: 'note'; id: string; text: string; detail?: string }
   | { kind: 'turn-recap'; id: string; durationMs: number; generationTokens: number }
-  | { kind: 'workflow-node'; id: string; nodeId: string; label: string; nodeKind: NodeKind; pass: number; port?: string; output?: string; exitCode?: number; childSessionId?: string; prompt?: string; durationMs?: number }
+  | { kind: 'workflow-node'; id: string; nodeId: string; label: string; nodeKind: NodeKind; pass: number; port?: string; output?: string; exitCode?: number; childSessionId?: string; prompt?: string; durationMs?: number; stats?: NodeModelStats }
   | { kind: 'workflow-end'; id: string; outcome: 'done' | 'blocked' | 'stopped' | 'error'; reason?: string; stats?: WorkflowStats };
 
 export interface ModifiedFile {
@@ -800,6 +807,14 @@ export function createThreadFold(): ThreadFold {
           }
           if (typeof data.durationMs === 'number') {
             item.durationMs = data.durationMs;
+          }
+          if (typeof data.stats === 'object' && data.stats !== null) {
+            const stats = data.stats as Record<string, unknown>;
+            item.stats = {
+              prefillTokens: isFiniteNumber(stats.prefillTokens) ? stats.prefillTokens : 0,
+              generationTokens: isFiniteNumber(stats.generationTokens) ? stats.generationTokens : 0,
+              generationSpeed: isFiniteNumber(stats.generationSpeed) ? stats.generationSpeed : 0
+            };
           }
           openWorkflowItems.delete(`${runId}:${nodeId}`);
         }
