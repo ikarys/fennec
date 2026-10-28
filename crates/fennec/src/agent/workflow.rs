@@ -701,6 +701,7 @@ fn end_turn(turn: &mut Turn, reason: DoneReason) -> Result<DoneReason, String> {
         turn.append(Event::ChatDone {
             message_id: new_id(),
             reason,
+            duration_ms: None,
         })?;
     }
     Ok(reason)

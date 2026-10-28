@@ -39,6 +39,7 @@ use crate::domain::skill::Skill;
 use serde_json::Value;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::{Duration, Instant};
 
 const CONTINUE_AFTER_TRUNCATION_PROMPT: &str =
     "Continue your previous response exactly where you left off.";
@@ -172,8 +173,10 @@ pub fn compact_session(turn: &mut Turn) -> Result<DoneReason, String> {
             reasoning_effort: turn.reasoning_effort,
         };
         match compaction::compact(turn, &prompt)? {
-            Compacted::Done | Compacted::Skipped => finish(turn, new_id(), DoneReason::Complete),
-            Compacted::Ended(reason) => finish(turn, new_id(), reason),
+            Compacted::Done | Compacted::Skipped => {
+                finish(turn, new_id(), DoneReason::Complete, None)
+            }
+            Compacted::Ended(reason) => finish(turn, new_id(), reason, None),
         }
     })
 }
@@ -294,6 +297,7 @@ fn run_top_level_agent_loop(
     turn: &mut Turn,
     agent: &AgentDefinition,
 ) -> Result<DoneReason, String> {
+    let started = Instant::now();
     let (system_prompt, tool_defs) = round_prompt_parts(turn)?;
     let mut max_tokens = turn.max_tokens;
     let mut truncation_retries = 0;
@@ -304,7 +308,12 @@ fn run_top_level_agent_loop(
     for _ in 0..MAX_ROUNDS {
         let message_id = new_id();
         if turn.stop.load(Ordering::Relaxed) {
-            return finish(turn, message_id, DoneReason::Stopped);
+            return finish(
+                turn,
+                message_id,
+                DoneReason::Stopped,
+                Some(started.elapsed()),
+            );
         }
         let prompt = RoundPrompt {
             system_prompt: &system_prompt,
@@ -320,7 +329,9 @@ fn run_top_level_agent_loop(
             )
         {
             match compaction::compact(turn, &prompt)? {
-                Compacted::Ended(reason) => return finish(turn, message_id, reason),
+                Compacted::Ended(reason) => {
+                    return finish(turn, message_id, reason, Some(started.elapsed()));
+                }
                 Compacted::Done => ensure_agent_reminder(turn, agent)?,
                 Compacted::Skipped => {}
             }
@@ -331,7 +342,9 @@ fn run_top_level_agent_loop(
         let (answer, stats) = match round::stream(turn, &message_id, &prompt)? {
             Round::Answered(answer, stats) => (answer, stats),
             Round::Interrupted => continue,
-            Round::Ended(reason) => return finish(turn, message_id, reason),
+            Round::Ended(reason) => {
+                return finish(turn, message_id, reason, Some(started.elapsed()));
+            }
         };
         turn.append(Event::ContextState {
             current_tokens: answer.prompt_tokens + answer.completion_tokens,
@@ -346,7 +359,12 @@ fn run_top_level_agent_loop(
                 partial: give_up,
             })?;
             if give_up {
-                return finish(turn, message_id, DoneReason::Truncated);
+                return finish(
+                    turn,
+                    message_id,
+                    DoneReason::Truncated,
+                    Some(started.elapsed()),
+                );
             }
             truncation_retries += 1;
             max_tokens = max_tokens.saturating_mul(3) / 2;
@@ -366,10 +384,22 @@ fn run_top_level_agent_loop(
             partial: false,
         })?;
         if answer.tool_calls.is_empty() {
-            return finish(turn, message_id, DoneReason::Complete);
+            return finish(
+                turn,
+                message_id,
+                DoneReason::Complete,
+                Some(started.elapsed()),
+            );
         }
         match execute_tools(turn, agent, &message_id, &answer.tool_calls)? {
-            Flow::WaitingForUser => return finish(turn, message_id, DoneReason::WaitingForUser),
+            Flow::WaitingForUser => {
+                return finish(
+                    turn,
+                    message_id,
+                    DoneReason::WaitingForUser,
+                    Some(started.elapsed()),
+                );
+            }
             Flow::Continue => {}
         }
     }
@@ -378,12 +408,21 @@ fn run_top_level_agent_loop(
         error: format!("stopped after {MAX_ROUNDS} rounds"),
         recoverable: false,
     })?;
-    finish(turn, new_id(), DoneReason::Stopped)
+    finish(turn, new_id(), DoneReason::Stopped, Some(started.elapsed()))
 }
 
 /// Records how the turn ended.
-fn finish(turn: &mut Turn, message_id: String, reason: DoneReason) -> Result<DoneReason, String> {
-    turn.append(Event::ChatDone { message_id, reason })?;
+fn finish(
+    turn: &mut Turn,
+    message_id: String,
+    reason: DoneReason,
+    duration: Option<Duration>,
+) -> Result<DoneReason, String> {
+    turn.append(Event::ChatDone {
+        message_id,
+        reason,
+        duration_ms: duration.map(|d| d.as_millis() as u64),
+    })?;
     Ok(reason)
 }
 
@@ -499,6 +538,21 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("fennec-turn-{}", new_id()));
         std::fs::create_dir_all(&dir).unwrap();
         dir
+    }
+
+    #[test]
+    fn the_final_chat_done_carries_the_loop_duration() {
+        let dir = scratch_dir();
+        let model = Scripted(RefCell::new(vec![reply("hi", vec![])]));
+        let (_, events) = run(&model, &dir);
+        assert!(matches!(
+            events.iter().rfind(|e| matches!(e, Event::ChatDone { .. })),
+            Some(Event::ChatDone {
+                duration_ms: Some(_),
+                ..
+            })
+        ));
+        std::fs::remove_dir_all(dir).ok();
     }
 
     #[test]
