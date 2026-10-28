@@ -185,7 +185,7 @@ read-only. The human edits them as usual.
   is null for a detached HEAD; `testFiles` are the integrated test files (paths
   relative to the project) that the protection does not cover yet; protection is read from the project's tree, not
   the worktree's.
-- `POST /api/sessions/{id}/integrate` `{acknowledged: [kind], message, protectTests?}` → `{head, commits, protectedTests, protectError}`:
+- `POST /api/sessions/{id}/integrate` `{acknowledged: [kind], message, protectTests?, removeWorktree?}` → `{head, commits, protectedTests, protectError, worktreeRemoved, removeError}`:
   the human's decision. The server recomputes the gate and answers 400 on a
   blank `message`, 409 while a turn runs, while the human has staged changes,
   while a blocker is not acknowledged (`noCommits` never is), or when git
@@ -199,6 +199,9 @@ read-only. The human edits them as usual.
   choice) the `testFiles` are then appended to the project's `.agents/protected`
   under `# tests validated by integration`; `protectedTests` lists them, and a
   write failure leaves the integration done and comes back in `protectError`.
+  With `removeWorktree: true` (default false) the session's worktree, branch and
+  refs are then removed as `discard` does (`worktree.discarded`, no commits); a
+  failure comes back in `removeError`.
   Nothing else in fennec integrates: no agent, workflow
   or schedule calls it.
 - `POST /api/sessions/{id}/discard` `{}` → `{commits}`:
