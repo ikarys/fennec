@@ -167,12 +167,14 @@ pub fn compact_session(turn: &mut Turn) -> Result<DoneReason, String> {
         if !open_calls::open_calls(&events).is_empty() {
             return Err("answer the pending question or send a message first".into());
         }
+        // The summary round runs as the session's agent, so it uses its effort too.
+        let agent_effort = resolve(turn.agents, &events).and_then(|agent| agent.reasoning_effort);
         let (system_prompt, tool_defs) = round_prompt_parts(turn)?;
         let prompt = RoundPrompt {
             system_prompt: &system_prompt,
             tools: &tool_defs,
             max_tokens: turn.max_tokens,
-            reasoning_effort: turn.reasoning_effort,
+            reasoning_effort: agent_effort.or(turn.reasoning_effort),
         };
         match compaction::compact(turn, &prompt)? {
             Compacted::Done | Compacted::Skipped => {
@@ -321,7 +323,7 @@ fn run_top_level_agent_loop(
             system_prompt: &system_prompt,
             tools: &tool_defs,
             max_tokens,
-            reasoning_effort: turn.reasoning_effort,
+            reasoning_effort: agent.reasoning_effort.or(turn.reasoning_effort),
         };
         if !compacted_last_round
             && should_compact(
