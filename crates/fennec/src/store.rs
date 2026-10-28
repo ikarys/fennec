@@ -19,6 +19,8 @@ pub enum StoreError {
     Sqlite(rusqlite::Error),
     Json(String),
     NoParent(String),
+    /// An API key in clear: it is sealed before it may be stored.
+    PlainSecret,
 }
 
 impl From<rusqlite::Error> for StoreError {
@@ -33,6 +35,9 @@ impl fmt::Display for StoreError {
             StoreError::Sqlite(e) => write!(f, "event store: {e}"),
             StoreError::Json(e) => write!(f, "settings: {e}"),
             StoreError::NoParent(id) => write!(f, "no such session: {id}"),
+            StoreError::PlainSecret => {
+                write!(f, "settings: an API key must be sealed before it is stored")
+            }
         }
     }
 }

@@ -15,6 +15,7 @@ mod preview;
 mod routes;
 mod session_name;
 mod session_usage;
+mod settings_routes;
 mod turns;
 mod workflow_routes;
 mod workflow_usage;
@@ -201,6 +202,7 @@ mod tests {
                 base_url: "http://localhost".into(),
                 api_key: None,
                 defaults: ModelParams {
+                    provider: "local".into(),
                     model: "test".into(),
                     max_tokens: 100,
                     context_window: 1000,
