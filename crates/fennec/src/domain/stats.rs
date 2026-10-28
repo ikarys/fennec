@@ -21,6 +21,17 @@ pub struct MessageStats {
     pub generation_speed: f64,
 }
 
+/// The model cost of one workflow node: the sum of its calls.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NodeTokens {
+    /// The prompts sent, the cached part included.
+    pub prefill_tokens: u64,
+    pub generation_tokens: u64,
+    /// Generated tokens per second, weighted by the calls' generated tokens.
+    pub generation_speed: f64,
+}
+
 /// Token counts of one call, as the server reports them.
 pub struct Usage {
     pub prompt_tokens: u64,
