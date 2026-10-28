@@ -2,7 +2,7 @@
 //! draws it (`GET /api/sessions/{id}/context`).
 
 use crate::domain::compaction::model_view;
-use crate::domain::context_parts::{context_parts, spread};
+use crate::domain::context_parts::{PartKind, context_parts, spread};
 use crate::domain::conversation::{fold_messages, frozen_prompt};
 use crate::domain::event::Event;
 use serde::Serialize;
@@ -27,8 +27,42 @@ pub struct ContextView {
     pub compact_mark: Option<u64>,
     /// `12,3k / 200,0k · 6 %`, or `12,3k tokens` when the window is unknown.
     pub line: String,
-    /// The tooltip.
+    /// The tooltip's first line: taken, left, total, threshold.
     pub title: String,
+    pub composition: Option<CompositionView>,
+}
+
+/// What the context is made of; token figures are spread pro rata of the
+/// text, so they are indicative.
+#[derive(Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompositionView {
+    /// The stacked bar: one segment per kind, in a fixed order.
+    pub kinds: Vec<KindView>,
+    /// Largest first.
+    pub parts: Vec<PartView>,
+    pub images: Option<String>,
+}
+
+#[derive(Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KindView {
+    pub kind: PartKind,
+    pub label: String,
+    pub tokens: String,
+    /// Share of the context, 0 to 100.
+    pub percent: u64,
+}
+
+#[derive(Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PartView {
+    /// None for the row that sums the parts past `MAX_PARTS`.
+    pub kind: Option<PartKind>,
+    pub label: String,
+    pub tokens: String,
+    /// Share of the context, 0 to 100.
+    pub percent: u64,
 }
 
 /// From the last `context.state` the model still sees; `window` and
@@ -79,7 +113,7 @@ pub fn context_view(events: &[Event], window: u64, compact_at: f64) -> ContextVi
         format!("{} tokens", tokens(current))
     };
 
-    let mut title = if max > 0 {
+    let title = if max > 0 {
         let mut title = format!(
             "{} pris · {} restants · {} total",
             tokens(current),
@@ -96,9 +130,9 @@ pub fn context_view(events: &[Event], window: u64, compact_at: f64) -> ContextVi
         format!("{} tokens", tokens(current))
     };
 
-    if current > 0 {
-        title.push_str(&composition(events, current));
-    }
+    let composition = (current > 0)
+        .then(|| composition(events, current))
+        .flatten();
 
     ContextView {
         percent,
@@ -106,11 +140,12 @@ pub fn context_view(events: &[Event], window: u64, compact_at: f64) -> ContextVi
         compact_mark,
         line,
         title,
+        composition,
     }
 }
 
-/// The tooltip's lines on what the context holds; empty when nothing is known.
-fn composition(events: &[Event], current: u64) -> String {
+/// What the context holds, ready to draw; none when nothing is known.
+fn composition(events: &[Event], current: u64) -> Option<CompositionView> {
     let (prompt, tools) = frozen_prompt(events);
     let parts = context_parts(
         prompt.unwrap_or(""),
@@ -118,33 +153,75 @@ fn composition(events: &[Event], current: u64) -> String {
         &fold_messages(events),
     );
     if parts.parts.is_empty() {
-        return String::new();
+        return None;
     }
     let shares = spread(&parts.parts, current);
-    let mut out = String::from("\n\nComposition, estimée au prorata du texte :");
-    for (part, share) in parts.parts.iter().zip(&shares).take(MAX_PARTS) {
-        out.push_str(&format!(
-            "\n{} : {} ({} %)",
-            part.label,
-            tokens(*share),
-            display::percent(*share, current)
+
+    let mut kinds: Vec<KindView> = Vec::new();
+    for kind in [PartKind::Prompt, PartKind::Conversation, PartKind::Tools] {
+        let share: u64 = parts
+            .parts
+            .iter()
+            .zip(&shares)
+            .filter(|(part, _)| part.kind == kind)
+            .map(|(_, share)| share)
+            .sum();
+        if share > 0 {
+            kinds.push(KindView {
+                kind,
+                label: kind_label(kind).into(),
+                tokens: tokens(share),
+                percent: display::percent(share, current),
+            });
+        }
+    }
+
+    let mut rows: Vec<PartView> = parts
+        .parts
+        .iter()
+        .zip(&shares)
+        .take(MAX_PARTS)
+        .map(|(part, &share)| part_view(Some(part.kind), part.label.clone(), share, current))
+        .collect();
+    let rest = &shares[rows.len()..];
+    if !rest.is_empty() {
+        rows.push(part_view(
+            None,
+            format!("{} autres parts", rest.len()),
+            rest.iter().sum(),
+            current,
         ));
     }
-    if parts.parts.len() > MAX_PARTS {
-        out.push_str(&format!(
-            "\n… et {} autres parts",
-            parts.parts.len() - MAX_PARTS
-        ));
-    }
-    match parts.images {
-        0 => {}
-        1 => out.push_str("\n+ 1 image, non estimée"),
-        n => out.push_str(&format!("\n+ {n} images, non estimées")),
-    }
-    out
+
+    Some(CompositionView {
+        kinds,
+        parts: rows,
+        images: match parts.images {
+            0 => None,
+            1 => Some("+ 1 image, non estimée".into()),
+            n => Some(format!("+ {n} images, non estimées")),
+        },
+    })
 }
 
-/// A tooltip longer than this stops being read.
+fn part_view(kind: Option<PartKind>, label: String, share: u64, current: u64) -> PartView {
+    PartView {
+        kind,
+        label,
+        tokens: tokens(share),
+        percent: display::percent(share, current),
+    }
+}
+
+fn kind_label(kind: PartKind) -> &'static str {
+    match kind {
+        PartKind::Prompt => "Prompt système",
+        PartKind::Conversation => "Conversation",
+        PartKind::Tools => "Outils",
+    }
+}
+
+/// Past this many rows the popover stops being read; the rest is one row.
 const MAX_PARTS: usize = 12;
 
 #[cfg(test)]
@@ -209,7 +286,7 @@ mod tests {
     }
 
     #[test]
-    fn the_tooltip_lists_the_context_parts() {
+    fn the_composition_groups_the_parts_by_kind() {
         let events = vec![
             Event::TurnSnapshot {
                 cached_system_prompt: "prompt".into(),
@@ -226,8 +303,15 @@ mod tests {
             state(100, 1000, Some(0.85)),
         ];
         let view = context_view(&events, 1000, 0.85);
-        assert!(view.title.contains("Composition"));
-        assert!(view.title.contains("Messages humains : "));
-        assert!(view.title.contains(" %)"));
+        let composition = view.composition.expect("composition");
+        let kinds: Vec<PartKind> = composition.kinds.iter().map(|k| k.kind).collect();
+        assert_eq!(kinds, [PartKind::Prompt, PartKind::Conversation]);
+        assert!(
+            composition
+                .parts
+                .iter()
+                .any(|p| p.label == "Messages humains" && p.kind == Some(PartKind::Conversation))
+        );
+        assert_eq!(composition.images, None);
     }
 }
