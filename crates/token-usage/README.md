@@ -16,12 +16,13 @@ Call { external_id, at_ms, product, group_id, group_name, run_id, kind, model, u
 Usage { prompt_tokens, cached_tokens, completion_tokens }
 Filter { product, group_id, run_id, kind, model, since_ms, until_ms, label }
 GroupBy::Day | GroupBy::Group | GroupBy::Model | GroupBy::Kind | GroupBy::Run
-Summary { calls, prompt_tokens, cached_tokens, completion_tokens, cache_hit_rate, total_secs, breakdown, savings }
+Summary { calls, prompt_tokens, cached_tokens, completion_tokens, cache_hit_rate, lost_cache_calls, lost_cache_tokens, total_secs, breakdown, savings }
 Row { key, name, summary }
 Error::Sqlite | Error::Json | Error::Version | Error::Io
 // JSON field names are camelCase; maps default to empty.
 // external_id is an idempotency key; None always inserts.
 // import also fills the labels of a known external_id stored without any.
+// a lost cache: a call of a run that re-read more than LOST_CACHE_SLACK tokens of the previous call's prompt (a shrinking prompt is a rewrite, not a loss).
 
 ## What it does NOT do
 

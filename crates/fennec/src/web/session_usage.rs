@@ -143,6 +143,8 @@ mod tests {
             cached_tokens: 200,
             completion_tokens: 10,
             cache_hit_rate: 200.0 / 300.0,
+            lost_cache_calls: 0,
+            lost_cache_tokens: 0,
             total_secs: 1.0,
             breakdown: Default::default(),
             savings: Default::default(),
