@@ -1,6 +1,7 @@
 import { DecisionList } from './DecisionList';
 import { useEffect, useRef, useState } from 'react';
 import type { Blocker, IntegrationConflict, IntegrationPreview } from '../../lib/api';
+import type { IntegrationResult } from '../../lib/api';
 import { getIntegration, integrate } from '../../lib/api';
 import { CriterionProvenanceBadge } from './CriteriaSection';
 import { Button } from '../ui/Button';
@@ -33,9 +34,10 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
   const [error, setError] = useState<string | null>(null);
   const [conflict, setConflict] = useState<IntegrationConflict | null>(null);
   const [posting, setPosting] = useState(false);
-  const [result, setResult] = useState<{ head: string; commits: string[] } | null>(null);
+  const [result, setResult] = useState<IntegrationResult | null>(null);
   const [acknowledged, setAcknowledged] = useState<Partial<Record<BlockerKind, boolean>>>({});
   const [message, setMessage] = useState('');
+  const [protectTests, setProtectTests] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -51,6 +53,7 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
     setResult(null);
     setAcknowledged({});
     setMessage('');
+    setProtectTests(false);
     let active = true;
     getIntegration(sessionId)
       .then((data) => {
@@ -90,7 +93,7 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
       .filter((blocker) => blocker.kind !== 'noCommits' && acknowledged[blocker.kind])
       .map((blocker) => blocker.kind);
     try {
-      const response = await integrate(sessionId, acknowledgedKinds, message);
+      const response = await integrate(sessionId, acknowledgedKinds, message, protectTests);
       setResult(response);
     } catch (integrateError) {
       // A 409 keeps the dialog open: the message says what to do.
@@ -159,6 +162,8 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
         {result && (
           <div className="text-xs text-ok">
             Intégré : {result.commits.length} commits, HEAD {result.head.slice(0, 8)}.
+            {result.protectedTests.length > 0 && ` ${result.protectedTests.length} tests protégés.`}
+            {result.protectError && <span className="text-err"> Tests non protégés : {result.protectError}</span>}
           </div>
         )}
 
@@ -235,6 +240,15 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
             <FieldRow label="Message du commit" hint="Un seul commit, à ton nom, avec la session en provenance (Fennec-Session).">
               <TextArea rows={3} className="w-full font-mono" value={message} onChange={(event) => setMessage(event.target.value)} />
             </FieldRow>
+
+            {preview.testFiles.length > 0 && (
+              <label className="flex items-start gap-1.5 text-xs">
+                <input type="checkbox" checked={protectTests} onChange={(event) => setProtectTests(event.target.checked)} />
+                <span>
+                  Protéger les tests intégrés ({preview.testFiles.length}) : l'agent ne pourra plus les modifier.
+                </span>
+              </label>
+            )}
 
             {preview.blockers.length > 0 && (
               <section className="flex flex-col gap-1.5">
