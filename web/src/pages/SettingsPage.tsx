@@ -11,7 +11,7 @@ import type {
   SandboxPrefs,
   SettingsResponse
 } from '../lib/api';
-import { saveSettings } from '../lib/api';
+import { listProvider, saveSettings } from '../lib/api';
 import { type ThemeId } from '../lib/theme';
 import { Button } from '../components/ui/Button';
 import { ModelSection } from '../components/settings/ModelSection';
@@ -28,6 +28,7 @@ interface SettingsPageProps {
   theme: ThemeId;
   onThemeChange: (theme: ThemeId) => void;
   onSaved: (next: SettingsResponse) => void;
+  onListing: (listing: ProviderListing) => void;
 }
 
 interface SettingsForm {
@@ -98,6 +99,20 @@ function providerToForm(provider: Provider): ProviderForm {
     newKey,
     sealed
   };
+}
+
+/** The API key a provider form carries, as the wire value (null when none). */
+function providerFormToApiKey(provider: ProviderForm): ApiKey | null {
+  if (provider.keyKind === 'env') {
+    const envVar = provider.envVar.trim();
+    return envVar === '' ? null : { env: envVar };
+  }
+  if (provider.keyKind === 'stored') {
+    const newKey = provider.newKey.trim();
+    if (newKey !== '') return { plain: newKey };
+    return provider.sealed ? { sealed: provider.sealed } : null;
+  }
+  return null;
 }
 
 function toForm(preferences: Preferences, listings: ProviderListing[]): SettingsForm {
@@ -200,20 +215,7 @@ function buildPreferences(form: SettingsForm, settings: SettingsResponse): Prefe
       }
     }
 
-    let apiKey: ApiKey | null = null;
-    if (providerForm.keyKind === 'env') {
-      const envVar = providerForm.envVar.trim();
-      if (envVar !== '') {
-        apiKey = { env: envVar };
-      }
-    } else if (providerForm.keyKind === 'stored') {
-      const newKey = providerForm.newKey.trim();
-      if (newKey !== '') {
-        apiKey = { plain: newKey };
-      } else if (providerForm.sealed) {
-        apiKey = { sealed: providerForm.sealed };
-      }
-    }
+    const apiKey = providerFormToApiKey(providerForm);
 
     return {
       id: providerForm.id,
@@ -240,7 +242,7 @@ function buildPreferences(form: SettingsForm, settings: SettingsResponse): Prefe
   };
 }
 
-export function SettingsPage({ settings, theme, onThemeChange, onSaved }: SettingsPageProps) {
+export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListing }: SettingsPageProps) {
   const [form, setForm] = useState<SettingsForm | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -315,6 +317,32 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved }: Settin
 
       return { ...previous, providers, model, models };
     });
+  }
+
+  /** Adds empty per-model entries for models a fresh listing surfaced. */
+  function mergeFormModels(listing: ProviderListing) {
+    setForm((previous) => {
+      if (!previous) return previous;
+      const models = { ...previous.models };
+      for (const model of listing.models) {
+        const key = `${listing.provider}/${model.id}`;
+        if (!(key in models)) {
+          models[key] = emptyModelForm;
+        }
+      }
+      return { ...previous, models };
+    });
+  }
+
+  /** Re-lists a provider now (its baseUrl/key may not be stored yet). */
+  async function handleFetch(provider: ProviderForm): Promise<void> {
+    const listing = await listProvider({
+      provider: provider.id,
+      baseUrl: provider.baseUrl,
+      apiKey: providerFormToApiKey(provider)
+    });
+    onListing(listing);
+    mergeFormModels(listing);
   }
 
   function updateDisplay(display: DisplayPrefs) {
@@ -410,6 +438,7 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved }: Settin
                   onChange={updateProvider}
                   onAdd={addProvider}
                   onRemove={removeProvider}
+                  onFetch={handleFetch}
                 />
                 <ModelPrefsSection
                   listings={settings.listings}
