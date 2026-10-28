@@ -33,7 +33,7 @@ fn generate(
     let store = SqliteStore::open(&settings.db_path)?;
     let prefs = store.preferences()?;
     let params = settings.llm.for_turn(&prefs);
-    let model = OpenAiClient::new(&settings.llm, &params.model);
+    let model = OpenAiClient::new(settings.endpoint(&prefs, &params.provider)?, &params.model);
     let stop = AtomicBool::new(false);
 
     // Keep the prompt short: it is only a naming hint, not a full context.
