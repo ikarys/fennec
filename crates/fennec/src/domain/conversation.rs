@@ -33,6 +33,7 @@ pub fn last_assistant_text(events: &[Event]) -> String {
             Event::MessageDelta {
                 message_id,
                 content,
+                ..
             } => {
                 if let Some((_, text)) = texts.iter_mut().rev().find(|(id, _)| id == message_id) {
                     text.push_str(content);
@@ -91,6 +92,7 @@ pub fn fold_messages(events: &[Event]) -> Vec<Value> {
             Event::MessageDelta {
                 message_id,
                 content,
+                ..
             } => {
                 if let Some(i) = find(&index, message_id) {
                     let text = messages[i]["content"].as_str().unwrap_or("").to_string() + content;
@@ -102,6 +104,7 @@ pub fn fold_messages(events: &[Event]) -> Vec<Value> {
             Event::MessageThinking {
                 message_id,
                 content,
+                ..
             } => {
                 if let Some(i) = find(&index, message_id) {
                     let text = messages[i]["reasoning_content"]
@@ -166,6 +169,7 @@ mod tests {
         let delta = |id: &str, text: &str| Event::MessageDelta {
             message_id: id.into(),
             content: text.into(),
+            tokens_per_second: None,
         };
         let events = vec![
             start("a", Role::Assistant, None, false),
@@ -198,10 +202,12 @@ mod tests {
             Event::MessageThinking {
                 message_id: "a".into(),
                 content: "hmm".into(),
+                tokens_per_second: None,
             },
             Event::MessageDelta {
                 message_id: "a".into(),
                 content: "ok".into(),
+                tokens_per_second: None,
             },
             Event::ToolCall {
                 message_id: "a".into(),

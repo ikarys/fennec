@@ -351,6 +351,7 @@ fn run_top_level_agent_loop(
         turn.append(Event::ContextState {
             current_tokens: answer.prompt_tokens + answer.completion_tokens,
             max_tokens: turn.context_window,
+            compact_at: Some(turn.compact_at),
         })?;
 
         if answer.finish_reason == "length" && answer.tool_calls.is_empty() {

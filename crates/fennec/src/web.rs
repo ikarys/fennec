@@ -3,6 +3,7 @@
 
 mod assets;
 mod children;
+mod context_view;
 mod editor;
 mod event_stream;
 mod guard;
