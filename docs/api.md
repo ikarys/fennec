@@ -31,7 +31,7 @@ with camelCase fields.
 | `session.rewound` | `{messageId}`: fennec's replay cut; the model's view drops that message and everything after it, the log keeps them |
 | `session.name_generated` | `{name}`: the model-generated session title; the server renames the session and wakes the event stream |
 | `workflow.started` | `{runId, workflow, task, stepByStep}`: `workflow` is the whole definition, frozen for the run |
-| `workflow.node.started` | `{runId, nodeId, pass, via?, childSessionId?}`: `via` is `{from, port}`, the edge taken |
+| `workflow.node.started` | `{runId, nodeId, pass, via?, childSessionId?, startedAt?}`: `via` is `{from, port}`, the edge taken; `startedAt` is unix ms, so a running node's elapsed time survives a reload (absent in older logs) |
 | `workflow.human.asked` | `{runId, nodeId, question}`: a human node's question with its `{{…}}` names filled in, right after the node starts |
 | `workflow.node.finished` | `{runId, nodeId, port, output, exitCode?, durationMs?}`: `durationMs` is the node's working time measured by fennec (none for a human node); its tokens are in the usage ledger (`GET …/usage/workflow`) |
 | `criteria.set` | `{criteria: [{id, description, check?}]}`: the criteria, all pending: the approved plan's, or a proposal the human accepted |

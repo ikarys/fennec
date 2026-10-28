@@ -70,7 +70,7 @@ export type ThreadItem =
   | { kind: 'mode'; id: string; name: string; color: string }
   | { kind: 'error'; id: string; message: string }
   | { kind: 'note'; id: string; text: string; detail?: string }
-  | { kind: 'workflow-node'; id: string; nodeId: string; label: string; nodeKind: NodeKind; pass: number; port?: string; output?: string; exitCode?: number; childSessionId?: string; prompt?: string; durationMs?: number }
+  | { kind: 'workflow-node'; id: string; nodeId: string; label: string; nodeKind: NodeKind; pass: number; port?: string; output?: string; exitCode?: number; childSessionId?: string; prompt?: string; durationMs?: number; startedAt?: number }
   | { kind: 'workflow-end'; id: string; runId: string; outcome: 'done' | 'blocked' | 'stopped' | 'error'; reason?: string; stats?: WorkflowStats };
 
 export interface ModifiedFile {
@@ -701,6 +701,9 @@ export function createThreadFold(): ThreadFold {
         };
         if (typeof data.childSessionId === 'string') {
           item.childSessionId = data.childSessionId;
+        }
+        if (typeof data.startedAt === 'number') {
+          item.startedAt = data.startedAt;
         }
         pushItem(item);
         openWorkflowItems.set(`${runId}:${nodeId}`, item);
