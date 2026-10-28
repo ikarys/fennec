@@ -17,12 +17,11 @@ export function MessageStatsLine({ item, streaming }: { item: AssistantItem; str
   return (
     <div
       className="flex min-w-0 gap-x-3 overflow-hidden text-[0.6875rem] whitespace-nowrap text-muted tabular-nums"
-      title={`Entrée ${stats.prefillTokens} tokens dont ${stats.cachedPromptTokens} en cache, ${fresh} nouveaux à ${formatSpeed(stats.prefillSpeed)} · sortie ${stats.generationTokens} tokens`}
+      title={`Entrée ${stats.prefillTokens} tokens dont ${stats.cachedPromptTokens} en cache, ${fresh} nouveaux à ${formatSpeed(stats.prefillSpeed)} · sortie ${stats.generationTokens} tokens à ${formatSpeed(stats.generationSpeed)}`}
     >
       <span>↑ {formatTokens(stats.prefillTokens)}</span>
       <span>cache {cachePercent(stats.cachedPromptTokens, stats.prefillTokens)} %</span>
       <span>↓ {formatTokens(stats.generationTokens)}</span>
-      <span>{formatSpeed(stats.generationSpeed)}</span>
       <span>{formatDuration(Math.round(stats.totalTime * 1000))}</span>
     </div>
   );

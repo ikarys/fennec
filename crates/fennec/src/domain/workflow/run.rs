@@ -1258,6 +1258,7 @@ mod tests {
         let events = vec![Event::ChatDone {
             message_id: "m".into(),
             reason: DoneReason::WaitingForUser,
+            duration_ms: None,
         }];
         assert_eq!(waiting(&state, &events), Some(Waiting::AgentQuestion));
     }

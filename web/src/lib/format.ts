@@ -16,7 +16,9 @@ export function formatRelative(ms: number): string {
 export function formatDuration(ms?: number): string {
   if (ms == null) return '';
   if (ms < 1000) return `${ms} ms`;
-  return `${(ms / 1000).toFixed(1).replace('.', ',')} s`;
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1).replace('.', ',')} s`;
+  const seconds = Math.round(ms / 1000);
+  return `${Math.floor(seconds / 60)} min ${seconds % 60} s`;
 }
 
 export function formatClock(ms: number): string {
