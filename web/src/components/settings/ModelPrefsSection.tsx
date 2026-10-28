@@ -1,4 +1,5 @@
-import type { ProviderListing, ReasoningEffort, SettingsDefaults } from '../../lib/api';
+import type { ParamSource, ProviderListing, ReasoningEffort, SettingsDefaults } from '../../lib/api';
+import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { FieldRow, Select, TextInput } from '../ui/Field';
 
@@ -17,6 +18,34 @@ interface ModelPrefsSectionProps {
 }
 
 const REASONING_EFFORTS: ReasoningEffort[] = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
+
+const SOURCE_LABELS: Record<ParamSource, string> = {
+  perModel: 'par modèle',
+  listed: 'listing',
+  default: 'défaut'
+};
+
+/** One line of the effective-parameters read-out for a model. */
+function ResolvedRow({
+  label,
+  value,
+  source,
+  badge
+}: {
+  label: string;
+  value: string;
+  source: ParamSource;
+  badge: string;
+}) {
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <span className="w-24 shrink-0 text-muted">{label}</span>
+      <span className="font-mono">{value}</span>
+      <span className="text-faint">({SOURCE_LABELS[source]})</span>
+      <span className={`ml-auto ${badge === 'envoyé' ? 'text-ok' : 'text-faint'}`}>{badge}</span>
+    </div>
+  );
+}
 
 export function percentFromFraction(fraction: number): string {
   return String(Number((fraction * 100).toFixed(2)));
@@ -88,6 +117,51 @@ export function ModelPrefsSection({ listings, values, defaults, onChange }: Mode
                         ))}
                       </Select>
                     </FieldRow>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5 rounded-lg bg-raised/40 p-2.5">
+                    <div>
+                      <p className="m-0 text-[0.6875rem] font-medium uppercase tracking-wide text-faint">
+                        Envoyé au modèle
+                      </p>
+                      <p className="m-0 text-[0.625rem] text-faint">
+                        Valeurs enregistrées — enregistrer pour appliquer les modifications ci-dessus.
+                      </p>
+                    </div>
+                    <ResolvedRow
+                      label="Tokens max"
+                      value={String(model.resolved.maxTokens.value)}
+                      source={model.resolved.maxTokens.source}
+                      badge={model.resolved.maxTokens.wire ? 'envoyé' : 'local'}
+                    />
+                    <ResolvedRow
+                      label="Contexte"
+                      value={String(model.resolved.contextWindow.value)}
+                      source={model.resolved.contextWindow.source}
+                      badge="local"
+                    />
+                    <ResolvedRow
+                      label="Compaction"
+                      value={`${percentFromFraction(model.resolved.compactAt.value)} %`}
+                      source={model.resolved.compactAt.source}
+                      badge="local"
+                    />
+                    <ResolvedRow
+                      label="Effort"
+                      value={model.resolved.reasoningEffort.value ?? '—'}
+                      source={model.resolved.reasoningEffort.source}
+                      badge={model.resolved.reasoningEffort.value ? 'envoyé' : 'non envoyé'}
+                    />
+                    {model.resolved.contextWindow.source === 'listed' && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="mt-1 self-start"
+                        onClick={() => onChange(key, 'contextWindow', String(model.resolved.contextWindow.value))}
+                      >
+                        Figer la fenêtre de contexte
+                      </Button>
+                    )}
                   </div>
                 </div>
               );
