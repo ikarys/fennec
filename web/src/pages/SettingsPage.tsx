@@ -1,17 +1,21 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import type {
+  ApiKey,
   DisplayPrefs,
   ModelPrefs,
+  ModelRef,
   Preferences,
+  Provider,
+  ProviderListing,
   ReasoningEffort,
   SandboxPrefs,
-  SettingsModel,
   SettingsResponse
 } from '../lib/api';
 import { saveSettings } from '../lib/api';
 import { type ThemeId } from '../lib/theme';
 import { Button } from '../components/ui/Button';
 import { ModelSection } from '../components/settings/ModelSection';
+import { ProvidersSection, type ProviderForm } from '../components/settings/ProvidersSection';
 import { ModelPrefsSection, percentFromFraction, type ModelForm } from '../components/settings/ModelPrefsSection';
 import { DisplaySection } from '../components/settings/DisplaySection';
 import { PanelPagesSection } from '../components/settings/PanelPagesSection';
@@ -28,6 +32,7 @@ interface SettingsPageProps {
 
 interface SettingsForm {
   model: string;
+  providers: ProviderForm[];
   models: Record<string, ModelForm>;
   display: DisplayPrefs;
   instructions: string;
@@ -52,20 +57,82 @@ const emptyModelForm: ModelForm = {
   reasoningEffort: ''
 };
 
-function toForm(preferences: Preferences, models: SettingsModel[]): SettingsForm {
-  const modelForms: Record<string, ModelForm> = {};
-  for (const model of models) {
-    const prefs = preferences.models[model.id] ?? {};
-    modelForms[model.id] = {
-      maxTokens: prefs.maxTokens == null ? '' : String(prefs.maxTokens),
-      contextWindow: prefs.contextWindow == null ? '' : String(prefs.contextWindow),
-      compactionThreshold: prefs.compactionThreshold == null ? '' : percentFromFraction(prefs.compactionThreshold),
-      reasoningEffort: prefs.reasoningEffort ?? ''
-    };
-  }
+function localProviderForm(): ProviderForm {
   return {
-    model: preferences.model ?? '',
-    models: modelForms,
+    id: 'local',
+    name: '',
+    baseUrl: '',
+    keyKind: 'none',
+    envVar: '',
+    newKey: '',
+    sealed: null
+  };
+}
+
+function providerToForm(provider: Provider): ProviderForm {
+  let keyKind: ProviderForm['keyKind'] = 'none';
+  let envVar = '';
+  let newKey = '';
+  let sealed: string | null = null;
+
+  if (provider.apiKey) {
+    if ('env' in provider.apiKey) {
+      keyKind = 'env';
+      envVar = provider.apiKey.env;
+    } else if ('sealed' in provider.apiKey) {
+      keyKind = 'stored';
+      sealed = provider.apiKey.sealed;
+    } else {
+      // A plain key should not come back from the server; keep it editable if it does.
+      keyKind = 'stored';
+      newKey = provider.apiKey.plain;
+    }
+  }
+
+  return {
+    id: provider.id,
+    name: provider.name,
+    baseUrl: provider.baseUrl,
+    keyKind,
+    envVar,
+    newKey,
+    sealed
+  };
+}
+
+function toForm(preferences: Preferences, listings: ProviderListing[]): SettingsForm {
+  const providerForms = preferences.providers.map(providerToForm);
+
+  if (!providerForms.some((provider) => provider.id === 'local')) {
+    providerForms.unshift(localProviderForm());
+  } else {
+    const localIndex = providerForms.findIndex((provider) => provider.id === 'local');
+    if (localIndex > 0) {
+      const [local] = providerForms.splice(localIndex, 1);
+      providerForms.unshift(local);
+    }
+  }
+
+  const models: Record<string, ModelForm> = {};
+  for (const listing of listings) {
+    const storedProvider = preferences.providers.find((provider) => provider.id === listing.provider);
+    for (const model of listing.models) {
+      const key = `${listing.provider}/${model.id}`;
+      const prefs = storedProvider?.models[model.id] ?? {};
+      models[key] = {
+        maxTokens: prefs.maxTokens == null ? '' : String(prefs.maxTokens),
+        contextWindow: prefs.contextWindow == null ? '' : String(prefs.contextWindow),
+        compactionThreshold:
+          prefs.compactionThreshold == null ? '' : percentFromFraction(prefs.compactionThreshold),
+        reasoningEffort: prefs.reasoningEffort ?? ''
+      };
+    }
+  }
+
+  return {
+    model: preferences.selected ? `${preferences.selected.provider}/${preferences.selected.model}` : '',
+    providers: providerForms,
+    models,
     display: preferences.display,
     instructions: preferences.globalInstructions ?? '',
     search: {
@@ -92,36 +159,77 @@ function parsePercent(value: string): number | null {
 }
 
 function buildPreferences(form: SettingsForm, settings: SettingsResponse): Preferences {
-  const listedIds = new Set(settings.models.map((model) => model.id));
-  const models: Record<string, ModelPrefs> = {};
+  const selected: ModelRef | null = form.model === '' ? null : (() => {
+    const slash = form.model.indexOf('/');
+    if (slash === -1) return null;
+    return {
+      provider: form.model.slice(0, slash),
+      model: form.model.slice(slash + 1)
+    };
+  })();
 
-  // Keep overrides for models that are no longer listed; the page does not edit them.
-  for (const [id, prefs] of Object.entries(settings.preferences.models)) {
-    if (!listedIds.has(id)) {
-      models[id] = prefs;
+  const providers: Provider[] = form.providers.map((providerForm) => {
+    const listing = settings.listings.find((item) => item.provider === providerForm.id);
+    const listedIds = new Set(listing?.models.map((model) => model.id) ?? []);
+    const storedProvider = settings.preferences.providers.find((item) => item.id === providerForm.id);
+    const models: Record<string, ModelPrefs> = {};
+
+    // Keep overrides for models that are no longer listed; the page does not edit them.
+    for (const [modelId, prefs] of Object.entries(storedProvider?.models ?? {})) {
+      if (!listedIds.has(modelId)) {
+        models[modelId] = prefs;
+      }
     }
-  }
 
-  for (const model of settings.models) {
-    const entry = form.models[model.id] ?? emptyModelForm;
-    const maxTokens = parseNumber(entry.maxTokens);
-    const contextWindow = parseNumber(entry.contextWindow);
-    const compactionThreshold = parsePercent(entry.compactionThreshold);
-    if (maxTokens == null && contextWindow == null && compactionThreshold == null && entry.reasoningEffort === '') continue;
-    const prefs: ModelPrefs = {};
-    if (maxTokens != null) prefs.maxTokens = maxTokens;
-    if (contextWindow != null) prefs.contextWindow = contextWindow;
-    if (compactionThreshold != null) prefs.compactionThreshold = compactionThreshold;
-    if (entry.reasoningEffort !== '') prefs.reasoningEffort = entry.reasoningEffort as ReasoningEffort;
-    models[model.id] = prefs;
-  }
+    if (listing) {
+      for (const model of listing.models) {
+        const key = `${listing.provider}/${model.id}`;
+        const entry = form.models[key] ?? emptyModelForm;
+        const maxTokens = parseNumber(entry.maxTokens);
+        const contextWindow = parseNumber(entry.contextWindow);
+        const compactionThreshold = parsePercent(entry.compactionThreshold);
+        if (maxTokens == null && contextWindow == null && compactionThreshold == null && entry.reasoningEffort === '')
+          continue;
+
+        const prefs: ModelPrefs = {};
+        if (maxTokens != null) prefs.maxTokens = maxTokens;
+        if (contextWindow != null) prefs.contextWindow = contextWindow;
+        if (compactionThreshold != null) prefs.compactionThreshold = compactionThreshold;
+        if (entry.reasoningEffort !== '') prefs.reasoningEffort = entry.reasoningEffort as ReasoningEffort;
+        models[model.id] = prefs;
+      }
+    }
+
+    let apiKey: ApiKey | null = null;
+    if (providerForm.keyKind === 'env') {
+      const envVar = providerForm.envVar.trim();
+      if (envVar !== '') {
+        apiKey = { env: envVar };
+      }
+    } else if (providerForm.keyKind === 'stored') {
+      const newKey = providerForm.newKey.trim();
+      if (newKey !== '') {
+        apiKey = { plain: newKey };
+      } else if (providerForm.sealed) {
+        apiKey = { sealed: providerForm.sealed };
+      }
+    }
+
+    return {
+      id: providerForm.id,
+      name: providerForm.name,
+      baseUrl: providerForm.baseUrl,
+      apiKey,
+      models
+    };
+  });
 
   const searxngUrl = form.search.url.trim();
   const searxngApiKey = form.search.apiKey.trim();
 
   return {
-    model: form.model === '' ? null : form.model,
-    models,
+    selected,
+    providers,
     display: form.display,
     globalInstructions: form.instructions.trim() === '' ? null : form.instructions,
     search: {
@@ -141,7 +249,7 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved }: Settin
 
   useEffect(() => {
     if (settings && form === null) {
-      setForm(toForm(settings.preferences, settings.models));
+      setForm(toForm(settings.preferences, settings.listings));
     }
   }, [settings, form]);
 
@@ -155,18 +263,57 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved }: Settin
     setForm((previous) => (previous ? { ...previous, model: value } : previous));
   }
 
-  function updateModelField(modelId: string, field: keyof ModelForm, value: string) {
+  function updateModelField(key: string, field: keyof ModelForm, value: string) {
     markDirty();
     setForm((previous) => {
       if (!previous) return previous;
-      const current = previous.models[modelId] ?? emptyModelForm;
+      const current = previous.models[key] ?? emptyModelForm;
       return {
         ...previous,
         models: {
           ...previous.models,
-          [modelId]: { ...current, [field]: value }
+          [key]: { ...current, [field]: value }
         }
       };
+    });
+  }
+
+  function updateProvider(index: number, patch: Partial<ProviderForm>) {
+    markDirty();
+    setForm((previous) => {
+      if (!previous) return previous;
+      return {
+        ...previous,
+        providers: previous.providers.map((provider, itemIndex) =>
+          itemIndex === index ? { ...provider, ...patch } : provider
+        )
+      };
+    });
+  }
+
+  function addProvider(provider: ProviderForm) {
+    markDirty();
+    setForm((previous) =>
+      previous ? { ...previous, providers: [...previous.providers, provider] } : previous
+    );
+  }
+
+  function removeProvider(index: number) {
+    markDirty();
+    setForm((previous) => {
+      if (!previous) return previous;
+      const provider = previous.providers[index];
+      const providers = previous.providers.filter((_, itemIndex) => itemIndex !== index);
+      const model = provider && previous.model.startsWith(`${provider.id}/`) ? '' : previous.model;
+
+      const models: Record<string, ModelForm> = {};
+      for (const [key, value] of Object.entries(previous.models)) {
+        if (!provider || !key.startsWith(`${provider.id}/`)) {
+          models[key] = value;
+        }
+      }
+
+      return { ...previous, providers, model, models };
     });
   }
 
@@ -198,7 +345,7 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved }: Settin
     setError(null);
     try {
       const response = await saveSettings(buildPreferences(form, settings));
-      setForm(toForm(response.preferences, response.models));
+      setForm(toForm(response.preferences, response.listings));
       setSaved(true);
       onSaved(response);
     } catch (err) {
@@ -252,13 +399,20 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved }: Settin
               <>
                 <ModelSection
                   value={form.model}
-                  models={settings.models}
-                  storedModel={settings.preferences.model}
+                  listings={settings.listings}
+                  stored={settings.preferences.selected}
                   defaultModel={settings.defaults.model}
                   onChange={updateModel}
                 />
+                <ProvidersSection
+                  providers={form.providers}
+                  listings={settings.listings}
+                  onChange={updateProvider}
+                  onAdd={addProvider}
+                  onRemove={removeProvider}
+                />
                 <ModelPrefsSection
-                  models={settings.models}
+                  listings={settings.listings}
                   values={form.models}
                   defaults={settings.defaults}
                   onChange={updateModelField}

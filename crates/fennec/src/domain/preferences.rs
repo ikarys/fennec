@@ -6,15 +6,20 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-pub use llm_providers::{ModelParams, ModelPrefs, ReasoningEffort};
+pub use llm_providers::{ApiKey, ModelParams, ModelPrefs, ModelRef, Provider, ReasoningEffort};
+
+/// The provider of the environment's endpoint (`FENNEC_LLM_URL`); always there,
+/// even with no stored entry.
+pub const LOCAL_PROVIDER: &str = "local";
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Preferences {
     /// The model new turns use; `None` means the environment's default.
-    pub model: Option<String>,
-    /// Per-model overrides, keyed by model id (openfox `ModelConfig` subset).
-    pub models: BTreeMap<String, ModelPrefs>,
+    pub selected: Option<ModelRef>,
+    /// The providers and each one's per-model overrides; an entry with id
+    /// `local` overrides only what it sets of the environment's endpoint.
+    pub providers: Vec<Provider>,
     pub display: Display,
     /// openfox `globalInstructions`: the human's instructions for every new
     /// session; `None` or blank adds nothing.
@@ -23,6 +28,11 @@ pub struct Preferences {
     pub search: SearchPrefs,
     /// How commands run: in bwrap or on the host.
     pub sandbox: SandboxPrefs,
+    /// Before providers (one endpoint): read, moved by `migrate`, never written.
+    #[serde(rename = "model", skip_serializing)]
+    pub(crate) legacy_model: Option<String>,
+    #[serde(rename = "models", skip_serializing)]
+    pub(crate) legacy_models: BTreeMap<String, ModelPrefs>,
 }
 
 /// openfox `search.searxngUrl` / `search.searxngApiKey`.
@@ -96,33 +106,90 @@ impl Default for Display {
 }
 
 impl Preferences {
+    /// Moves the one-endpoint fields into the `local` provider.
+    pub fn migrate(&mut self) {
+        if let Some(model) = self.legacy_model.take()
+            && self.selected.is_none()
+        {
+            self.selected = Some(ModelRef {
+                provider: LOCAL_PROVIDER.to_string(),
+                model,
+            });
+        }
+        if self.legacy_models.is_empty() {
+            return;
+        }
+        let legacy = std::mem::take(&mut self.legacy_models);
+        let local = match self.providers.iter().position(|p| p.id == LOCAL_PROVIDER) {
+            Some(index) => &mut self.providers[index],
+            None => {
+                self.providers.push(Provider {
+                    id: LOCAL_PROVIDER.to_string(),
+                    ..Default::default()
+                });
+                self.providers.last_mut().expect("just pushed")
+            }
+        };
+        for (model, prefs) in legacy {
+            local.models.entry(model).or_insert(prefs);
+        }
+    }
+
+    pub fn provider(&self, id: &str) -> Option<&Provider> {
+        self.providers.iter().find(|p| p.id == id)
+    }
+
+    /// A stored `Plain` key would have to be sealed before saving.
+    pub fn has_plain_keys(&self) -> bool {
+        self.providers
+            .iter()
+            .any(|p| matches!(p.api_key, Some(ApiKey::Plain(_))))
+    }
+
+    pub fn seal_keys(&mut self, seal: impl Fn(&str) -> String) {
+        for provider in &mut self.providers {
+            if let Some(ApiKey::Plain(key)) = &provider.api_key {
+                provider.api_key = Some(ApiKey::Sealed(seal(key)));
+            }
+        }
+    }
+
     /// Rejects values that would make a turn impossible to run.
     pub fn validate(&self) -> Result<(), String> {
-        if self.model.as_deref() == Some("") {
-            return Err("model must not be empty".into());
+        if let Some(selected) = &self.selected {
+            if selected.model.is_empty() {
+                return Err("selected model must not be empty".into());
+            }
+            if selected.provider != LOCAL_PROVIDER && self.provider(&selected.provider).is_none() {
+                return Err(format!("unknown provider {}", selected.provider));
+            }
         }
-        for (id, prefs) in &self.models {
-            if id.is_empty() {
-                return Err("model id must not be empty".into());
+
+        let mut seen = Vec::new();
+        for provider in &self.providers {
+            if seen.contains(&provider.id) {
+                return Err(format!("duplicate provider {}", provider.id));
             }
-            if let Some(max_tokens) = prefs.max_tokens
-                && max_tokens < 1
-            {
-                return Err(format!("model {id}: max_tokens must be >= 1"));
-            }
-            if let Some(context_window) = prefs.context_window
-                && context_window < 1024
-            {
-                return Err(format!("model {id}: context_window must be >= 1024"));
-            }
-            if let Some(threshold) = prefs.compaction_threshold
-                && !(0.0..=1.0).contains(&threshold)
-            {
+            seen.push(provider.id.clone());
+
+            provider.validate()?;
+
+            let http = provider.base_url.starts_with("http://")
+                || provider.base_url.starts_with("https://");
+            if provider.id == LOCAL_PROVIDER {
+                if !provider.base_url.is_empty() && !http {
+                    return Err(
+                        "the local provider's base_url must start with http:// or https://".into(),
+                    );
+                }
+            } else if !http {
                 return Err(format!(
-                    "model {id}: compaction_threshold must be in 0.0..=1.0"
+                    "provider {}'s base_url must start with http:// or https://",
+                    provider.id
                 ));
             }
         }
+
         if !FONT_SIZE_RANGE.contains(&self.display.font_size) {
             return Err(format!("font_size must be in {FONT_SIZE_RANGE:?}"));
         }
@@ -180,16 +247,20 @@ impl Preferences {
     pub fn resolve(
         &self,
         defaults: &ModelParams,
-        listed_window: impl Fn(&str) -> Option<u64>,
+        listed_window: impl Fn(&ModelRef) -> Option<u64>,
     ) -> ModelParams {
-        let model = self
-            .model
-            .clone()
-            .filter(|m| !m.is_empty())
-            .unwrap_or_else(|| defaults.model.clone());
-        let prefs = self.models.get(&model);
-        let window = listed_window(&model);
-        ModelParams::resolve(defaults, model, prefs, window)
+        let selected = match &self.selected {
+            Some(selected) if !selected.model.is_empty() => selected.clone(),
+            _ => ModelRef {
+                provider: defaults.provider.clone(),
+                model: defaults.model.clone(),
+            },
+        };
+        let prefs = self
+            .provider(&selected.provider)
+            .and_then(|p| p.models.get(&selected.model));
+        let window = listed_window(&selected);
+        ModelParams::resolve(defaults, selected, prefs, window)
     }
 }
 
@@ -199,6 +270,7 @@ mod tests {
 
     fn defaults() -> ModelParams {
         ModelParams {
+            provider: LOCAL_PROVIDER.into(),
             model: "default".into(),
             max_tokens: 32_000,
             context_window: 128_000,
@@ -207,21 +279,44 @@ mod tests {
         }
     }
 
+    fn local_provider(model: &str, prefs: ModelPrefs) -> Provider {
+        let mut models = BTreeMap::new();
+        models.insert(model.to_string(), prefs);
+        Provider {
+            id: LOCAL_PROVIDER.to_string(),
+            name: String::new(),
+            base_url: String::new(),
+            api_key: None,
+            models,
+        }
+    }
+
     fn valid() -> Preferences {
-        let mut p = Preferences {
-            model: Some("m".into()),
+        Preferences {
+            selected: Some(ModelRef {
+                provider: LOCAL_PROVIDER.to_string(),
+                model: "m".into(),
+            }),
+            providers: vec![local_provider(
+                "m",
+                ModelPrefs {
+                    max_tokens: Some(100),
+                    context_window: Some(2048),
+                    compaction_threshold: Some(0.5),
+                    reasoning_effort: Some(ReasoningEffort::High),
+                },
+            )],
             ..Default::default()
-        };
-        p.models.insert(
-            "m".into(),
-            ModelPrefs {
-                max_tokens: Some(100),
-                context_window: Some(2048),
-                compaction_threshold: Some(0.5),
-                reasoning_effort: Some(ReasoningEffort::High),
-            },
-        );
-        p
+        }
+    }
+
+    fn local_model<'a>(prefs: &'a mut Preferences, model: &str) -> &'a mut ModelPrefs {
+        let local = prefs
+            .providers
+            .iter_mut()
+            .find(|p| p.id == LOCAL_PROVIDER)
+            .unwrap();
+        local.models.get_mut(model).unwrap()
     }
 
     #[test]
@@ -236,6 +331,7 @@ mod tests {
         assert_eq!(
             resolved,
             ModelParams {
+                provider: LOCAL_PROVIDER.to_string(),
                 model: "m".into(),
                 max_tokens: 100,
                 context_window: 2048,
@@ -247,11 +343,12 @@ mod tests {
 
     #[test]
     fn a_reasoning_effort_resolves_per_model() {
-        let mut p = Preferences {
-            model: Some("a".into()),
-            ..Default::default()
-        };
-        p.models.insert(
+        let mut p = valid();
+        p.selected = Some(ModelRef {
+            provider: LOCAL_PROVIDER.to_string(),
+            model: "a".into(),
+        });
+        p.providers[0].models.insert(
             "a".into(),
             ModelPrefs {
                 reasoning_effort: Some(ReasoningEffort::Minimal),
@@ -263,7 +360,10 @@ mod tests {
             Some(ReasoningEffort::Minimal)
         );
 
-        p.model = Some("b".into());
+        p.selected = Some(ModelRef {
+            provider: LOCAL_PROVIDER.to_string(),
+            model: "b".into(),
+        });
         assert_eq!(p.resolve(&defaults(), |_| None).reasoning_effort, None);
 
         let with_default = ModelParams {
@@ -279,23 +379,29 @@ mod tests {
     #[test]
     fn a_model_preference_does_not_leak_to_another_model() {
         let mut p = Preferences::default();
-        p.models.insert(
-            "a".into(),
+        p.providers.push(local_provider(
+            "a",
             ModelPrefs {
                 max_tokens: Some(100),
                 context_window: Some(2048),
                 compaction_threshold: Some(0.5),
                 reasoning_effort: None,
             },
-        );
+        ));
 
-        p.model = Some("a".into());
+        p.selected = Some(ModelRef {
+            provider: LOCAL_PROVIDER.to_string(),
+            model: "a".into(),
+        });
         let a = p.resolve(&defaults(), |_| None);
         assert_eq!(a.max_tokens, 100);
         assert_eq!(a.context_window, 2048);
         assert_eq!(a.compact_at, 0.5);
 
-        p.model = Some("b".into());
+        p.selected = Some(ModelRef {
+            provider: LOCAL_PROVIDER.to_string(),
+            model: "b".into(),
+        });
         let b = p.resolve(&defaults(), |_| None);
         assert_eq!(b.max_tokens, 32_000);
         assert_eq!(b.context_window, 128_000);
@@ -305,13 +411,19 @@ mod tests {
     #[test]
     fn a_model_without_preferences_uses_the_listed_window() {
         let p = Preferences {
-            model: Some("listed".into()),
+            selected: Some(ModelRef {
+                provider: LOCAL_PROVIDER.to_string(),
+                model: "listed".into(),
+            }),
             ..Default::default()
         };
-        let resolved = p.resolve(&defaults(), |id| (id == "listed").then_some(64_000));
+        let resolved = p.resolve(&defaults(), |ref_| {
+            (ref_.provider == LOCAL_PROVIDER && ref_.model == "listed").then_some(64_000)
+        });
         assert_eq!(
             resolved,
             ModelParams {
+                provider: LOCAL_PROVIDER.to_string(),
                 model: "listed".into(),
                 max_tokens: 32_000,
                 context_window: 64_000,
@@ -324,32 +436,68 @@ mod tests {
     #[test]
     fn validate_rejects_bad_fields() {
         let mut p = valid();
-        p.models.get_mut("m").unwrap().max_tokens = Some(0);
+        local_model(&mut p, "m").max_tokens = Some(0);
         let err = p.validate().unwrap_err();
         assert!(err.contains("m"));
         assert!(err.contains("max_tokens"));
 
         let mut p = valid();
-        p.models.get_mut("m").unwrap().context_window = Some(1023);
+        local_model(&mut p, "m").context_window = Some(1023);
         let err = p.validate().unwrap_err();
         assert!(err.contains("context_window"));
 
         let mut p = valid();
-        p.models.get_mut("m").unwrap().compaction_threshold = Some(1.0001);
+        local_model(&mut p, "m").compaction_threshold = Some(1.0001);
         let err = p.validate().unwrap_err();
         assert!(err.contains("compaction_threshold"));
 
         let mut p = valid();
-        p.models.get_mut("m").unwrap().compaction_threshold = Some(f64::NAN);
+        local_model(&mut p, "m").compaction_threshold = Some(f64::NAN);
         assert!(p.validate().is_err());
 
         let mut p = valid();
-        p.model = Some(String::new());
+        p.providers[0]
+            .models
+            .insert(String::new(), ModelPrefs::default());
+        assert!(p.validate().unwrap_err().contains("model id"));
+
+        let mut p = valid();
+        p.selected = Some(ModelRef {
+            provider: LOCAL_PROVIDER.to_string(),
+            model: String::new(),
+        });
         assert!(p.validate().unwrap_err().contains("model"));
 
         let mut p = valid();
-        p.models.insert(String::new(), ModelPrefs::default());
-        assert!(p.validate().unwrap_err().contains("model id"));
+        p.selected = Some(ModelRef {
+            provider: "missing".into(),
+            model: "m".into(),
+        });
+        assert!(p.validate().unwrap_err().contains("unknown provider"));
+
+        let mut p = valid();
+        p.providers.push(Provider {
+            id: "other".into(),
+            name: "Other".into(),
+            base_url: "ftp://example.com".into(),
+            api_key: None,
+            models: BTreeMap::new(),
+        });
+        assert!(p.validate().unwrap_err().contains("base_url"));
+
+        let mut p = valid();
+        p.providers[0].base_url = "ftp://example.com".into();
+        assert!(p.validate().unwrap_err().contains("base_url"));
+
+        let mut p = valid();
+        p.providers.push(Provider {
+            id: LOCAL_PROVIDER.to_string(),
+            name: "Local again".into(),
+            base_url: String::new(),
+            api_key: None,
+            models: BTreeMap::new(),
+        });
+        assert!(p.validate().unwrap_err().contains("duplicate provider"));
 
         let mut p = valid();
         p.display.font_size = 12;
@@ -366,11 +514,8 @@ mod tests {
 
     #[test]
     fn preferences_round_trip_and_empty_json_loads() {
-        let mut p = Preferences {
-            model: Some("m".into()),
-            ..Default::default()
-        };
-        p.models.insert(
+        let mut models = BTreeMap::new();
+        models.insert(
             "m".into(),
             ModelPrefs {
                 max_tokens: Some(100),
@@ -379,6 +524,20 @@ mod tests {
                 reasoning_effort: Some(ReasoningEffort::XHigh),
             },
         );
+        let mut p = Preferences {
+            selected: Some(ModelRef {
+                provider: LOCAL_PROVIDER.to_string(),
+                model: "m".into(),
+            }),
+            providers: vec![Provider {
+                id: LOCAL_PROVIDER.to_string(),
+                name: "Local".into(),
+                base_url: String::new(),
+                api_key: Some(ApiKey::Env("FENNEC_API_KEY".into())),
+                models,
+            }],
+            ..Default::default()
+        };
         p.display.reasoning_open = false;
         p.display.font_size = 15;
         p.global_instructions = Some("Be terse.".into());
@@ -388,6 +547,8 @@ mod tests {
         };
 
         let json = serde_json::to_string(&p).unwrap();
+        assert!(json.contains("\"providers\""));
+        assert!(json.contains("\"selected\""));
         assert!(json.contains("\"maxTokens\""));
         assert!(json.contains("\"reasoningEffort\""));
         assert!(json.contains("\"fontSize\""));
@@ -402,12 +563,21 @@ mod tests {
 
     #[test]
     fn a_preferences_json_without_the_new_fields_loads() {
-        let p: Preferences = serde_json::from_str(
+        let mut p: Preferences = serde_json::from_str(
             r#"{"models":{"m":{"maxTokens":100}},"display":{"reasoningOpen":true,"toolResultsOpen":false}}"#,
         )
         .unwrap();
+        p.migrate();
         assert_eq!(p.display.font_size, DEFAULT_FONT_SIZE);
-        assert_eq!(p.models.get("m").unwrap().reasoning_effort, None);
+        assert_eq!(
+            p.provider(LOCAL_PROVIDER)
+                .unwrap()
+                .models
+                .get("m")
+                .unwrap()
+                .reasoning_effort,
+            None
+        );
         assert_eq!(p.sandbox, SandboxPrefs::default());
         assert!(p.sandbox.enabled);
         assert!(!p.sandbox.network);
@@ -506,5 +676,135 @@ mod tests {
             blocks: vec!["  ".into()],
         }]);
         assert!(p.validate().unwrap_err().contains("panel page block id"));
+    }
+
+    /// The wire model id and the parameters of a session from before providers
+    /// must not change, or its prompt cache is lost.
+    #[test]
+    fn legacy_preferences_resolve_to_the_same_parameters() {
+        let mut p: Preferences = serde_json::from_str(
+            r#"{"model":"qwen3.8-27b","models":{"qwen3.8-27b":{"maxTokens":100,"contextWindow":2048,"compactionThreshold":0.5,"reasoningEffort":"high"}}}"#,
+        )
+        .unwrap();
+        p.migrate();
+        assert_eq!(
+            p.resolve(&defaults(), |_| None),
+            ModelParams {
+                provider: LOCAL_PROVIDER.to_string(),
+                model: "qwen3.8-27b".into(),
+                max_tokens: 100,
+                context_window: 2048,
+                compact_at: 0.5,
+                reasoning_effort: Some(ReasoningEffort::High),
+            }
+        );
+    }
+
+    #[test]
+    fn legacy_preferences_without_a_model_resolve_to_the_defaults() {
+        for json in ["{}", r#"{"models":{}}"#] {
+            let mut p: Preferences = serde_json::from_str(json).unwrap();
+            p.migrate();
+            assert_eq!(p.resolve(&defaults(), |_| None), defaults());
+        }
+    }
+
+    #[test]
+    fn migration_is_idempotent_and_writes_no_legacy_field() {
+        let mut p: Preferences =
+            serde_json::from_str(r#"{"model":"m","models":{"m":{"maxTokens":100}}}"#).unwrap();
+        p.migrate();
+        let once = p.clone();
+        p.migrate();
+        assert_eq!(p, once);
+
+        let value = serde_json::to_value(&p).unwrap();
+        assert!(value.get("model").is_none());
+        assert!(value.get("models").is_none());
+
+        let mut reloaded: Preferences = serde_json::from_value(value).unwrap();
+        reloaded.migrate();
+        assert_eq!(reloaded, once);
+    }
+
+    #[test]
+    fn migration_keeps_newer_values() {
+        let mut p: Preferences =
+            serde_json::from_str(r#"{"model":"old","models":{"old":{"maxTokens":1}}}"#).unwrap();
+        p.selected = Some(ModelRef {
+            provider: LOCAL_PROVIDER.to_string(),
+            model: "new".into(),
+        });
+
+        let mut models = BTreeMap::new();
+        models.insert(
+            "new".into(),
+            ModelPrefs {
+                max_tokens: Some(2),
+                ..Default::default()
+            },
+        );
+        p.providers.push(Provider {
+            id: LOCAL_PROVIDER.to_string(),
+            name: String::new(),
+            base_url: String::new(),
+            api_key: None,
+            models,
+        });
+
+        p.migrate();
+        assert_eq!(
+            p.selected,
+            Some(ModelRef {
+                provider: LOCAL_PROVIDER.to_string(),
+                model: "new".into()
+            })
+        );
+        let local = p.provider(LOCAL_PROVIDER).unwrap();
+        assert_eq!(local.models.get("new").unwrap().max_tokens, Some(2));
+        assert_eq!(local.models.get("old").unwrap().max_tokens, Some(1));
+    }
+
+    #[test]
+    fn the_listed_window_is_asked_for_the_selected_provider_and_model() {
+        let p = Preferences {
+            selected: Some(ModelRef {
+                provider: "other".into(),
+                model: "m".into(),
+            }),
+            ..Default::default()
+        };
+        let resolved = p.resolve(&defaults(), |selected| {
+            (selected.provider == "other" && selected.model == "m").then_some(64_000)
+        });
+        assert_eq!(resolved.context_window, 64_000);
+    }
+
+    #[test]
+    fn seal_keys_seals_only_plain_keys() {
+        let mut p = Preferences::default();
+        p.providers.push(Provider {
+            id: "a".into(),
+            name: "A".into(),
+            base_url: "http://a".into(),
+            api_key: Some(ApiKey::Plain("plain".into())),
+            models: BTreeMap::new(),
+        });
+        p.providers.push(Provider {
+            id: "b".into(),
+            name: "B".into(),
+            base_url: "http://b".into(),
+            api_key: Some(ApiKey::Env("B_KEY".into())),
+            models: BTreeMap::new(),
+        });
+
+        assert!(p.has_plain_keys());
+        p.seal_keys(|key| format!("sealed:{key}"));
+        assert!(!p.has_plain_keys());
+        assert_eq!(
+            p.providers[0].api_key,
+            Some(ApiKey::Sealed("sealed:plain".into()))
+        );
+        assert_eq!(p.providers[1].api_key, Some(ApiKey::Env("B_KEY".into())));
     }
 }

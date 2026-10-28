@@ -19,13 +19,23 @@ impl SqliteStore {
             )
             .optional()?;
         match json {
-            Some(json) => serde_json::from_str(&json).map_err(|e| StoreError::Json(e.to_string())),
+            Some(json) => {
+                let mut prefs: Preferences =
+                    serde_json::from_str(&json).map_err(|e| StoreError::Json(e.to_string()))?;
+                prefs.migrate();
+                Ok(prefs)
+            }
             None => Ok(Preferences::default()),
         }
     }
 
     /// Upserts the stored preferences.
     pub fn save_preferences(&self, prefs: &Preferences) -> std::result::Result<(), StoreError> {
+        // A key in clear never reaches the database.
+        if prefs.has_plain_keys() {
+            return Err(StoreError::PlainSecret);
+        }
+
         let json = serde_json::to_string(prefs).map_err(|e| StoreError::Json(e.to_string()))?;
         let now = now_ms().to_string();
         self.db.execute(
@@ -39,19 +49,19 @@ impl SqliteStore {
 
 #[cfg(test)]
 mod tests {
-    use super::super::SqliteStore;
-    use crate::domain::preferences::{ModelPrefs, Preferences};
+    use super::super::{SqliteStore, StoreError};
+    use crate::domain::preferences::{
+        ApiKey, LOCAL_PROVIDER, ModelPrefs, ModelRef, Preferences, Provider,
+    };
+    use std::collections::BTreeMap;
 
     #[test]
     fn preferences_round_trip_and_default_when_absent() {
         let store = SqliteStore::in_memory().unwrap();
         assert_eq!(store.preferences().unwrap(), Preferences::default());
 
-        let mut prefs = Preferences {
-            model: Some("m".into()),
-            ..Default::default()
-        };
-        prefs.models.insert(
+        let mut models = BTreeMap::new();
+        models.insert(
             "m".into(),
             ModelPrefs {
                 max_tokens: Some(100),
@@ -60,13 +70,93 @@ mod tests {
                 reasoning_effort: None,
             },
         );
+        let mut prefs = Preferences {
+            selected: Some(ModelRef {
+                provider: LOCAL_PROVIDER.to_string(),
+                model: "m".into(),
+            }),
+            providers: vec![Provider {
+                id: LOCAL_PROVIDER.to_string(),
+                name: String::new(),
+                base_url: String::new(),
+                api_key: None,
+                models,
+            }],
+            ..Default::default()
+        };
         prefs.display.reasoning_open = false;
 
         store.save_preferences(&prefs).unwrap();
         assert_eq!(store.preferences().unwrap(), prefs);
 
-        prefs.model = Some("n".into());
+        prefs.selected = Some(ModelRef {
+            provider: LOCAL_PROVIDER.to_string(),
+            model: "n".into(),
+        });
         store.save_preferences(&prefs).unwrap();
-        assert_eq!(store.preferences().unwrap().model.as_deref(), Some("n"));
+        assert_eq!(
+            store.preferences().unwrap().selected,
+            Some(ModelRef {
+                provider: LOCAL_PROVIDER.to_string(),
+                model: "n".into(),
+            })
+        );
+    }
+
+    #[test]
+    fn a_legacy_row_loads_migrated() {
+        let store = SqliteStore::in_memory().unwrap();
+        let json = r#"{"model":"m","models":{"m":{"maxTokens":5}}}"#;
+        store
+            .db
+            .execute(
+                "INSERT INTO settings (key, value, updated_at) VALUES ('preferences', ?1, '0')",
+                [json],
+            )
+            .unwrap();
+
+        let prefs = store.preferences().unwrap();
+        assert_eq!(
+            prefs.selected,
+            Some(ModelRef {
+                provider: LOCAL_PROVIDER.to_string(),
+                model: "m".into(),
+            })
+        );
+        assert_eq!(
+            prefs
+                .provider(LOCAL_PROVIDER)
+                .unwrap()
+                .models
+                .get("m")
+                .unwrap()
+                .max_tokens,
+            Some(5)
+        );
+
+        store.save_preferences(&prefs).unwrap();
+        assert_eq!(store.preferences().unwrap(), prefs);
+    }
+
+    #[test]
+    fn a_plain_key_is_refused() {
+        let store = SqliteStore::in_memory().unwrap();
+        let before = Preferences::default();
+        store.save_preferences(&before).unwrap();
+
+        let mut prefs = Preferences::default();
+        prefs.providers.push(Provider {
+            id: LOCAL_PROVIDER.to_string(),
+            name: String::new(),
+            base_url: String::new(),
+            api_key: Some(ApiKey::Plain("secret".into())),
+            models: BTreeMap::new(),
+        });
+
+        match store.save_preferences(&prefs) {
+            Err(StoreError::PlainSecret) => {}
+            _ => panic!("expected PlainSecret"),
+        }
+        assert_eq!(store.preferences().unwrap(), before);
     }
 }
