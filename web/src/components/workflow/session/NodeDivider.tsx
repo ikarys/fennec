@@ -38,21 +38,20 @@ export function NodeDivider({ item, running }: { item: WorkflowNodeItem; running
   const badge = finished ? { port: item.port!, tone: portBadgeTone(item.port!) } : null;
   const hasDetails = Boolean(item.prompt || item.output || item.childSessionId);
   const [open, setOpen] = useState(false);
-  // Measured in the browser from the first render while the node is running.
+  // Elapsed since the node started; logs written before startedAt was carried
+  // fall back to the mount time.
   const startRef = useRef<number | null>(null);
   const [elapsedMs, setElapsedMs] = useState(0);
 
   useEffect(() => {
     if (!running || finished) return;
-    if (startRef.current === null) {
-      startRef.current = Date.now();
-    }
-    setElapsedMs(Date.now() - startRef.current);
+    const start = item.startedAt ?? (startRef.current ?? (startRef.current = Date.now()));
+    setElapsedMs(Date.now() - start);
     const interval = window.setInterval(() => {
-      setElapsedMs(Date.now() - (startRef.current ?? Date.now()));
+      setElapsedMs(Date.now() - start);
     }, 1000);
     return () => window.clearInterval(interval);
-  }, [running, finished]);
+  }, [running, finished, item.startedAt]);
 
   return (
     <div className="flex flex-col gap-1.5">
