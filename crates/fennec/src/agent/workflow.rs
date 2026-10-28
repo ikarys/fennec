@@ -282,6 +282,12 @@ fn start_from_plan(
             choice,
             comment,
         )?;
+        // The recorded approval is the human's: it records the plan's
+        // criteria too, so the builder works against a real contract.
+        let events = turn.log.events(turn.session_id)?;
+        if let Some(state) = run::current_run(&events) {
+            criteria::record_from_plan(turn, &state)?;
+        }
         return Ok(Cursor::After {
             from: human.id.clone(),
             port: choice.clone(),
@@ -355,6 +361,19 @@ fn answer_human(turn: &mut Turn, choice: &str, comment: &str) -> Result<Cursor, 
         comment,
         duration_ms: None,
     })?;
+
+    // The approval of the plan is what records its criteria: the builder then
+    // works against a real contract, not an empty one.
+    let approved = choices.first().is_some_and(|first| first == choice)
+        && state.workflow.nodes.iter().any(|plan| {
+            state
+                .workflow
+                .edge(&plan.id, "done")
+                .is_some_and(|edge| edge.to == open.node_id)
+        });
+    if approved {
+        criteria::record_from_plan(turn, &state)?;
+    }
 
     Ok(Cursor::After {
         from: open.node_id.clone(),

@@ -5,10 +5,11 @@ use super::nodes::{NodeEnd, NodeInput};
 use super::outcome;
 use crate::agent::turn::Turn;
 use crate::domain::criteria::{
-    CriterionState, CriterionStatus, Provenance, failures_summary, parse_done_when, parse_verdicts,
+    Criterion, CriterionState, CriterionStatus, Provenance, failures_summary, parse_done_when,
+    parse_verdicts,
 };
 use crate::domain::event::Event;
-use crate::domain::workflow::definition::DEFAULT_SHELL_TIMEOUT_SECS;
+use crate::domain::workflow::definition::{DEFAULT_SHELL_TIMEOUT_SECS, NodeKind};
 use crate::domain::workflow::run::{self as run, RunOutcome};
 use std::time::Duration;
 
@@ -117,6 +118,35 @@ pub(super) fn run(
         output: failures_summary(&states),
         exit_code: None,
     })
+}
+
+/// The run's criteria from the plan node its criteria node names, parsed:
+/// what a plan approval records.
+pub(super) fn plan_criteria(state: &run::RunState) -> Option<Vec<Criterion>> {
+    let plan = state
+        .workflow
+        .nodes
+        .iter()
+        .find_map(|node| match &node.kind {
+            NodeKind::Criteria { plan } => Some(plan.clone()),
+            _ => None,
+        })?;
+    let output = state.results.get(&plan)?.output.clone();
+    let criteria = parse_done_when(&output);
+    if criteria.is_empty() {
+        None
+    } else {
+        Some(criteria)
+    }
+}
+
+/// The human's approval of the plan is what records its criteria: from then
+/// on, a proposal is a diff against the approved contract, not an empty list.
+pub(super) fn record_from_plan(turn: &mut Turn, state: &run::RunState) -> Result<(), String> {
+    if let Some(criteria) = plan_criteria(state) {
+        turn.append(Event::CriteriaSet { criteria })?;
+    }
+    Ok(())
 }
 
 pub(super) fn record_verdicts(
