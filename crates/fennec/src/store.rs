@@ -377,7 +377,11 @@ const SESSION_SELECT: &str = "SELECT s.id, s.project_id, COALESCE(s.title, ''), 
     COALESCE((SELECT MAX(timestamp) FROM events e WHERE e.session_id = s.id), CAST(s.created_at AS INTEGER)),
     (SELECT json_extract(payload, '$.data.reason') FROM events e
        WHERE e.session_id = s.id AND e.event_type = 'chat.done' ORDER BY seq DESC LIMIT 1),
-    s.parent_id
+    s.parent_id,
+    COALESCE((SELECT e.event_type = 'workflow.finished' AND json_extract(e.payload, '$.data.outcome') = 'done'
+       FROM events e WHERE e.session_id = s.id
+         AND e.event_type IN ('workflow.finished', 'integration.applied', 'worktree.discarded')
+       ORDER BY seq DESC LIMIT 1), 0)
   FROM sessions s";
 
 fn session_row(r: &rusqlite::Row) -> rusqlite::Result<SessionSummary> {
@@ -391,6 +395,7 @@ fn session_row(r: &rusqlite::Row) -> rusqlite::Result<SessionSummary> {
         last_done: last_done
             .and_then(|s| serde_json::from_value::<DoneReason>(serde_json::Value::String(s)).ok()),
         parent_id: r.get(6)?,
+        awaiting_integration: r.get::<_, i64>(7)? != 0,
     })
 }
 
@@ -405,6 +410,29 @@ fn project_row(r: &rusqlite::Row) -> rusqlite::Result<Project> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::workflow::run::RunOutcome;
+
+    #[test]
+    fn a_finished_workflow_awaits_integration_until_discarded() {
+        let store = SqliteStore::in_memory().unwrap();
+        let project = store.project_for("/w").unwrap();
+        let sid = store.create_session(&project, "t").unwrap();
+        assert!(!store.session(&sid).unwrap().unwrap().awaiting_integration);
+        let finished = Event::WorkflowFinished {
+            run_id: "r".into(),
+            outcome: RunOutcome::Done,
+            reason: None,
+            stats: None,
+        };
+        store.append(&sid, &finished).unwrap();
+        assert!(store.session(&sid).unwrap().unwrap().awaiting_integration);
+        let discarded = Event::WorktreeDiscarded {
+            branch: "b".into(),
+            commits: vec![],
+        };
+        store.append(&sid, &discarded).unwrap();
+        assert!(!store.session(&sid).unwrap().unwrap().awaiting_integration);
+    }
 
     #[test]
     fn events_round_trip_in_order_and_sessions_report_how_they_ended() {

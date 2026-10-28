@@ -543,6 +543,7 @@ fn session_json(app: &App, s: &SessionSummary) -> Value {
     json!({
         "id": s.id, "title": s.title, "state": s.state(app.turns.is_running(&s.id)),
         "createdAt": s.created_at, "updatedAt": s.updated_at, "parentId": s.parent_id,
+        "awaitingIntegration": s.awaiting_integration,
     })
 }
 
