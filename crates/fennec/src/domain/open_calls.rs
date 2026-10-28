@@ -63,6 +63,7 @@ mod tests {
                 name: name.into(),
                 arguments: json!({}),
                 parse_error: None,
+                raw_arguments: None,
             },
         }
     }

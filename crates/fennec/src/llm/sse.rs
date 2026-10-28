@@ -95,11 +95,13 @@ pub fn parse(
             } else {
                 &c.arguments
             };
-            let (arguments, parse_error) = match serde_json::from_str::<Value>(raw) {
-                Ok(v) => (v, None),
+            // Invalid JSON is not sent back: some chat templates parse it.
+            let (arguments, parse_error, raw_arguments) = match serde_json::from_str::<Value>(raw) {
+                Ok(v) => (v, None, Some(raw.to_string())),
                 Err(e) => (
                     json!({}),
                     Some(format!("Invalid JSON arguments: {e}: {raw}")),
+                    None,
                 ),
             };
             ToolCall {
@@ -107,6 +109,7 @@ pub fn parse(
                 name: c.name,
                 arguments,
                 parse_error,
+                raw_arguments,
             }
         })
         .collect();
@@ -142,6 +145,10 @@ data: [DONE]
         assert_eq!(c.tool_calls.len(), 1);
         assert_eq!(c.tool_calls[0].id, "c1");
         assert_eq!(c.tool_calls[0].arguments, json!({"path": "a"}));
+        assert_eq!(
+            c.tool_calls[0].raw_arguments.as_deref(),
+            Some("{\"path\":\"a\"}")
+        );
         assert_eq!(deltas.len(), 3);
     }
 
