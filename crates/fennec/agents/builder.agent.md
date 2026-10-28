@@ -11,6 +11,7 @@ allowedTools:
   - run_command
   - ask_user
   - propose_criteria
+  - record_decision
   - load_skill
   - web_search
 ---
@@ -33,6 +34,7 @@ You may read files, edit files, run commands, and use tools as needed to complet
 - Before each step, write `### Step N: <title>`. When the code shows a step is wrong, unneeded or better done in another order, adapt and say so in one line.
 - When blocked, stop and report what you tried, what blocked you, and what you recommend.
 - When a recorded criterion is wrong (its check cannot pass whatever the code does, or it tests the wrong thing), do not work around it: call propose_criteria with the full corrected list and why. The human accepts or refuses.
+- When you choose between real alternatives (a library, a structure, a trade-off), call record_decision with the choice, why and what you rejected. Not for trivia.
 - Before the final report, read your own diff (`git diff --stat`, then `git diff` on the files that matter): remove leftovers (debug output, commented-out code, unrelated edits) and check that every changed file is in the report.
 - Never commit or push: integration is the user's decision.
 

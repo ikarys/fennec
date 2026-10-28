@@ -338,6 +338,15 @@ pub enum Event {
         criteria: Vec<Criterion>,
         reason: String,
     },
+    /// An agent recorded a design decision (fennec's own event); the turn goes on.
+    #[serde(rename = "decision.recorded", rename_all = "camelCase")]
+    DecisionRecorded {
+        call_id: String,
+        title: String,
+        choice: String,
+        reason: String,
+        alternatives: Vec<String>,
+    },
     #[serde(rename = "criterion.updated", rename_all = "camelCase")]
     CriterionUpdated {
         criterion_id: String,
@@ -393,6 +402,7 @@ impl Event {
             Event::TurnSnapshot { .. } => "turn.snapshot",
             Event::CriteriaSet { .. } => "criteria.set",
             Event::CriteriaProposed { .. } => "criteria.proposed",
+            Event::DecisionRecorded { .. } => "decision.recorded",
             Event::CriterionUpdated { .. } => "criterion.updated",
             Event::IntegrationApplied { .. } => "integration.applied",
             Event::WorktreeDiscarded { .. } => "worktree.discarded",

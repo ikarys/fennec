@@ -69,8 +69,9 @@ Integration, done: an "Intégrer" button runs the cherry-pick of a session's
 worktree branch into the human's repository, on the human's click only, after
 a review gate (commits, files, criteria, protected files touched) whose
 blockers the human must accept one by one (`integration.applied` records it).
-Next, one PR each: the rest of fennec's own layer (decision registry,
-tests protected once validated) → sub-agents as tools, when dogfooding shows sessions
+Decision registry, done: `record_decision` (the turn goes on) records a choice, its reason
+and the alternatives as `decision.recorded`; a "Décisions" block in the context panel.
+Next, one PR each: the rest of fennec's own layer (tests protected once validated) → sub-agents as tools, when dogfooding shows sessions
 saturating their context while exploring.
 
 ## Layout

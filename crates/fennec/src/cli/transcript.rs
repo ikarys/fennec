@@ -140,6 +140,7 @@ impl Transcript {
             | Event::CriteriaProposed { .. }
             | Event::CriterionUpdated { .. }
             | Event::IntegrationApplied { .. }
+            | Event::DecisionRecorded { .. }
             | Event::WorktreeDiscarded { .. } => Ok(()),
         };
         let _ = out.flush();
