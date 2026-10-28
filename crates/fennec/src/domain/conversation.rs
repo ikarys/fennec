@@ -123,7 +123,10 @@ pub fn fold_messages(events: &[Event]) -> Vec<Value> {
                     let call = json!({
                         "id": tool_call.id,
                         "type": "function",
-                        "function": {"name": tool_call.name, "arguments": tool_call.arguments.to_string()},
+                        "function": {"name": tool_call.name, "arguments": tool_call
+                            .raw_arguments
+                            .clone()
+                            .unwrap_or_else(|| tool_call.arguments.to_string())},
                     });
                     match messages[i]["tool_calls"].as_array_mut() {
                         Some(calls) => calls.push(call),
@@ -216,6 +219,7 @@ mod tests {
                     name: "read_file".into(),
                     arguments: json!({"path": "x"}),
                     parse_error: None,
+                    raw_arguments: None,
                 },
             },
             Event::MessageDone {
@@ -248,6 +252,30 @@ mod tests {
             msgs[2],
             json!({"role": "tool", "tool_call_id": "c1", "content": "Error: nope"})
         );
+    }
+
+    #[test]
+    fn tool_call_arguments_fold_back_as_the_model_streamed_them() {
+        let raw = r#"{"path": "x", "content": "y"}"#;
+        let events = [
+            start("a", Role::Assistant, None, false),
+            Event::ToolCall {
+                message_id: "a".into(),
+                tool_call: ToolCall {
+                    id: "c1".into(),
+                    name: "write_file".into(),
+                    arguments: serde_json::from_str(raw).unwrap(),
+                    parse_error: None,
+                    raw_arguments: Some(raw.into()),
+                },
+            },
+        ];
+        let msgs = fold_messages(&events);
+        let sent = msgs
+            .iter()
+            .find_map(|m| m["tool_calls"][0]["function"]["arguments"].as_str());
+        // Re-serialized, the keys would come back sorted and without spaces.
+        assert_eq!(sent, Some(raw));
     }
 
     #[test]

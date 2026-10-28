@@ -111,6 +111,7 @@ mod tests {
                 name: "load_skill".into(),
                 arguments: json!({"skillId": skill_id}),
                 parse_error: None,
+                raw_arguments: None,
             },
         }
     }

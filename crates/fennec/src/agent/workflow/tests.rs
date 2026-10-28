@@ -240,6 +240,7 @@ fn agent_input_stats_cover_the_calls_before_the_interruption() {
         name: "ask_user".into(),
         arguments: serde_json::json!({"question": "Which color?"}),
         parse_error: None,
+        raw_arguments: None,
     };
     let usage = |content: &str, calls: Vec<ToolCall>, prompt: u64, completion: u64| {
         Ok(Completion {
