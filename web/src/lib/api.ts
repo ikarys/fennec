@@ -85,9 +85,27 @@ export interface SandboxPrefs {
   network: boolean;
 }
 
-export interface Preferences {
-  model: string | null;
+export type ApiKey = { env: string } | { sealed: string } | { plain: string };
+
+export interface Provider {
+  /** Stable, without '/'. The 'local' one is the environment's endpoint (FENNEC_LLM_URL). */
+  id: string;
+  name: string;
+  /** Empty for 'local' means the environment's URL. */
+  baseUrl: string;
+  apiKey: ApiKey | null;
+  /** Keyed by the model id the provider lists. */
   models: Record<string, ModelPrefs>;
+}
+
+export interface ModelRef {
+  provider: string;
+  model: string;
+}
+
+export interface Preferences {
+  selected: ModelRef | null;
+  providers: Provider[];
   display: DisplayPrefs;
   /** openfox `globalInstructions`: added to the system prompt of new sessions. */
   globalInstructions?: string | null;
@@ -102,7 +120,18 @@ export interface SettingsModel {
   contextWindow: number | null;
 }
 
+/** What one provider lists now, with the URL it is reached at. */
+export interface ProviderListing {
+  provider: string;
+  name: string;
+  baseUrl: string;
+  models: SettingsModel[];
+  /** Why the listing failed; null when it answered. */
+  error: string | null;
+}
+
 export interface SettingsDefaults {
+  provider: string;
   model: string;
   maxTokens: number;
   contextWindow: number;
@@ -112,7 +141,7 @@ export interface SettingsDefaults {
 
 export interface SettingsResponse {
   preferences: Preferences;
-  models: SettingsModel[];
+  listings: ProviderListing[];
   defaults: SettingsDefaults;
 }
 
