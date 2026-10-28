@@ -248,6 +248,7 @@ mod tests {
                 name: "ask_user".into(),
                 arguments: json!({}),
                 parse_error: None,
+                raw_arguments: None,
             },
         }
     }
