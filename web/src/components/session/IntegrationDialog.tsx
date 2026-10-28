@@ -29,6 +29,8 @@ function blockerSentence(blocker: Blocker): string {
     }
     case 'branchChanged':
       return `Le run est parti de ${blocker.from}, tu es maintenant sur ${blocker.to ?? 'un HEAD détaché'} : les commits iraient ailleurs.`;
+    case 'localChanges':
+      return `Changements non commités seraient écrasés : ${blocker.paths.join(', ')} — committe-les ou stash-les avant d'intégrer.`;
   }
 }
 
