@@ -367,6 +367,9 @@ pub enum Event {
         #[serde(default)]
         message: String,
         acknowledged: Vec<String>,
+        /// Test files the human chose to protect with this integration.
+        #[serde(default)]
+        protected_tests: Vec<String>,
     },
     /// The human discarded the session's worktree and branch (fennec's own event).
     #[serde(rename = "worktree.discarded", rename_all = "camelCase")]
