@@ -172,10 +172,12 @@ read-only. The human edits them as usual.
   `git cherry-pick <base>..<branch>`;
   `mode` is the id of the agent the session resolves to from its event log
   (null when there is no top-level agent)
-- `GET /api/sessions/{id}/integration` → `{branch, base, originBranch, humanBranch, defaultMessage, commits: [{sha, subject}], files: [{path, protected}], criteria, blockers}`:
+- `GET /api/sessions/{id}/integration` → `{branch, base, originBranch, humanBranch, defaultMessage, commits: [{sha, subject}], files: [{path, protected}], criteria, decisions, blockers}`:
   what integrating the session's worktree branch would do (409 without a
   worktree). `originBranch` is the branch the run started from (null for
-  older worktrees or a detached HEAD). `defaultMessage` is fennec's starting
+  older worktrees or a detached HEAD). `decisions` are the session's
+  `decision.recorded` events, `{callId, title, choice, reason, alternatives}`:
+  informational (written by the model), never a blocker. `defaultMessage` is fennec's starting
   commit message (`feat: <title>`, an empty title gives `feat: integrate the
   agent's work`); the human edits it. `blockers` is the review gate, each
   `{kind, …}`: `noCommits`, `branchChanged {from, to}`, `criteriaNotPassed

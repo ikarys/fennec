@@ -8,6 +8,7 @@ use super::notifier::NotifyingLog;
 use super::routes::session_and_project;
 use crate::agent::ports::EventLog;
 use crate::domain::criteria::{CriterionState, CriterionStatus};
+use crate::domain::decision::{Decision, decisions_in_force};
 use crate::domain::event::Event;
 use crate::domain::integration::{
     Blocker, blockers, commit_message, default_message, unacknowledged,
@@ -31,6 +32,8 @@ struct Gate {
     top: PathBuf,
     preview: Preview,
     criteria: Vec<CriterionState>,
+    /// Informational: shown to the human, never a blocker.
+    decisions: Vec<Decision>,
     protected_touched: Vec<String>,
     blockers: Vec<Blocker>,
 }
@@ -54,7 +57,9 @@ fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Result<Gate, (u16, S
     // worktree's copy the agent worked in.
     let protection = protected::load(Path::new(&project.workdir));
     let protected_touched = integration::protected_touched(&preview.files, &prefix, &protection);
-    let criteria = run::current_run(&store.events(&session.id)?)
+    let events = store.events(&session.id)?;
+    let decisions = decisions_in_force(&events);
+    let criteria = run::current_run(&events)
         .map(|state| state.criteria)
         .unwrap_or_default();
     let blockers = blockers(
@@ -72,6 +77,7 @@ fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Result<Gate, (u16, S
         top,
         preview,
         criteria,
+        decisions,
         protected_touched,
         blockers,
     }))
@@ -104,6 +110,7 @@ pub fn get_integration(app: &App, stream: &mut TcpStream, id: &str) -> Result<()
             "commits": gate.preview.commits,
             "files": files,
             "criteria": criteria,
+            "decisions": gate.decisions,
             "blockers": gate.blockers,
         }),
     )
