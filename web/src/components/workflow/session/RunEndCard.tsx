@@ -1,8 +1,9 @@
 import type { ThreadItem } from '../../../lib/fold';
-import { cachePercent, formatDuration, formatTokens } from '../../../lib/format';
+import { formatDuration } from '../../../lib/format';
 import { Badge } from '../../ui/Badge';
 import { Button } from '../../ui/Button';
 import { Card } from '../../ui/Card';
+import { useRunUsage } from '../../session/CallUsage';
 import { useIntegrationInvite } from '../../session/IntegrationInvite';
 
 type WorkflowEndItem = Extract<ThreadItem, { kind: 'workflow-end' }>;
@@ -38,20 +39,17 @@ export function RunEndCard({ item }: { item: WorkflowEndItem }) {
   const outcome = outcomeTitle(item.outcome);
   const stats = item.stats;
   const invite = useIntegrationInvite();
+  const usage = useRunUsage(item.runId);
 
   const statRows: [Stat, Stat][] = stats
     ? [
         [
           { label: 'Temps de travail', value: formatDuration(stats.workingMs) },
-          { label: 'Appels au modèle', value: String(stats.calls) },
+          { label: 'Appels au modèle', value: usage?.calls ?? '–' },
         ],
         [
-          { label: 'Tokens générés', value: formatTokens(stats.generationTokens) },
-          {
-            label: 'Tokens lus',
-            value: formatTokens(stats.prefillTokens),
-            hint: `${cachePercent(stats.cachedPromptTokens, stats.prefillTokens)} % cache`,
-          },
+          { label: 'Tokens générés', value: usage?.generated ?? '–' },
+          { label: 'Tokens lus', value: usage?.read ?? '–', hint: usage?.cache },
         ],
         [
           { label: 'Fichiers modifiés', value: String(stats.filesChanged) },

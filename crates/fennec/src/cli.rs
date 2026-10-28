@@ -15,6 +15,7 @@ use crate::domain::open_calls;
 use crate::domain::slash::{TurnInput, resolve};
 use crate::instructions::all_instructions;
 use crate::llm::OpenAiClient;
+use crate::metering::MeteredLog;
 use crate::protected;
 use crate::skills;
 use crate::store::SqliteStore;
@@ -150,9 +151,15 @@ fn with_turn(
     let stop = AtomicBool::new(false);
     let mut transcript = Transcript::default();
     let mut on_event = |e: &Event| transcript.print(e);
+    let ledger = token_usage::Ledger::open(&settings.usage_path()).map_err(|e| e.to_string())?;
+    let metered = MeteredLog {
+        log: store,
+        store,
+        ledger: &ledger,
+    };
     work(&mut Turn {
         model: &model,
-        log: store,
+        log: &metered,
         tools: &tools,
         session_id,
         workdir: &workdir,

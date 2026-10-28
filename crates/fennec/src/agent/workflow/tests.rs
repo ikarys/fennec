@@ -88,14 +88,6 @@ impl ChildSessions for FakeChildren {
             text,
         })
     }
-
-    fn model_tokens(&self, _child: &str) -> Option<crate::domain::stats::NodeTokens> {
-        Some(crate::domain::stats::NodeTokens {
-            prefill_tokens: 100,
-            generation_tokens: 20,
-            generation_speed: 30.0,
-        })
-    }
 }
 
 #[derive(Default)]
@@ -227,6 +219,16 @@ fn start_agent_end() {
             ..
         }
     )));
+    // A session-context node runs inside the walk's own running mark: the
+    // session must stay running until the run ends, not drop between nodes.
+    let marks: Vec<bool> = events
+        .iter()
+        .filter_map(|e| match e {
+            Event::RunningChanged { is_running } => Some(*is_running),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(marks, [true, false]);
 }
 
 #[test]
@@ -291,20 +293,6 @@ fn agent_input_stats_cover_the_calls_before_the_interruption() {
     )
     .unwrap();
     assert_eq!(reason, DoneReason::Complete);
-
-    let events = h.log.0.into_inner();
-    assert!(events.iter().any(|e| matches!(
-        e,
-        Event::WorkflowNodeFinished {
-            node_id,
-            port,
-            stats: Some(stats),
-            ..
-        } if node_id == "a"
-            && port == "done"
-            && stats.prefill_tokens == 300
-            && stats.generation_tokens == 15
-    )));
 }
 
 fn criteria_workflow() -> Workflow {
@@ -1058,15 +1046,6 @@ fn agent_outcome() {
             node_id, port, output, ..
         } if node_id == "a" && port == "ko" && output == "result"))
     );
-    // The scripted model reports no tokens, so the node's stats are zero.
-    assert!(events.iter().any(|e| matches!(
-        e,
-        Event::WorkflowNodeFinished {
-            node_id,
-            stats: Some(stats),
-            ..
-        } if node_id == "a" && stats.generation_tokens == 0
-    )));
     assert!(events.iter().any(|e| matches!(
         e,
         Event::WorkflowFinished {
@@ -1264,15 +1243,6 @@ fn parallel_branches() {
     assert!(join_output.contains("result a"));
     assert!(join_output.contains("Branch B"));
     assert!(join_output.contains("result b"));
-    // The branch agent's model cost is recorded on its node's finished event.
-    assert!(events.iter().any(|e| matches!(
-        e,
-        Event::WorkflowNodeFinished {
-            node_id,
-            stats: Some(stats),
-            ..
-        } if node_id == "a" && stats.generation_tokens == 20
-    )));
 }
 
 #[test]
@@ -1648,7 +1618,6 @@ fn resume_interrupted_agent_keeps_its_pass_and_prompt() {
             exit_code: None,
             comment: None,
             duration_ms: None,
-            stats: None,
         },
         Event::WorkflowNodeStarted {
             run_id: "r".into(),
@@ -1704,16 +1673,5 @@ fn resume_interrupted_agent_keeps_its_pass_and_prompt() {
             is_system_generated: true,
             ..
         } if content.contains("retry prompt")
-    )));
-    // The resumed node's stats include the first segment's call.
-    assert!(events.iter().any(|e| matches!(
-        e,
-        Event::WorkflowNodeFinished {
-            node_id,
-            stats: Some(stats),
-            ..
-        } if node_id == "a"
-            && stats.prefill_tokens == 100
-            && stats.generation_tokens == 5
     )));
 }
