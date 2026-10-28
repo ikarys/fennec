@@ -270,6 +270,9 @@ read-only. The human edits them as usual.
 
 ## Workflows
 
+A session summary carries `awaitingIntegration`: true when a workflow ended `done` and no
+`integration.applied` or `worktree.discarded` came after it (the home page badges it).
+
 A session's `parentId` is the id of its parent session (null for a
 top-level session); child sessions are hidden from the lists and opened
 from the parent's thread.
