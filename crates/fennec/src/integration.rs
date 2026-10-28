@@ -3,7 +3,7 @@
 //! confirmation.
 
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
@@ -110,6 +110,12 @@ pub fn protected_touched(files: &[String], prefix: &str, protection: &Protection
         .collect()
 }
 
+/// Git's record of a cherry-pick under way; it exists while one is.
+fn sequencer_dir(top: &Path) -> PathBuf {
+    let out = git(top, &["rev-parse", "--git-path", "sequencer"], None).unwrap_or_default();
+    top.join(String::from_utf8_lossy(&out).trim())
+}
+
 /// Stages the agent's changes and commits them as one commit on the human's
 /// branch, then moves the base ref to the branch head, so a later
 /// integration only takes newer commits.
@@ -128,6 +134,15 @@ pub fn apply(top: &Path, wt: &Worktree, message: &str) -> Result<String, ApplyEr
     if git(top, &["diff", "--cached", "--quiet"], None).is_err() {
         return Err(ApplyError::Git {
             message: "you have staged changes: commit or unstage them first, they would go into the integration commit"
+                .into(),
+        });
+    }
+
+    // A pick left by something else (the human's, or an older run) makes git
+    // refuse ours with a message that blames fennec: say whose it is.
+    if sequencer_dir(top).exists() {
+        return Err(ApplyError::Git {
+            message: "a cherry-pick is already in progress in your repository: finish it (git cherry-pick --continue) or drop it (git cherry-pick --quit) first"
                 .into(),
         });
     }
@@ -156,6 +171,10 @@ pub fn apply(top: &Path, wt: &Worktree, message: &str) -> Result<String, ApplyEr
             }
             return Err(ApplyError::Conflict { files, command });
         }
+        // Git refused before changing anything (e.g. an unstaged edit it would
+        // overwrite) but may keep its sequencer, which blocks every later try.
+        // `--quit` forgets it and leaves the tree and index alone.
+        let _ = git(top, &["cherry-pick", "--quit"], None);
         return Err(ApplyError::Git {
             message: format!("{message}\nresolve it by hand: {command}"),
         });
@@ -335,6 +354,29 @@ mod tests {
             )
             .is_err()
         );
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn a_refused_apply_leaves_no_cherry_pick_in_progress() {
+        let (base, repo) = setup();
+        // The human's unstaged edit of a file the agent also changes: git
+        // refuses to overwrite it, which is not a conflict.
+        std::fs::write(repo.join("a.txt"), "two\n").unwrap();
+        let wt = open(&base.join("wt"), &repo, "s1").unwrap().unwrap();
+        std::fs::write(wt.workdir.join("a.txt"), "agent\n").unwrap();
+        assert_eq!(commit(&wt, "agent change"), Ok(true));
+
+        let top = top(&repo).unwrap().0;
+        let Err(ApplyError::Git { .. }) = apply(&top, &wt, "integrate") else {
+            panic!("expected git to refuse");
+        };
+
+        assert!(!sequencer_dir(&top).exists());
+        assert!(matches!(
+            apply(&top, &wt, "integrate"),
+            Err(ApplyError::Git { message }) if !message.contains("already in progress")
+        ));
         let _ = std::fs::remove_dir_all(&base);
     }
 
