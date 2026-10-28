@@ -270,6 +270,7 @@ mod tests {
             Event::ContextState {
                 current_tokens: 100,
                 max_tokens: 1000,
+                compact_at: None,
             },
             Event::ContextCompacted {
                 before_tokens: 100,
@@ -279,10 +280,12 @@ mod tests {
             Event::ContextState {
                 current_tokens: 200,
                 max_tokens: 1000,
+                compact_at: None,
             },
             Event::ContextState {
                 current_tokens: 300,
                 max_tokens: 1000,
+                compact_at: None,
             },
         ];
         assert_eq!(context_tokens(&events), 300);

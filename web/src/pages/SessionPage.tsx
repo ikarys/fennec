@@ -78,7 +78,7 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
   const [detailVersion, setDetailVersion] = useState(0);
   const [integrationOpen, setIntegrationOpen] = useState(false);
   const [integrationVersion, setIntegrationVersion] = useState(0);
-  const { view, hasMore, loadingOlder, loadOlder, skills, usage, calls, workflowUsage } = useSessionThread(sessionId);
+  const { view, hasMore, loadingOlder, loadOlder, skills, usage, calls, workflowUsage, context } = useSessionThread(sessionId);
   const running = view.running;
   const run = view.run;
   const waiting = runWaiting(run, running, view.lastDone);
@@ -284,9 +284,6 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
   }, [sessionId, detail?.worktree, lastRunEndId]);
   const projectName =
     detail?.project.name ?? projects.find((project) => project.id === projectId)?.name ?? projectId ?? '—';
-  const currentTokens = view.contextTokens ?? 0;
-  const maxTokens = view.contextMax ?? config?.contextWindow ?? 0;
-  const contextPercent = maxTokens > 0 ? Math.min(100, Math.round((currentTokens / maxTokens) * 100)) : 0;
 
   async function handleSend(content?: string) {
     // Attachments belong to the composer; a quick answer (`content`) sends none.
@@ -523,10 +520,7 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
             <span className="shrink-0 text-xs text-muted" title={detail?.project.workdir}>{projectName}</span>
             <div className="ml-auto">
               <ContextGauge
-                currentTokens={currentTokens}
-                maxTokens={maxTokens}
-                contextPercent={contextPercent}
-                compactAt={config?.compactAt ?? 0.85}
+                context={context}
                 compactDisabled={!sessionId || state === 'running' || state === 'waiting_for_user'}
                 onCompact={handleCompact}
                 compactError={compactError}

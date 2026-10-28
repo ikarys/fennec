@@ -175,9 +175,23 @@ pub enum Event {
         attachments: Vec<Attachment>,
     },
     #[serde(rename = "message.delta", rename_all = "camelCase")]
-    MessageDelta { message_id: String, content: String },
+    MessageDelta {
+        message_id: String,
+        content: String,
+        /// The generation speed so far, estimated from the streamed chunks
+        /// (agent/delta_buffer.rs); none in the first half second.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tokens_per_second: Option<f64>,
+    },
     #[serde(rename = "message.thinking", rename_all = "camelCase")]
-    MessageThinking { message_id: String, content: String },
+    MessageThinking {
+        message_id: String,
+        content: String,
+        /// The generation speed so far, estimated from the streamed chunks
+        /// (agent/delta_buffer.rs); none in the first half second.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tokens_per_second: Option<f64>,
+    },
     #[serde(rename = "message.done", rename_all = "camelCase")]
     MessageDone {
         message_id: String,
@@ -208,6 +222,10 @@ pub enum Event {
     ContextState {
         current_tokens: u64,
         max_tokens: u64,
+        /// The turn's compaction threshold (0 = off); none in events stored
+        /// before it was recorded.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        compact_at: Option<f64>,
     },
     /// Marks the cut where a new context window started from a summary.
     /// openfox also carries `closedWindowId`/`newWindowId`; fennec has no

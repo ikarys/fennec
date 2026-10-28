@@ -285,6 +285,21 @@ export interface SessionUsage {
   lastGenerationSpeed: number | null;
 }
 
+/** The session header's context gauge, computed by the server. */
+export interface ContextView {
+  /** 0 to 100, the bar's width. */
+  percent: number;
+  tone: 'ok' | 'warn' | 'err';
+  /** Where the compaction threshold sits, 0 to 100; null when compaction is off. */
+  compactMark: number | null;
+  line: string;
+  title: string;
+}
+
+export function getContext(id: string): Promise<ContextView> {
+  return request<ContextView>(`/api/sessions/${encodeURIComponent(id)}/context`);
+}
+
 export function getUsage(id: string): Promise<SessionUsage> {
   return request<SessionUsage>(`/api/sessions/${encodeURIComponent(id)}/usage`);
 }
