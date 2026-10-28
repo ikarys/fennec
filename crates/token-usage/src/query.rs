@@ -1,10 +1,13 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use rusqlite::{ToSql, params_from_iter};
 use serde::Serialize;
 
 use crate::call::Usage;
 use crate::ledger::{Error, Ledger};
+
+/// Chat templates re-render the last turn's edges, so a small gap is not a loss.
+pub const LOST_CACHE_SLACK: u64 = 1_000;
 
 #[derive(Default, Clone, Debug)]
 pub struct Filter {
@@ -26,6 +29,10 @@ pub struct Summary {
     pub cached_tokens: u64,
     pub completion_tokens: u64,
     pub cache_hit_rate: f64,
+    /// Calls that re-read more than `LOST_CACHE_SLACK` tokens their run had already sent.
+    pub lost_cache_calls: u64,
+    /// The tokens those calls re-read.
+    pub lost_cache_tokens: u64,
     pub total_secs: f64,
     pub breakdown: BTreeMap<String, u64>,
     pub savings: BTreeMap<String, u64>,
@@ -109,6 +116,7 @@ struct LoadedRow {
     labels: BTreeMap<String, String>,
     prefill_speed: f64,
     generation_speed: f64,
+    lost_cache_tokens: u64,
 }
 
 impl Ledger {
@@ -270,8 +278,11 @@ impl Ledger {
                 labels: serde_json::from_str(&raw.labels)?,
                 prefill_speed: raw.prefill_speed,
                 generation_speed: raw.generation_speed,
+                lost_cache_tokens: 0,
             });
         }
+
+        mark_lost_cache(&mut out);
 
         Ok(out)
     }
@@ -336,6 +347,28 @@ fn matches_label(labels: &BTreeMap<String, String>, f: &Filter) -> bool {
     }
 }
 
+/// Mark calls that lost a prefix cache.
+///
+/// Rows are already in time order. A call counts only when its run has a
+/// previous prompt, the prompt did not shrink, and the cache gap is above
+/// `LOST_CACHE_SLACK`. A shrunken prompt is a rewrite, not a loss.
+fn mark_lost_cache(rows: &mut [LoadedRow]) {
+    let mut previous_prompt: HashMap<String, u64> = HashMap::new();
+
+    for row in rows.iter_mut() {
+        row.lost_cache_tokens = match previous_prompt.get(&row.run_id) {
+            Some(&prev)
+                if row.prompt_tokens >= prev
+                    && prev.saturating_sub(row.cached_tokens) > LOST_CACHE_SLACK =>
+            {
+                prev - row.cached_tokens
+            }
+            _ => 0,
+        };
+        previous_prompt.insert(row.run_id.clone(), row.prompt_tokens);
+    }
+}
+
 fn new_summary() -> Summary {
     Summary {
         calls: 0,
@@ -343,6 +376,8 @@ fn new_summary() -> Summary {
         cached_tokens: 0,
         completion_tokens: 0,
         cache_hit_rate: 0.0,
+        lost_cache_calls: 0,
+        lost_cache_tokens: 0,
         total_secs: 0.0,
         breakdown: BTreeMap::new(),
         savings: BTreeMap::new(),
@@ -357,6 +392,13 @@ fn add_to_summary(summary: &mut Summary, row: &LoadedRow) {
         .completion_tokens
         .saturating_add(row.completion_tokens);
     summary.total_secs += row.total_secs;
+
+    if row.lost_cache_tokens > 0 {
+        summary.lost_cache_calls += 1;
+        summary.lost_cache_tokens = summary
+            .lost_cache_tokens
+            .saturating_add(row.lost_cache_tokens);
+    }
 
     add_map(&mut summary.breakdown, &row.breakdown);
     add_map(&mut summary.savings, &row.savings);
@@ -646,5 +688,42 @@ mod tests {
             ..Filter::default()
         };
         assert_eq!(ledger.latest(&only_old).unwrap().unwrap().at_ms, 1_000);
+    }
+
+    #[test]
+    fn lost_cache_counts_gaps_in_growing_prompts() {
+        let ledger = Ledger::open_in_memory().unwrap();
+
+        fn call(run_id: &str, at_ms: i64, prompt: u64, cached: u64) -> Call {
+            let mut call = base_call();
+            call.run_id = run_id.into();
+            call.at_ms = at_ms;
+            call.usage = Usage {
+                prompt_tokens: prompt,
+                cached_tokens: cached,
+                completion_tokens: 0,
+            };
+            call
+        }
+
+        ledger.record(&call("r", 10, 1000, 0)).unwrap();
+        ledger.record(&call("r", 20, 3000, 900)).unwrap();
+        ledger.record(&call("b", 25, 5000, 0)).unwrap();
+        ledger.record(&call("r", 30, 6000, 500)).unwrap();
+        ledger.record(&call("r", 40, 2000, 0)).unwrap();
+        ledger.record(&call("r", 50, 2500, 1900)).unwrap();
+
+        let summary = ledger.summary(&Filter::default()).unwrap();
+        assert_eq!(summary.lost_cache_calls, 1);
+        assert_eq!(summary.lost_cache_tokens, 2500);
+
+        let rows = ledger.series(&Filter::default(), GroupBy::Run).unwrap();
+        let run_a = rows.iter().find(|row| row.key == "r").unwrap();
+        assert_eq!(run_a.summary.lost_cache_calls, 1);
+        assert_eq!(run_a.summary.lost_cache_tokens, 2500);
+
+        let run_b = rows.iter().find(|row| row.key == "b").unwrap();
+        assert_eq!(run_b.summary.lost_cache_calls, 0);
+        assert_eq!(run_b.summary.lost_cache_tokens, 0);
     }
 }

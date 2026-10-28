@@ -149,13 +149,14 @@ crates/fennec/src/
                      notifier (wakes streams on append, no polling), turns, assets,
                      workflow_routes, children (child sessions for workflow nodes),
                      preview (a project's files in a sandboxed origin), session_usage,
-                     workflow_usage and context_view (display-ready token figures: the UI computes none)
+                     workflow_usage, context_view and insight (display-ready token figures: the UI computes none)
   cli/               terminal adapter: commands, transcript
 crates/token-usage/ the usage ledger, a crate of its own and fennec-free (calls, tokens, speed, savings;
                      SQLite file `usage.db`, `FENNEC_USAGE_DB`): outlives sessions, reusable by other products
 crates/fennec/build.rs   embeds web/dist (placeholder page when not built)
 web/src/           React + Vite + Tailwind v4 UI (same layout as openfox's web/src)
-  pages/             one component per route: HomePage, SessionPage, SettingsPage, WorkflowsPage (lazy)
+  pages/             one component per route: HomePage, SessionPage, SettingsPage, InsightPage,
+                     WorkflowsPage (lazy)
   components/        ui/ the primitives every screen uses (Button, Badge, SectionLabel, Card, Panel, fields);
                      shared UI; session/ the thread, tool cards, question card, message stats, composer,
                      context panel; project/ the folder browser; layout/ the top bar;
