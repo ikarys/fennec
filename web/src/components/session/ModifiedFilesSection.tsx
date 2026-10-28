@@ -44,7 +44,6 @@ export function ModifiedFilesSection({ modifiedFiles, sessionId }: ModifiedFiles
     <Panel
       id="modifiedFiles"
       title={panelBlock('modifiedFiles').title}
-      pinned
       summary={mergedFiles.length > 0 ? mergedFiles.length : undefined}
     >
       {mergedFiles.length === 0 && <div className="text-xs text-muted">Aucun fichier modifié.</div>}
