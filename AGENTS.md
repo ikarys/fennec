@@ -128,7 +128,7 @@ crates/fennec/src/
   tools/             Toolbox adapter: one file per tool, path_guard, args; sandbox (the bwrap
                      world of commands);
                      web_search queries the SearXNG instance from the Settings page
-  llm/               Model adapter: openai.rs (client), sse.rs (stream parser), models.rs (/models listing)
+  llm/               Model adapter: openai.rs, the Model port over llm-providers (tool-call arguments parsed here)
   store.rs           EventLog adapter: SQLite (openfox's schema), projects and sessions;
                      store/settings.rs the stored preferences
   metering.rs        the usage ledger adapter: MeteredLog (an EventLog that also writes each model call
@@ -154,6 +154,8 @@ crates/fennec/src/
   cli/               terminal adapter: commands, transcript
 crates/token-usage/ the usage ledger, a crate of its own and fennec-free (calls, tokens, speed, savings;
                      SQLite file `usage.db`, `FENNEC_USAGE_DB`): outlives sessions, reusable by other products
+crates/llm-providers/ talking to models, a crate of its own and fennec-free: the OpenAI-compatible client
+                     and its SSE parser, the /models listing, per-model parameters (ReasoningEffort, ModelPrefs)
 crates/fennec/build.rs   embeds web/dist (placeholder page when not built)
 web/src/           React + Vite + Tailwind v4 UI (same layout as openfox's web/src)
   pages/             one component per route: HomePage, SessionPage, SettingsPage, InsightPage,

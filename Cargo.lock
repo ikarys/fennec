@@ -108,6 +108,7 @@ name = "fennec"
 version = "0.1.0"
 dependencies = [
  "base64",
+ "llm-providers",
  "rusqlite",
  "serde",
  "serde_json",
@@ -312,6 +313,15 @@ name = "litrs"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4744e383959f0db86ede514b809b1c53251889093803c05267acc7d4e7030d70"
+
+[[package]]
+name = "llm-providers"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "ureq",
+]
 
 [[package]]
 name = "log"
