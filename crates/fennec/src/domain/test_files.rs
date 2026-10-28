@@ -39,7 +39,9 @@ pub fn new_test_patterns(files: &[String], protection: &Protection) -> Vec<Strin
 }
 
 /// The new content of `.agents/protected`: the existing lines kept, then the
-/// header and one path per line. Unchanged when there is nothing to add.
+/// header and one anchored path per line. Paths are prefixed with `/` because
+/// a pattern without `/` would match that name in every directory. Unchanged
+/// when there is nothing to add.
 pub fn append_to(existing: &str, paths: &[String]) -> String {
     if paths.is_empty() {
         return existing.to_string();
@@ -51,6 +53,7 @@ pub fn append_to(existing: &str, paths: &[String]) -> String {
     content.push_str(HEADER);
     content.push('\n');
     for path in paths {
+        content.push('/');
         content.push_str(path);
         content.push('\n');
     }
@@ -111,9 +114,13 @@ mod tests {
         let paths = vec!["a_test.go".to_string()];
         assert_eq!(
             append_to("x\n# mine", &paths),
-            format!("x\n# mine\n{HEADER}\na_test.go\n")
+            format!("x\n# mine\n{HEADER}\n/a_test.go\n")
         );
-        assert_eq!(append_to("", &paths), format!("{HEADER}\na_test.go\n"));
+        assert_eq!(append_to("", &paths), format!("{HEADER}\n/a_test.go\n"));
         assert_eq!(append_to("x", &[]), "x");
+
+        let protected = Protection::new(Some(&append_to("", &["a.test.ts".to_string()])));
+        assert!(protected.is_protected("a.test.ts"));
+        assert!(!protected.is_protected("web/a.test.ts"));
     }
 }
