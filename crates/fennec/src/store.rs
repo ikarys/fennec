@@ -445,6 +445,7 @@ mod tests {
         let ev = Event::MessageDelta {
             message_id: "m".into(),
             content: "hi".into(),
+            tokens_per_second: None,
         };
         assert_eq!(store.append(&sid, &ev).unwrap(), 2);
         let all = store.events(&sid).unwrap();
@@ -526,6 +527,7 @@ mod tests {
                         &Event::MessageDelta {
                             message_id: "m".into(),
                             content: format!("t{turn}c{i}"),
+                            tokens_per_second: None,
                         },
                     )
                     .unwrap();
@@ -591,6 +593,7 @@ mod tests {
                 &Event::MessageDelta {
                     message_id: "m".into(),
                     content: "between".into(),
+                    tokens_per_second: None,
                 },
             )
             .unwrap();
@@ -601,6 +604,7 @@ mod tests {
                 &Event::MessageDelta {
                     message_id: "m".into(),
                     content: "after".into(),
+                    tokens_per_second: None,
                 },
             )
             .unwrap();

@@ -14,13 +14,13 @@ with camelCase fields.
 |---|---|
 | `session.initialized` | `{workdir}` |
 | `message.start` | `{messageId, role: "user"\|"assistant", content?, isSystemGenerated?, metadata?: {type: "agent", name, color, kind: "definition"}, attachments?: [{id, filename, mimeType, size, data}]}` (metadata set on the agent reminder the loop injects as a system-generated user message when the agent changes; attachments are images the human sent: png/jpeg/gif/webp/bmp/svg, 5 MB each, at most 10 per message, `data` is a base64 data URL) |
-| `message.delta` | `{messageId, content}` (text chunk) |
-| `message.thinking` | `{messageId, content}` (reasoning chunk) |
+| `message.delta` | `{messageId, content, tokensPerSecond?}` (text chunk; the generation speed so far, estimated by the server from the characters streamed, absent in the first half second) |
+| `message.thinking` | `{messageId, content, tokensPerSecond?}` (reasoning chunk, same estimate) |
 | `message.done` | `{messageId, partial?, stats?}`; `stats` (assistant messages): `{model, totalTime (s), prefillTokens, cachedPromptTokens, generationTokens, prefillSpeed, generationSpeed}`, speeds in tokens/s, prefill speed over new (non-cached) tokens |
 | `tool.call` | `{messageId, toolCall: {id, name, arguments, parseError?}}` |
 | `tool.output` | `{messageId, toolCallId, stream: "stdout"\|"stderr", content}` |
 | `tool.result` | `{messageId, toolCallId, result: {success, output?, error?, durationMs, truncated, metadata?: {mimeType, dataUrl, path, size}}}` (`metadata` when `read_file` returned an image) |
-| `context.state` | `{currentTokens, maxTokens}` |
+| `context.state` | `{currentTokens, maxTokens, compactAt?}` (`compactAt`: the turn's compaction threshold, 0 = off; absent in older events) |
 | `context.compacted` | `{beforeTokens, afterTokens, summary}`: the cut where a new context window started from `summary`; `afterTokens` is an estimate until the next model call reports the real count |
 | `running.changed` | `{isRunning}` |
 | `chat.done` | `{messageId, reason: "complete"\|"stopped"\|"error"\|"truncated"\|"waiting_for_user", durationMs?}` (wall clock of the agent loop that ended; absent for compaction-only turns and older logs) |
@@ -215,6 +215,9 @@ read-only. The human edits them as usual.
 - `GET /api/sessions/{id}/usage` → `{calls, promptTokens, cachedTokens, completionTokens, cachePercent, lastGenerationSpeed}`:
   the session's model calls from the usage ledger (`usage.db`, crate `token-usage`), which outlives the log;
   `cachePercent` is 0 to 100, `lastGenerationSpeed` (tokens/s) is null before any call; 404 if no session
+- `GET /api/sessions/{id}/context` → `{percent, tone, compactMark, line, title}`: the header's gauge, from the last
+  `context.state` the model still sees (`tone` `ok`/`warn`/`err`, `compactMark` null when compaction is off); events
+  without `compactAt` and sessions without a measure use the current settings
 - `GET /api/sessions/{id}/usage/calls` → `[{messageId, line, detail, turnRecap}]`, oldest first: what sits under
   each answer, written by the server from the ledger (`line` `↑ 12,3k · cache 82 % · ↓ 345 · 4,2 s`, `detail` the
   tooltip, `turnRecap` on a turn's last call only, null otherwise: the turn's wall clock, `chat.done.durationMs`

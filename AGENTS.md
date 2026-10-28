@@ -148,7 +148,8 @@ crates/fennec/src/
   web/               HTTP adapter: http, guard (who may call), routes, event_stream (SSE),
                      notifier (wakes streams on append, no polling), turns, assets,
                      workflow_routes, children (child sessions for workflow nodes),
-                     preview (a project's files in a sandboxed origin)
+                     preview (a project's files in a sandboxed origin), session_usage,
+                     workflow_usage and context_view (display-ready token figures: the UI computes none)
   cli/               terminal adapter: commands, transcript
 crates/token-usage/ the usage ledger, a crate of its own and fennec-free (calls, tokens, speed, savings;
                      SQLite file `usage.db`, `FENNEC_USAGE_DB`): outlives sessions, reusable by other products

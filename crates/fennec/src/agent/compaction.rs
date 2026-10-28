@@ -125,6 +125,7 @@ pub(super) fn compact(turn: &mut Turn, prompt: &RoundPrompt) -> Result<Compacted
     turn.append(Event::ContextState {
         current_tokens: after,
         max_tokens: turn.context_window,
+        compact_at: Some(turn.compact_at),
     })?;
     Ok(Compacted::Done)
 }
@@ -184,6 +185,7 @@ mod tests {
             Event::ContextState {
                 current_tokens: 9_000,
                 max_tokens: 10_000,
+                compact_at: None,
             },
         );
     }
