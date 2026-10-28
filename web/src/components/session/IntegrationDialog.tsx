@@ -43,6 +43,7 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
   const [acknowledged, setAcknowledged] = useState<Partial<Record<BlockerKind, boolean>>>({});
   const [message, setMessage] = useState('');
   const [protectTests, setProtectTests] = useState(false);
+  const [removeWorktree, setRemoveWorktree] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -98,7 +99,7 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
       .filter((blocker) => blocker.kind !== 'noCommits' && acknowledged[blocker.kind])
       .map((blocker) => blocker.kind);
     try {
-      const response = await integrate(sessionId, acknowledgedKinds, message, protectTests);
+      const response = await integrate(sessionId, acknowledgedKinds, message, protectTests, removeWorktree);
       setResult(response);
     } catch (integrateError) {
       // A 409 keeps the dialog open: the message says what to do.
@@ -169,6 +170,8 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
             Intégré : {result.commits.length} commits, HEAD {result.head.slice(0, 8)}.
             {result.protectedTests.length > 0 && ` ${result.protectedTests.length} tests protégés.`}
             {result.protectError && <span className="text-err"> Tests non protégés : {result.protectError}</span>}
+            {result.worktreeRemoved && ' Dossier de l\'agent supprimé.'}
+            {result.removeError && <span className="text-err"> Dossier non supprimé : {result.removeError}</span>}
           </div>
         )}
 
@@ -256,6 +259,11 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
                 </span>
               </label>
             )}
+
+            <label className="flex items-start gap-1.5 text-xs">
+              <input type="checkbox" checked={removeWorktree} onChange={(event) => setRemoveWorktree(event.target.checked)} />
+              <span>Supprimer le dossier et la branche de l'agent après l'intégration (la session n'aura plus de copie de travail).</span>
+            </label>
 
             {preview.blockers.length > 0 && (
               <section className="flex flex-col gap-1.5">

@@ -165,6 +165,10 @@ pub fn integrate(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> 
         .get("protectTests")
         .and_then(Value::as_bool)
         .unwrap_or(false);
+    let remove_worktree = body
+        .get("removeWorktree")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
     if app.turns.is_running(id) {
         return error(stream, 409, "a turn is already running");
     }
@@ -223,6 +227,25 @@ pub fn integrate(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> 
             protected_tests: protected_tests.clone(),
         },
     )?;
+    // Same rule as above: the integration stands, a cleanup failure is reported.
+    let (worktree_removed, remove_error) = if remove_worktree {
+        match worktree::remove(&gate.top, &gate.wt) {
+            Ok(()) => {
+                // No commits to record: the base ref moved, `integration.applied` has them.
+                log.append(
+                    &gate.session_id,
+                    &Event::WorktreeDiscarded {
+                        branch: gate.wt.branch.clone(),
+                        commits: Vec::new(),
+                    },
+                )?;
+                (true, None)
+            }
+            Err(e) => (false, Some(e)),
+        }
+    } else {
+        (false, None)
+    };
     send_json(
         stream,
         200,
@@ -231,6 +254,8 @@ pub fn integrate(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> 
             "commits": commits,
             "protectedTests": protected_tests,
             "protectError": protect_error,
+            "worktreeRemoved": worktree_removed,
+            "removeError": remove_error,
         }),
     )
 }
