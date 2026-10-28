@@ -126,9 +126,18 @@ export interface CriterionView {
   provenance?: Provenance;
 }
 
+export interface DecisionView {
+  callId: string;
+  title: string;
+  choice: string;
+  reason: string;
+  alternatives: string[];
+}
+
 export interface ThreadView {
   items: ThreadItem[];
   criteria: CriterionView[];
+  decisions: DecisionView[];
   contextTokens?: number;
   contextMax?: number;
   running: boolean;
@@ -340,6 +349,7 @@ export function createThreadFold(): ThreadFold {
   // Null means "no live change yet": the session detail owns the mode.
   let mode: string | null = null;
   let criteria: CriterionView[] = [];
+  const decisions: DecisionView[] = [];
   let name: string | undefined;
   const runFold = createRunFold();
   type WorkflowNodeItem = Extract<ThreadItem, { kind: 'workflow-node' }>;
@@ -622,6 +632,20 @@ export function createThreadFold(): ThreadFold {
         break;
       }
 
+      case 'decision.recorded': {
+        const text = (value: unknown) => (typeof value === 'string' ? value : '');
+        const title = text(data.title);
+        if (!title) break;
+        decisions.push({
+          callId: text(data.callId),
+          title,
+          choice: text(data.choice),
+          reason: text(data.reason),
+          alternatives: Array.isArray(data.alternatives) ? data.alternatives.filter((a: unknown) => typeof a === 'string') : []
+        });
+        break;
+      }
+
       case 'criterion.updated': {
         const criterionId = String(data.criterionId ?? '');
         const status = parseCriterionStatus(data.status);
@@ -806,6 +830,7 @@ export function createThreadFold(): ThreadFold {
   const view = (): ThreadView => ({
     items: [...items],
     criteria: [...criteria],
+    decisions: [...decisions],
     contextTokens,
     contextMax,
     running,
