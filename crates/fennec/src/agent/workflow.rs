@@ -13,6 +13,7 @@ mod tests;
 use super::ports::{ChildSessions, Commands};
 use super::turn::{self, Turn};
 use crate::domain::attachment::Attachment;
+use crate::domain::clock::now_ms;
 use crate::domain::compaction::files_changed;
 use crate::domain::conversation::last_assistant_text;
 use crate::domain::event::{DoneReason, Event};
@@ -206,6 +207,7 @@ fn start_run(
         pass: 1,
         via: None,
         child_session_id: None,
+        started_at: Some(now_ms()),
     })?;
     turn.append(Event::WorkflowNodeFinished {
         run_id,
@@ -308,6 +310,7 @@ fn record_given(
         pass: 1,
         via: Some(via),
         child_session_id: None,
+        started_at: Some(now_ms()),
     })?;
     turn.append(Event::WorkflowNodeFinished {
         run_id: run_id.to_string(),
@@ -605,6 +608,7 @@ fn append_node_started(
         pass,
         via: Some(via.clone()),
         child_session_id: child_session_id.map(|s| s.to_string()),
+        started_at: Some(now_ms()),
     })
 }
 
