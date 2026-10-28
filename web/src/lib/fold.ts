@@ -327,6 +327,10 @@ export function createThreadFold(): ThreadFold {
   const tools = new Map<string, ToolCallView>();
   const usage: SessionUsage = { calls: 0, prefillTokens: 0, cachedPromptTokens: 0, generationTokens: 0 };
   let tokensPerChar = DEFAULT_TOKENS_PER_CHAR;
+  // Calibrated over the whole session: one message's ratio swings from 0.24 to
+  // 0.67 (tool calls carry template tokens no text shows), which put the live
+  // estimate up to twice the measured speed.
+  const calibration = { tokens: 0, chars: 0 };
   // [arrival time, chars] of the streaming message, oldest first.
   let samples: [number, number][] = [];
   let index = 0;
@@ -460,7 +464,9 @@ export function createThreadFold(): ThreadFold {
         usage.generationTokens += stats.generationTokens;
         usage.last = stats;
         if (assistant.chars > 200 && stats.generationTokens > 0) {
-          tokensPerChar = stats.generationTokens / assistant.chars;
+          calibration.tokens += stats.generationTokens;
+          calibration.chars += assistant.chars;
+          tokensPerChar = calibration.tokens / calibration.chars;
         }
         break;
       }
