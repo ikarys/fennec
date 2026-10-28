@@ -27,7 +27,6 @@ export function CriteriaSection({ criteria }: { criteria: CriterionView[] }) {
     <Panel
       id="criteria"
       title={panelBlock('criteria').title}
-      pinned
       summary={criteria.length > 0 ? `${passed}/${criteria.length}` : undefined}
     >
       {criteria.length === 0 ? (
