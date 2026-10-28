@@ -1,9 +1,105 @@
-import type { Project } from '../lib/api';
+import { useState } from 'react';
+import type { Project, SessionSummary } from '../lib/api';
 import { formatRelative, stateLabel } from '../lib/format';
 import { PlusIcon } from '../components/Icons';
 import { Button } from '../components/ui/Button';
-import { Badge } from '../components/ui/Badge';
+import { Badge, type BadgeTone } from '../components/ui/Badge';
 import { Card } from '../components/ui/Card';
+import { SectionLabel } from '../components/ui/SectionLabel';
+
+/** How many non-active sessions a project card shows before the toggle appears. */
+const RECENT_SESSIONS = 5;
+
+/** The states a session card keeps visible even when the list is collapsed. */
+const ACTIVE_STATES: Set<string> = new Set(['running', 'waiting_for_user', 'error']);
+
+function sessionTone(state: SessionSummary['state']): { tone: BadgeTone; dot: boolean; pulse: boolean } {
+  if (state === 'running') return { tone: 'accent', dot: true, pulse: true };
+  if (state === 'waiting_for_user') return { tone: 'accent', dot: true, pulse: false };
+  if (state === 'error') return { tone: 'err', dot: false, pulse: false };
+  if (state === 'complete') return { tone: 'ok', dot: false, pulse: false };
+  return { tone: 'neutral', dot: false, pulse: false };
+}
+
+function SessionRow({ session, onOpenSession }: { session: SessionSummary; onOpenSession: (id: string) => void }) {
+  const { tone, dot, pulse } = sessionTone(session.state);
+  return (
+    <button
+      type="button"
+      onClick={() => onOpenSession(session.id)}
+      className="grid w-full grid-cols-[minmax(0,1fr)_auto_5.5rem] items-center gap-3 border-t border-border px-4 py-2 text-left first:border-t-0 hover:bg-raised"
+    >
+      <span className="min-w-0 truncate font-medium">{session.title}</span>
+      <span className="flex items-center gap-1.5">
+        {session.awaitingIntegration && <Badge tone="accent">à intégrer</Badge>}
+        <Badge tone={tone} dot={dot} pulse={pulse}>
+          {stateLabel(session.state)}
+        </Badge>
+      </span>
+      <span className="text-right text-xs text-faint tabular-nums">{formatRelative(session.updatedAt)}</span>
+    </button>
+  );
+}
+
+function ProjectCard({
+  project,
+  onNewSession,
+  onOpenSession
+}: {
+  project: Project;
+  onNewSession: (projectId: string) => void;
+  onOpenSession: (sessionId: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  // The server already returns the sessions newest first.
+  const active = project.sessions.filter((session) => ACTIVE_STATES.has(session.state));
+  const rest = project.sessions.filter((session) => !ACTIVE_STATES.has(session.state));
+  const recent = rest.slice(0, RECENT_SESSIONS);
+  const hidden = rest.slice(RECENT_SESSIONS);
+
+  return (
+    <Card className="overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
+        <div className="flex min-w-0 flex-col gap-1">
+          <h2 className="truncate text-sm font-semibold">{project.name}</h2>
+          <div className="flex flex-wrap gap-3 text-xs font-mono text-muted">
+            <span className="truncate">{project.workdir}</span>
+            <span className="truncate">⎇ {project.branch ?? 'sans branche'}</span>
+          </div>
+        </div>
+        <Button variant="secondary" size="sm" onClick={() => onNewSession(project.id)}>
+          <PlusIcon className="h-3.5 w-3.5" />
+          Nouvelle session
+        </Button>
+      </div>
+
+      {project.sessions.length === 0 ? (
+        <div className="px-4 py-4 text-sm text-muted">Aucune session pour ce projet.</div>
+      ) : (
+        <div>
+          {active.length > 0 && <SectionLabel className="px-4 pt-3 pb-1">En cours</SectionLabel>}
+          {active.map((session) => (
+            <SessionRow key={session.id} session={session} onOpenSession={onOpenSession} />
+          ))}
+          {active.length > 0 && recent.length > 0 && <SectionLabel className="px-4 pt-3 pb-1">Récemment</SectionLabel>}
+          {recent.map((session) => (
+            <SessionRow key={session.id} session={session} onOpenSession={onOpenSession} />
+          ))}
+          {rest.length > RECENT_SESSIONS && (
+            <button
+              type="button"
+              onClick={() => setExpanded((value) => !value)}
+              className="block w-full border-t border-border px-4 py-2 text-left text-xs text-muted hover:bg-raised hover:text-text"
+            >
+              {expanded ? 'Replier' : `Afficher les ${hidden.length} autres sessions`}
+            </button>
+          )}
+          {expanded && hidden.map((session) => <SessionRow key={session.id} session={session} onOpenSession={onOpenSession} />)}
+        </div>
+      )}
+    </Card>
+  );
+}
 
 interface HomePageProps {
   projects: Project[];
@@ -58,66 +154,7 @@ export function HomePage({ projects, loading, error, onOpenProjectDialog, onNewS
         )}
 
         {projects.map((project) => (
-          <Card key={project.id} className="overflow-hidden">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
-              <div className="flex min-w-0 flex-col gap-1">
-                <h2 className="truncate text-sm font-semibold">{project.name}</h2>
-                <div className="flex flex-wrap gap-3 text-xs font-mono text-muted">
-                  <span className="truncate">{project.workdir}</span>
-                  <span className="truncate">⎇ {project.branch ?? 'sans branche'}</span>
-                </div>
-              </div>
-              <Button variant="secondary" size="sm" onClick={() => onNewSession(project.id)}>
-                <PlusIcon className="h-3.5 w-3.5" />
-                Nouvelle session
-              </Button>
-            </div>
-
-            {project.sessions.length === 0 ? (
-              <div className="px-4 py-4 text-sm text-muted">Aucune session pour ce projet.</div>
-            ) : (
-              <div>
-                {project.sessions.map((session) => {
-                  const label = stateLabel(session.state);
-                  const normalizedLabel = label.toLowerCase();
-                  let tone: 'neutral' | 'accent' | 'ok' | 'err' = 'neutral';
-                  let dot = false;
-                  let pulse = false;
-
-                  if (normalizedLabel === 'terminée' || normalizedLabel === 'completed' || normalizedLabel === 'done') {
-                    tone = 'ok';
-                  } else if (normalizedLabel === 'en cours' || normalizedLabel === 'running') {
-                    tone = 'accent';
-                    dot = true;
-                    pulse = true;
-                  } else if (normalizedLabel === 'en attente de toi' || normalizedLabel === 'waiting') {
-                    tone = 'accent';
-                    dot = true;
-                  } else if (normalizedLabel === 'erreur' || normalizedLabel === 'error' || normalizedLabel === 'failed') {
-                    tone = 'err';
-                  }
-
-                  return (
-                    <button
-                      key={session.id}
-                      type="button"
-                      onClick={() => onOpenSession(session.id)}
-                      className="grid w-full grid-cols-[minmax(0,1fr)_auto_5.5rem] items-center gap-3 border-t border-border px-4 py-2 text-left first:border-t-0 hover:bg-raised"
-                    >
-                      <span className="min-w-0 truncate font-medium">{session.title}</span>
-                      <span className="flex items-center gap-1.5">
-                        {session.awaitingIntegration && <Badge tone="accent">à intégrer</Badge>}
-                        <Badge tone={tone} dot={dot} pulse={pulse}>
-                          {label}
-                        </Badge>
-                      </span>
-                      <span className="text-right text-xs text-faint tabular-nums">{formatRelative(session.updatedAt)}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </Card>
+          <ProjectCard key={project.id} project={project} onNewSession={onNewSession} onOpenSession={onOpenSession} />
         ))}
       </div>
     </main>
