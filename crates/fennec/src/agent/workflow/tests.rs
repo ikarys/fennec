@@ -1610,6 +1610,7 @@ fn resume_interrupted_agent_keeps_its_pass_and_prompt() {
             pass: 1,
             via: None,
             child_session_id: None,
+            started_at: None,
         },
         Event::WorkflowNodeFinished {
             run_id: "r".into(),
@@ -1629,6 +1630,7 @@ fn resume_interrupted_agent_keeps_its_pass_and_prompt() {
                 port: "next".into(),
             }),
             child_session_id: None,
+            started_at: None,
         },
         // The model call the interrupted first segment made.
         Event::MessageDone {
