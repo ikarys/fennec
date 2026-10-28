@@ -148,11 +148,19 @@ pub fn accepted_proposal(events: &[Event], call_id: &str, answer: &str) -> Optio
     })
 }
 
+/// A proposal that changes nothing against the criteria in force.
+pub fn is_noop(in_force: &[Criterion], proposed: &[Criterion]) -> bool {
+    in_force.len() == proposed.len()
+        && in_force.iter().zip(proposed).all(|(current, proposed)| {
+            current.description == proposed.description && current.check == proposed.check
+        })
+}
+
 /// The question shown to the human (the UI speaks French) for a proposed criteria list.
 pub fn proposal_question(current: &[Criterion], proposed: &[Criterion], reason: &str) -> String {
     if current.is_empty() {
         let mut lines = vec![
-            "L'agent propose de remplacer les critères :".to_string(),
+            "L'agent propose les critères :".to_string(),
             String::new(),
             reason.to_string(),
             String::new(),
@@ -697,7 +705,7 @@ C3: pass
     }
 
     #[test]
-    fn proposal_question_empty_current_keeps_old_wording() {
+    fn proposal_question_empty_current_introduces_the_criteria() {
         let proposed = vec![
             criterion("C1", "builds", Some("true")),
             criterion("C2", "docs", None),
@@ -705,8 +713,41 @@ C3: pass
 
         assert_eq!(
             proposal_question(&[], &proposed, "the old check cannot run"),
-            "L'agent propose de remplacer les critères :\n\nthe old check cannot run\n\nC1: builds — check `true`\nC2: docs — sans check, à juger"
+            "L'agent propose les critères :\n\nthe old check cannot run\n\nC1: builds — check `true`\nC2: docs — sans check, à juger"
         );
+    }
+
+    #[test]
+    fn is_noop_only_for_the_same_list() {
+        let in_force = vec![
+            criterion("C1", "builds", Some("true")),
+            criterion("C2", "docs", None),
+        ];
+        assert!(is_noop(
+            &in_force,
+            &[
+                criterion("C1", "builds", Some("true")),
+                criterion("C2", "docs", None),
+            ]
+        ));
+        assert!(!is_noop(
+            &in_force,
+            &[criterion("C1", "builds", Some("true"))]
+        ));
+        assert!(!is_noop(
+            &in_force,
+            &[
+                criterion("C1", "builds faster", Some("true")),
+                criterion("C2", "docs", None),
+            ]
+        ));
+        assert!(!is_noop(
+            &in_force,
+            &[
+                criterion("C1", "builds", None),
+                criterion("C2", "docs", None),
+            ]
+        ));
     }
 
     #[test]

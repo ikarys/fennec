@@ -902,6 +902,84 @@ mod tests {
     }
 
     #[test]
+    fn propose_criteria_noop_does_not_ask() {
+        use crate::domain::criteria::Criterion;
+        use crate::domain::workflow::definition::{
+            Edge, EndOutcome, Node, NodeKind, Position, Workflow,
+        };
+
+        let dir = scratch_dir();
+        let workflow = Workflow {
+            id: "w".into(),
+            name: "w".into(),
+            description: String::new(),
+            max_steps: 50,
+            nodes: vec![
+                Node {
+                    id: "start".into(),
+                    name: None,
+                    position: Position::default(),
+                    kind: NodeKind::Start,
+                },
+                Node {
+                    id: "end".into(),
+                    name: None,
+                    position: Position::default(),
+                    kind: NodeKind::End {
+                        outcome: EndOutcome::Done,
+                    },
+                },
+            ],
+            edges: vec![Edge {
+                from: "start".into(),
+                port: "next".into(),
+                to: "end".into(),
+                max_passes: None,
+                pause: false,
+            }],
+        };
+        let call = ToolCall {
+            id: "c1".into(),
+            name: "propose_criteria".into(),
+            arguments: json!({"criteria":[{"description":"builds","check":"true"}],"reason":"unchanged"}),
+            parse_error: None,
+            raw_arguments: None,
+        };
+        let model = Scripted(RefCell::new(vec![
+            reply("", vec![call]),
+            reply("done", vec![]),
+        ]));
+        let stop = AtomicBool::new(false);
+        let mut h = Harness::new(Box::new(model), dir.clone(), &stop);
+        h.log.0.borrow_mut().extend([
+            Event::WorkflowStarted {
+                run_id: "r".into(),
+                workflow,
+                task: "t".into(),
+                step_by_step: false,
+            },
+            Event::CriteriaSet {
+                criteria: vec![Criterion {
+                    id: "C1".into(),
+                    description: "builds".into(),
+                    check: Some("true".into()),
+                }],
+            },
+        ]);
+
+        let reason = run_turn(&mut h.turn(), "go", &[]).unwrap();
+        assert_eq!(reason, DoneReason::Complete);
+        let events = h.log.0.borrow().clone();
+        assert!(
+            !events
+                .iter()
+                .any(|e| matches!(e, Event::ChatAskUser { call_id, .. } if call_id == "c1"))
+        );
+        assert!(events.iter().any(|e| matches!(e, Event::ToolResult { tool_call_id, result, .. } if tool_call_id == "c1" && result.output.as_deref() == Some("The criteria are unchanged; nothing to accept."))));
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
     fn record_decision_is_logged_and_the_turn_goes_on() {
         let dir = scratch_dir();
         let call = ToolCall {

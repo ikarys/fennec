@@ -7,6 +7,7 @@ use super::propose_criteria;
 use super::record_decision;
 use super::turn::Turn;
 use crate::domain::agent::AgentDefinition;
+use crate::domain::criteria;
 use crate::domain::event::{Event, ToolCall, ToolResult};
 use crate::domain::workflow::run;
 use std::sync::atomic::Ordering;
@@ -108,14 +109,31 @@ pub(super) fn execute_tools(
             match propose_criteria::parse(&call.arguments) {
                 // The model reads the failure and the loop goes on.
                 Err(e) => record(turn, message_id, call, ToolResult::failure(e))?,
-                // No result is recorded: the answer will be the result.
+                // The question shows the delta against the criteria in force;
+                // a proposal that changes nothing is accepted without asking.
                 Ok(proposal) => {
-                    // The question shows the delta against the criteria in force.
                     let in_force = run::criteria_in_force(&turn.log.events(turn.session_id)?);
-                    for event in propose_criteria::events(&call.id, proposal, &in_force) {
-                        turn.append(event)?;
+                    if criteria::is_noop(&in_force, &proposal.criteria) {
+                        turn.append(Event::CriteriaProposed {
+                            call_id: call.id.clone(),
+                            criteria: proposal.criteria.clone(),
+                            reason: proposal.reason.clone(),
+                        })?;
+                        record(
+                            turn,
+                            message_id,
+                            call,
+                            ToolResult::success(
+                                "The criteria are unchanged; nothing to accept.".into(),
+                                false,
+                            ),
+                        )?;
+                    } else {
+                        for event in propose_criteria::events(&call.id, proposal, &in_force) {
+                            turn.append(event)?;
+                        }
+                        waiting = true;
                     }
-                    waiting = true;
                 }
             }
             continue;

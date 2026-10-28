@@ -900,6 +900,192 @@ fn human_node() {
 }
 
 #[test]
+fn approving_the_plan_records_its_criteria_before_the_criteria_node() {
+    let workflow = Workflow {
+        id: "w".into(),
+        name: "w".into(),
+        description: String::new(),
+        max_steps: 50,
+        nodes: vec![
+            Node {
+                id: "start".into(),
+                name: None,
+                position: Position::default(),
+                kind: NodeKind::Start,
+            },
+            Node {
+                id: "plan".into(),
+                name: Some("Plan".into()),
+                position: Position::default(),
+                kind: NodeKind::Agent {
+                    agent: "plan".into(),
+                    prompt: "{{task}}".into(),
+                    retry_prompt: None,
+                    outputs: vec!["done".into()],
+                    context: AgentContext::Session,
+                    verdicts: false,
+                },
+            },
+            Node {
+                id: "approve".into(),
+                name: Some("Approve".into()),
+                position: Position::default(),
+                kind: NodeKind::Human {
+                    question: "Go?".into(),
+                    choices: vec!["Go".into(), "Revise".into()],
+                },
+            },
+            Node {
+                id: "criteria".into(),
+                name: Some("Criteria".into()),
+                position: Position::default(),
+                kind: NodeKind::Criteria {
+                    plan: "plan".into(),
+                },
+            },
+            Node {
+                id: "end".into(),
+                name: None,
+                position: Position::default(),
+                kind: NodeKind::End {
+                    outcome: EndOutcome::Done,
+                },
+            },
+        ],
+        edges: vec![
+            Edge {
+                from: "start".into(),
+                port: "next".into(),
+                to: "plan".into(),
+                max_passes: None,
+                pause: false,
+            },
+            Edge {
+                from: "plan".into(),
+                port: "done".into(),
+                to: "approve".into(),
+                max_passes: None,
+                pause: false,
+            },
+            Edge {
+                from: "approve".into(),
+                port: "Go".into(),
+                to: "criteria".into(),
+                max_passes: None,
+                pause: false,
+            },
+            Edge {
+                from: "approve".into(),
+                port: "Revise".into(),
+                to: "plan".into(),
+                max_passes: None,
+                pause: false,
+            },
+            Edge {
+                from: "criteria".into(),
+                port: "pass".into(),
+                to: "end".into(),
+                max_passes: None,
+                pause: false,
+            },
+            Edge {
+                from: "criteria".into(),
+                port: "fail".into(),
+                to: "end".into(),
+                max_passes: None,
+                pause: false,
+            },
+        ],
+    };
+
+    let model = Scripted(RefCell::new(vec![
+        reply("## Done when\n- C1 — check: `true`", vec![]),
+        reply("## Done when\n- C2 — check: `true`", vec![]),
+    ]));
+    let stop = AtomicBool::new(false);
+    let children = FakeChildren::default();
+    let commands = FakeCommands::default();
+    *commands.exit_codes.lock().unwrap() = vec![0];
+    let env = WorkflowEnv {
+        children: &children,
+        commands: &commands,
+    };
+    let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
+    h.agents = vec![plan()];
+
+    let reason = run_workflow(
+        &mut h.turn(),
+        &env,
+        WorkflowJob::Start {
+            workflow,
+            task: "do it".into(),
+            step_by_step: false,
+            attachments: Vec::new(),
+        },
+    )
+    .unwrap();
+    assert_eq!(reason, DoneReason::WaitingForUser);
+
+    // "Revise" sends the plan back: nothing is recorded.
+    let reason = run_workflow(
+        &mut h.turn(),
+        &env,
+        WorkflowJob::Answer {
+            choice: "Revise".into(),
+            comment: String::new(),
+        },
+    )
+    .unwrap();
+    assert_eq!(reason, DoneReason::WaitingForUser);
+    assert!(
+        !h.log
+            .0
+            .borrow()
+            .iter()
+            .any(|e| matches!(e, Event::CriteriaSet { .. }))
+    );
+
+    // "Go" records the latest plan's criteria — once, before the criteria node.
+    let reason = run_workflow(
+        &mut h.turn(),
+        &env,
+        WorkflowJob::Answer {
+            choice: "Go".into(),
+            comment: String::new(),
+        },
+    )
+    .unwrap();
+    assert_eq!(reason, DoneReason::Complete);
+
+    let events = h.log.0.into_inner();
+    let set_positions: Vec<usize> = events
+        .iter()
+        .enumerate()
+        .filter(|(_, e)| matches!(e, Event::CriteriaSet { .. }))
+        .map(|(i, _)| i)
+        .collect();
+    let criteria_start = events
+        .iter()
+        .enumerate()
+        .find(|(_, e)| {
+            matches!(e, Event::WorkflowNodeStarted { node_id, .. } if node_id == "criteria")
+        })
+        .map(|(i, _)| i)
+        .unwrap();
+    assert_eq!(set_positions.len(), 1);
+    assert!(set_positions[0] < criteria_start);
+    let recorded = events
+        .iter()
+        .find_map(|e| match e {
+            Event::CriteriaSet { criteria } => Some(criteria.clone()),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(recorded.len(), 1);
+    assert_eq!(recorded[0].description, "C2");
+}
+
+#[test]
 fn paused_edge() {
     let mut workflow = simple_workflow();
     workflow.edges[1].pause = true;

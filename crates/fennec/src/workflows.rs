@@ -24,7 +24,16 @@ pub struct Found {
     pub raw: Value,
 }
 
-const DEFAULTS: [&str; 1] = [include_str!("../workflows/plan-build-verify.workflow.json")];
+const DEFAULTS: [(&str, &str); 2] = [
+    (
+        "plan-build-verify.workflow.json",
+        include_str!("../workflows/plan-build-verify.workflow.json"),
+    ),
+    (
+        "quick.workflow.json",
+        include_str!("../workflows/quick.workflow.json"),
+    ),
+];
 
 /// The workflows a session in `workdir` can use.
 pub fn discover(workdir: &Path) -> Vec<Found> {
@@ -35,10 +44,8 @@ pub fn discover(workdir: &Path) -> Vec<Found> {
 fn discover_in(home: Option<&Path>, workdir: &Path) -> Vec<Found> {
     let mut found = Vec::new();
 
-    for content in DEFAULTS {
-        if let Some(workflow) =
-            load_workflow("plan-build-verify.workflow.json", content, Origin::Default)
-        {
+    for (file_name, content) in DEFAULTS {
+        if let Some(workflow) = load_workflow(file_name, content, Origin::Default) {
             insert_or_override(&mut found, workflow);
         }
     }
@@ -236,7 +243,7 @@ mod tests {
         let custom = found.iter().find(|f| f.workflow.id == "custom").unwrap();
         assert_eq!(custom.origin, Origin::Project);
         let names: Vec<_> = found.iter().map(|f| f.workflow.name.clone()).collect();
-        assert_eq!(names, vec!["Custom", "Project PBC"]);
+        assert_eq!(names, vec!["Custom", "Project PBC", "Quick build"]);
         let _ = std::fs::remove_dir_all(&root);
     }
 
@@ -299,15 +306,14 @@ mod tests {
     }
 
     #[test]
-    fn the_embedded_default_validates() {
+    fn the_embedded_defaults_validate() {
         let (_root, _home, workdir) = fixture();
         let found = discover_in(None, &workdir);
-        let default = found
-            .iter()
-            .find(|f| f.workflow.id == "plan-build-verify")
-            .unwrap();
         let agents = crate::agents::discover(&workdir);
-        let issues = crate::domain::workflow::validate::validate(&default.workflow, &agents);
-        assert!(issues.is_empty(), "issues: {issues:?}");
+        for id in ["plan-build-verify", "quick"] {
+            let default = found.iter().find(|f| f.workflow.id == id).unwrap();
+            let issues = crate::domain::workflow::validate::validate(&default.workflow, &agents);
+            assert!(issues.is_empty(), "{id} issues: {issues:?}");
+        }
     }
 }
