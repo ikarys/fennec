@@ -1,0 +1,10 @@
+# Layers point inward: adapters -> agent -> domain (see AGENTS.md "Layout").
+# Checked on the lines an integration adds; a violation must be accepted by the human.
+crates/fennec/src/domain/ forbids std::net
+crates/fennec/src/domain/ forbids crate::agent
+crates/fennec/src/domain/ forbids crate::web
+crates/fennec/src/domain/ forbids crate::store
+crates/fennec/src/domain/ forbids crate::tools
+crates/fennec/src/domain/ forbids crate::llm
+crates/fennec/src/agent/ forbids crate::web
+crates/fennec/src/agent/ forbids crate::store

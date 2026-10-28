@@ -3,6 +3,7 @@
 
 use serde::Serialize;
 
+use super::architecture::Violation;
 use super::criteria::{CriterionState, CriterionStatus};
 
 /// What blocks an integration, shown to the human before they confirm it.
@@ -25,6 +26,8 @@ pub enum Blocker {
     /// Protected files the branch changes (a command can create one: the file
     /// tools cannot).
     ProtectedTouched { paths: Vec<String> },
+    /// Added lines that break the project's `.agents/architecture` rules.
+    ArchitectureViolated { violations: Vec<Violation> },
 }
 
 impl Blocker {
@@ -36,17 +39,19 @@ impl Blocker {
             Blocker::CriteriaNotPassed { .. } => "criteriaNotPassed",
             Blocker::NoCriteria => "noCriteria",
             Blocker::ProtectedTouched { .. } => "protectedTouched",
+            Blocker::ArchitectureViolated { .. } => "architectureViolated",
         }
     }
 }
 
 /// The blockers of an integration, in the order the UI shows them:
 /// `NoCommits` first, then the branch, then the criteria, then the protected
-/// files.
+/// files, then the architecture rules.
 pub fn blockers(
     commits: usize,
     criteria: &[CriterionState],
     protected_touched: &[String],
+    violations: &[Violation],
     origin_branch: Option<&str>,
     human_branch: Option<&str>,
 ) -> Vec<Blocker> {
@@ -83,6 +88,12 @@ pub fn blockers(
     if !protected_touched.is_empty() {
         out.push(Blocker::ProtectedTouched {
             paths: protected_touched.to_vec(),
+        });
+    }
+
+    if !violations.is_empty() {
+        out.push(Blocker::ArchitectureViolated {
+            violations: violations.to_vec(),
         });
     }
 
@@ -187,11 +198,31 @@ mod tests {
     }
 
     #[test]
+    fn architecture_violations_block_last() {
+        let violation = Violation {
+            path: "a.rs".into(),
+            line: "use std::fs;".into(),
+            prefix: "".into(),
+            forbidden: "std::fs".into(),
+        };
+        let found = blockers(1, &[], &[], std::slice::from_ref(&violation), None, None);
+        assert_eq!(
+            found,
+            vec![
+                Blocker::NoCriteria,
+                Blocker::ArchitectureViolated {
+                    violations: vec![violation]
+                }
+            ]
+        );
+    }
+
+    #[test]
     fn blockers_are_ordered_no_commits_then_criteria_then_protected() {
         let criteria = vec![state("C1", verified_failed())];
         let protected = vec!["AGENTS.md".to_string()];
 
-        let blockers = blockers(0, &criteria, &protected, None, None);
+        let blockers = blockers(0, &criteria, &protected, &[], None, None);
 
         assert_eq!(
             blockers,
@@ -209,7 +240,10 @@ mod tests {
 
     #[test]
     fn no_criteria_is_a_blocker() {
-        assert_eq!(blockers(1, &[], &[], None, None), vec![Blocker::NoCriteria]);
+        assert_eq!(
+            blockers(1, &[], &[], &[], None, None),
+            vec![Blocker::NoCriteria]
+        );
     }
 
     #[test]
@@ -219,7 +253,7 @@ mod tests {
             state("C2", verified_failed()),
         ];
 
-        let blockers = blockers(1, &criteria, &[], None, None);
+        let blockers = blockers(1, &criteria, &[], &[], None, None);
 
         assert_eq!(
             blockers,
@@ -231,7 +265,7 @@ mod tests {
 
     /// The branch blocker alone: the other blockers are tested above.
     fn branch_blocker(origin: Option<&str>, human: Option<&str>) -> Option<Blocker> {
-        blockers(1, &[], &[], origin, human)
+        blockers(1, &[], &[], &[], origin, human)
             .into_iter()
             .find(|blocker| matches!(blocker, Blocker::BranchChanged { .. }))
     }
