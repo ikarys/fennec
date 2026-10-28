@@ -3,7 +3,7 @@
 
 use super::attachment::Attachment;
 use super::criteria::{Criterion, CriterionStatus};
-use super::stats::MessageStats;
+use super::stats::{MessageStats, NodeTokens};
 use super::workflow::definition::Workflow;
 use super::workflow::run::{RunOutcome, Via};
 use super::workflow::stats::RunStats;
@@ -270,6 +270,10 @@ pub enum Event {
         /// node, whose time is the human's.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         duration_ms: Option<u64>,
+        /// The node's model cost, summed over its calls; None for a node
+        /// that made no model call (and for events from before it existed).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        stats: Option<NodeTokens>,
     },
     /// A human node's question with its `{{…}}` names filled in, as the
     /// human reads it (fennec's own event, right after the node starts).

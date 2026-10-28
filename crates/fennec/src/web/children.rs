@@ -3,10 +3,12 @@
 
 use super::notifier::Notifier;
 use super::turns::with_turn;
-use crate::agent::ports::{AgentRun, ChildSessions};
+use crate::agent::ports::{AgentRun, ChildSessions, EventLog};
 use crate::agent::turn::run_agent_node;
 use crate::config::Settings;
 use crate::domain::conversation::last_assistant_text;
+use crate::domain::stats::NodeTokens;
+use crate::domain::workflow::stats::node_tokens;
 use crate::store::SqliteStore;
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
@@ -46,5 +48,11 @@ impl ChildSessions for Children<'_> {
                 Ok(AgentRun { reason, text })
             },
         )
+    }
+
+    fn model_tokens(&self, child_session_id: &str) -> Option<NodeTokens> {
+        let store = SqliteStore::open(&self.settings.db_path).ok()?;
+        let events = store.events(child_session_id).ok()?;
+        node_tokens(&events)
     }
 }

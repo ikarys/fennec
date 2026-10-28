@@ -2,6 +2,7 @@
 
 use crate::domain::criteria::{CriterionState, CriterionStatus, Provenance};
 use crate::domain::event::Event;
+use crate::domain::stats::NodeTokens;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -138,6 +139,40 @@ pub fn run_stats(
     }
 }
 
+/// The model cost of a node's run: the sum of its calls' stats; None when the
+/// node made no model call (shell, condition, criteria, human).
+pub fn node_tokens(events: &[Event]) -> Option<NodeTokens> {
+    let mut prefill_tokens = 0u64;
+    let mut generation_tokens = 0u64;
+    let mut weighted_speed = 0.0f64;
+    let mut any = false;
+
+    for event in events {
+        if let Event::MessageDone {
+            stats: Some(stats), ..
+        } = event
+        {
+            any = true;
+            prefill_tokens += stats.prefill_tokens;
+            generation_tokens += stats.generation_tokens;
+            weighted_speed += stats.generation_speed * stats.generation_tokens as f64;
+        }
+    }
+
+    if !any {
+        return None;
+    }
+    Some(NodeTokens {
+        prefill_tokens,
+        generation_tokens,
+        generation_speed: if generation_tokens > 0 {
+            weighted_speed / generation_tokens as f64
+        } else {
+            0.0
+        },
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -174,6 +209,7 @@ mod tests {
                 exit_code: None,
                 comment: None,
                 duration_ms: Some(100),
+                stats: None,
             },
             Event::WorkflowNodeStarted {
                 run_id: "r".into(),
@@ -190,6 +226,7 @@ mod tests {
                 exit_code: None,
                 comment: None,
                 duration_ms: None,
+                stats: None,
             },
             Event::WorkflowNodeStarted {
                 run_id: "r".into(),
@@ -206,6 +243,7 @@ mod tests {
                 exit_code: None,
                 comment: None,
                 duration_ms: Some(50),
+                stats: None,
             },
         ];
         let child = vec![Event::MessageDone {
@@ -286,5 +324,50 @@ mod tests {
         assert_eq!(stats.criteria_total, 3);
         assert_eq!(stats.criteria_passed, 2);
         assert_eq!(stats.criteria_verified, 1);
+    }
+
+    #[test]
+    fn node_tokens_sums_the_node_calls_and_weights_the_speed() {
+        use crate::domain::stats::NodeTokens;
+
+        let call = |prefill: u64, generation: u64, speed: f64| Event::MessageDone {
+            message_id: "m".into(),
+            stats: Some(stats_with_speed(prefill, generation, speed)),
+            partial: false,
+        };
+        let events = vec![
+            Event::WorkflowNodeStarted {
+                run_id: "r".into(),
+                node_id: "a".into(),
+                pass: 1,
+                via: None,
+                child_session_id: None,
+            },
+            call(100, 10, 20.0),
+            call(50, 30, 40.0),
+        ];
+
+        assert_eq!(
+            node_tokens(&events),
+            Some(NodeTokens {
+                prefill_tokens: 150,
+                generation_tokens: 40,
+                // (10*20 + 30*40) / 40
+                generation_speed: 35.0,
+            })
+        );
+        assert_eq!(node_tokens(&[]), None);
+    }
+
+    fn stats_with_speed(prefill: u64, generation: u64, speed: f64) -> MessageStats {
+        MessageStats {
+            model: "m".into(),
+            total_time: 0.0,
+            prefill_tokens: prefill,
+            cached_prompt_tokens: 0,
+            generation_tokens: generation,
+            prefill_speed: 0.0,
+            generation_speed: speed,
+        }
     }
 }

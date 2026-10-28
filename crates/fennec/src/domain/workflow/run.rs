@@ -663,6 +663,7 @@ mod tests {
             exit_code: None,
             comment: None,
             duration_ms: None,
+            stats: None,
         });
         state.apply(&Event::WorkflowPaused {
             run_id: "r".into(),
