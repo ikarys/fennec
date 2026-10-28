@@ -88,6 +88,7 @@ export type ThreadItem =
   | { kind: 'mode'; id: string; name: string; color: string }
   | { kind: 'error'; id: string; message: string }
   | { kind: 'note'; id: string; text: string; detail?: string }
+  | { kind: 'turn-recap'; id: string; durationMs: number; generationTokens: number }
   | { kind: 'workflow-node'; id: string; nodeId: string; label: string; nodeKind: NodeKind; pass: number; port?: string; output?: string; exitCode?: number; childSessionId?: string; prompt?: string; durationMs?: number }
   | { kind: 'workflow-end'; id: string; outcome: 'done' | 'blocked' | 'stopped' | 'error'; reason?: string; stats?: WorkflowStats };
 
@@ -334,6 +335,8 @@ export function createThreadFold(): ThreadFold {
   // [arrival time, chars] of the streaming message, oldest first.
   let samples: [number, number][] = [];
   let index = 0;
+  // Tokens generated since the last `chat.done`, for the turn recap.
+  let turnTokens = 0;
   // Null means "no live change yet": the session detail owns the mode.
   let mode: string | null = null;
   let criteria: CriterionView[] = [];
@@ -458,6 +461,7 @@ export function createThreadFold(): ThreadFold {
         const stats = data.stats as MessageStats | undefined;
         if (!stats) break;
         assistant.stats = stats;
+        turnTokens += stats.generationTokens;
         usage.calls += 1;
         usage.prefillTokens += stats.prefillTokens;
         usage.cachedPromptTokens += stats.cachedPromptTokens;
@@ -642,6 +646,11 @@ export function createThreadFold(): ThreadFold {
             reason === 'stopped' ? 'Arrêtée' : reason === 'truncated' ? 'Tronquée' : reason === 'error' ? 'Erreur' : 'Terminée';
           pushItem({ kind: 'note', id: `done-${index}`, text });
         }
+        const durationMs = Number(data.durationMs);
+        if (durationMs > 0 && turnTokens > 0) {
+          pushItem({ kind: 'turn-recap', id: `recap-${index}`, durationMs, generationTokens: turnTokens });
+        }
+        turnTokens = 0;
         break;
       }
 
