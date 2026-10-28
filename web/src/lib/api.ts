@@ -310,7 +310,7 @@ export interface IntegrationPreview {
   humanBranch: string | null;
   originBranch: string | null;
   commits: { sha: string; subject: string }[];
-  files: { path: string; protected: boolean }[];
+  files: { path: string; protected: boolean; added: number; removed: number }[];
   /** Test files (relative to the project) the integration could protect. */
   testFiles: string[];
   criteria: IntegrationCriterion[];
