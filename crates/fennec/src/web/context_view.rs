@@ -2,9 +2,12 @@
 //! draws it (`GET /api/sessions/{id}/context`).
 
 use crate::domain::compaction::model_view;
+use crate::domain::context_parts::{context_parts, spread};
+use crate::domain::conversation::{fold_messages, frozen_prompt};
 use crate::domain::event::Event;
 use serde::Serialize;
-use token_usage::display::tokens;
+use serde_json::Value;
+use token_usage::display::{self, tokens};
 
 #[derive(Debug, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -76,7 +79,7 @@ pub fn context_view(events: &[Event], window: u64, compact_at: f64) -> ContextVi
         format!("{} tokens", tokens(current))
     };
 
-    let title = if max > 0 {
+    let mut title = if max > 0 {
         let mut title = format!(
             "{} pris · {} restants · {} total",
             tokens(current),
@@ -93,6 +96,10 @@ pub fn context_view(events: &[Event], window: u64, compact_at: f64) -> ContextVi
         format!("{} tokens", tokens(current))
     };
 
+    if current > 0 {
+        title.push_str(&composition(events, current));
+    }
+
     ContextView {
         percent,
         tone,
@@ -102,9 +109,48 @@ pub fn context_view(events: &[Event], window: u64, compact_at: f64) -> ContextVi
     }
 }
 
+/// The tooltip's lines on what the context holds; empty when nothing is known.
+fn composition(events: &[Event], current: u64) -> String {
+    let (prompt, tools) = frozen_prompt(events);
+    let parts = context_parts(
+        prompt.unwrap_or(""),
+        tools.unwrap_or(&Value::Null),
+        &fold_messages(events),
+    );
+    if parts.parts.is_empty() {
+        return String::new();
+    }
+    let shares = spread(&parts.parts, current);
+    let mut out = String::from("\n\nComposition, estimée au prorata du texte :");
+    for (part, share) in parts.parts.iter().zip(&shares).take(MAX_PARTS) {
+        out.push_str(&format!(
+            "\n{} : {} ({} %)",
+            part.label,
+            tokens(*share),
+            display::percent(*share, current)
+        ));
+    }
+    if parts.parts.len() > MAX_PARTS {
+        out.push_str(&format!(
+            "\n… et {} autres parts",
+            parts.parts.len() - MAX_PARTS
+        ));
+    }
+    match parts.images {
+        0 => {}
+        1 => out.push_str("\n+ 1 image, non estimée"),
+        n => out.push_str(&format!("\n+ {n} images, non estimées")),
+    }
+    out
+}
+
+/// A tooltip longer than this stops being read.
+const MAX_PARTS: usize = 12;
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::event::Role;
 
     fn state(current: u64, max: u64, compact_at: Option<f64>) -> Event {
         Event::ContextState {
@@ -160,5 +206,28 @@ mod tests {
         let view = context_view(&events, 0, 0.85);
         assert_eq!(view.percent, 0);
         assert_eq!(view.line, "500 tokens");
+    }
+
+    #[test]
+    fn the_tooltip_lists_the_context_parts() {
+        let events = vec![
+            Event::TurnSnapshot {
+                cached_system_prompt: "prompt".into(),
+                cached_tools: Some(serde_json::json!([])),
+            },
+            Event::MessageStart {
+                message_id: "u".into(),
+                role: Role::User,
+                content: Some("hello".into()),
+                is_system_generated: false,
+                metadata: None,
+                attachments: Vec::new(),
+            },
+            state(100, 1000, Some(0.85)),
+        ];
+        let view = context_view(&events, 1000, 0.85);
+        assert!(view.title.contains("Composition"));
+        assert!(view.title.contains("Messages humains : "));
+        assert!(view.title.contains(" %)"));
     }
 }
