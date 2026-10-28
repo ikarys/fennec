@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getEventPage, getRunEventsBefore, getSkills, getUsage, getUsageCalls, getUsageWorkflow, type WorkflowUsage, type EventPageEntry, type SessionSkills, type CallUsage, type SessionUsage } from '../lib/api';
+import { getContext, type ContextView, getEventPage, getRunEventsBefore, getSkills, getUsage, getUsageCalls, getUsageWorkflow, type WorkflowUsage, type EventPageEntry, type SessionSkills, type CallUsage, type SessionUsage } from '../lib/api';
 import { createThreadFold, type FennecEvent, type ThreadFold, type ThreadView } from '../lib/fold';
 
 const PAGE_SIZE = 200;
@@ -31,6 +31,8 @@ export interface SessionThread {
   /** Each answer's ledger figures by message id. */
   calls: ReadonlyMap<string, CallUsage>;
   workflowUsage: WorkflowUsage;
+  /** The header's context gauge; null until the first fetch. */
+  context: ContextView | null;
 }
 
 /**
@@ -49,6 +51,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
   const [usage, setUsage] = useState<SessionUsage | null>(null);
   const [calls, setCalls] = useState<ReadonlyMap<string, CallUsage>>(new Map());
   const [workflowUsage, setWorkflowUsage] = useState<WorkflowUsage>({ nodes: [], runs: [] });
+  const [context, setContext] = useState<ContextView | null>(null);
   const eventsRef = useRef<FennecEvent[]>([]);
   const foldRef = useRef<ThreadFold>(createThreadFold());
   const firstSeqRef = useRef(0);
@@ -59,6 +62,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
   // cannot regress the panel.
   const skillsReqRef = useRef(0);
   const usageReqRef = useRef(0);
+  const contextReqRef = useRef(0);
 
   const refreshSkills = useCallback(() => {
     if (!sessionId) return;
@@ -92,6 +96,18 @@ export function useSessionThread(sessionId: string | null): SessionThread {
       });
   }, [sessionId]);
 
+  const refreshContext = useCallback(() => {
+    if (!sessionId) return;
+    const request = ++contextReqRef.current;
+    getContext(sessionId)
+      .then((view) => {
+        if (request === contextReqRef.current) setContext(view);
+      })
+      .catch(() => {
+        // Keep the last gauge: the next context.state refetches.
+      });
+  }, [sessionId]);
+
   const foldAll = useCallback(() => {
     const fresh = createThreadFold();
     const firstSeq = firstSeqRef.current;
@@ -116,12 +132,14 @@ export function useSessionThread(sessionId: string | null): SessionThread {
     loadSkillCallsRef.current = new Set();
     skillsReqRef.current += 1; // a fetch of the previous session may not answer
     usageReqRef.current += 1;
+    contextReqRef.current += 1;
     setView(EMPTY);
     setHasMore(false);
     setSkills(null);
     setUsage(null);
     setCalls(new Map());
     setWorkflowUsage({ nodes: [], runs: [] });
+    setContext(null);
     if (!sessionId) return;
 
     let cancelled = false;
@@ -142,6 +160,8 @@ export function useSessionThread(sessionId: string | null): SessionThread {
       if ((event.type === 'message.done' && data.stats)
         || event.type === 'workflow.node.finished'
         || event.type === 'workflow.finished') refreshUsage();
+      // A round measures the context; a replay cuts the model's view.
+      if (event.type === 'context.state' || event.type === 'session.rewound') refreshContext();
       if ((event.type === 'message.start' && data.role === 'user')
         || event.type === 'context.compacted'
         || event.type === 'session.rewound') {
@@ -190,6 +210,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
         foldAll();
         refreshSkills();
         refreshUsage();
+        refreshContext();
         setHasMore(page.length > 0 && page[0].seq > 1);
         openStream(lastSeqRef.current);
         if (page.length > 0 && page[0].seq > 1) {
@@ -214,7 +235,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
       source?.close();
       cancelAnimationFrame(frame);
     };
-  }, [sessionId, foldAll, refreshSkills, refreshUsage]);
+  }, [sessionId, foldAll, refreshSkills, refreshUsage, refreshContext]);
 
   // Returns true when the view was updated, so the caller knows whether a
   // scroll restore is armed for the upcoming view change.
@@ -243,5 +264,5 @@ export function useSessionThread(sessionId: string | null): SessionThread {
     }
   }, [sessionId, loadingOlder, foldAll, refreshSkills]);
 
-  return { view, hasMore, loadingOlder, loadOlder, skills, usage, calls, workflowUsage };
+  return { view, hasMore, loadingOlder, loadOlder, skills, usage, calls, workflowUsage, context };
 }

@@ -1,4 +1,3 @@
-import type { MessageStats } from './api';
 import { formatTokens } from './format';
 import type { NodeKind } from './workflow';
 import { createRunFold, type RunView } from './workflowRun';
@@ -44,9 +43,7 @@ export interface AssistantItem {
   id: string;
   segments: Segment[];
   done: boolean;
-  /** Characters streamed (text and reasoning), for the live estimate. */
-  chars: number;
-  /** Estimated tokens per second while the message streams. */
+  /** Tokens per second while the message streams, estimated by the server. */
   liveSpeed?: number;
 }
 
@@ -122,8 +119,6 @@ export interface ThreadView {
   items: ThreadItem[];
   criteria: CriterionView[];
   decisions: DecisionView[];
-  contextTokens?: number;
-  contextMax?: number;
   running: boolean;
   /** Reason of the last `chat.done`: the session state once a turn ends. */
   lastDone?: string;
@@ -141,11 +136,6 @@ export interface ThreadView {
   /** The last generated session name, if any (last one wins). */
   name?: string;
 }
-
-// The live speed is estimated from characters over the last few seconds;
-// the ratio is learnt from the messages the server measured.
-const LIVE_WINDOW_MS = 3000;
-const DEFAULT_TOKENS_PER_CHAR = 0.28;
 
 function splitLines(value: string): string[] {
   return value.split(/\r?\n/);
@@ -305,8 +295,6 @@ export interface ThreadFold {
  */
 export function createThreadFold(): ThreadFold {
   const items: ThreadItem[] = [];
-  let contextTokens: number | undefined;
-  let contextMax: number | undefined;
   let running = false;
   let lastDone: string | undefined;
   let pendingQuestion: PendingQuestion | undefined;
@@ -314,13 +302,6 @@ export function createThreadFold(): ThreadFold {
   const toolCounts = new Map<string, number>();
   const assistants = new Map<string, AssistantItem>();
   const tools = new Map<string, ToolCallView>();
-  let tokensPerChar = DEFAULT_TOKENS_PER_CHAR;
-  // Calibrated over the whole session: one message's ratio swings from 0.24 to
-  // 0.67 (tool calls carry template tokens no text shows), which put the live
-  // estimate up to twice the measured speed.
-  const calibration = { tokens: 0, chars: 0 };
-  // [arrival time, chars] of the streaming message, oldest first.
-  let samples: [number, number][] = [];
   let index = 0;
   // Tokens generated since the last `chat.done`, for the turn recap.
   // Null means "no live change yet": the session detail owns the mode.
@@ -347,23 +328,16 @@ export function createThreadFold(): ThreadFold {
   };
 
   const newAssistant = (id: string): AssistantItem => {
-    const assistant: AssistantItem = { kind: 'assistant', id, segments: [], done: false, chars: 0 };
+    const assistant: AssistantItem = { kind: 'assistant', id, segments: [], done: false };
     pushItem(assistant);
     assistants.set(id, assistant);
-    samples = [];
     return assistant;
   };
 
-  const streamed = (assistant: AssistantItem, content: string) => {
-    assistant.chars += content.length;
-    const now = performance.now();
-    samples.push([now, assistant.chars]);
-    while (samples.length > 2 && now - samples[0][0] > LIVE_WINDOW_MS) samples.shift();
-    const [t0, c0] = samples[0];
-    // A replayed burst arrives at once: no speed until there is a span.
-    if (now - t0 >= 500) {
-      assistant.liveSpeed = ((assistant.chars - c0) * tokensPerChar) / ((now - t0) / 1000);
-    }
+  // The last estimate stays until the message ends: deltas flushed in the
+  // first half second, or replayed from the log, carry none.
+  const streamed = (assistant: AssistantItem, data: Record<string, unknown>) => {
+    if (typeof data.tokensPerSecond === 'number') assistant.liveSpeed = data.tokensPerSecond;
   };
 
   const apply = (event: FennecEvent) => {
@@ -415,7 +389,7 @@ export function createThreadFold(): ThreadFold {
         const assistant = assistants.get(messageId);
         if (!assistant) break;
         const content = String(data.content ?? '');
-        streamed(assistant, content);
+        streamed(assistant, data);
         const last = assistant.segments[assistant.segments.length - 1];
         if (last && last.kind === 'text') {
           last.content += content;
@@ -430,7 +404,7 @@ export function createThreadFold(): ThreadFold {
         const assistant = assistants.get(messageId);
         if (!assistant) break;
         const content = String(data.content ?? '');
-        streamed(assistant, content);
+        streamed(assistant, data);
         const existing = assistant.segments.find((segment): segment is Extract<Segment, { kind: 'thinking' }> => segment.kind === 'thinking');
         if (existing) {
           existing.content += content;
@@ -445,13 +419,6 @@ export function createThreadFold(): ThreadFold {
         if (!assistant) break;
         assistant.done = true;
         assistant.liveSpeed = undefined;
-        const stats = data.stats as MessageStats | undefined;
-        if (!stats) break;
-        if (assistant.chars > 200 && stats.generationTokens > 0) {
-          calibration.tokens += stats.generationTokens;
-          calibration.chars += assistant.chars;
-          tokensPerChar = calibration.tokens / calibration.chars;
-        }
         break;
       }
 
@@ -476,9 +443,6 @@ export function createThreadFold(): ThreadFold {
         updateToolStats(tool, modified, toolCounts);
 
         const assistant = assistants.get(messageId) ?? newAssistant(messageId);
-        // The arguments are generated tokens too: without them a message that
-        // is mostly a write_file calibrates tokens per char far too high.
-        assistant.chars += JSON.stringify(toolCall.arguments ?? '').length;
         assistant.segments.push({ kind: 'tool', id: toolId, tool });
         tools.set(toolId, tool);
         break;
@@ -543,17 +507,10 @@ export function createThreadFold(): ThreadFold {
         break;
       }
 
-      case 'context.state': {
-        contextTokens = typeof data.currentTokens === 'number' ? data.currentTokens : contextTokens;
-        contextMax = typeof data.maxTokens === 'number' ? data.maxTokens : contextMax;
-        break;
-      }
-
       case 'context.compacted': {
         const beforeTokens = typeof data.beforeTokens === 'number' ? data.beforeTokens : 0;
         const afterTokens = typeof data.afterTokens === 'number' ? data.afterTokens : 0;
         const summary = String(data.summary ?? '');
-        contextTokens = afterTokens;
         const summaryTrimmed = summary.trim();
         for (let i = items.length - 1; i >= 0; i -= 1) {
           const item = items[i];
@@ -797,8 +754,6 @@ export function createThreadFold(): ThreadFold {
     items: [...items],
     criteria: [...criteria],
     decisions: [...decisions],
-    contextTokens,
-    contextMax,
     running,
     lastDone,
     pendingQuestion,

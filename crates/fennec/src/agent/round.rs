@@ -2,7 +2,7 @@
 //! request that fails before any content (openfox case 1) and asking to
 //! continue after a stream that breaks mid-answer (case 2).
 
-use super::delta_buffer::{DeltaBuffer, DeltaKind};
+use super::delta_buffer::{DeltaBuffer, DeltaKind, tokens_per_char};
 use super::ports::{Completion, Delta, Request};
 use super::turn::Turn;
 use crate::domain::conversation::fold_messages;
@@ -82,7 +82,8 @@ fn stream_once(
     prompt: &RoundPrompt,
     started: &mut bool,
 ) -> Result<Result<(Completion, MessageStats), String>, String> {
-    let messages = fold_messages(&turn.log.events(turn.session_id)?);
+    let events = turn.log.events(turn.session_id)?;
+    let messages = fold_messages(&events);
     let req = Request {
         system_prompt: prompt.system_prompt,
         messages: &messages,
@@ -92,7 +93,7 @@ fn stream_once(
         stop: turn.stop,
     };
     let model = turn.model;
-    let mut buffer = DeltaBuffer::new(message_id);
+    let mut buffer = DeltaBuffer::new(message_id, tokens_per_char(&events));
     let mut log_error = None;
     let sent = Instant::now();
     let mut first_token = None;
