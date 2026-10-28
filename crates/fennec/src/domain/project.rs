@@ -17,6 +17,8 @@ pub struct SessionSummary {
     pub updated_at: u64,
     pub last_done: Option<DoneReason>,
     pub parent_id: Option<String>,
+    /// A workflow ended `done` and nothing integrated or discarded its work since.
+    pub awaiting_integration: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
