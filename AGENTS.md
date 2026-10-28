@@ -261,8 +261,8 @@ far as they help, never blindly:
 
 **The prompt only grows.** The local inference server reuses its cache only
 for an exact prefix of an earlier request. Within a session, never rewrite
-what was already sent: the system prompt is frozen at the first turn
-(`turn.snapshot`), earlier messages fold back byte for byte, reasoning is
+what was already sent: the system prompt and the tool definitions are frozen
+at the first turn (`turn.snapshot`), earlier messages fold back byte for byte, reasoning is
 sent back as streamed. Anything that edits history (compaction, a changed
 prompt) costs a full re-read of the session: do it deliberately, measured
 with the per-message stats.
