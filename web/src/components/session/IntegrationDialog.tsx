@@ -22,6 +22,11 @@ function blockerSentence(blocker: Blocker): string {
       return 'Aucun critère : rien n\'a été vérifié.';
     case 'protectedTouched':
       return `Fichiers protégés modifiés : ${blocker.paths.join(', ')}.`;
+    case 'architectureViolated': {
+      const shown = blocker.violations.slice(0, 3).map((v) => `${v.path} : « ${v.line} » (interdit : ${v.forbidden})`);
+      const more = blocker.violations.length - shown.length;
+      return `Règles d'architecture violées : ${shown.join(' ; ')}${more > 0 ? ` (+${more})` : ''}.`;
+    }
     case 'branchChanged':
       return `Le run est parti de ${blocker.from}, tu es maintenant sur ${blocker.to ?? 'un HEAD détaché'} : les commits iraient ailleurs.`;
   }
