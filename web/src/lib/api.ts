@@ -301,6 +301,8 @@ export interface IntegrationPreview {
   originBranch: string | null;
   commits: { sha: string; subject: string }[];
   files: { path: string; protected: boolean }[];
+  /** Test files (relative to the project) the integration could protect. */
+  testFiles: string[];
   criteria: IntegrationCriterion[];
   /** Recorded by the agent: indicative, never a blocker. */
   decisions: DecisionView[];
@@ -315,10 +317,18 @@ export function getIntegration(sessionId: string): Promise<IntegrationPreview> {
 }
 
 /** Creates one commit with the worktree's changes on the human's branch after the accepted blockers. */
-export function integrate(sessionId: string, acknowledged: string[], message: string): Promise<{ head: string; commits: string[] }> {
-  return request<{ head: string; commits: string[] }>(`/api/sessions/${encodeURIComponent(sessionId)}/integrate`, {
+export interface IntegrationResult {
+  head: string;
+  commits: string[];
+  protectedTests: string[];
+  /** Set when the integration succeeded but `.agents/protected` could not be written. */
+  protectError: string | null;
+}
+
+export function integrate(sessionId: string, acknowledged: string[], message: string, protectTests: boolean): Promise<IntegrationResult> {
+  return request<IntegrationResult>(`/api/sessions/${encodeURIComponent(sessionId)}/integrate`, {
     method: 'POST',
-    body: JSON.stringify({ acknowledged, message })
+    body: JSON.stringify({ acknowledged, message, protectTests })
   });
 }
 
