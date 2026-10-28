@@ -207,7 +207,7 @@ event style:
 | event | data |
 |---|---|
 | `workflow.started` | `runId`, `workflow` (the whole definition, frozen for the run), `task`, `stepByStep` |
-| `workflow.node.started` | `runId`, `nodeId`, `pass`, `via?` (`{from, port}`, the edge taken), `childSessionId?` |
+| `workflow.node.started` | `runId`, `nodeId`, `pass`, `via?` (`{from, port}`, the edge taken), `childSessionId?`, `startedAt?` (unix ms, so a running node's elapsed time survives a reload) |
 | `workflow.node.finished` | `runId`, `nodeId`, `port`, `output`, `exitCode?` |
 | `workflow.paused` | `runId`, `from`, `port`, `to`: waiting before `to` |
 | `workflow.resumed` | `runId`, `comment` |
