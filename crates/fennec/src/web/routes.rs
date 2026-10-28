@@ -24,10 +24,10 @@ use crate::domain::project::{Project, SessionSummary};
 use crate::domain::replay::replayable;
 use crate::domain::slash::{TurnInput, commands, resolve};
 use crate::domain::workflow::run::Waiting;
-use crate::llm::list_models;
 use crate::skills;
 use crate::store::SqliteStore;
 use crate::{folders, git, workflows};
+use llm_providers::list_models;
 use serde_json::{Value, json};
 use std::net::TcpStream;
 use std::path::Path;
@@ -122,11 +122,8 @@ fn get_settings(app: &App, stream: &mut TcpStream) -> Result<(), String> {
     let prefs = store.preferences()?;
     // The endpoint may have loaded another model since start; fall back to
     // the startup listing when it cannot be reached now.
-    let models = list_models(
-        &app.settings.llm.base_url,
-        app.settings.llm.api_key.as_deref(),
-    )
-    .unwrap_or_else(|_| app.settings.llm.listed.clone());
+    let models = list_models(&app.settings.llm.endpoint())
+        .unwrap_or_else(|_| app.settings.llm.listed.clone());
     let body = json!({
         "preferences": prefs,
         "models": models,
