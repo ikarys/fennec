@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import type { SessionState } from '../../lib/api';
 import { stateDotClass } from '../../lib/format';
 import { CloseIcon, FoxIcon, PlusIcon, SearchIcon, SettingsIcon } from '../Icons';
@@ -67,8 +68,20 @@ export function TopBar({
   onNewSession,
   onOpenPalette
 }: TopBarProps) {
+  const tabRefs = useRef(new Map<string, HTMLDivElement>());
+
+  // ARIA tablist navigation: arrows move the selection and the focus.
+  const moveTab = (delta: number) => {
+    if (tabs.length === 0) return;
+    const index = tabs.findIndex((tab) => tab.id === activeTabId);
+    const from = index === -1 ? 0 : index;
+    const target = tabs[(from + delta + tabs.length) % tabs.length];
+    onPickTab(target.id);
+    tabRefs.current.get(target.id)?.focus();
+  };
+
   return (
-    <header className="flex min-h-12 shrink-0 flex-wrap items-stretch gap-1 border-b border-border bg-panel px-3">
+    <header className="flex min-h-12 shrink-0 items-stretch gap-1 border-b border-border bg-panel px-3">
       <a
         href="#/"
         aria-label="Accueil fennec"
@@ -81,7 +94,16 @@ export function TopBar({
       <div
         role="tablist"
         aria-label="Sessions ouvertes"
-        className="flex min-w-0 flex-1 items-end gap-0.5 overflow-x-auto"
+        onKeyDown={(event) => {
+          if (event.key === 'ArrowRight') {
+            event.preventDefault();
+            moveTab(1);
+          } else if (event.key === 'ArrowLeft') {
+            event.preventDefault();
+            moveTab(-1);
+          }
+        }}
+        className="flex min-w-0 flex-1 items-end gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {tabs.map((tab) => {
           const selected = tab.id === activeTabId;
@@ -90,42 +112,63 @@ export function TopBar({
               key={tab.id}
               role="tab"
               aria-selected={selected}
-              className={`-mb-px flex h-7 max-w-[280px] items-center gap-2 rounded-t-lg border border-b-0 px-2 pl-3 ${
-                selected ? 'border-border bg-bg text-text' : 'border-transparent bg-transparent text-muted'
+              tabIndex={selected ? 0 : -1}
+              ref={(node) => {
+                if (node) tabRefs.current.set(tab.id, node);
+                else tabRefs.current.delete(tab.id);
+              }}
+              title={`${tab.project} — ${tab.title}`}
+              onClick={() => onPickTab(tab.id)}
+              onKeyDown={(event) => {
+                // The tab div is focusable but not a button: Enter/Space activate it.
+                if (event.target !== event.currentTarget) return;
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  onPickTab(tab.id);
+                }
+              }}
+              className={`group -mb-px flex h-10 min-w-[96px] max-w-[220px] cursor-pointer items-center gap-2 rounded-t-lg border border-b-0 px-2 pl-3 transition-colors ${
+                selected
+                  ? 'border-border bg-bg text-text'
+                  : 'border-transparent text-muted hover:bg-raised/50 hover:text-text'
               }`}
             >
-              <span className={`h-[7px] w-[7px] flex-none rounded-full ${stateDotClass(tab.state)}`} />
-              <button
-                type="button"
-                onClick={() => onPickTab(tab.id)}
-                className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-medium"
-              >
+              <span
+                className={`h-1.5 w-1.5 flex-none rounded-full ${stateDotClass(tab.state)} ${
+                  tab.state === 'running' ? 'animate-pulse' : ''
+                }`}
+              />
+              <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-medium">
                 {tab.title}
-              </button>
-              <span className="whitespace-nowrap text-xs text-muted">{tab.project}</span>
+              </span>
               <Button
                 variant="ghost"
                 size="sm"
                 iconOnly
                 aria-label="Fermer l'onglet"
-                onClick={() => onCloseTab(tab.id)}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onCloseTab(tab.id);
+                }}
+                className="[@media(hover:hover)]:opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
               >
                 <CloseIcon className="h-3 w-3" />
               </Button>
             </div>
           );
         })}
-        <Button
-          variant="ghost"
-          size="sm"
-          iconOnly
-          aria-label="Nouvelle session"
-          onClick={onNewSession}
-          className="self-center"
-        >
-          <PlusIcon className="h-4 w-4" />
-        </Button>
       </div>
+
+      <Button
+        variant="ghost"
+        size="sm"
+        iconOnly
+        aria-label="Nouvelle session"
+        onClick={onNewSession}
+        className="self-center"
+      >
+        <PlusIcon className="h-4 w-4" />
+      </Button>
 
       <div className="flex items-center gap-2 py-1.5">
         <button
