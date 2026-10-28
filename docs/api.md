@@ -181,7 +181,7 @@ read-only. The human edits them as usual.
   commit message (`feat: <title>`, an empty title gives `feat: integrate the
   agent's work`); the human edits it. `blockers` is the review gate, each
   `{kind, …}`: `noCommits`, `branchChanged {from, to}`, `criteriaNotPassed
-  {criteria}`, `noCriteria`, `protectedTouched {paths}`; `branchChanged.to`
+  {criteria}`, `noCriteria`, `protectedTouched {paths}`, `architectureViolated {violations: [{path, line, prefix, forbidden}]}` (added lines that break the project's `.agents/architecture` rules, one `<path prefix> forbids <text>` per line; deterministic, checked on added lines only); `branchChanged.to`
   is null for a detached HEAD; `testFiles` are the integrated test files (paths
   relative to the project) that the protection does not cover yet; protection is read from the project's tree, not
   the worktree's.
