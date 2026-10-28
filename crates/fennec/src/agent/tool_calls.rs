@@ -4,6 +4,7 @@
 
 use super::ask_user;
 use super::propose_criteria;
+use super::record_decision;
 use super::turn::Turn;
 use crate::domain::agent::AgentDefinition;
 use crate::domain::event::{Event, ToolCall, ToolResult};
@@ -117,6 +118,18 @@ pub(super) fn execute_tools(
                     waiting = true;
                 }
             }
+            continue;
+        }
+        if call.name == record_decision::NAME {
+            // Not blocking: the result is recorded and the turn goes on.
+            let result = match record_decision::parse(&call.arguments) {
+                Err(e) => ToolResult::failure(e),
+                Ok(decision) => {
+                    turn.append(record_decision::event(&call.id, decision))?;
+                    ToolResult::success(record_decision::RECORDED.into(), false)
+                }
+            };
+            record(turn, message_id, call, result)?;
             continue;
         }
         let (tools, stop) = (turn.tools, turn.stop);
