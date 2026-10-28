@@ -146,6 +146,22 @@ impl LlmSettings {
     }
 }
 
+/// How many model rounds may run at once in the process, from
+/// `FENNEC_MODEL_CONCURRENCY`. Default one: a local GPU serves one round at a
+/// time; raise it when the endpoint tolerates parallel requests.
+pub fn model_concurrency() -> usize {
+    std::env::var("FENNEC_MODEL_CONCURRENCY")
+        .ok()
+        .and_then(|v| parse_concurrency(&v))
+        .unwrap_or(1)
+}
+
+/// A valid concurrency is a positive integer; anything else is rejected so
+/// `model_concurrency` falls back to its default.
+fn parse_concurrency(value: &str) -> Option<usize> {
+    value.parse().ok().filter(|n| *n >= 1)
+}
+
 /// `FENNEC_DB`, default `~/.local/share/fennec/fennec.db`; its directory is created.
 pub fn db_path() -> Result<PathBuf, String> {
     let path = match std::env::var_os("FENNEC_DB") {
@@ -208,6 +224,14 @@ mod tests {
             api_key,
             models: BTreeMap::new(),
         }
+    }
+
+    #[test]
+    fn model_concurrency_defaults_to_one_and_rejects_non_positive() {
+        assert_eq!(parse_concurrency("2"), Some(2));
+        assert_eq!(parse_concurrency("0"), None);
+        assert_eq!(parse_concurrency("abc"), None);
+        assert!(model_concurrency() >= 1);
     }
 
     /// Same server and key as before providers, so the same prompt cache.
