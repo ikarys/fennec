@@ -50,6 +50,24 @@ pub fn last_assistant_text(events: &[Event]) -> String {
         .unwrap_or_default()
 }
 
+/// The system prompt and tool definitions frozen at the first turn: the first
+/// snapshot's prompt and the first snapshot that carries tools (sessions from
+/// before the tools were frozen got them in a later snapshot).
+pub fn frozen_prompt(events: &[Event]) -> (Option<&str>, Option<&Value>) {
+    let mut snapshots = events.iter().filter_map(|e| match e {
+        Event::TurnSnapshot {
+            cached_system_prompt,
+            cached_tools,
+        } => Some((cached_system_prompt.as_str(), cached_tools.as_ref())),
+        _ => None,
+    });
+    let first = snapshots.next();
+    let tools = first
+        .and_then(|(_, tools)| tools)
+        .or_else(|| snapshots.find_map(|(_, tools)| tools));
+    (first.map(|(prompt, _)| prompt), tools)
+}
+
 /// Folds the log into OpenAI chat messages (without the system prompt). Only
 /// the model's view is folded: the events after the last `context.compacted`,
 /// minus what a later `session.rewound` cut off.
@@ -195,6 +213,29 @@ mod tests {
             metadata: None,
             attachments: Vec::new(),
         }
+    }
+
+    #[test]
+    fn frozen_prompt_reads_the_first_prompt_and_the_first_tools() {
+        let events = vec![
+            Event::TurnSnapshot {
+                cached_system_prompt: "first".into(),
+                cached_tools: None,
+            },
+            Event::TurnSnapshot {
+                cached_system_prompt: "second".into(),
+                cached_tools: Some(json!([1])),
+            },
+            Event::TurnSnapshot {
+                cached_system_prompt: "third".into(),
+                cached_tools: Some(json!([2])),
+            },
+        ];
+
+        let (prompt, tools) = frozen_prompt(&events);
+        assert_eq!(prompt, Some("first"));
+        assert_eq!(tools, Some(&json!([1])));
+        assert_eq!(frozen_prompt(&[]), (None, None));
     }
 
     #[test]
