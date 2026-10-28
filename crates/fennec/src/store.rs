@@ -430,6 +430,7 @@ mod tests {
                 &Event::ChatDone {
                     message_id: "m".into(),
                     reason: DoneReason::Stopped,
+                    duration_ms: None,
                 },
             )
             .unwrap();
