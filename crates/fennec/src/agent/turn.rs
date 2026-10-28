@@ -28,6 +28,7 @@ use super::tool_calls::{Flow, INTERRUPTED_ERROR, execute_tools};
 use crate::domain::agent::{AgentDefinition, DEFAULT_COLOR, last_reminder, resolve};
 use crate::domain::attachment::Attachment;
 use crate::domain::compaction::{context_tokens, should_compact};
+use crate::domain::conversation::frozen_prompt;
 use crate::domain::criteria::accepted_proposal;
 use crate::domain::event::{
     DoneReason, Event, MessageMetadata, MetadataSource, ReminderKind, Role, ToolResult,
@@ -209,24 +210,14 @@ pub(super) fn with_running(
 /// the whole session's prompt cache.
 fn round_prompt_parts(turn: &mut Turn) -> Result<(String, Value), String> {
     let events = turn.log.events(turn.session_id)?;
-    let snapshots: Vec<(&String, &Option<Value>)> = events
-        .iter()
-        .filter_map(|e| match e {
-            Event::TurnSnapshot {
-                cached_system_prompt,
-                cached_tools,
-            } => Some((cached_system_prompt, cached_tools)),
-            _ => None,
-        })
-        .collect();
-    let prompt = snapshots.first().map(|(prompt, _)| (*prompt).clone());
-    let tools = snapshots.iter().find_map(|(_, tools)| (*tools).clone());
-    if let (Some(prompt), Some(tools)) = (&prompt, &tools) {
-        return Ok((prompt.clone(), tools.clone()));
+    let (prompt, tools) = frozen_prompt(&events);
+    if let (Some(prompt), Some(tools)) = (prompt, tools) {
+        return Ok((prompt.to_string(), tools.clone()));
     }
+
     // A session from before the tools were frozen keeps its prompt and
     // freezes the tools now: one cache miss, then none.
-    let prompt = prompt.unwrap_or_else(|| {
+    let prompt = prompt.map(str::to_string).unwrap_or_else(|| {
         system_prompt(
             turn.workdir,
             turn.model.name(),
@@ -234,7 +225,7 @@ fn round_prompt_parts(turn: &mut Turn) -> Result<(String, Value), String> {
             turn.skills,
         )
     });
-    let tools = tools.unwrap_or_else(|| tool_definitions(turn));
+    let tools = tools.cloned().unwrap_or_else(|| tool_definitions(turn));
     turn.append(Event::TurnSnapshot {
         cached_system_prompt: prompt.clone(),
         cached_tools: Some(tools.clone()),
