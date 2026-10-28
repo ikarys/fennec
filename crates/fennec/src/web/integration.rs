@@ -81,6 +81,7 @@ fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Result<Gate, (u16, S
         &violations,
         preview.origin_branch.as_deref(),
         preview.human_branch.as_deref(),
+        &preview.local_changes,
     );
     let title = session.title.clone();
     Ok(Ok(Gate {
