@@ -38,7 +38,7 @@ with camelCase fields.
 | `criteria.proposed` | `{callId, criteria: [{id, description, check?}], reason}`: an agent's corrected criteria (`propose_criteria`), shown with a `chat.ask_user` of the same `callId` whose question lists only what changes against the criteria in force (modified, added, removed, then the unchanged ids); the human's `Accept` answer records them as `criteria.set` |
 | `decision.recorded` | `{callId, title, choice, reason, alternatives}`: a design decision an agent recorded with `record_decision` (indicative: produced by a model); the turn goes on |
 | `criterion.updated` | `{criterionId, status}`; `status` is `{type: "pending"}` or `{type: "passed" \| "failed", provenance}`, `provenance` `{kind: "verified", command, exitCode?, output}` (fennec ran the check) or `{kind: "indicative", agent, reason}` (an agent's verdict) |
-| `integration.applied` | `{branch, base, commits, head, message, acknowledged}`: the human integrated the session's branch; `message` is the integration commit message, `acknowledged` lists the blockers they accepted |
+| `integration.applied` | `{branch, base, commits, head, message, acknowledged, protectedTests}`: the human integrated the session's branch; `message` is the integration commit message, `acknowledged` lists the blockers they accepted, `protectedTests` the test files they protected with it (absent in older logs) |
 | `worktree.discarded` | `{branch, commits}`: the human discarded the session's worktree and branch; `commits` are the agent's commits that were dropped |
 | `workflow.paused` | `{runId, from, port, to}`: waiting before `to` |
 | `workflow.resumed` | `{runId, comment}` |
@@ -172,7 +172,7 @@ read-only. The human edits them as usual.
   `git cherry-pick <base>..<branch>`;
   `mode` is the id of the agent the session resolves to from its event log
   (null when there is no top-level agent)
-- `GET /api/sessions/{id}/integration` → `{branch, base, originBranch, humanBranch, defaultMessage, commits: [{sha, subject}], files: [{path, protected}], criteria, decisions, blockers}`:
+- `GET /api/sessions/{id}/integration` → `{branch, base, originBranch, humanBranch, defaultMessage, commits: [{sha, subject}], files: [{path, protected}], testFiles, criteria, decisions, blockers}`:
   what integrating the session's worktree branch would do (409 without a
   worktree). `originBranch` is the branch the run started from (null for
   older worktrees or a detached HEAD). `decisions` are the session's
@@ -182,9 +182,10 @@ read-only. The human edits them as usual.
   agent's work`); the human edits it. `blockers` is the review gate, each
   `{kind, …}`: `noCommits`, `branchChanged {from, to}`, `criteriaNotPassed
   {criteria}`, `noCriteria`, `protectedTouched {paths}`; `branchChanged.to`
-  is null for a detached HEAD; protection is read from the project's tree, not
+  is null for a detached HEAD; `testFiles` are the integrated test files (paths
+  relative to the project) that the protection does not cover yet; protection is read from the project's tree, not
   the worktree's.
-- `POST /api/sessions/{id}/integrate` `{acknowledged: [kind], message}` → `{head, commits}`:
+- `POST /api/sessions/{id}/integrate` `{acknowledged: [kind], message, protectTests?}` → `{head, commits, protectedTests, protectError}`:
   the human's decision. The server recomputes the gate and answers 400 on a
   blank `message`, 409 while a turn runs, while the human has staged changes,
   while a blocker is not acknowledged (`noCommits` never is), or when git
@@ -194,7 +195,11 @@ read-only. The human edits them as usual.
   conflict is aborted, the tree left as it was, and answers 409
   `{error: "conflict", conflict: {kind: "conflict", files, command}}`. On
   success it moves the base ref to the branch head and appends
-  `integration.applied`. Nothing else in fennec integrates: no agent, workflow
+  `integration.applied`. With `protectTests: true` (default false, the human's
+  choice) the `testFiles` are then appended to the project's `.agents/protected`
+  under `# tests validated by integration`; `protectedTests` lists them, and a
+  write failure leaves the integration done and comes back in `protectError`.
+  Nothing else in fennec integrates: no agent, workflow
   or schedule calls it.
 - `POST /api/sessions/{id}/discard` `{}` → `{commits}`:
   the human's decision; 409 while a turn runs or without a worktree; removes the

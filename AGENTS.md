@@ -71,7 +71,10 @@ a review gate (commits, files, criteria, protected files touched) whose
 blockers the human must accept one by one (`integration.applied` records it).
 Decision registry, done: `record_decision` (the turn goes on) records a choice, its reason
 and the alternatives as `decision.recorded`; a "Décisions" block in the context panel.
-Next, one PR each: the rest of fennec's own layer (tests protected once validated) → sub-agents as tools, when dogfooding shows sessions
+Protected tests, done: an unchecked "Protéger les tests intégrés" box in the
+integration dialog appends the integrated test files to `.agents/protected`
+(`domain/test_files.rs`).
+Next, one PR each: the rest of fennec's own layer → sub-agents as tools, when dogfooding shows sessions
 saturating their context while exploring.
 
 ## Layout
@@ -101,6 +104,7 @@ crates/fennec/src/
     replay.rs          which message the human may replay
     criteria.rs        acceptance criteria: the plan's "Done when", checks, verdicts, provenance
     protection.rs      protected files: the defaults, the gitignore-like patterns, the matcher
+    test_files.rs      which paths are tests; the lines an integration appends to `.agents/protected`
     integration.rs     the review gate: what blocks an integration until the human accepts it
     workflow/          a workflow: definition (nodes, ports, edges), template ({{…}} names),
                        validate (the graph rules), run (the run folded from its events, the next step)
