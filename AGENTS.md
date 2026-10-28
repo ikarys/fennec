@@ -146,7 +146,7 @@ crates/fennec/src/
                      ~/.agents/workflows, the project's .agents/workflows (the project wins)
   folders.rs         the folders the human browses to open a project
   protected.rs       the project's protected files: .agents/protected read, the existing paths found
-  web/               HTTP adapter: http, guard (who may call), routes, event_stream (SSE),
+  web/               HTTP adapter: http, guard (who may call), routes, settings_routes, event_stream (SSE),
                      notifier (wakes streams on append, no polling), turns, assets,
                      workflow_routes, children (child sessions for workflow nodes),
                      preview (a project's files in a sandboxed origin), session_usage,
@@ -155,7 +155,8 @@ crates/fennec/src/
 crates/token-usage/ the usage ledger, a crate of its own and fennec-free (calls, tokens, speed, savings;
                      SQLite file `usage.db`, `FENNEC_USAGE_DB`): outlives sessions, reusable by other products
 crates/llm-providers/ talking to models, a crate of its own and fennec-free: the OpenAI-compatible client
-                     and its SSE parser, the /models listing, per-model parameters (ReasoningEffort, ModelPrefs)
+                     and its SSE parser, the /models listing, providers and their per-model parameters
+                     (Provider, ModelRef, ModelPrefs, ReasoningEffort), API keys sealed at rest (MasterKey)
 crates/fennec/build.rs   embeds web/dist (placeholder page when not built)
 web/src/           React + Vite + Tailwind v4 UI (same layout as openfox's web/src)
   pages/             one component per route: HomePage, SessionPage, SettingsPage, InsightPage,
@@ -221,8 +222,9 @@ target/debug/fennec run "<prompt>"   # CLI, in the repository to work on
 
 Env: `FENNEC_LLM_URL`, `FENNEC_MODEL`, `FENNEC_API_KEY`, `FENNEC_MAX_TOKENS`,
 `FENNEC_COMPACT_AT` (default 0.85, 0 disables), `FENNEC_DB` (default `~/.local/share/fennec/fennec.db`).
-The model variables are defaults: the Settings page (stored in SQLite) overrides them
-per model, from the next turn on.
+The model variables are defaults and define the `local` provider: the Settings page (stored in
+SQLite) adds providers and overrides them per model, from the next turn on. Stored API keys are
+sealed with `secret.key`, next to the store (lose it and the stored keys are lost).
 
 ## Non-negotiable rules
 

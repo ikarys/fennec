@@ -9,6 +9,7 @@ use super::{
     context_view::context_view,
     event_stream, integration, session_name,
     session_usage::{SessionUsageView, call_views},
+    settings_routes,
     turns::Job,
     workflow_routes, workflow_usage,
 };
@@ -19,7 +20,6 @@ use crate::domain::agent::{resolve as agent_resolve, switch_to};
 use crate::domain::attachment::{Attachment, from_data_url};
 use crate::domain::event::Event;
 use crate::domain::id::new_id;
-use crate::domain::preferences::Preferences;
 use crate::domain::project::{Project, SessionSummary};
 use crate::domain::replay::replayable;
 use crate::domain::slash::{TurnInput, commands, resolve};
@@ -27,7 +27,6 @@ use crate::domain::workflow::run::Waiting;
 use crate::skills;
 use crate::store::SqliteStore;
 use crate::{folders, git, workflows};
-use llm_providers::list_models;
 use serde_json::{Value, json};
 use std::net::TcpStream;
 use std::path::Path;
@@ -45,9 +44,9 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
                 &json!({ "model": params.model, "contextWindow": params.context_window, "compactAt": params.compact_at }),
             )
         }
-        ("GET", ["api", "settings"]) => get_settings(app, stream),
+        ("GET", ["api", "settings"]) => settings_routes::get_settings(app, stream),
         ("GET", ["api", "insight"]) => super::insight::serve(app, req, stream),
-        ("POST", ["api", "settings"]) => save_settings(app, req, stream),
+        ("POST", ["api", "settings"]) => settings_routes::save_settings(app, req, stream),
         ("GET", ["api", "folders"]) => list_folders(req, stream),
         ("GET", ["api", "projects"]) => list_projects(app, stream),
         ("POST", ["api", "projects"]) => open_project(app, req, stream),
@@ -115,34 +114,6 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
         }
         _ => error(stream, 404, "not found"),
     }
-}
-
-fn get_settings(app: &App, stream: &mut TcpStream) -> Result<(), String> {
-    let store = app.store()?;
-    let prefs = store.preferences()?;
-    // The endpoint may have loaded another model since start; fall back to
-    // the startup listing when it cannot be reached now.
-    let models = list_models(&app.settings.llm.endpoint())
-        .unwrap_or_else(|_| app.settings.llm.listed.clone());
-    let body = json!({
-        "preferences": prefs,
-        "models": models,
-        "defaults": app.settings.llm.defaults,
-    });
-    send_json(stream, 200, &body)
-}
-
-fn save_settings(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
-    let body = req.json()?;
-    let prefs: Preferences = match serde_json::from_value(body) {
-        Ok(prefs) => prefs,
-        Err(e) => return error(stream, 400, &format!("invalid preferences: {e}")),
-    };
-    if let Err(e) = prefs.validate() {
-        return error(stream, 400, &e);
-    }
-    app.store()?.save_preferences(&prefs)?;
-    get_settings(app, stream)
 }
 
 fn list_folders(req: &Request, stream: &mut TcpStream) -> Result<(), String> {

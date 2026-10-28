@@ -71,25 +71,47 @@ or `"idle"` if none.
 The Settings page stores `Preferences` in SQLite. Environment variables are
 defaults; stored preferences override them per turn, without a restart.
 
+A turn runs on `selected`, a model of a provider. The provider `local` is the
+environment's endpoint (`FENNEC_LLM_URL`, `FENNEC_API_KEY`); a stored entry
+with id `local` overrides only what it sets. The model id is sent to the
+provider as is: `local` never appears on the wire.
+
 Precedence for a turn:
 
-1. stored per-model value in `models[model]`
-2. for `contextWindow` only, the endpoint's current `/models` listing
+1. stored per-model value in `providers[provider].models[model]`
+2. for `contextWindow` only, the local endpoint's startup `/models` listing
 3. the environment/built-in default (`FENNEC_*`, or 128 000 tokens)
+
+API keys (`apiKey`): `{"env": "VAR"}` names an environment variable read at
+each call; `{"sealed": "<hex>"}` is a key encrypted (ChaCha20-Poly1305) with
+the master key `secret.key` next to the store (mode 0600, hidden from the
+sandbox with the store); `{"plain": "<key>"}` is accepted by `POST` only and
+sealed before it is stored: a key in clear never reaches the database.
+
+Preferences written before providers (`model`, `models` at the top) are read
+as the `local` provider's, and written back in the new shape.
 
 `Preferences` JSON (camelCase, all fields optional on read):
 
 ```json
 {
-  "model": "string | null",
-  "models": {
-    "<model id>": {
-      "maxTokens": "number | null",
-      "contextWindow": "number | null",
-      "compactionThreshold": "number | null",
-      "reasoningEffort": "\"none\" | \"minimal\" | \"low\" | \"medium\" | \"high\" | \"xhigh\" | \"max\" | null"
+  "selected": "{provider, model} | null",
+  "providers": [
+    {
+      "id": "string, without '/'",
+      "name": "string",
+      "baseUrl": "string (empty for local: the environment's)",
+      "apiKey": "{env} | {sealed} | {plain} | null",
+      "models": {
+        "<model id>": {
+          "maxTokens": "number | null",
+          "contextWindow": "number | null",
+          "compactionThreshold": "number | null",
+          "reasoningEffort": "\"none\" | \"minimal\" | \"low\" | \"medium\" | \"high\" | \"xhigh\" | \"max\" | null"
+        }
+      }
     }
-  },
+  ],
   "display": {
     "reasoningOpen": true,
     "toolResultsOpen": false,
@@ -147,12 +169,13 @@ read-only. The human edits them as usual.
 
 - `GET /api/config` → `{model, contextWindow, compactAt}`: the resolved parameters of the
   stored preferences; `compactAt` is the fraction at which the session compacts (0 disables)
-- `GET /api/settings` → `{preferences, models, defaults}`
+- `GET /api/settings` → `{preferences, listings, defaults}`
   - `preferences`: the stored `Preferences`
-  - `models`: `[{id, contextWindow}]` from a fresh `/models` call; on failure
-    the startup listing
-  - `defaults`: `{model, maxTokens, contextWindow, compactAt}` from the
-    environment/built-in defaults
+  - `listings`: `[{provider, name, baseUrl, models: [{id, contextWindow}], error}]`,
+    local first, from a fresh `/models` call per provider (in parallel); the
+    local one falls back to the startup listing; `error` is why a call failed
+  - `defaults`: `{provider, model, maxTokens, contextWindow, compactAt, reasoningEffort}`
+    from the environment/built-in defaults
 - `POST /api/settings` with a full `Preferences` body → 200 with the same body
   as `GET /api/settings`; 400 with the validation message if invalid
 - `GET /api/projects` → `[{id, name, workdir, branch, sessions: [{id, title, state, createdAt, updatedAt}]}]`
