@@ -149,10 +149,16 @@ fn list_projects(app: &App, stream: &mut TcpStream) -> Result<(), String> {
     let store = app.store()?;
     let mut out = Vec::new();
     for p in store.projects()? {
+        // The log says a workflow ended; git says whether its work still waits.
+        let pending = git::sessions_with_unintegrated_work(Path::new(&p.workdir));
         let sessions: Vec<Value> = store
             .sessions(Some(&p.id))?
             .iter()
-            .map(|s| session_json(app, s))
+            .map(|s| {
+                let mut v = session_json(app, s);
+                v["awaitingIntegration"] = json!(s.awaiting_integration && pending.contains(&s.id));
+                v
+            })
             .collect();
         let mut v = project_json(&p);
         v["branch"] = json!(git::current_branch(Path::new(&p.workdir)));
