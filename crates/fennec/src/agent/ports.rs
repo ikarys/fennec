@@ -9,6 +9,8 @@ use serde_json::Value;
 use std::sync::atomic::AtomicBool;
 use std::time::Duration;
 
+pub use llm_providers::Delta;
+
 pub struct Request<'a> {
     pub system_prompt: &'a str,
     pub messages: &'a [Value],
@@ -18,18 +20,6 @@ pub struct Request<'a> {
     pub reasoning_effort: Option<ReasoningEffort>,
     /// Checked on every streamed line: the stream ends with "Aborted".
     pub stop: &'a AtomicBool,
-}
-
-/// What the stream yields while it runs (openfox `StreamEvent`).
-#[derive(Debug, PartialEq)]
-pub enum Delta {
-    Text(String),
-    Thinking(String),
-    /// A tool call's name is known before its arguments finish streaming.
-    ToolPreparing {
-        index: usize,
-        name: String,
-    },
 }
 
 #[derive(Debug, Default, PartialEq)]

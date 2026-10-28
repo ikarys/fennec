@@ -1,7 +1,9 @@
-//! The endpoint's model listing (`/models`), moved out of `config.rs` so the
-//! web API can refresh it without environment settings.
+//! The endpoint's model listing (`/models`), owned by the provider crate so
+//! callers can refresh it without environment settings.
 
+use super::endpoint::Endpoint;
 use serde::Serialize;
+use serde_json::Value;
 use std::time::Duration;
 
 #[derive(Debug, Clone, Serialize)]
@@ -12,25 +14,25 @@ pub struct ListedModel {
 }
 
 /// Lists the models the endpoint serves. `max_model_len` is vLLM's field.
-pub fn list_models(base_url: &str, api_key: Option<&str>) -> Result<Vec<ListedModel>, String> {
-    let url = format!("{}/models", base_url.trim_end_matches('/'));
-    // Bounded: fennec asks at startup and on the Settings page, and an
-    // endpoint that drops packets would otherwise hang both.
+pub fn list_models(endpoint: &Endpoint) -> Result<Vec<ListedModel>, String> {
+    let url = endpoint.url("models");
+    // Bounded: a settings page or startup call must not hang on a
+    // packet-dropping endpoint.
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .timeout_global(Some(Duration::from_secs(5)))
         .build()
         .into();
     let mut req = agent.get(&url);
-    if let Some(key) = api_key {
+    if let Some(key) = &endpoint.api_key {
         req = req.header("Authorization", &format!("Bearer {key}"));
     }
-    let value: serde_json::Value = req
+    let value: Value = req
         .call()
         .and_then(|r| r.into_body().read_json())
         .map_err(|e| format!("{url}: {e}"))?;
     let data = value
         .get("data")
-        .and_then(serde_json::Value::as_array)
+        .and_then(Value::as_array)
         .cloned()
         .unwrap_or_default();
     Ok(data
@@ -39,7 +41,7 @@ pub fn list_models(base_url: &str, api_key: Option<&str>) -> Result<Vec<ListedMo
             let id = m.get("id")?.as_str()?.to_string();
             (!id.is_empty()).then(|| ListedModel {
                 id,
-                context_window: m.get("max_model_len").and_then(serde_json::Value::as_u64),
+                context_window: m.get("max_model_len").and_then(Value::as_u64),
             })
         })
         .collect())

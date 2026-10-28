@@ -1,10 +1,8 @@
 //! Port of openfox `llm/streaming.ts`: reads an SSE chat-completion stream,
 //! accumulating tool-call fragments by index as the OpenAI protocol sends them.
 
-use crate::agent::ports::{Completion, Delta};
-use crate::domain::event::ToolCall;
-use crate::domain::id::new_id;
-use serde_json::{Value, json};
+use super::chat::{Completion, Delta, StreamedToolCall};
+use serde_json::Value;
 use std::io::BufRead;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -17,7 +15,7 @@ struct PendingCall {
 
 /// Parses an SSE chat-completion stream, accumulating tool-call fragments
 /// by index as the OpenAI protocol sends them.
-pub fn parse(
+pub(crate) fn parse(
     reader: impl BufRead,
     stop: &AtomicBool,
     on: &mut dyn FnMut(Delta),
@@ -89,28 +87,10 @@ pub fn parse(
     out.tool_calls = calls
         .into_iter()
         .filter(|c| !c.name.is_empty())
-        .map(|c| {
-            let raw = if c.arguments.trim().is_empty() {
-                "{}"
-            } else {
-                &c.arguments
-            };
-            // Invalid JSON is not sent back: some chat templates parse it.
-            let (arguments, parse_error, raw_arguments) = match serde_json::from_str::<Value>(raw) {
-                Ok(v) => (v, None, Some(raw.to_string())),
-                Err(e) => (
-                    json!({}),
-                    Some(format!("Invalid JSON arguments: {e}: {raw}")),
-                    None,
-                ),
-            };
-            ToolCall {
-                id: if c.id.is_empty() { new_id() } else { c.id },
-                name: c.name,
-                arguments,
-                parse_error,
-                raw_arguments,
-            }
+        .map(|c| StreamedToolCall {
+            id: c.id,
+            name: c.name,
+            arguments: c.arguments,
         })
         .collect();
     Ok(out)
@@ -144,19 +124,7 @@ data: [DONE]
         );
         assert_eq!(c.tool_calls.len(), 1);
         assert_eq!(c.tool_calls[0].id, "c1");
-        assert_eq!(c.tool_calls[0].arguments, json!({"path": "a"}));
-        assert_eq!(
-            c.tool_calls[0].raw_arguments.as_deref(),
-            Some("{\"path\":\"a\"}")
-        );
+        assert_eq!(c.tool_calls[0].arguments, "{\"path\":\"a\"}");
         assert_eq!(deltas.len(), 3);
-    }
-
-    #[test]
-    fn invalid_tool_arguments_are_kept_as_a_parse_error() {
-        let stream = r#"data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c","function":{"name":"x","arguments":"{oops"}}]}}]}
-"#;
-        let c = parse(stream.as_bytes(), &AtomicBool::new(false), &mut |_| {}).unwrap();
-        assert!(c.tool_calls[0].parse_error.is_some());
     }
 }
