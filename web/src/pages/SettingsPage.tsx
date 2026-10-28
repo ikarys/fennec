@@ -9,6 +9,7 @@ import type {
   SettingsResponse
 } from '../lib/api';
 import { saveSettings } from '../lib/api';
+import { type ThemeId } from '../lib/theme';
 import { Button } from '../components/ui/Button';
 import { ModelSection } from '../components/settings/ModelSection';
 import { ModelPrefsSection, percentFromFraction, type ModelForm } from '../components/settings/ModelPrefsSection';
@@ -20,6 +21,8 @@ import { SandboxSection } from '../components/settings/SandboxSection';
 
 interface SettingsPageProps {
   settings: SettingsResponse | null;
+  theme: ThemeId;
+  onThemeChange: (theme: ThemeId) => void;
   onSaved: (next: SettingsResponse) => void;
 }
 
@@ -129,7 +132,7 @@ function buildPreferences(form: SettingsForm, settings: SettingsResponse): Prefe
   };
 }
 
-export function SettingsPage({ settings, onSaved }: SettingsPageProps) {
+export function SettingsPage({ settings, theme, onThemeChange, onSaved }: SettingsPageProps) {
   const [form, setForm] = useState<SettingsForm | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -277,7 +280,12 @@ export function SettingsPage({ settings, onSaved }: SettingsPageProps) {
 
             {tab === 'display' && (
               <div className="flex flex-col gap-4">
-                <DisplaySection value={form.display} onChange={updateDisplay} />
+                <DisplaySection
+                  value={form.display}
+                  onChange={updateDisplay}
+                  theme={theme}
+                  onThemeChange={onThemeChange}
+                />
                 <PanelPagesSection
                   value={form.display.panelPages ?? null}
                   onChange={(panelPages) => updateDisplay({ ...form.display, panelPages })}
