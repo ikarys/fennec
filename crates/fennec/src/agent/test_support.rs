@@ -73,6 +73,7 @@ pub fn builder() -> Vec<AgentDefinition> {
             "load_skill".into(),
         ],
         commands: CommandAccess::ReadWrite,
+        reasoning_effort: None,
         color: None,
         prompt: "Build.".into(),
     }]
@@ -87,6 +88,7 @@ pub fn plan() -> AgentDefinition {
         subagent: false,
         allowed_tools: vec!["read_file".into(), "ask_user".into(), "load_skill".into()],
         commands: CommandAccess::ReadOnly,
+        reasoning_effort: None,
         color: None,
         prompt: "Plan.".into(),
     }
