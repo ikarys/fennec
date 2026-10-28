@@ -293,7 +293,20 @@ export interface ContextView {
   /** Where the compaction threshold sits, 0 to 100; null when compaction is off. */
   compactMark: number | null;
   line: string;
+  /** Taken, left, total, threshold. */
   title: string;
+  /** Null while nothing is measured. */
+  composition: ContextComposition | null;
+}
+
+export type ContextPartKind = 'prompt' | 'conversation' | 'tools';
+
+/** Indicative: the exact total spread over the parts by their share of the text. */
+export interface ContextComposition {
+  kinds: { kind: ContextPartKind; label: string; tokens: string; percent: number }[];
+  /** `kind` null: the row that sums the smallest parts. */
+  parts: { kind: ContextPartKind | null; label: string; tokens: string; percent: number }[];
+  images: string | null;
 }
 
 export function getContext(id: string): Promise<ContextView> {
