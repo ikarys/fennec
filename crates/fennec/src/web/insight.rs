@@ -9,8 +9,11 @@ use token_usage::display::{duration, percent, tokens};
 use token_usage::{Filter, GroupBy, Ledger, Row, Summary};
 
 use super::App;
+use super::context_view::{CompositionView, composition_view};
 use super::http::{Request, error, send_json};
 use crate::domain::clock::now_ms;
+use crate::domain::context_parts::PartKind;
+use std::collections::BTreeMap;
 
 const DAY_MS: u64 = 86_400_000;
 
@@ -54,6 +57,9 @@ pub struct InsightView {
     pub projects: Vec<RowView>,
     /// Per model, busiest first.
     pub models: Vec<RowView>,
+    /// What the prompts sent were made of, summed over the calls; none before
+    /// any call was broken down. Indicative, like the context gauge's.
+    pub consumers: Option<CompositionView>,
     /// Every project the ledger knows, by name, for the scope picker.
     pub project_options: Vec<ProjectOption>,
 }
@@ -128,6 +134,7 @@ impl InsightData {
         };
 
         let cards = cards(&total);
+        let consumers = consumers(&total.breakdown);
 
         let max = days
             .iter()
@@ -157,6 +164,7 @@ impl InsightData {
             days,
             projects,
             models,
+            consumers,
             project_options,
         }
     }
@@ -265,6 +273,25 @@ fn cards(total: &Summary) -> Vec<CardView> {
             detail: "tokens générés".into(),
         },
     ]
+}
+
+/// The ledger's `<kind>/<label>` keys, largest first; keys of another
+/// shape (an older or foreign writer) are left out.
+fn consumers(breakdown: &BTreeMap<String, u64>) -> Option<CompositionView> {
+    let mut shares: Vec<(PartKind, String, u64)> = breakdown
+        .iter()
+        .filter_map(|(key, &tokens)| {
+            let (kind, label) = PartKind::split_key(key)?;
+            Some((kind, label.to_string(), tokens))
+        })
+        .filter(|(_, _, tokens)| *tokens > 0)
+        .collect();
+    if shares.is_empty() {
+        return None;
+    }
+    shares.sort_by(|a, b| b.2.cmp(&a.2).then_with(|| a.1.cmp(&b.1)));
+    let total = shares.iter().map(|(_, _, tokens)| tokens).sum();
+    Some(composition_view(&shares, total, 0))
 }
 
 fn day_view(row: &Row, max: u64) -> DayView {
@@ -461,5 +488,26 @@ mod tests {
 
         assert_eq!(view.scope, "Projet un");
         assert!(view.projects.is_empty());
+    }
+
+    #[test]
+    fn consumers_group_the_breakdown_by_kind_largest_first() {
+        let breakdown: BTreeMap<String, u64> = [
+            ("prompt/AGENTS.md".to_string(), 300),
+            ("tools/Résultat : read_file".to_string(), 600),
+            ("conversation/Messages humains".to_string(), 100),
+            ("legacy".to_string(), 999),
+        ]
+        .into();
+        let view = consumers(&breakdown).expect("consumers");
+
+        let labels: Vec<&str> = view.parts.iter().map(|p| p.label.as_str()).collect();
+        assert_eq!(
+            labels,
+            ["Résultat : read_file", "AGENTS.md", "Messages humains"]
+        );
+        assert_eq!(view.parts[0].percent, 60);
+        assert_eq!(view.kinds.len(), 3);
+        assert!(consumers(&BTreeMap::new()).is_none());
     }
 }

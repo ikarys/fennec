@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getInsight, type InsightPeriod, type InsightRow, type InsightView } from '../lib/api';
 import { Card } from '../components/ui/Card';
+import { ContextComposition } from '../components/session/ContextComposition';
 import { SectionLabel } from '../components/ui/SectionLabel';
 import { Segmented, type Segment } from '../components/ui/Segmented';
 import { Select } from '../components/ui/Field';
@@ -188,6 +189,12 @@ export function InsightPage() {
                 <p className="mt-3 text-muted">Aucun appel sur la période.</p>
               )}
             </Card>
+
+            {view.consumers ? (
+              <Card className="p-4">
+                <ContextComposition composition={view.consumers} title="Ce qui consomme l'entrée" />
+              </Card>
+            ) : null}
 
             {view.projects.length > 0 ? (
               <InsightTable
