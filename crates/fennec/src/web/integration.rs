@@ -13,6 +13,7 @@ use crate::domain::event::Event;
 use crate::domain::integration::{
     Blocker, blockers, commit_message, default_message, unacknowledged,
 };
+use crate::domain::test_files::new_test_patterns;
 use crate::domain::workflow::run;
 use crate::integration::{self, ApplyError, Preview};
 use crate::protected;
@@ -35,6 +36,8 @@ struct Gate {
     /// Informational: shown to the human, never a blocker.
     decisions: Vec<Decision>,
     protected_touched: Vec<String>,
+    /// The test files under the project, relative to it, not yet protected.
+    test_files: Vec<String>,
     blockers: Vec<Blocker>,
 }
 
@@ -57,6 +60,12 @@ fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Result<Gate, (u16, S
     // worktree's copy the agent worked in.
     let protection = protected::load(Path::new(&project.workdir));
     let protected_touched = integration::protected_touched(&preview.files, &prefix, &protection);
+    let in_project: Vec<String> = preview
+        .files
+        .iter()
+        .filter_map(|file| file.strip_prefix(prefix.as_str()).map(String::from))
+        .collect();
+    let test_files = new_test_patterns(&in_project, &protection);
     let events = store.events(&session.id)?;
     let decisions = decisions_in_force(&events);
     let criteria = run::current_run(&events)
@@ -79,8 +88,16 @@ fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Result<Gate, (u16, S
         criteria,
         decisions,
         protected_touched,
+        test_files,
         blockers,
     }))
+}
+
+/// The project's directory, where `.agents/protected` lives.
+fn gate_workdir(store: &SqliteStore, id: &str) -> Result<String, String> {
+    session_and_project(store, id)?
+        .map(|(_, project)| project.workdir)
+        .ok_or_else(|| "no such session".into())
 }
 
 /// `GET /api/sessions/{id}/integration`: what the integration would do and
@@ -109,6 +126,7 @@ pub fn get_integration(app: &App, stream: &mut TcpStream, id: &str) -> Result<()
             "defaultMessage": default_message(&gate.title),
             "commits": gate.preview.commits,
             "files": files,
+            "testFiles": gate.test_files,
             "criteria": criteria,
             "decisions": gate.decisions,
             "blockers": gate.blockers,
@@ -131,6 +149,10 @@ pub fn integrate(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> 
                 .collect()
         })
         .unwrap_or_default();
+    let protect_tests = body
+        .get("protectTests")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
     if app.turns.is_running(id) {
         return error(stream, 409, "a turn is already running");
     }
@@ -163,6 +185,16 @@ pub fn integrate(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> 
         Err(ApplyError::Git { message }) => return error(stream, 409, &message),
     };
     let commits: Vec<String> = gate.preview.commits.iter().map(|c| c.sha.clone()).collect();
+    // The integration is done: a failure here is reported, never undone.
+    let (protected_tests, protect_error) = if protect_tests {
+        let workdir = gate_workdir(&store, id)?;
+        match protected::protect_tests(Path::new(&workdir), &gate.test_files) {
+            Ok(added) => (added, None),
+            Err(e) => (Vec::new(), Some(e.to_string())),
+        }
+    } else {
+        (Vec::new(), None)
+    };
     let log = NotifyingLog {
         log: &store,
         notifier: &app.notifier,
@@ -176,9 +208,19 @@ pub fn integrate(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> 
             head: head.clone(),
             message,
             acknowledged,
+            protected_tests: protected_tests.clone(),
         },
     )?;
-    send_json(stream, 200, &json!({ "head": head, "commits": commits }))
+    send_json(
+        stream,
+        200,
+        &json!({
+            "head": head,
+            "commits": commits,
+            "protectedTests": protected_tests,
+            "protectError": protect_error,
+        }),
+    )
 }
 
 /// `POST /api/sessions/{id}/discard`: the human's decision to drop the
