@@ -1,9 +1,9 @@
 use super::*;
-use crate::agent::ports::{AgentRun, ChildSessions, CommandRun, Commands, Model};
+use crate::agent::ports::{AgentRun, ChildSessions, CommandRun, Commands, Completion, Model};
 use crate::agent::test_support::{MemoryLog, Scripted, builder, plan, reply};
 use crate::domain::agent::AgentDefinition;
 use crate::domain::criteria::{CriterionStatus, Provenance};
-use crate::domain::event::{DoneReason, Event};
+use crate::domain::event::{DoneReason, Event, ToolCall};
 use crate::domain::workflow::definition::{
     AgentContext, Edge, EndOutcome, Node, NodeKind, Position, Workflow,
 };
@@ -86,6 +86,14 @@ impl ChildSessions for FakeChildren {
         Ok(AgentRun {
             reason: DoneReason::Complete,
             text,
+        })
+    }
+
+    fn model_tokens(&self, _child: &str) -> Option<crate::domain::stats::NodeTokens> {
+        Some(crate::domain::stats::NodeTokens {
+            prefill_tokens: 100,
+            generation_tokens: 20,
+            generation_speed: 30.0,
         })
     }
 }
@@ -218,6 +226,84 @@ fn start_agent_end() {
             outcome: RunOutcome::Done,
             ..
         }
+    )));
+}
+
+#[test]
+fn agent_input_stats_cover_the_calls_before_the_interruption() {
+    // The agent asks a question (its turn ends), the human answers, the agent
+    // finishes: the node's stats sum both segments' model calls.
+    let call = ToolCall {
+        id: "c1".into(),
+        name: "ask_user".into(),
+        arguments: serde_json::json!({"question": "Which color?"}),
+        parse_error: None,
+    };
+    let usage = |content: &str, calls: Vec<ToolCall>, prompt: u64, completion: u64| {
+        Ok(Completion {
+            content: content.into(),
+            finish_reason: if calls.is_empty() {
+                "stop"
+            } else {
+                "tool_calls"
+            }
+            .into(),
+            tool_calls: calls,
+            prompt_tokens: prompt,
+            completion_tokens: completion,
+            ..Completion::default()
+        })
+    };
+    let model = Scripted(RefCell::new(vec![
+        usage("", vec![call], 100, 5),
+        usage("done", vec![], 200, 10),
+    ]));
+    let stop = AtomicBool::new(false);
+    let children = FakeChildren::default();
+    let commands = FakeCommands::default();
+    let env = WorkflowEnv {
+        children: &children,
+        commands: &commands,
+    };
+    let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
+    h.agents = vec![plan()];
+
+    let reason = run_workflow(
+        &mut h.turn(),
+        &env,
+        WorkflowJob::Start {
+            workflow: simple_workflow(),
+            task: "do it".into(),
+            step_by_step: false,
+            attachments: Vec::new(),
+        },
+    )
+    .unwrap();
+    assert_eq!(reason, DoneReason::WaitingForUser);
+
+    let reason = run_workflow(
+        &mut h.turn(),
+        &env,
+        WorkflowJob::AgentInput {
+            prompt: "blue".into(),
+            attachments: Vec::new(),
+        },
+    )
+    .unwrap();
+    assert_eq!(reason, DoneReason::Complete);
+
+    let events = h.log.0.into_inner();
+    assert!(events.iter().any(|e| matches!(
+        e,
+        Event::WorkflowNodeFinished {
+            node_id,
+            port,
+            stats: Some(stats),
+            ..
+        } if node_id == "a"
+            && port == "done"
+            && stats.prefill_tokens == 300
+            && stats.generation_tokens == 15
     )));
 }
 
@@ -972,6 +1058,15 @@ fn agent_outcome() {
             node_id, port, output, ..
         } if node_id == "a" && port == "ko" && output == "result"))
     );
+    // The scripted model reports no tokens, so the node's stats are zero.
+    assert!(events.iter().any(|e| matches!(
+        e,
+        Event::WorkflowNodeFinished {
+            node_id,
+            stats: Some(stats),
+            ..
+        } if node_id == "a" && stats.generation_tokens == 0
+    )));
     assert!(events.iter().any(|e| matches!(
         e,
         Event::WorkflowFinished {
@@ -1169,6 +1264,15 @@ fn parallel_branches() {
     assert!(join_output.contains("result a"));
     assert!(join_output.contains("Branch B"));
     assert!(join_output.contains("result b"));
+    // The branch agent's model cost is recorded on its node's finished event.
+    assert!(events.iter().any(|e| matches!(
+        e,
+        Event::WorkflowNodeFinished {
+            node_id,
+            stats: Some(stats),
+            ..
+        } if node_id == "a" && stats.generation_tokens == 20
+    )));
 }
 
 #[test]
@@ -1544,6 +1648,7 @@ fn resume_interrupted_agent_keeps_its_pass_and_prompt() {
             exit_code: None,
             comment: None,
             duration_ms: None,
+            stats: None,
         },
         Event::WorkflowNodeStarted {
             run_id: "r".into(),
@@ -1554,6 +1659,20 @@ fn resume_interrupted_agent_keeps_its_pass_and_prompt() {
                 port: "next".into(),
             }),
             child_session_id: None,
+        },
+        // The model call the interrupted first segment made.
+        Event::MessageDone {
+            message_id: "m1".into(),
+            stats: Some(crate::domain::stats::MessageStats {
+                model: "scripted".into(),
+                total_time: 0.0,
+                prefill_tokens: 100,
+                cached_prompt_tokens: 0,
+                generation_tokens: 5,
+                prefill_speed: 0.0,
+                generation_speed: 0.0,
+            }),
+            partial: false,
         },
     ]);
 
@@ -1585,5 +1704,16 @@ fn resume_interrupted_agent_keeps_its_pass_and_prompt() {
             is_system_generated: true,
             ..
         } if content.contains("retry prompt")
+    )));
+    // The resumed node's stats include the first segment's call.
+    assert!(events.iter().any(|e| matches!(
+        e,
+        Event::WorkflowNodeFinished {
+            node_id,
+            stats: Some(stats),
+            ..
+        } if node_id == "a"
+            && stats.prefill_tokens == 100
+            && stats.generation_tokens == 5
     )));
 }

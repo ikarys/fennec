@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ThreadItem } from '../../../lib/fold';
-import { formatClock, formatDuration } from '../../../lib/format';
+import { formatClock, formatDuration, formatSpeed, formatTokens } from '../../../lib/format';
+import type { NodeKind } from '../../../lib/workflow';
 import { portTone } from '../../../lib/workflowRun';
 import { CheckIcon, ChevronRightIcon, CloseIcon, ExternalIcon, SpinnerIcon } from '../../Icons';
 import { Badge } from '../../ui/Badge';
@@ -14,6 +15,20 @@ function portBadgeTone(port: string): 'ok' | 'err' | 'accent' {
   if (tone === 'positive') return 'ok';
   if (tone === 'negative') return 'err';
   return 'accent';
+}
+
+/** The badge's colour by role, following the workflow editor's semantics. */
+function nodeKindTone(kind: NodeKind): string {
+  switch (kind) {
+    case 'agent':
+      return 'border-accent/40 bg-raised text-accent';
+    case 'human':
+      return 'border-accent/40 bg-accent-soft text-accent';
+    case 'criteria':
+      return 'border-ok/40 bg-raised text-ok';
+    default:
+      return 'border-border bg-raised text-muted';
+  }
 }
 
 export function NodeDivider({ item, running }: { item: WorkflowNodeItem; running: boolean }) {
@@ -42,7 +57,9 @@ export function NodeDivider({ item, running }: { item: WorkflowNodeItem; running
       <div className="flex items-center gap-2 text-[0.6875rem] text-muted">
         <span className="h-px grow bg-border" />
         <span className="flex min-w-0 items-center gap-1.5">
-          <span className="shrink-0 rounded border border-border bg-raised px-1.5 text-[0.625rem] uppercase tracking-wide">
+          <span
+            className={`shrink-0 rounded border px-1.5 text-[0.625rem] uppercase tracking-wide ${nodeKindTone(item.nodeKind)}`}
+          >
             {item.nodeKind}
           </span>
           <span className="truncate text-text" title={item.label}>
@@ -60,6 +77,15 @@ export function NodeDivider({ item, running }: { item: WorkflowNodeItem; running
           )}
           {finished && item.durationMs != null && (
             <span className="tabular-nums">{formatDuration(item.durationMs)}</span>
+          )}
+          {finished && item.stats && (
+            <span
+              className="tabular-nums text-muted"
+              title={`Entrée ${item.stats.prefillTokens} tokens · sortie ${item.stats.generationTokens} tokens · ${formatSpeed(item.stats.generationSpeed)}`}
+            >
+              ↑ {formatTokens(item.stats.prefillTokens)} · ↓ {formatTokens(item.stats.generationTokens)} ·{' '}
+              {formatSpeed(item.stats.generationSpeed)}
+            </span>
           )}
           {!finished && running && (
             <span className="flex items-center gap-1 text-accent-strong">
