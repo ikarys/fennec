@@ -17,9 +17,10 @@ use crate::domain::compaction::files_changed;
 use crate::domain::conversation::last_assistant_text;
 use crate::domain::event::{DoneReason, Event};
 use crate::domain::id::new_id;
+use crate::domain::stats::NodeTokens;
 use crate::domain::workflow::definition::{AgentContext, NodeKind, Workflow};
 use crate::domain::workflow::run::{self as run, Next, RunOutcome, RunState, Via};
-use crate::domain::workflow::stats::{RunStats, run_stats};
+use crate::domain::workflow::stats::{RunStats, node_tokens, run_stats};
 use crate::domain::workflow::template::render;
 use crate::domain::workflow::validate;
 use nodes::NodeInput;
@@ -215,6 +216,7 @@ fn start_run(
         exit_code: None,
         comment: None,
         duration_ms: None,
+        stats: None,
     })?;
 
     Ok(Cursor::After {
@@ -317,6 +319,7 @@ fn record_given(
         exit_code: None,
         comment,
         duration_ms: None,
+        stats: None,
     })
 }
 
@@ -351,6 +354,7 @@ fn answer_human(turn: &mut Turn, choice: &str, comment: &str) -> Result<Cursor, 
         exit_code: None,
         comment,
         duration_ms: None,
+        stats: None,
     })?;
 
     Ok(Cursor::After {
@@ -429,6 +433,23 @@ fn stop_run(turn: &mut Turn) -> Result<DoneReason, String> {
     )
 }
 
+/// The index of a node's last start event in the log. The stats of a resumed
+/// node must count the calls made before the interruption, so they are summed
+/// from there, not from the resume.
+fn node_start_index(events: &[Event], node_id: &str) -> usize {
+    events
+        .iter()
+        .rposition(|event| {
+            matches!(
+                event,
+                Event::WorkflowNodeStarted {
+                    node_id: id, ..
+                } if id == node_id
+            )
+        })
+        .unwrap_or(0)
+}
+
 fn agent_input(
     turn: &mut Turn,
     env: &WorkflowEnv,
@@ -454,6 +475,9 @@ fn agent_input(
         return Err("the open node is not a session-context agent node".into());
     };
 
+    // The stats cover the whole pass: from the node's start event, so the
+    // calls made before an interruption are counted with the resumed ones.
+    let started_index = node_start_index(&events, &open.node_id);
     let before = events.len();
     let reason = turn::answer_or_prompt(turn, prompt, attachments)?;
     let events = turn.log.events(turn.session_id)?;
@@ -463,7 +487,14 @@ fn agent_input(
     let end = nodes::agent_end(label, outputs, reason, text, |reminder| {
         session_send(turn, agent, reminder)
     })?;
-    let step = record(turn, &state, &node.id, end, None)?;
+    let step = record(
+        turn,
+        &state,
+        &node.id,
+        end,
+        None,
+        node_tokens(&events[started_index..]),
+    )?;
 
     match step {
         Step::Go(cursor) => walk_from(turn, env, cursor),
@@ -501,6 +532,10 @@ fn run_node(
         _ => None,
     };
     let started = Instant::now();
+    // From the node's last start event, so a resumed node counts the calls
+    // made before the interruption; for a fresh pass it is the start event
+    // appended right after.
+    let started_index = node_start_index(&turn.log.events(turn.session_id)?, node_id);
     append_node_started(turn, state, node_id, pass, &via, child.as_deref())?;
     if let NodeKind::Human { question, .. } = &node.kind {
         let (state, files) = folded_after_start(turn)?;
@@ -545,12 +580,20 @@ fn run_node(
     if verdicts && let nodes::NodeEnd::Finished { output, .. } = &end {
         criteria::record_verdicts(turn, &state, &agent_id, output)?;
     }
+    let stats = match child.as_deref() {
+        Some(child) => env.children.model_tokens(child),
+        None => {
+            let events = turn.log.events(turn.session_id)?;
+            node_tokens(&events[started_index..])
+        }
+    };
     record(
         turn,
         &state,
         node_id,
         end,
         Some(started.elapsed().as_millis() as u64),
+        stats,
     )
 }
 
@@ -614,6 +657,7 @@ fn record(
     node_id: &str,
     end: nodes::NodeEnd,
     duration_ms: Option<u64>,
+    stats: Option<NodeTokens>,
 ) -> Result<Step, String> {
     match end {
         nodes::NodeEnd::Finished {
@@ -629,6 +673,7 @@ fn record(
                 exit_code,
                 comment: None,
                 duration_ms,
+                stats,
             })?;
             Ok(Step::Go(Cursor::After {
                 from: node_id.to_string(),
