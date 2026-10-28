@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ThreadItem } from '../../../lib/fold';
-import { formatClock, formatDuration, formatSpeed, formatTokens } from '../../../lib/format';
+import { formatClock, formatDuration } from '../../../lib/format';
 import type { NodeKind } from '../../../lib/workflow';
 import { portTone } from '../../../lib/workflowRun';
 import { CheckIcon, ChevronRightIcon, CloseIcon, ExternalIcon, SpinnerIcon } from '../../Icons';
+import { useNodeUsage } from '../../session/CallUsage';
 import { Badge } from '../../ui/Badge';
 import { buttonClass } from '../../ui/Button';
 import { SectionLabel } from '../../ui/SectionLabel';
@@ -33,6 +34,7 @@ function nodeKindTone(kind: NodeKind): string {
 
 export function NodeDivider({ item, running }: { item: WorkflowNodeItem; running: boolean }) {
   const finished = item.port !== undefined;
+  const usage = useNodeUsage(item.id);
   const badge = finished ? { port: item.port!, tone: portBadgeTone(item.port!) } : null;
   const hasDetails = Boolean(item.prompt || item.output || item.childSessionId);
   const [open, setOpen] = useState(false);
@@ -78,13 +80,9 @@ export function NodeDivider({ item, running }: { item: WorkflowNodeItem; running
           {finished && item.durationMs != null && (
             <span className="tabular-nums">{formatDuration(item.durationMs)}</span>
           )}
-          {finished && item.stats && (
-            <span
-              className="tabular-nums text-muted"
-              title={`Entrée ${item.stats.prefillTokens} tokens · sortie ${item.stats.generationTokens} tokens · ${formatSpeed(item.stats.generationSpeed)}`}
-            >
-              ↑ {formatTokens(item.stats.prefillTokens)} · ↓ {formatTokens(item.stats.generationTokens)} ·{' '}
-              {formatSpeed(item.stats.generationSpeed)}
+          {finished && usage && (
+            <span className="tabular-nums text-muted" title={usage.detail}>
+              {usage.line}
             </span>
           )}
           {!finished && running && (

@@ -44,21 +44,10 @@ export interface AssistantItem {
   id: string;
   segments: Segment[];
   done: boolean;
-  /** Measured by the server once the message is done. */
-  stats?: MessageStats;
   /** Characters streamed (text and reasoning), for the live estimate. */
   chars: number;
   /** Estimated tokens per second while the message streams. */
   liveSpeed?: number;
-}
-
-/** What the session's model calls cost so far. */
-export interface SessionUsage {
-  calls: number;
-  prefillTokens: number;
-  cachedPromptTokens: number;
-  generationTokens: number;
-  last?: MessageStats;
 }
 
 export interface WorkflowNodeStat {
@@ -68,21 +57,10 @@ export interface WorkflowNodeStat {
   workingMs: number;
 }
 
-/** The model cost of one workflow node run, as the server sums its calls. */
-export interface NodeModelStats {
-  prefillTokens: number;
-  generationTokens: number;
-  generationSpeed: number;
-}
-
 export interface WorkflowStats {
   workingMs: number;
   nodes: WorkflowNodeStat[];
   reruns: number;
-  calls: number;
-  prefillTokens: number;
-  cachedPromptTokens: number;
-  generationTokens: number;
   filesChanged: number;
   criteriaTotal: number;
   criteriaPassed: number;
@@ -95,9 +73,8 @@ export type ThreadItem =
   | { kind: 'mode'; id: string; name: string; color: string }
   | { kind: 'error'; id: string; message: string }
   | { kind: 'note'; id: string; text: string; detail?: string }
-  | { kind: 'turn-recap'; id: string; durationMs: number; generationTokens: number }
-  | { kind: 'workflow-node'; id: string; nodeId: string; label: string; nodeKind: NodeKind; pass: number; port?: string; output?: string; exitCode?: number; childSessionId?: string; prompt?: string; durationMs?: number; stats?: NodeModelStats }
-  | { kind: 'workflow-end'; id: string; outcome: 'done' | 'blocked' | 'stopped' | 'error'; reason?: string; stats?: WorkflowStats };
+  | { kind: 'workflow-node'; id: string; nodeId: string; label: string; nodeKind: NodeKind; pass: number; port?: string; output?: string; exitCode?: number; childSessionId?: string; prompt?: string; durationMs?: number }
+  | { kind: 'workflow-end'; id: string; runId: string; outcome: 'done' | 'blocked' | 'stopped' | 'error'; reason?: string; stats?: WorkflowStats };
 
 export interface ModifiedFile {
   path: string;
@@ -154,7 +131,6 @@ export interface ThreadView {
   pendingQuestion?: PendingQuestion;
   modifiedFiles: ModifiedFile[];
   toolCounts: ToolCount[];
-  usage: SessionUsage;
   /**
    * The last `mode.changed` value, or null when the session detail should
    * provide the server's resolved mode.
@@ -267,10 +243,6 @@ function parseWorkflowStats(value: unknown): WorkflowStats | undefined {
     workingMs: isFiniteNumber(stats.workingMs) ? stats.workingMs : 0,
     nodes,
     reruns: isFiniteNumber(stats.reruns) ? stats.reruns : 0,
-    calls: isFiniteNumber(stats.calls) ? stats.calls : 0,
-    prefillTokens: isFiniteNumber(stats.prefillTokens) ? stats.prefillTokens : 0,
-    cachedPromptTokens: isFiniteNumber(stats.cachedPromptTokens) ? stats.cachedPromptTokens : 0,
-    generationTokens: isFiniteNumber(stats.generationTokens) ? stats.generationTokens : 0,
     filesChanged: isFiniteNumber(stats.filesChanged) ? stats.filesChanged : 0,
     criteriaTotal: isFiniteNumber(stats.criteriaTotal) ? stats.criteriaTotal : 0,
     criteriaPassed: isFiniteNumber(stats.criteriaPassed) ? stats.criteriaPassed : 0,
@@ -342,7 +314,6 @@ export function createThreadFold(): ThreadFold {
   const toolCounts = new Map<string, number>();
   const assistants = new Map<string, AssistantItem>();
   const tools = new Map<string, ToolCallView>();
-  const usage: SessionUsage = { calls: 0, prefillTokens: 0, cachedPromptTokens: 0, generationTokens: 0 };
   let tokensPerChar = DEFAULT_TOKENS_PER_CHAR;
   // Calibrated over the whole session: one message's ratio swings from 0.24 to
   // 0.67 (tool calls carry template tokens no text shows), which put the live
@@ -352,7 +323,6 @@ export function createThreadFold(): ThreadFold {
   let samples: [number, number][] = [];
   let index = 0;
   // Tokens generated since the last `chat.done`, for the turn recap.
-  let turnTokens = 0;
   // Null means "no live change yet": the session detail owns the mode.
   let mode: string | null = null;
   let criteria: CriterionView[] = [];
@@ -477,13 +447,6 @@ export function createThreadFold(): ThreadFold {
         assistant.liveSpeed = undefined;
         const stats = data.stats as MessageStats | undefined;
         if (!stats) break;
-        assistant.stats = stats;
-        turnTokens += stats.generationTokens;
-        usage.calls += 1;
-        usage.prefillTokens += stats.prefillTokens;
-        usage.cachedPromptTokens += stats.cachedPromptTokens;
-        usage.generationTokens += stats.generationTokens;
-        usage.last = stats;
         if (assistant.chars > 200 && stats.generationTokens > 0) {
           calibration.tokens += stats.generationTokens;
           calibration.chars += assistant.chars;
@@ -677,11 +640,6 @@ export function createThreadFold(): ThreadFold {
             reason === 'stopped' ? 'Arrêtée' : reason === 'truncated' ? 'Tronquée' : reason === 'error' ? 'Erreur' : 'Terminée';
           pushItem({ kind: 'note', id: `done-${index}`, text });
         }
-        const durationMs = Number(data.durationMs);
-        if (durationMs > 0 && turnTokens > 0) {
-          pushItem({ kind: 'turn-recap', id: `recap-${index}`, durationMs, generationTokens: turnTokens });
-        }
-        turnTokens = 0;
         break;
       }
 
@@ -808,14 +766,6 @@ export function createThreadFold(): ThreadFold {
           if (typeof data.durationMs === 'number') {
             item.durationMs = data.durationMs;
           }
-          if (typeof data.stats === 'object' && data.stats !== null) {
-            const stats = data.stats as Record<string, unknown>;
-            item.stats = {
-              prefillTokens: isFiniteNumber(stats.prefillTokens) ? stats.prefillTokens : 0,
-              generationTokens: isFiniteNumber(stats.generationTokens) ? stats.generationTokens : 0,
-              generationSpeed: isFiniteNumber(stats.generationSpeed) ? stats.generationSpeed : 0
-            };
-          }
           openWorkflowItems.delete(`${runId}:${nodeId}`);
         }
         break;
@@ -826,6 +776,7 @@ export function createThreadFold(): ThreadFold {
         pushItem({
           kind: 'workflow-end',
           id: `workflow-finished-${index}`,
+          runId: String(data.runId ?? ''),
           outcome,
           reason: typeof data.reason === 'string' ? data.reason : undefined,
           stats: parseWorkflowStats(data.stats)
@@ -853,7 +804,6 @@ export function createThreadFold(): ThreadFold {
     pendingQuestion,
     modifiedFiles: Array.from(modified.values()),
     toolCounts: Array.from(toolCounts.entries()).map(([name, count]) => ({ name, count })),
-    usage: { ...usage },
     mode,
     name,
     run: runFold.view()

@@ -428,32 +428,40 @@ fn finish(
     Ok(reason)
 }
 
+/// A fresh agent node in its child session, marked running like a human's
+/// turn (the child's page shows "terminé" whenever the last `running.changed`
+/// is false). Not for a session-context node: the walk already holds the
+/// session's mark, and a nested one would clear it mid-run.
+pub fn run_child_agent_node(
+    turn: &mut Turn,
+    agent_id: &str,
+    prompt: &str,
+) -> Result<DoneReason, String> {
+    with_running(turn, |turn| run_agent_node(turn, agent_id, prompt))
+}
+
 /// Runs `agent` on `prompt` in this session, as a workflow node: switches
 /// the mode when needed (as the human would), injects the agent's reminder,
 /// appends the prompt as a system-generated user message, runs the loop.
 pub fn run_agent_node(turn: &mut Turn, agent_id: &str, prompt: &str) -> Result<DoneReason, String> {
-    // Marked running like a human's turn: the child session's page shows
-    // "terminé" whenever the last `running.changed` is false.
-    with_running(turn, |turn| {
-        let events = turn.log.events(turn.session_id)?;
-        let agent = turn
-            .agents
-            .iter()
-            .find(|a| a.id == agent_id)
-            .ok_or_else(|| format!("unknown agent: {agent_id}"))?;
+    let events = turn.log.events(turn.session_id)?;
+    let agent = turn
+        .agents
+        .iter()
+        .find(|a| a.id == agent_id)
+        .ok_or_else(|| format!("unknown agent: {agent_id}"))?;
 
-        if resolve(turn.agents, &events).is_none_or(|a| a.id != agent_id) {
-            turn.append(Event::ModeChanged {
-                mode: agent_id.to_string(),
-                auto: true,
-                reason: Some("workflow".into()),
-            })?;
-        }
+    if resolve(turn.agents, &events).is_none_or(|a| a.id != agent_id) {
+        turn.append(Event::ModeChanged {
+            mode: agent_id.to_string(),
+            auto: true,
+            reason: Some("workflow".into()),
+        })?;
+    }
 
-        ensure_agent_reminder(turn, agent)?;
-        turn.append_user(prompt, true, None, Vec::new())?;
-        run_top_level_agent_loop(turn, agent)
-    })
+    ensure_agent_reminder(turn, agent)?;
+    turn.append_user(prompt, true, None, Vec::new())?;
+    run_top_level_agent_loop(turn, agent)
 }
 
 #[cfg(test)]
