@@ -1,0 +1,17 @@
+{
+  "id": "quick",
+  "name": "Quick build",
+  "description": "Build the task in this session's tree and stop; no plan, no criteria, no review. For small changes where a full build round is overkill.",
+  "maxSteps": 50,
+  "nodes": [
+    { "id": "start", "kind": "start", "position": { "x": 0, "y": 0 } },
+    { "id": "build", "kind": "agent", "name": "Build", "agent": "builder",
+      "prompt": "{{task}}\n\nThen end with the report.",
+      "position": { "x": 0, "y": 140 } },
+    { "id": "done", "kind": "end", "outcome": "done", "position": { "x": 0, "y": 280 } }
+  ],
+  "edges": [
+    { "from": "start", "port": "next", "to": "build" },
+    { "from": "build", "port": "done", "to": "done" }
+  ]
+}
