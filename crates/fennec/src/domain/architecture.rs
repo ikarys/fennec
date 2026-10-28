@@ -1,6 +1,8 @@
 //! Architecture rules from `.agents/architecture`: the human declares what a
 //! path may not contain. Fennec checks only the lines an integration adds,
-//! so debt already in the file never blocks the check.
+//! so debt already in the file never blocks the check. Rules match text, not
+//! syntax (`use crate::{web}` or a `super::` path slips past them), so the
+//! check is a tripwire shown to the human, not a proof.
 
 /// One `<path prefix> forbids <text>` rule.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -55,15 +57,18 @@ impl Rules {
     /// Check the added lines of `path` against every rule.
     ///
     /// A rule applies when `path` starts with its prefix. An added line is
-    /// checked after trimming and ignored when it is a comment (`//` or `#`).
-    /// Violations are emitted in added-line order, then rule order, so the
-    /// output is deterministic for the same input.
+    /// checked after trimming and ignored when it is a comment (`//` or `#`,
+    /// but not Rust attributes `#[` and `#![`). Violations are emitted in
+    /// added-line order, then rule order, so the output is deterministic for
+    /// the same input.
     pub fn check(&self, path: &str, added: &[String]) -> Vec<Violation> {
         let mut violations = Vec::new();
 
         for line in added {
             let line = line.trim();
-            if line.starts_with("//") || line.starts_with('#') {
+            if line.starts_with("//")
+                || (line.starts_with('#') && !line.starts_with("#[") && !line.starts_with("#!["))
+            {
                 continue;
             }
 
@@ -93,22 +98,31 @@ pub struct Violation {
     pub forbidden: String,
 }
 
-/// Extract the added lines from a unified diff of one file.
+/// Extract the added lines from a unified diff, which may contain several
+/// files.
 ///
-/// Only lines that start with a single `+` are added lines; the `+++` file
-/// header, context lines and removed lines are ignored. The leading `+` is
-/// removed, so a blank added line becomes an empty string.
+/// Lines before the first `@@` of a file are headers; a `diff --git ` line
+/// starts a new file's header again. Inside a hunk, a line starting with `+`
+/// is an added line with that one `+` removed, so `++i;` yields `+i;`.
 pub fn added_lines(diff: &str) -> Vec<String> {
-    diff.lines()
-        .filter_map(|line| {
-            let line = line.strip_prefix('+')?;
-            if line.starts_with('+') {
-                None
-            } else {
-                Some(line.to_string())
-            }
-        })
-        .collect()
+    let mut added = Vec::new();
+    let mut in_hunk = false;
+
+    for line in diff.lines() {
+        if line.starts_with("diff --git ") {
+            in_hunk = false;
+            continue;
+        }
+        if line.starts_with("@@") {
+            in_hunk = true;
+            continue;
+        }
+        if in_hunk && line.starts_with('+') {
+            added.push(line[1..].to_string());
+        }
+    }
+
+    added
 }
 
 #[cfg(test)]
@@ -162,6 +176,16 @@ mod tests {
     }
 
     #[test]
+    fn rust_attributes_are_not_skipped_as_comments() {
+        let rules = Rules::parse("src/ forbids crate::web");
+        let added = vec![String::from("#[allow(unused)] use crate::web::x;")];
+
+        let violations = rules.check("src/a.rs", &added);
+        assert_eq!(violations.len(), 1);
+        assert_eq!(violations[0].line, "#[allow(unused)] use crate::web::x;");
+    }
+
+    #[test]
     fn added_lines_ignores_headers_context_and_removed_lines() {
         let diff = "+++ b/src/a.rs
 @@ -1,2 +1,3 @@
@@ -169,9 +193,25 @@ mod tests {
 +added one
 -removed
 +
-++not_added
+++kept
 ";
-        assert_eq!(added_lines(diff), vec!["added one", ""]);
+        assert_eq!(added_lines(diff), vec!["added one", "", "+kept"]);
+    }
+
+    #[test]
+    fn added_lines_handles_several_files_in_one_diff() {
+        let diff = "diff --git a/x b/x
+--- a/x
++++ b/x
+@@ -1 +1 @@
++one
+diff --git a/y b/y
+--- a/y
++++ b/y
+@@ -1 +1 @@
++two
+";
+        assert_eq!(added_lines(diff), vec!["one", "two"]);
     }
 
     #[test]

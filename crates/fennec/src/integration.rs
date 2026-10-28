@@ -60,14 +60,22 @@ pub fn preview(top: &Path, wt: &Worktree) -> Result<Preview, String> {
         })
         .collect();
 
-    let files = git(top, &["diff", "--name-only", &wt.base, &wt.branch], None)?;
+    let files = git(
+        top,
+        &["diff", "--name-only", "--no-renames", &wt.base, &wt.branch],
+        None,
+    )?;
     let files = String::from_utf8_lossy(&files)
         .lines()
         .filter(|line| !line.is_empty())
         .map(String::from)
         .collect();
 
-    let numstat = git(top, &["diff", "--numstat", &wt.base, &wt.branch], None)?;
+    let numstat = git(
+        top,
+        &["diff", "--numstat", "--no-renames", &wt.base, &wt.branch],
+        None,
+    )?;
     let counts = parse_numstat(&String::from_utf8_lossy(&numstat));
 
     Ok(Preview {
@@ -114,6 +122,17 @@ pub fn protected_touched(files: &[String], prefix: &str, protection: &Protection
 fn sequencer_dir(top: &Path) -> PathBuf {
     let out = git(top, &["rev-parse", "--git-path", "sequencer"], None).unwrap_or_default();
     top.join(String::from_utf8_lossy(&out).trim())
+}
+
+/// Puts the human's repository back as it was before the pick: the index was
+/// clean (checked first), so what is staged is the pick's; `reset --merge`
+/// keeps the human's unstaged edits. A single commit leaves no sequencer,
+/// hence the fallback.
+fn undo_pick(top: &Path) {
+    if git(top, &["cherry-pick", "--abort"], None).is_err() {
+        let _ = git(top, &["reset", "-q", "--merge"], None);
+        let _ = git(top, &["cherry-pick", "--quit"], None);
+    }
 }
 
 /// Stages the agent's changes and commits them as one commit on the human's
@@ -163,18 +182,12 @@ pub fn apply(top: &Path, wt: &Worktree, message: &str) -> Result<String, ApplyEr
             })
             .unwrap_or_default();
         if !files.is_empty() {
-            // A range leaves a sequencer to abort; a single commit does not.
-            // `reset --merge` only undoes what the cherry-pick staged: the
-            // index was clean before it.
-            if git(top, &["cherry-pick", "--abort"], None).is_err() {
-                let _ = git(top, &["reset", "-q", "--merge"], None);
-            }
+            undo_pick(top);
             return Err(ApplyError::Conflict { files, command });
         }
-        // Git refused before changing anything (e.g. an unstaged edit it would
-        // overwrite) but may keep its sequencer, which blocks every later try.
-        // `--quit` forgets it and leaves the tree and index alone.
-        let _ = git(top, &["cherry-pick", "--quit"], None);
+        // Git refused (e.g. an unstaged edit it would overwrite); a range may
+        // have staged earlier commits, so undo the pick.
+        undo_pick(top);
         return Err(ApplyError::Git {
             message: format!("{message}\nresolve it by hand: {command}"),
         });
@@ -283,6 +296,23 @@ mod tests {
     }
 
     #[test]
+    fn preview_counts_a_renamed_file_under_its_new_path() {
+        let (base, repo) = setup();
+        let wt = open(&base.join("wt"), &repo, "s1").unwrap().unwrap();
+        std::fs::rename(wt.workdir.join("a.txt"), wt.workdir.join("c.txt")).unwrap();
+        assert_eq!(commit(&wt, "rename"), Ok(true));
+
+        let top = top(&repo).unwrap().0;
+        let p = preview(&top, &wt).unwrap();
+
+        assert!(p.files.contains(&"a.txt".to_string()));
+        assert!(p.files.contains(&"c.txt".to_string()));
+        assert_eq!(p.counts["c.txt"], (1, 0));
+        assert_eq!(p.counts["a.txt"], (0, 1));
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
     fn apply_brings_the_commits_onto_the_human_branch_and_moves_the_base() {
         let (base, repo) = setup();
         let wt = open(&base.join("wt"), &repo, "s1").unwrap().unwrap();
@@ -377,6 +407,34 @@ mod tests {
             apply(&top, &wt, "integrate"),
             Err(ApplyError::Git { message }) if !message.contains("already in progress")
         ));
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn a_range_refused_midway_leaves_the_human_tree_unchanged() {
+        let (base, repo) = setup();
+        let wt = open(&base.join("wt"), &repo, "s1").unwrap().unwrap();
+        std::fs::write(wt.workdir.join("b.txt"), "b\n").unwrap();
+        assert_eq!(commit(&wt, "first"), Ok(true));
+        std::fs::write(wt.workdir.join("a.txt"), "agent\n").unwrap();
+        assert_eq!(commit(&wt, "second"), Ok(true));
+
+        std::fs::write(repo.join("a.txt"), "human\n").unwrap();
+
+        let top = top(&repo).unwrap().0;
+        let before_head = text(&repo, &["rev-parse", "HEAD"]);
+        let Err(ApplyError::Git { .. }) = apply(&top, &wt, "integrate") else {
+            panic!("expected git to refuse");
+        };
+
+        assert_eq!(text(&repo, &["rev-parse", "HEAD"]), before_head);
+        assert!(!repo.join("b.txt").exists());
+        assert!(git(&repo, &["diff", "--cached", "--quiet"], None).is_ok());
+        assert_eq!(
+            std::fs::read_to_string(repo.join("a.txt")).unwrap(),
+            "human\n"
+        );
+        assert!(!sequencer_dir(&top).exists());
         let _ = std::fs::remove_dir_all(&base);
     }
 
