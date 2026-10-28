@@ -19,6 +19,9 @@ pub enum Blocker {
     /// The human's checked-out branch is not the one the run started from
     /// (`to` None: a detached HEAD); the commits would land elsewhere.
     BranchChanged { from: String, to: Option<String> },
+    /// Uncommitted changes in the human's tree that the cherry-pick would
+    /// overwrite; git would refuse the pick.
+    LocalChanges { paths: Vec<String> },
     /// The run's criteria that did not pass (failed or still pending); ids.
     CriteriaNotPassed { criteria: Vec<String> },
     /// The run has no criteria at all: nothing was checked.
@@ -36,6 +39,7 @@ impl Blocker {
         match self {
             Blocker::NoCommits => "noCommits",
             Blocker::BranchChanged { .. } => "branchChanged",
+            Blocker::LocalChanges { .. } => "localChanges",
             Blocker::CriteriaNotPassed { .. } => "criteriaNotPassed",
             Blocker::NoCriteria => "noCriteria",
             Blocker::ProtectedTouched { .. } => "protectedTouched",
@@ -45,8 +49,8 @@ impl Blocker {
 }
 
 /// The blockers of an integration, in the order the UI shows them:
-/// `NoCommits` first, then the branch, then the criteria, then the protected
-/// files, then the architecture rules.
+/// `NoCommits` first, then the branch, then the human's uncommitted changes,
+/// then the criteria, then the protected files, then the architecture rules.
 pub fn blockers(
     commits: usize,
     criteria: &[CriterionState],
@@ -54,6 +58,7 @@ pub fn blockers(
     violations: &[Violation],
     origin_branch: Option<&str>,
     human_branch: Option<&str>,
+    local_changes: &[String],
 ) -> Vec<Blocker> {
     let mut out = Vec::new();
 
@@ -67,6 +72,12 @@ pub fn blockers(
         out.push(Blocker::BranchChanged {
             from: origin.to_string(),
             to: human_branch.map(str::to_string),
+        });
+    }
+
+    if !local_changes.is_empty() {
+        out.push(Blocker::LocalChanges {
+            paths: local_changes.to_vec(),
         });
     }
 
@@ -189,6 +200,13 @@ mod tests {
             "branchChanged"
         );
         assert_eq!(
+            Blocker::LocalChanges {
+                paths: vec!["a.rs".into()]
+            }
+            .key(),
+            "localChanges"
+        );
+        assert_eq!(
             Blocker::ProtectedTouched {
                 paths: vec!["AGENTS.md".into()]
             }
@@ -205,7 +223,15 @@ mod tests {
             prefix: "".into(),
             forbidden: "std::fs".into(),
         };
-        let found = blockers(1, &[], &[], std::slice::from_ref(&violation), None, None);
+        let found = blockers(
+            1,
+            &[],
+            &[],
+            std::slice::from_ref(&violation),
+            None,
+            None,
+            &[],
+        );
         assert_eq!(
             found,
             vec![
@@ -222,7 +248,7 @@ mod tests {
         let criteria = vec![state("C1", verified_failed())];
         let protected = vec!["AGENTS.md".to_string()];
 
-        let blockers = blockers(0, &criteria, &protected, &[], None, None);
+        let blockers = blockers(0, &criteria, &protected, &[], None, None, &[]);
 
         assert_eq!(
             blockers,
@@ -241,9 +267,48 @@ mod tests {
     #[test]
     fn no_criteria_is_a_blocker() {
         assert_eq!(
-            blockers(1, &[], &[], &[], None, None),
+            blockers(1, &[], &[], &[], None, None, &[]),
             vec![Blocker::NoCriteria]
         );
+    }
+
+    #[test]
+    fn uncommitted_changes_block_after_the_branch_and_before_the_criteria() {
+        let local = vec!["a.rs".to_string()];
+        let criteria = vec![state("C1", verified_failed())];
+
+        let found = blockers(1, &criteria, &[], &[], Some("main"), Some("main"), &local);
+        assert_eq!(
+            found,
+            vec![
+                Blocker::LocalChanges {
+                    paths: vec!["a.rs".to_string()]
+                },
+                Blocker::CriteriaNotPassed {
+                    criteria: vec!["C1".to_string()]
+                },
+            ]
+        );
+
+        let found = blockers(1, &[], &[], &[], Some("main"), Some("feature"), &local);
+        assert_eq!(
+            found[0],
+            Blocker::BranchChanged {
+                from: "main".into(),
+                to: Some("feature".into())
+            }
+        );
+        assert_eq!(found[1], Blocker::LocalChanges { paths: local });
+    }
+
+    #[test]
+    fn an_acknowledged_local_changes_blocker_is_dropped() {
+        let blockers = vec![Blocker::LocalChanges {
+            paths: vec!["a.rs".to_string()],
+        }];
+
+        assert!(unacknowledged(&blockers, &["localChanges".to_string()]).is_empty());
+        assert_eq!(unacknowledged(&blockers, &[]).len(), 1);
     }
 
     #[test]
@@ -253,7 +318,7 @@ mod tests {
             state("C2", verified_failed()),
         ];
 
-        let blockers = blockers(1, &criteria, &[], &[], None, None);
+        let blockers = blockers(1, &criteria, &[], &[], None, None, &[]);
 
         assert_eq!(
             blockers,
@@ -265,7 +330,7 @@ mod tests {
 
     /// The branch blocker alone: the other blockers are tested above.
     fn branch_blocker(origin: Option<&str>, human: Option<&str>) -> Option<Blocker> {
-        blockers(1, &[], &[], &[], origin, human)
+        blockers(1, &[], &[], &[], origin, human, &[])
             .into_iter()
             .find(|blocker| matches!(blocker, Blocker::BranchChanged { .. }))
     }
