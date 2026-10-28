@@ -22,6 +22,7 @@ use super::compaction::{self, Compacted};
 use super::ports::{EventLog, Model, Toolbox};
 use super::prompt::system_prompt;
 use super::propose_criteria;
+use super::record_decision;
 use super::round::{self, Round, RoundPrompt};
 use super::tool_calls::{Flow, INTERRUPTED_ERROR, execute_tools};
 use crate::domain::agent::{AgentDefinition, DEFAULT_COLOR, last_reminder, resolve};
@@ -204,12 +205,13 @@ pub(super) fn with_running(
 /// so the loop and a manual compaction use an identical cached prefix.
 fn round_prompt_parts(turn: &mut Turn) -> Result<(String, Value), String> {
     let system_prompt = cached_system_prompt(turn)?;
-    // The loop owns `ask_user` and `propose_criteria`; they are not host
+    // The loop owns `ask_user`, `propose_criteria` and `record_decision`; they are not host
     // tools, so their definitions are added to the toolbox's.
     let mut tool_defs = turn.tools.definitions();
     if let Some(arr) = tool_defs.as_array_mut() {
         arr.push(ask_user::definition());
         arr.push(propose_criteria::definition());
+        arr.push(record_decision::definition());
     }
     Ok((system_prompt, tool_defs))
 }
@@ -874,6 +876,29 @@ mod tests {
                 .any(|e| matches!(e, Event::CriteriaSet { .. }))
         );
         assert!(events.iter().any(|e| matches!(e, Event::ToolResult { tool_call_id, result, .. } if tool_call_id == "c1" && result.output.as_deref() == Some("Refuse"))));
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn record_decision_is_logged_and_the_turn_goes_on() {
+        let dir = scratch_dir();
+        let call = ToolCall {
+            id: "d1".into(),
+            name: "record_decision".into(),
+            arguments: json!({"title":"Storage","choice":"SQLite","reason":"one file","alternatives":["Postgres"]}),
+            parse_error: None,
+        };
+        let model = Scripted(RefCell::new(vec![
+            reply("", vec![call]),
+            reply("done", vec![]),
+        ]));
+        let stop = AtomicBool::new(false);
+        let mut h = Harness::new(Box::new(model), dir.clone(), &stop);
+        let reason = run_turn(&mut h.turn(), "go", &[]).unwrap();
+        assert_eq!(reason, DoneReason::Complete);
+        let events = h.log.0.borrow().clone();
+        assert!(events.iter().any(|e| matches!(e, Event::DecisionRecorded { call_id, title, .. } if call_id == "d1" && title == "Storage")));
+        assert!(events.iter().any(|e| matches!(e, Event::ToolResult { tool_call_id, result, .. } if tool_call_id == "d1" && result.output.as_deref() == Some("Decision recorded."))));
         std::fs::remove_dir_all(dir).ok();
     }
 
