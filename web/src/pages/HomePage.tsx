@@ -105,9 +105,12 @@ export function HomePage({ projects, loading, error, onOpenProjectDialog, onNewS
                       className="grid w-full grid-cols-[minmax(0,1fr)_auto_5.5rem] items-center gap-3 border-t border-border px-4 py-2 text-left first:border-t-0 hover:bg-raised"
                     >
                       <span className="min-w-0 truncate font-medium">{session.title}</span>
-                      <Badge tone={tone} dot={dot} pulse={pulse}>
-                        {label}
-                      </Badge>
+                      <span className="flex items-center gap-1.5">
+                        {session.awaitingIntegration && <Badge tone="accent">à intégrer</Badge>}
+                        <Badge tone={tone} dot={dot} pulse={pulse}>
+                          {label}
+                        </Badge>
+                      </span>
                       <span className="text-right text-xs text-faint tabular-nums">{formatRelative(session.updatedAt)}</span>
                     </button>
                   );
