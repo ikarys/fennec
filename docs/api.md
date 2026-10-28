@@ -226,6 +226,12 @@ read-only. The human edits them as usual.
 - `GET /api/sessions/{id}/usage/workflow` → `{nodes: [{itemId, line, detail}], runs: [{runId, calls, generated, read, cache}]}`: the
   tokens of each workflow node run (`itemId` is `wf-{runId}-{nodeId}-{pass}`, its child session's calls or the
   session's own between its start and end) and of each finished run, from the ledger, ready to display.
+- `GET /api/insight?days=<7|30|90|all>&project=<id>` → `{scope, cards: [{label, value, detail}], days: [{day, label,
+  cachedPercent, freshPercent, lostPercent, title}], projects: [row], models: [row], projectOptions: [{id, name}]}`,
+  `row` being `{key, name, calls, input, cache, output, lost, time}`: the Insight page from the ledger, so deleted
+  sessions still count; `days` defaults to 30 (400 otherwise), `project` is optional (`projects` is then empty); bar
+  percentages are against the busiest day's input. A lost cache is a call that re-read more than 1,000 tokens of
+  its session's previous prompt without that prompt having shrunk (a compaction or a replay is not a loss).
 - `POST /api/sessions` `{projectId, prompt, mode?, attachments?}` → `{id}`;
   the turn starts at once; `mode` is optional, validated against the
   project's agents before the session is created (400 if unknown) and applied
