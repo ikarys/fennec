@@ -6,6 +6,7 @@ import { TopBar, type TabInfo } from './components/layout/TopBar';
 import { HomePage } from './pages/HomePage';
 import { SessionPage } from './pages/SessionPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { InsightPage } from './pages/InsightPage';
 import { Palette } from './components/Palette';
 import { ProjectDialog } from './components/project/ProjectDialog';
 import { DisplayPrefsProvider, defaultDisplayPrefs } from './lib/display';
@@ -17,6 +18,7 @@ type Route =
   | { name: 'session'; id: string }
   | { name: 'new'; id: string; testWorkflowId: string | null }
   | { name: 'settings' }
+  | { name: 'insight' }
   | { name: 'workflows'; projectId: string | null; workflowId: string | null; isNew: boolean };
 
 const TABS_KEY = 'fennec.tabs';
@@ -26,6 +28,9 @@ function parseRoute(): Route {
   const hash = window.location.hash;
   if (hash === '#/settings') {
     return { name: 'settings' };
+  }
+  if (hash === '#/insight') {
+    return { name: 'insight' };
   }
   if (hash.startsWith('#/workflows')) {
     const path = hash.slice(12); // Remove '#/workflows'
@@ -343,6 +348,8 @@ export default function App() {
                 isNew={route.isNew}
               />
             </Suspense>
+          ) : route.name === 'insight' ? (
+            <InsightPage />
           ) : (
             <SessionPage
               sessionId={route.name === 'session' ? route.id : null}
