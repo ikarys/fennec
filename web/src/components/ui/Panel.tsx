@@ -4,7 +4,7 @@
  * remembered per block in localStorage.
  */
 import { useState, type ReactNode } from 'react';
-import { ChevronRightIcon, PinIcon } from '../Icons';
+import { ChevronRightIcon } from '../Icons';
 import { SectionLabel } from './SectionLabel';
 
 function storageKey(id: string): string {
@@ -32,12 +32,11 @@ export interface PanelProps {
   id: string;
   title: ReactNode;
   summary?: ReactNode;
-  pinned?: boolean;
   defaultOpen?: boolean;
   children: ReactNode;
 }
 
-export function Panel({ id, title, summary, pinned = false, defaultOpen = true, children }: PanelProps) {
+export function Panel({ id, title, summary, defaultOpen = true, children }: PanelProps) {
   const [open, setOpen] = useState(() => loadOpen(id, defaultOpen));
 
   return (
@@ -55,11 +54,6 @@ export function Panel({ id, title, summary, pinned = false, defaultOpen = true, 
         <SectionLabel>{title}</SectionLabel>
         <span className="ml-auto flex items-center gap-1.5 text-xs text-muted tabular-nums">
           {summary}
-          {pinned && (
-            <span title="Toujours affiché" aria-label="Toujours affiché">
-              <PinIcon className="h-3 w-3" />
-            </span>
-          )}
         </span>
       </summary>
       <div className="flex flex-col gap-1.5 border-t border-border px-3 py-2.5">{children}</div>
