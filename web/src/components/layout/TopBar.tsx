@@ -3,6 +3,26 @@ import { stateDotClass } from '../../lib/format';
 import { CloseIcon, FoxIcon, PlusIcon, SearchIcon, SettingsIcon } from '../Icons';
 import { Button, buttonClass } from '../ui/Button';
 
+function InsightIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M3 3v18h18" />
+      <path d="M8 17v-5" />
+      <path d="M13 17v-9" />
+      <path d="M18 17v-3" />
+    </svg>
+  );
+}
+
 function WorkflowsIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -119,6 +139,14 @@ export function TopBar({
           <kbd className="rounded-md border border-border px-1.5 py-px text-[0.6875rem] text-muted">⌘K</kbd>
         </button>
 
+        <a
+          href="#/insight"
+          title="Insight"
+          aria-label="Insight"
+          className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
+        >
+          <InsightIcon className="h-4 w-4" />
+        </a>
         <a
           href="#/workflows"
           title="Workflows"
