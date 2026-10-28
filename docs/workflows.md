@@ -131,7 +131,12 @@ goes on.
 node's latest output: each bullet is a criterion (`C1`, `C2`…), and one that
 ends with `— check: \`<command>\`` carries a check. When the list differs
 from the run's current criteria, it records it (`criteria.set`): the plan the
-human approved is the contract, and no tool lets a model change it. Then it
+human approved is the contract, and no tool lets a model change it. A check
+is part of that contract: it must hold for any correct implementation of the
+work, not one implementation, and it must run in the sandbox (the main
+repository is read-only). A builder that cannot pass a check for those
+reasons proposes a corrected list (`propose_criteria`); the human decides.
+The node then
 runs each check itself, as a shell node does (in the sandbox), and records
 the result (`criterion.updated`) as **verified**. The node takes `pass` when
 every checked criterion passed; criteria without a check do not count here.
