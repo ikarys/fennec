@@ -3,11 +3,11 @@
 
 use super::event::Event;
 
-// Nothing on the server reads decisions back yet: the UI folds the same
-// events (web/src/lib/fold.ts). The Rust fold is the reference for the first
-// server-side reader (review gate, compaction facts).
-#[allow(dead_code)]
-#[derive(Debug, Clone, PartialEq, Eq)]
+use serde::Serialize;
+
+/// The wire shape matches the UI's `DecisionView` (web/src/lib/fold.ts).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Decision {
     pub call_id: String,
     pub title: String,
@@ -18,7 +18,6 @@ pub struct Decision {
 
 /// Every decision recorded in the log, in order. None is ever superseded:
 /// a later decision that reverses an earlier one is a decision of its own.
-#[allow(dead_code)]
 pub fn decisions_in_force(events: &[Event]) -> Vec<Decision> {
     events
         .iter()
@@ -67,6 +66,18 @@ mod tests {
             .map(|d| d.title)
             .collect();
         assert_eq!(titles, ["first", "second"]);
+    }
+
+    #[test]
+    fn serializes_to_the_payload_the_review_gate_sends() {
+        let value = serde_json::to_value(decisions_in_force(&[recorded("c1", "t")])).unwrap();
+        assert_eq!(
+            value,
+            serde_json::json!([{
+                "callId": "c1", "title": "t", "choice": "c",
+                "reason": "r", "alternatives": ["a"]
+            }])
+        );
     }
 
     #[test]
