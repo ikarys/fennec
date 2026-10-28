@@ -115,9 +115,32 @@ export interface Preferences {
   sandbox?: SandboxPrefs;
 }
 
+/** Where a resolved parameter value comes from. */
+export type ParamSource = 'perModel' | 'listed' | 'default';
+
+/** One resolved parameter: its value, source, and whether a call sends it. */
+export interface ResolvedValue<T> {
+  value: T;
+  source: ParamSource;
+  wire: boolean;
+}
+
+/** What a model's turn runs with, display-ready (the UI computes none). */
+export interface ResolvedParams {
+  maxTokens: ResolvedValue<number>;
+  contextWindow: ResolvedValue<number>;
+  compactAt: ResolvedValue<number>;
+  reasoningEffort: {
+    value: ReasoningEffort | null;
+    source: ParamSource;
+    wire: boolean;
+  };
+}
+
 export interface SettingsModel {
   id: string;
   contextWindow: number | null;
+  resolved: ResolvedParams;
 }
 
 /** What one provider lists now, with the URL it is reached at. */
@@ -266,6 +289,18 @@ export function saveSettings(preferences: Preferences): Promise<SettingsResponse
   return request<SettingsResponse>('/api/settings', {
     method: 'POST',
     body: JSON.stringify(preferences)
+  });
+}
+
+/** Re-list one provider's models now (its baseUrl/key may not be stored yet). */
+export function listProvider(body: {
+  provider: string;
+  baseUrl: string;
+  apiKey: ApiKey | null;
+}): Promise<ProviderListing> {
+  return request<ProviderListing>('/api/settings/providers/list', {
+    method: 'POST',
+    body: JSON.stringify(body)
   });
 }
 

@@ -20,6 +20,7 @@ interface ProvidersSectionProps {
   onChange: (index: number, patch: Partial<ProviderForm>) => void;
   onAdd: (provider: ProviderForm) => void;
   onRemove: (index: number) => void;
+  onFetch: (provider: ProviderForm) => Promise<void>;
 }
 
 interface ProviderDraft {
@@ -30,8 +31,16 @@ interface ProviderDraft {
 
 const emptyDraft: ProviderDraft = { id: '', name: '', baseUrl: '' };
 
-export function ProvidersSection({ providers, listings, onChange, onAdd, onRemove }: ProvidersSectionProps) {
+export function ProvidersSection({
+  providers,
+  listings,
+  onChange,
+  onAdd,
+  onRemove,
+  onFetch
+}: ProvidersSectionProps) {
   const [draft, setDraft] = useState<ProviderDraft>(emptyDraft);
+  const [fetchingId, setFetchingId] = useState<string | null>(null);
   const draftId = draft.id.trim();
   const draftDisabled =
     draftId === '' || draftId.includes('/') || providers.some((provider) => provider.id === draftId);
@@ -63,8 +72,26 @@ export function ProvidersSection({ providers, listings, onChange, onAdd, onRemov
             <div key={provider.id} className="flex flex-col gap-4 border-t border-border pt-4">
               <div className="flex items-center gap-3">
                 <h3 className="font-mono text-sm font-medium">{provider.name || provider.id}</h3>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="ml-auto"
+                  disabled={fetchingId === provider.id}
+                  onClick={async () => {
+                    setFetchingId(provider.id);
+                    try {
+                      await onFetch(provider);
+                    } catch {
+                      // A failed fetch leaves the listing as it was.
+                    } finally {
+                      setFetchingId(null);
+                    }
+                  }}
+                >
+                  {fetchingId === provider.id ? 'Récupération…' : 'Récupérer'}
+                </Button>
                 {!isLocal && (
-                  <Button variant="danger" size="sm" className="ml-auto" onClick={() => onRemove(index)}>
+                  <Button variant="danger" size="sm" onClick={() => onRemove(index)}>
                     Retirer
                   </Button>
                 )}
@@ -141,7 +168,7 @@ export function ProvidersSection({ providers, listings, onChange, onAdd, onRemov
                   <p className="m-0 text-xs text-muted">{listing.models.length} modèle(s) listé(s)</p>
                 )
               ) : (
-                <p className="m-0 text-xs text-muted">Ses modèles apparaissent après l'enregistrement.</p>
+                <p className="m-0 text-xs text-muted">Récupérer pour lister ses modèles.</p>
               )}
             </div>
           );
@@ -176,7 +203,7 @@ export function ProvidersSection({ providers, listings, onChange, onAdd, onRemov
             <Button variant="secondary" size="sm" disabled={draftDisabled} onClick={addProvider}>
               Ajouter
             </Button>
-            <p className="m-0 text-xs text-muted">Ses modèles apparaissent après l'enregistrement.</p>
+            <p className="m-0 text-xs text-muted">Ajouter, puis « Récupérer » pour lister ses modèles.</p>
           </div>
         </div>
       </div>
