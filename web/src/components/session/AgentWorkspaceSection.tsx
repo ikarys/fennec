@@ -100,7 +100,7 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
   const integrateDisabled = sessionId === null || running || !hasCommits || invite === null;
 
   return (
-    <Panel id="workspace" title={panelBlock('workspace').title} pinned>
+    <Panel id="workspace" title={panelBlock('workspace').title}>
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center gap-2">
           <FolderIcon className="h-4 w-4 shrink-0 text-muted" />
