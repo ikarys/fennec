@@ -360,25 +360,6 @@ export function ChevronRightIcon({ className }: IconProps) {
   );
 }
 
-/** A pushpin: marks a block that is always visible. */
-export function PinIcon({ className }: IconProps) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M12 17v5" />
-      <path d="M9 10.76V6h6v4.76l2 3.24H7z" />
-      <path d="M8 2h8" />
-    </svg>
-  );
-}
 
 /** Arrow pointing up-right: opens a linked page, here a child session. */
 export function ExternalIcon({ className }: IconProps) {
