@@ -333,12 +333,16 @@ export interface IntegrationResult {
   protectedTests: string[];
   /** Set when the integration succeeded but `.agents/protected` could not be written. */
   protectError: string | null;
+  /** The agent's folder and branch were removed along with the integration. */
+  worktreeRemoved: boolean;
+  /** Set when the integration succeeded but the worktree could not be removed. */
+  removeError: string | null;
 }
 
-export function integrate(sessionId: string, acknowledged: string[], message: string, protectTests: boolean): Promise<IntegrationResult> {
+export function integrate(sessionId: string, acknowledged: string[], message: string, protectTests: boolean, removeWorktree: boolean): Promise<IntegrationResult> {
   return request<IntegrationResult>(`/api/sessions/${encodeURIComponent(sessionId)}/integrate`, {
     method: 'POST',
-    body: JSON.stringify({ acknowledged, message, protectTests })
+    body: JSON.stringify({ acknowledged, message, protectTests, removeWorktree })
   });
 }
 
