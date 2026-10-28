@@ -11,6 +11,10 @@ export interface NodeRun {
   state: NodeRunState;
   port?: string;
   childSessionId?: string;
+  /** Unix ms; absent in older logs. */
+  startedAt?: number;
+  /** The node's working time in ms; none for a human node or a session-context agent node. */
+  durationMs?: number;
 }
 
 export interface RunView {
@@ -83,6 +87,9 @@ export function createRunFold(): RunFold {
           if (typeof data.childSessionId === 'string') {
             existing.childSessionId = data.childSessionId;
           }
+          if (typeof data.startedAt === 'number') {
+            existing.startedAt = data.startedAt;
+          }
           // workflow.resumed emptied open; the restarted node is open again.
           if (!run.open.includes(nodeId)) run.open.push(nodeId);
           return true;
@@ -98,6 +105,9 @@ export function createRunFold(): RunFold {
         if (typeof data.childSessionId === 'string') {
           nodeRun.childSessionId = data.childSessionId;
         }
+        if (typeof data.startedAt === 'number') {
+          nodeRun.startedAt = data.startedAt;
+        }
         run.runs.push(nodeRun);
         run.open.push(nodeId);
         return true;
@@ -110,6 +120,9 @@ export function createRunFold(): RunFold {
           if (candidate.nodeId === nodeId && candidate.state === 'running') {
             candidate.state = 'done';
             candidate.port = String(data.port ?? '');
+            if (typeof data.durationMs === 'number') {
+              candidate.durationMs = data.durationMs;
+            }
             break;
           }
         }
