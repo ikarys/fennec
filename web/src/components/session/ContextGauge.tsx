@@ -1,5 +1,6 @@
 import type { ContextView } from '../../lib/api';
 import { Button } from '../ui/Button';
+import { ContextComposition } from './ContextComposition';
 
 interface ContextGaugeProps {
   /** Computed by the server; null until the first fetch. */
@@ -25,15 +26,26 @@ export function ContextGauge({ context, compactDisabled, onCompact, compactError
       aria-valuemax={100}
       aria-valuenow={percent}
       className="flex shrink-0 items-center gap-2"
-      title={context?.title}
     >
-      <div className="relative h-1.5 w-24 overflow-hidden rounded-full bg-raised">
-        <div className={`h-full ${TONE_CLASS[context?.tone ?? 'ok']}`} style={{ width: `${percent}%` }} />
-        {context?.compactMark != null && (
-          <span aria-hidden className="absolute inset-y-0 w-px bg-text/60" style={{ left: `${context.compactMark}%` }} />
+      {/* Hover or keyboard focus opens the popover; no state to keep. */}
+      <div tabIndex={0} className="group relative flex items-center gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-accent-soft">
+        <div className="relative h-1.5 w-24 overflow-hidden rounded-full bg-raised">
+          <div className={`h-full ${TONE_CLASS[context?.tone ?? 'ok']}`} style={{ width: `${percent}%` }} />
+          {context?.compactMark != null && (
+            <span aria-hidden className="absolute inset-y-0 w-px bg-text/60" style={{ left: `${context.compactMark}%` }} />
+          )}
+        </div>
+        <span className="text-xs text-muted tabular-nums whitespace-nowrap">{context?.line ?? '…'}</span>
+        {context && (
+          <div
+            role="tooltip"
+            className="invisible absolute top-full left-0 z-30 mt-2 flex w-96 flex-col gap-3 rounded-xl border border-border-strong bg-panel p-4 opacity-0 shadow-2xl transition-opacity duration-150 group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100"
+          >
+            <p className="m-0 text-xs text-muted">{context.title}</p>
+            {context.composition && <ContextComposition composition={context.composition} />}
+          </div>
         )}
       </div>
-      <span className="text-xs text-muted tabular-nums whitespace-nowrap">{context?.line ?? '…'}</span>
       <Button
         variant="secondary"
         size="sm"
