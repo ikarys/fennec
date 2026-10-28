@@ -41,7 +41,6 @@ pub(super) fn run_fork(
         exit_code: None,
         comment: None,
         duration_ms: Some(started.elapsed().as_millis() as u64),
-        stats: None,
     })?;
 
     let events = turn.log.events(turn.session_id)?;
@@ -116,7 +115,6 @@ pub(super) fn run_fork(
         exit_code: None,
         comment: None,
         duration_ms: Some(started.elapsed().as_millis() as u64),
-        stats: None,
     })?;
 
     Ok(Step::Go(Cursor::After {
@@ -230,10 +228,6 @@ fn run_branch_node(
         exit_code,
     } = &end
     {
-        // The branch's agent nodes always run in a child session.
-        let stats = child_session_id
-            .as_deref()
-            .and_then(|child| branch.env.children.model_tokens(child));
         let finished = Event::WorkflowNodeFinished {
             run_id: branch.state.run_id.clone(),
             node_id: node_id.to_string(),
@@ -242,7 +236,6 @@ fn run_branch_node(
             exit_code: *exit_code,
             comment: None,
             duration_ms: Some(started_at.elapsed().as_millis() as u64),
-            stats,
         };
         emit(&mut branch.state, tx, finished);
     }

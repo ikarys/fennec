@@ -4,10 +4,10 @@ import remarkGfm from 'remark-gfm';
 import type { AssistantItem, Segment, ThreadItem } from '../../lib/fold';
 import { useDisplayPrefs } from '../../lib/display';
 import { splitContract } from '../../lib/plan';
-import { formatDuration, formatSpeed, formatTokens } from '../../lib/format';
 import { BulbIcon, ChevronRightIcon, ReplayIcon } from '../Icons';
 import { buttonClass } from '../ui/Button';
 import { CopyButton } from './CopyButton';
+import { useCallUsage } from './CallUsage';
 import { MessageStatsLine } from './MessageStats';
 import { PlanCard, ReportCard } from './PlanCard';
 import { ToolCard } from './ToolCard';
@@ -107,7 +107,8 @@ function AssistantItemView({ item, model, running, showHeader }: { item: Assista
         .join('\n\n')
     : '';
   const showCopy = item.done && copyText.length > 0;
-  const showStats = streaming ? item.liveSpeed != null : item.stats != null;
+  const call = useCallUsage(item.id);
+  const showStats = streaming ? item.liveSpeed != null : call != null;
 
   return (
     <div className="flex flex-col gap-2.5">
@@ -141,6 +142,7 @@ function AssistantItemView({ item, model, running, showHeader }: { item: Assista
           )}
         </>
       )}
+      {!streaming && call?.turnRecap && <div className="text-center text-xs text-muted tabular-nums">{call.turnRecap}</div>}
     </div>
   );
 }
@@ -211,15 +213,6 @@ export function ThreadItemView({ item, model, running, showHeader, onReplay }: {
       return <NoteDetail text={item.text} detail={item.detail} />;
     }
     return <div className="text-center text-xs text-muted">{item.text}</div>;
-  }
-
-  if (item.kind === 'turn-recap') {
-    return (
-      <div className="text-center text-xs text-muted tabular-nums">
-        {formatDuration(item.durationMs)} · ↓ {formatTokens(item.generationTokens)} tokens ·{' '}
-        {formatSpeed(item.generationTokens / (item.durationMs / 1000))}
-      </div>
-    );
   }
 
   if (item.kind === 'workflow-node') {

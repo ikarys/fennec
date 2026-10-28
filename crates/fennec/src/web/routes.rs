@@ -4,7 +4,12 @@ use super::App;
 use super::editor;
 use super::http::{Request, error, send, send_json};
 use super::notifier::NotifyingLog;
-use super::{assets, event_stream, integration, session_name, turns::Job, workflow_routes};
+use super::{
+    assets, event_stream, integration, session_name,
+    session_usage::{SessionUsageView, call_views},
+    turns::Job,
+    workflow_routes, workflow_usage,
+};
 use crate::agent::ports::EventLog;
 use crate::agent::workflow::WorkflowJob;
 use crate::agents;
@@ -60,6 +65,11 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
         ("POST", ["api", "sessions"]) => create_session(app, req, stream),
         ("GET", ["api", "sessions", id]) => get_session(app, stream, id),
         ("GET", ["api", "sessions", id, "skills"]) => serve_skills(app, stream, id),
+        ("GET", ["api", "sessions", id, "usage"]) => serve_usage(app, stream, id),
+        ("GET", ["api", "sessions", id, "usage", "workflow"]) => {
+            serve_usage_workflow(app, stream, id)
+        }
+        ("GET", ["api", "sessions", id, "usage", "calls"]) => serve_usage_calls(app, stream, id),
         ("POST", ["api", "sessions", id, "messages"]) => send_message(app, req, stream, id),
         ("POST", ["api", "sessions", id, "replay"]) => replay_message(app, req, stream, id),
         ("POST", ["api", "sessions", id, "compact"]) => compact_session(app, stream, id),
@@ -353,6 +363,67 @@ fn serve_skills(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), Strin
         stream,
         200,
         &json!({ "loaded": folded.loaded, "active": folded.active }),
+    )
+}
+
+/// The session's model calls from the usage ledger, which outlives the log.
+/// `GET /api/sessions/{id}/usage`.
+fn serve_usage(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+    let store = app.store()?;
+    if store.session(id)?.is_none() {
+        return error(stream, 404, "no such session");
+    }
+    let ledger =
+        token_usage::Ledger::open(&app.settings.usage_path()).map_err(|e| e.to_string())?;
+    let filter = token_usage::Filter {
+        run_id: Some(id.to_string()),
+        ..Default::default()
+    };
+    let summary = ledger.summary(&filter).map_err(|e| e.to_string())?;
+    let latest = ledger.latest(&filter).map_err(|e| e.to_string())?;
+    send_json(
+        stream,
+        200,
+        &json!(SessionUsageView::new(&summary, latest.as_ref())),
+    )
+}
+
+fn serve_usage_calls(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+    let store = app.store()?;
+    if store.session(id)?.is_none() {
+        return error(stream, 404, "no such session");
+    }
+    let events = store.events(id)?;
+    let ledger =
+        token_usage::Ledger::open(&app.settings.usage_path()).map_err(|e| e.to_string())?;
+    let filter = token_usage::Filter {
+        run_id: Some(id.to_string()),
+        ..Default::default()
+    };
+    let calls = ledger.calls(&filter).map_err(|e| e.to_string())?;
+    send_json(stream, 200, &json!(call_views(&events, &calls)))
+}
+
+fn serve_usage_workflow(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+    let store = app.store()?;
+    if store.session(id)?.is_none() {
+        return error(stream, 404, "no such session");
+    }
+    let events = store.events(id)?;
+    let ledger =
+        token_usage::Ledger::open(&app.settings.usage_path()).map_err(|e| e.to_string())?;
+    let mut calls = std::collections::HashMap::new();
+    for session in std::iter::once(id.to_string()).chain(workflow_usage::child_ids(&events)) {
+        let filter = token_usage::Filter {
+            run_id: Some(session.clone()),
+            ..Default::default()
+        };
+        calls.insert(session, ledger.calls(&filter).map_err(|e| e.to_string())?);
+    }
+    send_json(
+        stream,
+        200,
+        &json!(workflow_usage::workflow_usage(id, &events, &calls)),
     )
 }
 

@@ -273,6 +273,22 @@ export function getSkills(id: string): Promise<SessionSkills> {
   return request<SessionSkills>(`/api/sessions/${encodeURIComponent(id)}/skills`);
 }
 
+/** A session's model calls from the server's usage ledger: every figure is computed there. */
+export interface SessionUsage {
+  calls: number;
+  promptTokens: number;
+  cachedTokens: number;
+  completionTokens: number;
+  /** 0 to 100. */
+  cachePercent: number;
+  /** Tokens per second of the last call; null before any call. */
+  lastGenerationSpeed: number | null;
+}
+
+export function getUsage(id: string): Promise<SessionUsage> {
+  return request<SessionUsage>(`/api/sessions/${encodeURIComponent(id)}/usage`);
+}
+
 /** How a criterion's status was established, as reported by the integration preview. */
 export type IntegrationProvenance =
   | { kind: 'verified'; command: string; exitCode?: number; output: string }
@@ -544,4 +560,42 @@ export function stopWorkflow(sessionId: string, runId: string): Promise<void> {
     method: 'POST',
     body: JSON.stringify({ runId })
   });
+}
+
+/** What sits under one answer, written by the server from the usage ledger. */
+export interface CallUsage {
+  messageId: string;
+  line: string;
+  detail: string;
+  /** On the last call of a turn only. */
+  turnRecap: string | null;
+}
+
+export function getUsageCalls(id: string): Promise<CallUsage[]> {
+  return request<CallUsage[]>(`/api/sessions/${encodeURIComponent(id)}/usage/calls`);
+}
+
+/** A workflow node run's token line, written by the server from the usage ledger. */
+export interface NodeUsage {
+  /** The thread item it belongs under. */
+  itemId: string;
+  line: string;
+  detail: string;
+}
+
+export interface RunUsage {
+  runId: string;
+  calls: string;
+  generated: string;
+  read: string;
+  cache: string;
+}
+
+export interface WorkflowUsage {
+  nodes: NodeUsage[];
+  runs: RunUsage[];
+}
+
+export function getUsageWorkflow(id: string): Promise<WorkflowUsage> {
+  return request<WorkflowUsage>(`/api/sessions/${encodeURIComponent(id)}/usage/workflow`);
 }
