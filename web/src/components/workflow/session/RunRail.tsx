@@ -3,6 +3,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { portTone, upcomingSteps, type NodeRun, type RunView, type UpcomingStep } from '../../../lib/workflowRun';
+import { formatClock, formatDuration } from '../../../lib/format';
 import { CheckIcon, ChevronsLeftIcon, ChevronsRightIcon, CloseIcon, StopIcon } from '../../Icons';
 import { Badge } from '../../ui/Badge';
 import { Button } from '../../ui/Button';
@@ -99,6 +100,26 @@ function StepRow({ step, index, isLast }: { step: RailStep; index: number; isLas
   const isFinished = nodeRun?.state === 'done' || nodeRun?.state === 'ended';
   const port = nodeRun?.port;
   const pass = nodeRun?.pass ?? 1;
+  // Elapsed time while the node runs; logs written before startedAt was
+  // carried fall back to the mount time.
+  const [elapsedMs, setElapsedMs] = useState(0);
+  useEffect(() => {
+    if (!isRunning) return;
+    const start = nodeRun?.startedAt ?? Date.now();
+    setElapsedMs(Date.now() - start);
+    const interval = window.setInterval(() => setElapsedMs(Date.now() - start), 1000);
+    return () => window.clearInterval(interval);
+  }, [isRunning, nodeRun?.startedAt]);
+  // A node that ends the run has no workflow.node.finished. The frozen tick
+  // only exists when the row was watched running; a late reload has none, so
+  // no figure is shown (a 00:00 would be a lie).
+  const time = isRunning
+    ? formatClock(elapsedMs)
+    : nodeRun?.durationMs != null
+      ? formatDuration(nodeRun.durationMs)
+      : nodeRun?.state === 'ended' && elapsedMs > 0
+        ? formatClock(elapsedMs)
+        : null;
   const title = step.kind === 'run' ? (isInterrupted ? `${label} — interrompu` : label) : `${label} — à venir`;
   const labelClass = isRunning ? 'font-semibold text-accent-strong' : isFinished ? 'text-text' : isInterrupted ? 'text-muted' : 'text-faint';
   return (
@@ -115,6 +136,7 @@ function StepRow({ step, index, isLast }: { step: RailStep; index: number; isLas
           Étape {index + 1}
           {pass > 1 && <> · ×{pass}</>}
           {isInterrupted && <> · interrompu</>}
+          {time && <span className="tabular-nums"> · {time}</span>}
         </span>
         <span className="mt-0.5 flex items-center gap-1.5">
           <span className={`block min-w-0 grow truncate text-xs ${labelClass}`} title={title}>{label}</span>
