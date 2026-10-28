@@ -8,3 +8,5 @@ crates/fennec/src/domain/ forbids crate::tools
 crates/fennec/src/domain/ forbids crate::llm
 crates/fennec/src/agent/ forbids crate::web
 crates/fennec/src/agent/ forbids crate::store
+crates/fennec/src/domain/ forbids std::fs
+crates/fennec/src/domain/ forbids std::process
