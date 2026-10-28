@@ -30,6 +30,9 @@ pub struct Preview {
     /// The branch the run started from; `None` for older worktrees or a
     /// detached HEAD.
     pub origin_branch: Option<String>,
+    /// Uncommitted files of the human's tree the cherry-pick would
+    /// overwrite; git would refuse the pick on them.
+    pub local_changes: Vec<String>,
 }
 
 /// Why an integration failed.
@@ -65,7 +68,7 @@ pub fn preview(top: &Path, wt: &Worktree) -> Result<Preview, String> {
         &["diff", "--name-only", "--no-renames", &wt.base, &wt.branch],
         None,
     )?;
-    let files = String::from_utf8_lossy(&files)
+    let files: Vec<String> = String::from_utf8_lossy(&files)
         .lines()
         .filter(|line| !line.is_empty())
         .map(String::from)
@@ -79,12 +82,52 @@ pub fn preview(top: &Path, wt: &Worktree) -> Result<Preview, String> {
     let counts = parse_numstat(&String::from_utf8_lossy(&numstat));
 
     Ok(Preview {
+        local_changes: local_changes(top, wt.base.as_str(), wt.branch.as_str(), &files),
         commits,
         files,
         counts,
         human_branch: crate::git::current_branch(top),
         origin_branch: origin_branch(top, wt),
     })
+}
+
+/// The human's uncommitted files among `files` that the cherry-pick would
+/// overwrite: unstaged edits and untracked files.
+///
+/// An unstaged edit only counts when the tree's content differs from both
+/// the base's and the branch's: git overwrites a local edit only when the
+/// pick writes something else. That keeps the common case open, where the
+/// worktree started from the human's same dirty work and committed it.
+fn local_changes(top: &Path, base: &str, branch: &str, files: &[String]) -> Vec<String> {
+    let modified = git_names(top, &["diff", "--name-only"]);
+    let untracked = git_names(top, &["ls-files", "--others", "--exclude-standard"]);
+    files
+        .iter()
+        .filter(|file| {
+            if modified.contains(file.as_str()) {
+                !tree_equals(top, base, file) && !tree_equals(top, branch, file)
+            } else {
+                untracked.contains(file.as_str())
+            }
+        })
+        .cloned()
+        .collect()
+}
+
+/// The output lines of a git command, one set entry per non-empty line.
+fn git_names(top: &Path, args: &[&str]) -> std::collections::HashSet<String> {
+    git(top, args, None)
+        .map(|out| String::from(String::from_utf8_lossy(&out)))
+        .unwrap_or_default()
+        .lines()
+        .filter(|line| !line.is_empty())
+        .map(String::from)
+        .collect()
+}
+
+/// True when the working tree's `file` equals its content at `ref`.
+fn tree_equals(top: &Path, ref_name: &str, file: &str) -> bool {
+    git(top, &["diff", "--quiet", ref_name, "--", file], None).is_ok()
 }
 
 /// `git diff --numstat` lines (`added<TAB>removed<TAB>path`); binary files
@@ -309,6 +352,63 @@ mod tests {
         assert!(p.files.contains(&"c.txt".to_string()));
         assert_eq!(p.counts["c.txt"], (1, 0));
         assert_eq!(p.counts["a.txt"], (0, 1));
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn preview_flags_uncommitted_files_the_pick_would_overwrite() {
+        let (base, repo) = setup();
+        let wt = open(&base.join("wt"), &repo, "s1").unwrap().unwrap();
+        std::fs::write(wt.workdir.join("a.txt"), "agent\n").unwrap();
+        assert_eq!(commit(&wt, "agent change"), Ok(true));
+
+        std::fs::write(repo.join("a.txt"), "human\n").unwrap();
+        let top = top(&repo).unwrap().0;
+        let preview = preview(&top, &wt).unwrap();
+        assert_eq!(preview.local_changes, vec!["a.txt".to_string()]);
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn preview_does_not_flag_the_dirty_work_the_worktree_copied() {
+        let (base, repo) = setup();
+        let wt = open(&base.join("wt"), &repo, "s1").unwrap().unwrap();
+        std::fs::write(wt.workdir.join("a.txt"), "two\n").unwrap();
+        assert_eq!(commit(&wt, "agent change"), Ok(true));
+
+        std::fs::write(repo.join("a.txt"), "two\n").unwrap();
+        let top = top(&repo).unwrap().0;
+        let preview = preview(&top, &wt).unwrap();
+        assert!(preview.local_changes.is_empty());
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn preview_ignores_uncommitted_files_the_pick_does_not_touch() {
+        let (base, repo) = setup();
+        let wt = open(&base.join("wt"), &repo, "s1").unwrap().unwrap();
+        std::fs::write(wt.workdir.join("b.txt"), "b\n").unwrap();
+        assert_eq!(commit(&wt, "agent change"), Ok(true));
+
+        std::fs::write(repo.join("c.txt"), "c\n").unwrap();
+        std::fs::write(repo.join("a.txt"), "human\n").unwrap();
+        let top = top(&repo).unwrap().0;
+        let preview = preview(&top, &wt).unwrap();
+        assert!(preview.local_changes.is_empty());
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn preview_flags_an_untracked_file_the_pick_would_create() {
+        let (base, repo) = setup();
+        let wt = open(&base.join("wt"), &repo, "s1").unwrap().unwrap();
+        std::fs::write(wt.workdir.join("new.txt"), "agent\n").unwrap();
+        assert_eq!(commit(&wt, "agent change"), Ok(true));
+
+        std::fs::write(repo.join("new.txt"), "human\n").unwrap();
+        let top = top(&repo).unwrap().0;
+        let preview = preview(&top, &wt).unwrap();
+        assert_eq!(preview.local_changes, vec!["new.txt".to_string()]);
         let _ = std::fs::remove_dir_all(&base);
     }
 
