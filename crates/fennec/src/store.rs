@@ -2,6 +2,7 @@
 //! same `projects`/`sessions`/`events` schema minus the columns fennec does
 //! not use yet. Implements the agent's `EventLog`.
 
+pub mod calls;
 mod settings;
 
 use crate::agent::ports::EventLog;

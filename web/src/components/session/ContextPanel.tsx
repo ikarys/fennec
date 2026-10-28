@@ -1,5 +1,5 @@
 import type { ThreadView } from '../../lib/fold';
-import type { SessionDetail, SessionSkills } from '../../lib/api';
+import type { SessionDetail, SessionSkills, SessionUsage } from '../../lib/api';
 import { useEffect, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { useDisplayPrefs } from '../../lib/display';
 import { pageBlocks, panelPages, type PanelBlockId } from '../../lib/panelBlocks';
@@ -52,6 +52,8 @@ interface ContextPanelProps {
   view: ThreadView;
   /** The session's skills, folded server-side; null while the first fetch is in flight. */
   skills: SessionSkills | null;
+  /** The session's token totals, computed server-side; null while the first fetch is in flight. */
+  usage: SessionUsage | null;
   /** False on the « Nouvelle session » tab, where there is no log to fold. */
   hasSession: boolean;
   /** Older pages are not loaded: the totals cover the loaded messages only. */
@@ -66,7 +68,7 @@ interface ContextPanelProps {
   integrationVersion: number;
 }
 
-export function ContextPanel({ view, skills, hasSession, partial, worktree, sessionId, onWorktreeChanged, integrationVersion }: ContextPanelProps) {
+export function ContextPanel({ view, skills, usage, hasSession, partial, worktree, sessionId, onWorktreeChanged, integrationVersion }: ContextPanelProps) {
   const [width, setWidth] = useState(loadWidth);
   const [selectedPageName, setSelectedPageName] = useState(loadPageName);
   const pages = panelPages(useDisplayPrefs().panelPages);
@@ -109,7 +111,7 @@ export function ContextPanel({ view, skills, hasSession, partial, worktree, sess
           <AgentWorkspaceSection key={id} sessionId={sessionId} worktree={worktree} running={view.running} onDiscarded={onWorktreeChanged} integrationVersion={integrationVersion} />
         ) : null;
       case 'tokens':
-        return <TokensSection key={id} usage={view.usage} partial={partial} />;
+        return <TokensSection key={id} usage={usage} />;
       case 'skills':
         return <SkillsSection key={id} skills={skills} hasSession={hasSession} />;
       case 'decisions':

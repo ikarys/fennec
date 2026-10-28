@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getEventPage, getRunEventsBefore, getSkills, type EventPageEntry, type SessionSkills } from '../lib/api';
+import { getEventPage, getRunEventsBefore, getSkills, getUsage, getUsageCalls, getUsageWorkflow, type WorkflowUsage, type EventPageEntry, type SessionSkills, type CallUsage, type SessionUsage } from '../lib/api';
 import { createThreadFold, type FennecEvent, type ThreadFold, type ThreadView } from '../lib/fold';
 
 const PAGE_SIZE = 200;
@@ -26,6 +26,11 @@ export interface SessionThread {
   loadOlder: () => Promise<boolean>;
   /** The session's skills folded server-side; null while the first fetch is in flight. */
   skills: SessionSkills | null;
+  /** The session's token totals from the server's usage ledger; null until the first fetch. */
+  usage: SessionUsage | null;
+  /** Each answer's ledger figures by message id. */
+  calls: ReadonlyMap<string, CallUsage>;
+  workflowUsage: WorkflowUsage;
 }
 
 /**
@@ -41,6 +46,9 @@ export function useSessionThread(sessionId: string | null): SessionThread {
   const [hasMore, setHasMore] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [skills, setSkills] = useState<SessionSkills | null>(null);
+  const [usage, setUsage] = useState<SessionUsage | null>(null);
+  const [calls, setCalls] = useState<ReadonlyMap<string, CallUsage>>(new Map());
+  const [workflowUsage, setWorkflowUsage] = useState<WorkflowUsage>({ nodes: [], runs: [] });
   const eventsRef = useRef<FennecEvent[]>([]);
   const foldRef = useRef<ThreadFold>(createThreadFold());
   const firstSeqRef = useRef(0);
@@ -50,6 +58,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
   // A counter: only the latest fetch may answer, so out-of-order responses
   // cannot regress the panel.
   const skillsReqRef = useRef(0);
+  const usageReqRef = useRef(0);
 
   const refreshSkills = useCallback(() => {
     if (!sessionId) return;
@@ -65,6 +74,21 @@ export function useSessionThread(sessionId: string | null): SessionThread {
         if (request === skillsReqRef.current) {
           setSkills((prev) => prev ?? { loaded: [], active: [] });
         }
+      });
+  }, [sessionId]);
+
+  const refreshUsage = useCallback(() => {
+    if (!sessionId) return;
+    const request = ++usageReqRef.current;
+    Promise.all([getUsage(sessionId), getUsageCalls(sessionId), getUsageWorkflow(sessionId)])
+      .then(([totals, perCall, perWorkflow]) => {
+        if (request !== usageReqRef.current) return;
+        setUsage(totals);
+        setCalls(new Map(perCall.map((call) => [call.messageId, call])));
+        setWorkflowUsage(perWorkflow);
+      })
+      .catch(() => {
+        // Keep the last totals: the next model call refetches.
       });
   }, [sessionId]);
 
@@ -91,9 +115,13 @@ export function useSessionThread(sessionId: string | null): SessionThread {
     runPrefixRef.current = [];
     loadSkillCallsRef.current = new Set();
     skillsReqRef.current += 1; // a fetch of the previous session may not answer
+    usageReqRef.current += 1;
     setView(EMPTY);
     setHasMore(false);
     setSkills(null);
+    setUsage(null);
+    setCalls(new Map());
+    setWorkflowUsage({ nodes: [], runs: [] });
     if (!sessionId) return;
 
     let cancelled = false;
@@ -109,6 +137,11 @@ export function useSessionThread(sessionId: string | null): SessionThread {
       // or the model's view is cut (compaction, replay). An in-flight load_skill
       // call loads nothing until it succeeds, so it is tracked, not refetched;
       // an assistant message can't request a skill, so it is skipped.
+      // The ledger holds a call as soon as its message.done is stored.
+      // A workflow node's calls sit in a child session: the node's end is the cue.
+      if ((event.type === 'message.done' && data.stats)
+        || event.type === 'workflow.node.finished'
+        || event.type === 'workflow.finished') refreshUsage();
       if ((event.type === 'message.start' && data.role === 'user')
         || event.type === 'context.compacted'
         || event.type === 'session.rewound') {
@@ -156,6 +189,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
         trackLoadSkillCalls(page, loadSkillCallsRef.current);
         foldAll();
         refreshSkills();
+        refreshUsage();
         setHasMore(page.length > 0 && page[0].seq > 1);
         openStream(lastSeqRef.current);
         if (page.length > 0 && page[0].seq > 1) {
@@ -180,7 +214,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
       source?.close();
       cancelAnimationFrame(frame);
     };
-  }, [sessionId, foldAll, refreshSkills]);
+  }, [sessionId, foldAll, refreshSkills, refreshUsage]);
 
   // Returns true when the view was updated, so the caller knows whether a
   // scroll restore is armed for the upcoming view change.
@@ -209,5 +243,5 @@ export function useSessionThread(sessionId: string | null): SessionThread {
     }
   }, [sessionId, loadingOlder, foldAll, refreshSkills]);
 
-  return { view, hasMore, loadingOlder, loadOlder, skills };
+  return { view, hasMore, loadingOlder, loadOlder, skills, usage, calls, workflowUsage };
 }
