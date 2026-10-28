@@ -1,7 +1,7 @@
 {
   "id": "plan-build-verify",
   "name": "Plan, build, verify",
-  "description": "Plan, wait for approval, build, run the plan's criteria checks, verify the other criteria in a fresh context and send the findings back to the builder until it passes, then review the diff and send the findings worth fixing back, verified again, for at most two rounds; minor findings, or findings left after two rounds, go to the human.",
+  "description": "Plan, wait for approval, build, run the plan's criteria checks, verify the other criteria in a fresh context and send the findings back to the builder until it passes, then review the diff and send the findings back to the builder — which applies what it agrees with, including the minor nits it finds worth taking — verified again, for up to two rounds per outcome; findings left after that go to the human.",
   "maxSteps": 50,
   "nodes": [
     { "id": "start", "kind": "start", "position": { "x": 0, "y": 0 } },
@@ -49,7 +49,7 @@
     { "from": "verify", "port": "exhausted", "to": "stuck" },
     { "from": "verify", "port": "pass", "to": "review" },
     { "from": "review", "port": "clean", "to": "done" },
-    { "from": "review", "port": "minor", "to": "accept" },
+    { "from": "review", "port": "minor", "to": "fix-review", "maxPasses": 2 },
     { "from": "review", "port": "findings", "to": "fix-review", "maxPasses": 2 },
     { "from": "review", "port": "exhausted", "to": "accept" },
     { "from": "fix-review", "port": "done", "to": "criteria" },
