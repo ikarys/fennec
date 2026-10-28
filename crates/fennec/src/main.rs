@@ -3,6 +3,7 @@
 
 mod agent;
 mod agents;
+mod architecture;
 mod cli;
 mod config;
 mod domain;

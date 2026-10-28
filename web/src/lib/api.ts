@@ -287,11 +287,19 @@ export interface IntegrationCriterion {
   status: IntegrationCriterionStatus;
 }
 
+export interface ArchitectureViolation {
+  path: string;
+  line: string;
+  prefix: string;
+  forbidden: string;
+}
+
 export type Blocker =
   | { kind: 'noCommits' }
   | { kind: 'criteriaNotPassed'; criteria: string[] }
   | { kind: 'noCriteria' }
   | { kind: 'protectedTouched'; paths: string[] }
+  | { kind: 'architectureViolated'; violations: ArchitectureViolation[] }
   | { kind: 'branchChanged'; from: string; to: string | null };
 
 export interface IntegrationPreview {

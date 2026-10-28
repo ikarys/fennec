@@ -2,6 +2,7 @@
 //! made of and how its log reads back as a conversation.
 
 pub mod agent;
+pub mod architecture;
 pub mod attachment;
 pub mod clock;
 pub mod compaction;

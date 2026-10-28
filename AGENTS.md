@@ -74,6 +74,9 @@ and the alternatives as `decision.recorded`; a "Décisions" block in the context
 Protected tests, done: an unchecked "Protéger les tests intégrés" box in the
 integration dialog appends the integrated test files to `.agents/protected`
 (`domain/test_files.rs`).
+Architecture guard, done: `.agents/architecture` (`<path prefix> forbids <text>`) is
+checked on the lines an integration adds; a violation is a blocker the human accepts
+(`domain/architecture.rs`, `architecture.rs`).
 Next, one PR each: the rest of fennec's own layer → sub-agents as tools, when dogfooding shows sessions
 saturating their context while exploring.
 
