@@ -305,6 +305,10 @@ pub enum Event {
     ChatDone {
         message_id: String,
         reason: DoneReason,
+        /// Wall clock of the agent loop that ended; absent for compaction-only
+        /// turns and older logs.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        duration_ms: Option<u64>,
     },
     #[serde(rename = "chat.error", rename_all = "camelCase")]
     ChatError { error: String, recoverable: bool },
