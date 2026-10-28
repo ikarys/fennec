@@ -2,12 +2,26 @@
 //! Measured in bytes, since fennec has no tokenizer: `spread` shares the exact
 //! token count among the parts pro rata, so a part's figure is indicative.
 
+use serde::Serialize;
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
 
+/// Which side of the context a part belongs to, so a view can group them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PartKind {
+    /// The frozen system prompt and tool definitions.
+    Prompt,
+    /// What the human and the model said.
+    Conversation,
+    /// Tool calls and what they returned.
+    Tools,
+}
+
 #[derive(Debug, PartialEq)]
 pub struct ContextPart {
+    pub kind: PartKind,
     pub label: String,
     pub bytes: u64,
 }
@@ -21,15 +35,16 @@ pub struct ContextParts {
 }
 
 pub fn context_parts(system_prompt: &str, tools: &Value, messages: &[Value]) -> ContextParts {
-    let mut bytes_by_label: BTreeMap<String, u64> = BTreeMap::new();
+    let mut bytes_by_label: Parts = BTreeMap::new();
     let mut images = 0u64;
 
     for (label, bytes) in prompt_parts(system_prompt) {
-        add(&mut bytes_by_label, &label, bytes);
+        add(&mut bytes_by_label, PartKind::Prompt, &label, bytes);
     }
     if !tools.is_null() {
         add(
             &mut bytes_by_label,
+            PartKind::Prompt,
             "Définitions d'outils",
             tools.to_string().len() as u64,
         );
@@ -42,11 +57,26 @@ pub fn context_parts(system_prompt: &str, tools: &Value, messages: &[Value]) -> 
         images += image_count;
 
         match role {
-            "user" => add(&mut bytes_by_label, "Messages humains", bytes),
+            "user" => add(
+                &mut bytes_by_label,
+                PartKind::Conversation,
+                "Messages humains",
+                bytes,
+            ),
             "assistant" => {
-                add(&mut bytes_by_label, "Réponses du modèle", bytes);
+                add(
+                    &mut bytes_by_label,
+                    PartKind::Conversation,
+                    "Réponses du modèle",
+                    bytes,
+                );
                 if let Some(reasoning) = message["reasoning_content"].as_str() {
-                    add(&mut bytes_by_label, "Raisonnement", reasoning.len() as u64);
+                    add(
+                        &mut bytes_by_label,
+                        PartKind::Conversation,
+                        "Raisonnement",
+                        reasoning.len() as u64,
+                    );
                 }
                 if let Some(calls) = message["tool_calls"].as_array() {
                     let mut call_bytes = 0u64;
@@ -58,7 +88,12 @@ pub fn context_parts(system_prompt: &str, tools: &Value, messages: &[Value]) -> 
                             tool_names.insert(id.to_string(), name.to_string());
                         }
                     }
-                    add(&mut bytes_by_label, "Appels d'outils", call_bytes);
+                    add(
+                        &mut bytes_by_label,
+                        PartKind::Tools,
+                        "Appels d'outils",
+                        call_bytes,
+                    );
                 }
             }
             "tool" => {
@@ -68,7 +103,7 @@ pub fn context_parts(system_prompt: &str, tools: &Value, messages: &[Value]) -> 
                     Some(name) => format!("Résultat : {name}"),
                     None => "Résultat : ?".to_string(),
                 };
-                add(&mut bytes_by_label, &label, bytes);
+                add(&mut bytes_by_label, PartKind::Tools, &label, bytes);
             }
             _ => {}
         }
@@ -76,8 +111,8 @@ pub fn context_parts(system_prompt: &str, tools: &Value, messages: &[Value]) -> 
 
     let mut parts: Vec<ContextPart> = bytes_by_label
         .into_iter()
-        .filter(|(_, bytes)| *bytes > 0)
-        .map(|(label, bytes)| ContextPart { label, bytes })
+        .filter(|(_, (_, bytes))| *bytes > 0)
+        .map(|(label, (kind, bytes))| ContextPart { kind, label, bytes })
         .collect();
     parts.sort_by(|a, b| b.bytes.cmp(&a.bytes).then_with(|| a.label.cmp(&b.label)));
 
@@ -144,7 +179,7 @@ fn prompt_parts(prompt: &str) -> BTreeMap<String, u64> {
                 .and_then(|rest| rest.split('\n').next())
                 .unwrap_or("");
             let label = file_label(path);
-            add(&mut parts, &label, block.len() as u64);
+            *parts.entry(label).or_default() += block.len() as u64;
             attributed += block.len() as u64;
             start = block_end;
         }
@@ -188,9 +223,12 @@ fn content_bytes(content: &Value) -> (u64, u64) {
     }
 }
 
-fn add(parts: &mut BTreeMap<String, u64>, label: &str, bytes: u64) {
+/// Bytes by label; a label always has the same kind.
+type Parts = BTreeMap<String, (PartKind, u64)>;
+
+fn add(parts: &mut Parts, kind: PartKind, label: &str, bytes: u64) {
     if bytes > 0 {
-        *parts.entry(label.to_string()).or_default() += bytes;
+        parts.entry(label.to_string()).or_insert((kind, 0)).1 += bytes;
     }
 }
 
@@ -300,10 +338,12 @@ mod tests {
     fn spread_shares_the_tokens_pro_rata() {
         let parts = [
             ContextPart {
+                kind: PartKind::Prompt,
                 label: "a".into(),
                 bytes: 30,
             },
             ContextPart {
+                kind: PartKind::Prompt,
                 label: "b".into(),
                 bytes: 10,
             },
@@ -315,10 +355,12 @@ mod tests {
     fn spread_of_zero_bytes_is_zero() {
         let parts = [
             ContextPart {
+                kind: PartKind::Prompt,
                 label: "a".into(),
                 bytes: 0,
             },
             ContextPart {
+                kind: PartKind::Prompt,
                 label: "b".into(),
                 bytes: 0,
             },
