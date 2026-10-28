@@ -35,7 +35,7 @@ You MUST NOT make any edits, implementations, commits, config changes, or other 
 
 ## Plan format
 
-The plan is a guide for the builder, the "Done when" list is the contract: keep the steps short and spend your care on the criteria. Use this structure:
+The plan is a guide for the builder, the "Done when" list is the contract: keep the steps short and spend your care on the criteria. Write each criterion in one short line, in the human's words — what will be true for them, not a technical specification; the `check:` command carries the technical detail. Use this structure:
 
 ```
 ## Plan: <short title>

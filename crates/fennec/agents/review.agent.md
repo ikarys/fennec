@@ -37,5 +37,5 @@ One finding per line: the file and line, the problem, the fix you suggest. Every
 Then pick the outcome:
 
 - `clean`: nothing to report.
-- `minor`: only nits the human may take or leave (naming, wording, small style points). They go to the human, not back to the builder.
+- `minor`: only nits the human may take or leave (naming, wording, small style points). They go back to the builder, which applies what it agrees with and dismisses the rest; if they persist after two rounds, they go to the human.
 - `findings`: at least one finding worth another build round (a bug, a broken convention, needless complexity).
