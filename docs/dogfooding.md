@@ -22,8 +22,8 @@ A project outside a git repository still runs in place.
 Open edges:
 - Ignored files (`node_modules`, `target`, `.env`) are not copied: the first
   `just check` in a worktree reinstalls and rebuilds from scratch (time, disk).
-- Worktrees are never removed; remove one with `git worktree remove` and
-  delete its branch once integrated.
+- Worktrees are removed on the human's decision only: the integration dialog's
+  "Supprimer le dossier" box, or "Abandonner ce travail".
 - A plain session (no workflow) still writes the human's tree.
 - The session's agents, skills and instructions are read from the worktree.
   An agent can no longer edit them: `.agents/` and `AGENTS.md` are protected
