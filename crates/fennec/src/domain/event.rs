@@ -277,6 +277,10 @@ pub enum Event {
         via: Option<Via>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         child_session_id: Option<String>,
+        /// Unix milliseconds: a running node's elapsed time survives a reload.
+        /// `None` in logs written before it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        started_at: Option<u64>,
     },
     #[serde(rename = "workflow.node.finished", rename_all = "camelCase")]
     WorkflowNodeFinished {
@@ -626,6 +630,7 @@ mod tests {
                 pass: 1,
                 via: Some(via),
                 child_session_id: None,
+                started_at: None,
             } if run_id == "r"
                 && node_id == "n"
                 && via.from == "f"
