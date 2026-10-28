@@ -6,6 +6,7 @@ pub mod architecture;
 pub mod attachment;
 pub mod clock;
 pub mod compaction;
+pub mod context_parts;
 pub mod conversation;
 pub mod criteria;
 pub mod decision;

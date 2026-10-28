@@ -217,7 +217,9 @@ read-only. The human edits them as usual.
   `cachePercent` is 0 to 100, `lastGenerationSpeed` (tokens/s) is null before any call; 404 if no session
 - `GET /api/sessions/{id}/context` → `{percent, tone, compactMark, line, title}`: the header's gauge, from the last
   `context.state` the model still sees (`tone` `ok`/`warn`/`err`, `compactMark` null when compaction is off); events
-  without `compactAt` and sessions without a measure use the current settings
+  without `compactAt` and sessions without a measure use the current settings; `title` then lists what the context
+  holds (the instruction files, the tool definitions, each tool's results, the reasoning…), the exact token
+  count spread over the parts by their share of the text: indicative, and said so
 - `GET /api/sessions/{id}/usage/calls` → `[{messageId, line, detail, turnRecap}]`, oldest first: what sits under
   each answer, written by the server from the ledger (`line` `↑ 12,3k · cache 82 % · ↓ 345 · 4,2 s`, `detail` the
   tooltip, `turnRecap` on a turn's last call only, null otherwise: the turn's wall clock, `chat.done.durationMs`
