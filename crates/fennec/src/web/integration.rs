@@ -116,7 +116,15 @@ pub fn get_integration(app: &App, stream: &mut TcpStream, id: &str) -> Result<()
         .preview
         .files
         .iter()
-        .map(|path| json!({ "path": path, "protected": gate.protected_touched.contains(path) }))
+        .map(|path| {
+            let (added, removed) = gate.preview.counts.get(path).copied().unwrap_or_default();
+            json!({
+                "path": path,
+                "protected": gate.protected_touched.contains(path),
+                "added": added,
+                "removed": removed,
+            })
+        })
         .collect();
     let criteria: Vec<Value> = gate.criteria.iter().map(criterion_json).collect();
     send_json(
