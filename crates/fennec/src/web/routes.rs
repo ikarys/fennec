@@ -5,7 +5,9 @@ use super::editor;
 use super::http::{Request, error, send, send_json};
 use super::notifier::NotifyingLog;
 use super::{
-    assets, event_stream, integration, session_name,
+    assets,
+    context_view::context_view,
+    event_stream, integration, session_name,
     session_usage::{SessionUsageView, call_views},
     turns::Job,
     workflow_routes, workflow_usage,
@@ -66,6 +68,7 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
         ("GET", ["api", "sessions", id]) => get_session(app, stream, id),
         ("GET", ["api", "sessions", id, "skills"]) => serve_skills(app, stream, id),
         ("GET", ["api", "sessions", id, "usage"]) => serve_usage(app, stream, id),
+        ("GET", ["api", "sessions", id, "context"]) => serve_context(app, stream, id),
         ("GET", ["api", "sessions", id, "usage", "workflow"]) => {
             serve_usage_workflow(app, stream, id)
         }
@@ -368,6 +371,18 @@ fn serve_skills(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), Strin
 
 /// The session's model calls from the usage ledger, which outlives the log.
 /// `GET /api/sessions/{id}/usage`.
+/// The header's gauge; events from before `compactAt` was recorded fall back
+/// to the current settings.
+fn serve_context(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+    let store = app.store()?;
+    if store.session(id)?.is_none() {
+        return error(stream, 404, "no such session");
+    }
+    let params = app.settings.llm.for_turn(&store.preferences()?);
+    let view = context_view(&store.events(id)?, params.context_window, params.compact_at);
+    send_json(stream, 200, &json!(view))
+}
+
 fn serve_usage(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
     let store = app.store()?;
     if store.session(id)?.is_none() {
