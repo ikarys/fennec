@@ -47,6 +47,9 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
         ("GET", ["api", "settings"]) => settings_routes::get_settings(app, stream),
         ("GET", ["api", "insight"]) => super::insight::serve(app, req, stream),
         ("POST", ["api", "settings"]) => settings_routes::save_settings(app, req, stream),
+        ("POST", ["api", "settings", "providers", "list"]) => {
+            settings_routes::list_provider(app, req, stream)
+        }
         ("GET", ["api", "folders"]) => list_folders(req, stream),
         ("GET", ["api", "projects"]) => list_projects(app, stream),
         ("POST", ["api", "projects"]) => open_project(app, req, stream),

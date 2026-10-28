@@ -171,13 +171,23 @@ read-only. The human edits them as usual.
   stored preferences; `compactAt` is the fraction at which the session compacts (0 disables)
 - `GET /api/settings` → `{preferences, listings, defaults}`
   - `preferences`: the stored `Preferences`
-  - `listings`: `[{provider, name, baseUrl, models: [{id, contextWindow}], error}]`,
+  - `listings`: `[{provider, name, baseUrl, models: [{id, contextWindow, resolved}], error}]`,
     local first, from a fresh `/models` call per provider (in parallel); the
-    local one falls back to the startup listing; `error` is why a call failed
+    local one falls back to the startup listing; `error` is why a call failed.
+    `resolved` is what a turn of that model runs with, display-ready
+    (`{maxTokens, contextWindow, compactAt, reasoningEffort}`, each
+    `{value, source: perModel|listed|default, wire}`): `wire` marks what a
+    call sends to the provider (`maxTokens` always; `reasoningEffort` when
+    set; `contextWindow`/`compactAt` are local).
   - `defaults`: `{provider, model, maxTokens, contextWindow, compactAt, reasoningEffort}`
     from the environment/built-in defaults
 - `POST /api/settings` with a full `Preferences` body → 200 with the same body
   as `GET /api/settings`; 400 with the validation message if invalid
+- `POST /api/settings/providers/list` with `{provider, baseUrl, apiKey}` → a
+  single listing in the `listings` shape (with `resolved` per model). Re-lists
+  one provider's `/models` now, using the request's `baseUrl`/`apiKey` when
+  they are not (yet) stored, so a new provider can be probed before saving;
+  empty parts fall back to the stored/env endpoint
 - `GET /api/projects` → `[{id, name, workdir, branch, sessions: [{id, title, state, createdAt, updatedAt}]}]`
   (sessions newest first; `createdAt`/`updatedAt` are Unix milliseconds; `branch` may be `null`)
 - `POST /api/projects` `{workdir}` → the project (400 if not a directory)

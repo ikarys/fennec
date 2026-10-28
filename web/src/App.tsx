@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, lazy, Suspense } from 'react';
-import type { Config, Project, SettingsResponse } from './lib/api';
+import type { Config, Project, ProviderListing, SettingsResponse } from './lib/api';
 import { createProject, getConfig, getProjects, getSettings } from './lib/api';
 import { applyTheme, getStoredTheme, type ThemeId } from './lib/theme';
 import { TopBar, type TabInfo } from './components/layout/TopBar';
@@ -166,6 +166,19 @@ export default function App() {
     getConfig()
       .then(setConfig)
       .catch(() => setConfig(null));
+  }, []);
+
+  // A provider listing refreshed on demand (the fetch button) replaces that
+  // provider's entry, or appends it when the provider was not listed yet.
+  const handleListing = useCallback((listing: ProviderListing) => {
+    setSettings((previous) => {
+      if (!previous) return previous;
+      const exists = previous.listings.some((item) => item.provider === listing.provider);
+      const listings = exists
+        ? previous.listings.map((item) => (item.provider === listing.provider ? listing : item))
+        : [...previous.listings, listing];
+      return { ...previous, listings };
+    });
   }, []);
 
   // No polling: the list refreshes when the human looks at it (home, palette)
@@ -338,6 +351,7 @@ export default function App() {
               theme={theme}
               onThemeChange={setTheme}
               onSaved={handleSettingsSaved}
+              onListing={handleListing}
             />
           ) : route.name === 'workflows' ? (
             <Suspense fallback={<div className="flex grow items-center justify-center text-muted">Chargement…</div>}>
