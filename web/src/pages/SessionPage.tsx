@@ -30,6 +30,7 @@ import { ContextGauge } from '../components/session/ContextGauge';
 import { QuestionCard } from '../components/session/QuestionCard';
 import { ThreadItemView } from '../components/session/Thread';
 import { PlanActionsContext } from '../components/session/PlanActions';
+import { CallUsageContext, WorkflowUsageContext } from '../components/session/CallUsage';
 import { IntegrationInviteContext, type IntegrationInvite } from '../components/session/IntegrationInvite';
 import { IntegrationDialog } from '../components/session/IntegrationDialog';
 import { PreviewContext, PreviewWorkdirContext, type PreviewTarget } from '../components/preview/PreviewContext';
@@ -77,7 +78,7 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
   const [detailVersion, setDetailVersion] = useState(0);
   const [integrationOpen, setIntegrationOpen] = useState(false);
   const [integrationVersion, setIntegrationVersion] = useState(0);
-  const { view, hasMore, loadingOlder, loadOlder, skills } = useSessionThread(sessionId);
+  const { view, hasMore, loadingOlder, loadOlder, skills, usage, calls, workflowUsage } = useSessionThread(sessionId);
   const running = view.running;
   const run = view.run;
   const waiting = runWaiting(run, running, view.lastDone);
@@ -507,6 +508,8 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
       <PreviewWorkdirContext.Provider value={detail?.project.workdir}>
         <PlanActionsContext.Provider value={planActions}>
           <IntegrationInviteContext.Provider value={integrationInvite}>
+            <CallUsageContext.Provider value={calls}>
+            <WorkflowUsageContext.Provider value={workflowUsage}>
         <div className="flex min-h-0 min-w-0 grow">
           {run && <RunRail run={run} running={running} onStop={handleStopWorkflow} />}
           <main className="flex min-h-0 min-w-0 flex-[999_1_560px] flex-col">
@@ -657,6 +660,7 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
           <ContextPanel
             view={view}
             skills={skills}
+            usage={usage}
             hasSession={sessionId !== null}
             partial={hasMore}
             worktree={detail?.worktree ?? null}
@@ -678,6 +682,8 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
             <PreviewPane sessionId={sessionId} target={preview} onClose={() => setPreview(null)} />
           )}
         </div>
+            </WorkflowUsageContext.Provider>
+            </CallUsageContext.Provider>
           </IntegrationInviteContext.Provider>
         </PlanActionsContext.Provider>
       </PreviewWorkdirContext.Provider>

@@ -104,3 +104,14 @@ pub fn db_path() -> Result<PathBuf, String> {
     }
     Ok(path)
 }
+
+impl Settings {
+    /// `FENNEC_USAGE_DB`, default `usage.db` next to the store. A file of its
+    /// own: the usage ledger must outlive the sessions and survive a store reset.
+    pub fn usage_path(&self) -> PathBuf {
+        match std::env::var_os("FENNEC_USAGE_DB") {
+            Some(p) => PathBuf::from(p),
+            None => self.db_path.with_file_name("usage.db"),
+        }
+    }
+}

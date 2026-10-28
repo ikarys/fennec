@@ -12,6 +12,7 @@ use crate::domain::event::Event;
 use crate::domain::slash::TurnInput;
 use crate::instructions::all_instructions;
 use crate::llm::OpenAiClient;
+use crate::metering::MeteredLog;
 use crate::protected;
 use crate::skills;
 use crate::store::SqliteStore;
@@ -128,8 +129,14 @@ pub(super) fn with_turn<R>(
     body: impl FnOnce(&mut Turn, &LocalTools) -> Result<R, String>,
 ) -> Result<R, String> {
     let store = SqliteStore::open(&settings.db_path)?;
-    let log = NotifyingLog {
+    let ledger = token_usage::Ledger::open(&settings.usage_path()).map_err(|e| e.to_string())?;
+    let metered = MeteredLog {
         log: &store,
+        store: &store,
+        ledger: &ledger,
+    };
+    let log = NotifyingLog {
+        log: &metered,
         notifier,
     };
     let prefs = store.preferences()?;

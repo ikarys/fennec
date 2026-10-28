@@ -12,6 +12,7 @@ mod git;
 mod instructions;
 mod integration;
 mod llm;
+mod metering;
 mod protected;
 mod skills;
 mod store;
