@@ -587,6 +587,7 @@ mod tests {
             name: "write_file".into(),
             arguments: json!({"path": "hello.txt", "content": "hi"}),
             parse_error: None,
+            raw_arguments: None,
         };
         let model = Scripted(RefCell::new(vec![
             reply("", vec![call]),
@@ -619,6 +620,7 @@ mod tests {
             name: "run_command".into(),
             arguments: json!({}),
             parse_error: Some("bad".into()),
+            raw_arguments: None,
         };
         // A 1000-token window leaves no headroom: any measured context fills it.
         let full = Completion {
@@ -669,6 +671,7 @@ mod tests {
             name: "run_command".into(),
             arguments: json!({}),
             parse_error: Some("bad".into()),
+            raw_arguments: None,
         };
         let model = Scripted(RefCell::new(vec![
             reply("", vec![call]),
@@ -789,6 +792,7 @@ mod tests {
             name: "ask_user".into(),
             arguments: json!({"question": "Which color?"}),
             parse_error: None,
+            raw_arguments: None,
         };
         let model = Scripted(RefCell::new(vec![
             reply("", vec![call]),
@@ -836,6 +840,7 @@ mod tests {
             name: "propose_criteria".into(),
             arguments: json!({"criteria":[{"description":"builds","check":"true"}],"reason":"the old check cannot run"}),
             parse_error: None,
+            raw_arguments: None,
         };
         let model = Scripted(RefCell::new(vec![
             reply("", vec![call]),
@@ -880,6 +885,7 @@ mod tests {
             name: "propose_criteria".into(),
             arguments: json!({"criteria":[{"description":"builds","check":"true"}],"reason":"the old check cannot run"}),
             parse_error: None,
+            raw_arguments: None,
         };
         let model = Scripted(RefCell::new(vec![
             reply("", vec![call]),
@@ -910,6 +916,7 @@ mod tests {
             name: "record_decision".into(),
             arguments: json!({"title":"Storage","choice":"SQLite","reason":"one file","alternatives":["Postgres"]}),
             parse_error: None,
+            raw_arguments: None,
         };
         let model = Scripted(RefCell::new(vec![
             reply("", vec![call]),
@@ -933,12 +940,14 @@ mod tests {
             name: "ask_user".into(),
             arguments: json!({"question": "Proceed?"}),
             parse_error: None,
+            raw_arguments: None,
         };
         let read = ToolCall {
             id: "c2".into(),
             name: "read_file".into(),
             arguments: json!({"path": "x.txt"}),
             parse_error: None,
+            raw_arguments: None,
         };
         let model = Scripted(RefCell::new(vec![reply("", vec![ask, read])]));
         let stop = AtomicBool::new(false);
@@ -958,6 +967,7 @@ mod tests {
             name: "write_file".into(),
             arguments: json!({"path": "hello.txt", "content": "hi"}),
             parse_error: None,
+            raw_arguments: None,
         };
         let model = Scripted(RefCell::new(vec![
             reply("", vec![write]),
@@ -997,6 +1007,7 @@ mod tests {
                         name: "write_file".into(),
                         arguments: json!({}),
                         parse_error: None,
+                        raw_arguments: None,
                     },
                 },
             )
@@ -1030,6 +1041,7 @@ mod tests {
             name: "ask_user".into(),
             arguments: json!({}),
             parse_error: None,
+            raw_arguments: None,
         };
         let model = Scripted(RefCell::new(vec![
             reply("", vec![call]),
@@ -1056,6 +1068,7 @@ mod tests {
             name: "write_file".into(),
             arguments: json!({"path": "hello.txt", "content": "hi"}),
             parse_error: None,
+            raw_arguments: None,
         };
         let model = Scripted(RefCell::new(vec![
             reply("", vec![call]),
