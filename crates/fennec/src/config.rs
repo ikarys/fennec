@@ -2,7 +2,7 @@
 //! The environment values are defaults; stored preferences override them.
 
 use crate::domain::preferences::{ModelParams, Preferences};
-use crate::llm::{ListedModel, list_models};
+use llm_providers::{Endpoint, ListedModel, list_models};
 use std::path::PathBuf;
 
 #[derive(Clone)]
@@ -41,7 +41,11 @@ impl LlmSettings {
         // fennec still starts when the endpoint is down: the human reaches
         // the UI, and the model chosen in Settings (or FENNEC_MODEL) is used
         // once the endpoint is back.
-        let listed = list_models(&base_url, api_key.as_deref()).unwrap_or_else(|e| {
+        let endpoint = Endpoint {
+            base_url: base_url.clone(),
+            api_key: api_key.clone(),
+        };
+        let listed = list_models(&endpoint).unwrap_or_else(|e| {
             eprintln!(
                 "fennec: the model endpoint did not answer ({e}); starting without its listing"
             );
@@ -77,6 +81,13 @@ impl LlmSettings {
             },
             listed,
         })
+    }
+
+    pub fn endpoint(&self) -> Endpoint {
+        Endpoint {
+            base_url: self.base_url.clone(),
+            api_key: self.api_key.clone(),
+        }
     }
 
     /// The parameters the next turn should use, after stored preferences.

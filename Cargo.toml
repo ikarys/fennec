@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/fennec", "crates/token-usage"]
+members = ["crates/fennec", "crates/llm-providers", "crates/token-usage"]
 
 [workspace.package]
 edition = "2024"
