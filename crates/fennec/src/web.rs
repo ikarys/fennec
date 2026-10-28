@@ -12,8 +12,10 @@ mod notifier;
 mod preview;
 mod routes;
 mod session_name;
+mod session_usage;
 mod turns;
 mod workflow_routes;
+mod workflow_usage;
 
 use crate::agent::ports::EventLog;
 use crate::config::Settings;
@@ -140,7 +142,17 @@ pub fn serve(port: u16, settings: Settings) -> Result<(), String> {
     });
     // Fail now rather than on the first request. No turn runs yet, so a log
     // still marked running was cut by a crash.
-    let closed = app.store()?.close_dangling_turns()?;
+    let store = app.store()?;
+    // Idempotent: calls recorded before the ledger existed join it once.
+    let ledger =
+        token_usage::Ledger::open(&app.settings.usage_path()).map_err(|e| e.to_string())?;
+    let imported = crate::metering::backfill(&store, &ledger)?;
+    if imported > 0 {
+        eprintln!(
+            "fennec · {imported} past model call(s) added to or labelled in the usage ledger"
+        );
+    }
+    let closed = store.close_dangling_turns()?;
     if closed > 0 {
         eprintln!("fennec · closed {closed} turn(s) left open by a crash");
     }

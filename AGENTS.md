@@ -130,6 +130,8 @@ crates/fennec/src/
   llm/               Model adapter: openai.rs (client), sse.rs (stream parser), models.rs (/models listing)
   store.rs           EventLog adapter: SQLite (openfox's schema), projects and sessions;
                      store/settings.rs the stored preferences
+  metering.rs        the usage ledger adapter: MeteredLog (an EventLog that also writes each model call
+                     to the ledger) and the backfill of past calls; store/calls.rs reads them from the log
   git.rs             what fennec reads from a repository
   worktree.rs        a session's git worktree: a workflow never writes the human's tree
   integration.rs     the human's integration: preview of a worktree branch, cherry-pick, conflict abort
@@ -148,6 +150,8 @@ crates/fennec/src/
                      workflow_routes, children (child sessions for workflow nodes),
                      preview (a project's files in a sandboxed origin)
   cli/               terminal adapter: commands, transcript
+crates/token-usage/ the usage ledger, a crate of its own and fennec-free (calls, tokens, speed, savings;
+                     SQLite file `usage.db`, `FENNEC_USAGE_DB`): outlives sessions, reusable by other products
 crates/fennec/build.rs   embeds web/dist (placeholder page when not built)
 web/src/           React + Vite + Tailwind v4 UI (same layout as openfox's web/src)
   pages/             one component per route: HomePage, SessionPage, SettingsPage, WorkflowsPage (lazy)
