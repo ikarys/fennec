@@ -2,6 +2,7 @@
 //! committed and integrate it as one commit into the human's repository on
 //! confirmation.
 
+use std::collections::HashMap;
 use std::path::Path;
 
 use serde::Serialize;
@@ -23,6 +24,8 @@ pub struct Preview {
     pub commits: Vec<Commit>,
     /// Paths relative to the repository top.
     pub files: Vec<String>,
+    /// Lines added and removed per file of `files` (binary files count 0).
+    pub counts: HashMap<String, (u64, u64)>,
     pub human_branch: Option<String>,
     /// The branch the run started from; `None` for older worktrees or a
     /// detached HEAD.
@@ -64,12 +67,31 @@ pub fn preview(top: &Path, wt: &Worktree) -> Result<Preview, String> {
         .map(String::from)
         .collect();
 
+    let numstat = git(top, &["diff", "--numstat", &wt.base, &wt.branch], None)?;
+    let counts = parse_numstat(&String::from_utf8_lossy(&numstat));
+
     Ok(Preview {
         commits,
         files,
+        counts,
         human_branch: crate::git::current_branch(top),
         origin_branch: origin_branch(top, wt),
     })
+}
+
+/// `git diff --numstat` lines (`added<TAB>removed<TAB>path`); binary files
+/// show `-` and count 0.
+fn parse_numstat(out: &str) -> HashMap<String, (u64, u64)> {
+    out.lines()
+        .filter_map(|line| {
+            let mut parts = line.splitn(3, '\t');
+            let (added, removed, path) = (parts.next()?, parts.next()?, parts.next()?);
+            Some((
+                path.to_string(),
+                (added.parse().unwrap_or(0), removed.parse().unwrap_or(0)),
+            ))
+        })
+        .collect()
 }
 
 /// The protected files among `files` (relative to the repository top).
@@ -156,6 +178,15 @@ pub fn apply(top: &Path, wt: &Worktree, message: &str) -> Result<String, ApplyEr
 
 #[cfg(test)]
 mod tests {
+    use super::parse_numstat;
+
+    #[test]
+    fn numstat_counts_lines_and_zeroes_binary_files() {
+        let counts = parse_numstat("3\t1\ta.rs\n-\t-\timg.png\n");
+        assert_eq!(counts["a.rs"], (3, 1));
+        assert_eq!(counts["img.png"], (0, 0));
+    }
+
     use super::*;
     use crate::domain::id::new_id;
     use crate::worktree::{commit, open, remove, top};

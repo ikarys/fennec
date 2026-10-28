@@ -206,6 +206,8 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
                         {file.path}
                       </span>
                       {file.protected && <Badge tone="err">protégé</Badge>}
+                      <span className="shrink-0 tabular-nums text-ok">+{file.added}</span>
+                      <span className="shrink-0 tabular-nums text-err">−{file.removed}</span>
                     </div>
                   ))}
                 </div>
