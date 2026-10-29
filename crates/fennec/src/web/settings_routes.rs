@@ -169,6 +169,7 @@ pub fn save_settings(app: &App, req: &Request, stream: &mut TcpStream) -> Result
         Err(e) => return error(stream, 400, &format!("invalid preferences: {e}")),
     };
     prefs.migrate();
+    prefs.forget_orphan_favorites();
     if let Err(e) = prefs.validate() {
         return error(stream, 400, &e);
     }

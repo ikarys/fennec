@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, lazy, Suspense } from 'react';
-import type { Config, Project, ProviderListing, SettingsResponse } from './lib/api';
-import { createProject, getConfig, getProjects, getSettings } from './lib/api';
+import type { Project, ProviderListing, SettingsResponse } from './lib/api';
+import { createProject, getProjects, getSettings } from './lib/api';
 import { applyTheme, getStoredTheme, type ThemeId } from './lib/theme';
 import { TopBar, type TabInfo } from './components/layout/TopBar';
 import { HomePage } from './pages/HomePage';
@@ -90,7 +90,6 @@ export default function App() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [projectsError, setProjectsError] = useState<string | null>(null);
-  const [config, setConfig] = useState<Config | null>(null);
   const [settings, setSettings] = useState<SettingsResponse | null>(null);
   const [tabs, setTabs] = useState<string[]>(() => loadTabs());
   const [activeTabId, setActiveTabId] = useState<string | null>(() => loadActiveTab());
@@ -149,12 +148,6 @@ export default function App() {
   }, [refreshProjects]);
 
   useEffect(() => {
-    getConfig()
-      .then(setConfig)
-      .catch(() => setConfig(null));
-  }, []);
-
-  useEffect(() => {
     getSettings()
       .then(setSettings)
       .catch(() => setSettings(null));
@@ -162,10 +155,6 @@ export default function App() {
 
   const handleSettingsSaved = useCallback((next: SettingsResponse) => {
     setSettings(next);
-    // The resolved model and window shown in the context panel may change.
-    getConfig()
-      .then(setConfig)
-      .catch(() => setConfig(null));
   }, []);
 
   // A provider listing refreshed on demand (the fetch button) replaces that
@@ -370,7 +359,6 @@ export default function App() {
               testWorkflowId={route.name === 'new' ? route.testWorkflowId : null}
               pseudoTabId={pseudoTabId}
               projects={projects}
-              config={config}
               onSessionCreated={handleSessionCreated}
               onRunningChanged={refreshProjects}
               onRenamed={refreshProjects}
