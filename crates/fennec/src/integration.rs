@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
+use crate::domain::diff::{ChangedLines, changed_lines};
 use crate::domain::protection::Protection;
 use crate::worktree::{Worktree, git, origin_branch};
 
@@ -158,6 +159,32 @@ pub fn protected_touched(files: &[String], prefix: &str, protection: &Protection
             protection.is_protected(relative)
         })
         .cloned()
+        .collect()
+}
+
+/// The lines the agent's branch adds and removes, per file under the project
+/// (`files` relative to the repository top, the result relative to the
+/// project: the `prefix` is stripped, files outside it are skipped). A file
+/// git cannot diff (binary) changes no line.
+pub fn changed_files(
+    top: &Path,
+    wt: &Worktree,
+    files: &[String],
+    prefix: &str,
+) -> Vec<(String, ChangedLines)> {
+    files
+        .iter()
+        .filter_map(|file| Some((file, file.strip_prefix(prefix)?)))
+        .map(|(file, relative)| {
+            let diff = git(
+                top,
+                &["diff", "--unified=0", &wt.base, &wt.branch, "--", file],
+                None,
+            )
+            .map(|out| String::from_utf8_lossy(&out).into_owned())
+            .unwrap_or_default();
+            (relative.to_string(), changed_lines(&diff))
+        })
         .collect()
 }
 

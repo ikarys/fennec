@@ -27,6 +27,13 @@ function blockerSentence(blocker: Blocker): string {
       const more = blocker.violations.length - shown.length;
       return `Règles d'architecture violées : ${shown.join(' ; ')}${more > 0 ? ` (+${more})` : ''}.`;
     }
+    case 'suppressionsAdded': {
+      const shown = blocker.suppressions.slice(0, 3).map((s) => `${s.path} : « ${s.line} » (${s.marker})`);
+      const more = blocker.suppressions.length - shown.length;
+      return `Vérifications désactivées dans les lignes ajoutées : ${shown.join(' ; ')}${more > 0 ? ` (+${more})` : ''}.`;
+    }
+    case 'testsWeakened':
+      return `Tests affaiblis : ${blocker.testsRemoved} test(s) et ${blocker.assertionsRemoved} assertion(s) en moins (${blocker.paths.join(', ')}).`;
     case 'branchChanged':
       return `Le run est parti de ${blocker.from}, tu es maintenant sur ${blocker.to ?? 'un HEAD détaché'} : les commits iraient ailleurs.`;
     case 'localChanges':

@@ -77,8 +77,19 @@ integration dialog appends the integrated test files to `.agents/protected`
 Architecture guard, done: `.agents/architecture` (`<path prefix> forbids <text>`) is
 checked on the lines an integration adds; a violation is a blocker the human accepts
 (`domain/architecture.rs`, `architecture.rs`).
-Next, one PR each: the rest of fennec's own layer → sub-agents as tools, when dogfooding shows sessions
-saturating their context while exploring.
+Bypass detection, done: added lines that silence a lint, a type check or a test, and
+tests or assertions removed on balance, are blockers the human accepts (`domain/bypass.rs`).
+Next, one PR each: fennec's own layer, the tools that keep the human the author
+(capabilities C* of the Notion definition):
+1. An Architecture page per project: ADRs in `docs/adr/` (MADR, protected; an agent's
+   `decision.recorded` becomes an ADR proposal the human accepts), then audits
+   (read-only `audit` agent, fixed report format), then diagrams in Mermaid
+   (verified when extracted from the code, indicative when drawn by a model).
+2. Tooled human review (C9): a risk map (deterministic), a narrative diff (indicative).
+3. Knowledge map (C11): per module, reviewed by a human or never reviewed.
+4. Understanding dialogue (C10), then produced architecture and drift (C12),
+   security checks orchestrating known tools (C23), waivers (C7).
+Later: sub-agents as tools, when dogfooding shows sessions saturating their context.
 
 ## Layout
 
@@ -111,6 +122,8 @@ crates/fennec/src/
     protection.rs      protected files: the defaults, the gitignore-like patterns, the matcher
     test_files.rs      which paths are tests; the lines an integration appends to `.agents/protected`
     integration.rs     the review gate: what blocks an integration until the human accepts it
+    diff.rs            the lines a unified diff adds and removes
+    bypass.rs          what silences a gate: suppression markers added, tests or assertions removed
     workflow/          a workflow: definition (nodes, ports, edges), template ({{…}} names),
                        validate (the graph rules), run (the run folded from its events, the next step)
     id.rs, clock.rs
