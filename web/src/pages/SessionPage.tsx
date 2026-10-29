@@ -38,6 +38,7 @@ import { PreviewPane } from '../components/preview/PreviewPane';
 import { RunRail } from '../components/workflow/session/RunRail';
 import { RunActionCard } from '../components/workflow/session/RunActionCard';
 import { Button, buttonClass } from '../components/ui/Button';
+import { ChevronDownIcon } from '../components/Icons';
 import {
   DEFAULT_WORKFLOW_ID,
   defaultWorkflowSelection,
@@ -83,6 +84,7 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
   const run = view.run;
   const waiting = runWaiting(run, running, view.lastDone);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
   // Mirrors stickToBottom for rendering: the button that resumes it.
   const [awayFromBottom, setAwayFromBottom] = useState(false);
@@ -152,6 +154,22 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
       element.scrollTop = element.scrollHeight;
     }
   }, [view, detail]);
+
+  useEffect(() => {
+    // Content that grows after a render (images, re-wrap) widens the distance
+    // from the bottom with no view change, so the pin above never fires:
+    // watch the content and re-pin while following.
+    const element = scrollRef.current;
+    const content = contentRef.current;
+    if (!element || !content) return;
+    const observer = new ResizeObserver(() => {
+      if (stickToBottom.current) {
+        element.scrollTop = element.scrollHeight;
+      }
+    });
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const element = scrollRef.current;
@@ -529,54 +547,64 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
           </div>
         </div>
 
-        <div
-          ref={scrollRef}
-          onScroll={(event) => {
-            const element = event.currentTarget;
-            stickToBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80;
-            setAwayFromBottom(!stickToBottom.current);
-          }}
-          className="min-h-0 grow overflow-y-auto p-6"
-        >
-          {awayFromBottom && (
-            <div className="pointer-events-none sticky top-[calc(100%-2.5rem)] z-10 flex h-0 items-start justify-end">
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                iconOnly
-                title="Aller en bas et suivre la suite"
-                onClick={() => {
-                  const element = scrollRef.current;
-                  if (element) element.scrollTo({ top: element.scrollHeight, behavior: 'smooth' });
-                }}
-                aria-label="Aller en bas"
-                className="pointer-events-auto rounded-full shadow-md"
-              >
-                ↓
-              </Button>
+        <div className="relative min-h-0 grow">
+          <div
+            ref={scrollRef}
+            onScroll={(event) => {
+              const element = event.currentTarget;
+              const distance = element.scrollHeight - element.scrollTop - element.clientHeight;
+              // Hysteresis: disengage beyond 120px, re-engage within 40px, so a
+              // small move does not toggle follow.
+              if (stickToBottom.current) {
+                if (distance > 120) {
+                  stickToBottom.current = false;
+                  setAwayFromBottom(true);
+                }
+              } else if (distance <= 40) {
+                stickToBottom.current = true;
+                setAwayFromBottom(false);
+              }
+            }}
+            className="h-full overflow-y-auto p-6"
+          >
+            <div ref={contentRef} className="mx-auto flex max-w-[820px] flex-col gap-4.5">
+              {sessionId && hasMore && (
+                <Button className="mx-auto" onClick={handleLoadOlder} disabled={loadingOlder}>
+                  {loadingOlder ? 'Chargement…' : 'Charger les messages précédents'}
+                </Button>
+              )}
+              {view.items.length === 0 && !sessionId && (
+                <div className="py-10 text-center text-sm text-muted">Nouvelle session · écris ton premier message.</div>
+              )}
+              {view.items.map((item, index) => (
+                <ThreadItemView
+                  key={item.id}
+                  item={item}
+                  model={config?.model ?? 'modèle'}
+                  running={running}
+                  showHeader={view.items[index - 1]?.kind !== 'assistant'}
+                  onReplay={sessionId ? handleReplay : undefined}
+                />
+              ))}
             </div>
-          )}
-          <div className="mx-auto flex max-w-[820px] flex-col gap-4.5">
-            {sessionId && hasMore && (
-              <Button className="mx-auto" onClick={handleLoadOlder} disabled={loadingOlder}>
-                {loadingOlder ? 'Chargement…' : 'Charger les messages précédents'}
-              </Button>
-            )}
-            {view.items.length === 0 && !sessionId && (
-              <div className="py-10 text-center text-sm text-muted">Nouvelle session · écris ton premier message.</div>
-            )}
-            {view.items.map((item, index) => (
-              <ThreadItemView
-                key={item.id}
-                item={item}
-                model={config?.model ?? 'modèle'}
-                running={running}
-                showHeader={view.items[index - 1]?.kind !== 'assistant'}
-                onReplay={sessionId ? handleReplay : undefined}
-              />
-            ))}
           </div>
+          {awayFromBottom && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              iconOnly
+              title="Aller en bas et suivre la suite"
+              onClick={() => {
+                const element = scrollRef.current;
+                if (element) element.scrollTo({ top: element.scrollHeight, behavior: 'smooth' });
+              }}
+              aria-label="Aller en bas"
+              className="absolute bottom-4 right-6 rounded-full shadow-md backdrop-blur"
+            >
+              <ChevronDownIcon className="h-4 w-4" />
+            </Button>
+          )}
         </div>
 
         {view.pendingQuestion && !running && !waiting && !detail?.parentId && (

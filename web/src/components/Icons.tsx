@@ -361,6 +361,24 @@ export function ChevronRightIcon({ className }: IconProps) {
 }
 
 
+/** Down chevron: jumps a thread back to its latest message. */
+export function ChevronDownIcon({ className }: IconProps) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+
 /** Arrow pointing up-right: opens a linked page, here a child session. */
 export function ExternalIcon({ className }: IconProps) {
   return (
