@@ -128,7 +128,7 @@ fn with_turn(
 ) -> Result<DoneReason, String> {
     let workdir = std::env::current_dir().map_err(|e| e.to_string())?;
     let prefs = store.preferences()?;
-    let params = settings.llm.for_turn(&prefs);
+    let params = settings.llm.for_turn(&prefs, None);
     let instructions = all_instructions(prefs.global_instructions.as_deref(), &workdir);
     eprintln!(
         "session {session_id} · {} · {}",

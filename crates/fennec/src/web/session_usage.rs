@@ -37,6 +37,8 @@ impl SessionUsageView {
 #[serde(rename_all = "camelCase")]
 pub struct CallView {
     pub message_id: String,
+    /// The model that answered: the thread names it, not today's choice.
+    pub model: String,
     /// `↑ 12,3k · cache 82 % · ↓ 345 · 4,2 s`
     pub line: String,
     /// The same figures in full, with the speeds.
@@ -99,6 +101,7 @@ fn view(message_id: &str, call: &CallRecord) -> CallView {
     let fresh = usage.prompt_tokens.saturating_sub(usage.cached_tokens);
     CallView {
         message_id: message_id.to_string(),
+        model: call.model.clone(),
         line: format!(
             "↑ {} · cache {} % · ↓ {} · {}",
             display::tokens(usage.prompt_tokens),

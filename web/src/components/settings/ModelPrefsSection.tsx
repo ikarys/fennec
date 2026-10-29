@@ -1,4 +1,4 @@
-import type { ParamSource, ProviderListing, ReasoningEffort, SettingsDefaults } from '../../lib/api';
+import type { ModelRef, ParamSource, ProviderListing, ReasoningEffort, SettingsDefaults } from '../../lib/api';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { FieldRow, Select, TextInput } from '../ui/Field';
@@ -14,6 +14,8 @@ interface ModelPrefsSectionProps {
   listings: ProviderListing[];
   values: Record<string, ModelForm>;
   defaults: SettingsDefaults;
+  favorites: ModelRef[];
+  onToggleFavorite: (ref: ModelRef) => void;
   onChange: (key: string, field: keyof ModelForm, value: string) => void;
 }
 
@@ -51,7 +53,7 @@ export function percentFromFraction(fraction: number): string {
   return String(Number((fraction * 100).toFixed(2)));
 }
 
-export function ModelPrefsSection({ listings, values, defaults, onChange }: ModelPrefsSectionProps) {
+export function ModelPrefsSection({ listings, values, defaults, favorites, onToggleFavorite, onChange }: ModelPrefsSectionProps) {
   return (
     <Card className="p-4">
       <div className="flex flex-col gap-4">
@@ -65,9 +67,25 @@ export function ModelPrefsSection({ listings, values, defaults, onChange }: Mode
               const key = `${listing.provider}/${model.id}`;
               const value =
                 values[key] ?? { maxTokens: '', contextWindow: '', compactionThreshold: '', reasoningEffort: '' };
+              const isFavorite = favorites.some(
+                (favorite) => favorite.provider === listing.provider && favorite.model === model.id
+              );
               return (
                 <div key={key} className="flex flex-col gap-4">
-                  <h3 className="font-mono text-sm font-medium">{model.id}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="min-w-0 truncate font-mono text-sm font-medium">{model.id}</h3>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      iconOnly
+                      aria-label="Afficher dans le composer"
+                      title={isFavorite ? 'Retirer des favoris' : 'Afficher dans le composer'}
+                      onClick={() => onToggleFavorite({ provider: listing.provider, model: model.id })}
+                      className="ml-auto"
+                    >
+                      {isFavorite ? '★' : '☆'}
+                    </Button>
+                  </div>
                   <div className="grid gap-3 md:grid-cols-2">
                     <FieldRow label="Tokens max par réponse">
                       <TextInput

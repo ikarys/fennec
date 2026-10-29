@@ -29,13 +29,6 @@ export interface Project {
   sessions: SessionSummary[];
 }
 
-export interface Config {
-  model: string;
-  contextWindow: number;
-  /** The fraction of the window at which a session compacts; 0 disables. */
-  compactAt: number;
-}
-
 export interface SlashCommand {
   name: string;
   description: string;
@@ -103,10 +96,32 @@ export interface ModelRef {
   model: string;
 }
 
+export interface ModelChoice {
+  provider: string;
+  model: string;
+  providerName: string;
+}
+
+export interface ModelChoices {
+  default: ModelChoice;
+  favorites: ModelChoice[];
+}
+
+export interface SessionModel {
+  provider: string;
+  model: string;
+  providerName: string;
+  contextWindow: number;
+  compactAt: number;
+  source: 'session' | 'parent' | 'default';
+}
+
 export interface Preferences {
   selected: ModelRef | null;
   providers: Provider[];
   display: DisplayPrefs;
+  /** Models the composer offers as favourites. */
+  favorites?: ModelRef[];
   /** openfox `globalInstructions`: added to the system prompt of new sessions. */
   globalInstructions?: string | null;
   /** openfox search.*: the web_search tool's SearXNG instance. */
@@ -172,6 +187,8 @@ export interface SessionDetail {
   id: string;
   title: string;
   state: SessionState;
+  /** The session's model, resolved by the server. */
+  model: SessionModel;
   /** The agent id the session resolves to, or null when it has none. */
   mode: string | null;
   /** The parent session id, or null for a top-level session. */
@@ -277,10 +294,6 @@ export function listFolders(path?: string): Promise<FolderListing> {
   return request<FolderListing>(`/api/folders${query}`);
 }
 
-export function getConfig(): Promise<Config> {
-  return request<Config>('/api/config');
-}
-
 export function getSettings(): Promise<SettingsResponse> {
   return request<SettingsResponse>('/api/settings');
 }
@@ -325,6 +338,17 @@ export function listAgents(projectId: string): Promise<Agent[]> {
 
 export function getSession(id: string): Promise<SessionDetail> {
   return request<SessionDetail>(`/api/sessions/${encodeURIComponent(id)}`);
+}
+
+export function getModelChoices(): Promise<ModelChoices> {
+  return request<ModelChoices>('/api/models/choices');
+}
+
+export function setSessionModel(id: string, ref: ModelRef): Promise<{ model: SessionModel }> {
+  return request<{ model: SessionModel }>(`/api/sessions/${encodeURIComponent(id)}/model`, {
+    method: 'POST',
+    body: JSON.stringify(ref)
+  });
 }
 
 /** A session's skills folded from its log: loaded so far, and still in the model's view. */
@@ -473,7 +497,8 @@ export function createSession(
   prompt: string,
   mode?: string,
   attachments?: AttachmentInput[],
-  workflow?: { workflowId: string; stepByStep: boolean; worktree: boolean }
+  workflow?: { workflowId: string; stepByStep: boolean; worktree: boolean },
+  model?: ModelRef
 ): Promise<{ id: string }> {
   // `mode` is optional: omit it so the server applies its default resolution.
   const body: {
@@ -484,6 +509,7 @@ export function createSession(
     workflowId?: string;
     stepByStep?: boolean;
     worktree?: boolean;
+    model?: ModelRef;
   } = { projectId, prompt };
   if (mode != null) {
     body.mode = mode;
@@ -495,6 +521,9 @@ export function createSession(
     body.workflowId = workflow.workflowId;
     body.stepByStep = workflow.stepByStep;
     body.worktree = workflow.worktree;
+  }
+  if (model) {
+    body.model = model;
   }
   return request<{ id: string }>('/api/sessions', {
     method: 'POST',
@@ -658,6 +687,8 @@ export function stopWorkflow(sessionId: string, runId: string): Promise<void> {
 /** What sits under one answer, written by the server from the usage ledger. */
 export interface CallUsage {
   messageId: string;
+  /** The model that answered this call. */
+  model: string;
   line: string;
   detail: string;
   /** On the last call of a turn only. */
