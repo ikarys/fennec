@@ -1,3 +1,4 @@
+import { modelShortName } from './ModelPicker';
 import { memo, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -114,7 +115,8 @@ function AssistantItemView({ item, model, running, showHeader }: { item: Assista
     <div className="flex flex-col gap-2.5">
       {showHeader && (
         <div className="flex items-center gap-2 text-xs text-muted">
-          <span className="font-semibold text-text">{model}</span>
+          {/* The model that answered, from the ledger; the session's current one while it streams. */}
+          <span className="font-semibold text-text">{call ? modelShortName(call.model) : model}</span>
           <span className="rounded border border-border px-1.5 text-[0.6875rem]">produit par le modèle</span>
         </div>
       )}

@@ -28,6 +28,7 @@ with camelCase fields.
 | `chat.ask_user` | `{callId, question, type?: "text"\|"confirm"\|"choice", options?: [{value, label, description?}]}`: the model asked the human a question; the turn ends and the answer arrives as the next turn's input |
 | `turn.snapshot` | `{cachedSystemPrompt, cachedTools?}`: the session's system prompt and tool definitions, frozen at its first turn (a session from before `cachedTools` gets a second snapshot that freezes them) |
 | `mode.changed` | `{mode, auto, reason?}`: the human switched the session's agent; it applies from the next turn |
+| `model.changed` | `{model: {provider, model}}`: the human chose the session's model (fennec's own); it applies from the next turn, and a workflow's child sessions inherit it |
 | `session.rewound` | `{messageId}`: fennec's replay cut; the model's view drops that message and everything after it, the log keeps them |
 | `session.name_generated` | `{name}`: the model-generated session title; the server renames the session and wakes the event stream |
 | `workflow.started` | `{runId, workflow, task, stepByStep}`: `workflow` is the whole definition, frozen for the run |
@@ -71,7 +72,10 @@ or `"idle"` if none.
 The Settings page stores `Preferences` in SQLite. Environment variables are
 defaults; stored preferences override them per turn, without a restart.
 
-A turn runs on `selected`, a model of a provider. The provider `local` is the
+A turn runs on the session's model (its last `model.changed`, else its parent
+session's), else on `selected`, the default model of the Settings page.
+`favorites` lists the models the composer offers first, in the human's order.
+A model belongs to a provider. The provider `local` is the
 environment's endpoint (`FENNEC_LLM_URL`, `FENNEC_API_KEY`); a stored entry
 with id `local` overrides only what it sets. The model id is sent to the
 provider as is: `local` never appears on the wire.
@@ -187,7 +191,11 @@ read-only. The human edits them as usual.
   single listing in the `listings` shape (with `resolved` per model). Re-lists
   one provider's `/models` now, using the request's `baseUrl`/`apiKey` when
   they are not (yet) stored, so a new provider can be probed before saving;
-  empty parts fall back to the stored/env endpoint
+  empty parts fall back to the stored/env endpoint; the stored key is reused
+  only for the stored `baseUrl`, never sent to another one
+- `GET /api/models/choices` → `{default, favorites}`, each a
+  `{provider, model, providerName}`: what the composer's model picker offers;
+  read from the stored preferences, no provider is called
 - `GET /api/projects` → `[{id, name, workdir, branch, sessions: [{id, title, state, createdAt, updatedAt}]}]`
   (sessions newest first; `createdAt`/`updatedAt` are Unix milliseconds; `branch` may be `null`)
 - `POST /api/projects` `{workdir}` → the project (400 if not a directory)
@@ -199,7 +207,9 @@ read-only. The human edits them as usual.
 - `GET /api/folders?path=<absolute path>` → `{path, parent, folders: [{name, path, hidden, repo}]}`,
   the sub-folders of `path` (the home directory when omitted), sorted by name;
   `repo` marks a git repository; 400 if `path` cannot be read
-- `GET /api/sessions/{id}` → `{id, title, state, mode, project: {id, name, workdir}, worktree}`;
+- `GET /api/sessions/{id}` → `{id, title, state, mode, model, project: {id, name, workdir}, worktree}`;
+  `model` is `{provider, model, providerName, contextWindow, compactAt, source}`,
+  what the next turn runs on; `source` is `session`, `parent` or `default`;
   `worktree` is `{path, branch, base, editorUrl}` (`editorUrl` opens the copy in VS Code, through the WSL remote under WSL) when the session (or its root session) runs a workflow in
   its own git worktree, else null; the human takes the agent's work with
   `git cherry-pick <base>..<branch>`;
@@ -273,7 +283,9 @@ read-only. The human edits them as usual.
   `consumers` (null before any call was broken down) has the shape of `/context`'s `composition`: each call's input
   tokens spread pro rata of its prompt's text over its parts (ledger breakdown keys `<kind>/<label>`), summed over
   the period; indicative.
-- `POST /api/sessions` `{projectId, prompt, mode?, attachments?}` → `{id}`;
+- `POST /api/sessions` `{projectId, prompt, mode?, model?, attachments?}` → `{id}`;
+  `model` is `{provider, model}` (400 if empty or the provider is unknown),
+  recorded as `model.changed` before the first turn;
   the turn starts at once; `mode` is optional, validated against the
   project's agents before the session is created (400 if unknown) and applied
   before the first turn; `attachments` is `[{filename, data}]` (data a
@@ -302,6 +314,10 @@ read-only. The human edits them as usual.
 - `POST /api/sessions/{id}/mode` `{mode}` → 200 `{mode}`; 404 if no session;
   400 with `unknown mode: <mode>` if the id is not a top-level agent; appends
   `mode.changed` when the mode changes; allowed while a turn runs
+- `POST /api/sessions/{id}/model` `{provider, model}` → 200 `{model}` (the
+  session's `model` as in `GET /api/sessions/{id}`); 404 if no session; 400 if
+  the model is empty or the provider unknown; 409 while a workflow runs;
+  appends `model.changed`
 - `POST /api/sessions/{id}/stop` → 202; the turn ends with `chat.done` reason `"stopped"`
 - `GET /api/sessions/{id}/events` → Server-Sent Events. Each stored event is sent as
 

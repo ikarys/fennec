@@ -2,6 +2,7 @@
 //! the event log, and can be stopped. One turn at a time per session.
 
 use super::children::Children;
+use super::model_routes;
 use super::notifier::{Notifier, NotifyingLog};
 use crate::agent::turn::{Turn, compact_session, replay_turn, run_turn};
 use crate::agent::workflow::{WorkflowEnv, WorkflowJob, run_workflow};
@@ -140,7 +141,9 @@ pub(super) fn with_turn<R>(
         notifier,
     };
     let prefs = store.preferences()?;
-    let params = settings.llm.for_turn(&prefs);
+    // A workflow's child sessions run on the model the human chose for the session.
+    let (chosen, _) = model_routes::session_choice(&store, session_id)?;
+    let params = settings.llm.for_turn(&prefs, chosen.as_ref());
     let instructions = all_instructions(prefs.global_instructions.as_deref(), workdir);
     let skills = skills::discover(workdir);
     let agents = agents::discover(workdir);
