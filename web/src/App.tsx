@@ -331,7 +331,6 @@ export default function App() {
             navigate(tabPath(id));
           }}
           onCloseTab={closeTab}
-          onNewSession={() => startNewSession()}
           onOpenPalette={() => setPaletteOpen(true)}
         />
 
@@ -387,7 +386,6 @@ export default function App() {
           onNewSession={(projectId) => startNewSession(projectId)}
           onOpenProjectDialog={() => setProjectDialogOpen(true)}
           onHome={() => navigate('#/')}
-          onWorkflows={() => navigate('#/workflows')}
         />
 
         <ProjectDialog
