@@ -7,6 +7,7 @@ import { HomePage } from './pages/HomePage';
 import { SessionPage } from './pages/SessionPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { InsightPage } from './pages/InsightPage';
+import { ArchitecturePage } from './pages/ArchitecturePage';
 import { Palette } from './components/Palette';
 import { ProjectDialog } from './components/project/ProjectDialog';
 import { DisplayPrefsProvider, defaultDisplayPrefs } from './lib/display';
@@ -19,6 +20,7 @@ type Route =
   | { name: 'new'; id: string; testWorkflowId: string | null }
   | { name: 'settings' }
   | { name: 'insight' }
+  | { name: 'architecture'; projectId: string | null }
   | { name: 'workflows'; projectId: string | null; workflowId: string | null; isNew: boolean };
 
 const TABS_KEY = 'fennec.tabs';
@@ -31,6 +33,10 @@ function parseRoute(): Route {
   }
   if (hash === '#/insight') {
     return { name: 'insight' };
+  }
+  if (hash.startsWith('#/architecture')) {
+    const id = hash.slice('#/architecture/'.length);
+    return { name: 'architecture', projectId: id ? decodeURIComponent(id) : null };
   }
   if (hash.startsWith('#/workflows')) {
     const path = hash.slice(12); // Remove '#/workflows'
@@ -350,6 +356,8 @@ export default function App() {
                 isNew={route.isNew}
               />
             </Suspense>
+          ) : route.name === 'architecture' ? (
+            <ArchitecturePage projects={projects} projectId={route.projectId} />
           ) : route.name === 'insight' ? (
             <InsightPage />
           ) : (
