@@ -48,6 +48,21 @@ minor findings goes to `accept` directly, the findings listed for the human.
 Fixed: the review node has a third outcome, `minor`, wired straight to the
 human node; its question lists the review's findings.
 
+## Abandoning the work left a run asking for approval — fixed
+
+2026-10-28. A session planned an increment and paused on "Go with this plan?".
+The human abandoned the worktree ("Abandonner ce travail") while a sibling
+session did and integrated the same increment. Reopening the first session
+still showed the pending approval: answering it would have built the plan in
+the human's tree, on a main that already contained the work — redoing it.
+
+Fixed: discarding the worktree ends a run still waiting on the human
+(`run::finish_on_discard`, appended as `workflow.finished` with outcome
+`stopped`, reason "the work was abandoned"). The run is no longer active, so
+the approval card is no longer actionable; a `RunEndCard` shows the outcome
+and the reason. To redo the work, the human starts a new session (a fresh
+context on the current main).
+
 ## The local inference server takes the machine down — open
 
 2026-10-25. The local LLM brought the GPU driver down (`dxg` timeouts in the
