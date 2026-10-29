@@ -60,7 +60,7 @@ impl Settings {
     }
 
     /// The master key file is read only when a sealed key is used.
-    fn resolve_api_key(&self, key: ApiKey) -> Result<Option<String>, String> {
+    pub(crate) fn resolve_api_key(&self, key: ApiKey) -> Result<Option<String>, String> {
         key.resolve(|sealed| {
             let master = MasterKey::load_or_create(&self.secret_path())
                 .map_err(|e| format!("read the master key: {e}"))?;
