@@ -148,10 +148,17 @@ impl SqliteStore {
             .optional()?)
     }
 
+    /// Most recently active first (the newest event of its top-level
+    /// sessions, else their creation), then by name.
     pub fn projects(&self) -> Result<Vec<Project>> {
-        let mut stmt = self
-            .db
-            .prepare("SELECT id, name, workdir FROM projects ORDER BY name")?;
+        let mut stmt = self.db.prepare(
+            "SELECT p.id, p.name, p.workdir FROM projects p
+             ORDER BY (SELECT MAX(COALESCE(
+                          (SELECT MAX(e.timestamp) FROM events e WHERE e.session_id = s.id),
+                          CAST(s.created_at AS INTEGER)))
+                       FROM sessions s WHERE s.project_id = p.id AND s.parent_id IS NULL) DESC,
+                      p.name",
+        )?;
         let rows = stmt.query_map([], project_row)?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
@@ -417,6 +424,31 @@ fn project_row(r: &rusqlite::Row) -> rusqlite::Result<Project> {
 mod tests {
     use super::*;
     use crate::domain::workflow::run::RunOutcome;
+
+    #[test]
+    fn projects_list_the_most_recently_active_first() {
+        let store = SqliteStore::in_memory().unwrap();
+        let idle = store.project_for("/a").unwrap();
+        let busy = store.project_for("/b").unwrap();
+        store.project_for("/c").unwrap();
+        store.create_session(&idle, "t").unwrap();
+        let sid = store.create_session(&busy, "t").unwrap();
+        let later = store.session(&sid).unwrap().unwrap().updated_at + 1;
+        store
+            .db
+            .execute(
+                "INSERT INTO events (session_id, seq, timestamp, event_type, payload) VALUES (?1, 99, ?2, 'x', '{}')",
+                rusqlite::params![sid, later as i64],
+            )
+            .unwrap();
+        let workdirs: Vec<_> = store
+            .projects()
+            .unwrap()
+            .into_iter()
+            .map(|p| p.workdir)
+            .collect();
+        assert_eq!(workdirs, ["/b", "/a", "/c"]);
+    }
 
     #[test]
     fn a_finished_workflow_awaits_integration_until_discarded() {
