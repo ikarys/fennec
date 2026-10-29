@@ -79,16 +79,20 @@ checked on the lines an integration adds; a violation is a blocker the human acc
 (`domain/architecture.rs`, `architecture.rs`).
 Bypass detection, done: added lines that silence a lint, a type check or a test, and
 tests or assertions removed on balance, are blockers the human accepts (`domain/bypass.rs`).
+ADRs, done: an Architecture page per project (`#/architecture`) lists the MADR files of
+`docs/adr/`, protected (`domain/adr.rs`, `adr.rs`). Not the agents' recorded decisions:
+those explain one change, an ADR binds the project.
 Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
-1. An Architecture page per project: ADRs in `docs/adr/` (MADR, protected; an agent's
-   `decision.recorded` becomes an ADR proposal the human accepts), then audits
-   (read-only `audit` agent, fixed report format), then diagrams in Mermaid
-   (verified when extracted from the code, indicative when drawn by a model).
-2. Tooled human review (C9): a risk map (deterministic), a narrative diff (indicative).
-3. Knowledge map (C11): per module, reviewed by a human or never reviewed.
-4. Understanding dialogue (C10), then produced architecture and drift (C12),
-   security checks orchestrating known tools (C23), waivers (C7).
+1. The project map, on the Architecture page ("understand this project"): modules and
+   their dependencies extracted from the code (verified, a generated Mermaid diagram),
+   entry points and tests per module; then risk zones (C11: churn, untested, never
+   reviewed by a human, deterministic); then explanations with their file:line sources
+   and questions to an agent (C10, indicative).
+2. Audits: a read-only `audit` agent, fixed report format.
+3. Tooled human review (C9): a risk map (deterministic), a narrative diff (indicative).
+4. Produced architecture and drift (C12), security checks orchestrating known tools
+   (C23), waivers (C7).
 Later: sub-agents as tools, when dogfooding shows sessions saturating their context.
 
 ## Layout
@@ -124,6 +128,7 @@ crates/fennec/src/
     integration.rs     the review gate: what blocks an integration until the human accepts it
     diff.rs            the lines a unified diff adds and removes
     bypass.rs          what silences a gate: suppression markers added, tests or assertions removed
+    adr.rs             architecture decision records: a MADR file read (number, title, status, date)
     workflow/          a workflow: definition (nodes, ports, edges), template ({{…}} names),
                        validate (the graph rules), run (the run folded from its events, the next step)
     id.rs, clock.rs
@@ -160,9 +165,11 @@ crates/fennec/src/
                      ~/.agents/workflows, the project's .agents/workflows (the project wins)
   folders.rs         the folders the human browses to open a project
   protected.rs       the project's protected files: .agents/protected read, the existing paths found
+  adr.rs             the project's ADR files in docs/adr/, listed
   web/               HTTP adapter: http, guard (who may call), routes, settings_routes, event_stream (SSE),
                      notifier (wakes streams on append, no polling), turns, assets,
-                     workflow_routes, model_routes (the composer's model choices, a session's model),
+                     workflow_routes, architecture_routes (the Architecture page),
+                     model_routes (the composer's model choices, a session's model),
                      children (child sessions for workflow nodes),
                      preview (a project's files in a sandboxed origin), session_usage,
                      workflow_usage, context_view and insight (display-ready token figures: the UI computes none)
@@ -175,7 +182,7 @@ crates/llm-providers/ talking to models, a crate of its own and fennec-free: the
 crates/fennec/build.rs   embeds web/dist (placeholder page when not built)
 web/src/           React + Vite + Tailwind v4 UI (same layout as openfox's web/src)
   pages/             one component per route: HomePage, SessionPage, SettingsPage, InsightPage,
-                     WorkflowsPage (lazy)
+                     ArchitecturePage, WorkflowsPage (lazy)
   components/        ui/ the primitives every screen uses (Button, Badge, SectionLabel, Card, Panel, fields);
                      shared UI; session/ the thread, tool cards, question card, message stats, composer,
                      context panel; project/ the folder browser; layout/ the top bar;

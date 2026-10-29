@@ -603,6 +603,24 @@ export function getRunEventsBefore(id: string, before: number): Promise<EventPag
   return request<EventPageEntry[]>(`/api/sessions/${encodeURIComponent(id)}/workflow/run?${params}`);
 }
 
+/** An ADR file of the project's `docs/adr/` (verified: read from disk). */
+export interface Adr {
+  number: number;
+  file: string;
+  title: string;
+  status: string | null;
+  date: string | null;
+  body: string;
+}
+
+export interface Architecture {
+  adrs: Adr[];
+}
+
+export function getArchitecture(projectId: string): Promise<Architecture> {
+  return request<Architecture>(`/api/projects/${encodeURIComponent(projectId)}/architecture`);
+}
+
 export function listWorkflows(projectId: string): Promise<WorkflowSummary[]> {
   return request<WorkflowSummary[]>(`/api/projects/${encodeURIComponent(projectId)}/workflows`);
 }
