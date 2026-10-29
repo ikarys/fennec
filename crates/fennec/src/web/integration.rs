@@ -12,7 +12,7 @@ use crate::domain::criteria::{CriterionState, CriterionStatus};
 use crate::domain::decision::{Decision, decisions_in_force};
 use crate::domain::event::Event;
 use crate::domain::integration::{
-    Blocker, blockers, commit_message, default_message, unacknowledged,
+    Blocker, DiffChecks, blockers, commit_message, default_message, unacknowledged,
 };
 use crate::domain::test_files::new_test_patterns;
 use crate::domain::workflow::run;
@@ -68,7 +68,8 @@ fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Result<Gate, (u16, S
         .collect();
     let test_files = new_test_patterns(&in_project, &protection);
     let rules = architecture::load(Path::new(&project.workdir));
-    let violations = architecture::violations(&top, &wt, &preview.files, &prefix, &rules);
+    let changed = integration::changed_files(&top, &wt, &preview.files, &prefix);
+    let checks = DiffChecks::of(&rules, &changed);
     let events = store.events(&session.id)?;
     let decisions = decisions_in_force(&events);
     let criteria = run::current_run(&events)
@@ -78,7 +79,7 @@ fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Result<Gate, (u16, S
         preview.commits.len(),
         &criteria,
         &protected_touched,
-        &violations,
+        &checks,
         preview.origin_branch.as_deref(),
         preview.human_branch.as_deref(),
         &preview.local_changes,

@@ -3,8 +3,37 @@
 
 use serde::Serialize;
 
-use super::architecture::Violation;
+use super::architecture::{Rules, Violation};
+use super::bypass::{self, Suppression, TestsWeakened};
 use super::criteria::{CriterionState, CriterionStatus};
+use super::diff::ChangedLines;
+
+/// What the branch's diff tells the gate, checked on its lines.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct DiffChecks {
+    pub violations: Vec<Violation>,
+    pub suppressions: Vec<Suppression>,
+    pub weakened: Option<TestsWeakened>,
+}
+
+impl DiffChecks {
+    /// `files`: (path relative to the project, its changed lines).
+    pub fn of(rules: &Rules, files: &[(String, ChangedLines)]) -> DiffChecks {
+        let mut violations = Vec::new();
+        let mut suppressions = Vec::new();
+
+        for (path, lines) in files {
+            violations.extend(rules.check(path, &lines.added));
+            suppressions.extend(bypass::suppressions(path, &lines.added));
+        }
+
+        DiffChecks {
+            violations,
+            suppressions,
+            weakened: bypass::tests_weakened(files),
+        }
+    }
+}
 
 /// What blocks an integration, shown to the human before they confirm it.
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -31,6 +60,14 @@ pub enum Blocker {
     ProtectedTouched { paths: Vec<String> },
     /// Added lines that break the project's `.agents/architecture` rules.
     ArchitectureViolated { violations: Vec<Violation> },
+    /// Added lines that silence a lint, a type check or a test.
+    SuppressionsAdded { suppressions: Vec<Suppression> },
+    /// The branch removes more tests or assertions than it adds.
+    TestsWeakened {
+        tests_removed: usize,
+        assertions_removed: usize,
+        paths: Vec<String>,
+    },
 }
 
 impl Blocker {
@@ -44,18 +81,21 @@ impl Blocker {
             Blocker::NoCriteria => "noCriteria",
             Blocker::ProtectedTouched { .. } => "protectedTouched",
             Blocker::ArchitectureViolated { .. } => "architectureViolated",
+            Blocker::SuppressionsAdded { .. } => "suppressionsAdded",
+            Blocker::TestsWeakened { .. } => "testsWeakened",
         }
     }
 }
 
 /// The blockers of an integration, in the order the UI shows them:
 /// `NoCommits` first, then the branch, then the human's uncommitted changes,
-/// then the criteria, then the protected files, then the architecture rules.
+/// then the criteria, then the protected files, then the architecture rules,
+/// then the added suppressions, then the weakened tests.
 pub fn blockers(
     commits: usize,
     criteria: &[CriterionState],
     protected_touched: &[String],
-    violations: &[Violation],
+    checks: &DiffChecks,
     origin_branch: Option<&str>,
     human_branch: Option<&str>,
     local_changes: &[String],
@@ -102,9 +142,23 @@ pub fn blockers(
         });
     }
 
-    if !violations.is_empty() {
+    if !checks.violations.is_empty() {
         out.push(Blocker::ArchitectureViolated {
-            violations: violations.to_vec(),
+            violations: checks.violations.clone(),
+        });
+    }
+
+    if !checks.suppressions.is_empty() {
+        out.push(Blocker::SuppressionsAdded {
+            suppressions: checks.suppressions.clone(),
+        });
+    }
+
+    if let Some(weakened) = &checks.weakened {
+        out.push(Blocker::TestsWeakened {
+            tests_removed: weakened.tests_removed,
+            assertions_removed: weakened.assertions_removed,
+            paths: weakened.paths.clone(),
         });
     }
 
@@ -213,25 +267,43 @@ mod tests {
             .key(),
             "protectedTouched"
         );
+        assert_eq!(
+            Blocker::SuppressionsAdded {
+                suppressions: vec![Suppression {
+                    path: "a.rs".into(),
+                    line: "#[allow(x)]".into(),
+                    marker: "#[allow(".into(),
+                }]
+            }
+            .key(),
+            "suppressionsAdded"
+        );
+        assert_eq!(
+            Blocker::TestsWeakened {
+                tests_removed: 1,
+                assertions_removed: 0,
+                paths: vec!["a.rs".into()],
+            }
+            .key(),
+            "testsWeakened"
+        );
     }
 
     #[test]
-    fn architecture_violations_block_last() {
+    fn architecture_violations_block_after_protected_files() {
         let violation = Violation {
             path: "a.rs".into(),
             line: "use std::fs;".into(),
             prefix: "".into(),
             forbidden: "std::fs".into(),
         };
-        let found = blockers(
-            1,
-            &[],
-            &[],
-            std::slice::from_ref(&violation),
-            None,
-            None,
-            &[],
-        );
+        let checks = DiffChecks {
+            violations: vec![violation.clone()],
+            ..Default::default()
+        };
+
+        let found = blockers(1, &[], &[], &checks, None, None, &[]);
+
         assert_eq!(
             found,
             vec![
@@ -244,11 +316,88 @@ mod tests {
     }
 
     #[test]
+    fn suppressions_and_weakened_tests_block_after_architecture() {
+        let violation = Violation {
+            path: "a.rs".into(),
+            line: "use std::fs;".into(),
+            prefix: "".into(),
+            forbidden: "std::fs".into(),
+        };
+        let suppression = Suppression {
+            path: "a.rs".into(),
+            line: "#[allow(x)]".into(),
+            marker: "#[allow(".into(),
+        };
+        let checks = DiffChecks {
+            violations: vec![violation.clone()],
+            suppressions: vec![suppression.clone()],
+            weakened: Some(TestsWeakened {
+                tests_removed: 1,
+                assertions_removed: 0,
+                paths: vec!["a.rs".into()],
+            }),
+        };
+
+        let found = blockers(1, &[], &[], &checks, None, None, &[]);
+
+        assert_eq!(
+            found,
+            vec![
+                Blocker::NoCriteria,
+                Blocker::ArchitectureViolated {
+                    violations: vec![violation]
+                },
+                Blocker::SuppressionsAdded {
+                    suppressions: vec![suppression]
+                },
+                Blocker::TestsWeakened {
+                    tests_removed: 1,
+                    assertions_removed: 0,
+                    paths: vec!["a.rs".into()],
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn diff_checks_of_collects_violations_suppressions_and_weakened() {
+        let rules = Rules::parse("src/ forbids std::fs");
+        let files = vec![(
+            "src/a.rs".to_string(),
+            ChangedLines {
+                added: vec![
+                    String::from("use std::fs;"),
+                    String::from("#[allow(unused)]"),
+                ],
+                removed: vec![String::from("#[test]")],
+            },
+        )];
+
+        let checks = DiffChecks::of(&rules, &files);
+
+        assert_eq!(checks.violations.len(), 1);
+        assert_eq!(checks.violations[0].forbidden, "std::fs");
+        assert_eq!(checks.suppressions.len(), 1);
+        assert_eq!(checks.suppressions[0].marker, "#[allow(");
+        let weakened = checks.weakened.unwrap();
+        assert_eq!(weakened.tests_removed, 1);
+        assert_eq!(weakened.paths, vec!["src/a.rs".to_string()]);
+    }
+
+    #[test]
     fn blockers_are_ordered_no_commits_then_criteria_then_protected() {
         let criteria = vec![state("C1", verified_failed())];
         let protected = vec!["AGENTS.md".to_string()];
 
-        let blockers = blockers(0, &criteria, &protected, &[], None, None, &[]);
+        let blockers = blockers(
+            0,
+            &criteria,
+            &protected,
+            &DiffChecks::default(),
+            None,
+            None,
+            &[],
+        );
 
         assert_eq!(
             blockers,
@@ -267,7 +416,7 @@ mod tests {
     #[test]
     fn no_criteria_is_a_blocker() {
         assert_eq!(
-            blockers(1, &[], &[], &[], None, None, &[]),
+            blockers(1, &[], &[], &DiffChecks::default(), None, None, &[]),
             vec![Blocker::NoCriteria]
         );
     }
@@ -277,7 +426,15 @@ mod tests {
         let local = vec!["a.rs".to_string()];
         let criteria = vec![state("C1", verified_failed())];
 
-        let found = blockers(1, &criteria, &[], &[], Some("main"), Some("main"), &local);
+        let found = blockers(
+            1,
+            &criteria,
+            &[],
+            &DiffChecks::default(),
+            Some("main"),
+            Some("main"),
+            &local,
+        );
         assert_eq!(
             found,
             vec![
@@ -290,7 +447,15 @@ mod tests {
             ]
         );
 
-        let found = blockers(1, &[], &[], &[], Some("main"), Some("feature"), &local);
+        let found = blockers(
+            1,
+            &[],
+            &[],
+            &DiffChecks::default(),
+            Some("main"),
+            Some("feature"),
+            &local,
+        );
         assert_eq!(
             found[0],
             Blocker::BranchChanged {
@@ -318,7 +483,7 @@ mod tests {
             state("C2", verified_failed()),
         ];
 
-        let blockers = blockers(1, &criteria, &[], &[], None, None, &[]);
+        let blockers = blockers(1, &criteria, &[], &DiffChecks::default(), None, None, &[]);
 
         assert_eq!(
             blockers,
@@ -330,7 +495,7 @@ mod tests {
 
     /// The branch blocker alone: the other blockers are tested above.
     fn branch_blocker(origin: Option<&str>, human: Option<&str>) -> Option<Blocker> {
-        blockers(1, &[], &[], &[], origin, human, &[])
+        blockers(1, &[], &[], &DiffChecks::default(), origin, human, &[])
             .into_iter()
             .find(|blocker| matches!(blocker, Blocker::BranchChanged { .. }))
     }
