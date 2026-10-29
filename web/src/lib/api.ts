@@ -429,12 +429,20 @@ export interface ArchitectureViolation {
   forbidden: string;
 }
 
+export interface Suppression {
+  path: string;
+  line: string;
+  marker: string;
+}
+
 export type Blocker =
   | { kind: 'noCommits' }
   | { kind: 'criteriaNotPassed'; criteria: string[] }
   | { kind: 'noCriteria' }
   | { kind: 'protectedTouched'; paths: string[] }
   | { kind: 'architectureViolated'; violations: ArchitectureViolation[] }
+  | { kind: 'suppressionsAdded'; suppressions: Suppression[] }
+  | { kind: 'testsWeakened'; testsRemoved: number; assertionsRemoved: number; paths: string[] }
   | { kind: 'branchChanged'; from: string; to: string | null }
   | { kind: 'localChanges'; paths: string[] };
 

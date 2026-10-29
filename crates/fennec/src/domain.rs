@@ -4,12 +4,14 @@
 pub mod agent;
 pub mod architecture;
 pub mod attachment;
+pub mod bypass;
 pub mod clock;
 pub mod compaction;
 pub mod context_parts;
 pub mod conversation;
 pub mod criteria;
 pub mod decision;
+pub mod diff;
 pub mod event;
 pub mod frontmatter;
 pub mod id;

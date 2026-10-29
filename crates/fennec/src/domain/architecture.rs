@@ -49,11 +49,6 @@ impl Rules {
         Rules { rules }
     }
 
-    /// True when the human wrote no usable rule.
-    pub fn is_empty(&self) -> bool {
-        self.rules.is_empty()
-    }
-
     /// Check the added lines of `path` against every rule.
     ///
     /// A rule applies when `path` starts with its prefix. An added line is
@@ -96,33 +91,6 @@ pub struct Violation {
     pub line: String,
     pub prefix: String,
     pub forbidden: String,
-}
-
-/// Extract the added lines from a unified diff, which may contain several
-/// files.
-///
-/// Lines before the first `@@` of a file are headers; a `diff --git ` line
-/// starts a new file's header again. Inside a hunk, a line starting with `+`
-/// is an added line with that one `+` removed, so `++i;` yields `+i;`.
-pub fn added_lines(diff: &str) -> Vec<String> {
-    let mut added = Vec::new();
-    let mut in_hunk = false;
-
-    for line in diff.lines() {
-        if line.starts_with("diff --git ") {
-            in_hunk = false;
-            continue;
-        }
-        if line.starts_with("@@") {
-            in_hunk = true;
-            continue;
-        }
-        if in_hunk && line.starts_with('+') {
-            added.push(line[1..].to_string());
-        }
-    }
-
-    added
 }
 
 #[cfg(test)]
@@ -186,41 +154,12 @@ mod tests {
     }
 
     #[test]
-    fn added_lines_ignores_headers_context_and_removed_lines() {
-        let diff = "+++ b/src/a.rs
-@@ -1,2 +1,3 @@
- context
-+added one
--removed
-+
-++kept
-";
-        assert_eq!(added_lines(diff), vec!["added one", "", "+kept"]);
-    }
-
-    #[test]
-    fn added_lines_handles_several_files_in_one_diff() {
-        let diff = "diff --git a/x b/x
---- a/x
-+++ b/x
-@@ -1 +1 @@
-+one
-diff --git a/y b/y
---- a/y
-+++ b/y
-@@ -1 +1 @@
-+two
-";
-        assert_eq!(added_lines(diff), vec!["one", "two"]);
-    }
-
-    #[test]
     fn empty_rules_report_nothing() {
         let rules = Rules::parse(
             "# only a comment
 ",
         );
-        assert!(rules.is_empty());
+        assert!(rules.rules.is_empty());
         assert!(
             rules
                 .check("src/a.rs", &[String::from("anything")])
