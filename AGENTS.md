@@ -101,6 +101,7 @@ crates/fennec/src/
     open_calls.rs      tool calls left without a result (ask_user, stop, crash)
     compaction.rs      where the model's view starts, when to compact, the resume message
     preferences.rs     what the human chose on the Settings page; resolves a turn's model parameters
+    model_choice.rs    the model a session runs on: its last `model.changed`
     skill.rs           openfox skills/types: a SKILL.md package, its frontmatter, the text load_skill returns
     slash.rs           openfox tasks/slash: what a typed /compact or /<skill> stands for
     agent.rs           an agent (mode) and its reminder; frontmatter.rs the shared YAML header
@@ -148,7 +149,8 @@ crates/fennec/src/
   protected.rs       the project's protected files: .agents/protected read, the existing paths found
   web/               HTTP adapter: http, guard (who may call), routes, settings_routes, event_stream (SSE),
                      notifier (wakes streams on append, no polling), turns, assets,
-                     workflow_routes, children (child sessions for workflow nodes),
+                     workflow_routes, model_routes (the composer's model choices, a session's model),
+                     children (child sessions for workflow nodes),
                      preview (a project's files in a sandboxed origin), session_usage,
                      workflow_usage, context_view and insight (display-ready token figures: the UI computes none)
   cli/               terminal adapter: commands, transcript
