@@ -3,6 +3,7 @@
 
 use super::attachment::Attachment;
 use super::criteria::{Criterion, CriterionStatus};
+use super::preferences::ModelRef;
 use super::stats::MessageStats;
 use super::workflow::definition::Workflow;
 use super::workflow::run::{RunOutcome, Via};
@@ -250,6 +251,9 @@ pub enum Event {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         reason: Option<String>,
     },
+    /// fennec's own (openfox has none): the human chose the session's model.
+    #[serde(rename = "model.changed", rename_all = "camelCase")]
+    ModelChanged { model: ModelRef },
     /// fennec's own (openfox deletes the events instead): the human replayed
     /// `message_id`; the model's view drops that message and everything after
     /// it, the log keeps them.
@@ -422,6 +426,7 @@ impl Event {
             Event::ContextCompacted { .. } => "context.compacted",
             Event::RunningChanged { .. } => "running.changed",
             Event::ModeChanged { .. } => "mode.changed",
+            Event::ModelChanged { .. } => "model.changed",
             Event::SessionRewound { .. } => "session.rewound",
             Event::SessionNameGenerated { .. } => "session.name_generated",
             Event::WorkflowStarted { .. } => "workflow.started",
@@ -490,6 +495,25 @@ mod tests {
                 auto: false,
                 reason: None
             } if mode == "builder"
+        ));
+
+        assert_eq!(serde_json::to_value(&event).unwrap(), wire);
+    }
+
+    #[test]
+    fn model_changed_round_trips() {
+        let wire = json!({
+            "type": "model.changed",
+            "data": {
+                "model": {"provider": "local", "model": "m"}
+            }
+        });
+
+        let event: Event = serde_json::from_value(wire.clone()).unwrap();
+        assert!(matches!(
+            &event,
+            Event::ModelChanged { model }
+                if model.provider == "local" && model.model == "m"
         ));
 
         assert_eq!(serde_json::to_value(&event).unwrap(), wire);
