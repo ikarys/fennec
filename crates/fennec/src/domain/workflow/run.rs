@@ -312,6 +312,20 @@ pub fn waiting(state: &RunState, events: &[Event]) -> Option<Waiting> {
     Some(Waiting::Interrupted)
 }
 
+/// The finish event the human's discard implies: a run still waiting on the
+/// human ends, so its pending question no longer outlives the work it
+/// decided.
+pub fn finish_on_discard(events: &[Event]) -> Option<Event> {
+    let state = current_run(events)?;
+    let _waiting = waiting(&state, events)?;
+    Some(Event::WorkflowFinished {
+        run_id: state.run_id.clone(),
+        outcome: RunOutcome::Stopped,
+        reason: Some("the work was abandoned".to_string()),
+        stats: None,
+    })
+}
+
 pub fn next_after(state: &RunState, from: &str, port: &str, in_branch: bool) -> Next {
     if state.steps >= state.workflow.max_steps {
         return Next::Finish {
@@ -1273,5 +1287,65 @@ mod tests {
     fn waiting_is_interrupted_when_nothing_is_open() {
         let state = state(simple_workflow());
         assert_eq!(waiting(&state, &[]), Some(Waiting::Interrupted));
+    }
+
+    #[test]
+    fn finish_on_discard_ends_a_run_waiting_on_the_human() {
+        let events = vec![
+            Event::WorkflowStarted {
+                run_id: "r".into(),
+                workflow: human_workflow(),
+                task: "t".into(),
+                step_by_step: false,
+            },
+            Event::WorkflowNodeStarted {
+                run_id: "r".into(),
+                node_id: "a".into(),
+                pass: 1,
+                via: Some(Via {
+                    from: "start".into(),
+                    port: "next".into(),
+                }),
+                child_session_id: None,
+                started_at: None,
+            },
+        ];
+        let finished = finish_on_discard(&events).unwrap();
+        assert!(
+            matches!(
+                finished,
+                Event::WorkflowFinished {
+                    ref run_id,
+                    outcome: RunOutcome::Stopped,
+                    reason: Some(_),
+                    ..
+                } if run_id == "r"
+            ),
+            "{finished:?}"
+        );
+    }
+
+    #[test]
+    fn finish_on_discard_is_none_when_the_run_is_finished() {
+        let events = vec![
+            Event::WorkflowStarted {
+                run_id: "r".into(),
+                workflow: simple_workflow(),
+                task: "t".into(),
+                step_by_step: false,
+            },
+            Event::WorkflowFinished {
+                run_id: "r".into(),
+                outcome: RunOutcome::Done,
+                reason: None,
+                stats: None,
+            },
+        ];
+        assert!(finish_on_discard(&events).is_none());
+    }
+
+    #[test]
+    fn finish_on_discard_is_none_without_a_run() {
+        assert!(finish_on_discard(&[]).is_none());
     }
 }
