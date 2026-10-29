@@ -92,14 +92,14 @@ pub fn preview(top: &Path, wt: &Worktree) -> Result<Preview, String> {
 }
 
 /// The human's uncommitted files among `files` that the cherry-pick would
-/// overwrite: unstaged edits and untracked files.
+/// overwrite: edits, staged or not (git refuses both), and untracked files.
 ///
-/// An unstaged edit only counts when the tree's content differs from both
+/// An edit only counts when the tree's content differs from both
 /// the base's and the branch's: git overwrites a local edit only when the
 /// pick writes something else. That keeps the common case open, where the
 /// worktree started from the human's same dirty work and committed it.
 fn local_changes(top: &Path, base: &str, branch: &str, files: &[String]) -> Vec<String> {
-    let modified = git_names(top, &["diff", "--name-only"]);
+    let modified = git_names(top, &["diff", "HEAD", "--name-only"]);
     let untracked = git_names(top, &["ls-files", "--others", "--exclude-standard"]);
     files
         .iter()
