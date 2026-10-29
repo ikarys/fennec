@@ -27,19 +27,23 @@ export function QuestionCard({
             {question.question}
           </div>
           {question.type === 'choice' && question.options.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-col items-start gap-1.5">
               {question.options.map((option, index) => (
                 <Button
                   key={option.value || index}
                   type="button"
                   variant={index === 0 ? 'primary' : 'secondary'}
                   size="sm"
+                  multiline
                   disabled={disabled}
                   onClick={() => onAnswer(option.value)}
-                  className="text-left [whitespace:normal]"
+                  className="max-w-full"
                 >
-                  <span className="font-medium">{option.label}</span>
-                  {option.description && <span className="text-muted">{option.description}</span>}
+                  <span>
+                    <span className="font-medium">{option.label}</span>
+                    {/* Inherits the variant's text colour, dimmed: readable on the accent too. */}
+                    {option.description && <span className="font-normal opacity-75"> {option.description}</span>}
+                  </span>
                 </Button>
               ))}
             </div>
