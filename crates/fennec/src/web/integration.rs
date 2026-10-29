@@ -288,6 +288,11 @@ pub fn discard(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Re
             commits: commits.clone(),
         },
     )?;
+    // Abandoning the work ends a run still waiting on the human: its pending
+    // question would otherwise outlive the work it decided.
+    if let Some(finished) = run::finish_on_discard(&store.events(&gate.session_id)?) {
+        log.append(&gate.session_id, &finished)?;
+    }
     send_json(stream, 200, &json!({ "commits": commits }))
 }
 
