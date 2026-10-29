@@ -4,8 +4,9 @@
 
 /// Always protected, whatever the project lists: fennec's own definitions
 /// (agents, skills, workflows, this list), the instructions, the lockfiles
-/// (a new dependency is the human's decision) and the CI.
-pub const DEFAULT_PATTERNS: [&str; 9] = [
+/// (a new dependency is the human's decision), the CI and the accepted ADRs
+/// (`docs/adr`: an agent proposes a decision, it never rewrites one).
+pub const DEFAULT_PATTERNS: [&str; 10] = [
     ".agents",
     "AGENTS.md",
     "CLAUDE.md",
@@ -15,6 +16,7 @@ pub const DEFAULT_PATTERNS: [&str; 9] = [
     "pnpm-lock.yaml",
     ".github",
     ".gitlab-ci.yml",
+    "docs/adr",
 ];
 
 #[derive(Debug, Clone, PartialEq, Default)]

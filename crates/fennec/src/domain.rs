@@ -1,6 +1,7 @@
 //! fennec's vocabulary, free of storage, network and UI: what a session is
 //! made of and how its log reads back as a conversation.
 
+pub mod adr;
 pub mod agent;
 pub mod architecture;
 pub mod attachment;

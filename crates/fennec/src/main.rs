@@ -1,6 +1,7 @@
 //! `fennec`: the composition root. Parses the command line, reads the
 //! settings and hands them to the web or terminal adapter.
 
+mod adr;
 mod agent;
 mod agents;
 mod architecture;
