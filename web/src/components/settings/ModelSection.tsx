@@ -28,7 +28,7 @@ export function ModelSection({ value, listings, stored, defaultModel, onChange }
     <Card className="p-4">
       <div className="flex flex-col gap-4">
         <h2 className="text-sm font-semibold">Modèle</h2>
-        <FieldRow label="Modèle">
+        <FieldRow label="Modèle par défaut">
           <Select value={value} onChange={(event) => onChange(event.target.value)} className="w-full">
             <option value="">Défaut de l'environnement ({defaultModel})</option>
             {listings.map((listing) => (
@@ -47,6 +47,9 @@ export function ModelSection({ value, listings, stored, defaultModel, onChange }
             )}
           </Select>
         </FieldRow>
+        <p className="m-0 text-xs text-muted">
+          Les nouvelles sessions l'utilisent ; le composer change celui d'une session. Les favoris (★) sont proposés dans le composer.
+        </p>
       </div>
     </Card>
   );

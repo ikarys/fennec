@@ -14,6 +14,7 @@ pub mod event;
 pub mod frontmatter;
 pub mod id;
 pub mod integration;
+pub mod model_choice;
 pub mod open_calls;
 pub mod preferences;
 pub mod project;

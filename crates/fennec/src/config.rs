@@ -1,7 +1,7 @@
 //! Settings from the environment: where the model is, where the store is.
 //! The environment values are defaults; stored preferences override them.
 
-use crate::domain::preferences::{LOCAL_PROVIDER, ModelParams, Preferences};
+use crate::domain::preferences::{LOCAL_PROVIDER, ModelParams, ModelRef, Preferences};
 use llm_providers::{ApiKey, Endpoint, ListedModel, MasterKey, list_models};
 use std::path::PathBuf;
 
@@ -132,8 +132,8 @@ impl LlmSettings {
     }
 
     /// The parameters the next turn should use, after stored preferences.
-    pub fn for_turn(&self, prefs: &Preferences) -> ModelParams {
-        prefs.resolve(&self.defaults, |selected| {
+    pub fn for_turn(&self, prefs: &Preferences, chosen: Option<&ModelRef>) -> ModelParams {
+        prefs.resolve(chosen, &self.defaults, |selected| {
             if selected.provider == LOCAL_PROVIDER {
                 self.listed
                     .iter()
@@ -345,13 +345,13 @@ mod tests {
             }),
             ..Default::default()
         };
-        assert_eq!(settings.llm.for_turn(&prefs).context_window, 64_000);
+        assert_eq!(settings.llm.for_turn(&prefs, None).context_window, 64_000);
 
         prefs.selected = Some(ModelRef {
             provider: "other".into(),
             model: "listed".into(),
         });
-        assert_eq!(settings.llm.for_turn(&prefs).context_window, 2048);
+        assert_eq!(settings.llm.for_turn(&prefs, None).context_window, 2048);
 
         let _ = std::fs::remove_dir_all(&dir);
     }

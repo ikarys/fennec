@@ -7,7 +7,7 @@ use super::notifier::NotifyingLog;
 use super::{
     assets,
     context_view::context_view,
-    event_stream, integration, session_name,
+    event_stream, integration, model_routes, session_name,
     session_usage::{SessionUsageView, call_views},
     settings_routes,
     turns::Job,
@@ -20,6 +20,7 @@ use crate::domain::agent::{resolve as agent_resolve, switch_to};
 use crate::domain::attachment::{Attachment, from_data_url};
 use crate::domain::event::Event;
 use crate::domain::id::new_id;
+use crate::domain::preferences::ModelRef;
 use crate::domain::project::{Project, SessionSummary};
 use crate::domain::replay::replayable;
 use crate::domain::slash::{TurnInput, commands, resolve};
@@ -37,7 +38,7 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
         ("GET", ["api", "config"]) => {
             let store = app.store()?;
             let prefs = store.preferences()?;
-            let params = app.settings.llm.for_turn(&prefs);
+            let params = app.settings.llm.for_turn(&prefs, None);
             send_json(
                 stream,
                 200,
@@ -50,6 +51,7 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
         ("POST", ["api", "settings", "providers", "list"]) => {
             settings_routes::list_provider(app, req, stream)
         }
+        ("GET", ["api", "models", "choices"]) => model_routes::choices(app, stream),
         ("GET", ["api", "folders"]) => list_folders(req, stream),
         ("GET", ["api", "projects"]) => list_projects(app, stream),
         ("POST", ["api", "projects"]) => open_project(app, req, stream),
@@ -80,6 +82,7 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
         ("POST", ["api", "sessions", id, "replay"]) => replay_message(app, req, stream, id),
         ("POST", ["api", "sessions", id, "compact"]) => compact_session(app, stream, id),
         ("POST", ["api", "sessions", id, "mode"]) => set_session_mode(app, req, stream, id),
+        ("POST", ["api", "sessions", id, "model"]) => model_routes::set_model(app, req, stream, id),
         ("POST", ["api", "sessions", id, "workflow"]) => {
             workflow_routes::start_workflow(app, req, stream, id)
         }
@@ -246,6 +249,21 @@ fn create_session(app: &App, req: &Request, stream: &mut TcpStream) -> Result<()
         }
         None => None,
     };
+    let prefs = store.preferences()?;
+    let model_ref = match body.get("model") {
+        Some(v) if !v.is_null() => {
+            let provider = v["provider"].as_str().unwrap_or("").to_string();
+            let model = v["model"].as_str().unwrap_or("").to_string();
+            if model.is_empty() {
+                return error(stream, 400, "model is empty");
+            }
+            if app.settings.endpoint(&prefs, &provider).is_err() {
+                return error(stream, 400, "unknown provider");
+            }
+            Some(ModelRef { provider, model })
+        }
+        _ => None,
+    };
     let mode = body.get("mode").and_then(Value::as_str).map(str::to_string);
     let mode_event = match &mode {
         Some(mode) => {
@@ -274,7 +292,10 @@ fn create_session(app: &App, req: &Request, stream: &mut TcpStream) -> Result<()
             prompt.clone(),
         );
     }
-    append_mode_event(app, &store, &id, mode_event)?;
+    append_human_event(app, &store, &id, mode_event)?;
+    if let Some(model) = model_ref {
+        append_human_event(app, &store, &id, Some(Event::ModelChanged { model }))?;
+    }
     let session = store.session(&id)?.ok_or("the new session vanished")?;
     match workflow {
         Some(found) => {
@@ -311,6 +332,7 @@ fn get_session(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String
     let mut v = session_json(app, &s);
     v["project"] = project_json(&p);
     v["mode"] = json!(mode);
+    v["model"] = model_routes::session_model(app, &store, &s.id)?;
     v["worktree"] = match app.place(&store, &s, &p)?.worktree {
         Some(wt) => json!({
             "path": wt.path, "branch": wt.branch, "base": wt.base,
@@ -350,7 +372,11 @@ fn serve_context(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), Stri
     if store.session(id)?.is_none() {
         return error(stream, 404, "no such session");
     }
-    let params = app.settings.llm.for_turn(&store.preferences()?);
+    let (chosen, _) = model_routes::session_choice(&store, id)?;
+    let params = app
+        .settings
+        .llm
+        .for_turn(&store.preferences()?, chosen.as_ref());
     let view = context_view(&store.events(id)?, params.context_window, params.compact_at);
     send_json(stream, 200, &json!(view))
 }
@@ -435,7 +461,7 @@ fn set_session_mode(
         Ok(event) => event,
         Err(e) => return error(stream, 400, &e),
     };
-    append_mode_event(app, &store, id, event)?;
+    append_human_event(app, &store, id, event)?;
     send_json(stream, 200, &json!({ "mode": mode }))
 }
 
@@ -615,7 +641,8 @@ fn project_json(p: &Project) -> Value {
     json!({ "id": p.id, "name": p.name, "workdir": p.workdir })
 }
 
-fn append_mode_event(
+/// Appends a choice the human made (mode, model) and wakes the session's streams.
+pub(super) fn append_human_event(
     app: &App,
     store: &SqliteStore,
     session_id: &str,
