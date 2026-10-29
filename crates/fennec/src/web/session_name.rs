@@ -32,7 +32,7 @@ fn generate(
 ) -> Result<(), String> {
     let store = SqliteStore::open(&settings.db_path)?;
     let prefs = store.preferences()?;
-    let params = settings.llm.for_turn(&prefs);
+    let params = settings.llm.for_turn(&prefs, None);
     let model = OpenAiClient::new(settings.endpoint(&prefs, &params.provider)?, &params.model);
     let stop = AtomicBool::new(false);
 

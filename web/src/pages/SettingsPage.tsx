@@ -33,6 +33,7 @@ interface SettingsPageProps {
 
 interface SettingsForm {
   model: string;
+  favorites: ModelRef[];
   providers: ProviderForm[];
   models: Record<string, ModelForm>;
   display: DisplayPrefs;
@@ -146,6 +147,7 @@ function toForm(preferences: Preferences, listings: ProviderListing[]): Settings
 
   return {
     model: preferences.selected ? `${preferences.selected.provider}/${preferences.selected.model}` : '',
+    favorites: preferences.favorites ?? [],
     providers: providerForms,
     models,
     display: preferences.display,
@@ -231,6 +233,7 @@ function buildPreferences(form: SettingsForm, settings: SettingsResponse): Prefe
 
   return {
     selected,
+    favorites: form.favorites,
     providers,
     display: form.display,
     globalInstructions: form.instructions.trim() === '' ? null : form.instructions,
@@ -263,6 +266,22 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
   function updateModel(value: string) {
     markDirty();
     setForm((previous) => (previous ? { ...previous, model: value } : previous));
+  }
+
+  function toggleFavorite(ref: ModelRef) {
+    markDirty();
+    setForm((previous) => {
+      if (!previous) return previous;
+      const exists = previous.favorites.some(
+        (favorite) => favorite.provider === ref.provider && favorite.model === ref.model
+      );
+      const favorites = exists
+        ? previous.favorites.filter(
+            (favorite) => !(favorite.provider === ref.provider && favorite.model === ref.model)
+          )
+        : [...previous.favorites, ref];
+      return { ...previous, favorites };
+    });
   }
 
   function updateModelField(key: string, field: keyof ModelForm, value: string) {
@@ -444,6 +463,8 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
                   listings={settings.listings}
                   values={form.models}
                   defaults={settings.defaults}
+                  favorites={form.favorites}
+                  onToggleFavorite={toggleFavorite}
                   onChange={updateModelField}
                 />
               </>

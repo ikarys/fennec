@@ -1,6 +1,16 @@
 import type { WorkflowSummary } from '../lib/workflow';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Agent, AttachmentInput, Config, Project, SessionDetail, SessionState, SlashCommand } from '../lib/api';
+import type {
+  Agent,
+  AttachmentInput,
+  ModelChoice,
+  ModelChoices,
+  ModelRef,
+  Project,
+  SessionDetail,
+  SessionState,
+  SlashCommand
+} from '../lib/api';
 import type { AssistantItem, Segment } from '../lib/fold';
 import { splitContract } from '../lib/plan';
 import {
@@ -9,6 +19,7 @@ import {
   continueWorkflow,
   createSession,
   getSession,
+  getModelChoices,
   listAgents,
   listCommands,
   listWorkflows,
@@ -16,6 +27,7 @@ import {
   resumeWorkflow,
   sendMessage,
   setSessionMode,
+  setSessionModel,
   startWorkflow,
   stopSession,
   stopWorkflow
@@ -25,6 +37,7 @@ import { stateLabel } from '../lib/format';
 import { runWaiting } from '../lib/workflowRun';
 import { useSessionThread } from '../hooks/useSessionThread';
 import { Composer } from '../components/session/Composer';
+import { modelShortName } from '../components/session/ModelPicker';
 import { ContextPanel } from '../components/session/ContextPanel';
 import { ContextGauge } from '../components/session/ContextGauge';
 import { QuestionCard } from '../components/session/QuestionCard';
@@ -52,7 +65,6 @@ interface SessionPageProps {
   testWorkflowId: string | null;
   pseudoTabId: string | null;
   projects: Project[];
-  config: Config | null;
   onSessionCreated: (newId: string, pseudoId: string | null) => void;
   /** Tabs and the palette show session states from the projects list. */
   onRunningChanged: () => void;
@@ -61,7 +73,7 @@ interface SessionPageProps {
 }
 
 
-export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId, projects, config, onSessionCreated, onRunningChanged, onRenamed }: SessionPageProps) {
+export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId, projects, onSessionCreated, onRunningChanged, onRenamed }: SessionPageProps) {
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [text, setText] = useState('');
   const [attachments, setAttachments] = useState<AttachmentInput[]>([]);
@@ -74,6 +86,9 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
   // Optimistic mode while `setSessionMode` is in flight; cleared once the
   // server's mode (event stream or detail) matches it.
   const [pendingMode, setPendingMode] = useState<string | null>(null);
+  const [modelChoices, setModelChoices] = useState<ModelChoices | null>(null);
+  const [pendingModel, setPendingModel] = useState<ModelRef | null>(null);
+  const modelRequestRef = useRef(0);
   const [planBuildInFlight, setPlanBuildInFlight] = useState(false);
   const [preview, setPreview] = useState<PreviewTarget | null>(null);
   const [detailVersion, setDetailVersion] = useState(0);
@@ -126,6 +141,20 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
       active = false;
     };
   }, [sessionId, detailVersion]);
+
+  useEffect(() => {
+    let active = true;
+    getModelChoices()
+      .then((data) => {
+        if (active) setModelChoices(data);
+      })
+      .catch(() => {
+        // The composer falls back to the session's model or '…'.
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     // A workflow's first turn creates the worktree: re-read the detail when
@@ -247,6 +276,7 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
   // across tabs.
   useEffect(() => {
     setPendingMode(null);
+    setPendingModel(null);
     setPreview(null);
   }, [sessionId]);
 
@@ -262,6 +292,30 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
       setPendingMode(null);
     }
   }, [pendingMode, serverMode]);
+
+  const serverModel = detail?.model ?? modelChoices?.default ?? null;
+  const currentModel: ModelChoice | null = pendingModel
+    ? {
+        provider: pendingModel.provider,
+        model: pendingModel.model,
+        providerName:
+          modelChoices?.favorites.find((favorite) => sameModelRef(favorite, pendingModel))?.providerName ??
+          (modelChoices && sameModelRef(modelChoices.default, pendingModel)
+            ? modelChoices.default.providerName
+            : pendingModel.provider)
+      }
+    : serverModel;
+
+  useEffect(() => {
+    if (
+      pendingModel &&
+      serverModel &&
+      serverModel.provider === pendingModel.provider &&
+      serverModel.model === pendingModel.model
+    ) {
+      setPendingModel(null);
+    }
+  }, [pendingModel, serverModel]);
 
   // The detail is fetched once; the event stream says how a turn ended.
   const state: SessionState = running ? 'running' : ((view.lastDone as SessionState | undefined) ?? detail?.state ?? 'idle');
@@ -333,11 +387,18 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
             images
           );
         } else if (projectId) {
-          const created = await createSession(projectId, value, mode ?? undefined, images, {
-            workflowId,
-            stepByStep: workflowSelection.stepByStep,
-            worktree: workflowSelection.worktree
-          });
+          const created = await createSession(
+            projectId,
+            value,
+            mode ?? undefined,
+            images,
+            {
+              workflowId,
+              stepByStep: workflowSelection.stepByStep,
+              worktree: workflowSelection.worktree
+            },
+            pendingModel ?? undefined
+          );
           onSessionCreated(created.id, pseudoTabId);
         }
         // The next message gets the default workflow again.
@@ -346,7 +407,7 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
         await sendMessage(sessionId, value, images);
       } else if (projectId) {
         // A mode chosen before creation is applied to the first turn.
-        const created = await createSession(projectId, value, mode ?? undefined, images);
+        const created = await createSession(projectId, value, mode ?? undefined, images, undefined, pendingModel ?? undefined);
         onSessionCreated(created.id, pseudoTabId);
       }
       if (fromComposer) {
@@ -366,6 +427,10 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
 
   function handleRemoveAttachment(index: number) {
     setAttachments((current) => current.filter((_, i) => i !== index));
+  }
+
+  function sameModelRef(a: ModelRef, b: ModelRef): boolean {
+    return a.provider === b.provider && a.model === b.model;
   }
 
   async function handleModeChange(id: string): Promise<boolean> {
@@ -388,6 +453,32 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
       if (request !== modeRequestRef.current) return true;
       setPendingMode(null);
       setSendError(error instanceof Error ? error.message : 'Erreur lors du changement de mode');
+      return false;
+    }
+  }
+
+  async function handleModelChange(ref: ModelRef): Promise<boolean> {
+    // A not-yet-created session keeps the choice locally; `handleSend` passes
+    // it to `createSession`.
+    if (!sessionId) {
+      setPendingModel(ref);
+      return true;
+    }
+
+    const request = ++modelRequestRef.current;
+    setPendingModel(ref);
+    setSendError(null);
+
+    try {
+      await setSessionModel(sessionId, ref);
+      setDetailVersion((version) => version + 1);
+      setPendingModel(null);
+      return true;
+    } catch (error) {
+      // A newer request supersedes this one; only the latest may revert.
+      if (request !== modelRequestRef.current) return true;
+      setPendingModel(null);
+      setSendError(error instanceof Error ? error.message : 'Erreur lors du changement de modèle');
       return false;
     }
   }
@@ -580,7 +671,7 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
                 <ThreadItemView
                   key={item.id}
                   item={item}
-                  model={config?.model ?? 'modèle'}
+                  model={currentModel ? modelShortName(currentModel.model) : 'modèle'}
                   running={running}
                   showHeader={view.items[index - 1]?.kind !== 'assistant'}
                   onReplay={sessionId ? handleReplay : undefined}
@@ -655,7 +746,9 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
             onSend={() => handleSend()}
             onStop={handleStop}
             running={running}
-            model={config?.model}
+            currentModel={currentModel}
+            modelChoices={modelChoices}
+            onModelChange={handleModelChange}
             error={sendError}
             textareaRef={textareaRef}
             placeholder={

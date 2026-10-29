@@ -1,11 +1,12 @@
 import type { WorkflowSummary } from '../../lib/workflow';
 import { useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
-import type { Agent, AttachmentInput, SlashCommand } from '../../lib/api';
+import type { Agent, AttachmentInput, ModelChoice, ModelChoices, ModelRef, SlashCommand } from '../../lib/api';
 import { IMAGE_TYPES } from '../../lib/attachments';
 import { CloseIcon, PaperclipIcon, SendIcon, StopIcon } from '../Icons';
 import { matchCommands, SlashMenu } from './SlashMenu';
 import { ModePicker } from './ModePicker';
+import { ModelPicker, modelShortName } from './ModelPicker';
 import { Button } from '../ui/Button';
 import { WorkflowPicker, type WorkflowSelection } from '../workflow/session/WorkflowPicker';
 
@@ -15,7 +16,9 @@ interface ComposerProps {
   onSend: () => void;
   onStop: () => void;
   running: boolean;
-  model: string | undefined;
+  currentModel: ModelChoice | null;
+  modelChoices: ModelChoices | null;
+  onModelChange?: (ref: ModelRef) => void;
   error: string | null;
   textareaRef: RefObject<HTMLTextAreaElement | null>;
   placeholder?: string;
@@ -37,7 +40,9 @@ export function Composer({
   onSend,
   onStop,
   running,
-  model,
+  currentModel,
+  modelChoices,
+  onModelChange,
   error,
   textareaRef,
   placeholder,
@@ -232,11 +237,13 @@ export function Composer({
               onChange={onWorkflowSelectionChange}
             />
           )}
-          <div className="ml-auto flex items-center px-1.5 text-xs text-muted">
-            <span className="flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-ok" />
-              {model ?? '…'}
-            </span>
+          <div className="ml-auto flex items-center gap-1.5 px-1.5 text-xs text-muted">
+            <span className="h-1.5 w-1.5 rounded-full bg-ok" />
+            {onModelChange ? (
+              <ModelPicker current={currentModel} choices={modelChoices} onChange={onModelChange} />
+            ) : (
+              <span>{currentModel ? modelShortName(currentModel.model) : '…'}</span>
+            )}
           </div>
         </div>
         {error && <div className="px-3 pb-2 text-xs text-err">{error}</div>}

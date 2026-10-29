@@ -17,6 +17,8 @@ pub const LOCAL_PROVIDER: &str = "local";
 pub struct Preferences {
     /// The model new turns use; `None` means the environment's default.
     pub selected: Option<ModelRef>,
+    /// The models the composer offers first, in the human's order.
+    pub favorites: Vec<ModelRef>,
     /// The providers and each one's per-model overrides; an entry with id
     /// `local` overrides only what it sets of the environment's endpoint.
     pub providers: Vec<Provider>,
@@ -155,6 +157,14 @@ impl Preferences {
     }
 
     /// Rejects values that would make a turn impossible to run.
+    /// Drops the favourites of providers no longer stored: removing a provider
+    /// must not make the whole page unsaveable.
+    pub fn forget_orphan_favorites(&mut self) {
+        let known: Vec<String> = self.providers.iter().map(|p| p.id.clone()).collect();
+        self.favorites
+            .retain(|f| f.provider == LOCAL_PROVIDER || known.contains(&f.provider));
+    }
+
     pub fn validate(&self) -> Result<(), String> {
         if let Some(selected) = &self.selected {
             if selected.model.is_empty() {
@@ -163,6 +173,20 @@ impl Preferences {
             if selected.provider != LOCAL_PROVIDER && self.provider(&selected.provider).is_none() {
                 return Err(format!("unknown provider {}", selected.provider));
             }
+        }
+
+        let mut seen_favorites = Vec::new();
+        for favorite in &self.favorites {
+            if favorite.provider != LOCAL_PROVIDER && self.provider(&favorite.provider).is_none() {
+                return Err(format!("unknown provider {}", favorite.provider));
+            }
+            if seen_favorites.contains(favorite) {
+                return Err(format!(
+                    "duplicate favorite {}/{}",
+                    favorite.provider, favorite.model
+                ));
+            }
+            seen_favorites.push(favorite.clone());
         }
 
         let mut seen = Vec::new();
@@ -239,21 +263,25 @@ impl Preferences {
         Ok(())
     }
 
-    /// Resolves the parameters for the next turn.
-    ///
-    /// Precedence: Settings page > environment > built-in default.
-    /// The context window additionally falls back to the endpoint's current
-    /// listing before the built-in default.
+    /// The parameters of the model a turn runs on: a session's chosen model
+    /// wins over `selected`, which wins over the environment's default. An
+    /// empty chosen model is ignored. Per model: Settings page > environment >
+    /// built-in default; the context window falls back to the endpoint's
+    /// current listing before the built-in default.
     pub fn resolve(
         &self,
+        chosen: Option<&ModelRef>,
         defaults: &ModelParams,
         listed_window: impl Fn(&ModelRef) -> Option<u64>,
     ) -> ModelParams {
-        let selected = match &self.selected {
-            Some(selected) if !selected.model.is_empty() => selected.clone(),
-            _ => ModelRef {
-                provider: defaults.provider.clone(),
-                model: defaults.model.clone(),
+        let selected = match chosen {
+            Some(chosen) if !chosen.model.is_empty() => chosen.clone(),
+            _ => match &self.selected {
+                Some(selected) if !selected.model.is_empty() => selected.clone(),
+                _ => ModelRef {
+                    provider: defaults.provider.clone(),
+                    model: defaults.model.clone(),
+                },
             },
         };
         let prefs = self
@@ -321,13 +349,13 @@ mod tests {
 
     #[test]
     fn empty_preferences_resolve_to_the_defaults() {
-        let resolved = Preferences::default().resolve(&defaults(), |_| None);
+        let resolved = Preferences::default().resolve(None, &defaults(), |_| None);
         assert_eq!(resolved, defaults());
     }
 
     #[test]
     fn per_model_preferences_override_the_defaults() {
-        let resolved = valid().resolve(&defaults(), |_| None);
+        let resolved = valid().resolve(None, &defaults(), |_| None);
         assert_eq!(
             resolved,
             ModelParams {
@@ -356,7 +384,7 @@ mod tests {
             },
         );
         assert_eq!(
-            p.resolve(&defaults(), |_| None).reasoning_effort,
+            p.resolve(None, &defaults(), |_| None).reasoning_effort,
             Some(ReasoningEffort::Minimal)
         );
 
@@ -364,14 +392,17 @@ mod tests {
             provider: LOCAL_PROVIDER.to_string(),
             model: "b".into(),
         });
-        assert_eq!(p.resolve(&defaults(), |_| None).reasoning_effort, None);
+        assert_eq!(
+            p.resolve(None, &defaults(), |_| None).reasoning_effort,
+            None
+        );
 
         let with_default = ModelParams {
             reasoning_effort: Some(ReasoningEffort::Low),
             ..defaults()
         };
         assert_eq!(
-            p.resolve(&with_default, |_| None).reasoning_effort,
+            p.resolve(None, &with_default, |_| None).reasoning_effort,
             Some(ReasoningEffort::Low)
         );
     }
@@ -393,7 +424,7 @@ mod tests {
             provider: LOCAL_PROVIDER.to_string(),
             model: "a".into(),
         });
-        let a = p.resolve(&defaults(), |_| None);
+        let a = p.resolve(None, &defaults(), |_| None);
         assert_eq!(a.max_tokens, 100);
         assert_eq!(a.context_window, 2048);
         assert_eq!(a.compact_at, 0.5);
@@ -402,7 +433,7 @@ mod tests {
             provider: LOCAL_PROVIDER.to_string(),
             model: "b".into(),
         });
-        let b = p.resolve(&defaults(), |_| None);
+        let b = p.resolve(None, &defaults(), |_| None);
         assert_eq!(b.max_tokens, 32_000);
         assert_eq!(b.context_window, 128_000);
         assert_eq!(b.compact_at, 0.85);
@@ -417,7 +448,7 @@ mod tests {
             }),
             ..Default::default()
         };
-        let resolved = p.resolve(&defaults(), |ref_| {
+        let resolved = p.resolve(None, &defaults(), |ref_| {
             (ref_.provider == LOCAL_PROVIDER && ref_.model == "listed").then_some(64_000)
         });
         assert_eq!(
@@ -431,6 +462,47 @@ mod tests {
                 reasoning_effort: None,
             }
         );
+    }
+
+    #[test]
+    fn a_chosen_model_overrides_the_selected_one() {
+        let mut p = valid();
+        p.providers[0].models.insert(
+            "other".into(),
+            ModelPrefs {
+                max_tokens: Some(200),
+                context_window: Some(4096),
+                compaction_threshold: Some(0.75),
+                reasoning_effort: None,
+            },
+        );
+        let chosen = ModelRef {
+            provider: LOCAL_PROVIDER.to_string(),
+            model: "other".into(),
+        };
+        let resolved = p.resolve(Some(&chosen), &defaults(), |_| None);
+        assert_eq!(
+            resolved,
+            ModelParams {
+                provider: LOCAL_PROVIDER.to_string(),
+                model: "other".into(),
+                max_tokens: 200,
+                context_window: 4096,
+                compact_at: 0.75,
+                reasoning_effort: None,
+            }
+        );
+    }
+
+    #[test]
+    fn an_empty_chosen_model_falls_back_to_the_selected_one() {
+        let p = valid();
+        let chosen = ModelRef {
+            provider: LOCAL_PROVIDER.to_string(),
+            model: String::new(),
+        };
+        let resolved = p.resolve(Some(&chosen), &defaults(), |_| None);
+        assert_eq!(resolved.model, "m");
     }
 
     #[test]
@@ -510,6 +582,46 @@ mod tests {
         let mut p = valid();
         p.search.searxng_url = Some("ftp://example.com".into());
         assert!(p.validate().unwrap_err().contains("searxng_url"));
+    }
+
+    #[test]
+    fn orphan_favorites_are_forgotten() {
+        let mut p = valid();
+        let kept = ModelRef {
+            provider: LOCAL_PROVIDER.to_string(),
+            model: "m".into(),
+        };
+        p.favorites = vec![
+            kept.clone(),
+            ModelRef {
+                provider: "removed".into(),
+                model: "m".into(),
+            },
+        ];
+        p.forget_orphan_favorites();
+        assert_eq!(p.favorites, vec![kept]);
+        assert!(p.validate().is_ok());
+    }
+
+    #[test]
+    fn validate_rejects_unknown_and_duplicate_favorites() {
+        let mut p = valid();
+        p.favorites.push(ModelRef {
+            provider: "missing".into(),
+            model: "m".into(),
+        });
+        assert!(p.validate().unwrap_err().contains("unknown provider"));
+
+        let mut p = valid();
+        p.favorites.push(ModelRef {
+            provider: LOCAL_PROVIDER.to_string(),
+            model: "m".into(),
+        });
+        p.favorites.push(ModelRef {
+            provider: LOCAL_PROVIDER.to_string(),
+            model: "m".into(),
+        });
+        assert!(p.validate().unwrap_err().contains("duplicate favorite"));
     }
 
     #[test]
@@ -688,7 +800,7 @@ mod tests {
         .unwrap();
         p.migrate();
         assert_eq!(
-            p.resolve(&defaults(), |_| None),
+            p.resolve(None, &defaults(), |_| None),
             ModelParams {
                 provider: LOCAL_PROVIDER.to_string(),
                 model: "qwen3.8-27b".into(),
@@ -705,7 +817,7 @@ mod tests {
         for json in ["{}", r#"{"models":{}}"#] {
             let mut p: Preferences = serde_json::from_str(json).unwrap();
             p.migrate();
-            assert_eq!(p.resolve(&defaults(), |_| None), defaults());
+            assert_eq!(p.resolve(None, &defaults(), |_| None), defaults());
         }
     }
 
@@ -774,7 +886,7 @@ mod tests {
             }),
             ..Default::default()
         };
-        let resolved = p.resolve(&defaults(), |selected| {
+        let resolved = p.resolve(None, &defaults(), |selected| {
             (selected.provider == "other" && selected.model == "m").then_some(64_000)
         });
         assert_eq!(resolved.context_window, 64_000);
