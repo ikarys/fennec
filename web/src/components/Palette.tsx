@@ -25,10 +25,9 @@ interface PaletteProps {
   onNewSession: (projectId: string) => void;
   onOpenProjectDialog: () => void;
   onHome: () => void;
-  onWorkflows: () => void;
 }
 
-export function Palette({ open, projects, onClose, onOpenSession, onNewSession, onOpenProjectDialog, onHome, onWorkflows }: PaletteProps) {
+export function Palette({ open, projects, onClose, onOpenSession, onNewSession, onOpenProjectDialog, onHome }: PaletteProps) {
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
 
@@ -78,13 +77,6 @@ export function Palette({ open, projects, onClose, onOpenSession, onNewSession, 
         dot: 'bg-muted',
         action: () => onNewSession(project.id)
       })),
-      {
-        id: 'workflows',
-        title: 'Workflows',
-        meta: '',
-        dot: 'bg-muted',
-        action: onWorkflows
-      },
       {
         id: 'open-project',
         title: 'Ouvrir un projet…',

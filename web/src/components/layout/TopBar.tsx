@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import type { SessionState } from '../../lib/api';
 import { stateDotClass } from '../../lib/format';
-import { CloseIcon, FoxIcon, PlusIcon, SearchIcon, SettingsIcon } from '../Icons';
+import { CloseIcon, FoxIcon, SearchIcon, SettingsIcon } from '../Icons';
 import { Button, buttonClass } from '../ui/Button';
 
 function InsightIcon({ className }: { className?: string }) {
@@ -56,7 +56,6 @@ interface TopBarProps {
   activeTabId: string | null;
   onPickTab: (id: string) => void;
   onCloseTab: (id: string) => void;
-  onNewSession: () => void;
   onOpenPalette: () => void;
 }
 
@@ -65,7 +64,6 @@ export function TopBar({
   activeTabId,
   onPickTab,
   onCloseTab,
-  onNewSession,
   onOpenPalette
 }: TopBarProps) {
   const tabRefs = useRef(new Map<string, HTMLDivElement>());
@@ -159,26 +157,15 @@ export function TopBar({
         })}
       </div>
 
-      <Button
-        variant="ghost"
-        size="sm"
-        iconOnly
-        aria-label="Nouvelle session"
-        onClick={onNewSession}
-        className="self-center"
-      >
-        <PlusIcon className="h-4 w-4" />
-      </Button>
-
       <div className="flex items-center gap-2 py-1.5">
         <button
           type="button"
           onClick={onOpenPalette}
-          aria-label="Sessions, projets, commandes"
-          className="flex h-8 items-center gap-2.5 rounded-lg border border-border px-2.5 text-[0.8125rem] text-muted transition-colors hover:border-border-strong hover:text-text md:min-w-[220px]"
+          aria-label="Rechercher"
+          className="flex h-8 items-center gap-2 rounded-lg border border-border px-2.5 text-[0.8125rem] text-muted transition-colors hover:border-border-strong hover:text-text"
         >
           <SearchIcon className="h-3.5 w-3.5" />
-          <span className="hidden grow text-left md:inline">Sessions, projets, commandes</span>
+          <span className="hidden text-left md:inline">Rechercher…</span>
           <kbd className="rounded-md border border-border px-1.5 py-px text-[0.6875rem] text-muted">⌘K</kbd>
         </button>
 
