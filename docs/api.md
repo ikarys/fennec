@@ -197,7 +197,7 @@ read-only. The human edits them as usual.
   `{provider, model, providerName}`: what the composer's model picker offers;
   read from the stored preferences, no provider is called
 - `GET /api/projects` → `[{id, name, workdir, branch, sessions: [{id, title, state, createdAt, updatedAt}]}]`
-  (sessions newest first; `createdAt`/`updatedAt` are Unix milliseconds; `branch` may be `null`)
+  (projects most recently active first, sessions newest first; `createdAt`/`updatedAt` are Unix milliseconds; `branch` may be `null`)
 - `POST /api/projects` `{workdir}` → the project (400 if not a directory)
 - `GET /api/projects/{id}/commands` → `[{name, description}]`: the slash commands the composer offers (`compact`, then the project's skills); 404 if no project
 - `GET /api/projects/{id}/agents` → `[{id, name, description, color, subagent}]`: the
