@@ -162,8 +162,8 @@ then set offline). Disabled, commands run on the host, as in openfox.
 
 Protected files: a model may read them, never write them. They are fennec's
 defaults (`.agents`, `AGENTS.md`, `CLAUDE.md`, the lockfiles `Cargo.lock`,
-`package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, and the CI `.github`,
-`.gitlab-ci.yml`) plus the lines of the project's `.agents/protected`
+`package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, the CI `.github`,
+`.gitlab-ci.yml`, and the accepted ADRs `docs/adr`) plus the lines of the project's `.agents/protected`
 (gitignore-like: `#` comments, `*`, `?`, `**`, a leading `/` anchors, a
 pattern without `/` matches at any depth, a directory protects its content).
 `write_file` and `edit_file` refuse them; in the sandbox they are mounted
@@ -204,6 +204,9 @@ read-only. The human edits them as usual.
   project's agents in discovery order (`color` null when unset); the modes are the
   ones with `subagent` false, the others only run in a workflow node's fresh context;
   404 if no project
+- `GET /api/projects/{id}/architecture` → `{adrs: [{number, file, title, status, date, body}]}`:
+  the MADR files of the project's `docs/adr/` (`NNNN-slug.md`, sorted by number; `status` and
+  `date` from the frontmatter, null when absent; the title from the first `# ` heading); 404 if no project
 - `GET /api/folders?path=<absolute path>` → `{path, parent, folders: [{name, path, hidden, repo}]}`,
   the sub-folders of `path` (the home directory when omitted), sorted by name;
   `repo` marks a git repository; 400 if `path` cannot be read

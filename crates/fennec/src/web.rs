@@ -1,6 +1,7 @@
 //! Web adapter: the local server behind the UI. std only, one thread per
 //! connection, bound to 127.0.0.1.
 
+mod architecture_routes;
 mod assets;
 mod children;
 mod context_view;
