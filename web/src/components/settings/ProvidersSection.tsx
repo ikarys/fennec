@@ -3,7 +3,7 @@ import type { ProviderListing } from '../../lib/api';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Section } from '../ui/Section';
-import { ChevronRightIcon } from '../Icons';
+import { ChevronRightIcon, PlusIcon } from '../Icons';
 import { FieldRow, Select, TextInput } from '../ui/Field';
 import { formOnlyModels, type ModelForm } from './ModelPrefsSection';
 
@@ -50,6 +50,8 @@ export function ProvidersSection({
   const [draft, setDraft] = useState<ProviderDraft>(emptyDraft);
   const [fetchingId, setFetchingId] = useState<string | null>(null);
   const [modelDrafts, setModelDrafts] = useState<Record<string, string>>({});
+  const [addingProvider, setAddingProvider] = useState(false);
+  const [addingModelFor, setAddingModelFor] = useState<string | null>(null);
   const draftId = draft.id.trim();
   const draftDisabled =
     draftId === '' || draftId.includes('/') || providers.some((provider) => provider.id === draftId);
@@ -66,6 +68,7 @@ export function ProvidersSection({
       sealed: null
     });
     setDraft(emptyDraft);
+    setAddingProvider(false);
   }
 
   function addModel(providerId: string) {
@@ -82,8 +85,58 @@ export function ProvidersSection({
   }
 
   return (
-    <Section>
-      <h2 className="text-sm font-semibold">Providers</h2>
+    <Section
+      title="Providers"
+      actions={
+        <Button
+          variant="ghost"
+          size="sm"
+          iconOnly
+          aria-label="Ajouter un provider"
+          title="Ajouter un provider"
+          onClick={() => setAddingProvider((current) => !current)}
+        >
+          <PlusIcon className="h-3.5 w-3.5" />
+        </Button>
+      }
+    >
+      {addingProvider && (
+        <div className="flex flex-col gap-2 rounded-md border border-border p-3">
+          <div className="grid gap-2 md:grid-cols-3">
+            <FieldRow label="Identifiant" hint="Sans '/'">
+              <TextInput
+                value={draft.id}
+                onChange={(event) => setDraft({ ...draft, id: event.target.value })}
+                className="w-full"
+              />
+            </FieldRow>
+            <FieldRow label="Nom">
+              <TextInput
+                value={draft.name}
+                onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+                className="w-full"
+              />
+            </FieldRow>
+            <FieldRow label="URL de base">
+              <TextInput
+                value={draft.baseUrl}
+                onChange={(event) => setDraft({ ...draft, baseUrl: event.target.value })}
+                className="w-full"
+              />
+            </FieldRow>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" size="sm" disabled={draftDisabled} onClick={addProvider}>
+              Ajouter
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setAddingProvider(false)}>
+              Annuler
+            </Button>
+            <p className="m-0 text-xs text-faint">Ajouter, puis « Récupérer » pour lister ses modèles.</p>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col">
         {providers.map((provider, index) => {
           const listing = listings.find((item) => item.provider === provider.id);
@@ -94,128 +147,145 @@ export function ProvidersSection({
           const modelDraft = modelDrafts[provider.id] ?? '';
 
           return (
-            <details
-              key={provider.id}
-              // A failed listing opens by itself: the error is why the human came here.
-              open={error ? true : undefined}
-              className="group border-t border-border first:border-t-0"
-            >
-              <summary className="flex h-8 cursor-pointer list-none items-center gap-2 select-none [&::-webkit-details-marker]:hidden">
-                <ChevronRightIcon className="h-3 w-3 shrink-0 text-muted transition-transform group-open:rotate-90" />
-                <span className="min-w-0 truncate font-mono text-sm font-medium">
-                  {provider.name || provider.id}
-                </span>
-                {error ? (
-                  <Badge tone="err" title={error}>
-                    erreur
-                  </Badge>
-                ) : (
-                  <Badge tone="neutral">{count === 0 ? 'aucun modèle' : `${count} modèle${count > 1 ? 's' : ''}`}</Badge>
-                )}
-                <span className="ml-auto flex shrink-0 items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={fetchingId === provider.id}
-                    onClick={(event) => {
-                      keepOpen(event);
-                      void (async () => {
-                        setFetchingId(provider.id);
-                        try {
-                          await onFetch(provider);
-                        } catch {
-                          // A failed fetch leaves the listing as it was.
-                        } finally {
-                          setFetchingId(null);
-                        }
-                      })();
-                    }}
-                  >
-                    {fetchingId === provider.id ? 'Récupération…' : 'Récupérer'}
-                  </Button>
-                  {!isLocal && (
-                    <Button variant="ghost" size="sm" onClick={(event) => { keepOpen(event); onRemove(index); }}>
-                      Retirer
-                    </Button>
+            <div key={provider.id} className="border-t border-border first:border-t-0">
+              <details
+                // A failed listing opens by itself: the error is why the human came here.
+                open={error ? true : undefined}
+                className="group"
+              >
+                <summary className="-mx-2 flex h-9 cursor-pointer list-none items-center gap-2 rounded px-2 select-none hover:bg-raised [&::-webkit-details-marker]:hidden">
+                  <ChevronRightIcon className="h-3 w-3 shrink-0 text-muted transition-transform group-open:rotate-90" />
+                  <span className="min-w-0 truncate font-mono text-sm font-medium">
+                    {provider.name || provider.id}
+                  </span>
+                  {error ? (
+                    <Badge tone="err" title={error}>
+                      erreur
+                    </Badge>
+                  ) : (
+                    <Badge tone="neutral">{count === 0 ? 'aucun modèle' : `${count} modèle${count > 1 ? 's' : ''}`}</Badge>
                   )}
-                </span>
-              </summary>
-
-              <div className="flex flex-col gap-3 pb-4 pt-1">
-                {error && <p className="m-0 text-xs text-err">{error}</p>}
-                <div className="grid gap-2 md:grid-cols-2">
-                  <FieldRow label="Nom">
-                    <TextInput
-                      value={provider.name}
-                      onChange={(event) => onChange(index, { name: event.target.value })}
-                      className="w-full"
-                    />
-                  </FieldRow>
-
-                  <FieldRow
-                    label="URL de base"
-                    hint={isLocal ? "Vide : l'URL de l'environnement (FENNEC_LLM_URL)." : undefined}
-                  >
-                    <TextInput
-                      value={provider.baseUrl}
-                      placeholder={isLocal ? listing?.baseUrl ?? '' : ''}
-                      onChange={(event) => onChange(index, { baseUrl: event.target.value })}
-                      className="w-full"
-                    />
-                  </FieldRow>
-
-                  <FieldRow label="Clé API">
-                    <Select
-                      value={provider.keyKind}
-                      onChange={(event) =>
-                        onChange(index, { keyKind: event.target.value as ProviderForm['keyKind'] })
-                      }
-                      className="w-full"
+                  <span className="ml-auto flex shrink-0 items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      iconOnly
+                      aria-label="Ajouter un modèle"
+                      title="Ajouter un modèle par son id (endpoint sans /models)"
+                      onClick={(event) => {
+                        keepOpen(event);
+                        setAddingModelFor((current) => (current === provider.id ? null : provider.id));
+                      }}
                     >
-                      <option value="none">Aucune</option>
-                      <option value="env">Variable d'environnement</option>
-                      <option value="stored">Clé enregistrée (chiffrée)</option>
-                    </Select>
-                  </FieldRow>
+                      <PlusIcon className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={fetchingId === provider.id}
+                      onClick={(event) => {
+                        keepOpen(event);
+                        void (async () => {
+                          setFetchingId(provider.id);
+                          try {
+                            await onFetch(provider);
+                          } catch {
+                            // A failed fetch leaves the listing as it was.
+                          } finally {
+                            setFetchingId(null);
+                          }
+                        })();
+                      }}
+                    >
+                      {fetchingId === provider.id ? 'Récupération…' : 'Récupérer'}
+                    </Button>
+                    {!isLocal && (
+                      <Button variant="ghost" size="sm" onClick={(event) => { keepOpen(event); onRemove(index); }}>
+                        Retirer
+                      </Button>
+                    )}
+                  </span>
+                </summary>
 
-                  {provider.keyKind === 'env' && (
-                    <FieldRow label="Variable d'environnement">
+                <div className="flex flex-col gap-3 pb-4 pt-1">
+                  {error && <p className="m-0 text-xs text-err">{error}</p>}
+                  <div className="grid gap-2 md:grid-cols-2">
+                    <FieldRow label="Nom">
                       <TextInput
-                        value={provider.envVar}
-                        placeholder="OPENROUTER_API_KEY"
-                        onChange={(event) => onChange(index, { envVar: event.target.value })}
+                        value={provider.name}
+                        onChange={(event) => onChange(index, { name: event.target.value })}
                         className="w-full"
                       />
                     </FieldRow>
-                  )}
 
-                  {provider.keyKind === 'stored' && (
-                    <FieldRow label="Nouvelle clé">
+                    <FieldRow
+                      label="URL de base"
+                      hint={isLocal ? "Vide : l'URL de l'environnement (FENNEC_LLM_URL)." : undefined}
+                    >
                       <TextInput
-                        type="password"
-                        autoComplete="off"
-                        value={provider.newKey}
-                        placeholder={
-                          provider.sealed
-                            ? "Une clé chiffrée est enregistrée : saisir pour la remplacer"
-                            : "Coller la clé"
+                        value={provider.baseUrl}
+                        placeholder={isLocal ? listing?.baseUrl ?? '' : ''}
+                        onChange={(event) => onChange(index, { baseUrl: event.target.value })}
+                        className="w-full"
+                      />
+                    </FieldRow>
+
+                    <FieldRow label="Clé API">
+                      <Select
+                        value={provider.keyKind}
+                        onChange={(event) =>
+                          onChange(index, { keyKind: event.target.value as ProviderForm['keyKind'] })
                         }
-                        onChange={(event) => onChange(index, { newKey: event.target.value })}
                         className="w-full"
-                      />
+                      >
+                        <option value="none">Aucune</option>
+                        <option value="env">Variable d'environnement</option>
+                        <option value="stored">Clé enregistrée (chiffrée)</option>
+                      </Select>
                     </FieldRow>
+
+                    {provider.keyKind === 'env' && (
+                      <FieldRow label="Variable d'environnement">
+                        <TextInput
+                          value={provider.envVar}
+                          placeholder="OPENROUTER_API_KEY"
+                          onChange={(event) => onChange(index, { envVar: event.target.value })}
+                          className="w-full"
+                        />
+                      </FieldRow>
+                    )}
+
+                    {provider.keyKind === 'stored' && (
+                      <FieldRow label="Nouvelle clé">
+                        <TextInput
+                          type="password"
+                          autoComplete="off"
+                          value={provider.newKey}
+                          placeholder={
+                            provider.sealed
+                              ? "Une clé chiffrée est enregistrée : saisir pour la remplacer"
+                              : "Coller la clé"
+                          }
+                          onChange={(event) => onChange(index, { newKey: event.target.value })}
+                          className="w-full"
+                        />
+                      </FieldRow>
+                    )}
+                  </div>
+
+                  {added.length > 0 && (
+                    <p className="m-0 text-xs text-muted">
+                      Ajouté{added.length > 1 ? 's' : ''} : <span className="font-mono">{added.join(', ')}</span> — « Enregistrer » pour garder.
+                    </p>
                   )}
                 </div>
-
-                {added.length > 0 && (
-                  <p className="m-0 text-xs text-muted">
-                    Ajouté{added.length > 1 ? 's' : ''} : <span className="font-mono">{added.join(', ')}</span> — « Enregistrer » pour garder.
-                  </p>
-                )}
-                {/* Not a <form>: the Settings page is one, and a nested submit
-                    bubbles to it, saving the page before the model is added. */}
-                <div className="flex items-center gap-2">
+              </details>
+              {/* Not a <form>: the Settings page is one, and a nested submit
+                  bubbles to it, saving the page before the model is added. */}
+              {addingModelFor === provider.id && (
+                <div className="flex items-center gap-2 pb-3 pl-5">
                   <TextInput
+                    autoFocus
                     value={modelDraft}
                     onChange={(event) => setModelDrafts((previous) => ({ ...previous, [provider.id]: event.target.value }))}
                     onKeyDown={(event) => {
@@ -223,7 +293,7 @@ export function ProvidersSection({
                       event.preventDefault();
                       addModel(provider.id);
                     }}
-                    placeholder="Ajouter un modèle par son id (endpoint sans /models)"
+                    placeholder="Id du modèle (endpoint sans /models)"
                     className="w-full max-w-xs"
                   />
                   <Button
@@ -235,49 +305,14 @@ export function ProvidersSection({
                   >
                     Ajouter
                   </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setAddingModelFor(null)}>
+                    Annuler
+                  </Button>
                 </div>
-              </div>
-            </details>
+              )}
+            </div>
           );
         })}
-
-        <details className="group border-t border-border">
-          <summary className="flex h-8 cursor-pointer list-none items-center gap-2 text-sm text-muted select-none hover:text-text [&::-webkit-details-marker]:hidden">
-            <ChevronRightIcon className="h-3 w-3 shrink-0 transition-transform group-open:rotate-90" />
-            Ajouter un provider
-          </summary>
-          <div className="flex flex-col gap-2 pb-4 pt-1">
-            <div className="grid gap-2 md:grid-cols-3">
-              <FieldRow label="Identifiant" hint="Sans '/'">
-                <TextInput
-                  value={draft.id}
-                  onChange={(event) => setDraft({ ...draft, id: event.target.value })}
-                  className="w-full"
-                />
-              </FieldRow>
-              <FieldRow label="Nom">
-                <TextInput
-                  value={draft.name}
-                  onChange={(event) => setDraft({ ...draft, name: event.target.value })}
-                  className="w-full"
-                />
-              </FieldRow>
-              <FieldRow label="URL de base">
-                <TextInput
-                  value={draft.baseUrl}
-                  onChange={(event) => setDraft({ ...draft, baseUrl: event.target.value })}
-                  className="w-full"
-                />
-              </FieldRow>
-            </div>
-            <div className="flex items-center gap-3">
-              <Button variant="secondary" size="sm" disabled={draftDisabled} onClick={addProvider}>
-                Ajouter
-              </Button>
-              <p className="m-0 text-xs text-faint">Ajouter, puis « Récupérer » pour lister ses modèles.</p>
-            </div>
-          </div>
-        </details>
       </div>
     </Section>
   );
