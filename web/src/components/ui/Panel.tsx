@@ -1,7 +1,7 @@
 /**
- * A collapsible block of a side column. The header stays visible when folded
- * and shows a summary so the state is readable at a glance; open state is
- * remembered per block in localStorage.
+ * A collapsible section of a side column, separated by a hairline rather than
+ * boxed. The header stays visible when folded and shows a summary so the state
+ * is readable at a glance; open state is remembered per section in localStorage.
  */
 import { useState, type ReactNode } from 'react';
 import { ChevronRightIcon } from '../Icons';
@@ -47,16 +47,16 @@ export function Panel({ id, title, summary, defaultOpen = true, children }: Pane
         setOpen(nextOpen);
         saveOpen(id, nextOpen);
       }}
-      className="group shrink-0 overflow-hidden rounded-xl border border-border bg-panel"
+      className="group shrink-0 border-b border-border last:border-b-0"
     >
-      <summary className="flex cursor-pointer list-none items-center gap-2 bg-raised px-3 py-2 select-none [&::-webkit-details-marker]:hidden">
+      <summary className="flex cursor-pointer list-none items-center gap-2 rounded-sm px-1 py-2 hover:bg-raised/50 select-none [&::-webkit-details-marker]:hidden">
         <ChevronRightIcon className="h-3 w-3 shrink-0 text-muted transition-transform group-open:rotate-90" />
         <SectionLabel>{title}</SectionLabel>
         <span className="ml-auto flex items-center gap-1.5 text-xs text-muted tabular-nums">
           {summary}
         </span>
       </summary>
-      <div className="flex flex-col gap-1.5 border-t border-border px-3 py-2.5">{children}</div>
+      <div className="flex flex-col gap-1.5 px-1 pb-3">{children}</div>
     </details>
   );
 }

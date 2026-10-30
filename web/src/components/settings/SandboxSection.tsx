@@ -1,5 +1,5 @@
 import type { SandboxPrefs } from '../../lib/api';
-import { Card } from '../ui/Card';
+import { Section } from '../ui/Section';
 
 interface SandboxSectionProps {
   value: SandboxPrefs;
@@ -8,7 +8,7 @@ interface SandboxSectionProps {
 
 export function SandboxSection({ value, onChange }: SandboxSectionProps) {
   return (
-    <Card className="p-4">
+    <Section>
       <div className="flex flex-col gap-4">
         <h2 className="text-sm font-semibold">Bac à sable</h2>
         <div className="flex flex-col gap-1">
@@ -44,6 +44,6 @@ export function SandboxSection({ value, onChange }: SandboxSectionProps) {
           </p>
         </div>
       </div>
-    </Card>
+    </Section>
   );
 }
