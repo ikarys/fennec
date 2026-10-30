@@ -173,7 +173,13 @@ export default function ProjectPage({
           {activeTab === 'map' ? <MapTab projectId={projectId} /> : null}
           {activeTab === 'doc' ? <DocSection projectId={projectId} /> : null}
           {activeTab === 'analyses' ? (
-            <AnalysesSection busy={analyzing} error={analyzeError} onStart={(prompt, mode) => void startSession(prompt, mode)} />
+            <AnalysesSection
+              busy={analyzing}
+              error={analyzeError}
+              sessions={project.sessions}
+              onStart={(prompt, mode) => void startSession(prompt, mode)}
+              onOpenSession={onOpenSession}
+            />
           ) : null}
         </div>
       </div>
