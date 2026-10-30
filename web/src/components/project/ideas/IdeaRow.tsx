@@ -4,11 +4,10 @@
 import { useState } from 'react';
 import { Button } from '../../ui/Button';
 import {
-  ChevronDownIcon,
-  ChevronUpIcon,
   EditIcon,
   ExternalIcon,
   EyeIcon,
+  GripIcon,
   PlayIcon,
   ReplyIcon,
 } from '../../Icons';
@@ -42,6 +41,16 @@ const ACTION_ICONS: Record<IdeaAction, typeof EditIcon> = {
   review: EyeIcon,
 };
 
+export type RowReorder = {
+  onDragStart: () => void;
+  onDragOver: () => void;
+  onDrop: () => void;
+  onDragEnd: () => void;
+  onKeyMove: (direction: -1 | 1) => void;
+  dragging: boolean;
+  over: boolean;
+};
+
 export function IdeaRow({
   idea,
   projectId,
@@ -49,8 +58,7 @@ export function IdeaRow({
   onOpenSession,
   run,
   position,
-  onMoveUp,
-  onMoveDown,
+  reorder,
 }: {
   idea: IdeaView;
   projectId: string;
@@ -58,8 +66,7 @@ export function IdeaRow({
   onOpenSession: (sessionId: string) => void;
   run: (action: () => Promise<IdeaBoard>) => Promise<boolean>;
   position: number | null;
-  onMoveUp: (() => void) | null;
-  onMoveDown: (() => void) | null;
+  reorder: RowReorder | null;
 }) {
   const [pendingDrop, setPendingDrop] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -106,7 +113,7 @@ export function IdeaRow({
     const Icon = ACTION_ICONS[idea.action];
     return (
       <Button
-        variant="secondary"
+        variant="soft"
         size="sm"
         iconOnly
         disabled={busy}
@@ -120,35 +127,68 @@ export function IdeaRow({
   };
 
   return (
-    <div className="relative flex items-start gap-2 px-2 py-2">
+    <div
+      className={[
+        'relative flex items-start gap-2 px-2 py-2',
+        reorder?.dragging ? 'opacity-50' : null,
+        reorder?.over ? 'rounded-md ring-1 ring-accent' : null,
+      ]
+        .filter(Boolean)
+        .join(' ')}
+      draggable={reorder ? true : undefined}
+      onDragStart={
+        reorder
+          ? (e) => {
+              e.dataTransfer.effectAllowed = 'move';
+              // Firefox starts no drag without data.
+              e.dataTransfer.setData('text/plain', idea.id);
+              reorder.onDragStart();
+            }
+          : undefined
+      }
+      onDragOver={
+        reorder
+          ? (e) => {
+              e.preventDefault();
+              reorder.onDragOver();
+            }
+          : undefined
+      }
+      onDrop={
+        reorder
+          ? (e) => {
+              e.preventDefault();
+              reorder.onDrop();
+            }
+          : undefined
+      }
+      onDragEnd={reorder ? reorder.onDragEnd : undefined}
+    >
       {position != null ? (
         <span className="w-5 shrink-0 text-right font-mono text-xs text-muted">
           {position}
         </span>
       ) : null}
 
-      {onMoveUp ? (
+      {reorder ? (
         <Button
           variant="ghost"
           size="sm"
           iconOnly
-          title="Monter"
-          aria-label="Monter"
-          onClick={onMoveUp}
+          title="Glisser pour réordonner (↑/↓ au clavier)"
+          aria-label="Réordonner"
+          className="cursor-grab"
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowUp') {
+              e.preventDefault();
+              reorder.onKeyMove(-1);
+            } else if (e.key === 'ArrowDown') {
+              e.preventDefault();
+              reorder.onKeyMove(1);
+            }
+          }}
         >
-          <ChevronUpIcon className="h-4 w-4" />
-        </Button>
-      ) : null}
-      {onMoveDown ? (
-        <Button
-          variant="ghost"
-          size="sm"
-          iconOnly
-          title="Descendre"
-          aria-label="Descendre"
-          onClick={onMoveDown}
-        >
-          <ChevronDownIcon className="h-4 w-4" />
+          <GripIcon className="h-4 w-4" />
         </Button>
       ) : null}
 
