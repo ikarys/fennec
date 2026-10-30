@@ -42,6 +42,7 @@ import { Composer } from "../components/session/Composer";
 import { RunningStrip } from "../components/session/RunningStrip";
 import { modelShortName } from "../components/session/ModelPicker";
 import { Badge } from "../components/ui/Badge";
+import { AuditCard } from "../components/session/AuditCard";
 import { ContextPanel } from "../components/session/ContextPanel";
 import { ContextGauge } from "../components/session/ContextGauge";
 import { QuestionCard } from "../components/session/QuestionCard";
@@ -224,6 +225,14 @@ export function SessionPage({
     // a turn ends, not only on a reload.
     if (previousRunning.current && !running) {
       setDetailVersion((version) => version + 1);
+      // The notice only fires while this page is open; a global one needs a
+      // server-wide stream.
+      if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
+        new Notification(view.name ?? detail?.title ?? 'fennec', {
+          body: 'Tour terminé : à toi de relire.',
+          tag: sessionId ?? undefined,
+        });
+      }
     }
     previousRunning.current = running;
   }, [running]);
@@ -490,6 +499,11 @@ export function SessionPage({
     const images = fromComposer ? attachments : [];
     if ((!value && images.length === 0) || running) return;
     setSendError(null);
+
+    // Ask for notification permission in the user gesture that starts a turn.
+    if ('Notification' in window && Notification.permission === 'default') {
+      void Notification.requestPermission();
+    }
 
     // A quick answer or a message to a running/waiting run is an ordinary
     // message, not a workflow start.
@@ -902,6 +916,13 @@ export function SessionPage({
                               onReplay={sessionId ? handleReplay : undefined}
                             />
                           ))}
+                          {detail && detail.audit && detail.audit.findings.length > 0 && !running ? (
+                            <AuditCard
+                              audit={detail.audit}
+                              sessionId={sessionId}
+                              projectId={detail.project.id ?? null}
+                            />
+                          ) : null}
                         </div>
                       </div>
                       {awayFromBottom && !running && (
@@ -1015,8 +1036,6 @@ export function SessionPage({
                     skills={skills}
                     usage={usage}
                     request={detail?.request ?? null}
-                    audit={detail?.audit ?? null}
-                    projectId={detail?.project.id ?? null}
                     hasSession={sessionId !== null}
                     partial={hasMore}
                     worktree={detail?.worktree ?? null}
