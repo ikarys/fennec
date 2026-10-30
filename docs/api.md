@@ -230,14 +230,26 @@ read-only. The human edits them as usual.
     first `# ` heading).
 - `POST /api/projects/{id}/map-file` `{}` → `{mapFile}`: the human's click writes `docs/map.md` (a Mermaid
   diagram and a table) in the project's tree, not committed; 404 if no project
-- `GET /api/projects/{id}/ideas` → `{ideas: [{id, text, state, sessionId, plan, sessionState, halted, report, createdAt, updatedAt}], queueRunning}`: the project's
-  ideas backlog, folded from its append-only `idea.*` events (table `project_events`), newest first, dropped ones left
-  out; `state` `inbox | framing | ready | started`, `sessionId` the framing session, `plan` the approved plan verbatim,
-  `sessionState` the session's state (as in `/api/projects`) for a started idea, else null; `halted` why the night mode
-  stopped or skipped it (`idea.halted`), cleared by a new plan or a new start, else null; `report` for a started idea
-  `{integrated, criteria: {passed, failed, pending}, decisions: [{title, choice}]}` (`integrated`: the session has an `integration.applied`) from its session's current run, else null;
-  `queueRunning` whether the project's queue runs. 404 if no project.
-  Every write below answers the same fresh board; 404 if no project or no such idea:
+- `GET /api/projects/{id}/ideas` → `{queue, groups, nightReport}`: the project's ideas backlog as a board the UI renders
+  as is, folded (crate `backlog`) from its append-only `idea.*` events (table `project_events`), dropped ideas left out.
+  - `queue` `{running, autonomous, ready, next: {id, text} | null, caps: {maxMinutes, maxTokens}}`: whether the queue
+    runs (and in night mode), how many ideas it holds, the idea it starts next, the Settings caps (0 no cap).
+  - `groups` `[{stage, ideas: [idea]}]`, non-empty only, in this order: `yours` (waits for the human: review, question,
+    halted, failed), `running`, `queue` (in queue order), `drafts` (inbox, framing), `done` (integrated); outside the
+    queue, the most recently changed first.
+  - `idea` `{id, text, status, stage, action, sessionId, plan, halted, autonomous, position, createdAt, startedAt,
+    durationMs, tokens, criteria, decisions, commits, files}`: `status` `inbox | framing | queued | running | question |
+    review | halted | failed | integrated` (from the idea and its session's state; a started idea whose session is gone
+    is `failed`); `action` the one next step `frame | resumeFraming | start | open | answer | review`; `plan` the
+    approved plan verbatim; `halted` why the night mode stopped or skipped it, cleared by a new plan or start; `position`
+    its 1-based place in the queue; `durationMs` from its start to now (running) or its session's last change; `tokens`
+    uncached prompt plus completion of the project's calls in that window (exact while one idea runs at a time);
+    `criteria` `{passed, failed, pending}` and `decisions` `[{title, choice}]` from its session's run; `commits` and
+    `files` of its worktree branch past its base, for `review`, `halted` and `failed` only. Null when not applicable.
+  - `nightReport` the last queue run once finished and until read, if it started an idea: `{startedAt, finishedAt,
+    reason, autonomous, summary: {started, running, review, question, halted, failed, integrated}, ideas: [idea]}`;
+    `reason` `no idea ready | stopped by the human | project gone | server restarted | error: …`.
+  404 if no project. Every write below answers the same fresh board; 404 if no project or no such idea:
   - `POST /api/projects/{id}/ideas` `{text, sessionId?, plan?}` (`idea.added`; 400 if empty or over 4000 characters);
     with `sessionId` (a session of the project, else 404) and `plan` (400 if empty), also `idea.framing` and `idea.ready`:
     the plan card's "Mettre au backlog" for a plan written outside the backlog
@@ -246,15 +258,19 @@ read-only. The human edits them as usual.
   - `POST /api/projects/{id}/ideas/{ideaId}/drop` `{}` (`idea.dropped`)
   - `POST /api/projects/{id}/ideas/{ideaId}/start` `{}`: builds this idea now, outside the queue: from its plan
     when ready, else from its text (the workflow plans first; an idea without a session gets one, `idea.framing`),
-    then `idea.started`; 409 if already started or its session is busy
-  - `POST /api/projects/{id}/ideas/queue/start` `{autonomous?}`: starts the queue (no-op if it runs). It takes the oldest
-    ready idea not halted, starts the `plan-build-verify` workflow from its plan in its session's worktree (`idea.started`),
-    waits for the turn to end (done, waiting for the human, or failed), then the next; it ends when no idea is ready, or
-    on an error (a busy session) logged by the server. `autonomous` (night mode): `ask_user` answers itself (the agent
-    decides and records it with `record_decision`), `propose_criteria` is refused (the criteria stay the human's), in the
-    session and its child sessions; an idea over the Settings caps (`autonomy.maxMinutesPerIdea`,
-    `autonomy.maxTokensPerIdea`: uncached prompt plus completion tokens of the project since the idea started; 0 no cap)
-    is stopped, and an idea that fails to start is skipped, each with `idea.halted {ideaId, reason}`
+    then `idea.started {ideaId, autonomous: false}`; 409 if already started or its session is busy
+  - `POST /api/projects/{id}/ideas/reorder` `{ids}` (`idea.reordered`): the human's queue order; ids left out follow,
+    oldest first; 400 unless a list of queued idea ids
+  - `POST /api/projects/{id}/ideas/report/read` `{}` (`idea.report_read`): hides the night report
+  - `POST /api/projects/{id}/ideas/queue/start` `{autonomous?}`: starts the queue (no-op if it runs), recorded as
+    `idea.queue_started {autonomous}` … `idea.queue_finished {reason}`. It takes the first queued idea not halted,
+    starts the `plan-build-verify` workflow from its plan in its session's worktree (`idea.started {ideaId,
+    autonomous}`), waits for the turn to end (done, waiting for the human, or failed), then the next. The queue lives in
+    the server: a restart closes an open run (`server restarted`). `autonomous` (night mode): `ask_user` answers itself
+    (the agent decides and records it with `record_decision`), `propose_criteria` is refused (the criteria stay the
+    human's), in the session and its child sessions; an idea over the Settings caps (`autonomy.maxMinutesPerIdea`,
+    `autonomy.maxTokensPerIdea`, checked every 30 s) is stopped, and an idea that fails to start is skipped, each with
+    `idea.halted {ideaId, reason}`
   - `POST /api/projects/{id}/ideas/queue/stop` `{}`: the queue starts no further idea; the running turn finishes
 - `GET /api/folders?path=<absolute path>` → `{path, parent, folders: [{name, path, hidden, repo}]}`,
   the sub-folders of `path` (the home directory when omitted), sorted by name;

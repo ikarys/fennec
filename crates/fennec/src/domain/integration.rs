@@ -189,6 +189,15 @@ pub fn default_message(session_title: &str) -> String {
     if title.is_empty() {
         return "feat: integrate the agent's work".to_string();
     }
+    // Framing sessions are titled "Plan: …", and the integration commit
+    // inherited "feat: plan: …".
+    let title = match title.split_once(':') {
+        Some((head, rest)) if head.trim().eq_ignore_ascii_case("plan") => rest.trim(),
+        _ => title,
+    };
+    if title.is_empty() {
+        return "feat: integrate the agent's work".to_string();
+    }
     let mut chars = title.chars();
     let first = chars.next().unwrap().to_lowercase().to_string();
     format!("feat: {first}{}", chars.collect::<String>())
@@ -625,6 +634,16 @@ mod tests {
     #[test]
     fn default_message_uses_the_session_title() {
         assert_eq!(default_message("  Fix login "), "feat: fix login");
+    }
+
+    #[test]
+    fn default_message_drops_the_plan_prefix() {
+        assert_eq!(
+            default_message("Plan: Project pages vertical tabs"),
+            "feat: project pages vertical tabs"
+        );
+        assert_eq!(default_message("plan : x"), "feat: x");
+        assert_eq!(default_message("Plan:"), "feat: integrate the agent's work");
     }
 
     #[test]

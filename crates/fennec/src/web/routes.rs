@@ -22,7 +22,6 @@ use crate::domain::agent::{resolve as agent_resolve, switch_to};
 use crate::domain::attachment::{Attachment, from_data_url};
 use crate::domain::event::Event;
 use crate::domain::id::new_id;
-use crate::domain::idea::idea_for_session;
 use crate::domain::preferences::ModelRef;
 use crate::domain::project::{Project, SessionSummary};
 use crate::domain::replay::replayable;
@@ -32,6 +31,7 @@ use crate::domain::workflow::run::Waiting;
 use crate::skills;
 use crate::store::SqliteStore;
 use crate::{folders, git, workflows};
+use backlog::idea_for_session;
 use serde_json::{Value, json};
 use std::net::TcpStream;
 use std::path::Path;
@@ -76,6 +76,12 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         }
         ("POST", ["api", "projects", id, "ideas", "queue", "stop"]) => {
             idea_routes::stop_queue(app, stream, id)
+        }
+        ("POST", ["api", "projects", id, "ideas", "reorder"]) => {
+            idea_routes::reorder(app, req, stream, id)
+        }
+        ("POST", ["api", "projects", id, "ideas", "report", "read"]) => {
+            idea_routes::report_read(app, stream, id)
         }
         ("POST", ["api", "projects", id, "ideas", iid, "start"]) => {
             idea_routes::start_one(app, stream, id, iid)
