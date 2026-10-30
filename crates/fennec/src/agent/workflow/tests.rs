@@ -1791,6 +1791,7 @@ fn resume_interrupted_agent_keeps_its_pass_and_prompt() {
             workflow,
             task: "do it".into(),
             step_by_step: false,
+            started_at: None,
         },
         Event::WorkflowNodeStarted {
             run_id: "r".into(),
