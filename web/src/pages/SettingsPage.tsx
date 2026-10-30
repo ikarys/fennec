@@ -143,7 +143,8 @@ function toForm(preferences: Preferences, listings: ProviderListing[]): Settings
         reasoningEffort: prefs.reasoningEffort ?? ''
       };
     }
-  }  return {
+  }
+  return {
     model: preferences.selected ? `${preferences.selected.provider}/${preferences.selected.model}` : '',
     favorites: preferences.favorites ?? [],
     providers: providerForms,
@@ -187,33 +188,25 @@ function buildPreferences(form: SettingsForm, settings: SettingsResponse): Prefe
   const providers: Provider[] = form.providers.map((providerForm) => {
     const listing = settings.listings.find((item) => item.provider === providerForm.id);
     const listedIds = new Set(listing?.models.map((model) => model.id) ?? []);
-    const storedProvider = settings.preferences.providers.find((item) => item.id === providerForm.id);
     const models: Record<string, ModelPrefs> = {};
 
-    // Keep overrides for models that are no longer listed; the page does not edit them.
-    for (const [modelId, prefs] of Object.entries(storedProvider?.models ?? {})) {
-      if (!listedIds.has(modelId)) {
-        models[modelId] = prefs;
-      }
-    }
-
-    if (listing) {
-      for (const model of listing.models) {
-        const key = `${listing.provider}/${model.id}`;
-        const entry = form.models[key] ?? emptyModelForm;
-        const maxTokens = parseNumber(entry.maxTokens);
-        const contextWindow = parseNumber(entry.contextWindow);
-        const compactionThreshold = parsePercent(entry.compactionThreshold);
-        if (maxTokens == null && contextWindow == null && compactionThreshold == null && entry.reasoningEffort === '')
-          continue;
-
-        const prefs: ModelPrefs = {};
-        if (maxTokens != null) prefs.maxTokens = maxTokens;
-        if (contextWindow != null) prefs.contextWindow = contextWindow;
-        if (compactionThreshold != null) prefs.compactionThreshold = compactionThreshold;
-        if (entry.reasoningEffort !== '') prefs.reasoningEffort = entry.reasoningEffort as ReasoningEffort;
-        models[model.id] = prefs;
-      }
+    // Every model of the form is written from the form, listed or added by hand.
+    // A listed one with nothing set is dropped; a hand-added one is kept even
+    // empty: its entry is what makes it exist for the provider.
+    const prefix = `${providerForm.id}/`;
+    for (const [key, entry] of Object.entries(form.models)) {
+      if (!key.startsWith(prefix)) continue;
+      const modelId = key.slice(prefix.length);
+      const maxTokens = parseNumber(entry.maxTokens);
+      const contextWindow = parseNumber(entry.contextWindow);
+      const compactionThreshold = parsePercent(entry.compactionThreshold);
+      const prefs: ModelPrefs = {};
+      if (maxTokens != null) prefs.maxTokens = maxTokens;
+      if (contextWindow != null) prefs.contextWindow = contextWindow;
+      if (compactionThreshold != null) prefs.compactionThreshold = compactionThreshold;
+      if (entry.reasoningEffort !== '') prefs.reasoningEffort = entry.reasoningEffort as ReasoningEffort;
+      if (Object.keys(prefs).length === 0 && listedIds.has(modelId)) continue;
+      models[modelId] = prefs;
     }
 
     const apiKey = providerFormToApiKey(providerForm);
@@ -482,6 +475,7 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
                 <ProvidersSection
                   providers={form.providers}
                   listings={settings.listings}
+                  values={form.models}
                   onChange={updateProvider}
                   onAdd={addProvider}
                   onRemove={removeProvider}
