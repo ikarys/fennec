@@ -1,6 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Button } from '../components/ui/Button';
-import { SearchIcon } from '../components/Icons';
 import { Tabs } from '../components/ui/Tabs';
 import { TasksSection } from '../components/project/ideas/TasksSection';
 import { MapSection } from '../components/project/MapSection';
@@ -138,19 +137,13 @@ export default function ProjectPage({
         </h1>
         <div className="grow" />
         <Button
-          variant="secondary"
+          variant="primary"
           size="sm"
           disabled={analyzing}
-          iconOnly
           onClick={handleAnalyze}
-          title={
-            analyzing
-              ? "Analyser le projet : une session propose la philosophie, les couches et les règles d'AGENTS.md — Création…"
-              : "Analyser le projet : une session propose la philosophie, les couches et les règles d'AGENTS.md"
-          }
-          aria-label="Analyser le projet"
+          title="Une session propose la philosophie, les couches et les règles d'AGENTS.md"
         >
-          <SearchIcon className="h-4 w-4" />
+          {analyzing ? 'Création…' : 'Analyser le projet'}
         </Button>
       </div>
       {analyzeError ? <p className="mt-1 text-xs text-err">{analyzeError}</p> : null}
