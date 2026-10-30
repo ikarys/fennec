@@ -165,6 +165,7 @@ pub(super) fn with_turn<R>(
         workdir,
         instructions: &instructions,
         skills: &skills,
+        always_on: &prefs.always_on_skills,
         agents: &agents,
         max_tokens: params.max_tokens,
         context_window: params.context_window,

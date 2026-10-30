@@ -62,6 +62,8 @@ pub struct Turn<'a> {
     pub instructions: &'a str,
     /// openfox `skills`: listed in the system prompt, frozen with it.
     pub skills: &'a [Skill],
+    /// Skill ids whose bodies the system prompt carries; frozen with it.
+    pub always_on: &'a [String],
     /// The agents the session can run as; the log's last `mode.changed`
     /// picks one.
     pub agents: &'a [AgentDefinition],
@@ -225,6 +227,7 @@ fn round_prompt_parts(turn: &mut Turn) -> Result<(String, Value), String> {
             turn.model.name(),
             turn.instructions,
             turn.skills,
+            turn.always_on,
         )
     });
     let tools = tools.cloned().unwrap_or_else(|| tool_definitions(turn));
@@ -514,6 +517,7 @@ mod tests {
                 workdir: &self.workdir,
                 instructions: "",
                 skills: &[],
+                always_on: &[],
                 agents: &self.agents,
                 max_tokens: 100,
                 context_window: 1000,
@@ -539,6 +543,7 @@ mod tests {
             workdir,
             instructions: "",
             skills: &[],
+            always_on: &[],
             agents: &agents,
             max_tokens: 100,
             context_window: 1000,
@@ -752,6 +757,7 @@ mod tests {
             workdir: &workdir,
             instructions: "",
             skills: &[],
+            always_on: &[],
             agents: &agents,
             max_tokens: 100,
             context_window: 1000,

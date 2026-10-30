@@ -129,6 +129,8 @@ export interface Preferences {
   search?: SearchPrefs;
   /** fennec's bwrap world: how commands run. */
   sandbox?: SandboxPrefs;
+  /** Skill ids every new session gets in its system prompt. */
+  alwaysOnSkills?: string[];
 }
 
 /** Where a resolved parameter value comes from. */
@@ -180,10 +182,17 @@ export interface SettingsDefaults {
   reasoningEffort: ReasoningEffort | null;
 }
 
+export interface SkillSummary {
+  id: string;
+  description: string;
+}
+
 export interface SettingsResponse {
   preferences: Preferences;
   listings: ProviderListing[];
   defaults: SettingsDefaults;
+  /** The skills a session can load outside any project: defaults and ~/.agents/skills. */
+  skills: SkillSummary[];
 }
 
 export interface SessionDetail {
@@ -380,6 +389,10 @@ export function setSessionModel(id: string, ref: ModelRef): Promise<{ model: Ses
 export interface SessionSkills {
   loaded: string[];
   active: string[];
+  /** Frozen into the session's system prompt at its first turn. */
+  alwaysOn: string[];
+  /** Not loaded, not always-on: what the human may still type as /<id>. */
+  available: string[];
 }
 
 export function getSkills(id: string): Promise<SessionSkills> {
