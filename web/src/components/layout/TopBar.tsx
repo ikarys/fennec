@@ -117,9 +117,14 @@ export function TopBar({
               }}
               title={`${tab.project} — ${tab.title}`}
               onClick={() => onPickTab(tab.id)}
-              onAuxClick={(event) => {
+              onMouseDown={(event) => {
                 // Middle click (wheel) closes the tab, like a browser tab bar.
-                if (event.button === 1) onCloseTab(tab.id);
+                // preventDefault stops Chrome's autoscroll, which would
+                // otherwise swallow the click before auxclick fires.
+                if (event.button === 1) {
+                  event.preventDefault();
+                  onCloseTab(tab.id);
+                }
               }}
               onKeyDown={(event) => {
                 // The tab div is focusable but not a button: Enter/Space activate it.
