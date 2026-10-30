@@ -1,10 +1,12 @@
 //! Test doubles shared by the agent's test modules: a scripted model and an
 //! in-memory log, so each test module keeps one copy.
 
-use crate::agent::ports::{Completion, Delta, EventLog, Model, Request};
+use crate::agent::ports::{Completion, Delta, EventLog, Model, Request, Toolbox};
 use crate::domain::agent::{AgentDefinition, CommandAccess};
-use crate::domain::event::{Event, ToolCall};
+use crate::domain::event::{Event, OutputStream, ToolCall, ToolResult};
+use serde_json::{Value, json};
 use std::cell::RefCell;
+use std::sync::atomic::AtomicBool;
 
 /// Plays back one scripted reply per call, like openfox's mock LLM.
 pub struct Scripted(pub RefCell<Vec<Result<Completion, String>>>);
@@ -91,5 +93,34 @@ pub fn plan() -> AgentDefinition {
         reasoning_effort: None,
         color: None,
         prompt: "Plan.".into(),
+    }
+}
+
+/// A toolbox for the agent loop tests: `run_command` always succeeds with the
+/// marker `run_command` prints, so preflight can classify it without a shell.
+pub struct FakeToolbox;
+
+impl Toolbox for FakeToolbox {
+    fn definitions(&self) -> Value {
+        json!([])
+    }
+
+    fn execute(
+        &self,
+        name: &str,
+        args: &Value,
+        _access: CommandAccess,
+        _stop: &AtomicBool,
+        _on_output: &mut dyn FnMut(OutputStream, &str),
+    ) -> ToolResult {
+        if name == "run_command" {
+            let command = args
+                .get("command")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            ToolResult::success(format!("$ {command}\n[Exit code: 0]"), false)
+        } else {
+            ToolResult::success("ok".into(), false)
+        }
     }
 }

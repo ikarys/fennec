@@ -4,6 +4,7 @@
 use super::attachment::Attachment;
 use super::criteria::{Criterion, CriterionStatus};
 use super::preferences::ModelRef;
+use super::preflight::PreflightResult;
 use super::stats::MessageStats;
 use super::workflow::definition::Workflow;
 use super::workflow::run::{RunOutcome, Via};
@@ -377,6 +378,13 @@ pub enum Event {
         criteria: Vec<Criterion>,
         reason: String,
     },
+    /// fennec ran the plan's `check:` commands before any change; the planner
+    /// is sent back once when one cannot run or already passes.
+    #[serde(rename = "criteria.preflight", rename_all = "camelCase")]
+    CriteriaPreflight {
+        message_id: String,
+        results: Vec<PreflightResult>,
+    },
     /// An agent recorded a design decision (fennec's own event); the turn goes on.
     #[serde(rename = "decision.recorded", rename_all = "camelCase")]
     DecisionRecorded {
@@ -446,6 +454,7 @@ impl Event {
             Event::TurnSnapshot { .. } => "turn.snapshot",
             Event::CriteriaSet { .. } => "criteria.set",
             Event::CriteriaProposed { .. } => "criteria.proposed",
+            Event::CriteriaPreflight { .. } => "criteria.preflight",
             Event::DecisionRecorded { .. } => "decision.recorded",
             Event::CriterionUpdated { .. } => "criterion.updated",
             Event::IntegrationApplied { .. } => "integration.applied",
