@@ -218,6 +218,17 @@ export interface SettingsResponse {
   /** The skills a session can load outside any project: defaults and ~/.agents/skills. */
   skills: SkillSummary[];
   optInWorkflows: WorkflowOptIn[];
+  scanners: ScannerStatus[];
+}
+
+/** A security scanner the audit-security agent runs; `path` is null when fennec does not find it on PATH. */
+export interface ScannerStatus {
+  id: string;
+  name: string;
+  covers: string;
+  install: string;
+  url: string;
+  path: string | null;
 }
 
 export interface WorkflowOptIn {

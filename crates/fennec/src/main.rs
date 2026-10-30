@@ -17,6 +17,7 @@ mod llm;
 mod metering;
 mod module_map;
 mod protected;
+mod scanners;
 mod skills;
 mod store;
 mod tools;
