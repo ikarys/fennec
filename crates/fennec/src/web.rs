@@ -20,6 +20,7 @@ mod session_delete;
 mod session_name;
 mod session_usage;
 mod settings_routes;
+mod terminal;
 mod turns;
 mod workflow_routes;
 mod workflow_usage;
