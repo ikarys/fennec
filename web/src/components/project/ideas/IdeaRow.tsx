@@ -129,7 +129,7 @@ export function IdeaRow({
   return (
     <div
       className={[
-        'relative flex items-start gap-2 px-2 py-2',
+        'relative flex items-start gap-2 px-2 py-2 hover:bg-raised',
         reorder?.dragging ? 'opacity-50' : null,
         reorder?.over ? 'rounded-md ring-1 ring-accent' : null,
       ]

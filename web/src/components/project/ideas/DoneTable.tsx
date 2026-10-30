@@ -35,7 +35,7 @@ export function DoneTable({
         {ideas.map((idea) => {
           const sessionId = idea.sessionId;
           return (
-            <tr key={idea.id} className="border-t border-border">
+            <tr key={idea.id} className="border-t border-border hover:bg-raised">
               <td className="max-w-[320px] px-3 py-2">
                 <span className="block truncate" title={idea.text}>
                   {idea.text}
