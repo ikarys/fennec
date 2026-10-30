@@ -107,6 +107,15 @@ export function SessionPage({
   const [workflowSelection, setWorkflowSelection] = useState<WorkflowSelection>(
     { workflowId: null, stepByStep: false, worktree: true },
   );
+  // A session framing a backlog idea only talks: its messages must not start
+  // the default build workflow (a "go on" there once ran a whole build).
+  // Depends on `workflows` too, so a late workflow list does not reselect it.
+  const framingIdea = detail?.idea?.state === "framing";
+  useEffect(() => {
+    if (framingIdea) {
+      setWorkflowSelection((selection) => ({ ...selection, workflowId: null }));
+    }
+  }, [framingIdea, workflows]);
   // Optimistic mode while `setSessionMode` is in flight; cleared once the
   // server's mode (event stream or detail) matches it.
   const [pendingMode, setPendingMode] = useState<string | null>(null);
