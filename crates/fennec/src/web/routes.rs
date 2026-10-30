@@ -9,7 +9,7 @@ use super::terminal;
 use super::{
     assets,
     context_view::context_view,
-    event_stream, idea_routes, integration, model_routes, project_routes, session_delete,
+    event_stream, idea_routes, integration, model_routes, project_routes, servers, session_delete,
     session_name,
     session_usage::{SessionUsageView, call_views},
     settings_routes,
@@ -143,6 +143,12 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         }
         ("POST", ["api", "sessions", id, "discard"]) => integration::discard(app, req, stream, id),
         ("POST", ["api", "sessions", id, "terminal"]) => terminal::open(app, stream, id),
+        ("GET", ["api", "sessions", id, "servers"]) => servers::list(app, stream, id),
+        ("POST", ["api", "sessions", id, "servers"]) => servers::save(app, req, stream, id),
+        ("POST", ["api", "sessions", id, "servers", "start"]) => {
+            servers::start(app, req, stream, id)
+        }
+        ("POST", ["api", "sessions", id, "servers", "stop"]) => servers::stop(app, req, stream, id),
         ("POST", ["api", "sessions", id, "stop"]) => {
             app.turns.stop(id);
             send_json(stream, 202, &json!({}))
