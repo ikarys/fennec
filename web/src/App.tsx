@@ -370,7 +370,7 @@ export default function App() {
             </Suspense>
           ) : route.name === 'project' ? (
             <Suspense fallback={<div className="flex grow items-center justify-center text-muted">Chargement…</div>}>
-              <ProjectPage projects={projects} projectId={route.projectId} />
+              <ProjectPage projects={projects} projectId={route.projectId} onOpenSession={openSession} />
             </Suspense>
           ) : route.name === 'insight' ? (
             <InsightPage />

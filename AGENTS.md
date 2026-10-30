@@ -86,11 +86,12 @@ Project page and map, done: `#/project/<id>` (the "Projet" button of a home card
 modules and their dependencies read from the imports (verified, `domain/module_map.rs`), and
 writes them on the human's click to `docs/map.md` (`domain/map_doc.rs`), stale when the code moved:
 committed, it gives the project's shape to the next developer or agent without reading the code.
+Project analysis, done: an "Analyser le projet" button opens a session on the read-only `analyze`
+agent (`crates/fennec/agents/analyze.agent.md`), which drafts AGENTS.md's philosophy, layers and rules,
+each with its file:line source (indicative); the human reviews it.
 Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
-1. Project actions on the project page: "Analyser le projet" (a read-only agent drafts the
-   AGENTS.md philosophy, layers and rules, each with its file:line source, indicative, the
-   human reviews it), diagrams on demand of a function, process or engine
+1. Project actions on the project page: diagrams on demand of a function, process or engine
    (`docs/diagrams/`, Mermaid, indicative); then risk zones (C11: churn, untested, never
    reviewed by a human, deterministic) and questions to an agent (C10).
 2. Audits: a read-only `audit` agent, fixed report format.
