@@ -3,7 +3,9 @@ import type { SessionDetail, SessionSkills, SessionUsage } from '../../lib/api';
 import { useEffect, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { useDisplayPrefs } from '../../lib/display';
 import { pageBlocks, panelPages, type PanelBlockId } from '../../lib/panelBlocks';
+import { Button } from '../ui/Button';
 import { Select } from '../ui/Field';
+import { ChevronsLeftIcon, ChevronsRightIcon } from '../Icons';
 import { AgentWorkspaceSection } from './AgentWorkspaceSection';
 import { CriteriaSection } from './CriteriaSection';
 import { DecisionsSection } from './DecisionsSection';
@@ -15,6 +17,7 @@ import { VisionSection } from './VisionSection';
 
 const WIDTH_KEY = 'fennec.contextPanelWidth';
 const PAGE_KEY = 'fennec.contextPanel.page';
+const COLLAPSED_KEY = 'fennec.contextPanel.collapsed';
 const MIN_WIDTH = 240;
 const MAX_WIDTH = 560;
 const DEFAULT_WIDTH = 300;
@@ -48,6 +51,22 @@ function savePageName(name: string): void {
   }
 }
 
+function loadCollapsed(): boolean {
+  try {
+    return localStorage.getItem(COLLAPSED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function saveCollapsed(collapsed: boolean): void {
+  try {
+    localStorage.setItem(COLLAPSED_KEY, collapsed ? '1' : '0');
+  } catch {
+    // A blocked storage only loses the collapsed state on reload.
+  }
+}
+
 interface ContextPanelProps {
   view: ThreadView;
   /** The session's skills, folded server-side; null while the first fetch is in flight. */
@@ -71,6 +90,7 @@ interface ContextPanelProps {
 export function ContextPanel({ view, skills, usage, hasSession, partial, worktree, sessionId, onWorktreeChanged, integrationVersion }: ContextPanelProps) {
   const [width, setWidth] = useState(loadWidth);
   const [selectedPageName, setSelectedPageName] = useState(loadPageName);
+  const [collapsed, setCollapsed] = useState(loadCollapsed);
   const pages = panelPages(useDisplayPrefs().panelPages);
   const page = pages.find((candidate) => candidate.name === selectedPageName) ?? pages[0] ?? { name: '', blocks: [] };
 
@@ -81,6 +101,10 @@ export function ContextPanel({ view, skills, usage, hasSession, partial, worktre
       // A blocked storage only loses the width on reload.
     }
   }, [width]);
+
+  useEffect(() => {
+    saveCollapsed(collapsed);
+  }, [collapsed]);
 
   const startResize = (event: PointerEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -127,6 +151,28 @@ export function ContextPanel({ view, skills, usage, hasSession, partial, worktre
     }
   }
 
+  if (collapsed) {
+    return (
+      <aside
+        aria-label="Contexte de la session"
+        className="hidden min-h-0 w-10 shrink-0 flex-col border-l border-border bg-bg min-[1100px]:flex"
+      >
+        <div className="flex items-center justify-center p-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            iconOnly
+            aria-label="Déplier"
+            onClick={() => setCollapsed(false)}
+          >
+            <ChevronsLeftIcon className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </aside>
+    );
+  }
+
   return (
     <div className="relative hidden min-h-0 shrink-0 min-[1100px]:flex" style={{ width }}>
       <div
@@ -145,29 +191,47 @@ export function ContextPanel({ view, skills, usage, hasSession, partial, worktre
       />
       <aside
         aria-label="Contexte de la session"
-        className="flex min-h-0 w-full flex-col overflow-y-auto border-l border-border bg-bg [scrollbar-width:thin]"
+        className="flex min-h-0 w-full flex-col border-l border-border bg-bg"
       >
-        {pages.length > 1 && (
-          <label className="flex items-center gap-2 px-3 py-2 text-xs text-muted">Vue
-            <Select
-              aria-label="Page du panneau"
-              value={page.name}
-              onChange={(event) => {
-                const name = event.target.value;
-                setSelectedPageName(name);
-                savePageName(name);
-              }}
-              className="min-w-0 grow"
-            >
-              {pages.map((candidate) => (
-                <option key={candidate.name} value={candidate.name}>
-                  {candidate.name}
-                </option>
-              ))}
-            </Select>
-          </label>
-        )}
-        {pageBlocks(page, page === pages[0]).map(renderBlock)}
+        <div className="flex items-center gap-1 px-2 py-2">
+          <span className="min-w-0 truncate text-xs font-medium text-text" title="Contexte de la session">
+            Contexte
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            iconOnly
+            aria-label="Replier"
+            onClick={() => setCollapsed(true)}
+            className="ml-auto"
+          >
+            <ChevronsRightIcon className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+        <div className="min-h-0 grow overflow-y-auto [scrollbar-width:thin]">
+          {pages.length > 1 && (
+            <label className="flex items-center gap-2 px-3 py-2 text-xs text-muted">Vue
+              <Select
+                aria-label="Page du panneau"
+                value={page.name}
+                onChange={(event) => {
+                  const name = event.target.value;
+                  setSelectedPageName(name);
+                  savePageName(name);
+                }}
+                className="min-w-0 grow"
+              >
+                {pages.map((candidate) => (
+                  <option key={candidate.name} value={candidate.name}>
+                    {candidate.name}
+                  </option>
+                ))}
+              </Select>
+            </label>
+          )}
+          {pageBlocks(page, page === pages[0]).map(renderBlock)}
+        </div>
       </aside>
     </div>
   );
