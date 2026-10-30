@@ -1,13 +1,12 @@
-//! A reference tariff: what the tokens of the usage ledger would cost on a
-//! paid API, per million tokens. An estimate shown on the Insight page; the
-//! local model costs nothing.
+//! What a model's tokens cost, in dollars per million tokens, as the human sets it per model; an
+//! estimate (Insight), never sent to the model.
 
 use serde::{Deserialize, Serialize};
 
 /// Dollars per million tokens, as set on the Settings page.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
-pub struct Tariff {
+pub struct Price {
     /// Prompt tokens not read from cache.
     pub input_per_m: f64,
     /// Prompt tokens re-read from cache.
@@ -16,17 +15,7 @@ pub struct Tariff {
     pub output_per_m: f64,
 }
 
-impl Default for Tariff {
-    fn default() -> Self {
-        Self {
-            input_per_m: 3.0,
-            cached_per_m: 0.3,
-            output_per_m: 15.0,
-        }
-    }
-}
-
-impl Tariff {
+impl Price {
     /// The estimate in dollars for one usage summary.
     pub fn cost(&self, prompt_tokens: u64, cached_tokens: u64, completion_tokens: u64) -> f64 {
         let fresh = prompt_tokens.saturating_sub(cached_tokens);
@@ -42,14 +31,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn default_tariff_prices_a_million_prompt_tokens() {
-        let cost = Tariff::default().cost(1_000_000, 900_000, 100_000);
+    fn a_price_prices_a_million_prompt_tokens() {
+        let price = Price {
+            input_per_m: 3.0,
+            cached_per_m: 0.3,
+            output_per_m: 15.0,
+        };
+        let cost = price.cost(1_000_000, 900_000, 100_000);
         assert!((cost - 2.07).abs() < 1e-9);
     }
 
     #[test]
     fn cached_tokens_above_prompt_do_not_underflow() {
-        let cost = Tariff::default().cost(0, 1_000_000, 0);
+        let price = Price {
+            input_per_m: 3.0,
+            cached_per_m: 0.3,
+            output_per_m: 15.0,
+        };
+        let cost = price.cost(0, 1_000_000, 0);
         assert!((cost - 0.3).abs() < 1e-9);
     }
 }
