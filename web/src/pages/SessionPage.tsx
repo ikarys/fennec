@@ -1011,6 +1011,8 @@ export function SessionPage({
                     skills={skills}
                     usage={usage}
                     request={detail?.request ?? null}
+                    audit={detail?.audit ?? null}
+                    projectId={detail?.project.id ?? null}
                     hasSession={sessionId !== null}
                     partial={hasMore}
                     worktree={detail?.worktree ?? null}
