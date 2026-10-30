@@ -8,6 +8,7 @@ import { Badge } from '../ui/Badge';
 import { SectionLabel } from '../ui/SectionLabel';
 import { panelBlock } from '../../lib/panelBlocks';
 import { Panel } from '../ui/Panel';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 
 function shortFolderName(path: string): string {
   const name = path.split(/[\\/]/).filter(Boolean).pop() ?? path;
@@ -31,6 +32,7 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
   const invite = useIntegrationInvite();
   const [discarding, setDiscarding] = useState(false);
   const [discardError, setDiscardError] = useState<string | null>(null);
+  const [pendingDiscard, setPendingDiscard] = useState(false);
   const previousRunning = useRef(running);
   const fetchId = useRef(0);
   const repoFetchId = useRef(0);
@@ -128,13 +130,14 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
     </Button>
   );
 
-  const handleDiscard = async () => {
+  const openDiscard = () => {
     if (!sessionId || worktree === null) return;
-    const commits = preview?.commits.length ?? 0;
-    const confirmed = window.confirm(
-      `Abandonner ce travail ? Le dossier et la branche de l'agent seront supprimés, ses ${commits} commits perdus. Ton dossier et ta branche ne sont pas touchés.`
-    );
-    if (!confirmed) return;
+    setPendingDiscard(true);
+  };
+
+  const confirmDiscard = async () => {
+    if (!sessionId) return;
+    setPendingDiscard(false);
     setDiscarding(true);
     setDiscardError(null);
     try {
@@ -269,7 +272,7 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
             <Button
               variant="danger"
               size="sm"
-              onClick={() => void handleDiscard()}
+              onClick={openDiscard}
               disabled={sessionId === null || running || discarding}
               className="w-full"
             >
@@ -293,6 +296,14 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
           </div>
         )}
       </div>
+      <ConfirmDialog
+        open={pendingDiscard}
+        title="Abandonner ce travail ?"
+        body={`Le dossier et la branche de l'agent seront supprimés, ses ${preview?.commits.length ?? 0} commits perdus. Ton dossier et ta branche ne sont pas touchés.`}
+        confirmLabel="Abandonner"
+        onConfirm={() => void confirmDiscard()}
+        onCancel={() => setPendingDiscard(false)}
+      />
     </Panel>
   );
 }
