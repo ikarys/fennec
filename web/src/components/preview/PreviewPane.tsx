@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Button, buttonClass } from '../ui/Button';
+import { CloseIcon, RefreshIcon } from '../Icons';
 import { markdownComponents } from '../session/markdownComponents';
 import { previewUrl } from '../../lib/preview';
 import type { PreviewTarget } from './PreviewContext';
@@ -70,7 +71,15 @@ export function PreviewPane({ sessionId, target, onClose }: PreviewPaneProps) {
     <div className="fixed inset-y-0 right-0 z-40 flex w-[min(960px,92vw)] flex-col border-l border-border bg-bg shadow-xl">
       <header className="flex items-center gap-2 border-b border-border px-4 py-3">
         <span className="min-w-0 grow truncate font-mono text-xs text-muted">{target.path}</span>
-        <Button onClick={() => setReloadKey((value) => value + 1)}>Recharger</Button>
+        <Button
+          variant="ghost"
+          iconOnly
+          title="Recharger"
+          aria-label="Recharger"
+          onClick={() => setReloadKey((value) => value + 1)}
+        >
+          <RefreshIcon className="h-4 w-4" />
+        </Button>
         <a
           href={previewUrl(sessionId, target.path)}
           target="_blank"
@@ -79,7 +88,9 @@ export function PreviewPane({ sessionId, target, onClose }: PreviewPaneProps) {
         >
           Ouvrir dans un onglet
         </a>
-        <Button onClick={onClose}>Fermer</Button>
+        <Button variant="ghost" iconOnly title="Fermer" aria-label="Fermer" onClick={onClose}>
+          <CloseIcon className="h-4 w-4" />
+        </Button>
       </header>
       {target.kind === 'html' ? (
         <iframe

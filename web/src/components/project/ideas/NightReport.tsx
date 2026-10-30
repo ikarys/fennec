@@ -3,6 +3,7 @@
  */
 import { Badge } from '../../ui/Badge';
 import { Button } from '../../ui/Button';
+import { CheckIcon, EyeIcon } from '../../Icons';
 import { Card } from '../../ui/Card';
 import { formatRelative } from '../../../lib/format';
 import { IdeaStatusBadge } from './IdeaStatusBadge';
@@ -43,8 +44,15 @@ export function NightReport({
         </h3>
         <span className="text-xs text-muted">{formatRelative(report.finishedAt)}</span>
         <div className="grow" />
-        <Button variant="ghost" size="sm" onClick={() => void onDismiss()}>
-          Marquer comme lu
+        <Button
+          variant="ghost"
+          size="sm"
+          iconOnly
+          title="Marquer comme lu"
+          aria-label="Marquer comme lu"
+          onClick={() => void onDismiss()}
+        >
+          <CheckIcon className="h-4 w-4" />
         </Button>
       </div>
 
@@ -76,8 +84,15 @@ export function NightReport({
               <IdeaStatusBadge status={idea.status} />
               <IdeaMeta idea={idea} />
               {sid ? (
-                <Button variant="ghost" size="sm" onClick={() => onOpenSession(sid)}>
-                  Relire
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
+                  title="Relire"
+                  aria-label="Relire"
+                  onClick={() => onOpenSession(sid)}
+                >
+                  <EyeIcon className="h-4 w-4" />
                 </Button>
               ) : null}
             </div>

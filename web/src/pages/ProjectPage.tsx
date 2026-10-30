@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Button } from '../components/ui/Button';
+import { SearchIcon } from '../components/Icons';
 import { Tabs } from '../components/ui/Tabs';
 import { TasksSection } from '../components/project/ideas/TasksSection';
 import { MapSection } from '../components/project/MapSection';
@@ -140,10 +141,16 @@ export default function ProjectPage({
           variant="secondary"
           size="sm"
           disabled={analyzing}
+          iconOnly
           onClick={handleAnalyze}
-          title="Un agent en lecture seule rédige un brouillon d'AGENTS.md, chaque point avec sa source ; à relire"
+          title={
+            analyzing
+              ? "Analyser le projet : une session propose la philosophie, les couches et les règles d'AGENTS.md — Création…"
+              : "Analyser le projet : une session propose la philosophie, les couches et les règles d'AGENTS.md"
+          }
+          aria-label="Analyser le projet"
         >
-          {analyzing ? 'Création…' : 'Analyser le projet'}
+          <SearchIcon className="h-4 w-4" />
         </Button>
       </div>
       {analyzeError ? <p className="mt-1 text-xs text-err">{analyzeError}</p> : null}
