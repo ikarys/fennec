@@ -319,10 +319,7 @@ fn groups_json(board: &Board) -> Result<Value, String> {
             .filter(|(s, _, _)| *s == stage)
             .map(|(_, idea, view)| (*idea, view.clone()))
             .collect();
-        // The drafts group stays even empty: the UI puts the add input in it.
-        if entries.is_empty() && stage != Stage::Drafts {
-            continue;
-        }
+
         if stage == Stage::Queue {
             entries.sort_by_key(|(idea, _)| queue_place(idea));
         } else {
