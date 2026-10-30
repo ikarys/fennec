@@ -797,7 +797,8 @@ export function SessionPage({
                 <div className="flex min-h-0 min-w-0 grow">
                   {run && <RunRail run={run} />}
                   <main className="flex min-h-0 min-w-0 flex-[999_1_560px] flex-col">
-                    <div className="flex items-center gap-2 px-6 py-2.5">
+                    {/* A shadow under the title: the thread fades under it instead of meeting a hard edge. */}
+                    <div className="relative z-10 flex items-center gap-2 px-6 py-2.5 after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-5 after:bg-linear-to-b after:from-black/45 after:to-transparent">
                       <div className="mx-auto flex w-full max-w-[960px] items-center gap-2">
                         <h1
                           className="min-w-0 truncate text-[0.9375rem] font-semibold"
