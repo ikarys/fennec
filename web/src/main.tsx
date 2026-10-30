@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import { applyTheme, getStoredTheme } from './lib/theme';
+import '@fontsource-variable/inter';
 import './styles/app.css';
 
 applyTheme(getStoredTheme());
