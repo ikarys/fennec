@@ -9,7 +9,7 @@
  */
 import type { PanelPage } from './api';
 
-export type PanelBlockId = 'request' | 'audit' | 'criteria' | 'modifiedFiles' | 'workspace' | 'tokens' | 'skills' | 'decisions' | 'tools' | 'vision';
+export type PanelBlockId = 'request' | 'audit' | 'criteria' | 'modifiedFiles' | 'workspace' | 'servers' | 'tokens' | 'skills' | 'decisions' | 'tools' | 'vision';
 
 export interface PanelBlock {
   id: PanelBlockId;
@@ -24,6 +24,7 @@ export const PANEL_BLOCKS: readonly PanelBlock[] = [
   { id: 'criteria', title: 'Critères', core: true },
   { id: 'modifiedFiles', title: 'Fichiers modifiés', core: true },
   { id: 'workspace', title: "Espace de l'agent", core: true },
+  { id: 'servers', title: 'Serveurs', core: false },
   { id: 'skills', title: 'Skills', core: false },
   { id: 'decisions', title: 'Décisions', core: false },
   { id: 'tokens', title: 'Tokens', core: false },
@@ -34,7 +35,7 @@ export const PANEL_BLOCKS: readonly PanelBlock[] = [
 export const OPTIONAL_BLOCKS: readonly PanelBlock[] = PANEL_BLOCKS.filter((block) => !block.core);
 
 export const DEFAULT_PANEL_PAGES: readonly PanelPage[] = [
-  { name: 'Défaut', blocks: ['skills', 'decisions'] },
+  { name: 'Défaut', blocks: ['servers', 'skills', 'decisions'] },
   { name: 'Stats', blocks: ['tokens', 'tools', 'vision'] }
 ];
 

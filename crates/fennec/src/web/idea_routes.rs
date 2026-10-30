@@ -707,6 +707,7 @@ mod tests {
             notifier,
             skill_folds: Mutex::new(HashMap::new()),
             idea_queues: Mutex::default(),
+            server_runs: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
