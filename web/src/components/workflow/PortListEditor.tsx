@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Button } from '../ui/Button';
+import { CloseIcon, PlusIcon } from '../Icons';
 import { FieldRow, TextInput } from '../ui/Field';
 
 interface PortListEditorProps {
@@ -55,8 +56,9 @@ export function PortListEditor({ values, onChange, onRename, onRemove, label }: 
               iconOnly
               onClick={() => removeValue(value)}
               aria-label="Supprimer"
+              title="Supprimer"
             >
-              ×
+              <CloseIcon className="h-4 w-4" />
             </Button>
           </div>
         ))}
@@ -75,8 +77,16 @@ export function PortListEditor({ values, onChange, onRename, onRemove, label }: 
           placeholder="Ajouter…"
           className="grow"
         />
-        <Button type="button" variant="secondary" size="sm" onClick={addValue}>
-          Ajouter
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          iconOnly
+          onClick={addValue}
+          aria-label="Ajouter"
+          title="Ajouter"
+        >
+          <PlusIcon className="h-4 w-4" />
         </Button>
       </div>
     </>

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Plan, Report } from '../../lib/plan';
-import { CheckIcon, CloseIcon } from '../Icons';
+import { BookmarkIcon, CheckIcon, CloseIcon, EditIcon, PlayIcon } from '../Icons';
 import type { PlanActions } from './PlanActions';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -142,34 +142,41 @@ export function PlanCard({ plan, actions }: { plan: Plan; actions?: PlanActions 
             type="button"
             variant="ghost"
             size="sm"
+            iconOnly
             onClick={actions.onBuildAlone}
             disabled={actions.disabled}
             title="Exécute le plan avec l'agent Builder seul, sans critères ni review."
+            aria-label="Sans workflow"
           >
-            Sans workflow
+            <PlayIcon className="h-3.5 w-3.5" />
           </Button>
           {actions.ideaReady && (
             <Button
               type="button"
               variant="secondary"
               size="sm"
+              iconOnly
               onClick={actions.ideaReady.onMark}
               disabled={actions.disabled || actions.ideaReady.idea === 'saved'}
               className="ml-auto"
               title="Garde ce plan dans le backlog du projet, sans le lancer maintenant."
+              aria-label={IDEA_LABELS[actions.ideaReady.idea]}
             >
-              {IDEA_LABELS[actions.ideaReady.idea]}
+              <BookmarkIcon className="h-3.5 w-3.5" />
             </Button>
           )}
           <Button
             type="button"
             variant="secondary"
             size="sm"
+            iconOnly
             onClick={actions.onRevise}
             disabled={actions.disabled}
             className={actions.ideaReady ? undefined : 'ml-auto'}
+            title="Revoir le plan avec l'agent"
+            aria-label="Revoir"
           >
-            Revoir
+            <EditIcon className="h-3.5 w-3.5" />
           </Button>
         </div>
       )}

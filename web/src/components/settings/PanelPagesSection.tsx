@@ -3,6 +3,7 @@ import { OPTIONAL_BLOCKS, PANEL_BLOCKS, pageOptionalBlocks, panelBlock, panelPag
 import { Button } from '../ui/Button';
 import { Section } from '../ui/Section';
 import { TextInput } from '../ui/Field';
+import { ChevronDownIcon, ChevronUpIcon, PlusIcon, TrashIcon } from '../Icons';
 
 const MAX_PAGES = 12;
 
@@ -73,8 +74,16 @@ export function PanelPagesSection({ value, onChange }: PanelPagesSectionProps) {
                   onChange={(event) => updatePage(index, { ...page, name: event.target.value })}
                   className="grow"
                 />
-                <Button variant="ghost" size="sm" onClick={() => removePage(index)} disabled={index === 0}>
-                  Supprimer
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
+                  aria-label="Supprimer"
+                  title="Supprimer la page"
+                  onClick={() => removePage(index)}
+                  disabled={index === 0}
+                >
+                  <TrashIcon className="h-4 w-4" />
                 </Button>
               </div>
               <div className="flex flex-col gap-1.5">
@@ -92,20 +101,24 @@ export function PanelPagesSection({ value, onChange }: PanelPagesSectionProps) {
                     <Button
                       variant="ghost"
                       size="sm"
+                      iconOnly
                       onClick={() => updatePage(index, { ...page, blocks: moveBlock(blocks, id, -1) })}
                       disabled={blockIndex === 0}
                       aria-label="Monter"
+                      title="Monter"
                     >
-                      ↑
+                      <ChevronUpIcon className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
+                      iconOnly
                       onClick={() => updatePage(index, { ...page, blocks: moveBlock(blocks, id, 1) })}
                       disabled={blockIndex === blocks.length - 1}
                       aria-label="Descendre"
+                      title="Descendre"
                     >
-                      ↓
+                      <ChevronDownIcon className="h-4 w-4" />
                     </Button>
                   </div>
                 ))}
@@ -126,8 +139,16 @@ export function PanelPagesSection({ value, onChange }: PanelPagesSectionProps) {
         })}
       </div>
       <div className="flex items-center gap-2">
-        <Button variant="secondary" size="sm" onClick={addPage} disabled={pages.length >= MAX_PAGES}>
-          Ajouter une page
+        <Button
+          variant="secondary"
+          size="sm"
+          iconOnly
+          aria-label="Ajouter une page"
+          title="Ajouter une page"
+          onClick={addPage}
+          disabled={pages.length >= MAX_PAGES}
+        >
+          <PlusIcon className="h-4 w-4" />
         </Button>
         <Button variant="ghost" size="sm" onClick={() => onChange(null)} disabled={value === null}>
           Réinitialiser
