@@ -20,6 +20,7 @@
 use super::ask_user;
 use super::compaction::{self, Compacted};
 use super::ports::{EventLog, Model, Toolbox};
+use super::preflight;
 use super::prompt::system_prompt;
 use super::propose_criteria;
 use super::record_decision;
@@ -314,6 +315,7 @@ fn run_top_level_agent_loop(
     // Guards against compacting again before a real round has measured the
     // new window.
     let mut compacted_last_round = false;
+    let mut preflight_sent_back = false;
 
     for _ in 0..MAX_ROUNDS {
         let message_id = new_id();
@@ -395,6 +397,13 @@ fn run_top_level_agent_loop(
             partial: false,
         })?;
         if answer.tool_calls.is_empty() {
+            if let Some(feedback) = preflight::run(turn, agent, &message_id, &answer.content)?
+                && !preflight_sent_back
+            {
+                preflight_sent_back = true;
+                turn.append_user(&feedback, true, None, Vec::new())?;
+                continue;
+            }
             return finish(
                 turn,
                 message_id,
@@ -478,7 +487,7 @@ mod tests {
     use super::*;
     use crate::agent::ports::{Completion, Delta, Request};
     use crate::agent::round::CONTINUE_AFTER_STREAM_ERROR_PROMPT;
-    use crate::agent::test_support::{MemoryLog, Scripted, builder, plan, reply};
+    use crate::agent::test_support::{FakeToolbox, MemoryLog, Scripted, builder, plan, reply};
     use crate::domain::conversation::fold_messages;
     use crate::domain::event::ToolCall;
     use crate::tools::LocalTools;
@@ -1548,5 +1557,74 @@ mod tests {
         run_turn(&mut builder_h.turn(), "go", &[]).unwrap();
 
         assert_eq!(*plan_model.0.borrow(), *builder_model.0.borrow());
+    }
+
+    fn run_with_fake_tools(
+        model: Box<dyn Model>,
+        agents: Vec<AgentDefinition>,
+    ) -> (DoneReason, Vec<Event>) {
+        let log = MemoryLog::default();
+        let tools = FakeToolbox;
+        let stop = AtomicBool::new(false);
+        let mut on_event = |_: &Event| {};
+        let mut turn = Turn {
+            model: &*model,
+            log: &log,
+            tools: &tools,
+            session_id: "s",
+            workdir: Path::new("/tmp"),
+            instructions: "",
+            skills: &[],
+            always_on: &[],
+            agents: &agents,
+            max_tokens: 100,
+            context_window: 1000,
+            compact_at: 0.0,
+            reasoning_effort: None,
+            autonomous: false,
+            stop: &stop,
+            on_event: &mut on_event,
+        };
+        let reason = run_turn(&mut turn, "go", &[]).unwrap();
+        (reason, log.0.into_inner())
+    }
+
+    #[test]
+    fn a_plan_with_a_check_that_passes_already_is_sent_back_once() {
+        let plan_text = "## Done when\n- [ ] builds — check: `true`\n";
+        let model = Box::new(Scripted(RefCell::new(vec![
+            reply(plan_text, vec![]),
+            reply(plan_text, vec![]),
+        ])));
+        let (reason, events) = run_with_fake_tools(model, vec![plan()]);
+        assert_eq!(reason, DoneReason::Complete);
+        assert_eq!(
+            events
+                .iter()
+                .filter(|e| matches!(e, Event::CriteriaPreflight { .. }))
+                .count(),
+            2
+        );
+        assert!(events.iter().any(|e| matches!(
+            e,
+            Event::MessageStart {
+                role: Role::User,
+                is_system_generated: true,
+                content: Some(c),
+                ..
+            } if c.contains("passes already")
+        )));
+    }
+
+    #[test]
+    fn a_builder_plan_with_a_check_is_not_preflighted() {
+        let plan_text = "## Done when\n- [ ] builds — check: `true`\n";
+        let model = Box::new(Scripted(RefCell::new(vec![reply(plan_text, vec![])])));
+        let (_, events) = run_with_fake_tools(model, builder());
+        assert!(
+            !events
+                .iter()
+                .any(|e| matches!(e, Event::CriteriaPreflight { .. }))
+        );
     }
 }

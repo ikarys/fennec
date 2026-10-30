@@ -183,6 +183,72 @@ pub fn top(project_dir: &Path) -> Option<(PathBuf, String)> {
     repository(project_dir)
 }
 
+/// Read-only binds for dependency directories the worktree lacks.
+///
+/// A linked worktree does not contain gitignored dependency directories such
+/// as `node_modules` or `.venv`, and the sandbox has no network, so checks
+/// that need them must see the main checkout's copies read-only.
+pub fn dependency_mounts(workdir: &Path) -> Vec<(PathBuf, PathBuf)> {
+    let mut mounts = Vec::new();
+    if let Some(main_dir) = main_checkout(workdir) {
+        collect_dependency_mounts(&main_dir, workdir, 0, &mut mounts);
+    }
+    mounts
+}
+
+/// The main checkout's directory matching `workdir` when `workdir` is in a
+/// linked worktree; `None` in the main checkout or outside a repository.
+fn main_checkout(workdir: &Path) -> Option<PathBuf> {
+    let (_, prefix) = repository(workdir)?;
+    // `--path-format` applies to the options after it.
+    let out = git(
+        workdir,
+        &[
+            "rev-parse",
+            "--path-format=absolute",
+            "--git-dir",
+            "--git-common-dir",
+        ],
+        None,
+    )
+    .ok()?;
+    let text = String::from_utf8_lossy(&out);
+    let mut lines = text.lines();
+    let (git_dir, common_dir) = (lines.next()?, lines.next()?);
+    if git_dir == common_dir {
+        return None;
+    }
+    Some(Path::new(common_dir).parent()?.join(prefix))
+}
+
+fn collect_dependency_mounts(
+    main_dir: &Path,
+    workdir: &Path,
+    depth: u32,
+    mounts: &mut Vec<(PathBuf, PathBuf)>,
+) {
+    if depth >= 4 {
+        return;
+    }
+    let entries = match std::fs::read_dir(main_dir) {
+        Ok(entries) => entries,
+        Err(_) => return,
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let target = workdir.join(&name);
+        if name == "node_modules" || name == ".venv" {
+            mounts.push((path, target));
+        } else if name != "target" && !name.starts_with('.') {
+            collect_dependency_mounts(&path, &target, depth + 1, mounts);
+        }
+    }
+}
+
 /// The repository's top directory and the project's prefix inside it.
 fn repository(project_dir: &Path) -> Option<(PathBuf, String)> {
     let text = |args: &[&str]| {
@@ -381,6 +447,28 @@ mod tests {
         let root = base.join("wt");
         assert_eq!(open(&root, &base, "s1"), Ok(None));
         assert_eq!(find(&root, &base, "s1"), None);
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn dependency_mounts_maps_ignored_dependencies_from_the_main_checkout() {
+        let (base, repo) = setup();
+        std::fs::create_dir_all(repo.join("web/node_modules")).unwrap();
+        std::fs::write(repo.join("web/node_modules/package.json"), "{}").unwrap();
+        std::fs::write(repo.join(".gitignore"), "node_modules\n").unwrap();
+        git(&repo, &["add", "-A"], None).unwrap();
+        git(&repo, &["commit", "-q", "-m", "ignore dependencies"], None).unwrap();
+
+        let wt = open(&base.join("wt"), &repo, "s1").unwrap().unwrap();
+
+        assert_eq!(
+            dependency_mounts(&wt.workdir),
+            vec![(
+                repo.join("web/node_modules"),
+                wt.path.join("web/node_modules")
+            )]
+        );
+        assert!(dependency_mounts(&repo).is_empty());
         let _ = std::fs::remove_dir_all(&base);
     }
 }

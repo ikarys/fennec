@@ -5,6 +5,7 @@ mod ask_user;
 mod compaction;
 mod delta_buffer;
 pub mod ports;
+mod preflight;
 mod prompt;
 mod propose_criteria;
 mod record_decision;
