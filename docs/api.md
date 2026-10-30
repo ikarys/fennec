@@ -233,7 +233,9 @@ read-only. The human edits them as usual.
   `sessionState` the session's state (as in `/api/projects`) for a started idea, else null; `queueRunning` whether the
   project's queue runs. 404 if no project.
   Every write below answers the same fresh board; 404 if no project or no such idea: 404 if no project or no such idea:
-  - `POST /api/projects/{id}/ideas` `{text}` (`idea.added`; 400 if empty or over 4000 characters)
+  - `POST /api/projects/{id}/ideas` `{text, sessionId?, plan?}` (`idea.added`; 400 if empty or over 4000 characters);
+    with `sessionId` (a session of the project, else 404) and `plan` (400 if empty), also `idea.framing` and `idea.ready`:
+    the plan card's "Mettre au backlog" for a plan written outside the backlog
   - `POST /api/projects/{id}/ideas/{ideaId}/framing` `{sessionId}` (`idea.framing`; 404 if the session is not the project's)
   - `POST /api/projects/{id}/ideas/{ideaId}/ready` `{plan}` (`idea.ready`; 400 if empty)
   - `POST /api/projects/{id}/ideas/{ideaId}/drop` `{}` (`idea.dropped`)

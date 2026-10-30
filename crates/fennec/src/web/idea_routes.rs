@@ -34,29 +34,55 @@ pub fn list_ideas(app: &App, stream: &mut TcpStream, project_id: &str) -> Result
     send_ideas(app, stream, project_id)
 }
 
-/// `POST /api/projects/{id}/ideas` `{text}`.
+/// `POST /api/projects/{id}/ideas` `{text, sessionId?, plan?}`: with a
+/// session and its plan, a plan written outside the backlog joins it, ready.
 pub fn add_idea(
     app: &App,
     req: &Request,
     stream: &mut TcpStream,
     project_id: &str,
 ) -> Result<(), String> {
-    if app.store()?.project(project_id)?.is_none() {
+    let store = app.store()?;
+    if store.project(project_id)?.is_none() {
         return error(stream, 404, "no such project");
     }
     let body = req.json()?;
-    let text = body["text"].as_str().unwrap_or("").trim();
+    let field = |name: &str| body[name].as_str().unwrap_or("").trim().to_string();
+    let text = field("text");
     if text.is_empty() {
         return error(stream, 400, "empty idea");
     }
     if text.chars().count() > MAX_IDEA_CHARS {
         return error(stream, 400, "idea too long");
     }
-    let event = IdeaEvent::Added {
-        idea_id: new_id(),
-        text: text.to_string(),
-    };
-    app.store()?.append_idea_event(project_id, &event)?;
+    let (session_id, plan) = (field("sessionId"), field("plan"));
+    if !session_id.is_empty() {
+        match store.session(&session_id)? {
+            Some(session) if session.project_id == project_id => {}
+            _ => return error(stream, 404, "no such session"),
+        }
+        if plan.is_empty() {
+            return error(stream, 400, "empty plan");
+        }
+    }
+    let idea_id = new_id();
+    store.append_idea_event(
+        project_id,
+        &IdeaEvent::Added {
+            idea_id: idea_id.clone(),
+            text,
+        },
+    )?;
+    if !session_id.is_empty() {
+        store.append_idea_event(
+            project_id,
+            &IdeaEvent::Framing {
+                idea_id: idea_id.clone(),
+                session_id,
+            },
+        )?;
+        store.append_idea_event(project_id, &IdeaEvent::Ready { idea_id, plan })?;
+    }
     send_ideas(app, stream, project_id)
 }
 
