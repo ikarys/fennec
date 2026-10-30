@@ -18,6 +18,8 @@ pub enum BacklogEvent {
     },
     #[serde(rename = "idea.dropped", rename_all = "camelCase")]
     Dropped { idea_id: String },
+    #[serde(rename = "idea.completed", rename_all = "camelCase")]
+    Completed { idea_id: String },
     #[serde(rename = "idea.halted", rename_all = "camelCase")]
     Halted { idea_id: String, reason: String },
     #[serde(rename = "idea.reordered", rename_all = "camelCase")]
@@ -39,6 +41,7 @@ impl BacklogEvent {
             Self::Ready { .. } => "idea.ready",
             Self::Started { .. } => "idea.started",
             Self::Dropped { .. } => "idea.dropped",
+            Self::Completed { .. } => "idea.completed",
             Self::Halted { .. } => "idea.halted",
             Self::Reordered { .. } => "idea.reordered",
             Self::QueueStarted { .. } => "idea.queue_started",
@@ -55,6 +58,7 @@ impl BacklogEvent {
             | Self::Ready { idea_id, .. }
             | Self::Started { idea_id, .. }
             | Self::Dropped { idea_id }
+            | Self::Completed { idea_id }
             | Self::Halted { idea_id, .. } => Some(idea_id),
             Self::Reordered { .. }
             | Self::QueueStarted { .. }
@@ -100,6 +104,10 @@ mod tests {
         BacklogEvent::Dropped { idea_id: id.into() }
     }
 
+    fn completed(id: &str) -> BacklogEvent {
+        BacklogEvent::Completed { idea_id: id.into() }
+    }
+
     fn halted(id: &str, reason: &str) -> BacklogEvent {
         BacklogEvent::Halted {
             idea_id: id.into(),
@@ -134,6 +142,7 @@ mod tests {
         assert_eq!(ready("i1", "p").kind(), "idea.ready");
         assert_eq!(started("i1", false).kind(), "idea.started");
         assert_eq!(dropped("i1").kind(), "idea.dropped");
+        assert_eq!(completed("i1").kind(), "idea.completed");
         assert_eq!(halted("i1", "r").kind(), "idea.halted");
         assert_eq!(reordered(&["i1"]).kind(), "idea.reordered");
         assert_eq!(queue_started(true).kind(), "idea.queue_started");
@@ -148,6 +157,7 @@ mod tests {
         assert_eq!(ready("i1", "p").idea_id(), Some("i1"));
         assert_eq!(started("i1", false).idea_id(), Some("i1"));
         assert_eq!(dropped("i1").idea_id(), Some("i1"));
+        assert_eq!(completed("i1").idea_id(), Some("i1"));
         assert_eq!(halted("i1", "r").idea_id(), Some("i1"));
         assert_eq!(reordered(&["i1"]).idea_id(), None);
         assert_eq!(queue_started(true).idea_id(), None);
@@ -200,6 +210,17 @@ mod tests {
             json,
             r#"{"type":"idea.halted","data":{"ideaId":"i1","reason":"r"}}"#
         );
+
+        let decoded: BacklogEvent = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, event);
+    }
+
+    #[test]
+    fn completed_event_serde_wire() {
+        let event = completed("i1");
+
+        let json = serde_json::to_string(&event).unwrap();
+        assert_eq!(json, r#"{"type":"idea.completed","data":{"ideaId":"i1"}}"#);
 
         let decoded: BacklogEvent = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded, event);

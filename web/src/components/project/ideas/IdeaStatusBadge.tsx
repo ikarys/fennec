@@ -17,6 +17,7 @@ const STATUS_CONFIG: Record<
   halted: { label: 'arrêtée', tone: 'err' },
   failed: { label: 'échouée', tone: 'err' },
   integrated: { label: 'intégrée', tone: 'ok' },
+  completed: { label: 'faite', tone: 'ok' },
 };
 
 export function IdeaStatusBadge({ status }: { status: IdeaStatus }) {

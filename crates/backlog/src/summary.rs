@@ -30,7 +30,8 @@ pub fn summarize(statuses: &[Status]) -> RunSummary {
             Status::Question => summary.question += 1,
             Status::Halted => summary.halted += 1,
             Status::Failed => summary.failed += 1,
-            Status::Integrated => summary.integrated += 1,
+            // A human-completed idea is a done run outcome, like an integrated one.
+            Status::Integrated | Status::Completed => summary.integrated += 1,
             Status::Inbox | Status::Framing | Status::Queued => {}
         }
     }
@@ -51,6 +52,7 @@ mod tests {
             Status::Halted,
             Status::Failed,
             Status::Integrated,
+            Status::Completed,
             Status::Inbox,
             Status::Framing,
             Status::Queued,
@@ -58,12 +60,12 @@ mod tests {
 
         let summary = summarize(&statuses);
 
-        assert_eq!(summary.started, 9);
+        assert_eq!(summary.started, 10);
         assert_eq!(summary.running, 1);
         assert_eq!(summary.review, 1);
         assert_eq!(summary.question, 1);
         assert_eq!(summary.halted, 1);
         assert_eq!(summary.failed, 1);
-        assert_eq!(summary.integrated, 1);
+        assert_eq!(summary.integrated, 2);
     }
 }

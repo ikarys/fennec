@@ -72,8 +72,9 @@ pub(super) fn start_idea(
     project: &Project,
     idea: &Idea,
     autonomous: bool,
+    restart: bool,
 ) -> Result<String, String> {
-    if idea.state == IdeaState::Started {
+    if idea.state == IdeaState::Started && !restart {
         return Err("idea already started".into());
     }
     let Some(found) = find(
@@ -102,18 +103,22 @@ pub(super) fn start_idea(
         return Err("no such session".into());
     };
     let task = idea.text.clone();
-    let job = match (idea.state, &idea.plan) {
-        (IdeaState::Ready, Some(plan)) => WorkflowJob::StartFromPlan {
+    let job = if let Some(plan) = &idea.plan
+        && (idea.state == IdeaState::Ready || (restart && idea.state == IdeaState::Started))
+    {
+        // A restart reuses the approved plan; a fresh ready idea does too.
+        WorkflowJob::StartFromPlan {
             workflow: found.workflow,
             task,
             plan: plan.clone(),
-        },
-        _ => WorkflowJob::Start {
+        }
+    } else {
+        WorkflowJob::Start {
             workflow: found.workflow,
             task,
             step_by_step: false,
             attachments: Vec::new(),
-        },
+        }
     };
     let place = app.open_place(store, &session, project, true)?;
     app.turns
@@ -171,7 +176,7 @@ fn run_queue_loop(
             return Ok("no idea ready");
         };
 
-        let session_id = match start_idea(app, &store, &project, idea, autonomous) {
+        let session_id = match start_idea(app, &store, &project, idea, autonomous, false) {
             Ok(session_id) => session_id,
             // Night mode records why the idea halted and keeps going.
             Err(e) if autonomous => {
