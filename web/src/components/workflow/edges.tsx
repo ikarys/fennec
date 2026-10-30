@@ -74,7 +74,7 @@ function WorkflowEdgeBase({
       />
       {label && <EdgeLabelRenderer>
         <div
-          className="absolute rounded-md border border-border bg-panel px-1.5 py-0.5 text-[0.625rem] text-muted"
+          className="absolute rounded-md border border-border bg-panel px-1.5 py-0.5 text-[0.6875rem] text-muted"
           style={labelStyle}
         >
           {label}

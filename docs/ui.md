@@ -26,12 +26,12 @@ look lives in two places only, so a screen can never drift from the others:
   a box per item and never a box inside a box.
 - Only the accent gets a filled `Badge`; ok and err are coloured text.
   Labels are sentence case, never uppercase with tracking.
-- Radii are small (3 to 8px) and come from the tokens; no pills.
+- Radii are small (2 to 6px) and come from the tokens; no pills.
 - Text: `text-sm` for reading, `text-xs` for controls and metadata,
   `SectionLabel` for group titles. Numbers that line up use `tabular-nums`.
 - Provenance is visible (rule 3 of AGENTS.md): verified results and model
   output never share a look.
-- Side columns are stacks of `Panel` blocks separated by hairlines, each
+- Side columns are stacks of `Panel` blocks whose header is a tinted band, each
   header (chevron, title, summary when folded) always visible.
 
 ## Sizes

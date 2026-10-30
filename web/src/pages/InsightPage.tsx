@@ -164,7 +164,7 @@ export function InsightPage() {
 
                   <div className="mt-1 flex gap-1">
                     {view.days.map((day) => (
-                      <div key={day.day} className="min-w-0 flex-1 truncate text-[0.625rem] text-muted">
+                      <div key={day.day} className="min-w-0 flex-1 truncate text-[0.6875rem] text-muted">
                         {day.label}
                       </div>
                     ))}

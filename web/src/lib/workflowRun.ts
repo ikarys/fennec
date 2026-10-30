@@ -15,6 +15,8 @@ export interface NodeRun {
   startedAt?: number;
   /** The node's working time in ms; none for a human node or a session-context agent node. */
   durationMs?: number;
+  /** What the node returned (its report, a check's output); shown when it failed. */
+  output?: string;
 }
 
 export interface RunView {
@@ -122,6 +124,9 @@ export function createRunFold(): RunFold {
             candidate.port = String(data.port ?? '');
             if (typeof data.durationMs === 'number') {
               candidate.durationMs = data.durationMs;
+            }
+            if (typeof data.output === 'string') {
+              candidate.output = String(data.output ?? '');
             }
             break;
           }
