@@ -301,14 +301,14 @@ read-only. The human edits them as usual.
   `mode` is the id of the agent the session resolves to from its event log
   (null when there is no top-level agent)
 - `GET /api/sessions/{id}/repo` → `{dir, branch, originBranch, branchChanged, dirty}`: the human's repository now, for any session: its top directory, checked-out branch (null when detached), the branch the session's worktree started from (null without a worktree), whether they differ, and the count of uncommitted entries (`git status --porcelain`); 409 outside a git repository.
-- `GET /api/sessions/{id}/integration` → `{branch, base, originBranch, humanBranch, defaultMessage, commits: [{sha, subject}], files: [{path, protected, carried, added, removed}], testFiles, criteria, decisions, blockers}`:
+- `GET /api/sessions/{id}/integration` → `{branch, base, originBranch, humanBranch, defaultMessage, commits: [{sha, subject}], files: [{path, protected, carried, added, removed}], testFiles, criteria, decisions, blockers, idea}`:
   what integrating the session's worktree branch would do (409 without a
   worktree). `originBranch` is the branch the run started from (null for
   older worktrees or a detached HEAD). `decisions` are the session's
   `decision.recorded` events, `{callId, title, choice, reason, alternatives}`:
   informational (written by the model), never a blocker. `defaultMessage` is fennec's starting
   commit message (`feat: <title>`, an empty title gives `feat: integrate the
-  agent's work`); the human edits it. `blockers` is the review gate, each
+  agent's work`); the human edits it. `idea` is the idea tied to the session that the human may finish here (state started), null otherwise. `blockers` is the review gate, each
   `{kind, …}`: `noCommits`, `branchChanged {from, to}`, `localChanges {paths}` (uncommitted changes in the human's tree the agent's work would overwrite: content equal to neither the base's nor the branch's; the common case, the same dirty work copied into the worktree at the run's start, is not a blocker but a file flagged `carried`, whose uncommitted work goes into the integration commit), `criteriaNotPassed
   {criteria}`, `noCriteria`, `protectedTouched {paths}`, `architectureViolated {violations: [{path, line, prefix, forbidden}]}` (added lines that break the project's `.agents/architecture` rules, one `<path prefix> forbids <text>` per line; deterministic, checked on added lines only), `suppressionsAdded {suppressions: [{path, line, marker}]}` (added lines that silence a lint, a type check or a test: `#[allow(`, `@ts-ignore`, `noqa`, `it.skip(`, `pytest.mark.skip`…; text tripwires, comments included), `testsWeakened {testsRemoved, assertionsRemoved, paths}` (the branch removes more test declarations or assertions than it adds, summed over all files so moved tests do not count; `paths` are the files that lost some); `branchChanged.to`
   is null for a detached HEAD; `testFiles` are the integrated test files (paths

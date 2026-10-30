@@ -40,6 +40,8 @@ struct Gate {
     /// The test files under the project, relative to it, not yet protected.
     test_files: Vec<String>,
     blockers: Vec<Blocker>,
+    /// The session's idea the human may finish here, when it is still started.
+    idea: Option<(String, String)>,
 }
 
 /// The session's gate; `Err((status, message))` when there is nothing to gate.
@@ -85,6 +87,7 @@ fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Result<Gate, (u16, S
         &preview.local_changes,
     );
     let title = session.title.clone();
+    let idea = finishable_idea(&project.id, &store.ideas(&project.id)?, &session.id);
     Ok(Ok(Gate {
         session_id: session.id,
         title,
@@ -96,6 +99,7 @@ fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Result<Gate, (u16, S
         protected_touched,
         test_files,
         blockers,
+        idea,
     }))
 }
 
@@ -145,6 +149,7 @@ pub fn get_integration(app: &App, stream: &mut TcpStream, id: &str) -> Result<()
             "criteria": criteria,
             "decisions": gate.decisions,
             "blockers": gate.blockers,
+            "idea": idea_json(gate.idea.as_ref()),
         }),
     )
 }
@@ -340,4 +345,45 @@ fn criterion_json(state: &CriterionState) -> Value {
         "status": state.status,
         "provenance": provenance,
     })
+}
+
+/// The idea the integration dialog may finish: the session's idea, only while
+/// it is still started.
+fn finishable_idea(
+    project_id: &str,
+    ideas: &[backlog::Idea],
+    session_id: &str,
+) -> Option<(String, String)> {
+    backlog::idea_for_session(ideas, session_id)
+        .filter(|idea| idea.state == backlog::IdeaState::Started)
+        .map(|idea| (project_id.to_string(), idea.id.clone()))
+}
+
+fn idea_json(idea: Option<&(String, String)>) -> Value {
+    idea.map(|(project_id, id)| json!({ "projectId": project_id, "id": id }))
+        .unwrap_or(Value::Null)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn finishable_idea_is_none_without_ideas() {
+        assert_eq!(finishable_idea("project", &[], "session"), None);
+    }
+
+    #[test]
+    fn idea_json_is_null_without_idea() {
+        assert_eq!(idea_json(None), Value::Null);
+    }
+
+    #[test]
+    fn idea_json_carries_project_and_idea_ids() {
+        let idea = ("project".to_string(), "idea".to_string());
+        assert_eq!(
+            idea_json(Some(&idea)),
+            json!({ "projectId": "project", "id": "idea" })
+        );
+    }
 }
