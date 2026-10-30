@@ -76,7 +76,7 @@ export function RunEndCard({ item }: { item: WorkflowEndItem }) {
 
         {stats && (
           <div className="flex flex-col gap-3">
-            <div className="divide-y divide-border rounded-lg border border-border">
+            <div className="divide-y divide-border border-y border-border">
               {statRows.map((row) => (
                 <div key={row[0].label}>
                   <div className="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
@@ -89,7 +89,7 @@ export function RunEndCard({ item }: { item: WorkflowEndItem }) {
             </div>
 
             {stats.nodes.length > 0 && (
-              <details className="group rounded-lg border border-border">
+              <details className="group border-b border-border">
                 <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-1.5 text-xs text-muted select-none [&::-webkit-details-marker]:hidden">
                   <span aria-hidden className="text-[0.625rem] transition-transform group-open:rotate-90">
                     ▶
