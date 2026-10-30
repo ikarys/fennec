@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import type { SessionState } from '../../lib/api';
-import { stateDotClass } from '../../lib/format';
+import { SessionStateIcon } from '../session/SessionStateIcon';
 import { CloseIcon, FoxIcon, SearchIcon, SettingsIcon } from '../Icons';
 import { Button, buttonClass } from '../ui/Button';
 
@@ -131,11 +131,7 @@ export function TopBar({
                   : 'border-transparent text-muted hover:bg-raised/50 hover:text-text'
               }`}
             >
-              <span
-                className={`h-1.5 w-1.5 flex-none rounded-full ${stateDotClass(tab.state)} ${
-                  tab.state === 'running' ? 'animate-pulse' : ''
-                }`}
-              />
+              <SessionStateIcon state={tab.state} className="h-3.5 w-3.5" />
               <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-medium">
                 {tab.title}
               </span>
