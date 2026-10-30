@@ -171,6 +171,7 @@ fn with_turn(
         context_window: params.context_window,
         compact_at: params.compact_at,
         reasoning_effort: params.reasoning_effort,
+        autonomous: false,
         stop: &stop,
         on_event: &mut on_event,
     })

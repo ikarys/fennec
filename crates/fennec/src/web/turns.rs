@@ -81,6 +81,18 @@ impl Turns {
 
     /// Starts a turn; refuses while one runs on the session.
     pub fn start(&self, session_id: &str, place: Place, job: Job) -> Result<(), String> {
+        self.start_with(session_id, place, job, false)
+    }
+
+    /// `start`, with the human away when `autonomous` (`Turn::autonomous`),
+    /// for this turn and the child sessions it runs.
+    pub fn start_with(
+        &self,
+        session_id: &str,
+        place: Place,
+        job: Job,
+        autonomous: bool,
+    ) -> Result<(), String> {
         let stop = Arc::new(AtomicBool::new(false));
         {
             let mut running = self.running.lock().unwrap();
@@ -101,6 +113,7 @@ impl Turns {
                 &place.workdir,
                 &job,
                 &stop,
+                autonomous,
             ) {
                 eprintln!("fennec: session {session_id}: {e}");
             }
@@ -129,6 +142,7 @@ pub(super) fn with_turn<R>(
     session_id: &str,
     workdir: &Path,
     stop: &AtomicBool,
+    autonomous: bool,
     body: impl FnOnce(&mut Turn, &LocalTools) -> Result<R, String>,
 ) -> Result<R, String> {
     let store = SqliteStore::open(&settings.db_path)?;
@@ -173,6 +187,7 @@ pub(super) fn with_turn<R>(
         context_window: params.context_window,
         compact_at: params.compact_at,
         reasoning_effort: params.reasoning_effort,
+        autonomous,
         stop,
         on_event: &mut on_event,
     };
@@ -186,6 +201,7 @@ fn run(
     workdir: &Path,
     job: &Job,
     stop: &AtomicBool,
+    autonomous: bool,
 ) -> Result<(), String> {
     with_turn(
         settings,
@@ -193,6 +209,7 @@ fn run(
         session_id,
         workdir,
         stop,
+        autonomous,
         |turn, tools| match job {
             Job::Input(TurnInput::Prompt(prompt), attachments) => {
                 run_turn(turn, prompt, attachments).map(|_| ())
@@ -204,6 +221,7 @@ fn run(
                     settings,
                     notifier,
                     workdir,
+                    autonomous,
                 };
                 run_workflow(
                     turn,
