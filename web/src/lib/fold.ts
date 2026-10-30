@@ -705,6 +705,12 @@ export function createThreadFold(): ThreadFold {
         if (typeof data.startedAt === 'number') {
           item.startedAt = data.startedAt;
         }
+        // A resume restarts an interrupted node on its own pass: the restart
+        // replaces the unfinished divider instead of showing a second one.
+        const stale = openWorkflowItems.get(`${runId}:${nodeId}`);
+        if (stale && stale.pass === pass) {
+          items.splice(items.indexOf(stale), 1);
+        }
         pushItem(item);
         openWorkflowItems.set(`${runId}:${nodeId}`, item);
         if (kind === 'agent') {
