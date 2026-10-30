@@ -12,6 +12,7 @@ allowedTools:
   - record_decision
   - load_skill
   - web_search
+  - web_fetch
 ---
 
 # Plan Mode

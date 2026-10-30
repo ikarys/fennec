@@ -40,7 +40,7 @@ export function SandboxSection({ value, onChange }: SandboxSectionProps) {
           </label>
           <p className="text-xs text-muted">
             Coupé par défaut : npm et cargo passent hors ligne. À ouvrir pour installer des dépendances ou pour que le
-            navigateur atteigne un serveur de dev. web_search n'en dépend pas : fennec l'exécute lui-même.
+            navigateur atteigne un serveur de dev. web_search et web_fetch n'en dépendent pas : fennec les exécute lui-même.
           </p>
         </div>
       </div>

@@ -150,7 +150,7 @@ turn.
 `search` (openfox `search.*`, SearXNG only) is the instance the `web_search`
 tool queries (`GET {searxngUrl}/search?format=json&q=…`, with
 `Authorization: Bearer {searxngApiKey}` when set). The tool runs in fennec,
-not in a command: the model only chooses the query.
+not in a command: the model only chooses the query. `webFetch` (fennec's own, default true) allows the `web_fetch` tool, which also runs in fennec; the model chooses the URL, loopback and private addresses are refused.
 
 `sandbox` (fennec's own) is how commands run: the `run_command` tool and the
 workflow shell nodes. Enabled (the default), each command runs in bwrap: the
