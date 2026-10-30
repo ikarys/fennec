@@ -425,6 +425,25 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
     setForm((previous) => (previous ? { ...previous, enabledWorkflows } : previous));
   }
 
+  /** Saves one change at once on top of the stored preferences: the form's other unsaved edits stay pending. */
+  async function savePatch(patch: Partial<Preferences>) {
+    if (!settings) return;
+    setError(null);
+    try {
+      onSaved(await saveSettings({ ...settings.preferences, ...patch }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Impossible d’enregistrer les réglages');
+    }
+  }
+
+  function setDefaultModel(key: string) {
+    updateModel(key);
+    const slash = key.indexOf('/');
+    void savePatch({
+      selected: slash === -1 ? null : { provider: key.slice(0, slash), model: key.slice(slash + 1) }
+    });
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!settings || !form || saving) return;
@@ -508,6 +527,8 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
                   defaults={settings.defaults}
                   favorites={form.favorites}
                   onToggleFavorite={toggleFavorite}
+                  defaultModel={form.model}
+                  onSetDefault={setDefaultModel}
                   onChange={updateModelField}
                   onRemoveModel={removeModel}
                 />

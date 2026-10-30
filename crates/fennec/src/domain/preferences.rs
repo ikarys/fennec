@@ -279,9 +279,22 @@ impl Preferences {
         Ok(())
     }
 
+    /// The model a session runs on until the human picks one: `selected`,
+    /// else the environment's default. An empty `selected` is ignored.
+    /// Favourites only fill the composer's menu: they are not a default.
+    pub fn default_model(&self, defaults: &ModelParams) -> ModelRef {
+        self.selected
+            .as_ref()
+            .filter(|m| !m.model.is_empty())
+            .cloned()
+            .unwrap_or_else(|| ModelRef {
+                provider: defaults.provider.clone(),
+                model: defaults.model.clone(),
+            })
+    }
+
     /// The parameters of the model a turn runs on: a session's chosen model
-    /// wins over `selected`, which wins over the environment's default. An
-    /// empty chosen model is ignored. Per model: Settings page > environment >
+    /// wins over the default model. An empty chosen model is ignored. Per model: Settings page > environment >
     /// built-in default; the context window falls back to the endpoint's
     /// current listing before the built-in default.
     pub fn resolve(
@@ -292,13 +305,7 @@ impl Preferences {
     ) -> ModelParams {
         let selected = match chosen {
             Some(chosen) if !chosen.model.is_empty() => chosen.clone(),
-            _ => match &self.selected {
-                Some(selected) if !selected.model.is_empty() => selected.clone(),
-                _ => ModelRef {
-                    provider: defaults.provider.clone(),
-                    model: defaults.model.clone(),
-                },
-            },
+            _ => self.default_model(defaults),
         };
         let prefs = self
             .provider(&selected.provider)
