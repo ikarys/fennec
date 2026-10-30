@@ -349,9 +349,12 @@ read-only. The human edits them as usual.
   skills the session loaded (successful `load_skill` calls and `/<skill>`
   messages it typed, first-seen order) and those still in the model's view
   (not dropped by a compaction, not cut by a replay); 404 if no session
-- `GET /api/sessions/{id}/usage` → `{calls, promptTokens, cachedTokens, completionTokens, cachePercent, lastGenerationSpeed}`:
+- `GET /api/sessions/{id}/usage` → `{calls, promptTokens, cachedTokens, completionTokens, cachePercent, cost, costDetail, inputCost, cachedCost, outputCost, lastGenerationSpeed}`:
   the session's model calls from the usage ledger (`usage.db`, crate `token-usage`), which outlives the log;
-  `cachePercent` is 0 to 100, `lastGenerationSpeed` (tokens/s) is null before any call; 404 if no session
+  `cachePercent` is 0 to 100, `lastGenerationSpeed` (tokens/s) is null before any call;
+  `cost` is the estimate at each model's price (Settings, models), `—` when none has one, indicative;
+  `costDetail` says how or why not; `inputCost` (all prompt tokens, as `promptTokens`), `cachedCost` and
+  `outputCost` are the parts' costs, null when no model has a price; 404 if no session
 - `GET /api/sessions/{id}/context` → `{percent, tone, compactMark, line, title, composition}`: the header's gauge, from
   the last `context.state` the model still sees (`tone` `ok`/`warn`/`err`, `compactMark` null when compaction is off);
   events without `compactAt` and sessions without a measure use the current settings. `composition` (null while

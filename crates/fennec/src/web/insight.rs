@@ -11,6 +11,7 @@ use token_usage::{Filter, GroupBy, Ledger, Row, Summary};
 use super::App;
 use super::context_view::{CompositionView, composition_view};
 use super::http::{Request, error, send_json};
+use super::pricing::{Pricing, priced, prices};
 use crate::domain::clock::now_ms;
 use crate::domain::context_parts::PartKind;
 use llm_providers::Price;
@@ -115,13 +116,6 @@ pub struct InsightData {
     pub models: Vec<Row>,
     pub groups: Vec<Row>,
     pub project_models: BTreeMap<String, Vec<Row>>,
-}
-
-#[derive(Debug, PartialEq)]
-pub struct Pricing {
-    pub dollars: f64,
-    pub priced: usize,
-    pub unpriced: Vec<String>,
 }
 
 impl InsightData {
@@ -273,15 +267,7 @@ pub fn serve(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), Str
         project_models,
     };
 
-    let preferences = app.store()?.preferences()?;
-    let mut prices: BTreeMap<String, Price> = BTreeMap::new();
-    for provider in &preferences.providers {
-        for (model_id, model_prefs) in &provider.models {
-            if let Some(price) = model_prefs.price {
-                prices.entry(model_id.clone()).or_insert(price);
-            }
-        }
-    }
+    let prices = prices(&app.store()?.preferences()?);
 
     send_json(stream, 200, &json!(data.view(project.as_deref(), &prices)))
 }
@@ -293,44 +279,6 @@ fn busiest_first(rows: &mut [Row]) {
             .cmp(&a.summary.prompt_tokens)
             .then_with(|| a.key.cmp(&b.key))
     });
-}
-
-impl Pricing {
-    /// The dollars, or "—" when no model had a price: zero would claim a free run.
-    fn value(&self) -> String {
-        if self.priced == 0 {
-            "—".to_string()
-        } else {
-            usd(self.dollars)
-        }
-    }
-}
-
-fn priced(models: &[Row], prices: &BTreeMap<String, Price>) -> Pricing {
-    let mut dollars = 0.0;
-    let mut priced = 0;
-    let mut unpriced = Vec::new();
-
-    for row in models {
-        match prices.get(&row.key) {
-            Some(price) => {
-                dollars += price.cost(
-                    row.summary.prompt_tokens,
-                    row.summary.cached_tokens,
-                    row.summary.completion_tokens,
-                );
-                priced += 1;
-            }
-            None => unpriced.push(row.key.clone()),
-        }
-    }
-
-    unpriced.sort();
-    Pricing {
-        dollars,
-        priced,
-        unpriced,
-    }
 }
 
 fn cards(total: &Summary, pricing: &Pricing) -> Vec<CardView> {
@@ -374,16 +322,7 @@ fn cards(total: &Summary, pricing: &Pricing) -> Vec<CardView> {
         CardView {
             label: "Coût estimé".into(),
             value: pricing.value(),
-            detail: if pricing.priced == 0 {
-                "aucun modèle n'a de prix : Paramètres, Modèles".to_string()
-            } else {
-                let mut detail = "indicatif, au prix de chaque modèle".to_string();
-                if !pricing.unpriced.is_empty() {
-                    detail.push_str(" ; sans prix : ");
-                    detail.push_str(&pricing.unpriced.join(", "));
-                }
-                detail
-            },
+            detail: pricing.detail(),
         },
     ]
 }
@@ -613,28 +552,6 @@ mod tests {
 
         assert_eq!(view.scope, "Projet un");
         assert!(view.projects.is_empty());
-    }
-
-    #[test]
-    fn priced_sums_priced_models_and_lists_unpriced_models() {
-        let models = vec![
-            row("a", "a", summary(1, 1_000_000, 0, 0, 0, 0, 0.0)),
-            row("b", "b", summary(1, 1_000_000, 0, 0, 0, 0, 0.0)),
-        ];
-        let prices = BTreeMap::from([(
-            "a".to_string(),
-            Price {
-                input_per_m: 3.0,
-                cached_per_m: 0.0,
-                output_per_m: 0.0,
-            },
-        )]);
-
-        let pricing = priced(&models, &prices);
-
-        assert_eq!(pricing.priced, 1);
-        assert!((pricing.dollars - 3.0).abs() < 1e-9);
-        assert_eq!(pricing.unpriced, vec!["b".to_string()]);
     }
 
     #[test]
