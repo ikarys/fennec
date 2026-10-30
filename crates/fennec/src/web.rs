@@ -21,6 +21,7 @@ mod preview;
 mod pricing;
 mod project_routes;
 mod routes;
+mod servers;
 mod session_delete;
 mod session_name;
 mod session_usage;
@@ -39,6 +40,7 @@ use crate::store::SqliteStore;
 use crate::worktree;
 use notifier::Notifier;
 use serde_json::json;
+use servers::RunningServer;
 use std::collections::HashMap;
 use std::net::{TcpListener, TcpStream};
 use std::path::Path;
@@ -60,6 +62,8 @@ struct App {
     /// Projects whose ideas queue runs, and the flag that stops it after the
     /// current idea (`idea_queue::start_queue`).
     idea_queues: Mutex<HashMap<String, Arc<AtomicBool>>>,
+    /// Servers running per (session, name): the pid of each process group.
+    server_runs: Arc<Mutex<HashMap<String, RunningServer>>>,
 }
 
 impl App {
@@ -157,6 +161,7 @@ pub fn serve(port: u16, settings: Settings) -> Result<(), String> {
         notifier,
         skill_folds: Mutex::new(HashMap::new()),
         idea_queues: Mutex::default(),
+        server_runs: Arc::new(Mutex::new(HashMap::new())),
     });
     // Fail now rather than on the first request. No turn runs yet, so a log
     // still marked running was cut by a crash.
@@ -240,6 +245,7 @@ mod tests {
             notifier,
             skill_folds: Mutex::new(HashMap::new()),
             idea_queues: Mutex::default(),
+            server_runs: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 

@@ -13,6 +13,7 @@ import { CriteriaSection } from './CriteriaSection';
 import { DecisionsSection } from './DecisionsSection';
 import { ModifiedFilesSection } from './ModifiedFilesSection';
 import { RequestSection } from './RequestSection';
+import { ServersSection } from './ServersSection';
 import { SkillsSection } from './SkillsSection';
 import { TokensSection } from './TokensSection';
 import { ToolCountsSection } from './ToolCountsSection';
@@ -147,6 +148,8 @@ export function ContextPanel({ view, skills, usage, request, audit, projectId, h
         return sessionId ? (
           <AgentWorkspaceSection key={id} sessionId={sessionId} worktree={worktree ?? null} running={view.running} onDiscarded={onWorktreeChanged} integrationVersion={integrationVersion} />
         ) : null;
+      case 'servers':
+        return <ServersSection key={id} sessionId={sessionId} />;
       case 'tokens':
         return <TokensSection key={id} usage={usage} />;
       case 'skills':
