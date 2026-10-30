@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Button } from '../components/ui/Button';
-import { IdeasSection } from '../components/project/IdeasSection';
+import { VerticalTabs } from '../components/ui/VerticalTabs';
+import { IdeasSection } from '../components/project/ideas/IdeasSection';
 import { MapSection } from '../components/project/MapSection';
 import { DocSection } from '../components/project/DocSection';
 import {
@@ -9,6 +10,7 @@ import {
   type Project,
   type ProjectOverview,
 } from '../lib/api';
+import { frameIdea, type IdeaView } from '../lib/ideas';
 
 // The idea's text is the human's; the framing asks for a plan, not code.
 const framePrompt = (idea: string) =>
@@ -25,22 +27,14 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]['id'];
 
-export default function ProjectPage({
-  projects,
-  projectId,
-  onOpenSession,
-}: {
-  projects: Project[];
-  projectId: string;
-  onOpenSession: (sessionId: string) => void;
-}) {
-  const project = projects.find((p) => p.id === projectId) ?? null;
+/**
+ * The map tab fetches the project overview on its own so the ideas and doc
+ * tabs do not wait for it.
+ */
+function MapTab({ projectId }: { projectId: string }) {
   const [data, setData] = useState<ProjectOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
-  const [tab, setTab] = useState<TabId>('ideas');
 
   useEffect(() => {
     let cancelled = false;
@@ -65,6 +59,44 @@ export default function ProjectPage({
     };
   }, [projectId]);
 
+  if (loading) return <p className="text-muted">Chargement…</p>;
+  if (error) return <p className="text-err">{error}</p>;
+  if (!data) return <p className="text-muted">Chargement…</p>;
+
+  return (
+    <MapSection
+      projectId={projectId}
+      map={data.map}
+      mapFile={data.mapFile}
+      onWritten={(state) =>
+        setData((prev) => (prev ? { ...prev, mapFile: state } : prev))
+      }
+    />
+  );
+}
+
+export default function ProjectPage({
+  projects,
+  projectId,
+  tab,
+  onOpenSession,
+}: {
+  projects: Project[];
+  projectId: string;
+  tab: string | null;
+  onOpenSession: (sessionId: string) => void;
+}) {
+  const project = projects.find((p) => p.id === projectId) ?? null;
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+
+  // Unknown or null tab defaults to 'ideas'.
+  const activeTab: TabId = TABS.some((t) => t.id === tab) ? (tab as TabId) : 'ideas';
+
+  const handleTabSelect = (id: TabId) => {
+    window.location.hash = `#/project/${encodeURIComponent(projectId)}/${id}`;
+  };
+
   const handleAnalyze = async () => {
     setAnalyzing(true);
     setAnalyzeError(null);
@@ -76,6 +108,13 @@ export default function ProjectPage({
     } finally {
       setAnalyzing(false);
     }
+  };
+
+  // Creates the plan session, links it to the idea, and opens it.
+  const handleFrame = async (idea: IdeaView) => {
+    const session = await createSession(projectId, framePrompt(idea.text), 'plan');
+    await frameIdea(projectId, idea.id, session.id);
+    onOpenSession(session.id);
   };
 
   const shell = (children: ReactNode) => (
@@ -126,78 +165,26 @@ export default function ProjectPage({
     </>
   );
 
-  if (loading) {
-    return shell(
-      <>
-        {header}
-        <p className="mt-6 text-muted">Chargement…</p>
-      </>,
-    );
-  }
-
-  if (error) {
-    return shell(
-      <>
-        {header}
-        <p className="mt-6 text-err">{error}</p>
-      </>,
-    );
-  }
-
-  if (!data) {
-    return shell(
-      <>
-        {header}
-        <p className="mt-6 text-muted">Chargement…</p>
-      </>,
-    );
-  }
-
   return shell(
     <>
       {header}
       <div className="mt-6 flex gap-6">
-        <nav
-          aria-label="Sections du projet"
-          className="flex w-44 shrink-0 flex-col gap-1"
-        >
-          {TABS.map((candidate) => (
-            <button
-              key={candidate.id}
-              type="button"
-              onClick={() => setTab(candidate.id)}
-              className={`rounded-md px-3 py-2 text-left text-sm transition-colors ${
-                tab === candidate.id
-                  ? 'bg-raised font-medium text-text'
-                  : 'text-muted hover:bg-raised hover:text-text'
-              }`}
-            >
-              {candidate.label}
-            </button>
-          ))}
-        </nav>
+        <VerticalTabs
+          label="Sections du projet"
+          tabs={[...TABS]}
+          active={activeTab}
+          onSelect={handleTabSelect}
+        />
         <div className="min-w-0 grow">
-          {tab === 'ideas' ? (
+          {activeTab === 'ideas' ? (
             <IdeasSection
               projectId={projectId}
-              onFrame={async (idea) =>
-                (await createSession(projectId, framePrompt(idea.text), 'plan'))
-                  .id
-              }
+              onFrame={handleFrame}
               onOpenSession={onOpenSession}
             />
           ) : null}
-          {tab === 'map' ? (
-            <MapSection
-              projectId={projectId}
-              map={data.map}
-              mapFile={data.mapFile}
-              onWritten={(state) =>
-                setData((prev) => (prev ? { ...prev, mapFile: state } : prev))
-              }
-            />
-          ) : null}
-          {tab === 'doc' ? <DocSection projectId={projectId} /> : null}
+          {activeTab === 'map' ? <MapTab projectId={projectId} /> : null}
+          {activeTab === 'doc' ? <DocSection projectId={projectId} /> : null}
         </div>
       </div>
     </>,
