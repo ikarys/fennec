@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import type { Project, SessionSummary } from '../lib/api';
 import { DeleteSessionsDialog, type DeletionTarget } from '../components/session/DeleteSessionsDialog';
-import { formatRelative, stateLabel } from '../lib/format';
+import { formatRelative } from '../lib/format';
+import { SessionStateIcon } from '../components/session/SessionStateIcon';
 import { ChevronRightIcon, ProjectIcon, PlusIcon, TrashIcon } from '../components/Icons';
 import { Button, buttonClass } from '../components/ui/Button';
-import { Badge, type BadgeTone } from '../components/ui/Badge';
+import { Badge } from '../components/ui/Badge';
 import { SectionLabel } from '../components/ui/SectionLabel';
 import { Section } from '../components/ui/Section';
 
@@ -13,14 +14,6 @@ const RECENT_SESSIONS = 5;
 
 /** The states a session card keeps visible even when the list is collapsed. */
 const ACTIVE_STATES: Set<string> = new Set(['running', 'waiting_for_user', 'error']);
-
-function sessionTone(state: SessionSummary['state']): { tone: BadgeTone; dot: boolean; pulse: boolean } {
-  if (state === 'running') return { tone: 'accent', dot: true, pulse: true };
-  if (state === 'waiting_for_user') return { tone: 'accent', dot: true, pulse: false };
-  if (state === 'error') return { tone: 'err', dot: false, pulse: false };
-  if (state === 'complete') return { tone: 'ok', dot: false, pulse: false };
-  return { tone: 'neutral', dot: false, pulse: false };
-}
 
 function SessionRow({
   session,
@@ -35,7 +28,6 @@ function SessionRow({
   onDelete: (id: string) => void;
   onOpenSession: (id: string) => void;
 }) {
-  const { tone, dot, pulse } = sessionTone(session.state);
   const running = session.state === 'running';
   return (
     <div className="group flex h-8 w-full items-center gap-3 border-b border-border px-3 last:border-b-0 hover:bg-raised">
@@ -53,13 +45,9 @@ function SessionRow({
         onClick={() => onOpenSession(session.id)}
         className="flex min-w-0 grow items-center gap-3 text-left"
       >
+        <SessionStateIcon state={session.state} />
         <span className="min-w-0 grow truncate text-sm text-text">{session.title}</span>
-        <span className="flex w-40 shrink-0 items-center gap-1.5 font-mono text-[0.6875rem] text-muted tabular-nums">
-          {session.awaitingIntegration && <Badge tone="accent">à intégrer</Badge>}
-          <Badge tone={tone} dot={dot} pulse={pulse}>
-            {stateLabel(session.state)}
-          </Badge>
-        </span>
+        {session.awaitingIntegration && <Badge tone="accent">à intégrer</Badge>}
         <span className="w-24 shrink-0 whitespace-nowrap text-right font-mono text-[0.6875rem] text-muted tabular-nums">{formatRelative(session.updatedAt)}</span>
       </button>
       {!running && (
