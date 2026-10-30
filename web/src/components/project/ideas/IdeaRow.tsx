@@ -16,6 +16,7 @@ import { Menu, MenuItem } from '../../ui/Menu';
 import { IdeaStatusBadge } from './IdeaStatusBadge';
 import { IdeaMeta } from './IdeaMeta';
 import {
+  completeIdea,
   dropIdea,
   startIdea,
   type IdeaAction,
@@ -85,6 +86,15 @@ export function IdeaRow({
     setBusy(true);
     try {
       await run(() => dropIdea(projectId, idea.id));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleComplete = async () => {
+    setBusy(true);
+    try {
+      await run(() => completeIdea(projectId, idea.id));
     } finally {
       setBusy(false);
     }
@@ -221,6 +231,18 @@ export function IdeaRow({
                   return (
                     <MenuItem key={action} onSelect={() => void handleStart()}>
                       Lancer sans cadrage
+                    </MenuItem>
+                  );
+                case 'restart':
+                  return (
+                    <MenuItem key={action} onSelect={() => void handleStart()}>
+                      Relancer
+                    </MenuItem>
+                  );
+                case 'complete':
+                  return (
+                    <MenuItem key={action} onSelect={() => void handleComplete()}>
+                      Marquer comme faite
                     </MenuItem>
                   );
                 case 'drop':
