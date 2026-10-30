@@ -38,6 +38,7 @@ use serde_json::json;
 use std::collections::HashMap;
 use std::net::{TcpListener, TcpStream};
 use std::path::Path;
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use turns::{Place, Turns};
 
@@ -52,6 +53,9 @@ struct App {
     /// is O(log) and the UI refetches it on every relevant event; caching keeps
     /// the steady state to a max-seq lookup.
     skill_folds: Mutex<HashMap<String, (u64, SessionSkills)>>,
+    /// Projects whose ideas queue runs, and the flag that stops it after the
+    /// current idea (`idea_routes::start_queue`).
+    idea_queues: Mutex<HashMap<String, Arc<AtomicBool>>>,
 }
 
 impl App {
@@ -148,6 +152,7 @@ pub fn serve(port: u16, settings: Settings) -> Result<(), String> {
         port,
         notifier,
         skill_folds: Mutex::new(HashMap::new()),
+        idea_queues: Mutex::default(),
     });
     // Fail now rather than on the first request. No turn runs yet, so a log
     // still marked running was cut by a crash.
@@ -177,7 +182,7 @@ pub fn serve(port: u16, settings: Settings) -> Result<(), String> {
     Ok(())
 }
 
-fn handle(app: &App, stream: &mut TcpStream) -> Result<(), String> {
+fn handle(app: &Arc<App>, stream: &mut TcpStream) -> Result<(), String> {
     let req = http::read_request(stream)?;
     if let Err(refusal) = guard::check(&req, app.port) {
         return http::error(stream, refusal.status, refusal.message);
@@ -226,6 +231,7 @@ mod tests {
             port: 0,
             notifier,
             skill_folds: Mutex::new(HashMap::new()),
+            idea_queues: Mutex::default(),
         }
     }
 

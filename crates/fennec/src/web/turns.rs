@@ -113,6 +113,8 @@ impl Turns {
                 }
             }
             running.lock().unwrap().remove(&session_id);
+            // Whoever waits for the turn to end (the ideas queue) wakes now.
+            notifier.notify();
         });
         Ok(())
     }
