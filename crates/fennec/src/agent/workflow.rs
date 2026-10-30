@@ -198,6 +198,7 @@ fn start_run(
         workflow: workflow.clone(),
         task: task.to_string(),
         step_by_step,
+        started_at: Some(now_ms()),
     })?;
 
     let start_node = workflow.start().ok_or("no start node")?;
@@ -674,7 +675,9 @@ fn finished_run_stats(turn: &Turn) -> Result<RunStats, String> {
         .map(|state| state.criteria)
         .unwrap_or_default();
     let files = files_changed(run_events);
-    Ok(run_stats(run_events, &criteria, files.len()))
+    let mut stats = run_stats(run_events, &criteria, files.len());
+    stats.finished_at = Some(now_ms());
+    Ok(stats)
 }
 
 fn finish_run(

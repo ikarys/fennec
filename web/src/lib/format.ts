@@ -25,6 +25,15 @@ export function formatDuration(ms?: number): string {
   return `${Math.floor(seconds / 60)} min ${seconds % 60} s`;
 }
 
+/** A wall-clock timestamp as a local time (HH:MM), with a short date if not today. */
+export function formatClockTime(ms: number): string {
+  const date = new Date(ms);
+  const time = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(date);
+  if (new Date().toDateString() === date.toDateString()) return time;
+  const day = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' }).format(date);
+  return `${time} · ${day}`;
+}
+
 export function formatClock(ms: number): string {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
   const hours = Math.floor(totalSeconds / 3600);

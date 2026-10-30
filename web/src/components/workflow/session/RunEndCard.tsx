@@ -1,5 +1,5 @@
 import type { ThreadItem } from '../../../lib/fold';
-import { formatDuration } from '../../../lib/format';
+import { formatClockTime, formatDuration } from '../../../lib/format';
 import { Badge } from '../../ui/Badge';
 import { Button } from '../../ui/Button';
 import { Card } from '../../ui/Card';
@@ -41,8 +41,20 @@ export function RunEndCard({ item }: { item: WorkflowEndItem }) {
   const invite = useIntegrationInvite();
   const usage = useRunUsage(item.runId);
 
-  const statRows: [Stat, Stat][] = stats
+  const startAt = stats?.startedAt;
+  const endAt = stats?.finishedAt;
+
+  const statRows: Stat[][] = stats
     ? [
+        ...(startAt != null && endAt != null
+          ? [
+              [
+                { label: 'Départ', value: formatClockTime(startAt) },
+                { label: 'Fin', value: formatClockTime(endAt) },
+              ],
+              [{ label: 'Durée totale', value: formatDuration(endAt - startAt) }],
+            ]
+          : []),
         [
           { label: 'Temps de travail', value: formatDuration(stats.workingMs) },
           { label: 'Appels au modèle', value: usage?.calls ?? '–' },

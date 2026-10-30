@@ -1023,6 +1023,7 @@ mod tests {
                 workflow,
                 task: "t".into(),
                 step_by_step: false,
+                started_at: None,
             },
             Event::CriteriaSet {
                 criteria: vec![Criterion {
