@@ -150,7 +150,7 @@ export function RunEndCard({ item }: { item: WorkflowEndItem }) {
         )}
         {item.outcome === 'done' && invite && invite.lastRunEndId === item.id && (
           <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
-            <span className="text-sm text-muted">Le travail est prêt dans l'espace de l'agent.</span>
+            <span className="text-xs text-muted">Le travail est prêt dans l'espace de l'agent.</span>
             <Button variant="primary" size="sm" onClick={invite.open}>
               Relire et intégrer…
             </Button>
