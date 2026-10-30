@@ -78,7 +78,7 @@ export function RunEndCard({ item }: { item: WorkflowEndItem }) {
           <div className="flex flex-col gap-3">
             <div className="divide-y divide-border rounded-lg border border-border">
               {statRows.map((row) => (
-                <div key={row[0].label} className="odd:bg-raised/55">
+                <div key={row[0].label}>
                   <div className="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
                     {row.map((stat) => (
                       <StatCell key={stat.label} stat={stat} />
@@ -109,13 +109,13 @@ export function RunEndCard({ item }: { item: WorkflowEndItem }) {
                   </thead>
                   <tbody>
                     {stats.nodes.map((node) => (
-                      <tr key={node.nodeId} className="odd:bg-raised/55">
+                      <tr key={node.nodeId}>
                         <td className="py-1 pl-3 pr-3 text-text">
                           {node.label}
                           {node.runs > 1 && (
                             <span
                               title="boucle"
-                              className="ml-1.5 rounded-full bg-accent-soft px-1.5 py-px text-[0.65625rem] text-accent"
+                              className="ml-1.5 text-[0.65625rem] text-accent"
                             >
                               ×{node.runs}
                             </span>

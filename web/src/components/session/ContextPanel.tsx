@@ -145,7 +145,7 @@ export function ContextPanel({ view, skills, usage, hasSession, partial, worktre
       />
       <aside
         aria-label="Contexte de la session"
-        className="flex min-h-0 w-full flex-col gap-2 overflow-y-auto border-l border-border bg-bg px-3 py-3 [scrollbar-width:thin]"
+        className="flex min-h-0 w-full flex-col overflow-y-auto border-l border-border bg-bg px-3 py-3 [scrollbar-width:thin]"
       >
         {pages.length > 1 && (
           <Select

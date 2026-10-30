@@ -434,7 +434,7 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
                 type="button"
                 onClick={() => setTab(id)}
                 aria-current={tab === id ? 'page' : undefined}
-                className={`rounded-lg px-2.5 py-1.5 text-left text-sm ${
+                className={`rounded-md px-2 py-1 text-left ${
                   tab === id ? 'bg-raised text-text' : 'text-muted hover:text-text'
                 }`}
               >

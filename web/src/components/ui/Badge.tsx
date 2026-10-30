@@ -1,16 +1,17 @@
 /**
- * A small status pill: a run's state, a provenance (verified / indicative),
+ * A small status badge: a run's state, a provenance (verified / indicative),
  * an origin. The tone carries the meaning; the accent is not a status.
  */
 import type { ReactNode } from 'react';
 
 export type BadgeTone = 'neutral' | 'accent' | 'ok' | 'err';
 
+/** Colour says the state; only what needs the human (accent) gets a background. */
 const TONES: Record<BadgeTone, string> = {
-  neutral: 'bg-raised text-muted',
+  neutral: 'text-muted',
   accent: 'bg-accent-soft text-accent-strong',
-  ok: 'bg-ok-soft text-ok',
-  err: 'bg-del-bg text-err'
+  ok: 'text-ok',
+  err: 'text-err'
 };
 
 const DOTS: Record<BadgeTone, string> = {
@@ -40,7 +41,7 @@ export function Badge({
   return (
     <span
       title={title}
-      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[0.6875rem] font-medium whitespace-nowrap ${TONES[tone]} ${className}`.trim()}
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-sm px-1.5 py-0.5 text-[0.6875rem] font-medium whitespace-nowrap ${TONES[tone]} ${className}`.trim()}
     >
       {dot && <span className={`h-1.5 w-1.5 rounded-full ${DOTS[tone]} ${pulse ? 'animate-pulse' : ''}`} />}
       {children}

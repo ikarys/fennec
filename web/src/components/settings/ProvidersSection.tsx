@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { ProviderListing } from '../../lib/api';
 import { Button } from '../ui/Button';
-import { Card } from '../ui/Card';
+import { Section } from '../ui/Section';
 import { FieldRow, Select, TextInput } from '../ui/Field';
 
 export interface ProviderForm {
@@ -60,7 +60,7 @@ export function ProvidersSection({
   }
 
   return (
-    <Card className="p-4">
+    <Section>
       <div className="flex flex-col gap-4">
         <h2 className="text-sm font-semibold">Providers</h2>
 
@@ -207,6 +207,6 @@ export function ProvidersSection({
           </div>
         </div>
       </div>
-    </Card>
+    </Section>
   );
 }

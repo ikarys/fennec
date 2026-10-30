@@ -1,6 +1,6 @@
 import type { ModelRef, ParamSource, ProviderListing, ReasoningEffort, SettingsDefaults } from '../../lib/api';
 import { Button } from '../ui/Button';
-import { Card } from '../ui/Card';
+import { Section } from '../ui/Section';
 import { FieldRow, Select, TextInput } from '../ui/Field';
 
 export interface ModelForm {
@@ -55,7 +55,7 @@ export function percentFromFraction(fraction: number): string {
 
 export function ModelPrefsSection({ listings, values, defaults, favorites, onToggleFavorite, onChange }: ModelPrefsSectionProps) {
   return (
-    <Card className="p-4">
+    <Section>
       <div className="flex flex-col gap-4">
         <h2 className="text-sm font-semibold">Paramètres par modèle</h2>
         {listings.length === 0 && <p className="text-sm text-muted">Aucun modèle listé.</p>}
@@ -137,9 +137,9 @@ export function ModelPrefsSection({ listings, values, defaults, favorites, onTog
                     </FieldRow>
                   </div>
 
-                  <div className="flex flex-col gap-1.5 rounded-lg bg-raised/40 p-2.5">
+                  <div className="flex flex-col gap-1.5 border-l border-border pl-3">
                     <div>
-                      <p className="m-0 text-[0.6875rem] font-medium uppercase tracking-wide text-faint">
+                      <p className="m-0 text-xs font-medium text-muted">
                         Envoyé au modèle
                       </p>
                       <p className="m-0 text-[0.625rem] text-faint">
@@ -187,6 +187,6 @@ export function ModelPrefsSection({ listings, values, defaults, favorites, onTog
           </div>
         ))}
       </div>
-    </Card>
+    </Section>
   );
 }
