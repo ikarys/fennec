@@ -1,0 +1,278 @@
+//! Ideas are kept by fennec as a per-project backlog so a human's jotting is not lost mid-run.
+//! The human frames an idea in a plan-mode session and later decides it is ready with an approved plan, or drops it.
+//! Storage is append-only events; `fold` rebuilds the current list from the log.
+
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", content = "data")]
+pub enum IdeaEvent {
+    #[serde(rename = "idea.added", rename_all = "camelCase")]
+    Added { idea_id: String, text: String },
+    #[serde(rename = "idea.framing", rename_all = "camelCase")]
+    Framing { idea_id: String, session_id: String },
+    #[serde(rename = "idea.ready", rename_all = "camelCase")]
+    Ready { idea_id: String, plan: String },
+    #[serde(rename = "idea.dropped", rename_all = "camelCase")]
+    Dropped { idea_id: String },
+}
+
+impl IdeaEvent {
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Self::Added { .. } => "idea.added",
+            Self::Framing { .. } => "idea.framing",
+            Self::Ready { .. } => "idea.ready",
+            Self::Dropped { .. } => "idea.dropped",
+        }
+    }
+
+    pub fn idea_id(&self) -> &str {
+        match self {
+            Self::Added { idea_id, .. }
+            | Self::Framing { idea_id, .. }
+            | Self::Ready { idea_id, .. }
+            | Self::Dropped { idea_id } => idea_id,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum IdeaState {
+    Inbox,
+    Framing,
+    Ready,
+    Dropped,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Idea {
+    pub id: String,
+    pub text: String,
+    pub state: IdeaState,
+    pub session_id: Option<String>,
+    pub plan: Option<String>,
+    pub created_at: u64,
+    pub updated_at: u64,
+}
+
+/// The current ideas, newest first, from `(timestamp_ms, event)` in log order.
+pub fn fold(events: &[(u64, IdeaEvent)]) -> Vec<Idea> {
+    let mut ideas: Vec<Idea> = Vec::new();
+
+    for (timestamp, event) in events {
+        let id = event.idea_id();
+        let Some(index) = ideas.iter().position(|idea| idea.id == id) else {
+            if let IdeaEvent::Added { text, .. } = event {
+                ideas.push(Idea {
+                    id: id.to_string(),
+                    text: text.clone(),
+                    state: IdeaState::Inbox,
+                    session_id: None,
+                    plan: None,
+                    created_at: *timestamp,
+                    updated_at: *timestamp,
+                });
+            }
+            continue;
+        };
+
+        let idea = &mut ideas[index];
+        // A dropped idea stays dropped: a late event never resurrects it.
+        if idea.state == IdeaState::Dropped {
+            continue;
+        }
+        match event {
+            IdeaEvent::Added { .. } => continue,
+            IdeaEvent::Framing { session_id, .. } => {
+                idea.session_id = Some(session_id.clone());
+                idea.state = IdeaState::Framing;
+            }
+            IdeaEvent::Ready { plan, .. } => {
+                idea.plan = Some(plan.clone());
+                idea.state = IdeaState::Ready;
+            }
+            IdeaEvent::Dropped { .. } => idea.state = IdeaState::Dropped,
+        }
+        idea.updated_at = *timestamp;
+    }
+
+    ideas.retain(|idea| idea.state != IdeaState::Dropped);
+    ideas.sort_by_key(|idea| std::cmp::Reverse(idea.created_at));
+    ideas
+}
+
+/// The idea a framing session belongs to, if any.
+pub fn idea_for_session<'a>(ideas: &'a [Idea], session_id: &str) -> Option<&'a Idea> {
+    ideas
+        .iter()
+        .find(|idea| idea.session_id.as_deref() == Some(session_id))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn added_then_framed_then_ready() {
+        let events = vec![
+            (
+                1,
+                IdeaEvent::Added {
+                    idea_id: "i1".into(),
+                    text: "t".into(),
+                },
+            ),
+            (
+                2,
+                IdeaEvent::Framing {
+                    idea_id: "i1".into(),
+                    session_id: "s1".into(),
+                },
+            ),
+            (
+                3,
+                IdeaEvent::Ready {
+                    idea_id: "i1".into(),
+                    plan: "p".into(),
+                },
+            ),
+        ];
+
+        let ideas = fold(&events);
+
+        assert_eq!(ideas.len(), 1);
+        assert_eq!(ideas[0].id, "i1");
+        assert_eq!(ideas[0].state, IdeaState::Ready);
+        assert_eq!(ideas[0].session_id.as_deref(), Some("s1"));
+        assert_eq!(ideas[0].plan.as_deref(), Some("p"));
+        assert_eq!(ideas[0].created_at, 1);
+        assert_eq!(ideas[0].updated_at, 3);
+    }
+
+    #[test]
+    fn dropped_ideas_are_excluded() {
+        let events = vec![
+            (
+                1,
+                IdeaEvent::Added {
+                    idea_id: "i1".into(),
+                    text: "t".into(),
+                },
+            ),
+            (
+                2,
+                IdeaEvent::Dropped {
+                    idea_id: "i1".into(),
+                },
+            ),
+        ];
+
+        assert!(fold(&events).is_empty());
+    }
+
+    #[test]
+    fn events_for_unknown_id_are_ignored() {
+        let events = vec![
+            (
+                1,
+                IdeaEvent::Framing {
+                    idea_id: "missing".into(),
+                    session_id: "s1".into(),
+                },
+            ),
+            (
+                2,
+                IdeaEvent::Ready {
+                    idea_id: "missing".into(),
+                    plan: "p".into(),
+                },
+            ),
+            (
+                3,
+                IdeaEvent::Added {
+                    idea_id: "i1".into(),
+                    text: "t".into(),
+                },
+            ),
+        ];
+
+        let ideas = fold(&events);
+
+        assert_eq!(ideas.len(), 1);
+        assert_eq!(ideas[0].id, "i1");
+        assert_eq!(ideas[0].state, IdeaState::Inbox);
+    }
+
+    #[test]
+    fn ready_after_drop_does_not_resurrect() {
+        let events = vec![
+            (
+                1,
+                IdeaEvent::Added {
+                    idea_id: "i1".into(),
+                    text: "t".into(),
+                },
+            ),
+            (
+                2,
+                IdeaEvent::Dropped {
+                    idea_id: "i1".into(),
+                },
+            ),
+            (
+                3,
+                IdeaEvent::Ready {
+                    idea_id: "i1".into(),
+                    plan: "p".into(),
+                },
+            ),
+        ];
+
+        assert!(fold(&events).is_empty());
+    }
+
+    #[test]
+    fn newest_created_ideas_come_first() {
+        let events = vec![
+            (
+                1,
+                IdeaEvent::Added {
+                    idea_id: "old".into(),
+                    text: "old".into(),
+                },
+            ),
+            (
+                2,
+                IdeaEvent::Added {
+                    idea_id: "new".into(),
+                    text: "new".into(),
+                },
+            ),
+        ];
+
+        let ideas = fold(&events);
+
+        assert_eq!(ideas[0].id, "new");
+        assert_eq!(ideas[1].id, "old");
+    }
+
+    #[test]
+    fn idea_event_serde_round_trip() {
+        let event = IdeaEvent::Added {
+            idea_id: "i1".into(),
+            text: "t".into(),
+        };
+
+        let json = serde_json::to_string(&event).unwrap();
+        assert_eq!(
+            json,
+            r#"{"type":"idea.added","data":{"ideaId":"i1","text":"t"}}"#
+        );
+
+        let decoded: IdeaEvent = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, event);
+    }
+}
