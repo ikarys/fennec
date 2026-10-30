@@ -22,6 +22,8 @@ export interface SessionSummary {
   createdAt: number;
   updatedAt: number;
   parentId: string | null;
+  /** The agent the session resolves to (analyze, audit-*, …), or null when it has none. */
+  mode: string | null;
   /** A workflow ended done and nothing integrated or discarded its work since. */
   awaitingIntegration: boolean;
 }

@@ -141,9 +141,18 @@ pub fn chosen_mode(events: &[Event]) -> Option<&str> {
 /// top-level (non-subagent) agent, else DEFAULT_AGENT, else the first top-level agent.
 /// None only when there is no top-level agent at all.
 pub fn resolve<'a>(agents: &'a [AgentDefinition], events: &[Event]) -> Option<&'a AgentDefinition> {
+    resolve_mode(agents, chosen_mode(events))
+}
+
+/// The top-level agent for a chosen mode: that agent when it is a known
+/// top-level one, else DEFAULT_AGENT, else the first top-level agent. None
+/// only when there is no top-level agent at all.
+pub fn resolve_mode<'a>(
+    agents: &'a [AgentDefinition],
+    mode: Option<&str>,
+) -> Option<&'a AgentDefinition> {
     let top_level = || agents.iter().filter(|agent| !agent.subagent);
-    chosen_mode(events)
-        .and_then(|mode| top_level().find(|agent| agent.id == mode))
+    mode.and_then(|mode| top_level().find(|agent| agent.id == mode))
         .or_else(|| top_level().find(|agent| agent.id == DEFAULT_AGENT))
         .or_else(|| top_level().next())
 }
