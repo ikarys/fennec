@@ -46,7 +46,7 @@ export function ModelSection({ value, listings, stored, defaultModel, onChange }
         </Select>
       </FieldRow>
       <p className="m-0 text-xs text-muted">
-        Les nouvelles sessions l'utilisent ; le composer change celui d'une session. Les favoris (★) sont proposés dans le composer.
+        Les nouvelles sessions l'utilisent ; le composer change celui d'une session. Le modèle par défaut est marqué ★ ; les favoris (♥) sont proposés dans le composer.
       </p>
     </Section>
   );
