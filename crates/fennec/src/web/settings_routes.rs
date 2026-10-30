@@ -5,6 +5,8 @@ use super::App;
 use super::http::{Request, error, send_json};
 use super::model_view;
 use crate::domain::preferences::{LOCAL_PROVIDER, Preferences, Provider};
+use crate::domain::scanner::SCANNERS;
+use crate::scanners;
 use crate::skills;
 use crate::workflows;
 use llm_providers::{
@@ -47,12 +49,26 @@ pub fn get_settings(app: &App, stream: &mut TcpStream) -> Result<(), String> {
             })
         })
         .collect();
+    let scanners: Vec<Value> = SCANNERS
+        .iter()
+        .map(|scanner| {
+            json!({
+                "id": scanner.id,
+                "name": scanner.name,
+                "covers": scanner.covers,
+                "install": scanner.install,
+                "url": scanner.url,
+                "path": scanners::find(scanner.binary),
+            })
+        })
+        .collect();
     let body = json!({
         "preferences": prefs,
         "listings": listings,
         "defaults": app.settings.llm.defaults,
         "skills": skills,
         "optInWorkflows": opt_in_workflows,
+        "scanners": scanners,
     });
     send_json(stream, 200, &body)
 }

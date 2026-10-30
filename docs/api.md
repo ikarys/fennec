@@ -175,7 +175,10 @@ read-only. The human edits them as usual.
 
 - `GET /api/config` → `{model, contextWindow, compactAt}`: the resolved parameters of the
   stored preferences; `compactAt` is the fraction at which the session compacts (0 disables)
-- `GET /api/settings` → `{preferences, listings, defaults, skills, optInWorkflows}`
+- `GET /api/settings` → `{preferences, listings, defaults, skills, optInWorkflows, scanners}`
+  - `scanners`: `[{id, name, covers, install, url, path}]`, the security scanners the `audit-security`
+    agent runs; `path` is where fennec found the executable on PATH, null when absent (verified); fennec
+    never installs one, `install` is the command shown to the human
   - `preferences`: the stored `Preferences`
   - `listings`: `[{provider, name, baseUrl, models: [{id, contextWindow, resolved}], error}]`,
     local first, from a fresh `/models` call per provider (in parallel); the
