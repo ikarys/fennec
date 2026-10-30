@@ -70,6 +70,7 @@ export interface DisplayPrefs {
 export interface SearchPrefs {
   searxngUrl?: string | null;
   searxngApiKey?: string | null;
+  webFetch?: boolean;
 }
 
 /** fennec's bwrap world: how commands run. */
