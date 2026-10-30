@@ -149,7 +149,7 @@ fn fill(top: &Path, wt: &Worktree) -> Result<(), String> {
 const CAPTURES_EXCLUDED: &str = ":(exclude,glob)**/.playwright-cli/**";
 
 /// Commits everything in the worktree (`git add -A`) but the browser's
-/// captures, authored and committed by fennec, with `message`; `Ok(false)`
+/// captures, under the human's git identity, with `message`; `Ok(false)`
 /// when there was nothing to commit.
 pub fn commit(worktree: &Worktree, message: &str) -> Result<bool, String> {
     let dir = &worktree.path;
@@ -160,22 +160,10 @@ pub fn commit(worktree: &Worktree, message: &str) -> Result<bool, String> {
     if git(dir, &["diff", "--cached", "--name-only"], None)?.is_empty() {
         return Ok(false);
     }
-    // The fennec identity is deliberate: provenance (a commit made by
-    // fennec's code, not by the human).
-    git(
-        dir,
-        &[
-            "-c",
-            "user.name=fennec",
-            "-c",
-            "user.email=fennec@localhost",
-            "commit",
-            "-q",
-            "-m",
-            message,
-        ],
-        None,
-    )?;
+    // The human's git identity: fennec is the harness, not an author.
+    // Provenance stays in the `fennec/<session>` branch and the integration's
+    // `Fennec-Session` trailer.
+    git(dir, &["commit", "-q", "-m", message], None)?;
     Ok(true)
 }
 
@@ -326,7 +314,7 @@ mod tests {
     }
 
     #[test]
-    fn commit_records_the_agents_work_as_fennec() {
+    fn commit_records_the_agents_work_as_the_human() {
         let (base, repo) = setup();
         let wt = open(&base.join("wt"), &repo, "s1").unwrap().unwrap();
         std::fs::write(wt.workdir.join("agent.txt"), "x\n").unwrap();
@@ -334,7 +322,7 @@ mod tests {
         assert_eq!(commit(&wt, "agent work"), Ok(true));
         assert_eq!(
             text(&wt.path, &["log", "-1", "--format=%an"]).trim(),
-            "fennec"
+            "human"
         );
         assert_eq!(commit(&wt, "again"), Ok(false));
         std::fs::create_dir_all(wt.workdir.join(".playwright-cli")).unwrap();
