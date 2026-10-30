@@ -64,15 +64,7 @@ fn choice_value(prefs: &Preferences, model: &ModelRef) -> Value {
 pub(super) fn choices(app: &App, stream: &mut TcpStream) -> Result<(), String> {
     let store = app.store()?;
     let prefs = store.preferences()?;
-    let default = prefs
-        .selected
-        .as_ref()
-        .filter(|m| !m.model.is_empty())
-        .cloned()
-        .unwrap_or_else(|| ModelRef {
-            provider: app.settings.llm.defaults.provider.clone(),
-            model: app.settings.llm.defaults.model.clone(),
-        });
+    let default = prefs.default_model(&app.settings.llm.defaults);
     let favorites: Vec<Value> = prefs
         .favorites
         .iter()

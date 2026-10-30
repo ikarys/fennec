@@ -21,6 +21,9 @@ interface ModelPrefsSectionProps {
   defaults: SettingsDefaults;
   favorites: ModelRef[];
   onToggleFavorite: (ref: ModelRef) => void;
+  /** `provider/model` of the default model, '' when none is chosen. */
+  defaultModel: string;
+  onSetDefault: (key: string) => void;
   onChange: (key: string, field: keyof ModelForm, value: string) => void;
   onRemoveModel: (providerId: string, modelId: string) => void;
 }
@@ -98,6 +101,8 @@ function ModelRow({
   defaults,
   favorites,
   onToggleFavorite,
+  isDefault,
+  onSetDefault,
   onChange,
   onRemoveModel,
   open,
@@ -111,6 +116,8 @@ function ModelRow({
   defaults: SettingsDefaults;
   favorites: ModelRef[];
   onToggleFavorite: (ref: ModelRef) => void;
+  isDefault: boolean;
+  onSetDefault: (key: string) => void;
   onChange: (key: string, field: keyof ModelForm, value: string) => void;
   onRemoveModel: (providerId: string, modelId: string) => void;
   open: boolean;
@@ -138,11 +145,25 @@ function ModelRow({
           variant="ghost"
           size="sm"
           iconOnly
+          aria-pressed={isDefault}
+          aria-label="Modèle par défaut"
+          title={isDefault ? 'Modèle par défaut des nouvelles sessions (cliquer pour retirer)' : 'Utiliser par défaut dans les nouvelles sessions'}
+          onClick={() => onSetDefault(isDefault ? '' : key)}
+          className={`text-base ${isDefault ? 'text-accent' : 'text-faint'}`}
+        >
+          {isDefault ? '★' : '☆'}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          iconOnly
+          aria-pressed={isFavorite}
           aria-label="Afficher dans le composer"
           title={isFavorite ? 'Retirer des favoris' : 'Afficher dans le composer'}
           onClick={() => onToggleFavorite({ provider: providerId, model: modelId })}
+          className={`text-base ${isFavorite ? 'text-accent' : 'text-faint'}`}
         >
-          {isFavorite ? '★' : '☆'}
+          {isFavorite ? '♥' : '♡'}
         </Button>
         {model === null && (
           <Button
@@ -270,7 +291,17 @@ function ModelRow({
   );
 }
 
-export function ModelPrefsSection({ listings, values, defaults, favorites, onToggleFavorite, onChange, onRemoveModel }: ModelPrefsSectionProps) {
+export function ModelPrefsSection({
+  listings,
+  values,
+  defaults,
+  favorites,
+  onToggleFavorite,
+  defaultModel,
+  onSetDefault,
+  onChange,
+  onRemoveModel
+}: ModelPrefsSectionProps) {
   // A model with saved overrides opens by itself: that is what the human came to edit.
   const hasOverrides = (key: string) => {
     const value = values[key];
@@ -306,6 +337,8 @@ export function ModelPrefsSection({ listings, values, defaults, favorites, onTog
                   defaults={defaults}
                   favorites={favorites}
                   onToggleFavorite={onToggleFavorite}
+                  isDefault={defaultModel === `${listing.provider}/${model.id}`}
+                  onSetDefault={onSetDefault}
                   onChange={onChange}
                   onRemoveModel={onRemoveModel}
                   open={isOpen(`${listing.provider}/${model.id}`)}
@@ -322,6 +355,8 @@ export function ModelPrefsSection({ listings, values, defaults, favorites, onTog
                   defaults={defaults}
                   favorites={favorites}
                   onToggleFavorite={onToggleFavorite}
+                  isDefault={defaultModel === `${listing.provider}/${modelId}`}
+                  onSetDefault={onSetDefault}
                   onChange={onChange}
                   onRemoveModel={onRemoveModel}
                   open={isOpen(`${listing.provider}/${modelId}`)}
