@@ -25,46 +25,61 @@ function InsightTable({
   return (
     <Card className="p-4">
       <SectionLabel>{title}</SectionLabel>
-      <table className="mt-3 w-full text-sm tabular-nums">
-        <thead>
-          <tr>
-            <th className="px-3 py-2 text-left text-xs font-normal text-muted">Nom</th>
-            <th className="px-3 py-2 text-right text-xs font-normal text-muted">Appels</th>
-            <th className="px-3 py-2 text-right text-xs font-normal text-muted">Entrée</th>
-            <th className="px-3 py-2 text-right text-xs font-normal text-muted">Cache</th>
-            <th className="px-3 py-2 text-right text-xs font-normal text-muted">Sortie</th>
-            <th className="px-3 py-2 text-right text-xs font-normal text-muted">Cache perdu</th>
-<th className="px-3 py-2 text-right text-xs font-normal text-muted" title="Estimation au tarif de référence (Paramètres, Coût)">Coût</th>
-            <th className="px-3 py-2 text-right text-xs font-normal text-muted">Temps</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.key} className="border-t border-border">
-              <td className="px-3 py-2">
-                {onNameClick ? (
-                  <button
-                    type="button"
-                    onClick={() => onNameClick(row.key)}
-                    className="text-accent hover:underline"
-                  >
-                    {row.name}
-                  </button>
-                ) : (
-                  <span>{row.name}</span>
-                )}
-              </td>
-              <td className="px-3 py-2 text-right">{row.calls}</td>
-              <td className="px-3 py-2 text-right">{row.input}</td>
-              <td className="px-3 py-2 text-right">{row.cache}</td>
-              <td className="px-3 py-2 text-right">{row.output}</td>
-              <td className="px-3 py-2 text-right">{row.lost}</td>
-<td className="px-3 py-2 text-right">{row.cost}</td>
-              <td className="px-3 py-2 text-right">{row.time}</td>
+      <div className="mt-3 overflow-x-auto">
+        <table className="w-full min-w-[44rem] table-fixed whitespace-nowrap text-sm tabular-nums">
+          <colgroup>
+            <col className="w-[26%]" />
+            <col />
+            <col />
+            <col />
+            <col />
+            <col />
+            <col />
+            <col />
+          </colgroup>
+          <thead>
+            <tr>
+              <th className="py-2 pr-3 pl-0 text-left text-xs font-normal text-muted">Nom</th>
+              <th className="px-3 py-2 text-right text-xs font-normal text-muted">Appels</th>
+              <th className="px-3 py-2 text-right text-xs font-normal text-muted">Entrée</th>
+              <th className="px-3 py-2 text-right text-xs font-normal text-muted">Cache</th>
+              <th className="px-3 py-2 text-right text-xs font-normal text-muted">Sortie</th>
+              <th className="px-3 py-2 text-right text-xs font-normal text-muted">Cache perdu</th>
+              <th className="px-3 py-2 text-right text-xs font-normal text-muted" title="Estimation au tarif de référence (Paramètres, Coût)">Coût</th>
+              <th className="py-2 pr-0 pl-3 text-right text-xs font-normal text-muted">Temps</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.key} className="border-t border-border">
+                <td className="py-2 pr-3 pl-0">
+                  {onNameClick ? (
+                    <button
+                      type="button"
+                      onClick={() => onNameClick(row.key)}
+                      title={row.name}
+                      className="block max-w-full truncate text-left text-accent hover:underline"
+                    >
+                      {row.name}
+                    </button>
+                  ) : (
+                    <span title={row.name} className="block truncate">
+                      {row.name}
+                    </span>
+                  )}
+                </td>
+                <td className="px-3 py-2 text-right">{row.calls}</td>
+                <td className="px-3 py-2 text-right">{row.input}</td>
+                <td className="px-3 py-2 text-right">{row.cache}</td>
+                <td className="px-3 py-2 text-right">{row.output}</td>
+                <td className="px-3 py-2 text-right">{row.lost}</td>
+                <td className="px-3 py-2 text-right">{row.cost}</td>
+                <td className="py-2 pr-0 pl-3 text-right">{row.time}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </Card>
   );
 }
@@ -136,7 +151,7 @@ export function InsightPage() {
         {view ? (
           <>
             {view.cards.length > 0 ? (
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
                 {view.cards.map((card) => (
                   <Card key={card.label} className="p-4">
                     <SectionLabel>{card.label}</SectionLabel>
