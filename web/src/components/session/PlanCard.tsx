@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Plan, Report } from '../../lib/plan';
 import type { PreflightResultView } from '../../lib/fold';
-import { BookmarkIcon, CheckIcon, CloseIcon, EditIcon, PlayIcon } from '../Icons';
+import { CheckIcon, CloseIcon, EditIcon, PlayIcon } from '../Icons';
 import type { PlanActions } from './PlanActions';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -158,14 +158,12 @@ export function PlanCard({ plan, actions, preflight }: { plan: Plan; actions?: P
               type="button"
               variant="secondary"
               size="sm"
-              iconOnly
               onClick={actions.ideaReady.onMark}
               disabled={actions.disabled || actions.ideaReady.idea === 'saved'}
               className="ml-auto"
               title="Garde ce plan dans le backlog du projet, sans le lancer maintenant."
-              aria-label={IDEA_LABELS[actions.ideaReady.idea]}
             >
-              <BookmarkIcon className="h-3.5 w-3.5" />
+              {IDEA_LABELS[actions.ideaReady.idea]}
             </Button>
           )}
           <Button
