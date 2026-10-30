@@ -154,6 +154,8 @@ export function SessionPage({
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
+  // The last scrollTop seen by onScroll: follow disengages only when it drops.
+  const lastScrollTop = useRef(0);
   // Mirrors stickToBottom for rendering: the button that resumes it.
   const [awayFromBottom, setAwayFromBottom] = useState(false);
   // Set by `handleLoadOlder`: the distance from the bottom when the older
@@ -843,10 +845,13 @@ export function SessionPage({
                             element.scrollHeight -
                             element.scrollTop -
                             element.clientHeight;
-                          // Hysteresis: disengage beyond 120px, re-engage within 40px, so a
-                          // small move does not toggle follow.
+                          // Only a move up disengages: content growing during a run widens the
+                          // distance without the human scrolling. Hysteresis: disengage beyond
+                          // 120px, re-engage within 40px, so a small move does not toggle follow.
+                          const movedUp = element.scrollTop < lastScrollTop.current;
+                          lastScrollTop.current = element.scrollTop;
                           if (stickToBottom.current) {
-                            if (distance > 120) {
+                            if (movedUp && distance > 120) {
                               stickToBottom.current = false;
                               setAwayFromBottom(true);
                             }
