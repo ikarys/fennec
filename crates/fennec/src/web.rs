@@ -8,6 +8,7 @@ mod editor;
 mod event_stream;
 mod guard;
 mod http;
+mod idea_queue;
 mod idea_routes;
 mod insight;
 mod integration;
@@ -54,7 +55,7 @@ struct App {
     /// the steady state to a max-seq lookup.
     skill_folds: Mutex<HashMap<String, (u64, SessionSkills)>>,
     /// Projects whose ideas queue runs, and the flag that stops it after the
-    /// current idea (`idea_routes::start_queue`).
+    /// current idea (`idea_queue::start_queue`).
     idea_queues: Mutex<HashMap<String, Arc<AtomicBool>>>,
 }
 
@@ -169,6 +170,10 @@ pub fn serve(port: u16, settings: Settings) -> Result<(), String> {
     let closed = store.close_dangling_turns()?;
     if closed > 0 {
         eprintln!("fennec · closed {closed} turn(s) left open by a crash");
+    }
+    let closed_queues = idea_queue::close_interrupted_runs(&store)?;
+    if closed_queues > 0 {
+        eprintln!("fennec · closed {closed_queues} ideas queue(s) cut by a restart");
     }
     for stream in listener.incoming().flatten() {
         let app = app.clone();

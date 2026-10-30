@@ -90,14 +90,16 @@ Project analysis, done: an "Analyser le projet" button opens a session on the re
 agent (`crates/fennec/agents/analyze.agent.md`), which drafts AGENTS.md's philosophy, layers and rules,
 each with its file:line source (indicative); the human reviews it.
 Ideas backlog, done: the project page keeps the human's ideas (`idea.*` events per project,
-`domain/idea.rs`, `store/ideas.rs`); "Cadrer" opens a plan session tied to the idea, whose plan card marks
+`crates/backlog`, `store/ideas.rs`); "Cadrer" opens a plan session tied to the idea, whose plan card marks
 it ready with the plan verbatim. "Lancer la file" runs the ready ideas one at a time, oldest first, through
 the default workflow in each idea's session and worktree (`idea.started`); each shows its run's state, and
 integrating stays the human's click.
 Night mode, done: an "autonome" box runs the queue with the human away (`Turn::autonomous`): `ask_user` answers
 itself (the agent decides and records it), `propose_criteria` is refused; per-idea caps on duration and tokens
 (Settings, "Mode nuit") stop an idea and the queue goes on (`idea.halted`); each started idea shows its criteria
-and the decisions taken, for the morning.
+and the decisions taken, for the morning. Each queue run is recorded (`idea.queue_started`, `idea.queue_finished`, a
+restart closes it); the board (groups by stage, one next action per idea, the night report until read) is computed by
+the server.
 Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
 1. Project actions on the project page: diagrams on demand of a function, process or engine
@@ -147,7 +149,7 @@ crates/fennec/src/
     map_doc.rs         docs/map.md: the map as Markdown (Mermaid, table), stale or current
     workflow/          a workflow: definition (nodes, ports, edges), template ({{…}} names),
                        validate (the graph rules), run (the run folded from its events, the next step)
-    idea.rs            the project's ideas backlog: its events, folded (inbox, framing, ready)
+    doc.rs             the project's documentation: markdown files and ADRs, as the Doc tab lists them
     id.rs, clock.rs
   agent/             application layer: the agent loop
     ports.rs           Model, EventLog, Toolbox, ChildSessions, Commands: what the loop needs from outside
@@ -166,7 +168,7 @@ crates/fennec/src/
                      web_search queries the SearXNG instance from the Settings page
   llm/               Model adapter: openai.rs, the Model port over llm-providers (tool-call arguments parsed here)
   store.rs           EventLog adapter: SQLite (openfox's schema), projects and sessions;
-                     store/settings.rs the stored preferences; store/ideas.rs the per-project idea events
+                     store/settings.rs the stored preferences; store/ideas.rs the per-project backlog events
   metering.rs        the usage ledger adapter: MeteredLog (an EventLog that also writes each model call
                      to the ledger) and the backfill of past calls; store/calls.rs reads them from the log
   git.rs             what fennec reads from a repository
@@ -184,14 +186,18 @@ crates/fennec/src/
   protected.rs       the project's protected files: .agents/protected read, the existing paths found
   adr.rs             the project's ADR files in docs/adr/, listed
   module_map.rs      the project map's source files (git ls-files) and docs/map.md read, written
+  doc.rs             the project's markdown files read for the Doc tab
   web/               HTTP adapter: http, guard (who may call), routes, settings_routes, event_stream (SSE),
                      notifier (wakes streams on append, no polling), turns, assets,
-                     workflow_routes, project_routes (the project page), idea_routes (its ideas backlog),
+                     workflow_routes, project_routes (the project page), idea_routes (its ideas board, HTTP only),
+                     idea_queue (the queue's thread: starts ready ideas, night-mode caps, queue runs recorded),
                      model_routes (the composer's model choices, a session's model),
                      children (child sessions for workflow nodes),
                      preview (a project's files in a sandboxed origin), session_usage,
                      workflow_usage, context_view and insight (display-ready token figures: the UI computes none)
   cli/               terminal adapter: commands, transcript
+crates/backlog/     the ideas backlog, a crate of its own and fennec-free, no I/O: its events folded, the queue
+                     order, the night-mode caps, an idea's status, stage and next action, a run's summary
 crates/token-usage/ the usage ledger, a crate of its own and fennec-free (calls, tokens, speed, savings;
                      SQLite file `usage.db`, `FENNEC_USAGE_DB`): outlives sessions, reusable by other products
 crates/llm-providers/ talking to models, a crate of its own and fennec-free: the OpenAI-compatible client
