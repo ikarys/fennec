@@ -1,5 +1,5 @@
 import type { ModelRef, ProviderListing } from '../../lib/api';
-import { Card } from '../ui/Card';
+import { Section } from '../ui/Section';
 import { FieldRow, Select } from '../ui/Field';
 
 interface ModelSectionProps {
@@ -25,7 +25,7 @@ export function ModelSection({ value, listings, stored, defaultModel, onChange }
     : '';
 
   return (
-    <Card className="p-4">
+    <Section>
       <div className="flex flex-col gap-4">
         <h2 className="text-sm font-semibold">Modèle</h2>
         <FieldRow label="Modèle par défaut">
@@ -51,6 +51,6 @@ export function ModelSection({ value, listings, stored, defaultModel, onChange }
           Les nouvelles sessions l'utilisent ; le composer change celui d'une session. Les favoris (★) sont proposés dans le composer.
         </p>
       </div>
-    </Card>
+    </Section>
   );
 }

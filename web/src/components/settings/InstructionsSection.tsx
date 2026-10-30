@@ -1,9 +1,9 @@
-import { Card } from '../ui/Card';
+import { Section } from '../ui/Section';
 import { FieldRow, TextArea } from '../ui/Field';
 
 export function InstructionsSection({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   return (
-    <Card className="p-4">
+    <Section>
       <div className="flex flex-col gap-4">
         <h2 className="text-sm font-semibold">Instructions globales</h2>
         <FieldRow
@@ -19,6 +19,6 @@ export function InstructionsSection({ value, onChange }: { value: string; onChan
           />
         </FieldRow>
       </div>
-    </Card>
+    </Section>
   );
 }

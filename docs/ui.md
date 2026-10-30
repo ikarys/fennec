@@ -7,7 +7,7 @@ look lives in two places only, so a screen can never drift from the others:
    spacing unit, radii. Components use the tokens (`bg-panel`, `text-muted`),
    never a literal colour.
 2. **The primitives** (`web/src/components/ui/`): `Button`, `Badge`,
-   `SectionLabel`, `Card`, `Panel`, and the fields (`TextInput`, `Select`,
+   `SectionLabel`, `Card`, `Section`, `Panel`, and the fields (`TextInput`, `Select`,
    `TextArea`, `FieldRow`). A feature component picks a variant and adds only
    layout classes (width, margins, `shrink-0`); it never restyles a primitive's
    colours, paddings or font size. A new look is a new variant, here.
@@ -21,13 +21,17 @@ look lives in two places only, so a screen can never drift from the others:
   for "needs you" or "running"), a dot that pulses while something runs.
   The accent is for action and attention, not decoration.
 - Cards only for what stands apart (a plan, a dialog, a question waiting for
-  the human); lists and sections inside a card stay flat, separated by space
-  or a hairline (`border-border`).
+  the human). Everything else is flat: a page's groups are `Section`s and
+  lists are rows, separated by space or a hairline (`border-border`), never
+  a box per item and never a box inside a box.
+- Only the accent gets a filled `Badge`; ok and err are coloured text.
+  Labels are sentence case, never uppercase with tracking.
+- Radii are small (3 to 8px) and come from the tokens; no pills.
 - Text: `text-sm` for reading, `text-xs` for controls and metadata,
   `SectionLabel` for group titles. Numbers that line up use `tabular-nums`.
 - Provenance is visible (rule 3 of AGENTS.md): verified results and model
   output never share a look.
-- Side columns are stacks of `Panel` blocks: each bounded by its border, its
+- Side columns are stacks of `Panel` blocks separated by hairlines, each
   header (chevron, title, summary when folded) always visible.
 
 ## Sizes

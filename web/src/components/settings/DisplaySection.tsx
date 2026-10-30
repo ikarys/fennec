@@ -1,6 +1,6 @@
 import type { DisplayPrefs } from '../../lib/api';
 import { Segmented } from '../ui/Segmented';
-import { Card } from '../ui/Card';
+import { Section } from '../ui/Section';
 import { themes, type ThemeId } from '../../lib/theme';
 
 interface DisplaySectionProps {
@@ -14,7 +14,7 @@ const FONT_SIZES = [13, 14, 15, 16];
 
 export function DisplaySection({ value, onChange, theme, onThemeChange }: DisplaySectionProps) {
   return (
-    <Card className="p-4">
+    <Section>
       <div className="flex flex-col gap-4">
         <h2 className="text-sm font-semibold">Affichage</h2>
         <div className="flex items-center gap-3 text-sm text-text">
@@ -63,6 +63,6 @@ export function DisplaySection({ value, onChange, theme, onThemeChange }: Displa
           />
         </div>
       </div>
-    </Card>
+    </Section>
   );
 }

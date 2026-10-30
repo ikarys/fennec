@@ -28,7 +28,7 @@ export function Segmented<T extends string | number>({
   disabled?: boolean;
 }) {
   return (
-    <div role="group" aria-label={label} className="flex shrink-0 items-center gap-0.5 rounded-lg bg-raised/60 p-0.5">
+    <div role="group" aria-label={label} className="flex shrink-0 items-center gap-0.5 rounded-md bg-raised/60 p-0.5">
       {segments.map((segment) => {
         const selected = segment.value === value;
         return (
@@ -40,7 +40,7 @@ export function Segmented<T extends string | number>({
             aria-pressed={selected}
             disabled={disabled}
             onClick={() => onChange(segment.value)}
-            className={`flex h-6 items-center gap-1.5 rounded-md px-2 text-xs transition-colors disabled:opacity-60 ${
+            className={`flex h-6 items-center gap-1.5 rounded-sm px-2 text-xs transition-colors disabled:opacity-60 ${
               selected ? 'bg-accent-soft text-text ring-1 ring-accent/40' : 'text-muted hover:text-text'
             }`}
           >

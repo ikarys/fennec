@@ -4,10 +4,9 @@ import { formatRelative, stateLabel } from '../lib/format';
 import { ChevronRightIcon, PlusIcon } from '../components/Icons';
 import { Button, buttonClass } from '../components/ui/Button';
 import { Badge, type BadgeTone } from '../components/ui/Badge';
-import { Card } from '../components/ui/Card';
 import { SectionLabel } from '../components/ui/SectionLabel';
 
-/** How many non-active sessions a project card shows before the toggle appears. */
+/** How many non-active sessions a project section shows before the toggle appears. */
 const RECENT_SESSIONS = 5;
 
 /** The states a session card keeps visible even when the list is collapsed. */
@@ -27,7 +26,7 @@ function SessionRow({ session, onOpenSession }: { session: SessionSummary; onOpe
     <button
       type="button"
       onClick={() => onOpenSession(session.id)}
-      className="grid w-full grid-cols-[minmax(0,1fr)_auto_5.5rem] items-center gap-3 border-t border-border px-4 py-2 text-left first:border-t-0 hover:bg-raised"
+      className="grid w-full grid-cols-[minmax(0,1fr)_auto_5.5rem] items-center gap-3 rounded-md px-2 py-1.5 text-left hover:bg-raised"
     >
       <span className="min-w-0 truncate font-medium">{session.title}</span>
       <span className="flex items-center gap-1.5">
@@ -41,7 +40,7 @@ function SessionRow({ session, onOpenSession }: { session: SessionSummary; onOpe
   );
 }
 
-function ProjectCard({
+function ProjectSection({
   project,
   defaultOpen,
   onNewSession,
@@ -61,8 +60,8 @@ function ProjectCard({
   const hidden = rest.slice(RECENT_SESSIONS);
 
   return (
-    <Card className="overflow-hidden">
-      <div className={`flex flex-wrap items-center justify-between gap-3 px-4 py-3 ${open ? 'border-b border-border' : ''}`}>
+    <section className="border-t border-border pt-3 first:border-t-0 first:pt-0">
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-2">
         <button
           type="button"
           onClick={() => setOpen((value) => !value)}
@@ -98,14 +97,14 @@ function ProjectCard({
 
       {open &&
         (project.sessions.length === 0 ? (
-          <div className="px-4 py-4 text-sm text-muted">Aucune session pour ce projet.</div>
+          <div className="px-2 py-2 text-muted">Aucune session pour ce projet.</div>
         ) : (
           <div>
-            {active.length > 0 && <SectionLabel className="px-4 pt-3 pb-1">En cours</SectionLabel>}
+            {active.length > 0 && <SectionLabel className="px-2 pt-2 pb-1">En cours</SectionLabel>}
             {active.map((session) => (
               <SessionRow key={session.id} session={session} onOpenSession={onOpenSession} />
             ))}
-            {active.length > 0 && recent.length > 0 && <SectionLabel className="px-4 pt-3 pb-1">Récemment</SectionLabel>}
+            {active.length > 0 && recent.length > 0 && <SectionLabel className="px-2 pt-2 pb-1">Récemment</SectionLabel>}
             {recent.map((session) => (
               <SessionRow key={session.id} session={session} onOpenSession={onOpenSession} />
             ))}
@@ -113,7 +112,7 @@ function ProjectCard({
               <button
                 type="button"
                 onClick={() => setExpanded((value) => !value)}
-                className="block w-full border-t border-border px-4 py-2 text-left text-xs text-muted hover:bg-raised hover:text-text"
+                className="block w-full rounded-md px-2 py-1.5 text-left text-xs text-muted hover:bg-raised hover:text-text"
               >
                 {expanded ? 'Replier' : `Afficher les ${hidden.length} autres sessions`}
               </button>
@@ -124,7 +123,7 @@ function ProjectCard({
               ))}
           </div>
         ))}
-    </Card>
+    </section>
   );
 }
 
@@ -145,7 +144,7 @@ export function HomePage({ projects, loading, error, onOpenProjectDialog, onNewS
 
   return (
     <main className="grow overflow-y-auto px-6 py-8">
-      <div className="mx-auto flex max-w-[960px] flex-col gap-7">
+      <div className="mx-auto flex max-w-[960px] flex-col gap-5">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="flex flex-col gap-0.5">
             <h1 className="text-[1.375rem] font-semibold tracking-[-0.02em]">Projets</h1>
@@ -170,19 +169,19 @@ export function HomePage({ projects, loading, error, onOpenProjectDialog, onNewS
           </Button>
         </div>
 
-        {error && <Card className="px-4 py-3 text-sm text-err">{error}</Card>}
+        {error && <p className="m-0 text-err">{error}</p>}
 
         {loading && projects.length === 0 && <div className="text-sm text-muted">Chargement…</div>}
 
         {!loading && !error && projects.length === 0 && (
-          <Card className="px-6 py-10 text-center text-sm text-muted">
+          <p className="m-0 py-10 text-center text-muted">
             Aucun projet ouvert. Ouvre un dossier pour commencer.
-          </Card>
+          </p>
         )}
 
         {/* The server lists the most recently active project first: it opens unfolded. */}
         {projects.map((project, index) => (
-          <ProjectCard
+          <ProjectSection
             key={project.id}
             project={project}
             defaultOpen={index === 0}
