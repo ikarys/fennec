@@ -23,6 +23,7 @@ pub mod model_choice;
 pub mod module_map;
 pub mod open_calls;
 pub mod preferences;
+pub mod preflight;
 pub mod project;
 pub mod protection;
 pub mod replay;

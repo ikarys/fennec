@@ -169,7 +169,8 @@ pub(super) fn with_turn<R>(
         .with_search(prefs.search.clone())
         .with_sandbox(
             Sandbox::for_store(&prefs.sandbox, &settings.db_path)
-                .protecting(protected::existing_paths(workdir, &protection)),
+                .protecting(protected::existing_paths(workdir, &protection))
+                .with_mounts(worktree::dependency_mounts(workdir)),
         )
         .with_protection(protection);
     let mut on_event = |_: &Event| {};
