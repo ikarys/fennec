@@ -139,6 +139,7 @@ crates/fennec/src/
     attachment.rs      images sent to the model: sniffing, data URLs, limits
     replay.rs          which message the human may replay
     criteria.rs        acceptance criteria: the plan's "Done when", checks, verdicts, provenance
+    preflight.rs       a plan's checks run before any change: fails, passes already, cannot run
     protection.rs      protected files: the defaults, the gitignore-like patterns, the matcher
     test_files.rs      which paths are tests; the lines an integration appends to `.agents/protected`
     integration.rs     the review gate: what blocks an integration until the human accepts it
@@ -158,6 +159,7 @@ crates/fennec/src/
     delta_buffer.rs    coalesces streamed chunks into one event per 100 ms
     tool_calls.rs      openfox chat/execute-tools: runs and records tool calls
     ask_user.rs        openfox tools/ask: the loop's own tool; the turn ends waiting for the human
+    preflight.rs       runs a plan's checks at the end of the planner's turn, sends it back once
     compaction.rs      openfox context/compactor: the summary round and the new window
     prompt.rs          openfox chat/prompts: the system prompt, plus fennec's working method
     workflow.rs        the workflow walk and its jobs (start, answer, continue, resume, stop);
@@ -172,7 +174,8 @@ crates/fennec/src/
   metering.rs        the usage ledger adapter: MeteredLog (an EventLog that also writes each model call
                      to the ledger) and the backfill of past calls; store/calls.rs reads them from the log
   git.rs             what fennec reads from a repository
-  worktree.rs        a session's git worktree: a workflow never writes the human's tree
+  worktree.rs        a session's git worktree: a workflow never writes the human's tree; the main
+                     checkout's node_modules/.venv mounted read-only into its sandbox
   integration.rs     the human's integration: preview of a worktree branch, cherry-pick, conflict abort
   instructions.rs    openfox context/instructions: Settings' global instructions + the
                      AGENTS.md files above the workdir, for a new session's prompt
