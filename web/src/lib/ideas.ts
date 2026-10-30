@@ -3,6 +3,7 @@
  * Contract: docs/api.md.
  */
 import { request } from './api';
+import type { FileAttachmentInput } from './attachments';
 
 export type Stage = 'yours' | 'running' | 'queue' | 'drafts' | 'done';
 
@@ -22,9 +23,18 @@ export type IdeaAction = 'frame' | 'resumeFraming' | 'start' | 'open' | 'answer'
 
 export type IdeaMenuAction = 'restart' | 'reframe' | 'startUnframed' | 'complete' | 'drop';
 
+/** A file or image pinned to an idea, kept as a data URL. */
+export interface IdeaAttachmentView {
+  filename: string;
+  mimeType: string;
+  size: number;
+  data: string;
+}
+
 export interface IdeaView {
   id: string;
   text: string;
+  attachments: IdeaAttachmentView[];
   status: IdeaStatus;
   stage: Stage;
   action: IdeaAction | null;
@@ -89,10 +99,14 @@ export async function listIdeas(projectId: string): Promise<IdeaBoard> {
   return boardRequest(projectId, '/ideas');
 }
 
-export async function addIdea(projectId: string, text: string): Promise<IdeaBoard> {
+export async function addIdea(
+  projectId: string,
+  text: string,
+  attachments: FileAttachmentInput[] = [],
+): Promise<IdeaBoard> {
   return boardRequest(projectId, '/ideas', {
     method: 'POST',
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({ text, attachments }),
   });
 }
 
@@ -118,6 +132,52 @@ export async function frameIdea(
     method: 'POST',
     body: JSON.stringify({ sessionId }),
   });
+}
+
+/** What a framing idea puts in the composer: text files inlined, binaries
+ *  named, images attached. The plan is written against all of it. */
+export function framingPrefill(idea: IdeaView): {
+  text: string;
+  attachments: { filename: string; data: string }[];
+} {
+  let text = idea.text;
+  const attachments: { filename: string; data: string }[] = [];
+  const named: string[] = [];
+  for (const attachment of idea.attachments) {
+    if (attachment.mimeType.startsWith('image/')) {
+      attachments.push({ filename: attachment.filename, data: attachment.data });
+    } else if (isTextMime(attachment.mimeType)) {
+      const content = decodeDataUrl(attachment.data);
+      // A file with its own code fences would break a triple-backtick wrapper.
+      const fence = content.includes('```') ? '````' : '```';
+      text += `\n\nAttached file \`${attachment.filename}\`:\n\n${fence}\n${content}\n${fence}`;
+    } else {
+      named.push(attachment.filename);
+    }
+  }
+  if (named.length > 0) {
+    text += `\n\nAttached files (available when the idea is built): ${named.join(', ')}`;
+  }
+  return { text, attachments };
+}
+
+function isTextMime(mime: string): boolean {
+  return (
+    mime.startsWith('text/') ||
+    ['application/json', 'application/xml', 'application/yaml', 'application/x-yaml', 'application/csv'].includes(mime)
+  );
+}
+
+function decodeDataUrl(dataUrl: string): string {
+  const payload = dataUrl.split(';base64,').pop() ?? '';
+  try {
+    // atob alone returns one char per byte; multi-octet UTF-8 text needs a
+    // TextDecoder to come back readable.
+    const bytes = Uint8Array.from(atob(payload), (c) => c.charCodeAt(0));
+    return new TextDecoder('utf-8').decode(bytes);
+  } catch {
+    return '';
+  }
 }
 
 export async function markIdeaReady(

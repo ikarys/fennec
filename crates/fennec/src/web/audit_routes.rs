@@ -65,6 +65,7 @@ pub fn create_tasks(
                 &BacklogEvent::Added {
                     idea_id: new_id(),
                     text: audit.task_text(finding),
+                    attachments: Vec::new(),
                 },
             )?;
             created += 1;

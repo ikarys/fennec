@@ -170,6 +170,7 @@ mod tests {
             halted: halted.map(str::to_string),
             started_at: None,
             autonomous: false,
+            attachments: Vec::new(),
         }
     }
 

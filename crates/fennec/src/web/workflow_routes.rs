@@ -182,6 +182,7 @@ pub fn start_workflow(
             workflow: found.workflow,
             task,
             plan,
+            attachments,
         }
     };
     // The workflow definition is the human's: found in the project, not the worktree.

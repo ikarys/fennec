@@ -1552,6 +1552,7 @@ fn start_from_plan_records_the_plan_and_runs_the_criteria() {
             workflow: criteria_workflow(),
             task: "do it".into(),
             plan: "## Done when\n- C1 — check: `true`".into(),
+            attachments: Vec::new(),
         },
     )
     .unwrap();
@@ -1642,6 +1643,7 @@ fn start_from_plan_answers_the_approval_node() {
             workflow,
             task: "do it".into(),
             plan: "## Done when\n- C1 — check: `true`".into(),
+            attachments: Vec::new(),
         },
     )
     .unwrap();

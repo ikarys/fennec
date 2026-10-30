@@ -91,6 +91,7 @@ mod tests {
                 &BacklogEvent::Added {
                     idea_id: "i1".into(),
                     text: "t".into(),
+                    attachments: Vec::new(),
                 },
             )
             .unwrap();
