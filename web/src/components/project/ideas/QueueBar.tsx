@@ -3,6 +3,7 @@
  */
 import { useState } from 'react';
 import { Button } from '../../ui/Button';
+import { StopIcon } from '../../Icons';
 import { formatTokens } from '../../../lib/format';
 import { startQueue, stopQueue, type IdeaBoard } from '../../../lib/ideas';
 
@@ -49,8 +50,16 @@ export function QueueBar({
         <span className="text-sm text-text">
           File en cours{queue.autonomous ? ' · nuit' : ''}
         </span>
-        <Button variant="secondary" size="sm" disabled={busy} onClick={handleStop}>
-          Arrêter
+        <Button
+          variant="secondary"
+          size="sm"
+          disabled={busy}
+          iconOnly
+          title="Arrêter la file"
+          aria-label="Arrêter la file"
+          onClick={handleStop}
+        >
+          <StopIcon className="h-4 w-4" />
         </Button>
       </div>
     );

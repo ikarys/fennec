@@ -2,6 +2,7 @@
  * The done tasks table: the server's order, no sorting in the UI.
  */
 import { Button } from '../../ui/Button';
+import { EyeIcon } from '../../Icons';
 import { IdeaStatusBadge } from './IdeaStatusBadge';
 import { formatDuration, formatTokens } from '../../../lib/format';
 import type { IdeaView } from '../../../lib/ideas';
@@ -65,8 +66,15 @@ export function DoneTable({
               </td>
               <td className="px-3 py-2 text-right whitespace-nowrap">
                 {sessionId ? (
-                  <Button variant="ghost" size="sm" onClick={() => onOpenSession(sessionId)}>
-                    Relire
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
+                    title="Relire"
+                    aria-label="Relire"
+                    onClick={() => onOpenSession(sessionId)}
+                  >
+                    <EyeIcon className="h-4 w-4" />
                   </Button>
                 ) : null}
               </td>
