@@ -16,6 +16,8 @@ export type IdeaSessionState =
   | 'idle';
 
 export interface IdeaReport {
+  /** The human integrated the idea's work (`integration.applied`). */
+  integrated: boolean;
   criteria: {
     passed: number;
     failed: number;
