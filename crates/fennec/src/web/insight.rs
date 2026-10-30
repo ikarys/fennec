@@ -5,7 +5,7 @@
 use serde::Serialize;
 use serde_json::json;
 use std::net::TcpStream;
-use token_usage::display::{duration, percent, tokens};
+use token_usage::display::{duration, percent, tokens, usd};
 use token_usage::{Filter, GroupBy, Ledger, Row, Summary};
 
 use super::App;
@@ -13,6 +13,7 @@ use super::context_view::{CompositionView, composition_view};
 use super::http::{Request, error, send_json};
 use crate::domain::clock::now_ms;
 use crate::domain::context_parts::PartKind;
+use crate::domain::tariff::Tariff;
 use std::collections::BTreeMap;
 
 const DAY_MS: u64 = 86_400_000;
@@ -95,6 +96,7 @@ pub struct RowView {
     pub cache: String,
     pub output: String,
     pub lost: String,
+    pub cost: String,
     pub time: String,
 }
 
@@ -115,7 +117,7 @@ pub struct InsightData {
 }
 
 impl InsightData {
-    pub fn view(self, project: Option<&str>) -> InsightView {
+    pub fn view(self, project: Option<&str>, tariff: &Tariff) -> InsightView {
         let InsightData {
             total,
             days,
@@ -133,7 +135,7 @@ impl InsightData {
             None => "Tous les projets".to_string(),
         };
 
-        let cards = cards(&total);
+        let cards = cards(&total, tariff);
         let consumers = consumers(&total.breakdown);
 
         let max = days
@@ -147,14 +149,19 @@ impl InsightData {
         let projects = if project.is_none() {
             let mut rows = projects;
             busiest_first(&mut rows);
-            rows.into_iter().map(|row| row_view(&row, false)).collect()
+            rows.into_iter()
+                .map(|row| row_view(&row, false, tariff))
+                .collect()
         } else {
             Vec::new()
         };
 
         let mut models = models;
         busiest_first(&mut models);
-        let models = models.into_iter().map(|row| row_view(&row, true)).collect();
+        let models = models
+            .into_iter()
+            .map(|row| row_view(&row, true, tariff))
+            .collect();
 
         let project_options = project_options(&groups);
 
@@ -222,7 +229,9 @@ pub fn serve(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), Str
         groups,
     };
 
-    send_json(stream, 200, &json!(data.view(project.as_deref())))
+    let tariff = app.store()?.preferences()?.tariff;
+
+    send_json(stream, 200, &json!(data.view(project.as_deref(), &tariff)))
 }
 
 fn busiest_first(rows: &mut [Row]) {
@@ -234,7 +243,15 @@ fn busiest_first(rows: &mut [Row]) {
     });
 }
 
-fn cards(total: &Summary) -> Vec<CardView> {
+fn cost(summary: &Summary, tariff: &Tariff) -> f64 {
+    tariff.cost(
+        summary.prompt_tokens,
+        summary.cached_tokens,
+        summary.completion_tokens,
+    )
+}
+
+fn cards(total: &Summary, tariff: &Tariff) -> Vec<CardView> {
     let fresh = total.prompt_tokens.saturating_sub(total.cached_tokens);
     let cache = percent(total.cached_tokens, total.prompt_tokens);
     let lost_detail = if total.lost_cache_calls == 0 {
@@ -271,6 +288,16 @@ fn cards(total: &Summary) -> Vec<CardView> {
             label: "Sortie".into(),
             value: tokens(total.completion_tokens),
             detail: "tokens générés".into(),
+        },
+        CardView {
+            label: "Coût estimé".into(),
+            value: usd(cost(total, tariff)),
+            detail: format!(
+                "indicatif, au tarif {} / {} / {} par M (entrée, cache, sortie)",
+                usd(tariff.input_per_m),
+                usd(tariff.cached_per_m),
+                usd(tariff.output_per_m)
+            ),
         },
     ]
 }
@@ -324,7 +351,7 @@ fn day_view(row: &Row, max: u64) -> DayView {
     }
 }
 
-fn row_view(row: &Row, model: bool) -> RowView {
+fn row_view(row: &Row, model: bool, tariff: &Tariff) -> RowView {
     let name = if model {
         row.key.clone()
     } else {
@@ -345,6 +372,7 @@ fn row_view(row: &Row, model: bool) -> RowView {
         cache: format!("{cache} %"),
         output: tokens(row.summary.completion_tokens),
         lost,
+        cost: usd(cost(&row.summary, tariff)),
         time: duration(row.summary.total_secs),
     }
 }
@@ -448,14 +476,21 @@ mod tests {
             models,
             groups,
         }
-        .view(None);
+        .view(None, &Tariff::default());
 
         assert_eq!(view.scope, "Tous les projets");
 
         let labels: Vec<&str> = view.cards.iter().map(|c| c.label.as_str()).collect();
         assert_eq!(
             labels,
-            vec!["Appels", "Entrée", "Cache", "Cache perdu", "Sortie"]
+            vec![
+                "Appels",
+                "Entrée",
+                "Cache",
+                "Cache perdu",
+                "Sortie",
+                "Coût estimé"
+            ]
         );
         assert_eq!(view.cards[2].value, "97 %");
 
@@ -470,6 +505,7 @@ mod tests {
 
         assert_eq!(view.projects[0].key, "p2");
         assert_eq!(view.projects[0].lost, "—");
+        assert!(!view.projects[0].cost.is_empty());
     }
 
     #[test]
@@ -484,7 +520,7 @@ mod tests {
             models: vec![],
             groups,
         }
-        .view(Some("p1"));
+        .view(Some("p1"), &Tariff::default());
 
         assert_eq!(view.scope, "Projet un");
         assert!(view.projects.is_empty());

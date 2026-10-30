@@ -31,6 +31,30 @@ pub fn duration(secs: f64) -> String {
     format!("{} min {} s", seconds / 60, seconds % 60)
 }
 
+/// `148 $`, `3,20 $`, `<0,01 $`: dollars, French decimal comma.
+pub fn usd(value: f64) -> String {
+    if value <= 0.0 {
+        return "0 $".to_string();
+    }
+    if value < 0.01 {
+        return "<0,01 $".to_string();
+    }
+    if value < 100.0 {
+        return format!("{:.2} $", value).replace('.', ",");
+    }
+    let rounded = value.round() as u64;
+    let digits = rounded.to_string();
+    let mut out = String::new();
+    let len = digits.len();
+    for (index, digit) in digits.chars().enumerate() {
+        if index > 0 && (len - index).is_multiple_of(3) {
+            out.push('\u{202F}');
+        }
+        out.push(digit);
+    }
+    format!("{out} $")
+}
+
 /// Share of `part` in `whole`, `0` when `whole` is empty.
 pub fn percent(part: u64, whole: u64) -> u64 {
     if whole == 0 {
@@ -67,5 +91,17 @@ mod tests {
     fn percent_of_nothing_is_zero() {
         assert_eq!(percent(1, 0), 0);
         assert_eq!(percent(1, 3), 33);
+    }
+
+    #[test]
+    fn usd_formats_dollars_with_french_comma() {
+        assert_eq!(usd(0.0), "0 $");
+        assert_eq!(usd(-1.0), "0 $");
+        assert_eq!(usd(0.004), "<0,01 $");
+        assert_eq!(usd(3.2), "3,20 $");
+        assert_eq!(usd(99.999), "100,00 $");
+        assert_eq!(usd(148.0), "148 $");
+        assert_eq!(usd(1_482.0), "1\u{202F}482 $");
+        assert_eq!(usd(1_000_000.0), "1\u{202F}000\u{202F}000 $");
     }
 }
