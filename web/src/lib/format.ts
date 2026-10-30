@@ -65,44 +65,6 @@ export function stateLabel(state: SessionState): string {
   }
 }
 
-export function stateTextClass(state: SessionState): string {
-  switch (state) {
-    case 'running':
-      return 'text-accent';
-    case 'complete':
-      return 'text-ok';
-    case 'stopped':
-      return 'text-muted';
-    case 'error':
-      return 'text-err';
-    case 'truncated':
-      return 'text-muted';
-    case 'idle':
-      return 'text-faint';
-    case 'waiting_for_user':
-      return 'text-accent';
-  }
-}
-
-export function stateDotClass(state: SessionState): string {
-  switch (state) {
-    case 'running':
-      return 'bg-accent';
-    case 'complete':
-      return 'bg-ok';
-    case 'stopped':
-      return 'bg-muted';
-    case 'error':
-      return 'bg-err';
-    case 'truncated':
-      return 'bg-muted';
-    case 'idle':
-      return 'bg-faint';
-    case 'waiting_for_user':
-      return 'bg-accent';
-  }
-}
-
 export function formatSpeed(tokensPerSecond: number): string {
   return `${Math.round(tokensPerSecond)} tok/s`;
 }
