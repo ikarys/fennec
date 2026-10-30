@@ -340,6 +340,14 @@ export function listFolders(path?: string): Promise<FolderListing> {
   return request<FolderListing>(`/api/folders${query}`);
 }
 
+/** Create a new project folder `name` inside `path` (an empty git repo). */
+export function createFolder(path: string, name: string): Promise<{ path: string }> {
+  return request<{ path: string }>("/api/folders/create", {
+    method: "POST",
+    body: JSON.stringify({ path, name }),
+  });
+}
+
 export function getSettings(): Promise<SettingsResponse> {
   return request<SettingsResponse>("/api/settings");
 }
