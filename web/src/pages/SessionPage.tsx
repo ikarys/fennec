@@ -13,7 +13,6 @@ import type {
   SlashCommand,
 } from "../lib/api";
 import type { AssistantItem, Segment } from "../lib/fold";
-import { filterThread, type ThreadFilter } from "../lib/threadFilter";
 import { splitContract } from "../lib/plan";
 import {
   answerWorkflow,
@@ -43,7 +42,6 @@ import { Composer } from "../components/session/Composer";
 import { RunningStrip } from "../components/session/RunningStrip";
 import { modelShortName } from "../components/session/ModelPicker";
 import { Badge } from "../components/ui/Badge";
-import { Select } from "../components/ui/Field";
 import { ContextPanel } from "../components/session/ContextPanel";
 import { ContextGauge } from "../components/session/ContextGauge";
 import { QuestionCard } from "../components/session/QuestionCard";
@@ -122,7 +120,6 @@ export function SessionPage({
   const [backlogSegment, setBacklogSegment] = useState<string | null>(null);
   const [integrationOpen, setIntegrationOpen] = useState(false);
   const [integrationVersion, setIntegrationVersion] = useState(0);
-  const [threadFilter, setThreadFilter] = useState<ThreadFilter>("all");
   const {
     view,
     hasMore,
@@ -329,7 +326,6 @@ export function SessionPage({
     setPendingMode(null);
     setPendingModel(null);
     setPreview(null);
-    setThreadFilter("all");
   }, [sessionId]);
 
   // A new-session tab has no detail yet: the server lists its default agent
@@ -374,10 +370,6 @@ export function SessionPage({
   const title =
     view.name ?? detail?.title ?? (sessionId ? "Session" : "Nouvelle session");
 
-  const shownItems = useMemo(
-    () => filterThread(view.items, threadFilter),
-    [view.items, threadFilter],
-  );
   const lastAssistant = [...view.items]
     .reverse()
     .find((item): item is AssistantItem => item.kind === "assistant");
@@ -777,28 +769,7 @@ export function SessionPage({
                         >
                           {projectName}
                         </span>
-                        {view.items.length > 0 && (
-                          <label className="ml-auto flex shrink-0 items-center gap-1.5 text-xs text-muted">
-                            Afficher
-                            <Select
-                              className="w-auto"
-                              value={threadFilter}
-                              onChange={(event) =>
-                                setThreadFilter(
-                                  event.target.value as ThreadFilter,
-                                )
-                              }
-                            >
-                              <option value="all">tout le fil</option>
-                              <option value="mine">mes messages</option>
-                              <option value="tools">les appels d’outils</option>
-                              <option value="thinking">
-                                le raisonnement du modèle
-                              </option>
-                            </Select>
-                          </label>
-                        )}
-                        <div className={view.items.length > 0 ? "" : "ml-auto"}>
+                        <div className="ml-auto">
                           <ContextGauge
                             context={context}
                             compactDisabled={
@@ -856,14 +827,7 @@ export function SessionPage({
                               Nouvelle session · écris ton premier message.
                             </div>
                           )}
-                          {threadFilter !== "all" &&
-                            shownItems.length === 0 &&
-                            view.items.length > 0 && (
-                              <div className="py-10 text-center text-sm text-muted">
-                                Rien à afficher avec ce filtre.
-                              </div>
-                            )}
-                          {shownItems.map((item, index) => (
+                          {view.items.map((item, index) => (
                             <ThreadItemView
                               key={item.id}
                               item={item}
@@ -874,7 +838,7 @@ export function SessionPage({
                               }
                               running={running}
                               showHeader={
-                                shownItems[index - 1]?.kind !== "assistant"
+                                view.items[index - 1]?.kind !== "assistant"
                               }
                               onReplay={sessionId ? handleReplay : undefined}
                             />
