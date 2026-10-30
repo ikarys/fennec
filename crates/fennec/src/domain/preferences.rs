@@ -6,8 +6,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-use crate::domain::tariff::Tariff;
-
 pub use llm_providers::{ApiKey, ModelParams, ModelPrefs, ModelRef, Provider, ReasoningEffort};
 
 /// The provider of the environment's endpoint (`FENNEC_LLM_URL`); always there,
@@ -34,8 +32,6 @@ pub struct Preferences {
     pub sandbox: SandboxPrefs,
     /// The ideas queue's caps when it runs with the human away.
     pub autonomy: AutonomyPrefs,
-    /// The reference tariff Insight's estimated cost is computed at.
-    pub tariff: Tariff,
     /// Skill ids whose instructions every new session gets in its system prompt.
     pub always_on_skills: Vec<String>,
     /// Opt-in embedded workflows (`workflows::opt_in_defaults`) the human enabled.
@@ -382,6 +378,7 @@ mod tests {
             providers: vec![local_provider(
                 "m",
                 ModelPrefs {
+                    price: None,
                     max_tokens: Some(100),
                     context_window: Some(2048),
                     compaction_threshold: Some(0.5),
@@ -467,6 +464,7 @@ mod tests {
         p.providers.push(local_provider(
             "a",
             ModelPrefs {
+                price: None,
                 max_tokens: Some(100),
                 context_window: Some(2048),
                 compaction_threshold: Some(0.5),
@@ -524,6 +522,7 @@ mod tests {
         p.providers[0].models.insert(
             "other".into(),
             ModelPrefs {
+                price: None,
                 max_tokens: Some(200),
                 context_window: Some(4096),
                 compaction_threshold: Some(0.75),
@@ -684,6 +683,7 @@ mod tests {
         models.insert(
             "m".into(),
             ModelPrefs {
+                price: None,
                 max_tokens: Some(100),
                 context_window: Some(2048),
                 compaction_threshold: Some(0.25),
@@ -975,8 +975,8 @@ mod tests {
     }
 
     #[test]
-    fn a_preferences_json_without_a_tariff_loads_the_default() {
-        let p: Preferences = serde_json::from_str("{}").unwrap();
-        assert_eq!(p.tariff, Tariff::default());
+    fn an_old_stored_tariff_is_ignored() {
+        let p: Preferences = serde_json::from_str(r#"{"tariff":{"inputPerM":1}}"#).unwrap();
+        assert!(p.providers.is_empty());
     }
 }

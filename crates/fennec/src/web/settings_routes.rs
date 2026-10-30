@@ -347,6 +347,7 @@ mod tests {
         stored.insert(
             "hand-added".to_string(),
             ModelPrefs {
+                price: None,
                 context_window: Some(200_000),
                 ..Default::default()
             },
