@@ -78,6 +78,7 @@ pub struct CardView {
 #[serde(rename_all = "camelCase")]
 pub struct DayView {
     pub day: String,
+    /// The axis label, empty on bars between labelled ones.
     pub label: String,
     /// Heights against the busiest day's input, 0 to 100, stacked: cached,
     /// then fresh (re-read neither from cache nor lost), then lost.
@@ -149,7 +150,12 @@ impl InsightData {
             .max()
             .unwrap_or(0)
             .max(1);
-        let days = days.iter().map(|row| day_view(row, max)).collect();
+        let step = days.len().div_ceil(10).max(1);
+        let days = days
+            .iter()
+            .enumerate()
+            .map(|(index, row)| day_view(row, max, index % step == 0))
+            .collect();
 
         let projects = if project.is_none() {
             let mut rows = projects;
@@ -346,7 +352,7 @@ fn consumers(breakdown: &BTreeMap<String, u64>) -> Option<CompositionView> {
     Some(composition_view(&shares, total, 0))
 }
 
-fn day_view(row: &Row, max: u64) -> DayView {
+fn day_view(row: &Row, max: u64, show_label: bool) -> DayView {
     let prompt = row.summary.prompt_tokens;
     let cached = row.summary.cached_tokens;
     let lost = row
@@ -356,6 +362,11 @@ fn day_view(row: &Row, max: u64) -> DayView {
     let fresh = prompt.saturating_sub(cached).saturating_sub(lost);
 
     let label = day_label(&row.key);
+    let axis_label = if show_label {
+        label.clone()
+    } else {
+        String::new()
+    };
     let calls = row.summary.calls;
     let input = tokens(prompt);
     let cache = percent(cached, prompt);
@@ -368,7 +379,7 @@ fn day_view(row: &Row, max: u64) -> DayView {
 
     DayView {
         day: row.key.clone(),
-        label,
+        label: axis_label,
         cached_percent: percent(cached, max),
         fresh_percent: percent(fresh, max),
         lost_percent: percent(lost, max),
@@ -591,5 +602,35 @@ mod tests {
         assert_eq!(view.parts[0].percent, 60);
         assert_eq!(view.kinds.len(), 3);
         assert!(consumers(&BTreeMap::new()).is_none());
+    }
+
+    #[test]
+    fn day_labels_are_sparse_for_many_days() {
+        let days: Vec<Row> = (0..25)
+            .map(|i| {
+                let key = format!("2026-10-{:02}", i + 1);
+                row(&key, &key, summary(1, 100, 0, 10, 0, 0, 1.0))
+            })
+            .collect();
+        let total = summary(25, 2500, 0, 250, 0, 0, 25.0);
+
+        let view = InsightData {
+            total,
+            days,
+            projects: vec![],
+            models: vec![],
+            groups: vec![],
+            project_models: BTreeMap::new(),
+        }
+        .view(None, &BTreeMap::new());
+
+        for (index, day) in view.days.iter().enumerate() {
+            assert_eq!(day.label.is_empty(), index % 3 != 0);
+            assert!(day.title.starts_with(&day_label(&day.day)));
+        }
+
+        assert_eq!(view.days[0].label, "01/10");
+        assert_eq!(view.days[3].label, "04/10");
+        assert_eq!(view.days[24].label, "25/10");
     }
 }
