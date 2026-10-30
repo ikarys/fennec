@@ -17,6 +17,7 @@ mod insight;
 mod integration;
 mod model_routes;
 mod model_view;
+mod notice_stream;
 mod notifier;
 mod preview;
 mod pricing;

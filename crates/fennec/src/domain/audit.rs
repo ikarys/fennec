@@ -2,7 +2,39 @@
 
 use serde::Serialize;
 
+use crate::domain::event::{Event, Role};
+
 pub const MAX_TASK_CHARS: usize = 4_000;
+
+/// Finding numbers already turned into tasks since the last assistant answer.
+///
+/// A later assistant answer starts a new audit report, so only creations after
+/// the last assistant message refer to the report the UI is looking at.
+pub fn taken(events: &[Event]) -> Vec<u32> {
+    let mut last_assistant = None;
+    for (index, event) in events.iter().enumerate() {
+        if matches!(
+            event,
+            Event::MessageStart {
+                role: Role::Assistant,
+                ..
+            }
+        ) {
+            last_assistant = Some(index);
+        }
+    }
+    let mut numbers = Vec::new();
+    if let Some(start) = last_assistant {
+        for event in &events[start + 1..] {
+            if let Event::AuditTasksCreated { findings, .. } = event {
+                numbers.extend(findings.iter().copied());
+            }
+        }
+    }
+    numbers.sort_unstable();
+    numbers.dedup();
+    numbers
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -259,6 +291,57 @@ fn severity_word(severity: Severity) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn assistant_message(id: &str) -> Event {
+        serde_json::from_value(serde_json::json!({
+            "type": "message.start",
+            "data": { "messageId": id, "role": "assistant" }
+        }))
+        .unwrap()
+    }
+
+    fn audit_tasks_created(findings: Vec<u32>, idea_ids: Vec<&str>) -> Event {
+        serde_json::from_value(serde_json::json!({
+            "type": "audit.tasks_created",
+            "data": { "findings": findings, "ideaIds": idea_ids }
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn taken_is_empty_without_creations() {
+        let events = vec![assistant_message("m1")];
+        assert!(taken(&events).is_empty());
+    }
+
+    #[test]
+    fn taken_after_the_report() {
+        let events = vec![
+            assistant_message("m1"),
+            audit_tasks_created(vec![2, 1], vec!["a", "b"]),
+        ];
+        assert_eq!(taken(&events), vec![1, 2]);
+    }
+
+    #[test]
+    fn a_report_after_the_creation_resets_taken() {
+        let events = vec![
+            assistant_message("m1"),
+            audit_tasks_created(vec![1], vec!["a"]),
+            assistant_message("m2"),
+        ];
+        assert!(taken(&events).is_empty());
+    }
+
+    #[test]
+    fn two_creations_are_merged() {
+        let events = vec![
+            assistant_message("m1"),
+            audit_tasks_created(vec![1, 2], vec!["a", "b"]),
+            audit_tasks_created(vec![2, 3], vec!["b", "c"]),
+        ];
+        assert_eq!(taken(&events), vec![1, 2, 3]);
+    }
 
     #[test]
     fn parses_full_report_with_two_findings() {

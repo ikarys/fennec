@@ -225,14 +225,6 @@ export function SessionPage({
     // a turn ends, not only on a reload.
     if (previousRunning.current && !running) {
       setDetailVersion((version) => version + 1);
-      // The notice only fires while this page is open; a global one needs a
-      // server-wide stream.
-      if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
-        new Notification(view.name ?? detail?.title ?? 'fennec', {
-          body: 'Tour terminé : à toi de relire.',
-          tag: sessionId ?? undefined,
-        });
-      }
     }
     previousRunning.current = running;
   }, [running]);
@@ -921,6 +913,7 @@ export function SessionPage({
                               audit={detail.audit}
                               sessionId={sessionId}
                               projectId={detail.project.id ?? null}
+                              onCreated={() => setDetailVersion((version) => version + 1)}
                             />
                           ) : null}
                         </div>

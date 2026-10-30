@@ -418,6 +418,12 @@ pub enum Event {
         #[serde(default)]
         protected_tests: Vec<String>,
     },
+    /// The human turned audit findings into backlog ideas (fennec's own event).
+    #[serde(rename = "audit.tasks_created", rename_all = "camelCase")]
+    AuditTasksCreated {
+        findings: Vec<u32>,
+        idea_ids: Vec<String>,
+    },
     /// The human discarded the session's worktree and branch (fennec's own event).
     #[serde(rename = "worktree.discarded", rename_all = "camelCase")]
     WorktreeDiscarded {
@@ -462,6 +468,7 @@ impl Event {
             Event::DecisionRecorded { .. } => "decision.recorded",
             Event::CriterionUpdated { .. } => "criterion.updated",
             Event::IntegrationApplied { .. } => "integration.applied",
+            Event::AuditTasksCreated { .. } => "audit.tasks_created",
             Event::WorktreeDiscarded { .. } => "worktree.discarded",
         }
     }
