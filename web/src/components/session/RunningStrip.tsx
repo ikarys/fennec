@@ -1,6 +1,5 @@
 import type { RunView } from "../../lib/workflowRun";
 import { Button } from "../ui/Button";
-import { ChevronDownIcon } from "../Icons";
 
 /** Above the composer, where the eyes are during a run: says a turn is going on, and which node;
  * holds the auto-scroll switch. */
@@ -40,10 +39,9 @@ export function RunningStrip({
       )}
       <Button
         variant={following ? "secondary" : "ghost"}
-        iconOnly
-        className="ml-auto"
+        size="sm"
+        className="ml-auto shrink-0 tabular-nums"
         aria-pressed={following}
-        aria-label="Défilement auto"
         title={
           following
             ? "Défilement auto activé : le fil suit l'agent. Cliquer pour le couper."
@@ -51,7 +49,7 @@ export function RunningStrip({
         }
         onClick={() => onFollowChange(!following)}
       >
-        <ChevronDownIcon className="h-4 w-4" />
+        Autoscroll : <span className={following ? "text-accent" : ""}>{following ? "ON" : "OFF"}</span>
       </Button>
     </div>
   );
