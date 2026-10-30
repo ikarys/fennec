@@ -242,6 +242,8 @@ export interface SessionDetail {
   };
   /** The idea this session frames, or null. */
   idea: { id: string; state: "inbox" | "framing" | "ready" } | null;
+  /** The first message the human typed, verbatim, or null. */
+  request: string | null;
 }
 
 export class WorkflowSaveError extends Error {
