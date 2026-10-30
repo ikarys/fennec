@@ -10,6 +10,7 @@ import { InsightPage } from './pages/InsightPage';
 import { Palette } from './components/Palette';
 import { ProjectDialog } from './components/project/ProjectDialog';
 import { DisplayPrefsProvider, defaultDisplayPrefs } from './lib/display';
+import { useTurnNotices } from './hooks/useTurnNotices';
 
 const WorkflowsPage = lazy(() => import('./pages/WorkflowsPage'));
 const ProjectPage = lazy(() => import('./pages/ProjectPage'));
@@ -98,6 +99,7 @@ function loadActiveTab(): string | null {
 }
 
 export default function App() {
+  useTurnNotices();
   const [route, setRoute] = useState<Route>(() => parseRoute());
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);

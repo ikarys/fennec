@@ -19,7 +19,7 @@ use crate::skills;
 use crate::store::SqliteStore;
 use crate::tools::{LocalTools, Sandbox};
 use crate::worktree::{self, Worktree};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -71,6 +71,11 @@ impl Turns {
 
     pub fn is_running(&self, session_id: &str) -> bool {
         self.running.lock().unwrap().contains_key(session_id)
+    }
+
+    /// A copy of the running map's keys, for the server-wide notice stream.
+    pub fn running_ids(&self) -> HashSet<String> {
+        self.running.lock().unwrap().keys().cloned().collect()
     }
 
     pub fn stop(&self, session_id: &str) {
