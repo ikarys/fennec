@@ -52,6 +52,39 @@ pub fn home() -> PathBuf {
     std::env::var_os("HOME").map_or_else(|| PathBuf::from("/"), PathBuf::from)
 }
 
+/// A new project directory `base/name`: an empty git repository with a first
+/// empty commit, ready for fennec's worktree-based integration. `name` is a
+/// single level: no `/`, not starting with `.`, and not taken.
+pub fn create(base: &Path, name: &str) -> Result<PathBuf, String> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Err("empty name".into());
+    }
+    if name.contains('/') || name.contains(std::path::MAIN_SEPARATOR) {
+        return Err("a name without a separator".into());
+    }
+    if name.starts_with('.') {
+        return Err("a name not starting with .".into());
+    }
+    let base = base
+        .canonicalize()
+        .map_err(|e| format!("{}: {e}", base.display()))?;
+    let path = base.join(name);
+    if path.exists() {
+        return Err(format!("{}: already exists", path.display()));
+    }
+    std::fs::create_dir(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+    // A missing git identity leaves the folder created but uncommitted; the
+    // project stays openable either way.
+    crate::worktree::git(&path, &["init", "-q"], None).map_err(|e| format!("git init: {e}"))?;
+    let _ = crate::worktree::git(
+        &path,
+        &["commit", "--allow-empty", "-q", "-m", "fennec: initial"],
+        None,
+    );
+    Ok(path)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -86,6 +119,27 @@ mod tests {
                 .and_then(|p| p.to_str())
         );
         assert!(list(&root.join("missing")).is_err());
+        std::fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn create_makes_a_new_git_repo_and_rejects_bad_names() {
+        let root = std::env::temp_dir().join(format!(
+            "fennec-folders-create-{}",
+            crate::domain::id::new_id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+
+        let created = create(&root, "proj").unwrap();
+        assert_eq!(created, root.join("proj"));
+        assert!(created.is_dir());
+        assert!(created.join(".git").exists());
+
+        assert!(create(&root, "proj").is_err());
+        assert!(create(&root, "").is_err());
+        assert!(create(&root, "a/b").is_err());
+        assert!(create(&root, ".hidden").is_err());
+
         std::fs::remove_dir_all(root).ok();
     }
 }

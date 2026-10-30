@@ -6,7 +6,7 @@ import {
   type ChangeEvent,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
-import { listFolders, type FolderListing } from '../../lib/api';
+import { createFolder, listFolders, type FolderListing } from '../../lib/api';
 import { CloseIcon } from '../Icons';
 import { FolderList } from './FolderList';
 import { PathBreadcrumb } from './PathBreadcrumb';
@@ -30,6 +30,9 @@ export function ProjectDialog({ open, submitting, error, onClose, onSubmit }: Pr
   const [showHidden, setShowHidden] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [newName, setNewName] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const requestRef = useRef(0);
 
   const load = useCallback(async (target?: string) => {
@@ -60,6 +63,9 @@ export function ProjectDialog({ open, submitting, error, onClose, onSubmit }: Pr
     setSelectedPath(null);
     setShowHidden(false);
     setLoadError(null);
+    setNewName('');
+    setCreateError(null);
+    setCreating(false);
     setLoading(true);
     load();
 
@@ -79,6 +85,25 @@ export function ProjectDialog({ open, submitting, error, onClose, onSubmit }: Pr
 
   const navigateTo = (path: string) => {
     load(path);
+  };
+
+  const handleCreate = async () => {
+    if (creating) return;
+    const name = newName.trim();
+    if (!currentPath || !name) return;
+    setCreating(true);
+    setCreateError(null);
+    try {
+      const created = await createFolder(currentPath, name);
+      // onSubmit never throws (it owns its error state): awaiting it keeps
+      // `creating` true through the open, so a failure there re-enables the
+      // button instead of a stray double-create.
+      await onSubmit(created.path);
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : 'Impossible de créer le dossier');
+    } finally {
+      setCreating(false);
+    }
   };
 
   const handlePathKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
@@ -162,6 +187,33 @@ export function ProjectDialog({ open, submitting, error, onClose, onSubmit }: Pr
             onSelect={setSelectedPath}
             onOpen={navigateTo}
           />
+
+          <div className="mt-3 flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <label htmlFor="project-dialog-new-name" className="shrink-0 text-sm text-muted">
+                Nouveau projet
+              </label>
+              <TextInput
+                id="project-dialog-new-name"
+                value={newName}
+                onChange={(event) => setNewName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') handleCreate();
+                }}
+                placeholder="Nom du dossier"
+                className="min-w-0 flex-1"
+              />
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={creating || !currentPath || newName.trim().length === 0}
+                onClick={handleCreate}
+              >
+                {creating ? 'Création…' : 'Créer et ouvrir'}
+              </Button>
+            </div>
+            {createError && <div className="text-sm text-err">{createError}</div>}
+          </div>
         </div>
 
         <footer className="flex shrink-0 flex-col gap-3 border-t border-border p-4">
