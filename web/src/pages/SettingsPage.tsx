@@ -143,9 +143,7 @@ function toForm(preferences: Preferences, listings: ProviderListing[]): Settings
         reasoningEffort: prefs.reasoningEffort ?? ''
       };
     }
-  }
-
-  return {
+  }  return {
     model: preferences.selected ? `${preferences.selected.provider}/${preferences.selected.model}` : '',
     favorites: preferences.favorites ?? [],
     providers: providerForms,
@@ -321,6 +319,34 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
     );
   }
 
+  /** Adds a model by hand: an entry with no listed source, saved as an override. */
+  function addModel(providerId: string, modelId: string) {
+    markDirty();
+    setForm((previous) => {
+      if (!previous) return previous;
+      const key = `${providerId}/${modelId}`;
+      if (key in previous.models) return previous;
+      return { ...previous, models: { ...previous.models, [key]: emptyModelForm } };
+    });
+  }
+
+  /** Removes a hand-added model: its entry and everything that pointed at it. */
+  function removeModel(providerId: string, modelId: string) {
+    markDirty();
+    setForm((previous) => {
+      if (!previous) return previous;
+      const key = `${providerId}/${modelId}`;
+      const models = { ...previous.models };
+      delete models[key];
+      const favorites = previous.favorites.filter(
+        (favorite) => !(favorite.provider === providerId && favorite.model === modelId)
+      );
+      const model =
+        previous.model === key ? '' : previous.model;
+      return { ...previous, models, favorites, model };
+    });
+  }
+
   function removeProvider(index: number) {
     markDirty();
     setForm((previous) => {
@@ -460,6 +486,7 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
                   onAdd={addProvider}
                   onRemove={removeProvider}
                   onFetch={handleFetch}
+                  onAddModel={addModel}
                 />
                 <ModelPrefsSection
                   listings={settings.listings}
@@ -468,6 +495,7 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
                   favorites={form.favorites}
                   onToggleFavorite={toggleFavorite}
                   onChange={updateModelField}
+                  onRemoveModel={removeModel}
                 />
               </>
             )}
