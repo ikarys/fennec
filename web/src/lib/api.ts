@@ -626,6 +626,8 @@ export interface IntegrationPreview {
   /** Recorded by the agent: indicative, never a blocker. */
   decisions: DecisionView[];
   blockers: Blocker[];
+  /** The session's idea the human may finish here, or null. */
+  idea: { projectId: string; id: string } | null;
   /** A starting commit message (feat: <session title>); the human edits it. */
   defaultMessage: string;
 }
