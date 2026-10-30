@@ -4,7 +4,7 @@ import { useDisplayPrefs } from '../../lib/display';
 import { formatDuration } from '../../lib/format';
 import { previewKindOfPath, relativeToWorkdir } from '../../lib/preview';
 import { usePreviewOpener, usePreviewWorkdir } from '../preview/PreviewContext';
-import { EditIcon, FileIcon, SearchIcon, SpinnerIcon, TerminalIcon } from '../Icons';
+import { EditIcon, EyeIcon, FileIcon, SearchIcon, SpinnerIcon, TerminalIcon } from '../Icons';
 import { toolAnchorId } from '../../lib/vision';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -85,13 +85,16 @@ export function ToolCard({ tool }: { tool: ToolCallView }) {
             type="button"
             variant="ghost"
             size="sm"
+            iconOnly
             onClick={(event) => {
               event.stopPropagation();
               opener({ path: previewRelative, kind: previewKind });
             }}
             className="shrink-0"
+            title="Aperçu"
+            aria-label="Aperçu"
           >
-            Aperçu
+            <EyeIcon className="h-4 w-4" />
           </Button>
         )}
         {tool.name === 'edit_file' && (

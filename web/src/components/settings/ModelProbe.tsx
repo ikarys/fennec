@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { probeModel, type LimitSource, type ProbedModel } from '../../lib/api';
 import { Button } from '../ui/Button';
+import { SpinnerIcon, WandIcon } from '../Icons';
 import type { ModelForm } from './ModelPrefsSection';
 
 const SOURCE_LABELS: Record<LimitSource, string> = { endpoint: 'endpoint', catalog: 'catalogue' };
@@ -63,11 +64,13 @@ export function ModelProbe({
       <Button
         variant="secondary"
         size="sm"
+        iconOnly
         disabled={busy}
-        title="Quelques appels d'un token au modèle (endpoint enregistré) : efforts acceptés, limites nommées par l'endpoint, sinon le catalogue des familles connues"
+        aria-label="Auto"
+        title={busy ? 'Sondage…' : "Quelques appels d'un token au modèle (endpoint enregistré) : efforts acceptés, limites nommées par l'endpoint, sinon le catalogue des familles connues"}
         onClick={() => void probe()}
       >
-        {busy ? 'Sondage…' : 'Auto'}
+        {busy ? <SpinnerIcon className="h-4 w-4" /> : <WandIcon className="h-4 w-4" />}
       </Button>
       {message && (
         <span className={`text-xs ${message.failed ? 'text-err' : 'text-muted'}`}>

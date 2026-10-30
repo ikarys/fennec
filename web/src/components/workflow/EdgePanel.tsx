@@ -1,5 +1,6 @@
 import type { WorkflowEdge, WorkflowIssue } from '../../lib/workflow';
 import { Button } from '../ui/Button';
+import { TrashIcon } from '../Icons';
 import { FieldRow, TextInput } from '../ui/Field';
 
 interface EdgePanelProps {
@@ -64,8 +65,17 @@ export function EdgePanel({ edge, issues, onChange, onDelete }: EdgePanelProps) 
         </div>
       )}
 
-      <Button variant="danger" size="sm" type="button" onClick={onDelete} className="mt-2 self-start">
-        Supprimer le lien
+      <Button
+        variant="danger"
+        size="sm"
+        type="button"
+        iconOnly
+        onClick={onDelete}
+        aria-label="Supprimer le lien"
+        title="Supprimer le lien"
+        className="mt-2 self-start"
+      >
+        <TrashIcon className="h-4 w-4" />
       </Button>
     </div>
   );
