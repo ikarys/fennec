@@ -859,8 +859,14 @@ export interface ModuleMap {
 /** The committed `docs/map.md` against the map of the code as it is. */
 export type MapFileState = "missing" | "stale" | "current";
 
+/** A project's documentation file, read from disk (verified). */
+export interface DocFile {
+  path: string;
+  name: string;
+  content: string;
+}
+
 export interface ProjectOverview {
-  adrs: Adr[];
   map: ModuleMap;
   mapFile: MapFileState;
 }
@@ -870,6 +876,15 @@ export function getProjectOverview(
 ): Promise<ProjectOverview> {
   return request<ProjectOverview>(
     `/api/projects/${encodeURIComponent(projectId)}/overview`,
+  );
+}
+
+/** The project's documentation: its markdown files and its ADRs (verified). */
+export function getProjectDocs(
+  projectId: string,
+): Promise<{ files: DocFile[]; adrs: Adr[] }> {
+  return request<{ files: DocFile[]; adrs: Adr[] }>(
+    `/api/projects/${encodeURIComponent(projectId)}/docs`,
   );
 }
 
