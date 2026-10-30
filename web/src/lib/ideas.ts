@@ -54,6 +54,19 @@ export async function addIdea(projectId: string, text: string): Promise<IdeaBoar
   });
 }
 
+/** A plan written outside the backlog joins it as a ready idea of its session. */
+export async function addPlannedIdea(
+  projectId: string,
+  text: string,
+  sessionId: string,
+  plan: string,
+): Promise<IdeaBoard> {
+  return boardRequest(projectId, '/ideas', {
+    method: 'POST',
+    body: JSON.stringify({ text, sessionId, plan }),
+  });
+}
+
 export async function frameIdea(
   projectId: string,
   ideaId: string,

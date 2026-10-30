@@ -154,11 +154,11 @@ export function PlanCard({ plan, actions }: { plan: Plan; actions?: PlanActions 
               variant="secondary"
               size="sm"
               onClick={actions.ideaReady.onMark}
-              disabled={actions.disabled}
+              disabled={actions.disabled || actions.ideaReady.idea === 'saved'}
               className="ml-auto"
-              title="Garde ce plan sur l'idée, dans le backlog du projet, sans le lancer maintenant."
+              title="Garde ce plan dans le backlog du projet, sans le lancer maintenant."
             >
-              {actions.ideaReady.already ? "Mettre à jour l'idée" : 'Idée prête'}
+              {IDEA_LABELS[actions.ideaReady.idea]}
             </Button>
           )}
           <Button
@@ -276,3 +276,10 @@ export function ReportCard({ report }: { report: Report }) {
     </Card>
   );
 }
+
+const IDEA_LABELS = {
+  none: 'Mettre au backlog',
+  framing: 'Idée prête',
+  ready: "Mettre à jour l'idée",
+  saved: 'Dans le backlog ✓',
+} as const;
