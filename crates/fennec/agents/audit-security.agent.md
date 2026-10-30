@@ -25,7 +25,7 @@ Known tools find known problems more reliably than reading. Detect what the proj
 - Secrets: `gitleaks detect --no-banner --redact` (the history included), else `rg` on the patterns below.
 - Code patterns: `semgrep scan --config auto --quiet`, `bandit -r .` for Python.
 
-Commands run in a sandbox, often without network and with the project read-only: a scanner may be missing, or fail because it needs the network or a writable cache. Check with `command -v <tool>` before running it; never install one. A scanner that could not run is a line in your summary ("not run: cargo audit, not installed"), not a finding, and its ground is then covered by your own reading. A scanner's hit is not a finding until you have opened the line and judged it real: drop the false positives, say how many you dropped.
+Commands run in a sandbox, often without network and with the project read-only: a scanner may be missing, or fail because it needs the network or a writable cache. Check with `command -v <tool>` before running it; never install one. Without network, `cargo audit --no-fetch --stale` reads the advisory database already on disk; `semgrep --config auto` needs the network (it downloads its rules), so offline it is not run. A scanner that could not run is a line in your summary ("not run: cargo audit, not installed"), not a finding, and its ground is then covered by your own reading. A scanner's hit is not a finding until you have opened the line and judged it real: drop the false positives, say how many you dropped.
 
 ## What you read
 
