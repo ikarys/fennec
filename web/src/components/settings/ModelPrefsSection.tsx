@@ -1,6 +1,9 @@
+import { useState } from 'react';
 import type { ModelRef, ParamSource, ProviderListing, ReasoningEffort, SettingsDefaults } from '../../lib/api';
+import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Section } from '../ui/Section';
+import { ChevronRightIcon } from '../Icons';
 import { FieldRow, Select, TextInput } from '../ui/Field';
 
 export interface ModelForm {
@@ -17,6 +20,7 @@ interface ModelPrefsSectionProps {
   favorites: ModelRef[];
   onToggleFavorite: (ref: ModelRef) => void;
   onChange: (key: string, field: keyof ModelForm, value: string) => void;
+  onRemoveModel: (providerId: string, modelId: string) => void;
 }
 
 const REASONING_EFFORTS: ReasoningEffort[] = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
@@ -42,7 +46,7 @@ function ResolvedRow({
   return (
     <div className="flex items-center gap-2 text-xs">
       <span className="w-24 shrink-0 text-muted">{label}</span>
-      <span className="font-mono">{value}</span>
+      <span className="font-mono tabular-nums">{value}</span>
       <span className="text-faint">({SOURCE_LABELS[source]})</span>
       <span className={`ml-auto ${badge === 'envoyé' ? 'text-ok' : 'text-faint'}`}>{badge}</span>
     </div>
@@ -53,136 +57,187 @@ export function percentFromFraction(fraction: number): string {
   return String(Number((fraction * 100).toFixed(2)));
 }
 
-export function ModelPrefsSection({ listings, values, defaults, favorites, onToggleFavorite, onChange }: ModelPrefsSectionProps) {
+/** The compact line of a model row: what its turn runs with, at a glance. */
+function summary(value: ModelForm, model: ProviderListing['models'][number], defaults: SettingsDefaults): string {
+  const parts: string[] = [];
+  const window = value.contextWindow !== '' ? value.contextWindow : String(model.resolved.contextWindow.value);
+  parts.push(`ctx ${window}`);
+  const max = value.maxTokens !== '' ? value.maxTokens : String(model.resolved.maxTokens.value);
+  parts.push(`max ${max}`);
+  const effort =
+    value.reasoningEffort !== ''
+      ? value.reasoningEffort
+      : (model.resolved.reasoningEffort.value ?? `défaut ${defaults.reasoningEffort ?? '—'}`);
+  parts.push(`effort ${effort}`);
+  return parts.join(' · ');
+}
+
+export function ModelPrefsSection({ listings, values, defaults, favorites, onToggleFavorite, onChange, onRemoveModel }: ModelPrefsSectionProps) {
+  // A model with saved overrides opens by itself: that is what the human came to edit.
+  const hasOverrides = (key: string) => {
+    const value = values[key];
+    return value != null && (value.maxTokens !== '' || value.contextWindow !== '' || value.compactionThreshold !== '' || value.reasoningEffort !== '');
+  };
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+  const isOpen = (key: string) => open[key] ?? hasOverrides(key);
+
   return (
     <Section>
-      <div className="flex flex-col gap-4">
-        <h2 className="text-sm font-semibold">Paramètres par modèle</h2>
-        {listings.length === 0 && <p className="text-sm text-muted">Aucun modèle listé.</p>}
+      <h2 className="text-sm font-semibold">Paramètres par modèle</h2>
+      {listings.length === 0 && <p className="m-0 text-sm text-muted">Aucun modèle listé.</p>}
+      <div className="flex flex-col">
         {listings.map((listing) => (
-          <div key={listing.provider} className="flex flex-col gap-4 border-t border-border pt-4">
-            <h3 className="font-mono text-sm font-medium">{listing.name}</h3>
-            {listing.models.length === 0 && <p className="text-sm text-muted">Aucun modèle listé.</p>}
+          <div key={listing.provider} className="border-t border-border first:border-t-0">
+            <p className="m-0 py-1 font-mono text-xs font-medium text-muted">{listing.name}</p>
+            {listing.models.length === 0 && <p className="m-0 pb-2 text-xs text-faint">Aucun modèle listé.</p>}
             {listing.models.map((model) => {
-              const key = `${listing.provider}/${model.id}`;
-              const value =
-                values[key] ?? { maxTokens: '', contextWindow: '', compactionThreshold: '', reasoningEffort: '' };
-              const isFavorite = favorites.some(
-                (favorite) => favorite.provider === listing.provider && favorite.model === model.id
-              );
-              return (
-                <div key={key} className="flex flex-col gap-4">
-                  <div className="flex items-center gap-2">
-                    <h3 className="min-w-0 truncate font-mono text-sm font-medium">{model.id}</h3>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      iconOnly
-                      aria-label="Afficher dans le composer"
-                      title={isFavorite ? 'Retirer des favoris' : 'Afficher dans le composer'}
-                      onClick={() => onToggleFavorite({ provider: listing.provider, model: model.id })}
-                      className="ml-auto"
-                    >
-                      {isFavorite ? '★' : '☆'}
-                    </Button>
-                  </div>
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <FieldRow label="Tokens max par réponse">
-                      <TextInput
-                        type="number"
-                        min={1}
-                        step={1}
-                        value={value.maxTokens}
-                        placeholder={String(defaults.maxTokens)}
-                        onChange={(event) => onChange(key, 'maxTokens', event.target.value)}
-                        className="w-full"
-                      />
-                    </FieldRow>
-                    <FieldRow label="Fenêtre de contexte">
-                      <TextInput
-                        type="number"
-                        min={1024}
-                        step={1}
-                        value={value.contextWindow}
-                        placeholder={String(model.contextWindow ?? defaults.contextWindow)}
-                        onChange={(event) => onChange(key, 'contextWindow', event.target.value)}
-                        className="w-full"
-                      />
-                    </FieldRow>
-                    <FieldRow label="Compaction à (%)" hint="0 désactive la compaction automatique.">
-                      <TextInput
-                        type="number"
-                        min={0}
-                        max={100}
-                        step={1}
-                        value={value.compactionThreshold}
-                        placeholder={percentFromFraction(defaults.compactAt)}
-                        onChange={(event) => onChange(key, 'compactionThreshold', event.target.value)}
-                        className="w-full"
-                      />
-                    </FieldRow>
-                    <FieldRow label="Effort de réflexion">
-                      <Select
-                        value={value.reasoningEffort}
-                        onChange={(event) => onChange(key, 'reasoningEffort', event.target.value)}
-                        className="w-full"
+                const key = `${listing.provider}/${model.id}`;
+                const value =
+                  values[key] ?? { maxTokens: '', contextWindow: '', compactionThreshold: '', reasoningEffort: '' };
+                const isFavorite = favorites.some(
+                  (favorite) => favorite.provider === listing.provider && favorite.model === model.id
+                );
+                const open = isOpen(key);
+                return (
+                  <div key={key} className="flex flex-col border-t border-border/60 first:border-t-0">
+                    <div className="flex h-8 items-center gap-2">
+                      <button
+                        type="button"
+                        aria-expanded={open}
+                        onClick={() => setOpen((previous) => ({ ...previous, [key]: !open }))}
+                        className="flex min-w-0 flex-1 items-center gap-2 text-left"
                       >
-                        <option value="">Auto (sans effort)</option>
-                        {REASONING_EFFORTS.map((effort) => (
-                          <option key={effort} value={effort}>
-                            {effort}
-                          </option>
-                        ))}
-                      </Select>
-                    </FieldRow>
-                  </div>
-
-                  <div className="flex flex-col gap-1.5 border-l border-border pl-3">
-                    <div>
-                      <p className="m-0 text-xs font-medium text-muted">
-                        Envoyé au modèle
-                      </p>
-                      <p className="m-0 text-[0.6875rem] text-faint">
-                        Valeurs enregistrées — enregistrer pour appliquer les modifications ci-dessus.
-                      </p>
-                    </div>
-                    <ResolvedRow
-                      label="Tokens max"
-                      value={String(model.resolved.maxTokens.value)}
-                      source={model.resolved.maxTokens.source}
-                      badge={model.resolved.maxTokens.wire ? 'envoyé' : 'local'}
-                    />
-                    <ResolvedRow
-                      label="Contexte"
-                      value={String(model.resolved.contextWindow.value)}
-                      source={model.resolved.contextWindow.source}
-                      badge="local"
-                    />
-                    <ResolvedRow
-                      label="Compaction"
-                      value={`${percentFromFraction(model.resolved.compactAt.value)} %`}
-                      source={model.resolved.compactAt.source}
-                      badge="local"
-                    />
-                    <ResolvedRow
-                      label="Effort"
-                      value={model.resolved.reasoningEffort.value ?? '—'}
-                      source={model.resolved.reasoningEffort.source}
-                      badge={model.resolved.reasoningEffort.value ? 'envoyé' : 'non envoyé'}
-                    />
-                    {model.resolved.contextWindow.source === 'listed' && (
+                        <ChevronRightIcon
+                          className={`h-3 w-3 shrink-0 text-muted transition-transform ${open ? 'rotate-90' : ''}`}
+                        />
+                        <span className="min-w-0 truncate font-mono text-xs">{model.id}</span>
+                        {model.manual && <Badge tone="neutral">manuel</Badge>}
+                        <span className="shrink-0 text-xs text-faint tabular-nums">
+                          {summary(value, model, defaults)}
+                        </span>                      </button>
                       <Button
-                        variant="secondary"
+                        variant="ghost"
                         size="sm"
-                        className="mt-1 self-start"
-                        onClick={() => onChange(key, 'contextWindow', String(model.resolved.contextWindow.value))}
+                        iconOnly
+                        aria-label="Afficher dans le composer"
+                        title={isFavorite ? 'Retirer des favoris' : 'Afficher dans le composer'}
+                        onClick={() => onToggleFavorite({ provider: listing.provider, model: model.id })}
                       >
-                        Figer la fenêtre de contexte
+                        {isFavorite ? '★' : '☆'}
                       </Button>
+                      {model.manual && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          iconOnly
+                          aria-label="Retirer le modèle"
+                          title="Retirer ce modèle manuel"
+                          onClick={() => onRemoveModel(listing.provider, model.id)}
+                        >
+                          ×
+                        </Button>
+                      )}
+                    </div>
+
+                    {open && (
+                      <div className="flex flex-col gap-3 pb-3 pl-5">
+                        <div className="grid gap-2 md:grid-cols-2">
+                          <FieldRow label="Tokens max par réponse">
+                            <TextInput
+                              type="number"
+                              min={1}
+                              step={1}
+                              value={value.maxTokens}
+                              placeholder={String(defaults.maxTokens)}
+                              onChange={(event) => onChange(key, 'maxTokens', event.target.value)}
+                              className="w-full"
+                            />
+                          </FieldRow>
+                          <FieldRow label="Fenêtre de contexte">
+                            <TextInput
+                              type="number"
+                              min={1024}
+                              step={1}
+                              value={value.contextWindow}
+                              placeholder={String(model.contextWindow ?? defaults.contextWindow)}
+                              onChange={(event) => onChange(key, 'contextWindow', event.target.value)}
+                              className="w-full"
+                            />
+                          </FieldRow>
+                          <FieldRow label="Compaction à (%)" hint="0 désactive la compaction automatique.">
+                            <TextInput
+                              type="number"
+                              min={0}
+                              max={100}
+                              step={1}
+                              value={value.compactionThreshold}
+                              placeholder={percentFromFraction(defaults.compactAt)}
+                              onChange={(event) => onChange(key, 'compactionThreshold', event.target.value)}
+                              className="w-full"
+                            />
+                          </FieldRow>
+                          <FieldRow label="Effort de réflexion">
+                            <Select
+                              value={value.reasoningEffort}
+                              onChange={(event) => onChange(key, 'reasoningEffort', event.target.value)}
+                              className="w-full"
+                            >
+                              <option value="">Auto (sans effort)</option>
+                              {REASONING_EFFORTS.map((effort) => (
+                                <option key={effort} value={effort}>
+                                  {effort}
+                                </option>
+                              ))}
+                            </Select>
+                          </FieldRow>
+                        </div>
+
+                        <div className="flex flex-col gap-1.5 border-l border-border pl-3">
+                          <p className="m-0 text-xs font-medium text-muted">
+                            Envoyé au modèle{' '}
+                            <span className="font-normal text-faint">
+                              — valeurs enregistrées, « Enregistrer » pour appliquer
+                            </span>
+                          </p>
+                          <ResolvedRow
+                            label="Tokens max"
+                            value={String(model.resolved.maxTokens.value)}
+                            source={model.resolved.maxTokens.source}
+                            badge={model.resolved.maxTokens.wire ? 'envoyé' : 'local'}
+                          />
+                          <ResolvedRow
+                            label="Contexte"
+                            value={String(model.resolved.contextWindow.value)}
+                            source={model.resolved.contextWindow.source}
+                            badge="local"
+                          />
+                          <ResolvedRow
+                            label="Compaction"
+                            value={`${percentFromFraction(model.resolved.compactAt.value)} %`}
+                            source={model.resolved.compactAt.source}
+                            badge="local"
+                          />
+                          <ResolvedRow
+                            label="Effort"
+                            value={model.resolved.reasoningEffort.value ?? '—'}
+                            source={model.resolved.reasoningEffort.source}
+                            badge={model.resolved.reasoningEffort.wire ? 'envoyé' : 'non envoyé'}
+                          />
+                          {model.resolved.contextWindow.source === 'listed' && (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="mt-1 self-start"
+                              onClick={() => onChange(key, 'contextWindow', String(model.resolved.contextWindow.value))}
+                            >
+                              Figer la fenêtre de contexte
+                            </Button>
+                          )}
+                        </div>
+                      </div>
                     )}
                   </div>
-                </div>
-              );
+                );
             })}
           </div>
         ))}
@@ -190,3 +245,4 @@ export function ModelPrefsSection({ listings, values, defaults, favorites, onTog
     </Section>
   );
 }
+

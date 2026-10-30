@@ -157,6 +157,8 @@ export interface SettingsModel {
   id: string;
   contextWindow: number | null;
   resolved: ResolvedParams;
+  /** Added by hand: stored with no listing (the endpoint has no /models route). */
+  manual?: boolean;
 }
 
 /** What one provider lists now, with the URL it is reached at. */
