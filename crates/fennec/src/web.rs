@@ -18,6 +18,7 @@ mod model_routes;
 mod model_view;
 mod notifier;
 mod preview;
+mod pricing;
 mod project_routes;
 mod routes;
 mod session_delete;
