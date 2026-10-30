@@ -232,7 +232,7 @@ read-only. The human edits them as usual.
   out; `state` `inbox | framing | ready | started`, `sessionId` the framing session, `plan` the approved plan verbatim,
   `sessionState` the session's state (as in `/api/projects`) for a started idea, else null; `halted` why the night mode
   stopped or skipped it (`idea.halted`), cleared by a new plan or a new start, else null; `report` for a started idea
-  `{criteria: {passed, failed, pending}, decisions: [{title, choice}]}` from its session's current run, else null;
+  `{integrated, criteria: {passed, failed, pending}, decisions: [{title, choice}]}` (`integrated`: the session has an `integration.applied`) from its session's current run, else null;
   `queueRunning` whether the project's queue runs. 404 if no project.
   Every write below answers the same fresh board; 404 if no project or no such idea:
   - `POST /api/projects/{id}/ideas` `{text, sessionId?, plan?}` (`idea.added`; 400 if empty or over 4000 characters);
