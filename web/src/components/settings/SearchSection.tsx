@@ -1,4 +1,4 @@
-import { Card } from '../ui/Card';
+import { Section } from '../ui/Section';
 import { FieldRow, TextInput } from '../ui/Field';
 
 export interface SearchForm {
@@ -9,7 +9,7 @@ export interface SearchForm {
 
 export function SearchSection({ value, onChange }: { value: SearchForm; onChange: (value: SearchForm) => void }) {
   return (
-    <Card className="p-4">
+    <Section>
       <div className="flex flex-col gap-4">
         <h2 className="text-sm font-semibold">Recherche web</h2>
         <FieldRow label="URL de l’instance SearXNG">
@@ -47,6 +47,6 @@ export function SearchSection({ value, onChange }: { value: SearchForm; onChange
           </p>
         </div>
       </div>
-    </Card>
+    </Section>
   );
 }

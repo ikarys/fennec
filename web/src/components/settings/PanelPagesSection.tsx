@@ -1,7 +1,7 @@
 import type { PanelPage } from '../../lib/api';
 import { OPTIONAL_BLOCKS, PANEL_BLOCKS, pageOptionalBlocks, panelBlock, panelPages, type PanelBlockId } from '../../lib/panelBlocks';
 import { Button } from '../ui/Button';
-import { Card } from '../ui/Card';
+import { Section } from '../ui/Section';
 import { TextInput } from '../ui/Field';
 
 const MAX_PAGES = 12;
@@ -59,7 +59,7 @@ export function PanelPagesSection({ value, onChange }: PanelPagesSectionProps) {
   };
 
   return (
-    <Card className="p-4">
+    <Section>
       <div className="flex flex-col gap-4">
         <h2 className="text-sm font-semibold">Panneau de contexte</h2>
         <p className="m-0 text-xs text-muted">{alwaysShown}</p>
@@ -137,6 +137,6 @@ export function PanelPagesSection({ value, onChange }: PanelPagesSectionProps) {
           </Button>
         </div>
       </div>
-    </Card>
+    </Section>
   );
 }
