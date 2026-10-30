@@ -1,11 +1,13 @@
 /**
- * The project's ideas board: the queue, the stages, the night report.
+ * The project's tasks board: the queue, the stages, the night report.
  * The server computes everything; this only renders and polls.
  */
 import { useCallback, useEffect, useState } from 'react';
+import { Tabs } from '../../ui/Tabs';
 import { NightReport } from './NightReport';
 import { QueueBar } from './QueueBar';
 import { StageGroup } from './StageGroup';
+import { DoneTable } from './DoneTable';
 import {
   listIdeas,
   markReportRead,
@@ -13,14 +15,26 @@ import {
   type IdeaView,
 } from '../../../lib/ideas';
 
-export function IdeasSection({
+const SUB_TABS = [
+  { id: 'backlog', label: 'Backlog' },
+  { id: 'ready', label: 'Prêtes' },
+  { id: 'done', label: 'Terminées' },
+] as const;
+
+type SubTabId = (typeof SUB_TABS)[number]['id'];
+
+export function TasksSection({
   projectId,
+  sub,
   onFrame,
   onOpenSession,
+  onSelectSub,
 }: {
   projectId: string;
+  sub: string | null;
   onFrame: (idea: IdeaView) => Promise<void>;
   onOpenSession: (sessionId: string) => void;
+  onSelectSub: (sub: SubTabId) => void;
 }) {
   const [board, setBoard] = useState<IdeaBoard | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -99,6 +113,20 @@ export function IdeasSection({
     );
   }
 
+  // The server sends every stage; the UI only picks the one the URL asks for.
+  const yours = board.groups.find((g) => g.stage === 'yours')?.ideas ?? [];
+  const running = board.groups.find((g) => g.stage === 'running')?.ideas ?? [];
+  const drafts = board.groups.find((g) => g.stage === 'drafts')?.ideas ?? [];
+  const queue = board.groups.find((g) => g.stage === 'queue')?.ideas ?? [];
+  const done = board.groups.find((g) => g.stage === 'done')?.ideas ?? [];
+
+  const activeSub: SubTabId = SUB_TABS.find((t) => t.id === sub)?.id ?? 'backlog';
+  const counts: Record<SubTabId, number> = {
+    backlog: drafts.length,
+    ready: queue.length,
+    done: done.length,
+  };
+
   return (
     <section className="flex flex-col gap-4">
       {board.nightReport ? (
@@ -113,17 +141,63 @@ export function IdeasSection({
 
       {actionError ? <p className="text-xs text-err">{actionError}</p> : null}
 
-      {board.groups.map((group) => (
+      {yours.length > 0 ? (
         <StageGroup
-          key={group.stage}
-          stage={group.stage}
-          ideas={group.ideas}
+          stage="yours"
+          ideas={yours}
           projectId={projectId}
           onFrame={runFrame}
           onOpenSession={onOpenSession}
           run={run}
         />
-      ))}
+      ) : null}
+
+      {running.length > 0 ? (
+        <StageGroup
+          stage="running"
+          ideas={running}
+          projectId={projectId}
+          onFrame={runFrame}
+          onOpenSession={onOpenSession}
+          run={run}
+        />
+      ) : null}
+
+      <Tabs
+        label="Sections des tâches"
+        orientation="horizontal"
+        tabs={SUB_TABS.map((t) => ({ id: t.id, label: t.label, count: counts[t.id] }))}
+        active={activeSub}
+        onSelect={onSelectSub}
+      />
+
+      {activeSub === 'backlog' ? (
+        <StageGroup
+          stage="drafts"
+          ideas={drafts}
+          projectId={projectId}
+          onFrame={runFrame}
+          onOpenSession={onOpenSession}
+          run={run}
+          showLabel={false}
+        />
+      ) : null}
+
+      {activeSub === 'ready' ? (
+        <StageGroup
+          stage="queue"
+          ideas={queue}
+          projectId={projectId}
+          onFrame={runFrame}
+          onOpenSession={onOpenSession}
+          run={run}
+          showLabel={false}
+        />
+      ) : null}
+
+      {activeSub === 'done' ? (
+        <DoneTable ideas={done} onOpenSession={onOpenSession} />
+      ) : null}
     </section>
   );
 }

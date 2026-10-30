@@ -210,7 +210,7 @@ web/src/           React + Vite + Tailwind v4 UI (same layout as openfox's web/s
   components/        ui/ the primitives every screen uses (Button, Badge, SectionLabel, Card, Panel, fields);
                      shared UI; session/ the thread, tool cards, question card, message stats, composer,
                      context panel; project/ the folder browser, the project map and ideas/
-                     (the Ideas tab: queue bar, night report, stage groups, idea rows); layout/ the top bar;
+                     (the Tasks tab: queue bar, night report, stage groups, sub-tabs, done table, idea rows); layout/ the top bar;
                      workflow/ the editor (canvas, node shapes, panels) and session/ a run in the thread;
                      preview/ the preview pane and previewable code blocks
   hooks/             useSessionThread: the SSE stream of a session, folded
