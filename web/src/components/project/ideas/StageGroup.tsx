@@ -42,6 +42,8 @@ export function StageGroup({
 }) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
+  // The add field stays folded until asked for; it stays open to chain ideas.
+  const [adding, setAdding] = useState(false);
 
   const handleAdd = async () => {
     const value = text.trim();
@@ -69,6 +71,50 @@ export function StageGroup({
       {showLabel ? <SectionLabel>{STAGE_LABELS[stage]}</SectionLabel> : null}
 
       <div className={showLabel ? 'mt-2 flex flex-col gap-1' : 'flex flex-col gap-1'}>
+        {stage === 'drafts' ? (
+          adding ? (
+            <div className="relative mb-2">
+              <TextInput
+                autoFocus
+                className="w-full pr-10"
+                placeholder="Une idée à garder pour plus tard… (Échap pour fermer)"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                onBlur={() => {
+                  if (!text.trim()) setAdding(false);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    void handleAdd();
+                  } else if (e.key === 'Escape') {
+                    setText('');
+                    setAdding(false);
+                  }
+                }}
+              />
+              <Button
+                variant="ghost"
+                iconOnly
+                className="absolute right-1 top-1/2 -translate-y-1/2"
+                title="Ajouter l'idée au backlog (Entrée)"
+                aria-label="Ajouter l'idée au backlog"
+                disabled={!text.trim() || busy}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => void handleAdd()}
+              >
+                <PlusIcon className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : (
+            <div className="mb-2 flex justify-end">
+              <Button variant="secondary" size="sm" onClick={() => setAdding(true)}>
+                <PlusIcon className="h-4 w-4" />
+                Ajouter une idée
+              </Button>
+            </div>
+          )
+        ) : null}
         {stage === 'queue' && ideas.length === 0 ? (
           <p className="m-0 text-sm text-muted">Aucune tâche prête : cadre une idée du backlog.</p>
         ) : null}
@@ -94,33 +140,6 @@ export function StageGroup({
           />
         ))}
 
-        {stage === 'drafts' ? (
-          <div className="relative mt-2">
-            <TextInput
-              className="w-full pr-10"
-              placeholder="Une idée à garder pour plus tard…"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  void handleAdd();
-                }
-              }}
-            />
-            <Button
-              variant="ghost"
-              iconOnly
-              className="absolute right-1 top-1/2 -translate-y-1/2"
-              title="Ajouter l'idée au backlog (Entrée)"
-              aria-label="Ajouter l'idée au backlog"
-              disabled={!text.trim() || busy}
-              onClick={() => void handleAdd()}
-            >
-              <PlusIcon className="h-4 w-4" />
-            </Button>
-          </div>
-        ) : null}
       </div>
     </section>
   );
