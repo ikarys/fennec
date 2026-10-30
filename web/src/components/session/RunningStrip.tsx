@@ -1,7 +1,18 @@
 import type { RunView } from "../../lib/workflowRun";
+import { Button } from "../ui/Button";
+import { ChevronDownIcon } from "../Icons";
 
-/** Above the composer, where the eyes are during a run: says a turn is going on, and which node. */
-export function RunningStrip({ run }: { run: RunView | undefined }) {
+/** Above the composer, where the eyes are during a run: says a turn is going on, and which node;
+ * holds the auto-scroll switch. */
+export function RunningStrip({
+  run,
+  following,
+  onFollowChange,
+}: {
+  run: RunView | undefined;
+  following: boolean;
+  onFollowChange: (on: boolean) => void;
+}) {
   const node =
     run && !run.finished
       ? [...run.runs].reverse().find((r) => r.state === "running")
@@ -19,7 +30,7 @@ export function RunningStrip({ run }: { run: RunView | undefined }) {
             {node.pass > 1 && ` (passe ${node.pass})`}
           </span>
           {run?.pauseRequested && (
-            <span className="ml-auto shrink-0 text-text">
+            <span className="shrink-0 text-text">
               Pause demandée · arrêt après cette étape
             </span>
           )}
@@ -27,6 +38,21 @@ export function RunningStrip({ run }: { run: RunView | undefined }) {
       ) : (
         <span>L'agent travaille…</span>
       )}
+      <Button
+        variant={following ? "secondary" : "ghost"}
+        iconOnly
+        className="ml-auto"
+        aria-pressed={following}
+        aria-label="Défilement auto"
+        title={
+          following
+            ? "Défilement auto activé : le fil suit l'agent. Cliquer pour le couper."
+            : "Défilement auto coupé. Cliquer pour aller en bas et suivre l'agent."
+        }
+        onClick={() => onFollowChange(!following)}
+      >
+        <ChevronDownIcon className="h-4 w-4" />
+      </Button>
     </div>
   );
 }
