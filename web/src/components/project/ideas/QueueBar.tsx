@@ -1,9 +1,11 @@
 /**
- * The queue control bar: start/stop the file, night-mode toggle, caps display.
+ * The queue's main control: ready count, next idea, night mode, caps, start/stop.
  */
 import { useState } from 'react';
 import { Button } from '../../ui/Button';
-import { StopIcon } from '../../Icons';
+import { Card } from '../../ui/Card';
+import { Badge } from '../../ui/Badge';
+import { EditIcon, MoonIcon, PlayIcon, SettingsIcon, StopIcon } from '../../Icons';
 import { formatTokens } from '../../../lib/format';
 import { startQueue, stopQueue, type IdeaBoard } from '../../../lib/ideas';
 
@@ -46,61 +48,95 @@ export function QueueBar({
 
   if (queue.running) {
     return (
-      <div className="flex items-center gap-3">
-        <span className="text-sm text-text">
-          File en cours{queue.autonomous ? ' · nuit' : ''}
-        </span>
-        <Button
-          variant="secondary"
-          size="sm"
-          disabled={busy}
-          iconOnly
-          title="Arrêter la file"
-          aria-label="Arrêter la file"
-          onClick={handleStop}
-        >
-          <StopIcon className="h-4 w-4" />
-        </Button>
-      </div>
+      <Card className="flex flex-col gap-2 px-4 py-3">
+        <div className="flex items-center gap-3">
+          <span className="flex items-center gap-1.5 text-sm font-medium text-text">
+            <Badge tone="accent" dot pulse>
+              file en cours
+            </Badge>
+            {queue.autonomous ? (
+              <>
+                <MoonIcon className="h-3.5 w-3.5 text-muted" />
+                <span className="text-xs text-muted">mode nuit · {caps} par idée</span>
+              </>
+            ) : null}
+          </span>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={busy}
+            iconOnly
+            title="Arrêter la file"
+            aria-label="Arrêter la file"
+            className="ml-auto"
+            onClick={handleStop}
+          >
+            <StopIcon className="h-4 w-4" />
+          </Button>
+        </div>
+      </Card>
     );
   }
 
   return (
-    <div className="flex items-center gap-3">
-      <span className="text-sm text-muted">{queue.ready} prêtes</span>
-      {queue.next ? (
-        <span className="max-w-[200px] truncate text-xs text-muted" title={queue.next.text}>
-          {queue.next.text}
+    <Card className="flex flex-col gap-2 px-4 py-3">
+      <div className="flex items-center gap-3">
+        <span className="text-sm font-medium text-text tabular-nums">
+          {queue.ready} {queue.ready === 0 || queue.ready === 1 ? 'prête' : 'prêtes'}
         </span>
+        {queue.next ? (
+          <span className="min-w-0 truncate text-xs text-muted" title={queue.next.text}>
+            Prochaine : {queue.next.text}
+          </span>
+        ) : null}
+
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          <label className="flex cursor-pointer items-center gap-1.5 text-xs text-text">
+            <input
+              type="checkbox"
+              checked={autonomous}
+              onChange={(e) => setAutonomous(e.target.checked)}
+              className="h-4 w-4 accent-[var(--accent)]"
+            />
+            <MoonIcon className="h-3.5 w-3.5" />
+            Mode nuit
+          </label>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            title="Plafonds du mode nuit (Paramètres)"
+            aria-label="Plafonds du mode nuit (Paramètres)"
+            onClick={() => {
+              window.location.hash = '#/settings';
+            }}
+          >
+            <SettingsIcon className="h-4 w-4" />
+          </Button>
+
+          {queue.ready > 0 ? (
+            <Button variant="primary" size="md" disabled={busy} onClick={handleStart}>
+              <PlayIcon className="h-4 w-4" />
+              Lancer la file
+            </Button>
+          ) : null}
+        </div>
+      </div>
+
+      {queue.ready === 0 ? (
+        <p className="m-0 flex items-center gap-1 text-xs text-muted">
+          Rien n'est prêt : cadre une idée du backlog avec
+          <EditIcon className="h-3.5 w-3.5" />
+          pour l'ajouter à la file.
+        </p>
+      ) : autonomous ? (
+        <p className="m-0 text-xs text-muted">
+          {caps === 'sans limite'
+            ? "L'agent tranche seul ses questions et note chaque décision ; une idée n'a pas de plafond et la file passe à la suivante."
+            : `L'agent tranche seul ses questions et note chaque décision ; une idée s'arrête à ${caps} et la file passe à la suivante.`}
+        </p>
       ) : null}
-
-      <label className="flex items-center gap-1.5 text-xs text-muted">
-        <input
-          type="checkbox"
-          checked={autonomous}
-          onChange={(e) => setAutonomous(e.target.checked)}
-          className="h-3.5 w-3.5 accent-[var(--accent)]"
-        />
-        ☾ Nuit
-      </label>
-
-      <span className="text-xs text-faint">{caps}</span>
-      <a
-        href="#/settings"
-        className="text-xs text-muted hover:text-text"
-        aria-label="Réglages"
-      >
-        ⚙
-      </a>
-
-      <Button
-        variant="primary"
-        size="sm"
-        disabled={queue.ready === 0 || busy}
-        onClick={handleStart}
-      >
-        ▶ Lancer la file
-      </Button>
-    </div>
+    </Card>
   );
 }

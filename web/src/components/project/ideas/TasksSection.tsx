@@ -10,7 +10,7 @@ import { StageGroup } from './StageGroup';
 import { DoneTable } from './DoneTable';
 import { AddIdeaField } from './AddIdeaField';
 import { Button } from '../../ui/Button';
-import { PlusIcon } from '../../Icons';
+import { CloseIcon, PlusIcon } from '../../Icons';
 import {
   listIdeas,
   markReportRead,
@@ -137,6 +137,7 @@ export function TasksSection({
       {board.nightReport ? (
         <NightReport
           report={board.nightReport}
+          caps={board.queue.caps}
           onOpenSession={onOpenSession}
           onDismiss={() => run(() => markReportRead(projectId))}
         />
@@ -144,7 +145,23 @@ export function TasksSection({
 
       <QueueBar queue={board.queue} projectId={projectId} run={run} />
 
-      {actionError ? <p className="text-xs text-err">{actionError}</p> : null}
+      {actionError ? (
+        <div className="flex items-center gap-2">
+          <p className="m-0 flex items-center gap-2 text-xs text-err" role="alert">
+            {actionError}
+          </p>
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            title="Fermer"
+            aria-label="Fermer"
+            onClick={() => setActionError(null)}
+          >
+            <CloseIcon className="h-4 w-4" />
+          </Button>
+        </div>
+      ) : null}
 
       {yours.length > 0 ? (
         <StageGroup
@@ -154,6 +171,7 @@ export function TasksSection({
           onFrame={runFrame}
           onOpenSession={onOpenSession}
           run={run}
+          caps={board.queue.caps}
         />
       ) : null}
 
@@ -165,6 +183,7 @@ export function TasksSection({
           onFrame={runFrame}
           onOpenSession={onOpenSession}
           run={run}
+          caps={board.queue.caps}
         />
       ) : null}
 
@@ -180,9 +199,15 @@ export function TasksSection({
         onSelect={onSelectSub}
         trailing={
           adding ? null : (
-            <Button variant="soft" size="sm" onClick={() => setAdding(true)}>
+            <Button
+              variant="soft"
+              size="sm"
+              iconOnly
+              title="Ajouter une idée"
+              aria-label="Ajouter une idée"
+              onClick={() => setAdding(true)}
+            >
               <PlusIcon className="h-4 w-4" />
-              Ajouter une idée
             </Button>
           )
         }
@@ -196,6 +221,7 @@ export function TasksSection({
           onFrame={runFrame}
           onOpenSession={onOpenSession}
           run={run}
+          caps={board.queue.caps}
           showLabel={false}
         />
       ) : null}
@@ -208,6 +234,7 @@ export function TasksSection({
           onFrame={runFrame}
           onOpenSession={onOpenSession}
           run={run}
+          caps={board.queue.caps}
           showLabel={false}
         />
       ) : null}
