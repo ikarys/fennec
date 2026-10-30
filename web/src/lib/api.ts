@@ -58,6 +58,7 @@ export interface ModelPrefs {
   contextWindow?: number;
   compactionThreshold?: number;
   reasoningEffort?: ReasoningEffort | null;
+  price?: { inputPerM: number; cachedPerM: number; outputPerM: number } | null;
 }
 
 export interface PanelPage {
@@ -130,13 +131,6 @@ export interface SessionModel {
   source: "session" | "parent" | "default";
 }
 
-/** The reference tariff of Insight's estimated cost, in dollars per million tokens. */
-export interface TariffPrefs {
-  inputPerM: number;
-  cachedPerM: number;
-  outputPerM: number;
-}
-
 export interface Preferences {
   selected: ModelRef | null;
   providers: Provider[];
@@ -150,7 +144,6 @@ export interface Preferences {
   /** fennec's bwrap world: how commands run. */
   sandbox?: SandboxPrefs;
   autonomy?: AutonomyPrefs;
-  tariff?: TariffPrefs;
   /** Skill ids every new session gets in its system prompt. */
   alwaysOnSkills?: string[];
   /** Opt-in embedded workflows the human enabled. */

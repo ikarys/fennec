@@ -10,7 +10,6 @@ import type {
   ReasoningEffort,
   SandboxPrefs,
   AutonomyPrefs,
-  TariffPrefs,
   SettingsResponse
 } from '../lib/api';
 import { listProvider, saveSettings } from '../lib/api';
@@ -25,7 +24,6 @@ import { InstructionsSection } from '../components/settings/InstructionsSection'
 import { SearchSection, type SearchForm } from '../components/settings/SearchSection';
 import { SandboxSection } from '../components/settings/SandboxSection';
 import { AutonomySection } from '../components/settings/AutonomySection';
-import { TariffSection } from '../components/settings/TariffSection';
 import { ScannersSection } from '../components/settings/ScannersSection';
 import { SkillsSection } from '../components/settings/SkillsSection';
 import { WorkflowsSection } from '../components/settings/WorkflowsSection';
@@ -48,12 +46,11 @@ interface SettingsForm {
   search: SearchForm;
   sandbox: SandboxPrefs;
   autonomy: AutonomyPrefs;
-  tariff: TariffPrefs;
   alwaysOnSkills: string[];
   enabledWorkflows: string[];
 }
 
-type SettingsTab = 'models' | 'instructions' | 'skills' | 'workflows' | 'search' | 'sandbox' | 'security' | 'autonomy' | 'tariff' | 'display';
+type SettingsTab = 'models' | 'instructions' | 'skills' | 'workflows' | 'search' | 'sandbox' | 'security' | 'autonomy' | 'display';
 
 const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'models', label: 'Modèles' },
@@ -64,7 +61,6 @@ const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'sandbox', label: 'Bac à sable' },
   { id: 'security', label: 'Sécurité' },
   { id: 'autonomy', label: 'Mode nuit' },
-  { id: 'tariff', label: 'Coût' },
   { id: 'display', label: 'Affichage' }
 ];
 
@@ -72,7 +68,10 @@ const emptyModelForm: ModelForm = {
   maxTokens: '',
   contextWindow: '',
   compactionThreshold: '',
-  reasoningEffort: ''
+  reasoningEffort: '',
+  priceInput: '',
+  priceCached: '',
+  priceOutput: ''
 };
 
 function localProviderForm(): ProviderForm {
@@ -156,7 +155,10 @@ function toForm(preferences: Preferences, listings: ProviderListing[]): Settings
         contextWindow: prefs.contextWindow == null ? '' : String(prefs.contextWindow),
         compactionThreshold:
           prefs.compactionThreshold == null ? '' : percentFromFraction(prefs.compactionThreshold),
-        reasoningEffort: prefs.reasoningEffort ?? ''
+        reasoningEffort: prefs.reasoningEffort ?? '',
+        priceInput: prefs.price ? String(prefs.price.inputPerM) : '',
+        priceCached: prefs.price ? String(prefs.price.cachedPerM) : '',
+        priceOutput: prefs.price ? String(prefs.price.outputPerM) : ''
       };
     }
   }
@@ -174,7 +176,6 @@ function toForm(preferences: Preferences, listings: ProviderListing[]): Settings
     },
     sandbox: preferences.sandbox ?? { enabled: true, network: false },
     autonomy: preferences.autonomy ?? { maxMinutesPerIdea: 120, maxTokensPerIdea: 2_000_000 },
-    tariff: preferences.tariff ?? { inputPerM: 3, cachedPerM: 0.3, outputPerM: 15 },
     alwaysOnSkills: preferences.alwaysOnSkills ?? [],
     enabledWorkflows: preferences.enabledWorkflows ?? []
   };
@@ -220,11 +221,21 @@ function buildPreferences(form: SettingsForm, settings: SettingsResponse): Prefe
       const maxTokens = parseNumber(entry.maxTokens);
       const contextWindow = parseNumber(entry.contextWindow);
       const compactionThreshold = parsePercent(entry.compactionThreshold);
+      const priceInput = parseNumber(entry.priceInput);
+      const priceCached = parseNumber(entry.priceCached);
+      const priceOutput = parseNumber(entry.priceOutput);
       const prefs: ModelPrefs = {};
       if (maxTokens != null) prefs.maxTokens = maxTokens;
       if (contextWindow != null) prefs.contextWindow = contextWindow;
       if (compactionThreshold != null) prefs.compactionThreshold = compactionThreshold;
       if (entry.reasoningEffort !== '') prefs.reasoningEffort = entry.reasoningEffort as ReasoningEffort;
+      if (entry.priceInput !== '' || entry.priceCached !== '' || entry.priceOutput !== '') {
+        prefs.price = {
+          inputPerM: priceInput ?? 0,
+          cachedPerM: priceCached ?? 0,
+          outputPerM: priceOutput ?? 0
+        };
+      }
       if (Object.keys(prefs).length === 0 && listedIds.has(modelId)) continue;
       models[modelId] = prefs;
     }
@@ -256,7 +267,6 @@ function buildPreferences(form: SettingsForm, settings: SettingsResponse): Prefe
     },
     sandbox: form.sandbox,
     autonomy: form.autonomy,
-    tariff: form.tariff,
     alwaysOnSkills: form.alwaysOnSkills,
     enabledWorkflows: form.enabledWorkflows
   };
@@ -434,11 +444,6 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
     setForm((previous) => (previous ? { ...previous, autonomy } : previous));
   }
 
-  function updateTariff(tariff: TariffPrefs) {
-    markDirty();
-    setForm((previous) => (previous ? { ...previous, tariff } : previous));
-  }
-
   function updateAlwaysOnSkills(alwaysOnSkills: string[]) {
     markDirty();
     setForm((previous) => (previous ? { ...previous, alwaysOnSkills } : previous));
@@ -590,9 +595,6 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
 
             {tab === 'autonomy' && (
               <AutonomySection value={form.autonomy} onChange={updateAutonomy} />
-            )}
-            {tab === 'tariff' && (
-              <TariffSection value={form.tariff} onChange={updateTariff} />
             )}
 
             {tab === 'display' && (

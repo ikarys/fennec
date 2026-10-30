@@ -182,6 +182,7 @@ mod tests {
         // The provenance must not drift from what a turn actually runs with.
         let d = defaults();
         let per_model = ModelPrefs {
+            price: None,
             max_tokens: Some(4_000),
             context_window: Some(12_000),
             compaction_threshold: Some(0.7),
