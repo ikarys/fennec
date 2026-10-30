@@ -21,6 +21,9 @@ look lives in two places only, so a screen can never drift from the others:
 - One primary action per view (`Button variant="primary"`); the rest are
   `secondary`, or `ghost` in toolbars and lists. Destructive actions are
   `danger` and say what they destroy.
+- Buttons are icons (`iconOnly`) with a tooltip (`title`) that says what
+  they do; a text label only for a view's single primary action and a
+  dialog's confirm. Text on every button makes the UI heavy.
 - State is shown by form as well as words: a `Badge` tone (ok, err, accent
   for "needs you" or "running"), a dot that pulses while something runs.
   The accent is for action and attention, not decoration.
