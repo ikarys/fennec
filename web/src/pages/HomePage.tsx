@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { Project, SessionSummary } from '../lib/api';
 import { DeleteSessionsDialog, type DeletionTarget } from '../components/session/DeleteSessionsDialog';
 import { formatRelative, stateLabel } from '../lib/format';
-import { ChevronRightIcon, LayoutIcon, PlusIcon, TrashIcon } from '../components/Icons';
+import { ChevronRightIcon, ProjectIcon, PlusIcon, TrashIcon } from '../components/Icons';
 import { Button, buttonClass } from '../components/ui/Button';
 import { Badge, type BadgeTone } from '../components/ui/Badge';
 import { SectionLabel } from '../components/ui/SectionLabel';
@@ -137,7 +137,7 @@ function ProjectSection({
             aria-label="Voir le projet"
             className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
           >
-            <LayoutIcon className="h-4 w-4" />
+            <ProjectIcon className="h-4 w-4" />
           </a>
           <Button
             variant="secondary"
