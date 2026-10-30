@@ -320,6 +320,28 @@ export function listProvider(body: {
   });
 }
 
+/** Where a probed limit comes from: the endpoint's own words, or the model family's catalog entry. */
+export type LimitSource = 'endpoint' | 'catalog';
+
+/** What a probe of one model learned (indicative); null where nothing said it. */
+export interface ProbedModel {
+  contextWindow: number | null;
+  contextSource: LimitSource | null;
+  maxTokens: number | null;
+  /** The distinct efforts accepted; empty when neither the endpoint nor the catalog says. */
+  reasoningEfforts: ReasoningEffort[];
+  effortsSource: LimitSource | null;
+  defaultReasoningEffort: ReasoningEffort | null;
+}
+
+/** Probes a model of a stored provider for its limits, with two small calls. */
+export function probeModel(provider: string, model: string): Promise<ProbedModel> {
+  return request<ProbedModel>('/api/settings/models/probe', {
+    method: 'POST',
+    body: JSON.stringify({ provider, baseUrl: '', apiKey: null, model })
+  });
+}
+
 export function getProjects(): Promise<Project[]> {
   return request<Project[]>('/api/projects');
 }
