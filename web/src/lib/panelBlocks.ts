@@ -9,7 +9,7 @@
  */
 import type { PanelPage } from './api';
 
-export type PanelBlockId = 'request' | 'criteria' | 'modifiedFiles' | 'workspace' | 'tokens' | 'skills' | 'decisions' | 'tools' | 'vision';
+export type PanelBlockId = 'request' | 'audit' | 'criteria' | 'modifiedFiles' | 'workspace' | 'tokens' | 'skills' | 'decisions' | 'tools' | 'vision';
 
 export interface PanelBlock {
   id: PanelBlockId;
@@ -20,6 +20,7 @@ export interface PanelBlock {
 /** In display order: core blocks first. */
 export const PANEL_BLOCKS: readonly PanelBlock[] = [
   { id: 'request', title: 'Demande', core: true },
+  { id: 'audit', title: 'Audit', core: true },
   { id: 'criteria', title: 'Critères', core: true },
   { id: 'modifiedFiles', title: 'Fichiers modifiés', core: true },
   { id: 'workspace', title: "Espace de l'agent", core: true },
