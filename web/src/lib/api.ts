@@ -506,6 +506,16 @@ export interface SessionUsage {
   completionTokens: number;
   /** 0 to 100. */
   cachePercent: number;
+  /** Estimated cost at each model's price, "—" when no model has one. */
+  cost: string;
+  /** How the cost was reached, or why there is none. */
+  costDetail: string;
+  /** The cost of all the prompt tokens, cached ones included; null when no model has a price. */
+  inputCost: string | null;
+  /** The share of the cost of cached tokens; null when no model has a price. */
+  cachedCost: string | null;
+  /** The share of the cost of generated tokens; null when no model has a price. */
+  outputCost: string | null;
   /** Tokens per second of the last call; null before any call. */
   lastGenerationSpeed: number | null;
 }

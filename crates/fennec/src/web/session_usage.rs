@@ -1,6 +1,7 @@
 //! What the Tokens panel shows, computed here so the UI only draws it:
 //! a session's totals from the usage ledger (`GET /api/sessions/{id}/usage`).
 
+use super::pricing::Pricing;
 use crate::domain::event::Event;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -15,18 +16,38 @@ pub struct SessionUsageView {
     pub completion_tokens: u64,
     /// Share of the prompts the server took from its cache, 0 to 100.
     pub cache_percent: u64,
+    /// Estimated cost at each model's price, "—" when no model has one: indicative.
+    pub cost: String,
+    /// How the cost was reached, or why there is none (models without a price).
+    pub cost_detail: String,
+    /// The cost of all the prompt tokens (the cached ones included, as `prompt_tokens`),
+    /// none when no model has a price.
+    pub input_cost: Option<String>,
+    /// The share of the cost of cached tokens, none when no model has a price.
+    pub cached_cost: Option<String>,
+    /// The share of the cost of generated tokens, none when no model has a price.
+    pub output_cost: Option<String>,
     /// Generated tokens per second of the last call; none before any call.
     pub last_generation_speed: Option<f64>,
 }
 
 impl SessionUsageView {
-    pub fn new(summary: &Summary, latest: Option<&LatestCall>) -> SessionUsageView {
+    pub fn new(
+        summary: &Summary,
+        latest: Option<&LatestCall>,
+        pricing: &Pricing,
+    ) -> SessionUsageView {
         SessionUsageView {
             calls: summary.calls,
             prompt_tokens: summary.prompt_tokens,
             cached_tokens: summary.cached_tokens,
             completion_tokens: summary.completion_tokens,
             cache_percent: (summary.cache_hit_rate * 100.0).round() as u64,
+            cost: pricing.value(),
+            cost_detail: pricing.detail(),
+            input_cost: pricing.part(pricing.cost.input + pricing.cost.cached),
+            cached_cost: pricing.part(pricing.cost.cached),
+            output_cost: pricing.part(pricing.cost.output),
             last_generation_speed: latest.map(|call| call.generation_speed),
         }
     }
@@ -132,10 +153,17 @@ mod tests {
     fn an_empty_ledger_gives_zeroes_and_no_speed() {
         let ledger = Ledger::open_in_memory().unwrap();
         let summary = ledger.summary(&Filter::default()).unwrap();
-        let view = SessionUsageView::new(&summary, None);
+        let pricing = Pricing {
+            cost: llm_providers::Cost::default(),
+            priced: 0,
+            unpriced: vec![],
+        };
+        let view = SessionUsageView::new(&summary, None, &pricing);
         assert_eq!(view.calls, 0);
         assert_eq!(view.cache_percent, 0);
         assert_eq!(view.last_generation_speed, None);
+        assert_eq!(view.cost, "—");
+        assert_eq!(view.input_cost, None);
     }
 
     #[test]
@@ -158,10 +186,16 @@ mod tests {
             prefill_speed: 5.0,
             generation_speed: 42.5,
         };
-        let view = SessionUsageView::new(&summary, Some(&latest));
+        let pricing = Pricing {
+            cost: llm_providers::Cost::default(),
+            priced: 0,
+            unpriced: vec![],
+        };
+        let view = SessionUsageView::new(&summary, Some(&latest), &pricing);
         assert_eq!(view.cache_percent, 67);
         assert_eq!(view.last_generation_speed, Some(42.5));
         assert_eq!(view.prompt_tokens, 300);
+        assert_eq!(view.cost, "—");
     }
 
     fn record(message: &str, completion: u64) -> CallRecord {
