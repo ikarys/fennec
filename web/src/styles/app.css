@@ -92,6 +92,31 @@
   --scrim: rgba(5, 8, 15, 0.6);
 }
 
+/* Cyber: hominfer's terminal green. `ok` is cyan, not green, so a done or
+   integrated badge stays distinct from the accent of a running one. */
+:root[data-theme="cyber"] {
+  color-scheme: dark;
+  --bg: #000300;
+  --panel: #020A03;
+  --raised: #06140A;
+  --border: #0F3D17;
+  --border-strong: #1A5C26;
+  --text: #B6FFC4;
+  --muted: #3FBF5A;
+  --faint: #2E9944;
+  --accent: #00FF41;
+  --accent-strong: #8CFF9E;
+  --accent-soft: rgba(0, 255, 65, 0.12);
+  --on-accent: #000300;
+  --ok: #3DE8FF;
+  --ok-soft: rgba(61, 232, 255, 0.12);
+  --err: #FF4D3D;
+  --add-bg: rgba(0, 255, 65, 0.09);
+  --del-bg: rgba(255, 77, 61, 0.12);
+  --code: #010601;
+  --scrim: rgba(0, 3, 0, 0.7);
+}
+
 @theme inline {
   /* The text size setting scales the root font size: text in rem follows it,
      while spacing and radii stay in px so the layout does not move. */
@@ -208,4 +233,48 @@ html {
   --xy-node-color: var(--panel);
   --xy-edge-label-background-color: var(--panel);
   --xy-edge-label-color: var(--muted);
+}
+
+/* Cyber's look beyond colours: a terminal in mono, square, faint scanlines,
+   a glow on titles and on hover. Radii are inlined by @theme, hence !important. */
+:root[data-theme="cyber"] body {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-feature-settings: normal;
+  background: radial-gradient(ellipse at top, #04200B, var(--bg) 70%) fixed;
+}
+
+:root[data-theme="cyber"] body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background: repeating-linear-gradient(to bottom, transparent 0 2px, rgba(0, 0, 0, 0.18) 2px 3px);
+}
+
+:root[data-theme="cyber"] {
+  accent-color: var(--accent);
+}
+
+:root[data-theme="cyber"] *:not(.rounded-full) {
+  border-radius: 0 !important;
+}
+
+:root[data-theme="cyber"] h1 {
+  text-shadow: 0 0 8px rgba(0, 255, 65, 0.45);
+  letter-spacing: 0;
+}
+
+:root[data-theme="cyber"] h1::before {
+  content: "> ";
+  color: var(--accent);
+}
+
+:root[data-theme="cyber"] button:not(:disabled):hover {
+  box-shadow: 0 0 10px rgba(0, 255, 65, 0.25);
+}
+
+:root[data-theme="cyber"] ::selection {
+  background: var(--accent);
+  color: var(--on-accent);
 }

@@ -81,7 +81,7 @@ export function QueueBar({
   return (
     <Card className="flex flex-col gap-2 px-4 py-3">
       <div className="flex items-center gap-3">
-        <span className="text-sm font-medium text-text tabular-nums">
+        <span className="text-sm font-medium text-text tabular-nums whitespace-nowrap">
           {queue.ready} {queue.ready === 0 || queue.ready === 1 ? 'prête' : 'prêtes'}
         </span>
         {queue.next ? (
