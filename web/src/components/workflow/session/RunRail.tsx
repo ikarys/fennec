@@ -132,7 +132,7 @@ function StepRow({ step, index, isLast }: { step: RailStep; index: number; isLas
         {!isLast && <span aria-hidden className={`w-0.5 grow min-h-3 rounded-full ${connectorClass(step, true)}`} />}
       </div>
       <div className={`min-w-0 grow ${isLast ? '' : 'pb-3'}`}>
-        <span className="text-[0.5625rem] font-medium uppercase tracking-[0.06em] text-faint">
+        <span className="text-[0.6875rem] text-faint">
           Étape {index + 1}
           {pass > 1 && <> · ×{pass}</>}
           {isInterrupted && <> · interrompu</>}

@@ -38,6 +38,7 @@ import { runWaiting } from '../lib/workflowRun';
 import { useSessionThread } from '../hooks/useSessionThread';
 import { Composer } from '../components/session/Composer';
 import { modelShortName } from '../components/session/ModelPicker';
+import { Badge } from '../components/ui/Badge';
 import { ContextPanel } from '../components/session/ContextPanel';
 import { ContextGauge } from '../components/session/ContextGauge';
 import { QuestionCard } from '../components/session/QuestionCard';
@@ -622,10 +623,7 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
         <div className="flex items-center gap-2 px-6 py-2.5">
           <div className="mx-auto flex w-full max-w-[820px] items-center gap-2">
             <h1 className="min-w-0 truncate text-sm font-semibold" title={title}>{title}</h1>
-            <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-accent-soft px-2.5 py-0.5 text-xs font-medium text-accent-strong">
-              <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-              {stateLabel(state)}
-            </span>
+            <Badge tone="accent" dot>{stateLabel(state)}</Badge>
             <span className="shrink-0 text-xs text-muted" title={detail?.project.workdir}>{projectName}</span>
             <div className="ml-auto">
               <ContextGauge
