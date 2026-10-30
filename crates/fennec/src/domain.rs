@@ -13,6 +13,7 @@ pub mod conversation;
 pub mod criteria;
 pub mod decision;
 pub mod diff;
+pub mod doc;
 pub mod event;
 pub mod frontmatter;
 pub mod id;
