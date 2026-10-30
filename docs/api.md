@@ -234,7 +234,7 @@ read-only. The human edits them as usual.
   as is, folded (crate `backlog`) from its append-only `idea.*` events (table `project_events`), dropped ideas left out.
   - `queue` `{running, autonomous, ready, next: {id, text} | null, caps: {maxMinutes, maxTokens}}`: whether the queue
     runs (and in night mode), how many ideas it holds, the idea it starts next, the Settings caps (0 no cap).
-  - `groups` `[{stage, ideas: [idea]}]`, non-empty only except `drafts` (always sent: it holds the add input), in this order: `yours` (waits for the human: review, question,
+  - `groups` `[{stage, ideas: [idea]}]`, all five groups always sent, in this order: `yours` (waits for the human: review, question,
     halted, failed), `running`, `queue` (in queue order), `drafts` (inbox, framing), `done` (integrated); outside the
     queue, the most recently changed first.
   - `idea` `{id, text, status, stage, action, menu, sessionId, plan, halted, autonomous, position, createdAt, startedAt,
