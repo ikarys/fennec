@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import type { ThreadItem } from '../../lib/fold';
 import { seenImages, type SeenImage } from '../../lib/vision';
 import { panelBlock } from '../../lib/panelBlocks';
+import { CloseIcon, LocateIcon } from '../Icons';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Modal } from '../ui/Modal';
@@ -59,11 +60,25 @@ export function VisionSection({ items, partial }: { items: ThreadItem[]; partial
               {!selected.inContext && <div className="text-xs text-muted">Plus dans le contexte du modèle</div>}
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="secondary" size="sm" onClick={jumpToThread}>
-                Voir dans le fil
+              <Button
+                variant="secondary"
+                size="sm"
+                iconOnly
+                onClick={jumpToThread}
+                title="Voir dans le fil"
+                aria-label="Voir dans le fil"
+              >
+                <LocateIcon className="h-4 w-4" />
               </Button>
-              <Button variant="secondary" size="sm" onClick={closeDialog}>
-                Fermer
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
+                onClick={closeDialog}
+                title="Fermer"
+                aria-label="Fermer"
+              >
+                <CloseIcon className="h-4 w-4" />
               </Button>
             </div>
           </Card>

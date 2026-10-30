@@ -138,9 +138,15 @@ function ProjectSection({
           >
             Projet
           </a>
-          <Button variant="secondary" size="sm" onClick={() => onNewSession(project.id)}>
+          <Button
+            variant="secondary"
+            size="sm"
+            iconOnly
+            onClick={() => onNewSession(project.id)}
+            title="Nouvelle session dans ce projet"
+            aria-label="Nouvelle session"
+          >
             <PlusIcon className="h-3.5 w-3.5" />
-            Nouvelle session
           </Button>
         </>
       }

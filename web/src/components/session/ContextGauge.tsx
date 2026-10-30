@@ -1,4 +1,5 @@
 import type { ContextView } from '../../lib/api';
+import { CompressIcon } from '../Icons';
 import { Button } from '../ui/Button';
 import { ContextComposition } from './ContextComposition';
 
@@ -49,11 +50,13 @@ export function ContextGauge({ context, compactDisabled, onCompact, compactError
       <Button
         variant="secondary"
         size="sm"
+        iconOnly
         disabled={compactDisabled}
         onClick={onCompact}
         title="Résumer la conversation pour libérer le contexte"
+        aria-label="Compacter"
       >
-        Compacter
+        <CompressIcon className="h-4 w-4" />
       </Button>
       {compactError && <span className="text-xs text-err" title={compactError}>échec</span>}
     </div>

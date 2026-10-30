@@ -3,7 +3,7 @@ import type { ProviderListing } from '../../lib/api';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Section } from '../ui/Section';
-import { ChevronRightIcon, PlusIcon } from '../Icons';
+import { ChevronRightIcon, CloseIcon, PlusIcon, RefreshIcon, SpinnerIcon, TrashIcon } from '../Icons';
 import { FieldRow, Select, TextInput } from '../ui/Field';
 import { formOnlyModels, type ModelForm } from './ModelPrefsSection';
 
@@ -182,7 +182,10 @@ export function ProvidersSection({
                     <Button
                       variant="ghost"
                       size="sm"
+                      iconOnly
                       disabled={fetchingId === provider.id}
+                      aria-label="Récupérer"
+                      title={fetchingId === provider.id ? 'Récupération…' : 'Récupérer la liste des modèles (/models)'}
                       onClick={(event) => {
                         keepOpen(event);
                         void (async () => {
@@ -197,11 +200,18 @@ export function ProvidersSection({
                         })();
                       }}
                     >
-                      {fetchingId === provider.id ? 'Récupération…' : 'Récupérer'}
+                      {fetchingId === provider.id ? <SpinnerIcon className="h-3.5 w-3.5" /> : <RefreshIcon className="h-3.5 w-3.5" />}
                     </Button>
                     {!isLocal && (
-                      <Button variant="ghost" size="sm" onClick={(event) => { keepOpen(event); onRemove(index); }}>
-                        Retirer
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        iconOnly
+                        aria-label="Retirer"
+                        title="Retirer ce provider"
+                        onClick={(event) => { keepOpen(event); onRemove(index); }}
+                      >
+                        <TrashIcon className="h-3.5 w-3.5" />
                       </Button>
                     )}
                   </span>
@@ -300,13 +310,23 @@ export function ProvidersSection({
                     type="button"
                     variant="secondary"
                     size="sm"
+                    iconOnly
                     disabled={modelDraft.trim() === ''}
+                    aria-label="Ajouter"
+                    title="Ajouter le modèle"
                     onClick={() => addModel(provider.id)}
                   >
-                    Ajouter
+                    <PlusIcon className="h-3.5 w-3.5" />
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setAddingModelFor(null)}>
-                    Annuler
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
+                    aria-label="Annuler"
+                    title="Annuler"
+                    onClick={() => setAddingModelFor(null)}
+                  >
+                    <CloseIcon className="h-3.5 w-3.5" />
                   </Button>
                 </div>
               )}

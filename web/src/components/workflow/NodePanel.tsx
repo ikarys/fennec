@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
+import { TrashIcon } from '../Icons';
 import { FieldRow, Select, TextInput } from '../ui/Field';
 import type { Agent } from '../../lib/api';
 import type { WorkflowDef, WorkflowIssue, WorkflowNode } from '../../lib/workflow';
@@ -104,8 +105,17 @@ export function NodePanel({ def, node, agents, issues, onChange, onRename, onDel
         </div>
       )}
 
-      <Button variant="danger" size="sm" type="button" onClick={onDelete} className="mt-2 self-start">
-        Supprimer le nœud
+      <Button
+        variant="danger"
+        size="sm"
+        type="button"
+        iconOnly
+        onClick={onDelete}
+        aria-label="Supprimer le nœud"
+        title="Supprimer le nœud"
+        className="mt-2 self-start"
+      >
+        <TrashIcon className="h-4 w-4" />
       </Button>
     </div>
   );
