@@ -12,7 +12,7 @@ use super::slash;
 use std::collections::HashSet;
 
 /// What a session has loaded, what is frozen into its prompt as always-on,
-/// what is still in the model's view, and what it could still load.
+/// and what is still in the model's view.
 /// `loaded` and `active` are deduplicated in first-seen order.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SessionSkills {
@@ -20,29 +20,42 @@ pub struct SessionSkills {
     pub active: Vec<String>,
     /// Skill ids whose bodies the first `TurnSnapshot`'s system prompt carries.
     pub always_on: Vec<String>,
-    /// Registry ids neither loaded nor always-on, in registry order.
-    pub available: Vec<String>,
+    /// Whether the system prompt is frozen yet (a first `TurnSnapshot`).
+    pub started: bool,
 }
 
 /// The session's skills: `loaded` over the whole log, `active` over the
-/// model's view of it, `always_on` from the first frozen system prompt, and
-/// `available` from the registry minus both. `skills` is the project's
-/// registry: the caller does the discovery, this fold is pure.
+/// model's view of it, `always_on` from the first frozen system prompt.
+/// `skills` is the project's registry: the caller does the discovery, this
+/// fold is pure.
 pub fn fold_skills(events: &[Event], skills: &[Skill]) -> SessionSkills {
     let loaded = loads_in(events.iter(), skills);
     let active = loads_in(model_view(events), skills);
-    let always_on = always_on_in(events);
-    let available = skills
-        .iter()
-        .map(|skill| skill.id.clone())
-        .filter(|id| !loaded.contains(id) && !always_on.contains(id))
-        .collect();
     SessionSkills {
         loaded,
         active,
-        always_on,
-        available,
+        always_on: always_on_in(events),
+        started: frozen_prompt(events).0.is_some(),
     }
+}
+
+/// The skills the human chose always-on (Settings) that a started session
+/// lacks: chosen after its prompt froze, so only a `/<skill>` brings them in.
+/// Ids the project's registry does not know are left out: nothing to load.
+pub fn missed_always_on(
+    folded: &SessionSkills,
+    chosen: &[String],
+    skills: &[Skill],
+) -> Vec<String> {
+    if !folded.started {
+        return Vec::new();
+    }
+    chosen
+        .iter()
+        .filter(|id| skills.iter().any(|skill| &skill.id == *id))
+        .filter(|id| !folded.always_on.contains(id) && !folded.loaded.contains(id))
+        .cloned()
+        .collect()
 }
 
 /// The ids the first frozen system prompt carries as always-active; none
@@ -286,7 +299,7 @@ mod tests {
     }
 
     #[test]
-    fn a_turn_snapshot_freezes_always_on_and_available() {
+    fn a_turn_snapshot_freezes_always_on() {
         let prompt = "\n## ALWAYS-ACTIVE SKILLS\n\nThese skills' instructions apply to every task in this session. They are already loaded: do not call load_skill for them.\n\n<skill id=\"alpha\">\nA\n</skill>\n";
         let events = vec![
             Event::TurnSnapshot {
@@ -300,6 +313,5 @@ mod tests {
         assert_eq!(folded.always_on, vec!["alpha"]);
         assert_eq!(folded.loaded, vec!["beta"]);
         assert_eq!(folded.active, vec!["beta"]);
-        assert_eq!(folded.available, vec!["gamma"]);
     }
 }

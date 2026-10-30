@@ -23,6 +23,7 @@ use crate::domain::id::new_id;
 use crate::domain::preferences::ModelRef;
 use crate::domain::project::{Project, SessionSummary};
 use crate::domain::replay::replayable;
+use crate::domain::session_skills::missed_always_on;
 use crate::domain::slash::{TurnInput, commands, resolve};
 use crate::domain::workflow::run::Waiting;
 use crate::skills;
@@ -357,7 +358,7 @@ fn get_session(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String
 
 /// The session's skills folded from its log: loaded so far, those frozen
 /// into its prompt as always-on, those still in the model's view, and the
-/// registry ids it could still load. `GET /api/sessions/{id}/skills`.
+/// always-on ones chosen after its prompt froze. `GET /api/sessions/{id}/skills`.
 fn serve_skills(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
     let store = app.store()?;
     let Some((_, p)) = session_and_project(&store, id)? else {
@@ -365,6 +366,8 @@ fn serve_skills(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), Strin
     };
     let skills = skills::discover(Path::new(&p.workdir));
     let folded = app.folded_skills(&store, id, &skills)?;
+    let chosen = store.preferences()?.always_on_skills;
+    let missed = missed_always_on(&folded, &chosen, &skills);
     send_json(
         stream,
         200,
@@ -372,7 +375,7 @@ fn serve_skills(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), Strin
             "loaded": folded.loaded,
             "active": folded.active,
             "alwaysOn": folded.always_on,
-            "available": folded.available
+            "missedAlwaysOn": missed
         }),
     )
 }
