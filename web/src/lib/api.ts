@@ -391,8 +391,8 @@ export interface SessionSkills {
   active: string[];
   /** Frozen into the session's system prompt at its first turn. */
   alwaysOn: string[];
-  /** Not loaded, not always-on: what the human may still type as /<id>. */
-  available: string[];
+  /** Chosen always-on in Settings after this session's prompt froze: absent until typed as /<id>. */
+  missedAlwaysOn: string[];
 }
 
 export function getSkills(id: string): Promise<SessionSkills> {
