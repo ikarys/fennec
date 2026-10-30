@@ -1,4 +1,6 @@
 /** A tab rail: vertical for page sections, horizontal for sub-sections. */
+import type { ReactNode } from 'react';
+
 type Tab<T extends string> = { id: T; label: string; count?: number };
 
 export function Tabs<T extends string>({
@@ -6,6 +8,7 @@ export function Tabs<T extends string>({
   active,
   onSelect,
   label,
+  trailing,
   orientation = 'vertical',
 }: {
   tabs: Tab<T>[];
@@ -13,6 +16,8 @@ export function Tabs<T extends string>({
   onSelect: (id: T) => void;
   label: string;
   orientation?: 'vertical' | 'horizontal';
+  /** Shown at the right end of a horizontal rail: the section's own action. */
+  trailing?: ReactNode;
 }) {
   // The count is presentation only; the server owns the number's meaning.
   const renderLabel = (tab: Tab<T>) => (
@@ -36,7 +41,7 @@ export function Tabs<T extends string>({
         role="tablist"
         aria-label={label}
         aria-orientation="horizontal"
-        className="flex gap-1 border-b border-border"
+        className="flex items-center gap-1 border-b border-border"
       >
         {tabs.map((tab) => (
           <button
@@ -54,6 +59,7 @@ export function Tabs<T extends string>({
             {renderLabel(tab)}
           </button>
         ))}
+        {trailing ? <div className="ml-auto pb-1">{trailing}</div> : null}
       </div>
     );
   }

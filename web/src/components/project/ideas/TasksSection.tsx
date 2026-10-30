@@ -8,6 +8,9 @@ import { NightReport } from './NightReport';
 import { QueueBar } from './QueueBar';
 import { StageGroup } from './StageGroup';
 import { DoneTable } from './DoneTable';
+import { AddIdeaField } from './AddIdeaField';
+import { Button } from '../../ui/Button';
+import { PlusIcon } from '../../Icons';
 import {
   listIdeas,
   markReportRead,
@@ -39,6 +42,8 @@ export function TasksSection({
   const [board, setBoard] = useState<IdeaBoard | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  // The add field stays folded until asked for.
+  const [adding, setAdding] = useState(false);
 
   // Every user action goes through this one path so failures are visible.
   const run = useCallback(async (action: () => Promise<IdeaBoard>) => {
@@ -163,12 +168,24 @@ export function TasksSection({
         />
       ) : null}
 
+      {adding ? (
+        <AddIdeaField projectId={projectId} run={run} onClose={() => setAdding(false)} />
+      ) : null}
+
       <Tabs
         label="Sections des tâches"
         orientation="horizontal"
         tabs={SUB_TABS.map((t) => ({ id: t.id, label: t.label, count: counts[t.id] }))}
         active={activeSub}
         onSelect={onSelectSub}
+        trailing={
+          adding ? null : (
+            <Button variant="secondary" size="sm" onClick={() => setAdding(true)}>
+              <PlusIcon className="h-4 w-4" />
+              Ajouter une idée
+            </Button>
+          )
+        }
       />
 
       {activeSub === 'backlog' ? (
