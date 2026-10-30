@@ -17,7 +17,6 @@ pub mod doc;
 pub mod event;
 pub mod frontmatter;
 pub mod id;
-pub mod idea;
 pub mod integration;
 pub mod map_doc;
 pub mod model_choice;
