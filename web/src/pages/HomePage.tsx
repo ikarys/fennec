@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { Project, SessionSummary } from '../lib/api';
 import { formatRelative, stateLabel } from '../lib/format';
 import { ChevronRightIcon, PlusIcon } from '../components/Icons';
-import { Button } from '../components/ui/Button';
+import { Button, buttonClass } from '../components/ui/Button';
 import { Badge, type BadgeTone } from '../components/ui/Badge';
 import { Card } from '../components/ui/Card';
 import { SectionLabel } from '../components/ui/SectionLabel';
@@ -83,6 +83,13 @@ function ProjectCard({
             </span>
           </span>
         </button>
+        <a
+          href={'#/project/' + encodeURIComponent(project.id)}
+          title="La carte du projet, ses ADR"
+          className={buttonClass({ variant: 'ghost', size: 'sm' })}
+        >
+          Projet
+        </a>
         <Button variant="secondary" size="sm" onClick={() => onNewSession(project.id)}>
           <PlusIcon className="h-3.5 w-3.5" />
           Nouvelle session
