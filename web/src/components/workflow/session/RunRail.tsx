@@ -4,8 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { portTone, upcomingSteps, type NodeRun, type RunView, type UpcomingStep } from '../../../lib/workflowRun';
 import { formatClock, formatDuration } from '../../../lib/format';
-import { CheckIcon, ChevronsLeftIcon, ChevronsRightIcon, CloseIcon, StopIcon } from '../../Icons';
-import { Badge } from '../../ui/Badge';
+import { ChevronsLeftIcon, ChevronsRightIcon } from '../../Icons';
 import { Button } from '../../ui/Button';
 
 const COLLAPSED_KEY = 'fennec.runRail.collapsed';
@@ -26,36 +25,17 @@ function saveCollapsed(collapsed: boolean): void {
   }
 }
 
-/** The circle already says pass or fail; the port's name says which way (Go, minor, findings…). */
+/** The bar already says pass or fail; the port's name says which way (Go, minor, findings…). */
 const PLAIN_PORTS = new Set(['next', 'done']);
 
 function PortLabel({ port }: { port: string }) {
   if (PLAIN_PORTS.has(port.trim().toLowerCase())) return null;
-  return <span className="shrink-0 text-[0.625rem] text-muted">{port}</span>;
+  return <span className="shrink-0 text-[0.6875rem] text-muted">{port}</span>;
 }
 
-function outcomeLabel(outcome: string): string {
-  switch (outcome) {
-    case 'done': return 'terminé';
-    case 'blocked': return 'bloqué';
-    case 'stopped': return 'arrêté';
-    case 'error': return 'en erreur';
-    default: return outcome;
-  }
-}
-
-function outcomeTone(outcome: string): 'ok' | 'err' | 'neutral' {
-  switch (outcome) {
-    case 'done': return 'ok';
-    case 'blocked':
-    case 'stopped':
-    case 'error': return 'err';
-    default: return 'neutral';
-  }
-}
 
 function dotClass(nodeRun: NodeRun): string {
-  if (nodeRun.state === 'running') return 'animate-pulse bg-accent';
+  if (nodeRun.state === 'running') return 'bg-accent';
   if (nodeRun.state === 'interrupted') return 'bg-border-strong';
   if (nodeRun.state === 'ended') return nodeRun.port === 'done' ? 'bg-ok' : 'bg-err';
   if (nodeRun.state === 'done') {
@@ -71,28 +51,17 @@ type RailStep =
   | { kind: 'run'; run: NodeRun; key: string }
   | { kind: 'upcoming'; step: UpcomingStep; key: string };
 
-function circleFor(step: RailStep): { className: string; icon: 'check' | 'close' | null } {
-  if (step.kind === 'upcoming') return { className: 'border border-border-strong bg-transparent', icon: null };
+function barClass(step: RailStep): string {
+  if (step.kind === 'upcoming') return 'border-border';
   const { state, port } = step.run;
-  if (state === 'running') return { className: 'border-2 border-accent bg-accent-soft animate-pulse', icon: null };
-  if (state === 'interrupted') return { className: 'bg-border-strong', icon: null };
-  if (state === 'ended') return port === 'done' ? { className: 'bg-ok', icon: 'check' } : { className: 'bg-err', icon: 'close' };
-  const tone = portTone(port ?? '');
-  return tone === 'negative' ? { className: 'bg-err', icon: 'close' } : { className: 'bg-ok', icon: 'check' };
+  if (state === 'running') return 'border-accent';
+  if (state === 'interrupted') return 'border-border-strong';
+  if (state === 'ended') return port === 'done' ? 'border-ok' : 'border-err';
+  return portTone(port ?? '') === 'negative' ? 'border-err' : 'border-ok';
 }
 
-function connectorClass(step: RailStep, hasNext: boolean): string {
-  if (!hasNext || step.kind !== 'run') return 'bg-border';
-  const { state, port } = step.run;
-  if (state === 'done' || state === 'ended') {
-    if (state === 'ended') return port === 'done' ? 'bg-ok' : 'bg-err/60';
-    return portTone(port ?? '') === 'negative' ? 'bg-err/60' : 'bg-ok';
-  }
-  return 'bg-border';
-}
-
-function StepRow({ step, index, isLast }: { step: RailStep; index: number; isLast: boolean }) {
-  const circle = circleFor(step);
+function StepRow({ step }: { step: RailStep }) {
+  const bar = barClass(step);
   const label = step.kind === 'run' ? step.run.label : step.step.label;
   const nodeRun = step.kind === 'run' ? step.run : null;
   const isRunning = nodeRun?.state === 'running';
@@ -121,33 +90,38 @@ function StepRow({ step, index, isLast }: { step: RailStep; index: number; isLas
         ? formatClock(elapsedMs)
         : null;
   const title = step.kind === 'run' ? (isInterrupted ? `${label} — interrompu` : label) : `${label} — à venir`;
-  const labelClass = isRunning ? 'font-semibold text-accent-strong' : isFinished ? 'text-text' : isInterrupted ? 'text-muted' : 'text-faint';
+  const labelClass = isRunning
+    ? 'font-medium text-text'
+    : isFinished
+      ? 'text-text'
+      : isInterrupted
+        ? 'text-muted'
+        : 'text-faint';
+  // The first line that says something: a report often opens with a Markdown heading.
+  const outputLine = nodeRun?.output
+    ?.split('\n')
+    .map((line) => line.trim())
+    .find((line) => line.length > 0 && !line.startsWith('#'));
+  const showPort = isFinished && !!port && !PLAIN_PORTS.has(port.trim().toLowerCase());
+  const hasMeta = showPort || pass > 1 || time;
   return (
-    <li data-current={isRunning ? 'true' : undefined} className="flex gap-2.5">
-      <div className="flex w-4 shrink-0 flex-col items-center">
-        <span className={`mt-0.5 h-4 w-4 shrink-0 rounded-full ${circle.className} ${circle.icon ? 'flex items-center justify-center' : ''}`}>
-          {circle.icon === 'check' && <CheckIcon className="h-2.5 w-2.5 text-bg" />}
-          {circle.icon === 'close' && <CloseIcon className="h-2.5 w-2.5 text-bg" />}
+    <li data-current={isRunning ? 'true' : undefined} className={`flex flex-col border-l-2 ${bar} py-1 pl-2`}>
+      <span className={`truncate text-xs ${labelClass}`} title={title}>{label}</span>
+      {hasMeta && (
+        <span className="flex items-baseline gap-1.5 whitespace-nowrap text-[0.6875rem] text-muted">
+          {showPort && port ? <PortLabel port={port} /> : null}
+          {pass > 1 && <span className="tabular-nums">×{pass}</span>}
+          {time && <span className="ml-auto font-mono text-faint tabular-nums">{time}</span>}
         </span>
-        {!isLast && <span aria-hidden className={`w-0.5 grow min-h-3 rounded-full ${connectorClass(step, true)}`} />}
-      </div>
-      <div className={`min-w-0 grow ${isLast ? '' : 'pb-3'}`}>
-        <span className="text-[0.6875rem] text-faint">
-          Étape {index + 1}
-          {pass > 1 && <> · ×{pass}</>}
-          {isInterrupted && <> · interrompu</>}
-          {time && <span className="tabular-nums"> · {time}</span>}
-        </span>
-        <span className="mt-0.5 flex items-center gap-1.5">
-          <span className={`block min-w-0 grow truncate text-xs ${labelClass}`} title={title}>{label}</span>
-          {isFinished && port ? <PortLabel port={port} /> : null}
-        </span>
-      </div>
+      )}
+      {bar === 'border-err' && outputLine ? (
+        <span className="truncate text-[0.6875rem] text-muted" title={nodeRun?.output ?? ''}>{outputLine}</span>
+      ) : null}
     </li>
   );
 }
 
-export function RunRail({ run, running, onStop }: { run: RunView; running: boolean; onStop: () => void }) {
+export function RunRail({ run }: { run: RunView }) {
   const [collapsed, setCollapsed] = useState(loadCollapsed);
   const listRef = useRef<HTMLOListElement>(null);
   const count = run.runs.length;
@@ -189,13 +163,6 @@ export function RunRail({ run, running, onStop }: { run: RunView; running: boole
             <span key={`upcoming-${step.nodeId}`} title={`${step.label} — à venir`} className="h-2 w-2 shrink-0 rounded-full border border-dashed border-faint" />
           ))}
         </div>
-        {!run.finished && !running && (
-          <div className="flex justify-center border-t border-border p-1">
-            <Button type="button" variant="danger" size="sm" iconOnly aria-label="Arrêter le workflow" title="Arrêter le workflow" onClick={onStop}>
-              <StopIcon className="h-3 w-3" />
-            </Button>
-          </div>
-        )}
       </aside>
     );
   }
@@ -208,19 +175,9 @@ export function RunRail({ run, running, onStop }: { run: RunView; running: boole
           <ChevronsLeftIcon className="h-3.5 w-3.5" />
         </Button>
       </div>
-      <ol ref={listRef} className="min-h-0 grow overflow-y-auto px-3 pt-1 pb-2 [scrollbar-width:thin]">
-        {steps.map((step, index) => <StepRow key={step.key} step={step} index={index} isLast={index === steps.length - 1} />)}
+      <ol ref={listRef} className="flex min-h-0 grow flex-col gap-0.5 overflow-y-auto px-2 pt-1 pb-2 [scrollbar-width:thin]">
+        {steps.map((step) => <StepRow key={step.key} step={step} />)}
       </ol>
-      {(run.finished || !running) && (
-        <div className="mt-auto border-t border-border p-2">
-          {run.finished && <Badge tone={outcomeTone(run.finished.outcome)}>{outcomeLabel(run.finished.outcome)}</Badge>}
-          {!run.finished && !running && (
-            <Button type="button" variant="danger" size="sm" onClick={onStop} className="w-full">
-              Arrêter le workflow
-            </Button>
-          )}
-        </div>
-      )}
     </aside>
   );
 }

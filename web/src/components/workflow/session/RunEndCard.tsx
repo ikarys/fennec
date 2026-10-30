@@ -91,7 +91,7 @@ export function RunEndCard({ item }: { item: WorkflowEndItem }) {
             {stats.nodes.length > 0 && (
               <details className="group border-b border-border">
                 <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-1.5 text-xs text-muted select-none [&::-webkit-details-marker]:hidden">
-                  <span aria-hidden className="text-[0.625rem] transition-transform group-open:rotate-90">
+                  <span aria-hidden className="text-[0.6875rem] transition-transform group-open:rotate-90">
                     ▶
                   </span>
                   <span>Détail du temps</span>
@@ -115,7 +115,7 @@ export function RunEndCard({ item }: { item: WorkflowEndItem }) {
                           {node.runs > 1 && (
                             <span
                               title="boucle"
-                              className="ml-1.5 text-[0.65625rem] text-accent"
+                              className="ml-1.5 text-[0.6875rem] text-muted tabular-nums"
                             >
                               ×{node.runs}
                             </span>

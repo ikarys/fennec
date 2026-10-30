@@ -53,7 +53,7 @@ export function PlanCard({ plan, actions }: { plan: Plan; actions?: PlanActions 
         {plan.steps.map((step, i) => (
           <li key={i} className="relative flex gap-3 pb-4 last:pb-0">
             {i < plan.steps.length - 1 && <span aria-hidden="true" className="absolute bottom-0 left-3 top-6 w-px bg-border" />}
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent-soft text-xs font-semibold text-accent-strong">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-raised text-xs font-semibold text-muted">
               {step.number}
             </span>
             <div className="flex min-w-0 flex-col gap-1.5">
@@ -246,7 +246,7 @@ export function ReportCard({ report }: { report: Report }) {
       {report.test && (
         <div className="flex flex-col gap-1.5">
           <SectionLabel>À tester</SectionLabel>
-          <div className="text-sm text-accent-strong">
+          <div className="text-sm text-text">
             <Inline>{report.test}</Inline>
           </div>
         </div>

@@ -22,7 +22,7 @@ function portBadgeTone(port: string): 'ok' | 'err' | 'accent' {
 function nodeKindTone(kind: NodeKind): string {
   switch (kind) {
     case 'agent':
-      return 'text-accent';
+      return 'text-muted';
     case 'human':
       return 'text-accent';
     case 'criteria':

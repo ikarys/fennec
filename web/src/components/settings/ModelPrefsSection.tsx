@@ -142,7 +142,7 @@ export function ModelPrefsSection({ listings, values, defaults, favorites, onTog
                       <p className="m-0 text-xs font-medium text-muted">
                         Envoyé au modèle
                       </p>
-                      <p className="m-0 text-[0.625rem] text-faint">
+                      <p className="m-0 text-[0.6875rem] text-faint">
                         Valeurs enregistrées — enregistrer pour appliquer les modifications ci-dessus.
                       </p>
                     </div>
