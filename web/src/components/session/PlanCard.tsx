@@ -2,12 +2,14 @@ import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Plan, Report } from '../../lib/plan';
+import type { PreflightResultView } from '../../lib/fold';
 import { BookmarkIcon, CheckIcon, CloseIcon, EditIcon, PlayIcon } from '../Icons';
 import type { PlanActions } from './PlanActions';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { SectionLabel } from '../ui/SectionLabel';
+import { PreflightSection } from './PreflightSection';
 
 const REMARK_PLUGINS = [remarkGfm];
 
@@ -33,7 +35,7 @@ function PathChip({ path }: { path: string }) {
   return <code className="rounded bg-code px-1.5 py-0.5 font-mono text-[0.7188rem] text-text">{path}</code>;
 }
 
-export function PlanCard({ plan, actions }: { plan: Plan; actions?: PlanActions | null }) {
+export function PlanCard({ plan, actions, preflight }: { plan: Plan; actions?: PlanActions | null; preflight?: PreflightResultView[] }) {
   // The worktree decision is made when building a plan, not in the composer.
   const [worktree, setWorktree] = useState(true);
   return (
@@ -99,6 +101,7 @@ export function PlanCard({ plan, actions }: { plan: Plan; actions?: PlanActions 
           </ul>
         </div>
       )}
+      {preflight && preflight.length > 0 && <PreflightSection results={preflight} />}
       {plan.risks.length > 0 && (
         <div className="flex flex-col gap-1.5">
           <SectionLabel>Risques</SectionLabel>
