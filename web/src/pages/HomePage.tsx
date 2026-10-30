@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { Project, SessionSummary } from '../lib/api';
 import { DeleteSessionsDialog, type DeletionTarget } from '../components/session/DeleteSessionsDialog';
 import { formatRelative, stateLabel } from '../lib/format';
-import { ChevronRightIcon, PlusIcon, TrashIcon } from '../components/Icons';
+import { ChevronRightIcon, PlusIcon, RepoIcon, TrashIcon } from '../components/Icons';
 import { Button, buttonClass } from '../components/ui/Button';
 import { Badge, type BadgeTone } from '../components/ui/Badge';
 import { SectionLabel } from '../components/ui/SectionLabel';
@@ -133,20 +133,20 @@ function ProjectSection({
         <>
           <a
             href={'#/project/' + encodeURIComponent(project.id)}
-            title="La carte du projet, ses ADR"
-            className={buttonClass({ variant: 'ghost', size: 'sm' })}
+            title="Voir le projet : tâches, carte des modules, doc"
+            aria-label="Voir le projet"
+            className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
           >
-            Projet
+            <RepoIcon className="h-4 w-4" />
           </a>
           <Button
             variant="secondary"
             size="sm"
-            iconOnly
             onClick={() => onNewSession(project.id)}
             title="Nouvelle session dans ce projet"
-            aria-label="Nouvelle session"
           >
             <PlusIcon className="h-3.5 w-3.5" />
+            Session
           </Button>
         </>
       }
