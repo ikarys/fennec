@@ -3,6 +3,15 @@
  */
 import { useState } from 'react';
 import { Button } from '../../ui/Button';
+import {
+  ChevronDownIcon,
+  ChevronUpIcon,
+  EditIcon,
+  ExternalIcon,
+  EyeIcon,
+  PlayIcon,
+  ReplyIcon,
+} from '../../Icons';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { Menu, MenuItem } from '../../ui/Menu';
 import { IdeaStatusBadge } from './IdeaStatusBadge';
@@ -22,6 +31,15 @@ const ACTION_LABELS: Record<IdeaAction, string> = {
   open: 'Ouvrir',
   answer: 'Répondre',
   review: 'Relire',
+};
+
+const ACTION_ICONS: Record<IdeaAction, typeof EditIcon> = {
+  frame: EditIcon,
+  resumeFraming: EditIcon,
+  start: PlayIcon,
+  open: ExternalIcon,
+  answer: ReplyIcon,
+  review: EyeIcon,
 };
 
 export function IdeaRow({
@@ -76,37 +94,29 @@ export function IdeaRow({
 
   // The one primary action the server chose for this idea.
   const renderAction = () => {
-    switch (idea.action) {
-      case 'frame':
-        return (
-          <Button variant="secondary" size="sm" disabled={busy} onClick={() => void handleFrame()}>
-            {ACTION_LABELS.frame}
-          </Button>
-        );
-      case 'resumeFraming':
-      case 'open':
-      case 'answer':
-      case 'review':
-        if (!idea.sessionId) return null;
-        return (
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={busy}
-            onClick={() => onOpenSession(idea.sessionId as string)}
-          >
-            {ACTION_LABELS[idea.action]}
-          </Button>
-        );
-      case 'start':
-        return (
-          <Button variant="secondary" size="sm" disabled={busy} onClick={() => void handleStart()}>
-            {ACTION_LABELS.start}
-          </Button>
-        );
-      default:
-        return null;
-    }
+    const onClick =
+      idea.action === 'frame'
+        ? () => void handleFrame()
+        : idea.action === 'start'
+          ? () => void handleStart()
+          : idea.sessionId
+            ? () => onOpenSession(idea.sessionId as string)
+            : null;
+    if (!onClick || !idea.action) return null;
+    const Icon = ACTION_ICONS[idea.action];
+    return (
+      <Button
+        variant="secondary"
+        size="sm"
+        iconOnly
+        disabled={busy}
+        title={ACTION_LABELS[idea.action]}
+        aria-label={ACTION_LABELS[idea.action]}
+        onClick={onClick}
+      >
+        <Icon className="h-4 w-4" />
+      </Button>
+    );
   };
 
   return (
@@ -118,13 +128,27 @@ export function IdeaRow({
       ) : null}
 
       {onMoveUp ? (
-        <Button variant="ghost" size="sm" iconOnly aria-label="Monter" onClick={onMoveUp}>
-          ↑
+        <Button
+          variant="ghost"
+          size="sm"
+          iconOnly
+          title="Monter"
+          aria-label="Monter"
+          onClick={onMoveUp}
+        >
+          <ChevronUpIcon className="h-4 w-4" />
         </Button>
       ) : null}
       {onMoveDown ? (
-        <Button variant="ghost" size="sm" iconOnly aria-label="Descendre" onClick={onMoveDown}>
-          ↓
+        <Button
+          variant="ghost"
+          size="sm"
+          iconOnly
+          title="Descendre"
+          aria-label="Descendre"
+          onClick={onMoveDown}
+        >
+          <ChevronDownIcon className="h-4 w-4" />
         </Button>
       ) : null}
 
