@@ -9,6 +9,7 @@ mod editor;
 mod event_stream;
 mod guard;
 mod http;
+mod idea_assets;
 mod idea_queue;
 mod idea_routes;
 mod insight;
