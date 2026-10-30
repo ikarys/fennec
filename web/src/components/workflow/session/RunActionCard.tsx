@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import type { RunWaiting } from '../../../lib/workflowRun';
 import { Button } from '../../ui/Button';
-import { Card } from '../../ui/Card';
 import { TextInput } from '../../ui/Field';
 
 export function RunActionCard({
@@ -40,13 +39,8 @@ export function RunActionCard({
   const isBusy = busy || disabled;
 
   return (
-    <div className="px-6 py-2">
-      <Card className="mx-auto max-w-[820px] px-3 py-2">
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-1.5 text-xs font-semibold">
-            <span className="text-accent">⚡</span>
-            <span className="text-accent-strong">Workflow</span>
-          </div>
+    <div className="border-t border-border bg-panel px-6 py-2">
+      <div className="mx-auto flex max-w-[960px] flex-col gap-2">
 
           {waiting.kind === 'human' && (
             <>
@@ -117,7 +111,7 @@ export function RunActionCard({
           {waiting.kind === 'interrupted' && (
             <>
               <div className="text-sm leading-snug text-muted">
-                Workflow interrompu
+                Le workflow s'est interrompu : reprendre là où il en était ?
               </div>
               <div className="flex flex-wrap items-center gap-1.5">
                 <Button
@@ -144,7 +138,6 @@ export function RunActionCard({
 
           {error && <div className="text-xs text-err">{error}</div>}
         </div>
-      </Card>
-    </div>
-  );
+      </div>
+    );
 }

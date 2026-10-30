@@ -145,25 +145,27 @@ export function ContextPanel({ view, skills, usage, hasSession, partial, worktre
       />
       <aside
         aria-label="Contexte de la session"
-        className="flex min-h-0 w-full flex-col overflow-y-auto border-l border-border bg-bg px-3 py-3 [scrollbar-width:thin]"
+        className="flex min-h-0 w-full flex-col overflow-y-auto border-l border-border bg-bg [scrollbar-width:thin]"
       >
         {pages.length > 1 && (
-          <Select
-            aria-label="Page du panneau"
-            value={page.name}
-            onChange={(event) => {
-              const name = event.target.value;
-              setSelectedPageName(name);
-              savePageName(name);
-            }}
-            className="w-full"
-          >
-            {pages.map((candidate) => (
-              <option key={candidate.name} value={candidate.name}>
-                {candidate.name}
-              </option>
-            ))}
-          </Select>
+          <label className="flex items-center gap-2 px-3 py-2 text-xs text-muted">Vue
+            <Select
+              aria-label="Page du panneau"
+              value={page.name}
+              onChange={(event) => {
+                const name = event.target.value;
+                setSelectedPageName(name);
+                savePageName(name);
+              }}
+              className="min-w-0 grow"
+            >
+              {pages.map((candidate) => (
+                <option key={candidate.name} value={candidate.name}>
+                  {candidate.name}
+                </option>
+              ))}
+            </Select>
+          </label>
         )}
         {pageBlocks(page, page === pages[0]).map(renderBlock)}
       </aside>
