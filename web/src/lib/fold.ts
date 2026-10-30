@@ -66,6 +66,9 @@ export interface WorkflowNodeStat {
 
 export interface WorkflowStats {
   workingMs: number;
+  /** The run's wall-clock start and end (ms); absent in older logs. */
+  startedAt?: number;
+  finishedAt?: number;
   nodes: WorkflowNodeStat[];
   reruns: number;
   filesChanged: number;
@@ -241,6 +244,8 @@ function parseWorkflowStats(value: unknown): WorkflowStats | undefined {
   }
   return {
     workingMs: isFiniteNumber(stats.workingMs) ? stats.workingMs : 0,
+    startedAt: isFiniteNumber(stats.startedAt) ? stats.startedAt : undefined,
+    finishedAt: isFiniteNumber(stats.finishedAt) ? stats.finishedAt : undefined,
     nodes,
     reruns: isFiniteNumber(stats.reruns) ? stats.reruns : 0,
     filesChanged: isFiniteNumber(stats.filesChanged) ? stats.filesChanged : 0,

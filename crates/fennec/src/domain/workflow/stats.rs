@@ -11,6 +11,14 @@ use std::collections::HashMap;
 pub struct RunStats {
     /// The sum of the nodes' working time: the time waiting for the human is not counted.
     pub working_ms: u64,
+    /// The run's wall-clock start, read from its `workflow.started`. `None` in
+    /// logs written before the field.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub started_at: Option<u64>,
+    /// The run's wall-clock end, set when it finishes. `None` in logs written
+    /// before the field.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub finished_at: Option<u64>,
     pub nodes: Vec<NodeStats>,
     /// Node runs beyond the first, summed: how much the run looped.
     pub reruns: u32,
@@ -32,10 +40,16 @@ pub struct NodeStats {
 /// `run`: the run's events in the session (from its `workflow.started`); `criteria`: the
 /// run's folded criteria. Tokens are not here: the usage ledger holds them.
 pub fn run_stats(run: &[Event], criteria: &[CriterionState], files_changed: usize) -> RunStats {
-    let workflow = run.iter().find_map(|event| match event {
-        Event::WorkflowStarted { workflow, .. } => Some(workflow),
+    let start = run.iter().find_map(|event| match event {
+        Event::WorkflowStarted {
+            workflow,
+            started_at,
+            ..
+        } => Some((workflow, *started_at)),
         _ => None,
     });
+    let workflow = start.map(|(workflow, _)| workflow);
+    let started_at = start.and_then(|(_, started_at)| started_at);
 
     let mut nodes: Vec<NodeStats> = Vec::new();
     let mut index: HashMap<String, usize> = HashMap::new();
@@ -92,6 +106,8 @@ pub fn run_stats(run: &[Event], criteria: &[CriterionState], files_changed: usiz
 
     RunStats {
         working_ms,
+        started_at,
+        finished_at: None,
         nodes,
         reruns,
         files_changed: files_changed as u32,
@@ -230,5 +246,28 @@ mod tests {
         assert_eq!(stats.criteria_total, 3);
         assert_eq!(stats.criteria_passed, 2);
         assert_eq!(stats.criteria_verified, 1);
+    }
+
+    #[test]
+    fn run_stats_carries_the_run_wall_clock() {
+        let run = vec![Event::WorkflowStarted {
+            run_id: "r".into(),
+            workflow: crate::domain::workflow::definition::Workflow {
+                id: "w".into(),
+                name: "w".into(),
+                description: String::new(),
+                max_steps: 2,
+                nodes: vec![],
+                edges: vec![],
+            },
+            task: String::new(),
+            step_by_step: false,
+            started_at: Some(1_000),
+        }];
+        let stats = run_stats(&run, &[], 0);
+        // The start is read from the run's `workflow.started`; the end is set
+        // at finish time, not by the fold.
+        assert_eq!(stats.started_at, Some(1_000));
+        assert_eq!(stats.finished_at, None);
     }
 }
