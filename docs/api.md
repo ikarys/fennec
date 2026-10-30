@@ -391,7 +391,7 @@ read-only. The human edits them as usual.
 - `GET /api/sessions/{id}/usage/workflow` → `{nodes: [{itemId, line, detail}], runs: [{runId, calls, generated, read, cache}]}`: the
   tokens of each workflow node run (`itemId` is `wf-{runId}-{nodeId}-{pass}`, its child session's calls or the
   session's own between its start and end) and of each finished run, from the ledger, ready to display.
-- `GET /api/insight?days=<7|30|90|all>&project=<id>` → `{scope, cards: [{label, value, detail}], days: [{day, label,
+- `GET /api/insight?days=<7|30|90|all>&project=<id>` → `{cards: [{label, value, detail}], days: [{day, label,
   cachedPercent, freshPercent, lostPercent, title}], projects: [row], models: [row], consumers, projectOptions: [{id, name}]}`,
   `row` being `{key, name, calls, input, cache, output, lost, cost, time}`: the Insight page from the ledger, so deleted
   sessions still count; `cost` and the last card are an estimate at each model's own price (Settings, per model), "—"

@@ -1230,7 +1230,6 @@ export interface InsightRow {
   time: string;
 }
 export interface InsightView {
-  scope: string;
   cards: InsightCard[];
   days: InsightDay[];
   projects: InsightRow[];

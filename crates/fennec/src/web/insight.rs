@@ -50,8 +50,6 @@ impl Period {
 #[derive(Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InsightView {
-    /// "Tous les projets", or the project's name.
-    pub scope: String,
     pub cards: Vec<CardView>,
     /// One bar per day with calls, oldest first.
     pub days: Vec<DayView>,
@@ -132,15 +130,6 @@ impl InsightData {
 
         let pricing = priced(&models, prices);
 
-        let scope = match project {
-            Some(id) => groups
-                .iter()
-                .find(|row| row.key == id)
-                .map(|row| row.name.clone())
-                .unwrap_or_else(|| id.to_string()),
-            None => "Tous les projets".to_string(),
-        };
-
         let cards = cards(&total, &pricing);
         let consumers = consumers(&total.breakdown);
 
@@ -195,7 +184,6 @@ impl InsightData {
         let project_options = project_options(&groups);
 
         InsightView {
-            scope,
             cards,
             days,
             projects,
@@ -516,8 +504,6 @@ mod tests {
         }
         .view(None, &prices);
 
-        assert_eq!(view.scope, "Tous les projets");
-
         let labels: Vec<&str> = view.cards.iter().map(|c| c.label.as_str()).collect();
         assert_eq!(
             labels,
@@ -561,7 +547,6 @@ mod tests {
         }
         .view(Some("p1"), &BTreeMap::new());
 
-        assert_eq!(view.scope, "Projet un");
         assert!(view.projects.is_empty());
     }
 
