@@ -24,25 +24,6 @@ function InsightIcon({ className }: { className?: string }) {
   );
 }
 
-function ArchitectureIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M3 21h18" />
-      <path d="M5 21V9l7-5 7 5v12" />
-      <path d="M9 21v-6h6v6" />
-    </svg>
-  );
-}
-
 function WorkflowsIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -195,14 +176,6 @@ export function TopBar({
           className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
         >
           <InsightIcon className="h-4 w-4" />
-        </a>
-        <a
-          href="#/architecture"
-          title="Architecture"
-          aria-label="Architecture"
-          className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
-        >
-          <ArchitectureIcon className="h-4 w-4" />
         </a>
         <a
           href="#/workflows"

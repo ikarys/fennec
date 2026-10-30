@@ -204,9 +204,18 @@ read-only. The human edits them as usual.
   project's agents in discovery order (`color` null when unset); the modes are the
   ones with `subagent` false, the others only run in a workflow node's fresh context;
   404 if no project
-- `GET /api/projects/{id}/architecture` → `{adrs: [{number, file, title, status, date, body}]}`:
-  the MADR files of the project's `docs/adr/` (`NNNN-slug.md`, sorted by number; `status` and
-  `date` from the frontmatter, null when absent; the title from the first `# ` heading); 404 if no project
+- `GET /api/projects/{id}/overview` → `{map, mapFile, adrs}`, the project page (404 if no project):
+  - `map` `{modules: [{id, files, tests, entry, layer, row}], dependencies: [{from, to, imports}]}`:
+    the project map, read from the import lines of the files git tracks (Rust `crate::` and workspace
+    crates, TS/JS relative imports; test modules skipped); a module is a directory (`.` the root),
+    `imports` counts the importing files; `layer`/`row` place it (layers by dependency depth): the UI
+    computes nothing. Deterministic (verified).
+  - `mapFile` `missing | stale | current`: the project's `docs/map.md` against a fresh render of `map`.
+  - `adrs` `[{number, file, title, status, date, body}]`: the MADR files of `docs/adr/` (`NNNN-slug.md`,
+    sorted by number; `status` and `date` from the frontmatter, null when absent; the title from the
+    first `# ` heading).
+- `POST /api/projects/{id}/map-file` `{}` → `{mapFile}`: the human's click writes `docs/map.md` (a Mermaid
+  diagram and a table) in the project's tree, not committed; 404 if no project
 - `GET /api/folders?path=<absolute path>` → `{path, parent, folders: [{name, path, hidden, repo}]}`,
   the sub-folders of `path` (the home directory when omitted), sorted by name;
   `repo` marks a git repository; 400 if `path` cannot be read
