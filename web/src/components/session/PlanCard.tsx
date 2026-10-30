@@ -148,13 +148,26 @@ export function PlanCard({ plan, actions }: { plan: Plan; actions?: PlanActions 
           >
             Sans workflow
           </Button>
+          {actions.ideaReady && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={actions.ideaReady.onMark}
+              disabled={actions.disabled}
+              className="ml-auto"
+              title="Garde ce plan sur l'idée, dans le backlog du projet, sans le lancer maintenant."
+            >
+              {actions.ideaReady.already ? "Mettre à jour l'idée" : 'Idée prête'}
+            </Button>
+          )}
           <Button
             type="button"
             variant="secondary"
             size="sm"
             onClick={actions.onRevise}
             disabled={actions.disabled}
-            className="ml-auto"
+            className={actions.ideaReady ? undefined : 'ml-auto'}
           >
             Revoir
           </Button>

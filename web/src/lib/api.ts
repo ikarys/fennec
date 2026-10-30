@@ -232,6 +232,8 @@ export interface SessionDetail {
     name: string;
     workdir: string;
   };
+  /** The idea this session frames, or null. */
+  idea: { id: string; state: "inbox" | "framing" | "ready" } | null;
 }
 
 export class WorkflowSaveError extends Error {
@@ -245,7 +247,7 @@ export class WorkflowSaveError extends Error {
 
 export type IntegrationConflict = { files: string[]; command: string };
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     headers: {
       "Content-Type": "application/json",
