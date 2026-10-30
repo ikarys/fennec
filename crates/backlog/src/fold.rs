@@ -26,6 +26,7 @@ pub struct Idea {
     pub halted: Option<String>,
     pub started_at: Option<u64>,
     pub autonomous: bool,
+    pub attachments: Vec<crate::attachment::IdeaAttachment>,
 }
 
 /// One launch of the queue.
@@ -101,7 +102,10 @@ pub fn fold(events: &[(u64, BacklogEvent)]) -> Backlog {
         };
 
         let Some(index) = ideas.iter().position(|idea| idea.id == id) else {
-            if let BacklogEvent::Added { text, .. } = event {
+            if let BacklogEvent::Added {
+                text, attachments, ..
+            } = event
+            {
                 ideas.push(Idea {
                     id: id.to_string(),
                     text: text.clone(),
@@ -113,6 +117,7 @@ pub fn fold(events: &[(u64, BacklogEvent)]) -> Backlog {
                     halted: None,
                     started_at: None,
                     autonomous: false,
+                    attachments: attachments.clone(),
                 });
             }
             continue;
@@ -198,6 +203,7 @@ mod tests {
         BacklogEvent::Added {
             idea_id: id.into(),
             text: text.into(),
+            attachments: Vec::new(),
         }
     }
 
@@ -277,6 +283,28 @@ mod tests {
         assert_eq!(idea.updated_at, 3);
         assert_eq!(idea.started_at, None);
         assert!(!idea.autonomous);
+    }
+
+    #[test]
+    fn added_carries_its_attachments() {
+        let events = vec![ev(
+            1,
+            BacklogEvent::Added {
+                idea_id: "i1".into(),
+                text: "t".into(),
+                attachments: vec![crate::attachment::IdeaAttachment {
+                    filename: "a.png".into(),
+                    mime_type: "image/png".into(),
+                    size: 3,
+                    data: "data:image/png;base64,AAA=".into(),
+                }],
+            },
+        )];
+
+        let backlog = fold(&events);
+
+        assert_eq!(backlog.ideas[0].attachments.len(), 1);
+        assert_eq!(backlog.ideas[0].attachments[0].filename, "a.png");
     }
 
     #[test]

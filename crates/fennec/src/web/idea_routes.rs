@@ -19,13 +19,63 @@ use crate::domain::project::{Project, SessionState};
 use crate::domain::workflow::run;
 use crate::store::SqliteStore;
 use backlog::{
-    Backlog, BacklogEvent, Idea, IdeaState, Progress, STAGES, Stage, Status, queue_order, status,
-    summarize,
+    Backlog, BacklogEvent, Idea, IdeaAttachment, IdeaState, Progress, STAGES, Stage, Status,
+    queue_order, status, summarize,
 };
 use token_usage::{Filter, Ledger};
 
 /// An idea is a note, not a document: the plan holds the detail.
 const MAX_IDEA_CHARS: usize = 4_000;
+
+/// The pinned files on an idea: how many, and how big one may be. The stored
+/// payload is a base64 data URL, so a 5 MB file inflates to ~4/3 before the
+/// `data:` prefix — bound the payload, not the raw bytes, or a full 5 MB file
+/// the composer accepts would come back a 400.
+const MAX_IDEA_ATTACHMENTS: usize = 10;
+const MAX_IDEA_ATTACHMENT_BYTES: u64 = 5 * 1024 * 1024 * 4 / 3 + 1024;
+// The request body is capped at 32 MB (http.rs); keep the total under it so an
+// over-large idea gets a clean message, not the generic "body too large".
+const MAX_IDEA_ATTACHMENTS_TOTAL: u64 = 30 * 1024 * 1024;
+
+/// `{filename, mimeType, size, data}` items of an idea-create body.
+fn parse_attachments(body: &Value) -> Result<Vec<IdeaAttachment>, String> {
+    let Some(items) = body["attachments"].as_array() else {
+        return Ok(Vec::new());
+    };
+    if items.len() > MAX_IDEA_ATTACHMENTS {
+        return Err(format!(
+            "at most {MAX_IDEA_ATTACHMENTS} attachments per idea"
+        ));
+    }
+    let mut attachments = Vec::with_capacity(items.len());
+    let mut total: u64 = 0;
+    for item in items {
+        let filename = item["filename"].as_str().unwrap_or("").trim().to_string();
+        let mime_type = item["mimeType"].as_str().unwrap_or("").to_string();
+        let data = item["data"].as_str().unwrap_or("").to_string();
+        if filename.is_empty() || data.is_empty() {
+            return Err("an attachment needs a filename and a data URL".into());
+        }
+        // The declared size is what the browser said; the payload is what
+        // we store, so limit the payload (base64 ≈ 4/3 of the bytes).
+        if data.len() as u64 > MAX_IDEA_ATTACHMENT_BYTES {
+            return Err(format!("attachment {filename} larger than 5 MB"));
+        }
+        total += data.len() as u64;
+        if total > MAX_IDEA_ATTACHMENTS_TOTAL {
+            return Err("attachments total too large".into());
+        }
+        attachments.push(IdeaAttachment {
+            filename,
+            mime_type,
+            // The raw file size the client measured; fall back to the payload
+            // length when it is not in the body.
+            size: item["size"].as_u64().unwrap_or(data.len() as u64),
+            data,
+        });
+    }
+    Ok(attachments)
+}
 
 /// `GET /api/projects/{id}/ideas`.
 pub fn list_ideas(app: &App, stream: &mut TcpStream, project_id: &str) -> Result<(), String> {
@@ -56,6 +106,10 @@ pub fn add_idea(
     if text.chars().count() > MAX_IDEA_CHARS {
         return error(stream, 400, "idea too long");
     }
+    let attachments = match parse_attachments(&body) {
+        Ok(attachments) => attachments,
+        Err(e) => return error(stream, 400, &e),
+    };
     let (session_id, plan) = (field("sessionId"), field("plan"));
     if !session_id.is_empty() {
         match store.session(&session_id)? {
@@ -72,6 +126,7 @@ pub fn add_idea(
         &BacklogEvent::Added {
             idea_id: idea_id.clone(),
             text,
+            attachments,
         },
     )?;
     if !session_id.is_empty() {
@@ -509,6 +564,7 @@ fn idea_view(board: &Board, idea: &Idea) -> Result<(Status, Value), String> {
     let value = json!({
         "id": idea.id,
         "text": idea.text,
+        "attachments": serde_json::to_value(&idea.attachments).unwrap_or(Value::Array(vec![])),
         "status": status,
         "stage": stage,
         "action": action,
@@ -618,6 +674,113 @@ fn idea_report(events: &[Event]) -> IdeaReport {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::{LlmSettings, Settings};
+    use crate::domain::preferences::ModelParams;
+    use crate::web::notifier::Notifier;
+    use crate::web::turns::Turns;
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+    use std::sync::Mutex;
+
+    fn app() -> App {
+        let settings = Settings {
+            llm: LlmSettings {
+                base_url: "http://localhost".into(),
+                api_key: None,
+                defaults: ModelParams {
+                    provider: "local".into(),
+                    model: "test".into(),
+                    max_tokens: 100,
+                    context_window: 1000,
+                    compact_at: 0.85,
+                    reasoning_effort: None,
+                },
+                listed: Vec::new(),
+            },
+            db_path: PathBuf::from(":memory:"),
+        };
+        let notifier = Arc::new(Notifier::default());
+        App {
+            turns: Turns::new(settings.clone(), notifier.clone()),
+            settings,
+            port: 0,
+            notifier,
+            skill_folds: Mutex::new(HashMap::new()),
+            idea_queues: Mutex::default(),
+        }
+    }
+
+    #[test]
+    fn parse_attachments_parses_and_validates() {
+        let body = json!({
+            "attachments": [
+                { "filename": "a.png", "mimeType": "image/png", "size": 3, "data": "data:image/png;base64,AAA=" }
+            ]
+        });
+        let parsed = parse_attachments(&body).unwrap();
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].filename, "a.png");
+        assert_eq!(parsed[0].mime_type, "image/png");
+        assert_eq!(parsed[0].size, 3);
+
+        assert!(parse_attachments(&json!({})).unwrap().is_empty());
+
+        let missing = json!({ "attachments": [ { "filename": "", "data": "" } ] });
+        assert!(parse_attachments(&missing).is_err());
+
+        let too_big = json!({
+            "attachments": [ { "filename": "x", "mimeType": "image/png", "data": format!("data:image/png;base64,{}", "A".repeat(MAX_IDEA_ATTACHMENT_BYTES as usize + 1)) } ]
+        });
+        assert!(parse_attachments(&too_big).is_err());
+
+        // Seven 5 MB payloads clear the per-attachment cap but exceed the total.
+        let too_many = json!({
+            "attachments": (0..7).map(|i| json!({
+                "filename": format!("f{i}"), "mimeType": "image/png",
+                "data": format!("data:image/png;base64,{}", "A".repeat(5 * 1024 * 1024))
+            })).collect::<Vec<_>>()
+        });
+        assert!(parse_attachments(&too_many).is_err());
+    }
+
+    #[test]
+    fn board_view_lists_idea_attachments() {
+        let app = app();
+        let store = app.store().unwrap();
+        let project = store.project_for("/tmp/attach").unwrap();
+
+        store
+            .append_idea_event(
+                &project.id,
+                &BacklogEvent::Added {
+                    idea_id: "i1".into(),
+                    text: "t".into(),
+                    attachments: vec![IdeaAttachment {
+                        filename: "shot.png".into(),
+                        mime_type: "image/png".into(),
+                        size: 3,
+                        data: "data:image/png;base64,AAA=".into(),
+                    }],
+                },
+            )
+            .unwrap();
+
+        let backlog = store.backlog(&project.id).unwrap();
+        let project = store.project(&project.id).unwrap().unwrap();
+        let board = Board {
+            app: &app,
+            store: &store,
+            backlog: &backlog,
+            project: &project,
+            queue: queue_order(&backlog),
+            ledger: None,
+        };
+
+        let (_, value) = idea_view(&board, &backlog.ideas[0]).unwrap();
+        let attachments = value["attachments"].as_array().unwrap();
+        assert_eq!(attachments[0]["filename"], "shot.png");
+        assert_eq!(attachments[0]["data"], "data:image/png;base64,AAA=");
+    }
 
     #[test]
     fn progress_maps_each_session_state() {

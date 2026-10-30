@@ -5,7 +5,13 @@ use serde::{Deserialize, Serialize};
 #[serde(tag = "type", content = "data")]
 pub enum BacklogEvent {
     #[serde(rename = "idea.added", rename_all = "camelCase")]
-    Added { idea_id: String, text: String },
+    Added {
+        idea_id: String,
+        text: String,
+        // Lean: an idea without attachments serializes exactly as before.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        attachments: Vec<crate::attachment::IdeaAttachment>,
+    },
     #[serde(rename = "idea.framing", rename_all = "camelCase")]
     Framing { idea_id: String, session_id: String },
     #[serde(rename = "idea.ready", rename_all = "camelCase")]
@@ -76,6 +82,7 @@ mod tests {
         BacklogEvent::Added {
             idea_id: id.into(),
             text: text.into(),
+            attachments: Vec::new(),
         }
     }
 
@@ -177,6 +184,34 @@ mod tests {
 
         let decoded: BacklogEvent = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded, event);
+    }
+
+    #[test]
+    fn added_event_with_attachments_round_trips() {
+        let event = BacklogEvent::Added {
+            idea_id: "i1".into(),
+            text: "t".into(),
+            attachments: vec![crate::attachment::IdeaAttachment {
+                filename: "a.png".into(),
+                mime_type: "image/png".into(),
+                size: 3,
+                data: "data:image/png;base64,AAA=".into(),
+            }],
+        };
+
+        let json = serde_json::to_string(&event).unwrap();
+        assert!(json.contains(r#""attachments":[{""#));
+
+        let decoded: BacklogEvent = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, event);
+    }
+
+    #[test]
+    fn added_event_old_log_without_attachments_deserializes_empty() {
+        let json = r#"{"type":"idea.added","data":{"ideaId":"i1","text":"t"}}"#;
+
+        let decoded: BacklogEvent = serde_json::from_str(json).unwrap();
+        assert_eq!(decoded, added("i1", "t"));
     }
 
     #[test]

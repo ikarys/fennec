@@ -1,6 +1,6 @@
 import type { WorkflowSummary } from "../lib/workflow";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { addPlannedIdea, frameIdea, listIdeas, markIdeaReady } from "../lib/ideas";
+import { addPlannedIdea, frameIdea, framingPrefill, listIdeas, markIdeaReady } from "../lib/ideas";
 import type {
   Agent,
   AttachmentInput,
@@ -244,7 +244,11 @@ export function SessionPage({
           const idea = board.groups
             .flatMap((group) => group.ideas)
             .find((candidate) => candidate.id === ideaId);
-          if (idea) setText(idea.text);
+          if (idea) {
+            const prefill = framingPrefill(idea);
+            setText(prefill.text);
+            setAttachments(prefill.attachments);
+          }
         })
         .catch(() => {
           // Ignore: the composer stays editable with an empty message.
