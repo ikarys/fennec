@@ -25,32 +25,29 @@ export function ModelSection({ value, listings, stored, defaultModel, onChange }
     : '';
 
   return (
-    <Section>
-      <div className="flex flex-col gap-4">
-        <h2 className="text-sm font-semibold">Modèle</h2>
-        <FieldRow label="Modèle par défaut">
-          <Select value={value} onChange={(event) => onChange(event.target.value)} className="w-full">
-            <option value="">Défaut de l'environnement ({defaultModel})</option>
-            {listings.map((listing) => (
-              <optgroup key={listing.provider} label={listing.name}>
-                {listing.models.map((model) => (
-                  <option key={`${listing.provider}/${model.id}`} value={`${listing.provider}/${model.id}`}>
-                    {model.id}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-            {unlistedStored && (
-              <option value={`${unlistedStored.provider}/${unlistedStored.model}`}>
-                {unlistedStored.model} — {unlistedProviderName} (non listé)
-              </option>
-            )}
-          </Select>
-        </FieldRow>
-        <p className="m-0 text-xs text-muted">
-          Les nouvelles sessions l'utilisent ; le composer change celui d'une session. Les favoris (★) sont proposés dans le composer.
-        </p>
-      </div>
+    <Section title="Modèle">
+      <FieldRow label="Modèle par défaut">
+        <Select value={value} onChange={(event) => onChange(event.target.value)} className="w-full">
+          <option value="">Défaut de l'environnement ({defaultModel})</option>
+          {listings.map((listing) => (
+            <optgroup key={listing.provider} label={listing.name}>
+              {listing.models.map((model) => (
+                <option key={`${listing.provider}/${model.id}`} value={`${listing.provider}/${model.id}`}>
+                  {model.id}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+          {unlistedStored && (
+            <option value={`${unlistedStored.provider}/${unlistedStored.model}`}>
+              {unlistedStored.model} — {unlistedProviderName} (non listé)
+            </option>
+          )}
+        </Select>
+      </FieldRow>
+      <p className="m-0 text-xs text-muted">
+        Les nouvelles sessions l'utilisent ; le composer change celui d'une session. Les favoris (★) sont proposés dans le composer.
+      </p>
     </Section>
   );
 }

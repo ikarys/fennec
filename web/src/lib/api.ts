@@ -1,14 +1,19 @@
-import type { Origin, WorkflowDef, WorkflowIssue, WorkflowSummary } from './workflow';
-import type { DecisionView } from './fold';
+import type {
+  Origin,
+  WorkflowDef,
+  WorkflowIssue,
+  WorkflowSummary,
+} from "./workflow";
+import type { DecisionView } from "./fold";
 
 export type SessionState =
-  | 'running'
-  | 'complete'
-  | 'stopped'
-  | 'error'
-  | 'truncated'
-  | 'idle'
-  | 'waiting_for_user';
+  | "running"
+  | "complete"
+  | "stopped"
+  | "error"
+  | "truncated"
+  | "idle"
+  | "waiting_for_user";
 
 export interface SessionSummary {
   id: string;
@@ -44,7 +49,8 @@ export interface Agent {
 }
 
 /** openfox `ReasoningEffort`: how much a model may think. */
-export type ReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+export type ReasoningEffort =
+  "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 
 export interface ModelPrefs {
   maxTokens?: number;
@@ -114,7 +120,7 @@ export interface SessionModel {
   providerName: string;
   contextWindow: number;
   compactAt: number;
-  source: 'session' | 'parent' | 'default';
+  source: "session" | "parent" | "default";
 }
 
 export interface Preferences {
@@ -131,10 +137,12 @@ export interface Preferences {
   sandbox?: SandboxPrefs;
   /** Skill ids every new session gets in its system prompt. */
   alwaysOnSkills?: string[];
+  /** Opt-in embedded workflows the human enabled. */
+  enabledWorkflows?: string[];
 }
 
 /** Where a resolved parameter value comes from. */
-export type ParamSource = 'perModel' | 'listed' | 'default';
+export type ParamSource = "perModel" | "listed" | "default";
 
 /** One resolved parameter: its value, source, and whether a call sends it. */
 export interface ResolvedValue<T> {
@@ -193,6 +201,13 @@ export interface SettingsResponse {
   defaults: SettingsDefaults;
   /** The skills a session can load outside any project: defaults and ~/.agents/skills. */
   skills: SkillSummary[];
+  optInWorkflows: WorkflowOptIn[];
+}
+
+export interface WorkflowOptIn {
+  id: string;
+  name: string;
+  description: string;
 }
 
 export interface SessionDetail {
@@ -206,7 +221,12 @@ export interface SessionDetail {
   /** The parent session id, or null for a top-level session. */
   parentId: string | null;
   /** The git worktree the session's agent works in, or null when it runs in place. */
-  worktree: { path: string; branch: string; base: string; /** Opens the copy in VS Code (through the WSL remote under WSL). */ editorUrl: string } | null;
+  worktree: {
+    path: string;
+    branch: string;
+    base: string;
+    /** Opens the copy in VS Code (through the WSL remote under WSL). */ editorUrl: string;
+  } | null;
   project: {
     id: string;
     name: string;
@@ -218,7 +238,7 @@ export class WorkflowSaveError extends Error {
   issues: WorkflowIssue[];
   constructor(message: string, issues: WorkflowIssue[]) {
     super(message);
-    this.name = 'WorkflowSaveError';
+    this.name = "WorkflowSaveError";
     this.issues = issues;
   }
 }
@@ -228,9 +248,9 @@ export type IntegrationConflict = { files: string[]; command: string };
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     headers: {
-      'Content-Type': 'application/json'
+      "Content-Type": "application/json",
     },
-    ...init
+    ...init,
   });
 
   if (!response.ok) {
@@ -238,7 +258,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     let errors: WorkflowIssue[] | undefined;
     let conflict: IntegrationConflict | undefined;
     try {
-      const body = (await response.json()) as { error?: string; errors?: WorkflowIssue[]; conflict?: IntegrationConflict };
+      const body = (await response.json()) as {
+        error?: string;
+        errors?: WorkflowIssue[];
+        conflict?: IntegrationConflict;
+      };
       if (body.error) {
         message = body.error;
       }
@@ -302,18 +326,20 @@ export interface FolderListing {
 
 /** The folders inside `path` (the home directory when omitted). */
 export function listFolders(path?: string): Promise<FolderListing> {
-  const query = path ? `?path=${encodeURIComponent(path)}` : '';
+  const query = path ? `?path=${encodeURIComponent(path)}` : "";
   return request<FolderListing>(`/api/folders${query}`);
 }
 
 export function getSettings(): Promise<SettingsResponse> {
-  return request<SettingsResponse>('/api/settings');
+  return request<SettingsResponse>("/api/settings");
 }
 
-export function saveSettings(preferences: Preferences): Promise<SettingsResponse> {
-  return request<SettingsResponse>('/api/settings', {
-    method: 'POST',
-    body: JSON.stringify(preferences)
+export function saveSettings(
+  preferences: Preferences,
+): Promise<SettingsResponse> {
+  return request<SettingsResponse>("/api/settings", {
+    method: "POST",
+    body: JSON.stringify(preferences),
   });
 }
 
@@ -323,14 +349,14 @@ export function listProvider(body: {
   baseUrl: string;
   apiKey: ApiKey | null;
 }): Promise<ProviderListing> {
-  return request<ProviderListing>('/api/settings/providers/list', {
-    method: 'POST',
-    body: JSON.stringify(body)
+  return request<ProviderListing>("/api/settings/providers/list", {
+    method: "POST",
+    body: JSON.stringify(body),
   });
 }
 
 /** Where a probed limit comes from: the endpoint's own words, or the model family's catalog entry. */
-export type LimitSource = 'endpoint' | 'catalog';
+export type LimitSource = "endpoint" | "catalog";
 
 /** What a probe of one model learned (indicative); null where nothing said it. */
 export interface ProbedModel {
@@ -344,30 +370,37 @@ export interface ProbedModel {
 }
 
 /** Probes a model of a stored provider for its limits, with two small calls. */
-export function probeModel(provider: string, model: string): Promise<ProbedModel> {
-  return request<ProbedModel>('/api/settings/models/probe', {
-    method: 'POST',
-    body: JSON.stringify({ provider, baseUrl: '', apiKey: null, model })
+export function probeModel(
+  provider: string,
+  model: string,
+): Promise<ProbedModel> {
+  return request<ProbedModel>("/api/settings/models/probe", {
+    method: "POST",
+    body: JSON.stringify({ provider, baseUrl: "", apiKey: null, model }),
   });
 }
 
 export function getProjects(): Promise<Project[]> {
-  return request<Project[]>('/api/projects');
+  return request<Project[]>("/api/projects");
 }
 
 export function createProject(workdir: string): Promise<Project> {
-  return request<Project>('/api/projects', {
-    method: 'POST',
-    body: JSON.stringify({ workdir })
+  return request<Project>("/api/projects", {
+    method: "POST",
+    body: JSON.stringify({ workdir }),
   });
 }
 
 export function listCommands(projectId: string): Promise<SlashCommand[]> {
-  return request<SlashCommand[]>(`/api/projects/${encodeURIComponent(projectId)}/commands`);
+  return request<SlashCommand[]>(
+    `/api/projects/${encodeURIComponent(projectId)}/commands`,
+  );
 }
 
 export function listAgents(projectId: string): Promise<Agent[]> {
-  return request<Agent[]>(`/api/projects/${encodeURIComponent(projectId)}/agents`);
+  return request<Agent[]>(
+    `/api/projects/${encodeURIComponent(projectId)}/agents`,
+  );
 }
 
 export function getSession(id: string): Promise<SessionDetail> {
@@ -375,14 +408,20 @@ export function getSession(id: string): Promise<SessionDetail> {
 }
 
 export function getModelChoices(): Promise<ModelChoices> {
-  return request<ModelChoices>('/api/models/choices');
+  return request<ModelChoices>("/api/models/choices");
 }
 
-export function setSessionModel(id: string, ref: ModelRef): Promise<{ model: SessionModel }> {
-  return request<{ model: SessionModel }>(`/api/sessions/${encodeURIComponent(id)}/model`, {
-    method: 'POST',
-    body: JSON.stringify(ref)
-  });
+export function setSessionModel(
+  id: string,
+  ref: ModelRef,
+): Promise<{ model: SessionModel }> {
+  return request<{ model: SessionModel }>(
+    `/api/sessions/${encodeURIComponent(id)}/model`,
+    {
+      method: "POST",
+      body: JSON.stringify(ref),
+    },
+  );
 }
 
 /** A session's skills folded from its log: loaded so far, and still in the model's view. */
@@ -396,7 +435,9 @@ export interface SessionSkills {
 }
 
 export function getSkills(id: string): Promise<SessionSkills> {
-  return request<SessionSkills>(`/api/sessions/${encodeURIComponent(id)}/skills`);
+  return request<SessionSkills>(
+    `/api/sessions/${encodeURIComponent(id)}/skills`,
+  );
 }
 
 /** A session's model calls from the server's usage ledger: every figure is computed there. */
@@ -415,7 +456,7 @@ export interface SessionUsage {
 export interface ContextView {
   /** 0 to 100, the bar's width. */
   percent: number;
-  tone: 'ok' | 'warn' | 'err';
+  tone: "ok" | "warn" | "err";
   /** Where the compaction threshold sits, 0 to 100; null when compaction is off. */
   compactMark: number | null;
   line: string;
@@ -425,18 +466,30 @@ export interface ContextView {
   composition: ContextComposition | null;
 }
 
-export type ContextPartKind = 'prompt' | 'conversation' | 'tools';
+export type ContextPartKind = "prompt" | "conversation" | "tools";
 
 /** Indicative: the exact total spread over the parts by their share of the text. */
 export interface ContextComposition {
-  kinds: { kind: ContextPartKind; label: string; tokens: string; percent: number }[];
+  kinds: {
+    kind: ContextPartKind;
+    label: string;
+    tokens: string;
+    percent: number;
+  }[];
   /** `kind` null: the row that sums the smallest parts. */
-  parts: { kind: ContextPartKind | null; label: string; tokens: string; percent: number }[];
+  parts: {
+    kind: ContextPartKind | null;
+    label: string;
+    tokens: string;
+    percent: number;
+  }[];
   images: string | null;
 }
 
 export function getContext(id: string): Promise<ContextView> {
-  return request<ContextView>(`/api/sessions/${encodeURIComponent(id)}/context`);
+  return request<ContextView>(
+    `/api/sessions/${encodeURIComponent(id)}/context`,
+  );
 }
 
 export function getUsage(id: string): Promise<SessionUsage> {
@@ -445,12 +498,12 @@ export function getUsage(id: string): Promise<SessionUsage> {
 
 /** How a criterion's status was established, as reported by the integration preview. */
 export type IntegrationProvenance =
-  | { kind: 'verified'; command: string; exitCode?: number; output: string }
-  | { kind: 'indicative'; agent: string; reason: string };
+  | { kind: "verified"; command: string; exitCode?: number; output: string }
+  | { kind: "indicative"; agent: string; reason: string };
 
 export type IntegrationCriterionStatus =
-  | { type: 'pending' }
-  | { type: 'passed' | 'failed'; provenance: IntegrationProvenance };
+  | { type: "pending" }
+  | { type: "passed" | "failed"; provenance: IntegrationProvenance };
 
 export interface IntegrationCriterion {
   id: string;
@@ -473,15 +526,20 @@ export interface Suppression {
 }
 
 export type Blocker =
-  | { kind: 'noCommits' }
-  | { kind: 'criteriaNotPassed'; criteria: string[] }
-  | { kind: 'noCriteria' }
-  | { kind: 'protectedTouched'; paths: string[] }
-  | { kind: 'architectureViolated'; violations: ArchitectureViolation[] }
-  | { kind: 'suppressionsAdded'; suppressions: Suppression[] }
-  | { kind: 'testsWeakened'; testsRemoved: number; assertionsRemoved: number; paths: string[] }
-  | { kind: 'branchChanged'; from: string; to: string | null }
-  | { kind: 'localChanges'; paths: string[] };
+  | { kind: "noCommits" }
+  | { kind: "criteriaNotPassed"; criteria: string[] }
+  | { kind: "noCriteria" }
+  | { kind: "protectedTouched"; paths: string[] }
+  | { kind: "architectureViolated"; violations: ArchitectureViolation[] }
+  | { kind: "suppressionsAdded"; suppressions: Suppression[] }
+  | {
+      kind: "testsWeakened";
+      testsRemoved: number;
+      assertionsRemoved: number;
+      paths: string[];
+    }
+  | { kind: "branchChanged"; from: string; to: string | null }
+  | { kind: "localChanges"; paths: string[] };
 
 export interface IntegrationPreview {
   branch: string;
@@ -489,7 +547,14 @@ export interface IntegrationPreview {
   humanBranch: string | null;
   originBranch: string | null;
   commits: { sha: string; subject: string }[];
-  files: { path: string; protected: boolean; added: number; removed: number }[];
+  /** `carried`: the human's uncommitted work in the file, which the agent built on, goes into the integration commit. */
+  files: {
+    path: string;
+    protected: boolean;
+    carried: boolean;
+    added: number;
+    removed: number;
+  }[];
   /** Test files (relative to the project) the integration could protect. */
   testFiles: string[];
   criteria: IntegrationCriterion[];
@@ -501,8 +566,25 @@ export interface IntegrationPreview {
 }
 
 /** The worktree's integration preview: what a cherry-pick would bring and what needs acceptance. */
+/** The human's repository now: checked-out branch, the run's origin branch, uncommitted entries. */
+export interface RepoState {
+  dir: string;
+  branch: string | null;
+  originBranch: string | null;
+  branchChanged: boolean;
+  dirty: number;
+}
+
+export function getRepoState(sessionId: string): Promise<RepoState> {
+  return request<RepoState>(
+    `/api/sessions/${encodeURIComponent(sessionId)}/repo`,
+  );
+}
+
 export function getIntegration(sessionId: string): Promise<IntegrationPreview> {
-  return request<IntegrationPreview>(`/api/sessions/${encodeURIComponent(sessionId)}/integration`);
+  return request<IntegrationPreview>(
+    `/api/sessions/${encodeURIComponent(sessionId)}/integration`,
+  );
 }
 
 /** Creates one commit with the worktree's changes on the human's branch after the accepted blockers. */
@@ -518,19 +600,38 @@ export interface IntegrationResult {
   removeError: string | null;
 }
 
-export function integrate(sessionId: string, acknowledged: string[], message: string, protectTests: boolean, removeWorktree: boolean): Promise<IntegrationResult> {
-  return request<IntegrationResult>(`/api/sessions/${encodeURIComponent(sessionId)}/integrate`, {
-    method: 'POST',
-    body: JSON.stringify({ acknowledged, message, protectTests, removeWorktree })
-  });
+export function integrate(
+  sessionId: string,
+  acknowledged: string[],
+  message: string,
+  protectTests: boolean,
+  removeWorktree: boolean,
+): Promise<IntegrationResult> {
+  return request<IntegrationResult>(
+    `/api/sessions/${encodeURIComponent(sessionId)}/integrate`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        acknowledged,
+        message,
+        protectTests,
+        removeWorktree,
+      }),
+    },
+  );
 }
 
 /** Drops the session's worktree, branch and base ref; the human's decision. */
-export function discardWorktree(sessionId: string): Promise<{ commits: string[] }> {
-  return request<{ commits: string[] }>(`/api/sessions/${encodeURIComponent(sessionId)}/discard`, {
-    method: 'POST',
-    body: '{}'
-  });
+export function discardWorktree(
+  sessionId: string,
+): Promise<{ commits: string[] }> {
+  return request<{ commits: string[] }>(
+    `/api/sessions/${encodeURIComponent(sessionId)}/discard`,
+    {
+      method: "POST",
+      body: "{}",
+    },
+  );
 }
 
 export interface AttachmentInput {
@@ -544,7 +645,7 @@ export function createSession(
   mode?: string,
   attachments?: AttachmentInput[],
   workflow?: { workflowId: string; stepByStep: boolean; worktree: boolean },
-  model?: ModelRef
+  model?: ModelRef,
 ): Promise<{ id: string }> {
   // `mode` is optional: omit it so the server applies its default resolution.
   const body: {
@@ -571,46 +672,65 @@ export function createSession(
   if (model) {
     body.model = model;
   }
-  return request<{ id: string }>('/api/sessions', {
-    method: 'POST',
-    body: JSON.stringify(body)
+  return request<{ id: string }>("/api/sessions", {
+    method: "POST",
+    body: JSON.stringify(body),
   });
 }
 
-export function sendMessage(id: string, content: string, attachments?: AttachmentInput[]): Promise<void> {
-  const body: { content: string; attachments?: AttachmentInput[] } = { content };
+export function sendMessage(
+  id: string,
+  content: string,
+  attachments?: AttachmentInput[],
+): Promise<void> {
+  const body: { content: string; attachments?: AttachmentInput[] } = {
+    content,
+  };
   if (attachments && attachments.length > 0) {
     body.attachments = attachments;
   }
   return request<void>(`/api/sessions/${encodeURIComponent(id)}/messages`, {
-    method: 'POST',
-    body: JSON.stringify(body)
+    method: "POST",
+    body: JSON.stringify(body),
   });
 }
 
 export function replayMessage(id: string, messageId: string): Promise<void> {
   return request<void>(`/api/sessions/${encodeURIComponent(id)}/replay`, {
-    method: 'POST',
-    body: JSON.stringify({ messageId })
+    method: "POST",
+    body: JSON.stringify({ messageId }),
   });
 }
 
 export function setSessionMode(id: string, mode: string): Promise<void> {
   return request<void>(`/api/sessions/${encodeURIComponent(id)}/mode`, {
-    method: 'POST',
-    body: JSON.stringify({ mode })
+    method: "POST",
+    body: JSON.stringify({ mode }),
   });
 }
 
 export function stopSession(id: string): Promise<void> {
   return request<void>(`/api/sessions/${encodeURIComponent(id)}/stop`, {
-    method: 'POST'
+    method: "POST",
   });
 }
 
 export function compactSession(id: string): Promise<void> {
   return request<void>(`/api/sessions/${encodeURIComponent(id)}/compact`, {
-    method: 'POST'
+    method: "POST",
+  });
+}
+
+export interface DeleteSessionsResult {
+  deleted: string[];
+  failed: { id: string; error: string }[];
+}
+
+/** Deletes top-level sessions, their child sessions, logs and worktrees. */
+export function deleteSessions(ids: string[]): Promise<DeleteSessionsResult> {
+  return request<DeleteSessionsResult>("/api/sessions/delete", {
+    method: "POST",
+    body: JSON.stringify({ ids }),
   });
 }
 
@@ -624,20 +744,31 @@ export interface EventPageEntry {
  * ascending, from the start of a turn. The thread loads its pages this way;
  * the live tail comes from the SSE stream.
  */
-export function getEventPage(id: string, before: number, limit: number): Promise<EventPageEntry[]> {
+export function getEventPage(
+  id: string,
+  before: number,
+  limit: number,
+): Promise<EventPageEntry[]> {
   const params = new URLSearchParams({ limit: String(limit) });
-  if (before > 0) params.set('before', String(before));
-  return request<EventPageEntry[]>(`/api/sessions/${encodeURIComponent(id)}/events?${params}`);
+  if (before > 0) params.set("before", String(before));
+  return request<EventPageEntry[]>(
+    `/api/sessions/${encodeURIComponent(id)}/events?${params}`,
+  );
 }
 
 /**
  * The `workflow.*` events of the latest run started before `before`
  * (the log's end when 0), ascending, from its `workflow.started`.
  */
-export function getRunEventsBefore(id: string, before: number): Promise<EventPageEntry[]> {
+export function getRunEventsBefore(
+  id: string,
+  before: number,
+): Promise<EventPageEntry[]> {
   const params = new URLSearchParams();
-  if (before > 0) params.set('before', String(before));
-  return request<EventPageEntry[]>(`/api/sessions/${encodeURIComponent(id)}/workflow/run?${params}`);
+  if (before > 0) params.set("before", String(before));
+  return request<EventPageEntry[]>(
+    `/api/sessions/${encodeURIComponent(id)}/workflow/run?${params}`,
+  );
 }
 
 /** An ADR file of the project's `docs/adr/` (verified: read from disk). */
@@ -709,7 +840,7 @@ export interface ModuleMap {
 }
 
 /** The committed `docs/map.md` against the map of the code as it is. */
-export type MapFileState = 'missing' | 'stale' | 'current';
+export type MapFileState = "missing" | "stale" | "current";
 
 export interface ProjectOverview {
   adrs: Adr[];
@@ -717,40 +848,54 @@ export interface ProjectOverview {
   mapFile: MapFileState;
 }
 
-export function getProjectOverview(projectId: string): Promise<ProjectOverview> {
-  return request<ProjectOverview>(`/api/projects/${encodeURIComponent(projectId)}/overview`);
+export function getProjectOverview(
+  projectId: string,
+): Promise<ProjectOverview> {
+  return request<ProjectOverview>(
+    `/api/projects/${encodeURIComponent(projectId)}/overview`,
+  );
 }
 
-export function writeMapFile(projectId: string): Promise<{ mapFile: MapFileState }> {
-  return request<{ mapFile: MapFileState }>(`/api/projects/${encodeURIComponent(projectId)}/map-file`, {
-    method: 'POST',
-    body: '{}'
-  });
+export function writeMapFile(
+  projectId: string,
+): Promise<{ mapFile: MapFileState }> {
+  return request<{ mapFile: MapFileState }>(
+    `/api/projects/${encodeURIComponent(projectId)}/map-file`,
+    {
+      method: "POST",
+      body: "{}",
+    },
+  );
 }
 
 export function listWorkflows(projectId: string): Promise<WorkflowSummary[]> {
-  return request<WorkflowSummary[]>(`/api/projects/${encodeURIComponent(projectId)}/workflows`);
+  return request<WorkflowSummary[]>(
+    `/api/projects/${encodeURIComponent(projectId)}/workflows`,
+  );
 }
 
-export function getWorkflow(projectId: string, wid: string): Promise<{ origin: Origin; workflow: WorkflowDef }> {
+export function getWorkflow(
+  projectId: string,
+  wid: string,
+): Promise<{ origin: Origin; workflow: WorkflowDef }> {
   return request<{ origin: Origin; workflow: WorkflowDef }>(
-    `/api/projects/${encodeURIComponent(projectId)}/workflows/${encodeURIComponent(wid)}`
+    `/api/projects/${encodeURIComponent(projectId)}/workflows/${encodeURIComponent(wid)}`,
   );
 }
 
 export async function saveWorkflow(
   projectId: string,
   wid: string,
-  scope: 'project' | 'global',
-  workflow: WorkflowDef
+  scope: "project" | "global",
+  workflow: WorkflowDef,
 ): Promise<{ origin: Origin; workflow: WorkflowDef }> {
   try {
     return await request<{ origin: Origin; workflow: WorkflowDef }>(
       `/api/projects/${encodeURIComponent(projectId)}/workflows/${encodeURIComponent(wid)}`,
       {
-        method: 'PUT',
-        body: JSON.stringify({ scope, workflow })
-      }
+        method: "PUT",
+        body: JSON.stringify({ scope, workflow }),
+      },
     );
   } catch (error) {
     if (error instanceof Error) {
@@ -761,10 +906,13 @@ export async function saveWorkflow(
   }
 }
 
-export function validateWorkflow(projectId: string, workflow: WorkflowDef): Promise<WorkflowIssue[]> {
-  return request<{ errors: WorkflowIssue[] }>('/api/workflows/validate', {
-    method: 'POST',
-    body: JSON.stringify({ projectId, workflow })
+export function validateWorkflow(
+  projectId: string,
+  workflow: WorkflowDef,
+): Promise<WorkflowIssue[]> {
+  return request<{ errors: WorkflowIssue[] }>("/api/workflows/validate", {
+    method: "POST",
+    body: JSON.stringify({ projectId, workflow }),
   }).then((result) => result.errors);
 }
 
@@ -775,47 +923,84 @@ export function startWorkflow(
   stepByStep: boolean,
   worktree: boolean,
   attachments: AttachmentInput[] = [],
-  plan?: string
+  plan?: string,
 ): Promise<void> {
-  return request<void>(`/api/sessions/${encodeURIComponent(sessionId)}/workflow`, {
-    method: 'POST',
-    body: JSON.stringify({
-      workflowId,
-      task,
-      stepByStep,
-      worktree,
-      ...(attachments.length > 0 ? { attachments } : {}),
-      ...(plan ? { plan } : {})
-    })
-  });
+  return request<void>(
+    `/api/sessions/${encodeURIComponent(sessionId)}/workflow`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        workflowId,
+        task,
+        stepByStep,
+        worktree,
+        ...(attachments.length > 0 ? { attachments } : {}),
+        ...(plan ? { plan } : {}),
+      }),
+    },
+  );
 }
 
-export function answerWorkflow(sessionId: string, runId: string, choice: string, comment: string): Promise<void> {
-  return request<void>(`/api/sessions/${encodeURIComponent(sessionId)}/workflow/answer`, {
-    method: 'POST',
-    body: JSON.stringify({ runId, choice, comment })
-  });
+export function answerWorkflow(
+  sessionId: string,
+  runId: string,
+  choice: string,
+  comment: string,
+): Promise<void> {
+  return request<void>(
+    `/api/sessions/${encodeURIComponent(sessionId)}/workflow/answer`,
+    {
+      method: "POST",
+      body: JSON.stringify({ runId, choice, comment }),
+    },
+  );
 }
 
-export function continueWorkflow(sessionId: string, runId: string, comment: string): Promise<void> {
-  return request<void>(`/api/sessions/${encodeURIComponent(sessionId)}/workflow/continue`, {
-    method: 'POST',
-    body: JSON.stringify({ runId, comment })
-  });
+export function continueWorkflow(
+  sessionId: string,
+  runId: string,
+  comment: string,
+): Promise<void> {
+  return request<void>(
+    `/api/sessions/${encodeURIComponent(sessionId)}/workflow/continue`,
+    {
+      method: "POST",
+      body: JSON.stringify({ runId, comment }),
+    },
+  );
 }
 
-export function resumeWorkflow(sessionId: string, runId: string): Promise<void> {
-  return request<void>(`/api/sessions/${encodeURIComponent(sessionId)}/workflow/resume`, {
-    method: 'POST',
-    body: JSON.stringify({ runId })
-  });
+export function resumeWorkflow(
+  sessionId: string,
+  runId: string,
+): Promise<void> {
+  return request<void>(
+    `/api/sessions/${encodeURIComponent(sessionId)}/workflow/resume`,
+    {
+      method: "POST",
+      body: JSON.stringify({ runId }),
+    },
+  );
 }
 
 export function stopWorkflow(sessionId: string, runId: string): Promise<void> {
-  return request<void>(`/api/sessions/${encodeURIComponent(sessionId)}/workflow/stop`, {
-    method: 'POST',
-    body: JSON.stringify({ runId })
-  });
+  return request<void>(
+    `/api/sessions/${encodeURIComponent(sessionId)}/workflow/stop`,
+    {
+      method: "POST",
+      body: JSON.stringify({ runId }),
+    },
+  );
+}
+
+export function pauseWorkflow(sessionId: string, runId: string): Promise<void> {
+  return request<void>(
+    `/api/sessions/${encodeURIComponent(sessionId)}/workflow/pause`,
+    {
+      method: "POST",
+      body: JSON.stringify({ runId }),
+    },
+  );
 }
 
 /** What sits under one answer, written by the server from the usage ledger. */
@@ -830,7 +1015,9 @@ export interface CallUsage {
 }
 
 export function getUsageCalls(id: string): Promise<CallUsage[]> {
-  return request<CallUsage[]>(`/api/sessions/${encodeURIComponent(id)}/usage/calls`);
+  return request<CallUsage[]>(
+    `/api/sessions/${encodeURIComponent(id)}/usage/calls`,
+  );
 }
 
 /** A workflow node run's token line, written by the server from the usage ledger. */
@@ -855,19 +1042,52 @@ export interface WorkflowUsage {
 }
 
 export function getUsageWorkflow(id: string): Promise<WorkflowUsage> {
-  return request<WorkflowUsage>(`/api/sessions/${encodeURIComponent(id)}/usage/workflow`);
+  return request<WorkflowUsage>(
+    `/api/sessions/${encodeURIComponent(id)}/usage/workflow`,
+  );
 }
 
-export interface InsightCard { label: string; value: string; detail: string }
-export interface InsightDay { day: string; label: string; cachedPercent: number; freshPercent: number; lostPercent: number; title: string }
-export interface InsightRow { key: string; name: string; calls: string; input: string; cache: string; output: string; lost: string; time: string }
-export interface InsightView { scope: string; cards: InsightCard[]; days: InsightDay[]; projects: InsightRow[]; models: InsightRow[]; consumers: ContextComposition | null; projectOptions: { id: string; name: string }[] }
-export type InsightPeriod = '7' | '30' | '90' | 'all';
+export interface InsightCard {
+  label: string;
+  value: string;
+  detail: string;
+}
+export interface InsightDay {
+  day: string;
+  label: string;
+  cachedPercent: number;
+  freshPercent: number;
+  lostPercent: number;
+  title: string;
+}
+export interface InsightRow {
+  key: string;
+  name: string;
+  calls: string;
+  input: string;
+  cache: string;
+  output: string;
+  lost: string;
+  time: string;
+}
+export interface InsightView {
+  scope: string;
+  cards: InsightCard[];
+  days: InsightDay[];
+  projects: InsightRow[];
+  models: InsightRow[];
+  consumers: ContextComposition | null;
+  projectOptions: { id: string; name: string }[];
+}
+export type InsightPeriod = "7" | "30" | "90" | "all";
 
-export function getInsight(period: InsightPeriod, project: string | null): Promise<InsightView> {
+export function getInsight(
+  period: InsightPeriod,
+  project: string | null,
+): Promise<InsightView> {
   const params = new URLSearchParams({ days: period });
   if (project !== null) {
-    params.set('project', project);
+    params.set("project", project);
   }
   return request<InsightView>(`/api/insight?${params}`);
 }

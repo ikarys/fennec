@@ -333,6 +333,34 @@ impl SqliteStore {
         Ok(rows.next().transpose()?)
     }
 
+    /// The id followed by all its descendants, children of children included.
+    pub fn session_tree(&self, id: &str) -> Result<Vec<String>> {
+        let mut stmt = self.db.prepare_cached(
+            "WITH RECURSIVE tree(id) AS (
+               SELECT id FROM sessions WHERE id = ?1
+               UNION ALL
+               SELECT s.id FROM sessions s JOIN tree t ON s.parent_id = t.id
+             )
+             SELECT id FROM tree",
+        )?;
+        let rows = stmt.query_map(params![id], |r| r.get::<_, String>(0))?;
+        Ok(rows.collect::<rusqlite::Result<Vec<String>>>()?)
+    }
+
+    /// One transaction keeps a batch of deletes atomic with their events.
+    pub fn delete_sessions(&self, ids: &[String]) -> Result<()> {
+        let tx = self.db.unchecked_transaction()?;
+        for id in ids {
+            tx.execute(
+                "DELETE FROM events WHERE session_id = ?1",
+                params![id.as_str()],
+            )?;
+            tx.execute("DELETE FROM sessions WHERE id = ?1", params![id.as_str()])?;
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
     /// Ends the turns a crash left open: sessions whose last `running.changed`
     /// says running get `isRunning: false`, so the UI stops waiting on a turn
     /// no process runs. Called at server start, before any turn exists.
@@ -673,6 +701,29 @@ mod tests {
         assert_eq!(found.project_id, project.id);
 
         assert!(store.create_child_session("missing", "x").is_err());
+    }
+
+    #[test]
+    fn deleting_a_session_tree_removes_its_children_and_events() {
+        let store = SqliteStore::in_memory().unwrap();
+        let project = store.project_for("/w").unwrap();
+        let parent = store.create_session(&project, "parent").unwrap();
+        let child = store.create_child_session(&parent, "child").unwrap();
+        let grandchild = store.create_child_session(&child, "grandchild").unwrap();
+        let unrelated = store.create_session(&project, "unrelated").unwrap();
+
+        let tree = store.session_tree(&parent).unwrap();
+        assert_eq!(tree.len(), 3);
+        assert!(tree.contains(&parent));
+        assert!(tree.contains(&child));
+        assert!(tree.contains(&grandchild));
+
+        store.delete_sessions(&tree).unwrap();
+        assert!(store.session(&parent).unwrap().is_none());
+        assert!(store.session(&child).unwrap().is_none());
+        assert!(store.session(&grandchild).unwrap().is_none());
+        assert!(store.events_after(&child, 0).unwrap().is_empty());
+        assert!(store.session(&unrelated).unwrap().is_some());
     }
 
     #[test]

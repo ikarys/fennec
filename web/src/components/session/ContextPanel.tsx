@@ -107,8 +107,8 @@ export function ContextPanel({ view, skills, usage, hasSession, partial, worktre
       case 'modifiedFiles':
         return <ModifiedFilesSection key={id} modifiedFiles={view.modifiedFiles} sessionId={sessionId} />;
       case 'workspace':
-        return worktree ? (
-          <AgentWorkspaceSection key={id} sessionId={sessionId} worktree={worktree} running={view.running} onDiscarded={onWorktreeChanged} integrationVersion={integrationVersion} />
+        return sessionId ? (
+          <AgentWorkspaceSection key={id} sessionId={sessionId} worktree={worktree ?? null} running={view.running} onDiscarded={onWorktreeChanged} integrationVersion={integrationVersion} />
         ) : null;
       case 'tokens':
         return <TokensSection key={id} usage={usage} />;

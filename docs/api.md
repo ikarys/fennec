@@ -42,6 +42,7 @@ with camelCase fields.
 | `integration.applied` | `{branch, base, commits, head, message, acknowledged, protectedTests}`: the human integrated the session's branch; `message` is the integration commit message, `acknowledged` lists the blockers they accepted, `protectedTests` the test files they protected with it (absent in older logs) |
 | `worktree.discarded` | `{branch, commits}`: the human discarded the session's worktree and branch; `commits` are the agent's commits that were dropped |
 | `workflow.paused` | `{runId, from, port, to}`: waiting before `to` |
+| `workflow.pause_requested` | `{runId}`: the human asked to pause at the next edge (after the current node) |
 | `workflow.resumed` | `{runId, comment}` |
 | `workflow.finished` | `{runId, outcome, reason?, stats?}`: `outcome` is `done`, `blocked`, `stopped` or `error`; `stats` are facts fennec computed from the log: `{workingMs, nodes: [{nodeId, label, runs, workingMs}], reruns, filesChanged, criteriaTotal, criteriaPassed, criteriaVerified}` (the time waiting for the human excluded; tokens are in the usage ledger) |
 
@@ -173,7 +174,7 @@ read-only. The human edits them as usual.
 
 - `GET /api/config` → `{model, contextWindow, compactAt}`: the resolved parameters of the
   stored preferences; `compactAt` is the fraction at which the session compacts (0 disables)
-- `GET /api/settings` → `{preferences, listings, defaults}`
+- `GET /api/settings` → `{preferences, listings, defaults, skills, optInWorkflows}`
   - `preferences`: the stored `Preferences`
   - `listings`: `[{provider, name, baseUrl, models: [{id, contextWindow, resolved}], error}]`,
     local first, from a fresh `/models` call per provider (in parallel); the
@@ -185,6 +186,8 @@ read-only. The human edits them as usual.
     set; `contextWindow`/`compactAt` are local).
   - `defaults`: `{provider, model, maxTokens, contextWindow, compactAt, reasoningEffort}`
     from the environment/built-in defaults
+  - `optInWorkflows`: `[{id, name, description}]`, the embedded workflows that stay off
+    until their id is in `preferences.enabledWorkflows`
 - `POST /api/settings` with a full `Preferences` body → 200 with the same body
   as `GET /api/settings`; 400 with the validation message if invalid
 - `POST /api/settings/providers/list` with `{provider, baseUrl, apiKey}` → a
@@ -235,7 +238,8 @@ read-only. The human edits them as usual.
   `git cherry-pick <base>..<branch>`;
   `mode` is the id of the agent the session resolves to from its event log
   (null when there is no top-level agent)
-- `GET /api/sessions/{id}/integration` → `{branch, base, originBranch, humanBranch, defaultMessage, commits: [{sha, subject}], files: [{path, protected, added, removed}], testFiles, criteria, decisions, blockers}`:
+- `GET /api/sessions/{id}/repo` → `{dir, branch, originBranch, branchChanged, dirty}`: the human's repository now, for any session: its top directory, checked-out branch (null when detached), the branch the session's worktree started from (null without a worktree), whether they differ, and the count of uncommitted entries (`git status --porcelain`); 409 outside a git repository.
+- `GET /api/sessions/{id}/integration` → `{branch, base, originBranch, humanBranch, defaultMessage, commits: [{sha, subject}], files: [{path, protected, carried, added, removed}], testFiles, criteria, decisions, blockers}`:
   what integrating the session's worktree branch would do (409 without a
   worktree). `originBranch` is the branch the run started from (null for
   older worktrees or a detached HEAD). `decisions` are the session's
@@ -243,7 +247,7 @@ read-only. The human edits them as usual.
   informational (written by the model), never a blocker. `defaultMessage` is fennec's starting
   commit message (`feat: <title>`, an empty title gives `feat: integrate the
   agent's work`); the human edits it. `blockers` is the review gate, each
-  `{kind, …}`: `noCommits`, `branchChanged {from, to}`, `localChanges {paths}` (uncommitted changes in the human's tree the cherry-pick would overwrite — unstaged edits whose content differs from both the base's and the branch's, and untracked files the pick would create; the common case, the same dirty work copied into the worktree at the run's start, is not a blocker), `criteriaNotPassed
+  `{kind, …}`: `noCommits`, `branchChanged {from, to}`, `localChanges {paths}` (uncommitted changes in the human's tree the agent's work would overwrite: content equal to neither the base's nor the branch's; the common case, the same dirty work copied into the worktree at the run's start, is not a blocker but a file flagged `carried`, whose uncommitted work goes into the integration commit), `criteriaNotPassed
   {criteria}`, `noCriteria`, `protectedTouched {paths}`, `architectureViolated {violations: [{path, line, prefix, forbidden}]}` (added lines that break the project's `.agents/architecture` rules, one `<path prefix> forbids <text>` per line; deterministic, checked on added lines only), `suppressionsAdded {suppressions: [{path, line, marker}]}` (added lines that silence a lint, a type check or a test: `#[allow(`, `@ts-ignore`, `noqa`, `it.skip(`, `pytest.mark.skip`…; text tripwires, comments included), `testsWeakened {testsRemoved, assertionsRemoved, paths}` (the branch removes more test declarations or assertions than it adds, summed over all files so moved tests do not count; `paths` are the files that lost some); `branchChanged.to`
   is null for a detached HEAD; `testFiles` are the integrated test files (paths
   relative to the project) that the protection does not cover yet; protection is read from the project's tree, not
@@ -252,10 +256,12 @@ read-only. The human edits them as usual.
   the human's decision. The server recomputes the gate and answers 400 on a
   blank `message`, 409 while a turn runs, while the human has staged changes,
   while a blocker is not acknowledged (`noCommits` never is), or when git
-  fails; then it runs `git cherry-pick --no-commit <base>..<branch>` in the
-  human's repository and one `git commit` with `message` plus a
-  `Fennec-Session: <session id>` trailer, under the human's git identity. A
-  conflict is aborted, the tree left as it was, and answers 409
+  fails; then it merges `<base>..<branch>` onto the human's HEAD (plus the
+  `carried` files' uncommitted content) with `git merge-tree`, makes one
+  commit with `message` plus a `Fennec-Session: <session id>` trailer, under
+  the human's git identity, and moves the human's branch and tree to it with
+  `git reset --keep` (other uncommitted work stays). A conflict leaves the
+  repository untouched and answers 409
   `{error: "conflict", conflict: {kind: "conflict", files, command}}`. On
   success it moves the base ref to the branch head and appends
   `integration.applied`. With `protectTests: true` (default false, the human's
@@ -271,6 +277,7 @@ read-only. The human edits them as usual.
   the human's decision; 409 while a turn runs or without a worktree; removes the
   worktree, its branch and base ref in the human's repository and appends
   `worktree.discarded`. A later workflow in the session opens a fresh worktree.
+- `POST /api/sessions/delete` `{ids}` → `{deleted: [id], failed: [{id, error}]}`: deletes top-level sessions with their child sessions and logs, and removes each one's worktree, branch and refs (work not integrated is lost; the UI warns). 400 for an empty list or a child session, 404 for an unknown id, 409 `{error, running}` when one of them runs a turn (nothing is deleted then). A session whose worktree cannot be removed is kept and listed in `failed`. The usage ledger keeps the calls.
 - `GET /api/sessions/{id}/skills` → `{loaded: [ids], active: [ids]}`: the
   skills the session loaded (successful `load_skill` calls and `/<skill>`
   messages it typed, first-seen order) and those still in the model's view
@@ -414,6 +421,10 @@ from the parent's thread.
   same statuses
 - `POST /api/sessions/{id}/workflow/stop` `{runId}` → ends a run that is
   waiting or interrupted; same statuses
+- `POST /api/sessions/{id}/workflow/pause` `{runId}` → while the run works:
+  it finishes its current node and pauses at the next edge (inside parallel
+  branches, after the join); 202 `{}`, again 202; 409 when the run is not
+  running or `runId` is not the current run
 
 While a run is active, a typed message is refused with a 409 that names
 where the run waits: `the workflow waits for a choice` at a human node,

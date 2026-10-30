@@ -16,6 +16,7 @@ mod notifier;
 mod preview;
 mod project_routes;
 mod routes;
+mod session_delete;
 mod session_name;
 mod session_usage;
 mod settings_routes;

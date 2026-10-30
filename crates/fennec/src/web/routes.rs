@@ -7,7 +7,7 @@ use super::notifier::NotifyingLog;
 use super::{
     assets,
     context_view::context_view,
-    event_stream, integration, model_routes, project_routes, session_name,
+    event_stream, integration, model_routes, project_routes, session_delete, session_name,
     session_usage::{SessionUsageView, call_views},
     settings_routes,
     turns::Job,
@@ -80,6 +80,9 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
             workflow_routes::validate_workflow_route(app, req, stream)
         }
         ("POST", ["api", "sessions"]) => create_session(app, req, stream),
+        ("POST", ["api", "sessions", "delete"]) => {
+            session_delete::delete_sessions(app, req, stream)
+        }
         ("GET", ["api", "sessions", id]) => get_session(app, stream, id),
         ("GET", ["api", "sessions", id, "skills"]) => serve_skills(app, stream, id),
         ("GET", ["api", "sessions", id, "usage"]) => serve_usage(app, stream, id),
@@ -102,6 +105,7 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
         ("GET", ["api", "sessions", id, "integration"]) => {
             integration::get_integration(app, stream, id)
         }
+        ("GET", ["api", "sessions", id, "repo"]) => integration::get_repo(app, stream, id),
         ("POST", ["api", "sessions", id, "integrate"]) => {
             integration::integrate(app, req, stream, id)
         }
@@ -252,7 +256,8 @@ fn create_session(app: &App, req: &Request, stream: &mut TcpStream) -> Result<()
     // A workflow start is validated before the session is created.
     let workflow = match &workflow_id {
         Some(id) => {
-            let Some(found) = workflows::find(Path::new(&project.workdir), id) else {
+            let enabled = &app.store()?.preferences()?.enabled_workflows;
+            let Some(found) = workflows::find(Path::new(&project.workdir), id, enabled) else {
                 return error(stream, 404, "no such workflow");
             };
             Some(found)

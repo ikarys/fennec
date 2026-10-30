@@ -218,6 +218,14 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
                         {file.path}
                       </span>
                       {file.protected && <Badge tone="err">protégé</Badge>}
+                      {file.carried && (
+                        <Badge
+                          tone="accent"
+                          title="Le fichier avait des modifications non commitées sur lesquelles l'agent a travaillé : elles entrent dans ce commit."
+                        >
+                          ton travail inclus
+                        </Badge>
+                      )}
                       <span className="shrink-0 tabular-nums text-ok">+{file.added}</span>
                       <span className="shrink-0 tabular-nums text-err">−{file.removed}</span>
                     </div>
