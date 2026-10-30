@@ -5,7 +5,7 @@
  */
 import type { ButtonHTMLAttributes } from 'react';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
+export type ButtonVariant = 'primary' | 'soft' | 'secondary' | 'ghost' | 'danger';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 const BASE =
@@ -16,6 +16,8 @@ const MULTILINE = 'min-w-0 justify-start py-1 text-left whitespace-normal';
 
 const VARIANTS: Record<ButtonVariant, string> = {
   primary: 'bg-accent text-on-accent hover:bg-accent-strong',
+  /** A row's own action: coloured, quieter than the screen's primary. */
+  soft: 'bg-accent-soft text-accent-strong hover:bg-accent hover:text-on-accent',
   secondary: 'bg-raised text-text hover:bg-border',
   ghost: 'text-muted hover:bg-raised hover:text-text',
   danger: 'border border-err/40 text-err hover:bg-del-bg'
