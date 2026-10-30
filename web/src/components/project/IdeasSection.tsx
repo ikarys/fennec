@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState, type FormEvent, type KeyboardEvent } 
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { SectionLabel } from '../ui/SectionLabel';
 import { TextArea } from '../ui/Field';
 import {
@@ -36,6 +37,7 @@ export function IdeasSection({
   const [text, setText] = useState('');
   const [stopping, setStopping] = useState(false);
   const [autonomous, setAutonomous] = useState(false);
+  const [pendingDrop, setPendingDrop] = useState<Idea | null>(null);
 
   const applyBoard = useCallback((board: IdeaBoard) => {
     setIdeas(board.ideas);
@@ -128,9 +130,14 @@ export function IdeasSection({
     }
   };
 
-  const handleDrop = async (idea: Idea) => {
-    if (!window.confirm('Abandonner cette idée ?')) return;
+  const handleDrop = (idea: Idea) => {
+    setPendingDrop(idea);
+  };
 
+  const confirmDrop = async () => {
+    if (!pendingDrop) return;
+    const idea = pendingDrop;
+    setPendingDrop(null);
     setBusy(idea.id);
     setError(null);
 
@@ -450,6 +457,14 @@ export function IdeasSection({
           ))}
         </Card>
       )}
+      <ConfirmDialog
+        open={pendingDrop !== null}
+        title="Abandonner cette idée ?"
+        body="L'idée sort de la file. Cette action est définitive."
+        confirmLabel="Abandonner"
+        onConfirm={() => void confirmDrop()}
+        onCancel={() => setPendingDrop(null)}
+      />
     </section>
   );
 }
