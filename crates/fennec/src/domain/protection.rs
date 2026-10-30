@@ -2,10 +2,22 @@
 //! human protects from the model, the guardian of fennec's definition, first
 //! part. Patterns are gitignore-like.
 
-/// Always protected, whatever the project lists: fennec's own definitions
-/// (agents, skills, workflows, this list), the instructions, the lockfiles
-/// (a new dependency is the human's decision), the CI and the accepted ADRs
-/// (`docs/adr`: an agent proposes a decision, it never rewrites one).
+/// Lockfiles: protected by default in the human's directory, writable in a
+/// session worktree so an agent can add a dependency; the integration gate
+/// still shows them because it loads the project's protection.
+pub const LOCKFILES: [&str; 4] = [
+    "Cargo.lock",
+    "package-lock.json",
+    "yarn.lock",
+    "pnpm-lock.yaml",
+];
+
+/// Always protected in the human's own directory, whatever the project lists:
+/// fennec's own definitions (agents, skills, workflows, this list), the
+/// instructions, the lockfiles (a new dependency is the human's decision; in
+/// a session worktree they are writable and the integration gate still shows
+/// them), the CI and the accepted ADRs (`docs/adr`: an agent proposes a
+/// decision, it never rewrites one).
 pub const DEFAULT_PATTERNS: [&str; 10] = [
     ".agents",
     "AGENTS.md",
@@ -28,7 +40,24 @@ impl Protection {
     /// The defaults plus the lines of the project's `.agents/protected`
     /// (`content`; None when absent).
     pub fn new(content: Option<&str>) -> Protection {
-        let mut patterns = DEFAULT_PATTERNS
+        Self::build(&DEFAULT_PATTERNS, content)
+    }
+
+    /// The defaults without the lockfiles, plus the lines of the project's
+    /// `.agents/protected` (`content`; None when absent). Used in a session
+    /// worktree, where a new dependency may change a lockfile; the integration
+    /// gate still shows it because it loads the project's protection.
+    pub fn for_worktree(content: Option<&str>) -> Protection {
+        let defaults: Vec<&str> = DEFAULT_PATTERNS
+            .iter()
+            .filter(|pattern| !LOCKFILES.contains(pattern))
+            .copied()
+            .collect();
+        Self::build(&defaults, content)
+    }
+
+    fn build(defaults: &[&str], content: Option<&str>) -> Protection {
+        let mut patterns = defaults
             .iter()
             .filter_map(|pattern| normalize_pattern(pattern))
             .collect::<Vec<_>>();
@@ -267,6 +296,27 @@ mod tests {
     #[test]
     fn negation_line_does_not_remove_a_default() {
         let protection = Protection::new(Some("!Cargo.lock\n"));
+
+        assert!(protection.is_protected("Cargo.lock"));
+    }
+
+    #[test]
+    fn worktree_allows_lockfiles_but_keeps_other_defaults() {
+        let protection = Protection::for_worktree(None);
+
+        assert!(!protection.is_protected("Cargo.lock"));
+        assert!(!protection.is_protected("web/package-lock.json"));
+        assert!(!protection.is_protected("yarn.lock"));
+        assert!(!protection.is_protected("pnpm-lock.yaml"));
+
+        for protected in [".agents/x", "AGENTS.md", ".github/workflows/ci.yml"] {
+            assert!(protection.is_protected(protected), "{protected}");
+        }
+    }
+
+    #[test]
+    fn worktree_keeps_a_lockfile_listed_by_the_project() {
+        let protection = Protection::for_worktree(Some("Cargo.lock\n"));
 
         assert!(protection.is_protected("Cargo.lock"));
     }
