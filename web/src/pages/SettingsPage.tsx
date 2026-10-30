@@ -26,6 +26,7 @@ import { SearchSection, type SearchForm } from '../components/settings/SearchSec
 import { SandboxSection } from '../components/settings/SandboxSection';
 import { AutonomySection } from '../components/settings/AutonomySection';
 import { TariffSection } from '../components/settings/TariffSection';
+import { ScannersSection } from '../components/settings/ScannersSection';
 import { SkillsSection } from '../components/settings/SkillsSection';
 import { WorkflowsSection } from '../components/settings/WorkflowsSection';
 
@@ -52,7 +53,7 @@ interface SettingsForm {
   enabledWorkflows: string[];
 }
 
-type SettingsTab = 'models' | 'instructions' | 'skills' | 'workflows' | 'search' | 'sandbox' | 'autonomy' | 'tariff' | 'display';
+type SettingsTab = 'models' | 'instructions' | 'skills' | 'workflows' | 'search' | 'sandbox' | 'security' | 'autonomy' | 'tariff' | 'display';
 
 const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'models', label: 'Modèles' },
@@ -61,6 +62,7 @@ const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'workflows', label: 'Workflows' },
   { id: 'search', label: 'Recherche web' },
   { id: 'sandbox', label: 'Bac à sable' },
+  { id: 'security', label: 'Sécurité' },
   { id: 'autonomy', label: 'Mode nuit' },
   { id: 'tariff', label: 'Coût' },
   { id: 'display', label: 'Affichage' }
@@ -584,6 +586,7 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
             {tab === 'sandbox' && (
               <SandboxSection value={form.sandbox} onChange={updateSandbox} />
             )}
+            {tab === 'security' && settings && <ScannersSection scanners={settings.scanners ?? []} />}
 
             {tab === 'autonomy' && (
               <AutonomySection value={form.autonomy} onChange={updateAutonomy} />
