@@ -5,6 +5,7 @@ import { Button } from '../ui/Button';
 import { Section } from '../ui/Section';
 import { ChevronRightIcon } from '../Icons';
 import { FieldRow, Select, TextInput } from '../ui/Field';
+import { ModelProbe } from './ModelProbe';
 
 export interface ModelForm {
   maxTokens: string;
@@ -158,6 +159,15 @@ function ModelRow({
 
       {open && (
         <div className="flex flex-col gap-3 pb-3 pl-5">
+          <ModelProbe
+            providerId={providerId}
+            modelId={modelId}
+            onPatch={(patch) => {
+              for (const [field, fieldValue] of Object.entries(patch)) {
+                onChange(key, field as keyof ModelForm, fieldValue);
+              }
+            }}
+          />
           <div className="grid gap-2 md:grid-cols-2">
             <FieldRow label="Tokens max par réponse">
               <TextInput

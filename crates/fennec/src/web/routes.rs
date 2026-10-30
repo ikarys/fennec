@@ -51,6 +51,9 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
         ("POST", ["api", "settings", "providers", "list"]) => {
             settings_routes::list_provider(app, req, stream)
         }
+        ("POST", ["api", "settings", "models", "probe"]) => {
+            settings_routes::probe_model(app, req, stream)
+        }
         ("GET", ["api", "models", "choices"]) => model_routes::choices(app, stream),
         ("GET", ["api", "folders"]) => list_folders(req, stream),
         ("GET", ["api", "projects"]) => list_projects(app, stream),
