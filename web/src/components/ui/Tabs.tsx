@@ -19,7 +19,13 @@ export function Tabs<T extends string>({
     <>
       {tab.label}
       {tab.count != null ? (
-        <span className="ml-1.5 text-xs text-muted tabular-nums">{tab.count}</span>
+        <span
+          className={`ml-1.5 rounded-full px-1.5 py-0.5 text-xs tabular-nums ${
+            tab.id === active ? 'bg-accent-soft text-accent-strong' : 'bg-raised text-muted'
+          }`}
+        >
+          {tab.count}
+        </span>
       ) : null}
     </>
   );
