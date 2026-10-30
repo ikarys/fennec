@@ -1,5 +1,6 @@
 import type { WorkflowSummary } from "../lib/workflow";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { markIdeaReady } from "../lib/ideas";
 import type {
   Agent,
   AttachmentInput,
@@ -401,6 +402,12 @@ export function SessionPage({
           onBuild: handlePlanBuild,
           onBuildAlone: handlePlanBuildAlone,
           onRevise: handlePlanRevise,
+          ideaReady: detail?.idea
+            ? {
+                onMark: () => void handleIdeaReady(),
+                already: detail.idea.state === "ready",
+              }
+            : undefined,
           disabled: running || planBuildInFlight,
         }
       : null;
@@ -615,6 +622,17 @@ export function SessionPage({
       );
     } finally {
       setPlanBuildInFlight(false);
+    }
+  }
+
+  async function handleIdeaReady() {
+    if (!detail?.idea || !lastTextSegment) return;
+    setSendError(null);
+    try {
+      await markIdeaReady(detail.project.id, detail.idea.id, lastTextSegment.content);
+      setDetailVersion((version) => version + 1);
+    } catch (err) {
+      setSendError(err instanceof Error ? err.message : "Erreur inconnue");
     }
   }
 
