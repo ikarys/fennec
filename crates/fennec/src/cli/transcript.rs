@@ -140,6 +140,7 @@ impl Transcript {
             | Event::WorkflowFinished { .. }
             | Event::CriteriaSet { .. }
             | Event::CriteriaProposed { .. }
+            | Event::CriteriaPreflight { .. }
             | Event::CriterionUpdated { .. }
             | Event::IntegrationApplied { .. }
             | Event::DecisionRecorded { .. }

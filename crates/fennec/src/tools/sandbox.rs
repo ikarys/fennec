@@ -16,6 +16,7 @@ pub enum Sandbox {
         hidden_files: Vec<PathBuf>,
         writable: Vec<PathBuf>,
         read_only: Vec<PathBuf>,
+        mounts: Vec<(PathBuf, PathBuf)>,
     },
 }
 
@@ -86,6 +87,7 @@ impl Sandbox {
             hidden_files,
             writable,
             read_only: vec![],
+            mounts: Vec::new(),
         }
     }
 
@@ -120,6 +122,7 @@ impl Sandbox {
                 hidden_dirs,
                 hidden_files,
                 writable,
+                mounts,
                 ..
             } => Sandbox::Bwrap {
                 network,
@@ -127,6 +130,29 @@ impl Sandbox {
                 hidden_files,
                 writable,
                 read_only: paths,
+                mounts,
+            },
+        }
+    }
+
+    /// The same sandbox with `mounts` bound read-only from source to destination.
+    pub fn with_mounts(self, mounts: Vec<(PathBuf, PathBuf)>) -> Sandbox {
+        match self {
+            Sandbox::Off => Sandbox::Off,
+            Sandbox::Bwrap {
+                network,
+                hidden_dirs,
+                hidden_files,
+                writable,
+                read_only,
+                ..
+            } => Sandbox::Bwrap {
+                network,
+                hidden_dirs,
+                hidden_files,
+                writable,
+                read_only,
+                mounts,
             },
         }
     }
@@ -200,6 +226,7 @@ fn bwrap_args(sandbox: &Sandbox, workdir: &Path, cwd: &Path, command: &str) -> V
         hidden_files,
         writable,
         read_only,
+        mounts,
     } = sandbox
     else {
         return Vec::new();
@@ -237,6 +264,14 @@ fn bwrap_args(sandbox: &Sandbox, workdir: &Path, cwd: &Path, command: &str) -> V
     args.push(OsString::from("--bind"));
     args.push(workdir.as_os_str().to_os_string());
     args.push(workdir.as_os_str().to_os_string());
+
+    // Dependency directories from the main checkout: read-only, because the
+    // worktree lacks them and the sandbox has no network to install them.
+    for (src, dst) in mounts {
+        args.push(OsString::from("--ro-bind"));
+        args.push(src.as_os_str().to_os_string());
+        args.push(dst.as_os_str().to_os_string());
+    }
 
     // Later mounts win: protected paths stay read-only inside the writable
     // workdir.
@@ -293,6 +328,7 @@ mod tests {
                 hidden_files: vec![PathBuf::from("/home/user/.netrc")],
                 writable: vec![PathBuf::from("/home/user/.npm")],
                 read_only: vec![],
+                mounts: vec![],
             },
             Path::new("/work"),
             Path::new("/cwd"),
@@ -350,6 +386,7 @@ mod tests {
                 hidden_files: vec![],
                 writable: vec![],
                 read_only: vec![],
+                mounts: vec![],
             },
             Path::new("/work"),
             Path::new("/cwd"),
@@ -367,6 +404,7 @@ mod tests {
                 hidden_files: vec![],
                 writable: vec![],
                 read_only: vec![],
+                mounts: vec![],
             },
             Path::new("/work"),
             Path::new("/cwd"),
@@ -387,6 +425,7 @@ mod tests {
                 hidden_files: vec![],
                 writable: vec![],
                 read_only: vec![PathBuf::from("/work/protected")],
+                mounts: vec![],
             },
             Path::new("/work"),
             Path::new("/cwd"),
@@ -431,6 +470,65 @@ mod tests {
     }
 
     #[test]
+    fn bwrap_args_put_dependency_mounts_after_the_workdir_bind() {
+        let args = bwrap_args(
+            &Sandbox::Bwrap {
+                network: false,
+                hidden_dirs: vec![],
+                hidden_files: vec![],
+                writable: vec![],
+                read_only: vec![PathBuf::from("/work/protected")],
+                mounts: vec![(
+                    PathBuf::from("/main/web/node_modules"),
+                    PathBuf::from("/work/web/node_modules"),
+                )],
+            },
+            Path::new("/work"),
+            Path::new("/cwd"),
+            "echo hi",
+        );
+
+        assert_eq!(
+            args_as_strings(&args),
+            vec![
+                "--ro-bind",
+                "/",
+                "/",
+                "--dev",
+                "/dev",
+                "--proc",
+                "/proc",
+                "--tmpfs",
+                "/tmp",
+                "--bind",
+                "/work",
+                "/work",
+                "--ro-bind",
+                "/main/web/node_modules",
+                "/work/web/node_modules",
+                "--ro-bind",
+                "/work/protected",
+                "/work/protected",
+                "--unshare-all",
+                "--die-with-parent",
+                "--new-session",
+                "--setenv",
+                "npm_config_offline",
+                "true",
+                "--setenv",
+                "CARGO_NET_OFFLINE",
+                "true",
+                "--chdir",
+                "/cwd",
+                "--",
+                "sh",
+                "-c",
+                "echo hi",
+            ]
+        );
+    }
+
+    #[test]
     fn read_only_puts_the_workdir_read_only_bind_after_the_writable_bind() {
         let workdir = Path::new("/work");
         let sandbox = Sandbox::Bwrap {
@@ -439,6 +537,7 @@ mod tests {
             hidden_files: vec![],
             writable: vec![],
             read_only: vec![],
+            mounts: vec![],
         }
         .read_only(workdir)
         .expect("a bwrap sandbox");
@@ -514,6 +613,7 @@ mod tests {
             hidden_files,
             writable,
             read_only,
+            mounts,
         } = sandbox
         else {
             panic!("expected bwrap sandbox");
@@ -527,6 +627,7 @@ mod tests {
         assert!(!hidden_files.contains(&home.join(".npmrc")));
         assert!(writable.is_empty());
         assert!(read_only.is_empty());
+        assert!(mounts.is_empty());
 
         let _ = std::fs::remove_dir_all(&home);
         let _ = std::fs::remove_dir_all(&data_dir);
@@ -587,6 +688,7 @@ mod tests {
             hidden_files: vec![],
             writable: vec![],
             read_only: vec![],
+            mounts: vec![],
         };
 
         let output = sandbox
@@ -644,6 +746,7 @@ mod tests {
             hidden_files: vec![],
             writable: vec![],
             read_only: vec![],
+            mounts: vec![],
         };
 
         let output = sandbox
@@ -682,6 +785,7 @@ mod tests {
             hidden_files: vec![],
             writable: vec![],
             read_only: vec![],
+            mounts: vec![],
         };
 
         let output = sandbox
@@ -712,6 +816,7 @@ mod tests {
             hidden_files: vec![],
             writable: vec![],
             read_only: vec![],
+            mounts: vec![],
         };
 
         let output = sandbox
@@ -747,6 +852,7 @@ mod tests {
             hidden_files: vec![],
             writable: vec![],
             read_only: vec![protected.clone()],
+            mounts: vec![],
         };
 
         let output = sandbox
