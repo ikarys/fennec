@@ -33,7 +33,7 @@ import {
   stopWorkflow
 } from '../lib/api';
 import { readImages } from '../lib/attachments';
-import { stateLabel } from '../lib/format';
+import { sessionStatus } from '../lib/sessionStatus';
 import { runWaiting } from '../lib/workflowRun';
 import { useSessionThread } from '../hooks/useSessionThread';
 import { Composer } from '../components/session/Composer';
@@ -99,6 +99,9 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
   const running = view.running;
   const run = view.run;
   const waiting = runWaiting(run, running, view.lastDone);
+  // The detail is fetched once; the event stream says how a turn ended.
+  const state: SessionState = running ? 'running' : ((view.lastDone as SessionState | undefined) ?? detail?.state ?? 'idle');
+  const status = sessionStatus(state, run, waiting);
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
@@ -318,8 +321,6 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
     }
   }, [pendingModel, serverModel]);
 
-  // The detail is fetched once; the event stream says how a turn ended.
-  const state: SessionState = running ? 'running' : ((view.lastDone as SessionState | undefined) ?? detail?.state ?? 'idle');
   const title = view.name ?? detail?.title ?? (sessionId ? 'Session' : 'Nouvelle session');
 
   const lastAssistant = [...view.items].reverse().find((item): item is AssistantItem => item.kind === 'assistant');
@@ -618,12 +619,12 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
             <CallUsageContext.Provider value={calls}>
             <WorkflowUsageContext.Provider value={workflowUsage}>
         <div className="flex min-h-0 min-w-0 grow">
-          {run && <RunRail run={run} running={running} onStop={handleStopWorkflow} />}
+          {run && <RunRail run={run} />}
           <main className="flex min-h-0 min-w-0 flex-[999_1_560px] flex-col">
         <div className="flex items-center gap-2 px-6 py-2.5">
-          <div className="mx-auto flex w-full max-w-[820px] items-center gap-2">
-            <h1 className="min-w-0 truncate text-sm font-semibold" title={title}>{title}</h1>
-            <Badge tone="accent" dot>{stateLabel(state)}</Badge>
+          <div className="mx-auto flex w-full max-w-[960px] items-center gap-2">
+            <h1 className="min-w-0 truncate text-[0.9375rem] font-semibold" title={title}>{title}</h1>
+            <Badge tone={status.tone} dot={status.live} pulse={status.live}>{status.label}</Badge>
             <span className="shrink-0 text-xs text-muted" title={detail?.project.workdir}>{projectName}</span>
             <div className="ml-auto">
               <ContextGauge
@@ -656,7 +657,7 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
             }}
             className="h-full overflow-y-auto p-6"
           >
-            <div ref={contentRef} className="mx-auto flex max-w-[820px] flex-col gap-4.5">
+            <div ref={contentRef} className="mx-auto flex max-w-[960px] flex-col gap-4.5">
               {sessionId && hasMore && (
                 <Button className="mx-auto" onClick={handleLoadOlder} disabled={loadingOlder}>
                   {loadingOlder ? 'Chargement…' : 'Charger les messages précédents'}
@@ -715,26 +716,24 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
         )}
         {/* A node's session is driven by its workflow: the human answers in the parent. */}
         {detail?.parentId && (
-          <div className="px-6 py-3">
-            <div className="mx-auto flex max-w-[820px] items-center gap-3 rounded-[14px] border border-border bg-panel px-4 py-3">
-              <span
-                className={`h-2 w-2 shrink-0 rounded-full ${running ? 'animate-pulse bg-accent' : 'bg-ok'}`}
-              />
-              <div className="min-w-0 grow">
-                <div className="text-sm font-medium text-text">
-                  {running ? 'Ce nœud du workflow tourne…' : 'Ce nœud du workflow est terminé.'}
-                </div>
-                <div className="text-xs text-muted">
-                  Session pilotée par le workflow, en lecture seule : la suite se passe dans la session parente.
-                </div>
+          <div className="mx-auto flex max-w-[960px] items-center gap-3 border-t border-border px-1 py-2">
+            <span
+              className={`h-2 w-2 shrink-0 rounded-full ${running ? 'bg-accent' : 'bg-ok'}`}
+            />
+            <div className="min-w-0 grow">
+              <div className="text-sm font-medium text-text">
+                {running ? 'Ce nœud du workflow tourne…' : 'Ce nœud du workflow est terminé.'}
               </div>
-              <a
-                href={`#/s/${detail.parentId}`}
-                className={buttonClass({ variant: 'primary', size: 'sm' }, 'shrink-0')}
-              >
-                ← Retour au workflow
-              </a>
+              <div className="text-xs text-muted">
+                Session pilotée par le workflow, en lecture seule : la suite se passe dans la session parente.
+              </div>
             </div>
+            <a
+              href={`#/s/${detail.parentId}`}
+              className={buttonClass({ variant: 'primary', size: 'sm' }, 'shrink-0')}
+            >
+              ← Retour au workflow
+            </a>
           </div>
         )}
         {!detail?.parentId && (

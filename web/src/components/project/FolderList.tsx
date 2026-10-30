@@ -85,7 +85,7 @@ export function FolderList({ folders, parent, selected, loading, loadError, onSe
                       }`}
                     >
                       {folder.repo ? (
-                        <RepoIcon className="h-4 w-4 shrink-0 text-accent" />
+                        <RepoIcon className="h-4 w-4 shrink-0 text-muted" />
                       ) : (
                         <FolderIcon className="h-4 w-4 shrink-0 text-muted" />
                       )}
