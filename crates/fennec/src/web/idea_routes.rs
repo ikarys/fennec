@@ -487,7 +487,13 @@ fn idea_report(events: &[Event]) -> Value {
         .map(|decision| json!({ "title": decision.title, "choice": decision.choice }))
         .collect::<Vec<Value>>();
 
+    // The human's click is the end of an idea's road: the morning list shows it done.
+    let integrated = events
+        .iter()
+        .any(|event| matches!(event, Event::IntegrationApplied { .. }));
+
     json!({
+        "integrated": integrated,
         "criteria": {
             "passed": passed,
             "failed": failed,
@@ -509,5 +515,6 @@ mod tests {
         assert_eq!(report["criteria"]["failed"], 0);
         assert_eq!(report["criteria"]["pending"], 0);
         assert_eq!(report["decisions"], json!([]));
+        assert_eq!(report["integrated"], false);
     }
 }

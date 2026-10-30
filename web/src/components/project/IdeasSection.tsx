@@ -211,6 +211,10 @@ export function IdeasSection({
       return <Badge tone="ok">prête</Badge>;
     }
 
+    if (idea.report?.integrated) {
+      return <Badge tone="ok">intégrée</Badge>;
+    }
+
     if (idea.state === 'started' && idea.halted) {
       return (
         <Badge tone="err" title={idea.halted}>
