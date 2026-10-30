@@ -5,6 +5,7 @@ import { Button } from '../ui/Button';
 import { Section } from '../ui/Section';
 import { ChevronRightIcon } from '../Icons';
 import { FieldRow, Select, TextInput } from '../ui/Field';
+import { formOnlyModels, type ModelForm } from './ModelPrefsSection';
 
 export interface ProviderForm {
   id: string;
@@ -19,6 +20,8 @@ export interface ProviderForm {
 interface ProvidersSectionProps {
   providers: ProviderForm[];
   listings: ProviderListing[];
+  /** The form's per-model entries: those absent from a listing were added by hand. */
+  values: Record<string, ModelForm>;
   onChange: (index: number, patch: Partial<ProviderForm>) => void;
   onAdd: (provider: ProviderForm) => void;
   onRemove: (index: number) => void;
@@ -37,6 +40,7 @@ const emptyDraft: ProviderDraft = { id: '', name: '', baseUrl: '' };
 export function ProvidersSection({
   providers,
   listings,
+  values,
   onChange,
   onAdd,
   onRemove,
@@ -85,7 +89,8 @@ export function ProvidersSection({
           const listing = listings.find((item) => item.provider === provider.id);
           const isLocal = provider.id === 'local';
           const error = listing?.error ?? null;
-          const count = listing?.models.length ?? 0;
+          const added = formOnlyModels(values, provider.id, listing);
+          const count = (listing?.models.length ?? 0) + added.length;
           const modelDraft = modelDrafts[provider.id] ?? '';
 
           return (
@@ -202,23 +207,35 @@ export function ProvidersSection({
                   )}
                 </div>
 
-                <form
-                  className="flex items-center gap-2"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    addModel(provider.id);
-                  }}
-                >
+                {added.length > 0 && (
+                  <p className="m-0 text-xs text-muted">
+                    Ajouté{added.length > 1 ? 's' : ''} : <span className="font-mono">{added.join(', ')}</span> — « Enregistrer » pour garder.
+                  </p>
+                )}
+                {/* Not a <form>: the Settings page is one, and a nested submit
+                    bubbles to it, saving the page before the model is added. */}
+                <div className="flex items-center gap-2">
                   <TextInput
                     value={modelDraft}
                     onChange={(event) => setModelDrafts((previous) => ({ ...previous, [provider.id]: event.target.value }))}
+                    onKeyDown={(event) => {
+                      if (event.key !== 'Enter') return;
+                      event.preventDefault();
+                      addModel(provider.id);
+                    }}
                     placeholder="Ajouter un modèle par son id (endpoint sans /models)"
                     className="w-full max-w-xs"
                   />
-                  <Button type="submit" variant="secondary" size="sm" disabled={modelDraft.trim() === ''}>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    disabled={modelDraft.trim() === ''}
+                    onClick={() => addModel(provider.id)}
+                  >
                     Ajouter
                   </Button>
-                </form>
+                </div>
               </div>
             </details>
           );
