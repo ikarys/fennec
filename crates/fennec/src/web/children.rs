@@ -15,6 +15,8 @@ pub(super) struct Children<'a> {
     pub(super) settings: &'a Settings,
     pub(super) notifier: &'a Notifier,
     pub(super) workdir: &'a Path,
+    /// The parent's turn runs with the human away: so do its children.
+    pub(super) autonomous: bool,
 }
 
 impl ChildSessions for Children<'_> {
@@ -38,6 +40,7 @@ impl ChildSessions for Children<'_> {
             child_session_id,
             self.workdir,
             stop,
+            self.autonomous,
             |turn, _| {
                 let before = turn.log.events(child_session_id)?.len();
                 let reason = run_child_agent_node(turn, agent_id, prompt)?;

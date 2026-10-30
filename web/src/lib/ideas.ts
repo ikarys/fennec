@@ -15,6 +15,18 @@ export type IdeaSessionState =
   | 'truncated'
   | 'idle';
 
+export interface IdeaReport {
+  criteria: {
+    passed: number;
+    failed: number;
+    pending: number;
+  };
+  decisions: {
+    title: string;
+    choice: string;
+  }[];
+}
+
 export interface Idea {
   id: string;
   text: string;
@@ -22,6 +34,8 @@ export interface Idea {
   sessionId: string | null;
   plan: string | null;
   sessionState: IdeaSessionState | null;
+  halted: string | null;
+  report: IdeaReport | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -96,10 +110,10 @@ export async function dropIdea(projectId: string, ideaId: string): Promise<IdeaB
   });
 }
 
-export async function startQueue(projectId: string): Promise<IdeaBoard> {
+export async function startQueue(projectId: string, autonomous: boolean): Promise<IdeaBoard> {
   return boardRequest(projectId, '/ideas/queue/start', {
     method: 'POST',
-    body: '{}',
+    body: JSON.stringify({ autonomous }),
   });
 }
 

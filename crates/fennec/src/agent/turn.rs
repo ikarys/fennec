@@ -74,6 +74,9 @@ pub struct Turn<'a> {
     pub compact_at: f64,
     /// openfox `reasoningEffort`; `None` sends no `reasoning_effort` field.
     pub reasoning_effort: Option<ReasoningEffort>,
+    /// The human is away (the ideas queue's night mode): `ask_user` and
+    /// `propose_criteria` answer themselves instead of pausing the turn.
+    pub autonomous: bool,
     /// Set by the human to stop the turn: checked between rounds, while
     /// streaming and while a command runs.
     pub stop: &'a AtomicBool,
@@ -523,6 +526,7 @@ mod tests {
                 context_window: 1000,
                 compact_at: 0.0,
                 reasoning_effort: None,
+                autonomous: false,
                 stop: self.stop,
                 on_event: &mut self.on_event,
             }
@@ -549,6 +553,7 @@ mod tests {
             context_window: 1000,
             compact_at: 0.0,
             reasoning_effort: None,
+            autonomous: false,
             stop: &stop,
             on_event: &mut on_event,
         };
@@ -763,6 +768,7 @@ mod tests {
             context_window: 1000,
             compact_at: 0.0,
             reasoning_effort: None,
+            autonomous: false,
             stop: &stop,
             on_event: &mut on_event,
         };
@@ -828,6 +834,51 @@ mod tests {
         assert_eq!(msgs[tool_idx]["content"], "blue");
         assert_eq!(msgs[tool_idx - 1]["role"], "assistant");
         assert_eq!(msgs[tool_idx - 1]["tool_calls"][0]["id"], "c1");
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn while_the_human_is_away_ask_user_and_propose_criteria_answer_themselves() {
+        let dir = scratch_dir();
+        let ask = ToolCall {
+            id: "c1".into(),
+            name: "ask_user".into(),
+            arguments: json!({"question": "Which color?"}),
+            parse_error: None,
+            raw_arguments: None,
+        };
+        let propose = ToolCall {
+            id: "c2".into(),
+            name: "propose_criteria".into(),
+            arguments: json!({"criteria":[{"description":"builds","check":"true"}],"reason":"r"}),
+            parse_error: None,
+            raw_arguments: None,
+        };
+        let model = Scripted(RefCell::new(vec![
+            reply("", vec![ask, propose]),
+            reply("done", vec![]),
+        ]));
+        let stop = AtomicBool::new(false);
+        let mut h = Harness::new(Box::new(model), dir.clone(), &stop);
+        let mut turn = h.turn();
+        turn.autonomous = true;
+        assert_eq!(
+            run_turn(&mut turn, "go", &[]).unwrap(),
+            DoneReason::Complete
+        );
+        let events = h.log.0.borrow().clone();
+        assert!(
+            !events
+                .iter()
+                .any(|e| matches!(e, Event::ChatAskUser { .. }))
+        );
+        assert!(
+            !events
+                .iter()
+                .any(|e| matches!(e, Event::CriteriaProposed { .. }))
+        );
+        assert!(events.iter().any(|e| matches!(e, Event::ToolResult { tool_call_id, result, .. } if tool_call_id == "c1" && result.success)));
+        assert!(events.iter().any(|e| matches!(e, Event::ToolResult { tool_call_id, result, .. } if tool_call_id == "c2" && !result.success)));
         std::fs::remove_dir_all(dir).ok();
     }
 

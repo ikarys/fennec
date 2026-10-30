@@ -30,6 +30,8 @@ pub struct Preferences {
     pub search: SearchPrefs,
     /// How commands run: in bwrap or on the host.
     pub sandbox: SandboxPrefs,
+    /// The ideas queue's caps when it runs with the human away.
+    pub autonomy: AutonomyPrefs,
     /// Skill ids whose instructions every new session gets in its system prompt.
     pub always_on_skills: Vec<String>,
     /// Opt-in embedded workflows (`workflows::opt_in_defaults`) the human enabled.
@@ -76,6 +78,25 @@ impl Default for SandboxPrefs {
         SandboxPrefs {
             enabled: true,
             network: false,
+        }
+    }
+}
+
+/// fennec's own: what one idea may spend in the ideas queue's night mode
+/// before fennec stops it and goes on with the next. 0 means no cap.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct AutonomyPrefs {
+    pub max_minutes_per_idea: u32,
+    /// Uncached prompt tokens plus completion tokens: what a paid model bills.
+    pub max_tokens_per_idea: u64,
+}
+
+impl Default for AutonomyPrefs {
+    fn default() -> Self {
+        AutonomyPrefs {
+            max_minutes_per_idea: 120,
+            max_tokens_per_idea: 2_000_000,
         }
     }
 }

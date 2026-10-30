@@ -71,7 +71,7 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         ("GET", ["api", "projects", id, "ideas"]) => idea_routes::list_ideas(app, stream, id),
         ("POST", ["api", "projects", id, "ideas"]) => idea_routes::add_idea(app, req, stream, id),
         ("POST", ["api", "projects", id, "ideas", "queue", "start"]) => {
-            idea_routes::start_queue(app, stream, id)
+            idea_routes::start_queue(app, req, stream, id)
         }
         ("POST", ["api", "projects", id, "ideas", "queue", "stop"]) => {
             idea_routes::stop_queue(app, stream, id)
