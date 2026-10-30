@@ -1,14 +1,7 @@
 import type { RunView } from "../../lib/workflowRun";
-import { Button } from "../ui/Button";
 
 /** Above the composer, where the eyes are during a run: says a turn is going on, and which node. */
-export function RunningStrip({
-  run,
-  onPause,
-}: {
-  run: RunView | undefined;
-  onPause?: () => void;
-}) {
+export function RunningStrip({ run }: { run: RunView | undefined }) {
   const node =
     run && !run.finished
       ? [...run.runs].reverse().find((r) => r.state === "running")
@@ -25,21 +18,11 @@ export function RunningStrip({
             Workflow en cours · <span className="text-text">{node.label}</span>
             {node.pass > 1 && ` (passe ${node.pass})`}
           </span>
-          {run?.pauseRequested ? (
+          {run?.pauseRequested && (
             <span className="ml-auto shrink-0 text-text">
               Pause demandée · arrêt après cette étape
             </span>
-          ) : onPause ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onPause}
-              title="Laisser finir l'étape en cours, puis attendre ton feu vert avant la suivante"
-              className="ml-auto shrink-0"
-            >
-              ⏸ Pause
-            </Button>
-          ) : null}
+          )}
         </>
       ) : (
         <span>L'agent travaille…</span>

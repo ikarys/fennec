@@ -921,7 +921,7 @@ export function SessionPage({
                       </div>
                     )}
                     {running && !detail?.parentId && (
-                      <RunningStrip run={run} onPause={handlePauseWorkflow} />
+                      <RunningStrip run={run} />
                     )}
                     {!detail?.parentId && (
                       <Composer
@@ -929,6 +929,8 @@ export function SessionPage({
                         onTextChange={setText}
                         onSend={() => handleSend()}
                         onStop={handleStop}
+                        onPause={run && !run.finished && !run.paused ? handlePauseWorkflow : undefined}
+                        pauseRequested={run?.pauseRequested}
                         running={running}
                         currentModel={currentModel}
                         modelChoices={modelChoices}
