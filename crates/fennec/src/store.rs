@@ -335,6 +335,23 @@ impl SqliteStore {
         Ok(rows.next().transpose()?)
     }
 
+    /// The last agent a session switched to (`mode.changed`), or None. A
+    /// targeted read, not the full log: listing a project must not deserialize
+    /// every session's events.
+    pub fn last_mode(&self, session_id: &str) -> Result<Option<String>> {
+        Ok(self
+            .db
+            .query_row(
+                "SELECT json_extract(payload, '$.data.mode') FROM events
+                 WHERE session_id = ?1 AND event_type = 'mode.changed'
+                 ORDER BY seq DESC LIMIT 1",
+                [session_id],
+                |r| r.get::<_, Option<String>>(0),
+            )
+            .optional()?
+            .flatten())
+    }
+
     /// The id followed by all its descendants, children of children included.
     pub fn session_tree(&self, id: &str) -> Result<Vec<String>> {
         let mut stmt = self.db.prepare_cached(

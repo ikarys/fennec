@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Button } from '../ui/Button';
+import { Badge } from '../ui/Badge';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
-import { PlayIcon } from '../Icons';
+import { PlayIcon, ExternalIcon } from '../Icons';
+import { type SessionSummary } from '../../lib/api';
 
 /** What a project page can ask an agent to analyse: each one opens a session on a read-only agent. */
 const ANALYSES = [
@@ -33,12 +35,17 @@ type Analysis = (typeof ANALYSES)[number];
 export function AnalysesSection({
   busy,
   error,
+  sessions,
   onStart,
+  onOpenSession,
 }: {
   /** A session is being created: every launch waits. */
   busy: boolean;
   error: string | null;
+  /** The project's sessions: a running analysis shows as live, not launchable. */
+  sessions: SessionSummary[];
   onStart: (prompt: string, mode: string) => void;
+  onOpenSession: (sessionId: string) => void;
 }) {
   const [pending, setPending] = useState<Analysis | null>(null);
 
@@ -49,25 +56,47 @@ export function AnalysesSection({
         proposition.
       </p>
       <ul className="flex flex-col gap-2">
-        {ANALYSES.map((analysis) => (
-          <li key={analysis.mode} className="flex items-center gap-3 rounded-md border border-border p-3">
-            <div className="min-w-0 grow">
-              <p className="text-sm font-medium text-text">{analysis.title}</p>
-              <p className="text-xs text-muted">{analysis.description}</p>
-            </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              iconOnly
-              disabled={busy}
-              onClick={() => setPending(analysis)}
-              title={`${analysis.title}…`}
-              aria-label={analysis.title}
-            >
-              <PlayIcon className="h-3.5 w-3.5" />
-            </Button>
-          </li>
-        ))}
+        {ANALYSES.map((analysis) => {
+          const running =
+            sessions.find((s) => s.mode === analysis.mode && s.state === 'running') ?? null;
+          return (
+            <li key={analysis.mode} className="flex items-center gap-3 rounded-md border border-border p-3">
+              <div className="min-w-0 grow">
+                <p className="text-sm font-medium text-text">{analysis.title}</p>
+                <p className="text-xs text-muted">{analysis.description}</p>
+              </div>
+              {running ? (
+                <>
+                  <Badge tone="accent" dot pulse title="Analyse en cours">
+                    En cours
+                  </Badge>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    iconOnly
+                    onClick={() => onOpenSession(running.id)}
+                    title="Ouvrir la session"
+                    aria-label={`Ouvrir ${analysis.title}`}
+                  >
+                    <ExternalIcon className="h-3.5 w-3.5" />
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  iconOnly
+                  disabled={busy}
+                  onClick={() => setPending(analysis)}
+                  title={`${analysis.title}…`}
+                  aria-label={analysis.title}
+                >
+                  <PlayIcon className="h-3.5 w-3.5" />
+                </Button>
+              )}
+            </li>
+          );
+        })}
       </ul>
       {error ? <p className="text-xs text-err">{error}</p> : null}
       <ConfirmDialog
