@@ -164,7 +164,13 @@ pub(super) fn with_turn<R>(
     let skills = skills::discover(workdir);
     let agents = agents::discover(workdir);
     let model = OpenAiClient::new(settings.endpoint(&prefs, &params.provider)?, &params.model);
-    let protection = protected::load(workdir);
+    // A session worktree is the agent's own copy: a new dependency's lockfile
+    // may change there, and the integration gate shows it to the human.
+    let protection = if workdir.starts_with(worktree::root(&settings.db_path)) {
+        protected::load_for_worktree(workdir)
+    } else {
+        protected::load(workdir)
+    };
     let tools = LocalTools::new(workdir.to_path_buf())
         .with_search(prefs.search.clone())
         .with_sandbox(
