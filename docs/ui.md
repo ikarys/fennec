@@ -21,9 +21,10 @@ look lives in two places only, so a screen can never drift from the others:
   for "needs you" or "running"), a dot that pulses while something runs.
   The accent is for action and attention, not decoration.
 - Cards only for what stands apart (a plan, a dialog, a question waiting for
-  the human). Everything else is flat: a page's groups are `Section`s and
-  lists are rows, separated by space or a hairline (`border-border`), never
-  a box per item and never a box inside a box.
+  the human). A settings page's groups are `Section`s: a bordered block with
+  a tinted header band (title, description, actions such as a `+`). Inside,
+  everything is flat: lists are rows separated by space or a hairline
+  (`border-border`), never a box per item and never a box inside a box.
 - Only the accent gets a filled `Badge`; ok and err are coloured text.
   Labels are sentence case, never uppercase with tracking.
 - Radii are small (2 to 6px) and come from the tokens; no pills.

@@ -12,7 +12,7 @@ use crate::domain::criteria::{CriterionState, CriterionStatus};
 use crate::domain::decision::{Decision, decisions_in_force};
 use crate::domain::event::Event;
 use crate::domain::integration::{
-    Blocker, DiffChecks, blockers, commit_message, default_message, unacknowledged,
+    Blocker, DiffChecks, blockers, branch_changed, commit_message, default_message, unacknowledged,
 };
 use crate::domain::test_files::new_test_patterns;
 use crate::domain::workflow::run;
@@ -123,6 +123,7 @@ pub fn get_integration(app: &App, stream: &mut TcpStream, id: &str) -> Result<()
             json!({
                 "path": path,
                 "protected": gate.protected_touched.contains(path),
+                "carried": gate.preview.carried_changes.contains(path),
                 "added": added,
                 "removed": removed,
             })
@@ -144,6 +145,34 @@ pub fn get_integration(app: &App, stream: &mut TcpStream, id: &str) -> Result<()
             "criteria": criteria,
             "decisions": gate.decisions,
             "blockers": gate.blockers,
+        }),
+    )
+}
+
+/// The human's repository as it is now, read for every session (with or
+/// without a worktree).
+pub fn get_repo(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+    let store = app.store()?;
+    let Some((session, project)) = session_and_project(&store, id)? else {
+        return error(stream, 404, "no such session");
+    };
+    let Some((top, _)) = worktree::top(Path::new(&project.workdir)) else {
+        return error(stream, 409, "the project is not in a git repository");
+    };
+    let branch = crate::git::current_branch(&top);
+    let origin = app
+        .place(&store, &session, &project)?
+        .worktree
+        .and_then(|wt| worktree::origin_branch(&top, &wt));
+    send_json(
+        stream,
+        200,
+        &json!({
+            "dir": top.to_string_lossy(),
+            "branch": branch,
+            "originBranch": origin,
+            "branchChanged": branch_changed(origin.as_deref(), branch.as_deref()),
+            "dirty": crate::git::dirty_count(&top),
         }),
     )
 }

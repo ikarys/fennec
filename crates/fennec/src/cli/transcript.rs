@@ -134,6 +134,7 @@ impl Transcript {
             | Event::WorkflowNodeStarted { .. }
             | Event::WorkflowNodeFinished { .. }
             | Event::WorkflowPaused { .. }
+            | Event::WorkflowPauseRequested { .. }
             | Event::WorkflowResumed { .. }
             | Event::WorkflowHumanAsked { .. }
             | Event::WorkflowFinished { .. }

@@ -32,6 +32,8 @@ pub struct Preferences {
     pub sandbox: SandboxPrefs,
     /// Skill ids whose instructions every new session gets in its system prompt.
     pub always_on_skills: Vec<String>,
+    /// Opt-in embedded workflows (`workflows::opt_in_defaults`) the human enabled.
+    pub enabled_workflows: Vec<String>,
     /// Before providers (one endpoint): read, moved by `migrate`, never written.
     #[serde(rename = "model", skip_serializing)]
     pub(crate) legacy_model: Option<String>,

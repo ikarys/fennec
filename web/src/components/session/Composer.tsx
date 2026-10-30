@@ -186,7 +186,7 @@ export function Composer({
               }
             }}
             placeholder={placeholder ?? "Demande quelque chose… (@ pour un fichier, / pour une commande)"}
-            className="max-h-60 min-w-0 grow resize-none bg-transparent py-1.5 text-[0.9375rem] leading-relaxed outline-none placeholder:text-faint"
+            className="max-h-60 min-w-0 grow resize-none bg-transparent py-1.5 leading-relaxed outline-none placeholder:text-faint"
           />
           {running ? (
             <Button variant="danger" size="lg" iconOnly aria-label="Arrêter" title="Arrêter le tour" onClick={onStop}>

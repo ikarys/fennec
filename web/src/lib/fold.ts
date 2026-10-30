@@ -327,6 +327,9 @@ export function createThreadFold(): ThreadFold {
     items.push(item);
   };
 
+  const humanWords = (id: string, content: string) =>
+    pushItem({ kind: 'user', id, content, isSystemGenerated: false, attachments: [] });
+
   const newAssistant = (id: string): AssistantItem => {
     const assistant: AssistantItem = { kind: 'assistant', id, segments: [], done: false };
     pushItem(assistant);
@@ -672,13 +675,15 @@ export function createThreadFold(): ThreadFold {
       case 'workflow.started': {
         const workflow = runFold.view()?.workflow;
         if (workflow) {
-          pushItem({
-            kind: 'note',
-            id: `workflow-started-${index}`,
-            text: `Workflow « ${workflow.name} »`,
-            detail: String(data.task ?? '')
-          });
+          pushItem({ kind: 'note', id: `workflow-started-${index}`, text: `Workflow « ${workflow.name} »` });
         }
+        // The task is what the human typed: their message, not a detail of the note.
+        if (data.task) humanWords(`workflow-task-${index}`, String(data.task));
+        break;
+      }
+
+      case 'workflow.resumed': {
+        if (data.comment) humanWords(`workflow-resumed-${index}`, String(data.comment));
         break;
       }
 

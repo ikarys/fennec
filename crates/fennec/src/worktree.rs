@@ -74,11 +74,24 @@ pub fn open(root: &Path, project_dir: &Path, session_id: &str) -> Result<Option<
 /// until git gc, which is why the route records their shas.
 pub fn remove(top: &Path, wt: &Worktree) -> Result<(), String> {
     let path_arg = wt.path.to_string_lossy().into_owned();
-    git(top, &["worktree", "remove", "--force", &path_arg], None)?;
+    let removed = git(top, &["worktree", "remove", "--force", &path_arg], None);
+    if let Err(e) = &removed
+        && !e.contains("Permission denied")
+    {
+        return Err(e.clone());
+    }
+    // A directory git could not empty (files a container wrote as root through a bind mount)
+    // is no longer a worktree: drop its registration, branch and refs all the same.
+    let _ = git(top, &["worktree", "prune"], None);
     git(top, &["branch", "-D", &wt.branch], None)?;
     git(top, &["update-ref", "-d", &wt.base], None)?;
     // Older worktrees have no origin ref; deleting it is optional.
     let _ = git(top, &["symbolic-ref", "--delete", &wt.origin], None);
+    if let Err(e) = removed {
+        return Err(format!(
+            "{e}\nThe branch is removed; some files are not yours (owned by root?): `sudo rm -rf {path_arg}`."
+        ));
+    }
     Ok(())
 }
 

@@ -18,7 +18,7 @@ const VARIANTS: Record<ButtonVariant, string> = {
   primary: 'bg-accent text-on-accent hover:bg-accent-strong',
   secondary: 'bg-raised text-text hover:bg-border',
   ghost: 'text-muted hover:bg-raised hover:text-text',
-  danger: 'bg-raised text-text hover:bg-del-bg hover:text-err'
+  danger: 'border border-err/40 text-err hover:bg-del-bg'
 };
 
 /** `wrap` is `text` whose height is a minimum: a wrapping choice grows with its text. */
