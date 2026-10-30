@@ -64,6 +64,7 @@ mod tests {
         models.insert(
             "m".into(),
             ModelPrefs {
+                price: None,
                 max_tokens: Some(100),
                 context_window: Some(2048),
                 compaction_threshold: Some(0.5),

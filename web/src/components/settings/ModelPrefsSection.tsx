@@ -13,6 +13,9 @@ export interface ModelForm {
   contextWindow: string;
   compactionThreshold: string;
   reasoningEffort: string;
+  priceInput: string;
+  priceCached: string;
+  priceOutput: string;
 }
 
 interface ModelPrefsSectionProps {
@@ -74,11 +77,17 @@ export function percentFromFraction(fraction: number): string {
 }
 
 /** The compact line of a model row: what its turn runs with, at a glance. */
+function priceSuffix(base: string, value: ModelForm): string {
+  if (value.priceInput === '' && value.priceOutput === '') return base;
+  return `${base} · $${value.priceInput || '0'}/$${value.priceOutput || '0'}`;
+}
+
 function summary(value: ModelForm, model: ProviderListing['models'][number] | null, defaults: SettingsDefaults): string {
   const parts: string[] = [];
   if (model === null) {
     // A hand-added model: nothing is resolved until it is saved and used.
-    return value.contextWindow !== '' ? `ctx ${value.contextWindow}` : 'paramètres par défaut';
+    const base = value.contextWindow !== '' ? `ctx ${value.contextWindow}` : 'paramètres par défaut';
+    return priceSuffix(base, value);
   }
   const window = value.contextWindow !== '' ? value.contextWindow : String(model.resolved.contextWindow.value);
   parts.push(`ctx ${window}`);
@@ -89,7 +98,7 @@ function summary(value: ModelForm, model: ProviderListing['models'][number] | nu
       ? value.reasoningEffort
       : (model.resolved.reasoningEffort.value ?? `défaut ${defaults.reasoningEffort ?? '—'}`);
   parts.push(`effort ${effort}`);
-  return parts.join(' · ');
+  return priceSuffix(parts.join(' · '), value);
 }
 
 /** One model row: from the listing, or a hand-added one from the form only. */
@@ -124,7 +133,7 @@ function ModelRow({
   onToggleOpen: () => void;
 }) {
   const key = `${providerId}/${modelId}`;
-  const value = values[key] ?? { maxTokens: '', contextWindow: '', compactionThreshold: '', reasoningEffort: '' };
+  const value = values[key] ?? { maxTokens: '', contextWindow: '', compactionThreshold: '', reasoningEffort: '', priceInput: '', priceCached: '', priceOutput: '' };
   const isFavorite = favorites.some((favorite) => favorite.provider === providerId && favorite.model === modelId);
 
   return (
@@ -240,6 +249,44 @@ function ModelRow({
               </Select>
             </FieldRow>
           </div>
+          <div className="grid gap-2 md:grid-cols-3">
+            <p className="m-0 text-xs font-medium text-muted md:col-span-3">
+              Prix ($ par million de tokens, pour l'estimation d'Insight)
+            </p>
+            <FieldRow label="Entrée">
+              <TextInput
+                type="number"
+                min={0}
+                step="any"
+                value={value.priceInput}
+                placeholder="—"
+                onChange={(event) => onChange(key, 'priceInput', event.target.value)}
+                className="w-full"
+              />
+            </FieldRow>
+            <FieldRow label="Cache">
+              <TextInput
+                type="number"
+                min={0}
+                step="any"
+                value={value.priceCached}
+                placeholder="—"
+                onChange={(event) => onChange(key, 'priceCached', event.target.value)}
+                className="w-full"
+              />
+            </FieldRow>
+            <FieldRow label="Sortie">
+              <TextInput
+                type="number"
+                min={0}
+                step="any"
+                value={value.priceOutput}
+                placeholder="—"
+                onChange={(event) => onChange(key, 'priceOutput', event.target.value)}
+                className="w-full"
+              />
+            </FieldRow>
+          </div>
 
           {model !== null && (
             <div className="flex flex-col gap-1.5 border-l border-border pl-3">
@@ -308,7 +355,7 @@ export function ModelPrefsSection({
   // A model with saved overrides opens by itself: that is what the human came to edit.
   const hasOverrides = (key: string) => {
     const value = values[key];
-    return value != null && (value.maxTokens !== '' || value.contextWindow !== '' || value.compactionThreshold !== '' || value.reasoningEffort !== '');
+    return value != null && (value.maxTokens !== '' || value.contextWindow !== '' || value.compactionThreshold !== '' || value.reasoningEffort !== '' || value.priceInput !== '' || value.priceCached !== '' || value.priceOutput !== '');
   };
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const isOpen = (key: string) => open[key] ?? hasOverrides(key);
