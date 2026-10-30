@@ -14,10 +14,12 @@ type Report = NonNullable<IdeaBoard['nightReport']>;
 
 export function NightReport({
   report,
+  caps,
   onOpenSession,
   onDismiss,
 }: {
   report: Report;
+  caps: IdeaBoard['queue']['caps'];
   onOpenSession: (sessionId: string) => void;
   onDismiss: () => Promise<boolean>;
 }) {
@@ -82,7 +84,7 @@ export function NightReport({
                 {idea.text}
               </span>
               <IdeaStatusBadge status={idea.status} />
-              <IdeaMeta idea={idea} />
+              <IdeaMeta idea={idea} caps={caps} />
               {sid ? (
                 <Button
                   variant="ghost"

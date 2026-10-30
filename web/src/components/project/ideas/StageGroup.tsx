@@ -2,6 +2,7 @@
  * One stage of the tasks board: a labelled group of idea rows.
  */
 import { useState } from 'react';
+import { Card } from '../../ui/Card';
 import { SectionLabel } from '../../ui/SectionLabel';
 import { IdeaRow } from './IdeaRow';
 import {
@@ -26,6 +27,7 @@ export function StageGroup({
   onFrame,
   onOpenSession,
   run,
+  caps,
   showLabel = true,
 }: {
   stage: Stage;
@@ -34,6 +36,7 @@ export function StageGroup({
   onFrame: (idea: IdeaView) => Promise<void>;
   onOpenSession: (sessionId: string) => void;
   run: (action: () => Promise<IdeaBoard>) => Promise<boolean>;
+  caps: IdeaBoard['queue']['caps'];
   showLabel?: boolean;
 }) {
   const [dragFrom, setDragFrom] = useState<number | null>(null);
@@ -55,11 +58,19 @@ export function StageGroup({
     await run(() => reorderIdeas(projectId, ids));
   };
 
-  return (
-    <section>
-      {showLabel ? <SectionLabel>{STAGE_LABELS[stage]}</SectionLabel> : null}
+  // The stages that need the human or show live work stand apart from the flat lists.
+  const highlighted = stage === 'yours' || stage === 'running';
 
-      <div className={showLabel ? 'mt-2 flex flex-col gap-1' : 'flex flex-col gap-1'}>
+  const content = (
+    <>
+      {showLabel ? (
+        <SectionLabel as="h2">{STAGE_LABELS[stage]}</SectionLabel>
+      ) : null}
+      <div
+        className={
+          showLabel && !highlighted ? 'mt-2 flex flex-col gap-1' : 'flex flex-col gap-1'
+        }
+      >
         {stage === 'queue' && ideas.length === 0 ? (
           <p className="m-0 text-sm text-muted">Aucune tâche prête : cadre une idée du backlog.</p>
         ) : null}
@@ -71,6 +82,7 @@ export function StageGroup({
             onFrame={onFrame}
             onOpenSession={onOpenSession}
             run={run}
+            caps={caps}
             position={stage === 'queue' ? idea.position : null}
             reorder={
               stage === 'queue' && ideas.length > 1
@@ -95,8 +107,15 @@ export function StageGroup({
             }
           />
         ))}
-
       </div>
+    </>
+  );
+
+  return highlighted ? (
+    <section>
+      <Card className="flex flex-col gap-2 p-3">{content}</Card>
     </section>
+  ) : (
+    <section>{content}</section>
   );
 }
