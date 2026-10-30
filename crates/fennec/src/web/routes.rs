@@ -19,7 +19,9 @@ use super::{
 use crate::agent::ports::EventLog;
 use crate::agent::workflow::WorkflowJob;
 use crate::agents;
-use crate::domain::agent::{resolve as agent_resolve, switch_to};
+use crate::domain::agent::{
+    resolve as agent_resolve, resolve_mode as agent_resolve_mode, switch_to,
+};
 use crate::domain::attachment::{Attachment, from_data_url};
 use crate::domain::audit;
 use crate::domain::conversation::{first_request, last_assistant_text};
@@ -209,12 +211,18 @@ fn list_projects(app: &App, stream: &mut TcpStream) -> Result<(), String> {
     for p in store.projects()? {
         // The log says a workflow ended; git says whether its work still waits.
         let pending = git::sessions_with_unintegrated_work(Path::new(&p.workdir));
+        // Each session's agent, so the project page can tell an analysis apart.
+        let list = agents::discover(Path::new(&p.workdir));
         let sessions: Vec<Value> = store
             .sessions(Some(&p.id))?
             .iter()
             .map(|s| {
                 let mut v = session_json(app, s);
                 v["awaitingIntegration"] = json!(s.awaiting_integration && pending.contains(&s.id));
+                let mode = store.last_mode(&s.id).ok().flatten().and_then(|m| {
+                    agent_resolve_mode(&list, Some(m.as_str())).map(|a| a.id.clone())
+                });
+                v["mode"] = json!(mode);
                 v
             })
             .collect();
@@ -756,4 +764,90 @@ pub(super) fn append_human_event(
         log.append(session_id, &event)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::{LlmSettings, Settings};
+    use crate::domain::preferences::ModelParams;
+    use crate::web::notifier::Notifier;
+    use crate::web::turns::Turns;
+    use std::collections::HashMap;
+    use std::io::Read;
+    use std::net::TcpListener;
+    use std::path::PathBuf;
+    use std::sync::Mutex;
+
+    /// A file-backed store: `App::store` opens one connection per call, so an
+    /// in-memory DB would be empty on every call.
+    fn app(db_path: PathBuf) -> App {
+        let settings = Settings {
+            llm: LlmSettings {
+                base_url: "http://localhost".into(),
+                api_key: None,
+                defaults: ModelParams {
+                    provider: "local".into(),
+                    model: "test".into(),
+                    max_tokens: 100,
+                    context_window: 1000,
+                    compact_at: 0.85,
+                    reasoning_effort: None,
+                },
+                listed: Vec::new(),
+            },
+            db_path,
+        };
+        let notifier = Arc::new(Notifier::default());
+        App {
+            turns: Turns::new(settings.clone(), notifier.clone()),
+            settings,
+            port: 0,
+            notifier,
+            skill_folds: Mutex::new(HashMap::new()),
+            idea_queues: Mutex::default(),
+            server_runs: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+
+    #[test]
+    fn list_projects_includes_session_mode() {
+        let db_path = std::env::temp_dir().join(format!("fennec-routes-test-{}.db", new_id()));
+        let app = app(db_path.clone());
+        let store = app.store().unwrap();
+        let project = store.project_for("/tmp/analyze-mode").unwrap();
+        let session = store.create_session(&project, "analyze").unwrap();
+        store
+            .append(
+                &session,
+                &Event::ModeChanged {
+                    mode: "analyze".into(),
+                    auto: false,
+                    reason: None,
+                },
+            )
+            .unwrap();
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let client = TcpStream::connect(addr).unwrap();
+        let mut server = listener.accept().unwrap().0;
+        {
+            let mut client = client;
+            list_projects(&app, &mut client).unwrap();
+        }
+        let mut body = String::new();
+        server.read_to_string(&mut body).unwrap();
+        let json = body
+            .rsplit("\r\n\r\n")
+            .next()
+            .expect("a response body after the headers");
+        let projects: Value = serde_json::from_str(json).unwrap();
+        let mode = projects[0]["sessions"]
+            .as_array()
+            .and_then(|s| s.iter().find(|s| s["id"] == session))
+            .and_then(|s| s["mode"].as_str());
+        assert_eq!(mode, Some("analyze"));
+        let _ = std::fs::remove_file(&db_path);
+    }
 }
