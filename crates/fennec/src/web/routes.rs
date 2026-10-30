@@ -5,9 +5,9 @@ use super::editor;
 use super::http::{Request, error, send, send_json};
 use super::notifier::NotifyingLog;
 use super::{
-    architecture_routes, assets,
+    assets,
     context_view::context_view,
-    event_stream, integration, model_routes, session_name,
+    event_stream, integration, model_routes, project_routes, session_name,
     session_usage::{SessionUsageView, call_views},
     settings_routes,
     turns::Job,
@@ -57,8 +57,11 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
         ("POST", ["api", "projects"]) => open_project(app, req, stream),
         ("GET", ["api", "projects", id, "commands"]) => list_commands(app, stream, id),
         ("GET", ["api", "projects", id, "agents"]) => list_agents(app, stream, id),
-        ("GET", ["api", "projects", id, "architecture"]) => {
-            architecture_routes::get_architecture(app, stream, id)
+        ("GET", ["api", "projects", id, "overview"]) => {
+            project_routes::get_overview(app, stream, id)
+        }
+        ("POST", ["api", "projects", id, "map-file"]) => {
+            project_routes::write_map_file(app, stream, id)
         }
         ("GET", ["api", "projects", id, "workflows"]) => {
             workflow_routes::list_workflows(app, stream, id)

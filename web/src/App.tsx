@@ -7,12 +7,12 @@ import { HomePage } from './pages/HomePage';
 import { SessionPage } from './pages/SessionPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { InsightPage } from './pages/InsightPage';
-import { ArchitecturePage } from './pages/ArchitecturePage';
 import { Palette } from './components/Palette';
 import { ProjectDialog } from './components/project/ProjectDialog';
 import { DisplayPrefsProvider, defaultDisplayPrefs } from './lib/display';
 
 const WorkflowsPage = lazy(() => import('./pages/WorkflowsPage'));
+const ProjectPage = lazy(() => import('./pages/ProjectPage'));
 
 type Route =
   | { name: 'home' }
@@ -20,7 +20,7 @@ type Route =
   | { name: 'new'; id: string; testWorkflowId: string | null }
   | { name: 'settings' }
   | { name: 'insight' }
-  | { name: 'architecture'; projectId: string | null }
+  | { name: 'project'; projectId: string }
   | { name: 'workflows'; projectId: string | null; workflowId: string | null; isNew: boolean };
 
 const TABS_KEY = 'fennec.tabs';
@@ -34,9 +34,8 @@ function parseRoute(): Route {
   if (hash === '#/insight') {
     return { name: 'insight' };
   }
-  if (hash.startsWith('#/architecture')) {
-    const id = hash.slice('#/architecture/'.length);
-    return { name: 'architecture', projectId: id ? decodeURIComponent(id) : null };
+  if (hash.startsWith('#/project/')) {
+    return { name: 'project', projectId: decodeURIComponent(hash.slice('#/project/'.length)) };
   }
   if (hash.startsWith('#/workflows')) {
     const path = hash.slice(12); // Remove '#/workflows'
@@ -356,8 +355,10 @@ export default function App() {
                 isNew={route.isNew}
               />
             </Suspense>
-          ) : route.name === 'architecture' ? (
-            <ArchitecturePage projects={projects} projectId={route.projectId} />
+          ) : route.name === 'project' ? (
+            <Suspense fallback={<div className="flex grow items-center justify-center text-muted">Chargement…</div>}>
+              <ProjectPage projects={projects} projectId={route.projectId} />
+            </Suspense>
           ) : route.name === 'insight' ? (
             <InsightPage />
           ) : (

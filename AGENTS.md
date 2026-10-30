@@ -79,16 +79,20 @@ checked on the lines an integration adds; a violation is a blocker the human acc
 (`domain/architecture.rs`, `architecture.rs`).
 Bypass detection, done: added lines that silence a lint, a type check or a test, and
 tests or assertions removed on balance, are blockers the human accepts (`domain/bypass.rs`).
-ADRs, done: an Architecture page per project (`#/architecture`) lists the MADR files of
-`docs/adr/`, protected (`domain/adr.rs`, `adr.rs`). Not the agents' recorded decisions:
-those explain one change, an ADR binds the project.
+ADRs, done: the project page lists the MADR files of `docs/adr/`, protected
+(`domain/adr.rs`, `adr.rs`). Not the agents' recorded decisions: those explain one change,
+an ADR binds the project.
+Project page and map, done: `#/project/<id>` (the "Projet" button of a home card) shows the
+modules and their dependencies read from the imports (verified, `domain/module_map.rs`), and
+writes them on the human's click to `docs/map.md` (`domain/map_doc.rs`), stale when the code moved:
+committed, it gives the project's shape to the next developer or agent without reading the code.
 Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
-1. The project map, on the Architecture page ("understand this project"): modules and
-   their dependencies extracted from the code (verified, a generated Mermaid diagram),
-   entry points and tests per module; then risk zones (C11: churn, untested, never
-   reviewed by a human, deterministic); then explanations with their file:line sources
-   and questions to an agent (C10, indicative).
+1. Project actions on the project page: "Analyser le projet" (a read-only agent drafts the
+   AGENTS.md philosophy, layers and rules, each with its file:line source, indicative, the
+   human reviews it), diagrams on demand of a function, process or engine
+   (`docs/diagrams/`, Mermaid, indicative); then risk zones (C11: churn, untested, never
+   reviewed by a human, deterministic) and questions to an agent (C10).
 2. Audits: a read-only `audit` agent, fixed report format.
 3. Tooled human review (C9): a risk map (deterministic), a narrative diff (indicative).
 4. Produced architecture and drift (C12), security checks orchestrating known tools
@@ -129,6 +133,8 @@ crates/fennec/src/
     diff.rs            the lines a unified diff adds and removes
     bypass.rs          what silences a gate: suppression markers added, tests or assertions removed
     adr.rs             architecture decision records: a MADR file read (number, title, status, date)
+    module_map.rs      the project map: modules, their dependencies from the imports, their layout
+    map_doc.rs         docs/map.md: the map as Markdown (Mermaid, table), stale or current
     workflow/          a workflow: definition (nodes, ports, edges), template ({{…}} names),
                        validate (the graph rules), run (the run folded from its events, the next step)
     id.rs, clock.rs
@@ -166,9 +172,10 @@ crates/fennec/src/
   folders.rs         the folders the human browses to open a project
   protected.rs       the project's protected files: .agents/protected read, the existing paths found
   adr.rs             the project's ADR files in docs/adr/, listed
+  module_map.rs      the project map's source files (git ls-files) and docs/map.md read, written
   web/               HTTP adapter: http, guard (who may call), routes, settings_routes, event_stream (SSE),
                      notifier (wakes streams on append, no polling), turns, assets,
-                     workflow_routes, architecture_routes (the Architecture page),
+                     workflow_routes, project_routes (the project page),
                      model_routes (the composer's model choices, a session's model),
                      children (child sessions for workflow nodes),
                      preview (a project's files in a sandboxed origin), session_usage,
@@ -182,10 +189,10 @@ crates/llm-providers/ talking to models, a crate of its own and fennec-free: the
 crates/fennec/build.rs   embeds web/dist (placeholder page when not built)
 web/src/           React + Vite + Tailwind v4 UI (same layout as openfox's web/src)
   pages/             one component per route: HomePage, SessionPage, SettingsPage, InsightPage,
-                     ArchitecturePage, WorkflowsPage (lazy)
+                     ProjectPage, WorkflowsPage (lazy)
   components/        ui/ the primitives every screen uses (Button, Badge, SectionLabel, Card, Panel, fields);
                      shared UI; session/ the thread, tool cards, question card, message stats, composer,
-                     context panel; project/ the folder browser; layout/ the top bar;
+                     context panel; project/ the folder browser and the project map; layout/ the top bar;
                      workflow/ the editor (canvas, node shapes, panels) and session/ a run in the thread;
                      preview/ the preview pane and previewable code blocks
   hooks/             useSessionThread: the SSE stream of a session, folded
@@ -299,3 +306,5 @@ with the per-message stats.
 
 Conventional Commits, imperative mood (`feat:`, `fix:`, `docs:`, `refactor:`,
 `test:`, `chore:`).
+Every commit, whoever writes it (human, agent, local model): the message is in
+English, subject and body, and follows Conventional Commits; no exception.

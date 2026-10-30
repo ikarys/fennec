@@ -613,12 +613,82 @@ export interface Adr {
   body: string;
 }
 
-export interface Architecture {
-  adrs: Adr[];
+/** A module of the project map (verified: read from the code's imports), placed by the server. */
+export interface MapModule {
+  id: string;
+  /** The modules linked by dependencies it is drawn with; "" when it has none. */
+  group: string;
+  files: number;
+  tests: number;
+  entry: boolean;
+  layer: number;
+  row: number;
+  /** The first paragraph of its head file's leading doc comment (its authors' words). */
+  summary: string | null;
+  sources: MapSourceNote[];
+  /** The modules it imports, and those importing it, the most imports first. */
+  uses: MapLink[];
+  usedBy: MapLink[];
+  /** Top-left corner of its box (260 × 46), placed by the server. */
+  x: number;
+  y: number;
 }
 
-export function getArchitecture(projectId: string): Promise<Architecture> {
-  return request<Architecture>(`/api/projects/${encodeURIComponent(projectId)}/architecture`);
+export interface MapSourceNote {
+  path: string;
+  summary: string | null;
+}
+
+export interface MapLink {
+  module: string;
+  imports: number;
+}
+
+export interface MapPoint {
+  x: number;
+  y: number;
+}
+
+export interface MapDependency {
+  from: string;
+  to: string;
+  imports: number;
+  /** The arrow as a finished SVG path: right angles, rounded corners, hops at crossings. */
+  path: string;
+  /** Where the import count is shown. */
+  label: MapPoint;
+}
+
+export interface MapGroup {
+  name: string;
+  modules: number;
+}
+
+export interface ModuleMap {
+  modules: MapModule[];
+  dependencies: MapDependency[];
+  /** In display order: the biggest first, "" (modules without dependencies) last. */
+  groups: MapGroup[];
+}
+
+/** The committed `docs/map.md` against the map of the code as it is. */
+export type MapFileState = 'missing' | 'stale' | 'current';
+
+export interface ProjectOverview {
+  adrs: Adr[];
+  map: ModuleMap;
+  mapFile: MapFileState;
+}
+
+export function getProjectOverview(projectId: string): Promise<ProjectOverview> {
+  return request<ProjectOverview>(`/api/projects/${encodeURIComponent(projectId)}/overview`);
+}
+
+export function writeMapFile(projectId: string): Promise<{ mapFile: MapFileState }> {
+  return request<{ mapFile: MapFileState }>(`/api/projects/${encodeURIComponent(projectId)}/map-file`, {
+    method: 'POST',
+    body: '{}'
+  });
 }
 
 export function listWorkflows(projectId: string): Promise<WorkflowSummary[]> {

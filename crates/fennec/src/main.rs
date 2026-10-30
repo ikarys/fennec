@@ -14,6 +14,7 @@ mod instructions;
 mod integration;
 mod llm;
 mod metering;
+mod module_map;
 mod protected;
 mod skills;
 mod store;
