@@ -18,17 +18,17 @@ function portBadgeTone(port: string): 'ok' | 'err' | 'accent' {
   return 'accent';
 }
 
-/** The badge's colour by role, following the workflow editor's semantics. */
+/** The node kind's text colour by role, following the workflow editor's semantics. */
 function nodeKindTone(kind: NodeKind): string {
   switch (kind) {
     case 'agent':
-      return 'border-accent/40 bg-raised text-accent';
+      return 'text-accent';
     case 'human':
-      return 'border-accent/40 bg-accent-soft text-accent';
+      return 'text-accent';
     case 'criteria':
-      return 'border-ok/40 bg-raised text-ok';
+      return 'text-ok';
     default:
-      return 'border-border bg-raised text-muted';
+      return 'text-muted';
   }
 }
 
@@ -59,7 +59,7 @@ export function NodeDivider({ item, running }: { item: WorkflowNodeItem; running
         <span className="h-px grow bg-border" />
         <span className="flex min-w-0 items-center gap-1.5">
           <span
-            className={`shrink-0 rounded border px-1.5 text-[0.625rem] uppercase tracking-wide ${nodeKindTone(item.nodeKind)}`}
+            className={`shrink-0 text-[0.6875rem] ${nodeKindTone(item.nodeKind)}`}
           >
             {item.nodeKind}
           </span>
