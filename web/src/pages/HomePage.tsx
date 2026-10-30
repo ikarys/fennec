@@ -26,16 +26,16 @@ function SessionRow({ session, onOpenSession }: { session: SessionSummary; onOpe
     <button
       type="button"
       onClick={() => onOpenSession(session.id)}
-      className="grid w-full grid-cols-[minmax(0,1fr)_auto_5.5rem] items-center gap-3 rounded-md px-2 py-1.5 text-left hover:bg-raised"
+      className="group flex h-8 w-full items-center gap-3 border-b border-border px-3 text-left hover:bg-raised"
     >
-      <span className="min-w-0 truncate font-medium">{session.title}</span>
-      <span className="flex items-center gap-1.5">
+      <span className="min-w-0 grow truncate text-sm text-text">{session.title}</span>
+      <span className="flex w-40 shrink-0 items-center gap-1.5 font-mono text-[0.6875rem] text-muted tabular-nums">
         {session.awaitingIntegration && <Badge tone="accent">à intégrer</Badge>}
         <Badge tone={tone} dot={dot} pulse={pulse}>
           {stateLabel(session.state)}
         </Badge>
       </span>
-      <span className="text-right text-xs text-faint tabular-nums">{formatRelative(session.updatedAt)}</span>
+      <span className="w-24 shrink-0 text-right font-mono text-[0.6875rem] text-muted tabular-nums">{formatRelative(session.updatedAt)}</span>
     </button>
   );
 }
@@ -61,7 +61,7 @@ function ProjectSection({
 
   return (
     <section className="border-t border-border pt-3 first:border-t-0 first:pt-0">
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-2">
+      <div className="group flex items-center gap-3 border-b border-border px-3 hover:bg-raised">
         <button
           type="button"
           onClick={() => setOpen((value) => !value)}
@@ -82,17 +82,19 @@ function ProjectSection({
             </span>
           </span>
         </button>
-        <a
-          href={'#/project/' + encodeURIComponent(project.id)}
-          title="La carte du projet, ses ADR"
-          className={buttonClass({ variant: 'ghost', size: 'sm' })}
-        >
-          Projet
-        </a>
-        <Button variant="secondary" size="sm" onClick={() => onNewSession(project.id)}>
-          <PlusIcon className="h-3.5 w-3.5" />
-          Nouvelle session
-        </Button>
+        <span className="flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">
+          <a
+            href={'#/project/' + encodeURIComponent(project.id)}
+            title="La carte du projet, ses ADR"
+            className={buttonClass({ variant: 'ghost', size: 'sm' })}
+          >
+            Projet
+          </a>
+          <Button variant="secondary" size="sm" onClick={() => onNewSession(project.id)}>
+            <PlusIcon className="h-3.5 w-3.5" />
+            Nouvelle session
+          </Button>
+        </span>
       </div>
 
       {open &&
@@ -147,7 +149,7 @@ export function HomePage({ projects, loading, error, onOpenProjectDialog, onNewS
       <div className="mx-auto flex max-w-[960px] flex-col gap-5">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="flex flex-col gap-0.5">
-            <h1 className="text-[1.375rem] font-semibold tracking-[-0.02em]">Projets</h1>
+            <h1 className="text-[0.9375rem] font-semibold">Projets</h1>
             <p className="text-sm text-muted">
               {runningCount > 0 ? `${runningCount} session${runningCount > 1 ? 's' : ''} en cours` : 'Aucune session en cours'}
             </p>

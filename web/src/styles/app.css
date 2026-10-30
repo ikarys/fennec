@@ -4,12 +4,12 @@
   color-scheme: dark;
   --bg: #0E1013;
   --panel: #15181D;
-  --raised: #1D2128;
+  --raised: #20252D;
   --border: #272C34;
   --border-strong: #363C46;
   --text: #E7E9EC;
   --muted: #9AA2AE;
-  --faint: #4A505A;
+  --faint: #7D848F;
   --accent: #F08A4B;
   --accent-strong: #F6A876;
   --accent-soft: rgba(240, 138, 75, 0.14);
@@ -27,12 +27,12 @@
   color-scheme: dark;
   --bg: #0E1013;
   --panel: #15181D;
-  --raised: #1D2128;
+  --raised: #20252D;
   --border: #272C34;
   --border-strong: #363C46;
   --text: #E7E9EC;
   --muted: #9AA2AE;
-  --faint: #4A505A;
+  --faint: #7D848F;
   --accent: #F08A4B;
   --accent-strong: #F6A876;
   --accent-soft: rgba(240, 138, 75, 0.14);
@@ -55,7 +55,7 @@
   --border-strong: #CFCFC7;
   --text: #1A1B1E;
   --muted: #5C6066;
-  --faint: #B5B7BB;
+  --faint: #6B6F76;
   --accent: #C2531A;
   --accent-strong: #9E4012;
   --accent-soft: rgba(194, 83, 26, 0.10);
@@ -78,7 +78,7 @@
   --border-strong: #36415B;
   --text: #DDE3EE;
   --muted: #98A3B8;
-  --faint: #4A5570;
+  --faint: #7A86A2;
   --accent: #82A8F9;
   --accent-strong: #A9C3FB;
   --accent-soft: rgba(130, 168, 249, 0.14);
@@ -96,11 +96,11 @@
   /* The text size setting scales the root font size: text in rem follows it,
      while spacing and radii stay in px so the layout does not move. */
   --spacing: 3.5px;
-  --radius-sm: 3px;
-  --radius-md: 4px;
-  --radius-lg: 6px;
-  --radius-xl: 8px;
-  --radius-2xl: 10px;
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+  --radius-xl: 5px;
+  --radius-2xl: 6px;
   --color-bg: var(--bg);
   --color-panel: var(--panel);
   --color-raised: var(--raised);
@@ -136,7 +136,7 @@ body {
   font-size: 0.8125rem;
   font-feature-settings: "cv11", "ss01";
   -webkit-font-smoothing: antialiased;
-  line-height: 1.5;
+  line-height: 1.4;
 }
 
 a {

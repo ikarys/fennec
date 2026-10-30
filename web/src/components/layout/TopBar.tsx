@@ -173,25 +173,28 @@ export function TopBar({
           href="#/insight"
           title="Insight"
           aria-label="Insight"
-          className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
+          className={buttonClass({ variant: 'ghost', size: 'sm' })}
         >
           <InsightIcon className="h-4 w-4" />
+          <span className="hidden lg:inline">Insight</span>
         </a>
         <a
           href="#/workflows"
           title="Workflows"
           aria-label="Workflows"
-          className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
+          className={buttonClass({ variant: 'ghost', size: 'sm' })}
         >
           <WorkflowsIcon className="h-4 w-4" />
+          <span className="hidden lg:inline">Workflows</span>
         </a>
         <a
           href="#/settings"
           title="Réglages"
           aria-label="Réglages"
-          className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
+          className={buttonClass({ variant: 'ghost', size: 'sm' })}
         >
           <SettingsIcon className="h-4 w-4" />
+          <span className="hidden lg:inline">Réglages</span>
         </a>
       </div>
     </header>

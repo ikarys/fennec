@@ -32,7 +32,7 @@ export function AgentShape({ node }: ShapeProps) {
   return (
     <div className="w-48 rounded-lg border border-border bg-panel px-3 py-2">
       <div className="text-[0.8125rem] font-medium text-text">{node.name ?? node.id}</div>
-      {agent && <div className="text-xs text-accent">{agent}</div>}
+      {agent && <div className="text-xs text-muted">{agent}</div>}
       {prompt && <div className="mt-1 truncate text-xs text-muted">{prompt}</div>}
     </div>
   );
