@@ -49,6 +49,10 @@ export function formatClock(ms: number): string {
 
 export function formatTokens(value?: number): string {
   if (value == null) return '0';
+  // Same scale as the server's token_usage::display::tokens.
+  if (value >= 1_000_000) {
+    return `${(value / 1_000_000).toFixed(1).replace('.', ',')}M`;
+  }
   if (value >= 1000) {
     return `${(value / 1000).toFixed(1).replace('.', ',')}k`;
   }
