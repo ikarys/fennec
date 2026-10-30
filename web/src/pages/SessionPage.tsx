@@ -1,6 +1,6 @@
 import type { WorkflowSummary } from "../lib/workflow";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { markIdeaReady } from "../lib/ideas";
+import { addPlannedIdea, markIdeaReady } from "../lib/ideas";
 import type {
   Agent,
   AttachmentInput,
@@ -48,7 +48,7 @@ import { ContextPanel } from "../components/session/ContextPanel";
 import { ContextGauge } from "../components/session/ContextGauge";
 import { QuestionCard } from "../components/session/QuestionCard";
 import { ThreadItemView } from "../components/session/Thread";
-import { PlanActionsContext } from "../components/session/PlanActions";
+import { PlanActionsContext, type PlanActions } from "../components/session/PlanActions";
 import {
   CallUsageContext,
   WorkflowUsageContext,
@@ -118,6 +118,8 @@ export function SessionPage({
   const [planBuildInFlight, setPlanBuildInFlight] = useState(false);
   const [preview, setPreview] = useState<PreviewTarget | null>(null);
   const [detailVersion, setDetailVersion] = useState(0);
+  // The plan last put in the backlog: its button says so until a new plan comes.
+  const [backlogSegment, setBacklogSegment] = useState<string | null>(null);
   const [integrationOpen, setIntegrationOpen] = useState(false);
   const [integrationVersion, setIntegrationVersion] = useState(0);
   const [threadFilter, setThreadFilter] = useState<ThreadFilter>("all");
@@ -390,7 +392,7 @@ export function SessionPage({
   const planContract = lastTextSegment
     ? splitContract(lastTextSegment.content)
     : null;
-  const planActions =
+  const planActions: PlanActions | null =
     planContract?.contract.kind === "plan" &&
     lastTextSegment &&
     !running &&
@@ -402,10 +404,17 @@ export function SessionPage({
           onBuild: handlePlanBuild,
           onBuildAlone: handlePlanBuildAlone,
           onRevise: handlePlanRevise,
-          ideaReady: detail?.idea
+          ideaReady: detail
             ? {
                 onMark: () => void handleIdeaReady(),
-                already: detail.idea.state === "ready",
+                idea:
+                  backlogSegment === lastTextSegment.id
+                    ? "saved"
+                    : detail.idea?.state === "ready"
+                      ? "ready"
+                      : detail.idea
+                        ? "framing"
+                        : "none",
               }
             : undefined,
           disabled: running || planBuildInFlight,
@@ -626,10 +635,15 @@ export function SessionPage({
   }
 
   async function handleIdeaReady() {
-    if (!detail?.idea || !lastTextSegment) return;
+    if (!detail || !lastTextSegment) return;
     setSendError(null);
     try {
-      await markIdeaReady(detail.project.id, detail.idea.id, lastTextSegment.content);
+      if (detail.idea) {
+        await markIdeaReady(detail.project.id, detail.idea.id, lastTextSegment.content);
+      } else {
+        await addPlannedIdea(detail.project.id, detail.title, detail.id, lastTextSegment.content);
+      }
+      setBacklogSegment(lastTextSegment.id);
       setDetailVersion((version) => version + 1);
     } catch (err) {
       setSendError(err instanceof Error ? err.message : "Erreur inconnue");

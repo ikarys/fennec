@@ -5,8 +5,9 @@ export interface PlanActions {
   onBuild: (worktree: boolean) => void;
   onBuildAlone: () => void;
   onRevise: () => void;
-  /** Set when the session frames an idea: the plan becomes the idea's, ready. */
-  ideaReady?: { onMark: () => void; already: boolean };
+  /** The plan joins the backlog: a new idea (`none`), or the session's idea, ready;
+   * `saved` once this very plan is there. */
+  ideaReady?: { onMark: () => void; idea: 'none' | 'framing' | 'ready' | 'saved' };
   disabled?: boolean;
 }
 
