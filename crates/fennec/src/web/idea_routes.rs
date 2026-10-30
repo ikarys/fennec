@@ -376,7 +376,7 @@ fn idea_view(board: &Board, idea: &Idea) -> Result<(Status, Value), String> {
     let mut running = false;
     let mut session_state = None;
 
-    if idea.state == IdeaState::Started
+    if matches!(idea.state, IdeaState::Started | IdeaState::Framing)
         && let Some(session_id) = idea.session_id.as_deref()
     {
         running = app.turns.is_running(session_id);
@@ -393,8 +393,29 @@ fn idea_view(board: &Board, idea: &Idea) -> Result<(Status, Value), String> {
         criteria: None,
         decisions: Vec::new(),
     });
-    let progress = progress(session_state, running, report.integrated);
-    let status = status(idea, progress);
+    // A framing session where the human launched a workflow went past
+    // framing without the queue: show its run, not "resume framing".
+    let ran_workflow = events.as_deref().is_some_and(|events| {
+        events
+            .iter()
+            .any(|event| matches!(event, Event::WorkflowStarted { .. }))
+    });
+    let progress = if idea.state == IdeaState::Started || ran_workflow {
+        progress(session_state, running, report.integrated)
+    } else {
+        None
+    };
+    let status = if idea.state == IdeaState::Framing && ran_workflow {
+        status(
+            &Idea {
+                state: IdeaState::Started,
+                ..idea.clone()
+            },
+            progress,
+        )
+    } else {
+        status(idea, progress)
+    };
     let stage = status.stage();
     let action = status.action();
 
