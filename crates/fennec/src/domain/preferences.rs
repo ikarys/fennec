@@ -6,6 +6,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
+use crate::domain::tariff::Tariff;
+
 pub use llm_providers::{ApiKey, ModelParams, ModelPrefs, ModelRef, Provider, ReasoningEffort};
 
 /// The provider of the environment's endpoint (`FENNEC_LLM_URL`); always there,
@@ -32,6 +34,8 @@ pub struct Preferences {
     pub sandbox: SandboxPrefs,
     /// The ideas queue's caps when it runs with the human away.
     pub autonomy: AutonomyPrefs,
+    /// The reference tariff Insight's estimated cost is computed at.
+    pub tariff: Tariff,
     /// Skill ids whose instructions every new session gets in its system prompt.
     pub always_on_skills: Vec<String>,
     /// Opt-in embedded workflows (`workflows::opt_in_defaults`) the human enabled.
@@ -968,5 +972,11 @@ mod tests {
             Some(ApiKey::Sealed("sealed:plain".into()))
         );
         assert_eq!(p.providers[1].api_key, Some(ApiKey::Env("B_KEY".into())));
+    }
+
+    #[test]
+    fn a_preferences_json_without_a_tariff_loads_the_default() {
+        let p: Preferences = serde_json::from_str("{}").unwrap();
+        assert_eq!(p.tariff, Tariff::default());
     }
 }
