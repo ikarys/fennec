@@ -43,7 +43,8 @@ pub(super) fn definition() -> Value {
     })
 }
 
-pub(super) fn run(args: &Value, workdir: &Path) -> ToolResult {
+/// `cache` is readable by absolute path: it holds the pages `web_fetch` saved.
+pub(super) fn run(args: &Value, workdir: &Path, cache: &Path) -> ToolResult {
     let path = match args::string(args, "path") {
         Ok(value) => value,
         Err(error) => return ToolResult::failure(error),
@@ -63,6 +64,7 @@ pub(super) fn run(args: &Value, workdir: &Path) -> ToolResult {
         crate::skills::discover(workdir)
             .into_iter()
             .filter_map(|skill| skill.directory)
+            .chain([cache.to_path_buf()])
             .collect()
     };
     let full_path = match resolve_for_reading(workdir, packages, path) {
