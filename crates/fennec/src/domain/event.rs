@@ -272,6 +272,10 @@ pub enum Event {
         task: String,
         #[serde(default)]
         step_by_step: bool,
+        /// Unix milliseconds: the run's wall-clock start, so a finished run
+        /// can show its departure. `None` in logs written before it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        started_at: Option<u64>,
     },
     #[serde(rename = "workflow.node.started", rename_all = "camelCase")]
     WorkflowNodeStarted {

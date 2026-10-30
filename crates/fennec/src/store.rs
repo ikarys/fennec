@@ -650,6 +650,7 @@ mod tests {
                 workflow,
                 task: "task".into(),
                 step_by_step: false,
+                started_at: None,
             }
         }
 
