@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { Button } from '../../ui/Button';
 import {
   EditIcon,
-  ExternalIcon,
+  CheckIcon,
   EyeIcon,
   GripIcon,
   PlayIcon,
@@ -27,7 +27,7 @@ const ACTION_LABELS: Record<IdeaAction, string> = {
   frame: 'Cadrer',
   resumeFraming: 'Reprendre le cadrage',
   start: 'Lancer',
-  open: 'Ouvrir',
+  open: 'Voir la session',
   answer: 'Répondre',
   review: 'Relire',
 };
@@ -36,9 +36,9 @@ const ACTION_ICONS: Record<IdeaAction, typeof EditIcon> = {
   frame: EditIcon,
   resumeFraming: EditIcon,
   start: PlayIcon,
-  open: ExternalIcon,
+  open: EyeIcon,
   answer: ReplyIcon,
-  review: EyeIcon,
+  review: CheckIcon,
 };
 
 export type RowReorder = {
