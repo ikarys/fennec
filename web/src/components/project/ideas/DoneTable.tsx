@@ -3,7 +3,7 @@
  */
 import { Button } from '../../ui/Button';
 import { IdeaStatusBadge } from './IdeaStatusBadge';
-import { formatDuration, formatRelative, formatTokens } from '../../../lib/format';
+import { formatDuration, formatTokens } from '../../../lib/format';
 import type { IdeaView } from '../../../lib/ideas';
 
 export function DoneTable({
@@ -26,9 +26,7 @@ export function DoneTable({
           <th className="px-3 py-2 text-right text-xs font-medium text-muted">Durée</th>
           <th className="px-3 py-2 text-right text-xs font-medium text-muted">Tokens</th>
           <th className="px-3 py-2 text-right text-xs font-medium text-muted">Critères</th>
-          <th className="px-3 py-2 text-right text-xs font-medium text-muted">Commits</th>
           <th className="px-3 py-2 text-right text-xs font-medium text-muted">Décisions</th>
-          <th className="px-3 py-2 text-left text-xs font-medium text-muted">Démarrée</th>
           <th className="px-3 py-2" />
         </tr>
       </thead>
@@ -42,24 +40,19 @@ export function DoneTable({
                   {idea.text}
                 </span>
               </td>
-              <td className="px-3 py-2">
+              <td className="px-3 py-2 whitespace-nowrap">
                 <IdeaStatusBadge status={idea.status} />
               </td>
-              <td className="px-3 py-2 text-right">
+              <td className="px-3 py-2 text-right whitespace-nowrap">
                 {idea.durationMs != null ? formatDuration(idea.durationMs) : '—'}
               </td>
-              <td className="px-3 py-2 text-right">
+              <td className="px-3 py-2 text-right whitespace-nowrap">
                 {idea.tokens != null ? formatTokens(idea.tokens) : '—'}
               </td>
-              <td className="px-3 py-2 text-right">
+              <td className="px-3 py-2 text-right whitespace-nowrap">
                 {idea.criteria ? `${idea.criteria.passed}✓ ${idea.criteria.failed}✗` : '—'}
               </td>
-              <td className="px-3 py-2 text-right">
-                {idea.commits != null
-                  ? `${idea.commits} · ${idea.files ?? 0} fichier${(idea.files ?? 0) > 1 ? 's' : ''}`
-                  : '—'}
-              </td>
-              <td className="px-3 py-2 text-right">
+              <td className="px-3 py-2 text-right whitespace-nowrap">
                 {idea.decisions.length > 0 ? (
                   <span
                     title={idea.decisions.map((d) => `${d.title}: ${d.choice}`).join('\n')}
@@ -70,10 +63,7 @@ export function DoneTable({
                   '—'
                 )}
               </td>
-              <td className="px-3 py-2">
-                {idea.startedAt != null ? formatRelative(idea.startedAt) : '—'}
-              </td>
-              <td className="px-3 py-2 text-right">
+              <td className="px-3 py-2 text-right whitespace-nowrap">
                 {sessionId ? (
                   <Button variant="ghost" size="sm" onClick={() => onOpenSession(sessionId)}>
                     Relire
