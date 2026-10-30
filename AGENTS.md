@@ -91,7 +91,9 @@ agent (`crates/fennec/agents/analyze.agent.md`), which drafts AGENTS.md's philos
 each with its file:line source (indicative); the human reviews it.
 Ideas backlog, done: the project page keeps the human's ideas (`idea.*` events per project,
 `domain/idea.rs`, `store/ideas.rs`); "Cadrer" opens a plan session tied to the idea, whose plan card marks
-it ready with the plan verbatim. The orchestrator that runs ready ideas comes next.
+it ready with the plan verbatim. "Lancer la file" runs the ready ideas one at a time, oldest first, through
+the default workflow in each idea's session and worktree (`idea.started`); each shows its run's state, and
+integrating stays the human's click.
 Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
 1. Project actions on the project page: diagrams on demand of a function, process or engine
