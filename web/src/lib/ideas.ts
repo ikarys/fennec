@@ -15,11 +15,12 @@ export type IdeaStatus =
   | 'review'
   | 'halted'
   | 'failed'
-  | 'integrated';
+  | 'integrated'
+  | 'completed';
 
 export type IdeaAction = 'frame' | 'resumeFraming' | 'start' | 'open' | 'answer' | 'review';
 
-export type IdeaMenuAction = 'reframe' | 'startUnframed' | 'drop';
+export type IdeaMenuAction = 'restart' | 'reframe' | 'startUnframed' | 'complete' | 'drop';
 
 export interface IdeaView {
   id: string;
@@ -132,6 +133,13 @@ export async function markIdeaReady(
 
 export async function dropIdea(projectId: string, ideaId: string): Promise<IdeaBoard> {
   return boardRequest(projectId, `/ideas/${encodeURIComponent(ideaId)}/drop`, {
+    method: 'POST',
+    body: '{}',
+  });
+}
+
+export async function completeIdea(projectId: string, ideaId: string): Promise<IdeaBoard> {
+  return boardRequest(projectId, `/ideas/${encodeURIComponent(ideaId)}/complete`, {
     method: 'POST',
     body: '{}',
   });

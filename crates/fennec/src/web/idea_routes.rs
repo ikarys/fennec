@@ -87,7 +87,7 @@ pub fn add_idea(
     send_board(app, stream, project_id)
 }
 
-/// `POST /api/projects/{id}/ideas/{iid}/{framing,ready,drop}`.
+/// `POST /api/projects/{id}/ideas/{iid}/{framing,ready,drop,complete}`.
 pub fn update_idea(
     app: &App,
     req: &Request,
@@ -132,6 +132,7 @@ pub fn update_idea(
             BacklogEvent::Ready { idea_id, plan }
         }
         "drop" => BacklogEvent::Dropped { idea_id },
+        "complete" => BacklogEvent::Completed { idea_id },
         _ => return error(stream, 404, "not found"),
     };
     store.append_idea_event(project_id, &event)?;
@@ -139,7 +140,8 @@ pub fn update_idea(
 }
 
 /// `POST /api/projects/{id}/ideas/{iid}/start`: builds this idea now, framed
-/// or not, outside the queue (which then skips it, no longer ready).
+/// or not, outside the queue (which then skips it, no longer ready). A halted
+/// or failed idea is relaunched from its plan when it has one.
 pub fn start_one(
     app: &App,
     stream: &mut TcpStream,
@@ -154,7 +156,23 @@ pub fn start_one(
     let Some(idea) = backlog.ideas.iter().find(|idea| idea.id == idea_id) else {
         return error(stream, 404, "no such idea");
     };
-    if let Err(e) = idea_queue::start_idea(app, &store, &project, idea, false) {
+    let board = Board {
+        app,
+        store: &store,
+        backlog: &backlog,
+        project: &project,
+        queue: queue_order(&backlog),
+        ledger: Ledger::open(&app.settings.usage_path()).ok(),
+    };
+    let restart = idea.state == IdeaState::Started;
+    if restart {
+        // Only a halted or failed idea can be relaunched; a live one is busy.
+        let (idea_status, _) = idea_view(&board, idea)?;
+        if !matches!(idea_status, Status::Halted | Status::Failed) {
+            return error(stream, 409, "idea already started");
+        }
+    }
+    if let Err(e) = idea_queue::start_idea(app, &store, &project, idea, false, restart) {
         return error(stream, 409, &e);
     }
     send_board(app, stream, project_id)

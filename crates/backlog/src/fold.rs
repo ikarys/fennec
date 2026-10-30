@@ -10,6 +10,7 @@ pub enum IdeaState {
     Ready,
     Started,
     Dropped,
+    Completed,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -119,8 +120,9 @@ pub fn fold(events: &[(u64, BacklogEvent)]) -> Backlog {
 
         let idea = &mut ideas[index];
 
-        // A dropped idea stays dropped: a late event never resurrects it.
-        if idea.state == IdeaState::Dropped {
+        // A dropped idea stays dropped and a completed idea stays done: a late
+        // event never resurrects either.
+        if matches!(idea.state, IdeaState::Dropped | IdeaState::Completed) {
             continue;
         }
 
@@ -151,6 +153,11 @@ pub fn fold(events: &[(u64, BacklogEvent)]) -> Backlog {
                 }
             }
             BacklogEvent::Dropped { .. } => idea.state = IdeaState::Dropped,
+            BacklogEvent::Completed { .. } => {
+                idea.state = IdeaState::Completed;
+                // Completion is the human's final word: no halt remains.
+                idea.halted = None;
+            }
             BacklogEvent::Halted { reason, .. } => idea.halted = Some(reason.clone()),
             BacklogEvent::Reordered { .. }
             | BacklogEvent::QueueStarted { .. }
@@ -219,6 +226,10 @@ mod tests {
         BacklogEvent::Dropped { idea_id: id.into() }
     }
 
+    fn completed(id: &str) -> BacklogEvent {
+        BacklogEvent::Completed { idea_id: id.into() }
+    }
+
     fn halted(id: &str, reason: &str) -> BacklogEvent {
         BacklogEvent::Halted {
             idea_id: id.into(),
@@ -271,6 +282,68 @@ mod tests {
     #[test]
     fn dropped_ideas_are_excluded() {
         let events = vec![ev(1, added("i1", "t")), ev(2, dropped("i1"))];
+
+        let backlog = fold(&events);
+
+        assert!(backlog.ideas.is_empty());
+    }
+
+    #[test]
+    fn completed_ideas_stay_in_the_list_and_clear_halted() {
+        let events = vec![
+            ev(1, added("i1", "t")),
+            ev(2, ready("i1", "p")),
+            ev(3, halted("i1", "r")),
+            ev(4, completed("i1")),
+        ];
+
+        let backlog = fold(&events);
+
+        assert_eq!(backlog.ideas.len(), 1);
+        let idea = &backlog.ideas[0];
+        assert_eq!(idea.state, IdeaState::Completed);
+        assert_eq!(idea.halted, None);
+        assert_eq!(idea.updated_at, 4);
+    }
+
+    #[test]
+    fn completed_ideas_are_not_excluded_like_dropped() {
+        let events = vec![
+            ev(1, added("i1", "t")),
+            ev(2, completed("i1")),
+            ev(3, added("i2", "t2")),
+        ];
+
+        let backlog = fold(&events);
+
+        assert_eq!(backlog.ideas.len(), 2);
+        assert_eq!(backlog.ideas[0].id, "i2");
+        assert_eq!(backlog.ideas[1].id, "i1");
+        assert_eq!(backlog.ideas[1].state, IdeaState::Completed);
+    }
+
+    #[test]
+    fn completed_ideas_stay_completed() {
+        let events = vec![
+            ev(1, added("i1", "t")),
+            ev(2, completed("i1")),
+            ev(3, ready("i1", "p")),
+        ];
+
+        let backlog = fold(&events);
+
+        assert_eq!(backlog.ideas.len(), 1);
+        assert_eq!(backlog.ideas[0].state, IdeaState::Completed);
+        assert_eq!(backlog.ideas[0].plan, None);
+    }
+
+    #[test]
+    fn completed_after_drop_does_not_resurrect() {
+        let events = vec![
+            ev(1, added("i1", "t")),
+            ev(2, dropped("i1")),
+            ev(3, completed("i1")),
+        ];
 
         let backlog = fold(&events);
 
