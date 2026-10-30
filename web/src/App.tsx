@@ -263,6 +263,18 @@ export default function App() {
     [activeTabId, navigate]
   );
 
+  const handleSessionsDeleted = useCallback(
+    (ids: string[]) => {
+      const deleted = new Set(ids);
+      setTabs((previous) => previous.filter((id) => !deleted.has(id)));
+      if (activeTabId !== null && deleted.has(activeTabId)) {
+        setActiveTabId(null);
+      }
+      refreshProjects();
+    },
+    [activeTabId, refreshProjects]
+  );
+
   const startNewSession = useCallback(
     (projectId?: string) => {
       const targetProjectId = projectId ?? projects[0]?.id;
@@ -337,6 +349,7 @@ export default function App() {
               onOpenProjectDialog={() => setProjectDialogOpen(true)}
               onNewSession={(projectId) => startNewSession(projectId)}
               onOpenSession={openSession}
+              onSessionsDeleted={handleSessionsDeleted}
             />
           ) : route.name === 'settings' ? (
             <SettingsPage

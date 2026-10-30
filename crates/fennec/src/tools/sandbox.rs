@@ -70,6 +70,16 @@ impl Sandbox {
             hidden_dirs.push(data_dir.to_path_buf());
         }
 
+        // A container daemon's socket is root on the host (`docker run -v /:/host`): unix sockets
+        // ignore the read-only mount and the network namespace, so they are hidden outright.
+        for socket in DAEMON_SOCKETS {
+            if let Ok(path) = Path::new(socket).canonicalize()
+                && !hidden_files.contains(&path)
+            {
+                hidden_files.push(path);
+            }
+        }
+
         Sandbox::Bwrap {
             network: prefs.network,
             hidden_dirs,
@@ -90,7 +100,15 @@ impl Sandbox {
             .and_then(|path| path.parent().map(Path::to_path_buf))
             .filter(|dir| dir.parent().is_some())
             .unwrap_or_default();
-        Sandbox::from_prefs(prefs, home.as_deref(), &data_dir)
+        let mut sandbox = Sandbox::from_prefs(prefs, home.as_deref(), &data_dir);
+        // The session runtime dir holds rootless docker/podman and D-Bus sockets.
+        if let Sandbox::Bwrap { hidden_dirs, .. } = &mut sandbox
+            && let Some(runtime) = std::env::var_os("XDG_RUNTIME_DIR").map(PathBuf::from)
+            && runtime.is_dir()
+        {
+            hidden_dirs.push(runtime);
+        }
+        sandbox
     }
 
     /// The same sandbox with `paths` mounted read-only inside the workdir.
@@ -148,6 +166,15 @@ impl Sandbox {
         }
     }
 }
+
+/// Container daemons' system sockets; `/var/run` is usually a link to `/run`.
+const DAEMON_SOCKETS: [&str; 5] = [
+    "/run/docker.sock",
+    "/var/run/docker.sock",
+    "/run/containerd/containerd.sock",
+    "/run/podman/podman.sock",
+    "/run/crio/crio.sock",
+];
 
 /// An environment variable that likely holds a credential.
 // ponytail: a name heuristic; an allow-list of variables if one slips through.
@@ -573,6 +600,34 @@ mod tests {
         );
 
         let _ = std::fs::remove_dir_all(&workdir);
+    }
+
+    #[test]
+    fn e2e_container_daemon_sockets_are_hidden() {
+        // Needs bwrap and a docker socket on the machine; skipped otherwise.
+        if !bwrap_available() || !Path::new("/run/docker.sock").exists() {
+            return;
+        }
+
+        let workdir = temp_dir();
+        let data_dir = temp_dir();
+        let prefs = SandboxPrefs {
+            enabled: true,
+            network: false,
+        };
+        let sandbox = Sandbox::from_prefs(&prefs, None, &data_dir);
+        let output = sandbox
+            .command(
+                "test -S /run/docker.sock || test -S /var/run/docker.sock",
+                &workdir,
+                &workdir,
+            )
+            .output()
+            .unwrap();
+        assert!(!output.status.success(), "{:?}", output);
+
+        let _ = std::fs::remove_dir_all(&workdir);
+        let _ = std::fs::remove_dir_all(&data_dir);
     }
 
     #[test]

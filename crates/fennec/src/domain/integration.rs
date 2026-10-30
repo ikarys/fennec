@@ -87,6 +87,11 @@ impl Blocker {
     }
 }
 
+/// True when the human's branch is not the one the run started from.
+pub fn branch_changed(origin_branch: Option<&str>, human_branch: Option<&str>) -> bool {
+    matches!(origin_branch, Some(origin) if human_branch != Some(origin))
+}
+
 /// The blockers of an integration, in the order the UI shows them:
 /// `NoCommits` first, then the branch, then the human's uncommitted changes,
 /// then the criteria, then the protected files, then the architecture rules,
@@ -107,7 +112,7 @@ pub fn blockers(
     }
 
     if let Some(origin) = origin_branch
-        && human_branch != Some(origin)
+        && branch_changed(Some(origin), human_branch)
     {
         out.push(Blocker::BranchChanged {
             from: origin.to_string(),
@@ -534,6 +539,14 @@ mod tests {
                 to: None
             })
         );
+    }
+
+    #[test]
+    fn branch_changed_is_true_only_when_the_human_branch_differs() {
+        assert!(!branch_changed(None, Some("main")));
+        assert!(!branch_changed(Some("main"), Some("main")));
+        assert!(branch_changed(Some("main"), Some("feature")));
+        assert!(branch_changed(Some("main"), None));
     }
 
     #[test]

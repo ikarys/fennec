@@ -29,6 +29,8 @@ In this order:
 
 A shortcut whose comment names its limit (`ponytail:` or `shortcut:`) is a decision, not a finding, unless the real load already crosses it.
 
+A fix the builder cannot make where it runs (installing a dependency, network access, a protected file such as a lockfile) is not a finding: it would come back every round. List it under **To do outside the sandbox**, for the human, and pick the outcome from the other findings.
+
 You are not after perfection: only what is worth fixing now. Do not change anything; the builder fixes.
 
 ## Answer

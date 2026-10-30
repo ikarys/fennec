@@ -316,6 +316,9 @@ pub enum Event {
         port: String,
         to: String,
     },
+    /// The human asked the running run to pause at its next edge (fennec's own).
+    #[serde(rename = "workflow.pause_requested", rename_all = "camelCase")]
+    WorkflowPauseRequested { run_id: String },
     #[serde(rename = "workflow.resumed", rename_all = "camelCase")]
     WorkflowResumed {
         run_id: String,
@@ -434,6 +437,7 @@ impl Event {
             Event::WorkflowNodeFinished { .. } => "workflow.node.finished",
             Event::WorkflowHumanAsked { .. } => "workflow.human.asked",
             Event::WorkflowPaused { .. } => "workflow.paused",
+            Event::WorkflowPauseRequested { .. } => "workflow.pause_requested",
             Event::WorkflowResumed { .. } => "workflow.resumed",
             Event::WorkflowFinished { .. } => "workflow.finished",
             Event::ChatDone { .. } => "chat.done",

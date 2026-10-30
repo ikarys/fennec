@@ -50,6 +50,8 @@ pub struct RunState {
     pub workflow: Workflow,
     pub task: String,
     pub step_by_step: bool,
+    /// The human asked to pause at the next edge; cleared once paused.
+    pub pause_requested: bool,
     pub results: HashMap<String, NodeResult>,
     pub node_passes: HashMap<String, u32>,
     pub edge_passes: HashMap<(String, String), u32>,
@@ -92,6 +94,7 @@ impl RunState {
             workflow,
             task,
             step_by_step,
+            pause_requested: false,
             results: HashMap::new(),
             node_passes: HashMap::new(),
             edge_passes: HashMap::new(),
@@ -162,6 +165,9 @@ impl RunState {
                     self.comment = comment.clone();
                 }
             }
+            Event::WorkflowPauseRequested { run_id } if run_id == &self.run_id => {
+                self.pause_requested = true;
+            }
             Event::WorkflowPaused {
                 run_id,
                 from,
@@ -173,6 +179,7 @@ impl RunState {
                     port: port.clone(),
                     to: to.clone(),
                 });
+                self.pause_requested = false;
             }
             Event::WorkflowResumed { run_id, comment } if run_id == &self.run_id => {
                 // A resumed interrupted run starts its node afresh (a pause has no
@@ -190,6 +197,7 @@ impl RunState {
                 ..
             } if run_id == &self.run_id => {
                 self.finished = Some((*outcome, reason.clone()));
+                self.pause_requested = false;
             }
             Event::CriteriaSet { criteria } => {
                 self.criteria = criteria
@@ -371,7 +379,8 @@ pub fn next_after(state: &RunState, from: &str, port: &str, in_branch: bool) -> 
         _ => (edge, port),
     };
 
-    if !in_branch && (edge.pause || state.step_by_step) {
+    // Inside parallel branches the request waits for the join, like step-by-step.
+    if !in_branch && (edge.pause || state.step_by_step || state.pause_requested) {
         return Next::Pause(Pause {
             from: from.to_string(),
             port: port.to_string(),
@@ -839,6 +848,36 @@ mod tests {
                 to: "end".into(),
             })
         );
+    }
+
+    #[test]
+    fn a_pause_request_pauses_at_the_next_edge() {
+        let mut state = state(simple_workflow());
+        state.apply(&Event::WorkflowPauseRequested { run_id: "r".into() });
+
+        assert!(state.pause_requested);
+        assert_eq!(
+            next_after(&state, "a", "done", false),
+            Next::Pause(Pause {
+                from: "a".into(),
+                port: "done".into(),
+                to: "end".into(),
+            })
+        );
+    }
+
+    #[test]
+    fn a_pause_clears_the_request() {
+        let mut state = state(simple_workflow());
+        state.apply(&Event::WorkflowPauseRequested { run_id: "r".into() });
+        state.apply(&Event::WorkflowPaused {
+            run_id: "r".into(),
+            from: "a".into(),
+            port: "done".into(),
+            to: "end".into(),
+        });
+
+        assert!(!state.pause_requested);
     }
 
     #[test]

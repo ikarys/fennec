@@ -23,6 +23,7 @@ import { InstructionsSection } from '../components/settings/InstructionsSection'
 import { SearchSection, type SearchForm } from '../components/settings/SearchSection';
 import { SandboxSection } from '../components/settings/SandboxSection';
 import { SkillsSection } from '../components/settings/SkillsSection';
+import { WorkflowsSection } from '../components/settings/WorkflowsSection';
 
 interface SettingsPageProps {
   settings: SettingsResponse | null;
@@ -42,14 +43,16 @@ interface SettingsForm {
   search: SearchForm;
   sandbox: SandboxPrefs;
   alwaysOnSkills: string[];
+  enabledWorkflows: string[];
 }
 
-type SettingsTab = 'models' | 'instructions' | 'skills' | 'search' | 'sandbox' | 'display';
+type SettingsTab = 'models' | 'instructions' | 'skills' | 'workflows' | 'search' | 'sandbox' | 'display';
 
 const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'models', label: 'Modèles' },
   { id: 'instructions', label: 'Instructions' },
   { id: 'skills', label: 'Skills' },
+  { id: 'workflows', label: 'Workflows' },
   { id: 'search', label: 'Recherche web' },
   { id: 'sandbox', label: 'Bac à sable' },
   { id: 'display', label: 'Affichage' }
@@ -160,7 +163,8 @@ function toForm(preferences: Preferences, listings: ProviderListing[]): Settings
       webFetch: preferences.search?.webFetch ?? true
     },
     sandbox: preferences.sandbox ?? { enabled: true, network: false },
-    alwaysOnSkills: preferences.alwaysOnSkills ?? []
+    alwaysOnSkills: preferences.alwaysOnSkills ?? [],
+    enabledWorkflows: preferences.enabledWorkflows ?? []
   };
 }
 
@@ -239,7 +243,8 @@ function buildPreferences(form: SettingsForm, settings: SettingsResponse): Prefe
       webFetch: form.search.webFetch
     },
     sandbox: form.sandbox,
-    alwaysOnSkills: form.alwaysOnSkills
+    alwaysOnSkills: form.alwaysOnSkills,
+    enabledWorkflows: form.enabledWorkflows
   };
 }
 
@@ -415,6 +420,11 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
     setForm((previous) => (previous ? { ...previous, alwaysOnSkills } : previous));
   }
 
+  function updateEnabledWorkflows(enabledWorkflows: string[]) {
+    markDirty();
+    setForm((previous) => (previous ? { ...previous, enabledWorkflows } : previous));
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!settings || !form || saving) return;
@@ -513,6 +523,14 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
                 skills={settings.skills}
                 value={form.alwaysOnSkills}
                 onChange={updateAlwaysOnSkills}
+              />
+            )}
+
+            {tab === 'workflows' && (
+              <WorkflowsSection
+                workflows={settings.optInWorkflows}
+                value={form.enabledWorkflows}
+                onChange={updateEnabledWorkflows}
               />
             )}
 
