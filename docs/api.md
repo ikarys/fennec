@@ -238,10 +238,12 @@ read-only. The human edits them as usual.
   - `groups` `[{stage, ideas: [idea]}]`, all five groups always sent, in this order: `yours` (waits for the human: review, question,
     halted, failed), `running`, `queue` (in queue order), `drafts` (inbox, framing), `done` (integrated); outside the
     queue, the most recently changed first.
-  - `idea` `{id, text, status, stage, action, menu, sessionId, plan, halted, autonomous, position, createdAt, startedAt,
+  - `idea` `{id, text, attachments, status, stage, action, menu, sessionId, plan, halted, autonomous, position, createdAt, startedAt,
     durationMs, tokens, criteria, decisions, commits, files}`: `status` `inbox | framing | queued | running | question |
     review | halted | failed | integrated | completed` (from the idea and its session's state; a started idea whose
-    session is gone is `failed`); `action` the one next step `frame | resumeFraming | start | open | answer | review`;
+    session is gone is `failed`); `attachments` `[{filename, mimeType, size, data}]` the files and images pinned to the
+    idea (a base64 data URL in `data`; handed to the agent on framing and build: images as vision, text inlined,
+    binaries in the worktree); `action` the one next step `frame | resumeFraming | start | open | answer | review`;
     `menu` the secondary actions `restart | reframe | startUnframed | complete | drop` (empty for running, integrated
     and completed); `plan` the approved plan verbatim; `halted` why the night mode stopped or skipped it, cleared by a
     new plan or start; `position` its 1-based place in the queue; `durationMs` from its start to now (running) or its
@@ -253,7 +255,8 @@ read-only. The human edits them as usual.
     reason, autonomous, summary: {started, running, review, question, halted, failed, integrated}, ideas: [idea]}`;
     `reason` `no idea ready | stopped by the human | project gone | server restarted | error: …`.
   404 if no project. Every write below answers the same fresh board; 404 if no project or no such idea:
-  - `POST /api/projects/{id}/ideas` `{text, sessionId?, plan?}` (`idea.added`; 400 if empty or over 4000 characters);
+  - `POST /api/projects/{id}/ideas` `{text, sessionId?, plan?, attachments?}` (`idea.added`; 400 if empty or over 4000
+    characters; `attachments` is `[{filename, mimeType, size, data}]`, at most 10, 5 MB each);
     with `sessionId` (a session of the project, else 404) and `plan` (400 if empty), also `idea.framing` and `idea.ready`:
     the plan card's "Mettre au backlog" for a plan written outside the backlog
   - `POST /api/projects/{id}/ideas/{ideaId}/framing` `{sessionId}` (`idea.framing`; 404 if the session is not the project's)

@@ -7,6 +7,7 @@ import {
   EditIcon,
   CheckIcon,
   EyeIcon,
+  FileIcon,
   GripIcon,
   PlayIcon,
   ReplyIcon,
@@ -206,6 +207,30 @@ export function IdeaRow({
         <p className="m-0 text-sm text-text line-clamp-2" title={idea.text}>
           {idea.text}
         </p>
+        {idea.attachments.length > 0 ? (
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {idea.attachments.map((attachment, i) =>
+              attachment.mimeType.startsWith('image/') ? (
+                <img
+                  key={i}
+                  src={attachment.data}
+                  alt={attachment.filename}
+                  title={attachment.filename}
+                  className="h-9 w-9 rounded-md border border-border object-cover"
+                />
+              ) : (
+                <span
+                  key={i}
+                  title={attachment.filename}
+                  className="flex items-center gap-1 rounded-md border border-border bg-bg px-1.5 py-0.5 text-[11px] text-muted"
+                >
+                  <FileIcon className="h-3 w-3" />
+                  <span className="max-w-[120px] truncate">{attachment.filename}</span>
+                </span>
+              ),
+            )}
+          </div>
+        ) : null}
         {idea.halted ? (
           <p className="mt-0.5 text-xs text-muted">{idea.halted}</p>
         ) : null}

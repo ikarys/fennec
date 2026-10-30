@@ -7,12 +7,14 @@
 //! This crate has no I/O, no database, and no fennec types, so another
 //! product can reuse the same backlog logic.
 
+pub mod attachment;
 pub mod event;
 pub mod fold;
 pub mod queue;
 pub mod status;
 pub mod summary;
 
+pub use attachment::IdeaAttachment;
 pub use event::BacklogEvent;
 pub use fold::{Backlog, Idea, IdeaState, QueueRun, fold, idea_for_session};
 pub use queue::{CapHit, Caps, cap_reached, next_ready, queue_order};
