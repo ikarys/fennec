@@ -157,6 +157,7 @@ mod tests {
             workdir: Path::new("/tmp"),
             instructions: "",
             skills: &[],
+            always_on: &[],
             agents: &agents,
             max_tokens: 100,
             context_window: 10_000,

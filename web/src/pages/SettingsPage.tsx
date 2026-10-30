@@ -22,6 +22,7 @@ import { PanelPagesSection } from '../components/settings/PanelPagesSection';
 import { InstructionsSection } from '../components/settings/InstructionsSection';
 import { SearchSection, type SearchForm } from '../components/settings/SearchSection';
 import { SandboxSection } from '../components/settings/SandboxSection';
+import { SkillsSection } from '../components/settings/SkillsSection';
 
 interface SettingsPageProps {
   settings: SettingsResponse | null;
@@ -40,13 +41,15 @@ interface SettingsForm {
   instructions: string;
   search: SearchForm;
   sandbox: SandboxPrefs;
+  alwaysOnSkills: string[];
 }
 
-type SettingsTab = 'models' | 'instructions' | 'search' | 'sandbox' | 'display';
+type SettingsTab = 'models' | 'instructions' | 'skills' | 'search' | 'sandbox' | 'display';
 
 const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'models', label: 'Modèles' },
   { id: 'instructions', label: 'Instructions' },
+  { id: 'skills', label: 'Skills' },
   { id: 'search', label: 'Recherche web' },
   { id: 'sandbox', label: 'Bac à sable' },
   { id: 'display', label: 'Affichage' }
@@ -156,7 +159,8 @@ function toForm(preferences: Preferences, listings: ProviderListing[]): Settings
       apiKey: preferences.search?.searxngApiKey ?? '',
       webFetch: preferences.search?.webFetch ?? true
     },
-    sandbox: preferences.sandbox ?? { enabled: true, network: false }
+    sandbox: preferences.sandbox ?? { enabled: true, network: false },
+    alwaysOnSkills: preferences.alwaysOnSkills ?? []
   };
 }
 
@@ -234,7 +238,8 @@ function buildPreferences(form: SettingsForm, settings: SettingsResponse): Prefe
       searxngApiKey: searxngApiKey === '' ? null : searxngApiKey,
       webFetch: form.search.webFetch
     },
-    sandbox: form.sandbox
+    sandbox: form.sandbox,
+    alwaysOnSkills: form.alwaysOnSkills
   };
 }
 
@@ -405,6 +410,11 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
     setForm((previous) => (previous ? { ...previous, sandbox } : previous));
   }
 
+  function updateAlwaysOnSkills(alwaysOnSkills: string[]) {
+    markDirty();
+    setForm((previous) => (previous ? { ...previous, alwaysOnSkills } : previous));
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!settings || !form || saving) return;
@@ -496,6 +506,14 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
 
             {tab === 'instructions' && (
               <InstructionsSection value={form.instructions} onChange={updateInstructions} />
+            )}
+
+            {tab === 'skills' && (
+              <SkillsSection
+                skills={settings.skills}
+                value={form.alwaysOnSkills}
+                onChange={updateAlwaysOnSkills}
+              />
             )}
 
             {tab === 'search' && (

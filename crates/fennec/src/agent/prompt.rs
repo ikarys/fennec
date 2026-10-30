@@ -7,20 +7,21 @@
 //! and reporting habits), kept apart so the openfox text above still maps 1:1.
 
 use crate::domain::clock;
-use crate::domain::skill::Skill;
+use crate::domain::skill::{Skill, always_active_section};
 use std::path::Path;
 
 /// Port of openfox `buildBasePrompt`, without the sections for features
 /// not ported yet (sub-agents, caveman thinking).
 ///
 /// `instructions` (openfox `instructionsSection`) is appended at the end
-/// when non-empty, then `skills` (openfox `buildSkillsSection`) when
-/// non-empty.
+/// when non-empty, then the always-active skills' full bodies and the
+/// remaining skills (`buildSkillsSection`) when non-empty.
 pub fn system_prompt(
     workdir: &Path,
     model_name: &str,
     instructions: &str,
     skills: &[Skill],
+    always_on: &[String],
 ) -> String {
     let (y, m, d) = clock::today();
     let mut prompt = format!(
@@ -113,11 +114,21 @@ Your context is finite and every tool result stays in it. Spend it on what the t
         prompt.push('\n');
     }
 
-    prompt.push_str(&skills_section(skills));
+    let always_active: Vec<&Skill> = skills
+        .iter()
+        .filter(|skill| always_on.contains(&skill.id))
+        .collect();
+    prompt.push_str(&always_active_section(&always_active));
+
+    let available: Vec<&Skill> = skills
+        .iter()
+        .filter(|skill| !always_on.contains(&skill.id))
+        .collect();
+    prompt.push_str(&skills_section(&available));
     prompt
 }
 
-fn skills_section(skills: &[Skill]) -> String {
+fn skills_section(skills: &[&Skill]) -> String {
     if skills.is_empty() {
         return String::new();
     }
@@ -151,26 +162,26 @@ mod tests {
 
     #[test]
     fn empty_instructions_add_no_custom_section() {
-        let prompt = system_prompt(Path::new("/tmp"), "m", "", &[]);
+        let prompt = system_prompt(Path::new("/tmp"), "m", "", &[], &[]);
         assert!(!prompt.contains("CUSTOM INSTRUCTIONS"));
     }
 
     #[test]
     fn non_empty_instructions_are_appended_at_the_end() {
-        let prompt = system_prompt(Path::new("/tmp"), "m", "Be terse.", &[]);
+        let prompt = system_prompt(Path::new("/tmp"), "m", "Be terse.", &[], &[]);
         assert!(prompt.ends_with("## CUSTOM INSTRUCTIONS\n\nBe terse.\n"));
     }
 
     #[test]
     fn no_skills_add_no_skills_section() {
-        let prompt = system_prompt(Path::new("/tmp"), "m", "", &[]);
+        let prompt = system_prompt(Path::new("/tmp"), "m", "", &[], &[]);
         assert!(!prompt.contains("AVAILABLE SKILLS"));
     }
 
     #[test]
     fn two_skills_add_numbered_listing_after_custom_instructions() {
         let skills = vec![skill("alpha", "A"), skill("beta", "B")];
-        let prompt = system_prompt(Path::new("/tmp"), "m", "Custom.", &skills);
+        let prompt = system_prompt(Path::new("/tmp"), "m", "Custom.", &skills, &[]);
 
         assert!(prompt.contains("## CUSTOM INSTRUCTIONS\n\nCustom.\n\n## AVAILABLE SKILLS"));
         assert!(prompt.contains("1. **alpha** - A\n2. **beta** - B"));
@@ -179,5 +190,17 @@ mod tests {
                 "The skill's detailed instructions will be returned as a tool result.\n"
             )
         );
+    }
+
+    #[test]
+    fn an_always_on_skill_is_loaded_and_not_listed() {
+        let skills = vec![skill("alpha", "A"), skill("beta", "B")];
+        let prompt = system_prompt(Path::new("/tmp"), "m", "", &skills, &["alpha".to_string()]);
+
+        assert!(prompt.contains("ALWAYS-ACTIVE SKILLS"));
+        assert!(prompt.contains("<skill id=\"alpha\">"));
+        assert!(prompt.contains("## AVAILABLE SKILLS"));
+        assert!(!prompt.contains("**alpha**"));
+        assert!(prompt.contains("1. **beta** - B"));
     }
 }
