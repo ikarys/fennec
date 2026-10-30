@@ -59,6 +59,7 @@ export function IdeaRow({
   onFrame,
   onOpenSession,
   run,
+  caps,
   position,
   reorder,
 }: {
@@ -67,11 +68,21 @@ export function IdeaRow({
   onFrame: (idea: IdeaView) => Promise<void>;
   onOpenSession: (sessionId: string) => void;
   run: (action: () => Promise<IdeaBoard>) => Promise<boolean>;
+  caps: IdeaBoard['queue']['caps'];
   position: number | null;
   reorder: RowReorder | null;
 }) {
   const [pendingDrop, setPendingDrop] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  // The tab already names inbox/queued; a badge there is noise.
+  const showBadge = idea.status !== 'inbox' && idea.status !== 'queued';
+  const showMeta =
+    idea.durationMs != null ||
+    idea.tokens != null ||
+    idea.criteria != null ||
+    idea.decisions.length > 0 ||
+    idea.commits != null;
 
   const handleStart = async () => {
     setBusy(true);
@@ -234,10 +245,12 @@ export function IdeaRow({
         {idea.halted ? (
           <p className="mt-0.5 text-xs text-muted">{idea.halted}</p>
         ) : null}
-        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
-          <IdeaStatusBadge status={idea.status} />
-          <IdeaMeta idea={idea} />
-        </div>
+        {showBadge || showMeta ? (
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+            {showBadge ? <IdeaStatusBadge status={idea.status} /> : null}
+            {showMeta ? <IdeaMeta idea={idea} caps={caps} /> : null}
+          </div>
+        ) : null}
       </div>
 
       <div className="flex shrink-0 items-center gap-1">
