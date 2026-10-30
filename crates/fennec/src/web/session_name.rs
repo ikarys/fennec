@@ -57,6 +57,22 @@ fn generate(
         return Ok(());
     };
 
+    // Disambiguate against sibling sessions in the same project so the UI can
+    // tell repeated tasks apart.
+    let project_id = store.session(session_id)?.map(|s| s.project_id);
+    let name = match project_id {
+        Some(project_id) => {
+            let taken: Vec<String> = store
+                .sessions(Some(project_id.as_str()))?
+                .into_iter()
+                .filter(|s| s.id != session_id)
+                .map(|s| s.title)
+                .collect();
+            session_name::disambiguate(&name, &taken)
+        }
+        None => name,
+    };
+
     store.rename_session(session_id, &name)?;
     let log = NotifyingLog {
         log: &store,
