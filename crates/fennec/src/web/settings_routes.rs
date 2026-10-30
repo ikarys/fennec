@@ -96,7 +96,7 @@ fn model_entries(
     stored: Option<&BTreeMap<String, ModelPrefs>>,
     is_local: bool,
 ) -> Vec<Value> {
-    models
+    let mut entries: Vec<Value> = models
         .iter()
         .map(|model| {
             let prefs = stored.and_then(|models| models.get(&model.id));
@@ -107,7 +107,24 @@ fn model_entries(
                 "resolved": model_view::resolved(defaults, prefs, listed),
             })
         })
-        .collect()
+        .collect();
+    // Models stored with no listing: added by hand (an endpoint without a
+    // /models route, e.g. Databricks) or dropped by the endpoint since. They
+    // stay listed, selectable and editable; `manual` marks them in the UI.
+    if let Some(stored) = stored {
+        for (id, prefs) in stored {
+            if models.iter().any(|model| &model.id == id) {
+                continue;
+            }
+            entries.push(json!({
+                "id": id,
+                "contextWindow": null,
+                "resolved": model_view::resolved(defaults, Some(prefs), None),
+                "manual": true,
+            }));
+        }
+    }
+    entries
 }
 
 /// Re-lists one provider's models now. The request carries the baseUrl and
@@ -198,7 +215,8 @@ fn reuse_stored_key(requested: &str, stored: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{model_entries, reuse_stored_key};
-    use llm_providers::{ListedModel, ModelParams};
+    use llm_providers::{ListedModel, ModelParams, ModelPrefs};
+    use std::collections::BTreeMap;
 
     fn defaults() -> ModelParams {
         ModelParams {
@@ -264,5 +282,45 @@ mod tests {
             "http://stored:1234/v1"
         ));
         assert!(!reuse_stored_key("http://stored:1234/v1", ""));
+    }
+
+    #[test]
+    fn stored_models_without_a_listing_stay_listed_as_manual() {
+        let mut stored = BTreeMap::new();
+        stored.insert(
+            "hand-added".to_string(),
+            ModelPrefs {
+                context_window: Some(200_000),
+                ..Default::default()
+            },
+        );
+        let entries = model_entries(&listed(), &defaults(), Some(&stored), false);
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0]["id"], "m");
+        assert_eq!(entries[1]["id"], "hand-added");
+        assert_eq!(entries[1]["manual"], true);
+        assert_eq!(
+            entries[1]["resolved"]["contextWindow"]["source"],
+            "perModel"
+        );
+        assert_eq!(entries[1]["resolved"]["contextWindow"]["value"], 200_000);
+    }
+
+    #[test]
+    fn a_listed_model_is_never_marked_manual() {
+        let mut stored = BTreeMap::new();
+        stored.insert("m".to_string(), ModelPrefs::default());
+        let entries = model_entries(&listed(), &defaults(), Some(&stored), false);
+        assert_eq!(entries.len(), 1);
+        assert!(entries[0].get("manual").is_none());
+    }
+
+    #[test]
+    fn an_empty_listing_still_shows_the_stored_models() {
+        let mut stored = BTreeMap::new();
+        stored.insert("hand-added".to_string(), ModelPrefs::default());
+        let entries = model_entries(&[], &defaults(), Some(&stored), false);
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0]["id"], "hand-added");
     }
 }
