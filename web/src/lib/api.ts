@@ -85,6 +85,12 @@ export interface SandboxPrefs {
   network: boolean;
 }
 
+/** The ideas queue's caps in night mode, per idea; 0 means no cap. */
+export interface AutonomyPrefs {
+  maxMinutesPerIdea: number;
+  maxTokensPerIdea: number;
+}
+
 export type ApiKey = { env: string } | { sealed: string } | { plain: string };
 
 export interface Provider {
@@ -135,6 +141,7 @@ export interface Preferences {
   search?: SearchPrefs;
   /** fennec's bwrap world: how commands run. */
   sandbox?: SandboxPrefs;
+  autonomy?: AutonomyPrefs;
   /** Skill ids every new session gets in its system prompt. */
   alwaysOnSkills?: string[];
   /** Opt-in embedded workflows the human enabled. */

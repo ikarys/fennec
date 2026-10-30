@@ -17,6 +17,8 @@ pub enum IdeaEvent {
     Started { idea_id: String },
     #[serde(rename = "idea.dropped", rename_all = "camelCase")]
     Dropped { idea_id: String },
+    #[serde(rename = "idea.halted", rename_all = "camelCase")]
+    Halted { idea_id: String, reason: String },
 }
 
 impl IdeaEvent {
@@ -27,6 +29,7 @@ impl IdeaEvent {
             Self::Ready { .. } => "idea.ready",
             Self::Started { .. } => "idea.started",
             Self::Dropped { .. } => "idea.dropped",
+            Self::Halted { .. } => "idea.halted",
         }
     }
 
@@ -36,7 +39,8 @@ impl IdeaEvent {
             | Self::Framing { idea_id, .. }
             | Self::Ready { idea_id, .. }
             | Self::Started { idea_id }
-            | Self::Dropped { idea_id } => idea_id,
+            | Self::Dropped { idea_id }
+            | Self::Halted { idea_id, .. } => idea_id,
         }
     }
 }
@@ -61,6 +65,7 @@ pub struct Idea {
     pub plan: Option<String>,
     pub created_at: u64,
     pub updated_at: u64,
+    pub halted: Option<String>,
 }
 
 /// The current ideas, newest first, from `(timestamp_ms, event)` in log order.
@@ -79,6 +84,7 @@ pub fn fold(events: &[(u64, IdeaEvent)]) -> Vec<Idea> {
                     plan: None,
                     created_at: *timestamp,
                     updated_at: *timestamp,
+                    halted: None,
                 });
             }
             continue;
@@ -98,11 +104,18 @@ pub fn fold(events: &[(u64, IdeaEvent)]) -> Vec<Idea> {
             IdeaEvent::Ready { plan, .. } => {
                 idea.plan = Some(plan.clone());
                 idea.state = IdeaState::Ready;
+                // A new plan puts a halted idea back in the queue.
+                idea.halted = None;
             }
             // The human may start an idea at any stage; the session is set by
             // the framing event before it when the idea had none.
-            IdeaEvent::Started { .. } => idea.state = IdeaState::Started,
+            IdeaEvent::Started { .. } => {
+                idea.state = IdeaState::Started;
+                // A fresh start clears a previous night-mode halt.
+                idea.halted = None;
+            }
             IdeaEvent::Dropped { .. } => idea.state = IdeaState::Dropped,
+            IdeaEvent::Halted { reason, .. } => idea.halted = Some(reason.clone()),
         }
         idea.updated_at = *timestamp;
     }
@@ -125,6 +138,7 @@ pub fn next_ready(ideas: &[Idea]) -> Option<&Idea> {
         .iter()
         .filter(|idea| idea.state == IdeaState::Ready)
         .filter(|idea| idea.session_id.is_some() && idea.plan.is_some())
+        .filter(|idea| idea.halted.is_none())
         .min_by(|a, b| {
             a.created_at
                 .cmp(&b.created_at)
@@ -429,6 +443,103 @@ mod tests {
 
         let json = serde_json::to_string(&event).unwrap();
         assert_eq!(json, r#"{"type":"idea.started","data":{"ideaId":"i1"}}"#);
+
+        let decoded: IdeaEvent = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, event);
+    }
+
+    #[test]
+    fn halted_keeps_the_state_and_next_ready_skips_it() {
+        let events = vec![
+            (
+                1,
+                IdeaEvent::Added {
+                    idea_id: "i1".into(),
+                    text: "t".into(),
+                },
+            ),
+            (
+                2,
+                IdeaEvent::Framing {
+                    idea_id: "i1".into(),
+                    session_id: "s1".into(),
+                },
+            ),
+            (
+                3,
+                IdeaEvent::Ready {
+                    idea_id: "i1".into(),
+                    plan: "p".into(),
+                },
+            ),
+            (
+                4,
+                IdeaEvent::Halted {
+                    idea_id: "i1".into(),
+                    reason: "r".into(),
+                },
+            ),
+        ];
+
+        let ideas = fold(&events);
+
+        assert_eq!(ideas.len(), 1);
+        assert_eq!(ideas[0].state, IdeaState::Ready);
+        assert_eq!(ideas[0].halted.as_deref(), Some("r"));
+        assert!(next_ready(&ideas).is_none());
+    }
+
+    #[test]
+    fn a_new_start_clears_halted() {
+        let events = vec![
+            (
+                1,
+                IdeaEvent::Added {
+                    idea_id: "i1".into(),
+                    text: "t".into(),
+                },
+            ),
+            (
+                2,
+                IdeaEvent::Ready {
+                    idea_id: "i1".into(),
+                    plan: "p".into(),
+                },
+            ),
+            (
+                3,
+                IdeaEvent::Halted {
+                    idea_id: "i1".into(),
+                    reason: "r".into(),
+                },
+            ),
+            (
+                4,
+                IdeaEvent::Started {
+                    idea_id: "i1".into(),
+                },
+            ),
+        ];
+
+        let ideas = fold(&events);
+
+        assert_eq!(ideas.len(), 1);
+        assert_eq!(ideas[0].state, IdeaState::Started);
+        assert_eq!(ideas[0].halted, None);
+    }
+
+    #[test]
+    fn halted_event_serde_wire() {
+        let event = IdeaEvent::Halted {
+            idea_id: "i1".into(),
+            reason: "r".into(),
+        };
+
+        let json = serde_json::to_string(&event).unwrap();
+        assert_eq!(
+            json,
+            r#"{"type":"idea.halted","data":{"ideaId":"i1","reason":"r"}}"#
+        );
 
         let decoded: IdeaEvent = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded, event);

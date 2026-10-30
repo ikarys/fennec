@@ -94,6 +94,10 @@ Ideas backlog, done: the project page keeps the human's ideas (`idea.*` events p
 it ready with the plan verbatim. "Lancer la file" runs the ready ideas one at a time, oldest first, through
 the default workflow in each idea's session and worktree (`idea.started`); each shows its run's state, and
 integrating stays the human's click.
+Night mode, done: an "autonome" box runs the queue with the human away (`Turn::autonomous`): `ask_user` answers
+itself (the agent decides and records it), `propose_criteria` is refused; per-idea caps on duration and tokens
+(Settings, "Mode nuit") stop an idea and the queue goes on (`idea.halted`); each started idea shows its criteria
+and the decisions taken, for the morning.
 Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
 1. Project actions on the project page: diagrams on demand of a function, process or engine
