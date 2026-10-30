@@ -434,14 +434,17 @@ export function IdeasSection({
                   </Button>
                 ) : null}
 
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={busy !== null}
-                  onClick={() => handleDrop(idea)}
-                >
-                  Abandonner
-                </Button>
+                {/* Integrated work is in the human's branch: nothing left to abandon. */}
+                {idea.report?.integrated ? null : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={busy !== null}
+                    onClick={() => handleDrop(idea)}
+                  >
+                    Abandonner
+                  </Button>
+                )}
               </div>
             </div>
           ))}
