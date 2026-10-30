@@ -1,6 +1,6 @@
 import type { WorkflowSummary } from "../lib/workflow";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { addPlannedIdea, markIdeaReady } from "../lib/ideas";
+import { addPlannedIdea, frameIdea, listIdeas, markIdeaReady } from "../lib/ideas";
 import type {
   Agent,
   AttachmentInput,
@@ -77,6 +77,8 @@ interface SessionPageProps {
   projectId: string | null;
   /** A workflow opened from the editor's test button: preselected, step by step. */
   testWorkflowId: string | null;
+  /** A backlog idea framed from the project page: its text prefills the composer, the first send links the session to it. */
+  frameIdeaId: string | null;
   pseudoTabId: string | null;
   projects: Project[];
   onSessionCreated: (newId: string, pseudoId: string | null) => void;
@@ -90,6 +92,7 @@ export function SessionPage({
   sessionId,
   projectId,
   testWorkflowId,
+  frameIdeaId,
   pseudoTabId,
   projects,
   onSessionCreated,
@@ -230,6 +233,27 @@ export function SessionPage({
   }, [sessionId]);
 
   useEffect(() => {
+    if (!sessionId && projectId && frameIdeaId) {
+      const ideaId = frameIdeaId;
+      let ignore = false;
+      listIdeas(projectId)
+        .then((board) => {
+          if (ignore) return;
+          const idea = board.groups
+            .flatMap((group) => group.ideas)
+            .find((candidate) => candidate.id === ideaId);
+          if (idea) setText(idea.text);
+        })
+        .catch(() => {
+          // Ignore: the composer stays editable with an empty message.
+        });
+      return () => {
+        ignore = true;
+      };
+    }
+  }, [projectId, frameIdeaId, sessionId]);
+
+  useEffect(() => {
     if (view.pendingQuestion && !running) {
       textareaRef.current?.focus();
     }
@@ -324,6 +348,11 @@ export function SessionPage({
               stepByStep: true,
               worktree: true,
             });
+          } else if (frameIdeaId) {
+            setWorkflowSelection({
+              ...defaultWorkflowSelection(data),
+              workflowId: null,
+            });
           } else {
             setWorkflowSelection(defaultWorkflowSelection(data));
           }
@@ -335,7 +364,7 @@ export function SessionPage({
     return () => {
       ignore = true;
     };
-  }, [commandProjectId, testWorkflowId]);
+  }, [commandProjectId, testWorkflowId, frameIdeaId]);
 
   // A pending choice and preview belong to one session; do not leak them
   // across tabs.
@@ -501,11 +530,14 @@ export function SessionPage({
         const created = await createSession(
           projectId,
           value,
-          mode ?? undefined,
+          frameIdeaId ? "plan" : (mode ?? undefined),
           images,
           undefined,
           pendingModel ?? undefined,
         );
+        if (frameIdeaId) {
+          await frameIdea(projectId, frameIdeaId, created.id);
+        }
         onSessionCreated(created.id, pseudoTabId);
       }
       if (fromComposer) {
