@@ -138,6 +138,50 @@ pub fn sessions_with_unintegrated_work(workdir: &Path) -> HashSet<String> {
     unintegrated(&String::from_utf8_lossy(&out.stdout))
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BranchStats {
+    pub commits: usize,
+    pub files: usize,
+}
+
+/// What a session's worktree branch holds past its base ref; None when either ref is gone.
+pub fn branch_stats(workdir: &Path, session_id: &str) -> Option<BranchStats> {
+    let base = format!("refs/fennec/base/{session_id}");
+    let head = format!("refs/heads/fennec/{session_id}");
+    let range = format!("{base}..{head}");
+
+    let count_out = Command::new("git")
+        .current_dir(workdir)
+        .args(["rev-list", "--count"])
+        .arg(&range)
+        .output()
+        .ok()?;
+    if !count_out.status.success() {
+        return None;
+    }
+    let commits = String::from_utf8_lossy(&count_out.stdout)
+        .trim()
+        .parse::<usize>()
+        .ok()?;
+
+    let diff_out = Command::new("git")
+        .current_dir(workdir)
+        .args(["diff", "--name-only"])
+        .arg(&base)
+        .arg(&head)
+        .output()
+        .ok()?;
+    if !diff_out.status.success() {
+        return None;
+    }
+    let files = String::from_utf8_lossy(&diff_out.stdout)
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .count();
+
+    Some(BranchStats { commits, files })
+}
+
 /// Parses `for-each-ref` lines: a session is pending when its branch and base
 /// refs both exist and point to different commits.
 fn unintegrated(refs: &str) -> HashSet<String> {

@@ -4,30 +4,25 @@
 use std::net::TcpStream;
 use std::path::Path;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::thread;
-use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 
 use super::App;
 use super::http::{Request, error, send_json};
-use super::turns::Job;
+use super::idea_queue;
 use crate::agent::ports::EventLog;
-use crate::agent::workflow::WorkflowJob;
 use crate::domain::criteria::CriterionStatus;
 use crate::domain::decision::decisions_in_force;
 use crate::domain::event::Event;
 use crate::domain::id::new_id;
-use crate::domain::idea::{Idea, IdeaEvent, IdeaState, next_ready};
-use crate::domain::project::Project;
+use crate::domain::project::{Project, SessionState};
 use crate::domain::workflow::run;
 use crate::store::SqliteStore;
-use crate::workflows::find;
+use backlog::{
+    Backlog, BacklogEvent, Idea, IdeaState, Progress, STAGES, Stage, Status, queue_order, status,
+    summarize,
+};
 use token_usage::{Filter, Ledger};
-
-/// The workflow an idea is built with: the plan card's "Construire" default.
-const DEFAULT_WORKFLOW_ID: &str = "plan-build-verify";
 
 /// An idea is a note, not a document: the plan holds the detail.
 const MAX_IDEA_CHARS: usize = 4_000;
@@ -37,7 +32,7 @@ pub fn list_ideas(app: &App, stream: &mut TcpStream, project_id: &str) -> Result
     if app.store()?.project(project_id)?.is_none() {
         return error(stream, 404, "no such project");
     }
-    send_ideas(app, stream, project_id)
+    send_board(app, stream, project_id)
 }
 
 /// `POST /api/projects/{id}/ideas` `{text, sessionId?, plan?}`: with a
@@ -74,7 +69,7 @@ pub fn add_idea(
     let idea_id = new_id();
     store.append_idea_event(
         project_id,
-        &IdeaEvent::Added {
+        &BacklogEvent::Added {
             idea_id: idea_id.clone(),
             text,
         },
@@ -82,14 +77,14 @@ pub fn add_idea(
     if !session_id.is_empty() {
         store.append_idea_event(
             project_id,
-            &IdeaEvent::Framing {
+            &BacklogEvent::Framing {
                 idea_id: idea_id.clone(),
                 session_id,
             },
         )?;
-        store.append_idea_event(project_id, &IdeaEvent::Ready { idea_id, plan })?;
+        store.append_idea_event(project_id, &BacklogEvent::Ready { idea_id, plan })?;
     }
-    send_ideas(app, stream, project_id)
+    send_board(app, stream, project_id)
 }
 
 /// `POST /api/projects/{id}/ideas/{iid}/{framing,ready,drop}`.
@@ -106,7 +101,8 @@ pub fn update_idea(
         return error(stream, 404, "no such project");
     }
     if !store
-        .ideas(project_id)?
+        .backlog(project_id)?
+        .ideas
         .iter()
         .any(|idea| idea.id == idea_id)
     {
@@ -123,7 +119,7 @@ pub fn update_idea(
                 Some(session) if session.project_id == project_id => {}
                 _ => return error(stream, 404, "no such session"),
             }
-            IdeaEvent::Framing {
+            BacklogEvent::Framing {
                 idea_id,
                 session_id,
             }
@@ -133,13 +129,13 @@ pub fn update_idea(
             if plan.is_empty() {
                 return error(stream, 400, "empty plan");
             }
-            IdeaEvent::Ready { idea_id, plan }
+            BacklogEvent::Ready { idea_id, plan }
         }
-        "drop" => IdeaEvent::Dropped { idea_id },
+        "drop" => BacklogEvent::Dropped { idea_id },
         _ => return error(stream, 404, "not found"),
     };
     store.append_idea_event(project_id, &event)?;
-    send_ideas(app, stream, project_id)
+    send_board(app, stream, project_id)
 }
 
 /// `POST /api/projects/{id}/ideas/{iid}/start`: builds this idea now, framed
@@ -154,14 +150,14 @@ pub fn start_one(
     let Some(project) = store.project(project_id)? else {
         return error(stream, 404, "no such project");
     };
-    let ideas = store.ideas(project_id)?;
-    let Some(idea) = ideas.iter().find(|idea| idea.id == idea_id) else {
+    let backlog = store.backlog(project_id)?;
+    let Some(idea) = backlog.ideas.iter().find(|idea| idea.id == idea_id) else {
         return error(stream, 404, "no such idea");
     };
-    if let Err(e) = start_idea(app, &store, &project, idea, false) {
+    if let Err(e) = idea_queue::start_idea(app, &store, &project, idea, false) {
         return error(stream, 409, &e);
     }
-    send_ideas(app, stream, project_id)
+    send_board(app, stream, project_id)
 }
 
 /// `POST /api/projects/{id}/ideas/queue/start`.
@@ -177,35 +173,8 @@ pub fn start_queue(
         return error(stream, 404, "no such project");
     }
     let autonomous = req.json()?["autonomous"].as_bool().unwrap_or(false);
-
-    let stop = {
-        let mut queues = app.idea_queues.lock().expect("idea queue lock poisoned");
-        if queues.contains_key(project_id) {
-            None
-        } else {
-            let stop = Arc::new(AtomicBool::new(false));
-            queues.insert(project_id.to_string(), stop.clone());
-            Some(stop)
-        }
-    };
-
-    if let Some(stop) = stop {
-        let app = app.clone();
-        let project_id = project_id.to_string();
-        thread::spawn(move || {
-            let result = run_queue(app.as_ref(), &project_id, &stop, autonomous);
-            // Remove the flag even on error so a later start can run again.
-            app.idea_queues
-                .lock()
-                .expect("idea queue lock poisoned")
-                .remove(&project_id);
-            if let Err(e) = result {
-                eprintln!("fennec: idea queue {project_id}: {e}");
-            }
-        });
-    }
-
-    send_ideas(app.as_ref(), stream, project_id)
+    idea_queue::start_queue(app, project_id, autonomous);
+    send_board(app.as_ref(), stream, project_id)
 }
 
 /// `POST /api/projects/{id}/ideas/queue/stop`.
@@ -215,257 +184,355 @@ pub fn stop_queue(app: &App, stream: &mut TcpStream, project_id: &str) -> Result
     if app.store()?.project(project_id)?.is_none() {
         return error(stream, 404, "no such project");
     }
-    if let Some(stop) = app
-        .idea_queues
-        .lock()
-        .expect("idea queue lock poisoned")
-        .get(project_id)
-    {
-        stop.store(true, Ordering::SeqCst);
-    }
-    send_ideas(app, stream, project_id)
+    idea_queue::stop_queue(app, project_id);
+    send_board(app, stream, project_id)
 }
 
-fn send_ideas(app: &App, stream: &mut TcpStream, project_id: &str) -> Result<(), String> {
+/// `POST /api/projects/{id}/ideas/reorder` `{ids: [string]}`.
+pub fn reorder(
+    app: &App,
+    req: &Request,
+    stream: &mut TcpStream,
+    project_id: &str,
+) -> Result<(), String> {
     let store = app.store()?;
-    let ideas = store.ideas(project_id)?;
-    let queue_running = app
-        .idea_queues
-        .lock()
-        .expect("idea queue lock poisoned")
-        .contains_key(project_id);
-
-    let mut ideas_json = Vec::with_capacity(ideas.len());
-    for idea in &ideas {
-        let mut value = json!(idea);
-        let mut session_state = None;
-        let mut report = None;
-        if idea.state == IdeaState::Started
-            && let Some(session_id) = idea.session_id.as_deref()
-        {
-            session_state = store
-                .session(session_id)?
-                .map(|session| session.state(app.turns.is_running(session_id)));
-            // ponytail: reads each started idea's whole log on every board
-            // fetch (the UI polls while a run goes on); a cache keyed by the
-            // log's max seq, as `skill_folds` does, if it shows up.
-            if session_state.is_some() {
-                let events = store.events(session_id)?;
-                report = Some(idea_report(&events));
-            }
-        }
-        value["sessionState"] = json!(session_state);
-        value["report"] = json!(report);
-        ideas_json.push(value);
+    if store.project(project_id)?.is_none() {
+        return error(stream, 404, "no such project");
     }
+    let body = req.json()?;
+    let Some(ids_value) = body["ids"].as_array() else {
+        return error(stream, 400, "ids must be a list of idea ids");
+    };
+    let mut ids = Vec::with_capacity(ids_value.len());
+    for value in ids_value {
+        let Some(id) = value.as_str() else {
+            return error(stream, 400, "ids must be a list of idea ids");
+        };
+        ids.push(id.to_string());
+    }
+
+    let backlog = store.backlog(project_id)?;
+    let queued: std::collections::HashSet<&str> = queue_order(&backlog)
+        .iter()
+        .map(|idea| idea.id.as_str())
+        .collect();
+    if ids.iter().any(|id| !queued.contains(id.as_str())) {
+        return error(stream, 400, "unknown idea in ids");
+    }
+
+    store.append_idea_event(project_id, &BacklogEvent::Reordered { ids })?;
+    send_board(app, stream, project_id)
+}
+
+/// `POST /api/projects/{id}/ideas/report/read`.
+pub fn report_read(app: &App, stream: &mut TcpStream, project_id: &str) -> Result<(), String> {
+    let store = app.store()?;
+    if store.project(project_id)?.is_none() {
+        return error(stream, 404, "no such project");
+    }
+    store.append_idea_event(project_id, &BacklogEvent::ReportRead {})?;
+    send_board(app, stream, project_id)
+}
+
+/// What every idea view of one board reads: fetched once per board.
+struct Board<'a> {
+    app: &'a App,
+    store: &'a SqliteStore,
+    backlog: &'a Backlog,
+    project: &'a Project,
+    queue: Vec<&'a Idea>,
+    ledger: Option<Ledger>,
+}
+
+fn send_board(app: &App, stream: &mut TcpStream, project_id: &str) -> Result<(), String> {
+    let store = app.store()?;
+    let Some(project) = store.project(project_id)? else {
+        return error(stream, 404, "no such project");
+    };
+    let backlog = store.backlog(project_id)?;
+    let board = Board {
+        app,
+        store: &store,
+        backlog: &backlog,
+        project: &project,
+        queue: queue_order(&backlog),
+        ledger: Ledger::open(&app.settings.usage_path()).ok(),
+    };
+    let queue = queue_json(&board)?;
+    let groups = groups_json(&board)?;
+    let night_report = night_report_json(&board)?;
 
     send_json(
         stream,
         200,
-        &json!({ "ideas": ideas_json, "queueRunning": queue_running }),
+        &json!({
+            "queue": queue,
+            "groups": groups,
+            "nightReport": night_report,
+        }),
     )
 }
 
-fn run_queue(
-    app: &App,
-    project_id: &str,
-    stop: &AtomicBool,
-    autonomous: bool,
-) -> Result<(), String> {
-    loop {
-        if stop.load(Ordering::SeqCst) {
-            return Ok(());
+fn queue_json(board: &Board) -> Result<Value, String> {
+    let running = idea_queue::queue_running(board.app, &board.project.id);
+    let autonomous = running
+        && board
+            .backlog
+            .last_run
+            .as_ref()
+            .is_some_and(|run| run.autonomous);
+    let ready = board.queue.len();
+    let next =
+        backlog::next_ready(board.backlog).map(|idea| json!({ "id": idea.id, "text": idea.text }));
+    let autonomy = board.store.preferences()?.autonomy;
+
+    Ok(json!({
+        "running": running,
+        "autonomous": autonomous,
+        "ready": ready,
+        "next": next,
+        "caps": {
+            "maxMinutes": autonomy.max_minutes_per_idea,
+            "maxTokens": autonomy.max_tokens_per_idea,
+        },
+    }))
+}
+
+fn groups_json(board: &Board) -> Result<Value, String> {
+    let mut views: Vec<(Stage, &Idea, Value)> = Vec::new();
+    for idea in &board.backlog.ideas {
+        let (status, view) = idea_view(board, idea)?;
+        views.push((status.stage(), idea, view));
+    }
+    let queue_place = |idea: &Idea| {
+        board
+            .queue
+            .iter()
+            .position(|queued| queued.id == idea.id)
+            .unwrap_or(usize::MAX)
+    };
+
+    let mut groups = Vec::new();
+    for stage in STAGES {
+        let mut entries: Vec<(&Idea, Value)> = views
+            .iter()
+            .filter(|(s, _, _)| *s == stage)
+            .map(|(_, idea, view)| (*idea, view.clone()))
+            .collect();
+        if entries.is_empty() {
+            continue;
         }
-
-        let store = app.store()?;
-        let Some(project) = store.project(project_id)? else {
-            return Ok(());
-        };
-        let ideas = store.ideas(project_id)?;
-        let Some(idea) = next_ready(&ideas) else {
-            return Ok(());
-        };
-
-        let session_id = match start_idea(app, &store, &project, idea, autonomous) {
-            Ok(session_id) => session_id,
-            // Night mode records why the idea halted and keeps going.
-            Err(e) if autonomous => {
-                store.append_idea_event(
-                    project_id,
-                    &IdeaEvent::Halted {
-                        idea_id: idea.id.clone(),
-                        reason: e,
-                    },
-                )?;
-                continue;
-            }
-            Err(e) => return Err(e),
-        };
-
-        if autonomous {
-            watch_idea(app, &store, &project.id, &idea.id, &session_id)?;
+        if stage == Stage::Queue {
+            entries.sort_by_key(|(idea, _)| queue_place(idea));
         } else {
-            wait_for_turn(app, &session_id);
+            entries.sort_by_key(|(idea, _)| std::cmp::Reverse(idea.updated_at));
         }
+        let ideas = entries
+            .into_iter()
+            .map(|(_, view)| view)
+            .collect::<Vec<Value>>();
+        groups.push(json!({ "stage": stage, "ideas": ideas }));
     }
+
+    Ok(json!(groups))
 }
 
-/// Starts the idea's build with the default workflow, in its session's
-/// worktree: from the approved plan when it is ready, from the idea itself
-/// otherwise (the workflow then plans first). An idea not framed yet gets its
-/// session here. Errors when the session is busy. Returns the session the
-/// build runs in.
-fn start_idea(
-    app: &App,
-    store: &SqliteStore,
-    project: &Project,
-    idea: &Idea,
-    autonomous: bool,
-) -> Result<String, String> {
-    if idea.state == IdeaState::Started {
-        return Err("idea already started".into());
+fn night_report_json(board: &Board) -> Result<Value, String> {
+    let Some(run) = &board.backlog.last_run else {
+        return Ok(Value::Null);
+    };
+    if run.is_open() || run.read || run.idea_ids.is_empty() {
+        return Ok(Value::Null);
     }
-    let Some(found) = find(
-        Path::new(&project.workdir),
-        DEFAULT_WORKFLOW_ID,
-        &store.preferences()?.enabled_workflows,
-    ) else {
-        return Err(format!("no workflow {DEFAULT_WORKFLOW_ID}"));
-    };
-    let session_id = match &idea.session_id {
-        Some(id) => id.clone(),
-        None => {
-            let title: String = idea.text.chars().take(80).collect();
-            let id = store.create_session(project, &title)?;
-            store.append_idea_event(
-                &project.id,
-                &IdeaEvent::Framing {
-                    idea_id: idea.id.clone(),
-                    session_id: id.clone(),
-                },
-            )?;
-            id
-        }
-    };
-    let Some(session) = store.session(&session_id)? else {
-        return Err("no such session".into());
-    };
-    let task = idea.text.clone();
-    let job = match (idea.state, &idea.plan) {
-        (IdeaState::Ready, Some(plan)) => WorkflowJob::StartFromPlan {
-            workflow: found.workflow,
-            task,
-            plan: plan.clone(),
-        },
-        _ => WorkflowJob::Start {
-            workflow: found.workflow,
-            task,
-            step_by_step: false,
-            attachments: Vec::new(),
-        },
-    };
-    let place = app.open_place(store, &session, project, true)?;
-    app.turns
-        .start_with(&session_id, place, Job::Workflow(job), autonomous)?;
-    store.append_idea_event(
-        &project.id,
-        &IdeaEvent::Started {
-            idea_id: idea.id.clone(),
-        },
-    )?;
-    Ok(session_id)
+
+    let mut ideas = Vec::new();
+    let mut statuses = Vec::new();
+
+    for idea_id in &run.idea_ids {
+        let Some(idea) = board.backlog.ideas.iter().find(|idea| &idea.id == idea_id) else {
+            continue;
+        };
+        let (status, view) = idea_view(board, idea)?;
+        statuses.push(status);
+        ideas.push(view);
+    }
+
+    if ideas.is_empty() {
+        return Ok(Value::Null);
+    }
+
+    Ok(json!({
+        "startedAt": run.started_at,
+        "finishedAt": run.finished_at,
+        "reason": run.reason,
+        "autonomous": run.autonomous,
+        "summary": summarize(&statuses),
+        "ideas": ideas,
+    }))
 }
 
-fn watch_idea(
-    app: &App,
-    store: &SqliteStore,
-    project_id: &str,
-    idea_id: &str,
-    session_id: &str,
-) -> Result<(), String> {
-    let autonomy = store.preferences()?.autonomy;
-    let max_minutes = autonomy.max_minutes_per_idea;
-    let max_tokens = autonomy.max_tokens_per_idea;
+fn idea_view(board: &Board, idea: &Idea) -> Result<(Status, Value), String> {
+    let (app, store, project_id) = (board.app, board.store, board.project.id.as_str());
+    let mut session = None;
+    let mut events = None;
+    let mut running = false;
+    let mut session_state = None;
 
-    let started = Instant::now();
-    let since_ms = crate::domain::clock::now_ms() as i64;
-    let ledger = if max_tokens > 0 {
-        Some(Ledger::open(&app.settings.usage_path()).map_err(|e| e.to_string())?)
+    if idea.state == IdeaState::Started
+        && let Some(session_id) = idea.session_id.as_deref()
+    {
+        running = app.turns.is_running(session_id);
+        session = store.session(session_id)?;
+        session_state = session.as_ref().map(|s| s.state(running));
+        // ponytail: reads each started idea's whole log on every board fetch
+        // (the UI polls while a run goes on); a cache keyed by the log's max
+        // seq, as `skill_folds` does, if it shows up.
+        events = Some(store.events(session_id)?);
+    }
+
+    let report = events.as_deref().map(idea_report).unwrap_or(IdeaReport {
+        integrated: false,
+        criteria: None,
+        decisions: Vec::new(),
+    });
+    let progress = progress(session_state, running, report.integrated);
+    let status = status(idea, progress);
+    let stage = status.stage();
+    let action = status.action();
+
+    let position = if status == Status::Queued {
+        board
+            .queue
+            .iter()
+            .position(|queued| queued.id == idea.id)
+            .map(|index| index + 1)
     } else {
         None
     };
 
-    let mut halt_reason: Option<String> = None;
-    let mut stopped = false;
-    let mut last_token_check: Option<Instant> = None;
+    let duration_ms = if idea.state == IdeaState::Started
+        && let Some(started_at) = idea.started_at
+        && let Some(session) = &session
+    {
+        let end = if running {
+            crate::domain::clock::now_ms()
+        } else {
+            session.updated_at
+        };
+        Some(end.saturating_sub(started_at))
+    } else {
+        None
+    };
 
-    loop {
-        let seen = app.notifier.generation();
-        if !app.turns.is_running(session_id) {
-            break;
-        }
+    let tokens = if idea.state == IdeaState::Started
+        && let Some(started_at) = idea.started_at
+        && let Some(session) = &session
+        && let Some(ledger) = &board.ledger
+    {
+        // ponytail: counts the project's calls in that window, exact while the
+        // queue runs one idea at a time.
+        let until_ms = if running {
+            None
+        } else {
+            Some(session.updated_at as i64)
+        };
+        ledger
+            .summary(&Filter {
+                group_id: Some(project_id.to_string()),
+                since_ms: Some(started_at as i64),
+                until_ms,
+                ..Default::default()
+            })
+            .ok()
+            .map(|summary| {
+                summary.prompt_tokens.saturating_sub(summary.cached_tokens)
+                    + summary.completion_tokens
+            })
+    } else {
+        None
+    };
 
-        if halt_reason.is_none() {
-            if max_minutes > 0 && started.elapsed() >= Duration::from_secs(max_minutes as u64 * 60)
-            {
-                halt_reason = Some(format!("stopped after {max_minutes} minutes (cap)"));
-            } else if max_tokens > 0
-                && last_token_check
-                    .is_none_or(|checked| checked.elapsed() >= Duration::from_secs(30))
-            {
-                // ponytail: the ledger is summed per project since the idea started, so other
-                // work in the same project meanwhile counts too; a per-session filter
-                // (session and its child sessions) is the upgrade.
-                if let Some(ledger) = &ledger {
-                    let summary = ledger
-                        .summary(&Filter {
-                            group_id: Some(project_id.to_string()),
-                            since_ms: Some(since_ms),
-                            ..Default::default()
-                        })
-                        .map_err(|e| e.to_string())?;
-                    let spent = summary.prompt_tokens.saturating_sub(summary.cached_tokens)
-                        + summary.completion_tokens;
-                    if spent > max_tokens {
-                        halt_reason =
-                            Some(format!("stopped after {spent} tokens (cap {max_tokens})"));
-                    }
-                }
-                last_token_check = Some(Instant::now());
-            }
-        }
+    let criteria = if idea.state == IdeaState::Started {
+        Some(report.criteria.unwrap_or_default())
+    } else {
+        report.criteria
+    };
+    let decisions = report.decisions;
 
-        if !stopped && halt_reason.is_some() {
-            app.turns.stop(session_id);
-            stopped = true;
-        }
+    let (commits, files) = if matches!(status, Status::Review | Status::Halted | Status::Failed)
+        && let Some(session_id) = idea.session_id.as_deref()
+    {
+        crate::git::branch_stats(Path::new(&board.project.workdir), session_id)
+            .map(|stats| (Some(stats.commits), Some(stats.files)))
+            .unwrap_or((None, None))
+    } else {
+        (None, None)
+    };
 
-        app.notifier.wait_past(seen, Duration::from_secs(30));
-    }
+    let value = json!({
+        "id": idea.id,
+        "text": idea.text,
+        "status": status,
+        "stage": stage,
+        "action": action,
+        "sessionId": idea.session_id,
+        "plan": idea.plan,
+        "halted": idea.halted,
+        "autonomous": idea.autonomous,
+        "position": position,
+        "createdAt": idea.created_at,
+        "startedAt": idea.started_at,
+        "durationMs": duration_ms,
+        "tokens": tokens,
+        "criteria": criteria,
+        "decisions": decisions,
+        "commits": commits,
+        "files": files,
+    });
 
-    if let Some(reason) = halt_reason {
-        store.append_idea_event(
-            project_id,
-            &IdeaEvent::Halted {
-                idea_id: idea_id.to_string(),
-                reason,
-            },
-        )?;
-    }
-    Ok(())
+    Ok((status, value))
 }
 
-fn wait_for_turn(app: &App, session_id: &str) {
-    loop {
-        let seen = app.notifier.generation();
-        if !app.turns.is_running(session_id) {
-            return;
+fn progress(state: Option<SessionState>, running: bool, integrated: bool) -> Option<Progress> {
+    let state = state?;
+    if integrated {
+        return Some(Progress::Integrated);
+    }
+    if running {
+        return Some(Progress::Running);
+    }
+    match state {
+        SessionState::WaitingForUser => Some(Progress::WaitingForUser),
+        SessionState::Complete | SessionState::Idle => Some(Progress::Finished),
+        SessionState::Stopped | SessionState::Error | SessionState::Truncated => {
+            Some(Progress::Failed)
         }
-        app.notifier.wait_past(seen, Duration::from_secs(60));
+        SessionState::Running => Some(Progress::Running),
     }
 }
 
-fn idea_report(events: &[Event]) -> Value {
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CriteriaCounts {
+    passed: usize,
+    failed: usize,
+    pending: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DecisionView {
+    title: String,
+    choice: String,
+}
+
+struct IdeaReport {
+    integrated: bool,
+    criteria: Option<CriteriaCounts>,
+    decisions: Vec<DecisionView>,
+}
+
+fn idea_report(events: &[Event]) -> IdeaReport {
     let criteria = run::current_run(events)
         .map(|state| state.criteria)
         .unwrap_or_default();
@@ -482,25 +549,32 @@ fn idea_report(events: &[Event]) -> Value {
         }
     }
 
-    let decisions_json = decisions
-        .iter()
-        .map(|decision| json!({ "title": decision.title, "choice": decision.choice }))
-        .collect::<Vec<Value>>();
+    let decisions = decisions
+        .into_iter()
+        .map(|decision| DecisionView {
+            title: decision.title,
+            choice: decision.choice,
+        })
+        .collect();
 
     // The human's click is the end of an idea's road: the morning list shows it done.
     let integrated = events
         .iter()
         .any(|event| matches!(event, Event::IntegrationApplied { .. }));
 
-    json!({
-        "integrated": integrated,
-        "criteria": {
-            "passed": passed,
-            "failed": failed,
-            "pending": pending,
+    IdeaReport {
+        integrated,
+        criteria: if criteria.is_empty() {
+            None
+        } else {
+            Some(CriteriaCounts {
+                passed,
+                failed,
+                pending,
+            })
         },
-        "decisions": decisions_json,
-    })
+        decisions,
+    }
 }
 
 #[cfg(test)]
@@ -508,13 +582,48 @@ mod tests {
     use super::*;
 
     #[test]
-    fn idea_report_empty_log_has_zero_counts() {
+    fn progress_maps_each_session_state() {
+        assert!(progress(None, false, false).is_none());
+        assert!(matches!(
+            progress(Some(SessionState::Idle), false, true),
+            Some(Progress::Integrated)
+        ));
+        assert!(matches!(
+            progress(Some(SessionState::Idle), true, false),
+            Some(Progress::Running)
+        ));
+        assert!(matches!(
+            progress(Some(SessionState::WaitingForUser), false, false),
+            Some(Progress::WaitingForUser)
+        ));
+        assert!(matches!(
+            progress(Some(SessionState::Complete), false, false),
+            Some(Progress::Finished)
+        ));
+        assert!(matches!(
+            progress(Some(SessionState::Idle), false, false),
+            Some(Progress::Finished)
+        ));
+        assert!(matches!(
+            progress(Some(SessionState::Stopped), false, false),
+            Some(Progress::Failed)
+        ));
+        assert!(matches!(
+            progress(Some(SessionState::Error), false, false),
+            Some(Progress::Failed)
+        ));
+        assert!(matches!(
+            progress(Some(SessionState::Truncated), false, false),
+            Some(Progress::Failed)
+        ));
+    }
+
+    #[test]
+    fn idea_report_empty_log_has_no_criteria_and_no_decisions() {
         let report = idea_report(&[]);
 
-        assert_eq!(report["criteria"]["passed"], 0);
-        assert_eq!(report["criteria"]["failed"], 0);
-        assert_eq!(report["criteria"]["pending"], 0);
-        assert_eq!(report["decisions"], json!([]));
-        assert_eq!(report["integrated"], false);
+        assert!(report.criteria.is_none());
+        assert!(report.decisions.is_empty());
+        assert!(!report.integrated);
     }
 }
