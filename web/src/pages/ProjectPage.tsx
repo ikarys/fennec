@@ -15,7 +15,26 @@ import { type IdeaView } from '../lib/ideas';
 
 const ANALYZE_PROMPT =
   'Analyze this project and draft the philosophy, layers and rules of its AGENTS.md.';
-const AUDIT_PROMPT = 'Audit the software architecture of this project.';
+
+/** The audits a project page offers: each one a read-only agent whose findings may become tasks. */
+const AUDITS = {
+  architecture: {
+    mode: 'audit-architecture',
+    prompt: 'Audit the software architecture of this project.',
+    label: "Auditer l'architecture",
+    hint: "Un agent audite l'architecture ; ses constats peuvent devenir des tâches",
+    body: "Un agent en lecture seule lit le projet et rapporte ses constats (responsabilités, couches, modularité, KISS, SOLID, front). Sur un gros projet, l'audit peut consommer beaucoup de tokens. Tu choisiras ensuite les constats à transformer en tâches.",
+  },
+  security: {
+    mode: 'audit-security',
+    prompt: 'Audit the security of this project.',
+    label: 'Auditer la sécurité',
+    hint: 'Un agent audite la sécurité ; ses constats peuvent devenir des tâches',
+    body: "Un agent en lecture seule lance les scanners installés (cargo audit, npm audit, gitleaks, semgrep…) puis lit le code : secrets, injections, entrées non bornées, fuites de ressources, dépendances, CI. Il n'attaque rien et n'installe rien. Sur un gros projet, l'audit peut consommer beaucoup de tokens. Tu choisiras ensuite les constats à transformer en tâches.",
+  },
+} as const;
+
+type AuditKind = keyof typeof AUDITS;
 
 const TABS = [
   { id: 'tasks', label: 'Tâches' },
@@ -97,7 +116,7 @@ export default function ProjectPage({
     window.location.hash = `#/project/${encodeURIComponent(projectId)}/${id}`;
   };
 
-  const [confirmAudit, setConfirmAudit] = useState(false);
+  const [confirmAudit, setConfirmAudit] = useState<AuditKind | null>(null);
 
   const startSession = async (prompt: string, mode: string) => {
     setAnalyzing(true);
@@ -114,10 +133,6 @@ export default function ProjectPage({
 
   const handleAnalyze = () => {
     void startSession(ANALYZE_PROMPT, 'analyze');
-  };
-
-  const handleAudit = () => {
-    setConfirmAudit(true);
   };
 
   // Opens a new plan session with the idea in the composer: the human edits it, then sends.
@@ -142,15 +157,18 @@ export default function ProjectPage({
           {project.name}
         </h1>
         <div className="grow" />
-        <Button
-          variant="secondary"
-          size="sm"
-          disabled={analyzing}
-          onClick={handleAudit}
-          title="Un agent audite l'architecture ; ses constats peuvent devenir des tâches"
-        >
-          Auditer l'architecture
-        </Button>
+        {(Object.keys(AUDITS) as AuditKind[]).map((kind) => (
+          <Button
+            key={kind}
+            variant="secondary"
+            size="sm"
+            disabled={analyzing}
+            onClick={() => setConfirmAudit(kind)}
+            title={AUDITS[kind].hint}
+          >
+            {AUDITS[kind].label}
+          </Button>
+        ))}
         <Button
           variant="primary"
           size="sm"
@@ -163,16 +181,18 @@ export default function ProjectPage({
       </div>
       {analyzeError ? <p className="mt-1 text-xs text-err">{analyzeError}</p> : null}
       <ConfirmDialog
-        open={confirmAudit}
-        title="Auditer l'architecture ?"
-        body="Un agent en lecture seule lit le projet et rapporte ses constats (responsabilités, couches, modularité, KISS, SOLID, front). Sur un gros projet, l'audit peut consommer beaucoup de tokens. Tu choisiras ensuite les constats à transformer en tâches."
+        open={confirmAudit !== null}
+        title={confirmAudit ? `${AUDITS[confirmAudit].label} ?` : ''}
+        body={confirmAudit ? AUDITS[confirmAudit].body : ''}
         confirmLabel="Lancer l'audit"
         variant="primary"
         onConfirm={() => {
-          setConfirmAudit(false);
-          void startSession(AUDIT_PROMPT, 'audit-architecture');
+          if (!confirmAudit) return;
+          const audit = AUDITS[confirmAudit];
+          setConfirmAudit(null);
+          void startSession(audit.prompt, audit.mode);
         }}
-        onCancel={() => setConfirmAudit(false)}
+        onCancel={() => setConfirmAudit(null)}
       />
       <p className="mt-0.5 font-mono text-xs text-muted">
         {project.workdir} · ⎇ {project.branch ?? 'sans branche'}
