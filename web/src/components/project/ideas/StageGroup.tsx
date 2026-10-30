@@ -3,6 +3,7 @@
  */
 import { useState } from 'react';
 import { SectionLabel } from '../../ui/SectionLabel';
+import { Button } from '../../ui/Button';
 import { TextArea } from '../../ui/Field';
 import { IdeaRow } from './IdeaRow';
 import {
@@ -93,11 +94,11 @@ export function StageGroup({
         ))}
 
         {stage === 'drafts' ? (
-          <div className="mt-2">
+          <div className="mt-2 flex items-start gap-2">
             <TextArea
               rows={1}
               className="w-full"
-              placeholder="Une idée à garder pour plus tard…"
+              placeholder="Une idée à garder pour plus tard… (Entrée pour l'ajouter)"
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => {
@@ -107,6 +108,16 @@ export function StageGroup({
                 }
               }}
             />
+            <Button
+              iconOnly
+              className="shrink-0"
+              title="Ajouter l'idée au backlog"
+              aria-label="Ajouter l'idée au backlog"
+              disabled={!text.trim() || busy}
+              onClick={() => void handleAdd()}
+            >
+              +
+            </Button>
           </div>
         ) : null}
       </div>
