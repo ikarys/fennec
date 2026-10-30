@@ -137,6 +137,20 @@ export default function ProjectPage({
       {analyzeError ? <p className="mt-1 text-xs text-err">{analyzeError}</p> : null}
       <p className="mt-0.5 font-mono text-xs text-muted">
         {project.workdir} · ⎇ {project.branch ?? 'sans branche'}
+        {project.remote ? (
+          <>
+            {' · '}
+            <a
+              href={project.remote}
+              target="_blank"
+              rel="noreferrer"
+              className="text-accent-strong underline"
+              title={project.remote}
+            >
+              {project.remote.replace(/^https?:\/\//, '')}
+            </a>
+          </>
+        ) : null}
       </p>
     </>
   );

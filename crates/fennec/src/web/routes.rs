@@ -183,6 +183,11 @@ fn list_projects(app: &App, stream: &mut TcpStream) -> Result<(), String> {
             .collect();
         let mut v = project_json(&p);
         v["branch"] = json!(git::current_branch(Path::new(&p.workdir)));
+        v["remote"] = json!(
+            git::remote_url(Path::new(&p.workdir))
+                .as_deref()
+                .and_then(git::web_url)
+        );
         v["sessions"] = Value::Array(sessions);
         out.push(v);
     }

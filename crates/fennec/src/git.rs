@@ -20,6 +20,74 @@ pub fn current_branch(workdir: &Path) -> Option<String> {
         .map(String::from)
 }
 
+/// The remote a human opens in a browser: `origin` when set, else the first
+/// remote; `None` when the repository has no remote.
+pub fn remote_url(workdir: &Path) -> Option<String> {
+    let name = preferred_remote(workdir)?;
+    let out = Command::new("git")
+        .current_dir(workdir)
+        .args(["remote", "get-url", &name])
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .next()
+        .map(str::trim)
+        .filter(|u| !u.is_empty())
+        .map(String::from)
+}
+
+/// `origin` when present, else the first configured remote; `None` when there
+/// is none.
+fn preferred_remote(workdir: &Path) -> Option<String> {
+    let out = Command::new("git")
+        .current_dir(workdir)
+        .args(["remote"])
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let output = String::from_utf8_lossy(&out.stdout);
+    let remotes: Vec<&str> = output
+        .lines()
+        .map(str::trim)
+        .filter(|r| !r.is_empty())
+        .collect();
+    remotes
+        .iter()
+        .find(|r| **r == "origin")
+        .or_else(|| remotes.first())
+        .copied()
+        .map(String::from)
+}
+
+/// A git remote as a web URL a browser opens; `None` for a local path.
+/// `git@github.com:o/r.git` → `https://github.com/o/r`; `ssh://` and `https://`
+/// are kept, a trailing `.git` is dropped.
+pub fn web_url(remote: &str) -> Option<String> {
+    // The SCP form `git@host:path` splits on `:`; every scheme splits on `/`.
+    let rest = remote
+        .strip_prefix("ssh://")
+        .map(|r| r.strip_prefix("git@").unwrap_or(r))
+        .or_else(|| remote.strip_prefix("https://"))
+        .or_else(|| remote.strip_prefix("http://"))
+        .or_else(|| remote.strip_prefix("git@"))?;
+    let sep = if remote.starts_with("git@") { ':' } else { '/' };
+    let (host, path) = rest.split_once(sep)?;
+    if host.is_empty() || path.is_empty() {
+        return None;
+    }
+    Some(format!(
+        "https://{}/{}",
+        host,
+        path.trim_end_matches(".git")
+    ))
+}
+
 /// The number of uncommitted entries in the human's tree, for a quick glance.
 pub fn dirty_count(workdir: &Path) -> usize {
     let Ok(output) = Command::new("git")
@@ -94,7 +162,7 @@ fn unintegrated(refs: &str) -> HashSet<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{dirty_count, unintegrated};
+    use super::{dirty_count, remote_url, unintegrated, web_url};
     use std::process::Command;
 
     #[test]
@@ -105,6 +173,82 @@ mod tests {
         let pending = unintegrated(refs);
         assert_eq!(pending.len(), 1);
         assert!(pending.contains("a"));
+    }
+
+    #[test]
+    fn web_url_normalizes_remotes_to_web_links() {
+        assert_eq!(
+            web_url("git@github.com:owner/repo.git"),
+            Some("https://github.com/owner/repo".to_string())
+        );
+        assert_eq!(
+            web_url("https://github.com/owner/repo.git"),
+            Some("https://github.com/owner/repo".to_string())
+        );
+        assert_eq!(
+            web_url("https://gitlab.com/team/proj"),
+            Some("https://gitlab.com/team/proj".to_string())
+        );
+        assert_eq!(
+            web_url("ssh://git@gitea.io/owner/repo.git"),
+            Some("https://gitea.io/owner/repo".to_string())
+        );
+        assert_eq!(
+            web_url("git@gitlab.mycompany.io:team/app.git"),
+            Some("https://gitlab.mycompany.io/team/app".to_string())
+        );
+        assert_eq!(web_url("/home/user/repo"), None);
+        assert_eq!(web_url("file:///home/user/repo"), None);
+    }
+
+    #[test]
+    fn remote_url_reads_origin_then_first_remote() {
+        let dir = std::env::temp_dir().join(format!(
+            "fennec-remote-url-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let git = |args: &[&str]| {
+            let output = Command::new("git")
+                .current_dir(&dir)
+                .args(args)
+                .output()
+                .expect("git");
+            assert!(
+                output.status.success(),
+                "git {:?} failed: {}",
+                args,
+                String::from_utf8_lossy(&output.stderr)
+            );
+            output
+        };
+
+        git(&["init"]);
+        assert_eq!(remote_url(&dir), None);
+
+        git(&["remote", "add", "upstream", "git@example.com:team/proj.git"]);
+        assert_eq!(
+            remote_url(&dir),
+            Some("git@example.com:team/proj.git".to_string())
+        );
+
+        git(&[
+            "remote",
+            "add",
+            "origin",
+            "https://github.com/owner/repo.git",
+        ]);
+        assert_eq!(
+            remote_url(&dir),
+            Some("https://github.com/owner/repo.git".to_string())
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

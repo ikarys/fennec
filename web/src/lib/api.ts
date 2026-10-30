@@ -31,6 +31,7 @@ export interface Project {
   name: string;
   workdir: string;
   branch: string | null;
+  remote: string | null;
   sessions: SessionSummary[];
 }
 
