@@ -24,6 +24,7 @@ pub enum Status {
     Halted,
     Failed,
     Integrated,
+    Completed,
 }
 
 /// The top-level section an idea belongs to.
@@ -53,8 +54,10 @@ pub enum Action {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum MenuAction {
+    Restart,
     Reframe,
     StartUnframed,
+    Complete,
     Drop,
 }
 
@@ -89,6 +92,8 @@ pub fn status(idea: &Idea, progress: Option<Progress>) -> Status {
             // No progress means the session is gone: treat it as failed.
             Some(Progress::Failed) | None => Status::Failed,
         },
+        // Completion is final and wins over any live progress.
+        IdeaState::Completed => Status::Completed,
         // Dropped ideas are excluded by fold, but map to a neutral state.
         IdeaState::Dropped => Status::Inbox,
     }
@@ -105,7 +110,7 @@ impl Status {
             Status::Running => Stage::Running,
             Status::Queued => Stage::Queue,
             Status::Inbox | Status::Framing => Stage::Drafts,
-            Status::Integrated => Stage::Done,
+            Status::Integrated | Status::Completed => Stage::Done,
         }
     }
 
@@ -118,7 +123,9 @@ impl Status {
             Status::Running => Action::Open,
             Status::Question => Action::Answer,
             Status::Review => Action::Review,
-            Status::Halted | Status::Failed | Status::Integrated => Action::Open,
+            Status::Halted | Status::Failed | Status::Integrated | Status::Completed => {
+                Action::Open
+            }
         }
     }
 
@@ -131,11 +138,18 @@ impl Status {
         match self {
             Status::Inbox => &[MenuAction::StartUnframed, MenuAction::Drop],
             // A failed idea is retried by framing it again.
-            Status::Framing | Status::Queued | Status::Halted | Status::Failed => {
-                &[MenuAction::Reframe, MenuAction::Drop]
-            }
-            Status::Review | Status::Question => &[MenuAction::Drop],
-            Status::Running | Status::Integrated => &[],
+            Status::Framing => &[MenuAction::Complete, MenuAction::Reframe, MenuAction::Drop],
+            Status::Queued => &[MenuAction::Reframe, MenuAction::Drop],
+            // A halted or failed idea can be relaunched from its plan before it
+            // is framed again.
+            Status::Halted | Status::Failed => &[
+                MenuAction::Restart,
+                MenuAction::Reframe,
+                MenuAction::Complete,
+                MenuAction::Drop,
+            ],
+            Status::Review | Status::Question => &[MenuAction::Complete, MenuAction::Drop],
+            Status::Running | Status::Integrated | Status::Completed => &[],
         }
     }
 }
@@ -202,6 +216,15 @@ mod tests {
     }
 
     #[test]
+    fn completed_wins_over_progress() {
+        let idea = idea(IdeaState::Completed, Some("r"));
+
+        assert_eq!(status(&idea, Some(Progress::Running)), Status::Completed);
+        assert_eq!(status(&idea, Some(Progress::Integrated)), Status::Completed);
+        assert_eq!(status(&idea, None), Status::Completed);
+    }
+
+    #[test]
     fn dropped_maps_to_inbox() {
         assert_eq!(status(&idea(IdeaState::Dropped, None), None), Status::Inbox);
     }
@@ -234,6 +257,9 @@ mod tests {
 
         assert_eq!(Status::Integrated.stage(), Stage::Done);
         assert_eq!(Status::Integrated.action(), Action::Open);
+
+        assert_eq!(Status::Completed.stage(), Stage::Done);
+        assert_eq!(Status::Completed.action(), Action::Open);
     }
 
     #[test]
@@ -244,7 +270,7 @@ mod tests {
         );
         assert_eq!(
             Status::Framing.menu(),
-            &[MenuAction::Reframe, MenuAction::Drop]
+            &[MenuAction::Complete, MenuAction::Reframe, MenuAction::Drop]
         );
         assert_eq!(
             Status::Queued.menu(),
@@ -252,16 +278,33 @@ mod tests {
         );
         assert_eq!(
             Status::Halted.menu(),
-            &[MenuAction::Reframe, MenuAction::Drop]
+            &[
+                MenuAction::Restart,
+                MenuAction::Reframe,
+                MenuAction::Complete,
+                MenuAction::Drop,
+            ]
         );
         assert_eq!(
             Status::Failed.menu(),
-            &[MenuAction::Reframe, MenuAction::Drop]
+            &[
+                MenuAction::Restart,
+                MenuAction::Reframe,
+                MenuAction::Complete,
+                MenuAction::Drop,
+            ]
         );
-        assert_eq!(Status::Review.menu(), &[MenuAction::Drop]);
-        assert_eq!(Status::Question.menu(), &[MenuAction::Drop]);
+        assert_eq!(
+            Status::Review.menu(),
+            &[MenuAction::Complete, MenuAction::Drop]
+        );
+        assert_eq!(
+            Status::Question.menu(),
+            &[MenuAction::Complete, MenuAction::Drop]
+        );
         assert_eq!(Status::Running.menu(), &[]);
         assert_eq!(Status::Integrated.menu(), &[]);
+        assert_eq!(Status::Completed.menu(), &[]);
     }
 
     #[test]
@@ -269,6 +312,10 @@ mod tests {
         assert_eq!(
             serde_json::to_string(&Status::Question).unwrap(),
             r#""question""#
+        );
+        assert_eq!(
+            serde_json::to_string(&Status::Completed).unwrap(),
+            r#""completed""#
         );
     }
 
@@ -278,6 +325,14 @@ mod tests {
         assert_eq!(
             serde_json::to_string(&Action::ResumeFraming).unwrap(),
             r#""resumeFraming""#
+        );
+        assert_eq!(
+            serde_json::to_string(&MenuAction::Restart).unwrap(),
+            r#""restart""#
+        );
+        assert_eq!(
+            serde_json::to_string(&MenuAction::Complete).unwrap(),
+            r#""complete""#
         );
     }
 }

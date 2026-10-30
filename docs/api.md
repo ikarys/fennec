@@ -240,14 +240,15 @@ read-only. The human edits them as usual.
     queue, the most recently changed first.
   - `idea` `{id, text, status, stage, action, menu, sessionId, plan, halted, autonomous, position, createdAt, startedAt,
     durationMs, tokens, criteria, decisions, commits, files}`: `status` `inbox | framing | queued | running | question |
-    review | halted | failed | integrated` (from the idea and its session's state; a started idea whose session is gone
-    is `failed`); `action` the one next step `frame | resumeFraming | start | open | answer | review`; `menu` the
-    secondary actions `reframe | startUnframed | drop` (empty for running and integrated); `plan` the
-    approved plan verbatim; `halted` why the night mode stopped or skipped it, cleared by a new plan or start; `position`
-    its 1-based place in the queue; `durationMs` from its start to now (running) or its session's last change; `tokens`
-    uncached prompt plus completion of the project's calls in that window (exact while one idea runs at a time);
-    `criteria` `{passed, failed, pending}` and `decisions` `[{title, choice}]` from its session's run; `commits` and
-    `files` of its worktree branch past its base, for `review`, `halted` and `failed` only. Null when not applicable.
+    review | halted | failed | integrated | completed` (from the idea and its session's state; a started idea whose
+    session is gone is `failed`); `action` the one next step `frame | resumeFraming | start | open | answer | review`;
+    `menu` the secondary actions `restart | reframe | startUnframed | complete | drop` (empty for running, integrated
+    and completed); `plan` the approved plan verbatim; `halted` why the night mode stopped or skipped it, cleared by a
+    new plan or start; `position` its 1-based place in the queue; `durationMs` from its start to now (running) or its
+    session's last change; `tokens` uncached prompt plus completion of the project's calls in that window (exact while
+    one idea runs at a time); `criteria` `{passed, failed, pending}` and `decisions` `[{title, choice}]` from its
+    session's run; `commits` and `files` of its worktree branch past its base, for `review`, `halted` and `failed` only.
+    Null when not applicable.
   - `nightReport` the last queue run once finished and until read, if it started an idea: `{startedAt, finishedAt,
     reason, autonomous, summary: {started, running, review, question, halted, failed, integrated}, ideas: [idea]}`;
     `reason` `no idea ready | stopped by the human | project gone | server restarted | error: …`.
@@ -258,9 +259,11 @@ read-only. The human edits them as usual.
   - `POST /api/projects/{id}/ideas/{ideaId}/framing` `{sessionId}` (`idea.framing`; 404 if the session is not the project's)
   - `POST /api/projects/{id}/ideas/{ideaId}/ready` `{plan}` (`idea.ready`; 400 if empty)
   - `POST /api/projects/{id}/ideas/{ideaId}/drop` `{}` (`idea.dropped`)
+  - `POST /api/projects/{id}/ideas/{ideaId}/complete` `{}` (`idea.completed`)
   - `POST /api/projects/{id}/ideas/{ideaId}/start` `{}`: builds this idea now, outside the queue: from its plan
-    when ready, else from its text (the workflow plans first; an idea without a session gets one, `idea.framing`),
-    then `idea.started {ideaId, autonomous: false}`; 409 if already started or its session is busy
+    when ready, or when restarting a halted/failed idea that has a plan, else from its text (the workflow plans first;
+    an idea without a session gets one, `idea.framing`), then `idea.started {ideaId, autonomous: false}`; 409 if
+    already started and not halted/failed, or its session is busy
   - `POST /api/projects/{id}/ideas/reorder` `{ids}` (`idea.reordered`): the human's queue order; ids left out follow,
     oldest first; 400 unless a list of queued idea ids
   - `POST /api/projects/{id}/ideas/report/read` `{}` (`idea.report_read`): hides the night report
