@@ -35,8 +35,9 @@ use crate::{folders, git, workflows};
 use serde_json::{Value, json};
 use std::net::TcpStream;
 use std::path::Path;
+use std::sync::Arc;
 
-pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
+pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
     let segments: Vec<&str> = req.path.trim_matches('/').split('/').collect();
     match (req.method.as_str(), segments.as_slice()) {
         ("GET", ["api", "config"]) => {
@@ -69,6 +70,15 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
         }
         ("GET", ["api", "projects", id, "ideas"]) => idea_routes::list_ideas(app, stream, id),
         ("POST", ["api", "projects", id, "ideas"]) => idea_routes::add_idea(app, req, stream, id),
+        ("POST", ["api", "projects", id, "ideas", "queue", "start"]) => {
+            idea_routes::start_queue(app, stream, id)
+        }
+        ("POST", ["api", "projects", id, "ideas", "queue", "stop"]) => {
+            idea_routes::stop_queue(app, stream, id)
+        }
+        ("POST", ["api", "projects", id, "ideas", iid, "start"]) => {
+            idea_routes::start_one(app, stream, id, iid)
+        }
         ("POST", ["api", "projects", id, "ideas", iid, action]) => {
             idea_routes::update_idea(app, req, stream, id, iid, action)
         }

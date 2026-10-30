@@ -227,14 +227,24 @@ read-only. The human edits them as usual.
     first `# ` heading).
 - `POST /api/projects/{id}/map-file` `{}` → `{mapFile}`: the human's click writes `docs/map.md` (a Mermaid
   diagram and a table) in the project's tree, not committed; 404 if no project
-- `GET /api/projects/{id}/ideas` → `{ideas: [{id, text, state, sessionId, plan, createdAt, updatedAt}]}`: the project's
+- `GET /api/projects/{id}/ideas` → `{ideas: [{id, text, state, sessionId, plan, sessionState, createdAt, updatedAt}], queueRunning}`: the project's
   ideas backlog, folded from its append-only `idea.*` events (table `project_events`), newest first, dropped ones left
-  out; `state` `inbox | framing | ready`, `sessionId` the framing session, `plan` the approved plan verbatim. 404 if no project.
-  Every write below answers the same fresh `{ideas}`; 404 if no project or no such idea:
+  out; `state` `inbox | framing | ready | started`, `sessionId` the framing session, `plan` the approved plan verbatim,
+  `sessionState` the session's state (as in `/api/projects`) for a started idea, else null; `queueRunning` whether the
+  project's queue runs. 404 if no project.
+  Every write below answers the same fresh board; 404 if no project or no such idea: 404 if no project or no such idea:
   - `POST /api/projects/{id}/ideas` `{text}` (`idea.added`; 400 if empty or over 4000 characters)
   - `POST /api/projects/{id}/ideas/{ideaId}/framing` `{sessionId}` (`idea.framing`; 404 if the session is not the project's)
   - `POST /api/projects/{id}/ideas/{ideaId}/ready` `{plan}` (`idea.ready`; 400 if empty)
   - `POST /api/projects/{id}/ideas/{ideaId}/drop` `{}` (`idea.dropped`)
+  - `POST /api/projects/{id}/ideas/{ideaId}/start` `{}`: builds this idea now, outside the queue: from its plan
+    when ready, else from its text (the workflow plans first; an idea without a session gets one, `idea.framing`),
+    then `idea.started`; 409 if already started or its session is busy
+  - `POST /api/projects/{id}/ideas/queue/start` `{}`: starts the queue (no-op if it runs). It takes the oldest ready idea,
+    starts the `plan-build-verify` workflow from its plan in its session's worktree (`idea.started`), waits for the turn
+    to end (done, waiting for the human, or failed), then the next; it ends when no idea is ready, or on an error
+    (a busy session) logged by the server
+  - `POST /api/projects/{id}/ideas/queue/stop` `{}`: the queue starts no further idea; the running turn finishes
 - `GET /api/folders?path=<absolute path>` → `{path, parent, folders: [{name, path, hidden, repo}]}`,
   the sub-folders of `path` (the home directory when omitted), sorted by name;
   `repo` marks a git repository; 400 if `path` cannot be read

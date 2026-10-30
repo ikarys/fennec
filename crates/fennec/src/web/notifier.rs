@@ -19,7 +19,7 @@ impl Notifier {
         *self.generation.lock().unwrap()
     }
 
-    fn notify(&self) {
+    pub fn notify(&self) {
         *self.generation.lock().unwrap() += 1;
         self.changed.notify_all();
     }
