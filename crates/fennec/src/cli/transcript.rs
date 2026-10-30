@@ -143,6 +143,7 @@ impl Transcript {
             | Event::CriteriaPreflight { .. }
             | Event::CriterionUpdated { .. }
             | Event::IntegrationApplied { .. }
+            | Event::AuditTasksCreated { .. }
             | Event::DecisionRecorded { .. }
             | Event::WorktreeDiscarded { .. } => Ok(()),
         };

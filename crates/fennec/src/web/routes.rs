@@ -55,6 +55,7 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         }
         ("GET", ["api", "settings"]) => settings_routes::get_settings(app, stream),
         ("GET", ["api", "insight"]) => super::insight::serve(app, req, stream),
+        ("GET", ["api", "notices"]) => super::notice_stream::serve(app, stream),
         ("POST", ["api", "settings"]) => settings_routes::save_settings(app, req, stream),
         ("POST", ["api", "settings", "providers", "list"]) => {
             settings_routes::list_provider(app, req, stream)
@@ -416,7 +417,11 @@ fn get_session(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String
     // The first human request, so the context panel can show what was asked.
     v["request"] = json!(first_request(&events));
     // The audit report of the last answer, if it is one: the context panel lists its findings.
-    v["audit"] = json!(audit::parse(&last_assistant_text(&events)));
+    let mut audit_json = json!(audit::parse(&last_assistant_text(&events)));
+    if audit_json.is_object() {
+        audit_json["taken"] = json!(audit::taken(&events));
+    }
+    v["audit"] = audit_json;
     v["worktree"] = match app.place(&store, &s, &p)?.worktree {
         Some(wt) => json!({
             "path": wt.path, "branch": wt.branch, "base": wt.base,

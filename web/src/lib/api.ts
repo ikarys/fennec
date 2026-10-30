@@ -274,6 +274,7 @@ export interface Audit {
   scope: string;
   summary: string;
   findings: AuditFinding[];
+  taken: number[];
 }
 
 /** Turns the checked findings of a session's audit into backlog ideas. */
