@@ -18,7 +18,7 @@ pub fn speed(tokens_per_second: f64) -> String {
     format!("{} tok/s", tokens_per_second.round() as u64)
 }
 
-/// `820 ms`, `4,2 s`, `3 min 5 s`.
+/// `820 ms`, `4,2 s`, `3 min 5 s`, `6 h 13 min`.
 pub fn duration(secs: f64) -> String {
     let ms = (secs * 1000.0).round() as u64;
     if ms < 1000 {
@@ -28,7 +28,10 @@ pub fn duration(secs: f64) -> String {
         return format!("{:.1} s", ms as f64 / 1000.0).replace('.', ",");
     }
     let seconds = (ms as f64 / 1000.0).round() as u64;
-    format!("{} min {} s", seconds / 60, seconds % 60)
+    if seconds < 3600 {
+        return format!("{} min {} s", seconds / 60, seconds % 60);
+    }
+    format!("{} h {} min", seconds / 3600, (seconds % 3600) / 60)
 }
 
 /// `148 $`, `3,20 $`, `<0,01 $`: dollars, French decimal comma.
@@ -85,6 +88,8 @@ mod tests {
         assert_eq!(duration(0.82), "820 ms");
         assert_eq!(duration(4.24), "4,2 s");
         assert_eq!(duration(185.0), "3 min 5 s");
+        assert_eq!(duration(3600.0), "1 h 0 min");
+        assert_eq!(duration(22_384.0), "6 h 13 min");
     }
 
     #[test]
