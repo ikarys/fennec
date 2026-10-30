@@ -117,10 +117,7 @@ export function InsightPage() {
     <div className="min-h-0 grow overflow-y-auto bg-bg">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-baseline gap-2">
-            <h1 className="text-xl font-semibold">Insight</h1>
-            {view?.scope ? <span className="text-muted">{view.scope}</span> : null}
-          </div>
+          <h1 className="text-xl font-semibold">Insight</h1>
 
           <div className="flex flex-wrap items-center gap-2">
             <Select
