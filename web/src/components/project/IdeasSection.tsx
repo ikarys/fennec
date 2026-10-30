@@ -35,6 +35,7 @@ export function IdeasSection({
   const [busy, setBusy] = useState<string | null>(null);
   const [text, setText] = useState('');
   const [stopping, setStopping] = useState(false);
+  const [autonomous, setAutonomous] = useState(false);
 
   const applyBoard = useCallback((board: IdeaBoard) => {
     setIdeas(board.ideas);
@@ -150,7 +151,7 @@ export function IdeasSection({
     setError(null);
 
     try {
-      const board = await startQueue(projectId);
+      const board = await startQueue(projectId, autonomous);
       applyBoard(board);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Erreur inconnue');
@@ -210,6 +211,14 @@ export function IdeasSection({
       return <Badge tone="ok">prête</Badge>;
     }
 
+    if (idea.state === 'started' && idea.halted) {
+      return (
+        <Badge tone="err" title={idea.halted}>
+          arrêtée
+        </Badge>
+      );
+    }
+
     switch (idea.sessionState) {
       case 'running':
         return (
@@ -255,14 +264,29 @@ export function IdeasSection({
             ) : null}
           </div>
         ) : (
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={!hasReady || busy !== null}
-            onClick={handleStartQueue}
-          >
-            Lancer la file
-          </Button>
+          <div className="flex items-center gap-2">
+            <label
+              className="flex items-center gap-2 text-sm text-text"
+              title="La nuit : l'agent tranche ses questions lui-même et les note, les plafonds de durée et de tokens (Réglages › Mode nuit) s'appliquent, une idée en échec est sautée."
+            >
+              <input
+                type="checkbox"
+                checked={autonomous}
+                onChange={(event) => setAutonomous(event.target.checked)}
+                className="h-4 w-4 accent-[var(--accent)]"
+              />
+              autonome
+            </label>
+
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={!hasReady || busy !== null}
+              onClick={handleStartQueue}
+            >
+              Lancer la file
+            </Button>
+          </div>
         )}
       </div>
 
@@ -302,6 +326,47 @@ export function IdeasSection({
             >
               <div className="grow whitespace-pre-wrap">
                 {idea.text}
+
+                {idea.state === 'started' && idea.halted ? (
+                  <p className="mt-1 text-xs text-err">{idea.halted}</p>
+                ) : null}
+
+                {idea.state === 'started' &&
+                idea.report &&
+                (idea.report.criteria.passed +
+                  idea.report.criteria.failed +
+                  idea.report.criteria.pending >
+                  0 ||
+                  idea.report.decisions.length > 0) ? (
+                  <div className="mt-1 text-xs text-muted">
+                    {idea.report.criteria.passed +
+                      idea.report.criteria.failed +
+                      idea.report.criteria.pending >
+                    0 ? (
+                      <span>
+                        Critères : {idea.report.criteria.passed} ✓ ·{' '}
+                        {idea.report.criteria.failed} ✗ ·{' '}
+                        {idea.report.criteria.pending} en attente
+                      </span>
+                    ) : null}
+
+                    {idea.report.decisions.length > 0 ? (
+                      <details className="mt-1">
+                        <summary className="cursor-pointer text-xs text-muted">
+                          {idea.report.decisions.length} décision(s) prise(s)
+                        </summary>
+                        <ul className="mt-1 list-disc pl-4 text-xs text-text">
+                          {idea.report.decisions.map((decision, decisionIndex) => (
+                            <li key={decisionIndex}>
+                              <strong>{decision.title}</strong> : {decision.choice}
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    ) : null}
+                  </div>
+                ) : null}
+
                 {(idea.state === 'ready' || idea.state === 'started') &&
                 idea.plan ? (
                   <details className="mt-2">

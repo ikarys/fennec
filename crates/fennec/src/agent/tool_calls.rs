@@ -15,6 +15,10 @@ use std::sync::atomic::Ordering;
 /// openfox `INTERRUPTED_ERROR`: a call the human stopped before it ran.
 pub(super) const INTERRUPTED_ERROR: &str = "Tool execution was interrupted by user";
 /// A call queued after an `ask_user` that paused the turn.
+/// `ask_user`'s result while the human is away (`Turn::autonomous`).
+const AWAY_ANSWER: &str = "The human is away (autonomous run) and cannot answer. Decide yourself, choosing the safest option that stays within the approved plan, record the question and your choice with record_decision, and continue.";
+/// `propose_criteria`'s result while the human is away.
+const AWAY_CRITERIA: &str = "The human is away (autonomous run): the criteria stay as approved. Record your proposed change with record_decision for the human to review, and continue against the current criteria.";
 const NOT_RUN_AFTER_ASK: &str =
     "Not run: the turn paused at ask_user. Call it again after the answer if it is still needed.";
 
@@ -92,6 +96,13 @@ pub(super) fn execute_tools(
             match ask_user::parse(&call.arguments) {
                 // The model reads the failure and the loop goes on.
                 Err(e) => record(turn, message_id, call, ToolResult::failure(e))?,
+                // Nobody would answer before morning: the agent decides.
+                Ok(_) if turn.autonomous => record(
+                    turn,
+                    message_id,
+                    call,
+                    ToolResult::success(AWAY_ANSWER.into(), false),
+                )?,
                 // No result is recorded: the answer will be the result.
                 Ok(q) => {
                     turn.append(Event::ChatAskUser {
@@ -109,6 +120,13 @@ pub(super) fn execute_tools(
             match propose_criteria::parse(&call.arguments) {
                 // The model reads the failure and the loop goes on.
                 Err(e) => record(turn, message_id, call, ToolResult::failure(e))?,
+                // The contract is the human's: it never changes while they are away.
+                Ok(_) if turn.autonomous => record(
+                    turn,
+                    message_id,
+                    call,
+                    ToolResult::failure(AWAY_CRITERIA.into()),
+                )?,
                 // The question shows the delta against the criteria in force;
                 // a proposal that changes nothing is accepted without asking.
                 Ok(proposal) => {

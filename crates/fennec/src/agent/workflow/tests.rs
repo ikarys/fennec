@@ -53,6 +53,7 @@ impl<'a> Harness<'a> {
             context_window: 1000,
             compact_at: 0.0,
             reasoning_effort: None,
+            autonomous: false,
             stop: self.stop,
             on_event: &mut self.on_event,
         }
