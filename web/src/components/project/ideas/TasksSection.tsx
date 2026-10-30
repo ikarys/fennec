@@ -180,7 +180,7 @@ export function TasksSection({
         onSelect={onSelectSub}
         trailing={
           adding ? null : (
-            <Button variant="secondary" size="sm" onClick={() => setAdding(true)}>
+            <Button variant="soft" size="sm" onClick={() => setAdding(true)}>
               <PlusIcon className="h-4 w-4" />
               Ajouter une idée
             </Button>
