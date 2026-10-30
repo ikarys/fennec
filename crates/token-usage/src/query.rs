@@ -181,6 +181,7 @@ impl Ledger {
 
         let mut groups: BTreeMap<String, Summary> = BTreeMap::new();
         let mut latest_group: BTreeMap<String, (i64, i64, String)> = BTreeMap::new();
+        let mut day_span: Option<(i64, i64)> = None;
 
         for row in rows {
             if !matches_label(&row.labels, f) {
@@ -188,7 +189,12 @@ impl Ledger {
             }
 
             let key = match by {
-                GroupBy::Day => day_key(row.at_ms),
+                GroupBy::Day => {
+                    let day = row.at_ms.div_euclid(86_400_000);
+                    day_span =
+                        Some(day_span.map_or((day, day), |(lo, hi)| (lo.min(day), hi.max(day))));
+                    day_key(day)
+                }
                 GroupBy::Group => row.group_id.clone(),
                 GroupBy::Model => row.model.clone(),
                 GroupBy::Kind => row.kind.clone(),
@@ -210,6 +216,14 @@ impl Ledger {
                     current.1 = row.id;
                     current.2 = row.group_name.clone();
                 }
+            }
+        }
+
+        // A chart reads a day series as a continuous axis: the days without a
+        // call between the first and the last one are empty rows, not holes.
+        if let Some((first, last)) = day_span {
+            for day in first..=last {
+                groups.entry(day_key(day)).or_insert_with(new_summary);
             }
         }
 
@@ -421,8 +435,7 @@ fn finish_summary(summary: &mut Summary) {
     };
 }
 
-fn day_key(at_ms: i64) -> String {
-    let days = at_ms.div_euclid(86_400_000);
+fn day_key(days: i64) -> String {
     let (year, month, day) = civil_from_days(days);
     format!("{year:04}-{month:02}-{day:02}")
 }
@@ -725,5 +738,28 @@ mod tests {
         let run_b = rows.iter().find(|row| row.key == "b").unwrap();
         assert_eq!(run_b.summary.lost_cache_calls, 0);
         assert_eq!(run_b.summary.lost_cache_tokens, 0);
+    }
+
+    #[test]
+    fn series_by_day_fills_missing_days() {
+        let ledger = Ledger::open_in_memory().unwrap();
+
+        let mut first = base_call();
+        first.at_ms = 1_704_067_200_000;
+
+        let mut third = base_call();
+        third.at_ms = 1_704_240_000_000;
+
+        ledger.record(&first).unwrap();
+        ledger.record(&third).unwrap();
+
+        let rows = ledger.series(&Filter::default(), GroupBy::Day).unwrap();
+
+        assert_eq!(rows.len(), 3);
+        assert_eq!(rows[0].key, "2024-01-01");
+        assert_eq!(rows[1].key, "2024-01-02");
+        assert_eq!(rows[1].name, "2024-01-02");
+        assert_eq!(rows[1].summary.calls, 0);
+        assert_eq!(rows[2].key, "2024-01-03");
     }
 }
