@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Button } from '../components/ui/Button';
-import { VerticalTabs } from '../components/ui/VerticalTabs';
-import { IdeasSection } from '../components/project/ideas/IdeasSection';
+import { Tabs } from '../components/ui/Tabs';
+import { TasksSection } from '../components/project/ideas/TasksSection';
 import { MapSection } from '../components/project/MapSection';
 import { DocSection } from '../components/project/DocSection';
 import {
@@ -20,7 +20,7 @@ const ANALYZE_PROMPT =
   'Analyze this project and draft the philosophy, layers and rules of its AGENTS.md.';
 
 const TABS = [
-  { id: 'ideas', label: 'Idées' },
+  { id: 'tasks', label: 'Tâches' },
   { id: 'map', label: 'Carte des modules' },
   { id: 'doc', label: 'Doc' },
 ] as const;
@@ -28,7 +28,7 @@ const TABS = [
 type TabId = (typeof TABS)[number]['id'];
 
 /**
- * The map tab fetches the project overview on its own so the ideas and doc
+ * The map tab fetches the project overview on its own so the tasks and doc
  * tabs do not wait for it.
  */
 function MapTab({ projectId }: { projectId: string }) {
@@ -79,19 +79,21 @@ export default function ProjectPage({
   projects,
   projectId,
   tab,
+  sub,
   onOpenSession,
 }: {
   projects: Project[];
   projectId: string;
   tab: string | null;
+  sub: string | null;
   onOpenSession: (sessionId: string) => void;
 }) {
   const project = projects.find((p) => p.id === projectId) ?? null;
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
 
-  // Unknown or null tab defaults to 'ideas'.
-  const activeTab: TabId = TABS.some((t) => t.id === tab) ? (tab as TabId) : 'ideas';
+  // Unknown or null tab defaults to 'tasks'.
+  const activeTab: TabId = TABS.find((t) => t.id === tab)?.id ?? 'tasks';
 
   const handleTabSelect = (id: TabId) => {
     window.location.hash = `#/project/${encodeURIComponent(projectId)}/${id}`;
@@ -169,18 +171,22 @@ export default function ProjectPage({
     <>
       {header}
       <div className="mt-6 flex gap-6">
-        <VerticalTabs
+        <Tabs
           label="Sections du projet"
           tabs={[...TABS]}
           active={activeTab}
           onSelect={handleTabSelect}
         />
         <div className="min-w-0 grow">
-          {activeTab === 'ideas' ? (
-            <IdeasSection
+          {activeTab === 'tasks' ? (
+            <TasksSection
               projectId={projectId}
+              sub={sub}
               onFrame={handleFrame}
               onOpenSession={onOpenSession}
+              onSelectSub={(s) => {
+                window.location.hash = `#/project/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(s)}`;
+              }}
             />
           ) : null}
           {activeTab === 'map' ? <MapTab projectId={projectId} /> : null}

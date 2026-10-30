@@ -20,7 +20,7 @@ type Route =
   | { name: 'new'; id: string; testWorkflowId: string | null }
   | { name: 'settings' }
   | { name: 'insight' }
-  | { name: 'project'; projectId: string; tab: string | null }
+  | { name: 'project'; projectId: string; tab: string | null; sub: string | null }
   | { name: 'workflows'; projectId: string | null; workflowId: string | null; isNew: boolean };
 
 const TABS_KEY = 'fennec.tabs';
@@ -35,8 +35,8 @@ function parseRoute(): Route {
     return { name: 'insight' };
   }
   if (hash.startsWith('#/project/')) {
-    const [rawId, tab] = hash.slice('#/project/'.length).split('/');
-    return { name: 'project', projectId: decodeURIComponent(rawId), tab: tab ?? null };
+    const [rawId, tab, sub] = hash.slice('#/project/'.length).split('/');
+    return { name: 'project', projectId: decodeURIComponent(rawId), tab: tab ?? null, sub: sub ?? null };
   }
   if (hash.startsWith('#/workflows')) {
     const path = hash.slice(12); // Remove '#/workflows'
@@ -371,7 +371,7 @@ export default function App() {
             </Suspense>
           ) : route.name === 'project' ? (
             <Suspense fallback={<div className="flex grow items-center justify-center text-muted">Chargement…</div>}>
-              <ProjectPage projects={projects} projectId={route.projectId} tab={route.tab} onOpenSession={openSession} />
+              <ProjectPage projects={projects} projectId={route.projectId} tab={route.tab} sub={route.sub} onOpenSession={openSession} />
             </Suspense>
           ) : route.name === 'insight' ? (
             <InsightPage />
