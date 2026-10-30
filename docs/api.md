@@ -364,8 +364,9 @@ read-only. The human edits them as usual.
   session's own between its start and end) and of each finished run, from the ledger, ready to display.
 - `GET /api/insight?days=<7|30|90|all>&project=<id>` → `{scope, cards: [{label, value, detail}], days: [{day, label,
   cachedPercent, freshPercent, lostPercent, title}], projects: [row], models: [row], consumers, projectOptions: [{id, name}]}`,
-  `row` being `{key, name, calls, input, cache, output, lost, time}`: the Insight page from the ledger, so deleted
-  sessions still count; `days` defaults to 30 (400 otherwise), `project` is optional (`projects` is then empty); bar
+  `row` being `{key, name, calls, input, cache, output, lost, cost, time}`: the Insight page from the ledger, so deleted
+  sessions still count; `cost` and the last card are an estimate at the reference `tariff` of the preferences
+  (`{inputPerM, cachedPerM, outputPerM}`, dollars per million tokens, default 3 / 0.30 / 15), indicative; `days` defaults to 30 (400 otherwise), `project` is optional (`projects` is then empty); bar
   percentages are against the busiest day's input. A lost cache is a call that re-read more than 1,000 tokens of
   its session's previous prompt without that prompt having shrunk (a compaction or a replay is not a loss).
   `consumers` (null before any call was broken down) has the shape of `/context`'s `composition`: each call's input

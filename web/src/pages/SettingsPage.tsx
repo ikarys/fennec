@@ -10,6 +10,7 @@ import type {
   ReasoningEffort,
   SandboxPrefs,
   AutonomyPrefs,
+  TariffPrefs,
   SettingsResponse
 } from '../lib/api';
 import { listProvider, saveSettings } from '../lib/api';
@@ -24,6 +25,7 @@ import { InstructionsSection } from '../components/settings/InstructionsSection'
 import { SearchSection, type SearchForm } from '../components/settings/SearchSection';
 import { SandboxSection } from '../components/settings/SandboxSection';
 import { AutonomySection } from '../components/settings/AutonomySection';
+import { TariffSection } from '../components/settings/TariffSection';
 import { SkillsSection } from '../components/settings/SkillsSection';
 import { WorkflowsSection } from '../components/settings/WorkflowsSection';
 
@@ -45,11 +47,12 @@ interface SettingsForm {
   search: SearchForm;
   sandbox: SandboxPrefs;
   autonomy: AutonomyPrefs;
+  tariff: TariffPrefs;
   alwaysOnSkills: string[];
   enabledWorkflows: string[];
 }
 
-type SettingsTab = 'models' | 'instructions' | 'skills' | 'workflows' | 'search' | 'sandbox' | 'autonomy' | 'display';
+type SettingsTab = 'models' | 'instructions' | 'skills' | 'workflows' | 'search' | 'sandbox' | 'autonomy' | 'tariff' | 'display';
 
 const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'models', label: 'Modèles' },
@@ -59,6 +62,7 @@ const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'search', label: 'Recherche web' },
   { id: 'sandbox', label: 'Bac à sable' },
   { id: 'autonomy', label: 'Mode nuit' },
+  { id: 'tariff', label: 'Coût' },
   { id: 'display', label: 'Affichage' }
 ];
 
@@ -168,6 +172,7 @@ function toForm(preferences: Preferences, listings: ProviderListing[]): Settings
     },
     sandbox: preferences.sandbox ?? { enabled: true, network: false },
     autonomy: preferences.autonomy ?? { maxMinutesPerIdea: 120, maxTokensPerIdea: 2_000_000 },
+    tariff: preferences.tariff ?? { inputPerM: 3, cachedPerM: 0.3, outputPerM: 15 },
     alwaysOnSkills: preferences.alwaysOnSkills ?? [],
     enabledWorkflows: preferences.enabledWorkflows ?? []
   };
@@ -249,6 +254,7 @@ function buildPreferences(form: SettingsForm, settings: SettingsResponse): Prefe
     },
     sandbox: form.sandbox,
     autonomy: form.autonomy,
+    tariff: form.tariff,
     alwaysOnSkills: form.alwaysOnSkills,
     enabledWorkflows: form.enabledWorkflows
   };
@@ -426,6 +432,11 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
     setForm((previous) => (previous ? { ...previous, autonomy } : previous));
   }
 
+  function updateTariff(tariff: TariffPrefs) {
+    markDirty();
+    setForm((previous) => (previous ? { ...previous, tariff } : previous));
+  }
+
   function updateAlwaysOnSkills(alwaysOnSkills: string[]) {
     markDirty();
     setForm((previous) => (previous ? { ...previous, alwaysOnSkills } : previous));
@@ -576,6 +587,9 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
 
             {tab === 'autonomy' && (
               <AutonomySection value={form.autonomy} onChange={updateAutonomy} />
+            )}
+            {tab === 'tariff' && (
+              <TariffSection value={form.tariff} onChange={updateTariff} />
             )}
 
             {tab === 'display' && (

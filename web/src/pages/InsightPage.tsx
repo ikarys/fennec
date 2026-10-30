@@ -34,6 +34,7 @@ function InsightTable({
             <th className="px-3 py-2 text-right text-xs font-normal text-muted">Cache</th>
             <th className="px-3 py-2 text-right text-xs font-normal text-muted">Sortie</th>
             <th className="px-3 py-2 text-right text-xs font-normal text-muted">Cache perdu</th>
+<th className="px-3 py-2 text-right text-xs font-normal text-muted" title="Estimation au tarif de référence (Paramètres, Coût)">Coût</th>
             <th className="px-3 py-2 text-right text-xs font-normal text-muted">Temps</th>
           </tr>
         </thead>
@@ -58,6 +59,7 @@ function InsightTable({
               <td className="px-3 py-2 text-right">{row.cache}</td>
               <td className="px-3 py-2 text-right">{row.output}</td>
               <td className="px-3 py-2 text-right">{row.lost}</td>
+<td className="px-3 py-2 text-right">{row.cost}</td>
               <td className="px-3 py-2 text-right">{row.time}</td>
             </tr>
           ))}
