@@ -1,10 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Button } from '../components/ui/Button';
-import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { Tabs } from '../components/ui/Tabs';
 import { TasksSection } from '../components/project/ideas/TasksSection';
 import { MapSection } from '../components/project/MapSection';
 import { DocSection } from '../components/project/DocSection';
+import { AnalysesSection } from '../components/project/AnalysesSection';
 import {
   createSession,
   getProjectOverview,
@@ -13,33 +12,11 @@ import {
 } from '../lib/api';
 import { type IdeaView } from '../lib/ideas';
 
-const ANALYZE_PROMPT =
-  'Analyze this project and draft the philosophy, layers and rules of its AGENTS.md.';
-
-/** The audits a project page offers: each one a read-only agent whose findings may become tasks. */
-const AUDITS = {
-  architecture: {
-    mode: 'audit-architecture',
-    prompt: 'Audit the software architecture of this project.',
-    label: "Auditer l'architecture",
-    hint: "Un agent audite l'architecture ; ses constats peuvent devenir des tâches",
-    body: "Un agent en lecture seule lit le projet et rapporte ses constats (responsabilités, couches, modularité, KISS, SOLID, front). Sur un gros projet, l'audit peut consommer beaucoup de tokens. Tu choisiras ensuite les constats à transformer en tâches.",
-  },
-  security: {
-    mode: 'audit-security',
-    prompt: 'Audit the security of this project.',
-    label: 'Auditer la sécurité',
-    hint: 'Un agent audite la sécurité ; ses constats peuvent devenir des tâches',
-    body: "Un agent en lecture seule lance les scanners installés (cargo audit, npm audit, gitleaks, semgrep…) puis lit le code : secrets, injections, entrées non bornées, fuites de ressources, dépendances, CI. Il n'attaque rien et n'installe rien. Sur un gros projet, l'audit peut consommer beaucoup de tokens. Tu choisiras ensuite les constats à transformer en tâches.",
-  },
-} as const;
-
-type AuditKind = keyof typeof AUDITS;
-
 const TABS = [
   { id: 'tasks', label: 'Tâches' },
   { id: 'map', label: 'Carte des modules' },
   { id: 'doc', label: 'Doc' },
+  { id: 'analyses', label: 'Analyses' },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
@@ -116,8 +93,6 @@ export default function ProjectPage({
     window.location.hash = `#/project/${encodeURIComponent(projectId)}/${id}`;
   };
 
-  const [confirmAudit, setConfirmAudit] = useState<AuditKind | null>(null);
-
   const startSession = async (prompt: string, mode: string) => {
     setAnalyzing(true);
     setAnalyzeError(null);
@@ -129,10 +104,6 @@ export default function ProjectPage({
     } finally {
       setAnalyzing(false);
     }
-  };
-
-  const handleAnalyze = () => {
-    void startSession(ANALYZE_PROMPT, 'analyze');
   };
 
   // Opens a new plan session with the idea in the composer: the human edits it, then sends.
@@ -156,44 +127,7 @@ export default function ProjectPage({
         <h1 className="text-[1.375rem] font-semibold tracking-[-0.02em]">
           {project.name}
         </h1>
-        <div className="grow" />
-        {(Object.keys(AUDITS) as AuditKind[]).map((kind) => (
-          <Button
-            key={kind}
-            variant="secondary"
-            size="sm"
-            disabled={analyzing}
-            onClick={() => setConfirmAudit(kind)}
-            title={AUDITS[kind].hint}
-          >
-            {AUDITS[kind].label}
-          </Button>
-        ))}
-        <Button
-          variant="primary"
-          size="sm"
-          disabled={analyzing}
-          onClick={handleAnalyze}
-          title="Une session propose la philosophie, les couches et les règles d'AGENTS.md"
-        >
-          {analyzing ? 'Création…' : 'Analyser le projet'}
-        </Button>
       </div>
-      {analyzeError ? <p className="mt-1 text-xs text-err">{analyzeError}</p> : null}
-      <ConfirmDialog
-        open={confirmAudit !== null}
-        title={confirmAudit ? `${AUDITS[confirmAudit].label} ?` : ''}
-        body={confirmAudit ? AUDITS[confirmAudit].body : ''}
-        confirmLabel="Lancer l'audit"
-        variant="primary"
-        onConfirm={() => {
-          if (!confirmAudit) return;
-          const audit = AUDITS[confirmAudit];
-          setConfirmAudit(null);
-          void startSession(audit.prompt, audit.mode);
-        }}
-        onCancel={() => setConfirmAudit(null)}
-      />
       <p className="mt-0.5 font-mono text-xs text-muted">
         {project.workdir} · ⎇ {project.branch ?? 'sans branche'}
         {project.remote ? (
@@ -238,6 +172,9 @@ export default function ProjectPage({
           ) : null}
           {activeTab === 'map' ? <MapTab projectId={projectId} /> : null}
           {activeTab === 'doc' ? <DocSection projectId={projectId} /> : null}
+          {activeTab === 'analyses' ? (
+            <AnalysesSection busy={analyzing} error={analyzeError} onStart={(prompt, mode) => void startSession(prompt, mode)} />
+          ) : null}
         </div>
       </div>
     </>,
