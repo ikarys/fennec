@@ -136,7 +136,7 @@ function parsePlan(title: string, lines: string[]): Plan | null {
 
   for (const token of tokens) {
     if (token.kind === 'heading') {
-      const step = token.text.match(/^Step\s+(\d+):\s*(.*)$/i);
+      const step = token.text.match(/^Step\s+(\d+)\s*:\s*(.*)$/i);
       if (step) {
         current = { number: Number(step[1]), title: step[2].trim(), files: [], change: '', verify: '' };
         steps.push(current);
@@ -210,7 +210,7 @@ function parseReport(title: string, lines: string[]): Report | null {
     if (section === 'steps') {
       const cb = checkboxOf(token.text);
       const rest = cb ? cb.rest : token.text;
-      const m = rest.match(/^Step\s+(\d+):\s*(.*)$/i);
+      const m = rest.match(/^Step\s+(\d+)\s*:\s*(.*)$/i);
       const number = m ? Number(m[1]) : steps.length + 1;
       const { text, detail } = splitDetail(m ? m[2] : rest);
       steps.push({ number, checked: cb ? cb.checked : false, text, detail });
@@ -256,7 +256,7 @@ export function splitContract(text: string): { before: string; contract: Plan | 
   let title = '';
   // The contract is the last such heading: the models may restate it mid-message.
   for (let i = lines.length - 1; i >= 0; i--) {
-    const m = lines[i].match(/^#{2,3}\s+(Plan|Report):\s*(.+?)\s*$/);
+    const m = lines[i].match(/^#{2,3}\s+(Plan|Report)\s*:\s*(.+?)\s*$/);
     if (m) {
       start = i;
       kind = m[1] === 'Plan' ? 'plan' : 'report';
