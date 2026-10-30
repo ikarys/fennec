@@ -5,6 +5,8 @@ export interface PlanActions {
   onBuild: (worktree: boolean) => void;
   onBuildAlone: () => void;
   onRevise: () => void;
+  /** Set when the session frames an idea: the plan becomes the idea's, ready. */
+  ideaReady?: { onMark: () => void; already: boolean };
   disabled?: boolean;
 }
 

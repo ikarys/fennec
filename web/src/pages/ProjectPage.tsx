@@ -6,10 +6,14 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { SectionLabel } from '../components/ui/SectionLabel';
 import { markdownComponents } from '../components/session/markdownComponents';
+import { IdeasSection } from '../components/project/IdeasSection';
 import { ProjectMap } from '../components/project/ProjectMap';
 import { createSession, getProjectOverview, writeMapFile, type Adr, type Project, type ProjectOverview } from '../lib/api';
 
 const REMARK_PLUGINS = [remarkGfm];
+
+// The idea's text is the human's; the framing asks for a plan, not code.
+const framePrompt = (idea: string) => `Frame this idea into a plan; ask me what is unclear before planning.\n\nIdea: ${idea}`;
 
 const ANALYZE_PROMPT = 'Analyze this project and draft the philosophy, layers and rules of its AGENTS.md.';
 
@@ -155,6 +159,11 @@ export default function ProjectPage({
     <>
       {header}
       <div className="mt-6 flex flex-col gap-8">
+        <IdeasSection
+          projectId={projectId}
+          onFrame={async (idea) => (await createSession(projectId, framePrompt(idea.text), 'plan')).id}
+          onOpenSession={onOpenSession}
+        />
         <section>
           <div className="flex items-center gap-2">
             <SectionLabel>Carte des modules</SectionLabel>
