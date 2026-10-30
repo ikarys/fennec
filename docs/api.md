@@ -215,13 +215,16 @@ read-only. The human edits them as usual.
   project's agents in discovery order (`color` null when unset); the modes are the
   ones with `subagent` false, the others only run in a workflow node's fresh context;
   404 if no project
-- `GET /api/projects/{id}/overview` → `{map, mapFile, adrs}`, the project page (404 if no project):
+- `GET /api/projects/{id}/overview` → `{map, mapFile}`, the project page (404 if no project):
   - `map` `{modules: [{id, files, tests, entry, layer, row}], dependencies: [{from, to, imports}]}`:
     the project map, read from the import lines of the files git tracks (Rust `crate::` and workspace
     crates, TS/JS relative imports; test modules skipped); a module is a directory (`.` the root),
     `imports` counts the importing files; `layer`/`row` place it (layers by dependency depth): the UI
     computes nothing. Deterministic (verified).
   - `mapFile` `missing | stale | current`: the project's `docs/map.md` against a fresh render of `map`.
+- `GET /api/projects/{id}/docs` → `{files, adrs}`, the project's documentation, read from disk (verified):
+  - `files` `[{path, name, content}]`: the project's markdown (`AGENTS.md`, `README.md` and `docs/`, its
+    ADRs excluded), sorted by path; `path` forward slashes, `name` the file name.
   - `adrs` `[{number, file, title, status, date, body}]`: the MADR files of `docs/adr/` (`NNNN-slug.md`,
     sorted by number; `status` and `date` from the frontmatter, null when absent; the title from the
     first `# ` heading).
