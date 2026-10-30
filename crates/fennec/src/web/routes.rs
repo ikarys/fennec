@@ -478,10 +478,14 @@ fn serve_usage(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String
     };
     let summary = ledger.summary(&filter).map_err(|e| e.to_string())?;
     let latest = ledger.latest(&filter).map_err(|e| e.to_string())?;
+    let rows = ledger
+        .series(&filter, token_usage::GroupBy::Model)
+        .map_err(|e| e.to_string())?;
+    let pricing = super::pricing::priced(&rows, &super::pricing::prices(&store.preferences()?));
     send_json(
         stream,
         200,
-        &json!(SessionUsageView::new(&summary, latest.as_ref())),
+        &json!(SessionUsageView::new(&summary, latest.as_ref(), &pricing)),
     )
 }
 
