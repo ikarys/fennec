@@ -355,9 +355,9 @@ fn get_session(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String
     send_json(stream, 200, &v)
 }
 
-/// The session's skills folded from its log: loaded so far, and those
-/// still in the model's view (not dropped by a compaction, not cut by a
-/// replay). `GET /api/sessions/{id}/skills`.
+/// The session's skills folded from its log: loaded so far, those frozen
+/// into its prompt as always-on, those still in the model's view, and the
+/// registry ids it could still load. `GET /api/sessions/{id}/skills`.
 fn serve_skills(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
     let store = app.store()?;
     let Some((_, p)) = session_and_project(&store, id)? else {
@@ -368,7 +368,12 @@ fn serve_skills(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), Strin
     send_json(
         stream,
         200,
-        &json!({ "loaded": folded.loaded, "active": folded.active }),
+        &json!({
+            "loaded": folded.loaded,
+            "active": folded.active,
+            "alwaysOn": folded.always_on,
+            "available": folded.available
+        }),
     )
 }
 

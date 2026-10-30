@@ -1,29 +1,57 @@
 //! A session's skills folded from its event log: those loaded so far
-//! (successful `load_skill` calls, `/<skill>` messages) and those still in
-//! the model's view (not dropped by a compaction, not cut by a replay).
+//! (successful `load_skill` calls, `/<skill>` messages), those frozen into
+//! the session's system prompt as always-active, and those still in the
+//! model's view (not dropped by a compaction, not cut by a replay).
 //! fennec's own feature; openfox has no such fold.
 
 use super::compaction::model_view;
+use super::conversation::frozen_prompt;
 use super::event::{Event, Role};
-use super::skill::Skill;
+use super::skill::{Skill, always_active_ids};
 use super::slash;
 use std::collections::HashSet;
 
-/// What a session has loaded and what is still in the model's view,
-/// deduplicated in first-seen order.
+/// What a session has loaded, what is frozen into its prompt as always-on,
+/// what is still in the model's view, and what it could still load.
+/// `loaded` and `active` are deduplicated in first-seen order.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SessionSkills {
     pub loaded: Vec<String>,
     pub active: Vec<String>,
+    /// Skill ids whose bodies the first `TurnSnapshot`'s system prompt carries.
+    pub always_on: Vec<String>,
+    /// Registry ids neither loaded nor always-on, in registry order.
+    pub available: Vec<String>,
 }
 
 /// The session's skills: `loaded` over the whole log, `active` over the
-/// model's view of it. `skills` is the project's registry: the caller does
-/// the discovery, this fold is pure.
+/// model's view of it, `always_on` from the first frozen system prompt, and
+/// `available` from the registry minus both. `skills` is the project's
+/// registry: the caller does the discovery, this fold is pure.
 pub fn fold_skills(events: &[Event], skills: &[Skill]) -> SessionSkills {
     let loaded = loads_in(events.iter(), skills);
     let active = loads_in(model_view(events), skills);
-    SessionSkills { loaded, active }
+    let always_on = always_on_in(events);
+    let available = skills
+        .iter()
+        .map(|skill| skill.id.clone())
+        .filter(|id| !loaded.contains(id) && !always_on.contains(id))
+        .collect();
+    SessionSkills {
+        loaded,
+        active,
+        always_on,
+        available,
+    }
+}
+
+/// The ids the first frozen system prompt carries as always-active; none
+/// when the log has no `TurnSnapshot` yet.
+fn always_on_in(events: &[Event]) -> Vec<String> {
+    frozen_prompt(events)
+        .0
+        .map(always_active_ids)
+        .unwrap_or_default()
 }
 
 /// The skill ids a slice of the log loaded, in first-seen order: successful
@@ -255,5 +283,23 @@ mod tests {
         let folded = fold_skills(&events, &skills());
         assert_eq!(folded.loaded, vec!["beta", "alpha"]);
         assert_eq!(folded.active, vec!["beta", "alpha"]);
+    }
+
+    #[test]
+    fn a_turn_snapshot_freezes_always_on_and_available() {
+        let prompt = "\n## ALWAYS-ACTIVE SKILLS\n\nThese skills' instructions apply to every task in this session. They are already loaded: do not call load_skill for them.\n\n<skill id=\"alpha\">\nA\n</skill>\n";
+        let events = vec![
+            Event::TurnSnapshot {
+                cached_system_prompt: prompt.into(),
+                cached_tools: None,
+            },
+            load_call("c1", "beta"),
+            result("c1", true),
+        ];
+        let folded = fold_skills(&events, &skills());
+        assert_eq!(folded.always_on, vec!["alpha"]);
+        assert_eq!(folded.loaded, vec!["beta"]);
+        assert_eq!(folded.active, vec!["beta"]);
+        assert_eq!(folded.available, vec!["gamma"]);
     }
 }

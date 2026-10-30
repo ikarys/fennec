@@ -5,6 +5,7 @@ use super::App;
 use super::http::{Request, error, send_json};
 use super::model_view;
 use crate::domain::preferences::{LOCAL_PROVIDER, Preferences, Provider};
+use crate::skills;
 use llm_providers::{
     ApiKey, Endpoint, ListedModel, MasterKey, ModelParams, ModelPrefs, list_models,
 };
@@ -31,10 +32,15 @@ pub fn get_settings(app: &App, stream: &mut TcpStream) -> Result<(), String> {
             .map(|handle| handle.join().expect("a listing thread panicked"))
             .collect()
     });
+    let skills: Vec<Value> = skills::discover_global()
+        .into_iter()
+        .map(|skill| json!({ "id": skill.id, "description": skill.description }))
+        .collect();
     let body = json!({
         "preferences": prefs,
         "listings": listings,
         "defaults": app.settings.llm.defaults,
+        "skills": skills,
     });
     send_json(stream, 200, &body)
 }

@@ -76,7 +76,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
         // fall back to the empty state instead of a perpetual spinner; with
         // data, keep the last skills.
         if (request === skillsReqRef.current) {
-          setSkills((prev) => prev ?? { loaded: [], active: [] });
+          setSkills((prev) => prev ?? { loaded: [], active: [], alwaysOn: [], available: [] });
         }
       });
   }, [sessionId]);
