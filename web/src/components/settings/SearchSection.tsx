@@ -4,6 +4,7 @@ import { FieldRow, TextInput } from '../ui/Field';
 export interface SearchForm {
   url: string;
   apiKey: string;
+  webFetch: boolean;
 }
 
 export function SearchSection({ value, onChange }: { value: SearchForm; onChange: (value: SearchForm) => void }) {
@@ -31,6 +32,20 @@ export function SearchSection({ value, onChange }: { value: SearchForm; onChange
             className="w-full"
           />
         </FieldRow>
+        <div className="flex flex-col gap-1">
+          <label className="flex items-center gap-2 text-sm text-text">
+            <input
+              type="checkbox"
+              checked={value.webFetch}
+              onChange={(event) => onChange({ ...value, webFetch: event.target.checked })}
+              className="h-4 w-4 accent-[var(--accent)]"
+            />
+            Autoriser web_fetch
+          </label>
+          <p className="text-xs text-muted">
+            Le modèle télécharge les pages dont il choisit l’URL (adresses locales et privées refusées) ; fennec les garde en cache 7 jours. Indépendant du réseau du bac à sable : fennec l’exécute lui-même.
+          </p>
+        </div>
       </div>
     </Card>
   );
