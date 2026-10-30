@@ -13,6 +13,8 @@ pub enum IdeaEvent {
     Framing { idea_id: String, session_id: String },
     #[serde(rename = "idea.ready", rename_all = "camelCase")]
     Ready { idea_id: String, plan: String },
+    #[serde(rename = "idea.started", rename_all = "camelCase")]
+    Started { idea_id: String },
     #[serde(rename = "idea.dropped", rename_all = "camelCase")]
     Dropped { idea_id: String },
 }
@@ -23,6 +25,7 @@ impl IdeaEvent {
             Self::Added { .. } => "idea.added",
             Self::Framing { .. } => "idea.framing",
             Self::Ready { .. } => "idea.ready",
+            Self::Started { .. } => "idea.started",
             Self::Dropped { .. } => "idea.dropped",
         }
     }
@@ -32,6 +35,7 @@ impl IdeaEvent {
             Self::Added { idea_id, .. }
             | Self::Framing { idea_id, .. }
             | Self::Ready { idea_id, .. }
+            | Self::Started { idea_id }
             | Self::Dropped { idea_id } => idea_id,
         }
     }
@@ -43,6 +47,7 @@ pub enum IdeaState {
     Inbox,
     Framing,
     Ready,
+    Started,
     Dropped,
 }
 
@@ -94,6 +99,9 @@ pub fn fold(events: &[(u64, IdeaEvent)]) -> Vec<Idea> {
                 idea.plan = Some(plan.clone());
                 idea.state = IdeaState::Ready;
             }
+            // The human may start an idea at any stage; the session is set by
+            // the framing event before it when the idea had none.
+            IdeaEvent::Started { .. } => idea.state = IdeaState::Started,
             IdeaEvent::Dropped { .. } => idea.state = IdeaState::Dropped,
         }
         idea.updated_at = *timestamp;
@@ -109,6 +117,19 @@ pub fn idea_for_session<'a>(ideas: &'a [Idea], session_id: &str) -> Option<&'a I
     ideas
         .iter()
         .find(|idea| idea.session_id.as_deref() == Some(session_id))
+}
+
+/// The oldest ready idea that can be started: it needs a framing session and a plan.
+pub fn next_ready(ideas: &[Idea]) -> Option<&Idea> {
+    ideas
+        .iter()
+        .filter(|idea| idea.state == IdeaState::Ready)
+        .filter(|idea| idea.session_id.is_some() && idea.plan.is_some())
+        .min_by(|a, b| {
+            a.created_at
+                .cmp(&b.created_at)
+                .then_with(|| a.id.cmp(&b.id))
+        })
 }
 
 #[cfg(test)]
@@ -271,6 +292,143 @@ mod tests {
             json,
             r#"{"type":"idea.added","data":{"ideaId":"i1","text":"t"}}"#
         );
+
+        let decoded: IdeaEvent = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, event);
+    }
+
+    #[test]
+    fn started_after_ready() {
+        let events = vec![
+            (
+                1,
+                IdeaEvent::Added {
+                    idea_id: "i1".into(),
+                    text: "t".into(),
+                },
+            ),
+            (
+                2,
+                IdeaEvent::Ready {
+                    idea_id: "i1".into(),
+                    plan: "p".into(),
+                },
+            ),
+            (
+                3,
+                IdeaEvent::Started {
+                    idea_id: "i1".into(),
+                },
+            ),
+        ];
+
+        let ideas = fold(&events);
+
+        assert_eq!(ideas.len(), 1);
+        assert_eq!(ideas[0].state, IdeaState::Started);
+        assert_eq!(ideas[0].plan.as_deref(), Some("p"));
+        assert_eq!(ideas[0].updated_at, 3);
+    }
+
+    #[test]
+    fn an_inbox_idea_can_be_started() {
+        let events = vec![
+            (
+                1,
+                IdeaEvent::Added {
+                    idea_id: "i1".into(),
+                    text: "t".into(),
+                },
+            ),
+            (
+                2,
+                IdeaEvent::Started {
+                    idea_id: "i1".into(),
+                },
+            ),
+        ];
+
+        let ideas = fold(&events);
+
+        assert_eq!(ideas.len(), 1);
+        assert_eq!(ideas[0].state, IdeaState::Started);
+        assert_eq!(ideas[0].updated_at, 2);
+    }
+
+    #[test]
+    fn next_ready_picks_oldest_ready_and_skips_missing_session() {
+        let events = vec![
+            (
+                0,
+                IdeaEvent::Added {
+                    idea_id: "no_session".into(),
+                    text: "no session".into(),
+                },
+            ),
+            (
+                1,
+                IdeaEvent::Added {
+                    idea_id: "old".into(),
+                    text: "old".into(),
+                },
+            ),
+            (
+                2,
+                IdeaEvent::Framing {
+                    idea_id: "old".into(),
+                    session_id: "s_old".into(),
+                },
+            ),
+            (
+                3,
+                IdeaEvent::Ready {
+                    idea_id: "old".into(),
+                    plan: "p_old".into(),
+                },
+            ),
+            (
+                4,
+                IdeaEvent::Added {
+                    idea_id: "new".into(),
+                    text: "new".into(),
+                },
+            ),
+            (
+                5,
+                IdeaEvent::Framing {
+                    idea_id: "new".into(),
+                    session_id: "s_new".into(),
+                },
+            ),
+            (
+                6,
+                IdeaEvent::Ready {
+                    idea_id: "new".into(),
+                    plan: "p_new".into(),
+                },
+            ),
+            (
+                7,
+                IdeaEvent::Ready {
+                    idea_id: "no_session".into(),
+                    plan: "p_no_session".into(),
+                },
+            ),
+        ];
+
+        let ideas = fold(&events);
+
+        assert_eq!(next_ready(&ideas).map(|idea| idea.id.as_str()), Some("old"));
+    }
+
+    #[test]
+    fn started_event_serde_wire() {
+        let event = IdeaEvent::Started {
+            idea_id: "i1".into(),
+        };
+
+        let json = serde_json::to_string(&event).unwrap();
+        assert_eq!(json, r#"{"type":"idea.started","data":{"ideaId":"i1"}}"#);
 
         let decoded: IdeaEvent = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded, event);
