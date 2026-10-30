@@ -234,13 +234,14 @@ read-only. The human edits them as usual.
   as is, folded (crate `backlog`) from its append-only `idea.*` events (table `project_events`), dropped ideas left out.
   - `queue` `{running, autonomous, ready, next: {id, text} | null, caps: {maxMinutes, maxTokens}}`: whether the queue
     runs (and in night mode), how many ideas it holds, the idea it starts next, the Settings caps (0 no cap).
-  - `groups` `[{stage, ideas: [idea]}]`, non-empty only, in this order: `yours` (waits for the human: review, question,
+  - `groups` `[{stage, ideas: [idea]}]`, non-empty only except `drafts` (always sent: it holds the add input), in this order: `yours` (waits for the human: review, question,
     halted, failed), `running`, `queue` (in queue order), `drafts` (inbox, framing), `done` (integrated); outside the
     queue, the most recently changed first.
-  - `idea` `{id, text, status, stage, action, sessionId, plan, halted, autonomous, position, createdAt, startedAt,
+  - `idea` `{id, text, status, stage, action, menu, sessionId, plan, halted, autonomous, position, createdAt, startedAt,
     durationMs, tokens, criteria, decisions, commits, files}`: `status` `inbox | framing | queued | running | question |
     review | halted | failed | integrated` (from the idea and its session's state; a started idea whose session is gone
-    is `failed`); `action` the one next step `frame | resumeFraming | start | open | answer | review`; `plan` the
+    is `failed`); `action` the one next step `frame | resumeFraming | start | open | answer | review`; `menu` the
+    secondary actions `reframe | startUnframed | drop` (empty for running and integrated); `plan` the
     approved plan verbatim; `halted` why the night mode stopped or skipped it, cleared by a new plan or start; `position`
     its 1-based place in the queue; `durationMs` from its start to now (running) or its session's last change; `tokens`
     uncached prompt plus completion of the project's calls in that window (exact while one idea runs at a time);
