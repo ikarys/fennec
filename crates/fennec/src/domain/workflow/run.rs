@@ -257,6 +257,7 @@ pub fn current_run(events: &[Event]) -> Option<RunState> {
         workflow,
         task,
         step_by_step,
+        ..
     } = &events[start_index]
     else {
         return None;
@@ -784,6 +785,7 @@ mod tests {
             workflow: simple_workflow(),
             task: String::new(),
             step_by_step: false,
+            started_at: None,
         };
         let events = vec![
             started("old"),
@@ -802,12 +804,14 @@ mod tests {
                 workflow: simple_workflow(),
                 task: "old".into(),
                 step_by_step: false,
+                started_at: None,
             },
             Event::WorkflowStarted {
                 run_id: "new".into(),
                 workflow: simple_workflow(),
                 task: "new".into(),
                 step_by_step: true,
+                started_at: None,
             },
         ];
 
@@ -1336,6 +1340,7 @@ mod tests {
                 workflow: human_workflow(),
                 task: "t".into(),
                 step_by_step: false,
+                started_at: None,
             },
             Event::WorkflowNodeStarted {
                 run_id: "r".into(),
@@ -1372,6 +1377,7 @@ mod tests {
                 workflow: simple_workflow(),
                 task: "t".into(),
                 step_by_step: false,
+                started_at: None,
             },
             Event::WorkflowFinished {
                 run_id: "r".into(),
