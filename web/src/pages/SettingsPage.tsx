@@ -9,6 +9,7 @@ import type {
   ProviderListing,
   ReasoningEffort,
   SandboxPrefs,
+  AutonomyPrefs,
   SettingsResponse
 } from '../lib/api';
 import { listProvider, saveSettings } from '../lib/api';
@@ -22,6 +23,7 @@ import { PanelPagesSection } from '../components/settings/PanelPagesSection';
 import { InstructionsSection } from '../components/settings/InstructionsSection';
 import { SearchSection, type SearchForm } from '../components/settings/SearchSection';
 import { SandboxSection } from '../components/settings/SandboxSection';
+import { AutonomySection } from '../components/settings/AutonomySection';
 import { SkillsSection } from '../components/settings/SkillsSection';
 import { WorkflowsSection } from '../components/settings/WorkflowsSection';
 
@@ -42,11 +44,12 @@ interface SettingsForm {
   instructions: string;
   search: SearchForm;
   sandbox: SandboxPrefs;
+  autonomy: AutonomyPrefs;
   alwaysOnSkills: string[];
   enabledWorkflows: string[];
 }
 
-type SettingsTab = 'models' | 'instructions' | 'skills' | 'workflows' | 'search' | 'sandbox' | 'display';
+type SettingsTab = 'models' | 'instructions' | 'skills' | 'workflows' | 'search' | 'sandbox' | 'autonomy' | 'display';
 
 const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'models', label: 'Modèles' },
@@ -55,6 +58,7 @@ const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'workflows', label: 'Workflows' },
   { id: 'search', label: 'Recherche web' },
   { id: 'sandbox', label: 'Bac à sable' },
+  { id: 'autonomy', label: 'Mode nuit' },
   { id: 'display', label: 'Affichage' }
 ];
 
@@ -163,6 +167,7 @@ function toForm(preferences: Preferences, listings: ProviderListing[]): Settings
       webFetch: preferences.search?.webFetch ?? true
     },
     sandbox: preferences.sandbox ?? { enabled: true, network: false },
+    autonomy: preferences.autonomy ?? { maxMinutesPerIdea: 120, maxTokensPerIdea: 2_000_000 },
     alwaysOnSkills: preferences.alwaysOnSkills ?? [],
     enabledWorkflows: preferences.enabledWorkflows ?? []
   };
@@ -243,6 +248,7 @@ function buildPreferences(form: SettingsForm, settings: SettingsResponse): Prefe
       webFetch: form.search.webFetch
     },
     sandbox: form.sandbox,
+    autonomy: form.autonomy,
     alwaysOnSkills: form.alwaysOnSkills,
     enabledWorkflows: form.enabledWorkflows
   };
@@ -415,6 +421,11 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
     setForm((previous) => (previous ? { ...previous, sandbox } : previous));
   }
 
+  function updateAutonomy(autonomy: AutonomyPrefs) {
+    markDirty();
+    setForm((previous) => (previous ? { ...previous, autonomy } : previous));
+  }
+
   function updateAlwaysOnSkills(alwaysOnSkills: string[]) {
     markDirty();
     setForm((previous) => (previous ? { ...previous, alwaysOnSkills } : previous));
@@ -561,6 +572,10 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
 
             {tab === 'sandbox' && (
               <SandboxSection value={form.sandbox} onChange={updateSandbox} />
+            )}
+
+            {tab === 'autonomy' && (
+              <AutonomySection value={form.autonomy} onChange={updateAutonomy} />
             )}
 
             {tab === 'display' && (
