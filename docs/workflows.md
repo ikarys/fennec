@@ -42,6 +42,8 @@ commit to the human's branch (rule 1), even when every edge is automatic.
 2. `~/.agents/workflows/`
 3. the defaults embedded in the binary (`crates/fennec/workflows/`)
 
+The embedded defaults are `plan-build-verify` (plan, build, verify), `quick` (small direct build), `write-docs` (project documentation), and `write-training` (a training course).
+
 `id` matches `^[a-z0-9][a-z0-9-]*$` and equals the file name. The editor
 saves into the project's or the global folder; an embedded default is
 copied on its first save.
