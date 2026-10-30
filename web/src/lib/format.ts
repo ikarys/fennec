@@ -17,6 +17,10 @@ export function formatDuration(ms?: number): string {
   if (ms == null) return '';
   if (ms < 1000) return `${ms} ms`;
   if (ms < 60_000) return `${(ms / 1000).toFixed(1).replace('.', ',')} s`;
+  if (ms >= 3_600_000) {
+    const totalMinutes = Math.floor(ms / 60_000);
+    return `${Math.floor(totalMinutes / 60)} h ${totalMinutes % 60} min`;
+  }
   const seconds = Math.round(ms / 1000);
   return `${Math.floor(seconds / 60)} min ${seconds % 60} s`;
 }
