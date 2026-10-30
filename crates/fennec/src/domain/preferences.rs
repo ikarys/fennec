@@ -37,12 +37,24 @@ pub struct Preferences {
     pub(crate) legacy_models: BTreeMap<String, ModelPrefs>,
 }
 
-/// openfox `search.searxngUrl` / `search.searxngApiKey`.
-#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+/// openfox `search.searxngUrl` / `search.searxngApiKey`; fennec's own `webFetch`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct SearchPrefs {
     pub searxng_url: Option<String>,
     pub searxng_api_key: Option<String>,
+    /// fennec's own: lets the model fetch the URLs it chooses (web_fetch); on by default.
+    pub web_fetch: bool,
+}
+
+impl Default for SearchPrefs {
+    fn default() -> Self {
+        Self {
+            searxng_url: None,
+            searxng_api_key: None,
+            web_fetch: true,
+        }
+    }
 }
 
 /// fennec's own (openfox runs commands on the host): the bwrap world of commands.
@@ -295,6 +307,12 @@ impl Preferences {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn search_prefs_stored_before_web_fetch_allow_it() {
+        let search: SearchPrefs = serde_json::from_str(r#"{"searxngUrl":"http://s"}"#).unwrap();
+        assert!(search.web_fetch);
+    }
 
     fn defaults() -> ModelParams {
         ModelParams {

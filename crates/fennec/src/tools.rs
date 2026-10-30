@@ -1,7 +1,8 @@
 //! The host toolbox: openfox's `read_file`, `write_file`, `edit_file` and
 //! `run_command`, plus `load_skill`, run inside one working directory, and
 //! `web_search`, which queries the human's SearXNG instance: the model only
-//! chooses the query.
+//! chooses the query, and `web_fetch`, which saves a page in a cache and returns
+//! a pointer to it (the model reads the parts it needs with `read_file`).
 //! Commands run in the bwrap world when the human enabled it; the file tools
 //! keep the in-process path guard. Writes to protected paths are refused;
 //! commands see them read-only. A read-only agent's commands see the workdir
@@ -16,6 +17,7 @@ mod run_command;
 mod sandbox;
 #[cfg(test)]
 mod test_support;
+mod web_fetch;
 mod web_search;
 mod write_file;
 
@@ -36,6 +38,7 @@ pub struct LocalTools {
     search: SearchPrefs,
     sandbox: Sandbox,
     protection: Protection,
+    web_cache: PathBuf,
 }
 
 impl LocalTools {
@@ -48,6 +51,7 @@ impl LocalTools {
             // The composition root loads the project's protection; tests run
             // unprotected.
             protection: Protection::default(),
+            web_cache: web_fetch::default_cache_dir(),
         }
     }
 
@@ -76,6 +80,7 @@ impl Toolbox for LocalTools {
             run_command::definition(),
             load_skill::definition(),
             web_search::definition(),
+            web_fetch::definition(),
         ])
     }
 
@@ -90,7 +95,7 @@ impl Toolbox for LocalTools {
         let start = Instant::now();
         let workdir = &self.workdir;
         let mut result = match name {
-            "read_file" => read_file::run(args, workdir),
+            "read_file" => read_file::run(args, workdir, &self.web_cache),
             "write_file" => write_file::run(args, workdir, &self.protection),
             "edit_file" => edit_file::run(args, workdir, &self.protection),
             "run_command" => match access {
@@ -107,6 +112,15 @@ impl Toolbox for LocalTools {
             },
             "load_skill" => load_skill::run(args, workdir),
             "web_search" => web_search::run(args, &self.search),
+            "web_fetch" => {
+                if !self.search.web_fetch {
+                    ToolResult::failure(
+                        "web_fetch is turned off on the Settings page (Recherche web).".to_string(),
+                    )
+                } else {
+                    web_fetch::run(args, &self.web_cache)
+                }
+            },
             _ => ToolResult::failure(format!("Unknown tool: {name}")),
         };
         result.duration_ms = start.elapsed().as_millis() as u64;

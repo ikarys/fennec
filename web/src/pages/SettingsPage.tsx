@@ -154,7 +154,8 @@ function toForm(preferences: Preferences, listings: ProviderListing[]): Settings
     instructions: preferences.globalInstructions ?? '',
     search: {
       url: preferences.search?.searxngUrl ?? '',
-      apiKey: preferences.search?.searxngApiKey ?? ''
+      apiKey: preferences.search?.searxngApiKey ?? '',
+      webFetch: preferences.search?.webFetch ?? true
     },
     sandbox: preferences.sandbox ?? { enabled: true, network: false }
   };
@@ -239,7 +240,8 @@ function buildPreferences(form: SettingsForm, settings: SettingsResponse): Prefe
     globalInstructions: form.instructions.trim() === '' ? null : form.instructions,
     search: {
       searxngUrl: searxngUrl === '' ? null : searxngUrl,
-      searxngApiKey: searxngApiKey === '' ? null : searxngApiKey
+      searxngApiKey: searxngApiKey === '' ? null : searxngApiKey,
+      webFetch: form.search.webFetch
     },
     sandbox: form.sandbox
   };
