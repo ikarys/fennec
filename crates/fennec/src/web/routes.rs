@@ -1,6 +1,7 @@
 //! The JSON API (contract: `docs/api.md`) and the UI's pages.
 
 use super::App;
+use super::audit_routes;
 use super::editor;
 use super::http::{Request, error, send, send_json};
 use super::notifier::NotifyingLog;
@@ -20,7 +21,8 @@ use crate::agent::workflow::WorkflowJob;
 use crate::agents;
 use crate::domain::agent::{resolve as agent_resolve, switch_to};
 use crate::domain::attachment::{Attachment, from_data_url};
-use crate::domain::conversation::first_request;
+use crate::domain::audit;
+use crate::domain::conversation::{first_request, last_assistant_text};
 use crate::domain::event::Event;
 use crate::domain::id::new_id;
 use crate::domain::preferences::ModelRef;
@@ -121,6 +123,9 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         ("POST", ["api", "sessions", id, "messages"]) => send_message(app, req, stream, id),
         ("POST", ["api", "sessions", id, "replay"]) => replay_message(app, req, stream, id),
         ("POST", ["api", "sessions", id, "compact"]) => compact_session(app, stream, id),
+        ("POST", ["api", "sessions", id, "audit", "tasks"]) => {
+            audit_routes::create_tasks(app, req, stream, id)
+        }
         ("POST", ["api", "sessions", id, "mode"]) => set_session_mode(app, req, stream, id),
         ("POST", ["api", "sessions", id, "model"]) => model_routes::set_model(app, req, stream, id),
         ("POST", ["api", "sessions", id, "workflow"]) => {
@@ -403,6 +408,8 @@ fn get_session(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String
     };
     // The first human request, so the context panel can show what was asked.
     v["request"] = json!(first_request(&events));
+    // The audit report of the last answer, if it is one: the context panel lists its findings.
+    v["audit"] = json!(audit::parse(&last_assistant_text(&events)));
     v["worktree"] = match app.place(&store, &s, &p)?.worktree {
         Some(wt) => json!({
             "path": wt.path, "branch": wt.branch, "base": wt.base,

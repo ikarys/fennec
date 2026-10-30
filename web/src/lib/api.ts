@@ -244,6 +244,32 @@ export interface SessionDetail {
   idea: { id: string; state: "inbox" | "framing" | "ready" } | null;
   /** The first message the human typed, verbatim, or null. */
   request: string | null;
+  /** The last answer read as an audit report, or null. */
+  audit: Audit | null;
+}
+
+export interface AuditFinding {
+  number: number;
+  title: string;
+  severity: 'high' | 'medium' | 'low';
+  principle: string;
+  locations: string[];
+  problem: string;
+  fix: string;
+}
+
+export interface Audit {
+  scope: string;
+  summary: string;
+  findings: AuditFinding[];
+}
+
+/** Turns the checked findings of a session's audit into backlog ideas. */
+export function createAuditTasks(sessionId: string, findings: number[]): Promise<{ created: number }> {
+  return request<{ created: number }>(`/api/sessions/${encodeURIComponent(sessionId)}/audit/tasks`, {
+    method: 'POST',
+    body: JSON.stringify({ findings }),
+  });
 }
 
 export class WorkflowSaveError extends Error {

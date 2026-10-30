@@ -13,12 +13,13 @@ use std::path::{Path, PathBuf};
 
 use crate::domain::agent::{AgentDefinition, parse_agent_md};
 
-const DEFAULTS: [&str; 5] = [
+const DEFAULTS: [&str; 6] = [
     include_str!("../agents/plan.agent.md"),
     include_str!("../agents/builder.agent.md"),
     include_str!("../agents/verify.agent.md"),
     include_str!("../agents/review.agent.md"),
     include_str!("../agents/analyze.agent.md"),
+    include_str!("../agents/audit-architecture.agent.md"),
 ];
 
 /// openfox `loadAllAgents`: the agents a session in `workdir` can use.
@@ -186,6 +187,19 @@ mod tests {
 
         assert!(!analyze.subagent);
         assert_eq!(analyze.commands, CommandAccess::ReadOnly);
+    }
+
+    #[test]
+    fn audit_architecture_default_is_read_only_and_not_a_subagent() {
+        let (_root, _home, workdir) = fixture();
+        let agents = discover_in(None, &workdir);
+        let audit_agent = agents
+            .iter()
+            .find(|agent| agent.id == "audit-architecture")
+            .unwrap();
+
+        assert!(!audit_agent.subagent);
+        assert_eq!(audit_agent.commands, CommandAccess::ReadOnly);
     }
 
     #[test]

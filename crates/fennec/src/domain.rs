@@ -5,6 +5,7 @@ pub mod adr;
 pub mod agent;
 pub mod architecture;
 pub mod attachment;
+pub mod audit;
 pub mod bypass;
 pub mod clock;
 pub mod compaction;

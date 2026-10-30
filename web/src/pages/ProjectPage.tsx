@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Button } from '../components/ui/Button';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { Tabs } from '../components/ui/Tabs';
 import { TasksSection } from '../components/project/ideas/TasksSection';
 import { MapSection } from '../components/project/MapSection';
@@ -14,6 +15,7 @@ import { type IdeaView } from '../lib/ideas';
 
 const ANALYZE_PROMPT =
   'Analyze this project and draft the philosophy, layers and rules of its AGENTS.md.';
+const AUDIT_PROMPT = 'Audit the software architecture of this project.';
 
 const TABS = [
   { id: 'tasks', label: 'Tâches' },
@@ -95,17 +97,27 @@ export default function ProjectPage({
     window.location.hash = `#/project/${encodeURIComponent(projectId)}/${id}`;
   };
 
-  const handleAnalyze = async () => {
+  const [confirmAudit, setConfirmAudit] = useState(false);
+
+  const startSession = async (prompt: string, mode: string) => {
     setAnalyzing(true);
     setAnalyzeError(null);
     try {
-      const created = await createSession(projectId, ANALYZE_PROMPT, 'analyze');
+      const created = await createSession(projectId, prompt, mode);
       onOpenSession(created.id);
     } catch (err) {
       setAnalyzeError(err instanceof Error ? err.message : 'Erreur inconnue');
     } finally {
       setAnalyzing(false);
     }
+  };
+
+  const handleAnalyze = () => {
+    void startSession(ANALYZE_PROMPT, 'analyze');
+  };
+
+  const handleAudit = () => {
+    setConfirmAudit(true);
   };
 
   // Opens a new plan session with the idea in the composer: the human edits it, then sends.
@@ -131,6 +143,15 @@ export default function ProjectPage({
         </h1>
         <div className="grow" />
         <Button
+          variant="secondary"
+          size="sm"
+          disabled={analyzing}
+          onClick={handleAudit}
+          title="Un agent audite l'architecture ; ses constats peuvent devenir des tâches"
+        >
+          Auditer l'architecture
+        </Button>
+        <Button
           variant="primary"
           size="sm"
           disabled={analyzing}
@@ -141,6 +162,18 @@ export default function ProjectPage({
         </Button>
       </div>
       {analyzeError ? <p className="mt-1 text-xs text-err">{analyzeError}</p> : null}
+      <ConfirmDialog
+        open={confirmAudit}
+        title="Auditer l'architecture ?"
+        body="Un agent en lecture seule lit le projet et rapporte ses constats (responsabilités, couches, modularité, KISS, SOLID, front). Sur un gros projet, l'audit peut consommer beaucoup de tokens. Tu choisiras ensuite les constats à transformer en tâches."
+        confirmLabel="Lancer l'audit"
+        variant="primary"
+        onConfirm={() => {
+          setConfirmAudit(false);
+          void startSession(AUDIT_PROMPT, 'audit-architecture');
+        }}
+        onCancel={() => setConfirmAudit(false)}
+      />
       <p className="mt-0.5 font-mono text-xs text-muted">
         {project.workdir} · ⎇ {project.branch ?? 'sans branche'}
         {project.remote ? (
