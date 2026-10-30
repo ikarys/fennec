@@ -157,6 +157,14 @@ export function SessionPage({
   // page is requested. Prepending changes scrollHeight but not this
   // distance, so restoring it keeps the same messages in view.
   const restoreScroll = useRef<number | null>(null);
+  // Turning follow on jumps to the bottom at once: a smooth scroll chases a
+  // bottom that moves while the agent writes and never re-engages follow.
+  const setFollow = (on: boolean) => {
+    stickToBottom.current = on;
+    setAwayFromBottom(!on);
+    const element = scrollRef.current;
+    if (on && element) element.scrollTop = element.scrollHeight;
+  };
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const modeRequestRef = useRef(0);
   const previousRunning = useRef(running);
@@ -854,21 +862,14 @@ export function SessionPage({
                           ))}
                         </div>
                       </div>
-                      {awayFromBottom && (
+                      {awayFromBottom && !running && (
                         <Button
                           type="button"
                           variant="secondary"
                           size="sm"
                           iconOnly
                           title="Aller en bas et suivre la suite"
-                          onClick={() => {
-                            const element = scrollRef.current;
-                            if (element)
-                              element.scrollTo({
-                                top: element.scrollHeight,
-                                behavior: "smooth",
-                              });
-                          }}
+                          onClick={() => setFollow(true)}
                           aria-label="Aller en bas"
                           className="absolute bottom-4 right-6 rounded-full shadow-md backdrop-blur"
                         >
@@ -926,7 +927,11 @@ export function SessionPage({
                       </div>
                     )}
                     {running && !detail?.parentId && (
-                      <RunningStrip run={run} />
+                      <RunningStrip
+                        run={run}
+                        following={!awayFromBottom}
+                        onFollowChange={setFollow}
+                      />
                     )}
                     {!detail?.parentId && (
                       <Composer
