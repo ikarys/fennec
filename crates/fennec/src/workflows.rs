@@ -24,7 +24,7 @@ pub struct Found {
     pub raw: Value,
 }
 
-const DEFAULTS: [(&str, &str); 2] = [
+const DEFAULTS: [(&str, &str); 4] = [
     (
         "plan-build-verify.workflow.json",
         include_str!("../workflows/plan-build-verify.workflow.json"),
@@ -32,6 +32,14 @@ const DEFAULTS: [(&str, &str); 2] = [
     (
         "quick.workflow.json",
         include_str!("../workflows/quick.workflow.json"),
+    ),
+    (
+        "write-docs.workflow.json",
+        include_str!("../workflows/write-docs.workflow.json"),
+    ),
+    (
+        "write-training.workflow.json",
+        include_str!("../workflows/write-training.workflow.json"),
     ),
 ];
 
@@ -243,7 +251,16 @@ mod tests {
         let custom = found.iter().find(|f| f.workflow.id == "custom").unwrap();
         assert_eq!(custom.origin, Origin::Project);
         let names: Vec<_> = found.iter().map(|f| f.workflow.name.clone()).collect();
-        assert_eq!(names, vec!["Custom", "Project PBC", "Quick build"]);
+        assert_eq!(
+            names,
+            vec![
+                "Custom",
+                "Project PBC",
+                "Quick build",
+                "Write a training course",
+                "Write documentation"
+            ]
+        );
         let _ = std::fs::remove_dir_all(&root);
     }
 
@@ -310,7 +327,7 @@ mod tests {
         let (_root, _home, workdir) = fixture();
         let found = discover_in(None, &workdir);
         let agents = crate::agents::discover(&workdir);
-        for id in ["plan-build-verify", "quick"] {
+        for id in ["plan-build-verify", "quick", "write-docs", "write-training"] {
             let default = found.iter().find(|f| f.workflow.id == id).unwrap();
             let issues = crate::domain::workflow::validate::validate(&default.workflow, &agents);
             assert!(issues.is_empty(), "{id} issues: {issues:?}");
