@@ -1,6 +1,7 @@
 import type { Origin, WorkflowDef } from '../../lib/workflow';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
+import { PlayIcon } from '../Icons';
 import { Select, TextInput } from '../ui/Field';
 
 interface EditorHeaderProps {
@@ -71,11 +72,13 @@ export function EditorHeader({
           variant="secondary"
           size="sm"
           type="button"
+          iconOnly
           onClick={onTest}
           disabled={!canTest}
+          aria-label="Tester pas à pas"
           title={canTest ? "Ouvre une nouvelle session avec ce workflow, en pas à pas." : "Enregistre le workflow avant de le tester."}
         >
-          Tester pas à pas
+          <PlayIcon className="h-4 w-4" />
         </Button>
       )}
       <Button variant="primary" size="sm" type="button" onClick={onSave} disabled={saving}>

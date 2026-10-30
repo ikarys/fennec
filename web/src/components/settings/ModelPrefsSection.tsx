@@ -4,7 +4,7 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Section } from '../ui/Section';
 import { SectionLabel } from '../ui/SectionLabel';
-import { ChevronRightIcon } from '../Icons';
+import { ChevronRightIcon, CloseIcon, HeartIcon, PinIcon, StarIcon } from '../Icons';
 import { FieldRow, Select, TextInput } from '../ui/Field';
 import { ModelProbe } from './ModelProbe';
 
@@ -151,7 +151,7 @@ function ModelRow({
           onClick={() => onSetDefault(isDefault ? '' : key)}
           className={`text-base ${isDefault ? 'text-accent' : 'text-faint'}`}
         >
-          {isDefault ? '★' : '☆'}
+          <StarIcon className="h-3 w-3" filled={isDefault} />
         </Button>
         <Button
           variant="ghost"
@@ -163,7 +163,7 @@ function ModelRow({
           onClick={() => onToggleFavorite({ provider: providerId, model: modelId })}
           className={`text-base ${isFavorite ? 'text-accent' : 'text-faint'}`}
         >
-          {isFavorite ? '♥' : '♡'}
+          <HeartIcon className="h-3 w-3" filled={isFavorite} />
         </Button>
         {model === null && (
           <Button
@@ -174,7 +174,7 @@ function ModelRow({
             title="Retirer ce modèle manuel"
             onClick={() => onRemoveModel(providerId, modelId)}
           >
-            ×
+            <CloseIcon className="h-3 w-3" />
           </Button>
         )}
       </div>
@@ -277,10 +277,13 @@ function ModelRow({
                 <Button
                   variant="secondary"
                   size="sm"
+                  iconOnly
                   className="mt-1 self-start"
+                  aria-label="Figer"
+                  title="Figer la fenêtre de contexte"
                   onClick={() => onChange(key, 'contextWindow', String(model.resolved.contextWindow.value))}
                 >
-                  Figer la fenêtre de contexte
+                  <PinIcon className="h-3 w-3" />
                 </Button>
               )}
             </div>

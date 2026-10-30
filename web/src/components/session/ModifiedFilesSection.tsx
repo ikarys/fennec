@@ -3,6 +3,7 @@ import type { ThreadView } from '../../lib/fold';
 import { previewKindOfPath, relativeToWorkdir, type PreviewKind } from '../../lib/preview';
 import { usePreviewOpener, usePreviewWorkdir } from '../preview/PreviewContext';
 import { panelBlock } from '../../lib/panelBlocks';
+import { EyeIcon } from '../Icons';
 import { Button } from '../ui/Button';
 import { Panel } from '../ui/Panel';
 
@@ -66,9 +67,12 @@ export function ModifiedFilesSection({ modifiedFiles, sessionId }: ModifiedFiles
               <Button
                 variant="ghost"
                 size="sm"
+                iconOnly
                 onClick={() => opener({ path: relative, kind })}
+                title="Aperçu"
+                aria-label="Aperçu"
               >
-                Aperçu
+                <EyeIcon className="h-4 w-4" />
               </Button>
             )}
           </div>

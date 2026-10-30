@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { RunWaiting } from '../../../lib/workflowRun';
+import { StopIcon } from '../../Icons';
 import { Button } from '../../ui/Button';
 import { TextInput } from '../../ui/Field';
 
@@ -99,10 +100,13 @@ export function RunActionCard({
                   type="button"
                   variant="danger"
                   size="sm"
+                  iconOnly
                   disabled={isBusy}
                   onClick={() => handleAction(onStop)}
+                  title="Arrêter le workflow"
+                  aria-label="Arrêter"
                 >
-                  Arrêter
+                  <StopIcon className="h-4 w-4" />
                 </Button>
               </div>
             </>
@@ -127,10 +131,13 @@ export function RunActionCard({
                   type="button"
                   variant="danger"
                   size="sm"
+                  iconOnly
                   disabled={isBusy}
                   onClick={() => handleAction(onStop)}
+                  title="Arrêter le workflow"
+                  aria-label="Arrêter"
                 >
-                  Arrêter
+                  <StopIcon className="h-4 w-4" />
                 </Button>
               </div>
             </>
