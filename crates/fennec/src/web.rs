@@ -2,6 +2,7 @@
 //! connection, bound to 127.0.0.1.
 
 mod assets;
+mod audit_routes;
 mod children;
 mod context_view;
 mod editor;

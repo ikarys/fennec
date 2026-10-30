@@ -280,8 +280,12 @@ read-only. The human edits them as usual.
 - `GET /api/folders?path=<absolute path>` → `{path, parent, folders: [{name, path, hidden, repo}]}`,
   the sub-folders of `path` (the home directory when omitted), sorted by name;
   `repo` marks a git repository; 400 if `path` cannot be read
-- `GET /api/sessions/{id}` → `{id, title, state, mode, model, project: {id, name, workdir}, worktree, idea, request}`;
+- `POST /api/sessions/{id}/audit/tasks` `{findings: [number]}` → `{created}`: adds one idea per finding of the
+  session's audit report to its project's backlog, the text written by the server; 400 when a number is unknown;
+- `GET /api/sessions/{id}` → `{id, title, state, mode, model, project: {id, name, workdir}, worktree, idea, request, audit}`;
   `idea` is `{id, state}` when the session frames one of the project's ideas, else null;
+  `audit` is the session's last answer read as an audit report, `{scope, summary, findings: [{number, title,
+  severity: high|medium|low, principle, locations: [string], problem, fix}]}`, or null when it is not one;
   `request` is the first message the human typed in the session, verbatim, or null;
   `model` is `{provider, model, providerName, contextWindow, compactAt, source}`,
   what the next turn runs on; `source` is `session`, `parent` or `default`;

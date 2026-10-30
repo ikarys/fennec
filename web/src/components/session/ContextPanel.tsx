@@ -7,6 +7,8 @@ import { Button } from '../ui/Button';
 import { Select } from '../ui/Field';
 import { ChevronsLeftIcon, ChevronsRightIcon } from '../Icons';
 import { AgentWorkspaceSection } from './AgentWorkspaceSection';
+import type { Audit } from '../../lib/api';
+import { AuditSection } from './AuditSection';
 import { CriteriaSection } from './CriteriaSection';
 import { DecisionsSection } from './DecisionsSection';
 import { ModifiedFilesSection } from './ModifiedFilesSection';
@@ -76,6 +78,10 @@ interface ContextPanelProps {
   usage: SessionUsage | null;
   /** The first message the human typed, verbatim; null while unknown or absent. */
   request: string | null;
+  /** The last answer read as an audit report; null when it is not one. */
+  audit: Audit | null;
+  /** The session's project, for the link to its tasks. */
+  projectId: string | null;
   /** False on the « Nouvelle session » tab, where there is no log to fold. */
   hasSession: boolean;
   /** Older pages are not loaded: the totals cover the loaded messages only. */
@@ -90,7 +96,7 @@ interface ContextPanelProps {
   integrationVersion: number;
 }
 
-export function ContextPanel({ view, skills, usage, request, hasSession, partial, worktree, sessionId, onWorktreeChanged, integrationVersion }: ContextPanelProps) {
+export function ContextPanel({ view, skills, usage, request, audit, projectId, hasSession, partial, worktree, sessionId, onWorktreeChanged, integrationVersion }: ContextPanelProps) {
   const [width, setWidth] = useState(loadWidth);
   const [selectedPageName, setSelectedPageName] = useState(loadPageName);
   const [collapsed, setCollapsed] = useState(loadCollapsed);
@@ -131,6 +137,8 @@ export function ContextPanel({ view, skills, usage, request, hasSession, partial
     switch (id) {
       case 'request':
         return <RequestSection key={id} request={request} />;
+      case 'audit':
+        return <AuditSection key={id} audit={audit} sessionId={sessionId} projectId={projectId} />;
       case 'criteria':
         return <CriteriaSection key={id} criteria={view.criteria} />;
       case 'modifiedFiles':
