@@ -1,5 +1,5 @@
 import { DecisionList } from './DecisionList';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Blocker, IntegrationConflict, IntegrationPreview } from '../../lib/api';
 import type { IntegrationResult } from '../../lib/api';
 import { getIntegration, integrate } from '../../lib/api';
@@ -7,6 +7,7 @@ import { CriterionProvenanceBadge } from './CriteriaSection';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Card } from '../ui/Card';
+import { Modal } from '../ui/Modal';
 import { FieldRow, TextArea } from '../ui/Field';
 import { SectionLabel } from '../ui/SectionLabel';
 
@@ -42,7 +43,6 @@ function blockerSentence(blocker: Blocker): string {
 }
 
 export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: string; open: boolean; onClose: () => void }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
   const [preview, setPreview] = useState<IntegrationPreview | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,10 +55,7 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
   const [removeWorktree, setRemoveWorktree] = useState(false);
 
   useEffect(() => {
-    if (!open) {
-      dialogRef.current?.close();
-      return;
-    }
+    if (!open) return;
     // A fresh open re-reads the worktree: the previous result and accepted
     // blockers belong to the last preview, not to this one.
     setPreview(null);
@@ -82,14 +79,12 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
         setError(fetchError instanceof Error ? fetchError.message : 'Erreur');
         setLoading(false);
       });
-    dialogRef.current?.showModal();
     return () => {
       active = false;
     };
   }, [open, sessionId]);
 
   const closeDialog = () => {
-    dialogRef.current?.close();
     onClose();
   };
 
@@ -124,17 +119,7 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
   };
 
   return (
-    <dialog
-      ref={dialogRef}
-      aria-label="Intégrer"
-      onCancel={() => onClose()}
-      onClick={(event) => {
-        if (event.target === dialogRef.current) {
-          closeDialog();
-        }
-      }}
-      className="m-auto w-[min(92vw,720px)] text-text backdrop:bg-black/60"
-    >
+    <Modal open={open} onClose={onClose} busy={posting} label="Intégrer" width="w-[min(92vw,720px)]">
       <Card className="flex flex-col gap-3 p-4">
         <div className="flex flex-col gap-1">
           <h2 className="m-0 text-sm font-semibold">
@@ -329,6 +314,6 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
           </Button>
         </div>
       </Card>
-    </dialog>
+    </Modal>
   );
 }

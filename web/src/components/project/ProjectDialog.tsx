@@ -13,6 +13,7 @@ import { PathBreadcrumb } from './PathBreadcrumb';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { TextInput } from '../ui/Field';
+import { Modal } from '../ui/Modal';
 
 interface ProjectDialogProps {
   open: boolean;
@@ -66,17 +67,6 @@ export function ProjectDialog({ open, submitting, error, onClose, onSubmit }: Pr
     return () => window.clearTimeout(timer);
   }, [open, load]);
 
-  useEffect(() => {
-    if (!open) return;
-
-    const handleWindowKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-
-    window.addEventListener('keydown', handleWindowKeyDown);
-    return () => window.removeEventListener('keydown', handleWindowKeyDown);
-  }, [open, onClose]);
-
   if (!open) return null;
 
   const visibleFolders = listing
@@ -110,16 +100,8 @@ export function ProjectDialog({ open, submitting, error, onClose, onSubmit }: Pr
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Ouvrir un projet"
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <Card className="flex max-h-[85vh] w-full max-w-2xl flex-col shadow-2xl">
+    <Modal open={open} onClose={onClose} busy={submitting} label="Ouvrir un projet" width="w-[min(92vw,672px)]">
+      <Card className="flex max-h-[85vh] w-full flex-col">
         <header className="flex shrink-0 items-start justify-between gap-3 border-b border-border p-4">
           <div className="flex min-w-0 flex-col gap-1">
             <h2 className="truncate text-base font-semibold text-text">Ouvrir un projet</h2>
@@ -207,6 +189,6 @@ export function ProjectDialog({ open, submitting, error, onClose, onSubmit }: Pr
           </div>
         </footer>
       </Card>
-    </div>
+    </Modal>
   );
 }
