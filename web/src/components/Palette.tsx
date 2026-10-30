@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Project } from '../lib/api';
-import { stateDotClass, stateLabel } from '../lib/format';
+import type { Project, SessionState } from '../lib/api';
+import { stateLabel } from '../lib/format';
+import { SessionStateIcon } from './session/SessionStateIcon';
 import { SearchIcon } from './Icons';
 import { SectionLabel } from './ui/SectionLabel';
 
@@ -8,7 +9,8 @@ interface PaletteItem {
   id: string;
   title: string;
   meta: string;
-  dot: string;
+  /** A session's state; the other entries show a plain dot. */
+  state?: SessionState;
   action: () => void;
 }
 
@@ -46,7 +48,7 @@ export function Palette({ open, projects, onClose, onOpenSession, onNewSession, 
       id: `session-${session.id}`,
       title: session.title,
       meta: `${session.project} · ${stateLabel(session.state)}`,
-      dot: stateDotClass(session.state),
+      state: session.state,
       action: () => onOpenSession(session.id)
     });
 
@@ -74,21 +76,18 @@ export function Palette({ open, projects, onClose, onOpenSession, onNewSession, 
         id: `new-${project.id}`,
         title: `Nouvelle session dans ${project.name}`,
         meta: '⌘N',
-        dot: 'bg-muted',
         action: () => onNewSession(project.id)
       })),
       {
         id: 'open-project',
         title: 'Ouvrir un projet…',
         meta: '',
-        dot: 'bg-muted',
         action: onOpenProjectDialog
       },
       {
         id: 'home',
         title: 'Accueil',
         meta: '',
-        dot: 'bg-muted',
         action: onHome
       }
     ].filter((command) => !q || command.title.toLowerCase().includes(q));
@@ -196,7 +195,11 @@ export function Palette({ open, projects, onClose, onOpenSession, onNewSession, 
                       active ? 'bg-raised' : 'bg-transparent'
                     } min-h-10`}
                   >
-                    <span className={`h-[7px] w-[7px] flex-none rounded-full ${item.dot}`} />
+                    {item.state ? (
+                      <SessionStateIcon state={item.state} className="h-3.5 w-3.5" />
+                    ) : (
+                      <span className="mx-[3.5px] h-[7px] w-[7px] flex-none rounded-full bg-muted" />
+                    )}
                     <span className="min-w-0 grow overflow-hidden text-ellipsis whitespace-nowrap font-medium">
                       {item.title}
                     </span>
