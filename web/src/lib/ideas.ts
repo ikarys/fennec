@@ -4,47 +4,72 @@
  */
 import { request } from './api';
 
-export type IdeaState = 'inbox' | 'framing' | 'ready' | 'started';
+export type Stage = 'yours' | 'running' | 'queue' | 'drafts' | 'done';
 
-export type IdeaSessionState =
+export type IdeaStatus =
+  | 'inbox'
+  | 'framing'
+  | 'queued'
   | 'running'
-  | 'waiting_for_user'
-  | 'complete'
-  | 'error'
-  | 'stopped'
-  | 'truncated'
-  | 'idle';
+  | 'question'
+  | 'review'
+  | 'halted'
+  | 'failed'
+  | 'integrated';
 
-export interface IdeaReport {
-  /** The human integrated the idea's work (`integration.applied`). */
-  integrated: boolean;
-  criteria: {
-    passed: number;
-    failed: number;
-    pending: number;
-  };
-  decisions: {
-    title: string;
-    choice: string;
-  }[];
-}
+export type IdeaAction = 'frame' | 'resumeFraming' | 'start' | 'open' | 'answer' | 'review';
 
-export interface Idea {
+export type IdeaMenuAction = 'reframe' | 'startUnframed' | 'drop';
+
+export interface IdeaView {
   id: string;
   text: string;
-  state: IdeaState;
+  status: IdeaStatus;
+  stage: Stage;
+  action: IdeaAction | null;
+  menu: IdeaMenuAction[];
   sessionId: string | null;
   plan: string | null;
-  sessionState: IdeaSessionState | null;
   halted: string | null;
-  report: IdeaReport | null;
+  autonomous: boolean;
+  position: number | null;
   createdAt: number;
-  updatedAt: number;
+  startedAt: number | null;
+  durationMs: number | null;
+  tokens: number | null;
+  criteria: { passed: number; failed: number; pending: number } | null;
+  decisions: { title: string; choice: string }[];
+  commits: number | null;
+  files: number | null;
 }
 
 export interface IdeaBoard {
-  ideas: Idea[];
-  queueRunning: boolean;
+  queue: {
+    running: boolean;
+    autonomous: boolean;
+    ready: number;
+    next: { id: string; text: string } | null;
+    caps: { maxMinutes: number; maxTokens: number };
+  };
+  groups: { stage: Stage; ideas: IdeaView[] }[];
+  nightReport:
+    | null
+    | {
+        startedAt: number;
+        finishedAt: number;
+        reason: string;
+        autonomous: boolean;
+        summary: {
+          started: number;
+          running: number;
+          review: number;
+          question: number;
+          halted: number;
+          failed: number;
+          integrated: number;
+        };
+        ideas: IdeaView[];
+      };
 }
 
 type BoardRequestInit = {
@@ -129,6 +154,20 @@ export async function stopQueue(projectId: string): Promise<IdeaBoard> {
 /** Builds this idea now, outside the queue: from its plan when ready, else the workflow plans first. */
 export async function startIdea(projectId: string, ideaId: string): Promise<IdeaBoard> {
   return boardRequest(projectId, `/ideas/${encodeURIComponent(ideaId)}/start`, {
+    method: 'POST',
+    body: '{}',
+  });
+}
+
+export async function reorderIdeas(projectId: string, ids: string[]): Promise<IdeaBoard> {
+  return boardRequest(projectId, '/ideas/reorder', {
+    method: 'POST',
+    body: JSON.stringify({ ids }),
+  });
+}
+
+export async function markReportRead(projectId: string): Promise<IdeaBoard> {
+  return boardRequest(projectId, '/ideas/report/read', {
     method: 'POST',
     body: '{}',
   });

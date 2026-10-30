@@ -7,7 +7,8 @@ look lives in two places only, so a screen can never drift from the others:
    spacing unit, radii. Components use the tokens (`bg-panel`, `text-muted`),
    never a literal colour.
 2. **The primitives** (`web/src/components/ui/`): `Button`, `Badge`,
-   `SectionLabel`, `Card`, `Modal`, `ConfirmDialog`, `Section`, `Panel`, and the
+   `SectionLabel`, `Card`, `Modal`, `ConfirmDialog`, `Section`, `Panel`,
+   `Segmented`, `VerticalTabs` (a page's sections), `Menu`, and the
    fields (`TextInput`, `Select`, `TextArea`, `FieldRow`). Every modal and
    confirmation is one of these: a dialog's shell is `Modal`, a "are you sure"
    is `ConfirmDialog`, never a raw `<dialog>` overlay or a browser `confirm()`.
