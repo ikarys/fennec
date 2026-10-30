@@ -20,6 +20,7 @@ use crate::agent::workflow::WorkflowJob;
 use crate::agents;
 use crate::domain::agent::{resolve as agent_resolve, switch_to};
 use crate::domain::attachment::{Attachment, from_data_url};
+use crate::domain::conversation::first_request;
 use crate::domain::event::Event;
 use crate::domain::id::new_id;
 use crate::domain::preferences::ModelRef;
@@ -400,6 +401,8 @@ fn get_session(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String
         Some(idea) => json!({ "id": idea.id, "state": idea.state }),
         None => Value::Null,
     };
+    // The first human request, so the context panel can show what was asked.
+    v["request"] = json!(first_request(&events));
     v["worktree"] = match app.place(&store, &s, &p)?.worktree {
         Some(wt) => json!({
             "path": wt.path, "branch": wt.branch, "base": wt.base,
