@@ -30,6 +30,8 @@ pub struct Preferences {
     pub search: SearchPrefs,
     /// How commands run: in bwrap or on the host.
     pub sandbox: SandboxPrefs,
+    /// Skill ids whose instructions every new session gets in its system prompt.
+    pub always_on_skills: Vec<String>,
     /// Before providers (one endpoint): read, moved by `migrate`, never written.
     #[serde(rename = "model", skip_serializing)]
     pub(crate) legacy_model: Option<String>,

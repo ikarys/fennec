@@ -19,10 +19,17 @@ const DEFAULTS: [&str; 1] = [include_str!("../skills/browser/SKILL.md")];
 /// openfox `loadAllSkills`: the skills a session in `workdir` can load.
 pub fn discover(workdir: &Path) -> Vec<Skill> {
     let home = std::env::var_os("HOME").map(PathBuf::from);
-    discover_in(home.as_deref(), workdir)
+    discover_in(home.as_deref(), Some(workdir))
 }
 
-fn discover_in(home: Option<&Path>, workdir: &Path) -> Vec<Skill> {
+/// The skills a session can load outside any project: the embedded defaults
+/// and `~/.agents/skills`. The Settings page has no `workdir`.
+pub fn discover_global() -> Vec<Skill> {
+    let home = std::env::var_os("HOME").map(PathBuf::from);
+    discover_in(home.as_deref(), None)
+}
+
+fn discover_in(home: Option<&Path>, workdir: Option<&Path>) -> Vec<Skill> {
     let mut skills = Vec::new();
 
     for content in DEFAULTS {
@@ -46,9 +53,11 @@ fn discover_in(home: Option<&Path>, workdir: &Path) -> Vec<Skill> {
         }
     }
 
-    let dir = workdir.join(".agents").join("skills");
-    for skill in load_skills_directory(&dir) {
-        insert_or_override(&mut skills, skill);
+    if let Some(workdir) = workdir {
+        let dir = workdir.join(".agents").join("skills");
+        for skill in load_skills_directory(&dir) {
+            insert_or_override(&mut skills, skill);
+        }
     }
 
     skills
@@ -135,15 +144,18 @@ mod tests {
     #[test]
     fn missing_dirs_load_defaults_only() {
         let (root, home, workdir) = fixture();
-        assert_eq!(discover_in(Some(&home), &workdir).len(), DEFAULTS.len());
-        assert_eq!(discover_in(None, &workdir).len(), DEFAULTS.len());
+        assert_eq!(
+            discover_in(Some(&home), Some(&workdir)).len(),
+            DEFAULTS.len()
+        );
+        assert_eq!(discover_in(None, Some(&workdir)).len(), DEFAULTS.len());
         let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]
     fn embedded_browser_skill_is_discovered_with_no_directory() {
         let (root, _home, workdir) = fixture();
-        let found = discover_in(None, &workdir);
+        let found = discover_in(None, Some(&workdir));
         assert_eq!(found.len(), DEFAULTS.len());
         assert_eq!(found[0].id, "browser");
         assert_eq!(found[0].directory, None);
@@ -161,7 +173,7 @@ mod tests {
             "---\nname: pkg\ndescription: d\n---\nbody\n",
         );
 
-        let found = discover_in(Some(&home), &workdir);
+        let found = discover_in(Some(&home), Some(&workdir));
         assert_eq!(found.len(), DEFAULTS.len() + 1);
         let pkg = found.iter().find(|skill| skill.id == "pkg").unwrap();
         assert_eq!(
@@ -179,7 +191,7 @@ mod tests {
         write_skill(&skills, "invalid", "---\nname: invalid\n---\nbody\n");
         std::fs::write(skills.join("plain.txt"), "not a package").unwrap();
 
-        let found = discover_in(Some(&home), &workdir);
+        let found = discover_in(Some(&home), Some(&workdir));
         assert_eq!(found.len(), DEFAULTS.len());
         assert!(found.iter().all(|skill| skill.id == "browser"));
         let _ = std::fs::remove_dir_all(&root);
@@ -207,7 +219,7 @@ mod tests {
             "---\nname: alpha\ndescription: project\n---\nproject body\n",
         );
 
-        let found = discover_in(Some(&home), &workdir);
+        let found = discover_in(Some(&home), Some(&workdir));
         assert_eq!(found.len(), DEFAULTS.len() + 2);
         assert_eq!(found[0].id, "browser");
         assert_eq!(found[1].id, "alpha");
@@ -226,7 +238,7 @@ mod tests {
             "---\nname: browser\ndescription: project\n---\nproject body\n",
         );
 
-        let found = discover_in(None, &workdir);
+        let found = discover_in(None, Some(&workdir));
         assert_eq!(found.len(), DEFAULTS.len());
         assert_eq!(found[0].id, "browser");
         assert_eq!(found[0].description, "project");
@@ -245,7 +257,7 @@ mod tests {
         write_skill(&skills, "b", "---\nname: b\ndescription: b\n---\nb\n");
         write_skill(&skills, "a", "---\nname: a\ndescription: a\n---\na\n");
 
-        let found = discover_in(None, &workdir);
+        let found = discover_in(None, Some(&workdir));
         let ids: Vec<&str> = found.iter().map(|skill| skill.id.as_str()).collect();
         assert_eq!(ids, vec!["browser", "a", "b"]);
         let _ = std::fs::remove_dir_all(&root);
