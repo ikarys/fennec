@@ -10,11 +10,7 @@ import {
   type Project,
   type ProjectOverview,
 } from '../lib/api';
-import { frameIdea, type IdeaView } from '../lib/ideas';
-
-// The idea's text is the human's; the framing asks for a plan, not code.
-const framePrompt = (idea: string) =>
-  `Frame this idea into a plan; ask me what is unclear before planning.\n\nIdea: ${idea}`;
+import { type IdeaView } from '../lib/ideas';
 
 const ANALYZE_PROMPT =
   'Analyze this project and draft the philosophy, layers and rules of its AGENTS.md.';
@@ -112,11 +108,9 @@ export default function ProjectPage({
     }
   };
 
-  // Creates the plan session, links it to the idea, and opens it.
+  // Opens a new plan session with the idea in the composer: the human edits it, then sends.
   const handleFrame = async (idea: IdeaView) => {
-    const session = await createSession(projectId, framePrompt(idea.text), 'plan');
-    await frameIdea(projectId, idea.id, session.id);
-    onOpenSession(session.id);
+    window.location.hash = `#/new/${encodeURIComponent(projectId)}?frame=${encodeURIComponent(idea.id)}`;
   };
 
   const shell = (children: ReactNode) => (
