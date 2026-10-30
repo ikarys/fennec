@@ -127,12 +127,42 @@ fn model_entries(
     entries
 }
 
-/// Re-lists one provider's models now. The request carries the baseUrl and
-/// API key to use when they are not (yet) stored, so a new provider can be
-/// probed before saving. Returns a single listing in the same shape as
-/// `GET /api/settings`.
+/// Re-lists one provider's models now. Returns a single listing in the same
+/// shape as `GET /api/settings`.
 pub fn list_provider(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
     let body = req.json()?;
+    let (provider, endpoint) = requested_endpoint(app, &body)?;
+    let listed = list_models(&endpoint);
+    let prefs = app.store()?.preferences()?;
+    let name = provider_name(&prefs, &provider);
+    let listing = listing_body(app, &prefs, &provider, &name, endpoint.base_url, listed);
+    send_json(stream, 200, &listing)
+}
+
+/// Probes one model for its limits (an endpoint that does not list them).
+/// The request names the provider as `providers/list` does, plus `model`.
+/// The result is indicative: it is read from the endpoint's error messages.
+pub fn probe_model(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
+    let body = req.json()?;
+    let (_, endpoint) = requested_endpoint(app, &body)?;
+    let Some(model) = body
+        .get("model")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|id| !id.is_empty())
+    else {
+        return error(stream, 400, "model must not be empty");
+    };
+    match llm_providers::probe_model(&endpoint, model) {
+        Ok(probed) => send_json(stream, 200, &json!(probed)),
+        Err(e) => error(stream, 502, &e),
+    }
+}
+
+/// The provider a request names and the endpoint to reach it at. The request
+/// carries the baseUrl and API key to use when they are not (yet) stored, so
+/// a new provider can be probed before saving.
+fn requested_endpoint(app: &App, body: &Value) -> Result<(String, Endpoint), String> {
     let provider = body
         .get("provider")
         .and_then(Value::as_str)
@@ -169,14 +199,7 @@ pub fn list_provider(app: &App, req: &Request, stream: &mut TcpStream) -> Result
         None if reuse_stored_key(&base_url, &stored_base_url) => stored.and_then(|e| e.api_key),
         None => None,
     };
-    let endpoint = Endpoint {
-        base_url: base_url.clone(),
-        api_key,
-    };
-    let listed = list_models(&endpoint);
-    let name = provider_name(&prefs, &provider);
-    let listing = listing_body(app, &prefs, &provider, &name, base_url, listed);
-    send_json(stream, 200, &listing)
+    Ok((provider, Endpoint { base_url, api_key }))
 }
 
 pub fn save_settings(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), String> {

@@ -193,6 +193,14 @@ read-only. The human edits them as usual.
   they are not (yet) stored, so a new provider can be probed before saving;
   empty parts fall back to the stored/env endpoint; the stored key is reused
   only for the stored `baseUrl`, never sent to another one
+- `POST /api/settings/models/probe` with `{provider, baseUrl, apiKey, model}`
+  (endpoint resolved as for `providers/list`) → `{contextWindow, contextSource,
+  maxTokens, reasoningEfforts, effortsSource, defaultReasoningEffort}`
+  (openfox auto-config). One-token calls: a baseline, one per effort
+  (accepted, deduped by `prompt_tokens`), one with an oversized `max_tokens`
+  whose refusal may name the limits. A source is `endpoint` or `catalog` (the
+  model family's known values, `llm-providers/src/catalog.rs`). Indicative;
+  502 with the endpoint's message when the model cannot be called
 - `GET /api/models/choices` → `{default, favorites}`, each a
   `{provider, model, providerName}`: what the composer's model picker offers;
   read from the stored preferences, no provider is called
