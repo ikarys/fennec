@@ -4,7 +4,8 @@
 import { useState } from 'react';
 import { SectionLabel } from '../../ui/SectionLabel';
 import { Button } from '../../ui/Button';
-import { TextArea } from '../../ui/Field';
+import { TextInput } from '../../ui/Field';
+import { PlusIcon } from '../../Icons';
 import { IdeaRow } from './IdeaRow';
 import {
   addIdea,
@@ -94,29 +95,29 @@ export function StageGroup({
         ))}
 
         {stage === 'drafts' ? (
-          <div className="mt-2 flex items-start gap-2">
-            <TextArea
-              rows={1}
-              className="w-full"
-              placeholder="Une idée à garder pour plus tard… (Entrée pour l'ajouter)"
+          <div className="relative mt-2">
+            <TextInput
+              className="w-full pr-10"
+              placeholder="Une idée à garder pour plus tard…"
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
+                if (e.key === 'Enter') {
                   e.preventDefault();
                   void handleAdd();
                 }
               }}
             />
             <Button
+              variant="ghost"
               iconOnly
-              className="shrink-0"
-              title="Ajouter l'idée au backlog"
+              className="absolute right-1 top-1/2 -translate-y-1/2"
+              title="Ajouter l'idée au backlog (Entrée)"
               aria-label="Ajouter l'idée au backlog"
               disabled={!text.trim() || busy}
               onClick={() => void handleAdd()}
             >
-              +
+              <PlusIcon className="h-4 w-4" />
             </Button>
           </div>
         ) : null}
