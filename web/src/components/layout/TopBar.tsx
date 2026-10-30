@@ -44,6 +44,28 @@ function WorkflowsIcon({ className }: { className?: string }) {
   );
 }
 
+function BacklogIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M3 6l2 2 3-3" />
+      <path d="M3 13l2 2 3-3" />
+      <path d="M3 20l2 2 3-3" />
+      <path d="M13 6h8" />
+      <path d="M13 13h8" />
+      <path d="M13 20h8" />
+    </svg>
+  );
+}
+
 export interface TabInfo {
   id: string;
   title: string;
@@ -181,7 +203,6 @@ export function TopBar({
           className={buttonClass({ variant: 'ghost', size: 'sm' })}
         >
           <InsightIcon className="h-4 w-4" />
-          <span className="hidden lg:inline">Insight</span>
         </a>
         <a
           href="#/workflows"
@@ -190,7 +211,14 @@ export function TopBar({
           className={buttonClass({ variant: 'ghost', size: 'sm' })}
         >
           <WorkflowsIcon className="h-4 w-4" />
-          <span className="hidden lg:inline">Workflows</span>
+        </a>
+        <a
+          href="#/backlog"
+          title="Backlog"
+          aria-label="Backlog"
+          className={buttonClass({ variant: 'ghost', size: 'sm' })}
+        >
+          <BacklogIcon className="h-4 w-4" />
         </a>
         <a
           href="#/settings"
@@ -199,7 +227,6 @@ export function TopBar({
           className={buttonClass({ variant: 'ghost', size: 'sm' })}
         >
           <SettingsIcon className="h-4 w-4" />
-          <span className="hidden lg:inline">Réglages</span>
         </a>
       </div>
     </header>
