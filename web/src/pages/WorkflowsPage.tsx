@@ -129,6 +129,22 @@ export default function WorkflowsPage({ projects, projectId, workflowId, isNew }
           </Select>
         </div>
 
+        <form onSubmit={handleNewWorkflow} className="mt-6 flex items-center gap-2">
+          <TextInput
+            type="text"
+            value={newId}
+            onChange={(event) => {
+              setNewId(event.target.value);
+              setNewIdError(null);
+            }}
+            placeholder="nouveau-workflow"
+          />
+          <Button variant="primary" size="md" type="submit" disabled={!selectedProjectId}>
+            Nouveau workflow
+          </Button>
+        </form>
+        {newIdError && <div className="mt-1 text-xs text-err">{newIdError}</div>}
+
         {selectedProjectId && (
           <div className="mt-4">
             {listError && <div className="text-err">{listError}</div>}
@@ -156,22 +172,6 @@ export default function WorkflowsPage({ projects, projectId, workflowId, isNew }
             )}
           </div>
         )}
-
-        <form onSubmit={handleNewWorkflow} className="mt-6 flex items-center gap-2">
-          <TextInput
-            type="text"
-            value={newId}
-            onChange={(event) => {
-              setNewId(event.target.value);
-              setNewIdError(null);
-            }}
-            placeholder="nouveau-workflow"
-          />
-          <Button variant="primary" size="md" type="submit" disabled={!selectedProjectId}>
-            Nouveau workflow
-          </Button>
-        </form>
-        {newIdError && <div className="mt-1 text-xs text-err">{newIdError}</div>}
       </div>
     </main>
   );

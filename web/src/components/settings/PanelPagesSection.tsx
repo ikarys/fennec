@@ -59,83 +59,79 @@ export function PanelPagesSection({ value, onChange }: PanelPagesSectionProps) {
   };
 
   return (
-    <Section>
+    <Section title="Panneau de contexte" description={alwaysShown}>
       <div className="flex flex-col gap-4">
-        <h2 className="text-sm font-semibold">Panneau de contexte</h2>
-        <p className="m-0 text-xs text-muted">{alwaysShown}</p>
-        <div className="flex flex-col gap-4">
-          {pages.map((page, index) => {
-            // Edits work on what the panel shows, so unknown stored ids drop out on the first change.
-            const blocks = pageOptionalBlocks(page);
-            return (
-              <div key={index} className="flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                  <TextInput
-                    aria-label="Nom de la page"
-                    value={page.name}
-                    onChange={(event) => updatePage(index, { ...page, name: event.target.value })}
-                    className="grow"
-                  />
-                  <Button variant="ghost" size="sm" onClick={() => removePage(index)} disabled={index === 0}>
-                    Supprimer
-                  </Button>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  {blocks.map((id, blockIndex) => (
-                    <div key={id} className="flex items-center gap-2 text-xs text-text">
-                      <label className="flex grow items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked
-                          onChange={() => updatePage(index, { ...page, blocks: toggleBlock(blocks, id) })}
-                          className="h-4 w-4 accent-[var(--accent)]"
-                        />
-                        <span>{panelBlock(id).title}</span>
-                      </label>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => updatePage(index, { ...page, blocks: moveBlock(blocks, id, -1) })}
-                        disabled={blockIndex === 0}
-                        aria-label="Monter"
-                      >
-                        ↑
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => updatePage(index, { ...page, blocks: moveBlock(blocks, id, 1) })}
-                        disabled={blockIndex === blocks.length - 1}
-                        aria-label="Descendre"
-                      >
-                        ↓
-                      </Button>
-                    </div>
-                  ))}
-                  {OPTIONAL_BLOCKS.filter((block) => !blocks.includes(block.id)).map((block) => (
-                    <label key={block.id} className="flex items-center gap-2 text-xs text-text">
+        {pages.map((page, index) => {
+          // Edits work on what the panel shows, so unknown stored ids drop out on the first change.
+          const blocks = pageOptionalBlocks(page);
+          return (
+            <div key={index} className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <TextInput
+                  aria-label="Nom de la page"
+                  value={page.name}
+                  onChange={(event) => updatePage(index, { ...page, name: event.target.value })}
+                  className="grow"
+                />
+                <Button variant="ghost" size="sm" onClick={() => removePage(index)} disabled={index === 0}>
+                  Supprimer
+                </Button>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                {blocks.map((id, blockIndex) => (
+                  <div key={id} className="flex items-center gap-2 text-xs text-text">
+                    <label className="flex grow items-center gap-2">
                       <input
                         type="checkbox"
-                        checked={false}
-                        onChange={() => updatePage(index, { ...page, blocks: toggleBlock(blocks, block.id) })}
+                        checked
+                        onChange={() => updatePage(index, { ...page, blocks: toggleBlock(blocks, id) })}
                         className="h-4 w-4 accent-[var(--accent)]"
                       />
-                      <span className="grow">{block.title}</span>
+                      <span>{panelBlock(id).title}</span>
                     </label>
-                  ))}
-                </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => updatePage(index, { ...page, blocks: moveBlock(blocks, id, -1) })}
+                      disabled={blockIndex === 0}
+                      aria-label="Monter"
+                    >
+                      ↑
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => updatePage(index, { ...page, blocks: moveBlock(blocks, id, 1) })}
+                      disabled={blockIndex === blocks.length - 1}
+                      aria-label="Descendre"
+                    >
+                      ↓
+                    </Button>
+                  </div>
+                ))}
+                {OPTIONAL_BLOCKS.filter((block) => !blocks.includes(block.id)).map((block) => (
+                  <label key={block.id} className="flex items-center gap-2 text-xs text-text">
+                    <input
+                      type="checkbox"
+                      checked={false}
+                      onChange={() => updatePage(index, { ...page, blocks: toggleBlock(blocks, block.id) })}
+                      className="h-4 w-4 accent-[var(--accent)]"
+                    />
+                    <span className="grow">{block.title}</span>
+                  </label>
+                ))}
               </div>
-            );
-          })}
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="secondary" size="sm" onClick={addPage} disabled={pages.length >= MAX_PAGES}>
-            Ajouter une page
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => onChange(null)} disabled={value === null}>
-            Réinitialiser
-          </Button>
-        </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex items-center gap-2">
+        <Button variant="secondary" size="sm" onClick={addPage} disabled={pages.length >= MAX_PAGES}>
+          Ajouter une page
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => onChange(null)} disabled={value === null}>
+          Réinitialiser
+        </Button>
       </div>
     </Section>
   );

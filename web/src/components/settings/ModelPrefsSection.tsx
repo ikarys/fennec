@@ -3,6 +3,7 @@ import type { ModelRef, ParamSource, ProviderListing, ReasoningEffort, SettingsD
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Section } from '../ui/Section';
+import { SectionLabel } from '../ui/SectionLabel';
 import { ChevronRightIcon } from '../Icons';
 import { FieldRow, Select, TextInput } from '../ui/Field';
 import { ModelProbe } from './ModelProbe';
@@ -121,7 +122,7 @@ function ModelRow({
 
   return (
     <div className="flex flex-col border-t border-border/60 first:border-t-0">
-      <div className="flex h-8 items-center gap-2">
+      <div className="-mx-2 flex h-8 items-center gap-2 rounded px-2 hover:bg-raised">
         <button
           type="button"
           aria-expanded={open}
@@ -280,55 +281,57 @@ export function ModelPrefsSection({ listings, values, defaults, favorites, onTog
   const toggleOpen = (key: string) => setOpen((previous) => ({ ...previous, [key]: !isOpen(key) }));
 
   return (
-    <Section>
-      <h2 className="text-sm font-semibold">Paramètres par modèle</h2>
+    <Section title="Paramètres par modèle">
       {listings.length === 0 && <p className="m-0 text-sm text-muted">Aucun modèle listé.</p>}
       <div className="flex flex-col">
         {listings.map((listing) => {
           const formOnly = formOnlyModels(values, listing.provider, listing);
+          const count = listing.models.length + formOnly.length;
           return (
-          <div key={listing.provider} className="border-t border-border first:border-t-0">
-            <p className="m-0 py-1 font-mono text-xs font-medium text-muted">{listing.name}</p>
-            {listing.models.length === 0 && formOnly.length === 0 && (
-              <p className="m-0 pb-2 text-xs text-faint">Aucun modèle listé.</p>
-            )}
-            {listing.models.map((model) => (
-              <ModelRow
-                key={`${listing.provider}/${model.id}`}
-                providerId={listing.provider}
-                modelId={model.id}
-                model={model}
-                values={values}
-                defaults={defaults}
-                favorites={favorites}
-                onToggleFavorite={onToggleFavorite}
-                onChange={onChange}
-                onRemoveModel={onRemoveModel}
-                open={isOpen(`${listing.provider}/${model.id}`)}
-                onToggleOpen={() => toggleOpen(`${listing.provider}/${model.id}`)}
-              />
-            ))}
-            {formOnly.map((modelId) => (
-              <ModelRow
-                key={`${listing.provider}/${modelId}`}
-                providerId={listing.provider}
-                modelId={modelId}
-                model={null}
-                values={values}
-                defaults={defaults}
-                favorites={favorites}
-                onToggleFavorite={onToggleFavorite}
-                onChange={onChange}
-                onRemoveModel={onRemoveModel}
-                open={isOpen(`${listing.provider}/${modelId}`)}
-                onToggleOpen={() => toggleOpen(`${listing.provider}/${modelId}`)}
-              />
-            ))}
-          </div>
+            <div key={listing.provider} className="border-t border-border first:border-t-0 pt-3 first:pt-0">
+              <SectionLabel className="pb-1">
+                <span className="font-mono">{listing.name}</span>
+                {count > 0 && <span className="text-faint"> · {count}</span>}
+              </SectionLabel>
+              {listing.models.length === 0 && formOnly.length === 0 && (
+                <p className="m-0 pb-2 text-xs text-faint">Aucun modèle listé.</p>
+              )}
+              {listing.models.map((model) => (
+                <ModelRow
+                  key={`${listing.provider}/${model.id}`}
+                  providerId={listing.provider}
+                  modelId={model.id}
+                  model={model}
+                  values={values}
+                  defaults={defaults}
+                  favorites={favorites}
+                  onToggleFavorite={onToggleFavorite}
+                  onChange={onChange}
+                  onRemoveModel={onRemoveModel}
+                  open={isOpen(`${listing.provider}/${model.id}`)}
+                  onToggleOpen={() => toggleOpen(`${listing.provider}/${model.id}`)}
+                />
+              ))}
+              {formOnly.map((modelId) => (
+                <ModelRow
+                  key={`${listing.provider}/${modelId}`}
+                  providerId={listing.provider}
+                  modelId={modelId}
+                  model={null}
+                  values={values}
+                  defaults={defaults}
+                  favorites={favorites}
+                  onToggleFavorite={onToggleFavorite}
+                  onChange={onChange}
+                  onRemoveModel={onRemoveModel}
+                  open={isOpen(`${listing.provider}/${modelId}`)}
+                  onToggleOpen={() => toggleOpen(`${listing.provider}/${modelId}`)}
+                />
+              ))}
+            </div>
           );
         })}
       </div>
     </Section>
   );
 }
-

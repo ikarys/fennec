@@ -10,6 +10,22 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 
+/** A silent command still shows it is alive: the time since the card appeared. */
+// ponytail: counts from mount, so a reload restarts it; the events carry no timestamp.
+function RunningSince() {
+  const [start] = useState(() => Date.now());
+  const [now, setNow] = useState(start);
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  return (
+    <div className="text-muted">
+      En cours, pas encore de sortie · {formatDuration(now - start)}
+    </div>
+  );
+}
+
 export function ToolCard({ tool }: { tool: ToolCallView }) {
   const display = useDisplayPrefs();
   const [open, setOpen] = useState(display.toolResultsOpen);
@@ -150,6 +166,7 @@ export function ToolCard({ tool }: { tool: ToolCallView }) {
                 <>
                   {tool.stdout && <div>{tool.stdout}</div>}
                   {tool.stderr && <div className="text-err">{tool.stderr}</div>}
+                  {!tool.stdout && !tool.stderr && <RunningSince />}
                 </>
               ) : (
                 <div>{tool.output || tool.error || 'Aucune sortie'}</div>

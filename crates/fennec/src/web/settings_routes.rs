@@ -6,6 +6,7 @@ use super::http::{Request, error, send_json};
 use super::model_view;
 use crate::domain::preferences::{LOCAL_PROVIDER, Preferences, Provider};
 use crate::skills;
+use crate::workflows;
 use llm_providers::{
     ApiKey, Endpoint, ListedModel, MasterKey, ModelParams, ModelPrefs, list_models,
 };
@@ -36,11 +37,22 @@ pub fn get_settings(app: &App, stream: &mut TcpStream) -> Result<(), String> {
         .into_iter()
         .map(|skill| json!({ "id": skill.id, "description": skill.description }))
         .collect();
+    let opt_in_workflows: Vec<Value> = workflows::opt_in_defaults()
+        .into_iter()
+        .map(|workflow| {
+            json!({
+                "id": workflow.id,
+                "name": workflow.name,
+                "description": workflow.description,
+            })
+        })
+        .collect();
     let body = json!({
         "preferences": prefs,
         "listings": listings,
         "defaults": app.settings.llm.defaults,
         "skills": skills,
+        "optInWorkflows": opt_in_workflows,
     });
     send_json(stream, 200, &body)
 }

@@ -2,9 +2,9 @@
  * The workflow run as a collapsible left rail: vertical, so every step stays visible.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { portTone, upcomingSteps, type NodeRun, type RunView, type UpcomingStep } from '../../../lib/workflowRun';
+import { portTone, runRounds, upcomingSteps, type NodeRun, type RunView, type UpcomingStep } from '../../../lib/workflowRun';
 import { formatClock, formatDuration } from '../../../lib/format';
-import { ChevronsLeftIcon, ChevronsRightIcon } from '../../Icons';
+import { ChevronDownIcon, ChevronRightIcon, ChevronsLeftIcon, ChevronsRightIcon } from '../../Icons';
 import { Button } from '../../ui/Button';
 
 const COLLAPSED_KEY = 'fennec.runRail.collapsed';
@@ -65,6 +65,7 @@ function StepRow({ step }: { step: RailStep }) {
   const label = step.kind === 'run' ? step.run.label : step.step.label;
   const nodeRun = step.kind === 'run' ? step.run : null;
   const isRunning = nodeRun?.state === 'running';
+  const isHumanRunning = isRunning && nodeRun?.kind === 'human';
   const isInterrupted = nodeRun?.state === 'interrupted';
   const isFinished = nodeRun?.state === 'done' || nodeRun?.state === 'ended';
   const port = nodeRun?.port;
@@ -73,22 +74,24 @@ function StepRow({ step }: { step: RailStep }) {
   // carried fall back to the mount time.
   const [elapsedMs, setElapsedMs] = useState(0);
   useEffect(() => {
-    if (!isRunning) return;
+    if (!isRunning || isHumanRunning) return;
     const start = nodeRun?.startedAt ?? Date.now();
     setElapsedMs(Date.now() - start);
     const interval = window.setInterval(() => setElapsedMs(Date.now() - start), 1000);
     return () => window.clearInterval(interval);
-  }, [isRunning, nodeRun?.startedAt]);
+  }, [isRunning, isHumanRunning, nodeRun?.startedAt]);
   // A node that ends the run has no workflow.node.finished. The frozen tick
   // only exists when the row was watched running; a late reload has none, so
   // no figure is shown (a 00:00 would be a lie).
-  const time = isRunning
-    ? formatClock(elapsedMs)
-    : nodeRun?.durationMs != null
-      ? formatDuration(nodeRun.durationMs)
-      : nodeRun?.state === 'ended' && elapsedMs > 0
-        ? formatClock(elapsedMs)
-        : null;
+  const time = isHumanRunning
+    ? 'en attente'
+    : isRunning
+      ? formatClock(elapsedMs)
+      : nodeRun?.durationMs != null
+        ? formatDuration(nodeRun.durationMs)
+        : nodeRun?.state === 'ended' && elapsedMs > 0
+          ? formatClock(elapsedMs)
+          : null;
   const title = step.kind === 'run' ? (isInterrupted ? `${label} — interrompu` : label) : `${label} — à venir`;
   const labelClass = isRunning
     ? 'font-medium text-text'
@@ -101,7 +104,8 @@ function StepRow({ step }: { step: RailStep }) {
   const outputLine = nodeRun?.output
     ?.split('\n')
     .map((line) => line.trim())
-    .find((line) => line.length > 0 && !line.startsWith('#'));
+    .find((line) => line.length > 0 && !line.startsWith('#'))
+    ?.replace(/[*_`]/g, '');
   const showPort = isFinished && !!port && !PLAIN_PORTS.has(port.trim().toLowerCase());
   const hasMeta = showPort || pass > 1 || time;
   return (
@@ -111,7 +115,9 @@ function StepRow({ step }: { step: RailStep }) {
         <span className="flex items-baseline gap-1.5 whitespace-nowrap text-[0.6875rem] text-muted">
           {showPort && port ? <PortLabel port={port} /> : null}
           {pass > 1 && <span className="tabular-nums">×{pass}</span>}
-          {time && <span className="ml-auto font-mono text-faint tabular-nums">{time}</span>}
+          {time && (
+            <span className={`ml-auto text-faint ${isHumanRunning ? '' : 'font-mono tabular-nums'}`}>{time}</span>
+          )}
         </span>
       )}
       {bar === 'border-err' && outputLine ? (
@@ -121,15 +127,67 @@ function StepRow({ step }: { step: RailStep }) {
   );
 }
 
+function RoundRow({
+  index,
+  round,
+  expanded,
+  onToggle
+}: {
+  index: number;
+  round: NodeRun[];
+  expanded: boolean;
+  onToggle: (index: number) => void;
+}) {
+  const last = round[round.length - 1];
+  if (!last) return null;
+  const bar = barClass({ kind: 'run', run: last, key: '' });
+  const hasDuration = round.some((nodeRun) => nodeRun.durationMs != null);
+  const totalDuration = round.reduce((total, nodeRun) => total + (nodeRun.durationMs ?? 0), 0);
+  return (
+    <li className={`flex flex-col border-l-2 ${bar} py-1 pl-2`}>
+      <button type="button" aria-expanded={expanded} onClick={() => onToggle(index)} className="-my-1 -ml-2 w-[calc(100%+0.5rem)] cursor-pointer rounded-r py-1 pl-2 text-left hover:bg-raised">
+        <span className="flex items-center gap-1 text-xs text-text">
+          {expanded ? <ChevronDownIcon className="h-3 w-3 shrink-0 text-muted" /> : <ChevronRightIcon className="h-3 w-3 shrink-0 text-muted" />}
+          <span className="truncate">Tour {index + 1}</span>
+        </span>
+        <span className="flex items-baseline gap-1.5 whitespace-nowrap text-[0.6875rem] text-muted">
+          {last.port ? <PortLabel port={last.port} /> : null}
+          <span className="tabular-nums">{round.length} étape{round.length > 1 ? 's' : ''}</span>
+          {hasDuration && <span className="ml-auto font-mono text-faint tabular-nums">{formatDuration(totalDuration)}</span>}
+        </span>
+      </button>
+      {expanded ? (
+        <div className="mt-1 flex flex-col gap-0.5 pl-2">
+          {round.map((nodeRun, runIndex) => (
+            <StepRow
+              key={`${nodeRun.nodeId}-${nodeRun.pass}-${runIndex}`}
+              step={{ kind: 'run' as const, run: nodeRun, key: `${nodeRun.nodeId}-${nodeRun.pass}-${runIndex}` }}
+            />
+          ))}
+        </div>
+      ) : null}
+    </li>
+  );
+}
+
 export function RunRail({ run }: { run: RunView }) {
   const [collapsed, setCollapsed] = useState(loadCollapsed);
+  const [expandedRounds, setExpandedRounds] = useState<Set<number>>(new Set());
   const listRef = useRef<HTMLOListElement>(null);
   const count = run.runs.length;
   const upcoming = useMemo(() => upcomingSteps(run), [run]);
-  const steps = useMemo<RailStep[]>(() => [
-    ...run.runs.map((nodeRun, index) => ({ kind: 'run' as const, run: nodeRun, key: `${nodeRun.nodeId}-${nodeRun.pass}-${index}` })),
-    ...upcoming.map((step) => ({ kind: 'upcoming' as const, step, key: `upcoming-${step.nodeId}` }))
-  ], [run, upcoming]);
+  const rounds = useMemo(() => runRounds(run.runs), [run.runs]);
+  const toggleRound = (index: number): void => {
+    setExpandedRounds((previous) => {
+      const next = new Set(previous);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     saveCollapsed(collapsed);
@@ -176,7 +234,29 @@ export function RunRail({ run }: { run: RunView }) {
         </Button>
       </div>
       <ol ref={listRef} className="flex min-h-0 grow flex-col gap-0.5 overflow-y-auto px-2 pt-1 pb-2 [scrollbar-width:thin]">
-        {steps.map((step) => <StepRow key={step.key} step={step} />)}
+        {rounds.slice(0, -1).map((round, index) => (
+          <RoundRow
+            key={`round-${index}`}
+            index={index}
+            round={round}
+            expanded={expandedRounds.has(index)}
+            onToggle={toggleRound}
+          />
+        ))}
+        {rounds.length > 0
+          ? rounds[rounds.length - 1]?.map((nodeRun, index) => (
+              <StepRow
+                key={`${nodeRun.nodeId}-${nodeRun.pass}-${index}`}
+                step={{ kind: 'run' as const, run: nodeRun, key: `${nodeRun.nodeId}-${nodeRun.pass}-${index}` }}
+              />
+            ))
+          : null}
+        {upcoming.map((step) => (
+          <StepRow
+            key={`upcoming-${step.nodeId}`}
+            step={{ kind: 'upcoming' as const, step, key: `upcoming-${step.nodeId}` }}
+          />
+        ))}
       </ol>
     </aside>
   );
