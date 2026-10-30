@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import type { Blocker, IntegrationConflict, IntegrationPreview } from '../../lib/api';
 import type { IntegrationResult } from '../../lib/api';
 import { getIntegration, integrate } from '../../lib/api';
+import { completeIdea } from '../../lib/ideas';
 import { CriterionProvenanceBadge } from './CriteriaSection';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -93,6 +94,7 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
     preview?.blockers.some((blocker) => blocker.kind !== 'noCommits' && !acknowledged[blocker.kind]) ?? false;
   const integrateDisabled =
     loading || posting || (result === null && (!hasCommits || hasUncheckedBlocker || message.trim() === ''));
+  const canFinish = preview !== null && result === null && !hasCommits && preview.idea !== null;
 
   const handleIntegrate = async () => {
     if (!preview) return;
@@ -113,6 +115,21 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
       } else {
         setError(integrateError instanceof Error ? integrateError.message : 'Erreur');
       }
+    } finally {
+      setPosting(false);
+    }
+  };
+
+  const handleFinish = async () => {
+    if (!preview || preview.idea === null) return;
+    setPosting(true);
+    setError(null);
+    setConflict(null);
+    try {
+      await completeIdea(preview.idea.projectId, preview.idea.id);
+      closeDialog();
+    } catch (finishError) {
+      setError(finishError instanceof Error ? finishError.message : 'Erreur');
     } finally {
       setPosting(false);
     }
@@ -294,6 +311,11 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
           </div>
         )}
 
+        {canFinish && (
+          <p className="text-xs text-muted">
+            Rien à intégrer : si le travail est déjà dans ta branche (intégré à la main), termine la tâche.
+          </p>
+        )}
         <div className="flex justify-end gap-2">
           <Button variant="secondary" size="md" onClick={closeDialog}>
             Annuler
@@ -302,15 +324,17 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
             variant="primary"
             size="md"
             onClick={() => {
-              if (result) {
+              if (canFinish) {
+                void handleFinish();
+              } else if (result) {
                 closeDialog();
               } else {
                 void handleIntegrate();
               }
             }}
-            disabled={integrateDisabled}
+            disabled={canFinish ? posting : integrateDisabled}
           >
-            {result ? 'Fermer' : 'Intégrer'}
+            {canFinish ? 'Terminer la tâche' : result ? 'Fermer' : 'Intégrer'}
           </Button>
         </div>
       </Card>
