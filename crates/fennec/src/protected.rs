@@ -8,9 +8,17 @@ use crate::domain::test_files;
 
 /// The project's protection: defaults plus `.agents/protected` when present.
 pub fn load(workdir: &Path) -> Protection {
-    let path = workdir.join(".agents").join("protected");
-    let content = std::fs::read_to_string(path).ok();
-    Protection::new(content.as_deref())
+    Protection::new(protected_content(workdir).as_deref())
+}
+
+/// The project's protection in a session worktree: defaults without the
+/// lockfiles, plus `.agents/protected` when present.
+pub fn load_for_worktree(workdir: &Path) -> Protection {
+    Protection::for_worktree(protected_content(workdir).as_deref())
+}
+
+fn protected_content(workdir: &Path) -> Option<String> {
+    std::fs::read_to_string(workdir.join(".agents").join("protected")).ok()
 }
 
 /// Protects the tests an integration brought: the new ones among `files`
