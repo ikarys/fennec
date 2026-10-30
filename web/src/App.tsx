@@ -13,6 +13,7 @@ import { DisplayPrefsProvider, defaultDisplayPrefs } from './lib/display';
 
 const WorkflowsPage = lazy(() => import('./pages/WorkflowsPage'));
 const ProjectPage = lazy(() => import('./pages/ProjectPage'));
+const BacklogPage = lazy(() => import('./pages/BacklogPage'));
 
 type Route =
   | { name: 'home' }
@@ -20,6 +21,7 @@ type Route =
   | { name: 'new'; id: string; testWorkflowId: string | null; frameIdeaId: string | null }
   | { name: 'settings' }
   | { name: 'insight' }
+  | { name: 'backlog' }
   | { name: 'project'; projectId: string; tab: string | null; sub: string | null }
   | { name: 'workflows'; projectId: string | null; workflowId: string | null; isNew: boolean };
 
@@ -33,6 +35,9 @@ function parseRoute(): Route {
   }
   if (hash === '#/insight') {
     return { name: 'insight' };
+  }
+  if (hash === '#/backlog') {
+    return { name: 'backlog' };
   }
   if (hash.startsWith('#/project/')) {
     const [rawId, tab, sub] = hash.slice('#/project/'.length).split('/');
@@ -376,6 +381,10 @@ export default function App() {
             </Suspense>
           ) : route.name === 'insight' ? (
             <InsightPage />
+          ) : route.name === 'backlog' ? (
+            <Suspense fallback={<div className="flex grow items-center justify-center text-muted">Chargement…</div>}>
+              <BacklogPage />
+            </Suspense>
           ) : (
             <SessionPage
               sessionId={route.name === 'session' ? route.id : null}
