@@ -1,9 +1,10 @@
 /** Asks the human to delete the selected sessions, showing exactly what is removed and what is kept. */
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { deleteSessions, type SessionSummary } from "../../lib/api";
 import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
 import { Card } from "../ui/Card";
+import { Modal } from "../ui/Modal";
 
 export interface DeletionTarget {
   session: SessionSummary;
@@ -19,17 +20,9 @@ export function DeleteSessionsDialog({
   onClose: () => void;
   onDeleted: (ids: string[]) => void;
 }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<{ id: string; error: string }[]>([]);
   const [thrown, setThrown] = useState<string | null>(null);
-
-  useEffect(() => dialogRef.current?.showModal(), []);
-
-  const closeDialog = () => {
-    dialogRef.current?.close();
-    onClose();
-  };
 
   const confirm = async () => {
     const ids = targets.map((target) => target.session.id);
@@ -40,7 +33,7 @@ export function DeleteSessionsDialog({
       const result = await deleteSessions(ids);
       if (result.deleted.length > 0) onDeleted(result.deleted);
       if (result.failed.length === 0) {
-        closeDialog();
+        onClose();
       } else {
         setFailed(result.failed);
       }
@@ -66,18 +59,7 @@ export function DeleteSessionsDialog({
   );
 
   return (
-    <dialog
-      ref={dialogRef}
-      aria-label="Supprimer"
-      onCancel={(event) => {
-        if (busy) event.preventDefault();
-        else closeDialog();
-      }}
-      onClick={(event) => {
-        if (event.target === dialogRef.current && !busy) closeDialog();
-      }}
-      className="m-auto w-[min(92vw,560px)] text-text backdrop:bg-black/60"
-    >
+    <Modal open onClose={onClose} busy={busy} label="Supprimer">
       <Card className="flex flex-col gap-3 p-4">
         <h2 className="m-0 text-sm font-semibold">
           {targets.length === 1
@@ -134,7 +116,7 @@ export function DeleteSessionsDialog({
             variant="secondary"
             autoFocus
             disabled={busy}
-            onClick={closeDialog}
+            onClick={onClose}
           >
             Annuler
           </Button>
@@ -147,6 +129,6 @@ export function DeleteSessionsDialog({
           </Button>
         </div>
       </Card>
-    </dialog>
+    </Modal>
   );
 }

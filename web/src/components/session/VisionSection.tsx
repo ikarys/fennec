@@ -1,17 +1,18 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { ThreadItem } from '../../lib/fold';
 import { seenImages, type SeenImage } from '../../lib/vision';
 import { panelBlock } from '../../lib/panelBlocks';
 import { Button } from '../ui/Button';
+import { Card } from '../ui/Card';
+import { Modal } from '../ui/Modal';
 import { Panel } from '../ui/Panel';
 
 export function VisionSection({ items, partial }: { items: ThreadItem[]; partial: boolean }) {
   const images = useMemo(() => seenImages(items), [items]);
-  const dialogRef = useRef<HTMLDialogElement>(null);
   const [selected, setSelected] = useState<SeenImage | null>(null);
 
   const closeDialog = () => {
-    dialogRef.current?.close();
+    setSelected(null);
   };
 
   const jumpToThread = () => {
@@ -36,10 +37,7 @@ export function VisionSection({ items, partial }: { items: ThreadItem[]; partial
               type="button"
               aria-label={`Agrandir ${image.label}`}
               title={image.inContext ? image.label : 'Plus dans le contexte du modèle'}
-              onClick={() => {
-                setSelected(image);
-                dialogRef.current?.showModal();
-              }}
+              onClick={() => setSelected(image)}
               className={`block w-full overflow-hidden rounded-md ${image.inContext ? '' : 'opacity-40'}`}
             >
               <img src={image.src} alt={image.label} className="aspect-square w-full rounded-md border border-border object-cover" />
@@ -47,18 +45,14 @@ export function VisionSection({ items, partial }: { items: ThreadItem[]; partial
           ))}
         </div>
       )}
-      <dialog
-        ref={dialogRef}
-        aria-label={selected?.label ?? 'Vision'}
-        onClick={(event) => {
-          if (event.target === dialogRef.current) {
-            closeDialog();
-          }
-        }}
-        className="m-auto w-auto max-w-[min(90vw,1100px)] rounded-xl border border-border bg-panel p-4 text-text backdrop:bg-black/60"
+      <Modal
+        open={selected !== null}
+        onClose={closeDialog}
+        label={selected?.label ?? 'Vision'}
+        width="w-auto max-w-[min(90vw,1100px)]"
       >
         {selected && (
-          <div className="flex flex-col gap-3">
+          <Card className="flex flex-col gap-3 p-4">
             <img src={selected.src} alt={selected.label} className="max-h-[75vh] max-w-full object-contain" />
             <div className="flex flex-col gap-1">
               <div className="font-mono text-xs text-muted">{selected.label}</div>
@@ -72,9 +66,9 @@ export function VisionSection({ items, partial }: { items: ThreadItem[]; partial
                 Fermer
               </Button>
             </div>
-          </div>
+          </Card>
         )}
-      </dialog>
+      </Modal>
     </Panel>
   );
 }

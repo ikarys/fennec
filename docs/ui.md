@@ -7,8 +7,11 @@ look lives in two places only, so a screen can never drift from the others:
    spacing unit, radii. Components use the tokens (`bg-panel`, `text-muted`),
    never a literal colour.
 2. **The primitives** (`web/src/components/ui/`): `Button`, `Badge`,
-   `SectionLabel`, `Card`, `Section`, `Panel`, and the fields (`TextInput`, `Select`,
-   `TextArea`, `FieldRow`). A feature component picks a variant and adds only
+   `SectionLabel`, `Card`, `Modal`, `ConfirmDialog`, `Section`, `Panel`, and the
+   fields (`TextInput`, `Select`, `TextArea`, `FieldRow`). Every modal and
+   confirmation is one of these: a dialog's shell is `Modal`, a "are you sure"
+   is `ConfirmDialog`, never a raw `<dialog>` overlay or a browser `confirm()`.
+   A feature component picks a variant and adds only
    layout classes (width, margins, `shrink-0`); it never restyles a primitive's
    colours, paddings or font size. A new look is a new variant, here.
 
