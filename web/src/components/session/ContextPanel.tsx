@@ -66,11 +66,9 @@ interface ContextPanelProps {
   onWorktreeChanged: () => void;
   /** Bumped when the review dialog closes: the workspace block re-reads the preview. */
   integrationVersion: number;
-  /** Types /<skill> in the composer. */
-  onInsertSkill?: (id: string) => void;
 }
 
-export function ContextPanel({ view, skills, usage, hasSession, partial, worktree, sessionId, onWorktreeChanged, integrationVersion, onInsertSkill }: ContextPanelProps) {
+export function ContextPanel({ view, skills, usage, hasSession, partial, worktree, sessionId, onWorktreeChanged, integrationVersion }: ContextPanelProps) {
   const [width, setWidth] = useState(loadWidth);
   const [selectedPageName, setSelectedPageName] = useState(loadPageName);
   const pages = panelPages(useDisplayPrefs().panelPages);
@@ -115,7 +113,7 @@ export function ContextPanel({ view, skills, usage, hasSession, partial, worktre
       case 'tokens':
         return <TokensSection key={id} usage={usage} />;
       case 'skills':
-        return <SkillsSection key={id} skills={skills} hasSession={hasSession} onInsertSkill={onInsertSkill} />;
+        return <SkillsSection key={id} skills={skills} hasSession={hasSession} />;
       case 'decisions':
         return <DecisionsSection key={id} decisions={view.decisions} />;
       case 'tools':

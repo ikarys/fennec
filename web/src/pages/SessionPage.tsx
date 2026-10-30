@@ -779,10 +779,6 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
             sessionId={sessionId}
             onWorktreeChanged={() => setDetailVersion((version) => version + 1)}
             integrationVersion={integrationVersion}
-            onInsertSkill={(id) => {
-              setText((previous) => `/${id} ${previous.replace(/^\/\S+\s*/, '')}`);
-              textareaRef.current?.focus();
-            }}
           />
           {sessionId && integrationOpen && (
             <IntegrationDialog

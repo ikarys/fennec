@@ -5,11 +5,9 @@ import { Panel } from '../ui/Panel';
 interface SkillsSectionProps {
   skills: SessionSkills | null;
   hasSession: boolean;
-  /** Types /<skill> in the composer. */
-  onInsertSkill?: (id: string) => void;
 }
 
-export function SkillsSection({ skills, hasSession, onInsertSkill }: SkillsSectionProps) {
+export function SkillsSection({ skills, hasSession }: SkillsSectionProps) {
   const loadedCount = skills === null ? 0 : new Set([...skills.loaded, ...skills.alwaysOn]).size;
   const activeCount = skills === null ? 0 : new Set([...skills.active, ...skills.alwaysOn]).size;
   const alwaysOnOnly = skills ? skills.alwaysOn.filter((id) => !skills.loaded.includes(id)) : [];
@@ -49,22 +47,16 @@ export function SkillsSection({ skills, hasSession, onInsertSkill }: SkillsSecti
           <span className="text-[0.6875rem] text-muted">toujours actif</span>
         </div>
       ))}
-      {hasSession && skills !== null && onInsertSkill !== undefined && skills.available.length > 0 && (
-        <div className="flex flex-col">
-          <div className="pt-1 text-[0.6875rem] text-muted">Disponibles</div>
-          {skills.available.map((id) => (
-            <button
-              key={id}
-              type="button"
-              className="flex items-center py-1 text-left font-mono text-xs text-muted hover:text-text"
-              title={`Taper /${id} dans le message`}
-              onClick={() => onInsertSkill?.(id)}
-            >
-              {id}
-            </button>
-          ))}
+      {hasSession && skills !== null && skills.missedAlwaysOn.map((id) => (
+        <div
+          key={`missed-${id}`}
+          title="Coché « toujours actif » après le début de cette session : son prompt est figé"
+          className="flex items-center gap-2 py-1.5 font-mono text-xs text-muted"
+        >
+          <span>{id}</span>
+          <span className="font-sans text-[0.6875rem]">absent, tape /{id}</span>
         </div>
-      )}
+      ))}
     </Panel>
   );
 }
