@@ -61,6 +61,7 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         }
         ("GET", ["api", "models", "choices"]) => model_routes::choices(app, stream),
         ("GET", ["api", "folders"]) => list_folders(req, stream),
+        ("POST", ["api", "folders", "create"]) => create_folder(req, stream),
         ("GET", ["api", "projects"]) => list_projects(app, stream),
         ("POST", ["api", "projects"]) => open_project(app, req, stream),
         ("GET", ["api", "projects", id, "commands"]) => list_commands(app, stream, id),
@@ -169,6 +170,21 @@ fn list_folders(req: &Request, stream: &mut TcpStream) -> Result<(), String> {
         .map_or_else(folders::home, Into::into);
     match folders::list(&dir) {
         Ok(listing) => send_json(stream, 200, &json!(listing)),
+        Err(e) => error(stream, 400, &e),
+    }
+}
+
+fn create_folder(req: &Request, stream: &mut TcpStream) -> Result<(), String> {
+    let body = req.json()?;
+    let base = body["path"].as_str().unwrap_or("");
+    let name = body["name"].as_str().unwrap_or("");
+    let base = if base.is_empty() {
+        folders::home()
+    } else {
+        Path::new(base).into()
+    };
+    match folders::create(&base, name) {
+        Ok(path) => send_json(stream, 200, &json!({ "path": path.display().to_string() })),
         Err(e) => error(stream, 400, &e),
     }
 }
