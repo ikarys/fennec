@@ -319,7 +319,8 @@ fn groups_json(board: &Board) -> Result<Value, String> {
             .filter(|(s, _, _)| *s == stage)
             .map(|(_, idea, view)| (*idea, view.clone()))
             .collect();
-        if entries.is_empty() {
+        // The drafts group stays even empty: the UI puts the add input in it.
+        if entries.is_empty() && stage != Stage::Drafts {
             continue;
         }
         if stage == Stage::Queue {
@@ -475,6 +476,7 @@ fn idea_view(board: &Board, idea: &Idea) -> Result<(Status, Value), String> {
         "status": status,
         "stage": stage,
         "action": action,
+        "menu": status.menu(),
         "sessionId": idea.session_id,
         "plan": idea.plan,
         "halted": idea.halted,

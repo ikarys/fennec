@@ -49,6 +49,15 @@ pub enum Action {
     Review,
 }
 
+/// The secondary actions offered in an idea's menu.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum MenuAction {
+    Reframe,
+    StartUnframed,
+    Drop,
+}
+
 /// Display order for stages. `Yours` first because it waits for the human.
 pub const STAGES: [Stage; 5] = [
     Stage::Yours,
@@ -110,6 +119,23 @@ impl Status {
             Status::Question => Action::Answer,
             Status::Review => Action::Review,
             Status::Halted | Status::Failed | Status::Integrated => Action::Open,
+        }
+    }
+
+    /// The secondary actions offered in an idea's menu.
+    ///
+    /// `Reframe` is only offered where the fold accepts a `Framing` event for
+    /// the idea's state; the explicit list keeps the UI from offering a step
+    /// the server would ignore.
+    pub fn menu(self) -> &'static [MenuAction] {
+        match self {
+            Status::Inbox => &[MenuAction::StartUnframed, MenuAction::Drop],
+            // A failed idea is retried by framing it again.
+            Status::Framing | Status::Queued | Status::Halted | Status::Failed => {
+                &[MenuAction::Reframe, MenuAction::Drop]
+            }
+            Status::Review | Status::Question => &[MenuAction::Drop],
+            Status::Running | Status::Integrated => &[],
         }
     }
 }
@@ -208,6 +234,34 @@ mod tests {
 
         assert_eq!(Status::Integrated.stage(), Stage::Done);
         assert_eq!(Status::Integrated.action(), Action::Open);
+    }
+
+    #[test]
+    fn menu_lists_match_the_states() {
+        assert_eq!(
+            Status::Inbox.menu(),
+            &[MenuAction::StartUnframed, MenuAction::Drop]
+        );
+        assert_eq!(
+            Status::Framing.menu(),
+            &[MenuAction::Reframe, MenuAction::Drop]
+        );
+        assert_eq!(
+            Status::Queued.menu(),
+            &[MenuAction::Reframe, MenuAction::Drop]
+        );
+        assert_eq!(
+            Status::Halted.menu(),
+            &[MenuAction::Reframe, MenuAction::Drop]
+        );
+        assert_eq!(
+            Status::Failed.menu(),
+            &[MenuAction::Reframe, MenuAction::Drop]
+        );
+        assert_eq!(Status::Review.menu(), &[MenuAction::Drop]);
+        assert_eq!(Status::Question.menu(), &[MenuAction::Drop]);
+        assert_eq!(Status::Running.menu(), &[]);
+        assert_eq!(Status::Integrated.menu(), &[]);
     }
 
     #[test]

@@ -16,5 +16,5 @@ pub mod summary;
 pub use event::BacklogEvent;
 pub use fold::{Backlog, Idea, IdeaState, QueueRun, fold, idea_for_session};
 pub use queue::{CapHit, Caps, cap_reached, next_ready, queue_order};
-pub use status::{Action, Progress, STAGES, Stage, Status, status};
+pub use status::{Action, MenuAction, Progress, STAGES, Stage, Status, status};
 pub use summary::{RunSummary, summarize};
