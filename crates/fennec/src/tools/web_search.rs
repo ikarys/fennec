@@ -204,6 +204,7 @@ mod tests {
         let prefs = SearchPrefs {
             searxng_url: Some("   ".into()),
             searxng_api_key: None,
+            ..SearchPrefs::default()
         };
         let result = run(&json!({ "query": "rust" }), &prefs);
 
@@ -295,6 +296,7 @@ mod tests {
         let prefs = SearchPrefs {
             searxng_url: Some(format!("http://{addr}")),
             searxng_api_key: Some("k".into()),
+            ..SearchPrefs::default()
         };
         let result = run(&json!({ "query": "rust lang" }), &prefs);
         let request = server.join().unwrap();
