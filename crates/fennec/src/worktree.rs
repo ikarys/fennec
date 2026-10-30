@@ -144,18 +144,24 @@ fn fill(top: &Path, wt: &Worktree) -> Result<(), String> {
     Ok(())
 }
 
-/// Where `@playwright/cli` writes its screenshots: `.playwright-cli/` in the
-/// workdir, which may be a subdirectory of the worktree.
-const CAPTURES_EXCLUDED: &str = ":(exclude,glob)**/.playwright-cli/**";
+/// What the model looked at or used as input, not work to integrate: the
+/// browser's captures and the files an idea pinned. The human would
+/// cherry-pick them otherwise.
+const EXCLUDED_INPUTS: &[&str] = &[
+    ":(exclude,glob)**/.playwright-cli/**",
+    ":(exclude,glob)**/.fennec/**",
+];
 
-/// Commits everything in the worktree (`git add -A`) but the browser's
-/// captures, under the human's git identity, with `message`; `Ok(false)`
-/// when there was nothing to commit.
+/// Commits everything in the worktree (`git add -A`) but the model's inputs,
+/// under the human's git identity, with `message`; `Ok(false)` when there was
+/// nothing to commit.
 pub fn commit(worktree: &Worktree, message: &str) -> Result<bool, String> {
     let dir = &worktree.path;
-    // The browser skill's screenshots are what the model looked at, not work
-    // to integrate: the human would cherry-pick them otherwise.
-    git(dir, &["add", "-A", "--", ".", CAPTURES_EXCLUDED], None)?;
+    // The captures and the idea's attached files are what the agent consumed,
+    // not its work: the human would cherry-pick them otherwise.
+    let mut args: Vec<&str> = vec!["add", "-A", "--", "."];
+    args.extend_from_slice(EXCLUDED_INPUTS);
+    git(dir, &args, None)?;
     // The staged changes, not `git status`: the excluded captures stay untracked.
     if git(dir, &["diff", "--cached", "--name-only"], None)?.is_empty() {
         return Ok(false);
@@ -394,6 +400,9 @@ mod tests {
         std::fs::create_dir_all(wt.workdir.join(".playwright-cli")).unwrap();
         std::fs::write(wt.workdir.join(".playwright-cli/page.png"), "png").unwrap();
         assert_eq!(commit(&wt, "captures only"), Ok(false));
+        std::fs::create_dir_all(wt.workdir.join(".fennec/assets")).unwrap();
+        std::fs::write(wt.workdir.join(".fennec/assets/design.zip"), "zip").unwrap();
+        assert_eq!(commit(&wt, "idea assets only"), Ok(false));
         let range = format!("{}..{}", wt.base, wt.branch);
         assert_eq!(
             text(&wt.path, &["log", "--format=%s", &range]).trim(),

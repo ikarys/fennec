@@ -48,6 +48,7 @@ pub enum WorkflowJob {
         workflow: Workflow,
         task: String,
         plan: String,
+        attachments: Vec<Attachment>,
     },
     /// The choice at a human node, with an optional comment.
     Answer { choice: String, comment: String },
@@ -96,7 +97,8 @@ fn walk(turn: &mut Turn, env: &WorkflowEnv, job: WorkflowJob) -> Result<DoneReas
             workflow,
             task,
             plan,
-        } => start_from_plan(turn, &workflow, &task, &plan)?,
+            attachments,
+        } => start_from_plan(turn, &workflow, &task, &plan, &attachments)?,
         WorkflowJob::Answer { choice, comment } => answer_human(turn, &choice, &comment)?,
         WorkflowJob::Continue { comment } => continue_paused(turn, &comment)?,
         WorkflowJob::AgentInput {
@@ -231,6 +233,7 @@ fn start_from_plan(
     workflow: &Workflow,
     task: &str,
     plan: &str,
+    attachments: &[Attachment],
 ) -> Result<Cursor, String> {
     // Checked before the run starts: a refusal leaves no half-recorded run.
     let plan_id = workflow
@@ -246,7 +249,7 @@ fn start_from_plan(
         return Err("the workflow does not start with its plan node".into());
     }
 
-    start_run(turn, workflow, task, false, &[])?;
+    start_run(turn, workflow, task, false, attachments)?;
     let events = turn.log.events(turn.session_id)?;
     let run_id = run::current_run(&events)
         .ok_or("no active workflow run")?

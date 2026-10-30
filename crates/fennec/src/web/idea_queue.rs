@@ -102,7 +102,15 @@ pub(super) fn start_idea(
     let Some(session) = store.session(&session_id)? else {
         return Err("no such session".into());
     };
-    let task = idea.text.clone();
+    let place = app.open_place(store, &session, project, true)?;
+    // The idea's pinned files become what the agent consumes: images for the
+    // model, text inlined, binaries written into the worktree.
+    let (attachments, addendum) = super::idea_assets::prepare(&idea.attachments, &place.workdir);
+    let task = if addendum.is_empty() {
+        idea.text.clone()
+    } else {
+        format!("{}{}", idea.text, addendum)
+    };
     let job = if let Some(plan) = &idea.plan
         && (idea.state == IdeaState::Ready || (restart && idea.state == IdeaState::Started))
     {
@@ -111,16 +119,16 @@ pub(super) fn start_idea(
             workflow: found.workflow,
             task,
             plan: plan.clone(),
+            attachments,
         }
     } else {
         WorkflowJob::Start {
             workflow: found.workflow,
             task,
             step_by_step: false,
-            attachments: Vec::new(),
+            attachments,
         }
     };
-    let place = app.open_place(store, &session, project, true)?;
     app.turns
         .start_with(&session_id, place, Job::Workflow(job), autonomous)?;
     store.append_idea_event(

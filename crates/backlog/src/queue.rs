@@ -106,6 +106,7 @@ mod tests {
         BacklogEvent::Added {
             idea_id: id.into(),
             text: text.into(),
+            attachments: Vec::new(),
         }
     }
 
