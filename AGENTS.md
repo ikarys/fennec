@@ -89,6 +89,9 @@ committed, it gives the project's shape to the next developer or agent without r
 Project analysis, done: an "Analyser le projet" button opens a session on the read-only `analyze`
 agent (`crates/fennec/agents/analyze.agent.md`), which drafts AGENTS.md's philosophy, layers and rules,
 each with its file:line source (indicative); the human reviews it.
+Ideas backlog, done: the project page keeps the human's ideas (`idea.*` events per project,
+`domain/idea.rs`, `store/ideas.rs`); "Cadrer" opens a plan session tied to the idea, whose plan card marks
+it ready with the plan verbatim. The orchestrator that runs ready ideas comes next.
 Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
 1. Project actions on the project page: diagrams on demand of a function, process or engine
@@ -138,6 +141,7 @@ crates/fennec/src/
     map_doc.rs         docs/map.md: the map as Markdown (Mermaid, table), stale or current
     workflow/          a workflow: definition (nodes, ports, edges), template ({{…}} names),
                        validate (the graph rules), run (the run folded from its events, the next step)
+    idea.rs            the project's ideas backlog: its events, folded (inbox, framing, ready)
     id.rs, clock.rs
   agent/             application layer: the agent loop
     ports.rs           Model, EventLog, Toolbox, ChildSessions, Commands: what the loop needs from outside
@@ -156,7 +160,7 @@ crates/fennec/src/
                      web_search queries the SearXNG instance from the Settings page
   llm/               Model adapter: openai.rs, the Model port over llm-providers (tool-call arguments parsed here)
   store.rs           EventLog adapter: SQLite (openfox's schema), projects and sessions;
-                     store/settings.rs the stored preferences
+                     store/settings.rs the stored preferences; store/ideas.rs the per-project idea events
   metering.rs        the usage ledger adapter: MeteredLog (an EventLog that also writes each model call
                      to the ledger) and the backfill of past calls; store/calls.rs reads them from the log
   git.rs             what fennec reads from a repository
@@ -176,7 +180,7 @@ crates/fennec/src/
   module_map.rs      the project map's source files (git ls-files) and docs/map.md read, written
   web/               HTTP adapter: http, guard (who may call), routes, settings_routes, event_stream (SSE),
                      notifier (wakes streams on append, no polling), turns, assets,
-                     workflow_routes, project_routes (the project page),
+                     workflow_routes, project_routes (the project page), idea_routes (its ideas backlog),
                      model_routes (the composer's model choices, a session's model),
                      children (child sessions for workflow nodes),
                      preview (a project's files in a sandboxed origin), session_usage,

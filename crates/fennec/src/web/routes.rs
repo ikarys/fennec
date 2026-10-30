@@ -8,7 +8,8 @@ use super::terminal;
 use super::{
     assets,
     context_view::context_view,
-    event_stream, integration, model_routes, project_routes, session_delete, session_name,
+    event_stream, idea_routes, integration, model_routes, project_routes, session_delete,
+    session_name,
     session_usage::{SessionUsageView, call_views},
     settings_routes,
     turns::Job,
@@ -21,6 +22,7 @@ use crate::domain::agent::{resolve as agent_resolve, switch_to};
 use crate::domain::attachment::{Attachment, from_data_url};
 use crate::domain::event::Event;
 use crate::domain::id::new_id;
+use crate::domain::idea::idea_for_session;
 use crate::domain::preferences::ModelRef;
 use crate::domain::project::{Project, SessionSummary};
 use crate::domain::replay::replayable;
@@ -64,6 +66,11 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
         ("GET", ["api", "projects", id, "agents"]) => list_agents(app, stream, id),
         ("GET", ["api", "projects", id, "overview"]) => {
             project_routes::get_overview(app, stream, id)
+        }
+        ("GET", ["api", "projects", id, "ideas"]) => idea_routes::list_ideas(app, stream, id),
+        ("POST", ["api", "projects", id, "ideas"]) => idea_routes::add_idea(app, req, stream, id),
+        ("POST", ["api", "projects", id, "ideas", iid, action]) => {
+            idea_routes::update_idea(app, req, stream, id, iid, action)
         }
         ("POST", ["api", "projects", id, "map-file"]) => {
             project_routes::write_map_file(app, stream, id)
@@ -350,6 +357,11 @@ fn get_session(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String
     v["project"] = project_json(&p);
     v["mode"] = json!(mode);
     v["model"] = model_routes::session_model(app, &store, &s.id)?;
+    // The idea this session frames, so its plan card can mark it ready.
+    v["idea"] = match idea_for_session(&store.ideas(&p.id)?, &s.id) {
+        Some(idea) => json!({ "id": idea.id, "state": idea.state }),
+        None => Value::Null,
+    };
     v["worktree"] = match app.place(&store, &s, &p)?.worktree {
         Some(wt) => json!({
             "path": wt.path, "branch": wt.branch, "base": wt.base,

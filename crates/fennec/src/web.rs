@@ -8,6 +8,7 @@ mod editor;
 mod event_stream;
 mod guard;
 mod http;
+mod idea_routes;
 mod insight;
 mod integration;
 mod model_routes;
