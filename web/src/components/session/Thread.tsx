@@ -2,7 +2,7 @@ import { modelShortName } from './ModelPicker';
 import { memo, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import type { AssistantItem, Segment, ThreadItem } from '../../lib/fold';
+import type { AssistantItem, PreflightResultView, Segment, ThreadItem } from '../../lib/fold';
 import { useDisplayPrefs } from '../../lib/display';
 import { splitContract } from '../../lib/plan';
 import { BulbIcon, ChevronRightIcon, ReplayIcon } from '../Icons';
@@ -46,7 +46,7 @@ const ThinkingSegment = memo(function ThinkingSegment({ content }: { content: st
 
 const REMARK_PLUGINS = [remarkGfm];
 
-const TextSegment = memo(function TextSegment({ content, caret, id }: { content: string; caret: boolean; id?: string }) {
+const TextSegment = memo(function TextSegment({ content, caret, id, preflight }: { content: string; caret: boolean; id?: string; preflight?: PreflightResultView[] }) {
   const actions = usePlanActions();
   // Parsed only when settled: a half-written contract would flicker between the
   // two renderings while the message streams.
@@ -64,7 +64,7 @@ const TextSegment = memo(function TextSegment({ content, caret, id }: { content:
               {contract.before}
             </ReactMarkdown>
           )}
-          {contract.contract.kind === 'plan' ? <PlanCard plan={contract.contract} actions={planActions} /> : <ReportCard report={contract.contract} />}
+          {contract.contract.kind === 'plan' ? <PlanCard plan={contract.contract} actions={planActions} preflight={preflight} /> : <ReportCard report={contract.contract} />}
         </>
       ) : (
         <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={markdownComponents}>{content}</ReactMarkdown>
@@ -125,7 +125,7 @@ function AssistantItemView({ item, model, running, showHeader }: { item: Assista
           return <ThinkingSegment key={segment.id} content={segment.content} />;
         }
         if (segment.kind === 'text') {
-          return <TextSegment key={segment.id} id={segment.id} content={segment.content} caret={streaming && segment.id === lastTextId} />;
+          return <TextSegment key={segment.id} id={segment.id} content={segment.content} caret={streaming && segment.id === lastTextId} preflight={segment.id === lastTextId ? item.preflight : undefined} />;
         }
         return <ToolCard key={segment.id} tool={segment.tool} />;
       })}

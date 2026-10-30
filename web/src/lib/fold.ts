@@ -38,6 +38,14 @@ export type Segment =
   | { kind: 'text'; id: string; content: string }
   | { kind: 'tool'; id: string; tool: ToolCallView };
 
+export interface PreflightResultView {
+  criterionId: string;
+  command: string;
+  verdict: 'fails' | 'passesAlready' | 'cannotRun';
+  exitCode?: number;
+  output: string;
+}
+
 export interface AssistantItem {
   kind: 'assistant';
   id: string;
@@ -45,6 +53,8 @@ export interface AssistantItem {
   done: boolean;
   /** Tokens per second while the message streams, estimated by the server. */
   liveSpeed?: number;
+  /** The plan's checks run by fennec before any change, from `criteria.preflight`. */
+  preflight?: PreflightResultView[];
 }
 
 export interface WorkflowNodeStat {
@@ -559,6 +569,31 @@ export function createThreadFold(): ThreadFold {
         if (parsed) {
           criteria = parsed;
         }
+        break;
+      }
+
+      case 'criteria.preflight': {
+        const assistant = assistants.get(String(data.messageId ?? ''));
+        if (!assistant) break;
+        const rawResults = Array.isArray(data.results) ? data.results : [];
+        const results: PreflightResultView[] = [];
+        for (const raw of rawResults) {
+          if (typeof raw !== 'object' || raw === null) continue;
+          const result = raw as Record<string, unknown>;
+          const criterionId = typeof result.criterionId === 'string' ? result.criterionId : undefined;
+          const command = typeof result.command === 'string' ? result.command : undefined;
+          const verdict = result.verdict;
+          if (criterionId === undefined || command === undefined) continue;
+          if (verdict !== 'fails' && verdict !== 'passesAlready' && verdict !== 'cannotRun') continue;
+          results.push({
+            criterionId,
+            command,
+            verdict,
+            exitCode: isFiniteNumber(result.exitCode) ? result.exitCode : undefined,
+            output: typeof result.output === 'string' ? result.output : ''
+          });
+        }
+        assistant.preflight = results;
         break;
       }
 
