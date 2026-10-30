@@ -7,7 +7,7 @@ use super::http::{Request, error, send, send_json};
 use super::notifier::NotifyingLog;
 use super::terminal;
 use super::{
-    assets,
+    assets, backlog_routes,
     context_view::context_view,
     event_stream, idea_routes, integration, model_routes, project_routes, servers, session_delete,
     session_name,
@@ -66,6 +66,7 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         ("GET", ["api", "folders"]) => list_folders(req, stream),
         ("POST", ["api", "folders", "create"]) => create_folder(req, stream),
         ("GET", ["api", "projects"]) => list_projects(app, stream),
+        ("GET", ["api", "backlog"]) => backlog_routes::list_backlog(app, stream),
         ("POST", ["api", "projects"]) => open_project(app, req, stream),
         ("GET", ["api", "projects", id, "commands"]) => list_commands(app, stream, id),
         ("GET", ["api", "projects", id, "agents"]) => list_agents(app, stream, id),

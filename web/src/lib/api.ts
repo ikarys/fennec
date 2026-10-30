@@ -449,6 +449,33 @@ export function createProject(workdir: string): Promise<Project> {
   });
 }
 
+/** A done task on the cross-project Backlog dashboard. */
+export interface BacklogTask {
+  id: string;
+  text: string;
+  /** `completed` (the human closed it) or `integrated` (it ran and was integrated). */
+  status: "completed" | "integrated";
+  updatedAt: number;
+}
+
+export interface BacklogProject {
+  id: string;
+  name: string;
+  doneCount: number;
+  /** The project's done tasks, most recent first. */
+  tasks: BacklogTask[];
+}
+
+export interface BacklogView {
+  /** Every project's done tasks, most done first. */
+  projects: BacklogProject[];
+  total: { done: number; projects: number };
+}
+
+export function getBacklog(): Promise<BacklogView> {
+  return request<BacklogView>("/api/backlog");
+}
+
 export function listCommands(projectId: string): Promise<SlashCommand[]> {
   return request<SlashCommand[]>(
     `/api/projects/${encodeURIComponent(projectId)}/commands`,

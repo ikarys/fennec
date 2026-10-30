@@ -3,6 +3,7 @@
 
 mod assets;
 mod audit_routes;
+mod backlog_routes;
 mod children;
 mod context_view;
 mod editor;
