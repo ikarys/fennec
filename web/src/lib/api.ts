@@ -715,6 +715,13 @@ export function stopSession(id: string): Promise<void> {
   });
 }
 
+/** Opens the human's terminal in the session's folder: its worktree, else the project. */
+export function openTerminal(id: string): Promise<void> {
+  return request<void>(`/api/sessions/${encodeURIComponent(id)}/terminal`, {
+    method: "POST",
+  });
+}
+
 export function compactSession(id: string): Promise<void> {
   return request<void>(`/api/sessions/${encodeURIComponent(id)}/compact`, {
     method: "POST",
