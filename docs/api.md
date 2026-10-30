@@ -277,6 +277,11 @@ read-only. The human edits them as usual.
   the human's decision; 409 while a turn runs or without a worktree; removes the
   worktree, its branch and base ref in the human's repository and appends
   `worktree.discarded`. A later workflow in the session opens a fresh worktree.
+- `POST /api/sessions/{id}/terminal` → 202 `{path}`: opens the human's own
+  terminal in the session's folder (its worktree, else the project): Windows
+  Terminal under WSL, Terminal.app on macOS, else `$TERMINAL` or
+  `x-terminal-emulator`. Outside the sandbox: the human's action. 500 if it
+  cannot start.
 - `POST /api/sessions/delete` `{ids}` → `{deleted: [id], failed: [{id, error}]}`: deletes top-level sessions with their child sessions and logs, and removes each one's worktree, branch and refs (work not integrated is lost; the UI warns). 400 for an empty list or a child session, 404 for an unknown id, 409 `{error, running}` when one of them runs a turn (nothing is deleted then). A session whose worktree cannot be removed is kept and listed in `failed`. The usage ledger keeps the calls.
 - `GET /api/sessions/{id}/skills` → `{loaded: [ids], active: [ids]}`: the
   skills the session loaded (successful `load_skill` calls and `/<skill>`

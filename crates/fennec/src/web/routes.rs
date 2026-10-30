@@ -4,6 +4,7 @@ use super::App;
 use super::editor;
 use super::http::{Request, error, send, send_json};
 use super::notifier::NotifyingLog;
+use super::terminal;
 use super::{
     assets,
     context_view::context_view,
@@ -110,6 +111,7 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
             integration::integrate(app, req, stream, id)
         }
         ("POST", ["api", "sessions", id, "discard"]) => integration::discard(app, req, stream, id),
+        ("POST", ["api", "sessions", id, "terminal"]) => terminal::open(app, stream, id),
         ("POST", ["api", "sessions", id, "stop"]) => {
             app.turns.stop(id);
             send_json(stream, 202, &json!({}))

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { IntegrationPreview, RepoState, SessionDetail } from '../../lib/api';
-import { discardWorktree, getIntegration, getRepoState } from '../../lib/api';
-import { BranchIcon, CheckIcon, CopyIcon, EditIcon, FolderIcon, SpinnerIcon } from '../Icons';
+import { discardWorktree, getIntegration, getRepoState, openTerminal } from '../../lib/api';
+import { BranchIcon, CheckIcon, CopyIcon, EditIcon, FolderIcon, SpinnerIcon, TerminalIcon } from '../Icons';
 import { useIntegrationInvite } from './IntegrationInvite';
 import { Button, buttonClass } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -108,6 +108,26 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
     copiedTimer.current = window.setTimeout(() => setCopied(false), 1500);
   };
 
+  const [terminalError, setTerminalError] = useState<string | null>(null);
+  const handleOpenTerminal = () => {
+    if (!sessionId) return;
+    setTerminalError(null);
+    openTerminal(sessionId).catch((failure) => setTerminalError(failure instanceof Error ? failure.message : 'Erreur'));
+  };
+  const terminalButton = (
+    <Button
+      variant="ghost"
+      size="sm"
+      iconOnly
+      onClick={handleOpenTerminal}
+      disabled={!sessionId}
+      title="Ouvrir un terminal ici"
+      aria-label="Ouvrir un terminal ici"
+    >
+      <TerminalIcon className="h-3.5 w-3.5" />
+    </Button>
+  );
+
   const handleDiscard = async () => {
     if (!sessionId || worktree === null) return;
     const commits = preview?.commits.length ?? 0;
@@ -154,6 +174,7 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
                   >
                     <EditIcon className="h-3.5 w-3.5" />
                   </a>
+                  {terminalButton}
                   <Button
                     variant="ghost"
                     size="sm"
@@ -194,8 +215,12 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
               </div>
             </>
           ) : (
-            <div className="text-xs text-muted">Travaille directement dans ton dossier.</div>
+            <div className="flex items-center gap-2 text-xs text-muted">
+              <span className="grow">Travaille directement dans ton dossier.</span>
+              {terminalButton}
+            </div>
           )}
+          {terminalError !== null && <div className="text-xs text-err">{terminalError}</div>}
         </div>
 
         {repo !== null && (
