@@ -21,10 +21,12 @@ export function AuditCard({
   audit,
   sessionId,
   projectId,
+  onCreated,
 }: {
   audit: Audit | null;
   sessionId: string | null;
   projectId: string | null;
+  onCreated: () => void;
 }) {
   const [checked, setChecked] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
@@ -33,7 +35,34 @@ export function AuditCard({
 
   if (!audit || audit.findings.length === 0 || !sessionId) return null;
 
-  const allChecked = audit.findings.every((finding) => checked.has(finding.number));
+  const taken = new Set(audit.taken);
+  const allTaken = audit.findings.every((finding) => taken.has(finding.number));
+
+  if (allTaken) {
+    const count = audit.findings.length;
+    return (
+      <Card className="p-4">
+        <p className="m-0 flex items-center gap-2 text-sm text-muted">
+          {count === 1
+            ? 'Le constat de cet audit est dans le backlog.'
+            : `Les ${count} constats de cet audit sont dans le backlog.`}
+          {projectId ? (
+            <a
+              href={'#/project/' + encodeURIComponent(projectId) + '/tasks'}
+              className="text-xs text-accent-strong underline"
+            >
+              Voir les tâches
+            </a>
+          ) : null}
+        </p>
+      </Card>
+    );
+  }
+
+  const untaken = audit.findings
+    .filter((finding) => !taken.has(finding.number))
+    .map((finding) => finding.number);
+  const allChecked = untaken.length > 0 && untaken.every((number) => checked.has(number));
 
   const toggle = (number: number) => {
     setChecked((previous) => {
@@ -45,7 +74,7 @@ export function AuditCard({
   };
 
   const toggleAll = () => {
-    setChecked(allChecked ? new Set() : new Set(audit.findings.map((finding) => finding.number)));
+    setChecked(allChecked ? new Set() : new Set(untaken));
   };
 
   const handleCreate = async () => {
@@ -57,6 +86,7 @@ export function AuditCard({
       const result = await createAuditTasks(sessionId, [...checked].sort((a, b) => a - b));
       setCreated(result.created);
       setChecked(new Set());
+      onCreated();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur inconnue');
     } finally {
@@ -73,24 +103,31 @@ export function AuditCard({
         </p>
       </div>
       <ul className="m-0 flex list-none flex-col gap-2 p-0">
-        {audit.findings.map((finding) => (
-          <li key={finding.number}>
-            <label className="flex cursor-pointer items-center gap-2 text-sm" title={finding.problem}>
-              <input
-                type="checkbox"
-                className="h-4 w-4 shrink-0 accent-[var(--color-accent)]"
-                checked={checked.has(finding.number)}
-                disabled={busy}
-                onChange={() => toggle(finding.number)}
-              />
-              <span className="tabular-nums text-xs text-muted">{finding.number}.</span>
-              <Badge tone={SEVERITY[finding.severity].tone} dot>
-                {SEVERITY[finding.severity].label}
-              </Badge>
-              <span className="min-w-0 text-text">{finding.title}</span>
-            </label>
-          </li>
-        ))}
+        {audit.findings.map((finding) => {
+          const isTaken = taken.has(finding.number);
+          return (
+            <li key={finding.number}>
+              <label
+                className={'flex items-center gap-2 text-sm' + (isTaken ? '' : ' cursor-pointer')}
+                title={finding.problem}
+              >
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 shrink-0 accent-[var(--color-accent)]"
+                  checked={isTaken || checked.has(finding.number)}
+                  disabled={busy || isTaken}
+                  onChange={() => toggle(finding.number)}
+                />
+                <span className="tabular-nums text-xs text-muted">{finding.number}.</span>
+                <Badge tone={SEVERITY[finding.severity].tone} dot>
+                  {SEVERITY[finding.severity].label}
+                </Badge>
+                <span className="min-w-0 text-text">{finding.title}</span>
+                {isTaken ? <Badge tone="ok">tâche créée</Badge> : null}
+              </label>
+            </li>
+          );
+        })}
       </ul>
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="sm" onClick={toggleAll} disabled={busy}>
