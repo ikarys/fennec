@@ -1,6 +1,7 @@
 /**
  * One stage of the tasks board: a labelled group of idea rows.
  */
+import { useState } from 'react';
 import { SectionLabel } from '../../ui/SectionLabel';
 import { IdeaRow } from './IdeaRow';
 import {
@@ -35,12 +36,22 @@ export function StageGroup({
   run: (action: () => Promise<IdeaBoard>) => Promise<boolean>;
   showLabel?: boolean;
 }) {
-  // Swap two adjacent ids and send the full new order to the server.
-  const handleReorder = async (index: number, direction: -1 | 1) => {
+  const [dragFrom, setDragFrom] = useState<number | null>(null);
+  const [dragOver, setDragOver] = useState<number | null>(null);
+
+  const move = async (from: number, to: number) => {
+    if (
+      from === to ||
+      from < 0 ||
+      from >= ideas.length ||
+      to < 0 ||
+      to >= ideas.length
+    ) {
+      return;
+    }
     const ids = ideas.map((i) => i.id);
-    const target = index + direction;
-    if (target < 0 || target >= ids.length) return;
-    [ids[index], ids[target]] = [ids[target], ids[index]];
+    const [item] = ids.splice(from, 1);
+    ids.splice(to, 0, item);
     await run(() => reorderIdeas(projectId, ids));
   };
 
@@ -61,14 +72,25 @@ export function StageGroup({
             onOpenSession={onOpenSession}
             run={run}
             position={stage === 'queue' ? idea.position : null}
-            onMoveUp={
-              stage === 'queue' && index > 0
-                ? () => void handleReorder(index, -1)
-                : null
-            }
-            onMoveDown={
-              stage === 'queue' && index < ideas.length - 1
-                ? () => void handleReorder(index, 1)
+            reorder={
+              stage === 'queue' && ideas.length > 1
+                ? {
+                    onDragStart: () => setDragFrom(index),
+                    onDragOver: () => setDragOver(index),
+                    onDrop: () => {
+                      if (dragFrom != null) void move(dragFrom, index);
+                      setDragFrom(null);
+                      setDragOver(null);
+                    },
+                    onDragEnd: () => {
+                      setDragFrom(null);
+                      setDragOver(null);
+                    },
+                    onKeyMove: (d: -1 | 1) => void move(index, index + d),
+                    dragging: dragFrom === index,
+                    over:
+                      dragOver === index && dragFrom !== null && dragFrom !== index,
+                  }
                 : null
             }
           />
