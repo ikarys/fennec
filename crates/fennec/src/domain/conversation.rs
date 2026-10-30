@@ -50,6 +50,21 @@ pub fn last_assistant_text(events: &[Event]) -> String {
         .unwrap_or_default()
 }
 
+/// The content of the first message the human typed (not system-generated,
+/// not a loop reminder): what the session was opened for.
+pub fn first_request(events: &[Event]) -> Option<String> {
+    events.iter().find_map(|event| match event {
+        Event::MessageStart {
+            role: Role::User,
+            is_system_generated: false,
+            metadata: None,
+            content: Some(content),
+            ..
+        } if !content.trim().is_empty() => Some(content.clone()),
+        _ => None,
+    })
+}
+
 /// The system prompt and tool definitions frozen at the first turn: the first
 /// snapshot's prompt and the first snapshot that carries tools (sessions from
 /// before the tools were frozen got them in a later snapshot).
@@ -202,6 +217,32 @@ mod tests {
         ];
         assert_eq!(last_assistant_text(&events), "first answer");
         assert_eq!(last_assistant_text(&events[3..]), "");
+    }
+
+    #[test]
+    fn first_request_skips_system_generated_and_assistant_messages() {
+        let events = vec![
+            start("s", Role::User, Some("system"), true),
+            start("a", Role::Assistant, Some("hello"), false),
+            start("u", Role::User, Some("  "), false),
+            start("v", Role::User, Some("do it"), false),
+        ];
+        assert_eq!(first_request(&events), Some("do it".into()));
+    }
+
+    #[test]
+    fn first_request_returns_the_first_user_message() {
+        let events = vec![
+            start("u1", Role::User, Some("first"), false),
+            start("u2", Role::User, Some("second"), false),
+        ];
+        assert_eq!(first_request(&events), Some("first".into()));
+    }
+
+    #[test]
+    fn first_request_is_none_without_user_messages() {
+        let events = vec![start("a", Role::Assistant, Some("hi"), false)];
+        assert_eq!(first_request(&events), None);
     }
 
     fn start(id: &str, role: Role, content: Option<&str>, system_generated: bool) -> Event {

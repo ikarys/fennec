@@ -280,8 +280,9 @@ read-only. The human edits them as usual.
 - `GET /api/folders?path=<absolute path>` → `{path, parent, folders: [{name, path, hidden, repo}]}`,
   the sub-folders of `path` (the home directory when omitted), sorted by name;
   `repo` marks a git repository; 400 if `path` cannot be read
-- `GET /api/sessions/{id}` → `{id, title, state, mode, model, project: {id, name, workdir}, worktree, idea}`;
+- `GET /api/sessions/{id}` → `{id, title, state, mode, model, project: {id, name, workdir}, worktree, idea, request}`;
   `idea` is `{id, state}` when the session frames one of the project's ideas, else null;
+  `request` is the first message the human typed in the session, verbatim, or null;
   `model` is `{provider, model, providerName, contextWindow, compactAt, source}`,
   what the next turn runs on; `source` is `session`, `parent` or `default`;
   `worktree` is `{path, branch, base, editorUrl}` (`editorUrl` opens the copy in VS Code, through the WSL remote under WSL) when the session (or its root session) runs a workflow in
