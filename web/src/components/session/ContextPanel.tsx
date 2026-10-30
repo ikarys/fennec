@@ -10,6 +10,7 @@ import { AgentWorkspaceSection } from './AgentWorkspaceSection';
 import { CriteriaSection } from './CriteriaSection';
 import { DecisionsSection } from './DecisionsSection';
 import { ModifiedFilesSection } from './ModifiedFilesSection';
+import { RequestSection } from './RequestSection';
 import { SkillsSection } from './SkillsSection';
 import { TokensSection } from './TokensSection';
 import { ToolCountsSection } from './ToolCountsSection';
@@ -73,6 +74,8 @@ interface ContextPanelProps {
   skills: SessionSkills | null;
   /** The session's token totals, computed server-side; null while the first fetch is in flight. */
   usage: SessionUsage | null;
+  /** The first message the human typed, verbatim; null while unknown or absent. */
+  request: string | null;
   /** False on the « Nouvelle session » tab, where there is no log to fold. */
   hasSession: boolean;
   /** Older pages are not loaded: the totals cover the loaded messages only. */
@@ -87,7 +90,7 @@ interface ContextPanelProps {
   integrationVersion: number;
 }
 
-export function ContextPanel({ view, skills, usage, hasSession, partial, worktree, sessionId, onWorktreeChanged, integrationVersion }: ContextPanelProps) {
+export function ContextPanel({ view, skills, usage, request, hasSession, partial, worktree, sessionId, onWorktreeChanged, integrationVersion }: ContextPanelProps) {
   const [width, setWidth] = useState(loadWidth);
   const [selectedPageName, setSelectedPageName] = useState(loadPageName);
   const [collapsed, setCollapsed] = useState(loadCollapsed);
@@ -126,6 +129,8 @@ export function ContextPanel({ view, skills, usage, hasSession, partial, worktre
 
   function renderBlock(id: PanelBlockId) {
     switch (id) {
+      case 'request':
+        return <RequestSection key={id} request={request} />;
       case 'criteria':
         return <CriteriaSection key={id} criteria={view.criteria} />;
       case 'modifiedFiles':
