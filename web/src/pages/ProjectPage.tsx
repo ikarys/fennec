@@ -7,9 +7,11 @@ import { Card } from '../components/ui/Card';
 import { SectionLabel } from '../components/ui/SectionLabel';
 import { markdownComponents } from '../components/session/markdownComponents';
 import { ProjectMap } from '../components/project/ProjectMap';
-import { getProjectOverview, writeMapFile, type Adr, type Project, type ProjectOverview } from '../lib/api';
+import { createSession, getProjectOverview, writeMapFile, type Adr, type Project, type ProjectOverview } from '../lib/api';
 
 const REMARK_PLUGINS = [remarkGfm];
+
+const ANALYZE_PROMPT = 'Analyze this project and draft the philosophy, layers and rules of its AGENTS.md.';
 
 function statusTone(status: string) {
   if (status === 'accepted') return 'ok' as const;
@@ -35,13 +37,23 @@ function AdrRow({ adr, first }: { adr: Adr; first: boolean }) {
   );
 }
 
-export default function ProjectPage({ projects, projectId }: { projects: Project[]; projectId: string }) {
+export default function ProjectPage({
+  projects,
+  projectId,
+  onOpenSession,
+}: {
+  projects: Project[];
+  projectId: string;
+  onOpenSession: (sessionId: string) => void;
+}) {
   const project = projects.find((p) => p.id === projectId) ?? null;
   const [data, setData] = useState<ProjectOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [writing, setWriting] = useState(false);
   const [writeError, setWriteError] = useState<string | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -80,6 +92,19 @@ export default function ProjectPage({ projects, projectId }: { projects: Project
     }
   };
 
+  const handleAnalyze = async () => {
+    setAnalyzing(true);
+    setAnalyzeError(null);
+    try {
+      const created = await createSession(projectId, ANALYZE_PROMPT, 'analyze');
+      onOpenSession(created.id);
+    } catch (err) {
+      setAnalyzeError(err instanceof Error ? err.message : 'Erreur inconnue');
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
   const shell = (children: ReactNode) => (
     <main className="grow overflow-y-auto px-6 py-8">
       <div className="mx-auto max-w-[1100px]">{children}</div>
@@ -92,7 +117,20 @@ export default function ProjectPage({ projects, projectId }: { projects: Project
 
   const header = (
     <>
-      <h1 className="text-[1.375rem] font-semibold tracking-[-0.02em]">{project.name}</h1>
+      <div className="flex items-center gap-3">
+        <h1 className="text-[1.375rem] font-semibold tracking-[-0.02em]">{project.name}</h1>
+        <div className="grow" />
+        <Button
+          variant="secondary"
+          size="sm"
+          disabled={analyzing}
+          onClick={handleAnalyze}
+          title="Un agent en lecture seule rédige un brouillon d'AGENTS.md, chaque point avec sa source ; à relire"
+        >
+          {analyzing ? 'Création…' : 'Analyser le projet'}
+        </Button>
+      </div>
+      {analyzeError ? <p className="mt-1 text-xs text-err">{analyzeError}</p> : null}
       <p className="mt-0.5 font-mono text-xs text-muted">
         {project.workdir} · ⎇ {project.branch ?? 'sans branche'}
       </p>
