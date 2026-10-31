@@ -3,7 +3,7 @@ import type { Project, SessionSummary } from '../lib/api';
 import { DeleteSessionsDialog, type DeletionTarget } from '../components/session/DeleteSessionsDialog';
 import { formatRelative } from '../lib/format';
 import { SessionStateIcon } from '../components/session/SessionStateIcon';
-import { ChevronRightIcon, ProjectIcon, PlusIcon, TrashIcon } from '../components/Icons';
+import { BulbIcon, ChevronRightIcon, PlusIcon, RepoIcon, TrashIcon } from '../components/Icons';
 import { Button, buttonClass } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { SectionLabel } from '../components/ui/SectionLabel';
@@ -125,7 +125,7 @@ function ProjectSection({
             aria-label="Voir le projet"
             className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
           >
-            <ProjectIcon className="h-4 w-4" />
+            <RepoIcon className="h-4 w-4" />
           </a>
           <Button
             variant="secondary"
@@ -133,10 +133,19 @@ function ProjectSection({
             onClick={() => onNewSession(project.id)}
             title="Nouvelle session dans ce projet"
             aria-label="Nouvelle session"
-            iconOnly
           >
-            <PlusIcon className="h-4 w-4" />
+            <PlusIcon className="h-3.5 w-3.5" />
+            Nouvelle session
           </Button>
+          <a
+            href={'#/project/' + encodeURIComponent(project.id) + '/tasks'}
+            title="Ajouter une idée au backlog"
+            aria-label="Ajouter une idée au backlog"
+            className={buttonClass({ variant: 'ghost', size: 'sm' })}
+          >
+            <BulbIcon className="h-3.5 w-3.5" />
+            Backlog
+          </a>
         </>
       }
     >
