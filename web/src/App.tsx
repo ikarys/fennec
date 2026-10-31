@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState, lazy, Suspense } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react';
 import type { Project, ProviderListing, SettingsResponse } from './lib/api';
 import { createProject, getProjects, getSettings } from './lib/api';
 import { applyTheme, getStoredTheme, type ThemeId } from './lib/theme';
 import { TopBar, type TabInfo } from './components/layout/TopBar';
 import { HomePage } from './pages/HomePage';
 import { SessionPage } from './pages/SessionPage';
+import { SplitPage } from './pages/SplitPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { InsightPage } from './pages/InsightPage';
 import { Palette } from './components/Palette';
@@ -23,6 +24,7 @@ type Route =
   | { name: 'settings' }
   | { name: 'insight' }
   | { name: 'backlog' }
+  | { name: 'split'; left: string | null; right: string | null }
   | { name: 'project'; projectId: string; tab: string | null; sub: string | null }
   | { name: 'workflows'; projectId: string | null; workflowId: string | null; isNew: boolean };
 
@@ -56,6 +58,11 @@ function parseRoute(): Route {
     const workflowId = segments.length >= 2 ? decodeURIComponent(segments[1]) : null;
     return { name: 'workflows', projectId, workflowId, isNew };
   }
+  if (hash.startsWith('#/split')) {
+    const rest = hash.slice('#/split'.length).replace(/^\//, '');
+    const parts = rest.split('/');
+    return { name: 'split', left: parsePaneToken(parts[0] ?? null), right: parsePaneToken(parts[1] ?? null) };
+  }
   if (hash.startsWith('#/s/')) {
     const id = decodeURIComponent(hash.slice(4));
     if (id.startsWith('new:')) {
@@ -77,6 +84,20 @@ function tabPath(tabId: string): string {
   return tabId.startsWith('new:')
     ? `#/new/${encodeURIComponent(tabId.slice(4))}`
     : `#/s/${encodeURIComponent(tabId)}`;
+}
+
+/** A split pane's value in the URL: a session id, `new:<projectId>`, or `-` for empty. */
+function paneToken(value: string | null): string {
+  return value ? encodeURIComponent(value) : '-';
+}
+
+function splitPath(left: string | null, right: string | null): string {
+  return `#/split/${paneToken(left)}/${paneToken(right)}`;
+}
+
+function parsePaneToken(raw: string | null | undefined): string | null {
+  if (!raw || raw === '-') return null;
+  return decodeURIComponent(raw);
 }
 
 function loadTabs(): string[] {
@@ -112,6 +133,8 @@ export default function App() {
   const [projectSubmitting, setProjectSubmitting] = useState(false);
   const [projectError, setProjectError] = useState<string | null>(null);
   const [theme, setTheme] = useState<ThemeId>(() => getStoredTheme());
+  // The ⌘\ handler is attached once; it always calls the latest toggle.
+  const toggleSplitRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     const onHashChange = () => setRoute(parseRoute());
@@ -196,6 +219,10 @@ export default function App() {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
         setPaletteOpen((open) => !open);
+      }
+      if ((event.metaKey || event.ctrlKey) && event.key === '\\') {
+        event.preventDefault();
+        toggleSplitRef.current();
       }
       if (event.key === 'Escape') {
         setPaletteOpen(false);
@@ -331,6 +358,55 @@ export default function App() {
     [refreshProjects]
   );
 
+  // Split view: the two panes' ids live in the URL; each pane is an independent
+  // SessionPage. Choosing a session or creating one rewrites that pane's token.
+  const openSessionInPane = useCallback(
+    (side: 'left' | 'right', sessionId: string) => {
+      setTabs((previous) => (previous.includes(sessionId) ? previous : [...previous, sessionId]));
+      const { left, right } = route.name === 'split' ? route : { left: null, right: null };
+      navigate(splitPath(side === 'left' ? sessionId : left, side === 'right' ? sessionId : right));
+    },
+    [route, navigate]
+  );
+
+  const newSessionInPane = useCallback(
+    (side: 'left' | 'right', projectId: string) => {
+      const { left, right } = route.name === 'split' ? route : { left: null, right: null };
+      navigate(splitPath(side === 'left' ? `new:${projectId}` : left, side === 'right' ? `new:${projectId}` : right));
+    },
+    [route, navigate]
+  );
+
+  const sessionCreatedInPane = useCallback(
+    (side: 'left' | 'right', newId: string, pseudoId: string | null) => {
+      setTabs((previous) => {
+        const replaced = pseudoId ? previous.map((id) => (id === pseudoId ? newId : id)) : previous;
+        return replaced.includes(newId) ? replaced : [...replaced, newId];
+      });
+      if (activeTabId === pseudoId) setActiveTabId(newId);
+      const { left, right } = route.name === 'split' ? route : { left: null, right: null };
+      navigate(splitPath(side === 'left' ? newId : left, side === 'right' ? newId : right));
+      refreshProjects();
+    },
+    [activeTabId, route, navigate, refreshProjects]
+  );
+
+  const toggleSplit = useCallback(() => {
+    if (route.name === 'split') {
+      // Exit to a single session view: the left pane, else the active tab.
+      const target = route.left ?? activeTabId;
+      navigate(target ? tabPath(target) : '#/');
+      return;
+    }
+    const current =
+      route.name === 'session' ? route.id : route.name === 'new' ? `new:${route.id}` : activeTabId;
+    navigate(splitPath(current, null));
+  }, [route, activeTabId, navigate]);
+
+  useEffect(() => {
+    toggleSplitRef.current = toggleSplit;
+  }, [toggleSplit]);
+
   const pseudoTabId = route.name === 'new' ? `new:${route.id}` : null;
 
   return (
@@ -347,6 +423,8 @@ export default function App() {
           }}
           onCloseTab={closeTab}
           onOpenPalette={() => setPaletteOpen(true)}
+          splitActive={route.name === 'split'}
+          onToggleSplit={toggleSplit}
         />
 
         <div className="flex min-h-0 grow">
@@ -387,6 +465,19 @@ export default function App() {
             <Suspense fallback={<div className="flex grow items-center justify-center text-muted">Chargement…</div>}>
               <BacklogPage />
             </Suspense>
+          ) : route.name === 'split' ? (
+            <SplitPage
+              left={route.left}
+              right={route.right}
+              projects={projects}
+              onChooseSession={openSessionInPane}
+              onNewSessionInPane={newSessionInPane}
+              onSessionCreated={sessionCreatedInPane}
+              onRunningChanged={refreshProjects}
+              onRenamed={refreshProjects}
+              onOpenProjectDialog={() => setProjectDialogOpen(true)}
+              onHome={() => navigate('#/')}
+            />
           ) : (
             <SessionPage
               sessionId={route.name === 'session' ? route.id : null}
