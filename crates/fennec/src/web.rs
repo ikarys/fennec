@@ -21,6 +21,7 @@ mod model_view;
 mod notice_stream;
 mod preview;
 mod pricing;
+mod project_dashboard;
 mod project_routes;
 mod routes;
 mod servers;

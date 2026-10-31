@@ -211,3 +211,38 @@ export function writeMapFile(
     },
   );
 }
+
+// The project dashboard: display-ready tiles and recent sessions.
+export type DashboardIcon = 'sessions' | 'ideas' | 'tokens' | 'time' | 'cost' | 'disk' | 'map' | 'doc';
+
+export interface DashboardTile {
+  id: string;
+  icon: DashboardIcon;
+  label: string;
+  figure: string;
+  detail: string;
+  tone: 'accent' | 'ok' | 'err' | 'neutral';
+  active: boolean;
+  href: string | null;
+  title: string | null;
+}
+
+export interface RecentSession {
+  id: string;
+  title: string;
+  updatedAt: number;
+  running: boolean;
+}
+
+export interface ProjectDashboard {
+  tiles: DashboardTile[];
+  recent: RecentSession[];
+}
+
+export function getProjectDashboard(
+  projectId: string,
+): Promise<ProjectDashboard> {
+  return request<ProjectDashboard>(
+    `/api/projects/${encodeURIComponent(projectId)}/dashboard`,
+  );
+}

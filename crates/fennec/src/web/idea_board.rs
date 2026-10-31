@@ -50,6 +50,15 @@ impl<'a> Board<'a> {
     pub(super) fn status_of(&self, idea: &Idea) -> Result<Status, String> {
         idea_view(self, idea).map(|(status, _)| status)
     }
+
+    /// Every idea's stage, in backlog order.
+    pub(super) fn stages(&self) -> Result<Vec<Stage>, String> {
+        self.backlog
+            .ideas
+            .iter()
+            .map(|idea| self.status_of(idea).map(|status| status.stage()))
+            .collect()
+    }
 }
 
 /// The board's payload: `{queue, groups, summary, nightReport}`.

@@ -9,12 +9,13 @@ use std::path::Path;
 use super::App;
 use super::http::{Request, error, send_json};
 use crate::domain::clock;
+use crate::domain::project::SessionSummary;
 use crate::worktree::usage;
 use crate::worktree::usage::WorktreeUsage;
 use serde_json::{Value, json};
 
 const CACHE_MS: u64 = 10 * 60 * 1000;
-const ALERT_BYTES: u64 = 5 * 1024 * 1024 * 1024;
+pub(super) const ALERT_BYTES: u64 = 5 * 1024 * 1024 * 1024;
 
 pub fn summary(app: &App, stream: &mut TcpStream) -> Result<(), String> {
     let (_, entries) = cached_scan(app, false);
@@ -47,25 +48,22 @@ pub fn list(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Resul
     let (scanned_at, entries) = cached_scan(app, fresh);
     let project_workdir = Path::new(&project.workdir);
 
+    let project_entries = project_entries(&store, &entries, id, project_workdir)?;
+
     let mut entry_values = Vec::new();
     let mut total_bytes = 0u64;
     let mut generated_bytes = 0u64;
 
-    for entry in &entries {
-        let found = store.session(&entry.name)?;
-        let session = found
+    for item in project_entries {
+        let session = item
+            .session
             .as_ref()
             .map(|s| (s.project_id.as_str(), s.title.as_str(), s.updated_at));
-        let session_project = session.map(|s| s.0);
+        let running = item.session.is_some() && running(app, &store, &item.entry.name)?;
 
-        if !belongs(entry, session_project, id, project_workdir) {
-            continue;
-        }
-
-        let running = session.is_some() && running(app, &store, &entry.name)?;
-        entry_values.push(entry_json(entry, session, running));
-        total_bytes += entry.bytes;
-        generated_bytes += entry.generated_bytes;
+        entry_values.push(entry_json(item.entry, session, running));
+        total_bytes += item.entry.bytes;
+        generated_bytes += item.entry.generated_bytes;
     }
 
     send_json(
@@ -140,6 +138,33 @@ pub fn remove_orphan(app: &App, req: &Request, stream: &mut TcpStream) -> Result
     }
 }
 
+/// The project's disk usage from the cached scan only: the dashboard must not
+/// trigger a scan.
+pub(super) fn project_disk(
+    app: &App,
+    store: &crate::store::SqliteStore,
+    project: &crate::domain::project::Project,
+) -> Result<Option<(u64, u64)>, String> {
+    // Cloned out so the store reads below do not hold the scan's lock.
+    let Some((_, entries)) = app.worktree_scan.lock().unwrap().clone() else {
+        return Ok(None);
+    };
+
+    let project_workdir = Path::new(&project.workdir);
+    let project_entries = project_entries(store, &entries, &project.id, project_workdir)?;
+
+    let total_bytes = project_entries
+        .iter()
+        .map(|item| item.entry.bytes)
+        .sum::<u64>();
+    let generated_bytes = project_entries
+        .iter()
+        .map(|item| item.entry.generated_bytes)
+        .sum::<u64>();
+
+    Ok(Some((total_bytes, generated_bytes)))
+}
+
 fn cached_scan(app: &App, fresh: bool) -> (u64, Vec<WorktreeUsage>) {
     let now = clock::now_ms();
     let mut scan = app.worktree_scan.lock().unwrap();
@@ -182,6 +207,33 @@ fn largest_project_id(app: &App, entries: &[WorktreeUsage]) -> Result<Option<Str
         .filter(|(project_id, _)| projects.iter().any(|project| project.id == *project_id))
         .max_by_key(|(_, bytes)| *bytes)
         .map(|(project_id, _)| project_id))
+}
+
+/// A scanned worktree of the project, with its session when the store knows it.
+struct ProjectEntry<'a> {
+    entry: &'a WorktreeUsage,
+    session: Option<SessionSummary>,
+}
+
+/// The scan's entries that belong to the project: one filter for the tab and the dashboard.
+fn project_entries<'a>(
+    store: &crate::store::SqliteStore,
+    entries: &'a [WorktreeUsage],
+    project_id: &str,
+    project_workdir: &Path,
+) -> Result<Vec<ProjectEntry<'a>>, String> {
+    let mut out = Vec::new();
+
+    for entry in entries {
+        let session = store.session(&entry.name)?;
+        let session_project = session.as_ref().map(|s| s.project_id.as_str());
+
+        if belongs(entry, session_project, project_id, project_workdir) {
+            out.push(ProjectEntry { entry, session });
+        }
+    }
+
+    Ok(out)
 }
 
 fn belongs(
