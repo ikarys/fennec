@@ -243,6 +243,22 @@ read-only. The human edits them as usual.
   - `adrs` `[{number, file, title, status, date, body}]`: the MADR files of `docs/adr/` (`NNNN-slug.md`,
     sorted by number; `status` and `date` from the frontmatter, null when absent; the title from the
     first `# ` heading).
+- `GET /api/projects/{id}/worktrees[?fresh=1]` → `{scannedAt, totalBytes, generatedBytes, entries}`: the disk the
+  project's session worktrees take, measured from disk (verified; allocated bytes, like `du`). `fresh=1` measures again,
+  otherwise a scan younger than 10 minutes is reused; 404 if no project.
+  - `entries` `[{name, sessionId, sessionTitle, running, updatedAt, bytes, generatedBytes, orphan, repoMissing,
+    foreignOwned, sudoCommand}]`, largest first: `name` the directory under the worktrees root (the root session's id);
+    `generatedBytes` the part in `target`, `node_modules` and `.venv` (rebuilt by a build); `orphan` when no session
+    owns it or git no longer registers it; `repoMissing` when its repository is gone (such orphans show on every
+    project page); `sudoCommand` (`sudo rm -rf <path>`) for an orphan holding files of another user (root).
+- `GET /api/worktrees` → `{totalBytes, generatedBytes, alert, largestProjectId}`: every worktree, for the home page;
+  `alert` from 5 GiB; `largestProjectId` the project whose worktrees take the most, null when none.
+- `POST /api/worktrees/clean` `{name}` → `{freedBytes}`: the human's click empties a worktree's generated directories
+  (`target` removed, `node_modules`/`.venv` emptied, they are the sandbox's mount points); 400 invalid name, 404 no such
+  worktree, 409 while a turn of its session runs or when removing fails (the message names the `sudo` command).
+- `POST /api/worktrees/remove-orphan` `{name}` → `{}`: removes an orphan directory and what git keeps of it (its
+  registration, `fennec/<name>` branch, base and origin refs); 409 for a session's live worktree (use
+  `POST /api/sessions/{id}/discard`) or when removing fails.
 - `POST /api/projects/{id}/map-file` `{}` → `{mapFile}`: the human's click writes `docs/map.md` (a Mermaid
   diagram and a table) in the project's tree, not committed; 404 if no project
 - `GET /api/projects/{id}/ideas` → `{queue, groups, nightReport}`: the project's ideas backlog as a board the UI renders
