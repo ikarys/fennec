@@ -12,19 +12,24 @@ use crate::domain::event::Event;
 use crate::store::SqliteStore;
 use backlog::{Idea, IdeaState};
 
-/// `GET /api/backlog`: every project's done tasks, most done first.
+/// `GET /api/backlog`: projects with done tasks, most done first, plus idle
+/// projects without any done task.
 pub fn list_backlog(app: &App, stream: &mut TcpStream) -> Result<(), String> {
     let store = app.store()?;
     send_json(stream, 200, &backlog_view(&store)?)
 }
 
-/// The dashboard's payload: one entry per project, each listing its done tasks
-/// (most recent first), and the totals across all of them.
+/// The dashboard's payload: projects with at least one done task, each listing
+/// its done tasks (most recent first), idle projects without any, and the
+/// totals across all projects.
 fn backlog_view(store: &SqliteStore) -> Result<Value, String> {
     let mut projects: Vec<Value> = Vec::new();
+    let mut idle: Vec<Value> = Vec::new();
     let mut total_done = 0usize;
+    let mut total_projects = 0usize;
 
     for project in store.projects()? {
+        total_projects += 1;
         let mut tasks: Vec<Value> = Vec::new();
         for idea in store.ideas(&project.id)? {
             if let Some(status) = done_status(store, &idea)? {
@@ -38,19 +43,28 @@ fn backlog_view(store: &SqliteStore) -> Result<Value, String> {
             }
         }
         tasks.sort_by_key(|task| std::cmp::Reverse(task["updatedAt"].as_u64().unwrap_or(0)));
-        projects.push(json!({
-            "id": project.id,
-            "name": project.name,
-            "doneCount": tasks.len(),
-            "tasks": tasks,
-        }));
+        if tasks.is_empty() {
+            idle.push(json!({
+                "id": project.id,
+                "name": project.name,
+            }));
+        } else {
+            projects.push(json!({
+                "id": project.id,
+                "name": project.name,
+                "doneCount": tasks.len(),
+                "tasks": tasks,
+            }));
+        }
     }
 
     projects.sort_by_key(|project| std::cmp::Reverse(project["doneCount"].as_u64().unwrap_or(0)));
+    idle.sort_by_key(|project| project["name"].as_str().unwrap_or("").to_lowercase());
 
     Ok(json!({
         "projects": projects,
-        "total": { "done": total_done, "projects": projects.len() },
+        "idle": idle,
+        "total": { "done": total_done, "projects": total_projects },
     }))
 }
 
@@ -236,12 +250,16 @@ mod tests {
             )
             .unwrap();
 
+        // Project C: no done task, so it is idle.
+        let c = store.project_for("/tmp/backlog-c").unwrap();
+
         let view = backlog_view(&store).unwrap();
 
         assert_eq!(view["total"]["done"], 3);
-        assert_eq!(view["total"]["projects"], 2);
+        assert_eq!(view["total"]["projects"], 3);
 
         let projects = view["projects"].as_array().unwrap();
+        assert_eq!(projects.len(), 2);
         // Project A holds the most done tasks, so it leads the list.
         assert_eq!(projects[0]["id"], a.id);
         assert_eq!(projects[0]["doneCount"], 2);
@@ -255,5 +273,10 @@ mod tests {
 
         assert_eq!(projects[1]["id"], b.id);
         assert_eq!(projects[1]["doneCount"], 1);
+
+        let idle = view["idle"].as_array().unwrap();
+        assert_eq!(idle.len(), 1);
+        assert_eq!(idle[0]["id"], c.id);
+        assert_eq!(idle[0]["name"], c.name);
     }
 }
