@@ -206,12 +206,13 @@ export default function App() {
     });
   }, []);
 
-  // No polling: the list refreshes when the human looks at it (home, palette)
-  // and when a turn starts or ends; F5 does the rest.
-  const homeVisible = route.name === 'home' || paletteOpen;
+  // No polling: the list refreshes when the human looks at it (home, project,
+  // palette) and when a turn starts or ends; F5 does the rest.
+  const projectsVisible =
+    route.name === 'home' || route.name === 'project' || paletteOpen;
   useEffect(() => {
-    if (homeVisible) refreshProjects();
-  }, [homeVisible, refreshProjects]);
+    if (projectsVisible) refreshProjects();
+  }, [projectsVisible, refreshProjects]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
