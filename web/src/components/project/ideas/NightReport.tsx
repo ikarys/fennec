@@ -76,15 +76,19 @@ export function NightReport({
           return (
             <div
               key={idea.id}
-              className={`flex items-center gap-2 py-1.5 text-xs ${
+              className={`flex items-start gap-2 py-2 text-xs ${
                 i > 0 ? 'border-t border-border' : ''
               }`}
             >
-              <span className="min-w-0 grow truncate" title={idea.text}>
-                {idea.text}
-              </span>
-              <IdeaStatusBadge status={idea.status} />
-              <IdeaMeta idea={idea} caps={caps} />
+              <div className="min-w-0 grow">
+                <div className="truncate text-sm" title={idea.text}>
+                  {idea.text}
+                </div>
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  <IdeaStatusBadge status={idea.status} />
+                  <IdeaMeta idea={idea} caps={caps} />
+                </div>
+              </div>
               {sid ? (
                 <Button
                   variant="ghost"
