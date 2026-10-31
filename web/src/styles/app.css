@@ -69,27 +69,29 @@
   --scrim: rgba(30, 30, 25, 0.28);
 }
 
-:root[data-theme="brume"] {
+/* Monokai: the editor palette; its pink is the error colour, its green `ok`,
+   its orange the accent, close to fennec's own. */
+:root[data-theme="monokai"] {
   color-scheme: dark;
-  --bg: #0F1420;
-  --panel: #151B29;
-  --raised: #1D2536;
-  --border: #283147;
-  --border-strong: #36415B;
-  --text: #DDE3EE;
-  --muted: #98A3B8;
-  --faint: #7A86A2;
-  --accent: #82A8F9;
-  --accent-strong: #A9C3FB;
-  --accent-soft: rgba(130, 168, 249, 0.14);
-  --on-accent: #0F1420;
-  --ok: #5CC9A7;
-  --ok-soft: rgba(92, 201, 167, 0.14);
-  --err: #F07178;
-  --add-bg: rgba(92, 201, 167, 0.10);
-  --del-bg: rgba(240, 113, 120, 0.10);
-  --code: #0C111B;
-  --scrim: rgba(5, 8, 15, 0.6);
+  --bg: #272822;
+  --panel: #2D2E27;
+  --raised: #3E3D32;
+  --border: #49483E;
+  --border-strong: #5E5D50;
+  --text: #F8F8F2;
+  --muted: #B3AD93;
+  --faint: #9A957D;
+  --accent: #FD971F;
+  --accent-strong: #FFB86C;
+  --accent-soft: rgba(253, 151, 31, 0.14);
+  --on-accent: #272822;
+  --ok: #A6E22E;
+  --ok-soft: rgba(166, 226, 46, 0.14);
+  --err: #FF4D8A;
+  --add-bg: rgba(166, 226, 46, 0.10);
+  --del-bg: rgba(249, 38, 114, 0.12);
+  --code: #1E1F1A;
+  --scrim: rgba(20, 20, 16, 0.6);
 }
 
 /* Cyber: hominfer's terminal green. `ok` is cyan, not green, so a done or
