@@ -176,10 +176,13 @@ read-only. The human edits them as usual.
 
 - `GET /api/config` → `{model, contextWindow, compactAt}`: the resolved parameters of the
   stored preferences; `compactAt` is the fraction at which the session compacts (0 disables)
-- `GET /api/settings` → `{preferences, listings, defaults, skills, optInWorkflows, scanners}`
+- `GET /api/settings` → `{preferences, listings, defaults, skills, optInWorkflows, scanners, sandboxHealth}`
   - `scanners`: `[{id, name, covers, install, url, path}]`, the security scanners the `audit-security`
     agent runs; `path` is where fennec found the executable on PATH, null when absent (verified); fennec
     never installs one, `install` is the command shown to the human
+  - `sandboxHealth`: `{status: ready|missing|blocked, detail}`, whether bwrap runs here, probed on each
+    call (verified); `detail` is bwrap's error when blocked (on recent Ubuntu, AppArmor's user namespace
+    restriction, see docs/releasing.md)
   - `preferences`: the stored `Preferences`
   - `listings`: `[{provider, name, baseUrl, models: [{id, contextWindow, resolved}], error}]`,
     local first, from a fresh `/models` call per provider (in parallel); the

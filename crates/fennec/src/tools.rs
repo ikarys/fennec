@@ -21,7 +21,7 @@ mod web_fetch;
 mod web_search;
 mod write_file;
 
-pub use sandbox::Sandbox;
+pub use sandbox::{Sandbox, SandboxHealth, probe};
 
 use crate::agent::ports::{CommandRun, Commands, Toolbox};
 use crate::domain::agent::CommandAccess;
