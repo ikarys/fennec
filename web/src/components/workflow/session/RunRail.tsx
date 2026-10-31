@@ -6,6 +6,7 @@ import { portTone, runRounds, upcomingSteps, type NodeRun, type RunView, type Up
 import { formatClock, formatDuration } from '../../../lib/format';
 import { ChevronDownIcon, ChevronRightIcon, ChevronsLeftIcon, ChevronsRightIcon } from '../../Icons';
 import { Button } from '../../ui/Button';
+import { NodeOutputModal } from './NodeOutputModal';
 
 const COLLAPSED_KEY = 'fennec.runRail.collapsed';
 
@@ -60,7 +61,7 @@ function barClass(step: RailStep): string {
   return portTone(port ?? '') === 'negative' ? 'border-err' : 'border-ok';
 }
 
-function StepRow({ step }: { step: RailStep }) {
+function StepRow({ step, onShowOutput }: { step: RailStep; onShowOutput: (run: NodeRun) => void }) {
   const bar = barClass(step);
   const label = step.kind === 'run' ? step.run.label : step.step.label;
   const nodeRun = step.kind === 'run' ? step.run : null;
@@ -113,7 +114,20 @@ function StepRow({ step }: { step: RailStep }) {
       <span className={`truncate text-xs ${labelClass}`} title={title}>{label}</span>
       {hasMeta && (
         <span className="flex items-baseline gap-1.5 whitespace-nowrap text-[0.6875rem] text-muted">
-          {showPort && port ? <PortLabel port={port} /> : null}
+          {showPort && port && nodeRun ? (
+            nodeRun.output ? (
+              <button
+                type="button"
+                onClick={() => onShowOutput(nodeRun)}
+                className="shrink-0 cursor-pointer text-[0.6875rem] text-muted hover:text-text hover:underline"
+                title="Voir ce que l'agent a trouvé"
+              >
+                {port}
+              </button>
+            ) : (
+              <PortLabel port={port} />
+            )
+          ) : null}
           {pass > 1 && <span className="tabular-nums">×{pass}</span>}
           {time && (
             <span className={`ml-auto text-faint ${isHumanRunning ? '' : 'font-mono tabular-nums'}`}>{time}</span>
@@ -131,12 +145,14 @@ function RoundRow({
   index,
   round,
   expanded,
-  onToggle
+  onToggle,
+  onShowOutput
 }: {
   index: number;
   round: NodeRun[];
   expanded: boolean;
   onToggle: (index: number) => void;
+  onShowOutput: (run: NodeRun) => void;
 }) {
   const last = round[round.length - 1];
   if (!last) return null;
@@ -161,6 +177,7 @@ function RoundRow({
           {round.map((nodeRun, runIndex) => (
             <StepRow
               key={`${nodeRun.nodeId}-${nodeRun.pass}-${runIndex}`}
+              onShowOutput={onShowOutput}
               step={{ kind: 'run' as const, run: nodeRun, key: `${nodeRun.nodeId}-${nodeRun.pass}-${runIndex}` }}
             />
           ))}
@@ -173,6 +190,8 @@ function RoundRow({
 export function RunRail({ run }: { run: RunView }) {
   const [collapsed, setCollapsed] = useState(loadCollapsed);
   const [expandedRounds, setExpandedRounds] = useState<Set<number>>(new Set());
+  // The node whose output is open in a modal (rendered outside the <ol>).
+  const [outputRun, setOutputRun] = useState<NodeRun | null>(null);
   const listRef = useRef<HTMLOListElement>(null);
   const count = run.runs.length;
   const upcoming = useMemo(() => upcomingSteps(run), [run]);
@@ -241,12 +260,14 @@ export function RunRail({ run }: { run: RunView }) {
             round={round}
             expanded={expandedRounds.has(index)}
             onToggle={toggleRound}
+            onShowOutput={setOutputRun}
           />
         ))}
         {rounds.length > 0
           ? rounds[rounds.length - 1]?.map((nodeRun, index) => (
               <StepRow
                 key={`${nodeRun.nodeId}-${nodeRun.pass}-${index}`}
+                onShowOutput={setOutputRun}
                 step={{ kind: 'run' as const, run: nodeRun, key: `${nodeRun.nodeId}-${nodeRun.pass}-${index}` }}
               />
             ))
@@ -254,10 +275,12 @@ export function RunRail({ run }: { run: RunView }) {
         {upcoming.map((step) => (
           <StepRow
             key={`upcoming-${step.nodeId}`}
+            onShowOutput={setOutputRun}
             step={{ kind: 'upcoming' as const, step, key: `upcoming-${step.nodeId}` }}
           />
         ))}
       </ol>
+      <NodeOutputModal nodeRun={outputRun} onClose={() => setOutputRun(null)} />
     </aside>
   );
 }
