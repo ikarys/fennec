@@ -62,6 +62,9 @@ struct App {
     /// is O(log) and the UI refetches it on every relevant event; caching keeps
     /// the steady state to a max-seq lookup.
     skill_folds: Mutex<HashMap<String, (u64, SessionSkills)>>,
+    /// Each idea session's board report, keyed by its log's max seq like
+    /// `skill_folds`: the UI polls the board while a run goes on.
+    idea_reports: Mutex<HashMap<String, (u64, idea_board::IdeaReport)>>,
     /// Projects whose ideas queue runs, and the flag that stops it after the
     /// current idea (`idea_queue::start_queue`).
     idea_queues: Mutex<HashMap<String, Arc<AtomicBool>>>,
@@ -157,6 +160,24 @@ impl App {
         cache.insert(id.to_string(), (last, folded.clone()));
         Ok(folded)
     }
+
+    /// The session's idea report, cached against the log's max seq (see
+    /// `idea_reports`): the O(log) re-read runs only when a new event has
+    /// followed.
+    pub(crate) fn idea_report(
+        &self,
+        store: &SqliteStore,
+        session_id: &str,
+    ) -> Result<idea_board::IdeaReport, String> {
+        let last = store.last_seq(session_id)?;
+        let mut cache = self.idea_reports.lock().unwrap();
+        if cache.get(session_id).is_some_and(|(seq, _)| *seq == last) {
+            return Ok(cache[session_id].1.clone());
+        }
+        let report = idea_board::idea_report(&store.events(session_id)?);
+        cache.insert(session_id.to_string(), (last, report.clone()));
+        Ok(report)
+    }
 }
 
 pub fn serve(port: u16, settings: Settings) -> Result<(), String> {
@@ -173,6 +194,7 @@ pub fn serve(port: u16, settings: Settings) -> Result<(), String> {
         port,
         notifier,
         skill_folds: Mutex::new(HashMap::new()),
+        idea_reports: Mutex::new(HashMap::new()),
         idea_queues: Mutex::default(),
         server_runs: Arc::new(Mutex::new(HashMap::new())),
     });
@@ -257,6 +279,7 @@ mod tests {
             port: 0,
             notifier,
             skill_folds: Mutex::new(HashMap::new()),
+            idea_reports: Mutex::new(HashMap::new()),
             idea_queues: Mutex::default(),
             server_runs: Arc::new(Mutex::new(HashMap::new())),
         }
