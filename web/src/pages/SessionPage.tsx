@@ -810,10 +810,10 @@ export function SessionPage({
                   {run && <RunRail run={run} />}
                   <main className="flex min-h-0 min-w-0 flex-[999_1_560px] flex-col">
                     {/* A shadow under the title: the thread fades under it instead of meeting a hard edge. */}
-                    <div className="relative z-10 flex items-center gap-2 px-6 py-2.5 after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-5 after:bg-linear-to-b after:from-black/45 after:to-transparent">
-                      <div className="mx-auto flex w-full max-w-[960px] items-center gap-2">
+                    <div className="relative z-10 flex items-center gap-2 px-4 md:px-6 py-2.5 after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-5 after:bg-linear-to-b after:from-black/45 after:to-transparent">
+                      <div className="mx-auto flex w-full max-w-[960px] flex-wrap items-center gap-x-2 gap-y-1">
                         <h1
-                          className="min-w-0 truncate text-[0.9375rem] font-semibold"
+                          className="w-full min-w-0 truncate text-[0.9375rem] font-semibold sm:w-auto"
                           title={title}
                         >
                           {title}
@@ -870,7 +870,7 @@ export function SessionPage({
                             setAwayFromBottom(false);
                           }
                         }}
-                        className="h-full overflow-y-auto p-6"
+                        className="h-full overflow-y-auto p-4 md:p-6"
                       >
                         <div
                           ref={contentRef}
