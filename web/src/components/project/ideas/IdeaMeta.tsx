@@ -3,9 +3,15 @@
  */
 import { formatDuration, formatTokens } from '../../../lib/format';
 import type { IdeaBoard, IdeaView } from '../../../lib/ideas';
+import { CheckIcon, ClockIcon, CommitIcon, DecisionIcon, FileIcon, TokensIcon } from '../../Icons';
+import { Stat } from '../../ui/Stat';
+
+// French run labels keep the singular for both 0 and 1.
+function frSingularOrPlural(count: number, singular: string): string {
+  return count === 0 || count === 1 ? singular : `${singular}s`;
+}
 
 /**
- * The idea's run meta: duration, tokens, criteria, decisions, and git counts.
  * The prop is the fields this component reads, so both board ideas and the
  * cross-project backlog summaries can be passed without casts.
  */
@@ -15,80 +21,76 @@ export function IdeaMeta({
 }: {
   idea: Pick<
     IdeaView,
-    "durationMs" | "autonomous" | "tokens" | "criteria" | "decisions" | "commits" | "files"
+    'durationMs' | 'autonomous' | 'tokens' | 'criteria' | 'decisions' | 'commits' | 'files'
   >;
   caps: IdeaBoard['queue']['caps'];
 }) {
   return (
     <>
       {idea.durationMs != null ? (
-        idea.autonomous && caps.maxMinutes > 0 ? (
-          <span
-            className="text-muted tabular-nums"
-            title="Durée de l'idée, plafond du mode nuit"
-          >
-            {formatDuration(idea.durationMs)} / {caps.maxMinutes} min
-          </span>
-        ) : (
-          <span className="text-muted tabular-nums">
-            {formatDuration(idea.durationMs)}
-          </span>
-        )
+        <Stat
+          icon={<ClockIcon />}
+          title={
+            idea.autonomous && caps.maxMinutes > 0
+              ? `Durée ${formatDuration(idea.durationMs)} sur un plafond de ${caps.maxMinutes} min (mode nuit)`
+              : `Durée ${formatDuration(idea.durationMs)}`
+          }
+        >
+          {formatDuration(idea.durationMs)}
+        </Stat>
       ) : null}
       {idea.tokens != null ? (
-        idea.autonomous && caps.maxTokens > 0 ? (
-          <span className="text-muted tabular-nums">
-            {formatTokens(idea.tokens)} / {formatTokens(caps.maxTokens)} tokens
-          </span>
-        ) : (
-          <span className="text-muted tabular-nums">
-            {formatTokens(idea.tokens)} tokens
-          </span>
-        )
+        <Stat
+          icon={<TokensIcon />}
+          title={
+            idea.autonomous && caps.maxTokens > 0
+              ? `${formatTokens(idea.tokens)} tokens sur un plafond de ${formatTokens(caps.maxTokens)}`
+              : `${formatTokens(idea.tokens)} tokens`
+          }
+        >
+          {formatTokens(idea.tokens)}
+        </Stat>
       ) : null}
       {idea.criteria ? (
-        <span
-          className="text-muted tabular-nums"
-          title="Critères d'acceptation du plan approuvé"
+        <Stat
+          icon={<CheckIcon />}
+          tone={
+            idea.criteria.failed > 0
+              ? 'err'
+              : idea.criteria.passed > 0 && idea.criteria.pending === 0
+                ? 'ok'
+                : 'neutral'
+          }
+          title={`Critères : ${idea.criteria.passed} ${frSingularOrPlural(idea.criteria.passed, 'validé')} · ${idea.criteria.failed} ${frSingularOrPlural(idea.criteria.failed, 'échoué')} · ${idea.criteria.pending} en attente`}
         >
-          critères : {idea.criteria.passed}{' '}
-          {idea.criteria.passed === 0 || idea.criteria.passed === 1
-            ? 'validé'
-            : 'validés'}{' '}
-          ·{' '}
-          <span
-            className={
-              idea.criteria.failed > 0 ? 'text-err tabular-nums' : 'tabular-nums'
-            }
-          >
-            {idea.criteria.failed}{' '}
-            {idea.criteria.failed === 0 || idea.criteria.failed === 1
-              ? 'échoué'
-              : 'échoués'}
-          </span>
-          {idea.criteria.pending > 0 ? (
-            <>
-              {' '}
-              · {idea.criteria.pending} en attente
-            </>
-          ) : null}
-        </span>
+          {`${idea.criteria.passed}/${idea.criteria.passed + idea.criteria.failed + idea.criteria.pending}`}
+        </Stat>
       ) : null}
       {idea.decisions.length > 0 ? (
-        <span
-          className="text-muted tabular-nums"
-          title={idea.decisions.map((d) => `${d.title}: ${d.choice}`).join('\n')}
+        <Stat
+          icon={<DecisionIcon />}
+          title={`${idea.decisions.length} ${frSingularOrPlural(idea.decisions.length, 'décision')}\n${idea.decisions.map((d) => `${d.title} : ${d.choice}`).join('\n')}`}
         >
-          {idea.decisions.length} décision{idea.decisions.length > 1 ? 's' : ''}
-        </span>
+          {idea.decisions.length}
+        </Stat>
       ) : null}
       {idea.commits != null ? (
-        <span className="text-muted tabular-nums">
-          {idea.commits} commit{idea.commits > 1 ? 's' : ''}
-          {idea.files != null
-            ? ` · ${idea.files} fichier${idea.files > 1 ? 's' : ''}`
-            : ''}
-        </span>
+        <>
+          <Stat
+            icon={<CommitIcon />}
+            title={`${idea.commits} ${frSingularOrPlural(idea.commits, 'commit')}`}
+          >
+            {idea.commits}
+          </Stat>
+          {idea.files != null ? (
+            <Stat
+              icon={<FileIcon />}
+              title={`${idea.files} ${frSingularOrPlural(idea.files, 'fichier')} ${frSingularOrPlural(idea.files, 'modifié')}`}
+            >
+              {idea.files}
+            </Stat>
+          ) : null}
+        </>
       ) : null}
     </>
   );

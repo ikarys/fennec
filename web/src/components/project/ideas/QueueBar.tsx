@@ -86,7 +86,7 @@ export function QueueBar({
         </span>
         {queue.next ? (
           <span className="min-w-0 truncate text-xs text-muted" title={queue.next.text}>
-            Prochaine : {queue.next.text}
+            Prochaine : {queue.next.title}
           </span>
         ) : null}
 
@@ -115,12 +115,17 @@ export function QueueBar({
             <SettingsIcon className="h-4 w-4" />
           </Button>
 
-          {queue.ready > 0 ? (
-            <Button variant="primary" size="md" disabled={busy} onClick={handleStart}>
-              <PlayIcon className="h-4 w-4" />
-              Lancer la file
-            </Button>
-          ) : null}
+          {/* Always shown, disabled when empty, so the view's main action never vanishes. */}
+          <Button
+            variant="primary"
+            size="md"
+            disabled={busy || queue.ready === 0}
+            title={queue.ready === 0 ? 'Aucune idée prête : cadre une idée du backlog' : undefined}
+            onClick={handleStart}
+          >
+            <PlayIcon className="h-4 w-4" />
+            Lancer la file
+          </Button>
         </div>
       </div>
 
