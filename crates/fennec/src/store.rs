@@ -315,6 +315,26 @@ impl SqliteStore {
         )? as u64)
     }
 
+    /// The session's `running.changed` events at/after `since_ms`, in log order.
+    pub fn running_changes(&self, session_id: &str, since_ms: u64) -> Result<Vec<(u64, bool)>> {
+        let mut stmt = self.db.prepare_cached(
+            "SELECT timestamp, payload FROM events WHERE session_id = ?1 AND event_type = 'running.changed' AND timestamp >= ?2 ORDER BY seq",
+        )?;
+        let rows = stmt.query_map(params![session_id, since_ms as i64], |r| {
+            Ok((r.get::<_, i64>(0)? as u64, r.get::<_, String>(1)?))
+        })?;
+        Ok(rows
+            .collect::<rusqlite::Result<Vec<(u64, String)>>>()?
+            .into_iter()
+            .filter_map(|(timestamp, payload)| {
+                serde_json::from_str::<serde_json::Value>(&payload)
+                    .ok()
+                    .and_then(|value| value["data"]["isRunning"].as_bool())
+                    .map(|is_running| (timestamp, is_running))
+            })
+            .collect())
+    }
+
     /// Top-level sessions, newest first; `project_id` filters when given.
     /// Child sessions are hidden from the lists.
     pub fn sessions(&self, project_id: Option<&str>) -> Result<Vec<SessionSummary>> {
