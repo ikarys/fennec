@@ -1,7 +1,7 @@
-//! The cross-project backlog dashboard (contract: `docs/api.md`): where the
-//! human's tasks stand across every project. It gathers each project's board
-//! and shows what waits for the human, what runs, the queues, then what got
-//! done. `routes.rs` only dispatches here.
+//! The cross-project Backlog page: one table row per project with its idea
+//! counts and queue controls. It gathers each project's board so the human can
+//! see what needs attention and start/stop queues without opening each project.
+//! `routes.rs` only dispatches here.
 
 use std::net::TcpStream;
 
@@ -10,26 +10,18 @@ use serde_json::{Value, json};
 use super::App;
 use super::http::send_json;
 use super::idea_board::{Board, board_json};
-use crate::domain::project::Project;
 use crate::store::SqliteStore;
 
-/// How many done ideas the overview keeps: enough to show recent activity
-/// without turning the cross-project page into a project's full history.
-const RECENT_DONE: usize = 15;
-
-/// `GET /api/backlog`: the cross-project view of every project's board.
+/// `GET /api/backlog`: the cross-project table of every project's board.
 pub fn list_backlog(app: &App, stream: &mut TcpStream) -> Result<(), String> {
     let store = app.store()?;
     send_json(stream, 200, &backlog_view(app, &store)?)
 }
 
-/// The dashboard's payload: the human's waiting ideas, running ideas, active
-/// queues, recent done ideas, and the totals across all projects.
+/// The table's payload: totals across all projects and one row per project that
+/// has ideas in a stage or a running queue.
 fn backlog_view(app: &App, store: &SqliteStore) -> Result<Value, String> {
-    let mut yours: Vec<Value> = Vec::new();
-    let mut running: Vec<Value> = Vec::new();
-    let mut queues: Vec<Value> = Vec::new();
-    let mut done: Vec<Value> = Vec::new();
+    let mut rows: Vec<Value> = Vec::new();
 
     let mut total_yours = 0usize;
     let mut total_running = 0usize;
@@ -37,7 +29,6 @@ fn backlog_view(app: &App, store: &SqliteStore) -> Result<Value, String> {
     let mut total_drafts = 0usize;
     let mut total_done = 0usize;
     let mut total_projects = 0usize;
-    let mut caps = json!({ "maxMinutes": 0, "maxTokens": 0 });
 
     for project in store.projects()? {
         total_projects += 1;
@@ -46,8 +37,10 @@ fn backlog_view(app: &App, store: &SqliteStore) -> Result<Value, String> {
         let board = Board::new(app, store, &backlog, &project);
         let board = board_json(&board)?;
 
-        // The caps are global preferences, so any project's board provides them.
-        caps = board["queue"]["caps"].clone();
+        let mut yours = 0usize;
+        let mut running = 0usize;
+        let mut drafts = 0usize;
+        let mut done = 0usize;
 
         for group in board["groups"].as_array().into_iter().flatten() {
             let Some(ideas) = group["ideas"].as_array() else {
@@ -56,54 +49,60 @@ fn backlog_view(app: &App, store: &SqliteStore) -> Result<Value, String> {
             let count = ideas.len();
 
             match group["stage"].as_str() {
-                Some("yours") => {
-                    total_yours += count;
-                    yours.extend(ideas.iter().map(|idea| summary(idea, &project)));
-                }
-                Some("running") => {
-                    total_running += count;
-                    running.extend(ideas.iter().map(|idea| summary(idea, &project)));
-                }
-                Some("drafts") => {
-                    total_drafts += count;
-                }
-                Some("done") => {
-                    total_done += count;
-                    done.extend(ideas.iter().map(|idea| summary(idea, &project)));
-                }
+                Some("yours") => yours += count,
+                Some("running") => running += count,
+                Some("drafts") => drafts += count,
+                Some("done") => done += count,
                 _ => {}
             }
         }
 
         let queue = &board["queue"];
         let ready = queue["ready"].as_u64().unwrap_or(0) as usize;
-        total_ready += ready;
-
         let is_running = queue["running"].as_bool().unwrap_or(false);
-        if is_running || ready > 0 {
-            queues.push(json!({
+
+        total_yours += yours;
+        total_running += running;
+        total_ready += ready;
+        total_drafts += drafts;
+        total_done += done;
+
+        // An empty project is noise in the table; keep a row only when it has
+        // an idea in a stage or its queue is already running.
+        if yours > 0 || running > 0 || ready > 0 || drafts > 0 || done > 0 || is_running {
+            rows.push(json!({
                 "project": { "id": project.id, "name": project.name },
-                "running": is_running,
-                "autonomous": queue["autonomous"].as_bool().unwrap_or(false),
+                "yours": yours,
+                "running": running,
                 "ready": ready,
-                "next": queue["next"].clone(),
+                "drafts": drafts,
+                "done": done,
+                "queue": {
+                    "running": is_running,
+                    "autonomous": queue["autonomous"].as_bool().unwrap_or(false),
+                    "next": queue["next"].clone(),
+                },
             }));
         }
     }
 
-    sort_by_updated_at_desc(&mut yours);
-    sort_by_updated_at_desc(&mut running);
-    sort_by_updated_at_desc(&mut done);
-    done.truncate(RECENT_DONE);
-
-    // Running queues are the most urgent; among stopped queues, the largest
-    // ready pile is the most relevant.
-    queues.sort_by(|a, b| {
-        let a_running = a["running"].as_bool().unwrap_or(false);
-        let b_running = b["running"].as_bool().unwrap_or(false);
+    // Running queues need the human first; among stopped rows, the ideas waiting
+    // for a decision and the largest ready pile are the most actionable.
+    rows.sort_by(|a, b| {
+        let a_running = a["queue"]["running"].as_bool().unwrap_or(false);
+        let b_running = b["queue"]["running"].as_bool().unwrap_or(false);
+        let a_yours = a["yours"].as_u64().unwrap_or(0);
+        let b_yours = b["yours"].as_u64().unwrap_or(0);
         let a_ready = a["ready"].as_u64().unwrap_or(0);
         let b_ready = b["ready"].as_u64().unwrap_or(0);
-        b_running.cmp(&a_running).then(b_ready.cmp(&a_ready))
+        let a_name = a["project"]["name"].as_str().unwrap_or("");
+        let b_name = b["project"]["name"].as_str().unwrap_or("");
+
+        b_running
+            .cmp(&a_running)
+            .then(b_yours.cmp(&a_yours))
+            .then(b_ready.cmp(&a_ready))
+            .then(a_name.cmp(b_name))
     });
 
     Ok(json!({
@@ -115,31 +114,8 @@ fn backlog_view(app: &App, store: &SqliteStore) -> Result<Value, String> {
             "done": total_done,
             "projects": total_projects,
         },
-        "caps": caps,
-        "yours": yours,
-        "running": running,
-        "queues": queues,
-        "done": done,
+        "projects": rows,
     }))
-}
-
-/// The cross-project idea summary: the board's idea view without its heavy
-/// base64 payloads, plus the project it belongs to.
-fn summary(idea: &Value, project: &Project) -> Value {
-    let mut summary = idea.clone();
-    if let Some(object) = summary.as_object_mut() {
-        object.remove("attachments");
-        object.remove("plan");
-        object.insert(
-            "project".to_string(),
-            json!({ "id": project.id, "name": project.name }),
-        );
-    }
-    summary
-}
-
-fn sort_by_updated_at_desc(ideas: &mut [Value]) {
-    ideas.sort_by_key(|idea| std::cmp::Reverse(idea["updatedAt"].as_u64().unwrap_or(0)));
 }
 
 #[cfg(test)]
@@ -248,15 +224,11 @@ mod tests {
         assert_eq!(view["total"]["done"], 1);
         assert_eq!(view["total"]["ready"], 1);
 
-        let done = view["done"].as_array().unwrap();
-        assert_eq!(done.len(), 1);
-        assert_eq!(done[0]["id"], "a1");
-        assert_eq!(done[0]["project"]["name"], a.name);
-        assert!(done[0].get("attachments").is_none());
-
-        let queues = view["queues"].as_array().unwrap();
-        assert_eq!(queues.len(), 1);
-        assert_eq!(queues[0]["project"]["id"], a.id);
-        assert_eq!(queues[0]["ready"], 1);
+        let projects = view["projects"].as_array().unwrap();
+        assert_eq!(projects.len(), 1);
+        assert_eq!(projects[0]["project"]["id"], a.id);
+        assert_eq!(projects[0]["done"], 1);
+        assert_eq!(projects[0]["ready"], 1);
+        assert_eq!(projects[0]["queue"]["running"], false);
     }
 }
