@@ -22,11 +22,17 @@ dev:
     trap 'kill $server' EXIT
     cd web && npm run dev
 
-# Everything CI would check
-check: web
+# Everything CI checks, in the same steps
+check: web lint test
+
+# The UI primitives rule, formatting, clippy
+lint:
     node web/scripts/check-ui.mjs
     cargo fmt --all --check
     cargo clippy --all-targets -- -D warnings
+
+# The unit and end-to-end tests of every crate
+test:
     cargo test
 
 # Once per clone: use the repository's git hooks (Conventional Commits, no direct push to main/develop)

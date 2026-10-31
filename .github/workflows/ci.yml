@@ -45,8 +45,13 @@ jobs:
           components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v2
       - uses: extractions/setup-just@v2
-      - name: Check
-        run: just check
+      # `just check`, step by step so each shows on its own in the run.
+      - name: Build the UI
+        run: just web
+      - name: Lint
+        run: just lint
+      - name: Tests
+        run: just test
 
   edge-build:
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
