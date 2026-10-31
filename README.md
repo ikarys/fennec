@@ -63,14 +63,22 @@ An idea is framed in a read-only plan session, then the human approves the plan 
 - ADRs: MADR files in `docs/adr/` are listed and protected.
 - Protected tests: an unchecked "Protéger les tests intégrés" box in the integration dialog appends integrated test files to `.agents/protected`.
 
+### Ideas & night mode
+
+![The Tasks tab after a night: the board, the queue bar and the night report](docs/images/night-report.png)
+
+- The project page keeps the human's ideas; "Cadrer" opens a plan session tied to the idea; the approved plan marks the idea ready, verbatim.
+- "Lancer la file" runs the ready ideas one at a time, oldest first, each through the default workflow (plan, build, criteria checks, fresh-context verify and review) in its own session and git worktree.
+- Night mode ("Mode nuit" box): the queue runs with the human away; `ask_user` answers itself, the agent decides and records the decision with its reason, and changing the acceptance criteria is refused.
+- Per-idea caps on duration and tokens (Settings) stop an idea; the queue goes on with the next one.
+- In the morning: a night report lists each idea run with its duration, tokens, criteria passed, decisions taken and files changed, until marked read; integrating stays the human's click, one idea at a time.
+- The board groups ideas by stage (to decide, running, ready, done) with one next action per idea, computed by the server; a cross-project backlog and a "à regarder" counter in the top bar point to what needs the human's eye.
+
 ### Project understanding
 
 - Project page shows modules and dependencies read from imports, and writes them to `docs/map.md` on the human's click; the map is marked stale when the code moved.
 - ADRs from `docs/adr/` are listed as project documentation.
 - Project analysis opens a read-only `analyze` agent session that drafts AGENTS.md philosophy, layers, and rules with file:line sources.
-- Ideas backlog keeps the human's ideas per project; "Cadrer" opens a plan session tied to the idea.
-- "Lancer la file" runs ready ideas one at a time, oldest first, through the default workflow in each idea's session and worktree.
-- Night mode runs the queue with the human away; per-idea caps stop an idea, and each started idea shows its criteria and decisions for the morning.
 
 ### Settings & models
 
