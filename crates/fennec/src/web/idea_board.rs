@@ -8,7 +8,6 @@ use serde_json::{Value, json};
 
 use super::App;
 use super::idea_queue;
-use crate::agent::ports::EventLog;
 use crate::domain::criteria::CriterionStatus;
 use crate::domain::decision::decisions_in_force;
 use crate::domain::event::Event;
@@ -178,7 +177,12 @@ fn night_report_json(board: &Board) -> Result<Value, String> {
 fn idea_view(board: &Board, idea: &Idea) -> Result<(Status, Value), String> {
     let (app, store, project_id) = (board.app, board.store, board.project.id.as_str());
     let mut session = None;
-    let mut events = None;
+    let mut report = IdeaReport {
+        integrated: false,
+        criteria: None,
+        decisions: Vec::new(),
+        ran_workflow: false,
+    };
     let mut running = false;
     let mut session_state = None;
 
@@ -188,24 +192,12 @@ fn idea_view(board: &Board, idea: &Idea) -> Result<(Status, Value), String> {
         running = app.turns.is_running(session_id);
         session = store.session(session_id)?;
         session_state = session.as_ref().map(|s| s.state(running));
-        // ponytail: reads each started idea's whole log on every board fetch
-        // (the UI polls while a run goes on); a cache keyed by the log's max
-        // seq, as `skill_folds` does, if it shows up.
-        events = Some(store.events(session_id)?);
+        report = app.idea_report(store, session_id)?;
     }
 
-    let report = events.as_deref().map(idea_report).unwrap_or(IdeaReport {
-        integrated: false,
-        criteria: None,
-        decisions: Vec::new(),
-    });
     // A framing session where the human launched a workflow went past
     // framing without the queue: show its run, not "resume framing".
-    let ran_workflow = events.as_deref().is_some_and(|events| {
-        events
-            .iter()
-            .any(|event| matches!(event, Event::WorkflowStarted { .. }))
-    });
+    let ran_workflow = report.ran_workflow;
     let progress = if idea.state == IdeaState::Started || ran_workflow {
         progress(session_state, running, report.integrated)
     } else {
@@ -382,13 +374,15 @@ struct DecisionView {
     choice: String,
 }
 
-struct IdeaReport {
+#[derive(Debug, Clone)]
+pub(crate) struct IdeaReport {
     integrated: bool,
     criteria: Option<CriteriaCounts>,
     decisions: Vec<DecisionView>,
+    ran_workflow: bool,
 }
 
-fn idea_report(events: &[Event]) -> IdeaReport {
+pub(crate) fn idea_report(events: &[Event]) -> IdeaReport {
     let criteria = run::current_run(events)
         .map(|state| state.criteria)
         .unwrap_or_default();
@@ -413,6 +407,9 @@ fn idea_report(events: &[Event]) -> IdeaReport {
         })
         .collect();
 
+    let ran_workflow = events
+        .iter()
+        .any(|event| matches!(event, Event::WorkflowStarted { .. }));
     // The human's click is the end of an idea's road: the morning list shows it done.
     let integrated = events
         .iter()
@@ -430,6 +427,7 @@ fn idea_report(events: &[Event]) -> IdeaReport {
             })
         },
         decisions,
+        ran_workflow,
     }
 }
 
@@ -469,6 +467,7 @@ mod tests {
             port: 0,
             notifier,
             skill_folds: Mutex::new(HashMap::new()),
+            idea_reports: Mutex::new(HashMap::new()),
             idea_queues: Mutex::default(),
             server_runs: Arc::new(Mutex::new(HashMap::new())),
         }
@@ -556,6 +555,7 @@ mod tests {
         assert!(report.criteria.is_none());
         assert!(report.decisions.is_empty());
         assert!(!report.integrated);
+        assert!(!report.ran_workflow);
     }
 
     #[test]
