@@ -368,7 +368,8 @@ read-only. The human edits them as usual.
 - `POST /api/sessions/{id}/discard` `{}` → `{commits}`:
   the human's decision; 409 while a turn runs or without a worktree; removes the
   worktree, its branch and base ref in the human's repository and appends
-  `worktree.discarded`. A later workflow in the session opens a fresh worktree.
+  `worktree.discarded`; the session's idea, still started, is dropped (`idea.dropped`). A later workflow in the
+  session opens a fresh worktree.
 - `POST /api/sessions/{id}/resolve-conflict` `{}` → `{conflicts, started}`:
   brings the session's branch up to date with the human's HEAD as one commit
   (the base ref moves to that HEAD, conflict markers are left in the files);
