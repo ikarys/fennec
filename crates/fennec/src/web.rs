@@ -11,8 +11,8 @@ mod event_stream;
 mod guard;
 mod http;
 mod idea_assets;
-mod idea_queue;
 mod idea_board;
+mod idea_queue;
 mod idea_routes;
 mod insight;
 mod integration;
@@ -182,9 +182,9 @@ pub fn serve(port: u16, settings: Settings) -> Result<(), String> {
     if closed > 0 {
         eprintln!("fennec · closed {closed} turn(s) left open by a crash");
     }
-    let closed_queues = idea_queue::close_interrupted_runs(&store)?;
-    if closed_queues > 0 {
-        eprintln!("fennec · closed {closed_queues} ideas queue(s) cut by a restart");
+    let resumed_queues = idea_queue::resume_interrupted_runs(&app)?;
+    if resumed_queues > 0 {
+        eprintln!("fennec · resumed {resumed_queues} ideas queue(s) cut by a restart");
     }
     for stream in listener.incoming().flatten() {
         let app = app.clone();
@@ -351,6 +351,37 @@ mod tests {
         let from_child = app.place(&store, &child, &project).unwrap();
         assert_eq!(from_child.worktree, Some(wt));
         assert_eq!(from_child.workdir, opened.workdir);
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn a_queue_cut_by_a_restart_starts_again() {
+        let base =
+            std::env::temp_dir().join(format!("fennec-requeue-{}", crate::domain::id::new_id()));
+        std::fs::create_dir_all(&base).unwrap();
+        let app = Arc::new(app_with_db(base.join("fennec.db")));
+        let store = app.store().unwrap();
+        let project = store.project_for("/tmp/requeue").unwrap();
+        store
+            .append_idea_event(
+                &project.id,
+                &backlog::BacklogEvent::QueueStarted { autonomous: true },
+            )
+            .unwrap();
+
+        assert_eq!(idea_queue::resume_interrupted_runs(&app).unwrap(), 1);
+        for _ in 0..200 {
+            if !idea_queue::queue_running(&app, &project.id) {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+
+        // The cut run is closed, then a new run in the same mode starts and,
+        // with nothing ready, ends on its own.
+        let run = store.backlog(&project.id).unwrap().last_run.unwrap();
+        assert!(run.autonomous);
+        assert_eq!(run.reason.as_deref(), Some("no idea ready"));
         let _ = std::fs::remove_dir_all(&base);
     }
 }
