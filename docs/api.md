@@ -237,6 +237,11 @@ read-only. The human edits them as usual.
     `imports` counts the importing files; `layer`/`row` place it (layers by dependency depth): the UI
     computes nothing. Deterministic (verified).
   - `mapFile` `missing | stale | current`: the project's `docs/map.md` against a fresh render of `map`.
+- `GET /api/projects/{id}/dashboard` → `{tiles, recent}`, the project page's overview tab (404 if no project):
+  - `tiles` `[{id, icon, label, figure, detail, tone, active, href, title}]`, in display order (`sessions`,
+    `ideas`, `tokens`, `time`, `cost`, `disk`, `map`, `doc`); every string is final display text. Usage over
+    the last 30 days from the ledger; `disk` only reads the cached worktree scan (`—` until one ran), never scans.
+  - `recent` `[{id, title, updatedAt, running}]`: the 5 top-level sessions updated last, newest first.
 - `GET /api/projects/{id}/docs` → `{files, adrs}`, the project's documentation, read from disk (verified):
   - `files` `[{path, name, content}]`: the project's markdown (`AGENTS.md`, `README.md` and `docs/`, its
     ADRs excluded), sorted by path; `path` forward slashes, `name` the file name.
