@@ -8,7 +8,6 @@ use serde_json::json;
 
 use super::App;
 use super::http::{Request, error, send_json};
-use super::routes::session_and_project;
 use crate::agent::ports::EventLog;
 use crate::domain::audit;
 use crate::domain::conversation::last_assistant_text;
@@ -25,7 +24,7 @@ pub fn create_tasks(
     session_id: &str,
 ) -> Result<(), String> {
     let store = app.store()?;
-    let Some((session, project)) = session_and_project(&store, session_id)? else {
+    let Some((session, project)) = app.session_and_project(session_id)? else {
         return error(stream, 404, "no such session");
     };
 
