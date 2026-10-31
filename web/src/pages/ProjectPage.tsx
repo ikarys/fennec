@@ -1,5 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Tabs } from '../components/ui/Tabs';
+import { buttonClass } from '../components/ui/Button';
+import { EditIcon } from '../components/Icons';
 import { TasksSection } from '../components/project/ideas/TasksSection';
 import { MapSection } from '../components/project/MapSection';
 import { DocSection } from '../components/project/DocSection';
@@ -131,6 +133,14 @@ export default function ProjectPage({
         <h1 className="text-2xl font-semibold">
           {project.name}
         </h1>
+        <a
+          href={project.editorUrl}
+          title="Ouvrir dans VS Code"
+          aria-label="Ouvrir dans VS Code"
+          className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
+        >
+          <EditIcon className="h-4 w-4" />
+        </a>
       </div>
       <p className="mt-0.5 break-all font-mono text-xs text-muted">
         {project.workdir} · ⎇ {project.branch ?? 'sans branche'}
