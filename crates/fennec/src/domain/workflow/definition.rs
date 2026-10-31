@@ -185,6 +185,36 @@ impl Workflow {
         ports
     }
 
+    /// The node ids inside a parallel's fork region: everything reachable from
+    /// its `branch` edges, walking forward, stopping at the joins.
+    pub fn branch_region(&self, parallel_id: &str) -> HashSet<String> {
+        let mut region = HashSet::new();
+        let mut queue = VecDeque::new();
+
+        for edge in self.edges_from(parallel_id, BRANCH) {
+            if region.insert(edge.to.clone()) {
+                queue.push_back(edge.to.clone());
+            }
+        }
+
+        while let Some(id) = queue.pop_front() {
+            if self
+                .node(&id)
+                .is_some_and(|node| matches!(node.kind, NodeKind::Join))
+            {
+                continue;
+            }
+
+            for edge in self.edges.iter().filter(|edge| edge.from == id) {
+                if region.insert(edge.to.clone()) {
+                    queue.push_back(edge.to.clone());
+                }
+            }
+        }
+
+        region
+    }
+
     pub fn join_of(&self, parallel_id: &str) -> Option<String> {
         let mut queue = VecDeque::new();
         let mut seen = HashSet::new();
