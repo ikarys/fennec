@@ -1,7 +1,8 @@
-import { useRef } from 'react';
-import type { SessionState } from '../../lib/api';
+import { useEffect, useRef, useState } from 'react';
+import type { AttentionItem, SessionState } from '../../lib/api';
 import { SessionStateIcon } from '../session/SessionStateIcon';
-import { CloseIcon, FoxIcon, SearchIcon, SettingsIcon, SplitIcon } from '../Icons';
+import { BellIcon, CloseIcon, FoxIcon, SearchIcon, SettingsIcon, SplitIcon } from '../Icons';
+import { Badge } from '../ui/Badge';
 import { Button, buttonClass } from '../ui/Button';
 
 function InsightIcon({ className }: { className?: string }) {
@@ -66,6 +67,89 @@ function BacklogIcon({ className }: { className?: string }) {
   );
 }
 
+function kindLabel(kind: AttentionItem['kind']): string {
+  switch (kind) {
+    case 'question':
+      return 'Question';
+    case 'workflowPause':
+      return 'Workflow';
+    case 'awaitingIntegration':
+      return 'À intégrer';
+    case 'error':
+      return 'Erreur';
+  }
+}
+
+/** The "N à regarder" bell: what needs the human, from any session, anywhere. */
+function AttentionBell({ attention, onOpen }: { attention: AttentionItem[]; onOpen: (id: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const count = attention.length;
+
+  // Close on outside mousedown or Escape while open.
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onPointer);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onPointer);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-label="À regarder"
+        aria-haspopup="true"
+        aria-expanded={open}
+        title={count > 0 ? `${count} à regarder` : 'Rien à regarder'}
+        className={buttonClass({ variant: 'ghost', size: 'sm' }, count > 0 ? 'text-accent' : undefined)}
+      >
+        <span className="flex items-center gap-1">
+          <BellIcon className="h-4 w-4" />
+          {count > 0 ? <Badge tone="accent">{count}</Badge> : null}
+        </span>
+      </button>
+      {open ? (
+        <div className="absolute right-0 top-full z-10 mt-1 max-h-[70vh] w-72 overflow-y-auto rounded-md border border-border bg-panel p-1 shadow-lg">
+          {count === 0 ? (
+            <div className="px-2 py-1.5 text-xs text-muted">Rien à regarder.</div>
+          ) : (
+            attention.map((item) => (
+              <button
+                key={item.sessionId}
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  onOpen(item.sessionId);
+                }}
+                className="block w-full rounded px-2 py-1.5 text-left hover:bg-raised"
+              >
+                <div className="flex items-center gap-1.5">
+                  <Badge tone={item.kind === 'error' ? 'err' : 'accent'} dot>
+                    {kindLabel(item.kind)}
+                  </Badge>
+                  <span className="min-w-0 flex-1 truncate text-xs font-medium text-text">{item.title}</span>
+                </div>
+                {item.detail ? <div className="mt-0.5 truncate text-[0.75rem] text-muted">{item.detail}</div> : null}
+              </button>
+            ))
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export interface TabInfo {
   id: string;
   title: string;
@@ -76,6 +160,8 @@ export interface TabInfo {
 interface TopBarProps {
   tabs: TabInfo[];
   activeTabId: string | null;
+  attention: AttentionItem[];
+  onOpenAttention: (id: string) => void;
   onPickTab: (id: string) => void;
   onCloseTab: (id: string) => void;
   onOpenPalette: () => void;
@@ -86,6 +172,8 @@ interface TopBarProps {
 export function TopBar({
   tabs,
   activeTabId,
+  attention,
+  onOpenAttention,
   onPickTab,
   onCloseTab,
   onOpenPalette,
@@ -199,6 +287,8 @@ export function TopBar({
           <span className="hidden text-left md:inline">Rechercher…</span>
           <kbd className="rounded-md border border-border px-1.5 py-px text-[0.6875rem] text-muted">⌘K</kbd>
         </button>
+
+        <AttentionBell attention={attention} onOpen={onOpenAttention} />
 
         <button
           type="button"

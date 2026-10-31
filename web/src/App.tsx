@@ -120,7 +120,6 @@ function loadActiveTab(): string | null {
 }
 
 export default function App() {
-  useTurnNotices();
   const [route, setRoute] = useState<Route>(() => parseRoute());
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
@@ -279,6 +278,7 @@ export default function App() {
     },
     [navigate]
   );
+  const { items: attention } = useTurnNotices(openSession);
 
   const closeTab = useCallback(
     (tabId: string) => {
@@ -417,6 +417,8 @@ export default function App() {
         <TopBar
           tabs={tabInfos}
           activeTabId={activeTabId}
+          attention={attention}
+          onOpenAttention={openSession}
           onPickTab={(id) => {
             setActiveTabId(id);
             navigate(tabPath(id));
