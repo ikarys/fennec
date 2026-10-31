@@ -7,11 +7,14 @@
 use super::App;
 use crate::agent::ports::EventLog;
 use crate::domain::attention::{self, Attention};
+use crate::domain::project::SessionSummary;
+use crate::git;
 use crate::store::SqliteStore;
 use serde_json::{Value, json};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::Write;
 use std::net::TcpStream;
+use std::path::Path;
 use std::time::{Duration, Instant};
 
 /// A comment line now and then, so a closed browser tab is noticed.
@@ -59,13 +62,15 @@ fn current_attention(app: &App, store: &SqliteStore) -> Result<AttentionSet, Str
     let running = app.turns.running_ids();
     let mut set = HashMap::new();
     let mut seqs = HashMap::new();
-    for session in store.sessions(None)? {
+    let mut pending = HashMap::new();
+    for mut session in store.sessions(None)? {
         if running.contains(&session.id) {
             continue;
         }
         let seq = store.last_seq(&session.id)?;
         seqs.insert(session.id.clone(), seq);
         let events = store.events(&session.id)?;
+        confirm_pending_work(store, &mut pending, &mut session)?;
         if let Some(item) = attention::attention(&session, &events, false) {
             set.insert(session.id.clone(), item);
         }
@@ -86,9 +91,10 @@ fn refresh(
     // shortcut: the full SESSION_SELECT (per-session subqueries) runs on every
     // wake; sub-ms for a human's handful of sessions. Cache the list in App and
     // query only the moved sessions if it ever weighs.
-    let sessions = store.sessions(None)?;
+    let mut sessions = store.sessions(None)?;
     let mut changed = false;
-    for session in &sessions {
+    let mut pending = HashMap::new();
+    for session in &mut sessions {
         if running.contains(&session.id) {
             // A running turn needs no attention: drop it if it lingers.
             if attention.remove(&session.id).is_some() {
@@ -102,6 +108,7 @@ fn refresh(
         }
         last_seq.insert(session.id.clone(), seq);
         let events = store.events(&session.id)?;
+        confirm_pending_work(store, &mut pending, session)?;
         let next = attention::attention(session, &events, false);
         if attention.get(&session.id).cloned() != next {
             changed = true;
@@ -127,6 +134,29 @@ fn refresh(
         }
     }
     Ok(changed)
+}
+
+/// Finished work awaits integration only while its branch still holds commits
+/// past its base, as on the home cards (`list_projects`): work integrated or
+/// dropped by hand (a branch deleted, reset onto its base) no longer needs the
+/// human. One git call per project per pass, and only for finished work.
+fn confirm_pending_work(
+    store: &SqliteStore,
+    pending: &mut HashMap<String, HashSet<String>>,
+    session: &mut SessionSummary,
+) -> Result<(), String> {
+    if !session.awaiting_integration {
+        return Ok(());
+    }
+    if !pending.contains_key(&session.project_id) {
+        let found = match store.project(&session.project_id)? {
+            Some(p) => git::sessions_with_unintegrated_work(Path::new(&p.workdir)),
+            None => HashSet::new(),
+        };
+        pending.insert(session.project_id.clone(), found);
+    }
+    session.awaiting_integration = pending[&session.project_id].contains(&session.id);
+    Ok(())
 }
 
 /// The snapshot as a `data:` frame, ordered by session so it is stable.
@@ -248,12 +278,42 @@ mod tests {
         assert!(!set.contains_key(&clean));
     }
 
-    #[test]
-    fn an_integration_clears_the_item() {
-        let app = app();
-        let store = app.store().unwrap();
-        let project = store.project_for("/tmp/notice-integration").unwrap();
-        let session = store.create_session(&project, "integrating").unwrap();
+    fn git_in(repo: &std::path::Path, args: &[&str]) -> String {
+        let out = std::process::Command::new("git")
+            .arg("-C")
+            .arg(repo)
+            .args(["-c", "user.name=t", "-c", "user.email=t@e"])
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(out.status.success(), "git {args:?}");
+        String::from_utf8_lossy(&out.stdout).trim().to_string()
+    }
+
+    /// A session in a fresh repository whose workflow finished `done`; its
+    /// `fennec/<session>` branch holds a commit past its base when `work`, or
+    /// sits on its base otherwise (the work was integrated or dropped by hand).
+    fn finished_session(store: &SqliteStore, work: bool) -> String {
+        let repo =
+            std::env::temp_dir().join(format!("fennec-notices-{}", crate::domain::id::new_id()));
+        std::fs::create_dir_all(&repo).unwrap();
+        git_in(&repo, &["init", "-q"]);
+        git_in(&repo, &["commit", "-q", "--allow-empty", "-m", "base"]);
+        let project = store.project_for(repo.to_str().unwrap()).unwrap();
+        let session = store.create_session(&project, "finished").unwrap();
+        let base = git_in(&repo, &["rev-parse", "HEAD"]);
+        git_in(
+            &repo,
+            &["update-ref", &format!("refs/fennec/base/{session}"), &base],
+        );
+        if work {
+            git_in(&repo, &["commit", "-q", "--allow-empty", "-m", "work"]);
+        }
+        let head = git_in(&repo, &["rev-parse", "HEAD"]);
+        git_in(
+            &repo,
+            &["update-ref", &format!("refs/heads/fennec/{session}"), &head],
+        );
         store
             .append(
                 &session,
@@ -265,6 +325,26 @@ mod tests {
                 },
             )
             .unwrap();
+        session
+    }
+
+    #[test]
+    fn work_already_on_its_base_needs_no_integration() {
+        let app = app();
+        let store = app.store().unwrap();
+        let session = finished_session(&store, false);
+        let (attention, _) = current_attention(&app, &store).unwrap();
+        assert!(
+            !attention.contains_key(&session),
+            "nothing left to integrate: {attention:?}"
+        );
+    }
+
+    #[test]
+    fn an_integration_clears_the_item() {
+        let app = app();
+        let store = app.store().unwrap();
+        let session = finished_session(&store, true);
 
         let (mut attention, mut last_seq) = current_attention(&app, &store).unwrap();
         assert!(
