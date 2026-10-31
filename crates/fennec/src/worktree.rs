@@ -9,6 +9,8 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
+pub mod usage;
+
 /// A session's worktree.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Worktree {

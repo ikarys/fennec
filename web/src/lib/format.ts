@@ -47,6 +47,22 @@ export function formatClock(ms: number): string {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${Math.floor(bytes)} o`;
+
+  const units = ['Ko', 'Mo', 'Go', 'To'];
+  let value = bytes / 1024;
+  let unit = 0;
+
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+
+  const text = value < 10 ? value.toFixed(1).replace('.', ',') : String(Math.round(value));
+  return `${text} ${units[unit]}`;
+}
+
 export function formatTokens(value?: number): string {
   if (value == null) return '0';
   // Same scale as the server's token_usage::display::tokens.
