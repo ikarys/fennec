@@ -13,12 +13,13 @@ use std::path::{Path, PathBuf};
 
 use crate::domain::agent::{AgentDefinition, parse_agent_md};
 
-const DEFAULTS: [&str; 8] = [
+const DEFAULTS: [&str; 9] = [
     include_str!("../agents/plan.agent.md"),
     include_str!("../agents/builder.agent.md"),
     include_str!("../agents/verify.agent.md"),
     include_str!("../agents/review.agent.md"),
     include_str!("../agents/analyze.agent.md"),
+    include_str!("../agents/ask.agent.md"),
     include_str!("../agents/audit-architecture.agent.md"),
     include_str!("../agents/audit-security.agent.md"),
     include_str!("../agents/mockup.agent.md"),
@@ -182,13 +183,15 @@ mod tests {
     }
 
     #[test]
-    fn analyze_default_is_read_only_and_not_a_subagent() {
+    fn analyze_and_ask_defaults_are_read_only_and_not_subagents() {
         let (_root, _home, workdir) = fixture();
         let agents = discover_in(None, &workdir);
-        let analyze = agents.iter().find(|agent| agent.id == "analyze").unwrap();
+        for id in ["analyze", "ask"] {
+            let agent = agents.iter().find(|agent| agent.id == id).unwrap();
 
-        assert!(!analyze.subagent);
-        assert_eq!(analyze.commands, CommandAccess::ReadOnly);
+            assert!(!agent.subagent);
+            assert_eq!(agent.commands, CommandAccess::ReadOnly);
+        }
     }
 
     #[test]
