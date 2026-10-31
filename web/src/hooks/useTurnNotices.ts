@@ -7,6 +7,18 @@
  */
 import { useEffect } from 'react';
 
+/** True when the current hash shows this session: `#/s/<id>` or a split pane `#/split/<a>/<b>`. */
+function hashShowsSession(hash: string, sessionId: string): boolean {
+  if (hash.startsWith('#/s/' + sessionId)) return true;
+  if (hash.startsWith('#/split/')) {
+    return hash
+      .slice('#/split/'.length)
+      .split('/')
+      .some((token) => token !== '-' && decodeURIComponent(token) === sessionId);
+  }
+  return false;
+}
+
 export function useTurnNotices(): void {
   useEffect(() => {
     const source = new EventSource('/api/notices');
@@ -17,7 +29,7 @@ export function useTurnNotices(): void {
         projectId: string;
       };
       if (!('Notification' in window) || Notification.permission !== 'granted') return;
-      if (!document.hidden && window.location.hash.startsWith('#/s/' + notice.sessionId)) return;
+      if (!document.hidden && hashShowsSession(window.location.hash, notice.sessionId)) return;
       const notification = new Notification(notice.title || 'fennec', {
         body: 'Tour terminé : à toi de jouer.',
         tag: notice.sessionId,

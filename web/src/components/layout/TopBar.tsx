@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import type { SessionState } from '../../lib/api';
 import { SessionStateIcon } from '../session/SessionStateIcon';
-import { CloseIcon, FoxIcon, SearchIcon, SettingsIcon } from '../Icons';
+import { CloseIcon, FoxIcon, SearchIcon, SettingsIcon, SplitIcon } from '../Icons';
 import { Button, buttonClass } from '../ui/Button';
 
 function InsightIcon({ className }: { className?: string }) {
@@ -79,6 +79,8 @@ interface TopBarProps {
   onPickTab: (id: string) => void;
   onCloseTab: (id: string) => void;
   onOpenPalette: () => void;
+  splitActive: boolean;
+  onToggleSplit: () => void;
 }
 
 export function TopBar({
@@ -86,7 +88,9 @@ export function TopBar({
   activeTabId,
   onPickTab,
   onCloseTab,
-  onOpenPalette
+  onOpenPalette,
+  splitActive,
+  onToggleSplit
 }: TopBarProps) {
   const tabRefs = useRef(new Map<string, HTMLDivElement>());
 
@@ -196,6 +200,16 @@ export function TopBar({
           <kbd className="rounded-md border border-border px-1.5 py-px text-[0.6875rem] text-muted">⌘K</kbd>
         </button>
 
+        <button
+          type="button"
+          onClick={onToggleSplit}
+          aria-label="Vue scindée"
+          aria-pressed={splitActive}
+          title="Vue scindée (⌘\)"
+          className={buttonClass({ variant: 'ghost', size: 'sm' }, splitActive ? 'text-accent' : undefined)}
+        >
+          <SplitIcon className="h-4 w-4" />
+        </button>
         <a
           href="#/insight"
           title="Insight"
