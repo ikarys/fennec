@@ -331,6 +331,11 @@ pub fn discard(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Re
     if let Some(finished) = run::finish_on_discard(&store.events(&gate.session_id)?) {
         log.append(&gate.session_id, &finished)?;
     }
+    // The idea's work is gone with its worktree: left started, it would wait
+    // for a review on the board forever.
+    if let Some((project_id, idea_id)) = gate.idea {
+        store.append_idea_event(&project_id, &backlog::BacklogEvent::Dropped { idea_id })?;
+    }
     send_json(stream, 200, &json!({ "commits": commits }))
 }
 
