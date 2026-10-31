@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 
 use crate::domain::agent::{AgentDefinition, parse_agent_md};
 
-const DEFAULTS: [&str; 7] = [
+const DEFAULTS: [&str; 8] = [
     include_str!("../agents/plan.agent.md"),
     include_str!("../agents/builder.agent.md"),
     include_str!("../agents/verify.agent.md"),
@@ -21,6 +21,7 @@ const DEFAULTS: [&str; 7] = [
     include_str!("../agents/analyze.agent.md"),
     include_str!("../agents/audit-architecture.agent.md"),
     include_str!("../agents/audit-security.agent.md"),
+    include_str!("../agents/mockup.agent.md"),
 ];
 
 /// openfox `loadAllAgents`: the agents a session in `workdir` can use.
