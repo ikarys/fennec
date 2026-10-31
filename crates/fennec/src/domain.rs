@@ -38,4 +38,5 @@ pub mod slash;
 pub mod stats;
 
 pub mod test_files;
+pub mod vision;
 pub mod workflow;
