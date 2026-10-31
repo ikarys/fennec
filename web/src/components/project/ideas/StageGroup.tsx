@@ -68,7 +68,7 @@ export function StageGroup({
       ) : null}
       <div
         className={
-          showLabel && !highlighted ? 'mt-2 flex flex-col gap-1' : 'flex flex-col gap-1'
+          showLabel && !highlighted ? 'mt-2 flex flex-col divide-y divide-border' : 'flex flex-col divide-y divide-border'
         }
       >
         {stage === 'queue' && ideas.length === 0 ? (
