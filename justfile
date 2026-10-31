@@ -22,9 +22,23 @@ dev:
     trap 'kill $server' EXIT
     cd web && npm run dev
 
-# Everything CI would check
-check: web
+# Everything CI checks: the conventions (web, lint) and the tests
+check: web lint test
+
+# The UI primitives rule, formatting, clippy
+lint:
     node web/scripts/check-ui.mjs
     cargo fmt --all --check
     cargo clippy --all-targets -- -D warnings
+
+# The unit tests of every crate
+test:
     cargo test
+
+# Once per clone: use the repository's git hooks (Conventional Commits, no direct push to main/develop)
+setup:
+    git config core.hooksPath .githooks
+
+# Open the PR that promotes develop to main (then release-please prepares the release)
+promote:
+    gh pr create --base main --head develop --title "chore: promote develop to main" --body "Promote develop to main."
