@@ -52,7 +52,7 @@ export function Panel({ id, title, summary, defaultOpen = true, children }: Pane
       <summary className="sticky top-0 z-10 flex h-7 cursor-pointer list-none items-center gap-2 border-y border-border bg-raised px-3 select-none hover:bg-border [&::-webkit-details-marker]:hidden">
         <ChevronRightIcon className="h-3 w-3 shrink-0 text-muted transition-transform group-open:rotate-90" />
         <SectionLabel className="font-semibold text-text">{title}</SectionLabel>
-        <span className="ml-auto flex items-center gap-1.5 font-mono text-[0.6875rem] text-muted tabular-nums">
+        <span className="ml-auto flex items-center gap-1.5 font-mono text-xs text-muted tabular-nums">
           {summary}
         </span>
       </summary>

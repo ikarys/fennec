@@ -24,7 +24,7 @@ export function Stat({
   return (
     <span
       title={title}
-      className={`inline-flex shrink-0 items-center gap-1 rounded-md border border-border bg-raised px-1.5 py-0.5 text-[0.6875rem] leading-4 tabular-nums whitespace-nowrap ${toneClasses[tone]}`}
+      className={`inline-flex shrink-0 items-center gap-1 rounded-md border border-border bg-raised px-1.5 py-0.5 text-xs leading-4 tabular-nums whitespace-nowrap ${toneClasses[tone]}`}
     >
       <span className="opacity-80 [&>svg]:h-3 [&>svg]:w-3" aria-hidden="true">
         {icon}

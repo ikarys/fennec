@@ -55,11 +55,11 @@ export function NodeDivider({ item, running }: { item: WorkflowNodeItem; running
 
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="flex items-center gap-2 text-[0.6875rem] text-muted">
+      <div className="flex items-center gap-2 text-xs text-muted">
         <span className="h-px grow bg-border" />
         <span className="flex min-w-0 items-center gap-1.5">
           <span
-            className={`shrink-0 text-[0.6875rem] ${nodeKindTone(item.nodeKind)}`}
+            className={`shrink-0 text-xs ${nodeKindTone(item.nodeKind)}`}
           >
             {item.nodeKind}
           </span>
@@ -120,7 +120,7 @@ export function NodeDivider({ item, running }: { item: WorkflowNodeItem; running
               <div className="flex flex-col gap-1">
                 <SectionLabel>Sortie</SectionLabel>
                 {item.nodeKind === 'shell' || item.nodeKind === 'criteria' ? (
-                  <pre className="max-h-48 overflow-y-auto whitespace-pre-wrap break-words rounded bg-code p-2 font-mono text-[0.6875rem] text-muted">
+                  <pre className="max-h-48 overflow-y-auto whitespace-pre-wrap break-words rounded bg-code p-2 font-mono text-xs text-muted">
                     {item.output}
                   </pre>
                 ) : (

@@ -124,7 +124,7 @@ export default function ProjectPage({
   const header = (
     <>
       <div className="flex items-center gap-3">
-        <h1 className="text-xl font-semibold">
+        <h1 className="text-2xl font-semibold">
           {project.name}
         </h1>
       </div>

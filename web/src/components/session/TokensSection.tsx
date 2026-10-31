@@ -7,7 +7,7 @@ function Figure({ value, cost }: { value: ReactNode; cost: string | null }) {
   return (
     <>
       {value}
-      {cost && <span className="ml-1.5 text-[0.6875rem] text-muted">{cost}</span>}
+      {cost && <span className="ml-1.5 text-xs text-muted">{cost}</span>}
     </>
   );
 }

@@ -11,7 +11,7 @@ const items = [
 export function EdgeLegend() {
   return (
     <Panel position="top-left">
-      <div className="flex flex-col gap-1 rounded-md border border-border bg-panel/90 px-2 py-1.5 text-[0.6875rem] text-muted">
+      <div className="flex flex-col gap-1 rounded-md border border-border bg-panel/90 px-2 py-1.5 text-xs text-muted">
         {items.map((item) => (
           <div key={item.label} className="flex items-center gap-2">
             <svg width="28" height="8" aria-hidden="true">
