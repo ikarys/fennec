@@ -82,13 +82,16 @@ An idea is framed in a read-only plan session, then the human approves the plan 
 
 ## Install
 
-### From a release tarball
+```bash
+curl -fsSL https://raw.githubusercontent.com/ikarys/fennec/main/install.sh | sh
+```
 
-1. Download `fennec-<version>-<target>.tar.gz` and its `.sha256` from a [release](../../releases) (`x86_64` and `aarch64` Linux).
-2. Run `sha256sum -c fennec-<label>-<target>.tar.gz.sha256`.
-3. Extract and run `./fennec --version`.
+The script installs the latest release (`x86_64` or `aarch64` Linux) into `~/.local/bin` after
+checking its checksum; `FENNEC_VERSION` picks a tag, `FENNEC_INSTALL_DIR` the directory. With
+[mise](https://mise.jdx.dev): `mise use -g github:ikarys/fennec`. Or download a tarball from the
+[releases](../../releases) by hand.
 
-The `edge` prerelease is the latest develop build, installed the same way; it is not a release.
+The `edge` prerelease (`FENNEC_VERSION=edge`) is the latest develop build, not a release.
 
 Requirements: glibc 2.35 or later (Ubuntu 22.04, Debian 12 and newer) and `bwrap` (package `bubblewrap`) for the command sandbox. On Ubuntu 23.10 and later, AppArmor forbids the user namespaces bwrap needs; the Settings page says so and [docs/releasing.md](docs/releasing.md#installing-a-binary) gives the fix.
 
