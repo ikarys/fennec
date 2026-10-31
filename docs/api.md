@@ -215,12 +215,18 @@ read-only. The human edits them as usual.
 - `GET /api/projects` → `[{id, name, workdir, branch, sessions: [{id, title, state, createdAt, updatedAt}]}]`
   (projects most recently active first, sessions newest first; `createdAt`/`updatedAt` are Unix milliseconds; `branch` may be `null`)
 - `POST /api/projects` `{workdir}` → the project (400 if not a directory)
-- `GET /api/backlog` → `{projects, idle, total}`: the cross-project dashboard of done tasks (the Backlog page):
-  - `projects` `[{id, name, doneCount, tasks}]`, most done tasks first; `tasks` `[{id, text, status, updatedAt}]` most
-    recent first, `status` is `completed` (the human completed it) or `integrated` (it ran and its work was
-    integrated), `updatedAt` Unix milliseconds
-  - `idle` `[{id, name}]`: projects with no done task, by name
-  - `total` `{done, projects}`: the done tasks across all projects, and how many projects are listed
+- `GET /api/backlog` → `{total, caps, yours, running, queues, done}`: the cross-project Backlog page (where tasks
+  stand across every project):
+  - `total` `{yours, running, ready, drafts, done, projects}`: counts across all projects; `done` counts all done
+    ideas, `ready` sums each project's `queue.ready`
+  - `caps` `{maxMinutes, maxTokens}`: the global night-mode caps (from any project's board; zeros when there is no
+    project)
+  - `yours`, `running` `[idea]`: the ideas of those stages across projects, most recent `updatedAt` first
+  - `queues` `[{project, running, autonomous, ready, next}]`: projects whose queue is running or has ready ideas,
+    running first then most ready; `project` `{id, name}`, `next` `{id, text} | null`
+  - `done` `[idea]`: the done stage across projects, most recent `updatedAt` first, at most 15
+  - `idea` is the board's idea view minus `attachments`/`plan` (base64 payloads, too heavy for an overview) plus
+    `project` `{id, name}`
 - `GET /api/projects/{id}/commands` → `[{name, description}]`: the slash commands the composer offers (`compact`, then the project's skills); 404 if no project
 - `GET /api/projects/{id}/agents` → `[{id, name, description, color, subagent}]`: the
   project's agents in discovery order (`color` null when unset); the modes are the

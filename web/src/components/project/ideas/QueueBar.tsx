@@ -66,7 +66,7 @@ export function QueueBar({
             size="sm"
             disabled={busy}
             iconOnly
-            title="Arrêter la file"
+            title="Arrêter la file après la tâche en cours"
             aria-label="Arrêter la file"
             className="ml-auto"
             onClick={handleStop}

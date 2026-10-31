@@ -5,6 +5,7 @@ import type {
   WorkflowSummary,
 } from "./workflow";
 import type { DecisionView } from "./fold";
+import type { IdeaBoard, IdeaView } from "./ideas";
 
 export type SessionState =
   | "running"
@@ -452,29 +453,28 @@ export function createProject(workdir: string): Promise<Project> {
   });
 }
 
-/** A done task on the cross-project Backlog dashboard. */
-export interface BacklogTask {
-  id: string;
-  text: string;
-  /** `completed` (the human closed it) or `integrated` (it ran and was integrated). */
-  status: "completed" | "integrated";
-  updatedAt: number;
+/** An idea on the cross-project Backlog page: the board's idea plus its project. */
+export type BacklogIdea = Omit<IdeaView, "attachments" | "plan"> & {
+  project: { id: string; name: string };
+};
+
+/** A project's queue on the Backlog page: running, or with ideas ready. */
+export interface BacklogQueue {
+  project: { id: string; name: string };
+  running: boolean;
+  autonomous: boolean;
+  ready: number;
+  next: { id: string; text: string } | null;
 }
 
-export interface BacklogProject {
-  id: string;
-  name: string;
-  doneCount: number;
-  /** The project's done tasks, most recent first. */
-  tasks: BacklogTask[];
-}
-
+/** `GET /api/backlog`: what waits, runs, is queued and got done, across projects. */
 export interface BacklogView {
-  /** Every project's done tasks, most done first. */
-  projects: BacklogProject[];
-  /** Projects with no done task, by name. */
-  idle: { id: string; name: string }[];
-  total: { done: number; projects: number };
+  total: { yours: number; running: number; ready: number; drafts: number; done: number; projects: number };
+  caps: IdeaBoard["queue"]["caps"];
+  yours: BacklogIdea[];
+  running: BacklogIdea[];
+  queues: BacklogQueue[];
+  done: BacklogIdea[];
 }
 
 export function getBacklog(): Promise<BacklogView> {
