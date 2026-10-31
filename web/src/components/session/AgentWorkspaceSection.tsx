@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { IntegrationPreview, RepoState, SessionDetail } from '../../lib/api';
-import { discardWorktree, getIntegration, getRepoState, openTerminal } from '../../lib/api';
+import type { Blocker, IntegrationPreview, RepoState, SessionDetail } from '../../lib/api';
+import { discardWorktree, getIntegration, getRepoState, openTerminal, resolveConflict } from '../../lib/api';
 import { BranchIcon, CheckIcon, CopyIcon, EditIcon, FolderIcon, SpinnerIcon, TerminalIcon } from '../Icons';
 import { useIntegrationInvite } from './IntegrationInvite';
 import { Button, buttonClass } from '../ui/Button';
@@ -33,6 +33,8 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
   const [discarding, setDiscarding] = useState(false);
   const [discardError, setDiscardError] = useState<string | null>(null);
   const [pendingDiscard, setPendingDiscard] = useState(false);
+  const [resolvingConflict, setResolvingConflict] = useState(false);
+  const [conflictError, setConflictError] = useState<string | null>(null);
   const previousRunning = useRef(running);
   const fetchId = useRef(0);
   const repoFetchId = useRef(0);
@@ -155,6 +157,24 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
   // The file list lives in the Fichiers modifiés block; here only what blocks the review.
   const protectedCount = preview?.files.filter((file) => file.protected).length ?? 0;
   const integrateDisabled = sessionId === null || running || !hasCommits || invite === null;
+  const conflictFiles =
+    preview?.blockers.find(
+      (blocker): blocker is Extract<Blocker, { kind: 'conflict' }> => blocker.kind === 'conflict',
+    )?.files ?? [];
+
+  const handleResolveConflict = async () => {
+    if (!sessionId) return;
+    setResolvingConflict(true);
+    setConflictError(null);
+    try {
+      await resolveConflict(sessionId);
+      void fetchPreview();
+    } catch (failure) {
+      setConflictError(failure instanceof Error ? failure.message : 'Erreur');
+    } finally {
+      setResolvingConflict(false);
+    }
+  };
 
   return (
     <Panel id="workspace" title={panelBlock('workspace').title}>
@@ -258,6 +278,29 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
 
         {worktree !== null && (
           <div className="flex flex-col gap-1.5">
+            {conflictFiles.length > 0 && (
+              <div className="rounded-lg border border-err/40 bg-err/10 px-2.5 py-2 text-xs flex flex-col gap-1.5">
+                <div>
+                  Conflit avec {humanBranch} sur {conflictFiles.length} fichier(s) : l'intégration est bloquée.
+                </div>
+                <div className="flex flex-col gap-0.5 font-mono">
+                  {conflictFiles.map((file) => (
+                    <div key={file}>{file}</div>
+                  ))}
+                </div>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => void handleResolveConflict()}
+                  disabled={running || resolvingConflict || sessionId === null}
+                  title="L'agent met sa branche à jour et résout les conflits dans cette session"
+                >
+                  Résoudre avec l'agent
+                </Button>
+                {conflictError && <div className="text-xs text-err">{conflictError}</div>}
+              </div>
+            )}
             <Button
               variant="primary"
               size="sm"
@@ -269,15 +312,18 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
               Intégrer dans {humanBranch}
             </Button>
 
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={openDiscard}
-              disabled={sessionId === null || running || discarding}
-              className="w-full"
-            >
-              Abandonner ce travail
-            </Button>
+            {/* Once integrated the branch holds nothing past its base: nothing to abandon. */}
+            {hasCommits && (
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={openDiscard}
+                disabled={sessionId === null || running || discarding}
+                className="w-full"
+              >
+                Abandonner ce travail
+              </Button>
+            )}
             {discardError && <div className="text-xs text-err">{discardError}</div>}
 
             <details className="text-xs">

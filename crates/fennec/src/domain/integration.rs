@@ -14,6 +14,9 @@ pub struct DiffChecks {
     pub violations: Vec<Violation>,
     pub suppressions: Vec<Suppression>,
     pub weakened: Option<TestsWeakened>,
+    /// Files whose added lines still hold git conflict markers: a resolution
+    /// left unfinished, which git no longer sees as a conflict.
+    pub markers: Vec<String>,
 }
 
 impl DiffChecks {
@@ -21,18 +24,32 @@ impl DiffChecks {
     pub fn of(rules: &Rules, files: &[(String, ChangedLines)]) -> DiffChecks {
         let mut violations = Vec::new();
         let mut suppressions = Vec::new();
+        let mut markers = Vec::new();
 
         for (path, lines) in files {
             violations.extend(rules.check(path, &lines.added));
             suppressions.extend(bypass::suppressions(path, &lines.added));
+            if lines.added.iter().any(|line| is_conflict_marker(line)) {
+                markers.push(path.clone());
+            }
         }
 
         DiffChecks {
             violations,
             suppressions,
             weakened: bypass::tests_weakened(files),
+            markers,
         }
     }
+}
+
+/// `<<<<<<< ours` or `>>>>>>> theirs` (or bare): the lines git writes around
+/// a conflict. `=======` alone is left out: Markdown and RST use it.
+fn is_conflict_marker(line: &str) -> bool {
+    ["<<<<<<<", ">>>>>>>"].iter().any(|marker| {
+        line.strip_prefix(marker)
+            .is_some_and(|rest| rest.is_empty() || rest.starts_with(' '))
+    })
 }
 
 /// What blocks an integration, shown to the human before they confirm it.
@@ -133,10 +150,16 @@ pub fn blockers(
         out.push(Blocker::NoCommits);
     }
 
-    if !conflicts.is_empty() {
-        out.push(Blocker::Conflict {
-            files: conflicts.to_vec(),
-        });
+    // Markers left in the files are a conflict too: integrating them would
+    // commit a broken file, and only a resolution clears them.
+    let mut conflicted = conflicts.to_vec();
+    for file in &checks.markers {
+        if !conflicted.contains(file) {
+            conflicted.push(file.clone());
+        }
+    }
+    if !conflicted.is_empty() {
+        out.push(Blocker::Conflict { files: conflicted });
     }
 
     if let Some(origin) = origin_branch
@@ -240,6 +263,18 @@ pub fn commit_message(message: &str, session_id: &str) -> Result<String, String>
         return Err("empty commit message".to_string());
     }
     Ok(format!("{message}\n\nFennec-Session: {session_id}"))
+}
+
+/// The prompt sent to the agent after `update_branch` left conflict markers.
+pub fn conflict_prompt(human_branch: &str, files: &[String]) -> String {
+    let list = files
+        .iter()
+        .map(|file| format!("- {file}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    format!(
+        "Your branch was brought up to date with `{human_branch}`, the human's branch. The human changed the same lines as your work in these files, which now hold git conflict markers (<<<<<<<, =======, >>>>>>>):\n{list}\n\nResolve every conflict: keep the intent of both sides, remove every marker, then run the project's checks. Do not run git: fennec commits your work when the turn ends."
+    )
 }
 
 #[cfg(test)]
@@ -379,6 +414,7 @@ mod tests {
                 assertions_removed: 0,
                 paths: vec!["a.rs".into()],
             }),
+            markers: vec![],
         };
 
         let found = blockers(1, &[], &[], &checks, &Landing::default());
@@ -772,5 +808,35 @@ mod tests {
             commit_message("   ", "s1"),
             Err("empty commit message".to_string())
         );
+    }
+
+    #[test]
+    fn conflict_markers_left_in_added_lines_block_as_a_conflict() {
+        let lines = ChangedLines {
+            added: vec!["<<<<<<< HEAD".into(), "a".into(), "=======".into()],
+            removed: vec![],
+        };
+        let clean = ChangedLines {
+            added: vec!["=======".into(), "<<<<<<<<< not a marker".into()],
+            removed: vec![],
+        };
+        let checks = DiffChecks::of(
+            &Rules::default(),
+            &[("a.rs".into(), lines), ("doc.md".into(), clean)],
+        );
+        assert_eq!(checks.markers, vec!["a.rs".to_string()]);
+        let found = blockers(1, &[], &[], &checks, &Landing::default());
+        assert!(found.contains(&Blocker::Conflict {
+            files: vec!["a.rs".into()]
+        }));
+    }
+
+    #[test]
+    fn conflict_prompt_names_the_branch_and_each_file() {
+        let prompt = conflict_prompt("main", &["a.txt".into(), "b.rs".into()]);
+
+        assert!(prompt.contains("`main`"));
+        assert!(prompt.contains("- a.txt"));
+        assert!(prompt.contains("- b.rs"));
     }
 }
