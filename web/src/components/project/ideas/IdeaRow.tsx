@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { Button } from '../../ui/Button';
 import {
   EditIcon,
-  CheckIcon,
+  ReviewIcon,
   EyeIcon,
   FileIcon,
   GripIcon,
@@ -40,7 +40,7 @@ const ACTION_ICONS: Record<IdeaAction, typeof EditIcon> = {
   start: PlayIcon,
   open: EyeIcon,
   answer: ReplyIcon,
-  review: CheckIcon,
+  review: ReviewIcon,
 };
 
 export type RowReorder = {
@@ -215,8 +215,8 @@ export function IdeaRow({
       ) : null}
 
       <div className="min-w-0 grow">
-        <p className="m-0 text-sm text-text line-clamp-2" title={idea.text}>
-          {idea.text}
+        <p className="m-0 truncate text-sm text-text" title={idea.text}>
+          {idea.title}
         </p>
         {idea.attachments.length > 0 ? (
           <div className="mt-1.5 flex flex-wrap gap-1">
@@ -246,7 +246,7 @@ export function IdeaRow({
           <p className="mt-0.5 text-xs text-muted">{idea.halted}</p>
         ) : null}
         {showBadge || showMeta ? (
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
             {showBadge ? <IdeaStatusBadge status={idea.status} /> : null}
             {showMeta ? <IdeaMeta idea={idea} caps={caps} /> : null}
           </div>

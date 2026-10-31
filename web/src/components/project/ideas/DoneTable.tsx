@@ -2,7 +2,7 @@
  * The done tasks table: the server's order, no sorting in the UI.
  */
 import { Button } from '../../ui/Button';
-import { EyeIcon } from '../../Icons';
+import { ReviewIcon } from '../../Icons';
 import { IdeaStatusBadge } from './IdeaStatusBadge';
 import { formatDuration, formatTokens } from '../../../lib/format';
 import type { IdeaView } from '../../../lib/ideas';
@@ -38,7 +38,7 @@ export function DoneTable({
             <tr key={idea.id} className="border-t border-border hover:bg-raised">
               <td className="max-w-[320px] px-3 py-2">
                 <span className="block truncate" title={idea.text}>
-                  {idea.text}
+                  {idea.title}
                 </span>
               </td>
               <td className="px-3 py-2 whitespace-nowrap">
@@ -74,7 +74,7 @@ export function DoneTable({
                     aria-label="Relire"
                     onClick={() => onOpenSession(sessionId)}
                   >
-                    <EyeIcon className="h-4 w-4" />
+                    <ReviewIcon className="h-4 w-4" />
                   </Button>
                 ) : null}
               </td>
