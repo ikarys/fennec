@@ -1,16 +1,10 @@
-import type { WorkflowSummary } from "../lib/workflow";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { addPlannedIdea, frameIdea, framingPrefill, listIdeas, markIdeaReady } from "../lib/ideas";
 import type {
-  Agent,
   AttachmentInput,
-  ModelChoice,
-  ModelChoices,
-  ModelRef,
   Project,
   SessionDetail,
   SessionState,
-  SlashCommand,
 } from "../lib/api";
 import type { AssistantItem, Segment } from "../lib/fold";
 import { splitContract } from "../lib/plan";
@@ -20,16 +14,10 @@ import {
   continueWorkflow,
   createSession,
   getSession,
-  getModelChoices,
-  listAgents,
-  listCommands,
-  listWorkflows,
   pauseWorkflow,
   replayMessage,
   resumeWorkflow,
   sendMessage,
-  setSessionMode,
-  setSessionModel,
   startWorkflow,
   stopSession,
   stopWorkflow,
@@ -38,6 +26,9 @@ import { readImages } from "../lib/attachments";
 import { sessionStatus } from "../lib/sessionStatus";
 import { runWaiting } from "../lib/workflowRun";
 import { useSessionThread } from "../hooks/useSessionThread";
+import { useProjectOptions } from "../hooks/useProjectOptions";
+import { useModeAndModel } from "../hooks/useModeAndModel";
+import { useScrollFollow } from "../hooks/useScrollFollow";
 import { Composer } from "../components/session/Composer";
 import { RunningStrip } from "../components/session/RunningStrip";
 import { modelShortName } from "../components/session/ModelPicker";
@@ -70,7 +61,6 @@ import { ChevronDownIcon } from "../components/Icons";
 import {
   DEFAULT_WORKFLOW_ID,
   defaultWorkflowSelection,
-  type WorkflowSelection,
 } from "../components/workflow/session/WorkflowPicker";
 
 interface SessionPageProps {
@@ -105,27 +95,9 @@ export function SessionPage({
   const [attachments, setAttachments] = useState<AttachmentInput[]>([]);
   const [sendError, setSendError] = useState<string | null>(null);
   const [compactError, setCompactError] = useState<string | null>(null);
-  const [commands, setCommands] = useState<SlashCommand[]>([]);
-  const [agents, setAgents] = useState<Agent[]>([]);
-  const [workflows, setWorkflows] = useState<WorkflowSummary[]>([]);
-  const [workflowSelection, setWorkflowSelection] = useState<WorkflowSelection>(
-    { workflowId: null, stepByStep: false, worktree: true },
-  );
   // A session framing a backlog idea only talks: its messages must not start
   // the default build workflow (a "go on" there once ran a whole build).
-  // Depends on `workflows` too, so a late workflow list does not reselect it.
   const framingIdea = detail?.idea?.state === "framing";
-  useEffect(() => {
-    if (framingIdea) {
-      setWorkflowSelection((selection) => ({ ...selection, workflowId: null }));
-    }
-  }, [framingIdea, workflows]);
-  // Optimistic mode while `setSessionMode` is in flight; cleared once the
-  // server's mode (event stream or detail) matches it.
-  const [pendingMode, setPendingMode] = useState<string | null>(null);
-  const [modelChoices, setModelChoices] = useState<ModelChoices | null>(null);
-  const [pendingModel, setPendingModel] = useState<ModelRef | null>(null);
-  const modelRequestRef = useRef(0);
   const [planBuildInFlight, setPlanBuildInFlight] = useState(false);
   const [preview, setPreview] = useState<PreviewTarget | null>(null);
   const [detailVersion, setDetailVersion] = useState(0);
@@ -152,28 +124,44 @@ export function SessionPage({
     ? "running"
     : ((view.lastDone as SessionState | undefined) ?? detail?.state ?? "idle");
   const status = sessionStatus(state, run, waiting);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const stickToBottom = useRef(true);
-  // The last scrollTop seen by onScroll: follow disengages only when it drops.
-  const lastScrollTop = useRef(0);
-  // Mirrors stickToBottom for rendering: the button that resumes it.
-  const [awayFromBottom, setAwayFromBottom] = useState(false);
-  // Set by `handleLoadOlder`: the distance from the bottom when the older
-  // page is requested. Prepending changes scrollHeight but not this
-  // distance, so restoring it keeps the same messages in view.
-  const restoreScroll = useRef<number | null>(null);
-  // Turning follow on jumps to the bottom at once: a smooth scroll chases a
-  // bottom that moves while the agent writes and never re-engages follow.
-  const setFollow = (on: boolean) => {
-    stickToBottom.current = on;
-    setAwayFromBottom(!on);
-    const element = scrollRef.current;
-    if (on && element) element.scrollTop = element.scrollHeight;
-  };
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const modeRequestRef = useRef(0);
   const previousRunning = useRef(running);
+  const {
+    commands,
+    agents,
+    workflows,
+    workflowSelection,
+    setWorkflowSelection,
+  } = useProjectOptions({
+    projectId: detail?.project.id ?? projectId,
+    testWorkflowId,
+    frameIdeaId,
+    framingIdea,
+  });
+  const {
+    modelChoices,
+    mode,
+    currentModel,
+    pendingModel,
+    handleModeChange,
+    handleModelChange,
+  } = useModeAndModel({
+    sessionId,
+    viewMode: view.mode,
+    detailMode: detail?.mode ?? null,
+    fallbackMode: agents[0]?.id ?? null,
+    detailModel: detail?.model ?? null,
+    onError: setSendError,
+    onModelApplied: () => setDetailVersion((version) => version + 1),
+  });
+  const {
+    scrollRef,
+    contentRef,
+    awayFromBottom,
+    setFollow,
+    onScroll,
+    handleLoadOlder,
+  } = useScrollFollow({ view, detail, loadOlder });
 
   useEffect(() => {
     onRunningChanged();
@@ -205,20 +193,6 @@ export function SessionPage({
       active = false;
     };
   }, [sessionId, detailVersion]);
-
-  useEffect(() => {
-    let active = true;
-    getModelChoices()
-      .then((data) => {
-        if (active) setModelChoices(data);
-      })
-      .catch(() => {
-        // The composer falls back to the session's model or '…'.
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
 
   useEffect(() => {
     // A workflow's first turn creates the worktree: re-read the detail when
@@ -266,159 +240,10 @@ export function SessionPage({
     }
   }, [view.pendingQuestion, running]);
 
+  // A preview belongs to one session; do not leak it across tabs.
   useEffect(() => {
-    const element = scrollRef.current;
-    if (element && stickToBottom.current) {
-      element.scrollTop = element.scrollHeight;
-    }
-  }, [view, detail]);
-
-  useEffect(() => {
-    // Content that grows after a render (images, re-wrap) widens the distance
-    // from the bottom with no view change, so the pin above never fires:
-    // watch the content and re-pin while following.
-    const element = scrollRef.current;
-    const content = contentRef.current;
-    if (!element || !content) return;
-    const observer = new ResizeObserver(() => {
-      if (stickToBottom.current) {
-        element.scrollTop = element.scrollHeight;
-      }
-    });
-    observer.observe(content);
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
-    const element = scrollRef.current;
-    const previous = restoreScroll.current;
-    if (element && previous != null) {
-      element.scrollTop = element.scrollHeight - previous;
-      restoreScroll.current = null;
-    }
-  }, [view]);
-
-  const commandProjectId = detail?.project.id ?? projectId;
-
-  useEffect(() => {
-    if (!commandProjectId) {
-      setCommands([]);
-      return;
-    }
-    let ignore = false;
-    listCommands(commandProjectId)
-      .then((data) => {
-        if (!ignore) setCommands(data);
-      })
-      .catch(() => {
-        if (!ignore) setCommands([]);
-      });
-    return () => {
-      ignore = true;
-    };
-  }, [commandProjectId]);
-
-  useEffect(() => {
-    if (!commandProjectId) {
-      setAgents([]);
-      return;
-    }
-    let ignore = false;
-    listAgents(commandProjectId)
-      .then((data) => {
-        if (!ignore) setAgents(data.filter((agent) => !agent.subagent));
-      })
-      .catch(() => {
-        if (!ignore) setAgents([]);
-      });
-    return () => {
-      ignore = true;
-    };
-  }, [commandProjectId]);
-
-  useEffect(() => {
-    if (!commandProjectId) {
-      setWorkflows([]);
-      return;
-    }
-    let ignore = false;
-    listWorkflows(commandProjectId)
-      .then((data) => {
-        if (!ignore) {
-          setWorkflows(data);
-          if (
-            testWorkflowId &&
-            data.some((workflow) => workflow.id === testWorkflowId)
-          ) {
-            setWorkflowSelection({
-              workflowId: testWorkflowId,
-              stepByStep: true,
-              worktree: true,
-            });
-          } else if (frameIdeaId) {
-            setWorkflowSelection({
-              ...defaultWorkflowSelection(data),
-              workflowId: null,
-            });
-          } else {
-            setWorkflowSelection(defaultWorkflowSelection(data));
-          }
-        }
-      })
-      .catch(() => {
-        if (!ignore) setWorkflows([]);
-      });
-    return () => {
-      ignore = true;
-    };
-  }, [commandProjectId, testWorkflowId, frameIdeaId]);
-
-  // A pending choice and preview belong to one session; do not leak them
-  // across tabs.
-  useEffect(() => {
-    setPendingMode(null);
-    setPendingModel(null);
     setPreview(null);
   }, [sessionId]);
-
-  // A new-session tab has no detail yet: the server lists its default agent
-  // first (the embedded defaults come before any file).
-  const serverMode = view.mode ?? detail?.mode ?? agents[0]?.id ?? null;
-  const mode = pendingMode ?? serverMode;
-
-  useEffect(() => {
-    // The pending value is only for the request gap; the server's mode is the
-    // source of truth once it catches up.
-    if (pendingMode && serverMode === pendingMode) {
-      setPendingMode(null);
-    }
-  }, [pendingMode, serverMode]);
-
-  const serverModel = detail?.model ?? modelChoices?.default ?? null;
-  const currentModel: ModelChoice | null = pendingModel
-    ? {
-        provider: pendingModel.provider,
-        model: pendingModel.model,
-        providerName:
-          modelChoices?.favorites.find((favorite) =>
-            sameModelRef(favorite, pendingModel),
-          )?.providerName ??
-          (modelChoices && sameModelRef(modelChoices.default, pendingModel)
-            ? modelChoices.default.providerName
-            : pendingModel.provider),
-      }
-    : serverModel;
-
-  useEffect(() => {
-    if (
-      pendingModel &&
-      serverModel &&
-      serverModel.provider === pendingModel.provider &&
-      serverModel.model === pendingModel.model
-    ) {
-      setPendingModel(null);
-    }
-  }, [pendingModel, serverModel]);
 
   const title =
     view.name ?? detail?.title ?? (sessionId ? "Session" : "Nouvelle session");
@@ -576,68 +401,6 @@ export function SessionPage({
     setAttachments((current) => current.filter((_, i) => i !== index));
   }
 
-  function sameModelRef(a: ModelRef, b: ModelRef): boolean {
-    return a.provider === b.provider && a.model === b.model;
-  }
-
-  async function handleModeChange(id: string): Promise<boolean> {
-    // A not-yet-created session keeps the choice locally; `handleSend` passes
-    // it to `createSession`.
-    if (!sessionId) {
-      setPendingMode(id);
-      return true;
-    }
-
-    const request = ++modeRequestRef.current;
-    setPendingMode(id);
-    setSendError(null);
-
-    try {
-      await setSessionMode(sessionId, id);
-      return true;
-    } catch (error) {
-      // A newer request supersedes this one; only the latest may revert.
-      if (request !== modeRequestRef.current) return true;
-      setPendingMode(null);
-      setSendError(
-        error instanceof Error
-          ? error.message
-          : "Erreur lors du changement de mode",
-      );
-      return false;
-    }
-  }
-
-  async function handleModelChange(ref: ModelRef): Promise<boolean> {
-    // A not-yet-created session keeps the choice locally; `handleSend` passes
-    // it to `createSession`.
-    if (!sessionId) {
-      setPendingModel(ref);
-      return true;
-    }
-
-    const request = ++modelRequestRef.current;
-    setPendingModel(ref);
-    setSendError(null);
-
-    try {
-      await setSessionModel(sessionId, ref);
-      setDetailVersion((version) => version + 1);
-      setPendingModel(null);
-      return true;
-    } catch (error) {
-      // A newer request supersedes this one; only the latest may revert.
-      if (request !== modelRequestRef.current) return true;
-      setPendingModel(null);
-      setSendError(
-        error instanceof Error
-          ? error.message
-          : "Erreur lors du changement de modèle",
-      );
-      return false;
-    }
-  }
-
   async function runPlanBuildAlone() {
     const modeChanged = await handleModeChange("builder");
     // Sent directly, not through handleSend: a workflow picked in the
@@ -790,15 +553,6 @@ export function SessionPage({
     }
   }
 
-  async function handleLoadOlder() {
-    const element = scrollRef.current;
-    if (!element) return;
-    restoreScroll.current = element.scrollHeight - element.scrollTop;
-    // Clear the armed restore when the view did not change (failed or empty
-    // page), so a later unrelated view change cannot apply a stale distance.
-    if (!(await loadOlder())) restoreScroll.current = null;
-  }
-
   return (
     <PreviewContext.Provider value={setPreview}>
       <PreviewWorkdirContext.Provider value={detail?.project.workdir}>
@@ -849,27 +603,7 @@ export function SessionPage({
                     <div className="relative min-h-0 grow">
                       <div
                         ref={scrollRef}
-                        onScroll={(event) => {
-                          const element = event.currentTarget;
-                          const distance =
-                            element.scrollHeight -
-                            element.scrollTop -
-                            element.clientHeight;
-                          // Only a move up disengages: content growing during a run widens the
-                          // distance without the human scrolling. Hysteresis: disengage beyond
-                          // 120px, re-engage within 40px, so a small move does not toggle follow.
-                          const movedUp = element.scrollTop < lastScrollTop.current;
-                          lastScrollTop.current = element.scrollTop;
-                          if (stickToBottom.current) {
-                            if (movedUp && distance > 120) {
-                              stickToBottom.current = false;
-                              setAwayFromBottom(true);
-                            }
-                          } else if (distance <= 40) {
-                            stickToBottom.current = true;
-                            setAwayFromBottom(false);
-                          }
-                        }}
+                        onScroll={onScroll}
                         className="h-full overflow-y-auto p-4 md:p-6"
                       >
                         <div
