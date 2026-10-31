@@ -111,10 +111,12 @@ tab, report findings as cards the human turns into backlog tasks (never offered 
 audit first runs the scanners found on PATH (Settings, never installed: the start of C23).
 Review map, done (C9, part 1): the integration dialog lists the branch's files riskiest first, each with
 its signals (the gate's checks per file, churn, untested, large), read from git (verified; `domain/review_map.rs`).
+Narrative diff, done (C9, part 2): a "Raconter" button in the integration dialog opens a session on the
+read-only `narrate` agent (`crates/fennec/agents/narrate.agent.md`), which tells the branch's change file by
+file in the review order, each claim with its `path:line` source (indicative).
 Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
-1. Tooled human review (C9, part 2): a narrative diff (indicative).
-2. Produced architecture and drift (C12), waivers (C7).
+1. Produced architecture and drift (C12), waivers (C7).
 Later: sub-agents as tools, when dogfooding shows sessions saturating their context.
 
 ## Layout
