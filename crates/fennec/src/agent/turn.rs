@@ -731,6 +731,19 @@ mod tests {
         );
     }
 
+    #[test]
+    fn a_failed_request_is_reported_before_it_is_retried() {
+        let model = Scripted(RefCell::new(vec![
+            Err("connection refused".into()),
+            reply("done", vec![]),
+        ]));
+        let (reason, events) = run(&model, Path::new("/tmp"));
+        assert_eq!(reason, DoneReason::Complete);
+        assert!(events.iter().any(|e| matches!(e,
+            Event::ChatError { error, recoverable: true }
+                if error == "connection refused (retry 1/3 in 1s)")));
+    }
+
     /// Answers at once and keeps the system prompt of each call.
     #[derive(Default)]
     struct Recording(RefCell<Vec<String>>);

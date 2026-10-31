@@ -70,7 +70,14 @@ pub fn stream(turn: &mut Turn, message_id: &str, prompt: &RoundPrompt) -> Result
             })?;
             return Ok(Round::Ended(DoneReason::Error));
         }
-        std::thread::sleep(Duration::from_secs(1 << (failures - 1)));
+        // Shown at once: the human sees the model is not answering instead of
+        // a silent "running" for the whole retry sequence.
+        let wait = 1 << (failures - 1);
+        turn.append(Event::ChatError {
+            error: format!("{error} (retry {failures}/{MAX_REQUEST_RETRIES} in {wait}s)"),
+            recoverable: true,
+        })?;
+        std::thread::sleep(Duration::from_secs(wait));
     }
 }
 
