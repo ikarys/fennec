@@ -15,6 +15,7 @@ import type {
 import { listProvider, saveSettings } from '../lib/api';
 import { type ThemeId } from '../lib/theme';
 import { Button } from '../components/ui/Button';
+import { Tabs } from '../components/ui/Tabs';
 import { ModelSection } from '../components/settings/ModelSection';
 import { ProvidersSection, type ProviderForm } from '../components/settings/ProvidersSection';
 import { ModelPrefsSection, percentFromFraction, type ModelForm } from '../components/settings/ModelPrefsSection';
@@ -278,6 +279,7 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<SettingsTab>('models');
+  const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
     if (settings && form === null) {
@@ -288,6 +290,7 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
   function markDirty() {
     setSaved(false);
     setError(null);
+    setDirty(true);
   }
 
   function updateModel(value: string) {
@@ -483,6 +486,7 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
       const response = await saveSettings(buildPreferences(form, settings));
       setForm(toForm(response.preferences, response.listings));
       setSaved(true);
+      setDirty(false);
       onSaved(response);
     } catch (err) {
       setSaved(false);
@@ -494,9 +498,9 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
 
   if (!settings || !form) {
     return (
-      <main className="grow overflow-y-auto px-6 py-8">
-        <div className="mx-auto max-w-[720px]">
-          <h1 className="text-[1.375rem] font-semibold tracking-[-0.02em]">Réglages</h1>
+      <main className="grow overflow-y-auto px-4 pt-6 md:px-6 md:pt-8">
+        <div className="mx-auto max-w-[960px]">
+          <h1 className="text-xl font-semibold">Réglages</h1>
           <p className="mt-0.5 text-muted">S'applique au prochain tour, sans redémarrage.</p>
           <div className="mt-6 text-sm text-muted">Chargement…</div>
         </div>
@@ -505,30 +509,16 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
   }
 
   return (
-    <main className="grow overflow-y-auto px-6 py-8">
+    <main className="grow overflow-y-auto px-4 pt-6 md:px-6 md:pt-8">
       <div className="mx-auto flex max-w-[960px] flex-col gap-6">
         <div>
-          <h1 className="text-[1.375rem] font-semibold tracking-[-0.02em]">Réglages</h1>
+          <h1 className="text-xl font-semibold">Réglages</h1>
           <p className="mt-0.5 text-muted">S'applique au prochain tour, sans redémarrage.</p>
         </div>
 
-        <div className="flex gap-6">
+        <div className="flex flex-col gap-6 md:flex-row">
           {/* One form across the tabs: an edit on one tab is kept when switching. */}
-          <nav aria-label="Sections des réglages" className="flex w-44 shrink-0 flex-col gap-0.5">
-            {TABS.map(({ id, label }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setTab(id)}
-                aria-current={tab === id ? 'page' : undefined}
-                className={`rounded-md px-2 py-1 text-left ${
-                  tab === id ? 'bg-raised text-text' : 'text-muted hover:text-text'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </nav>
+          <Tabs label="Sections des réglages" tabs={TABS} active={tab} onSelect={setTab} />
 
           <form onSubmit={handleSubmit} className="flex min-w-0 grow flex-col gap-6">
             {tab === 'models' && (
@@ -612,13 +602,16 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
               </div>
             )}
 
-            <div className="flex items-center gap-3">
-              <Button type="submit" variant="primary" size="md" disabled={saving}>
-                {saving ? 'Enregistrement…' : 'Enregistrer'}
-              </Button>
-              {saved && <span className="text-xs text-ok">Enregistré</span>}
-              {error && <span className="text-xs text-err">{error}</span>}
-            </div>
+            {tab !== 'security' && (
+              <div className="sticky bottom-0 -mx-1 flex items-center gap-3 border-t border-border bg-bg px-1 py-3">
+                <Button type="submit" variant="primary" size="md" disabled={saving}>
+                  {saving ? 'Enregistrement…' : 'Enregistrer'}
+                </Button>
+                {dirty && !saving && <span className="text-xs text-muted">Modifications non enregistrées</span>}
+                {saved && <span className="text-xs text-ok">Enregistré</span>}
+                {error && <span className="text-xs text-err">{error}</span>}
+              </div>
+            )}
           </form>
         </div>
       </div>
