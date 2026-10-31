@@ -196,6 +196,20 @@ export function getContext(id: string): Promise<ContextView> {
   );
 }
 
+/** The images the model received, computed by the server over the whole log. */
+export interface SeenImage {
+  label: string;
+  anchorId: string;
+  src: string;
+  inContext: boolean;
+}
+
+export function getVision(id: string): Promise<SeenImage[]> {
+  return request<SeenImage[]>(
+    `/api/sessions/${encodeURIComponent(id)}/vision`,
+  );
+}
+
 /** How a criterion's status was established, as reported by the integration preview. */
 export type IntegrationProvenance =
   | { kind: "verified"; command: string; exitCode?: number; output: string }
