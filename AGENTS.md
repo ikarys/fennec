@@ -100,10 +100,12 @@ itself (the agent decides and records it), `propose_criteria` is refused; per-id
 and the decisions taken, for the morning. Each queue run is recorded (`idea.queue_started`, `idea.queue_finished`, a
 restart closes it); the board (groups by stage, one next action per idea, the night report until read) is computed by
 the server.
+Risk zones, done (C11): a "Risques" tab on the project page lists the source files that churn, have
+no tests, or whose every line (git blame) comes from an AI commit never integrated through fennec (an AI
+`Co-Authored-By` trailer, no `Fennec-Session`), read from git (verified; `domain/risk.rs`, `risk.rs`).
 Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
-1. Project actions on the project page: risk zones (C11: churn, untested, never reviewed
-   by a human, deterministic) and questions to an agent (C10).
+1. Questions to an agent on the project page (C10).
 2. Audits: a read-only `audit` agent, fixed report format.
 3. Tooled human review (C9): a risk map (deterministic), a narrative diff (indicative).
 4. Produced architecture and drift (C12), security checks orchestrating known tools
@@ -147,6 +149,7 @@ crates/fennec/src/
     adr.rs             architecture decision records: a MADR file read (number, title, status, date)
     module_map.rs      the project map: modules, their dependencies from the imports, their layout
     map_doc.rs         docs/map.md: the map as Markdown (Mermaid, table), stale or current
+    risk.rs            risk zones: a commit's authorship from its trailers, the signals, the report
     workflow/          a workflow: definition (nodes, ports, edges), template ({{…}} names),
                        validate (the graph rules), run (the run folded from its events, the next step)
     doc.rs             the project's documentation: markdown files and ADRs, as the Doc tab lists them
@@ -188,6 +191,7 @@ crates/fennec/src/
   protected.rs       the project's protected files: .agents/protected read, the existing paths found
   adr.rs             the project's ADR files in docs/adr/, listed
   module_map.rs      the project map's source files (git ls-files) and docs/map.md read, written
+  risk.rs            the risk zones measured from git: AI commits, churn, a parallel blame
   doc.rs             the project's markdown files read for the Doc tab
   web/               HTTP adapter: http, guard (who may call), routes, settings_routes, event_stream (SSE),
                      notifier (wakes streams on append, no polling), turns, assets,

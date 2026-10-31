@@ -30,7 +30,7 @@ pub fn write_map_file(workdir: &Path, map: &ModuleMap) -> std::io::Result<()> {
     std::fs::write(path, map_doc::render(map))
 }
 
-fn tracked_files(workdir: &Path) -> Vec<SourceFile> {
+pub(crate) fn tracked_files(workdir: &Path) -> Vec<SourceFile> {
     let Ok(out) = Command::new("git")
         .current_dir(workdir)
         .args(["ls-files", "-z"])

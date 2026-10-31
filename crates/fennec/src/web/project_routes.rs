@@ -9,7 +9,7 @@ use serde_json::json;
 
 use super::App;
 use super::http::{error, send_json};
-use crate::{adr, doc, module_map};
+use crate::{adr, doc, module_map, risk};
 
 /// `GET /api/projects/{id}/overview`.
 pub fn get_overview(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
@@ -51,4 +51,14 @@ pub fn write_map_file(app: &App, stream: &mut TcpStream, id: &str) -> Result<(),
     module_map::write_map_file(workdir, &map).map_err(|e| e.to_string())?;
     let state = module_map::map_file_state(workdir, &map);
     send_json(stream, 200, &json!({ "mapFile": state }))
+}
+
+/// `GET /api/projects/{id}/risks`: risk zones for a project workdir.
+pub fn get_risks(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+    let Some(project) = app.store()?.project(id)? else {
+        return error(stream, 404, "no such project");
+    };
+    let workdir = Path::new(&project.workdir);
+    let body = serde_json::to_value(risk::load(workdir)).map_err(|e| e.to_string())?;
+    send_json(stream, 200, &body)
 }
