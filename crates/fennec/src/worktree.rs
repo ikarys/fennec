@@ -216,8 +216,16 @@ pub fn dependency_mounts(workdir: &Path) -> Vec<(PathBuf, PathBuf)> {
 /// dependencies (shared, not copied: a worktree stays light).
 pub fn link_dependencies(workdir: &Path) -> Result<(), String> {
     for (source, target) in dependency_mounts(workdir) {
-        if std::fs::symlink_metadata(&target).is_ok() {
-            continue;
+        match std::fs::symlink_metadata(&target) {
+            // An empty directory is the mount point bwrap left behind for the
+            // sandbox's bind: replace it. A filled one is a real install: keep it.
+            Ok(meta) if meta.is_dir() => {
+                if std::fs::remove_dir(&target).is_err() {
+                    continue;
+                }
+            }
+            Ok(_) => continue,
+            Err(_) => {}
         }
         if let Some(parent) = target.parent() {
             std::fs::create_dir_all(parent)
@@ -526,6 +534,8 @@ mod tests {
         let wt = open(&base.join("wt"), &repo, "s1").unwrap().unwrap();
         let link = wt.path.join("web/node_modules");
 
+        // The empty mount point a sandboxed command leaves is replaced.
+        std::fs::create_dir_all(&link).unwrap();
         assert_eq!(link_dependencies(&wt.workdir), Ok(()));
         assert!(link.symlink_metadata().unwrap().is_symlink());
         assert_eq!(
