@@ -152,7 +152,7 @@ mod tests {
     use crate::domain::event::{AskType, Event, Role, ToolCall};
     use crate::domain::preferences::ModelParams;
     use crate::domain::workflow::run::RunOutcome;
-    use crate::web::notifier::Notifier;
+    use crate::notifier::Notifier;
     use crate::web::turns::Turns;
     use serde_json::json;
     use std::path::PathBuf;
