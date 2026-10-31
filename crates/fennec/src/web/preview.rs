@@ -4,7 +4,6 @@
 
 use super::App;
 use super::http::{error, percent_decode, send_with};
-use super::routes::session_and_project;
 use std::net::TcpStream;
 use std::path::Path;
 
@@ -17,7 +16,7 @@ pub(super) fn serve(
     segments: &[&str],
 ) -> Result<(), String> {
     let store = app.store()?;
-    let Some((session, project)) = session_and_project(&store, session_id)? else {
+    let Some((session, project)) = app.session_and_project(session_id)? else {
         return error(stream, 404, "no such session");
     };
     let Some(relative) = relative_path_from_segments(segments) else {
