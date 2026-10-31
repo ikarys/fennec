@@ -167,8 +167,11 @@ body {
   line-height: 1.4;
 }
 
-a {
-  color: inherit;
+/* In the base layer so a link's colour utilities (text-*, hover:text-*) win over it. */
+@layer base {
+  a {
+    color: inherit;
+  }
 }
 
 /* The browser's own surfaces carry the theme too. */
