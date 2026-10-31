@@ -27,6 +27,7 @@ use crate::domain::project::{Project, SessionSummary};
 use crate::domain::replay::replayable;
 use crate::domain::session_skills::missed_always_on;
 use crate::domain::slash::{TurnInput, commands, resolve};
+use crate::domain::vision::seen_images;
 use crate::domain::workflow::run::Waiting;
 use crate::notifier::NotifyingLog;
 use crate::skills;
@@ -345,6 +346,14 @@ pub(super) fn serve_context(app: &App, stream: &mut TcpStream, id: &str) -> Resu
         .for_turn(&store.preferences()?, chosen.as_ref());
     let view = context_view(&store.events(id)?, params.context_window, params.compact_at);
     send_json(stream, 200, &json!(view))
+}
+
+pub(super) fn serve_vision(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+    let store = app.store()?;
+    if store.session(id)?.is_none() {
+        return error(stream, 404, "no such session");
+    }
+    send_json(stream, 200, &json!(seen_images(&store.events(id)?)))
 }
 
 pub(super) fn serve_usage(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {

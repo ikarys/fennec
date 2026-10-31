@@ -1,6 +1,5 @@
-import { useMemo, useState } from 'react';
-import type { ThreadItem } from '../../lib/fold';
-import { seenImages, type SeenImage } from '../../lib/vision';
+import { useState } from 'react';
+import type { SeenImage } from '../../lib/api';
 import { panelBlock } from '../../lib/panelBlocks';
 import { CloseIcon, LocateIcon } from '../Icons';
 import { Button } from '../ui/Button';
@@ -8,8 +7,7 @@ import { Card } from '../ui/Card';
 import { Modal } from '../ui/Modal';
 import { Panel } from '../ui/Panel';
 
-export function VisionSection({ items, partial }: { items: ThreadItem[]; partial: boolean }) {
-  const images = useMemo(() => seenImages(items), [items]);
+export function VisionSection({ images }: { images: SeenImage[] }) {
   const [selected, setSelected] = useState<SeenImage | null>(null);
 
   const closeDialog = () => {
@@ -27,14 +25,13 @@ export function VisionSection({ items, partial }: { items: ThreadItem[]; partial
   return (
     <Panel id="vision" title={panelBlock('vision').title} summary={images.length > 0 ? images.length : undefined}>
       <p className="m-0 text-xs text-muted">Les images que le modèle a vues : captures, images lues ou jointes. Grisées : sorties de son contexte.</p>
-      {partial && <div className="text-xs text-muted">(messages chargés seulement)</div>}
       {images.length === 0 ? (
         <div className="text-xs text-muted">Aucune image vue.</div>
       ) : (
         <div className="grid grid-cols-3 gap-1.5">
-          {images.map((image) => (
+          {images.map((image, index) => (
             <button
-              key={image.id}
+              key={`${image.anchorId}-${index}`}
               type="button"
               aria-label={`Agrandir ${image.label}`}
               title={image.inContext ? image.label : 'Plus dans le contexte du modèle'}
