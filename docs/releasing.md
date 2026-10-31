@@ -43,7 +43,9 @@ One-time, done with `gh api`:
 Add branch protection/rulesets for `main` and `develop`:
 
 - Require PR.
-- Require `check` and `title` status checks.
+- Require `check` and `title` status checks. `ci.yml` skips documentation-only changes
+  (`paths-ignore`), and a skipped workflow leaves a required check pending forever: when
+  `check` becomes required, move the docs filter into the job (a paths step) instead.
 - No force-push.
 - No deletion.
 
