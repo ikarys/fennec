@@ -7,6 +7,8 @@ export interface Project {
   workdir: string;
   branch: string | null;
   remote: string | null;
+  /** Opens the project in VS Code (through the WSL remote under WSL). */
+  editorUrl: string;
   sessions: SessionSummary[];
 }
 

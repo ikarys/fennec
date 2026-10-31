@@ -92,6 +92,10 @@ pub(super) fn list_projects(app: &App, stream: &mut TcpStream) -> Result<(), Str
                 .as_deref()
                 .and_then(git::web_url)
         );
+        v["editorUrl"] = json!(editor::vscode_link(
+            &p.workdir,
+            std::env::var("WSL_DISTRO_NAME").ok().as_deref(),
+        ));
         v["sessions"] = Value::Array(sessions);
         out.push(v);
     }
