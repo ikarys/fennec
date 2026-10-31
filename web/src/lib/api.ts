@@ -28,6 +28,19 @@ export interface SessionSummary {
   awaitingIntegration: boolean;
 }
 
+/** What a session is waiting for; the badge and the notification are worded from it. */
+export type AttentionKind = "question" | "workflowPause" | "awaitingIntegration" | "error";
+
+/** One session that needs the human, as the `/api/notices` snapshot carries it. */
+export interface AttentionItem {
+  sessionId: string;
+  projectId: string;
+  title: string;
+  kind: AttentionKind;
+  /** The question text, the workflow's question, or the error message; empty for work ready to integrate. */
+  detail: string;
+}
+
 export interface Project {
   id: string;
   name: string;
