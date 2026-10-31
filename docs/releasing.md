@@ -69,4 +69,14 @@ Today this is unavailable because the repo is private on a Free plan.
 It needs glibc 2.35 or later (built on Ubuntu 22.04) and `bwrap` for the command sandbox.
 The `edge` prerelease is the latest develop build, the same way: not a release.
 
-Requires glibc ≥ 2.35 (built on Ubuntu 22.04) and `bwrap` for the sandbox.
+On Ubuntu 23.10 and later, AppArmor forbids unprivileged user namespaces, so every
+sandboxed command fails (`bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted`
+or `setting up uid map: Permission denied`). Either allow them for the whole host:
+
+```bash
+echo 'kernel.apparmor_restrict_unprivileged_userns=0' | sudo tee /etc/sysctl.d/60-bwrap-userns.conf
+sudo sysctl --system
+```
+
+or give `bwrap` alone an AppArmor profile that grants `userns` (tighter, see
+`/etc/apparmor.d/` on your release). CI uses the sysctl (`.github/workflows/ci.yml`).
