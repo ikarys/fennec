@@ -146,9 +146,9 @@ function ModelRow({
           className="flex min-w-0 flex-1 items-center gap-2 text-left"
         >
           <ChevronRightIcon className={`h-3 w-3 shrink-0 text-muted transition-transform ${open ? 'rotate-90' : ''}`} />
-          <span className="min-w-0 truncate font-mono text-xs">{modelId}</span>
+          <span className="max-w-[60%] shrink-0 truncate font-mono text-xs">{modelId}</span>
           {model === null && <Badge tone="neutral">manuel</Badge>}
-          <span className="shrink-0 text-xs text-faint tabular-nums">{summary(value, model, defaults)}</span>
+          <span className="min-w-0 truncate text-xs text-faint tabular-nums">{summary(value, model, defaults)}</span>
         </button>
         <Button
           variant="ghost"
