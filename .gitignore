@@ -6,3 +6,7 @@ web/dist/
 *.tsbuildinfo
 .playwright-cli/
 .impeccable/
+# Stray SQLite stores (usage.db, fennec.db) left by local runs.
+*.db
+*.db-shm
+*.db-wal
