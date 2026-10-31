@@ -112,7 +112,7 @@ export default function ProjectPage({
   };
 
   const shell = (children: ReactNode) => (
-    <main className="grow overflow-y-auto px-6 py-8">
+    <main className="grow overflow-y-auto px-4 py-6 md:px-6 md:py-8">
       <div className="mx-auto max-w-[1100px]">{children}</div>
     </main>
   );
@@ -124,11 +124,11 @@ export default function ProjectPage({
   const header = (
     <>
       <div className="flex items-center gap-3">
-        <h1 className="text-[1.375rem] font-semibold tracking-[-0.02em]">
+        <h1 className="text-xl font-semibold">
           {project.name}
         </h1>
       </div>
-      <p className="mt-0.5 font-mono text-xs text-muted">
+      <p className="mt-0.5 break-all font-mono text-xs text-muted">
         {project.workdir} · ⎇ {project.branch ?? 'sans branche'}
         {project.remote ? (
           <>
@@ -151,7 +151,7 @@ export default function ProjectPage({
   return shell(
     <>
       {header}
-      <div className="mt-6 flex gap-6">
+      <div className="mt-6 flex flex-col gap-6 md:flex-row">
         <Tabs
           label="Sections du projet"
           tabs={[...TABS]}
