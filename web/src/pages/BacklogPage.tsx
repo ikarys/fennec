@@ -3,6 +3,7 @@ import { getBacklog, type BacklogProject, type BacklogView } from '../lib/api';
 import { formatRelative } from '../lib/format';
 import { Badge } from '../components/ui/Badge';
 import { Card } from '../components/ui/Card';
+import { SectionLabel } from '../components/ui/SectionLabel';
 
 function ProjectRow({ project }: { project: BacklogProject }) {
   const href = `#/project/${encodeURIComponent(project.id)}/tasks`;
@@ -21,23 +22,21 @@ function ProjectRow({ project }: { project: BacklogProject }) {
         </Badge>
       </div>
 
-      {project.tasks.length > 0 ? (
-        <ul className="mt-3 space-y-1.5">
-          {project.tasks.map((task) => (
-            <li key={task.id} className="flex items-baseline gap-2 text-sm">
+      <ul className="mt-3 space-y-1.5">
+        {project.tasks.map((task) => (
+          <li key={task.id} className="flex items-baseline gap-2 text-sm">
+            <span className="w-20 shrink-0">
               <Badge tone={task.status === 'integrated' ? 'ok' : 'neutral'} dot>
                 {task.status === 'integrated' ? 'intégré' : 'complété'}
               </Badge>
-              <span className="min-w-0 flex-1 truncate" title={task.text}>
-                {task.text}
-              </span>
-              <span className="shrink-0 text-xs text-muted">{formatRelative(task.updatedAt)}</span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="mt-3 text-sm text-muted">Aucune tâche terminée.</p>
-      )}
+            </span>
+            <span className="min-w-0 flex-1 line-clamp-2 md:line-clamp-1" title={task.text}>
+              {task.text}
+            </span>
+            <span className="shrink-0 text-xs text-muted">{formatRelative(task.updatedAt)}</span>
+          </li>
+        ))}
+      </ul>
     </Card>
   );
 }
@@ -83,9 +82,29 @@ export default function BacklogPage() {
 
         {view ? (
           <div className="flex flex-col gap-3">
-            {view.projects.map((project) => (
-              <ProjectRow key={project.id} project={project} />
-            ))}
+            {view.projects.length === 0 ? (
+              <p className="text-muted">Aucune tâche terminée pour l'instant.</p>
+            ) : (
+              view.projects.map((project) => (
+                <ProjectRow key={project.id} project={project} />
+              ))
+            )}
+            {view.idle.length > 0 ? (
+              <Card className="p-4">
+                <SectionLabel>Sans tâche terminée</SectionLabel>
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                  {view.idle.map((project) => (
+                    <a
+                      key={project.id}
+                      href={`#/project/${encodeURIComponent(project.id)}/tasks`}
+                      className="text-muted hover:text-accent-strong"
+                    >
+                      {project.name}
+                    </a>
+                  ))}
+                </div>
+              </Card>
+            ) : null}
           </div>
         ) : null}
       </div>
