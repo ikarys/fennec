@@ -106,12 +106,14 @@ no tests, or whose every line (git blame) comes from an AI commit never integrat
 Questions, done (C10): the Analyses tab of the project page takes a question and opens a session on the
 read-only `ask` agent (`crates/fennec/agents/ask.agent.md`), which answers with a `path:line` source per claim
 (indicative).
+Audits, done: the read-only `audit-architecture` and `audit-security` agents, launched from the Analyses
+tab, report findings as cards the human turns into backlog tasks (never offered twice); the security
+audit first runs the scanners found on PATH (Settings, never installed: the start of C23).
 Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
-1. Audits: a read-only `audit` agent, fixed report format.
-2. Tooled human review (C9): a risk map (deterministic), a narrative diff (indicative).
-3. Produced architecture and drift (C12), security checks orchestrating known tools
-   (C23), waivers (C7).
+1. Tooled human review (C9): a risk map of a session's diff in the integration dialog (deterministic),
+   then a narrative diff (indicative).
+2. Produced architecture and drift (C12), waivers (C7).
 Later: sub-agents as tools, when dogfooding shows sessions saturating their context.
 
 ## Layout
