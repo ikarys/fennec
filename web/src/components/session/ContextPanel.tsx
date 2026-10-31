@@ -1,5 +1,5 @@
 import type { ThreadView } from '../../lib/fold';
-import type { SessionDetail, SessionSkills, SessionUsage } from '../../lib/api';
+import type { SeenImage, SessionDetail, SessionSkills, SessionUsage } from '../../lib/api';
 import { useEffect, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { useDisplayPrefs } from '../../lib/display';
 import { pageBlocks, panelPages, type PanelBlockId } from '../../lib/panelBlocks';
@@ -79,8 +79,6 @@ interface ContextPanelProps {
   request: string | null;
   /** False on the « Nouvelle session » tab, where there is no log to fold. */
   hasSession: boolean;
-  /** Older pages are not loaded: the totals cover the loaded messages only. */
-  partial: boolean;
   /** Where the agent's work lands; null when the session runs in place. */
   worktree: SessionDetail['worktree'];
   /** The session id, for the integration dialog; null on a new-session tab. */
@@ -89,9 +87,11 @@ interface ContextPanelProps {
   onWorktreeChanged: () => void;
   /** Bumped when the review dialog closes: the workspace block re-reads the preview. */
   integrationVersion: number;
+  /** The images the model received, computed server-side. */
+  vision: SeenImage[];
 }
 
-export function ContextPanel({ view, skills, usage, request, hasSession, partial, worktree, sessionId, onWorktreeChanged, integrationVersion }: ContextPanelProps) {
+export function ContextPanel({ view, skills, usage, request, hasSession, worktree, sessionId, onWorktreeChanged, integrationVersion, vision }: ContextPanelProps) {
   const [width, setWidth] = useState(loadWidth);
   const [selectedPageName, setSelectedPageName] = useState(loadPageName);
   const [collapsed, setCollapsed] = useState(loadCollapsed);
@@ -151,7 +151,7 @@ export function ContextPanel({ view, skills, usage, request, hasSession, partial
       case 'tools':
         return <ToolCountsSection key={id} toolCounts={view.toolCounts} />;
       case 'vision':
-        return <VisionSection key={id} items={view.items} partial={partial} />;
+        return <VisionSection key={id} images={vision} />;
       default: {
         const exhaustive: never = id;
         return exhaustive;
