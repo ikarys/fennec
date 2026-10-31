@@ -192,7 +192,7 @@ crates/fennec/src/
   doc.rs             the project's markdown files read for the Doc tab
   web/               HTTP adapter: http, guard (who may call), routes, settings_routes, event_stream (SSE),
                      notifier (wakes streams on append, no polling), turns, assets,
-                     workflow_routes, project_routes (the project page), idea_routes (its ideas board, HTTP only),
+                     workflow_routes, project_routes (the project page), project_dashboard (its overview tiles), idea_routes (its ideas board, HTTP only),
                      idea_queue (the queue's thread: starts ready ideas, night-mode caps, queue runs recorded),
                      model_routes (the composer's model choices, a session's model),
                      children (child sessions for workflow nodes),
@@ -212,7 +212,7 @@ web/src/           React + Vite + Tailwind v4 UI (same layout as openfox's web/s
                      ProjectPage, WorkflowsPage (lazy)
   components/        ui/ the primitives every screen uses (Button, Badge, SectionLabel, Card, Panel, fields);
                      shared UI; session/ the thread, tool cards, question card, message stats, composer,
-                     context panel; project/ the folder browser, the project map and ideas/
+                     context panel; project/ the folder browser, the dashboard, the project map and ideas/
                      (the Tasks tab: queue bar, night report, stage groups, sub-tabs, done table, idea rows); layout/ the top bar;
                      workflow/ the editor (canvas, node shapes, panels) and session/ a run in the thread;
                      preview/ the preview pane and previewable code blocks
