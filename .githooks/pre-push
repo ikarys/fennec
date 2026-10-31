@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in
+    refs/heads/main|refs/heads/develop)
+      branch="${remote_ref#refs/heads/}"
+      echo "fennec: direct push to $branch refused; open a PR (see docs/releasing.md). Bypass: git push --no-verify" >&2
+      exit 1
+      ;;
+  esac
+done
