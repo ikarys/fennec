@@ -567,7 +567,7 @@ export function SessionPage({
                     <div className="relative z-10 flex items-center gap-2 px-4 md:px-6 py-2.5 after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-5 after:bg-linear-to-b after:from-black/45 after:to-transparent">
                       <div className="mx-auto flex w-full max-w-[960px] flex-wrap items-center gap-x-2 gap-y-1">
                         <h1
-                          className="w-full min-w-0 truncate text-[0.9375rem] font-semibold sm:w-auto"
+                          className="w-full min-w-0 truncate text-base font-semibold sm:w-auto"
                           title={title}
                         >
                           {title}

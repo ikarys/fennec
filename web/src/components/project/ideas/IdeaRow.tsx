@@ -233,7 +233,7 @@ export function IdeaRow({
                 <span
                   key={i}
                   title={attachment.filename}
-                  className="flex items-center gap-1 rounded-md border border-border bg-bg px-1.5 py-0.5 text-[11px] text-muted"
+                  className="flex items-center gap-1 rounded-md border border-border bg-bg px-1.5 py-0.5 text-xs text-muted"
                 >
                   <FileIcon className="h-3 w-3" />
                   <span className="max-w-[120px] truncate">{attachment.filename}</span>

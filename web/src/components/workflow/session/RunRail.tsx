@@ -31,7 +31,7 @@ const PLAIN_PORTS = new Set(['next', 'done']);
 
 function PortLabel({ port }: { port: string }) {
   if (PLAIN_PORTS.has(port.trim().toLowerCase())) return null;
-  return <span className="shrink-0 text-[0.6875rem] text-muted">{port}</span>;
+  return <span className="shrink-0 text-xs text-muted">{port}</span>;
 }
 
 
@@ -113,13 +113,13 @@ function StepRow({ step, onShowOutput }: { step: RailStep; onShowOutput: (run: N
     <li data-current={isRunning ? 'true' : undefined} className={`flex flex-col border-l-2 ${bar} py-1 pl-2`}>
       <span className={`truncate text-xs ${labelClass}`} title={title}>{label}</span>
       {hasMeta && (
-        <span className="flex items-baseline gap-1.5 whitespace-nowrap text-[0.6875rem] text-muted">
+        <span className="flex items-baseline gap-1.5 whitespace-nowrap text-xs text-muted">
           {showPort && port && nodeRun ? (
             nodeRun.output ? (
               <button
                 type="button"
                 onClick={() => onShowOutput(nodeRun)}
-                className="shrink-0 cursor-pointer text-[0.6875rem] text-muted hover:text-text hover:underline"
+                className="shrink-0 cursor-pointer text-xs text-muted hover:text-text hover:underline"
                 title="Voir ce que l'agent a trouvé"
               >
                 {port}
@@ -135,7 +135,7 @@ function StepRow({ step, onShowOutput }: { step: RailStep; onShowOutput: (run: N
         </span>
       )}
       {bar === 'border-err' && outputLine ? (
-        <span className="truncate text-[0.6875rem] text-muted" title={nodeRun?.output ?? ''}>{outputLine}</span>
+        <span className="truncate text-xs text-muted" title={nodeRun?.output ?? ''}>{outputLine}</span>
       ) : null}
     </li>
   );
@@ -166,7 +166,7 @@ function RoundRow({
           {expanded ? <ChevronDownIcon className="h-3 w-3 shrink-0 text-muted" /> : <ChevronRightIcon className="h-3 w-3 shrink-0 text-muted" />}
           <span className="truncate">Tour {index + 1}</span>
         </span>
-        <span className="flex items-baseline gap-1.5 whitespace-nowrap text-[0.6875rem] text-muted">
+        <span className="flex items-baseline gap-1.5 whitespace-nowrap text-xs text-muted">
           {last.port ? <PortLabel port={last.port} /> : null}
           <span className="tabular-nums">{round.length} étape{round.length > 1 ? 's' : ''}</span>
           {hasDuration && <span className="ml-auto font-mono text-faint tabular-nums">{formatDuration(totalDuration)}</span>}

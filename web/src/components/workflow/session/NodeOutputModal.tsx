@@ -36,7 +36,7 @@ export function NodeOutputModal({ nodeRun, onClose }: { nodeRun: NodeRun | null;
         </div>
         <div className="max-h-[70vh] overflow-y-auto rounded-md border border-border bg-raised px-3 py-2 text-xs">
           {kind === 'shell' || kind === 'criteria' ? (
-            <pre className="whitespace-pre-wrap break-words font-mono text-[0.6875rem] text-muted">{output}</pre>
+            <pre className="whitespace-pre-wrap break-words font-mono text-xs text-muted">{output}</pre>
           ) : (
             <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={markdownComponents}>
               {output}

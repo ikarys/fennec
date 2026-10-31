@@ -26,7 +26,7 @@ const VARIANTS: Record<ButtonVariant, string> = {
 /** `wrap` is `text` whose height is a minimum: a wrapping choice grows with its text. */
 const SIZES: Record<ButtonSize, { text: string; wrap: string; square: string }> = {
   sm: { text: 'h-7 px-2.5 text-xs', wrap: 'min-h-7 px-2.5 text-xs', square: 'size-7 text-xs' },
-  md: { text: 'h-8 px-3 text-[0.8125rem]', wrap: 'min-h-8 px-3 text-[0.8125rem]', square: 'size-8 text-[0.8125rem]' },
+  md: { text: 'h-8 px-3 text-sm', wrap: 'min-h-8 px-3 text-sm', square: 'size-8 text-sm' },
   /** The composer's send button: the one action of the screen. */
   lg: { text: 'h-10 rounded-lg px-4 text-sm', wrap: 'min-h-10 rounded-lg px-4 text-sm', square: 'size-10 rounded-lg text-sm' }
 };

@@ -54,9 +54,9 @@ export function CriteriaSection({ criteria }: { criteria: CriterionView[] }) {
                       <>
                         <div className="font-mono text-muted">$ {provenance.command}</div>
                         {typeof provenance.exitCode === 'number' && (
-                          <div className="text-[0.6875rem] text-muted">Code de sortie : {provenance.exitCode}</div>
+                          <div className="text-xs text-muted">Code de sortie : {provenance.exitCode}</div>
                         )}
-                        <pre className="max-h-40 overflow-auto rounded bg-code p-2 font-mono text-[0.6875rem] text-muted">
+                        <pre className="max-h-40 overflow-auto rounded bg-code p-2 font-mono text-xs text-muted">
                           {provenance.output}
                         </pre>
                       </>

@@ -96,7 +96,7 @@ export function NodePanel({ def, node, agents, issues, onChange, onRename, onDel
 
       {nodeIssues.length > 0 && (
         <div className="flex flex-col gap-1">
-          <div className="text-[0.8125rem] font-medium text-err">Problèmes</div>
+          <div className="text-sm font-medium text-err">Problèmes</div>
           {nodeIssues.map((issue, index) => (
             <div key={index} className="rounded-md bg-del-bg px-2 py-1 text-xs text-err">
               {issue.message}

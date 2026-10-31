@@ -107,7 +107,7 @@ export function ProjectMap({ map }: { map: ModuleMap }) {
                 ⓘ
               </button>
             </div>
-            <div className="text-[10px] text-muted">
+            <div className="text-xs text-muted">
               {module.files} fichiers · {module.tests} testés{module.entry ? ' · entrée' : ''}
             </div>
           </div>
