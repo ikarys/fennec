@@ -112,6 +112,34 @@ just            # build the UI, then run the release server on http://127.0.0.1:
 just check      # the contributor gate: formatting, clippy, tests, UI build
 ```
 
+### Start at boot (Linux)
+
+A systemd user service keeps fennec running in the background:
+
+```ini
+# ~/.config/systemd/user/fennec.service
+[Unit]
+Description=fennec
+
+[Service]
+ExecStart=%h/.local/bin/fennec serve
+# The model variables of "Configuration", if you use them:
+# Environment=FENNEC_LLM_URL=http://127.0.0.1:8000/v1
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
+```
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable --now fennec   # start now and at each login
+sudo loginctl enable-linger "$USER"    # start at boot, before any login
+journalctl --user -u fennec -f         # its logs
+```
+
+Under WSL, systemd must be on (`[boot]` `systemd=true` in `/etc/wsl.conf`).
+
 ## Quick start
 
 ```bash
