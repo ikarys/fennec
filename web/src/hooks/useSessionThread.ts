@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getContext, type ContextView, getEventPage, getRunEventsBefore, getSkills, getUsage, getUsageCalls, getUsageWorkflow, type WorkflowUsage, type EventPageEntry, type SessionSkills, type CallUsage, type SessionUsage } from '../lib/api';
+import { getContext, getVision, type ContextView, getEventPage, getRunEventsBefore, getSkills, getUsage, getUsageCalls, getUsageWorkflow, type WorkflowUsage, type EventPageEntry, type SessionSkills, type CallUsage, type SessionUsage, type SeenImage } from '../lib/api';
 import { createThreadFold, type FennecEvent, type ThreadFold, type ThreadView } from '../lib/fold';
 
 const PAGE_SIZE = 200;
@@ -33,6 +33,8 @@ export interface SessionThread {
   workflowUsage: WorkflowUsage;
   /** The header's context gauge; null until the first fetch. */
   context: ContextView | null;
+  /** The images the model received, computed server-side; [] until the first fetch. */
+  vision: SeenImage[];
 }
 
 /**
@@ -52,6 +54,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
   const [calls, setCalls] = useState<ReadonlyMap<string, CallUsage>>(new Map());
   const [workflowUsage, setWorkflowUsage] = useState<WorkflowUsage>({ nodes: [], runs: [] });
   const [context, setContext] = useState<ContextView | null>(null);
+  const [vision, setVision] = useState<SeenImage[]>([]);
   const eventsRef = useRef<FennecEvent[]>([]);
   const foldRef = useRef<ThreadFold>(createThreadFold());
   const firstSeqRef = useRef(0);
@@ -63,6 +66,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
   const skillsReqRef = useRef(0);
   const usageReqRef = useRef(0);
   const contextReqRef = useRef(0);
+  const visionReqRef = useRef(0);
 
   const refreshSkills = useCallback(() => {
     if (!sessionId) return;
@@ -108,6 +112,18 @@ export function useSessionThread(sessionId: string | null): SessionThread {
       });
   }, [sessionId]);
 
+  const refreshVision = useCallback(() => {
+    if (!sessionId) return;
+    const request = ++visionReqRef.current;
+    getVision(sessionId)
+      .then((images) => {
+        if (request === visionReqRef.current) setVision(images);
+      })
+      .catch(() => {
+        // Keep the last images: the next image or cut refetches.
+      });
+  }, [sessionId]);
+
   const foldAll = useCallback(() => {
     const fresh = createThreadFold();
     const firstSeq = firstSeqRef.current;
@@ -133,6 +149,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
     skillsReqRef.current += 1; // a fetch of the previous session may not answer
     usageReqRef.current += 1;
     contextReqRef.current += 1;
+    visionReqRef.current += 1;
     setView(EMPTY);
     setHasMore(false);
     setSkills(null);
@@ -140,6 +157,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
     setCalls(new Map());
     setWorkflowUsage({ nodes: [], runs: [] });
     setContext(null);
+    setVision([]);
     if (!sessionId) return;
 
     let cancelled = false;
@@ -162,6 +180,15 @@ export function useSessionThread(sessionId: string | null): SessionThread {
         || event.type === 'workflow.finished') refreshUsage();
       // A round measures the context; a replay cuts the model's view.
       if (event.type === 'context.state' || event.type === 'session.rewound') refreshContext();
+      // An image came in, or the model's view was cut: the Vision block's
+      // inContext flags can only change then.
+      if ((event.type === 'tool.result'
+        && String(data.result?.metadata?.mimeType ?? '').startsWith('image/'))
+        || (event.type === 'message.start' && data.attachments?.length)
+        || event.type === 'context.compacted'
+        || event.type === 'session.rewound') {
+        refreshVision();
+      }
       if ((event.type === 'message.start' && data.role === 'user')
         || event.type === 'context.compacted'
         || event.type === 'session.rewound') {
@@ -211,6 +238,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
         refreshSkills();
         refreshUsage();
         refreshContext();
+        refreshVision();
         setHasMore(page.length > 0 && page[0].seq > 1);
         openStream(lastSeqRef.current);
         if (page.length > 0 && page[0].seq > 1) {
@@ -235,7 +263,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
       source?.close();
       cancelAnimationFrame(frame);
     };
-  }, [sessionId, foldAll, refreshSkills, refreshUsage, refreshContext]);
+  }, [sessionId, foldAll, refreshSkills, refreshUsage, refreshContext, refreshVision]);
 
   // Returns true when the view was updated, so the caller knows whether a
   // scroll restore is armed for the upcoming view change.
@@ -264,5 +292,5 @@ export function useSessionThread(sessionId: string | null): SessionThread {
     }
   }, [sessionId, loadingOlder, foldAll, refreshSkills]);
 
-  return { view, hasMore, loadingOlder, loadOlder, skills, usage, calls, workflowUsage, context };
+  return { view, hasMore, loadingOlder, loadOlder, skills, usage, calls, workflowUsage, context, vision };
 }

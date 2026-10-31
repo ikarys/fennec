@@ -420,6 +420,9 @@ read-only. The human edits them as usual.
   (the instruction files, the tool definitions, each tool's results, the reasoning…; past 12, one row with `kind`
   null sums the rest), `images` a note or null. The exact token count is spread over the parts by their share of
   the text: indicative, and said so
+- `GET /api/sessions/{id}/vision` → `[{label, anchorId, src, inContext}]`: the images the model received over the
+  whole log, in log order; `inContext` false once a compaction, a replay or the image window (4 to 6 latest images)
+  took it out of the model's view; deterministic; 404 if no session.
 - `GET /api/sessions/{id}/usage/calls` → `[{messageId, line, detail, turnRecap}]`, oldest first: what sits under
   each answer, written by the server from the ledger (`line` `↑ 12,3k · cache 82 % · ↓ 345 · 4,2 s`, `detail` the
   tooltip, `turnRecap` on a turn's last call only, null otherwise: the turn's wall clock, `chat.done.durationMs`
