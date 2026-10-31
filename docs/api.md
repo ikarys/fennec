@@ -386,16 +386,19 @@ read-only. The human edits them as usual.
   Terminal under WSL, Terminal.app on macOS, else `$TERMINAL` or
   `x-terminal-emulator`. Outside the sandbox: the human's action. 500 if it
   cannot start.
-- `GET /api/sessions/{id}/servers` → `[{name, command, running}]`: the project's
-  servers (`.agents/servers.json`) and whether each runs in this session. 404 if no session.
+- `GET /api/sessions/{id}/servers` → `[{name, command, running, url}]`: the project's
+  servers (`.agents/servers.json`) and whether each runs in this session; `url` is
+  `http://127.0.0.1:{port}` when it runs in this session, `null` otherwise. 404 if no session.
 - `POST /api/sessions/{id}/servers` `{servers: [{name, command}]}` → the same list:
   saves the project's servers to `.agents/servers.json`. 400 on an empty name/command or a
   duplicate name, 404 if no session.
-- `POST /api/sessions/{id}/servers/start` `{name}` → 202 `{pid}`: starts the server in the
-  project's directory (where its dependencies live, not the session's worktree) as
-  `setsid sh -c <command>`, so a stop frees the port by killing the whole process group.
-  Outside the sandbox: the human's action. 404 for an unknown server, 409 if it already runs,
-  500 if it cannot start. A server that exits on its own is dropped from the running state.
+- `POST /api/sessions/{id}/servers/start` `{name}` → 202 `{pid, port}`: starts the named server
+  (from the project's `.agents/servers.json`) in the session's worktree when it has one, after
+  linking its missing dependency directories to the main checkout's copies; otherwise in the
+  project's directory. It passes a free `PORT` and runs as `setsid sh -c <command>`, so a stop
+  frees the port by killing the whole process group. Outside the sandbox: the human's action.
+  404 for an unknown server, 409 if it already runs, 500 if it cannot start. A server that exits
+  on its own is dropped from the running state.
 - `POST /api/sessions/{id}/servers/stop` `{name}` → `{}`: stops the server by killing its
   process group. 404 if it is not running.
 - `POST /api/sessions/delete` `{ids}` → `{deleted: [id], failed: [{id, error}]}`: deletes top-level sessions with their child sessions and logs, and removes each one's worktree, branch and refs (work not integrated is lost; the UI warns). 400 for an empty list or a child session, 404 for an unknown id, 409 `{error, running}` when one of them runs a turn (nothing is deleted then). A session whose worktree cannot be removed is kept and listed in `failed`. The usage ledger keeps the calls.

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ServerView } from '../../lib/api';
 import { getServers, startServer, stopServer } from '../../lib/api';
-import { PlayIcon, PlusIcon, SpinnerIcon, StopIcon } from '../Icons';
+import { ExternalIcon, PlayIcon, PlusIcon, SpinnerIcon, StopIcon } from '../Icons';
 import { Badge } from '../ui/Badge';
-import { Button } from '../ui/Button';
+import { Button, buttonClass } from '../ui/Button';
 import { Panel } from '../ui/Panel';
 import { panelBlock } from '../../lib/panelBlocks';
 import { ServerEditor } from './ServerEditor';
@@ -61,7 +61,9 @@ export function ServersSection({ sessionId }: ServersSectionProps) {
   return (
     <Panel id="servers" title={panelBlock('servers').title} summary={summary}>
       <div className="flex flex-col gap-1.5">
-        <p className="m-0 text-xs text-muted">Les serveurs du projet, démarrés dans le dossier de l'agent.</p>
+        <p className="m-0 text-xs text-muted">
+          Démarrés dans le worktree de la session, sur le port <code>$PORT</code>.
+        </p>
         {servers === null && <div className="text-xs text-muted">Chargement…</div>}
         {servers !== null && servers.length === 0 && (
           <div className="text-xs text-muted">Aucun serveur configuré.</div>
@@ -74,6 +76,18 @@ export function ServersSection({ sessionId }: ServersSectionProps) {
             <span className="min-w-0 grow truncate font-mono text-xs" title={server.command}>
               {server.name}
             </span>
+            {server.url !== null && (
+              <a
+                href={server.url}
+                target="_blank"
+                rel="noreferrer"
+                className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
+                aria-label={`Ouvrir ${server.url}`}
+                title={`Ouvrir ${server.url}`}
+              >
+                <ExternalIcon className="h-3.5 w-3.5" />
+              </a>
+            )}
             <Button
               variant="ghost"
               size="sm"
