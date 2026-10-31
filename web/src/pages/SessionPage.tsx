@@ -115,6 +115,7 @@ export function SessionPage({
     calls,
     workflowUsage,
     context,
+    vision,
   } = useSessionThread(sessionId);
   const running = view.running;
   const run = view.run;
@@ -764,13 +765,13 @@ export function SessionPage({
                     usage={usage}
                     request={detail?.request ?? null}
                     hasSession={sessionId !== null}
-                    partial={hasMore}
                     worktree={detail?.worktree ?? null}
                     sessionId={sessionId}
                     onWorktreeChanged={() =>
                       setDetailVersion((version) => version + 1)
                     }
                     integrationVersion={integrationVersion}
+                    vision={vision}
                   />
                   {sessionId && integrationOpen && (
                     <IntegrationDialog
