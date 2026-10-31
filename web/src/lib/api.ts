@@ -472,6 +472,8 @@ export interface BacklogProject {
 export interface BacklogView {
   /** Every project's done tasks, most done first. */
   projects: BacklogProject[];
+  /** Projects with no done task, by name. */
+  idle: { id: string; name: string }[];
   total: { done: number; projects: number };
 }
 
