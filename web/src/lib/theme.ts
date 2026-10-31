@@ -9,7 +9,7 @@ export interface ThemeOption {
 export const themes: ThemeOption[] = [
   { id: 'nuit', label: 'Nuit', swatch: '#0E1013' },
   { id: 'jour', label: 'Jour', swatch: '#F6F6F3' },
-  { id: 'ardoise', label: 'Ardoise', swatch: '#23272F' },
+  { id: 'ardoise', label: 'Ardoise', swatch: '#1E2332' },
   { id: 'cyber', label: 'Cyber', swatch: '#000300' }
 ];
 
