@@ -12,6 +12,7 @@ mod guard;
 mod http;
 mod idea_assets;
 mod idea_queue;
+mod idea_board;
 mod idea_routes;
 mod insight;
 mod integration;
