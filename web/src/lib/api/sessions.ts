@@ -447,6 +447,7 @@ export interface ServerDef {
 /** A server with its running state in this session. */
 export interface ServerView extends ServerDef {
   running: boolean;
+  url: string | null;
 }
 
 export function getServers(id: string): Promise<ServerView[]> {
