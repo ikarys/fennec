@@ -1,10 +1,12 @@
 /**
- * The project's tasks board: the queue, the stages, the night report.
- * The server computes everything; this only renders and polls.
+ * The project's tasks board, split into horizontal tabs: an overview, the
+ * human's queue, and the backlog's three server-computed views.
+ * The server computes every figure; this component only renders and polls.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { Tabs } from '../../ui/Tabs';
-import { NightReport } from './NightReport';
+import { Segmented } from '../../ui/Segmented';
+import { TasksOverview } from './TasksOverview';
 import { QueueBar } from './QueueBar';
 import { StageGroup } from './StageGroup';
 import { DoneTable } from './DoneTable';
@@ -18,13 +20,40 @@ import {
   type IdeaView,
 } from '../../../lib/ideas';
 
-const SUB_TABS = [
-  { id: 'backlog', label: 'Backlog' },
-  { id: 'ready', label: 'Prêtes' },
-  { id: 'done', label: 'Terminées' },
-] as const;
+export type TasksSub = 'overview' | 'yours' | 'backlog' | 'ready' | 'done';
 
-type SubTabId = (typeof SUB_TABS)[number]['id'];
+type TopTabId = 'overview' | 'yours' | 'queue';
+type BacklogView = 'backlog' | 'ready' | 'done';
+
+const TOP_TABS: readonly { id: TopTabId; label: string }[] = [
+  { id: 'overview', label: 'Vue d’ensemble' },
+  { id: 'yours', label: 'À décider' },
+  { id: 'queue', label: 'Backlog' },
+];
+
+function normalizeSub(sub: string | null): TasksSub {
+  if (
+    sub === 'overview' ||
+    sub === 'yours' ||
+    sub === 'backlog' ||
+    sub === 'ready' ||
+    sub === 'done'
+  ) {
+    return sub;
+  }
+  return 'overview';
+}
+
+function topTabFor(sub: TasksSub): TopTabId {
+  if (sub === 'overview') return 'overview';
+  if (sub === 'yours') return 'yours';
+  return 'queue';
+}
+
+function backlogViewFor(sub: TasksSub): BacklogView {
+  if (sub === 'ready' || sub === 'done') return sub;
+  return 'backlog';
+}
 
 export function TasksSection({
   projectId,
@@ -37,7 +66,7 @@ export function TasksSection({
   sub: string | null;
   onFrame: (idea: IdeaView) => Promise<void>;
   onOpenSession: (sessionId: string) => void;
-  onSelectSub: (sub: SubTabId) => void;
+  onSelectSub: (sub: TasksSub) => void;
 }) {
   const [board, setBoard] = useState<IdeaBoard | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -120,30 +149,39 @@ export function TasksSection({
 
   // The server sends every stage; the UI only picks the one the URL asks for.
   const yours = board.groups.find((g) => g.stage === 'yours')?.ideas ?? [];
-  const running = board.groups.find((g) => g.stage === 'running')?.ideas ?? [];
   const drafts = board.groups.find((g) => g.stage === 'drafts')?.ideas ?? [];
   const queue = board.groups.find((g) => g.stage === 'queue')?.ideas ?? [];
   const done = board.groups.find((g) => g.stage === 'done')?.ideas ?? [];
 
-  const activeSub: SubTabId = SUB_TABS.find((t) => t.id === sub)?.id ?? 'backlog';
-  const counts: Record<SubTabId, number> = {
-    backlog: drafts.length,
-    ready: queue.length,
-    done: done.length,
-  };
+  const activeSub = normalizeSub(sub);
+  const activeTopTab = topTabFor(activeSub);
+  const backlogView = backlogViewFor(activeSub);
 
   return (
     <section className="flex flex-col gap-4">
-      {board.nightReport ? (
-        <NightReport
-          report={board.nightReport}
-          caps={board.queue.caps}
-          onOpenSession={onOpenSession}
-          onDismiss={() => run(() => markReportRead(projectId))}
-        />
-      ) : null}
-
-      <QueueBar queue={board.queue} projectId={projectId} run={run} />
+      <Tabs
+        label="Sections des tâches"
+        orientation="horizontal"
+        tabs={TOP_TABS.map((t) => ({
+          id: t.id,
+          label: t.label,
+          count:
+            t.id === 'yours'
+              ? yours.length
+              : t.id === 'queue'
+                ? drafts.length + queue.length
+                : undefined,
+        }))}
+        active={activeTopTab}
+        onSelect={(id) => {
+          const tab = id as TopTabId;
+          if (tab === 'queue') {
+            onSelectSub('backlog');
+          } else {
+            onSelectSub(tab);
+          }
+        }}
+      />
 
       {actionError ? (
         <div className="flex items-center gap-2">
@@ -163,84 +201,107 @@ export function TasksSection({
         </div>
       ) : null}
 
-      {yours.length > 0 ? (
-        <StageGroup
-          stage="yours"
-          ideas={yours}
+      {activeTopTab === 'overview' ? (
+        <TasksOverview
+          board={board}
           projectId={projectId}
           onFrame={runFrame}
           onOpenSession={onOpenSession}
           run={run}
-          caps={board.queue.caps}
+          onSelect={onSelectSub}
+          onDismissReport={() => run(() => markReportRead(projectId))}
         />
       ) : null}
 
-      {running.length > 0 ? (
-        <StageGroup
-          stage="running"
-          ideas={running}
-          projectId={projectId}
-          onFrame={runFrame}
-          onOpenSession={onOpenSession}
-          run={run}
-          caps={board.queue.caps}
-        />
+      {activeTopTab === 'yours' ? (
+        yours.length > 0 ? (
+          <StageGroup
+            stage="yours"
+            ideas={yours}
+            projectId={projectId}
+            onFrame={runFrame}
+            onOpenSession={onOpenSession}
+            run={run}
+            caps={board.queue.caps}
+            showLabel={false}
+          />
+        ) : (
+          <p className="text-sm text-muted">Rien ne t’attend.</p>
+        )
       ) : null}
 
-      {adding ? (
-        <AddIdeaField projectId={projectId} run={run} onClose={() => setAdding(false)} />
-      ) : null}
+      {activeTopTab === 'queue' ? (
+        <div className="flex flex-col gap-4">
+          <QueueBar queue={board.queue} projectId={projectId} run={run} />
 
-      <Tabs
-        label="Sections des tâches"
-        orientation="horizontal"
-        tabs={SUB_TABS.map((t) => ({ id: t.id, label: t.label, count: counts[t.id] }))}
-        active={activeSub}
-        onSelect={onSelectSub}
-        trailing={
-          adding ? null : (
-            <Button
-              variant="soft"
-              size="sm"
-              iconOnly
-              title="Ajouter une idée"
-              aria-label="Ajouter une idée"
-              onClick={() => setAdding(true)}
-            >
-              <PlusIcon className="h-4 w-4" />
-            </Button>
-          )
-        }
-      />
+          <div className="flex items-center gap-2">
+            <Segmented
+              label="Vue du backlog"
+              segments={[
+                { value: 'backlog' as const, label: `Idées (${drafts.length})` },
+                { value: 'ready' as const, label: `Prêtes (${queue.length})` },
+                { value: 'done' as const, label: `Terminées (${done.length})` },
+              ]}
+              value={backlogView}
+              onChange={(view) => onSelectSub(view as BacklogView)}
+            />
+            {adding ? null : (
+              <div className="ml-auto">
+                <Button
+                  variant="soft"
+                  size="sm"
+                  iconOnly
+                  title="Ajouter une idée"
+                  aria-label="Ajouter une idée"
+                  onClick={() => setAdding(true)}
+                >
+                  <PlusIcon className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+          </div>
 
-      {activeSub === 'backlog' ? (
-        <StageGroup
-          stage="drafts"
-          ideas={drafts}
-          projectId={projectId}
-          onFrame={runFrame}
-          onOpenSession={onOpenSession}
-          run={run}
-          caps={board.queue.caps}
-          showLabel={false}
-        />
-      ) : null}
+          {adding ? (
+            <AddIdeaField projectId={projectId} run={run} onClose={() => setAdding(false)} />
+          ) : null}
 
-      {activeSub === 'ready' ? (
-        <StageGroup
-          stage="queue"
-          ideas={queue}
-          projectId={projectId}
-          onFrame={runFrame}
-          onOpenSession={onOpenSession}
-          run={run}
-          caps={board.queue.caps}
-          showLabel={false}
-        />
-      ) : null}
+          {backlogView === 'backlog' && drafts.length === 0 && !adding ? (
+            <p className="m-0 text-sm text-muted">Aucune idée en attente de cadrage.</p>
+          ) : null}
+          {backlogView === 'ready' && queue.length === 0 ? (
+            <p className="m-0 text-sm text-muted">Aucune idée cadrée dans la file.</p>
+          ) : null}
 
-      {activeSub === 'done' ? (
-        <DoneTable ideas={done} onOpenSession={onOpenSession} />
+          {backlogView === 'backlog' ? (
+            <StageGroup
+              stage="drafts"
+              ideas={drafts}
+              projectId={projectId}
+              onFrame={runFrame}
+              onOpenSession={onOpenSession}
+              run={run}
+              caps={board.queue.caps}
+              showLabel={false}
+            />
+          ) : null}
+
+          {backlogView === 'ready' ? (
+            <StageGroup
+              stage="queue"
+              ideas={queue}
+              projectId={projectId}
+              onFrame={runFrame}
+              onOpenSession={onOpenSession}
+              run={run}
+              caps={board.queue.caps}
+              showLabel={false}
+            />
+          ) : null}
+
+          {backlogView === 'done' ? (
+            <DoneTable ideas={done} onOpenSession={onOpenSession} />
+          ) : null}
+        </div>
       ) : null}
     </section>
   );

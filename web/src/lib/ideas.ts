@@ -34,6 +34,8 @@ export interface IdeaAttachmentView {
 export interface IdeaView {
   id: string;
   text: string;
+  /** A short title: the approved plan's, else the text's first sentence. */
+  title: string;
   attachments: IdeaAttachmentView[];
   status: IdeaStatus;
   stage: Stage;
@@ -55,15 +57,27 @@ export interface IdeaView {
   files: number | null;
 }
 
+export interface RunSummary {
+  started: number;
+  running: number;
+  review: number;
+  question: number;
+  halted: number;
+  failed: number;
+  integrated: number;
+}
+
 export interface IdeaBoard {
   queue: {
     running: boolean;
     autonomous: boolean;
     ready: number;
-    next: { id: string; text: string } | null;
+    next: { id: string; text: string; title: string } | null;
     caps: { maxMinutes: number; maxTokens: number };
   };
   groups: { stage: Stage; ideas: IdeaView[] }[];
+  /** Every idea's status, counted by the server. */
+  summary: RunSummary;
   nightReport:
     | null
     | {
@@ -71,15 +85,7 @@ export interface IdeaBoard {
         finishedAt: number;
         reason: string;
         autonomous: boolean;
-        summary: {
-          started: number;
-          running: number;
-          review: number;
-          question: number;
-          halted: number;
-          failed: number;
-          integrated: number;
-        };
+        summary: RunSummary;
         ideas: IdeaView[];
       };
 }
