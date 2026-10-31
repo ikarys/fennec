@@ -16,7 +16,7 @@ pub fn load(workdir: &Path) -> RiskReport {
     };
     let ai_hashes = ai_commits(&ai_log);
 
-    let since = format!("--since={}.days", risk::CHURN_DAYS);
+    let since = churn_since();
     let Some(churn_log) = git_stdout(workdir, &["log", &since, "--format=%x1e", "--name-only"])
     else {
         return risk::report(Vec::new());
@@ -56,6 +56,56 @@ pub fn load(workdir: &Path) -> RiskReport {
     });
 
     risk::report(facts)
+}
+
+/// The `--since` argument shared by the risk report and the hot-file lookup.
+fn churn_since() -> String {
+    format!("--since={}.days", risk::CHURN_DAYS)
+}
+
+/// Repository-top-relative paths with at least `risk::HOT_CHURN` commits in
+/// the last `risk::CHURN_DAYS` days; empty when git cannot answer.
+pub fn hot_files(top: &Path) -> HashSet<String> {
+    let since = churn_since();
+    let Some(log) = git_stdout(top, &["log", &since, "--format=%x1e", "--name-only"]) else {
+        return HashSet::new();
+    };
+
+    churn_counts(&log)
+        .into_iter()
+        .filter_map(|(path, count)| (count >= risk::HOT_CHURN).then_some(path))
+        .collect()
+}
+
+/// Of `files` (top-relative), the ones that are tested on `branch`.
+///
+/// A file whose content cannot be read from the branch is treated as tested:
+/// it is then out of the way and cannot carry an `Untested` review signal.
+pub fn tested_on_branch(top: &Path, branch: &str, files: &[String]) -> HashSet<String> {
+    let tree = git_stdout(top, &["ls-tree", "-r", "--name-only", branch]).unwrap_or_default();
+    let test_paths: Vec<String> = tree
+        .lines()
+        .map(str::trim)
+        .filter(|path| !path.is_empty() && crate::domain::test_files::is_test_path(path))
+        .map(String::from)
+        .collect();
+    let test_refs: Vec<&str> = test_paths.iter().map(String::as_str).collect();
+
+    let mut tested = HashSet::new();
+
+    for file in files {
+        let show = format!("{branch}:{file}");
+        let Some(content) = git_stdout(top, &["show", &show]) else {
+            tested.insert(file.clone());
+            continue;
+        };
+
+        if risk::is_tested(file, &content, &test_refs) {
+            tested.insert(file.clone());
+        }
+    }
+
+    tested
 }
 
 fn measure_chunk(
