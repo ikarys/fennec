@@ -7,7 +7,7 @@ export function MessageStatsLine({ item, streaming }: { item: AssistantItem; str
   if (streaming) {
     if (item.liveSpeed == null) return null;
     return (
-      <div className="text-[0.6875rem] text-muted tabular-nums" title="Estimé d'après le texte reçu, mesuré à la fin du message">
+      <div className="text-xs text-muted tabular-nums" title="Estimé d'après le texte reçu, mesuré à la fin du message">
         ≈ {formatSpeed(item.liveSpeed)}
       </div>
     );
@@ -19,7 +19,7 @@ function FinalLine({ messageId }: { messageId: string }) {
   const call = useCallUsage(messageId);
   if (!call) return null;
   return (
-    <div className="min-w-0 overflow-hidden text-[0.6875rem] whitespace-nowrap text-muted tabular-nums" title={call.detail}>
+    <div className="min-w-0 overflow-hidden text-xs whitespace-nowrap text-muted tabular-nums" title={call.detail}>
       {call.line}
     </div>
   );

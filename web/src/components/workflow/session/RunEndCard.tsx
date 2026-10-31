@@ -27,9 +27,9 @@ function StatCell({ stat }: { stat: Stat }) {
   return (
     <div className="flex items-baseline justify-between gap-3 px-3 py-1.5">
       <span className="text-xs text-muted">{stat.label}</span>
-      <span className="whitespace-nowrap text-right text-[0.8125rem] font-medium tabular-nums text-text">
+      <span className="whitespace-nowrap text-right text-sm font-medium tabular-nums text-text">
         {stat.value}
-        {stat.hint && <span className="ml-1.5 text-[0.6875rem] font-normal text-muted">{stat.hint}</span>}
+        {stat.hint && <span className="ml-1.5 text-xs font-normal text-muted">{stat.hint}</span>}
       </span>
     </div>
   );
@@ -103,7 +103,7 @@ export function RunEndCard({ item }: { item: WorkflowEndItem }) {
             {stats.nodes.length > 0 && (
               <details className="group border-b border-border">
                 <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-1.5 text-xs text-muted select-none [&::-webkit-details-marker]:hidden">
-                  <span aria-hidden className="text-[0.6875rem] transition-transform group-open:rotate-90">
+                  <span aria-hidden className="text-xs transition-transform group-open:rotate-90">
                     ▶
                   </span>
                   <span>Détail du temps</span>
@@ -127,7 +127,7 @@ export function RunEndCard({ item }: { item: WorkflowEndItem }) {
                           {node.runs > 1 && (
                             <span
                               title="boucle"
-                              className="ml-1.5 text-[0.6875rem] text-muted tabular-nums"
+                              className="ml-1.5 text-xs text-muted tabular-nums"
                             >
                               ×{node.runs}
                             </span>
@@ -154,7 +154,7 @@ export function RunEndCard({ item }: { item: WorkflowEndItem }) {
               </details>
             )}
 
-            <div className="flex items-center gap-2 text-[0.6875rem] text-muted">
+            <div className="flex items-center gap-2 text-xs text-muted">
               <span>Calculé par fennec à partir du journal</span>
               <Badge tone="ok">vérifié</Badge>
             </div>

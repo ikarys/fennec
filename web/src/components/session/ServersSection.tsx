@@ -61,7 +61,7 @@ export function ServersSection({ sessionId }: ServersSectionProps) {
   return (
     <Panel id="servers" title={panelBlock('servers').title} summary={summary}>
       <div className="flex flex-col gap-1.5">
-        <p className="m-0 text-[0.6875rem] text-muted">Les serveurs du projet, démarrés dans le dossier de l'agent.</p>
+        <p className="m-0 text-xs text-muted">Les serveurs du projet, démarrés dans le dossier de l'agent.</p>
         {servers === null && <div className="text-xs text-muted">Chargement…</div>}
         {servers !== null && servers.length === 0 && (
           <div className="text-xs text-muted">Aucun serveur configuré.</div>

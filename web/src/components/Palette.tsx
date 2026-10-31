@@ -159,13 +159,13 @@ export function Palette({ open, projects, onClose, onOpenSession, onNewSession, 
               }
             }}
             placeholder="Rechercher une session, un projet, une commande…"
-            className="grow min-h-[50px] bg-transparent text-[0.9375rem] outline-none"
+            className="grow min-h-[50px] bg-transparent text-base outline-none"
           />
           <button
             type="button"
             onClick={onClose}
             aria-label="Fermer la palette"
-            className="text-[0.6875rem] rounded border border-border px-1.5 text-faint"
+            className="text-xs rounded border border-border px-1.5 text-faint"
           >
             Échap
           </button>
@@ -212,9 +212,9 @@ export function Palette({ open, projects, onClose, onOpenSession, onNewSession, 
         </div>
 
         <div className="flex flex-wrap gap-4 border-t border-border px-3.5 py-2">
-          <span className="text-[0.6875rem] rounded border border-border px-1.5 text-faint">↑↓ naviguer</span>
-          <span className="text-[0.6875rem] rounded border border-border px-1.5 text-faint">↵ ouvrir dans un onglet</span>
-          <span className="text-[0.6875rem] rounded border border-border px-1.5 text-faint">⌘↵ nouvelle session ici</span>
+          <span className="text-xs rounded border border-border px-1.5 text-faint">↑↓ naviguer</span>
+          <span className="text-xs rounded border border-border px-1.5 text-faint">↵ ouvrir dans un onglet</span>
+          <span className="text-xs rounded border border-border px-1.5 text-faint">⌘↵ nouvelle session ici</span>
         </div>
       </div>
     </div>

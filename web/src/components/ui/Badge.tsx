@@ -41,7 +41,7 @@ export function Badge({
   return (
     <span
       title={title}
-      className={`inline-flex shrink-0 items-center gap-1.5 rounded-sm px-1.5 py-0.5 text-[0.6875rem] font-medium whitespace-nowrap ${TONES[tone]} ${className}`.trim()}
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-sm px-1.5 py-0.5 text-xs font-medium whitespace-nowrap ${TONES[tone]} ${className}`.trim()}
     >
       {dot && <span className={`h-1.5 w-1.5 rounded-full ${DOTS[tone]} ${pulse ? 'animate-pulse' : ''}`} />}
       {children}

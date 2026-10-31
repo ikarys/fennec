@@ -3,7 +3,7 @@ import type { PreflightResultView } from '../../lib/fold';
 import { Badge } from '../ui/Badge';
 import { SectionLabel } from '../ui/SectionLabel';
 
-const INLINE_CODE = 'rounded bg-code px-1 py-0.5 font-mono text-[0.7812rem] text-text';
+const INLINE_CODE = 'rounded bg-code px-1 py-0.5 font-mono text-xs text-text';
 
 const VERDICTS: Record<PreflightResultView['verdict'], { tone: 'ok' | 'err'; label: string; title: string }> = {
   fails: {
@@ -50,7 +50,7 @@ export function PreflightSection({ results }: { results: PreflightResultView[] }
               {result.output && (
                 <details>
                   <summary className="cursor-pointer text-xs text-muted">Sortie</summary>
-                  <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded bg-code p-2 font-mono text-[0.7188rem] text-muted">
+                  <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded bg-code p-2 font-mono text-xs text-muted">
                     {result.output}
                   </pre>
                 </details>
