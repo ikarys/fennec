@@ -166,7 +166,7 @@ then set offline). Disabled, commands run on the host, as in openfox.
 Protected files: a model may read them, never write them. They are fennec's
 defaults (`.agents`, `AGENTS.md`, `CLAUDE.md`, the lockfiles `Cargo.lock`,
 `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, the CI `.github`,
-`.gitlab-ci.yml`, and the accepted ADRs `docs/adr`) plus the lines of the project's `.agents/protected`
+`.gitlab-ci.yml`, the release configuration `release-please-config.json`, `.release-please-manifest.json`, the git hooks `.githooks`, and the accepted ADRs `docs/adr`) plus the lines of the project's `.agents/protected`
 (gitignore-like: `#` comments, `*`, `?`, `**`, a leading `/` anchors, a
 pattern without `/` matches at any depth, a directory protects its content).
 `write_file` and `edit_file` refuse them; in the sandbox they are mounted
