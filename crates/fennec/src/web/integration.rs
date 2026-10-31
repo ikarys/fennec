@@ -11,7 +11,8 @@ use crate::domain::criteria::{CriterionState, CriterionStatus};
 use crate::domain::decision::{Decision, decisions_in_force};
 use crate::domain::event::Event;
 use crate::domain::integration::{
-    Blocker, DiffChecks, blockers, branch_changed, commit_message, default_message, unacknowledged,
+    Blocker, DiffChecks, Landing, blockers, branch_changed, commit_message, default_message,
+    unacknowledged,
 };
 use crate::domain::test_files::new_test_patterns;
 use crate::domain::workflow::run;
@@ -82,9 +83,12 @@ fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Result<Gate, (u16, S
         &criteria,
         &protected_touched,
         &checks,
-        preview.origin_branch.as_deref(),
-        preview.human_branch.as_deref(),
-        &preview.local_changes,
+        &Landing {
+            origin_branch: preview.origin_branch.as_deref(),
+            human_branch: preview.human_branch.as_deref(),
+            local_changes: &preview.local_changes,
+            conflicts: &preview.conflicts,
+        },
     );
     let title = session.title.clone();
     let idea = finishable_idea(&project.id, &store.ideas(&project.id)?, &session.id);
