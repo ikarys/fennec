@@ -102,9 +102,8 @@ restart closes it); the board (groups by stage, one next action per idea, the ni
 the server.
 Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
-1. Project actions on the project page: diagrams on demand of a function, process or engine
-   (`docs/diagrams/`, Mermaid, indicative); then risk zones (C11: churn, untested, never
-   reviewed by a human, deterministic) and questions to an agent (C10).
+1. Project actions on the project page: risk zones (C11: churn, untested, never reviewed
+   by a human, deterministic) and questions to an agent (C10).
 2. Audits: a read-only `audit` agent, fixed report format.
 3. Tooled human review (C9): a risk map (deterministic), a narrative diff (indicative).
 4. Produced architecture and drift (C12), security checks orchestrating known tools
