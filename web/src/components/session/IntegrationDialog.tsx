@@ -2,7 +2,7 @@ import { DecisionList } from './DecisionList';
 import { useEffect, useState } from 'react';
 import type { Blocker, IntegrationConflict, IntegrationPreview, ReviewSignal } from '../../lib/api';
 import type { IntegrationResult } from '../../lib/api';
-import { getIntegration, integrate } from '../../lib/api';
+import { createSession, getIntegration, integrate } from '../../lib/api';
 import { completeIdea } from '../../lib/ideas';
 import { CriterionProvenanceBadge } from './CriteriaSection';
 import { Button } from '../ui/Button';
@@ -58,6 +58,16 @@ const SIGNAL_LABEL: Record<Exclude<ReviewSignal, 'protected'>, { label: string; 
   }
 };
 
+/** The narrate agent's prompt: the branch, its base and the files in the server's review order. */
+function narrativePrompt(preview: IntegrationPreview): string {
+  const lines = preview.files.map((file, index) => {
+    const signals = file.signals.length ? ` — signals: ${file.signals.join(', ')}` : '';
+    return `${index + 1}. ${file.path} (+${file.added} −${file.removed})${signals}`;
+  });
+
+  return `Narrate the change of branch \`${preview.branch}\` since base \`${preview.base}\`, file by file in this review order:\n${lines.join('\n')}\nUse \`git diff ${preview.base} ${preview.branch} -- <path>\` for each file.`;
+}
+
 function blockerSentence(blocker: Blocker): string {
   switch (blocker.kind) {
     case 'noCommits':
@@ -89,7 +99,8 @@ function blockerSentence(blocker: Blocker): string {
   }
 }
 
-export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: string; open: boolean; onClose: () => void }) {
+export function IntegrationDialog({ sessionId, open, onClose, projectId }: { sessionId: string; open: boolean; onClose: () => void; projectId: string | null }) {
+  const [narrating, setNarrating] = useState(false);
   const [preview, setPreview] = useState<IntegrationPreview | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -255,10 +266,34 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
             </section>
 
             <section className="flex flex-col gap-1.5">
-              <SectionLabel>
+              <SectionLabel className="flex items-center">
                 Fichiers{preview.files.length > 0 && <span className="ml-1 tabular-nums">{preview.files.length}</span>}
                 {preview.files.length > 0 && (
                   <span className="ml-2 text-xs text-muted">ordre de relecture · vérifié</span>
+                )}
+                {preview.files.length > 0 && projectId && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="ml-auto"
+                    title="Un agent en lecture seule raconte le changement fichier par fichier, dans cet ordre ; son récit est indicatif."
+                    disabled={narrating}
+                    onClick={async () => {
+                      if (!projectId) return;
+                      setNarrating(true);
+                      try {
+                        const created = await createSession(projectId, narrativePrompt(preview), 'narrate');
+                        window.location.hash = '#/s/' + encodeURIComponent(created.id);
+                        onClose();
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : String(err));
+                      } finally {
+                        setNarrating(false);
+                      }
+                    }}
+                  >
+                    Raconter
+                  </Button>
                 )}
               </SectionLabel>
               {preview.files.length === 0 ? (
