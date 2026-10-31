@@ -133,6 +133,7 @@ pub fn fold(events: &[(u64, BacklogEvent)]) -> Backlog {
 
         match event {
             BacklogEvent::Added { .. } => continue,
+            BacklogEvent::Edited { text, .. } => idea.text = text.clone(),
             BacklogEvent::Framing { session_id, .. } => {
                 idea.session_id = Some(session_id.clone());
                 idea.state = IdeaState::Framing;
@@ -204,6 +205,13 @@ mod tests {
             idea_id: id.into(),
             text: text.into(),
             attachments: Vec::new(),
+        }
+    }
+
+    fn edited(id: &str, text: &str) -> BacklogEvent {
+        BacklogEvent::Edited {
+            idea_id: id.into(),
+            text: text.into(),
         }
     }
 
@@ -283,6 +291,35 @@ mod tests {
         assert_eq!(idea.updated_at, 3);
         assert_eq!(idea.started_at, None);
         assert!(!idea.autonomous);
+    }
+
+    #[test]
+    fn added_then_edited_updates_text_and_timestamp() {
+        let events = vec![ev(1, added("i1", "old")), ev(2, edited("i1", "new"))];
+
+        let backlog = fold(&events);
+
+        assert_eq!(backlog.ideas.len(), 1);
+        let idea = &backlog.ideas[0];
+        assert_eq!(idea.text, "new");
+        assert_eq!(idea.updated_at, 2);
+    }
+
+    #[test]
+    fn edited_after_completed_keeps_text() {
+        let events = vec![
+            ev(1, added("i1", "t")),
+            ev(2, completed("i1")),
+            ev(3, edited("i1", "new")),
+        ];
+
+        let backlog = fold(&events);
+
+        assert_eq!(backlog.ideas.len(), 1);
+        let idea = &backlog.ideas[0];
+        assert_eq!(idea.state, IdeaState::Completed);
+        assert_eq!(idea.text, "t");
+        assert_eq!(idea.updated_at, 2);
     }
 
     #[test]

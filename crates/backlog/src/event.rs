@@ -12,6 +12,8 @@ pub enum BacklogEvent {
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         attachments: Vec<crate::attachment::IdeaAttachment>,
     },
+    #[serde(rename = "idea.edited", rename_all = "camelCase")]
+    Edited { idea_id: String, text: String },
     #[serde(rename = "idea.framing", rename_all = "camelCase")]
     Framing { idea_id: String, session_id: String },
     #[serde(rename = "idea.ready", rename_all = "camelCase")]
@@ -43,6 +45,7 @@ impl BacklogEvent {
     pub fn kind(&self) -> &'static str {
         match self {
             Self::Added { .. } => "idea.added",
+            Self::Edited { .. } => "idea.edited",
             Self::Framing { .. } => "idea.framing",
             Self::Ready { .. } => "idea.ready",
             Self::Started { .. } => "idea.started",
@@ -60,6 +63,7 @@ impl BacklogEvent {
     pub fn idea_id(&self) -> Option<&str> {
         match self {
             Self::Added { idea_id, .. }
+            | Self::Edited { idea_id, .. }
             | Self::Framing { idea_id, .. }
             | Self::Ready { idea_id, .. }
             | Self::Started { idea_id, .. }
@@ -83,6 +87,13 @@ mod tests {
             idea_id: id.into(),
             text: text.into(),
             attachments: Vec::new(),
+        }
+    }
+
+    fn edited(id: &str, text: &str) -> BacklogEvent {
+        BacklogEvent::Edited {
+            idea_id: id.into(),
+            text: text.into(),
         }
     }
 
@@ -180,6 +191,20 @@ mod tests {
         assert_eq!(
             json,
             r#"{"type":"idea.added","data":{"ideaId":"i1","text":"t"}}"#
+        );
+
+        let decoded: BacklogEvent = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, event);
+    }
+
+    #[test]
+    fn edited_event_serde_round_trip() {
+        let event = edited("i1", "t");
+
+        let json = serde_json::to_string(&event).unwrap();
+        assert_eq!(
+            json,
+            r#"{"type":"idea.edited","data":{"ideaId":"i1","text":"t"}}"#
         );
 
         let decoded: BacklogEvent = serde_json::from_str(&json).unwrap();
