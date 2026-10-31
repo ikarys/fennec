@@ -13,7 +13,7 @@ import {
 } from '../../../lib/ideas';
 
 const STAGE_LABELS: Record<Stage, string> = {
-  yours: 'À toi',
+  yours: 'À décider',
   running: 'En cours',
   queue: 'File',
   drafts: 'Idées',

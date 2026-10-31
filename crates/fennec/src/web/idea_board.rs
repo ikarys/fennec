@@ -53,11 +53,14 @@ impl<'a> Board<'a> {
     }
 }
 
-/// The board's payload: `{queue, groups, nightReport}`.
+/// The board's payload: `{queue, groups, summary, nightReport}`.
 pub(super) fn board_json(board: &Board) -> Result<Value, String> {
+    let (groups, statuses) = groups_json(board)?;
     Ok(json!({
         "queue": queue_json(board)?,
-        "groups": groups_json(board)?,
+        "groups": groups,
+        // The overview's figures: every idea's status, counted once here.
+        "summary": summarize(&statuses),
         "nightReport": night_report_json(board)?,
     }))
 }
@@ -70,9 +73,20 @@ fn queue_json(board: &Board) -> Result<Value, String> {
             .last_run
             .as_ref()
             .is_some_and(|run| run.autonomous);
-    let ready = board.queue.len();
-    let next =
-        backlog::next_ready(board.backlog).map(|idea| json!({ "id": idea.id, "text": idea.text }));
+    // A halted idea is still in the queue order but waits for the human ("À toi"),
+    // and the queue skips it: it is not ready.
+    let ready = board
+        .queue
+        .iter()
+        .filter(|idea| idea.halted.is_none())
+        .count();
+    let next = backlog::next_ready(board.backlog).map(|idea| {
+        json!({
+            "id": idea.id,
+            "text": idea.text,
+            "title": backlog::title(&idea.text, idea.plan.as_deref()),
+        })
+    });
     let autonomy = board.store.preferences()?.autonomy;
 
     Ok(json!({
@@ -87,10 +101,13 @@ fn queue_json(board: &Board) -> Result<Value, String> {
     }))
 }
 
-fn groups_json(board: &Board) -> Result<Value, String> {
+/// The ideas grouped by stage, and their statuses (one log read per idea).
+fn groups_json(board: &Board) -> Result<(Value, Vec<Status>), String> {
     let mut views: Vec<(Stage, &Idea, Value)> = Vec::new();
+    let mut statuses = Vec::new();
     for idea in &board.backlog.ideas {
         let (status, view) = idea_view(board, idea)?;
+        statuses.push(status);
         views.push((status.stage(), idea, view));
     }
     let queue_place = |idea: &Idea| {
@@ -121,7 +138,7 @@ fn groups_json(board: &Board) -> Result<Value, String> {
         groups.push(json!({ "stage": stage, "ideas": ideas }));
     }
 
-    Ok(json!(groups))
+    Ok((json!(groups), statuses))
 }
 
 fn night_report_json(board: &Board) -> Result<Value, String> {
@@ -280,6 +297,7 @@ fn idea_view(board: &Board, idea: &Idea) -> Result<(Status, Value), String> {
     let value = json!({
         "id": idea.id,
         "text": idea.text,
+        "title": backlog::title(&idea.text, idea.plan.as_deref()),
         "attachments": serde_json::to_value(&idea.attachments).unwrap_or(Value::Array(vec![])),
         "status": status,
         "stage": stage,
