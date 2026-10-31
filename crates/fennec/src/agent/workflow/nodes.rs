@@ -23,6 +23,9 @@ pub(super) enum NodeEnd {
     },
     /// A session-context agent asked the human (ask_user): the turn ends waiting.
     AgentAsked,
+    /// The agent's turn failed (a model error, a truncation): the node stays
+    /// open, the run waits interrupted so the human can resume it or stop it.
+    Halted { reason: String },
 }
 
 /// What every node runner reads: the folded run (its start already applied),
@@ -158,9 +161,8 @@ fn unfinished(label: &str, reason: DoneReason) -> Option<NodeEnd> {
             outcome: RunOutcome::Stopped,
             reason: None,
         }),
-        DoneReason::Error | DoneReason::Truncated => Some(NodeEnd::EndRun {
-            outcome: RunOutcome::Error,
-            reason: Some(format!("\"{label}\" ended: {reason}")),
+        DoneReason::Error | DoneReason::Truncated => Some(NodeEnd::Halted {
+            reason: format!("\"{label}\" ended: {reason}"),
         }),
     }
 }
@@ -208,5 +210,38 @@ pub(super) fn fresh_agent(
             reason: Some(format!("\"{label}\" asked a question in a child session")),
         }),
         end => Ok(end),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_model_error_halts_the_node_instead_of_ending_the_run() {
+        assert!(matches!(
+            unfinished("agent", DoneReason::Error),
+            Some(NodeEnd::Halted { .. })
+        ));
+    }
+
+    #[test]
+    fn a_truncated_turn_halts_the_node_instead_of_ending_the_run() {
+        assert!(matches!(
+            unfinished("agent", DoneReason::Truncated),
+            Some(NodeEnd::Halted { .. })
+        ));
+    }
+
+    #[test]
+    fn agent_end_halts_on_a_model_error_without_asking_again() {
+        let end = agent_end(
+            "agent",
+            &["done".into()],
+            DoneReason::Error,
+            "text".into(),
+            |_| unreachable!(),
+        );
+        assert!(matches!(end, Ok(NodeEnd::Halted { .. })));
     }
 }

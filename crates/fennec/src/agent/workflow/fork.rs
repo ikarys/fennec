@@ -262,6 +262,8 @@ fn emit(state: &mut RunState, tx: &Sender<Event>, event: Event) {
 fn branch_failure(end: NodeEnd) -> Failure {
     match end {
         NodeEnd::EndRun { outcome, reason } => (outcome, reason),
+        // A branch cannot be resumed alone: the run ends as before.
+        NodeEnd::Halted { reason } => (RunOutcome::Error, Some(reason)),
         NodeEnd::AgentAsked => (
             RunOutcome::Blocked,
             Some("a branch agent asked a question".into()),

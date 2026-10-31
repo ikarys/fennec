@@ -5,6 +5,36 @@ use super::compaction::model_view;
 use super::event::{Event, Role, ToolResult};
 use serde_json::{Value, json};
 
+/// At most this many images go to the model: inference servers cap the media
+/// of one request (a local vision model refused 7 screenshots). The window
+/// moves by whole windows, so the earlier messages change only once every
+/// `IMAGE_WINDOW` images: each change re-reads the prompt from the first
+/// dropped image (see AGENTS.md, the prompt only grows).
+// ponytail: fixed count, a per-model setting if a provider allows more.
+const IMAGE_WINDOW: usize = 4;
+
+/// Replaces the images before the current window by a text part: with `n`
+/// images, those from `((n - 1) / window) * window` on are kept.
+fn cap_images(messages: &mut [Value], window: usize) {
+    let is_image = |part: &Value| part["type"] == "image_url";
+    let mut parts: Vec<&mut Value> = messages
+        .iter_mut()
+        .filter_map(|message| message["content"].as_array_mut())
+        .flatten()
+        .filter(|part| is_image(part))
+        .collect();
+    if window == 0 || parts.len() <= window {
+        return;
+    }
+    let keep_from = ((parts.len() - 1) / window) * window;
+    for part in parts.iter_mut().take(keep_from) {
+        **part = json!({
+            "type": "text",
+            "text": "[image dropped from the context: read the file again to see it]",
+        });
+    }
+}
+
 /// Port of openfox `renderToolResultContent`: the single LLM-facing
 /// rendering of a tool result, shared by the live path and the fold.
 pub fn render_tool_result(result: &ToolResult) -> String {
@@ -191,6 +221,7 @@ pub fn fold_messages(events: &[Event]) -> Vec<Value> {
             _ => {}
         }
     }
+    cap_images(&mut messages, IMAGE_WINDOW);
     messages
 }
 
@@ -455,5 +486,101 @@ mod tests {
         assert_eq!(msgs.len(), 2);
         assert_eq!(msgs[0]["content"], "the resume message");
         assert_eq!(msgs[1]["content"], "new answer");
+    }
+
+    #[test]
+    fn cap_images_leaves_three_images_unchanged() {
+        let mut messages = vec![
+            json!({"role": "user", "content": [image_part("a")]}),
+            json!({"role": "user", "content": [image_part("b")]}),
+            json!({"role": "user", "content": [image_part("c")]}),
+        ];
+        cap_images(&mut messages, 4);
+        for message in &messages {
+            assert_eq!(
+                message["content"][0].get("type").and_then(Value::as_str),
+                Some("image_url")
+            );
+        }
+    }
+
+    #[test]
+    fn cap_images_keeps_only_the_last_window_of_five_images() {
+        let mut messages: Vec<Value> = (0..5)
+            .map(|i| {
+                json!({
+                    "role": "user",
+                    "content": [image_part(&format!("img{}", i))],
+                })
+            })
+            .collect();
+        cap_images(&mut messages, 4);
+        for message in &messages[..4] {
+            assert_eq!(message["content"][0], dropped_part());
+        }
+        assert_eq!(
+            messages[4]["content"][0]
+                .get("type")
+                .and_then(Value::as_str),
+            Some("image_url")
+        );
+    }
+
+    #[test]
+    fn cap_images_keeps_only_the_last_window_of_nine_images() {
+        let mut messages: Vec<Value> = (0..9)
+            .map(|i| {
+                json!({
+                    "role": "user",
+                    "content": [image_part(&format!("img{}", i))],
+                })
+            })
+            .collect();
+        cap_images(&mut messages, 4);
+        for message in &messages[..8] {
+            assert_eq!(message["content"][0], dropped_part());
+        }
+        assert_eq!(
+            messages[8]["content"][0]
+                .get("type")
+                .and_then(Value::as_str),
+            Some("image_url")
+        );
+    }
+
+    #[test]
+    fn cap_images_keeps_the_last_window_of_eight_images() {
+        let mut messages: Vec<Value> = (0..8)
+            .map(|i| {
+                json!({
+                    "role": "user",
+                    "content": [image_part(&format!("img{}", i))],
+                })
+            })
+            .collect();
+        cap_images(&mut messages, 4);
+        for message in &messages[..4] {
+            assert_eq!(message["content"][0], dropped_part());
+        }
+        for message in &messages[4..] {
+            assert_eq!(
+                message["content"][0].get("type").and_then(Value::as_str),
+                Some("image_url")
+            );
+        }
+    }
+
+    fn image_part(url: &str) -> Value {
+        json!({
+            "type": "image_url",
+            "image_url": {"url": url},
+        })
+    }
+
+    fn dropped_part() -> Value {
+        json!({
+            "type": "text",
+            "text": "[image dropped from the context: read the file again to see it]",
+        })
     }
 }

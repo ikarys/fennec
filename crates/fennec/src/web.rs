@@ -26,6 +26,7 @@ mod routes;
 mod servers;
 mod session_delete;
 mod session_name;
+mod session_routes;
 mod session_usage;
 mod settings_routes;
 mod terminal;
@@ -73,6 +74,16 @@ impl App {
     /// threads.
     fn store(&self) -> Result<SqliteStore, String> {
         Ok(SqliteStore::open(&self.settings.db_path)?)
+    }
+
+    /// The session and its project, or `None` when there is no such session.
+    /// Shared by the route modules, which depend on this, not on `routes`.
+    fn session_and_project(&self, id: &str) -> Result<Option<(SessionSummary, Project)>, String> {
+        let store = self.store()?;
+        let Some(s) = store.session(id)? else {
+            return Ok(None);
+        };
+        Ok(store.project(&s.project_id)?.map(|p| (s, p)))
     }
 
     /// Where the session's turns run (see `Place`). A child session shares
