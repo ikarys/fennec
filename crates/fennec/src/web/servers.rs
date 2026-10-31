@@ -4,7 +4,6 @@
 
 use super::App;
 use super::http::{Request, error, send_json};
-use super::routes::session_and_project;
 use crate::domain::server::{ServerDef, validate};
 use crate::servers;
 use serde_json::{Value, json};
@@ -26,8 +25,7 @@ fn key(session_id: &str, name: &str) -> String {
 /// The project's servers with their running state in this session.
 /// `GET /api/sessions/{id}/servers`.
 pub fn list(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
-    let store = app.store()?;
-    let Some((_, project)) = session_and_project(&store, id)? else {
+    let Some((_, project)) = app.session_and_project(id)? else {
         return error(stream, 404, "no such session");
     };
     let defs = servers::read(Path::new(&project.workdir));
@@ -48,8 +46,7 @@ pub fn list(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
 /// Saves the project's servers to `.agents/servers.json`.
 /// `POST /api/sessions/{id}/servers` with `{servers: [{name, command}]}`.
 pub fn save(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Result<(), String> {
-    let store = app.store()?;
-    let Some((_, project)) = session_and_project(&store, id)? else {
+    let Some((_, project)) = app.session_and_project(id)? else {
         return error(stream, 404, "no such session");
     };
     let body = req.json()?;
@@ -75,8 +72,7 @@ pub fn save(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Resul
 /// Starts a server in the project's directory.
 /// `POST /api/sessions/{id}/servers/start` with `{name}`.
 pub fn start(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Result<(), String> {
-    let store = app.store()?;
-    let Some((_, project)) = session_and_project(&store, id)? else {
+    let Some((_, project)) = app.session_and_project(id)? else {
         return error(stream, 404, "no such session");
     };
     let name = req_name(req)?;
