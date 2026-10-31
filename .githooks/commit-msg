@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
-# Refuses a commit whose subject is not a Conventional Commit: release-please
-# reads them to choose the version. Also run by CI on PR titles (pr-title.yml),
-# so the rule lives here only.
+# Refuses a commit on develop or main whose subject is not a Conventional
+# Commit: release-please reads them to choose the version. Elsewhere anything
+# goes, the PR is squashed under its title. Also run by CI on PR titles
+# (pr-title.yml, where GitHub sets CI), so the rule lives here only.
 set -euo pipefail
+
+if [[ -z ${CI:-} ]]; then
+  branch=$(git symbolic-ref --short -q HEAD || true)
+  [[ $branch == develop || $branch == main ]] || exit 0
+fi
 
 subject=$(head -n1 "$1")
 pattern='^(feat|fix|docs|refactor|test|chore|perf|build|ci|style|revert)(\([a-z0-9._/-]+\))?!?: .+'
