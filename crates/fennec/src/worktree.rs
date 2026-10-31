@@ -147,11 +147,15 @@ fn fill(top: &Path, wt: &Worktree) -> Result<(), String> {
 }
 
 /// What the model looked at or used as input, not work to integrate: the
-/// browser's captures and the files an idea pinned. The human would
-/// cherry-pick them otherwise.
+/// browser's captures, the files an idea pinned, and the dependency links
+/// `link_dependencies` makes. The human would cherry-pick them otherwise
+/// (`.gitignore`'s `node_modules/` does not match a symlink, which git sees
+/// as a file).
 const EXCLUDED_INPUTS: &[&str] = &[
     ":(exclude,glob)**/.playwright-cli/**",
     ":(exclude,glob)**/.fennec/**",
+    ":(exclude,glob)**/node_modules",
+    ":(exclude,glob)**/.venv",
 ];
 
 /// Commits everything in the worktree (`git add -A`) but the model's inputs,
@@ -159,8 +163,9 @@ const EXCLUDED_INPUTS: &[&str] = &[
 /// nothing to commit.
 pub fn commit(worktree: &Worktree, message: &str) -> Result<bool, String> {
     let dir = &worktree.path;
-    // The captures and the idea's attached files are what the agent consumed,
-    // not its work: the human would cherry-pick them otherwise.
+    // The captures, the idea's attached files, and the dependency links are
+    // what the agent consumed, not its work: the human would cherry-pick them
+    // otherwise.
     let mut args: Vec<&str> = vec!["add", "-A", "--", "."];
     args.extend_from_slice(EXCLUDED_INPUTS);
     git(dir, &args, None)?;
@@ -202,6 +207,26 @@ pub fn dependency_mounts(workdir: &Path) -> Vec<(PathBuf, PathBuf)> {
         collect_dependency_mounts(&main_dir, workdir, 0, &mut mounts);
     }
     mounts
+}
+
+/// Links the main checkout's dependency directories into the worktree.
+///
+/// A server runs on the host, not in bwrap, so it cannot get the sandbox's
+/// read-only binds; a symlink to the main checkout's copy gives it the same
+/// dependencies (shared, not copied: a worktree stays light).
+pub fn link_dependencies(workdir: &Path) -> Result<(), String> {
+    for (source, target) in dependency_mounts(workdir) {
+        if std::fs::symlink_metadata(&target).is_ok() {
+            continue;
+        }
+        if let Some(parent) = target.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("create {}: {e}", parent.display()))?;
+        }
+        std::os::unix::fs::symlink(&source, &target)
+            .map_err(|e| format!("link {}: {e}", target.display()))?;
+    }
+    Ok(())
 }
 
 /// The main checkout's directory matching `workdir` when `workdir` is in a
@@ -250,6 +275,12 @@ fn collect_dependency_mounts(
         let name = entry.file_name().to_string_lossy().into_owned();
         let target = workdir.join(&name);
         if name == "node_modules" || name == ".venv" {
+            // A symlink already reaches the main checkout's copy, which the
+            // sandbox sees read-only through its `/` bind; binding onto a
+            // symlink is not wanted.
+            if target.symlink_metadata().is_ok_and(|m| m.is_symlink()) {
+                continue;
+            }
             mounts.push((path, target));
         } else if name != "target" && !name.starts_with('.') {
             collect_dependency_mounts(&path, &target, depth + 1, mounts);
@@ -480,6 +511,30 @@ mod tests {
             )]
         );
         assert!(dependency_mounts(&repo).is_empty());
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn link_dependencies_links_main_checkout_dependencies_and_excludes_them() {
+        let (base, repo) = setup();
+        std::fs::create_dir_all(repo.join("web/node_modules")).unwrap();
+        std::fs::write(repo.join("web/node_modules/package.json"), "{}").unwrap();
+        std::fs::write(repo.join(".gitignore"), "node_modules\n").unwrap();
+        git(&repo, &["add", "-A"], None).unwrap();
+        git(&repo, &["commit", "-q", "-m", "ignore dependencies"], None).unwrap();
+
+        let wt = open(&base.join("wt"), &repo, "s1").unwrap().unwrap();
+        let link = wt.path.join("web/node_modules");
+
+        assert_eq!(link_dependencies(&wt.workdir), Ok(()));
+        assert!(link.symlink_metadata().unwrap().is_symlink());
+        assert_eq!(
+            std::fs::read_link(&link).unwrap(),
+            repo.join("web/node_modules")
+        );
+        assert_eq!(link_dependencies(&wt.workdir), Ok(()));
+        assert!(dependency_mounts(&wt.workdir).is_empty());
+        assert_eq!(commit(&wt, "nothing"), Ok(false));
         let _ = std::fs::remove_dir_all(&base);
     }
 }
