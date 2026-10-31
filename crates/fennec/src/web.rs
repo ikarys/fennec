@@ -33,6 +33,7 @@ mod terminal;
 mod turns;
 mod workflow_routes;
 mod workflow_usage;
+mod worktree_routes;
 
 use crate::agent::ports::EventLog;
 use crate::config::Settings;
@@ -65,6 +66,9 @@ struct App {
     /// Projects whose ideas queue runs, and the flag that stops it after the
     /// current idea (`idea_queue::start_queue`).
     idea_queues: Mutex<HashMap<String, Arc<AtomicBool>>>,
+    /// The last worktrees disk scan and when it ran (ms): a scan walks gigabytes,
+    /// so the home page's total reuses it for a while (`worktree_routes`).
+    worktree_scan: Mutex<Option<(u64, Vec<crate::worktree::usage::WorktreeUsage>)>>,
     /// Servers running per (session, name): the pid of each process group.
     server_runs: Arc<Mutex<HashMap<String, RunningServer>>>,
 }
@@ -174,6 +178,7 @@ pub fn serve(port: u16, settings: Settings) -> Result<(), String> {
         notifier,
         skill_folds: Mutex::new(HashMap::new()),
         idea_queues: Mutex::default(),
+        worktree_scan: Mutex::default(),
         server_runs: Arc::new(Mutex::new(HashMap::new())),
     });
     // Fail now rather than on the first request. No turn runs yet, so a log
@@ -258,6 +263,7 @@ mod tests {
             notifier,
             skill_folds: Mutex::new(HashMap::new()),
             idea_queues: Mutex::default(),
+            worktree_scan: Mutex::default(),
             server_runs: Arc::new(Mutex::new(HashMap::new())),
         }
     }
