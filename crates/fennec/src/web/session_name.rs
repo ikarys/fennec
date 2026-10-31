@@ -2,13 +2,13 @@
 //! `generateSessionNameForSession`: one model call, no project context, no
 //! thinking, and the result is stored as a `session.name_generated` event.
 
-use super::notifier::{Notifier, NotifyingLog};
 use crate::agent::ports::{Delta, EventLog, Model, Request};
 use crate::config::Settings;
 use crate::domain::event::Event;
 use crate::domain::preferences::ReasoningEffort;
 use crate::domain::session_name;
 use crate::llm::OpenAiClient;
+use crate::notifier::{Notifier, NotifyingLog};
 use crate::store::SqliteStore;
 use serde_json::json;
 use std::sync::Arc;

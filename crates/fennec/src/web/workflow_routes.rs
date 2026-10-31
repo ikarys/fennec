@@ -3,7 +3,6 @@
 
 use super::App;
 use super::http::{Request, error, send_json};
-use super::notifier::NotifyingLog;
 use super::routes::session_and_project;
 use super::turns::{Job, Place};
 use crate::agent::ports::EventLog;
@@ -14,6 +13,7 @@ use crate::domain::project::Project;
 use crate::domain::workflow::definition::Workflow;
 use crate::domain::workflow::run::{self as run, Waiting};
 use crate::domain::workflow::validate;
+use crate::notifier::NotifyingLog;
 use crate::workflows::{self, Origin};
 use serde_json::{Value, json};
 use std::net::TcpStream;
