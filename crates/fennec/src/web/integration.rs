@@ -13,11 +13,13 @@ use crate::domain::integration::{
     Blocker, DiffChecks, Landing, blockers, branch_changed, commit_message, conflict_prompt,
     default_message, unacknowledged,
 };
+use crate::domain::review_map::{self, FileFacts, ReviewSignal};
 use crate::domain::test_files::new_test_patterns;
 use crate::domain::workflow::run;
 use crate::integration::{self, ApplyError, Preview};
 use crate::notifier::NotifyingLog;
 use crate::protected;
+use crate::risk;
 use crate::store::SqliteStore;
 use crate::worktree::{self, Worktree};
 use serde_json::{Value, json};
@@ -40,6 +42,8 @@ struct Gate {
     /// The test files under the project, relative to it, not yet protected.
     test_files: Vec<String>,
     blockers: Vec<Blocker>,
+    /// Review map, top-relative: riskiest first, with deterministic signals.
+    review: Vec<(String, Vec<ReviewSignal>)>,
     /// The session's idea the human may finish here, when it is still started.
     idea: Option<(String, String)>,
 }
@@ -72,6 +76,35 @@ fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Result<Gate, (u16, S
     let rules = architecture::load(Path::new(&project.workdir));
     let changed = integration::changed_files(&top, &wt, &preview.files, &prefix);
     let checks = DiffChecks::of(&rules, &changed);
+    let hot = risk::hot_files(&top);
+    let tested = risk::tested_on_branch(&top, &wt.branch, &preview.files);
+    let facts: Vec<FileFacts> = preview
+        .files
+        .iter()
+        .filter_map(|path| {
+            let project_path = path.strip_prefix(prefix.as_str())?;
+            let (added, removed) = preview.counts.get(path).copied().unwrap_or_default();
+            Some(FileFacts {
+                path: project_path.to_string(),
+                added,
+                removed,
+                protected: protected_touched.contains(path),
+                hot: hot.contains(path),
+                tested: tested.contains(path),
+            })
+        })
+        .collect();
+    let mut review: Vec<(String, Vec<ReviewSignal>)> = review_map::order(&facts, &checks)
+        .into_iter()
+        .map(|(path, signals)| (format!("{prefix}{path}"), signals))
+        .collect();
+    for path in preview
+        .files
+        .iter()
+        .filter(|path| !path.starts_with(prefix.as_str()))
+    {
+        review.push((path.clone(), Vec::new()));
+    }
     let events = store.events(&session.id)?;
     let decisions = decisions_in_force(&events);
     let criteria = run::current_run(&events)
@@ -102,6 +135,7 @@ fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Result<Gate, (u16, S
         protected_touched,
         test_files,
         blockers,
+        review,
         idea,
     }))
 }
@@ -122,10 +156,9 @@ pub fn get_integration(app: &App, stream: &mut TcpStream, id: &str) -> Result<()
         Err((status, message)) => return error(stream, status, &message),
     };
     let files: Vec<Value> = gate
-        .preview
-        .files
+        .review
         .iter()
-        .map(|path| {
+        .map(|(path, signals)| {
             let (added, removed) = gate.preview.counts.get(path).copied().unwrap_or_default();
             json!({
                 "path": path,
@@ -133,6 +166,7 @@ pub fn get_integration(app: &App, stream: &mut TcpStream, id: &str) -> Result<()
                 "carried": gate.preview.carried_changes.contains(path),
                 "added": added,
                 "removed": removed,
+                "signals": signals,
             })
         })
         .collect();

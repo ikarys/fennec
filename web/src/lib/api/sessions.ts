@@ -256,6 +256,16 @@ export type Blocker =
   | { kind: "branchChanged"; from: string; to: string | null }
   | { kind: "localChanges"; paths: string[] };
 
+export type ReviewSignal =
+  | 'protected'
+  | 'bypass'
+  | 'architecture'
+  | 'conflictMarker'
+  | 'testsWeakened'
+  | 'hot'
+  | 'untested'
+  | 'large';
+
 export interface IntegrationPreview {
   branch: string;
   base: string;
@@ -269,6 +279,8 @@ export interface IntegrationPreview {
     carried: boolean;
     added: number;
     removed: number;
+    /** Deterministic review signals, riskiest files first (server order). */
+    signals: ReviewSignal[];
   }[];
   /** Test files (relative to the project) the integration could protect. */
   testFiles: string[];
