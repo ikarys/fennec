@@ -668,6 +668,7 @@ mod tests {
             skill_folds: Mutex::new(HashMap::new()),
             idea_reports: Mutex::new(HashMap::new()),
             idea_queues: Mutex::default(),
+            worktree_scan: Mutex::default(),
             server_runs: Arc::new(Mutex::new(HashMap::new())),
         }
     }
