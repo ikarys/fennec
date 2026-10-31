@@ -85,13 +85,7 @@ pub fn preview(top: &Path, wt: &Worktree) -> Result<Preview, String> {
 
     // The preview reports a conflict before the click; a git failure here is
     // not a conflict, the click will report it.
-    let conflicts = match ours_with_carried(top, &carried_changes) {
-        Ok(ours) => match merge_tree(top, &ours, wt.branch.as_str(), wt.base.as_str()) {
-            Err(MergeOutcome::Conflict { files }) => files,
-            _ => Vec::new(),
-        },
-        Err(_) => Vec::new(),
-    };
+    let conflicts = conflicts(top, wt);
 
     Ok(Preview {
         carried_changes,
@@ -103,6 +97,41 @@ pub fn preview(top: &Path, wt: &Worktree) -> Result<Preview, String> {
         human_branch: crate::git::current_branch(top),
         origin_branch: origin_branch(top, wt),
     })
+}
+
+/// The files the merge of the branch onto the human's HEAD conflicts on;
+/// empty when it merges cleanly or git fails.
+pub fn conflicts(top: &Path, wt: &Worktree) -> Vec<String> {
+    let Ok(files) = touched_files(top, wt) else {
+        return Vec::new();
+    };
+    let (carried, _) = uncommitted_split(top, wt.base.as_str(), wt.branch.as_str(), &files);
+    let Ok(ours) = ours_with_carried(top, &carried) else {
+        return Vec::new();
+    };
+    match merge_tree(top, &ours, wt.branch.as_str(), wt.base.as_str()) {
+        Ok((_, conflicted)) => conflicted,
+        Err(_) => Vec::new(),
+    }
+}
+
+/// Brings the branch up to date with the human's HEAD as one commit, leaving
+/// conflict markers in the files for the agent to resolve; returns the
+/// conflicted files.
+pub fn update_branch(top: &Path, wt: &Worktree) -> Result<Vec<String>, String> {
+    let ours = git(top, &["rev-parse", "HEAD"], None)
+        .map(|out| String::from_utf8_lossy(&out).trim().to_string())?;
+    let (tree, conflicted) = merge_tree(top, &ours, wt.branch.as_str(), wt.base.as_str())?;
+    let message = format!("fennec: bring {} up to date with HEAD", wt.branch);
+    let commit = git(
+        top,
+        &["commit-tree", &tree, "-p", &ours, "-m", &message],
+        None,
+    )
+    .map(|out| String::from_utf8_lossy(&out).trim().to_string())?;
+    git(&wt.path, &["reset", "-q", "--hard", &commit], None)?;
+    git(top, &["update-ref", &wt.base, &ours], None)?;
+    Ok(conflicted)
 }
 
 /// The agent's touched files: `git diff --name-only --no-renames base branch`.
@@ -328,18 +357,16 @@ fn ours_with_carried(top: &Path, carried: &[String]) -> Result<String, String> {
     }
 }
 
-/// Why `git merge-tree` gave no tree: a conflict (with the files), or a git failure.
-enum MergeOutcome {
-    /// Conflicts in `files`.
-    Conflict { files: Vec<String> },
-    /// git itself failed.
-    Git { message: String },
-}
-
 /// `git merge-tree --write-tree --name-only --no-messages --merge-base=<base>
-/// <ours> <branch>`: the merged tree, computed off the trees so a dirty
-/// working tree does not make git refuse (needs git ≥ 2.40).
-fn merge_tree(top: &Path, ours: &str, branch: &str, base: &str) -> Result<String, MergeOutcome> {
+/// <ours> <branch>`: the merged tree and the conflicted files, computed off
+/// the trees so a dirty working tree does not make git refuse (needs git ≥
+/// 2.40). `Err` is a git failure.
+fn merge_tree(
+    top: &Path,
+    ours: &str,
+    branch: &str,
+    base: &str,
+) -> Result<(String, Vec<String>), String> {
     let merge_base = format!("--merge-base={base}");
     let command = format!(
         "git -C {} merge-tree --write-tree --name-only --no-messages {merge_base} {ours} {branch}",
@@ -359,33 +386,36 @@ fn merge_tree(top: &Path, ours: &str, branch: &str, base: &str) -> Result<String
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .output()
-        .map_err(|e| MergeOutcome::Git {
-            message: format!("{command}: {e}"),
-        })?;
+        .map_err(|e| format!("{command}: {e}"))?;
 
     match out.status.code() {
         // No conflicts: the first line is the merged tree.
-        Some(0) => String::from_utf8_lossy(&out.stdout)
-            .lines()
-            .find(|line| !line.is_empty())
-            .map(str::to_string)
-            .ok_or_else(|| MergeOutcome::Git {
-                message: format!("{command}: no tree in the output"),
-            }),
+        Some(0) => {
+            let tree = String::from_utf8_lossy(&out.stdout)
+                .lines()
+                .find(|line| !line.is_empty())
+                .map(str::to_string)
+                .ok_or_else(|| format!("{command}: no tree in the output"))?;
+            Ok((tree, Vec::new()))
+        }
         // Conflicts: the first line is a tree, the following non-empty lines
         // are the conflicted paths.
         Some(1) => {
-            let files = String::from_utf8_lossy(&out.stdout)
+            let lines: Vec<String> = String::from_utf8_lossy(&out.stdout)
                 .lines()
                 .filter(|line| !line.is_empty())
-                .skip(1)
                 .map(String::from)
                 .collect();
-            Err(MergeOutcome::Conflict { files })
+            let tree = lines
+                .first()
+                .cloned()
+                .ok_or_else(|| format!("{command}: no tree in the output"))?;
+            Ok((tree, lines.into_iter().skip(1).collect()))
         }
-        _ => Err(MergeOutcome::Git {
-            message: format!("{command}: {}", String::from_utf8_lossy(&out.stderr).trim()),
-        }),
+        _ => Err(format!(
+            "{command}: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        )),
     }
 }
 
@@ -452,17 +482,20 @@ pub fn apply(top: &Path, wt: &Worktree, message: &str) -> Result<String, ApplyEr
 
     // The merge, computed off the trees so a dirty working tree does not make
     // git refuse; a conflict names the files.
-    let tree = match merge_tree(top, &ours, wt.branch.as_str(), wt.base.as_str()) {
-        Ok(tree) => tree,
-        Err(MergeOutcome::Conflict { files }) => {
-            return Err(ApplyError::Conflict { files, command });
-        }
-        Err(MergeOutcome::Git { message }) => {
+    let (tree, conflicted) = match merge_tree(top, &ours, wt.branch.as_str(), wt.base.as_str()) {
+        Ok((tree, conflicted)) => (tree, conflicted),
+        Err(message) => {
             return Err(ApplyError::Git {
                 message: format!("{message}\nresolve it by hand: {command}"),
             });
         }
     };
+    if !conflicted.is_empty() {
+        return Err(ApplyError::Conflict {
+            files: conflicted,
+            command,
+        });
+    }
 
     // The integration commit, on the human's HEAD.
     let commit = git(
@@ -765,6 +798,43 @@ mod tests {
         assert_eq!(
             preview(&top, &wt).unwrap().conflicts,
             vec!["a.txt".to_string()]
+        );
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn conflicts_and_update_branch_leave_markers_for_the_agent() {
+        let (base, repo) = setup();
+        let wt = open(&base.join("wt"), &repo, "s1").unwrap().unwrap();
+        std::fs::write(wt.workdir.join("a.txt"), "agent\n").unwrap();
+        assert_eq!(commit(&wt, "agent change"), Ok(true));
+
+        std::fs::write(repo.join("a.txt"), "human\n").unwrap();
+        git(&repo, &["add", "-A"], None).unwrap();
+        git(&repo, &["commit", "-q", "-m", "human change"], None).unwrap();
+
+        let top = top(&repo).unwrap().0;
+        let human_head = text(&repo, &["rev-parse", "HEAD"]);
+        assert_eq!(conflicts(&top, &wt), vec!["a.txt".to_string()]);
+
+        let conflicted = update_branch(&top, &wt).unwrap();
+        assert_eq!(conflicted, vec!["a.txt".to_string()]);
+        assert!(
+            std::fs::read_to_string(wt.workdir.join("a.txt"))
+                .unwrap()
+                .contains("<<<<<<<")
+        );
+        assert_eq!(text(&repo, &["rev-parse", &wt.base]), human_head);
+        assert_eq!(
+            text(
+                &repo,
+                &[
+                    "rev-list",
+                    "--count",
+                    &format!("{}..{}", wt.base, wt.branch)
+                ]
+            ),
+            "1"
         );
         let _ = std::fs::remove_dir_all(&base);
     }

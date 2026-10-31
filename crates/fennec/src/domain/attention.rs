@@ -20,6 +20,9 @@ pub enum AttentionKind {
     WorkflowPause,
     /// A workflow ended and nothing integrated or discarded its work since.
     AwaitingIntegration,
+    /// Finished work whose branch conflicts with the human's branch: it cannot
+    /// be integrated until resolved.
+    Conflict,
     /// The last turn failed.
     Error,
 }
@@ -296,6 +299,10 @@ mod tests {
         assert_eq!(
             serde_json::to_string(&AttentionKind::AwaitingIntegration).unwrap(),
             "\"awaitingIntegration\""
+        );
+        assert_eq!(
+            serde_json::to_string(&AttentionKind::Conflict).unwrap(),
+            "\"conflict\""
         );
     }
 }
