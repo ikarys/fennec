@@ -2,7 +2,7 @@
 //! `?after=`), then new events as they are appended, woken by the notifier.
 
 use super::http::{Request, error};
-use super::notifier::Notifier;
+use crate::notifier::Notifier;
 use crate::store::SqliteStore;
 use std::io::Write;
 use std::net::TcpStream;
