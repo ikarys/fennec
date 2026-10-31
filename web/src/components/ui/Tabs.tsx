@@ -69,7 +69,7 @@ export function Tabs<T extends string>({
       role="tablist"
       aria-label={label}
       aria-orientation="vertical"
-      className="flex w-44 shrink-0 flex-col gap-1"
+      className="flex shrink-0 gap-1 overflow-x-auto md:w-44 md:flex-col md:overflow-visible"
     >
       {tabs.map((tab) => (
         <button
@@ -78,7 +78,7 @@ export function Tabs<T extends string>({
           role="tab"
           aria-selected={tab.id === active}
           onClick={() => onSelect(tab.id)}
-          className={`rounded-md px-3 py-2 text-left text-sm transition-colors ${
+          className={`whitespace-nowrap rounded-md px-3 py-2 text-left text-sm transition-colors ${
             tab.id === active
               ? 'bg-raised font-medium text-text'
               : 'text-muted hover:bg-raised hover:text-text'
