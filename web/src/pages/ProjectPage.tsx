@@ -5,6 +5,7 @@ import { MapSection } from '../components/project/MapSection';
 import { DocSection } from '../components/project/DocSection';
 import { AnalysesSection } from '../components/project/AnalysesSection';
 import { DiskSection } from '../components/project/DiskSection';
+import { DashboardSection } from '../components/project/DashboardSection';
 import {
   createSession,
   getProjectOverview,
@@ -14,6 +15,7 @@ import {
 import { type IdeaView } from '../lib/ideas';
 
 const TABS = [
+  { id: 'overview', label: "Vue d'ensemble" },
   { id: 'tasks', label: 'Tâches' },
   { id: 'map', label: 'Carte des modules' },
   { id: 'doc', label: 'Doc' },
@@ -88,8 +90,8 @@ export default function ProjectPage({
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
 
-  // Unknown or null tab defaults to 'tasks'.
-  const activeTab: TabId = TABS.find((t) => t.id === tab)?.id ?? 'tasks';
+  // Unknown or null tab defaults to 'overview'.
+  const activeTab: TabId = TABS.find((t) => t.id === tab)?.id ?? 'overview';
 
   const handleTabSelect = (id: TabId) => {
     window.location.hash = `#/project/${encodeURIComponent(projectId)}/${id}`;
@@ -161,6 +163,9 @@ export default function ProjectPage({
           onSelect={handleTabSelect}
         />
         <div className="min-w-0 grow">
+          {activeTab === 'overview' ? (
+            <DashboardSection projectId={projectId} onOpenSession={onOpenSession} />
+          ) : null}
           {activeTab === 'tasks' ? (
             <TasksSection
               projectId={projectId}
