@@ -74,8 +74,8 @@ export function ToolCard({ tool }: { tool: ToolCallView }) {
           className="flex min-w-0 grow items-center gap-2.5"
         >
           {icon}
-          <span className="shrink-0 font-mono text-[0.7812rem] font-medium">{tool.name}</span>
-          <span title={arg} className="min-w-0 truncate font-mono text-[0.7812rem] text-muted">
+          <span className="shrink-0 font-mono text-xs font-medium">{tool.name}</span>
+          <span title={arg} className="min-w-0 truncate font-mono text-xs text-muted">
             {arg}
           </span>
           <span className="grow" />

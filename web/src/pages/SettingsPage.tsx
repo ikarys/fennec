@@ -500,7 +500,7 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
     return (
       <main className="grow overflow-y-auto px-4 pt-6 md:px-6 md:pt-8">
         <div className="mx-auto max-w-[960px]">
-          <h1 className="text-xl font-semibold">Réglages</h1>
+          <h1 className="text-2xl font-semibold">Réglages</h1>
           <p className="mt-0.5 text-muted">S'applique au prochain tour, sans redémarrage.</p>
           <div className="mt-6 text-sm text-muted">Chargement…</div>
         </div>
@@ -512,7 +512,7 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
     <main className="grow overflow-y-auto px-4 pt-6 md:px-6 md:pt-8">
       <div className="mx-auto flex max-w-[960px] flex-col gap-6">
         <div>
-          <h1 className="text-xl font-semibold">Réglages</h1>
+          <h1 className="text-2xl font-semibold">Réglages</h1>
           <p className="mt-0.5 text-muted">S'applique au prochain tour, sans redémarrage.</p>
         </div>
 

@@ -14,7 +14,7 @@ import { PreflightSection } from './PreflightSection';
 const REMARK_PLUGINS = [remarkGfm];
 
 // Inline code: Thread.tsx's inline style, on bg-code so it reads on the raised card.
-const INLINE_CODE = 'rounded bg-code px-1 py-0.5 font-mono text-[0.7812rem] text-text';
+const INLINE_CODE = 'rounded bg-code px-1 py-0.5 font-mono text-xs text-text';
 
 // Titles and bodies may hold inline markdown (code, **bold**).
 function Inline({ children }: { children: string }) {
@@ -32,7 +32,7 @@ function Inline({ children }: { children: string }) {
 }
 
 function PathChip({ path }: { path: string }) {
-  return <code className="rounded bg-code px-1.5 py-0.5 font-mono text-[0.7188rem] text-text">{path}</code>;
+  return <code className="rounded bg-code px-1.5 py-0.5 font-mono text-xs text-text">{path}</code>;
 }
 
 export function PlanCard({ plan, actions, preflight }: { plan: Plan; actions?: PlanActions | null; preflight?: PreflightResultView[] }) {
@@ -280,7 +280,7 @@ export function ReportCard({ report }: { report: Report }) {
           </div>
         </div>
       )}
-      <p className="m-0 text-[0.6875rem] text-faint">Coches déclarées par le modèle, non vérifiées par fennec.</p>
+      <p className="m-0 text-xs text-faint">Coches déclarées par le modèle, non vérifiées par fennec.</p>
     </Card>
   );
 }

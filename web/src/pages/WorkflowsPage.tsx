@@ -108,7 +108,7 @@ export default function WorkflowsPage({ projects, projectId, workflowId, isNew }
   return (
     <main className="grow overflow-y-auto px-4 py-6 md:px-6 md:py-8">
       <div className="mx-auto max-w-[720px]">
-        <h1 className="text-xl font-semibold">Workflows</h1>
+        <h1 className="text-2xl font-semibold">Workflows</h1>
         <p className="mt-0.5 text-muted">Dessinez un graphe, reliez ses ports, enregistrez-le dans le projet ou en global.</p>
 
         <div className="mt-6 flex items-center gap-3">

@@ -48,7 +48,7 @@ function SessionRow({
         <SessionStateIcon state={session.state} />
         <span className="min-w-0 grow truncate text-sm text-text">{session.title}</span>
         {session.awaitingIntegration && <Badge tone="accent">à intégrer</Badge>}
-        <span className="w-24 shrink-0 whitespace-nowrap text-right font-mono text-[0.6875rem] text-muted tabular-nums">{formatRelative(session.updatedAt)}</span>
+        <span className="w-24 shrink-0 whitespace-nowrap text-right font-mono text-xs text-muted tabular-nums">{formatRelative(session.updatedAt)}</span>
       </button>
       {!running && (
         <Button
@@ -236,7 +236,7 @@ export function HomePage({ projects, loading, error, onOpenProjectDialog, onNewS
       <div className="mx-auto flex max-w-[960px] flex-col gap-5">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="flex flex-col gap-0.5">
-            <h1 className="text-xl font-semibold">Projets</h1>
+            <h1 className="text-2xl font-semibold">Projets</h1>
             <p className="text-sm text-muted">
               {runningCount > 0 ? `${runningCount} session${runningCount > 1 ? 's' : ''} en cours` : 'Aucune session en cours'}
             </p>
