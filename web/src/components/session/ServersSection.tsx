@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ServerView } from '../../lib/api';
 import { getServers, startServer, stopServer } from '../../lib/api';
-import { ExternalIcon, PlayIcon, PlusIcon, SpinnerIcon, StopIcon } from '../Icons';
+import { ExternalIcon, PlayIcon, SettingsIcon, SpinnerIcon, StopIcon } from '../Icons';
 import { Badge } from '../ui/Badge';
 import { Button, buttonClass } from '../ui/Button';
 import { Panel } from '../ui/Panel';
@@ -108,7 +108,7 @@ export function ServersSection({ sessionId }: ServersSectionProps) {
           </div>
         ))}
         <Button variant="secondary" size="sm" onClick={() => setEditorOpen(true)}>
-          <PlusIcon className="h-3.5 w-3.5" />
+          <SettingsIcon className="h-3.5 w-3.5" />
           Configurer
         </Button>
       </div>
