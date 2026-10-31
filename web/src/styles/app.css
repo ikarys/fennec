@@ -69,29 +69,30 @@
   --scrim: rgba(30, 30, 25, 0.28);
 }
 
-/* Ardoise: a mid slate, lighter than Nuit, for long reading without glare.
-   Off-white text, three soft hues far apart: amber accent, mint ok, rose err. */
+/* Ardoise: a blue slate, lighter than Nuit, for long reading without glare.
+   Its own hue family, so it never reads as a faded Nuit: periwinkle accent
+   instead of orange, mint ok, rose err, all three far apart. */
 :root[data-theme="ardoise"] {
   color-scheme: dark;
-  --bg: #23272F;
-  --panel: #2A2F38;
-  --raised: #343A45;
-  --border: #3A404C;
-  --border-strong: #4B5262;
-  --text: #D9DDE4;
-  --muted: #A7AFBC;
-  --faint: #8E97A6;
-  --accent: #E6A85C;
-  --accent-strong: #F0C08A;
-  --accent-soft: rgba(230, 168, 92, 0.14);
-  --on-accent: #1E2128;
-  --ok: #74C7A0;
-  --ok-soft: rgba(116, 199, 160, 0.14);
-  --err: #EF7B8B;
-  --add-bg: rgba(116, 199, 160, 0.10);
-  --del-bg: rgba(239, 123, 139, 0.11);
-  --code: #1F232A;
-  --scrim: rgba(15, 17, 21, 0.55);
+  --bg: #1E2332;
+  --panel: #252B3C;
+  --raised: #2F3749;
+  --border: #343C50;
+  --border-strong: #465068;
+  --text: #DDE3EF;
+  --muted: #A6B0C5;
+  --faint: #929DB5;
+  --accent: #82AAFF;
+  --accent-strong: #A8C3FF;
+  --accent-soft: rgba(130, 170, 255, 0.15);
+  --on-accent: #141826;
+  --ok: #8BD5A0;
+  --ok-soft: rgba(139, 213, 160, 0.14);
+  --err: #F58A9E;
+  --add-bg: rgba(139, 213, 160, 0.10);
+  --del-bg: rgba(245, 138, 158, 0.11);
+  --code: #1A1E2B;
+  --scrim: rgba(12, 14, 22, 0.55);
 }
 
 /* Cyber: hominfer's terminal green. `ok` is cyan, not green, so a done or
