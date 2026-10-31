@@ -248,6 +248,13 @@ read-only. The human edits them as usual.
   - `adrs` `[{number, file, title, status, date, body}]`: the MADR files of `docs/adr/` (`NNNN-slug.md`,
     sorted by number; `status` and `date` from the frontmatter, null when absent; the title from the
     first `# ` heading).
+- `GET /api/projects/{id}/risks` → `{files, unreviewedPercent, untested, churning, unreviewed, churnDays, zones}`, the
+  project's risk zones, read from git (verified; 404 if no project). `files` counts the tracked source files, tests
+  excluded; `unreviewedPercent` the share of their lines (git blame) from AI commits never reviewed: a commit with an
+  AI `Co-Authored-By` trailer and no `Fennec-Session` trailer (written only by an integration, the human's review gate).
+  - `zones` `[{path, signals, churn, lines, unreviewedPercent}]`: the files with at least one signal, most signals
+    first, then churn; `signals` among `unreviewed` (every line from such commits), `untested` (no inline tests, no
+    test file of the same stem), `churn` (touched by 5 commits or more in the last `churnDays` days).
 - `GET /api/projects/{id}/worktrees[?fresh=1]` → `{scannedAt, totalBytes, generatedBytes, entries}`: the disk the
   project's session worktrees take, measured from disk (verified; allocated bytes, like `du`). `fresh=1` measures again,
   otherwise a scan younger than 10 minutes is reused; 404 if no project.

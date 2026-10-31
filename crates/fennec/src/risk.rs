@@ -1,0 +1,243 @@
+//! Git-backed adapter that measures project risk zones from a workdir.
+
+use std::collections::{HashMap, HashSet};
+use std::path::Path;
+use std::process::Command;
+use std::thread::{available_parallelism, scope};
+
+use crate::domain::module_map::SourceFile;
+use crate::domain::risk::{self, Authorship, FileFacts, RiskReport};
+
+pub fn load(workdir: &Path) -> RiskReport {
+    let sources = crate::module_map::tracked_files(workdir);
+
+    let Some(ai_log) = git_stdout(workdir, &["log", "--format=%x1e%H%x1f%B"]) else {
+        return risk::report(Vec::new());
+    };
+    let ai_hashes = ai_commits(&ai_log);
+
+    let since = format!("--since={}.days", risk::CHURN_DAYS);
+    let Some(churn_log) = git_stdout(workdir, &["log", &since, "--format=%x1e", "--name-only"])
+    else {
+        return risk::report(Vec::new());
+    };
+    let churn = churn_counts(&churn_log);
+
+    let mut test_paths: Vec<String> = Vec::new();
+    let mut candidates: Vec<SourceFile> = Vec::new();
+
+    for source in sources {
+        if crate::domain::test_files::is_test_path(&source.path) {
+            test_paths.push(source.path);
+        } else {
+            candidates.push(source);
+        }
+    }
+
+    let test_paths: Vec<&str> = test_paths.iter().map(|path| path.as_str()).collect();
+    let workers = available_parallelism()
+        .map(|value| value.get())
+        .unwrap_or(1);
+
+    // One chunk per core: blaming the whole repository is the slow part.
+    let chunk_size = candidates.len().div_ceil(workers).max(1);
+    let facts: Vec<FileFacts> = scope(|s| {
+        let handles: Vec<_> = candidates
+            .chunks(chunk_size)
+            .map(|chunk| {
+                let (ai_hashes, churn, test_paths) = (&ai_hashes, &churn, &test_paths);
+                s.spawn(move || measure_chunk(workdir, chunk, ai_hashes, churn, test_paths))
+            })
+            .collect();
+        handles
+            .into_iter()
+            .flat_map(|handle| handle.join().expect("risk worker panicked"))
+            .collect()
+    });
+
+    risk::report(facts)
+}
+
+fn measure_chunk(
+    workdir: &Path,
+    sources: &[SourceFile],
+    ai_hashes: &HashSet<String>,
+    churn: &HashMap<String, usize>,
+    test_paths: &[&str],
+) -> Vec<FileFacts> {
+    sources
+        .iter()
+        .map(|source| measure_source(workdir, source, ai_hashes, churn, test_paths))
+        .collect()
+}
+
+fn measure_source(
+    workdir: &Path,
+    source: &SourceFile,
+    ai_hashes: &HashSet<String>,
+    churn: &HashMap<String, usize>,
+    test_paths: &[&str],
+) -> FileFacts {
+    let (lines, unreviewed_lines) = git_blame_counts(workdir, &source.path, ai_hashes)
+        .unwrap_or_else(|| (source.content.lines().count(), 0));
+
+    FileFacts {
+        path: source.path.clone(),
+        lines,
+        unreviewed_lines,
+        churn: churn.get(&source.path).copied().unwrap_or(0),
+        tested: risk::is_tested(&source.path, &source.content, test_paths),
+    }
+}
+
+fn ai_commits(log: &str) -> HashSet<String> {
+    let mut ai_hashes = HashSet::new();
+
+    for record in log.split('\x1e') {
+        let Some((hash, message)) = record.split_once('\x1f') else {
+            continue;
+        };
+
+        let hash = hash.trim();
+        if hash.is_empty() {
+            continue;
+        }
+
+        if risk::authorship(message) == Authorship::Ai {
+            ai_hashes.insert(hash.to_string());
+        }
+    }
+
+    ai_hashes
+}
+
+fn churn_counts(log: &str) -> HashMap<String, usize> {
+    let mut counts = HashMap::new();
+
+    for record in log.split('\x1e') {
+        for line in record.lines() {
+            let path = line.trim();
+            if path.is_empty() {
+                continue;
+            }
+
+            *counts.entry(path.to_string()).or_insert(0) += 1;
+        }
+    }
+
+    counts
+}
+
+fn blame_counts(porcelain: &str, ai_hashes: &HashSet<String>) -> (usize, usize) {
+    let mut lines = 0;
+    let mut unreviewed_lines = 0;
+
+    for line in porcelain.lines() {
+        if line.starts_with('\t') {
+            continue;
+        }
+
+        let Some((hash, _)) = line.split_once(' ') else {
+            continue;
+        };
+
+        if is_commit_hash(hash) {
+            lines += 1;
+            if ai_hashes.contains(hash) {
+                unreviewed_lines += 1;
+            }
+        }
+    }
+
+    (lines, unreviewed_lines)
+}
+
+fn git_blame_counts(
+    workdir: &Path,
+    path: &str,
+    ai_hashes: &HashSet<String>,
+) -> Option<(usize, usize)> {
+    let output = Command::new("git")
+        .current_dir(workdir)
+        .args(["blame", "--line-porcelain", "-w", "HEAD", "--", path])
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    Some(blame_counts(&stdout, ai_hashes))
+}
+
+fn git_stdout(workdir: &Path, args: &[&str]) -> Option<String> {
+    let output = Command::new("git")
+        .current_dir(workdir)
+        .args(args)
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    Some(String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
+fn is_commit_hash(token: &str) -> bool {
+    token.len() == 40 && token.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ai_commits_keeps_only_ai_hashes() {
+        let human = "b".repeat(40);
+        let ai = "c".repeat(40);
+        let integrated = "d".repeat(40);
+
+        let log = format!(
+            "\x1e{human}\x1fHuman commit\n\x1e{ai}\x1fAI commit\n\nCo-Authored-By: Claude <bot@example.com>\n\x1e{integrated}\x1fIntegrated\n\nFennec-Session: 1\nCo-Authored-By: Claude <bot@example.com>"
+        );
+
+        let hashes = ai_commits(&log);
+
+        assert_eq!(hashes.len(), 1);
+        assert!(hashes.contains(&ai));
+    }
+
+    #[test]
+    fn churn_counts_counts_paths_per_commit() {
+        let log = "\x1e\nsrc/a.rs\nsrc/b.rs\n\x1e\nsrc/a.rs\n";
+        let counts = churn_counts(log);
+
+        assert_eq!(counts.get("src/a.rs"), Some(&2));
+        assert_eq!(counts.get("src/b.rs"), Some(&1));
+    }
+
+    #[test]
+    fn blame_counts_counts_ai_and_human_headers() {
+        let ai_hash = "a".repeat(40);
+        let human_hash = "b".repeat(40);
+        let ai_hashes = HashSet::from([ai_hash.clone()]);
+
+        let porcelain = format!(
+            "{ai_hash} 1 1 1\n\tfirst\nauthor someone\n{human_hash} 2 2 1\n\tsecond\nauthor someone\n"
+        );
+
+        let (lines, unreviewed_lines) = blame_counts(&porcelain, &ai_hashes);
+
+        assert_eq!((lines, unreviewed_lines), (2, 1));
+    }
+
+    #[test]
+    fn load_measures_this_repository() {
+        let workdir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let report = load(&workdir);
+
+        assert!(report.files > 0);
+    }
+}
