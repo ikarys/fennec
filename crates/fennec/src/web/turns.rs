@@ -3,7 +3,7 @@
 
 use super::children::Children;
 use super::model_routes;
-use crate::agent::turn::{Turn, compact_session, replay_turn, run_turn};
+use crate::agent::turn::{Turn, compact_session, replay_turn, retry_turn, run_turn};
 use crate::agent::workflow::{WorkflowEnv, WorkflowJob, run_workflow};
 use crate::config::Settings;
 use crate::domain::attachment::Attachment;
@@ -43,6 +43,8 @@ pub enum Job {
     Input(TurnInput, Vec<Attachment>),
     /// The human replays one of their messages.
     Replay(String),
+    /// The human retries a turn that ended in an error.
+    Retry,
     /// A workflow run (start, answer, continue, resume, stop).
     Workflow(WorkflowJob),
 }
@@ -187,6 +189,7 @@ fn run(
             }
             Job::Input(TurnInput::Compact, _) => compact_session(turn).map(|_| ()),
             Job::Replay(message_id) => replay_turn(turn, message_id).map(|_| ()),
+            Job::Retry => retry_turn(turn).map(|_| ()),
             Job::Workflow(workflow_job) => {
                 let children = Children {
                     settings,

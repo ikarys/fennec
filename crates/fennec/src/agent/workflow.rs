@@ -413,35 +413,94 @@ fn resume_interrupted(turn: &mut Turn) -> Result<Cursor, String> {
         return Err("the run is paused, not interrupted".into());
     }
 
-    let open = state.open.first().ok_or("no open node to resume")?;
+    let (node_id, via) = if let Some(open) = state.open.first() {
+        // An interrupted run: re-enter the open node on its own pass.
+        let via = events
+            .iter()
+            .rev()
+            .find_map(|e| match e {
+                Event::WorkflowNodeStarted { node_id, via, .. } if node_id == &open.node_id => {
+                    via.clone()
+                }
+                _ => None,
+            })
+            .unwrap_or_else(|| default_via(&state));
+        (open.node_id.clone(), via)
+    } else {
+        // A run that ended in error: re-enter the node that was open when it
+        // ended, on a new pass.
+        match state.finished {
+            Some((RunOutcome::Error, _)) => {
+                let (node_id, via) = open_at_finish(&events, &state.run_id)
+                    .ok_or("the run ended in error but no node can be re-run")?;
+                if in_branch(&state.workflow, &node_id) {
+                    return Err(
+                        "the failed node is in a branch, it cannot be relaunched alone".into(),
+                    );
+                }
+                (node_id, via.unwrap_or_else(|| default_via(&state)))
+            }
+            Some(_) => {
+                return Err("the run is finished, it can only be relaunched on an error".into());
+            }
+            None => return Err("no open node to resume".into()),
+        }
+    };
 
     turn.append(Event::WorkflowResumed {
         run_id: state.run_id.clone(),
         comment: String::new(),
     })?;
 
-    let via = events
-        .iter()
-        .rev()
-        .find_map(|e| match e {
-            Event::WorkflowNodeStarted { node_id, via, .. } if node_id == &open.node_id => {
-                via.clone()
-            }
-            _ => None,
-        })
-        .unwrap_or_else(|| Via {
-            from: state
-                .workflow
-                .start()
-                .map(|n| n.id.clone())
-                .unwrap_or_default(),
-            port: "next".into(),
-        });
+    Ok(Cursor::Enter { via, to: node_id })
+}
 
-    Ok(Cursor::Enter {
-        via,
-        to: open.node_id.clone(),
-    })
+fn default_via(state: &RunState) -> Via {
+    Via {
+        from: state
+            .workflow
+            .start()
+            .map(|n| n.id.clone())
+            .unwrap_or_default(),
+        port: "next".into(),
+    }
+}
+
+/// The node that was open when a finished run ended: from the run's start on,
+/// the last node started with no finish after it, and the via that entered it.
+fn open_at_finish(events: &[Event], run_id: &str) -> Option<(String, Option<Via>)> {
+    let start = events
+        .iter()
+        .rposition(|e| matches!(e, Event::WorkflowStarted { run_id: r, .. } if r == run_id))?;
+    let mut open: Option<(String, Option<Via>)> = None;
+    for event in &events[start + 1..] {
+        match event {
+            Event::WorkflowNodeStarted {
+                run_id: r,
+                node_id,
+                via,
+                ..
+            } if r == run_id => {
+                open = Some((node_id.clone(), via.clone()));
+            }
+            Event::WorkflowNodeFinished {
+                run_id: r, node_id, ..
+            } if r == run_id && open.as_ref().is_some_and(|(id, _)| id == node_id) => {
+                open = None;
+            }
+            _ => {}
+        }
+    }
+    open
+}
+
+/// A node that runs inside a parallel's fork region cannot be relaunched alone.
+fn in_branch(workflow: &Workflow, node_id: &str) -> bool {
+    workflow
+        .nodes
+        .iter()
+        .filter(|n| matches!(n.kind, NodeKind::Parallel))
+        .any(|p| workflow.branch_region(&p.id).contains(node_id))
 }
 
 fn stop_run(turn: &mut Turn) -> Result<DoneReason, String> {
