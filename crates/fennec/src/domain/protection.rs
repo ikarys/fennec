@@ -16,9 +16,10 @@ pub const LOCKFILES: [&str; 4] = [
 /// fennec's own definitions (agents, skills, workflows, this list), the
 /// instructions, the lockfiles (a new dependency is the human's decision; in
 /// a session worktree they are writable and the integration gate still shows
-/// them), the CI and the accepted ADRs (`docs/adr`: an agent proposes a
-/// decision, it never rewrites one).
-pub const DEFAULT_PATTERNS: [&str; 10] = [
+/// them), the CI and the release configuration, the git hooks (they run
+/// outside the sandbox on the human's next push), and the accepted ADRs
+/// (`docs/adr`: an agent proposes a decision, it never rewrites one).
+pub const DEFAULT_PATTERNS: [&str; 13] = [
     ".agents",
     "AGENTS.md",
     "CLAUDE.md",
@@ -28,6 +29,9 @@ pub const DEFAULT_PATTERNS: [&str; 10] = [
     "pnpm-lock.yaml",
     ".github",
     ".gitlab-ci.yml",
+    "release-please-config.json",
+    ".release-please-manifest.json",
+    ".githooks",
     "docs/adr",
 ];
 
@@ -229,6 +233,8 @@ mod tests {
             "Cargo.lock",
             "crates/x/Cargo.lock",
             ".github/workflows/ci.yml",
+            ".githooks/pre-push",
+            "release-please-config.json",
             "AGENTS.md",
             "sub/AGENTS.md",
         ] {

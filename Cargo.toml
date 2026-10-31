@@ -3,6 +3,7 @@ resolver = "3"
 members = ["crates/backlog", "crates/fennec", "crates/llm-providers", "crates/token-usage"]
 
 [workspace.package]
+version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-only"
 
