@@ -75,6 +75,8 @@ function kindLabel(kind: AttentionItem['kind']): string {
       return 'Workflow';
     case 'awaitingIntegration':
       return 'À intégrer';
+    case 'conflict':
+      return 'Conflit';
     case 'error':
       return 'Erreur';
   }
