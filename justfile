@@ -22,7 +22,7 @@ dev:
     trap 'kill $server' EXIT
     cd web && npm run dev
 
-# Everything CI checks, in the same steps
+# Everything CI checks: the conventions (web, lint) and the tests
 check: web lint test
 
 # The UI primitives rule, formatting, clippy
@@ -31,7 +31,7 @@ lint:
     cargo fmt --all --check
     cargo clippy --all-targets -- -D warnings
 
-# The unit and end-to-end tests of every crate
+# The unit tests of every crate
 test:
     cargo test
 

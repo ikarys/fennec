@@ -25,16 +25,11 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # The conventions: the UI compiles and keeps its primitives, rustfmt, clippy.
   check:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Install bubblewrap
-        run: sudo apt-get update -y && sudo apt-get install -y bubblewrap
-      # Ubuntu 24.04's AppArmor blocks bwrap's network namespace setup;
-      # without this the sandbox tests fail instead of exercising the sandbox.
-      - name: Allow unprivileged user namespaces
-        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -45,17 +40,31 @@ jobs:
           components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v2
       - uses: extractions/setup-just@v2
-      # `just check`, step by step so each shows on its own in the run.
       - name: Build the UI
         run: just web
       - name: Lint
         run: just lint
-      - name: Tests
+
+  # The unit tests, the sandbox's included (they need bwrap).
+  tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install bubblewrap
+        run: sudo apt-get update -y && sudo apt-get install -y bubblewrap
+      # Ubuntu 24.04's AppArmor blocks bwrap's network namespace setup;
+      # without this the sandbox tests fail instead of exercising the sandbox.
+      - name: Allow unprivileged user namespaces
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: extractions/setup-just@v2
+      - name: Unit tests
         run: just test
 
   edge-build:
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
-    needs: check
+    needs: [check, tests]
     uses: ./.github/workflows/build.yml
     with:
       label: edge
