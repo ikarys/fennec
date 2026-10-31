@@ -215,18 +215,13 @@ read-only. The human edits them as usual.
 - `GET /api/projects` → `[{id, name, workdir, branch, sessions: [{id, title, state, createdAt, updatedAt}]}]`
   (projects most recently active first, sessions newest first; `createdAt`/`updatedAt` are Unix milliseconds; `branch` may be `null`)
 - `POST /api/projects` `{workdir}` → the project (400 if not a directory)
-- `GET /api/backlog` → `{total, caps, yours, running, queues, done}`: the cross-project Backlog page (where tasks
-  stand across every project):
-  - `total` `{yours, running, ready, drafts, done, projects}`: counts across all projects; `done` counts all done
-    ideas, `ready` sums each project's `queue.ready`
-  - `caps` `{maxMinutes, maxTokens}`: the global night-mode caps (from any project's board; zeros when there is no
-    project)
-  - `yours`, `running` `[idea]`: the ideas of those stages across projects, most recent `updatedAt` first
-  - `queues` `[{project, running, autonomous, ready, next}]`: projects whose queue is running or has ready ideas,
-    running first then most ready; `project` `{id, name}`, `next` `{id, text} | null`
-  - `done` `[idea]`: the done stage across projects, most recent `updatedAt` first, at most 15
-  - `idea` is the board's idea view minus `attachments`/`plan` (base64 payloads, too heavy for an overview) plus
-    `project` `{id, name}`
+- `GET /api/backlog` → `{total, projects}`: the cross-project Backlog page, one row per project (the idea lists
+  live in each project's Tasks tab):
+  - `total` `{yours, running, ready, drafts, done, projects}`: counts across all projects; `ready` sums each
+    project's `queue.ready`, `projects` counts every project
+  - `projects` `[{project, yours, running, ready, drafts, done, queue}]`: the projects with at least one idea or a
+    running queue; `project` `{id, name}`, the counts are its board's stages, `queue` `{running, autonomous, next}`
+    (`next` `{id, text, title} | null`); a running queue first, then most `yours`, most `ready`, then by name
 - `GET /api/projects/{id}/commands` → `[{name, description}]`: the slash commands the composer offers (`compact`, then the project's skills); 404 if no project
 - `GET /api/projects/{id}/agents` → `[{id, name, description, color, subagent}]`: the
   project's agents in discovery order (`color` null when unset); the modes are the
