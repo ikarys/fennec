@@ -4,6 +4,7 @@ import { Badge } from '../ui/Badge';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { PlayIcon, ExternalIcon } from '../Icons';
 import { type SessionSummary } from '../../lib/api';
+import { QuestionForm } from './QuestionForm';
 
 /** What a project page can ask an agent to analyse: each one opens a session on a read-only agent. */
 const ANALYSES = [
@@ -51,6 +52,7 @@ export function AnalysesSection({
 
   return (
     <div className="flex flex-col gap-2">
+      <QuestionForm busy={busy} onAsk={(question) => onStart(question, 'ask')} />
       <p className="text-xs text-muted">
         Chaque analyse ouvre une session sur un agent en lecture seule : il ne modifie rien, son rapport est une
         proposition.
