@@ -8,6 +8,7 @@ use crate::domain::preferences::{LOCAL_PROVIDER, Preferences, Provider};
 use crate::domain::scanner::SCANNERS;
 use crate::scanners;
 use crate::skills;
+use crate::tools::{SandboxHealth, probe};
 use crate::workflows;
 use llm_providers::{
     ApiKey, Endpoint, ListedModel, MasterKey, ModelParams, ModelPrefs, list_models,
@@ -69,8 +70,19 @@ pub fn get_settings(app: &App, stream: &mut TcpStream) -> Result<(), String> {
         "skills": skills,
         "optInWorkflows": opt_in_workflows,
         "scanners": scanners,
+        "sandboxHealth": sandbox_health(),
     });
     send_json(stream, 200, &body)
+}
+
+/// The sandbox health as JSON, probed on each call so a kernel fix shows up
+/// without a fennec restart.
+fn sandbox_health() -> Value {
+    match probe() {
+        SandboxHealth::Ready => json!({ "status": "ready", "detail": null }),
+        SandboxHealth::Missing => json!({ "status": "missing", "detail": null }),
+        SandboxHealth::Blocked(detail) => json!({ "status": "blocked", "detail": detail }),
+    }
 }
 
 /// What `provider` lists now, at its stored endpoint.

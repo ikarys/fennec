@@ -579,7 +579,7 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
             )}
 
             {tab === 'sandbox' && (
-              <SandboxSection value={form.sandbox} onChange={updateSandbox} />
+              <SandboxSection value={form.sandbox} onChange={updateSandbox} health={settings?.sandboxHealth} />
             )}
             {tab === 'security' && settings && <ScannersSection scanners={settings.scanners ?? []} />}
 
