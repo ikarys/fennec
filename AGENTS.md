@@ -103,12 +103,14 @@ the server.
 Risk zones, done (C11): a "Risques" tab on the project page lists the source files that churn, have
 no tests, or whose every line (git blame) comes from an AI commit never integrated through fennec (an AI
 `Co-Authored-By` trailer, no `Fennec-Session`), read from git (verified; `domain/risk.rs`, `risk.rs`).
+Questions, done (C10): the Analyses tab of the project page takes a question and opens a session on the
+read-only `ask` agent (`crates/fennec/agents/ask.agent.md`), which answers with a `path:line` source per claim
+(indicative).
 Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
-1. Questions to an agent on the project page (C10).
-2. Audits: a read-only `audit` agent, fixed report format.
-3. Tooled human review (C9): a risk map (deterministic), a narrative diff (indicative).
-4. Produced architecture and drift (C12), security checks orchestrating known tools
+1. Audits: a read-only `audit` agent, fixed report format.
+2. Tooled human review (C9): a risk map (deterministic), a narrative diff (indicative).
+3. Produced architecture and drift (C12), security checks orchestrating known tools
    (C23), waivers (C7).
 Later: sub-agents as tools, when dogfooding shows sessions saturating their context.
 
