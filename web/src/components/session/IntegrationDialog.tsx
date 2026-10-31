@@ -1,12 +1,13 @@
 import { DecisionList } from './DecisionList';
 import { useEffect, useState } from 'react';
-import type { Blocker, IntegrationConflict, IntegrationPreview } from '../../lib/api';
+import type { Blocker, IntegrationConflict, IntegrationPreview, ReviewSignal } from '../../lib/api';
 import type { IntegrationResult } from '../../lib/api';
 import { getIntegration, integrate } from '../../lib/api';
 import { completeIdea } from '../../lib/ideas';
 import { CriterionProvenanceBadge } from './CriteriaSection';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
+import type { BadgeTone } from '../ui/Badge';
 import { Card } from '../ui/Card';
 import { Modal } from '../ui/Modal';
 import { FieldRow, TextArea } from '../ui/Field';
@@ -17,6 +18,45 @@ type BlockerKind = Blocker['kind'];
 // These blockers cannot be fixed by an acceptance: the merge has nothing to
 // do, or it cannot succeed.
 const neverAcknowledged = (kind: string) => kind === 'noCommits' || kind === 'conflict';
+
+// `protected` has its own badge, shown before these.
+const SIGNAL_LABEL: Record<Exclude<ReviewSignal, 'protected'>, { label: string; tone: BadgeTone; title: string }> = {
+  bypass: {
+    label: 'contournement',
+    tone: 'err',
+    title: 'Les lignes ajoutées font taire un lint, un contrôle de types ou un test.'
+  },
+  architecture: {
+    label: 'architecture',
+    tone: 'err',
+    title: "Le fichier viole une règle d'architecture."
+  },
+  conflictMarker: {
+    label: 'marqueurs de conflit',
+    tone: 'err',
+    title: 'Des marqueurs de conflit git restent dans les lignes ajoutées.'
+  },
+  testsWeakened: {
+    label: 'tests affaiblis',
+    tone: 'err',
+    title: 'Des tests ou assertions ont été affaiblis dans ce fichier.'
+  },
+  hot: {
+    label: 'instable',
+    tone: 'accent',
+    title: 'Modifié 5 fois ou plus ces 90 derniers jours.'
+  },
+  untested: {
+    label: 'sans test',
+    tone: 'accent',
+    title: 'Aucun test en ligne et aucun fichier de test du même nom sur la branche.'
+  },
+  large: {
+    label: 'gros changement',
+    tone: 'neutral',
+    title: '200 lignes ou plus modifiées.'
+  }
+};
 
 function blockerSentence(blocker: Blocker): string {
   switch (blocker.kind) {
@@ -217,6 +257,9 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
             <section className="flex flex-col gap-1.5">
               <SectionLabel>
                 Fichiers{preview.files.length > 0 && <span className="ml-1 tabular-nums">{preview.files.length}</span>}
+                {preview.files.length > 0 && (
+                  <span className="ml-2 text-xs text-muted">ordre de relecture · vérifié</span>
+                )}
               </SectionLabel>
               {preview.files.length === 0 ? (
                 <div className="text-xs text-muted">Aucun fichier.</div>
@@ -235,6 +278,13 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
                         >
                           ton travail inclus
                         </Badge>
+                      )}
+                      {file.signals.map((signal) =>
+                        signal === 'protected' ? null : (
+                          <Badge key={signal} tone={SIGNAL_LABEL[signal].tone} title={SIGNAL_LABEL[signal].title}>
+                            {SIGNAL_LABEL[signal].label}
+                          </Badge>
+                        ),
                       )}
                       <span className="shrink-0 tabular-nums text-ok">+{file.added}</span>
                       <span className="shrink-0 tabular-nums text-err">−{file.removed}</span>
