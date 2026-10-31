@@ -45,6 +45,9 @@ impl DiffChecks {
 pub enum Blocker {
     /// Nothing to integrate.
     NoCommits,
+    /// The human's branch changed the same lines since the run started: the
+    /// merge would fail.
+    Conflict { files: Vec<String> },
     /// The human's checked-out branch is not the one the run started from
     /// (`to` None: a detached HEAD); the commits would land elsewhere.
     BranchChanged { from: String, to: Option<String> },
@@ -75,6 +78,7 @@ impl Blocker {
     pub fn key(&self) -> &'static str {
         match self {
             Blocker::NoCommits => "noCommits",
+            Blocker::Conflict { .. } => "conflict",
             Blocker::BranchChanged { .. } => "branchChanged",
             Blocker::LocalChanges { .. } => "localChanges",
             Blocker::CriteriaNotPassed { .. } => "criteriaNotPassed",
@@ -92,23 +96,47 @@ pub fn branch_changed(origin_branch: Option<&str>, human_branch: Option<&str>) -
     matches!(origin_branch, Some(origin) if human_branch != Some(origin))
 }
 
+/// Where the work would land: the human's tree as git sees it at review time.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Landing<'a> {
+    /// The branch the run started from, and the one checked out now (None:
+    /// a detached HEAD).
+    pub origin_branch: Option<&'a str>,
+    pub human_branch: Option<&'a str>,
+    /// Uncommitted changes in the human's tree the agent's work would overwrite.
+    pub local_changes: &'a [String],
+    /// Files the merge onto the human's HEAD would conflict on.
+    pub conflicts: &'a [String],
+}
+
 /// The blockers of an integration, in the order the UI shows them:
-/// `NoCommits` first, then the branch, then the human's uncommitted changes,
-/// then the criteria, then the protected files, then the architecture rules,
-/// then the added suppressions, then the weakened tests.
+/// `NoCommits` first, then a merge conflict, then the branch, then the
+/// human's uncommitted changes, then the criteria, then the protected files,
+/// then the architecture rules, then the added suppressions, then the
+/// weakened tests.
 pub fn blockers(
     commits: usize,
     criteria: &[CriterionState],
     protected_touched: &[String],
     checks: &DiffChecks,
-    origin_branch: Option<&str>,
-    human_branch: Option<&str>,
-    local_changes: &[String],
+    landing: &Landing,
 ) -> Vec<Blocker> {
+    let Landing {
+        origin_branch,
+        human_branch,
+        local_changes,
+        conflicts,
+    } = *landing;
     let mut out = Vec::new();
 
     if commits == 0 {
         out.push(Blocker::NoCommits);
+    }
+
+    if !conflicts.is_empty() {
+        out.push(Blocker::Conflict {
+            files: conflicts.to_vec(),
+        });
     }
 
     if let Some(origin) = origin_branch
@@ -170,13 +198,14 @@ pub fn blockers(
     out
 }
 
-/// The blockers the human did not acknowledge (by key). `NoCommits` can
-/// never be acknowledged: there is nothing to integrate.
+/// The blockers the human did not acknowledge (by key). `NoCommits` and
+/// `Conflict` can never be acknowledged: there is nothing to integrate, and
+/// accepting a conflict would not make the merge succeed.
 pub fn unacknowledged<'a>(blockers: &'a [Blocker], acknowledged: &[String]) -> Vec<&'a Blocker> {
     blockers
         .iter()
         .filter(|blocker| match blocker {
-            Blocker::NoCommits => true,
+            Blocker::NoCommits | Blocker::Conflict { .. } => true,
             _ => !acknowledged.contains(&blocker.key().to_string()),
         })
         .collect()
@@ -316,7 +345,7 @@ mod tests {
             ..Default::default()
         };
 
-        let found = blockers(1, &[], &[], &checks, None, None, &[]);
+        let found = blockers(1, &[], &[], &checks, &Landing::default());
 
         assert_eq!(
             found,
@@ -352,7 +381,7 @@ mod tests {
             }),
         };
 
-        let found = blockers(1, &[], &[], &checks, None, None, &[]);
+        let found = blockers(1, &[], &[], &checks, &Landing::default());
 
         assert_eq!(
             found,
@@ -408,9 +437,7 @@ mod tests {
             &criteria,
             &protected,
             &DiffChecks::default(),
-            None,
-            None,
-            &[],
+            &Landing::default(),
         );
 
         assert_eq!(
@@ -430,7 +457,7 @@ mod tests {
     #[test]
     fn no_criteria_is_a_blocker() {
         assert_eq!(
-            blockers(1, &[], &[], &DiffChecks::default(), None, None, &[]),
+            blockers(1, &[], &[], &DiffChecks::default(), &Landing::default()),
             vec![Blocker::NoCriteria]
         );
     }
@@ -445,9 +472,12 @@ mod tests {
             &criteria,
             &[],
             &DiffChecks::default(),
-            Some("main"),
-            Some("main"),
-            &local,
+            &Landing {
+                origin_branch: Some("main"),
+                human_branch: Some("main"),
+                local_changes: &local,
+                ..Landing::default()
+            },
         );
         assert_eq!(
             found,
@@ -466,9 +496,12 @@ mod tests {
             &[],
             &[],
             &DiffChecks::default(),
-            Some("main"),
-            Some("feature"),
-            &local,
+            &Landing {
+                origin_branch: Some("main"),
+                human_branch: Some("feature"),
+                local_changes: &local,
+                ..Landing::default()
+            },
         );
         assert_eq!(
             found[0],
@@ -497,7 +530,13 @@ mod tests {
             state("C2", verified_failed()),
         ];
 
-        let blockers = blockers(1, &criteria, &[], &DiffChecks::default(), None, None, &[]);
+        let blockers = blockers(
+            1,
+            &criteria,
+            &[],
+            &DiffChecks::default(),
+            &Landing::default(),
+        );
 
         assert_eq!(
             blockers,
@@ -509,9 +548,19 @@ mod tests {
 
     /// The branch blocker alone: the other blockers are tested above.
     fn branch_blocker(origin: Option<&str>, human: Option<&str>) -> Option<Blocker> {
-        blockers(1, &[], &[], &DiffChecks::default(), origin, human, &[])
-            .into_iter()
-            .find(|blocker| matches!(blocker, Blocker::BranchChanged { .. }))
+        blockers(
+            1,
+            &[],
+            &[],
+            &DiffChecks::default(),
+            &Landing {
+                origin_branch: origin,
+                human_branch: human,
+                ..Landing::default()
+            },
+        )
+        .into_iter()
+        .find(|blocker| matches!(blocker, Blocker::BranchChanged { .. }))
     }
 
     #[test]
@@ -604,6 +653,64 @@ mod tests {
         assert_eq!(
             unacknowledged(&blockers, &acknowledged),
             vec![&Blocker::NoCommits]
+        );
+    }
+
+    #[test]
+    fn conflict_blocker_has_its_key() {
+        assert_eq!(
+            Blocker::Conflict {
+                files: vec!["a.txt".into()]
+            }
+            .key(),
+            "conflict"
+        );
+    }
+
+    #[test]
+    fn a_conflict_is_listed_first_after_no_commits() {
+        let criteria = vec![state("C1", indicative_passed())];
+        let conflicts = vec!["a.txt".to_string()];
+
+        let found = blockers(
+            0,
+            &criteria,
+            &[],
+            &DiffChecks::default(),
+            &Landing {
+                origin_branch: Some("main"),
+                human_branch: Some("feature"),
+                conflicts: &conflicts,
+                ..Landing::default()
+            },
+        );
+
+        assert_eq!(
+            found,
+            vec![
+                Blocker::NoCommits,
+                Blocker::Conflict {
+                    files: vec!["a.txt".into()]
+                },
+                Blocker::BranchChanged {
+                    from: "main".into(),
+                    to: Some("feature".into())
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn a_conflict_stays_unacknowledged_even_if_acknowledged() {
+        let blockers = vec![Blocker::Conflict {
+            files: vec!["a.txt".into()],
+        }];
+
+        assert_eq!(
+            unacknowledged(&blockers, &["conflict".to_string()]),
+            vec![&Blocker::Conflict {
+                files: vec!["a.txt".into()]
+            }]
         );
     }
 

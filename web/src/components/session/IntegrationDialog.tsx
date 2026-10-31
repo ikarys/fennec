@@ -14,10 +14,16 @@ import { SectionLabel } from '../ui/SectionLabel';
 
 type BlockerKind = Blocker['kind'];
 
+// These blockers cannot be fixed by an acceptance: the merge has nothing to
+// do, or it cannot succeed.
+const neverAcknowledged = (kind: string) => kind === 'noCommits' || kind === 'conflict';
+
 function blockerSentence(blocker: Blocker): string {
   switch (blocker.kind) {
     case 'noCommits':
       return 'Aucun commit à intégrer.';
+    case 'conflict':
+      return `Conflit avec ta branche : ${blocker.files.join(', ')}.`;
     case 'criteriaNotPassed':
       return `Critères non passés : ${blocker.criteria.join(', ')}.`;
     case 'noCriteria':
@@ -91,7 +97,9 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
 
   const hasCommits = (preview?.commits.length ?? 0) > 0;
   const hasUncheckedBlocker =
-    preview?.blockers.some((blocker) => blocker.kind !== 'noCommits' && !acknowledged[blocker.kind]) ?? false;
+    preview?.blockers.some(
+      (blocker) => blocker.kind === 'conflict' || (!neverAcknowledged(blocker.kind) && !acknowledged[blocker.kind]),
+    ) ?? false;
   const integrateDisabled =
     loading || posting || (result === null && (!hasCommits || hasUncheckedBlocker || message.trim() === ''));
   const canFinish = preview !== null && result === null && !hasCommits && preview.idea !== null;
@@ -102,7 +110,7 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
     setError(null);
     setConflict(null);
     const acknowledgedKinds = preview.blockers
-      .filter((blocker) => blocker.kind !== 'noCommits' && acknowledged[blocker.kind])
+      .filter((blocker) => !neverAcknowledged(blocker.kind) && acknowledged[blocker.kind])
       .map((blocker) => blocker.kind);
     try {
       const response = await integrate(sessionId, acknowledgedKinds, message, protectTests, removeWorktree);
@@ -291,7 +299,7 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
                   {preview.blockers.map((blocker) => (
                     <div key={blocker.kind} className="flex items-start justify-between gap-2 text-xs">
                       <span className="grow break-words text-text">{blockerSentence(blocker)}</span>
-                      {blocker.kind !== 'noCommits' && (
+                      {!neverAcknowledged(blocker.kind) && (
                         <label className="flex shrink-0 items-center gap-1.5 text-xs">
                           <input
                             type="checkbox"
