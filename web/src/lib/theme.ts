@@ -1,4 +1,4 @@
-export type ThemeId = 'nuit' | 'jour' | 'brume' | 'cyber';
+export type ThemeId = 'nuit' | 'jour' | 'monokai' | 'cyber';
 
 export interface ThemeOption {
   id: ThemeId;
@@ -9,7 +9,7 @@ export interface ThemeOption {
 export const themes: ThemeOption[] = [
   { id: 'nuit', label: 'Nuit', swatch: '#0E1013' },
   { id: 'jour', label: 'Jour', swatch: '#F6F6F3' },
-  { id: 'brume', label: 'Brume', swatch: '#0F1420' },
+  { id: 'monokai', label: 'Monokai', swatch: '#272822' },
   { id: 'cyber', label: 'Cyber', swatch: '#000300' }
 ];
 
@@ -27,7 +27,7 @@ export function applyTheme(id: ThemeId): void {
 export function getStoredTheme(): ThemeId {
   try {
     const value = localStorage.getItem(STORAGE_KEY);
-    if (value === 'nuit' || value === 'jour' || value === 'brume' || value === 'cyber') {
+    if (value === 'nuit' || value === 'jour' || value === 'monokai' || value === 'cyber') {
       return value;
     }
   } catch {
