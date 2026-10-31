@@ -776,6 +776,7 @@ export function SessionPage({
                   {sessionId && integrationOpen && (
                     <IntegrationDialog
                       sessionId={sessionId}
+                      projectId={detail?.project.id ?? projectId}
                       open
                       onClose={() => {
                         setIntegrationOpen(false);
