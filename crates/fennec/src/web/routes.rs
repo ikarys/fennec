@@ -7,9 +7,9 @@ use super::App;
 use super::audit_routes;
 use super::http::{Request, error, send, send_json};
 use super::{
-    assets, backlog_routes, event_stream, idea_routes, integration, model_routes, project_routes,
-    servers, session_delete, session_routes, settings_routes, terminal, workflow_routes,
-    worktree_routes,
+    assets, backlog_routes, event_stream, idea_routes, integration, model_routes,
+    project_dashboard, project_routes, servers, session_delete, session_routes, settings_routes,
+    terminal, workflow_routes, worktree_routes,
 };
 use serde_json::json;
 use std::net::TcpStream;
@@ -51,6 +51,7 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         ("GET", ["api", "projects", id, "overview"]) => {
             project_routes::get_overview(app, stream, id)
         }
+        ("GET", ["api", "projects", id, "dashboard"]) => project_dashboard::serve(app, stream, id),
         ("GET", ["api", "projects", id, "docs"]) => project_routes::get_docs(app, stream, id),
         ("GET", ["api", "projects", id, "worktrees"]) => {
             worktree_routes::list(app, req, stream, id)
