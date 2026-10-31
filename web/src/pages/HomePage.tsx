@@ -5,6 +5,7 @@ import { formatRelative } from '../lib/format';
 import { SessionStateIcon } from '../components/session/SessionStateIcon';
 import { BulbIcon, ChevronRightIcon, PlusIcon, RepoIcon, TrashIcon } from '../components/Icons';
 import { Button, buttonClass } from '../components/ui/Button';
+import { WorktreeAlert } from '../components/project/WorktreeAlert';
 import { Badge } from '../components/ui/Badge';
 import { SectionLabel } from '../components/ui/SectionLabel';
 import { Section } from '../components/ui/Section';
@@ -249,6 +250,7 @@ export function HomePage({ projects, loading, error, onOpenProjectDialog, onNewS
             <p className="text-sm text-muted">
               {runningCount > 0 ? `${runningCount} session${runningCount > 1 ? 's' : ''} en cours` : 'Aucune session en cours'}
             </p>
+            <WorktreeAlert />
           </div>
           <Button variant="primary" size="md" onClick={onOpenProjectDialog}>
             <svg

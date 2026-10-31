@@ -4,6 +4,7 @@ import { TasksSection } from '../components/project/ideas/TasksSection';
 import { MapSection } from '../components/project/MapSection';
 import { DocSection } from '../components/project/DocSection';
 import { AnalysesSection } from '../components/project/AnalysesSection';
+import { DiskSection } from '../components/project/DiskSection';
 import {
   createSession,
   getProjectOverview,
@@ -17,6 +18,7 @@ const TABS = [
   { id: 'map', label: 'Carte des modules' },
   { id: 'doc', label: 'Doc' },
   { id: 'analyses', label: 'Analyses' },
+  { id: 'disk', label: 'Espace disque' },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
@@ -181,6 +183,7 @@ export default function ProjectPage({
               onOpenSession={onOpenSession}
             />
           ) : null}
+          {activeTab === 'disk' ? <DiskSection projectId={projectId} onOpenSession={onOpenSession} /> : null}
         </div>
       </div>
     </>,
