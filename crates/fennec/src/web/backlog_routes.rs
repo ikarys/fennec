@@ -1,5 +1,7 @@
-//! The cross-project backlog dashboard (contract: `docs/api.md`): a summary of
-//! the tasks done on every project. `routes.rs` only dispatches here.
+//! The cross-project backlog dashboard (contract: `docs/api.md`): where the
+//! human's tasks stand across every project. It gathers each project's board
+//! and shows what waits for the human, what runs, the queues, then what got
+//! done. `routes.rs` only dispatches here.
 
 use std::net::TcpStream;
 
@@ -7,85 +9,137 @@ use serde_json::{Value, json};
 
 use super::App;
 use super::http::send_json;
-use crate::agent::ports::EventLog;
-use crate::domain::event::Event;
+use super::idea_board::{Board, board_json};
+use crate::domain::project::Project;
 use crate::store::SqliteStore;
-use backlog::{Idea, IdeaState};
 
-/// `GET /api/backlog`: projects with done tasks, most done first, plus idle
-/// projects without any done task.
+/// How many done ideas the overview keeps: enough to show recent activity
+/// without turning the cross-project page into a project's full history.
+const RECENT_DONE: usize = 15;
+
+/// `GET /api/backlog`: the cross-project view of every project's board.
 pub fn list_backlog(app: &App, stream: &mut TcpStream) -> Result<(), String> {
     let store = app.store()?;
-    send_json(stream, 200, &backlog_view(&store)?)
+    send_json(stream, 200, &backlog_view(app, &store)?)
 }
 
-/// The dashboard's payload: projects with at least one done task, each listing
-/// its done tasks (most recent first), idle projects without any, and the
-/// totals across all projects.
-fn backlog_view(store: &SqliteStore) -> Result<Value, String> {
-    let mut projects: Vec<Value> = Vec::new();
-    let mut idle: Vec<Value> = Vec::new();
+/// The dashboard's payload: the human's waiting ideas, running ideas, active
+/// queues, recent done ideas, and the totals across all projects.
+fn backlog_view(app: &App, store: &SqliteStore) -> Result<Value, String> {
+    let mut yours: Vec<Value> = Vec::new();
+    let mut running: Vec<Value> = Vec::new();
+    let mut queues: Vec<Value> = Vec::new();
+    let mut done: Vec<Value> = Vec::new();
+
+    let mut total_yours = 0usize;
+    let mut total_running = 0usize;
+    let mut total_ready = 0usize;
+    let mut total_drafts = 0usize;
     let mut total_done = 0usize;
     let mut total_projects = 0usize;
+    let mut caps = json!({ "maxMinutes": 0, "maxTokens": 0 });
 
     for project in store.projects()? {
         total_projects += 1;
-        let mut tasks: Vec<Value> = Vec::new();
-        for idea in store.ideas(&project.id)? {
-            if let Some(status) = done_status(store, &idea)? {
-                total_done += 1;
-                tasks.push(json!({
-                    "id": idea.id,
-                    "text": idea.text,
-                    "status": status,
-                    "updatedAt": idea.updated_at,
-                }));
+
+        let backlog = store.backlog(&project.id)?;
+        let board = Board::new(app, store, &backlog, &project);
+        let board = board_json(&board)?;
+
+        // The caps are global preferences, so any project's board provides them.
+        caps = board["queue"]["caps"].clone();
+
+        for group in board["groups"].as_array().into_iter().flatten() {
+            let Some(ideas) = group["ideas"].as_array() else {
+                continue;
+            };
+            let count = ideas.len();
+
+            match group["stage"].as_str() {
+                Some("yours") => {
+                    total_yours += count;
+                    yours.extend(ideas.iter().map(|idea| summary(idea, &project)));
+                }
+                Some("running") => {
+                    total_running += count;
+                    running.extend(ideas.iter().map(|idea| summary(idea, &project)));
+                }
+                Some("drafts") => {
+                    total_drafts += count;
+                }
+                Some("done") => {
+                    total_done += count;
+                    done.extend(ideas.iter().map(|idea| summary(idea, &project)));
+                }
+                _ => {}
             }
         }
-        tasks.sort_by_key(|task| std::cmp::Reverse(task["updatedAt"].as_u64().unwrap_or(0)));
-        if tasks.is_empty() {
-            idle.push(json!({
-                "id": project.id,
-                "name": project.name,
-            }));
-        } else {
-            projects.push(json!({
-                "id": project.id,
-                "name": project.name,
-                "doneCount": tasks.len(),
-                "tasks": tasks,
+
+        let queue = &board["queue"];
+        let ready = queue["ready"].as_u64().unwrap_or(0) as usize;
+        total_ready += ready;
+
+        let is_running = queue["running"].as_bool().unwrap_or(false);
+        if is_running || ready > 0 {
+            queues.push(json!({
+                "project": { "id": project.id, "name": project.name },
+                "running": is_running,
+                "autonomous": queue["autonomous"].as_bool().unwrap_or(false),
+                "ready": ready,
+                "next": queue["next"].clone(),
             }));
         }
     }
 
-    projects.sort_by_key(|project| std::cmp::Reverse(project["doneCount"].as_u64().unwrap_or(0)));
-    idle.sort_by_key(|project| project["name"].as_str().unwrap_or("").to_lowercase());
+    sort_by_updated_at_desc(&mut yours);
+    sort_by_updated_at_desc(&mut running);
+    sort_by_updated_at_desc(&mut done);
+    done.truncate(RECENT_DONE);
+
+    // Running queues are the most urgent; among stopped queues, the largest
+    // ready pile is the most relevant.
+    queues.sort_by(|a, b| {
+        let a_running = a["running"].as_bool().unwrap_or(false);
+        let b_running = b["running"].as_bool().unwrap_or(false);
+        let a_ready = a["ready"].as_u64().unwrap_or(0);
+        let b_ready = b["ready"].as_u64().unwrap_or(0);
+        b_running.cmp(&a_running).then(b_ready.cmp(&a_ready))
+    });
 
     Ok(json!({
-        "projects": projects,
-        "idle": idle,
-        "total": { "done": total_done, "projects": total_projects },
+        "total": {
+            "yours": total_yours,
+            "running": total_running,
+            "ready": total_ready,
+            "drafts": total_drafts,
+            "done": total_done,
+            "projects": total_projects,
+        },
+        "caps": caps,
+        "yours": yours,
+        "running": running,
+        "queues": queues,
+        "done": done,
     }))
 }
 
-/// The status of a done task, or `None` when it is not done. A task is done
-/// when the human completed it, or started it and then integrated its work —
-/// the same two states the project board's `done` group shows.
-fn done_status(store: &SqliteStore, idea: &Idea) -> Result<Option<&'static str>, String> {
-    match idea.state {
-        IdeaState::Completed => Ok(Some("completed")),
-        IdeaState::Started => {
-            let Some(session_id) = idea.session_id.as_deref() else {
-                return Ok(None);
-            };
-            let integrated = store
-                .events(session_id)?
-                .iter()
-                .any(|event| matches!(event, Event::IntegrationApplied { .. }));
-            Ok(integrated.then_some("integrated"))
-        }
-        _ => Ok(None),
+/// The cross-project idea summary: the board's idea view without its heavy
+/// base64 payloads, plus the project it belongs to.
+fn summary(idea: &Value, project: &Project) -> Value {
+    let mut summary = idea.clone();
+    if let Some(object) = summary.as_object_mut() {
+        object.remove("attachments");
+        object.remove("plan");
+        object.insert(
+            "project".to_string(),
+            json!({ "id": project.id, "name": project.name }),
+        );
     }
+    summary
+}
+
+fn sort_by_updated_at_desc(ideas: &mut [Value]) {
+    ideas.sort_by_key(|idea| std::cmp::Reverse(idea["updatedAt"].as_u64().unwrap_or(0)));
 }
 
 #[cfg(test)]
@@ -129,32 +183,19 @@ mod tests {
         }
     }
 
-    fn integrated_event() -> Event {
-        Event::IntegrationApplied {
-            branch: "b".into(),
-            base: "main".into(),
-            commits: Vec::new(),
-            head: "h".into(),
-            message: String::new(),
-            acknowledged: Vec::new(),
-            protected_tests: Vec::new(),
-        }
-    }
-
     #[test]
-    fn backlog_view_lists_done_tasks_per_project() {
+    fn backlog_view_summarizes_boards_across_projects() {
         let app = app();
         let store = app.store().unwrap();
 
-        // Project A: one completed, one started+integrated, one started and not
-        // integrated (the last one is not done).
+        // Project A: one completed idea and one ready idea.
         let a = store.project_for("/tmp/backlog-a").unwrap();
         store
             .append_idea_event(
                 &a.id,
                 &BacklogEvent::Added {
                     idea_id: "a1".into(),
-                    text: "done explicit".into(),
+                    text: "done".into(),
                     attachments: Vec::new(),
                 },
             )
@@ -167,116 +208,55 @@ mod tests {
                 },
             )
             .unwrap();
-
-        let sa = store.create_session(&a, "sa").unwrap();
         store
             .append_idea_event(
                 &a.id,
                 &BacklogEvent::Added {
                     idea_id: "a2".into(),
-                    text: "integrated".into(),
+                    text: "ready".into(),
                     attachments: Vec::new(),
                 },
             )
             .unwrap();
+        // A ready idea is queued only once framed in a session.
+        let framing = store.create_session(&a, "framing").unwrap();
         store
             .append_idea_event(
                 &a.id,
                 &BacklogEvent::Framing {
                     idea_id: "a2".into(),
-                    session_id: sa.clone(),
+                    session_id: framing,
                 },
             )
             .unwrap();
         store
             .append_idea_event(
                 &a.id,
-                &BacklogEvent::Started {
+                &BacklogEvent::Ready {
                     idea_id: "a2".into(),
-                    autonomous: false,
-                },
-            )
-            .unwrap();
-        store.append(&sa, &integrated_event()).unwrap();
-
-        let sb = store.create_session(&a, "sb").unwrap();
-        store
-            .append_idea_event(
-                &a.id,
-                &BacklogEvent::Added {
-                    idea_id: "a3".into(),
-                    text: "not integrated".into(),
-                    attachments: Vec::new(),
-                },
-            )
-            .unwrap();
-        store
-            .append_idea_event(
-                &a.id,
-                &BacklogEvent::Framing {
-                    idea_id: "a3".into(),
-                    session_id: sb.clone(),
-                },
-            )
-            .unwrap();
-        store
-            .append_idea_event(
-                &a.id,
-                &BacklogEvent::Started {
-                    idea_id: "a3".into(),
-                    autonomous: false,
+                    plan: "plan".into(),
                 },
             )
             .unwrap();
 
-        // Project B: one completed.
-        let b = store.project_for("/tmp/backlog-b").unwrap();
-        store
-            .append_idea_event(
-                &b.id,
-                &BacklogEvent::Added {
-                    idea_id: "b1".into(),
-                    text: "b done".into(),
-                    attachments: Vec::new(),
-                },
-            )
-            .unwrap();
-        store
-            .append_idea_event(
-                &b.id,
-                &BacklogEvent::Completed {
-                    idea_id: "b1".into(),
-                },
-            )
-            .unwrap();
+        // Project B: nothing.
+        store.project_for("/tmp/backlog-b").unwrap();
 
-        // Project C: no done task, so it is idle.
-        let c = store.project_for("/tmp/backlog-c").unwrap();
+        let view = backlog_view(&app, &store).unwrap();
 
-        let view = backlog_view(&store).unwrap();
+        assert_eq!(view["total"]["projects"], 2);
+        assert_eq!(view["total"]["done"], 1);
+        assert_eq!(view["total"]["ready"], 1);
 
-        assert_eq!(view["total"]["done"], 3);
-        assert_eq!(view["total"]["projects"], 3);
+        let done = view["done"].as_array().unwrap();
+        assert_eq!(done.len(), 1);
+        assert_eq!(done[0]["id"], "a1");
+        assert_eq!(done[0]["project"]["name"], a.name);
+        assert!(done[0].get("attachments").is_none());
 
-        let projects = view["projects"].as_array().unwrap();
-        assert_eq!(projects.len(), 2);
-        // Project A holds the most done tasks, so it leads the list.
-        assert_eq!(projects[0]["id"], a.id);
-        assert_eq!(projects[0]["doneCount"], 2);
-        let a_tasks = projects[0]["tasks"].as_array().unwrap();
-        let statuses: Vec<&str> = a_tasks
-            .iter()
-            .map(|task| task["status"].as_str().unwrap())
-            .collect();
-        assert!(statuses.contains(&"completed"));
-        assert!(statuses.contains(&"integrated"));
-
-        assert_eq!(projects[1]["id"], b.id);
-        assert_eq!(projects[1]["doneCount"], 1);
-
-        let idle = view["idle"].as_array().unwrap();
-        assert_eq!(idle.len(), 1);
-        assert_eq!(idle[0]["id"], c.id);
-        assert_eq!(idle[0]["name"], c.name);
+        let queues = view["queues"].as_array().unwrap();
+        assert_eq!(queues.len(), 1);
+        assert_eq!(queues[0]["project"]["id"], a.id);
+        assert_eq!(queues[0]["ready"], 1);
     }
 }
