@@ -316,6 +316,12 @@ fn bwrap_args(sandbox: &Sandbox, workdir: &Path, cwd: &Path, command: &str) -> V
     // Dependency directories from the main checkout: read-only, because the
     // worktree lacks them and the sandbox has no network to install them.
     for (src, dst) in mounts {
+        // The list is taken when the turn starts; starting a server since then
+        // may have replaced the mount point with a link to the same copy, onto
+        // which bwrap cannot bind.
+        if dst.symlink_metadata().is_ok_and(|m| m.is_symlink()) {
+            continue;
+        }
         args.push(OsString::from("--ro-bind"));
         args.push(src.as_os_str().to_os_string());
         args.push(dst.as_os_str().to_os_string());
@@ -517,6 +523,31 @@ mod tests {
                 "echo hi",
             ]
         );
+    }
+
+    #[test]
+    fn bwrap_args_skip_a_mount_point_since_replaced_by_a_link() {
+        let dir = std::env::temp_dir().join(format!("fennec-mount-link-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let link = dir.join("node_modules");
+        let _ = std::fs::remove_file(&link);
+        std::os::unix::fs::symlink("/main/web/node_modules", &link).unwrap();
+        let args = bwrap_args(
+            &Sandbox::Bwrap {
+                network: false,
+                hidden_dirs: vec![],
+                hidden_files: vec![],
+                writable: vec![],
+                read_only: vec![],
+                mounts: vec![(PathBuf::from("/main/web/node_modules"), link)],
+            },
+            &dir,
+            &dir,
+            "echo hi",
+        );
+        std::fs::remove_dir_all(&dir).unwrap();
+
+        assert!(!args_as_strings(&args).contains(&"/main/web/node_modules".to_string()));
     }
 
     #[test]
