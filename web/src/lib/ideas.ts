@@ -45,6 +45,7 @@ export interface IdeaView {
   autonomous: boolean;
   position: number | null;
   createdAt: number;
+  updatedAt: number;
   startedAt: number | null;
   durationMs: number | null;
   tokens: number | null;

@@ -4,11 +4,19 @@
 import { formatDuration, formatTokens } from '../../../lib/format';
 import type { IdeaBoard, IdeaView } from '../../../lib/ideas';
 
+/**
+ * The idea's run meta: duration, tokens, criteria, decisions, and git counts.
+ * The prop is the fields this component reads, so both board ideas and the
+ * cross-project backlog summaries can be passed without casts.
+ */
 export function IdeaMeta({
   idea,
   caps,
 }: {
-  idea: IdeaView;
+  idea: Pick<
+    IdeaView,
+    "durationMs" | "autonomous" | "tokens" | "criteria" | "decisions" | "commits" | "files"
+  >;
   caps: IdeaBoard['queue']['caps'];
 }) {
   return (
