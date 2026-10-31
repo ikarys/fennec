@@ -215,8 +215,8 @@ read-only. The human edits them as usual.
 - `GET /api/models/choices` → `{default, favorites}`, each a
   `{provider, model, providerName}`: what the composer's model picker offers;
   read from the stored preferences, no provider is called
-- `GET /api/projects` → `[{id, name, workdir, branch, sessions: [{id, title, state, createdAt, updatedAt}]}]`
-  (projects most recently active first, sessions newest first; `createdAt`/`updatedAt` are Unix milliseconds; `branch` may be `null`)
+- `GET /api/projects` → `[{id, name, workdir, branch, remote, editorUrl, sessions: [{id, title, state, createdAt, updatedAt}]}]`
+  (projects most recently active first, sessions newest first; `createdAt`/`updatedAt` are Unix milliseconds; `branch` and `remote` may be `null`; `editorUrl` opens the workdir in VS Code, through the WSL remote under WSL)
 - `POST /api/projects` `{workdir}` → the project (400 if not a directory)
 - `GET /api/backlog` → `{total, projects}`: the cross-project Backlog page, one row per project (the idea lists
   live in each project's Tasks tab):
