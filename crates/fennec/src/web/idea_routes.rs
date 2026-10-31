@@ -131,7 +131,7 @@ pub fn add_idea(
     send_board(app, stream, project_id)
 }
 
-/// `POST /api/projects/{id}/ideas/{iid}/{framing,ready,drop,complete}`.
+/// `POST /api/projects/{id}/ideas/{iid}/{framing,ready,edit,drop,complete}`.
 pub fn update_idea(
     app: &App,
     req: &Request,
@@ -174,6 +174,16 @@ pub fn update_idea(
                 return error(stream, 400, "empty plan");
             }
             BacklogEvent::Ready { idea_id, plan }
+        }
+        "edit" => {
+            let text = field("text");
+            if text.is_empty() {
+                return error(stream, 400, "empty idea");
+            }
+            if text.chars().count() > MAX_IDEA_CHARS {
+                return error(stream, 400, "idea too long");
+            }
+            BacklogEvent::Edited { idea_id, text }
         }
         "drop" => BacklogEvent::Dropped { idea_id },
         "complete" => BacklogEvent::Completed { idea_id },

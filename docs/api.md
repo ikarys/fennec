@@ -275,6 +275,7 @@ read-only. The human edits them as usual.
     the plan card's "Mettre au backlog" for a plan written outside the backlog
   - `POST /api/projects/{id}/ideas/{ideaId}/framing` `{sessionId}` (`idea.framing`; 404 if the session is not the project's)
   - `POST /api/projects/{id}/ideas/{ideaId}/ready` `{plan}` (`idea.ready`; 400 if empty)
+  - `POST /api/projects/{id}/ideas/{ideaId}/edit` `{text}` (`idea.edited`; 400 if empty or over 4000 characters): the human rewrites the idea's text; a dropped or completed idea keeps its text
   - `POST /api/projects/{id}/ideas/{ideaId}/drop` `{}` (`idea.dropped`)
   - `POST /api/projects/{id}/ideas/{ideaId}/complete` `{}` (`idea.completed`)
   - `POST /api/projects/{id}/ideas/{ideaId}/start` `{}`: builds this idea now, outside the queue: from its plan
