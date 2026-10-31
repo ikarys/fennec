@@ -8,13 +8,13 @@ use serde_json::json;
 
 use super::App;
 use super::http::{Request, error, send_json};
-use super::notifier::NotifyingLog;
 use super::routes::session_and_project;
 use crate::agent::ports::EventLog;
 use crate::domain::audit;
 use crate::domain::conversation::last_assistant_text;
 use crate::domain::event::Event;
 use crate::domain::id::new_id;
+use crate::notifier::NotifyingLog;
 use backlog::BacklogEvent;
 
 /// `POST /api/sessions/{id}/audit/tasks` `{findings: [number]}` → `{created}`.
