@@ -25,7 +25,12 @@ export interface SessionSummary {
 }
 
 /** What a session is waiting for; the badge and the notification are worded from it. */
-export type AttentionKind = "question" | "workflowPause" | "awaitingIntegration" | "error";
+export type AttentionKind =
+  | "question"
+  | "workflowPause"
+  | "awaitingIntegration"
+  | "conflict"
+  | "error";
 
 /** One session that needs the human, as the `/api/notices` snapshot carries it. */
 export interface AttentionItem {
@@ -325,6 +330,19 @@ export function discardWorktree(
 ): Promise<{ commits: string[] }> {
   return request<{ commits: string[] }>(
     `/api/sessions/${encodeURIComponent(sessionId)}/discard`,
+    {
+      method: "POST",
+      body: "{}",
+    },
+  );
+}
+
+/** Brings the session's branch up to date with the human's branch and starts a turn to resolve conflicts. */
+export function resolveConflict(
+  sessionId: string,
+): Promise<{ conflicts: string[]; started: boolean }> {
+  return request<{ conflicts: string[]; started: boolean }>(
+    `/api/sessions/${encodeURIComponent(sessionId)}/resolve-conflict`,
     {
       method: "POST",
       body: "{}",

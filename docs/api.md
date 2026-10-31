@@ -352,6 +352,12 @@ read-only. The human edits them as usual.
   the human's decision; 409 while a turn runs or without a worktree; removes the
   worktree, its branch and base ref in the human's repository and appends
   `worktree.discarded`. A later workflow in the session opens a fresh worktree.
+- `POST /api/sessions/{id}/resolve-conflict` `{}` → `{conflicts, started}`:
+  brings the session's branch up to date with the human's HEAD as one commit
+  (the base ref moves to that HEAD, conflict markers are left in the files);
+  409 while a turn runs or a workflow waits. When conflicts remain the session
+  switches to `builder` (`mode.changed`, reason `conflict`) and a turn starts
+  with a prompt naming the conflicted files; `started` is true then.
 - `POST /api/sessions/{id}/terminal` → 202 `{path}`: opens the human's own
   terminal in the session's folder (its worktree, else the project): Windows
   Terminal under WSL, Terminal.app on macOS, else `$TERMINAL` or

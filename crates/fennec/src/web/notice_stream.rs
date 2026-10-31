@@ -72,6 +72,11 @@ fn current_attention(app: &App, store: &SqliteStore) -> Result<AttentionSet, Str
         let events = store.events(&session.id)?;
         confirm_pending_work(store, &mut pending, &mut session)?;
         if let Some(item) = attention::attention(&session, &events, false) {
+            let item = if item.kind == attention::AttentionKind::AwaitingIntegration {
+                mark_conflict(app, store, &session, item)?
+            } else {
+                item
+            };
             set.insert(session.id.clone(), item);
         }
     }
@@ -109,7 +114,12 @@ fn refresh(
         last_seq.insert(session.id.clone(), seq);
         let events = store.events(&session.id)?;
         confirm_pending_work(store, &mut pending, session)?;
-        let next = attention::attention(session, &events, false);
+        let mut next = attention::attention(session, &events, false);
+        if let Some(item) = &next
+            && item.kind == attention::AttentionKind::AwaitingIntegration
+        {
+            next = Some(mark_conflict(app, store, session, item.clone())?);
+        }
         if attention.get(&session.id).cloned() != next {
             changed = true;
             match next {
@@ -157,6 +167,38 @@ fn confirm_pending_work(
     }
     session.awaiting_integration = pending[&session.project_id].contains(&session.id);
     Ok(())
+}
+
+/// Finished work whose branch conflicts with the human's branch is a `Conflict`
+/// attention, not an `AwaitingIntegration` one: the human cannot integrate it
+/// until the agent resolves the markers.
+fn mark_conflict(
+    app: &App,
+    store: &SqliteStore,
+    session: &SessionSummary,
+    item: Attention,
+) -> Result<Attention, String> {
+    // ponytail: recomputed only when the session's log moves; a commit on the
+    // human's branch alone does not refresh it until the next page load.
+    let Some(project) = store.project(&session.project_id)? else {
+        return Ok(item);
+    };
+    let Some(wt) = app.place(store, session, &project)?.worktree else {
+        return Ok(item);
+    };
+    let Some((top, _)) = crate::worktree::top(Path::new(&project.workdir)) else {
+        return Ok(item);
+    };
+    let conflicts = crate::integration::conflicts(&top, &wt);
+    if conflicts.is_empty() {
+        Ok(item)
+    } else {
+        Ok(Attention {
+            kind: attention::AttentionKind::Conflict,
+            detail: conflicts.join(", "),
+            ..item
+        })
+    }
 }
 
 /// The snapshot as a `data:` frame, ordered by session so it is stable.

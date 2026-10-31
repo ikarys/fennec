@@ -132,6 +132,9 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
             integration::integrate(app, req, stream, id)
         }
         ("POST", ["api", "sessions", id, "discard"]) => integration::discard(app, req, stream, id),
+        ("POST", ["api", "sessions", id, "resolve-conflict"]) => {
+            integration::resolve_conflict(app, req, stream, id)
+        }
         ("POST", ["api", "sessions", id, "terminal"]) => terminal::open(app, stream, id),
         ("GET", ["api", "sessions", id, "servers"]) => servers::list(app, stream, id),
         ("POST", ["api", "sessions", id, "servers"]) => servers::save(app, req, stream, id),
