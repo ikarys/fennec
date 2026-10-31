@@ -62,9 +62,20 @@ Today this is unavailable because the repo is private on a Free plan.
 
 ## Installing a binary
 
-1. Download the tarball and `.sha256` from the release.
-2. Run `sha256sum -c fennec-<label>-<target>.tar.gz.sha256`.
-3. Extract and run `./fennec --version`.
+```bash
+curl -fsSL https://raw.githubusercontent.com/ikarys/fennec/main/install.sh | sh
+```
+
+`install.sh` resolves the latest release (or `FENNEC_VERSION`, a tag or `edge`), checks the
+`.sha256`, and installs `fennec` into `FENNEC_INSTALL_DIR` (default `~/.local/bin`). It only needs
+`curl`, `tar` and `sha256sum`, and warns when glibc is too old, `bwrap` is missing or the directory
+is not in `PATH`. The repo's `.agents/protected` keeps it out of fennec's agents' reach.
+
+With [mise](https://mise.jdx.dev): `mise use -g github:ikarys/fennec`. Its GitHub backend picks the
+asset from the target in its name, so the release names must keep `<arch>-unknown-linux-gnu`.
+
+By hand: download the tarball and its `.sha256` from the release, run
+`sha256sum -c fennec-<label>-<target>.tar.gz.sha256`, extract, run `./fennec --version`.
 
 It needs glibc 2.35 or later (built on Ubuntu 22.04) and `bwrap` for the command sandbox.
 The `edge` prerelease is the latest develop build, the same way: not a release.
