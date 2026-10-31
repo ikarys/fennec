@@ -63,6 +63,23 @@ the approval card is no longer actionable; a `RunEndCard` shows the outcome
 and the reason. To redo the work, the human starts a new session (a fresh
 context on the current main).
 
+## A session's change could not be previewed — fixed
+
+2026-10-31. The panel's servers ran in the project's main directory, on the
+port their command hard-coded: they served the human's checkout, never the
+agent's worktree, so a new design or API change could only be seen after
+integrating it.
+
+Fixed: a server starts in the session's worktree, with the main checkout's
+`node_modules`/`.venv` linked in (never committed) and a free port in `$PORT`;
+the panel links to it. To preview fennec itself, `.agents/servers.json` can
+hold a server on a fresh store, never the live one (a second server on it
+would resume the night queue):
+
+```json
+[{"name": "fennec", "command": "cd web && npm run build && cd .. && cargo build && FENNEC_DB=$(mktemp -d)/fennec.db target/debug/fennec --port $PORT"}]
+```
+
 ## The local inference server takes the machine down — open
 
 2026-10-25. The local LLM brought the GPU driver down (`dxg` timeouts in the
