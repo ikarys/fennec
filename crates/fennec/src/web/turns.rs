@@ -3,21 +3,16 @@
 
 use super::children::Children;
 use super::model_routes;
-use super::notifier::{Notifier, NotifyingLog};
 use crate::agent::turn::{Turn, compact_session, replay_turn, run_turn};
 use crate::agent::workflow::{WorkflowEnv, WorkflowJob, run_workflow};
-use crate::agents;
 use crate::config::Settings;
 use crate::domain::attachment::Attachment;
 use crate::domain::event::Event;
 use crate::domain::slash::TurnInput;
-use crate::instructions::all_instructions;
-use crate::llm::OpenAiClient;
-use crate::metering::MeteredLog;
-use crate::protected;
-use crate::skills;
+use crate::notifier::Notifier;
 use crate::store::SqliteStore;
-use crate::tools::{LocalTools, Sandbox};
+use crate::tools::LocalTools;
+use crate::turn_build;
 use crate::worktree::{self, Worktree};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -138,9 +133,8 @@ impl Turns {
     }
 }
 
-/// Builds the turn's dependencies and hands the turn (and its tools) to
-/// `body`. The store, log, prefs, instructions, skills, agents, model and
-/// tools stay locals here.
+/// Opens the session's store, resolves its model choice and hands the turn
+/// (and its tools) to `body`; the shared wiring lives in `turn_build`.
 pub(super) fn with_turn<R>(
     settings: &Settings,
     notifier: &Notifier,
@@ -151,59 +145,24 @@ pub(super) fn with_turn<R>(
     body: impl FnOnce(&mut Turn, &LocalTools) -> Result<R, String>,
 ) -> Result<R, String> {
     let store = SqliteStore::open(&settings.db_path)?;
-    let ledger = token_usage::Ledger::open(&settings.usage_path()).map_err(|e| e.to_string())?;
-    let metered = MeteredLog {
-        log: &store,
-        store: &store,
-        ledger: &ledger,
-    };
-    let log = NotifyingLog {
-        log: &metered,
-        notifier,
-    };
-    let prefs = store.preferences()?;
     // A workflow's child sessions run on the model the human chose for the session.
     let (chosen, _) = model_routes::session_choice(&store, session_id)?;
-    let params = settings.llm.for_turn(&prefs, chosen.as_ref());
-    let instructions = all_instructions(prefs.global_instructions.as_deref(), workdir);
-    let skills = skills::discover(workdir);
-    let agents = agents::discover(workdir);
-    let model = OpenAiClient::new(settings.endpoint(&prefs, &params.provider)?, &params.model);
-    // A session worktree is the agent's own copy: a new dependency's lockfile
-    // may change there, and the integration gate shows it to the human.
-    let protection = if workdir.starts_with(worktree::root(&settings.db_path)) {
-        protected::load_for_worktree(workdir)
-    } else {
-        protected::load(workdir)
-    };
-    let tools = LocalTools::new(workdir.to_path_buf())
-        .with_search(prefs.search.clone())
-        .with_sandbox(
-            Sandbox::for_store(&prefs.sandbox, &settings.db_path)
-                .protecting(protected::existing_paths(workdir, &protection))
-                .with_mounts(worktree::dependency_mounts(workdir)),
-        )
-        .with_protection(protection);
     let mut on_event = |_: &Event| {};
-    let mut turn = Turn {
-        model: &model,
-        log: &log,
-        tools: &tools,
-        session_id,
-        workdir,
-        instructions: &instructions,
-        skills: &skills,
-        always_on: &prefs.always_on_skills,
-        agents: &agents,
-        max_tokens: params.max_tokens,
-        context_window: params.context_window,
-        compact_at: params.compact_at,
-        reasoning_effort: params.reasoning_effort,
+    let mut options = turn_build::Options {
+        notifier: Some(notifier),
+        model_choice: chosen,
         autonomous,
-        stop,
         on_event: &mut on_event,
     };
-    body(&mut turn, &tools)
+    turn_build::with_turn(
+        settings,
+        &store,
+        session_id,
+        workdir,
+        stop,
+        &mut options,
+        body,
+    )
 }
 
 fn run(

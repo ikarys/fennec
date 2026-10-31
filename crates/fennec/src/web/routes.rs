@@ -4,7 +4,6 @@ use super::App;
 use super::audit_routes;
 use super::editor;
 use super::http::{Request, error, send, send_json};
-use super::notifier::NotifyingLog;
 use super::terminal;
 use super::{
     assets, backlog_routes,
@@ -33,6 +32,7 @@ use crate::domain::replay::replayable;
 use crate::domain::session_skills::missed_always_on;
 use crate::domain::slash::{TurnInput, commands, resolve};
 use crate::domain::workflow::run::Waiting;
+use crate::notifier::NotifyingLog;
 use crate::skills;
 use crate::store::SqliteStore;
 use crate::{folders, git, workflows};
@@ -771,7 +771,7 @@ mod tests {
     use super::*;
     use crate::config::{LlmSettings, Settings};
     use crate::domain::preferences::ModelParams;
-    use crate::web::notifier::Notifier;
+    use crate::notifier::Notifier;
     use crate::web::turns::Turns;
     use std::collections::HashMap;
     use std::io::Read;

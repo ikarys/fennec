@@ -4,7 +4,6 @@
 
 use super::App;
 use super::http::{Request, error, send_json};
-use super::notifier::NotifyingLog;
 use super::routes::session_and_project;
 use crate::agent::ports::EventLog;
 use crate::architecture;
@@ -17,6 +16,7 @@ use crate::domain::integration::{
 use crate::domain::test_files::new_test_patterns;
 use crate::domain::workflow::run;
 use crate::integration::{self, ApplyError, Preview};
+use crate::notifier::NotifyingLog;
 use crate::protected;
 use crate::store::SqliteStore;
 use crate::worktree::{self, Worktree};

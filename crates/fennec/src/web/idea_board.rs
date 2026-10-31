@@ -411,7 +411,7 @@ mod tests {
     use super::*;
     use crate::config::{LlmSettings, Settings};
     use crate::domain::preferences::ModelParams;
-    use crate::web::notifier::Notifier;
+    use crate::notifier::Notifier;
     use crate::web::turns::Turns;
     use backlog::{BacklogEvent, IdeaAttachment};
     use std::collections::HashMap;
