@@ -1,14 +1,50 @@
-import type { SandboxPrefs } from '../../lib/api';
+import type { SandboxHealth, SandboxPrefs } from '../../lib/api';
+import { CopyButton } from '../session/CopyButton';
+import { Badge } from '../ui/Badge';
 import { Section } from '../ui/Section';
+
+const FIX =
+  "echo 'kernel.apparmor_restrict_unprivileged_userns=0' | sudo tee /etc/sysctl.d/60-bwrap-userns.conf && sudo sysctl --system";
 
 interface SandboxSectionProps {
   value: SandboxPrefs;
   onChange: (value: SandboxPrefs) => void;
+  health?: SandboxHealth;
 }
 
-export function SandboxSection({ value, onChange }: SandboxSectionProps) {
+export function SandboxSection({ value, onChange, health }: SandboxSectionProps) {
   return (
     <Section title="Bac à sable">
+      {value.enabled && health && health.status !== 'ready' && (
+        <div className="flex flex-col gap-1 rounded-md border border-err p-3">
+          <Badge tone="err" className="self-start">bwrap indisponible</Badge>
+          {health.status === 'missing' && (
+            <p className="text-xs text-muted">
+              bwrap n&apos;est pas installé : les commandes du modèle échoueront. Installe le paquet
+              bubblewrap, puis recharge cette page.
+            </p>
+          )}
+          {health.status === 'blocked' && (
+            <>
+              <p className="text-xs text-muted">
+                bwrap ne peut pas créer son espace isolé : les commandes du modèle échoueront. Sur
+                Ubuntu 23.10 et suivants, AppArmor interdit les user namespaces ; lance la commande
+                ci-dessous puis recharge cette page (détails : docs/releasing.md).
+              </p>
+              {health.detail && <code className="font-mono text-xs text-err">{health.detail}</code>}
+              <div className="flex items-center gap-2">
+                <code
+                  className="min-w-0 grow truncate rounded bg-surface px-2 py-1 font-mono text-xs"
+                  title={FIX}
+                >
+                  {FIX}
+                </code>
+                <CopyButton text={FIX} />
+              </div>
+            </>
+          )}
+        </div>
+      )}
       <div className="flex flex-col gap-1">
         <label className="flex items-center gap-2 text-sm text-text">
           <input
