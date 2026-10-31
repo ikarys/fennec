@@ -6,8 +6,9 @@ use super::App;
 use super::http::{Request, error, send_json};
 use crate::domain::server::{ServerDef, validate};
 use crate::servers;
+use crate::worktree;
 use serde_json::{Value, json};
-use std::net::TcpStream;
+use std::net::{TcpListener, TcpStream};
 use std::path::Path;
 use std::process::Command;
 
@@ -15,6 +16,7 @@ use std::process::Command;
 /// port by killing the whole tree (`setsid` makes the child the group leader).
 pub(super) struct RunningServer {
     pub(super) pid: u32,
+    pub(super) port: u16,
 }
 
 /// `{sessionId}/{name}`: one running server per (session, server).
@@ -33,10 +35,12 @@ pub fn list(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
     let out: Vec<Value> = defs
         .iter()
         .map(|def| {
+            let run = running.get(&key(id, def.name.trim()));
             json!({
                 "name": def.name,
                 "command": def.command,
-                "running": running.contains_key(&key(id, def.name.trim())),
+                "running": run.is_some(),
+                "url": run.map(|s| format!("http://127.0.0.1:{}", s.port)),
             })
         })
         .collect();
@@ -69,10 +73,10 @@ pub fn save(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Resul
     list(app, stream, id)
 }
 
-/// Starts a server in the project's directory.
+/// Starts a server in the session's place.
 /// `POST /api/sessions/{id}/servers/start` with `{name}`.
 pub fn start(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Result<(), String> {
-    let Some((_, project)) = app.session_and_project(id)? else {
+    let Some((session, project)) = app.session_and_project(id)? else {
         return error(stream, 404, "no such session");
     };
     let name = req_name(req)?;
@@ -84,15 +88,24 @@ pub fn start(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Resu
     if app.server_runs.lock().unwrap().contains_key(&k) {
         return error(stream, 409, "already running");
     }
-    // In the project's directory, not the session's worktree: a worktree is a
-    // bare checkout without node_modules/.venv, so a dev server would not start.
-    let mut child = spawn(&def.command, Path::new(&project.workdir))
-        .map_err(|e| format!("start {name}: {e}"))?;
+    let store = app.store()?;
+    let place = app.place(&store, &session, &project)?;
+    // In the session's own place, so the server serves the agent's work; the
+    // server list is still read from the project's directory (the human's
+    // configuration).
+    if place.worktree.is_some()
+        && let Err(e) = worktree::link_dependencies(&place.workdir)
+    {
+        return error(stream, 500, &format!("link the dependencies: {e}"));
+    }
+    let port = free_port().map_err(|e| format!("pick a port: {e}"))?;
+    let mut child =
+        spawn(&def.command, &place.workdir, port).map_err(|e| format!("start {name}: {e}"))?;
     let pid = child.id();
     app.server_runs
         .lock()
         .unwrap()
-        .insert(k.clone(), RunningServer { pid });
+        .insert(k.clone(), RunningServer { pid, port });
     // Reap in the background; drop the entry when the process exits so a server
     // that crashes on its own stops showing as running.
     let runs = app.server_runs.clone();
@@ -105,7 +118,7 @@ pub fn start(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Resu
             runs.remove(&k);
         }
     });
-    send_json(stream, 202, &json!({ "pid": pid }))
+    send_json(stream, 202, &json!({ "pid": pid, "port": port }))
 }
 
 /// Stops a server in this session. `POST /api/sessions/{id}/servers/stop` with `{name}`.
@@ -134,17 +147,26 @@ fn req_name(req: &Request) -> Result<String, String> {
     Ok(name)
 }
 
-/// `setsid sh -c <command>` in `workdir`: a new process group, pid == pgid.
-fn spawn(command: &str, workdir: &Path) -> std::io::Result<std::process::Child> {
+/// A free port on loopback.
+// ponytail: the port is free when picked, another process may take it before the server binds; the server then fails to start and shows as stopped.
+fn free_port() -> std::io::Result<u16> {
+    let listener = TcpListener::bind("127.0.0.1:0")?;
+    Ok(listener.local_addr()?.port())
+}
+
+/// `setsid sh -c <command>` in `workdir` with `PORT`: a new process group, pid == pgid.
+fn spawn(command: &str, workdir: &Path, port: u16) -> std::io::Result<std::process::Child> {
     Command::new("setsid")
         .args(["sh", "-c", command])
         .current_dir(workdir)
+        .env("PORT", port.to_string())
         .spawn()
 }
 
 /// Kills the server's whole process group; ignores an already-gone process.
 fn stop_process(pid: u32) {
+    // `--`: procps' kill otherwise reads `-<pid>` as an option and kills nothing.
     let _ = Command::new("kill")
-        .args(["-TERM", &format!("-{pid}")])
+        .args(["-TERM", "--", &format!("-{pid}")])
         .output();
 }
