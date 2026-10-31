@@ -193,6 +193,54 @@ impl Sandbox {
     }
 }
 
+/// Whether bwrap can build the world commands run in, on this machine (verified).
+#[derive(Debug, Clone, PartialEq)]
+pub enum SandboxHealth {
+    Ready,
+    Missing,
+    Blocked(String),
+}
+
+/// Probes bwrap with the minimal world fennec needs, so a kernel setting that
+/// forbids unprivileged user namespaces (Ubuntu 23.10+ AppArmor) surfaces in
+/// the Settings page instead of every sandboxed command failing silently.
+pub fn probe() -> SandboxHealth {
+    let output = Command::new("bwrap")
+        .args([
+            "--ro-bind",
+            "/",
+            "/",
+            "--dev",
+            "/dev",
+            "--proc",
+            "/proc",
+            "--unshare-all",
+            "--die-with-parent",
+            "--",
+            "true",
+        ])
+        .output();
+    health_from(output)
+}
+
+fn health_from(output: std::io::Result<std::process::Output>) -> SandboxHealth {
+    match output {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => SandboxHealth::Missing,
+        Err(error) => SandboxHealth::Blocked(error.to_string()),
+        Ok(output) if output.status.success() => SandboxHealth::Ready,
+        Ok(output) => SandboxHealth::Blocked(
+            String::from_utf8_lossy(&output.stderr)
+                .lines()
+                .map(str::trim)
+                .find(|line| !line.is_empty())
+                .map(ToOwned::to_owned)
+                .unwrap_or_else(|| {
+                    format!("bwrap exited with {}", output.status.code().unwrap_or(-1))
+                }),
+        ),
+    }
+}
+
 /// Container daemons' system sockets; `/var/run` is usually a link to `/run`.
 const DAEMON_SOCKETS: [&str; 5] = [
     "/run/docker.sock",
@@ -311,7 +359,9 @@ fn bwrap_args(sandbox: &Sandbox, workdir: &Path, cwd: &Path, command: &str) -> V
 mod tests {
     use super::*;
     use crate::tools::test_support::temp_dir;
+    use std::os::unix::process::ExitStatusExt;
     use std::path::Path;
+    use std::process::ExitStatus;
 
     fn args_as_strings(args: &[OsString]) -> Vec<String> {
         args.iter()
@@ -879,5 +929,47 @@ mod tests {
         assert_eq!(std::fs::read_to_string(&sibling).unwrap(), "ok\n");
 
         let _ = std::fs::remove_dir_all(&workdir);
+    }
+
+    #[test]
+    fn health_from_missing_when_bwrap_is_not_found() {
+        let output = Err(std::io::Error::new(std::io::ErrorKind::NotFound, "bwrap"));
+        assert_eq!(health_from(output), SandboxHealth::Missing);
+    }
+
+    #[test]
+    fn health_from_ready_when_probe_succeeds() {
+        let output = Ok(std::process::Output {
+            status: ExitStatus::from_raw(0),
+            stdout: vec![],
+            stderr: vec![],
+        });
+        assert_eq!(health_from(output), SandboxHealth::Ready);
+    }
+
+    #[test]
+    fn health_from_blocked_uses_the_first_stderr_line() {
+        let output = Ok(std::process::Output {
+            status: ExitStatus::from_raw(256),
+            stdout: vec![],
+            stderr: b"bwrap: setting up uid map: Permission denied\n".to_vec(),
+        });
+        assert_eq!(
+            health_from(output),
+            SandboxHealth::Blocked("bwrap: setting up uid map: Permission denied".to_string())
+        );
+    }
+
+    #[test]
+    fn health_from_blocked_reports_the_exit_status_when_stderr_is_empty() {
+        let output = Ok(std::process::Output {
+            status: ExitStatus::from_raw(256),
+            stdout: vec![],
+            stderr: vec![],
+        });
+        assert!(matches!(
+            health_from(output),
+            SandboxHealth::Blocked(detail) if detail.contains("exited")
+        ));
     }
 }

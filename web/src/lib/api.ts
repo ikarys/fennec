@@ -214,6 +214,7 @@ export interface SettingsResponse {
   skills: SkillSummary[];
   optInWorkflows: WorkflowOptIn[];
   scanners: ScannerStatus[];
+  sandboxHealth: SandboxHealth;
 }
 
 /** A security scanner the audit-security agent runs; `path` is null when fennec does not find it on PATH. */
@@ -224,6 +225,12 @@ export interface ScannerStatus {
   install: string;
   url: string;
   path: string | null;
+}
+
+/** Whether bwrap runs on this machine, probed by the server on each settings load (verified). */
+export interface SandboxHealth {
+  status: 'ready' | 'missing' | 'blocked';
+  detail: string | null;
 }
 
 export interface WorkflowOptIn {
