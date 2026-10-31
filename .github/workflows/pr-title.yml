@@ -1,0 +1,25 @@
+# Its own workflow: a title edit must not re-run (or cancel) the checks.
+# The squash title becomes the commit release-please reads.
+name: pr-title
+
+on:
+  pull_request:
+    branches: [develop, main]
+    types: [opened, reopened, edited, synchronize]
+
+permissions: {}
+
+jobs:
+  title:
+    runs-on: ubuntu-latest
+    env:
+      PR_TITLE: ${{ github.event.pull_request.title }}
+    steps:
+      - name: Validate PR title
+        run: |
+          set -euo pipefail
+          pattern='^(feat|fix|docs|refactor|test|chore|perf|build|ci|style|revert)(\([a-z0-9._/-]+\))?!?: .+'
+          if [[ ! "$PR_TITLE" =~ $pattern ]]; then
+            echo "PR title must be Conventional Commits, e.g. 'feat: add x' or 'fix(ui): y'." >&2
+            exit 1
+          fi

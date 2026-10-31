@@ -28,3 +28,11 @@ check: web
     cargo fmt --all --check
     cargo clippy --all-targets -- -D warnings
     cargo test
+
+# Once per clone: use the repository's git hooks (no direct push to main/develop)
+setup:
+    git config core.hooksPath .githooks
+
+# Open the PR that promotes develop to main (then release-please prepares the release)
+promote:
+    gh pr create --base main --head develop --title "chore: promote develop to main" --body "Promote develop to main."

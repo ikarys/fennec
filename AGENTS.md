@@ -255,7 +255,12 @@ docs/dogfooding.md the frictions met while fennec builds fennec, and their statu
 just                # build the UI and run the release server on :7777
 just check          # the gate before any commit: fmt, clippy -D warnings, tests, UI build
 just dev            # server + Vite dev server on :5173
+just setup          # once per clone: the git hooks (no direct push to main/develop)
+just promote        # open the PR develop → main; release-please then prepares the release
 ```
+
+Branches, PRs, versions and binaries: `docs/releasing.md`. Feature branches go to
+`develop` by PR (squash, Conventional title); versions are never edited by hand.
 
 Without just:
 

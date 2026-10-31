@@ -1,0 +1,54 @@
+name: build
+
+on:
+  workflow_call:
+    inputs:
+      label:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        # Ubuntu 22.04 links against glibc 2.35, so the binary runs on older hosts too.
+        include:
+          - { target: x86_64-unknown-linux-gnu, os: ubuntu-22.04 }
+          - { target: aarch64-unknown-linux-gnu, os: ubuntu-22.04-arm }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Build web UI
+        run: |
+          cd web
+          npm ci
+          npm run build
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      - name: Build binary
+        run: cargo build --release --locked --target ${{ matrix.target }} -p fennec
+      - name: Pack release
+        run: |
+          set -euo pipefail
+          name="fennec-${{ inputs.label }}-${{ matrix.target }}"
+          mkdir -p "$name"
+          cp "target/${{ matrix.target }}/release/fennec" "$name/fennec"
+          cp LICENSE README.md THIRD_PARTY.md "$name/"
+          tar -czf "$name.tar.gz" "$name"
+          sha256sum "$name.tar.gz" > "$name.tar.gz.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fennec-${{ matrix.target }}
+          path: |
+            fennec-${{ inputs.label }}-${{ matrix.target }}.tar.gz
+            fennec-${{ inputs.label }}-${{ matrix.target }}.tar.gz.sha256
