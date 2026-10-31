@@ -16,6 +16,7 @@ import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { Menu, MenuItem } from '../../ui/Menu';
 import { IdeaStatusBadge } from './IdeaStatusBadge';
 import { IdeaMeta } from './IdeaMeta';
+import { formatRelative } from '../../../lib/format';
 import {
   completeIdea,
   dropIdea,
@@ -135,7 +136,7 @@ export function IdeaRow({
     const Icon = ACTION_ICONS[idea.action];
     return (
       <Button
-        variant="soft"
+        variant="ghost"
         size="sm"
         iconOnly
         disabled={busy}
@@ -151,7 +152,7 @@ export function IdeaRow({
   return (
     <div
       className={[
-        'relative flex items-start gap-2 px-2 py-2 hover:bg-raised',
+        'group relative flex items-center gap-2 px-2 py-2.5 hover:bg-raised',
         reorder?.dragging ? 'opacity-50' : null,
         reorder?.over ? 'rounded-md ring-1 ring-accent' : null,
       ]
@@ -218,6 +219,11 @@ export function IdeaRow({
         <p className="m-0 truncate text-sm text-text" title={idea.text}>
           {idea.title}
         </p>
+        <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted">
+          <span title={new Date(idea.createdAt).toLocaleString()}>{formatRelative(idea.createdAt)}</span>
+          {showBadge ? <IdeaStatusBadge status={idea.status} /> : null}
+          {showMeta ? <IdeaMeta idea={idea} caps={caps} /> : null}
+        </div>
         {idea.attachments.length > 0 ? (
           <div className="mt-1.5 flex flex-wrap gap-1">
             {idea.attachments.map((attachment, i) =>
@@ -245,17 +251,13 @@ export function IdeaRow({
         {idea.halted ? (
           <p className="mt-0.5 text-xs text-muted">{idea.halted}</p>
         ) : null}
-        {showBadge || showMeta ? (
-          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
-            {showBadge ? <IdeaStatusBadge status={idea.status} /> : null}
-            {showMeta ? <IdeaMeta idea={idea} caps={caps} /> : null}
-          </div>
-        ) : null}
       </div>
 
-      <div className="flex shrink-0 items-center gap-1">
+      <div className="flex shrink-0 items-center gap-0.5">
         {renderAction()}
+        {/* The secondary choices show on hover or focus; touch screens (no hover) keep them. */}
         {idea.menu.length > 0 ? (
+          <div className="transition-opacity [@media(hover:hover)]:opacity-0 group-hover:opacity-100 focus-within:opacity-100">
           <Menu label="Actions">
             {idea.menu.map((action) => {
               switch (action) {
@@ -292,6 +294,7 @@ export function IdeaRow({
               }
             })}
           </Menu>
+          </div>
         ) : null}
       </div>
 
