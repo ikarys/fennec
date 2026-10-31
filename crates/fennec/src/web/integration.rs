@@ -10,8 +10,8 @@ use crate::domain::criteria::{CriterionState, CriterionStatus};
 use crate::domain::decision::{Decision, decisions_in_force};
 use crate::domain::event::Event;
 use crate::domain::integration::{
-    Blocker, DiffChecks, Landing, blockers, branch_changed, commit_message, default_message,
-    unacknowledged,
+    Blocker, DiffChecks, Landing, blockers, branch_changed, commit_message, conflict_prompt,
+    default_message, unacknowledged,
 };
 use crate::domain::test_files::new_test_patterns;
 use crate::domain::workflow::run;
@@ -332,6 +332,92 @@ pub fn discard(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Re
         log.append(&gate.session_id, &finished)?;
     }
     send_json(stream, 200, &json!({ "commits": commits }))
+}
+
+/// `POST /api/sessions/{id}/resolve-conflict`: bring the branch up to date
+/// with the human's HEAD and, when conflicts remain, start a turn that
+/// resolves them.
+pub fn resolve_conflict(
+    app: &App,
+    req: &Request,
+    stream: &mut TcpStream,
+    id: &str,
+) -> Result<(), String> {
+    let _ = req.json()?;
+    if app.turns.is_running(id) {
+        return error(stream, 409, "a turn is already running");
+    }
+    if super::workflow_routes::waiting_for(app, id)?.is_some() {
+        return error(stream, 409, "a workflow is waiting in this session");
+    }
+    let store = app.store()?;
+    let gate = match gate(&store, app, id)? {
+        Ok(gate) => gate,
+        Err((status, message)) => return error(stream, status, &message),
+    };
+    if let Err(message) = worktree::commit(&gate.wt, &format!("fennec: agent work in session {id}"))
+    {
+        return error(stream, 409, &message);
+    }
+    let mut conflicts = match integration::update_branch(&gate.top, &gate.wt) {
+        Ok(conflicts) => conflicts,
+        Err(message) => return error(stream, 409, &message),
+    };
+    // Markers an earlier resolution left: git no longer sees them, the gate does.
+    for blocker in &gate.blockers {
+        if let Blocker::Conflict { files } = blocker {
+            for file in files {
+                if !conflicts.contains(file) {
+                    conflicts.push(file.clone());
+                }
+            }
+        }
+    }
+    if conflicts.is_empty() {
+        return send_json(stream, 200, &json!({ "conflicts": [], "started": false }));
+    }
+
+    let Some((session, project)) = app.session_and_project(id)? else {
+        return error(stream, 404, "no such session");
+    };
+    let agents = crate::agents::discover(Path::new(&project.workdir));
+    let events = store.events(id)?;
+    if let Ok(Some(Event::ModeChanged { mode, .. })) =
+        crate::domain::agent::switch_to(&agents, &events, "builder")
+    {
+        let log = NotifyingLog {
+            log: &store,
+            notifier: &app.notifier,
+        };
+        log.append(
+            id,
+            &Event::ModeChanged {
+                mode,
+                auto: true,
+                reason: Some("conflict".into()),
+            },
+        )?;
+    }
+
+    let human_branch = gate
+        .preview
+        .human_branch
+        .clone()
+        .unwrap_or_else(|| "HEAD".into());
+    let prompt = conflict_prompt(&human_branch, &conflicts);
+    let place = app.place(&store, &session, &project)?;
+    if let Err(message) = app.turns.start(
+        id,
+        place,
+        super::turns::Job::Input(crate::domain::slash::TurnInput::Prompt(prompt), Vec::new()),
+    ) {
+        return error(stream, 409, &message);
+    }
+    send_json(
+        stream,
+        202,
+        &json!({ "conflicts": conflicts, "started": true }),
+    )
 }
 
 fn criterion_json(state: &CriterionState) -> Value {

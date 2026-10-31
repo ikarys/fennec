@@ -31,6 +31,8 @@ function bodyFor(item: AttentionItem): string {
       return item.detail ? `${item.detail} — choix à faire` : 'Workflow en attente de ton choix';
     case 'awaitingIntegration':
       return 'Prêt à intégrer';
+    case 'conflict':
+      return item.detail ? `Conflit avec ta branche : ${item.detail}` : 'Conflit avec ta branche';
     case 'error':
       return item.detail ? `Erreur : ${item.detail}` : 'Une erreur est survenue';
   }
