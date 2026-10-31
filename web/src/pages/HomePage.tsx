@@ -132,9 +132,10 @@ function ProjectSection({
             size="sm"
             onClick={() => onNewSession(project.id)}
             title="Nouvelle session dans ce projet"
+            aria-label="Nouvelle session"
+            iconOnly
           >
-            <PlusIcon className="h-3.5 w-3.5" />
-            Session
+            <PlusIcon className="h-4 w-4" />
           </Button>
         </>
       }
@@ -231,11 +232,11 @@ export function HomePage({ projects, loading, error, onOpenProjectDialog, onNewS
   };
 
   return (
-    <main className="grow overflow-y-auto px-6 py-8">
+    <main className="grow overflow-y-auto px-4 py-6 md:px-6 md:py-8">
       <div className="mx-auto flex max-w-[960px] flex-col gap-5">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="flex flex-col gap-0.5">
-            <h1 className="text-[0.9375rem] font-semibold">Projets</h1>
+            <h1 className="text-xl font-semibold">Projets</h1>
             <p className="text-sm text-muted">
               {runningCount > 0 ? `${runningCount} session${runningCount > 1 ? 's' : ''} en cours` : 'Aucune session en cours'}
             </p>
