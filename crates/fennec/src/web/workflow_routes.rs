@@ -3,7 +3,6 @@
 
 use super::App;
 use super::http::{Request, error, send_json};
-use super::routes::session_and_project;
 use super::turns::{Job, Place};
 use crate::agent::ports::EventLog;
 use crate::agent::workflow::WorkflowJob;
@@ -152,7 +151,7 @@ pub fn start_workflow(
 ) -> Result<(), String> {
     let body = req.json()?;
     let store = app.store()?;
-    let Some((session, project)) = session_and_project(&store, id)? else {
+    let Some((session, project)) = app.session_and_project(id)? else {
         return error(stream, 404, "no such session");
     };
     let workflow_id = body["workflowId"].as_str().unwrap_or("");
@@ -160,7 +159,7 @@ pub fn start_workflow(
     let Some(found) = workflows::find(Path::new(&project.workdir), workflow_id, enabled) else {
         return error(stream, 404, "no such workflow");
     };
-    let attachments = match super::routes::parse_attachments(&body) {
+    let attachments = match super::session_routes::parse_attachments(&body) {
         Ok(attachments) => attachments,
         Err(e) => return error(stream, 400, &e),
     };
@@ -216,7 +215,7 @@ pub fn control_workflow(
         _ => return error(stream, 404, "not found"),
     };
     let store = app.store()?;
-    let Some((session, project)) = session_and_project(&store, id)? else {
+    let Some((session, project)) = app.session_and_project(id)? else {
         return error(stream, 404, "no such session");
     };
     if app.turns.is_running(id) {

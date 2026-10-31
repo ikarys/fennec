@@ -665,6 +665,9 @@ fn record(
         nodes::NodeEnd::EndRun { outcome, reason } => {
             finish_run(turn, state, outcome, reason).map(Step::Exit)
         }
+        // A model error leaves the node open; the run exits interrupted so the
+        // human can resume it or stop it.
+        nodes::NodeEnd::Halted { .. } => Ok(Step::Exit(DoneReason::Error)),
         nodes::NodeEnd::AgentAsked => Ok(Step::Exit(DoneReason::WaitingForUser)),
     }
 }

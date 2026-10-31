@@ -4,7 +4,6 @@
 
 use super::App;
 use super::http::{Request, error, send_json};
-use super::routes::session_and_project;
 use crate::agent::ports::EventLog;
 use crate::architecture;
 use crate::domain::criteria::{CriterionState, CriterionStatus};
@@ -47,7 +46,7 @@ struct Gate {
 
 /// The session's gate; `Err((status, message))` when there is nothing to gate.
 fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Result<Gate, (u16, String)>, String> {
-    let Some((session, project)) = session_and_project(store, id)? else {
+    let Some((session, project)) = app.session_and_project(id)? else {
         return Ok(Err((404, "no such session".into())));
     };
     let Some(wt) = app.place(store, &session, &project)?.worktree else {
@@ -108,8 +107,8 @@ fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Result<Gate, (u16, S
 }
 
 /// The project's directory, where `.agents/protected` lives.
-fn gate_workdir(store: &SqliteStore, id: &str) -> Result<String, String> {
-    session_and_project(store, id)?
+fn gate_workdir(app: &App, id: &str) -> Result<String, String> {
+    app.session_and_project(id)?
         .map(|(_, project)| project.workdir)
         .ok_or_else(|| "no such session".into())
 }
@@ -162,7 +161,7 @@ pub fn get_integration(app: &App, stream: &mut TcpStream, id: &str) -> Result<()
 /// without a worktree).
 pub fn get_repo(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
     let store = app.store()?;
-    let Some((session, project)) = session_and_project(&store, id)? else {
+    let Some((session, project)) = app.session_and_project(id)? else {
         return error(stream, 404, "no such session");
     };
     let Some((top, _)) = worktree::top(Path::new(&project.workdir)) else {
@@ -243,7 +242,7 @@ pub fn integrate(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> 
     let commits: Vec<String> = gate.preview.commits.iter().map(|c| c.sha.clone()).collect();
     // The integration is done: a failure here is reported, never undone.
     let (protected_tests, protect_error) = if protect_tests {
-        let workdir = gate_workdir(&store, id)?;
+        let workdir = gate_workdir(app, id)?;
         match protected::protect_tests(Path::new(&workdir), &gate.test_files) {
             Ok(added) => (added, None),
             Err(e) => (Vec::new(), Some(e.to_string())),
