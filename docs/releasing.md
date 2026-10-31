@@ -35,7 +35,7 @@ Run `just setup` once per clone. The `pre-push` hook refuses direct pushes to `m
 One-time, done with `gh api`:
 
 - Allow squash and merge commit; disable rebase merge.
-- Delete branch on merge.
+- Delete branch on merge: off. Without branch protection it would delete `develop` when a promote PR merges; delete feature branches by hand.
 - Allow Actions to create PRs (release-please needs it).
 
 ## When fennec goes public
