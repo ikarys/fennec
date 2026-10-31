@@ -1,0 +1,256 @@
+import { request } from "./request";
+
+/** openfox `ReasoningEffort`: how much a model may think. */
+export type ReasoningEffort =
+  "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+
+export interface ModelPrefs {
+  maxTokens?: number;
+  contextWindow?: number;
+  compactionThreshold?: number;
+  reasoningEffort?: ReasoningEffort | null;
+  price?: { inputPerM: number; cachedPerM: number; outputPerM: number } | null;
+}
+
+export interface PanelPage {
+  name: string;
+  blocks: string[];
+}
+
+export interface DisplayPrefs {
+  reasoningOpen: boolean;
+  toolResultsOpen: boolean;
+  /** The UI's base font size in pixels (server default 14, range 13..=16). */
+  fontSize: number;
+  /** The context panel's pages; null means the UI's defaults (lib/panelBlocks). */
+  panelPages: PanelPage[] | null;
+}
+
+export interface SearchPrefs {
+  searxngUrl?: string | null;
+  searxngApiKey?: string | null;
+  webFetch?: boolean;
+}
+
+/** fennec's bwrap world: how commands run. */
+export interface SandboxPrefs {
+  enabled: boolean;
+  network: boolean;
+}
+
+/** The ideas queue's caps in night mode, per idea; 0 means no cap. */
+export interface AutonomyPrefs {
+  maxMinutesPerIdea: number;
+  maxTokensPerIdea: number;
+}
+
+export type ApiKey = { env: string } | { sealed: string } | { plain: string };
+
+export interface Provider {
+  /** Stable, without '/'. The 'local' one is the environment's endpoint (FENNEC_LLM_URL). */
+  id: string;
+  name: string;
+  /** Empty for 'local' means the environment's URL. */
+  baseUrl: string;
+  apiKey: ApiKey | null;
+  /** Keyed by the model id the provider lists. */
+  models: Record<string, ModelPrefs>;
+}
+
+export interface ModelRef {
+  provider: string;
+  model: string;
+}
+
+export interface ModelChoice {
+  provider: string;
+  model: string;
+  providerName: string;
+}
+
+export interface ModelChoices {
+  default: ModelChoice;
+  favorites: ModelChoice[];
+}
+
+export interface SessionModel {
+  provider: string;
+  model: string;
+  providerName: string;
+  contextWindow: number;
+  compactAt: number;
+  source: "session" | "parent" | "default";
+}
+
+export interface Preferences {
+  selected: ModelRef | null;
+  providers: Provider[];
+  display: DisplayPrefs;
+  /** Models the composer offers as favourites. */
+  favorites?: ModelRef[];
+  /** openfox `globalInstructions`: added to the system prompt of new sessions. */
+  globalInstructions?: string | null;
+  /** openfox search.*: the web_search tool's SearXNG instance. */
+  search?: SearchPrefs;
+  /** fennec's bwrap world: how commands run. */
+  sandbox?: SandboxPrefs;
+  autonomy?: AutonomyPrefs;
+  /** Skill ids every new session gets in its system prompt. */
+  alwaysOnSkills?: string[];
+  /** Opt-in embedded workflows the human enabled. */
+  enabledWorkflows?: string[];
+}
+
+/** Where a resolved parameter value comes from. */
+export type ParamSource = "perModel" | "listed" | "default";
+
+/** One resolved parameter: its value, source, and whether a call sends it. */
+export interface ResolvedValue<T> {
+  value: T;
+  source: ParamSource;
+  wire: boolean;
+}
+
+/** What a model's turn runs with, display-ready (the UI computes none). */
+export interface ResolvedParams {
+  maxTokens: ResolvedValue<number>;
+  contextWindow: ResolvedValue<number>;
+  compactAt: ResolvedValue<number>;
+  reasoningEffort: {
+    value: ReasoningEffort | null;
+    source: ParamSource;
+    wire: boolean;
+  };
+}
+
+export interface SettingsModel {
+  id: string;
+  contextWindow: number | null;
+  resolved: ResolvedParams;
+  /** Added by hand: stored with no listing (the endpoint has no /models route). */
+  manual?: boolean;
+}
+
+/** What one provider lists now, with the URL it is reached at. */
+export interface ProviderListing {
+  provider: string;
+  name: string;
+  baseUrl: string;
+  models: SettingsModel[];
+  /** Why the listing failed; null when it answered. */
+  error: string | null;
+}
+
+export interface SettingsDefaults {
+  provider: string;
+  model: string;
+  maxTokens: number;
+  contextWindow: number;
+  compactAt: number;
+  reasoningEffort: ReasoningEffort | null;
+}
+
+export interface SkillSummary {
+  id: string;
+  description: string;
+}
+
+/** A security scanner the audit-security agent runs; `path` is null when fennec does not find it on PATH. */
+export interface ScannerStatus {
+  id: string;
+  name: string;
+  covers: string;
+  install: string;
+  url: string;
+  path: string | null;
+}
+
+/** Whether bwrap runs on this machine, probed by the server on each settings load (verified). */
+export interface SandboxHealth {
+  status: 'ready' | 'missing' | 'blocked';
+  detail: string | null;
+}
+
+export interface WorkflowOptIn {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export interface SettingsResponse {
+  preferences: Preferences;
+  listings: ProviderListing[];
+  defaults: SettingsDefaults;
+  /** The skills a session can load outside any project: defaults and ~/.agents/skills. */
+  skills: SkillSummary[];
+  optInWorkflows: WorkflowOptIn[];
+  scanners: ScannerStatus[];
+  sandboxHealth: SandboxHealth;
+}
+
+export function getSettings(): Promise<SettingsResponse> {
+  return request<SettingsResponse>("/api/settings");
+}
+
+export function saveSettings(
+  preferences: Preferences,
+): Promise<SettingsResponse> {
+  return request<SettingsResponse>("/api/settings", {
+    method: "POST",
+    body: JSON.stringify(preferences),
+  });
+}
+
+/** Re-list one provider's models now (its baseUrl/key may not be stored yet). */
+export function listProvider(body: {
+  provider: string;
+  baseUrl: string;
+  apiKey: ApiKey | null;
+}): Promise<ProviderListing> {
+  return request<ProviderListing>("/api/settings/providers/list", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+/** Where a probed limit comes from: the endpoint's own words, or the model family's catalog entry. */
+export type LimitSource = "endpoint" | "catalog";
+
+/** What a probe of one model learned (indicative); null where nothing said it. */
+export interface ProbedModel {
+  contextWindow: number | null;
+  contextSource: LimitSource | null;
+  maxTokens: number | null;
+  /** The distinct efforts accepted; empty when neither the endpoint nor the catalog says. */
+  reasoningEfforts: ReasoningEffort[];
+  effortsSource: LimitSource | null;
+  defaultReasoningEffort: ReasoningEffort | null;
+}
+
+/** Probes a model of a stored provider for its limits, with two small calls. */
+export function probeModel(
+  provider: string,
+  model: string,
+): Promise<ProbedModel> {
+  return request<ProbedModel>("/api/settings/models/probe", {
+    method: "POST",
+    body: JSON.stringify({ provider, baseUrl: "", apiKey: null, model }),
+  });
+}
+
+export function getModelChoices(): Promise<ModelChoices> {
+  return request<ModelChoices>("/api/models/choices");
+}
+
+export function setSessionModel(
+  id: string,
+  ref: ModelRef,
+): Promise<{ model: SessionModel }> {
+  return request<{ model: SessionModel }>(
+    `/api/sessions/${encodeURIComponent(id)}/model`,
+    {
+      method: "POST",
+      body: JSON.stringify(ref),
+    },
+  );
+}
