@@ -53,6 +53,7 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         }
         ("GET", ["api", "projects", id, "dashboard"]) => project_dashboard::serve(app, stream, id),
         ("GET", ["api", "projects", id, "docs"]) => project_routes::get_docs(app, stream, id),
+        ("GET", ["api", "projects", id, "risks"]) => project_routes::get_risks(app, stream, id),
         ("GET", ["api", "projects", id, "worktrees"]) => {
             worktree_routes::list(app, req, stream, id)
         }
