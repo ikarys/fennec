@@ -28,7 +28,15 @@ just promote
 
 ## Local protection
 
-Run `just setup` once per clone. The `pre-push` hook refuses direct pushes to `main` and `develop`. `git push --no-verify` is the human escape hatch.
+Run `just setup` once per clone. Two hooks, both bypassed by `--no-verify` (the human's escape hatch):
+
+- `pre-push` refuses direct pushes to `main` and `develop`.
+- `commit-msg` refuses a subject that is not a Conventional Commit (git's own merge, revert and
+  autosquash subjects pass). CI runs the same script on PR titles, so the rule lives in one place.
+
+The hooks apply to fennec's session worktrees too (they share the repository's config): fennec's
+own commits there are `chore: agent work in session <id>`. An integration lands on the branch the
+human has checked out, so integrate on a feature branch, not on `develop`.
 
 ## Repo settings
 

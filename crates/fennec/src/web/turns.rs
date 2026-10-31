@@ -125,7 +125,8 @@ impl Turns {
             // Whatever the job did, what the agent wrote is recorded as
             // fennec's commits for the human to cherry-pick.
             if let Some(wt) = &place.worktree {
-                let message = format!("fennec: agent work in session {session_id}");
+                // A Conventional Commit: the repository's commit-msg hook may require one.
+                let message = format!("chore: agent work in session {session_id}");
                 if let Err(e) = worktree::commit(wt, &message) {
                     eprintln!("fennec: session {session_id}: commit: {e}");
                 }

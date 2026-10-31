@@ -7,19 +7,18 @@ on:
     branches: [develop, main]
     types: [opened, reopened, edited, synchronize]
 
-permissions: {}
+permissions:
+  contents: read
 
 jobs:
   title:
     runs-on: ubuntu-latest
-    env:
-      PR_TITLE: ${{ github.event.pull_request.title }}
     steps:
+      - uses: actions/checkout@v4
+      # The title goes through a file, never into the script: no injection.
       - name: Validate PR title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
-          set -euo pipefail
-          pattern='^(feat|fix|docs|refactor|test|chore|perf|build|ci|style|revert)(\([a-z0-9._/-]+\))?!?: .+'
-          if [[ ! "$PR_TITLE" =~ $pattern ]]; then
-            echo "PR title must be Conventional Commits, e.g. 'feat: add x' or 'fix(ui): y'." >&2
-            exit 1
-          fi
+          printf '%s\n' "$PR_TITLE" > "$RUNNER_TEMP/title"
+          .githooks/commit-msg "$RUNNER_TEMP/title"

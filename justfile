@@ -29,7 +29,7 @@ check: web
     cargo clippy --all-targets -- -D warnings
     cargo test
 
-# Once per clone: use the repository's git hooks (no direct push to main/develop)
+# Once per clone: use the repository's git hooks (Conventional Commits, no direct push to main/develop)
 setup:
     git config core.hooksPath .githooks
 
