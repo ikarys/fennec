@@ -29,6 +29,7 @@ pub mod preflight;
 pub mod project;
 pub mod protection;
 pub mod replay;
+pub mod risk;
 pub mod scanner;
 pub mod server;
 pub mod session_name;
