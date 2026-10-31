@@ -3,9 +3,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Section } from '../ui/Section';
+import { Tile } from '../ui/Tile';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { CopyButton } from '../session/CopyButton';
-import { EraserIcon, RefreshIcon, SpinnerIcon, TrashIcon } from '../Icons';
+import { EraserIcon, HardDriveIcon, RefreshIcon, SpinnerIcon, TrashIcon } from '../Icons';
 import {
   cleanWorktree,
   getProjectWorktrees,
@@ -142,33 +143,46 @@ export function DiskSection({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3 px-4 py-4">
-        <span className="text-2xl font-semibold">{data ? formatBytes(data.totalBytes) : '…'}</span>
-        {data ? (
-          <span className="text-sm text-muted">
-            dont {formatBytes(data.generatedBytes)} de cache de build (target, node_modules, .venv),
-            rebâti par une compilation · mesuré {formatRelative(data.scannedAt)}
-          </span>
-        ) : (
-          <span className="text-sm text-muted">Mesure de l'espace disque…</span>
-        )}
-        {data ? <Badge tone="neutral" title="Mesuré sur le disque">vérifié</Badge> : null}
-        <Button
-          variant="ghost"
-          size="sm"
-          iconOnly
-          title="Mesurer à nouveau"
-          aria-label="Mesurer à nouveau"
-          disabled={measuring}
-          onClick={() => void refresh()}
-        >
-          {measuring ? <SpinnerIcon className="h-3.5 w-3.5" /> : <RefreshIcon className="h-3.5 w-3.5" />}
-        </Button>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Tile
+          icon={<HardDriveIcon />}
+          label="Espace disque"
+          figure={data ? formatBytes(data.totalBytes) : '…'}
+          detail={data ? `mesuré ${formatRelative(data.scannedAt)}` : "Mesure de l'espace disque…"}
+          tone="neutral"
+        />
+        <Tile
+          icon={<EraserIcon />}
+          label="Cache de build"
+          figure={data ? formatBytes(data.generatedBytes) : '…'}
+          detail="target, node_modules, .venv : rebâti par une compilation"
+          tone="accent"
+          active={data ? data.generatedBytes > 0 : false}
+        />
       </div>
 
       {loadError ? <div className="px-4 pb-2 text-err text-xs">{loadError}</div> : null}
 
-      <Section title="Worktrees des sessions" flush>
+      <Section
+        title="Worktrees des sessions"
+        flush
+        actions={
+          <>
+            {data ? <Badge tone="neutral" title="Mesuré sur le disque">vérifié</Badge> : null}
+            <Button
+              variant="ghost"
+              size="sm"
+              iconOnly
+              title="Mesurer à nouveau"
+              aria-label="Mesurer à nouveau"
+              disabled={measuring}
+              onClick={() => void refresh()}
+            >
+              {measuring ? <SpinnerIcon className="h-3.5 w-3.5" /> : <RefreshIcon className="h-3.5 w-3.5" />}
+            </Button>
+          </>
+        }
+      >
         {sessions.length === 0 ? (
           <div className="px-4 py-3 text-sm text-muted">Aucun worktree.</div>
         ) : (
