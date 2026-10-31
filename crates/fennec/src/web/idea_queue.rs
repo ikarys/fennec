@@ -9,17 +9,25 @@ use std::time::{Duration, Instant};
 
 use super::App;
 use super::turns::Job;
+use crate::agent::ports::EventLog;
 use crate::agent::workflow::WorkflowJob;
 use crate::domain::project::Project;
+use crate::domain::workflow::run;
 use crate::store::SqliteStore;
 use crate::workflows::find;
-use backlog::{BacklogEvent, Caps, Idea, IdeaState, next_ready};
+use backlog::{Backlog, BacklogEvent, Caps, Idea, IdeaState, next_ready};
 use token_usage::{Filter, Ledger};
 
 /// The workflow an idea is built with: the plan card's "Construire" default.
 const DEFAULT_WORKFLOW_ID: &str = "plan-build-verify";
 
 pub(super) fn start_queue(app: &Arc<App>, project_id: &str, autonomous: bool) {
+    spawn_queue(app, project_id, autonomous, Vec::new());
+}
+
+/// `resume`: the ideas of a run a restart cut, whose interrupted workflow the
+/// queue resumes before it starts the next ready idea.
+fn spawn_queue(app: &Arc<App>, project_id: &str, autonomous: bool, resume: Vec<String>) {
     let stop = {
         let mut queues = app.idea_queues.lock().expect("idea queue lock poisoned");
         if queues.contains_key(project_id) {
@@ -35,7 +43,7 @@ pub(super) fn start_queue(app: &Arc<App>, project_id: &str, autonomous: bool) {
         let app = app.clone();
         let project_id = project_id.to_string();
         thread::spawn(move || {
-            let result = run_queue(app.as_ref(), &project_id, &stop, autonomous);
+            let result = run_queue(app.as_ref(), &project_id, &stop, autonomous, &resume);
             // Remove the flag even on error so a later start can run again.
             app.idea_queues
                 .lock()
@@ -146,11 +154,12 @@ fn run_queue(
     project_id: &str,
     stop: &AtomicBool,
     autonomous: bool,
+    resume: &[String],
 ) -> Result<(), String> {
     let store = app.store()?;
     store.append_idea_event(project_id, &BacklogEvent::QueueStarted { autonomous })?;
 
-    match run_queue_loop(app, project_id, stop, autonomous) {
+    match run_queue_loop(app, project_id, stop, autonomous, resume) {
         Ok(reason) => {
             store.append_idea_event(
                 project_id,
@@ -169,7 +178,9 @@ fn run_queue_loop(
     project_id: &str,
     stop: &AtomicBool,
     autonomous: bool,
+    resume: &[String],
 ) -> Result<&'static str, String> {
+    let mut to_resume = resume.to_vec();
     loop {
         if stop.load(Ordering::SeqCst) {
             return Ok("stopped by the human");
@@ -180,6 +191,19 @@ fn run_queue_loop(
             return Ok("project gone");
         };
         let backlog = store.backlog(project_id)?;
+
+        // Each cut idea is resumed once: a resume that fails again does not loop.
+        if let Some(idea_id) = to_resume.pop() {
+            if let Some(session_id) = resume_idea(app, &store, &project, &backlog, &idea_id)? {
+                if autonomous {
+                    watch_idea(app, &store, &project.id, &idea_id, &session_id)?;
+                } else {
+                    wait_for_turn(app, &session_id);
+                }
+            }
+            continue;
+        }
+
         let Some(idea) = next_ready(&backlog) else {
             return Ok("no idea ready");
         };
@@ -314,10 +338,48 @@ fn wait_for_turn(app: &App, session_id: &str) {
     }
 }
 
-/// A queue lives in memory: a restart ends it, and the morning report must say so.
-pub(super) fn close_interrupted_runs(store: &SqliteStore) -> Result<usize, String> {
+/// Resumes the idea's workflow when a restart cut it mid-node: the idea is
+/// started, its session idle, its run neither finished nor paused, a node open.
+/// Returns the session resumed, `None` when there is nothing to resume.
+fn resume_idea(
+    app: &App,
+    store: &SqliteStore,
+    project: &Project,
+    backlog: &Backlog,
+    idea_id: &str,
+) -> Result<Option<String>, String> {
+    let Some(idea) = backlog.ideas.iter().find(|idea| idea.id == idea_id) else {
+        return Ok(None);
+    };
+    let Some(session_id) = idea.session_id.as_deref() else {
+        return Ok(None);
+    };
+    if idea.state != IdeaState::Started || app.turns.is_running(session_id) {
+        return Ok(None);
+    }
+    let cut = run::current_run(&store.events(session_id)?).is_some_and(|state| {
+        state.finished.is_none() && state.paused.is_none() && !state.open.is_empty()
+    });
+    let Some(session) = store.session(session_id)?.filter(|_| cut) else {
+        return Ok(None);
+    };
+    let place = app.place(store, &session, project)?;
+    let job = Job::Workflow(WorkflowJob::Resume);
+    app.turns
+        .start_with(session_id, place, job, idea.autonomous)?;
+    Ok(Some(session_id.to_string()))
+}
+
+/// A queue lives in memory: a restart cuts it. The cut run is closed, so the
+/// report says so, then the queue starts again in the same mode and first
+/// resumes the workflows the restart interrupted.
+pub(super) fn resume_interrupted_runs(app: &Arc<App>) -> Result<usize, String> {
+    let store = app.store()?;
     let open = store.open_queue_runs().map_err(|e| e.to_string())?;
     for project_id in &open {
+        let Some(run) = store.backlog(project_id)?.last_run else {
+            continue;
+        };
         store
             .append_idea_event(
                 project_id,
@@ -326,6 +388,7 @@ pub(super) fn close_interrupted_runs(store: &SqliteStore) -> Result<usize, Strin
                 },
             )
             .map_err(|e| e.to_string())?;
+        spawn_queue(app, project_id, run.autonomous, run.idea_ids);
     }
     Ok(open.len())
 }
