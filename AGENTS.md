@@ -109,10 +109,11 @@ read-only `ask` agent (`crates/fennec/agents/ask.agent.md`), which answers with 
 Audits, done: the read-only `audit-architecture` and `audit-security` agents, launched from the Analyses
 tab, report findings as cards the human turns into backlog tasks (never offered twice); the security
 audit first runs the scanners found on PATH (Settings, never installed: the start of C23).
+Review map, done (C9, part 1): the integration dialog lists the branch's files riskiest first, each with
+its signals (the gate's checks per file, churn, untested, large), read from git (verified; `domain/review_map.rs`).
 Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
-1. Tooled human review (C9): a risk map of a session's diff in the integration dialog (deterministic),
-   then a narrative diff (indicative).
+1. Tooled human review (C9, part 2): a narrative diff (indicative).
 2. Produced architecture and drift (C12), waivers (C7).
 Later: sub-agents as tools, when dogfooding shows sessions saturating their context.
 
@@ -154,6 +155,7 @@ crates/fennec/src/
     module_map.rs      the project map: modules, their dependencies from the imports, their layout
     map_doc.rs         docs/map.md: the map as Markdown (Mermaid, table), stale or current
     risk.rs            risk zones: a commit's authorship from its trailers, the signals, the report
+    review_map.rs      the review order of a branch's files: per-file signals (gate checks, churn, tests, size)
     workflow/          a workflow: definition (nodes, ports, edges), template ({{…}} names),
                        validate (the graph rules), run (the run folded from its events, the next step)
     doc.rs             the project's documentation: markdown files and ADRs, as the Doc tab lists them
@@ -195,7 +197,8 @@ crates/fennec/src/
   protected.rs       the project's protected files: .agents/protected read, the existing paths found
   adr.rs             the project's ADR files in docs/adr/, listed
   module_map.rs      the project map's source files (git ls-files) and docs/map.md read, written
-  risk.rs            the risk zones measured from git: AI commits, churn, a parallel blame
+  risk.rs            the risk zones measured from git: AI commits, churn, a parallel blame; the hot
+                     files and the files tested on a branch, for the review map
   doc.rs             the project's markdown files read for the Doc tab
   web/               HTTP adapter: http, guard (who may call), routes, settings_routes, event_stream (SSE),
                      notifier (wakes streams on append, no polling), turns, assets,
