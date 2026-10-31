@@ -1,10 +1,22 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ComponentType } from 'react';
 import { getInsight, type InsightPeriod, type InsightRow, type InsightView } from '../lib/api';
+import {
+  ActivityIcon,
+  AlertIcon,
+  ArrowUpIcon,
+  CoinIcon,
+  CpuIcon,
+  InboxIcon,
+  LayersIcon,
+  ProjectIcon
+} from '../components/Icons';
 import { Card } from '../components/ui/Card';
 import { ContextComposition } from '../components/session/ContextComposition';
 import { SectionLabel } from '../components/ui/SectionLabel';
 import { Segmented, type Segment } from '../components/ui/Segmented';
 import { Select } from '../components/ui/Field';
+
+type Icon = ComponentType<{ className?: string }>;
 
 const PERIOD_SEGMENTS: Segment<InsightPeriod>[] = [
   { value: '7', label: '7 j' },
@@ -13,18 +25,59 @@ const PERIOD_SEGMENTS: Segment<InsightPeriod>[] = [
   { value: 'all', label: 'Tout' }
 ];
 
+/** One tinted chip per KPI card, keyed on the server's label. */
+const CARD_TONE: Record<string, { Icon: Icon; chip: string }> = {
+  'Appels': { Icon: ActivityIcon, chip: 'bg-accent-soft text-accent' },
+  'Entrée': { Icon: InboxIcon, chip: 'bg-raised text-text' },
+  'Cache': { Icon: LayersIcon, chip: 'bg-ok-soft text-ok' },
+  'Cache perdu': { Icon: AlertIcon, chip: 'bg-del-bg text-err' },
+  'Sortie': { Icon: ArrowUpIcon, chip: 'bg-raised text-text' },
+  'Coût estimé': { Icon: CoinIcon, chip: 'bg-accent-soft text-accent' }
+};
+
+function cardTone(label: string) {
+  return CARD_TONE[label] ?? { Icon: ActivityIcon, chip: 'bg-raised text-text' };
+}
+
+function KpiCard({ label, value, detail }: { label: string; value: string; detail: string }) {
+  const { Icon, chip } = cardTone(label);
+  return (
+    <Card className="p-4 transition-colors hover:border-border-strong">
+      <div className="flex items-start justify-between gap-2">
+        <SectionLabel>{label}</SectionLabel>
+        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${chip}`}>
+          <Icon className="h-4 w-4" />
+        </span>
+      </div>
+      <div className="mt-2 text-2xl font-semibold tabular-nums">{value}</div>
+      <div className="mt-1 text-xs text-muted">{detail}</div>
+    </Card>
+  );
+}
+
+function SectionHeader({ icon: Icon, title }: { icon?: Icon; title: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      {Icon ? <Icon className="h-4 w-4 text-muted" /> : null}
+      <SectionLabel>{title}</SectionLabel>
+    </div>
+  );
+}
+
 function InsightTable({
   title,
+  icon: Icon,
   rows,
   onNameClick
 }: {
   title: string;
+  icon?: Icon;
   rows: InsightRow[];
   onNameClick?: (key: string) => void;
 }) {
   return (
     <Card className="p-4">
-      <SectionLabel>{title}</SectionLabel>
+      <SectionHeader icon={Icon} title={title} />
       <div className="mt-3 overflow-x-auto">
         <table className="w-full min-w-[44rem] table-fixed whitespace-nowrap text-sm tabular-nums">
           <colgroup>
@@ -51,7 +104,7 @@ function InsightTable({
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.key} className="border-t border-border">
+              <tr key={row.key} className="border-t border-border transition-colors hover:bg-raised">
                 <td className="py-2 pr-3 pl-0">
                   {onNameClick ? (
                     <button
@@ -72,8 +125,8 @@ function InsightTable({
                 <td className="px-3 py-2 text-right">{row.input}</td>
                 <td className="px-3 py-2 text-right">{row.cache}</td>
                 <td className="px-3 py-2 text-right">{row.output}</td>
-                <td className="px-3 py-2 text-right">{row.lost}</td>
-                <td className="px-3 py-2 text-right">{row.cost}</td>
+                <td className={`px-3 py-2 text-right ${row.lost === '—' ? '' : 'text-err'}`}>{row.lost}</td>
+                <td className={`px-3 py-2 text-right ${row.cost === '—' ? '' : 'text-accent'}`}>{row.cost}</td>
                 <td className="py-2 pr-0 pl-3 text-right">{row.time}</td>
               </tr>
             ))}
@@ -117,7 +170,15 @@ export function InsightPage() {
     <div className="min-h-0 grow overflow-y-auto bg-bg">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-xl font-semibold">Insight</h1>
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-md bg-accent-soft text-accent">
+              <ActivityIcon className="h-4 w-4" />
+            </span>
+            <div>
+              <h1 className="text-xl font-semibold">Insight</h1>
+              <p className="text-xs text-muted">Usage du modèle sur la période</p>
+            </div>
+          </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <Select
@@ -150,27 +211,23 @@ export function InsightPage() {
             {view.cards.length > 0 ? (
               <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
                 {view.cards.map((card) => (
-                  <Card key={card.label} className="p-4">
-                    <SectionLabel>{card.label}</SectionLabel>
-                    <div className="mt-2 text-2xl font-semibold tabular-nums">{card.value}</div>
-                    <div className="mt-1 text-xs text-muted">{card.detail}</div>
-                  </Card>
+                  <KpiCard key={card.label} label={card.label} value={card.value} detail={card.detail} />
                 ))}
               </div>
             ) : null}
 
             <Card className="p-4">
-              <SectionLabel>Entrée par jour</SectionLabel>
+              <SectionHeader icon={ActivityIcon} title="Entrée par jour" />
 
               {view.days.length > 0 ? (
                 <>
-                  <div className="mt-3 flex h-40 items-end gap-1">
+                  <div className="mt-3 flex h-40 items-end gap-1 border-b border-border pb-px">
                     {view.days.map((day) => (
-                      <div key={day.day} title={day.title} className="flex h-full min-w-0 flex-1">
-                        <div className="flex h-full w-full flex-col-reverse">
-                          <div className="bg-accent/35" style={{ height: `${day.cachedPercent}%` }} />
-                          <div className="bg-accent" style={{ height: `${day.freshPercent}%` }} />
-                          <div className="bg-err" style={{ height: `${day.lostPercent}%` }} />
+                      <div key={day.day} title={day.title} className="group flex h-full min-w-0 flex-1 items-end">
+                        <div className="flex h-full w-full flex-col-reverse transition-[filter] group-hover:brightness-110">
+                          <div className="rounded-t-[3px] bg-accent/35" style={{ height: `${day.cachedPercent}%` }} />
+                          <div className="rounded-t-[3px] bg-accent" style={{ height: `${day.freshPercent}%` }} />
+                          <div className="rounded-t-[3px] bg-err" style={{ height: `${day.lostPercent}%` }} />
                         </div>
                       </div>
                     ))}
@@ -186,15 +243,15 @@ export function InsightPage() {
 
                   <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-muted">
                     <span className="flex items-center gap-1.5">
-                      <span className="h-2.5 w-2.5 rounded-sm bg-accent/35" />
+                      <span className="h-2.5 w-2.5 rounded-full bg-accent/35" />
                       cache
                     </span>
                     <span className="flex items-center gap-1.5">
-                      <span className="h-2.5 w-2.5 rounded-sm bg-accent" />
+                      <span className="h-2.5 w-2.5 rounded-full bg-accent" />
                       hors cache
                     </span>
                     <span className="flex items-center gap-1.5">
-                      <span className="h-2.5 w-2.5 rounded-sm bg-err" />
+                      <span className="h-2.5 w-2.5 rounded-full bg-err" />
                       cache perdu
                     </span>
                   </div>
@@ -211,18 +268,13 @@ export function InsightPage() {
             ) : null}
 
             {view.projects.length > 0 ? (
-              <InsightTable
-                title="Par projet"
-                rows={view.projects}
-                onNameClick={(key) => setProject(key)}
-              />
+              <InsightTable title="Par projet" icon={ProjectIcon} rows={view.projects} onNameClick={(key) => setProject(key)} />
             ) : null}
 
-            <InsightTable title="Modèles" rows={view.models} />
+            <InsightTable title="Modèles" icon={CpuIcon} rows={view.models} />
           </>
         ) : null}
       </div>
     </div>
   );
 }
-
