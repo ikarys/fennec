@@ -4,7 +4,7 @@
 
 Most coding agents optimise for writing code fast. fennec's thesis is that AI-written code is abundant, while understanding, mastery and responsibility are rare; it tools what is rare. You frame the work, the agent loop runs the steps, then waits for your review; nothing is integrated without a human decision.
 
-Status: early, Linux only. fennec is a Rust port of [openfox](https://github.com/co-l/openfox) grown into its own layer.
+Status: early, Linux only.
 
 ## Why fennec
 
@@ -155,4 +155,6 @@ These are defaults: the Settings page adds providers and overrides parameters pe
 
 ## License
 
-fennec is licensed under [AGPL-3.0-only](LICENSE). The openfox MIT notice is kept in [THIRD_PARTY.md](THIRD_PARTY.md).
+fennec is licensed under [AGPL-3.0-only](LICENSE).
+
+fennec's agent loop and web UI started from [openfox](https://github.com/co-l/openfox), ported to Rust; its MIT notice is kept in [THIRD_PARTY.md](THIRD_PARTY.md).
