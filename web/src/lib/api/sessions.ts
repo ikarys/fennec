@@ -222,6 +222,7 @@ export interface Suppression {
 
 export type Blocker =
   | { kind: "noCommits" }
+  | { kind: "conflict"; files: string[] }
   | { kind: "criteriaNotPassed"; criteria: string[] }
   | { kind: "noCriteria" }
   | { kind: "protectedTouched"; paths: string[] }

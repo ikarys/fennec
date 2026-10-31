@@ -39,6 +39,9 @@ pub struct Preview {
     /// overwrite (content equal to neither the base's nor the branch's):
     /// the integration refuses on them.
     pub local_changes: Vec<String>,
+    /// Files the merge onto the human's HEAD would conflict on (empty: it
+    /// merges cleanly).
+    pub conflicts: Vec<String>,
 }
 
 /// Why an integration failed.
@@ -80,9 +83,20 @@ pub fn preview(top: &Path, wt: &Worktree) -> Result<Preview, String> {
     let (carried_changes, local_changes) =
         uncommitted_split(top, wt.base.as_str(), wt.branch.as_str(), &files);
 
+    // The preview reports a conflict before the click; a git failure here is
+    // not a conflict, the click will report it.
+    let conflicts = match ours_with_carried(top, &carried_changes) {
+        Ok(ours) => match merge_tree(top, &ours, wt.branch.as_str(), wt.base.as_str()) {
+            Err(MergeOutcome::Conflict { files }) => files,
+            _ => Vec::new(),
+        },
+        Err(_) => Vec::new(),
+    };
+
     Ok(Preview {
         carried_changes,
         local_changes,
+        conflicts,
         commits,
         files,
         counts,
@@ -304,6 +318,16 @@ fn temp_commit_with_carried(top: &Path, carried: &[String]) -> Result<String, St
     Ok(String::from_utf8_lossy(&commit_out).trim().to_string())
 }
 
+/// `ours` for the merge: `HEAD` when nothing is carried, else a temporary
+/// commit of `HEAD` plus the carried files' working content.
+fn ours_with_carried(top: &Path, carried: &[String]) -> Result<String, String> {
+    if carried.is_empty() {
+        Ok("HEAD".to_string())
+    } else {
+        temp_commit_with_carried(top, carried)
+    }
+}
+
 /// Why `git merge-tree` gave no tree: a conflict (with the files), or a git failure.
 enum MergeOutcome {
     /// Conflicts in `files`.
@@ -424,11 +448,7 @@ pub fn apply(top: &Path, wt: &Worktree, message: &str) -> Result<String, ApplyEr
     // `ours`: HEAD, or a temporary commit of HEAD plus the carried files'
     // working content, so the merge carries the human's uncommitted work the
     // agent built on.
-    let ours = if carried.is_empty() {
-        "HEAD".to_string()
-    } else {
-        temp_commit_with_carried(top, &carried).map_err(|message| ApplyError::Git { message })?
-    };
+    let ours = ours_with_carried(top, &carried).map_err(|message| ApplyError::Git { message })?;
 
     // The merge, computed off the trees so a dirty working tree does not make
     // git refuse; a conflict names the files.
@@ -555,6 +575,7 @@ mod tests {
             preview.files,
             vec!["agent.txt".to_string(), "agent2.txt".to_string()]
         );
+        assert!(preview.conflicts.is_empty());
         assert!(preview.human_branch.is_some());
         let _ = std::fs::remove_dir_all(&base);
     }
@@ -725,6 +746,25 @@ mod tests {
                 None
             )
             .is_err()
+        );
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn preview_reports_a_conflict_before_the_click() {
+        let (base, repo) = setup();
+        let wt = open(&base.join("wt"), &repo, "s1").unwrap().unwrap();
+        std::fs::write(wt.workdir.join("a.txt"), "agent\n").unwrap();
+        assert_eq!(commit(&wt, "agent change"), Ok(true));
+
+        std::fs::write(repo.join("a.txt"), "human\n").unwrap();
+        git(&repo, &["add", "-A"], None).unwrap();
+        git(&repo, &["commit", "-q", "-m", "human change"], None).unwrap();
+
+        let top = top(&repo).unwrap().0;
+        assert_eq!(
+            preview(&top, &wt).unwrap().conflicts,
+            vec!["a.txt".to_string()]
         );
         let _ = std::fs::remove_dir_all(&base);
     }
