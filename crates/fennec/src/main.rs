@@ -18,6 +18,7 @@ mod metering;
 mod module_map;
 mod notifier;
 mod protected;
+mod risk;
 mod scanners;
 mod servers;
 mod skills;
