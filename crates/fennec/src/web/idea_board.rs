@@ -235,44 +235,49 @@ fn idea_view(board: &Board, idea: &Idea) -> Result<(Status, Value), String> {
         None
     };
 
-    let duration_ms = if idea.state == IdeaState::Started
+    let spans = if idea.state == IdeaState::Started
         && let Some(started_at) = idea.started_at
-        && let Some(session) = &session
+        && let Some(session_id) = idea.session_id.as_deref()
+        && session.is_some()
     {
-        let end = if running {
-            crate::domain::clock::now_ms()
-        } else {
-            session.updated_at
-        };
-        Some(end.saturating_sub(started_at))
+        Some(run_spans(
+            &store.running_changes(session_id, started_at)?,
+            running.then(crate::domain::clock::now_ms),
+        ))
     } else {
         None
     };
 
-    let tokens = if idea.state == IdeaState::Started
-        && let Some(started_at) = idea.started_at
-        && let Some(session) = &session
-        && let Some(ledger) = &board.ledger
-    {
-        // ponytail: counts the project's calls in that window, exact while the
-        // queue runs one idea at a time.
-        let until_ms = if running {
-            None
-        } else {
-            Some(session.updated_at as i64)
-        };
-        ledger
-            .summary(&Filter {
-                group_id: Some(project_id.to_string()),
-                since_ms: Some(started_at as i64),
-                until_ms,
-                ..Default::default()
-            })
-            .ok()
-            .map(|summary| {
-                summary.prompt_tokens.saturating_sub(summary.cached_tokens)
-                    + summary.completion_tokens
-            })
+    let duration_ms = spans.as_ref().map(|spans| {
+        spans
+            .iter()
+            .map(|&(start, end)| end.saturating_sub(start))
+            .sum::<u64>()
+    });
+
+    let tokens = if let (Some(spans), Some(ledger)) = (&spans, &board.ledger) {
+        // ponytail: counts the project's calls in the run spans, exact while the
+        // queue runs one idea at a time; the spans also exclude the waits for
+        // the human and the later integration.
+        Some(
+            spans
+                .iter()
+                .filter_map(|&(start, end)| {
+                    ledger
+                        .summary(&Filter {
+                            group_id: Some(project_id.to_string()),
+                            since_ms: Some(start as i64),
+                            until_ms: Some(end as i64),
+                            ..Default::default()
+                        })
+                        .ok()
+                        .map(|summary| {
+                            summary.prompt_tokens.saturating_sub(summary.cached_tokens)
+                                + summary.completion_tokens
+                        })
+                })
+                .sum::<u64>(),
+        )
     } else {
         None
     };
@@ -338,6 +343,28 @@ fn progress(state: Option<SessionState>, running: bool, integrated: bool) -> Opt
         }
         SessionState::Running => Some(Progress::Running),
     }
+}
+
+/// The spans a session ran, from its `running.changed` flips: the time an idea
+/// worked, without the waits for the human or a later integration.
+fn run_spans(changes: &[(u64, bool)], now_ms: Option<u64>) -> Vec<(u64, u64)> {
+    let mut spans = Vec::new();
+    let mut open = None;
+    for &(timestamp, is_running) in changes {
+        if is_running {
+            if open.is_none() {
+                open = Some(timestamp);
+            }
+        } else if let Some(start) = open.take() {
+            spans.push((start, timestamp));
+        }
+    }
+    if let Some(start) = open
+        && let Some(now) = now_ms
+    {
+        spans.push((start, now));
+    }
+    spans
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize)]
@@ -529,5 +556,38 @@ mod tests {
         assert!(report.criteria.is_none());
         assert!(report.decisions.is_empty());
         assert!(!report.integrated);
+    }
+
+    #[test]
+    fn run_spans_sums_closed_spans() {
+        let spans = run_spans(&[(10, true), (20, false), (30, true), (40, false)], None);
+        assert_eq!(spans, vec![(10, 20), (30, 40)]);
+        assert_eq!(
+            spans.iter().map(|&(start, end)| end - start).sum::<u64>(),
+            20
+        );
+    }
+
+    #[test]
+    fn run_spans_repeated_true_does_not_reopen() {
+        let spans = run_spans(&[(10, true), (20, true), (30, false)], None);
+        assert_eq!(spans, vec![(10, 30)]);
+    }
+
+    #[test]
+    fn run_spans_closes_open_span_at_now_when_running() {
+        let spans = run_spans(&[(10, true)], Some(50));
+        assert_eq!(spans, vec![(10, 50)]);
+    }
+
+    #[test]
+    fn run_spans_drops_open_span_when_not_running() {
+        assert_eq!(run_spans(&[(10, true)], None), Vec::new());
+    }
+
+    #[test]
+    fn run_spans_ignores_leading_false() {
+        let spans = run_spans(&[(5, false), (10, true), (20, false)], None);
+        assert_eq!(spans, vec![(10, 20)]);
     }
 }
