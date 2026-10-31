@@ -175,7 +175,7 @@ export function InsightPage() {
               <ActivityIcon className="h-4 w-4" />
             </span>
             <div>
-              <h1 className="text-xl font-semibold">Insight</h1>
+              <h1 className="text-2xl font-semibold">Insight</h1>
               <p className="text-xs text-muted">Usage du modèle sur la période</p>
             </div>
           </div>
@@ -235,7 +235,7 @@ export function InsightPage() {
 
                   <div className="mt-1 flex gap-1">
                     {view.days.map((day) => (
-                      <div key={day.day} className="min-w-0 flex-1 truncate text-[0.6875rem] text-muted">
+                      <div key={day.day} className="min-w-0 flex-1 truncate text-xs text-muted">
                         {day.label}
                       </div>
                     ))}

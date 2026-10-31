@@ -140,7 +140,7 @@ function AttentionBell({ attention, onOpen }: { attention: AttentionItem[]; onOp
                   </Badge>
                   <span className="min-w-0 flex-1 truncate text-xs font-medium text-text">{item.title}</span>
                 </div>
-                {item.detail ? <div className="mt-0.5 truncate text-[0.75rem] text-muted">{item.detail}</div> : null}
+                {item.detail ? <div className="mt-0.5 truncate text-xs text-muted">{item.detail}</div> : null}
               </button>
             ))
           )}
@@ -197,7 +197,7 @@ export function TopBar({
       <a
         href="#/"
         aria-label="Accueil fennec"
-        className="flex items-center gap-2 py-2 pl-1 pr-3 text-[0.9375rem] font-semibold tracking-[-0.01em] text-text"
+        className="flex items-center gap-2 py-2 pl-1 pr-3 text-base font-semibold tracking-[-0.01em] text-text"
       >
         <FoxIcon className="h-5 w-5 text-accent" />
         <span>fennec</span>
@@ -281,11 +281,11 @@ export function TopBar({
           type="button"
           onClick={onOpenPalette}
           aria-label="Rechercher"
-          className="flex h-8 items-center gap-2 rounded-lg border border-border px-2.5 text-[0.8125rem] text-muted transition-colors hover:border-border-strong hover:text-text"
+          className="flex h-8 items-center gap-2 rounded-lg border border-border px-2.5 text-sm text-muted transition-colors hover:border-border-strong hover:text-text"
         >
           <SearchIcon className="h-3.5 w-3.5" />
           <span className="hidden text-left md:inline">Rechercher…</span>
-          <kbd className="rounded-md border border-border px-1.5 py-px text-[0.6875rem] text-muted">⌘K</kbd>
+          <kbd className="rounded-md border border-border px-1.5 py-px text-xs text-muted">⌘K</kbd>
         </button>
 
         <AttentionBell attention={attention} onOpen={onOpenAttention} />

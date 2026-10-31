@@ -5,7 +5,7 @@
 import type { InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
 
 const FIELD =
-  'rounded-md border border-border bg-bg/40 px-2.5 py-1.5 text-[0.8125rem] text-text outline-none transition-colors placeholder:text-faint hover:border-border-strong focus:border-accent focus:ring-1 focus:ring-accent-soft disabled:opacity-60';
+  'rounded-md border border-border bg-bg/40 px-2.5 py-1.5 text-sm text-text outline-none transition-colors placeholder:text-faint hover:border-border-strong focus:border-accent focus:ring-1 focus:ring-accent-soft disabled:opacity-60';
 
 export function TextInput({ className = '', type = 'text', ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return <input type={type} className={`${FIELD} ${className}`.trim()} {...props} />;

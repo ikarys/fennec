@@ -18,7 +18,7 @@ export function SkillsSection({ skills, hasSession }: SkillsSectionProps) {
       title={panelBlock('skills').title}
       summary={skills !== null && loadedCount > 0 ? `${activeCount}/${loadedCount}` : undefined}
     >
-      <p className="m-0 text-[0.6875rem] text-muted">Les instructions spécialisées dans le contexte du modèle. Point vert : encore dans son contexte.</p>
+      <p className="m-0 text-xs text-muted">Les instructions spécialisées dans le contexte du modèle. Point vert : encore dans son contexte.</p>
       {(!hasSession || (skills !== null && skills.loaded.length === 0 && skills.alwaysOn.length === 0)) && (
         <div className="text-xs text-muted">Aucun skill chargé.</div>
       )}
@@ -44,7 +44,7 @@ export function SkillsSection({ skills, hasSession }: SkillsSectionProps) {
         >
           <span>{id}</span>
           <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ok" />
-          <span className="text-[0.6875rem] text-muted">toujours actif</span>
+          <span className="text-xs text-muted">toujours actif</span>
         </div>
       ))}
       {hasSession && skills !== null && skills.missedAlwaysOn.map((id) => (
@@ -54,7 +54,7 @@ export function SkillsSection({ skills, hasSession }: SkillsSectionProps) {
           className="flex items-center gap-2 py-1.5 font-mono text-xs text-muted"
         >
           <span>{id}</span>
-          <span className="font-sans text-[0.6875rem]">absent, tape /{id}</span>
+          <span className="font-sans text-xs">absent, tape /{id}</span>
         </div>
       ))}
     </Panel>

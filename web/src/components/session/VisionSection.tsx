@@ -26,8 +26,8 @@ export function VisionSection({ items, partial }: { items: ThreadItem[]; partial
 
   return (
     <Panel id="vision" title={panelBlock('vision').title} summary={images.length > 0 ? images.length : undefined}>
-      <p className="m-0 text-[0.6875rem] text-muted">Les images que le modèle a vues : captures, images lues ou jointes. Grisées : sorties de son contexte.</p>
-      {partial && <div className="text-[0.6875rem] text-muted">(messages chargés seulement)</div>}
+      <p className="m-0 text-xs text-muted">Les images que le modèle a vues : captures, images lues ou jointes. Grisées : sorties de son contexte.</p>
+      {partial && <div className="text-xs text-muted">(messages chargés seulement)</div>}
       {images.length === 0 ? (
         <div className="text-xs text-muted">Aucune image vue.</div>
       ) : (
