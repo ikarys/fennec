@@ -458,6 +458,34 @@ pub enum Event {
         /// What was refused: the command, the tool name, or the path.
         subject: String,
     },
+    /// fennec paused a tool call for the human's approval (an "ask" rule, or a path outside the
+    /// workdir). The call stays open until the answer. `kind`/`pattern`/`access` are the rule the
+    /// "session", "always" and "never" answers would store (the rules crate's proposal).
+    #[serde(rename = "rule.approval_requested", rename_all = "camelCase")]
+    RuleApprovalRequested {
+        call_id: String,
+        /// What is asked: the command, the tool name, or the path.
+        subject: String,
+        /// The explicit rule that asked, None for the default (a path outside the workdir).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        rule_id: Option<String>,
+        /// "command" | "tool" | "path"
+        kind: String,
+        pattern: String,
+        /// "read" | "write" | "readWrite" for a path
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        access: Option<String>,
+    },
+    /// The human's answer to a `rule.approval_requested`.
+    #[serde(rename = "rule.approval_answered", rename_all = "camelCase")]
+    RuleApprovalAnswered {
+        call_id: String,
+        /// "once" | "session" | "always" | "never"
+        choice: String,
+        /// The rule the answer stored, if any.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        rule_id: Option<String>,
+    },
     /// The human wrote the agent's AGENTS.md draft to the project (fennec's own event).
     #[serde(rename = "agents_md.written", rename_all = "camelCase")]
     AgentsMdWritten { replaced: bool },
@@ -510,6 +538,8 @@ impl Event {
             Event::TaskAccepted { .. } => "task.accepted",
             Event::AgentSuggested { .. } => "agent.suggested",
             Event::RuleBlocked { .. } => "rule.blocked",
+            Event::RuleApprovalRequested { .. } => "rule.approval_requested",
+            Event::RuleApprovalAnswered { .. } => "rule.approval_answered",
             Event::AgentsMdWritten { .. } => "agents_md.written",
             Event::WorktreeDiscarded { .. } => "worktree.discarded",
         }
