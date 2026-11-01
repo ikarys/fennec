@@ -46,4 +46,5 @@ pub mod task_proposal;
 
 pub mod test_files;
 pub mod vision;
+pub mod waiver;
 pub mod workflow;

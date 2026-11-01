@@ -492,6 +492,13 @@ export function answerRuleApproval(id: string, callId: string, choice: ApprovalC
   });
 }
 
+export function answerWaiver(id: string, callId: string, hours: number | null): Promise<void> {
+  return request<void>(`/api/sessions/${encodeURIComponent(id)}/waiver`, {
+    method: "POST",
+    body: JSON.stringify(hours === null ? { callId, grant: false } : { callId, grant: true, hours }),
+  });
+}
+
 export function setSessionMode(id: string, mode: string): Promise<void> {
   return request<void>(`/api/sessions/${encodeURIComponent(id)}/mode`, {
     method: "POST",

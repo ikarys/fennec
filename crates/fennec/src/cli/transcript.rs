@@ -151,6 +151,8 @@ impl Transcript {
             | Event::RuleBlocked { .. }
             | Event::RuleApprovalRequested { .. }
             | Event::RuleApprovalAnswered { .. }
+            | Event::WaiverRequested { .. }
+            | Event::WaiverAnswered { .. }
             | Event::AgentsMdWritten { .. }
             | Event::WorktreeDiscarded { .. } => Ok(()),
         };

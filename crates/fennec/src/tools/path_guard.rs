@@ -142,7 +142,7 @@ pub(super) fn resolve_for_writing(
         && protection.is_protected(&relative)
     {
         return Err(format!(
-            "{p} is protected by the human (.agents/protected, or a default: fennec's definitions, AGENTS.md, lockfiles, CI). Do not work around it: say in your report what should change there and why."
+            "{p} is protected by the human (.agents/protected, or a default: fennec's definitions, AGENTS.md, lockfiles, CI). Do not work around it. If the change is required, call request_waiver with this path and why; otherwise say in your report what should change there and why."
         ));
     }
 
