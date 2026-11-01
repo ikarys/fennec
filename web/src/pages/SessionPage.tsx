@@ -12,6 +12,7 @@ import { splitContract } from "../lib/plan";
 import {
   answerRuleApproval,
   answerWaiver,
+  cancelQueued,
   answerWorkflow,
   compactSession,
   continueWorkflow,
@@ -45,6 +46,7 @@ import { ContextGauge } from "../components/session/ContextGauge";
 import { QuestionCard } from "../components/session/QuestionCard";
 import { RuleApprovalCard } from "../components/session/RuleApprovalCard";
 import { WaiverCard } from "../components/session/WaiverCard";
+import { QueuedMessages } from "../components/session/QueuedMessages";
 import { ThreadItemView } from "../components/session/Thread";
 import { PlanActionsContext, type PlanActions } from "../components/session/PlanActions";
 import {
@@ -348,7 +350,7 @@ export function SessionPage({
     const fromComposer = content === undefined;
     const value = (content ?? text).trim();
     const images = fromComposer ? attachments : [];
-    if ((!value && images.length === 0) || running) return;
+    if (!value && images.length === 0) return;
     setSendError(null);
 
     // Ask for notification permission in the user gesture that starts a turn.
@@ -361,6 +363,7 @@ export function SessionPage({
     const workflowId =
       fromComposer &&
       workflowSelection.workflowId &&
+      !running &&
       (!run || run.finished) &&
       !view.pendingQuestion
         ? workflowSelection.workflowId
@@ -599,6 +602,18 @@ export function SessionPage({
     }
   }
 
+  async function handleCancelQueued(queueId: string) {
+    if (!sessionId) return;
+    setSendError(null);
+    try {
+      await cancelQueued(sessionId, queueId);
+    } catch (error) {
+      setSendError(
+        error instanceof Error ? error.message : "Erreur lors du retrait de la file",
+      );
+    }
+  }
+
   async function handleWaiver(hours: number | null) {
     if (!sessionId || !view.pendingWaiver) return;
     setSendError(null);
@@ -822,6 +837,9 @@ export function SessionPage({
                         following={!awayFromBottom}
                         onFollowChange={setFollow}
                       />
+                    )}
+                    {!detail?.parentId && (
+                      <QueuedMessages queued={view.queued} onCancel={handleCancelQueued} />
                     )}
                     {!detail?.parentId && (
                       <Composer

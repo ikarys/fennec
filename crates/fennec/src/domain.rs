@@ -31,6 +31,7 @@ pub mod preferences;
 pub mod preflight;
 pub mod project;
 pub mod protection;
+pub mod queue;
 pub mod replay;
 pub mod review_map;
 pub mod risk;

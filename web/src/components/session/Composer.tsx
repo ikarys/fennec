@@ -108,8 +108,9 @@ export function Composer({
     }
   }
 
-  const canSend =
-    !running && (text.trim().length > 0 || (attachments?.length ?? 0) > 0);
+  const canSend = running
+    ? text.trim().length > 0 && !(attachments?.length)
+    : text.trim().length > 0 || (attachments?.length ?? 0) > 0;
 
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const files = event.target.files;
@@ -245,30 +246,33 @@ export function Composer({
               <PauseIcon className="h-4 w-4" />
             </Button>
           )}
-          {running ? (
+          {running && (
             <Button
               variant="danger"
               size="lg"
               iconOnly
               aria-label="Arrêter"
-              title="Arrêter le tour"
+              title="Arrêter le tour (vide la file)"
               onClick={onStop}
             >
               <StopIcon className="h-4 w-4" />
             </Button>
-          ) : (
-            <Button
-              variant="primary"
-              size="lg"
-              iconOnly
-              aria-label="Envoyer"
-              title="Envoyer (Entrée) · nouvelle ligne : Maj+Entrée"
-              onClick={onSend}
-              disabled={!canSend}
-            >
-              <SendIcon className="h-[18px] w-[18px]" />
-            </Button>
           )}
+          <Button
+            variant={running ? "secondary" : "primary"}
+            size="lg"
+            iconOnly
+            aria-label={running ? "Mettre en file" : "Envoyer"}
+            title={
+              running
+                ? "Mettre en file (Entrée) : glissé à l'agent après ses outils en cours"
+                : "Envoyer (Entrée) · nouvelle ligne : Maj+Entrée"
+            }
+            onClick={onSend}
+            disabled={!canSend}
+          >
+            <SendIcon className="h-[18px] w-[18px]" />
+          </Button>
         </div>
         {/* Left: what will run. Right: what it runs on. */}
         <div className="flex flex-wrap items-center gap-1 rounded-b-2xl border-t border-border bg-bg/60 px-2 py-1.5">

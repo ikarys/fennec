@@ -143,6 +143,10 @@ a card where only the human grants it, for 1, 8 or 24 hours, or refuses. A grant
 session, until it expires (the file tools and the sandbox), and writes a MADR file to the session's `docs/adr/`, which
 goes with the branch to the integration gate (`domain/waiver.rs`, `agent/waiver.rs`, `web/waiver_routes.rs`). With the
 human away, a request is refused.
+Prompt queue, done: a message typed while a turn runs is queued (`queue.added`, openfox's asap mode) and shown above the
+composer, each removable; the loop drops the queued messages into the turn between tool rounds (a slash command waits),
+and the first one left starts the next turn when it ends (`domain/queue.rs`, `agent/queue.rs`). A stop drops the queue;
+a pending approval or waiver holds it until the human answers.
 Project deletion, done: a trash button on the project page deletes everything fennec holds for a project (sessions,
 worktrees and branches, rules, ideas); its source folder only when the human ticks the box, never the home, the root or
 fennec's store (`web/project_delete.rs`).
@@ -180,6 +184,7 @@ crates/fennec/src/
     replay.rs          which message the human may replay
     rule_approval.rs   the call paused for the human's approval, folded from the log; the four answers
     waiver.rs          a protected file's waiver: the pending request, the active grants, the ADR a grant writes
+    queue.rs           the messages queued while a turn runs: pending, those the loop may drop in, what a turn's end does
     criteria.rs        acceptance criteria: the plan's "Done when", checks, verdicts, provenance
     preflight.rs       a plan's checks run before any change: fails, passes already, cannot run
     protection.rs      protected files: the defaults, the gitignore-like patterns, the matcher
@@ -213,6 +218,7 @@ crates/fennec/src/
     rule_approval.rs   the human's answer to an approval: runs or refuses the recorded call, resumes the loop
     request_waiver.rs  the loop's own tool: asks the human to waive one protected file; the turn pauses
     waiver.rs          the human's answer to a waiver (recorded at the click): the call's result, the loop resumed
+    queue.rs           openfox chat/drain-queue: the queued messages dropped into the turn between tool rounds
     preflight.rs       runs a plan's checks at the end of the planner's turn, sends it back once
     compaction.rs      openfox context/compactor: the summary round and the new window
     prompt.rs          openfox chat/prompts: the system prompt, plus fennec's working method
