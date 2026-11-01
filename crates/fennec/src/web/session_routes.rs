@@ -17,6 +17,7 @@ use crate::agents;
 use crate::domain::agent::{
     resolve as agent_resolve, resolve_mode as agent_resolve_mode, switch_to,
 };
+use crate::domain::agent_suggestion;
 use crate::domain::agents_md;
 use crate::domain::attachment::{Attachment, from_data_url};
 use crate::domain::audit;
@@ -312,6 +313,20 @@ pub(super) fn get_session(app: &App, stream: &mut TcpStream, id: &str) -> Result
         }),
         None => Value::Null,
     };
+    // The agent switch suggested in this turn, with the target's display name; dropped if that agent is gone.
+    v["agentSuggestion"] = agent_suggestion::last_suggestion(&events)
+        .and_then(|s| {
+            let target = list.iter().find(|a| a.id == s.agent && !a.subagent)?;
+            Some(json!({
+                "callId": s.call_id,
+                "agent": s.agent,
+                "name": target.name,
+                "color": target.color,
+                "reason": s.reason,
+                "brief": s.brief,
+            }))
+        })
+        .unwrap_or(Value::Null);
     v["worktree"] = match app.place(&store, &s, &p)?.worktree {
         Some(wt) => json!({
             "path": wt.path, "branch": wt.branch, "base": wt.base,
