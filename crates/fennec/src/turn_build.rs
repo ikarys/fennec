@@ -109,14 +109,22 @@ pub fn with_turn<R>(
     })
     .with_patterns(&blocked_paths)
     .exempting(&waiver_paths);
+    let shared_target = worktree::shared_target(&worktree::root(&settings.db_path), workdir);
     let tools = LocalTools::new(workdir.to_path_buf())
         .with_search(prefs.search.clone())
         .with_sandbox(
             Sandbox::for_store(&prefs.sandbox, &settings.db_path)
                 .protecting(protected::existing_paths(workdir, &protection))
-                .with_mounts(worktree::dependency_mounts(workdir)),
+                .with_mounts(worktree::dependency_mounts(workdir))
+                .writing(shared_target.iter().cloned().collect()),
         )
         .with_protection(protection)
+        .with_env(
+            shared_target
+                .map(|dir| ("CARGO_TARGET_DIR".to_string(), dir))
+                .into_iter()
+                .collect(),
+        )
         .with_rules(rules);
     let mut turn = Turn {
         model: &model,
