@@ -332,6 +332,10 @@ pub(super) fn get_session(app: &App, stream: &mut TcpStream, id: &str) -> Result
     v["worktree"] = match app.place(&store, &s, &p)?.worktree {
         Some(wt) => json!({
             "path": wt.path, "branch": wt.branch, "base": wt.base,
+            // What the integration would bring: none means nothing to review.
+            "commits": wt.branch.strip_prefix("fennec/")
+                .and_then(|id| git::branch_stats(Path::new(&p.workdir), id))
+                .map_or(0, |stats| stats.commits),
             "editorUrl": editor::vscode_link(
                 &wt.path.to_string_lossy(),
                 std::env::var("WSL_DISTRO_NAME").ok().as_deref(),
