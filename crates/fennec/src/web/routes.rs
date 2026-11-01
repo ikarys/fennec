@@ -127,6 +127,9 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         ("POST", ["api", "sessions", id, "messages"]) => {
             session_routes::send_message(app, req, stream, id)
         }
+        ("POST", ["api", "sessions", id, "queue", queue_id, "cancel"]) => {
+            session_routes::cancel_queued(app, stream, id, queue_id)
+        }
         ("POST", ["api", "sessions", id, "rule-approval"]) => {
             rule_approval_routes::answer_rule_approval(app, req, stream, id)
         }
