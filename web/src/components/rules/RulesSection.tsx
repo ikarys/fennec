@@ -44,9 +44,6 @@ const ACCESS_LABELS: Record<RuleAccess, string> = {
   readWrite: 'lecture et écriture',
 };
 
-const INTRO =
-  "fennec applique ces règles lui-même avant chaque appel d'outil d'un agent et chaque commande d'un workflow : le modèle ne peut pas les contourner. Une commande est comparée mot à mot (programme, mots, options), à travers sudo, sh -c, && et | ; une règle « autoriser » pour une commande ne couvre que cette commande exacte. Un chemin hors du projet est refusé, en lecture comme en écriture, sauf si une règle « autoriser » le nomme (une règle « demander » est aussi refusée tant que fennec ne peut pas poser la question dans la session).";
-
 function IconLink({
   href,
   title,
@@ -63,7 +60,7 @@ function IconLink({
       href={href}
       title={title}
       aria-label={label}
-      className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted transition-colors hover:bg-accent"
+      className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted transition-colors hover:bg-raised hover:text-text"
     >
       {children}
     </a>
@@ -82,28 +79,23 @@ function RuleRow({
   onDelete?: () => void;
 }) {
   return (
-    <li className="flex items-center gap-2 rounded-md border border-border p-3">
-      <Badge tone="neutral" className="shrink-0">
-        {KIND_LABELS[rule.kind]}
-      </Badge>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="truncate font-mono text-sm">{rule.pattern}</span>
+    <li className="grid grid-cols-[5.5rem_minmax(0,1fr)_auto_2rem] items-center gap-3 px-4 py-2.5">
+      <Badge tone="neutral">{KIND_LABELS[rule.kind]}</Badge>
+      <div className="min-w-0">
+        <div className="flex items-baseline gap-2">
+          <span className="truncate font-mono text-sm" title={rule.pattern}>
+            {rule.pattern}
+          </span>
           {rule.kind === 'path' && rule.access ? (
-            <Badge tone="neutral" className="shrink-0">
-              {ACCESS_LABELS[rule.access]}
-            </Badge>
+            <Badge tone="neutral">{ACCESS_LABELS[rule.access]}</Badge>
           ) : null}
         </div>
-        <div className="truncate font-mono text-xs text-muted">{rule.understood}</div>
-        {rule.note ? <div className="truncate text-xs text-muted">{rule.note}</div> : null}
-        {rule.origin !== 'human' ? (
-          <div className="text-xs text-muted">par ta réponse dans une session</div>
-        ) : null}
+        <div className="truncate text-xs text-faint" title={rule.understood}>
+          {rule.understood}
+        </div>
+        {rule.note ? <div className="truncate text-xs text-muted italic">{rule.note}</div> : null}
       </div>
-      <Badge tone={ACTION_TONES[rule.action]} className="shrink-0">
-        {ACTION_LABELS[rule.action]}
-      </Badge>
+      <Badge tone={ACTION_TONES[rule.action]}>{ACTION_LABELS[rule.action]}</Badge>
       {editable ? (
         <Button
           variant="ghost"
@@ -115,7 +107,9 @@ function RuleRow({
         >
           <TrashIcon className="h-4 w-4" />
         </Button>
-      ) : null}
+      ) : (
+        <span />
+      )}
     </li>
   );
 }
@@ -133,10 +127,10 @@ function RuleList({
   onDelete?: (id: number) => void;
   emptyMessage?: string;
 }) {
-  if (rules.length === 0) return <p className="text-xs text-muted">{emptyMessage}</p>;
+  if (rules.length === 0) return <p className="px-4 py-3 text-xs text-muted">{emptyMessage}</p>;
 
   return (
-    <ul className="flex flex-col gap-2">
+    <ul className="divide-y divide-border">
       {rules.map((rule) => (
         <RuleRow
           key={rule.id}
@@ -195,9 +189,15 @@ function RuleForm({ projects, onAdded }: { projects: ProjectOption[]; onAdded: (
 
   return (
     <div>
-      <div className="flex flex-wrap items-end gap-3">
+      <div
+        className={
+          kind === 'path'
+            ? 'grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[10rem_8rem_minmax(0,1fr)_auto_8rem]'
+            : 'grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[10rem_8rem_minmax(0,1fr)_8rem]'
+        }
+      >
         <FieldRow label="Portée" htmlFor="rule-scope">
-          <Select id="rule-scope" value={scope} onChange={(e) => setScope(e.target.value)}>
+          <Select id="rule-scope" className="w-full" value={scope} onChange={(e) => setScope(e.target.value)}>
             <option value="global">Globale</option>
             {projects.map((project) => (
               <option key={project.id} value={project.id}>
@@ -207,7 +207,7 @@ function RuleForm({ projects, onAdded }: { projects: ProjectOption[]; onAdded: (
           </Select>
         </FieldRow>
         <FieldRow label="Type" htmlFor="rule-kind">
-          <Select id="rule-kind" value={kind} onChange={(e) => setKind(e.target.value as RuleKind)}>
+          <Select id="rule-kind" className="w-full" value={kind} onChange={(e) => setKind(e.target.value as RuleKind)}>
             <option value="command">commande</option>
             <option value="tool">outil</option>
             <option value="path">chemin</option>
@@ -216,6 +216,7 @@ function RuleForm({ projects, onAdded }: { projects: ProjectOption[]; onAdded: (
         <FieldRow label="Motif" htmlFor="rule-pattern">
           <TextInput
             id="rule-pattern"
+            className="w-full font-mono"
             value={pattern}
             placeholder={placeholder}
             onChange={(e) => setPattern(e.target.value)}
@@ -226,6 +227,7 @@ function RuleForm({ projects, onAdded }: { projects: ProjectOption[]; onAdded: (
           <FieldRow label="Accès" htmlFor="rule-access">
             <Select
               id="rule-access"
+              className="w-full"
               value={access}
               onChange={(e) => setAccess(e.target.value as RuleAccess)}
             >
@@ -236,21 +238,26 @@ function RuleForm({ projects, onAdded }: { projects: ProjectOption[]; onAdded: (
           </FieldRow>
         ) : null}
         <FieldRow label="Action" htmlFor="rule-action">
-          <Select id="rule-action" value={action} onChange={(e) => setAction(e.target.value as RuleAction)}>
+          <Select id="rule-action" className="w-full" value={action} onChange={(e) => setAction(e.target.value as RuleAction)}>
             <option value="block">bloquer</option>
             <option value="ask">demander</option>
             <option value="allow">autoriser</option>
           </Select>
         </FieldRow>
-        <FieldRow label="Note" htmlFor="rule-note">
-          <TextInput
-            id="rule-note"
-            value={note}
-            placeholder="Pourquoi (optionnel)"
-            onChange={(e) => setNote(e.target.value)}
-            onKeyDown={addOnEnter}
-          />
-        </FieldRow>
+      </div>
+      <div className="mt-3 flex items-end gap-3">
+        <div className="min-w-0 flex-1">
+          <FieldRow label="Note" htmlFor="rule-note">
+            <TextInput
+              id="rule-note"
+              className="w-full"
+              value={note}
+              placeholder="Pourquoi (optionnel)"
+              onChange={(e) => setNote(e.target.value)}
+              onKeyDown={addOnEnter}
+            />
+          </FieldRow>
+        </div>
         <Button variant="primary" onClick={submit} disabled={!pattern.trim() || busy}>
           Ajouter
         </Button>
@@ -301,7 +308,21 @@ export function RulesSection() {
 
   return (
     <>
-      <Section title="Règles" description={INTRO}>
+      <Section
+        title="Règles"
+        description="Appliquées par fennec avant chaque appel d'outil et chaque commande de workflow : le modèle ne peut pas les contourner."
+      >
+        <details>
+          <summary className="cursor-pointer text-xs text-muted">Comment les règles sont comparées</summary>
+          <ul className="mt-2 flex list-disc flex-col gap-1 pl-5 text-xs text-muted">
+            <li>Une commande est comparée mot à mot (programme, mots, options), à travers sudo, sh -c, && et |.</li>
+            <li>Une règle « autoriser » pour une commande ne couvre que cette commande exacte.</li>
+            <li>
+              Un chemin hors du projet est refusé, en lecture comme en écriture, sauf si une règle « autoriser » le nomme ;
+              une règle « demander » met le tour en pause jusqu'à ta réponse.
+            </li>
+          </ul>
+        </details>
         {loading ? <p className="text-xs text-muted">Chargement…</p> : null}
         {!loading && error ? <p className="text-xs text-err">{error}</p> : null}
         {!loading && !error ? (
@@ -313,7 +334,7 @@ export function RulesSection() {
       </Section>
       {!loading && !error && overview ? (
         <>
-          <Section title="Globales">
+          <Section title="Globales" flush>
             <RuleList
               rules={overview.global}
               editable
@@ -332,33 +353,36 @@ export function RulesSection() {
                   </span>
                 )
               }
+              flush
             >
               <RuleList rules={project.rules} editable deletingId={deletingId} onDelete={handleDelete} />
             </Section>
           ))}
           {overview.sessions.length > 0 ? (
-            <Section title="Accordées dans une session">
-              <div className="flex flex-col gap-4">
-                {overview.sessions.map((session) => (
-                  <div key={session.id}>
-                    <div className="mb-2 flex items-center justify-between gap-2">
-                      <span className={session.title ? 'text-sm font-medium' : 'text-sm text-muted'}>
-                        {session.title ?? 'Session supprimée'}
-                      </span>
-                      {session.title ? (
-                        <IconLink
-                          href={`#/s/${encodeURIComponent(session.id)}`}
-                          title="Ouvrir la session"
-                          label="Ouvrir la session"
-                        >
-                          <ExternalIcon className="h-4 w-4" />
-                        </IconLink>
-                      ) : null}
-                    </div>
-                    <RuleList rules={session.rules} editable deletingId={deletingId} onDelete={handleDelete} />
+            <Section title="Accordées dans une session" flush>
+              {overview.sessions.map((session, index) => (
+                <div key={session.id}>
+                  <div
+                    className={`flex items-center justify-between gap-2 border-b border-border bg-raised/50 px-4 py-1.5 ${
+                      index > 0 ? 'border-t border-border' : ''
+                    }`.trim()}
+                  >
+                    <span className={session.title ? 'truncate text-xs font-medium' : 'truncate text-xs text-muted'}>
+                      {session.title ?? 'Session supprimée'}
+                    </span>
+                    {session.title ? (
+                      <IconLink
+                        href={`#/s/${encodeURIComponent(session.id)}`}
+                        title="Ouvrir la session"
+                        label="Ouvrir la session"
+                      >
+                        <ExternalIcon className="h-4 w-4" />
+                      </IconLink>
+                    ) : null}
                   </div>
-                ))}
-              </div>
+                  <RuleList rules={session.rules} editable deletingId={deletingId} onDelete={handleDelete} />
+                </div>
+              ))}
             </Section>
           ) : null}
         </>
@@ -404,15 +428,16 @@ export function ProjectRulesSummary({ projectId }: { projectId: string }) {
             <ExternalIcon className="h-4 w-4" />
           </IconLink>
         }
+        flush
       >
-        {loading ? <p className="text-xs text-muted">Chargement…</p> : null}
-        {!loading && error ? <p className="text-xs text-err">{error}</p> : null}
+        {loading ? <p className="px-4 py-3 text-xs text-muted">Chargement…</p> : null}
+        {!loading && error ? <p className="px-4 py-3 text-xs text-err">{error}</p> : null}
         {!loading && !error ? <RuleList rules={data?.rules ?? []} editable={false} deletingId={null} /> : null}
       </Section>
       {!loading && !error ? (
         <>
           <p className="text-xs text-muted">Les règles globales s'appliquent aussi :</p>
-          <Section title="Règles globales">
+          <Section title="Règles globales" flush>
             <RuleList rules={data?.global ?? []} editable={false} deletingId={null} />
           </Section>
         </>

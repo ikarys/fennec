@@ -1,5 +1,5 @@
 /**
- * The shared ⋯ menu for an idea: reframe, start, restart, complete, drop.
+ * The shared ⋯ menu for an idea: reframe, start, restart, complete, drop, remove.
  */
 import { useState } from 'react';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
@@ -23,7 +23,8 @@ export function IdeaMenu({
   onFrame: (idea: IdeaView) => Promise<void>;
   run: (action: () => Promise<IdeaBoard>) => Promise<boolean>;
 }) {
-  const [pendingDrop, setPendingDrop] = useState(false);
+  // Both drop and remove end in `idea.dropped`; only the wording differs.
+  const [pendingDrop, setPendingDrop] = useState<'drop' | 'remove' | null>(null);
   if (idea.menu.length === 0) {
     return null;
   }
@@ -33,7 +34,7 @@ export function IdeaMenu({
   const handleStart = () => void run(() => startIdea(projectId, idea.id));
   const handleComplete = () => void run(() => completeIdea(projectId, idea.id));
   const handleDrop = () => {
-    setPendingDrop(false);
+    setPendingDrop(null);
     void run(() => dropIdea(projectId, idea.id));
   };
 
@@ -68,20 +69,30 @@ export function IdeaMenu({
               );
             case 'drop':
               return (
-                <MenuItem key={action} tone="danger" onSelect={() => setPendingDrop(true)}>
+                <MenuItem key={action} tone="danger" onSelect={() => setPendingDrop('drop')}>
                   Abandonner
+                </MenuItem>
+              );
+            case 'remove':
+              return (
+                <MenuItem key={action} tone="danger" onSelect={() => setPendingDrop('remove')}>
+                  Supprimer
                 </MenuItem>
               );
           }
         })}
       </Menu>
       <ConfirmDialog
-        open={pendingDrop}
-        title="Abandonner cette idée ?"
-        body="L'idée sort de la file. Cette action est définitive."
-        confirmLabel="Abandonner"
+        open={pendingDrop !== null}
+        title={pendingDrop === 'remove' ? 'Supprimer cette tâche ?' : 'Abandonner cette idée ?'}
+        body={
+          pendingDrop === 'remove'
+            ? 'La tâche sort du tableau ; sa session et son historique restent. Cette action est définitive.'
+            : "L'idée sort de la file. Cette action est définitive."
+        }
+        confirmLabel={pendingDrop === 'remove' ? 'Supprimer' : 'Abandonner'}
         onConfirm={handleDrop}
-        onCancel={() => setPendingDrop(false)}
+        onCancel={() => setPendingDrop(null)}
       />
     </>
   );

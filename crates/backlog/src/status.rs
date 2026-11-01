@@ -59,6 +59,8 @@ pub enum MenuAction {
     StartUnframed,
     Complete,
     Drop,
+    /// A done task taken off the board (`idea.dropped`); its session stays.
+    Remove,
 }
 
 /// Display order for stages. `Yours` first because it waits for the human.
@@ -149,7 +151,8 @@ impl Status {
                 MenuAction::Drop,
             ],
             Status::Review | Status::Question => &[MenuAction::Complete, MenuAction::Drop],
-            Status::Running | Status::Integrated | Status::Completed => &[],
+            Status::Running => &[],
+            Status::Integrated | Status::Completed => &[MenuAction::Remove],
         }
     }
 }
@@ -304,8 +307,8 @@ mod tests {
             &[MenuAction::Complete, MenuAction::Drop]
         );
         assert_eq!(Status::Running.menu(), &[]);
-        assert_eq!(Status::Integrated.menu(), &[]);
-        assert_eq!(Status::Completed.menu(), &[]);
+        assert_eq!(Status::Integrated.menu(), &[MenuAction::Remove]);
+        assert_eq!(Status::Completed.menu(), &[MenuAction::Remove]);
     }
 
     #[test]

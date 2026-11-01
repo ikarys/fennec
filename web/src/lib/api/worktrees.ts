@@ -9,6 +9,8 @@ export interface WorktreeEntry {
   bytes: number;
   generatedBytes: number;
   orphan: boolean;
+  /** The shared Cargo cache: emptied, never deleted. */
+  cache: boolean;
   repoMissing: boolean;
   foreignOwned: boolean;
   sudoCommand: string | null;
