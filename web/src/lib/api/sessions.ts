@@ -284,6 +284,7 @@ export type Blocker =
   | { kind: "criteriaNotPassed"; criteria: string[] }
   | { kind: "noCriteria" }
   | { kind: "protectedTouched"; paths: string[] }
+  | { kind: "sensitiveTouched"; paths: string[] }
   | { kind: "architectureViolated"; violations: ArchitectureViolation[] }
   | { kind: "suppressionsAdded"; suppressions: Suppression[] }
   | {
@@ -297,6 +298,7 @@ export type Blocker =
 
 export type ReviewSignal =
   | 'protected'
+  | 'sensitive'
   | 'bypass'
   | 'architecture'
   | 'conflictMarker'
