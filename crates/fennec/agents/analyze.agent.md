@@ -3,6 +3,7 @@ id: analyze
 name: Analyse
 description: Reads the project and drafts its AGENTS.md philosophy, layers and rules, each with its source, without changing anything
 subagent: false
+phase: understand
 commands: read-only
 color: '#0ea5e9'
 allowedTools:

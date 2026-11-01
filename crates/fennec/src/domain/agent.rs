@@ -23,6 +23,19 @@ pub enum CommandAccess {
     ReadOnly,
 }
 
+/// fennec's own: `phase` in the frontmatter, the step of a project an agent serves; the composer groups its menu by it, in this order.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
+#[serde(rename_all = "lowercase")]
+pub enum Phase {
+    Start,
+    Frame,
+    Build,
+    Understand,
+    Check,
+}
+
 /// openfox `AgentDefinition` (metadata flattened).
 #[derive(Debug, Clone, PartialEq)]
 pub struct AgentDefinition {
@@ -36,6 +49,8 @@ pub struct AgentDefinition {
     /// fennec's own: `reasoningEffort` in the frontmatter; overrides the model's default effort for this agent's rounds.
     pub reasoning_effort: Option<ReasoningEffort>,
     pub color: Option<String>,
+    /// None for sub-agents and agents that name no known phase.
+    pub phase: Option<Phase>,
     pub prompt: String,
 }
 
@@ -74,6 +89,9 @@ pub fn parse_agent_md(content: &str) -> Option<AgentDefinition> {
         .scalar("color")
         .filter(|value| !value.is_empty())
         .map(|value| value.to_string());
+    let phase = fields.scalar("phase").and_then(|value| {
+        serde_json::from_value::<Phase>(serde_json::Value::String(value.to_string())).ok()
+    });
 
     Some(AgentDefinition {
         id: id.to_string(),
@@ -84,6 +102,7 @@ pub fn parse_agent_md(content: &str) -> Option<AgentDefinition> {
         commands,
         reasoning_effort,
         color,
+        phase,
         prompt: body,
     })
 }
@@ -220,6 +239,7 @@ mod tests {
             commands: CommandAccess::ReadWrite,
             reasoning_effort: None,
             color: None,
+            phase: None,
             prompt: "prompt".to_string(),
         }
     }
@@ -297,6 +317,22 @@ allowedTools:
     #[test]
     fn empty_body_is_none() {
         assert_eq!(parse_agent_md("---\nid: plan\n---\n"), None);
+    }
+
+    #[test]
+    fn phase_is_parsed() {
+        let content = "---\nid: plan\nphase: understand\n---\nbody\n";
+        let agent = parse_agent_md(content).unwrap();
+        assert_eq!(agent.phase, Some(Phase::Understand));
+    }
+
+    #[test]
+    fn unknown_or_missing_phase_is_none() {
+        let unknown = parse_agent_md("---\nid: plan\nphase: later\n---\nbody\n").unwrap();
+        assert_eq!(unknown.phase, None);
+
+        let missing = parse_agent_md("---\nid: plan\n---\nbody\n").unwrap();
+        assert_eq!(missing.phase, None);
     }
 
     #[test]

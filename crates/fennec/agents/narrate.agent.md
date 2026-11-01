@@ -3,6 +3,7 @@ id: narrate
 name: Récit
 description: Narrates a branch's change file by file in the review order, each claim sourced, without changing anything
 subagent: false
+phase: understand
 commands: read-only
 color: '#a855f7'
 allowedTools:
