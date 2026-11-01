@@ -38,6 +38,7 @@ pub const DEFAULT_PATTERNS: [&str; 13] = [
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Protection {
     patterns: Vec<String>,
+    exempt: Vec<String>,
 }
 
 impl Protection {
@@ -86,7 +87,10 @@ impl Protection {
             }
         }
 
-        Protection { patterns }
+        Protection {
+            patterns,
+            exempt: Vec::new(),
+        }
     }
 
     /// Only these patterns, no defaults.
@@ -96,7 +100,10 @@ impl Protection {
             .iter()
             .filter_map(|pattern| rules::path::normalize(pattern))
             .collect();
-        Protection { patterns }
+        Protection {
+            patterns,
+            exempt: Vec::new(),
+        }
     }
 
     /// These patterns on top: the human's blocking path rules, so the file tools refuse
@@ -110,10 +117,22 @@ impl Protection {
         self
     }
 
+    /// These exact paths are exempt from protection for the session (a granted
+    /// waiver). The sandbox's read-only mounts come from the same `Protection`,
+    /// so commands can write them too.
+    pub fn exempting(mut self, paths: &[String]) -> Protection {
+        self.exempt.extend(paths.iter().cloned());
+        self
+    }
+
     /// `relative`: a path relative to the project root, `/`-separated, no
     /// leading `./`.
     pub fn is_protected(&self, relative: &str) -> bool {
         if relative.is_empty() {
+            return false;
+        }
+
+        if self.exempt.iter().any(|path| path == relative) {
             return false;
         }
 
@@ -246,5 +265,14 @@ mod tests {
         let protection = Protection::for_worktree(Some("Cargo.lock\n"));
 
         assert!(protection.is_protected("Cargo.lock"));
+    }
+
+    #[test]
+    fn exempting_exempts_the_exact_path_only() {
+        let protection = Protection::new(None).exempting(&["AGENTS.md".to_string()]);
+
+        assert!(!protection.is_protected("AGENTS.md"));
+        assert!(protection.is_protected("sub/AGENTS.md"));
+        assert!(protection.is_protected(".agents/agents/builder.agent.md"));
     }
 }

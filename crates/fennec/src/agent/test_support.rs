@@ -71,6 +71,7 @@ pub fn builder() -> Vec<AgentDefinition> {
             "edit_file".into(),
             "run_command".into(),
             "ask_user".into(),
+            "request_waiver".into(),
             "propose_criteria".into(),
             "record_decision".into(),
             "load_skill".into(),

@@ -11,6 +11,7 @@ allowedTools:
   - edit_file
   - run_command
   - ask_user
+  - request_waiver
   - propose_criteria
   - record_decision
   - load_skill

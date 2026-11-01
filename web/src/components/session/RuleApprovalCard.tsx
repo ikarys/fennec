@@ -4,12 +4,13 @@
  */
 import type { PendingApproval } from '../../lib/fold';
 import type { ApprovalChoice } from '../../lib/api/sessions';
+import { shortPath } from '../../lib/shortPath';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 
 function approvalAction(approval: PendingApproval): string {
-  if (approval.kind === 'command') return 'Lancer la commande';
-  if (approval.kind === 'tool') return "Utiliser l'outil";
+  if (approval.kind === 'command') return 'Lancer';
+  if (approval.kind === 'tool') return 'Utiliser';
   if (approval.access === 'write') return 'Écrire';
   if (approval.access === 'readWrite') return 'Lire et écrire';
   return 'Lire';
@@ -36,21 +37,19 @@ export function RuleApprovalCard({
   return (
     <div className="px-6 py-2">
       <Card className="mx-auto max-w-[820px] px-3 py-2">
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-1.5 text-xs font-semibold">
-            <span className="text-accent">!</span>
-            <span className="text-accent-strong">Autorisation demandée</span>
-          </div>
-          <div className="text-sm leading-snug [overflow-wrap:break-word]">
-            <span className="text-muted">{action}</span>{' '}
-            <span className="font-mono text-text">{approval.subject}</span>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-accent">!</span>
+          <span className="text-muted">{action}</span>
+          <span className="min-w-0 truncate font-mono text-sm text-text" title={approval.subject}>
+            {approval.kind === 'path' ? shortPath(approval.subject) : approval.subject}
+          </span>
+          <div className="ml-auto flex flex-wrap items-center gap-1.5">
             <Button
               type="button"
               variant="primary"
               size="sm"
               disabled={disabled}
+              title="Autoriser cet appel seulement"
               onClick={() => onAnswer('once')}
             >
               Une fois
@@ -59,41 +58,32 @@ export function RuleApprovalCard({
               type="button"
               variant="secondary"
               size="sm"
-              multiline
               disabled={disabled}
+              title={`Pour cette session : ${scope.pattern}${scope.suffix ?? ''}`}
               onClick={() => onAnswer('session')}
-              className="max-w-full"
             >
-              <span>
-                <span className="font-medium">Pour la session</span>
-                <span className="font-normal opacity-75">
-                  {' '}
-                  <span className="font-mono">{scope.pattern}</span>
-                  {scope.suffix}
-                </span>
-              </span>
+              Session
             </Button>
             <Button
               type="button"
               variant="secondary"
               size="sm"
               disabled={disabled}
+              title="Règle du projet, visible et supprimable dans Réglages › Règles"
               onClick={() => onAnswer('always')}
             >
-              Toujours (projet)
+              Toujours
             </Button>
             <Button
               type="button"
               variant="danger"
               size="sm"
               disabled={disabled}
+              title="Refuser et créer une règle du projet (Réglages › Règles)"
               onClick={() => onAnswer('never')}
             >
-              Jamais (projet)
+              Jamais
             </Button>
-          </div>
-          <div className="text-xs text-faint">
-            « Toujours » et « Jamais » créent une règle du projet, visible et supprimable dans Réglages › Règles.
           </div>
         </div>
       </Card>
