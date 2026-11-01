@@ -11,6 +11,7 @@ mod propose_criteria;
 mod propose_task;
 mod record_decision;
 mod round;
+mod rule_check;
 mod suggest_agent;
 #[cfg(test)]
 mod test_support;

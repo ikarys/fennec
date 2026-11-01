@@ -106,6 +106,11 @@ export function ToolCard({ tool }: { tool: ToolCallView }) {
         {tool.name === 'read_file' && lineCount > 0 && (
           <span className="shrink-0 text-xs whitespace-nowrap text-muted">{lineCount} lignes</span>
         )}
+        {tool.blockedBy && (
+          <Badge tone="err" className="shrink-0" title={`Refusé par la règle ${tool.blockedBy.scope === 'global' ? 'globale' : 'du projet'} « ${tool.blockedBy.pattern} »`}>
+            vérifié · règle
+          </Badge>
+        )}
         {tool.name === 'run_command' && tool.status !== 'running' && tool.exitCode != null && (
           <Badge tone={tool.exitCode === 0 ? 'ok' : 'err'} className="shrink-0">
             vérifié · exit {tool.exitCode}

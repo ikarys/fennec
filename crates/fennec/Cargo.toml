@@ -9,6 +9,7 @@ base64 = "0.23"
 llm-providers = { path = "../llm-providers" }
 token-usage = { path = "../token-usage" }
 backlog = { path = "../backlog" }
+rules = { path = "../rules" }
 rusqlite = { version = "0.41", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

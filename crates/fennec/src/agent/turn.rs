@@ -549,8 +549,16 @@ mod tests {
     }
 
     fn run(model: &dyn Model, workdir: &Path) -> (DoneReason, Vec<Event>) {
+        run_with_rules(model, workdir, rules::Rules::default())
+    }
+
+    fn run_with_rules(
+        model: &dyn Model,
+        workdir: &Path,
+        rules: rules::Rules,
+    ) -> (DoneReason, Vec<Event>) {
         let log = MemoryLog::default();
-        let tools = LocalTools::new(workdir.to_path_buf());
+        let tools = LocalTools::new(workdir.to_path_buf()).with_rules(rules);
         let stop = AtomicBool::new(false);
         let mut on_event = |_: &Event| {};
         let agents = builder();
@@ -580,6 +588,41 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("fennec-turn-{}", new_id()));
         std::fs::create_dir_all(&dir).unwrap();
         dir
+    }
+
+    #[test]
+    fn a_command_matching_a_rule_is_refused_and_logged() {
+        let dir = scratch_dir();
+        std::fs::create_dir_all(dir.join("target")).unwrap();
+        let call = ToolCall {
+            id: "c1".into(),
+            name: "run_command".into(),
+            arguments: json!({"command": "rm -fr target"}),
+            parse_error: None,
+            raw_arguments: None,
+        };
+        let model = Scripted(RefCell::new(vec![
+            reply("", vec![call]),
+            reply("done", vec![]),
+        ]));
+        let rules = rules::Rules::new(vec![rules::Rule {
+            id: 1,
+            scope: rules::Scope::Global,
+            target: rules::Target::parse(rules::TargetKind::Command, "rm -rf", None).unwrap(),
+            action: rules::Action::Block,
+            note: None,
+            origin: rules::Origin::Human,
+        }]);
+        let (_, events) = run_with_rules(&model, &dir, rules);
+        assert!(events.iter().any(
+            |e| matches!(e, Event::RuleBlocked { subject, .. } if subject == "rm -fr target")
+        ));
+        assert!(events.iter().any(|e| matches!(
+            e,
+            Event::ToolResult { result, .. } if !result.success && result.error.as_deref().is_some_and(|m| m.contains("rm -rf"))
+        )));
+        assert!(dir.join("target").exists(), "the command never ran");
+        std::fs::remove_dir_all(dir).ok();
     }
 
     #[test]

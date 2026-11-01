@@ -1,4 +1,4 @@
-//! Deleting sessions on the human's request (contract: docs/api.md): the log, the child sessions and the worktree with its branch. The usage ledger keeps the calls.
+//! Deleting sessions on the human's request (contract: docs/api.md): the log, the child sessions and the worktree with its branch. The usage ledger keeps the calls. The session's rules go with the session.
 
 use super::App;
 use super::http::{Request, error, send_json};
@@ -51,6 +51,8 @@ pub fn delete_sessions(app: &App, req: &Request, stream: &mut TcpStream) -> Resu
     }
     let mut deleted: Vec<String> = Vec::new();
     let mut failed: Vec<Value> = Vec::new();
+    let rule_store =
+        rules::RuleStore::open(&app.settings.rules_path()).map_err(|e| e.to_string())?;
     for (id, session, tree) in plans {
         // A child session shares its root's worktree: removing the root's removes theirs.
         if let Some(project) = store.project(&session.project_id)?
@@ -66,6 +68,9 @@ pub fn delete_sessions(app: &App, req: &Request, stream: &mut TcpStream) -> Resu
             }
         }
         store.delete_sessions(&tree)?;
+        for sid in &tree {
+            rule_store.delete_session(sid).map_err(|e| e.to_string())?;
+        }
         let mut folds = app.skill_folds.lock().unwrap();
         for sid in &tree {
             folds.remove(sid);

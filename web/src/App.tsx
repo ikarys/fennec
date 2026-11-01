@@ -21,7 +21,7 @@ type Route =
   | { name: 'home' }
   | { name: 'session'; id: string }
   | { name: 'new'; id: string; testWorkflowId: string | null; frameIdeaId: string | null; fromSessionId: string | null }
-  | { name: 'settings' }
+  | { name: 'settings'; tab: string | null }
   | { name: 'insight' }
   | { name: 'backlog' }
   | { name: 'split'; left: string | null; right: string | null }
@@ -33,8 +33,8 @@ const ACTIVE_TAB_KEY = 'fennec.activeTab';
 
 function parseRoute(): Route {
   const hash = window.location.hash;
-  if (hash === '#/settings') {
-    return { name: 'settings' };
+  if (hash === '#/settings' || hash.startsWith('#/settings/')) {
+    return { name: 'settings', tab: hash.slice('#/settings/'.length) || null };
   }
   if (hash === '#/insight') {
     return { name: 'insight' };
@@ -444,6 +444,8 @@ export default function App() {
             />
           ) : route.name === 'settings' ? (
             <SettingsPage
+              key={route.tab ?? ''}
+              initialTab={route.tab}
               settings={settings}
               theme={theme}
               onThemeChange={setTheme}

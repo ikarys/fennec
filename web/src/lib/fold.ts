@@ -21,6 +21,8 @@ export interface ToolCallView {
   error?: string;
   truncated?: boolean;
   exitCode?: number;
+  /** The human's rule that refused this call (fennec's own check: verified). */
+  blockedBy?: { pattern: string; scope: string };
   addedLines?: number;
   removedLines?: number;
   contentPreview?: string[];
@@ -503,6 +505,11 @@ export function createThreadFold(): ThreadFold {
         break;
       }
 
+      case 'rule.blocked': {
+        const tool = tools.get(String(data.callId ?? ''));
+        if (tool) tool.blockedBy = { pattern: String(data.pattern ?? ''), scope: String(data.scope ?? '') };
+        break;
+      }
       case 'chat.ask_user': {
         const callId = String(data.callId ?? `tool-${index}`);
         const question = String(data.question ?? '');
