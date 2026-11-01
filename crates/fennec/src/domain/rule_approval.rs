@@ -117,6 +117,7 @@ mod tests {
             kind: "tool".into(),
             pattern: "pattern".into(),
             access: None,
+            folders: Vec::new(),
         }
     }
 
