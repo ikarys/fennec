@@ -61,6 +61,7 @@ pub fn reply(content: &str, calls: Vec<ToolCall>) -> Result<Completion, String> 
 pub fn builder() -> Vec<AgentDefinition> {
     vec![AgentDefinition {
         id: "builder".into(),
+        phase: None,
         name: "Builder".into(),
         description: String::new(),
         subagent: false,
@@ -85,6 +86,7 @@ pub fn builder() -> Vec<AgentDefinition> {
 pub fn plan() -> AgentDefinition {
     AgentDefinition {
         id: "plan".into(),
+        phase: None,
         name: "Plan".into(),
         description: String::new(),
         subagent: false,

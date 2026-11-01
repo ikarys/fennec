@@ -3,6 +3,7 @@ id: audit-architecture
 name: Audit architecture
 description: Audits the project's software architecture (responsibilities, layers, modularity, maintainability) without changing anything; each finding sourced and actionable
 subagent: false
+phase: check
 commands: read-only
 color: '#a855f7'
 allowedTools:
