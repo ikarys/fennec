@@ -52,6 +52,8 @@ pub struct Dependency {
     pub path: String,
     /// Where the import count is shown.
     pub label: Point,
+    /// Breaks one of the human's module rules (`.agents/architecture`).
+    pub violation: bool,
 }
 
 /// A source file and the first paragraph of its leading doc comment.
@@ -186,7 +188,8 @@ fn module_stats(sources: &Sources, owners: &BTreeMap<&str, String>) -> BTreeMap<
 fn dependencies(sources: &Sources, owners: &BTreeMap<&str, String>) -> Vec<Dependency> {
     let roots = crate_roots(sources);
     let mut importers: BTreeMap<(&str, &str), BTreeSet<&str>> = BTreeMap::new();
-    for (&path, &content) in sources {
+    // Tests import whatever they exercise: not the architecture.
+    for (&path, &content) in sources.iter().filter(|(path, _)| !is_test_path(path)) {
         let from = owners[path].as_str();
         for target in imported_files(path, content, sources, &roots) {
             let to = owners.get(target.as_str()).map(String::as_str);
@@ -446,6 +449,20 @@ mod tests {
             edges(&map),
             [("src", "src/domain", 1), ("src/web", "src/domain", 1)]
         );
+    }
+
+    #[test]
+    fn test_files_add_no_dependency() {
+        let map = build_from(&[
+            ("src/domain.rs", ""),
+            (
+                "src/agent/workflow/tests.rs",
+                "use crate::tools::LocalTools;\n",
+            ),
+            ("src/tools.rs", ""),
+            ("src/tools/local.rs", ""),
+        ]);
+        assert_eq!(edges(&map), []);
     }
 
     #[test]

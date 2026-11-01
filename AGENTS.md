@@ -135,12 +135,15 @@ the turn with the call open (`rule.approval_requested`); the human answers on a 
 on the path and its subdirectories, the command, the tool), always or never (a project rule). fennec then runs the
 recorded call itself or refuses it, and the turn goes on: the model never retries. With the human away (night mode),
 an "ask" is refused.
+Produced architecture, done (C12): `.agents/architecture` also takes module rules (`<A> never imports <B>`), checked on
+every dependency of the project map; the "Carte des modules" tab lists the breaks, draws them red, and counts the dependencies added or
+removed since the committed `docs/map.md` (verified; `domain/drift.rs`).
 Project deletion, done: a trash button on the project page deletes everything fennec holds for a project (sessions,
 worktrees and branches, rules, ideas); its source folder only when the human ticks the box, never the home, the root or
 fennec's store (`web/project_delete.rs`).
 Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
-1. Produced architecture and drift (C12), waivers (C7).
+1. Waivers (C7).
 Later: sub-agents as tools, when dogfooding shows sessions saturating their context.
 
 ## Layout
@@ -180,7 +183,8 @@ crates/fennec/src/
     bypass.rs          what silences a gate: suppression markers added, tests or assertions removed
     adr.rs             architecture decision records: a MADR file read (number, title, status, date)
     module_map.rs      the project map: modules, their dependencies from the imports, their layout
-    map_doc.rs         docs/map.md: the map as Markdown (Mermaid, table), stale or current
+    map_doc.rs         docs/map.md: the map as Markdown (Mermaid, table), stale or current; its edges read back
+    drift.rs           the produced architecture against the human's module rules and the committed docs/map.md
     risk.rs            risk zones: a commit's authorship from its trailers, the signals, the report
     agents_md.rs       the AGENTS.md draft at the end of an answer, which the human writes in one click
     task_proposal.rs   the backlog tasks an agent proposed with propose_task, and which the human accepted

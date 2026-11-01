@@ -145,6 +145,15 @@ export function ProjectMap({ map }: { map: ModuleMap }) {
           },
           markerEnd: { type: MarkerType.ArrowClosed },
         };
+        if (dependency.violation) {
+          return {
+            ...base,
+            label: String(dependency.imports),
+            style: { stroke: 'var(--err)' },
+            labelStyle: { fill: 'var(--text)', fontSize: 10 },
+            labelBgStyle: { fill: 'var(--surface)' },
+          };
+        }
         if (focus === null) return { ...base, style: { stroke: 'var(--muted)', opacity: 0.5 } };
         if (dependency.from === focus || dependency.to === focus) {
           return {
