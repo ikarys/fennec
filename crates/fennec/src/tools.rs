@@ -83,10 +83,11 @@ impl LocalTools {
         self
     }
 
-    fn outside(&self) -> path_guard::Outside<'_> {
+    fn outside(&self, approved: bool) -> path_guard::Outside<'_> {
         path_guard::Outside {
             rules: &self.rules,
             home: self.home.as_deref(),
+            approved,
         }
     }
 }
@@ -112,12 +113,42 @@ impl Toolbox for LocalTools {
         stop: &AtomicBool,
         on_output: &mut dyn FnMut(OutputStream, &str),
     ) -> ToolResult {
+        self.dispatch(name, args, access, stop, on_output, false)
+    }
+
+    fn execute_approved(
+        &self,
+        name: &str,
+        args: &Value,
+        access: CommandAccess,
+        stop: &AtomicBool,
+        on_output: &mut dyn FnMut(OutputStream, &str),
+    ) -> ToolResult {
+        self.dispatch(name, args, access, stop, on_output, true)
+    }
+
+    fn check_rules(&self, name: &str, args: &Value) -> RuleCheck<'_> {
+        rule_request::check(&self.rules, &self.workdir, self.home.as_deref(), name, args)
+    }
+}
+
+impl LocalTools {
+    /// Runs one tool call; `approved` lets a file tool reach the path the human approved once.
+    fn dispatch(
+        &self,
+        name: &str,
+        args: &Value,
+        access: CommandAccess,
+        stop: &AtomicBool,
+        on_output: &mut dyn FnMut(OutputStream, &str),
+        approved: bool,
+    ) -> ToolResult {
         let start = Instant::now();
         let workdir = &self.workdir;
         let mut result = match name {
-            "read_file" => read_file::run(args, workdir, &self.web_cache, &self.outside()),
-            "write_file" => write_file::run(args, workdir, &self.protection, &self.outside()),
-            "edit_file" => edit_file::run(args, workdir, &self.protection, &self.outside()),
+            "read_file" => read_file::run(args, workdir, &self.web_cache, &self.outside(approved)),
+            "write_file" => write_file::run(args, workdir, &self.protection, &self.outside(approved)),
+            "edit_file" => edit_file::run(args, workdir, &self.protection, &self.outside(approved)),
             "run_command" => match access {
                 CommandAccess::ReadWrite => {
                     run_command::run(args, workdir, &self.sandbox, stop, on_output)
@@ -145,10 +176,6 @@ impl Toolbox for LocalTools {
         };
         result.duration_ms = start.elapsed().as_millis() as u64;
         result
-    }
-
-    fn check_rules(&self, name: &str, args: &Value) -> RuleCheck<'_> {
-        rule_request::check(&self.rules, &self.workdir, self.home.as_deref(), name, args)
     }
 }
 
