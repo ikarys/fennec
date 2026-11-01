@@ -74,6 +74,8 @@ export interface SessionDetail {
   proposedTasks: ProposedTask[];
   /** The last answer holds an AGENTS.md draft: whether the file exists, and whether the human already wrote this draft. */
   agentsMdDraft: { exists: boolean; written: boolean } | null;
+  /** The agent switch suggested in this turn, if the target agent still exists. */
+  agentSuggestion: AgentSuggestion | null;
 }
 
 export interface AuditFinding {
@@ -94,6 +96,16 @@ export interface Audit {
 }
 
 /** A backlog task an agent proposed with propose_task; ideaId is set once the human accepted it. */
+/** An agent's suggestion to go on in a new session with another agent (indicative). */
+export interface AgentSuggestion {
+  callId: string;
+  agent: string;
+  name: string;
+  color: string | null;
+  reason: string;
+  brief: string;
+}
+
 export interface ProposedTask {
   callId: string;
   title: string;

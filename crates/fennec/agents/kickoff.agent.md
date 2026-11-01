@@ -15,6 +15,7 @@ allowedTools:
   - load_skill
   - web_search
   - web_fetch
+  - suggest_agent
 ---
 
 # Démarrage

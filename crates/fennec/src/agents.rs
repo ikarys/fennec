@@ -149,7 +149,8 @@ mod tests {
                 "record_decision",
                 "load_skill",
                 "web_search",
-                "web_fetch"
+                "web_fetch",
+                "suggest_agent"
             ]
         );
         assert_eq!(plan.commands, CommandAccess::ReadOnly);
@@ -176,7 +177,8 @@ mod tests {
                 "record_decision",
                 "load_skill",
                 "web_search",
-                "web_fetch"
+                "web_fetch",
+                "suggest_agent"
             ]
         );
         assert_eq!(builder.commands, CommandAccess::ReadWrite);
