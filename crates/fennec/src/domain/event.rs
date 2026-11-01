@@ -158,6 +158,14 @@ pub enum ReminderKind {
     Reminder,
 }
 
+/// openfox also has `completion` (not ported: an asap message left at the end
+/// of the turn starts the next one anyway).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum QueueMode {
+    Asap,
+}
+
 /// The subset of openfox's `TurnEvent` union the agent loop needs. Wire
 /// names and field names match openfox so stored payloads stay comparable.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -505,6 +513,22 @@ pub enum Event {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         adr: Option<String>,
     },
+    /// A message the human typed while a turn runs; it is queued, not refused.
+    #[serde(rename = "queue.added", rename_all = "camelCase")]
+    QueueAdded {
+        queue_id: String,
+        mode: QueueMode,
+        content: String,
+        /// Epoch milliseconds.
+        queued_at: u64,
+    },
+    /// The queued message was dropped into the running turn or started the
+    /// next one.
+    #[serde(rename = "queue.drained", rename_all = "camelCase")]
+    QueueDrained { queue_id: String },
+    /// The human removed the queued message, or a stop dropped the queue.
+    #[serde(rename = "queue.cancelled", rename_all = "camelCase")]
+    QueueCancelled { queue_id: String },
     /// The human wrote the agent's AGENTS.md draft to the project (fennec's own event).
     #[serde(rename = "agents_md.written", rename_all = "camelCase")]
     AgentsMdWritten { replaced: bool },
@@ -561,6 +585,9 @@ impl Event {
             Event::RuleApprovalAnswered { .. } => "rule.approval_answered",
             Event::WaiverRequested { .. } => "waiver.requested",
             Event::WaiverAnswered { .. } => "waiver.answered",
+            Event::QueueAdded { .. } => "queue.added",
+            Event::QueueDrained { .. } => "queue.drained",
+            Event::QueueCancelled { .. } => "queue.cancelled",
             Event::AgentsMdWritten { .. } => "agents_md.written",
             Event::WorktreeDiscarded { .. } => "worktree.discarded",
         }
