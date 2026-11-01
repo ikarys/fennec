@@ -2,11 +2,11 @@
  * The add-idea dialog: a multilinear text and images pasted straight from the
  * clipboard (Ctrl+V). Files and images go to the agent on framing and build.
  */
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button } from '../../ui/Button';
 import { Modal } from '../../ui/Modal';
 import { TextArea } from '../../ui/Field';
-import { CloseIcon, FileIcon } from '../../Icons';
+import { CloseIcon, FileIcon, PaperclipIcon } from '../../Icons';
 import { addIdea, type IdeaBoard } from '../../../lib/ideas';
 import { readFiles, type FileAttachmentInput } from '../../../lib/attachments';
 
@@ -34,6 +34,18 @@ export function NewIdeaDialog({
     }
     setAttachError(null);
     setAttachments((current) => [...current, ...read]);
+  };
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files ? [...event.target.files] : [];
+    if (files.length > 0) {
+      void handleAttach(files);
+    }
+    if (event.target) {
+      event.target.value = '';
+    }
   };
 
   const handlePaste = (event: React.ClipboardEvent) => {
@@ -140,17 +152,42 @@ export function NewIdeaDialog({
         ) : null}
 
         <p className="m-0 text-xs text-faint">
-          Coller une image avec Ctrl+V (capture, screenshot)
+          Coller une image avec Ctrl+V, ou joindre un fichier
         </p>
         {attachError ? <p className="m-0 text-xs text-err">{attachError}</p> : null}
 
-        <div className="flex items-center justify-end gap-2 border-t border-border pt-3">
-          <Button variant="ghost" onClick={onClose}>
-            Annuler
-          </Button>
-          <Button variant="primary" disabled={!text.trim() || busy} onClick={() => void handleAdd()}>
-            Ajouter l’idée
-          </Button>
+        <div className="flex items-center justify-between border-t border-border pt-3">
+          <div className="flex items-center gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={handleFileChange}
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              iconOnly
+              title="Joindre un fichier ou une image"
+              aria-label="Joindre un fichier ou une image"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <PaperclipIcon className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" onClick={onClose}>
+              Annuler
+            </Button>
+            <Button
+              variant="primary"
+              disabled={!text.trim() || busy}
+              onClick={() => void handleAdd()}
+            >
+              Ajouter l’idée
+            </Button>
+          </div>
         </div>
       </div>
     </Modal>

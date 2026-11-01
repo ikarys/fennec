@@ -21,4 +21,4 @@ pub use fold::{Backlog, Idea, IdeaState, QueueRun, fold, idea_for_session};
 pub use queue::{CapHit, Caps, cap_reached, next_ready, queue_order};
 pub use status::{Action, MenuAction, Progress, STAGES, Stage, Status, status};
 pub use summary::{RunSummary, summarize};
-pub use title::title;
+pub use title::{description, title};

@@ -5,13 +5,16 @@
 import { useState } from 'react';
 import { Button } from '../../ui/Button';
 import { Card } from '../../ui/Card';
+import { Badge } from '../../ui/Badge';
 import { PlayIcon, EyeIcon, GripIcon } from '../../Icons';
 import { startIdea, type IdeaBoard, type IdeaView } from '../../../lib/ideas';
 import type { RowReorder } from './IdeaRow';
+import { IdeaMenu } from './IdeaMenu';
 
 export function ReadyCard({
   idea,
   projectId,
+  onFrame,
   onOpenSession,
   run,
   position,
@@ -19,10 +22,11 @@ export function ReadyCard({
 }: {
   idea: IdeaView;
   projectId: string;
+  onFrame: (idea: IdeaView) => Promise<void>;
   onOpenSession: (sessionId: string) => void;
   run: (action: () => Promise<IdeaBoard>) => Promise<boolean>;
   position: number | null;
-  reorder: RowReorder;
+  reorder: RowReorder | null;
 }) {
   const [busy, setBusy] = useState(false);
 
@@ -43,52 +47,66 @@ export function ReadyCard({
     <Card
       className={[
         'relative flex gap-2 p-3 pl-4',
-        reorder.dragging ? 'opacity-50' : null,
-        reorder.over ? 'ring-1 ring-accent' : null,
+        reorder?.dragging ? 'opacity-50' : null,
+        reorder?.over ? 'ring-1 ring-accent' : null,
       ]
         .filter(Boolean)
         .join(' ')}
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.effectAllowed = 'move';
-        // Firefox starts no drag without data.
-        e.dataTransfer.setData('text/plain', idea.id);
-        reorder.onDragStart();
-      }}
-      onDragOver={(e) => {
-        e.preventDefault();
-        reorder.onDragOver();
-      }}
-      onDrop={(e) => {
-        e.preventDefault();
-        reorder.onDrop();
-      }}
-      onDragEnd={reorder.onDragEnd}
+      draggable={reorder ? true : undefined}
+      onDragStart={
+        reorder
+          ? (e) => {
+              e.dataTransfer.effectAllowed = 'move';
+              // Firefox starts no drag without data.
+              e.dataTransfer.setData('text/plain', idea.id);
+              reorder.onDragStart();
+            }
+          : undefined
+      }
+      onDragOver={
+        reorder
+          ? (e) => {
+              e.preventDefault();
+              reorder.onDragOver();
+            }
+          : undefined
+      }
+      onDrop={
+        reorder
+          ? (e) => {
+              e.preventDefault();
+              reorder.onDrop();
+            }
+          : undefined
+      }
+      onDragEnd={reorder ? reorder.onDragEnd : undefined}
     >
       <span className="absolute inset-y-0 left-0 w-0.5 rounded-l-xl bg-accent" aria-hidden />
       <div className="flex shrink-0 items-center gap-1 pt-0.5">
         {position != null ? (
           <span className="w-5 text-right font-mono text-xs text-muted">{position}</span>
         ) : null}
-        <Button
-          variant="ghost"
-          size="sm"
-          iconOnly
-          title="Glisser pour réordonner (↑/↓ au clavier)"
-          aria-label="Réordonner"
-          className="cursor-grab"
-          onKeyDown={(e) => {
-            if (e.key === 'ArrowUp') {
-              e.preventDefault();
-              reorder.onKeyMove(-1);
-            } else if (e.key === 'ArrowDown') {
-              e.preventDefault();
-              reorder.onKeyMove(1);
-            }
-          }}
-        >
-          <GripIcon className="h-4 w-4" />
-        </Button>
+        {reorder ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            title="Glisser pour réordonner (↑/↓ au clavier)"
+            aria-label="Réordonner"
+            className="cursor-grab"
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                reorder.onKeyMove(-1);
+              } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                reorder.onKeyMove(1);
+              }
+            }}
+          >
+            <GripIcon className="h-4 w-4" />
+          </Button>
+        ) : null}
       </div>
 
       <div className="min-w-0 grow">
@@ -104,12 +122,12 @@ export function ReadyCard({
         {idea.halted ? <p className="m-0 mt-1 text-xs text-muted">{idea.halted}</p> : null}
         <div className="mt-2 flex items-center gap-2 text-xs">
           {criteriaCount != null ? (
-            <span className="rounded bg-raised px-1.5 py-0.5 text-muted">{criteriaCount} critères</span>
+            <Badge>{criteriaCount} critère{criteriaCount > 1 ? 's' : ''}</Badge>
           ) : null}
           {idea.decisions.length > 0 ? (
-            <span className="rounded bg-raised px-1.5 py-0.5 text-muted">
+            <Badge>
               {idea.decisions.length} décision{idea.decisions.length > 1 ? 's' : ''}
-            </span>
+            </Badge>
           ) : null}
         </div>
       </div>
@@ -136,6 +154,7 @@ export function ReadyCard({
           <PlayIcon className="h-4 w-4" />
           Lancer
         </Button>
+        <IdeaMenu idea={idea} projectId={projectId} onFrame={onFrame} run={run} />
       </div>
     </Card>
   );

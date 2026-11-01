@@ -13,14 +13,11 @@ import {
   PlayIcon,
   ReplyIcon,
 } from '../../Icons';
-import { ConfirmDialog } from '../../ui/ConfirmDialog';
-import { Menu, MenuItem } from '../../ui/Menu';
 import { IdeaStatusBadge } from './IdeaStatusBadge';
 import { IdeaMeta } from './IdeaMeta';
+import { IdeaMenu } from './IdeaMenu';
 import { formatRelative } from '../../../lib/format';
 import {
-  completeIdea,
-  dropIdea,
   startIdea,
   type IdeaAction,
   type IdeaBoard,
@@ -74,7 +71,6 @@ export function IdeaRow({
   position: number | null;
   reorder: RowReorder | null;
 }) {
-  const [pendingDrop, setPendingDrop] = useState(false);
   const [busy, setBusy] = useState(false);
 
   // The tab already names inbox/queued; a badge there is noise.
@@ -90,25 +86,6 @@ export function IdeaRow({
     setBusy(true);
     try {
       await run(() => startIdea(projectId, idea.id));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleDrop = async () => {
-    setPendingDrop(false);
-    setBusy(true);
-    try {
-      await run(() => dropIdea(projectId, idea.id));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleComplete = async () => {
-    setBusy(true);
-    try {
-      await run(() => completeIdea(projectId, idea.id));
     } finally {
       setBusy(false);
     }
@@ -150,10 +127,7 @@ export function IdeaRow({
     );
   };
 
-  // The title is the text's first sentence; the row shows what is left.
-  const description = idea.text.startsWith(idea.title)
-    ? idea.text.slice(idea.title.length).replace(/^[\s.,;:]+/, '').trim()
-    : '';
+
 
   return (
     <div
@@ -225,9 +199,9 @@ export function IdeaRow({
         <p className="m-0 truncate text-sm text-text" title={idea.text}>
           {idea.title}
         </p>
-        {description ? (
-          <p className="m-0 truncate text-xs text-faint" title={description}>
-            {description}
+        {idea.description ? (
+          <p className="m-0 truncate text-xs text-faint" title={idea.description}>
+            {idea.description}
           </p>
         ) : null}
         {idea.attachments.length > 0 ? (
@@ -271,54 +245,8 @@ export function IdeaRow({
 
       <div className="flex shrink-0 items-center gap-1">
         {renderAction()}
-        {idea.menu.length > 0 ? (
-          <Menu label="Actions">
-            {idea.menu.map((action) => {
-              switch (action) {
-                case 'reframe':
-                  return (
-                    <MenuItem key={action} onSelect={() => void handleFrame()}>
-                      Recadrer
-                    </MenuItem>
-                  );
-                case 'startUnframed':
-                  return (
-                    <MenuItem key={action} onSelect={() => void handleStart()}>
-                      Lancer sans cadrage
-                    </MenuItem>
-                  );
-                case 'restart':
-                  return (
-                    <MenuItem key={action} onSelect={() => void handleStart()}>
-                      Relancer
-                    </MenuItem>
-                  );
-                case 'complete':
-                  return (
-                    <MenuItem key={action} onSelect={() => void handleComplete()}>
-                      Marquer comme faite
-                    </MenuItem>
-                  );
-                case 'drop':
-                  return (
-                    <MenuItem key={action} tone="danger" onSelect={() => setPendingDrop(true)}>
-                      Abandonner
-                    </MenuItem>
-                  );
-              }
-            })}
-          </Menu>
-        ) : null}
+        <IdeaMenu idea={idea} projectId={projectId} onFrame={onFrame} run={run} />
       </div>
-
-      <ConfirmDialog
-        open={pendingDrop}
-        title="Abandonner cette idée ?"
-        body="L'idée sort de la file. Cette action est définitive."
-        confirmLabel="Abandonner"
-        onConfirm={() => void handleDrop()}
-        onCancel={() => setPendingDrop(false)}
-      />
     </div>
   );
 }

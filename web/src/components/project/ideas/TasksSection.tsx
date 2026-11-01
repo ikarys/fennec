@@ -12,7 +12,7 @@ import { StageGroup } from './StageGroup';
 import { DoneTable } from './DoneTable';
 import { NewIdeaDialog } from './NewIdeaDialog';
 import { Button } from '../../ui/Button';
-import { CloseIcon } from '../../Icons';
+import { CloseIcon, PlusIcon } from '../../Icons';
 import {
   listIdeas,
   markReportRead,
@@ -249,10 +249,11 @@ export function TasksSection({
               <Button
                 variant="secondary"
                 size="sm"
-                title="Ajouter une idée"
+                title="Ajouter une idée au backlog"
                 onClick={() => setNewIdeaOpen(true)}
               >
-                + Add task
+                <PlusIcon className="h-4 w-4" />
+                Nouvelle idée
               </Button>
             </div>
           </div>

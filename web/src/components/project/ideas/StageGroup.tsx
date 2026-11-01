@@ -101,11 +101,12 @@ export function StageGroup({
                     dragOver === index && dragFrom !== null && dragFrom !== index,
                 }
               : null;
-          return stage === 'queue' && reorder ? (
+          return stage === 'queue' ? (
             <ReadyCard
               key={idea.id}
               idea={idea}
               projectId={projectId}
+              onFrame={onFrame}
               onOpenSession={onOpenSession}
               run={run}
               position={idea.position}
@@ -120,8 +121,8 @@ export function StageGroup({
               onOpenSession={onOpenSession}
               run={run}
               caps={caps}
-              position={stage === 'queue' ? idea.position : null}
-              reorder={reorder}
+              position={null}
+              reorder={null}
             />
           );
         })}
