@@ -47,7 +47,7 @@ with camelCase fields.
 | `agents_md.written` | `{replaced}`: the human wrote the AGENTS.md draft of the last answer to the project's root; `replaced` when a file was there |
 | `agent.suggested` | `{callId, agent, reason, brief}`: the `suggest_agent` tool: an agent suggests the human go on in a new session with another agent; nothing switches until the human opens it |
 | `rule.blocked` | `{callId, ruleId, kind, pattern, scope, subject}`: fennec refused a tool call by one of the human's rules (fennec's own check, verified), before the call's failed `tool.result`; `kind` `command`/`tool`/`path`, `scope` `global`/`project`/`session`, `subject` the command, tool name or path refused (workdir-relative inside it, absolute outside) |
-| `rule.approval_requested` | `{callId, subject, ruleId, kind, pattern, access}`: fennec paused a tool call for the human (an "ask" rule, `ruleId` its id, or a file tool outside the workdir, `ruleId` null); the call stays open, no `tool.result`, and the turn ends `waiting_for_user`; `kind`/`pattern`/`access` are the rule the `session`, `always` and `never` answers store (`access` `read`/`write`/`readWrite` for a path, else null) |
+| `rule.approval_requested` | `{callId, subject, ruleId, kind, pattern, access, folders}`:; `folders` (a path only) the folders the human may grant instead, narrowest first, never `/` or `~/` fennec paused a tool call for the human (an "ask" rule, `ruleId` its id, or a file tool outside the workdir, `ruleId` null); the call stays open, no `tool.result`, and the turn ends `waiting_for_user`; `kind`/`pattern`/`access` are the rule the `session`, `always` and `never` answers store (`access` `read`/`write`/`readWrite` for a path, else null) |
 | `rule.approval_answered` | `{callId, choice, ruleId}`: the human's answer (`once`/`session`/`always`/`never`), `ruleId` the rule it stored (null for `once`); fennec then appends the call's `tool.result` (run, or refused for `never`) and the turn goes on |
 | `waiver.requested` | `{callId, path, reason}`: the agent's `request_waiver`: it asks the human to waive the protection of one project file; the call stays open, no `tool.result`, and the turn ends `waiting_for_user` (refused at once while the human is away) |
 | `waiver.answered` | `{callId, granted, expiresAt, adr}`: the human's answer, recorded at the click; a grant exempts exactly `path` from protection (file tools and sandbox) in this session until `expiresAt` (ms), and `adr` is the MADR file written for it (`docs/adr/NNNN-waiver-<slug>.md` in the session's workdir); fennec then appends the call's `tool.result` and the turn goes on |
@@ -521,9 +521,9 @@ read-only. The human edits them as usual.
   A prompt or message starting with `/compact` alone compacts the session
   instead; `/<skill> [text]` asks the model to load that skill; any other text
   is sent as typed. `/compact` takes no attachments (400).
-- `POST /api/sessions/{id}/rule-approval` `{callId, choice}` → 202; 404 if no
+- `POST /api/sessions/{id}/rule-approval` `{callId, choice, pattern?}` → 202; 404 if no
   session; 409 if a turn is running or `no pending approval for this call`; 400
-  for an unknown choice or a pattern the rules store refuses. `session` stores an
+  for an unknown choice, a `pattern` not among the request's `folders`, or a pattern the rules store refuses. `session` stores an
   allow rule for the session, `always` an allow rule and `never` a block rule for
   the project (origin: the answer), then a turn records `rule.approval_answered`,
   runs or refuses the recorded call and resumes the loop.

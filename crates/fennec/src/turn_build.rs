@@ -19,7 +19,7 @@ use crate::skills;
 use crate::store::SqliteStore;
 use crate::tools::{LocalTools, Sandbox};
 use crate::worktree;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 
 /// The differences between the adapters' turns; everything else is shared.
@@ -110,6 +110,15 @@ pub fn with_turn<R>(
     .with_patterns(&blocked_paths)
     .exempting(&waiver_paths);
     let shared_target = worktree::shared_target(&worktree::root(&settings.db_path), workdir);
+    // The model may still name the human's checkout after the session moved
+    // into its worktree: the file tools redirect those paths.
+    let project_dir = match &session {
+        Some(session) => store
+            .project(&session.project_id)
+            .map_err(|e| e.to_string())?
+            .map(|p| PathBuf::from(p.workdir)),
+        None => None,
+    };
     let tools = LocalTools::new(workdir.to_path_buf())
         .with_search(prefs.search.clone())
         .with_sandbox(
@@ -126,6 +135,10 @@ pub fn with_turn<R>(
                 .collect(),
         )
         .with_rules(rules);
+    let tools = match project_dir {
+        Some(dir) => tools.with_project_dir(dir),
+        None => tools,
+    };
     let mut turn = Turn {
         model: &model,
         log,
