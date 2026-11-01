@@ -434,6 +434,9 @@ pub enum Event {
     /// The human accepted a proposed task into the backlog (fennec's own event).
     #[serde(rename = "task.accepted", rename_all = "camelCase")]
     TaskAccepted { call_id: String, idea_id: String },
+    /// The human wrote the agent's AGENTS.md draft to the project (fennec's own event).
+    #[serde(rename = "agents_md.written", rename_all = "camelCase")]
+    AgentsMdWritten { replaced: bool },
     /// The human discarded the session's worktree and branch (fennec's own event).
     #[serde(rename = "worktree.discarded", rename_all = "camelCase")]
     WorktreeDiscarded {
@@ -481,6 +484,7 @@ impl Event {
             Event::AuditTasksCreated { .. } => "audit.tasks_created",
             Event::TaskProposed { .. } => "task.proposed",
             Event::TaskAccepted { .. } => "task.accepted",
+            Event::AgentsMdWritten { .. } => "agents_md.written",
             Event::WorktreeDiscarded { .. } => "worktree.discarded",
         }
     }

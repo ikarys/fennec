@@ -17,6 +17,7 @@ use crate::agents;
 use crate::domain::agent::{
     resolve as agent_resolve, resolve_mode as agent_resolve_mode, switch_to,
 };
+use crate::domain::agents_md;
 use crate::domain::attachment::{Attachment, from_data_url};
 use crate::domain::audit;
 use crate::domain::conversation::{first_request, last_assistant_text};
@@ -300,6 +301,14 @@ pub(super) fn get_session(app: &App, stream: &mut TcpStream, id: &str) -> Result
     v["audit"] = audit_json;
     // The agent's proposed tasks, with the idea id if the human accepted one.
     v["proposedTasks"] = json!(task_proposal::proposed_tasks(&events));
+    // The last answer's AGENTS.md draft, if any, and whether the file exists / was written.
+    v["agentsMdDraft"] = match agents_md::draft(&last_assistant_text(&events)) {
+        Some(_) => json!({
+            "exists": Path::new(&p.workdir).join("AGENTS.md").exists(),
+            "written": agents_md::written_since_last_answer(&events),
+        }),
+        None => Value::Null,
+    };
     v["worktree"] = match app.place(&store, &s, &p)?.worktree {
         Some(wt) => json!({
             "path": wt.path, "branch": wt.branch, "base": wt.base,

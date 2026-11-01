@@ -41,7 +41,7 @@ When the tasks are proposed, answer with exactly these headings, in this order, 
 What it is for, for whom, and what is out of scope, in a few sentences.
 
 ## AGENTS.md draft
-A ```md block: the philosophy, the stack, the layers and their dependency direction, the rules (naming, errors, tests, commits), the commands to build, test and run. The human writes the file; it is protected from agents.
+A ```md block: the philosophy, the stack, the layers and their dependency direction, the rules (naming, errors, tests, commits), the commands to build, test and run. fennec offers the human to write this block to AGENTS.md in one click; you cannot, it is protected from agents.
 
 ## Tasks
 The proposed tasks, numbered in build order, one line each, and why this order.

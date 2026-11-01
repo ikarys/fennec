@@ -72,6 +72,8 @@ export interface SessionDetail {
   audit: Audit | null;
   /** The tasks agents proposed in this session, in order. */
   proposedTasks: ProposedTask[];
+  /** The last answer holds an AGENTS.md draft: whether the file exists, and whether the human already wrote this draft. */
+  agentsMdDraft: { exists: boolean; written: boolean } | null;
 }
 
 export interface AuditFinding {
@@ -110,6 +112,13 @@ export function createAuditTasks(sessionId: string, findings: number[]): Promise
 /** Accepts a proposed task, turning it into a backlog idea. */
 export function acceptProposedTask(sessionId: string, callId: string): Promise<{ ideaId: string }> {
   return request<{ ideaId: string }>(`/api/sessions/${encodeURIComponent(sessionId)}/proposals/${encodeURIComponent(callId)}/accept`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+export function writeAgentsMd(sessionId: string): Promise<{ replaced: boolean }> {
+  return request<{ replaced: boolean }>(`/api/sessions/${encodeURIComponent(sessionId)}/agents-md`, {
     method: 'POST',
     body: JSON.stringify({}),
   });

@@ -4,6 +4,7 @@
 //! session, project and folder handlers live in `session_routes`.
 
 use super::App;
+use super::agents_md_routes;
 use super::audit_routes;
 use super::http::{Request, error, send, send_json};
 use super::proposal_routes;
@@ -130,6 +131,7 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         ("POST", ["api", "sessions", id, "proposals", call_id, "accept"]) => {
             proposal_routes::accept(app, stream, id, call_id)
         }
+        ("POST", ["api", "sessions", id, "agents-md"]) => agents_md_routes::write(app, stream, id),
         ("POST", ["api", "sessions", id, "mode"]) => {
             session_routes::set_session_mode(app, req, stream, id)
         }

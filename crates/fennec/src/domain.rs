@@ -3,6 +3,7 @@
 
 pub mod adr;
 pub mod agent;
+pub mod agents_md;
 pub mod architecture;
 pub mod attachment;
 pub mod attention;

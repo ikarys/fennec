@@ -35,6 +35,7 @@ import { modelShortName } from "../components/session/ModelPicker";
 import { Badge } from "../components/ui/Badge";
 import { AuditCard } from "../components/session/AuditCard";
 import { ProposedTasksCard } from "../components/session/ProposedTasksCard";
+import { AgentsMdCard } from "../components/session/AgentsMdCard";
 import { ContextPanel } from "../components/session/ContextPanel";
 import { ContextGauge } from "../components/session/ContextGauge";
 import { QuestionCard } from "../components/session/QuestionCard";
@@ -658,6 +659,13 @@ export function SessionPage({
                               sessionId={sessionId}
                               projectId={detail.project.id ?? null}
                               onAccepted={() => setDetailVersion((version) => version + 1)}
+                            />
+                          ) : null}
+                          {detail && detail.agentsMdDraft && !running ? (
+                            <AgentsMdCard
+                              draft={detail.agentsMdDraft}
+                              sessionId={sessionId}
+                              onWritten={() => setDetailVersion((version) => version + 1)}
                             />
                           ) : null}
                         </div>

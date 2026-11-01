@@ -117,11 +117,14 @@ file in the review order, each claim with its `path:line` source (indicative).
 Project kickoff, done: the read-only `kickoff` agent ("Démarrer le projet" in the Analyses tab) asks what a new
 project is for, has the human choose its stack and architecture (`record_decision`), drafts its AGENTS.md and
 proposes its first tasks in build order, a walking skeleton first, with `propose_task` (`task.proposed`); the human
-adds each to the backlog from a card in the thread (`task.accepted`).
+adds each to the backlog from a card in the thread (`task.accepted`). AGENTS.md stays protected from agents: the human
+writes the draft to it in one click (`agents_md.written`).
 Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
 1. Produced architecture and drift (C12), waivers (C7).
-Later: sub-agents as tools, when dogfooding shows sessions saturating their context.
+Later: sub-agents as tools, when dogfooding shows sessions saturating their context. A rules crate (the human, 2026-11-01):
+one fennec-free place that manages the project's rules, today spread over AGENTS.md, `.agents/protected`,
+`.agents/architecture` and the ADRs.
 
 ## Layout
 
@@ -161,6 +164,7 @@ crates/fennec/src/
     module_map.rs      the project map: modules, their dependencies from the imports, their layout
     map_doc.rs         docs/map.md: the map as Markdown (Mermaid, table), stale or current
     risk.rs            risk zones: a commit's authorship from its trailers, the signals, the report
+    agents_md.rs       the AGENTS.md draft at the end of an answer, which the human writes in one click
     task_proposal.rs   the backlog tasks an agent proposed with propose_task, and which the human accepted
     review_map.rs      the review order of a branch's files: per-file signals (gate checks, churn, tests, size)
     workflow/          a workflow: definition (nodes, ports, edges), template ({{…}} names),
