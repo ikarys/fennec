@@ -442,6 +442,9 @@ read-only. The human edits them as usual.
   Terminal under WSL, Terminal.app on macOS, else `$TERMINAL` or
   `x-terminal-emulator`. Outside the sandbox: the human's action. 500 if it
   cannot start.
+- `POST /api/sessions/{id}/files` → 202 `{path}`: opens the human's own file
+  manager in the session's project folder (their repository, not the worktree):
+  Explorer under WSL, `open` on macOS, else `xdg-open`. 500 if it cannot start.
 - `GET /api/sessions/{id}/servers` → `[{name, command, running, url}]`: the project's
   servers (`.agents/servers.json`) and whether each runs in this session; `url` is
   `http://127.0.0.1:{port}` when it runs in this session, `null` otherwise. 404 if no session.
