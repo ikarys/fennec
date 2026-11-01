@@ -310,7 +310,7 @@ fn ensure_agent_reminder(turn: &mut Turn, agent: &AgentDefinition) -> Result<(),
     turn.append_user(&agent.reminder(), true, Some(metadata), Vec::new())
 }
 
-fn run_top_level_agent_loop(
+pub(super) fn run_top_level_agent_loop(
     turn: &mut Turn,
     agent: &AgentDefinition,
 ) -> Result<DoneReason, String> {
