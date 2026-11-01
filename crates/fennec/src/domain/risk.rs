@@ -54,6 +54,16 @@ pub struct RiskZone {
 
 #[derive(Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct RiskModule {
+    pub path: String,
+    pub unreviewed: usize,
+    pub untested: usize,
+    pub churning: usize,
+    pub zones: Vec<RiskZone>,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RiskReport {
     pub files: usize,
     pub unreviewed_percent: u8,
@@ -61,7 +71,8 @@ pub struct RiskReport {
     pub churning: usize,
     pub unreviewed: usize,
     pub churn_days: u32,
-    pub zones: Vec<RiskZone>,
+    pub modules: Vec<RiskModule>,
+    pub remedy_prompt: String,
 }
 
 pub fn authorship(message: &str) -> Authorship {
@@ -103,6 +114,36 @@ pub fn report(files: Vec<FileFacts>) -> RiskReport {
             .then_with(|| left.path.cmp(&right.path))
     });
 
+    let mut modules: Vec<RiskModule> = Vec::new();
+    for zone in zones {
+        let path = parent_directory(&zone.path);
+        let unreviewed = usize::from(zone.signals.contains(&Signal::Unreviewed));
+        let untested = usize::from(zone.signals.contains(&Signal::Untested));
+        let churning = usize::from(zone.signals.contains(&Signal::Churn));
+
+        if let Some(module) = modules.iter_mut().find(|module| module.path == path) {
+            module.unreviewed += unreviewed;
+            module.untested += untested;
+            module.churning += churning;
+            module.zones.push(zone);
+        } else {
+            modules.push(RiskModule {
+                path,
+                unreviewed,
+                untested,
+                churning,
+                zones: vec![zone],
+            });
+        }
+    }
+
+    modules.sort_by(|left, right| {
+        total_signal_count(right)
+            .cmp(&total_signal_count(left))
+            .then_with(|| left.path.cmp(&right.path))
+    });
+
+    let remedy_prompt = remedy_prompt(&modules);
     RiskReport {
         files: measured,
         unreviewed_percent: percent_round(unreviewed_lines, total_lines),
@@ -110,7 +151,8 @@ pub fn report(files: Vec<FileFacts>) -> RiskReport {
         churning,
         unreviewed,
         churn_days: CHURN_DAYS,
-        zones,
+        modules,
+        remedy_prompt,
     }
 }
 
@@ -123,6 +165,31 @@ pub fn is_tested(path: &str, content: &str, test_paths: &[&str]) -> bool {
     test_paths
         .iter()
         .any(|test_path| test_stem(test_path) == source_stem)
+}
+
+/// The brief the "Remédier" button sends to the `remedy` agent: the zones by module, riskiest first.
+fn remedy_prompt(modules: &[RiskModule]) -> String {
+    if modules.is_empty() {
+        return String::new();
+    }
+
+    let mut lines = Vec::new();
+    lines.push(format!(
+        "Remediate the risk zones of this project, measured from git, riskiest module first. Signals: unreviewed = every line comes from an AI commit never integrated through fennec; untested = no inline test and no test file of the same stem; churn = touched by {HOT_CHURN} commits or more in the last {CHURN_DAYS} days."
+    ));
+    lines.push(String::new());
+
+    for (index, module) in modules.iter().enumerate() {
+        if index > 0 {
+            lines.push(String::new());
+        }
+        lines.push(format!("## {}", module.path));
+        for zone in &module.zones {
+            lines.push(format!("- {}: {}", zone.path, zone_signals(zone)));
+        }
+    }
+
+    format!("{}\n", lines.join("\n"))
 }
 
 fn is_ai_coauthor(line: &str) -> bool {
@@ -212,6 +279,28 @@ fn test_stem(path: &str) -> &str {
         .unwrap_or(base)
 }
 
+fn parent_directory(path: &str) -> String {
+    path.rsplit_once('/')
+        .map_or(".", |(dir, _)| dir)
+        .to_string()
+}
+
+fn total_signal_count(module: &RiskModule) -> usize {
+    module.zones.iter().map(|zone| zone.signals.len()).sum()
+}
+
+fn zone_signals(zone: &RiskZone) -> String {
+    zone.signals
+        .iter()
+        .map(|signal| match signal {
+            Signal::Unreviewed => "unreviewed".to_string(),
+            Signal::Untested => "untested".to_string(),
+            Signal::Churn => format!("churn ({} commits)", zone.churn),
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -287,7 +376,14 @@ mod tests {
         assert_eq!(report.unreviewed, 1);
         assert_eq!(report.churn_days, CHURN_DAYS);
 
-        let paths: Vec<&str> = report.zones.iter().map(|zone| zone.path.as_str()).collect();
+        assert_eq!(report.modules.len(), 1);
+        let module = &report.modules[0];
+        assert_eq!(module.path, ".");
+        assert_eq!(module.unreviewed, 1);
+        assert_eq!(module.untested, 1);
+        assert_eq!(module.churning, 3);
+
+        let paths: Vec<&str> = module.zones.iter().map(|zone| zone.path.as_str()).collect();
         assert_eq!(paths, vec!["b.rs", "a.rs", "c.rs"]);
     }
 
@@ -302,12 +398,126 @@ mod tests {
         }];
 
         let report = report(files);
-        let zone = &report.zones[0];
+        let zone = &report.modules[0].zones[0];
 
         assert_eq!(
             zone.signals,
             vec![Signal::Unreviewed, Signal::Untested, Signal::Churn]
         );
+    }
+
+    #[test]
+    fn report_groups_zones_by_parent_directory() {
+        let files = vec![
+            FileFacts {
+                path: "src/alpha/two.rs".into(),
+                lines: 1,
+                unreviewed_lines: 0,
+                churn: 0,
+                tested: false,
+            },
+            FileFacts {
+                path: "src/alpha/one.rs".into(),
+                lines: 2,
+                unreviewed_lines: 2,
+                churn: 6,
+                tested: false,
+            },
+            FileFacts {
+                path: "zeta/one.rs".into(),
+                lines: 1,
+                unreviewed_lines: 1,
+                churn: 6,
+                tested: true,
+            },
+            FileFacts {
+                path: "root.rs".into(),
+                lines: 1,
+                unreviewed_lines: 0,
+                churn: 0,
+                tested: false,
+            },
+        ];
+
+        let report = report(files);
+
+        let module_paths: Vec<&str> = report
+            .modules
+            .iter()
+            .map(|module| module.path.as_str())
+            .collect();
+        assert_eq!(module_paths, vec!["src/alpha", "zeta", "."]);
+
+        assert_eq!(report.modules[0].unreviewed, 1);
+        assert_eq!(report.modules[0].untested, 2);
+        assert_eq!(report.modules[0].churning, 1);
+        assert_eq!(report.modules[1].unreviewed, 1);
+        assert_eq!(report.modules[1].untested, 0);
+        assert_eq!(report.modules[1].churning, 1);
+        assert_eq!(report.modules[2].unreviewed, 0);
+        assert_eq!(report.modules[2].untested, 1);
+        assert_eq!(report.modules[2].churning, 0);
+
+        let alpha_zones: Vec<&str> = report.modules[0]
+            .zones
+            .iter()
+            .map(|zone| zone.path.as_str())
+            .collect();
+        assert_eq!(alpha_zones, vec!["src/alpha/one.rs", "src/alpha/two.rs"]);
+        assert_eq!(report.modules[1].zones.len(), 1);
+        assert_eq!(report.modules[2].zones.len(), 1);
+    }
+
+    #[test]
+    fn remedy_prompt_lists_modules_and_signals() {
+        let modules = vec![
+            RiskModule {
+                path: "crates/fennec/src/agent".into(),
+                unreviewed: 1,
+                untested: 2,
+                churning: 1,
+                zones: vec![
+                    RiskZone {
+                        path: "crates/fennec/src/agent/turn.rs".into(),
+                        signals: vec![Signal::Unreviewed, Signal::Untested, Signal::Churn],
+                        churn: 12,
+                        lines: 100,
+                        unreviewed_percent: 100,
+                    },
+                    RiskZone {
+                        path: "crates/fennec/src/agent/round.rs".into(),
+                        signals: vec![Signal::Untested],
+                        churn: 0,
+                        lines: 40,
+                        unreviewed_percent: 0,
+                    },
+                ],
+            },
+            RiskModule {
+                path: "web/src".into(),
+                unreviewed: 1,
+                untested: 0,
+                churning: 0,
+                zones: vec![RiskZone {
+                    path: "web/src/app.tsx".into(),
+                    signals: vec![Signal::Unreviewed],
+                    churn: 0,
+                    lines: 20,
+                    unreviewed_percent: 100,
+                }],
+            },
+        ];
+
+        let expected = format!(
+            "Remediate the risk zones of this project, measured from git, riskiest module first. Signals: unreviewed = every line comes from an AI commit never integrated through fennec; untested = no inline test and no test file of the same stem; churn = touched by {HOT_CHURN} commits or more in the last {CHURN_DAYS} days.\n\n## crates/fennec/src/agent\n- crates/fennec/src/agent/turn.rs: unreviewed, untested, churn (12 commits)\n- crates/fennec/src/agent/round.rs: untested\n\n## web/src\n- web/src/app.tsx: unreviewed\n"
+        );
+
+        assert_eq!(remedy_prompt(&modules), expected);
+    }
+
+    #[test]
+    fn remedy_prompt_is_empty_without_zones() {
+        assert_eq!(remedy_prompt(&[]), "");
     }
 
     #[test]
