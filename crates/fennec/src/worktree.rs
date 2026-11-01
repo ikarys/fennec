@@ -209,6 +209,31 @@ pub fn dependency_mounts(workdir: &Path) -> Vec<(PathBuf, PathBuf)> {
     mounts
 }
 
+/// One shared Cargo target directory for every worktree of a project.
+///
+/// Worktrees are many and short-lived, while a target directory is large;
+/// sharing it per project avoids one target per session.
+pub fn shared_target(root: &Path, workdir: &Path) -> Option<PathBuf> {
+    // ponytail: sessions of one project share build outputs, so one session's build can affect another's; per-session overlays if that matters.
+    let (top, prefix) = repository(workdir)?;
+    if !top.join("Cargo.toml").is_file() {
+        return None;
+    }
+    let main = main_checkout(workdir)?;
+    // `main` is the main checkout's copy of `workdir`; dropping the worktree's
+    // prefix leaves the main checkout's repository top, the project key.
+    let main_top = main
+        .ancestors()
+        .nth(Path::new(&prefix).components().count())?;
+    let key = main_top
+        .to_string_lossy()
+        .trim_start_matches('/')
+        .replace('/', "-");
+    let dir = root.join(".cargo-target").join(key);
+    std::fs::create_dir_all(&dir).ok()?;
+    Some(dir)
+}
+
 /// Links the main checkout's dependency directories into the worktree.
 ///
 /// A server runs on the host, not in bwrap, so it cannot get the sandbox's
@@ -519,6 +544,22 @@ mod tests {
             )]
         );
         assert!(dependency_mounts(&repo).is_empty());
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn shared_target_shares_one_target_per_project_for_worktrees() {
+        let (base, repo) = setup();
+        std::fs::write(repo.join("Cargo.toml"), "[package]\nname = \"demo\"\n").unwrap();
+        git(&repo, &["add", "-A"], None).unwrap();
+        git(&repo, &["commit", "-q", "-m", "cargo"], None).unwrap();
+
+        let wt = open(&base.join("wt"), &repo, "s1").unwrap().unwrap();
+
+        let dir = shared_target(&base, &wt.workdir).unwrap();
+        assert!(dir.starts_with(base.join(".cargo-target")));
+        assert!(dir.is_dir());
+        assert!(shared_target(&base, &repo).is_none());
         let _ = std::fs::remove_dir_all(&base);
     }
 
