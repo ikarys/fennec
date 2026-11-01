@@ -135,6 +135,9 @@ the turn with the call open (`rule.approval_requested`); the human answers on a 
 on the path and its subdirectories, the command, the tool), always or never (a project rule). fennec then runs the
 recorded call itself or refuses it, and the turn goes on: the model never retries. With the human away (night mode),
 an "ask" is refused.
+Project deletion, done: a trash button on the project page deletes everything fennec holds for a project (sessions,
+worktrees and branches, rules, ideas); its source folder only when the human ticks the box, never the home, the root or
+fennec's store (`web/project_delete.rs`).
 Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
 1. Produced architecture and drift (C12), waivers (C7).
@@ -233,7 +236,7 @@ crates/fennec/src/
   doc.rs             the project's markdown files read for the Doc tab
   web/               HTTP adapter: http, guard (who may call), routes, settings_routes, event_stream (SSE),
                      notifier (wakes streams on append, no polling), turns, assets,
-                     workflow_routes, project_routes (the project page), project_dashboard (its overview tiles), idea_routes (its ideas board, HTTP only),
+                     workflow_routes, project_routes (the project page), project_delete (a project deleted, its folder on request), project_dashboard (its overview tiles), idea_routes (its ideas board, HTTP only),
                      idea_queue (the queue's thread: starts ready ideas, night-mode caps, queue runs recorded),
                      model_routes (the composer's model choices, a session's model), rule_routes (the human's rules), rule_approval_routes (an approval answered, its rule stored),
                      children (child sessions for workflow nodes),
