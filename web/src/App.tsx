@@ -20,7 +20,7 @@ const BacklogPage = lazy(() => import('./pages/BacklogPage'));
 type Route =
   | { name: 'home' }
   | { name: 'session'; id: string }
-  | { name: 'new'; id: string; testWorkflowId: string | null; frameIdeaId: string | null }
+  | { name: 'new'; id: string; testWorkflowId: string | null; frameIdeaId: string | null; fromSessionId: string | null }
   | { name: 'settings' }
   | { name: 'insight' }
   | { name: 'backlog' }
@@ -66,7 +66,7 @@ function parseRoute(): Route {
   if (hash.startsWith('#/s/')) {
     const id = decodeURIComponent(hash.slice(4));
     if (id.startsWith('new:')) {
-      return { name: 'new', id: id.slice(4), testWorkflowId: null, frameIdeaId: null };
+      return { name: 'new', id: id.slice(4), testWorkflowId: null, frameIdeaId: null, fromSessionId: null };
     }
     return { name: 'session', id };
   }
@@ -74,7 +74,8 @@ function parseRoute(): Route {
     const [rawId, query] = hash.slice(6).split('?');
     const testWorkflowId = query ? new URLSearchParams(query).get('test') : null;
     const frameIdeaId = query ? new URLSearchParams(query).get('frame') : null;
-    return { name: 'new', id: decodeURIComponent(rawId), testWorkflowId, frameIdeaId };
+    const fromSessionId = query ? new URLSearchParams(query).get('from') : null;
+    return { name: 'new', id: decodeURIComponent(rawId), testWorkflowId, frameIdeaId, fromSessionId };
   }
   return { name: 'home' };
 }
@@ -487,6 +488,7 @@ export default function App() {
               projectId={route.name === 'new' ? route.id : null}
               testWorkflowId={route.name === 'new' ? route.testWorkflowId : null}
               frameIdeaId={route.name === 'new' ? route.frameIdeaId : null}
+              fromSessionId={route.name === 'new' ? route.fromSessionId : null}
               pseudoTabId={pseudoTabId}
               projects={projects}
               onSessionCreated={handleSessionCreated}
