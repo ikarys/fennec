@@ -12,6 +12,7 @@ use super::test_files::is_test_path;
 #[serde(rename_all = "camelCase")]
 pub enum ReviewSignal {
     Protected,
+    Sensitive,
     Bypass,
     Architecture,
     ConflictMarker,
@@ -40,6 +41,9 @@ pub fn signals(file: &FileFacts, checks: &DiffChecks) -> Vec<ReviewSignal> {
 
     if file.protected {
         out.push(ReviewSignal::Protected);
+    }
+    if checks.sensitive.contains(&file.path) {
+        out.push(ReviewSignal::Sensitive);
     }
     if checks
         .suppressions
@@ -104,6 +108,7 @@ fn is_gate(signal: ReviewSignal) -> bool {
     matches!(
         signal,
         ReviewSignal::Protected
+            | ReviewSignal::Sensitive
             | ReviewSignal::Bypass
             | ReviewSignal::Architecture
             | ReviewSignal::ConflictMarker
@@ -253,5 +258,21 @@ mod tests {
         let a = file("a.rs", 0, 0, false, false, true);
         let path_last = order(&[b, a], &DiffChecks::default());
         assert_eq!(path_last[0].0, "a.rs");
+    }
+
+    #[test]
+    fn sensitive_file_ranks_before_plain_file_and_carries_signal() {
+        let checks = DiffChecks {
+            sensitive: vec!["src/auth/login.rs".into()],
+            ..Default::default()
+        };
+        let sensitive = file("src/auth/login.rs", 10, 0, false, false, true);
+        let plain = file("src/plain.rs", 10, 0, false, false, true);
+
+        let ordered = order(&[plain, sensitive], &checks);
+
+        assert_eq!(ordered[0].0, "src/auth/login.rs");
+        assert_eq!(ordered[0].1, vec![ReviewSignal::Sensitive]);
+        assert_eq!(ordered[1].1, vec![]);
     }
 }

@@ -17,6 +17,8 @@ pub struct DiffChecks {
     /// Files whose added lines still hold git conflict markers: a resolution
     /// left unfinished, which git no longer sees as a conflict.
     pub markers: Vec<String>,
+    /// Changed files inside the human's sensitive zones.
+    pub sensitive: Vec<String>,
 }
 
 impl DiffChecks {
@@ -25,12 +27,16 @@ impl DiffChecks {
         let mut violations = Vec::new();
         let mut suppressions = Vec::new();
         let mut markers = Vec::new();
+        let mut sensitive = Vec::new();
 
         for (path, lines) in files {
             violations.extend(rules.check(path, &lines.added));
             suppressions.extend(bypass::suppressions(path, &lines.added));
             if lines.added.iter().any(|line| is_conflict_marker(line)) {
                 markers.push(path.clone());
+            }
+            if rules.is_sensitive(path) {
+                sensitive.push(path.clone());
             }
         }
 
@@ -39,6 +45,7 @@ impl DiffChecks {
             suppressions,
             weakened: bypass::tests_weakened(files),
             markers,
+            sensitive,
         }
     }
 }
@@ -78,6 +85,9 @@ pub enum Blocker {
     /// Protected files the branch changes (a command can create one: the file
     /// tools cannot).
     ProtectedTouched { paths: Vec<String> },
+    /// Files in the sensitive zones of `.agents/architecture`: the human's
+    /// review is mandatory there.
+    SensitiveTouched { paths: Vec<String> },
     /// Added lines that break the project's `.agents/architecture` rules.
     ArchitectureViolated { violations: Vec<Violation> },
     /// Added lines that silence a lint, a type check or a test.
@@ -101,6 +111,7 @@ impl Blocker {
             Blocker::CriteriaNotPassed { .. } => "criteriaNotPassed",
             Blocker::NoCriteria => "noCriteria",
             Blocker::ProtectedTouched { .. } => "protectedTouched",
+            Blocker::SensitiveTouched { .. } => "sensitiveTouched",
             Blocker::ArchitectureViolated { .. } => "architectureViolated",
             Blocker::SuppressionsAdded { .. } => "suppressionsAdded",
             Blocker::TestsWeakened { .. } => "testsWeakened",
@@ -129,8 +140,8 @@ pub struct Landing<'a> {
 /// The blockers of an integration, in the order the UI shows them:
 /// `NoCommits` first, then a merge conflict, then the branch, then the
 /// human's uncommitted changes, then the criteria, then the protected files,
-/// then the architecture rules, then the added suppressions, then the
-/// weakened tests.
+/// then the sensitive zones, then the architecture rules, then the added
+/// suppressions, then the weakened tests.
 pub fn blockers(
     commits: usize,
     criteria: &[CriterionState],
@@ -195,6 +206,12 @@ pub fn blockers(
     if !protected_touched.is_empty() {
         out.push(Blocker::ProtectedTouched {
             paths: protected_touched.to_vec(),
+        });
+    }
+
+    if !checks.sensitive.is_empty() {
+        out.push(Blocker::SensitiveTouched {
+            paths: checks.sensitive.clone(),
         });
     }
 
@@ -346,6 +363,13 @@ mod tests {
             "protectedTouched"
         );
         assert_eq!(
+            Blocker::SensitiveTouched {
+                paths: vec!["src/auth/login.rs".into()]
+            }
+            .key(),
+            "sensitiveTouched"
+        );
+        assert_eq!(
             Blocker::SuppressionsAdded {
                 suppressions: vec![Suppression {
                     path: "a.rs".into(),
@@ -415,6 +439,7 @@ mod tests {
                 paths: vec!["a.rs".into()],
             }),
             markers: vec![],
+            sensitive: vec![],
         };
 
         let found = blockers(1, &[], &[], &checks, &Landing::default());
@@ -461,6 +486,26 @@ mod tests {
         let weakened = checks.weakened.unwrap();
         assert_eq!(weakened.tests_removed, 1);
         assert_eq!(weakened.paths, vec!["src/a.rs".to_string()]);
+    }
+
+    #[test]
+    fn sensitive_files_block_and_are_listed() {
+        let rules = Rules::parse("sensitive src/auth/");
+        let files = vec![(
+            "src/auth/login.rs".to_string(),
+            ChangedLines {
+                added: vec![String::from("fn login() {}")],
+                removed: vec![],
+            },
+        )];
+
+        let checks = DiffChecks::of(&rules, &files);
+        assert_eq!(checks.sensitive, vec!["src/auth/login.rs".to_string()]);
+
+        let found = blockers(1, &[], &[], &checks, &Landing::default());
+        assert!(found.contains(&Blocker::SensitiveTouched {
+            paths: vec!["src/auth/login.rs".to_string()],
+        }));
     }
 
     #[test]
