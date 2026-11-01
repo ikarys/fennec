@@ -43,6 +43,7 @@ pub struct LocalTools {
     web_cache: PathBuf,
     rules: Rules,
     home: Option<String>,
+    env: Vec<(String, PathBuf)>,
 }
 
 impl LocalTools {
@@ -60,6 +61,8 @@ impl LocalTools {
             // The rules crate expands `~` in path rules; the host's home is
             // the only home fennec knows.
             home: std::env::var_os("HOME").map(|h| h.to_string_lossy().into_owned()),
+            // Extra environment for commands, set by the composition root.
+            env: Vec::new(),
         }
     }
 
@@ -75,6 +78,11 @@ impl LocalTools {
 
     pub fn with_protection(mut self, protection: Protection) -> LocalTools {
         self.protection = protection;
+        self
+    }
+
+    pub fn with_env(mut self, env: Vec<(String, PathBuf)>) -> LocalTools {
+        self.env = env;
         self
     }
 
@@ -151,10 +159,12 @@ impl LocalTools {
             "edit_file" => edit_file::run(args, workdir, &self.protection, &self.outside(approved)),
             "run_command" => match access {
                 CommandAccess::ReadWrite => {
-                    run_command::run(args, workdir, &self.sandbox, stop, on_output)
+                    run_command::run(args, workdir, &self.sandbox, &self.env, stop, on_output)
                 }
                 CommandAccess::ReadOnly => match self.sandbox.read_only(workdir) {
-                    Some(sandbox) => run_command::run(args, workdir, &sandbox, stop, on_output),
+                    Some(sandbox) => {
+                        run_command::run(args, workdir, &sandbox, &self.env, stop, on_output)
+                    },
                     None => ToolResult::failure(
                         "run_command is read-only in this mode and needs fennec's sandbox, which is turned off on the Settings page."
                             .to_string(),
@@ -193,15 +203,14 @@ impl Commands for LocalTools {
         }
 
         let mut on_output = |_: OutputStream, _: &str| {};
-        match run_command::process::execute(
+        let launch = run_command::process::Launch {
             command,
-            &self.workdir,
-            &self.workdir,
-            timeout,
-            stop,
-            &mut on_output,
-            &self.sandbox,
-        ) {
+            workdir: &self.workdir,
+            cwd: &self.workdir,
+            sandbox: &self.sandbox,
+            env: &self.env,
+        };
+        match run_command::process::execute(launch, timeout, stop, &mut on_output) {
             Ok(execution) => command_run(execution),
             Err(error) => CommandRun {
                 exit_code: None,
