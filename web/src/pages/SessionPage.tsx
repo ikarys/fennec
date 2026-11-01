@@ -335,9 +335,10 @@ export function SessionPage({
     return null;
   }, [view.items]);
   const integrationInvite = useMemo<IntegrationInvite | null>(() => {
-    if (!sessionId || !detail?.worktree) return null;
+    // No commit on the agent's branch: nothing to review, no invitation.
+    if (!sessionId || !detail?.worktree?.commits) return null;
     return { lastRunEndId, open: () => setIntegrationOpen(true) };
-  }, [sessionId, detail?.worktree, lastRunEndId]);
+  }, [sessionId, detail?.worktree?.commits, lastRunEndId]);
   const projectName =
     detail?.project.name ??
     projects.find((project) => project.id === projectId)?.name ??
