@@ -31,6 +31,8 @@ import { SkillsSection } from '../components/settings/SkillsSection';
 import { WorkflowsSection } from '../components/settings/WorkflowsSection';
 
 interface SettingsPageProps {
+  /** The tab named in the address (`#/settings/rules`), when it names one. */
+  initialTab?: string | null;
   settings: SettingsResponse | null;
   theme: ThemeId;
   onThemeChange: (theme: ThemeId) => void;
@@ -275,12 +277,12 @@ function buildPreferences(form: SettingsForm, settings: SettingsResponse): Prefe
   };
 }
 
-export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListing }: SettingsPageProps) {
+export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSaved, onListing }: SettingsPageProps) {
   const [form, setForm] = useState<SettingsForm | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<SettingsTab>('models');
+  const [tab, setTab] = useState<SettingsTab>(() => TABS.find((t) => t.id === initialTab)?.id ?? 'models');
   const [dirty, setDirty] = useState(false);
 
   useEffect(() => {

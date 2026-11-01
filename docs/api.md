@@ -46,7 +46,7 @@ with camelCase fields.
 | `task.accepted` | `{callId, ideaId}`: the human added the proposed task `callId` to the project's backlog as `ideaId` |
 | `agents_md.written` | `{replaced}`: the human wrote the AGENTS.md draft of the last answer to the project's root; `replaced` when a file was there |
 | `agent.suggested` | `{callId, agent, reason, brief}`: the `suggest_agent` tool: an agent suggests the human go on in a new session with another agent; nothing switches until the human opens it |
-| `rule.blocked` | `{callId, ruleId, kind, pattern, scope, subject}`: fennec refused a tool call by one of the human's rules (fennec's own check, verified), before the call's failed `tool.result`; `kind` `command`/`tool`/`path`, `scope` `global`/`project`, `subject` the command, tool name or workdir-relative path refused |
+| `rule.blocked` | `{callId, ruleId, kind, pattern, scope, subject}`: fennec refused a tool call by one of the human's rules (fennec's own check, verified), before the call's failed `tool.result`; `kind` `command`/`tool`/`path`, `scope` `global`/`project`/`session`, `subject` the command, tool name or path refused (workdir-relative inside it, absolute outside) |
 | `worktree.discarded` | `{branch, commits}`: the human discarded the session's worktree and branch; `commits` are the agent's commits that were dropped |
 | `workflow.paused` | `{runId, from, port, to}`: waiting before `to` |
 | `workflow.pause_requested` | `{runId}`: the human asked to pause at the next edge (after the current node) |
@@ -254,18 +254,24 @@ read-only. The human edits them as usual.
   - `adrs` `[{number, file, title, status, date, body}]`: the MADR files of `docs/adr/` (`NNNN-slug.md`,
     sorted by number; `status` and `date` from the frontmatter, null when absent; the title from the
     first `# ` heading).
-- `GET /api/rules` → `{rules}`, the global rules; `POST /api/rules` `{kind, pattern, action, note?}` adds one (400 with
-  `{error}` when the pattern does not parse: empty, flags only, over 500 characters) → `{rules}`;
+- `GET /api/rules` → `{global, projects: [{id, name, rules}], sessions: [{id, title, projectId, rules}]}`, every rule of
+  the rules crate's own store (`rules.db`, `FENNEC_RULES_DB`): global ones, per project, and the session grants;
+  `POST /api/rules` `{scope: "global" | {project: id}, kind, pattern, access?, action, note?}` adds one → 201 `{rule}`
+  (400 with `{error}` when the pattern does not parse: empty, flags only, `..`, over 500 characters; 404 if no project);
   `POST /api/rules/{id}/delete` → `{ok}` (404 if none). A rule is never edited: delete it and add another. No agent tool
   reaches these routes.
-  - a rule `{id, scope, kind, pattern, action, note, understood}`: `kind` `command` (matched on parsed tokens: program,
-    words in order, flags as a set, through `sudo`, `env`, `sh -c`, `&&`, `|`, `find -exec`), `tool` (a tool name) or
-    `path` (a `.agents/protected` pattern, merged into the protected files); `action` `block` or `ask` (blocks too,
-    until the approval flow); `understood` how the server read the pattern, for display.
+  - a rule `{id, scope, kind, pattern, access, action, note, origin, understood}`: `scope` `global`/`project`/`session`;
+    `kind` `command` (matched on parsed tokens: program, words in order, flags as a set, through `sudo`, `env`, `sh -c`,
+    `&&`, `|`, `find -exec`; block and ask rules match a superset, allow rules only the exact command), `tool` (a tool
+    name) or `path` (gitignore-like, relative to the project or absolute / `~/…`; `access` `read`/`write`/`readWrite`,
+    null otherwise); `action` `allow`, `ask` (refuses too, until the approval flow) or `block`; `origin` `"human"` or
+    `{session}` (made by an answer in that session); `understood` how the server read the pattern, for display.
+  - Precedence: block > allow > ask, then the narrowest scope. A file tool outside the workdir needs an allow rule; block
+    write rules relative to the project are also mounted read-only in the sandbox.
   - Rules load once per turn: a change applies from the next turn. They are checked before every agent tool call and
     every workflow `shell`/`criteria` command.
-- `GET /api/projects/{id}/rules` → `{rules, global}`, the project's rules and the global ones that apply to it too;
-  `POST /api/projects/{id}/rules` adds a project rule → `{rules, global}` (404 if no project).
+- `GET /api/projects/{id}/rules` → `{rules, global}`, the project's rules and the global ones that apply to it too
+  (read-only: the Settings page's "Règles" tab, `#/settings/rules`, edits them).
 - `GET /api/projects/{id}/risks` → `{files, unreviewedPercent, untested, churning, unreviewed, churnDays, zones}`, the
   project's risk zones, read from git (verified; 404 if no project). `files` counts the tracked source files, tests
   excluded; `unreviewedPercent` the share of their lines (git blame) from AI commits never reviewed: a commit with an
