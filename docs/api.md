@@ -42,6 +42,8 @@ with camelCase fields.
 | `criterion.updated` | `{criterionId, status}`; `status` is `{type: "pending"}` or `{type: "passed" \| "failed", provenance}`, `provenance` `{kind: "verified", command, exitCode?, output}` (fennec ran the check) or `{kind: "indicative", agent, reason}` (an agent's verdict) |
 | `integration.applied` | `{branch, base, commits, head, message, acknowledged, protectedTests}`: the human integrated the session's branch; `message` is the integration commit message, `acknowledged` lists the blockers they accepted, `protectedTests` the test files they protected with it (absent in older logs) |
 | `audit.tasks_created` | `{findings, ideaIds}`: the human turned audit findings into backlog ideas; `findings` are the report finding numbers, `ideaIds` the created ideas |
+| `task.proposed` | `{callId, title, text}`: a backlog task an agent proposed with `propose_task` (indicative: produced by a model); the turn goes on |
+| `task.accepted` | `{callId, ideaId}`: the human added the proposed task `callId` to the project's backlog as `ideaId` |
 | `worktree.discarded` | `{branch, commits}`: the human discarded the session's worktree and branch; `commits` are the agent's commits that were dropped |
 | `workflow.paused` | `{runId, from, port, to}`: waiting before `to` |
 | `workflow.pause_requested` | `{runId}`: the human asked to pause at the next edge (after the current node) |
@@ -329,11 +331,16 @@ read-only. The human edits them as usual.
 - `POST /api/sessions/{id}/audit/tasks` `{findings: [number]}` → `{created}`: adds one idea per finding of the
   session's audit report to its project's backlog, the text written by the server; 400 when a number is unknown;
   409 when a finding is already a task; records `audit.tasks_created` in the session's log;
-- `GET /api/sessions/{id}` → `{id, title, state, mode, model, project: {id, name, workdir}, worktree, idea, request, audit}`;
+- `POST /api/sessions/{id}/proposals/{callId}/accept` `{}` → `{ideaId}`: adds the task proposed by the call
+  `callId` to the session's project backlog (title, blank line, text); 404 when no such proposal; 409 when already
+  accepted; records `task.accepted` in the session's log;
+- `GET /api/sessions/{id}` → `{id, title, state, mode, model, project: {id, name, workdir}, worktree, idea, request, audit, proposedTasks}`;
   `idea` is `{id, state}` when the session frames one of the project's ideas, else null;
   `audit` is the session's last answer read as an audit report, `{scope, summary, findings: [{number, title,
   severity: high|medium|low, principle, locations: [string], problem, fix}], taken: [number]}`, or null when it is
   not one; `taken` lists findings already turned into tasks since this report;
+  `proposedTasks` is `[{callId, title, text, ideaId}]`, the tasks proposed in the session in order, `ideaId` null
+  until the human accepts one;
   `request` is the first message the human typed in the session, verbatim, or null;
   `model` is `{provider, model, providerName, contextWindow, compactAt, source}`,
   what the next turn runs on; `source` is `session`, `parent` or `default`;

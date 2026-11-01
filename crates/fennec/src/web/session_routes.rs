@@ -27,6 +27,7 @@ use crate::domain::project::{Project, SessionSummary};
 use crate::domain::replay::replayable;
 use crate::domain::session_skills::missed_always_on;
 use crate::domain::slash::{TurnInput, commands, resolve};
+use crate::domain::task_proposal;
 use crate::domain::vision::seen_images;
 use crate::domain::workflow::run::Waiting;
 use crate::notifier::NotifyingLog;
@@ -297,6 +298,8 @@ pub(super) fn get_session(app: &App, stream: &mut TcpStream, id: &str) -> Result
         audit_json["taken"] = json!(audit::taken(&events));
     }
     v["audit"] = audit_json;
+    // The agent's proposed tasks, with the idea id if the human accepted one.
+    v["proposedTasks"] = json!(task_proposal::proposed_tasks(&events));
     v["worktree"] = match app.place(&store, &s, &p)?.worktree {
         Some(wt) => json!({
             "path": wt.path, "branch": wt.branch, "base": wt.base,

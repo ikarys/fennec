@@ -34,6 +34,7 @@ import { RunningStrip } from "../components/session/RunningStrip";
 import { modelShortName } from "../components/session/ModelPicker";
 import { Badge } from "../components/ui/Badge";
 import { AuditCard } from "../components/session/AuditCard";
+import { ProposedTasksCard } from "../components/session/ProposedTasksCard";
 import { ContextPanel } from "../components/session/ContextPanel";
 import { ContextGauge } from "../components/session/ContextGauge";
 import { QuestionCard } from "../components/session/QuestionCard";
@@ -649,6 +650,14 @@ export function SessionPage({
                               sessionId={sessionId}
                               projectId={detail.project.id ?? null}
                               onCreated={() => setDetailVersion((version) => version + 1)}
+                            />
+                          ) : null}
+                          {detail && detail.proposedTasks.length > 0 && !running ? (
+                            <ProposedTasksCard
+                              tasks={detail.proposedTasks}
+                              sessionId={sessionId}
+                              projectId={detail.project.id ?? null}
+                              onAccepted={() => setDetailVersion((version) => version + 1)}
                             />
                           ) : null}
                         </div>

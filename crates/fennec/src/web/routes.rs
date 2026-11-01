@@ -6,6 +6,7 @@
 use super::App;
 use super::audit_routes;
 use super::http::{Request, error, send, send_json};
+use super::proposal_routes;
 use super::{
     assets, backlog_routes, event_stream, idea_routes, integration, model_routes,
     project_dashboard, project_routes, servers, session_delete, session_routes, settings_routes,
@@ -125,6 +126,9 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         }
         ("POST", ["api", "sessions", id, "audit", "tasks"]) => {
             audit_routes::create_tasks(app, req, stream, id)
+        }
+        ("POST", ["api", "sessions", id, "proposals", call_id, "accept"]) => {
+            proposal_routes::accept(app, stream, id, call_id)
         }
         ("POST", ["api", "sessions", id, "mode"]) => {
             session_routes::set_session_mode(app, req, stream, id)

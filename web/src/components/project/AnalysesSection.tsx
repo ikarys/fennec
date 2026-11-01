@@ -9,6 +9,13 @@ import { QuestionForm } from './QuestionForm';
 /** What a project page can ask an agent to analyse: each one opens a session on a read-only agent. */
 const ANALYSES = [
   {
+    mode: 'kickoff',
+    prompt: 'Start this project with me: ask me what it is for, then draft its AGENTS.md and propose its first tasks.',
+    title: 'Démarrer le projet',
+    description: "Comprend le projet avec toi, rédige un brouillon d'AGENTS.md et propose les premières tâches, dans l'ordre ; aucun code écrit.",
+    confirm: "Un agent en lecture seule te pose quelques questions (but, périmètre, contraintes), te fait choisir la stack et l'architecture, puis propose un brouillon d'AGENTS.md et les premières tâches, un squelette qui tourne d'abord. Tu choisis les tâches qui entrent au backlog.",
+  },
+  {
     mode: 'analyze',
     prompt: 'Analyze this project and draft the philosophy, layers and rules of its AGENTS.md.',
     title: 'Analyser le projet',

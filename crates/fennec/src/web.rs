@@ -23,6 +23,7 @@ mod preview;
 mod pricing;
 mod project_dashboard;
 mod project_routes;
+mod proposal_routes;
 mod routes;
 mod servers;
 mod session_delete;
