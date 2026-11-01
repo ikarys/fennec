@@ -1,14 +1,13 @@
 //! Port of openfox `tools/path-security.ts`, simplified: a path outside the
-//! working directory is denied (openfox asks the human to confirm).
+//! working directory is denied unless the human's rules allow it (openfox asks;
+//! the ask flow comes later).
 
 use std::path::{Component, Path, PathBuf};
 
 use crate::domain::protection::Protection;
+use rules::{Access, Decision, PathRequest, Request, Rules};
 
-pub(super) fn resolve_in_workdir(workdir: &Path, p: &str) -> Result<PathBuf, String> {
-    let canonical_workdir = workdir
-        .canonicalize()
-        .unwrap_or_else(|_| workdir.to_path_buf());
+fn resolve(workdir: &Path, p: &str) -> Result<PathBuf, String> {
     let normalized = lexical_normalize(workdir, p);
 
     let mut ancestor = normalized.clone();
@@ -38,12 +37,6 @@ pub(super) fn resolve_in_workdir(workdir: &Path, p: &str) -> Result<PathBuf, Str
         .canonicalize()
         .map_err(|e| format!("Cannot resolve path {p}: {e}"))?;
 
-    if canonical_ancestor != canonical_workdir
-        && !canonical_ancestor.starts_with(&canonical_workdir)
-    {
-        return Err(format!("Path outside working directory: {p}"));
-    }
-
     let mut resolved = canonical_ancestor;
     for component in remaining.iter().rev() {
         resolved.push(component);
@@ -52,12 +45,85 @@ pub(super) fn resolve_in_workdir(workdir: &Path, p: &str) -> Result<PathBuf, Str
     Ok(resolved)
 }
 
+pub(super) fn resolve_in_workdir(workdir: &Path, p: &str) -> Result<PathBuf, String> {
+    let resolved = resolve(workdir, p)?;
+    let canonical_workdir = workdir
+        .canonicalize()
+        .unwrap_or_else(|_| workdir.to_path_buf());
+
+    if resolved != canonical_workdir && !resolved.starts_with(&canonical_workdir) {
+        return Err(format!("Path outside working directory: {p}"));
+    }
+
+    Ok(resolved)
+}
+
+pub(super) fn path_request(
+    workdir: &Path,
+    home: Option<&str>,
+    p: &str,
+    access: Access,
+) -> Option<PathRequest> {
+    let resolved = resolve(workdir, p).ok()?;
+    let canonical_workdir = workdir
+        .canonicalize()
+        .unwrap_or_else(|_| workdir.to_path_buf());
+
+    let relative = resolved
+        .strip_prefix(&canonical_workdir)
+        .ok()
+        .map(|stripped| stripped.to_string_lossy().replace('\\', "/"));
+
+    Some(PathRequest {
+        absolute: resolved.to_string_lossy().replace('\\', "/"),
+        relative,
+        home: home.map(str::to_owned),
+        access,
+    })
+}
+
+/// The paths outside the workdir the human's rules grant.
+pub(super) struct Outside<'a> {
+    pub rules: &'a Rules,
+    pub home: Option<&'a str>,
+}
+
+impl<'a> Outside<'a> {
+    /// No grant: tests of the file tools run inside their workdir.
+    #[cfg(test)]
+    pub(super) fn none() -> Outside<'static> {
+        Outside {
+            rules: &rules::NO_RULES,
+            home: None,
+        }
+    }
+
+    fn grants(&self, workdir: &Path, p: &str, access: Access) -> Option<PathBuf> {
+        let request = path_request(workdir, self.home, p, access)?;
+        if request.relative.is_some() {
+            return None;
+        }
+
+        let decision = self.rules.decide(&Request::Path(&request));
+        if matches!(decision, Decision::Allow(Some(_))) {
+            Some(PathBuf::from(request.absolute))
+        } else {
+            None
+        }
+    }
+}
+
 pub(super) fn resolve_for_writing(
     workdir: &Path,
     protection: &Protection,
+    outside: &Outside,
     p: &str,
 ) -> Result<PathBuf, String> {
-    let resolved = resolve_in_workdir(workdir, p)?;
+    let resolved = match resolve_in_workdir(workdir, p) {
+        Ok(resolved) => resolved,
+        Err(denied) => return outside.grants(workdir, p, Access::Write).ok_or(denied),
+    };
+
     let canonical_workdir = workdir
         .canonicalize()
         .unwrap_or_else(|_| workdir.to_path_buf());
@@ -83,12 +149,18 @@ pub(super) fn resolve_for_writing(
 pub(super) fn resolve_for_reading(
     workdir: &Path,
     packages: impl FnOnce() -> Vec<PathBuf>,
+    outside: &Outside,
     p: &str,
 ) -> Result<PathBuf, String> {
     resolve_in_workdir(workdir, p).or_else(|denied| {
+        if let Some(granted) = outside.grants(workdir, p, Access::Read) {
+            return Ok(granted);
+        }
+
         if !Path::new(p).is_absolute() {
             return Err(denied);
         }
+
         packages()
             .iter()
             .find_map(|dir| resolve_in_workdir(dir, p).ok())
@@ -129,9 +201,10 @@ fn lexical_normalize(workdir: &Path, p: &str) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
-    use super::{resolve_for_reading, resolve_for_writing};
+    use super::{Outside, resolve_for_reading, resolve_for_writing};
     use crate::domain::protection::Protection;
     use crate::tools::test_support::{no_output, run_tool, temp_dir};
+    use rules::{Access, Action, Origin, Rule, Rules, Scope, Target, TargetKind};
 
     #[test]
     fn a_skill_package_is_readable_by_absolute_path_only() {
@@ -140,13 +213,19 @@ mod tests {
         let outside = temp_dir();
         std::fs::write(package.join("ref.md"), "ref").unwrap();
         let packages = || vec![package.clone()];
+        let outside_rules = Outside::none();
 
         let absolute = package.join("ref.md");
-        assert!(resolve_for_reading(&dir, packages, absolute.to_str().unwrap()).is_ok());
-        let relative = resolve_for_reading(&dir, packages, "ref.md").unwrap();
+        assert!(
+            resolve_for_reading(&dir, packages, &outside_rules, absolute.to_str().unwrap()).is_ok()
+        );
+        let relative = resolve_for_reading(&dir, packages, &outside_rules, "ref.md").unwrap();
         assert!(relative.starts_with(dir.canonicalize().unwrap()));
         let elsewhere = outside.join("secret.md");
-        assert!(resolve_for_reading(&dir, packages, elsewhere.to_str().unwrap()).is_err());
+        assert!(
+            resolve_for_reading(&dir, packages, &outside_rules, elsewhere.to_str().unwrap())
+                .is_err()
+        );
 
         for d in [dir, package, outside] {
             let _ = std::fs::remove_dir_all(d);
@@ -181,9 +260,10 @@ mod tests {
         std::fs::create_dir_all(dir.join(".agents")).unwrap();
         std::fs::write(dir.join(".agents").join("protected"), "x").unwrap();
         let protection = Protection::new(None);
+        let outside = Outside::none();
 
         for path in ["Cargo.lock", ".agents/protected", "./sub/../Cargo.lock"] {
-            let error = resolve_for_writing(&dir, &protection, path).unwrap_err();
+            let error = resolve_for_writing(&dir, &protection, &outside, path).unwrap_err();
             assert!(error.contains("is protected"), "{path}: {error}");
         }
 
@@ -196,8 +276,9 @@ mod tests {
         std::fs::write(dir.join("Cargo.lock"), "lock").unwrap();
         std::os::unix::fs::symlink(dir.join("Cargo.lock"), dir.join("lock-link")).unwrap();
         let protection = Protection::new(None);
+        let outside = Outside::none();
 
-        let error = resolve_for_writing(&dir, &protection, "lock-link").unwrap_err();
+        let error = resolve_for_writing(&dir, &protection, &outside, "lock-link").unwrap_err();
         assert!(error.contains("is protected"));
 
         let _ = std::fs::remove_dir_all(&dir);
@@ -208,8 +289,9 @@ mod tests {
         let dir = temp_dir();
         std::fs::create_dir_all(dir.join("src")).unwrap();
         let protection = Protection::new(None);
+        let outside = Outside::none();
 
-        let resolved = resolve_for_writing(&dir, &protection, "src/main.rs").unwrap();
+        let resolved = resolve_for_writing(&dir, &protection, &outside, "src/main.rs").unwrap();
         assert_eq!(
             resolved,
             dir.canonicalize().unwrap().join("src").join("main.rs")
@@ -241,5 +323,39 @@ mod tests {
 
         let _ = std::fs::remove_dir_all(&dir);
         let _ = std::fs::remove_dir_all(&outside);
+    }
+
+    #[test]
+    fn an_allow_read_rule_grants_reading_outside_the_workdir_only() {
+        let workdir = temp_dir();
+        let outside_dir = temp_dir();
+        std::fs::write(outside_dir.join("note.txt"), "note").unwrap();
+        let rule = Rule {
+            id: 1,
+            scope: Scope::Global,
+            target: Target::parse(
+                TargetKind::Path,
+                &format!("{}/", outside_dir.to_string_lossy()),
+                Some(Access::Read),
+            )
+            .unwrap(),
+            action: Action::Allow,
+            note: None,
+            origin: Origin::Human,
+        };
+        let rules = Rules::new(vec![rule]);
+        let outside = Outside {
+            rules: &rules,
+            home: None,
+        };
+        let protection = Protection::new(None);
+        let file = outside_dir.join("note.txt").to_string_lossy().into_owned();
+
+        assert!(resolve_for_reading(&workdir, Vec::new, &outside, &file).is_ok());
+        let error = resolve_for_writing(&workdir, &protection, &outside, &file).unwrap_err();
+        assert!(error.contains("Path outside working directory"));
+
+        let _ = std::fs::remove_dir_all(&workdir);
+        let _ = std::fs::remove_dir_all(&outside_dir);
     }
 }

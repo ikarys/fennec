@@ -26,6 +26,7 @@ mod project_dashboard;
 mod project_routes;
 mod proposal_routes;
 mod routes;
+mod rule_routes;
 mod servers;
 mod session_delete;
 mod session_name;
