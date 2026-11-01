@@ -126,8 +126,11 @@ pub fn fold(events: &[(u64, BacklogEvent)]) -> Backlog {
         let idea = &mut ideas[index];
 
         // A dropped idea stays dropped and a completed idea stays done: a late
-        // event never resurrects either.
-        if matches!(idea.state, IdeaState::Dropped | IdeaState::Completed) {
+        // event never resurrects either. A done idea may still be removed.
+        if idea.state == IdeaState::Dropped
+            || (idea.state == IdeaState::Completed
+                && !matches!(event, BacklogEvent::Dropped { .. }))
+        {
             continue;
         }
 
@@ -400,6 +403,17 @@ mod tests {
         assert_eq!(backlog.ideas.len(), 1);
         assert_eq!(backlog.ideas[0].state, IdeaState::Completed);
         assert_eq!(backlog.ideas[0].plan, None);
+    }
+
+    #[test]
+    fn a_completed_idea_can_be_removed() {
+        let events = vec![
+            ev(1, added("i1", "t")),
+            ev(2, completed("i1")),
+            ev(3, dropped("i1")),
+        ];
+
+        assert!(fold(&events).ideas.is_empty());
     }
 
     #[test]
