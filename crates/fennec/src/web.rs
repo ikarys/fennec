@@ -23,6 +23,7 @@ mod notice_stream;
 mod preview;
 mod pricing;
 mod project_dashboard;
+mod project_delete;
 mod project_routes;
 mod proposal_routes;
 mod routes;
