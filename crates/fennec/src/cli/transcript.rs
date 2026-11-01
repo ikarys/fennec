@@ -147,6 +147,7 @@ impl Transcript {
             | Event::DecisionRecorded { .. }
             | Event::TaskProposed { .. }
             | Event::TaskAccepted { .. }
+            | Event::AgentSuggested { .. }
             | Event::AgentsMdWritten { .. }
             | Event::WorktreeDiscarded { .. } => Ok(()),
         };

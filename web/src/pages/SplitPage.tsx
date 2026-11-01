@@ -119,6 +119,7 @@ export function SplitPage({
         projectId={isNew ? value.slice(4) : null}
         testWorkflowId={null}
         frameIdeaId={null}
+        fromSessionId={null}
         pseudoTabId={isNew ? value : null}
         projects={projects}
         onSessionCreated={(newId, pseudoId) => onSessionCreated(side, newId, pseudoId)}

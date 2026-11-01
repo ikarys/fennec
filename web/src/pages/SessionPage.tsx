@@ -36,6 +36,7 @@ import { Badge } from "../components/ui/Badge";
 import { AuditCard } from "../components/session/AuditCard";
 import { ProposedTasksCard } from "../components/session/ProposedTasksCard";
 import { AgentsMdCard } from "../components/session/AgentsMdCard";
+import { AgentSuggestionCard } from "../components/session/AgentSuggestionCard";
 import { ContextPanel } from "../components/session/ContextPanel";
 import { ContextGauge } from "../components/session/ContextGauge";
 import { QuestionCard } from "../components/session/QuestionCard";
@@ -72,6 +73,8 @@ interface SessionPageProps {
   testWorkflowId: string | null;
   /** A backlog idea framed from the project page: its text prefills the composer, the first send links the session to it. */
   frameIdeaId: string | null;
+  /** A session whose agent suggested this one: its brief prefills the composer and its agent is preselected. */
+  fromSessionId: string | null;
   pseudoTabId: string | null;
   projects: Project[];
   onSessionCreated: (newId: string, pseudoId: string | null) => void;
@@ -86,6 +89,7 @@ export function SessionPage({
   projectId,
   testWorkflowId,
   frameIdeaId,
+  fromSessionId,
   pseudoTabId,
   projects,
   onSessionCreated,
@@ -236,6 +240,28 @@ export function SessionPage({
       };
     }
   }, [projectId, frameIdeaId, sessionId]);
+
+  // Read through a ref: the effect below runs once per source session, not
+  // on every render that recreates the handler.
+  const modeChangeRef = useRef(handleModeChange);
+  modeChangeRef.current = handleModeChange;
+  useEffect(() => {
+    if (!sessionId && fromSessionId) {
+      let ignore = false;
+      getSession(fromSessionId)
+        .then((source) => {
+          if (ignore || !source.agentSuggestion) return;
+          setText(source.agentSuggestion.brief);
+          void modeChangeRef.current(source.agentSuggestion.agent);
+        })
+        .catch(() => {
+          // Ignore: the composer stays editable with an empty message.
+        });
+      return () => {
+        ignore = true;
+      };
+    }
+  }, [fromSessionId, sessionId]);
 
   useEffect(() => {
     if (view.pendingQuestion && !running) {
@@ -666,6 +692,13 @@ export function SessionPage({
                               draft={detail.agentsMdDraft}
                               sessionId={sessionId}
                               onWritten={() => setDetailVersion((version) => version + 1)}
+                            />
+                          ) : null}
+                          {detail && detail.agentSuggestion && sessionId && detail.project.id && !running ? (
+                            <AgentSuggestionCard
+                              suggestion={detail.agentSuggestion}
+                              sessionId={sessionId}
+                              projectId={detail.project.id}
                             />
                           ) : null}
                         </div>

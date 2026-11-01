@@ -13,6 +13,7 @@ allowedTools:
   - ask_user
   - record_decision
   - load_skill
+  - suggest_agent
 ---
 
 # Maquette
