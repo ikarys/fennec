@@ -21,17 +21,19 @@ use crate::domain::agent_suggestion;
 use crate::domain::agents_md;
 use crate::domain::attachment::{Attachment, from_data_url};
 use crate::domain::audit;
+use crate::domain::clock;
 use crate::domain::conversation::{first_request, last_assistant_text};
-use crate::domain::event::Event;
+use crate::domain::event::{Event, QueueMode};
 use crate::domain::id::new_id;
 use crate::domain::preferences::ModelRef;
 use crate::domain::project::{Project, SessionSummary};
+use crate::domain::queue;
 use crate::domain::replay::replayable;
 use crate::domain::session_skills::missed_always_on;
 use crate::domain::slash::{TurnInput, commands, resolve};
 use crate::domain::task_proposal;
 use crate::domain::vision::seen_images;
-use crate::domain::workflow::run::Waiting;
+use crate::domain::workflow::run::{Waiting, current_run};
 use crate::notifier::NotifyingLog;
 use crate::skills;
 use crate::store::SqliteStore;
@@ -502,7 +504,33 @@ pub(super) fn send_message(
         return error(stream, 404, "no such session");
     };
     if app.turns.is_running(id) {
-        return error(stream, 409, "a turn is already running");
+        if !attachments.is_empty() {
+            return error(stream, 409, "images wait for the end of the turn");
+        }
+        if current_run(&store.events(id)?).is_some_and(|run| run.finished.is_none()) {
+            return error(stream, 409, "a workflow is running in this session");
+        }
+        let queue_id = new_id();
+        match app.turns.enqueue(id, || {
+            NotifyingLog {
+                log: &store,
+                notifier: &app.notifier,
+            }
+            .append(
+                id,
+                &Event::QueueAdded {
+                    queue_id: queue_id.clone(),
+                    mode: QueueMode::Asap,
+                    content: content.clone(),
+                    queued_at: clock::now_ms(),
+                },
+            )
+            .map(|_| ())
+        }) {
+            Ok(true) => return send_json(stream, 202, &json!({ "queued": queue_id })),
+            Ok(false) => {}
+            Err(e) => return error(stream, 409, &e),
+        }
     }
     let place = app.place(&store, &session, &p)?;
     // While a run is active the typed message answers where it waits.
@@ -535,6 +563,36 @@ pub(super) fn send_message(
         Ok(()) => send_json(stream, 202, &json!({})),
         Err(e) => error(stream, 409, &e),
     }
+}
+
+pub(super) fn cancel_queued(
+    app: &App,
+    stream: &mut TcpStream,
+    id: &str,
+    queue_id: &str,
+) -> Result<(), String> {
+    let store = app.store()?;
+    if store.session(id)?.is_none() {
+        return error(stream, 404, "no such session");
+    }
+    let events = store.events(id)?;
+    if !queue::pending(&events)
+        .iter()
+        .any(|queued| queued.queue_id == queue_id)
+    {
+        return error(stream, 404, "no such queued message");
+    }
+    let log = NotifyingLog {
+        log: &store,
+        notifier: &app.notifier,
+    };
+    log.append(
+        id,
+        &Event::QueueCancelled {
+            queue_id: queue_id.to_string(),
+        },
+    )?;
+    send_json(stream, 200, &json!({}))
 }
 
 pub(super) fn replay_message(

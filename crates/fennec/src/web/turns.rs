@@ -3,14 +3,17 @@
 
 use super::children::Children;
 use super::model_routes;
+use crate::agent::ports::EventLog;
 use crate::agent::turn::{Turn, compact_session, replay_turn, run_turn};
 use crate::agent::workflow::{WorkflowEnv, WorkflowJob, run_workflow};
 use crate::config::Settings;
 use crate::domain::attachment::Attachment;
 use crate::domain::event::Event;
+use crate::domain::queue;
 use crate::domain::rule_approval::Choice;
-use crate::domain::slash::TurnInput;
-use crate::notifier::Notifier;
+use crate::domain::slash::{TurnInput, resolve};
+use crate::notifier::{Notifier, NotifyingLog};
+use crate::skills;
 use crate::store::SqliteStore;
 use crate::tools::LocalTools;
 use crate::turn_build;
@@ -88,6 +91,24 @@ impl Turns {
         }
     }
 
+    /// Records a queued message while the session's turn is running. The
+    /// running lock is held while `add` appends, so a turn that ends in
+    /// between cannot miss the queue: it either sees the message in
+    /// `after_turn` or the call falls through to a normal start.
+    pub fn enqueue(
+        &self,
+        session_id: &str,
+        add: impl FnOnce() -> Result<(), String>,
+    ) -> Result<bool, String> {
+        let running = self.running.lock().unwrap();
+        if running.contains_key(session_id) {
+            add()?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
     /// Starts a turn; refuses while one runs on the session.
     pub fn start(&self, session_id: &str, place: Place, job: Job) -> Result<(), String> {
         self.start_with(session_id, place, job, false)
@@ -115,28 +136,55 @@ impl Turns {
         let running = self.running.clone();
         let session_id = session_id.to_string();
         std::thread::spawn(move || {
-            if let Err(e) = run(
-                &settings,
-                &notifier,
-                &session_id,
-                &place.workdir,
-                &job,
-                &stop,
-                autonomous,
-            ) {
-                eprintln!("fennec: session {session_id}: {e}");
-            }
-            // Whatever the job did, what the agent wrote is recorded as
-            // fennec's commits for the human to cherry-pick.
-            if let Some(wt) = &place.worktree {
-                let message = format!("fennec: agent work in session {session_id}");
-                if let Err(e) = worktree::commit(wt, &message) {
-                    eprintln!("fennec: session {session_id}: commit: {e}");
+            let mut job = job;
+            loop {
+                if let Err(e) = run(
+                    &settings,
+                    &notifier,
+                    &session_id,
+                    &place.workdir,
+                    &job,
+                    &stop,
+                    autonomous,
+                ) {
+                    eprintln!("fennec: session {session_id}: {e}");
+                }
+                // Whatever the job did, what the agent wrote is recorded as
+                // fennec's commits for the human to cherry-pick.
+                if let Some(wt) = &place.worktree {
+                    let message = format!("fennec: agent work in session {session_id}");
+                    if let Err(e) = worktree::commit(wt, &message) {
+                        eprintln!("fennec: session {session_id}: commit: {e}");
+                    }
+                }
+                let mut running = running.lock().unwrap();
+                match next_job(
+                    &settings,
+                    &notifier,
+                    &session_id,
+                    &place.workdir,
+                    stop.load(Ordering::Relaxed),
+                ) {
+                    Ok(Some(next)) => {
+                        drop(running);
+                        job = next;
+                    }
+                    Ok(None) => {
+                        running.remove(&session_id);
+                        drop(running);
+                        // Whoever waits for the turn to end (the ideas queue) wakes now.
+                        notifier.notify();
+                        break;
+                    }
+                    Err(e) => {
+                        eprintln!("fennec: session {session_id}: queue: {e}");
+                        running.remove(&session_id);
+                        drop(running);
+                        notifier.notify();
+                        break;
+                    }
                 }
             }
-            running.lock().unwrap().remove(&session_id);
-            // Whoever waits for the turn to end (the ideas queue) wakes now.
-            notifier.notify();
         });
         Ok(())
     }
@@ -224,4 +272,45 @@ fn run(
             }
         },
     )
+}
+
+/// The queued message that starts the next job once a turn ends, if any.
+/// Called while the session's running lock is held, so a message queued in
+/// the meantime is seen here and not lost.
+fn next_job(
+    settings: &Settings,
+    notifier: &Notifier,
+    session_id: &str,
+    workdir: &Path,
+    stopped: bool,
+) -> Result<Option<Job>, String> {
+    let store = SqliteStore::open(&settings.db_path)?;
+    let events = store.events(session_id)?;
+    match queue::after_turn(&events, stopped) {
+        queue::AfterTurn::Idle | queue::AfterTurn::Hold => Ok(None),
+        queue::AfterTurn::Cancel(ids) => {
+            let log = NotifyingLog {
+                log: &store,
+                notifier,
+            };
+            for id in ids {
+                log.append(session_id, &Event::QueueCancelled { queue_id: id })?;
+            }
+            Ok(None)
+        }
+        queue::AfterTurn::Start(q) => {
+            let log = NotifyingLog {
+                log: &store,
+                notifier,
+            };
+            log.append(
+                session_id,
+                &Event::QueueDrained {
+                    queue_id: q.queue_id.clone(),
+                },
+            )?;
+            let input = resolve(&q.content, &skills::discover(workdir));
+            Ok(Some(Job::Input(input, Vec::new())))
+        }
+    }
 }
