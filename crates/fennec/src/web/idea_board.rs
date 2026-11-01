@@ -304,6 +304,7 @@ fn idea_view(board: &Board, idea: &Idea) -> Result<(Status, Value), String> {
         "id": idea.id,
         "text": idea.text,
         "title": backlog::title(&idea.text, idea.plan.as_deref()),
+        "description": backlog::description(&idea.text, idea.plan.as_deref()),
         "attachments": serde_json::to_value(&idea.attachments).unwrap_or(Value::Array(vec![])),
         "status": status,
         "stage": stage,
