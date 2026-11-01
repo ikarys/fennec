@@ -1,25 +1,45 @@
 /**
  * One stage of the tasks board: a labelled group of idea rows.
  */
-import { useState } from 'react';
-import { Card } from '../../ui/Card';
-import { SectionLabel } from '../../ui/SectionLabel';
-import { IdeaRow } from './IdeaRow';
-import { ReadyCard } from './ReadyCard';
+import { useState, type ReactNode } from "react";
+import { Card } from "../../ui/Card";
+import { SectionLabel } from "../../ui/SectionLabel";
+import { IdeaRow } from "./IdeaRow";
 import {
   reorderIdeas,
   type IdeaBoard,
   type IdeaView,
   type Stage,
-} from '../../../lib/ideas';
+} from "../../../lib/ideas";
 
 const STAGE_LABELS: Record<Stage, string> = {
-  yours: 'À décider',
-  running: 'En cours',
-  queue: 'File',
-  drafts: 'Idées',
-  done: 'Terminées',
+  yours: "À décider",
+  running: "En cours",
+  queue: "File",
+  drafts: "Idées",
+  done: "Terminées",
 };
+
+/** The highlighted stages' card already frames them; the other lists get one. */
+function ListFrame({
+  highlighted,
+  spaced,
+  children,
+}: {
+  highlighted: boolean;
+  spaced: boolean;
+  children: ReactNode;
+}) {
+  return highlighted ? (
+    <div className="flex flex-col gap-1">{children}</div>
+  ) : (
+    <Card
+      className={`flex flex-col divide-y divide-border overflow-hidden ${spaced ? "mt-2" : ""}`}
+    >
+      {children}
+    </Card>
+  );
+}
 
 export function StageGroup({
   stage,
@@ -37,7 +57,7 @@ export function StageGroup({
   onFrame: (idea: IdeaView) => Promise<void>;
   onOpenSession: (sessionId: string) => void;
   run: (action: () => Promise<IdeaBoard>) => Promise<boolean>;
-  caps: IdeaBoard['queue']['caps'];
+  caps: IdeaBoard["queue"]["caps"];
   showLabel?: boolean;
 }) {
   const [dragFrom, setDragFrom] = useState<number | null>(null);
@@ -59,30 +79,23 @@ export function StageGroup({
     await run(() => reorderIdeas(projectId, ids));
   };
 
-  // The stages that need the human stand apart from the flat lists; the
-  // queue renders its own cards, so it stays a flat section.
-  const highlighted = stage === 'yours' || stage === 'running';
+  // The stages that need the human stand apart; the others are one list.
+  const highlighted = stage === "yours" || stage === "running";
 
   const content = (
     <>
       {showLabel ? (
         <SectionLabel as="h2">{STAGE_LABELS[stage]}</SectionLabel>
       ) : null}
-      <div
-        className={
-          stage === 'queue'
-            ? 'flex flex-col gap-2'
-            : showLabel && !highlighted
-              ? 'mt-2 flex flex-col gap-1'
-              : 'flex flex-col gap-1'
-        }
-      >
-        {stage === 'queue' && ideas.length === 0 ? (
-          <p className="m-0 text-sm text-muted">Aucune tâche prête : cadre une idée du backlog.</p>
+      <ListFrame highlighted={highlighted} spaced={showLabel}>
+        {stage === "queue" && ideas.length === 0 ? (
+          <p className="m-0 px-3 py-2 text-sm text-muted">
+            Aucune tâche prête : cadre une idée du backlog.
+          </p>
         ) : null}
         {ideas.map((idea, index) => {
           const reorder =
-            stage === 'queue' && ideas.length > 1
+            stage === "queue" && ideas.length > 1
               ? {
                   onDragStart: () => setDragFrom(index),
                   onDragOver: () => setDragOver(index),
@@ -98,22 +111,12 @@ export function StageGroup({
                   onKeyMove: (d: -1 | 1) => void move(index, index + d),
                   dragging: dragFrom === index,
                   over:
-                    dragOver === index && dragFrom !== null && dragFrom !== index,
+                    dragOver === index &&
+                    dragFrom !== null &&
+                    dragFrom !== index,
                 }
               : null;
-          return stage === 'queue' ? (
-            <ReadyCard
-              key={idea.id}
-              idea={idea}
-              projectId={projectId}
-              onFrame={onFrame}
-              onOpenSession={onOpenSession}
-              run={run}
-              caps={caps}
-              position={idea.position}
-              reorder={reorder}
-            />
-          ) : (
+          return (
             <IdeaRow
               key={idea.id}
               idea={idea}
@@ -122,12 +125,12 @@ export function StageGroup({
               onOpenSession={onOpenSession}
               run={run}
               caps={caps}
-              position={null}
-              reorder={null}
+              position={stage === "queue" ? idea.position : null}
+              reorder={reorder}
             />
           );
         })}
-      </div>
+      </ListFrame>
     </>
   );
 
