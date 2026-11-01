@@ -123,8 +123,8 @@ Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
 1. Produced architecture and drift (C12), waivers (C7).
 Later: sub-agents as tools, when dogfooding shows sessions saturating their context. A rules crate (the human, 2026-11-01):
-one fennec-free place that manages the project's rules, today spread over AGENTS.md, `.agents/protected`,
-`.agents/architecture` and the ADRs.
+rules stored in the database, global or per project, that fennec's Rust code enforces itself, never the model (e.g.
+refuse any `rm -rf` command).
 
 ## Layout
 
