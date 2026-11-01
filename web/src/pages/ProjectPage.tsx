@@ -1,7 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Tabs } from '../components/ui/Tabs';
-import { buttonClass } from '../components/ui/Button';
-import { EditIcon } from '../components/Icons';
+import { Button, buttonClass } from '../components/ui/Button';
+import { EditIcon, TrashIcon } from '../components/Icons';
+import { DeleteProjectDialog } from '../components/project/DeleteProjectDialog';
 import { TasksSection } from '../components/project/ideas/TasksSection';
 import { MapSection } from '../components/project/MapSection';
 import { DocSection } from '../components/project/DocSection';
@@ -95,6 +96,7 @@ export default function ProjectPage({
   const project = projects.find((p) => p.id === projectId) ?? null;
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Unknown or null tab defaults to 'overview'.
   const activeTab: TabId = TABS.find((t) => t.id === tab)?.id ?? 'overview';
@@ -145,6 +147,16 @@ export default function ProjectPage({
         >
           <EditIcon className="h-4 w-4" />
         </a>
+        <Button
+          variant="ghost"
+          size="sm"
+          iconOnly
+          title="Supprimer le projet"
+          aria-label="Supprimer le projet"
+          onClick={() => setDeleting(true)}
+        >
+          <TrashIcon className="h-4 w-4" />
+        </Button>
       </div>
       <p className="mt-0.5 break-all font-mono text-xs text-muted">
         {project.workdir} · ⎇ {project.branch ?? 'sans branche'}
@@ -169,6 +181,16 @@ export default function ProjectPage({
   return shell(
     <>
       {header}
+      {deleting && (
+        <DeleteProjectDialog
+          project={project}
+          onClose={() => setDeleting(false)}
+          onDeleted={() => {
+            setDeleting(false);
+            window.location.hash = '#/';
+          }}
+        />
+      )}
       <div className="mt-6 flex flex-col gap-6 md:flex-row">
         <Tabs
           label="Sections du projet"
