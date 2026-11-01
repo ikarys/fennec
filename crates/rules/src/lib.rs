@@ -1,12 +1,20 @@
-//! Fennec rule model and command-pattern matching.
+//! Fennec's rule engine.
 //!
-//! This crate is intentionally fennec-free: it performs no I/O and owns no
-//! database. It only represents rules and evaluates in-memory command, tool,
-//! and path-rule metadata, so another product can reuse it without pulling in
-//! fennec runtime concerns.
+//! This crate owns the human's rules: the model, the matching, the decision, and the
+//! storage in its own SQLite file. A host only asks the crate what to do and enforces
+//! the answer.
 
+mod answer;
 pub mod command;
-pub mod rule;
+mod decide;
+pub mod path;
+mod rule;
+mod store;
 
+pub use answer::{Proposal, proposal};
 pub use command::{CommandPattern, PatternError, segments};
-pub use rule::{Action, NO_RULES, Rule, Rules, Scope, Target, TargetKind};
+pub use decide::{Decision, PathRequest, Request};
+pub use rule::{
+    Access, Action, NO_RULES, Origin, PathPattern, Rule, Rules, Scope, Target, TargetKind,
+};
+pub use store::{NewRule, RuleStore, StoreError};

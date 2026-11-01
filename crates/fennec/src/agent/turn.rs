@@ -41,7 +41,6 @@ use crate::domain::open_calls;
 use crate::domain::preferences::ReasoningEffort;
 use crate::domain::replay::replayable;
 use crate::domain::skill::Skill;
-use rules::Rules;
 use serde_json::Value;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -81,8 +80,6 @@ pub struct Turn<'a> {
     /// The human is away (the ideas queue's night mode): `ask_user` and
     /// `propose_criteria` answer themselves instead of pausing the turn.
     pub autonomous: bool,
-    /// The human's rules, checked before each tool call (fennec's code, never the model).
-    pub rules: &'a Rules,
     /// Set by the human to stop the turn: checked between rounds, while
     /// streaming and while a command runs.
     pub stop: &'a AtomicBool,
@@ -545,7 +542,6 @@ mod tests {
                 compact_at: 0.0,
                 reasoning_effort: None,
                 autonomous: false,
-                rules: &rules::NO_RULES,
                 stop: self.stop,
                 on_event: &mut self.on_event,
             }
@@ -553,16 +549,16 @@ mod tests {
     }
 
     fn run(model: &dyn Model, workdir: &Path) -> (DoneReason, Vec<Event>) {
-        run_with_rules(model, workdir, &rules::NO_RULES)
+        run_with_rules(model, workdir, rules::Rules::default())
     }
 
     fn run_with_rules(
         model: &dyn Model,
         workdir: &Path,
-        rules: &Rules,
+        rules: rules::Rules,
     ) -> (DoneReason, Vec<Event>) {
         let log = MemoryLog::default();
-        let tools = LocalTools::new(workdir.to_path_buf());
+        let tools = LocalTools::new(workdir.to_path_buf()).with_rules(rules);
         let stop = AtomicBool::new(false);
         let mut on_event = |_: &Event| {};
         let agents = builder();
@@ -581,7 +577,6 @@ mod tests {
             compact_at: 0.0,
             reasoning_effort: None,
             autonomous: false,
-            rules,
             stop: &stop,
             on_event: &mut on_event,
         };
@@ -610,14 +605,15 @@ mod tests {
             reply("", vec![call]),
             reply("done", vec![]),
         ]));
-        let rules = Rules::new(vec![rules::Rule {
-            id: "block-rm".into(),
+        let rules = rules::Rules::new(vec![rules::Rule {
+            id: 1,
             scope: rules::Scope::Global,
-            target: rules::Target::parse(rules::TargetKind::Command, "rm -rf").unwrap(),
+            target: rules::Target::parse(rules::TargetKind::Command, "rm -rf", None).unwrap(),
             action: rules::Action::Block,
             note: None,
+            origin: rules::Origin::Human,
         }]);
-        let (_, events) = run_with_rules(&model, &dir, &rules);
+        let (_, events) = run_with_rules(&model, &dir, rules);
         assert!(events.iter().any(
             |e| matches!(e, Event::RuleBlocked { subject, .. } if subject == "rm -fr target")
         ));
@@ -844,7 +840,6 @@ mod tests {
             compact_at: 0.0,
             reasoning_effort: None,
             autonomous: false,
-            rules: &rules::NO_RULES,
             stop: &stop,
             on_event: &mut on_event,
         };
@@ -1658,7 +1653,6 @@ mod tests {
             compact_at: 0.0,
             reasoning_effort: None,
             autonomous: false,
-            rules: &rules::NO_RULES,
             stop: &stop,
             on_event: &mut on_event,
         };

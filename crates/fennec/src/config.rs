@@ -78,6 +78,15 @@ impl Settings {
             None => self.db_path.with_file_name("usage.db"),
         }
     }
+
+    /// `FENNEC_RULES_DB`, default `rules.db` next to the store. A file of its
+    /// own: the human's rules are owned by the `rules` crate, not fennec's store.
+    pub fn rules_path(&self) -> PathBuf {
+        match std::env::var_os("FENNEC_RULES_DB") {
+            Some(p) => PathBuf::from(p),
+            None => self.db_path.with_file_name("rules.db"),
+        }
+    }
 }
 
 impl LlmSettings {

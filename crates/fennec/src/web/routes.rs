@@ -64,13 +64,10 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         ("POST", ["api", "worktrees", "remove-orphan"]) => {
             worktree_routes::remove_orphan(app, req, stream)
         }
-        ("GET", ["api", "rules"]) => rule_routes::list_global(app, stream),
-        ("POST", ["api", "rules"]) => rule_routes::add_global(app, req, stream),
+        ("GET", ["api", "rules"]) => rule_routes::list(app, stream),
+        ("POST", ["api", "rules"]) => rule_routes::add(app, req, stream),
         ("POST", ["api", "rules", id, "delete"]) => rule_routes::delete(app, stream, id),
         ("GET", ["api", "projects", id, "rules"]) => rule_routes::list_project(app, stream, id),
-        ("POST", ["api", "projects", id, "rules"]) => {
-            rule_routes::add_project(app, req, stream, id)
-        }
         ("GET", ["api", "projects", id, "ideas"]) => idea_routes::list_ideas(app, stream, id),
         ("POST", ["api", "projects", id, "ideas"]) => idea_routes::add_idea(app, req, stream, id),
         ("POST", ["api", "projects", id, "ideas", "queue", "start"]) => {

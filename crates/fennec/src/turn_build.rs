@@ -68,15 +68,36 @@ pub fn with_turn<R>(
     // A session worktree is the agent's own copy: a new dependency's lockfile
     // may change there, and the integration gate shows it to the human. Outside
     // a worktree the mount list is empty, so this is a no-op for the CLI.
-    // The human's rules: global, plus the session's project's. Loaded per turn, so a rule
-    // changed in the UI applies from the next turn.
-    let rules = match store.session(session_id)? {
-        Some(session) => store.rules_for(&session.project_id)?,
+    // The human's rules live in the `rules` crate's own database. They are
+    // loaded per turn so a rule changed in the UI applies from the next turn.
+    let rule_store = rules::RuleStore::open(&settings.rules_path()).map_err(|e| e.to_string())?;
+    let session = store.session(session_id)?;
+    let rules = match &session {
+        Some(session) => rule_store
+            .for_turn(&session.project_id, Some(session_id))
+            .map_err(|e| e.to_string())?,
         None => rules::Rules::default(),
     };
-    // Path rules are merged into `Protection` so the file tools and sandbox enforce them.
-    // `paths()` also yields `Ask` path rules; in this PR an `Ask` blocks, so that is intended.
-    let blocked_paths: Vec<String> = rules.paths().map(|rule| rule.target.pattern()).collect();
+    // Only project-relative `Block` path rules that cover writes can be enforced
+    // by the file tools' protection and the sandbox's read-only mounts; the rest
+    // are checked per call by the `rules` crate.
+    let blocked_paths: Vec<String> = rules
+        .all()
+        .iter()
+        .filter_map(|rule| {
+            if !matches!(rule.action, rules::Action::Block) {
+                return None;
+            }
+            match &rule.target {
+                rules::Target::Path { pattern, access }
+                    if access.covers(rules::Access::Write) && pattern.is_relative() =>
+                {
+                    Some(pattern.text().to_string())
+                }
+                _ => None,
+            }
+        })
+        .collect();
     let protection = (if workdir.starts_with(worktree::root(&settings.db_path)) {
         protected::load_for_worktree(workdir)
     } else {
@@ -107,7 +128,6 @@ pub fn with_turn<R>(
         compact_at: params.compact_at,
         reasoning_effort: params.reasoning_effort,
         autonomous: options.autonomous,
-        rules: tools.rules(),
         stop,
         on_event: &mut options.on_event,
     };

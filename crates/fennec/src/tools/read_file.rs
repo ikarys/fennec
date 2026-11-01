@@ -4,7 +4,7 @@
 //! Not ported: PDF files, directories.
 
 use super::args;
-use super::path_guard::resolve_for_reading;
+use super::path_guard::{Outside, resolve_for_reading};
 use crate::domain::attachment::{data_url, sniff_image};
 use crate::domain::event::{ToolResult, ToolResultMetadata};
 use serde_json::{Value, json};
@@ -44,7 +44,7 @@ pub(super) fn definition() -> Value {
 }
 
 /// `cache` is readable by absolute path: it holds the pages `web_fetch` saved.
-pub(super) fn run(args: &Value, workdir: &Path, cache: &Path) -> ToolResult {
+pub(super) fn run(args: &Value, workdir: &Path, cache: &Path, outside: &Outside) -> ToolResult {
     let path = match args::string(args, "path") {
         Ok(value) => value,
         Err(error) => return ToolResult::failure(error),
@@ -67,7 +67,7 @@ pub(super) fn run(args: &Value, workdir: &Path, cache: &Path) -> ToolResult {
             .chain([cache.to_path_buf()])
             .collect()
     };
-    let full_path = match resolve_for_reading(workdir, packages, path) {
+    let full_path = match resolve_for_reading(workdir, packages, outside, path) {
         Ok(value) => value,
         Err(error) => return ToolResult::failure(error),
     };

@@ -198,20 +198,14 @@ pub(super) fn execute_tools(
             continue;
         }
         // The human's rules run before the tool: the model's call never reaches it.
-        // An `Ask` rule is refused too until the approval flow lands.
-        let rules = turn.rules;
-        let workdir = turn.workdir;
-        if let Some(refusal) = rule_check::check(rules, workdir, call) {
-            turn.append(rule_check::event(&call.id, &refusal))?;
-            record(
-                turn,
-                message_id,
-                call,
-                ToolResult::failure(refusal.rule.refusal()),
-            )?;
+        let tools = turn.tools;
+        let check = tools.check_rules(&call.name, &call.arguments);
+        if let Some(rule) = rule_check::refusal(&check) {
+            turn.append(rule_check::event(&call.id, rule, &check.subject))?;
+            record(turn, message_id, call, ToolResult::failure(rule.refusal()))?;
             continue;
         }
-        let (tools, stop) = (turn.tools, turn.stop);
+        let stop = turn.stop;
         let mut log_error = None;
         let r = tools.execute(
             &call.name,

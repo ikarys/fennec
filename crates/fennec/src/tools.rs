@@ -13,6 +13,7 @@ mod edit_file;
 mod load_skill;
 mod path_guard;
 mod read_file;
+mod rule_request;
 mod run_command;
 mod sandbox;
 #[cfg(test)]
@@ -23,12 +24,12 @@ mod write_file;
 
 pub use sandbox::{Sandbox, SandboxHealth, probe};
 
-use crate::agent::ports::{CommandRun, Commands, Toolbox};
+use crate::agent::ports::{CommandRun, Commands, RuleCheck, Toolbox};
 use crate::domain::agent::CommandAccess;
 use crate::domain::event::{OutputStream, ToolResult};
 use crate::domain::preferences::SearchPrefs;
 use crate::domain::protection::Protection;
-use rules::Rules;
+use rules::{Decision, Request, Rules};
 use serde_json::Value;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
@@ -41,6 +42,7 @@ pub struct LocalTools {
     protection: Protection,
     web_cache: PathBuf,
     rules: Rules,
+    home: Option<String>,
 }
 
 impl LocalTools {
@@ -55,6 +57,9 @@ impl LocalTools {
             protection: Protection::default(),
             web_cache: web_fetch::default_cache_dir(),
             rules: Rules::default(),
+            // The rules crate expands `~` in path rules; the host's home is
+            // the only home fennec knows.
+            home: std::env::var_os("HOME").map(|h| h.to_string_lossy().into_owned()),
         }
     }
 
@@ -78,8 +83,11 @@ impl LocalTools {
         self
     }
 
-    pub fn rules(&self) -> &Rules {
-        &self.rules
+    fn outside(&self) -> path_guard::Outside<'_> {
+        path_guard::Outside {
+            rules: &self.rules,
+            home: self.home.as_deref(),
+        }
     }
 }
 
@@ -107,9 +115,9 @@ impl Toolbox for LocalTools {
         let start = Instant::now();
         let workdir = &self.workdir;
         let mut result = match name {
-            "read_file" => read_file::run(args, workdir, &self.web_cache),
-            "write_file" => write_file::run(args, workdir, &self.protection),
-            "edit_file" => edit_file::run(args, workdir, &self.protection),
+            "read_file" => read_file::run(args, workdir, &self.web_cache, &self.outside()),
+            "write_file" => write_file::run(args, workdir, &self.protection, &self.outside()),
+            "edit_file" => edit_file::run(args, workdir, &self.protection, &self.outside()),
             "run_command" => match access {
                 CommandAccess::ReadWrite => {
                     run_command::run(args, workdir, &self.sandbox, stop, on_output)
@@ -138,18 +146,25 @@ impl Toolbox for LocalTools {
         result.duration_ms = start.elapsed().as_millis() as u64;
         result
     }
+
+    fn check_rules(&self, name: &str, args: &Value) -> RuleCheck<'_> {
+        rule_request::check(&self.rules, &self.workdir, self.home.as_deref(), name, args)
+    }
 }
 
 impl Commands for LocalTools {
     fn run(&self, command: &str, timeout: Duration, stop: &AtomicBool) -> CommandRun {
-        // A workflow shell node cannot pause for the human: any matching rule refuses it.
-        if let Some(rule) = self.rules.check_command(command) {
+        // A workflow shell node cannot pause for the human: an explicit Ask
+        // rule refuses it too, not only Block.
+        let decision = self.rules.decide(&Request::Command(command));
+        if let Decision::Block(rule) | Decision::Ask(Some(rule)) = decision {
             return CommandRun {
                 exit_code: None,
                 stopped: false,
                 output: rule.refusal(),
             };
         }
+
         let mut on_output = |_: OutputStream, _: &str| {};
         match run_command::process::execute(
             command,

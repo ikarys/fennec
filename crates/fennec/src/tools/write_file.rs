@@ -1,7 +1,7 @@
 //! Port of openfox `tools/write.ts`.
 
 use super::args;
-use super::path_guard::resolve_for_writing;
+use super::path_guard::{Outside, resolve_for_writing};
 use crate::domain::event::ToolResult;
 use crate::domain::protection::Protection;
 use serde_json::{Value, json};
@@ -35,7 +35,12 @@ pub(super) fn definition() -> Value {
     })
 }
 
-pub(super) fn run(args: &Value, workdir: &Path, protection: &Protection) -> ToolResult {
+pub(super) fn run(
+    args: &Value,
+    workdir: &Path,
+    protection: &Protection,
+    outside: &Outside,
+) -> ToolResult {
     let path = match args::string(args, "path") {
         Ok(value) => value,
         Err(error) => return ToolResult::failure(error),
@@ -46,7 +51,7 @@ pub(super) fn run(args: &Value, workdir: &Path, protection: &Protection) -> Tool
         Err(error) => return ToolResult::failure(error),
     };
 
-    let full_path = match resolve_for_writing(workdir, protection, path) {
+    let full_path = match resolve_for_writing(workdir, protection, outside, path) {
         Ok(value) => value,
         Err(error) => return ToolResult::failure(error),
     };
@@ -75,6 +80,7 @@ pub(super) fn run(args: &Value, workdir: &Path, protection: &Protection) -> Tool
 mod tests {
     use super::run;
     use crate::domain::protection::Protection;
+    use crate::tools::path_guard::Outside;
     use crate::tools::test_support::temp_dir;
 
     #[test]
@@ -86,7 +92,7 @@ mod tests {
             "path": "Cargo.lock",
             "content": "changed"
         });
-        let result = run(&args, &dir, &Protection::new(None));
+        let result = run(&args, &dir, &Protection::new(None), &Outside::none());
 
         assert!(!result.success);
         assert!(result.error.unwrap().contains("is protected"));

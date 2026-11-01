@@ -54,7 +54,7 @@ impl<'a> Harness<'a> {
             compact_at: 0.0,
             reasoning_effort: None,
             autonomous: false,
-            rules: &rules::NO_RULES,
+
             stop: self.stop,
             on_event: &mut self.on_event,
         }

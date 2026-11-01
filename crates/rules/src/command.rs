@@ -91,6 +91,18 @@ impl CommandPattern {
         words_are_in_order_subsequence(&segment_words, &self.words)
     }
 
+    /// True when the segment is exactly this command: same program, same words in the same
+    /// order, same flags. An Allow rule matches this way, so it never covers added flags.
+    pub fn matches_exactly(&self, segment: &[String]) -> bool {
+        let Some(program) = segment.first() else {
+            return false;
+        };
+        let (segment_flags, segment_words) = segment_flags_and_words(segment);
+        self.program == basename(program)
+            && self.flags == segment_flags
+            && self.words == segment_words
+    }
+
     /// Returns a human-readable description of how fennec understood the pattern.
     pub fn describe(&self) -> String {
         let program = &self.program;
