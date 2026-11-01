@@ -162,6 +162,9 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         ("GET", ["api", "sessions", id, "integration"]) => {
             integration::get_integration(app, stream, id)
         }
+        ("POST", ["api", "sessions", id, "integration", "message"]) => {
+            integration::suggest_message(app, stream, id)
+        }
         ("GET", ["api", "sessions", id, "repo"]) => integration::get_repo(app, stream, id),
         ("POST", ["api", "sessions", id, "integrate"]) => {
             integration::integrate(app, req, stream, id)
