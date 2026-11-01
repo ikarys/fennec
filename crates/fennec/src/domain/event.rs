@@ -483,6 +483,11 @@ pub enum Event {
         /// "read" | "write" | "readWrite" for a path
         #[serde(default, skip_serializing_if = "Option::is_none")]
         access: Option<String>,
+        /// The folders the human may grant instead of `pattern`, narrowest first.
+        ///
+        /// Empty unless `kind` is a path.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        folders: Vec<String>,
     },
     /// The human's answer to a `rule.approval_requested`.
     #[serde(rename = "rule.approval_answered", rename_all = "camelCase")]
