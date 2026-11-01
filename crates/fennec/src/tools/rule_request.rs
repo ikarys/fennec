@@ -3,7 +3,7 @@
 
 use crate::agent::ports::RuleCheck;
 use crate::tools::path_guard;
-use rules::{Access, Decision, Request, Rules};
+use rules::{Access, Decision, Proposal, Request, Rules};
 use serde_json::Value;
 use std::path::Path;
 
@@ -17,24 +17,29 @@ pub(super) fn check<'r>(
     let mut check = RuleCheck {
         decision: rules.decide(&Request::Tool(name)),
         subject: name.to_string(),
+        proposal: Some(rules::proposal(&Request::Tool(name))),
     };
-    let mut weigh = |decision: Decision<'r>, subject: &dyn Fn() -> String| {
-        let combined = combine(check.decision, decision);
-        if combined != check.decision {
-            check = RuleCheck {
-                decision: combined,
-                subject: subject(),
-            };
-        }
-    };
+    let mut weigh =
+        |decision: Decision<'r>, proposal: Option<Proposal>, subject: &dyn Fn() -> String| {
+            let combined = combine(check.decision, decision);
+            if combined != check.decision {
+                check = RuleCheck {
+                    decision: combined,
+                    subject: subject(),
+                    proposal,
+                };
+            }
+        };
 
     let argument = |key: &str| args.get(key).and_then(Value::as_str);
     if name == "run_command"
         && let Some(command) = argument("command")
     {
-        weigh(rules.decide(&Request::Command(command)), &|| {
-            command.to_string()
-        });
+        weigh(
+            rules.decide(&Request::Command(command)),
+            Some(rules::proposal(&Request::Command(command))),
+            &|| command.to_string(),
+        );
     }
 
     let access = match name {
@@ -46,12 +51,16 @@ pub(super) fn check<'r>(
         && let Some(path) = argument("path")
         && let Some(request) = path_guard::path_request(workdir, home, path, access)
     {
-        weigh(rules.decide(&Request::Path(&request)), &|| {
-            request
-                .relative
-                .clone()
-                .unwrap_or_else(|| request.absolute.clone())
-        });
+        weigh(
+            rules.decide(&Request::Path(&request)),
+            Some(rules::proposal(&Request::Path(&request))),
+            &|| {
+                request
+                    .relative
+                    .clone()
+                    .unwrap_or_else(|| request.absolute.clone())
+            },
+        );
     }
 
     check
@@ -80,7 +89,9 @@ fn has_rule(decision: Decision) -> bool {
 mod tests {
     use super::check;
     use crate::domain::id::new_id;
-    use rules::{Access, Action, Decision, Origin, Rule, Rules, Scope, Target, TargetKind};
+    use rules::{
+        Access, Action, Decision, Origin, Proposal, Rule, Rules, Scope, Target, TargetKind,
+    };
     use serde_json::json;
     use std::path::PathBuf;
 
@@ -226,6 +237,15 @@ mod tests {
             &json!({"path": outside.to_string_lossy()}),
         );
         assert_eq!(check.decision, Decision::Ask(None));
+        assert_eq!(
+            check.proposal,
+            Some(Proposal {
+                kind: TargetKind::Path,
+                // the file's directory: "this path and its subdirectories"
+                pattern: format!("{}/", outside.parent().unwrap().to_string_lossy()),
+                access: Some(Access::Read),
+            })
+        );
 
         let _ = std::fs::remove_file(&outside);
         let _ = std::fs::remove_dir_all(&workdir);

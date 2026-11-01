@@ -111,6 +111,11 @@ export function ToolCard({ tool }: { tool: ToolCallView }) {
             vérifié · règle
           </Badge>
         )}
+        {tool.awaitingApproval && (
+          <Badge tone="accent" className="shrink-0" title="fennec attend ton autorisation pour cet appel">
+            en attente
+          </Badge>
+        )}
         {tool.name === 'run_command' && tool.status !== 'running' && tool.exitCode != null && (
           <Badge tone={tool.exitCode === 0 ? 'ok' : 'err'} className="shrink-0">
             vérifié · exit {tool.exitCode}

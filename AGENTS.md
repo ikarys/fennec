@@ -125,17 +125,19 @@ Contrôler.
 Agent suggestions, done: `suggest_agent` (the turn goes on) lets an agent suggest the human go on in a new
 session with another agent, with a reason and a brief (`agent.suggested`); a card after the turn opens the new
 session's page on that agent with the brief in the composer, and nothing starts until the human sends it.
-Rules, done (part 1, block): the human's rules, global, per project or granted to a session, owned by the `rules`
+Rules, done: the human's rules, global, per project or granted to a session, owned by the `rules`
 crate (model, matching, decision, its own SQLite file `rules.db`) and enforced by fennec's code, never the model: a
 command matched on parsed tokens (through `sudo`, `sh -c`, `&&`, `find -exec`), a tool name, or a path read or written
 (project-relative, absolute or `~/…`). A block refuses the call before it runs (`rule.blocked`, a "règle" badge on the
 tool card, verified); workflow shell nodes too. Settings' "Règles" tab (`#/settings/rules`) shows, adds and deletes them
-all; the project page shows its own read-only. An "ask" rule refuses until its approval flow (next PR).
+all; the project page shows its own read-only. An "ask" rule, or a file tool reaching outside the workdir, pauses
+the turn with the call open (`rule.approval_requested`); the human answers on a card: once, for the session (a grant
+on the path and its subdirectories, the command, the tool), always or never (a project rule). fennec then runs the
+recorded call itself or refuses it, and the turn goes on: the model never retries. With the human away (night mode),
+an "ask" is refused.
 Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
-1. Rules, part 2: "ask" rules pause the turn for the human's approval (`rule.approval_requested`): once, for the
-   session, always, never.
-2. Produced architecture and drift (C12), waivers (C7).
+1. Produced architecture and drift (C12), waivers (C7).
 Later: sub-agents as tools, when dogfooding shows sessions saturating their context.
 
 ## Layout
@@ -165,6 +167,7 @@ crates/fennec/src/
     agent.rs           an agent (mode) and its reminder; frontmatter.rs the shared YAML header
     attachment.rs      images sent to the model: sniffing, data URLs, limits
     replay.rs          which message the human may replay
+    rule_approval.rs   the call paused for the human's approval, folded from the log; the four answers
     criteria.rs        acceptance criteria: the plan's "Done when", checks, verdicts, provenance
     preflight.rs       a plan's checks run before any change: fails, passes already, cannot run
     protection.rs      protected files: the defaults, the gitignore-like patterns, the matcher
@@ -193,7 +196,8 @@ crates/fennec/src/
     ask_user.rs        openfox tools/ask: the loop's own tool; the turn ends waiting for the human
     propose_task.rs    the loop's propose_task tool: a backlog task proposed, the turn goes on
     suggest_agent.rs   the loop's own tool: suggests a new session on another agent (the human opens it)
-    rule_check.rs      the rules crate's decision on a tool call: the refusal and its `rule.blocked`
+    rule_check.rs      the rules crate's decision on a tool call: the refusal and its `rule.blocked`, the approval request
+    rule_approval.rs   the human's answer to an approval: runs or refuses the recorded call, resumes the loop
     preflight.rs       runs a plan's checks at the end of the planner's turn, sends it back once
     compaction.rs      openfox context/compactor: the summary round and the new window
     prompt.rs          openfox chat/prompts: the system prompt, plus fennec's working method
@@ -231,15 +235,13 @@ crates/fennec/src/
                      notifier (wakes streams on append, no polling), turns, assets,
                      workflow_routes, project_routes (the project page), project_dashboard (its overview tiles), idea_routes (its ideas board, HTTP only),
                      idea_queue (the queue's thread: starts ready ideas, night-mode caps, queue runs recorded),
-                     model_routes (the composer's model choices, a session's model), rule_routes (the human's rules),
+                     model_routes (the composer's model choices, a session's model), rule_routes (the human's rules), rule_approval_routes (an approval answered, its rule stored),
                      children (child sessions for workflow nodes),
                      preview (a project's files in a sandboxed origin), session_usage,
                      workflow_usage, context_view and insight (display-ready token figures: the UI computes none)
   cli/               terminal adapter: commands, transcript
 crates/backlog/     the ideas backlog, a crate of its own and fennec-free, no I/O: its events folded, the queue
                      order, the night-mode caps, an idea's status, stage and next action, a run's summary
-crates/rules/       the human's rules, a crate of its own and fennec-free, no I/O: a rule (scope, target, action),
-                     the command pattern and the quote-aware splitter that matches it, which rule wins
 crates/rules/       the human's rules, a crate of its own and fennec-free: the model, the command and path matchers,
                      the decision (block > allow > ask, narrowest scope), its SQLite store `rules.db` (`FENNEC_RULES_DB`)
 crates/token-usage/ the usage ledger, a crate of its own and fennec-free (calls, tokens, speed, savings;
@@ -291,7 +293,7 @@ docs/dogfooding.md the frictions met while fennec builds fennec, and their statu
    pattern where none existed (the review gate is to catch it). The human's rules are
    kernel code too; command rules match parsed tokens, so `eval`, a variable (`$X -rf`) or
    a script written then run slips past them: a guard rail, the sandbox stays the wall. A file
-   tool outside the workdir needs an allow rule; the sandbox does not read the rules (it still hides
+   tool outside the workdir needs an allow rule or the human's approval; the sandbox does not read the rules (it still hides
    `~/.ssh` from commands).
 
 ## Build, test, run
