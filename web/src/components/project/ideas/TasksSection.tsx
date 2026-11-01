@@ -10,7 +10,7 @@ import { TasksOverview } from './TasksOverview';
 import { QueueBar } from './QueueBar';
 import { StageGroup } from './StageGroup';
 import { DoneTable } from './DoneTable';
-import { AddIdeaField } from './AddIdeaField';
+import { NewIdeaDialog } from './NewIdeaDialog';
 import { Button } from '../../ui/Button';
 import { CloseIcon, PlusIcon } from '../../Icons';
 import {
@@ -71,8 +71,8 @@ export function TasksSection({
   const [board, setBoard] = useState<IdeaBoard | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  // The add field stays folded until asked for.
-  const [adding, setAdding] = useState(false);
+  // The add dialog stays closed until asked for.
+  const [newIdeaOpen, setNewIdeaOpen] = useState(false);
 
   // Every user action goes through this one path so failures are visible.
   const run = useCallback(async (action: () => Promise<IdeaBoard>) => {
@@ -245,27 +245,20 @@ export function TasksSection({
               value={backlogView}
               onChange={(view) => onSelectSub(view as BacklogView)}
             />
-            {adding ? null : (
-              <div className="ml-auto">
-                <Button
-                  variant="soft"
-                  size="sm"
-                  iconOnly
-                  title="Ajouter une idée"
-                  aria-label="Ajouter une idée"
-                  onClick={() => setAdding(true)}
-                >
-                  <PlusIcon className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
+            <div className="ml-auto">
+              <Button
+                variant="secondary"
+                size="sm"
+                title="Ajouter une idée au backlog"
+                onClick={() => setNewIdeaOpen(true)}
+              >
+                <PlusIcon className="h-4 w-4" />
+                Nouvelle idée
+              </Button>
+            </div>
           </div>
 
-          {adding ? (
-            <AddIdeaField projectId={projectId} run={run} onClose={() => setAdding(false)} />
-          ) : null}
-
-          {backlogView === 'backlog' && drafts.length === 0 && !adding ? (
+          {backlogView === 'backlog' && drafts.length === 0 ? (
             <p className="m-0 text-sm text-muted">Aucune idée en attente de cadrage.</p>
           ) : null}
           {backlogView === 'ready' && queue.length === 0 ? (
@@ -303,6 +296,13 @@ export function TasksSection({
           ) : null}
         </div>
       ) : null}
+
+      <NewIdeaDialog
+        projectId={projectId}
+        open={newIdeaOpen}
+        run={run}
+        onClose={() => setNewIdeaOpen(false)}
+      />
     </section>
   );
 }
