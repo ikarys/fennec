@@ -17,6 +17,7 @@ use crate::agents;
 use crate::domain::agent::{
     resolve as agent_resolve, resolve_mode as agent_resolve_mode, switch_to,
 };
+use crate::domain::agents_md;
 use crate::domain::attachment::{Attachment, from_data_url};
 use crate::domain::audit;
 use crate::domain::conversation::{first_request, last_assistant_text};
@@ -27,6 +28,7 @@ use crate::domain::project::{Project, SessionSummary};
 use crate::domain::replay::replayable;
 use crate::domain::session_skills::missed_always_on;
 use crate::domain::slash::{TurnInput, commands, resolve};
+use crate::domain::task_proposal;
 use crate::domain::vision::seen_images;
 use crate::domain::workflow::run::Waiting;
 use crate::notifier::NotifyingLog;
@@ -297,6 +299,16 @@ pub(super) fn get_session(app: &App, stream: &mut TcpStream, id: &str) -> Result
         audit_json["taken"] = json!(audit::taken(&events));
     }
     v["audit"] = audit_json;
+    // The agent's proposed tasks, with the idea id if the human accepted one.
+    v["proposedTasks"] = json!(task_proposal::proposed_tasks(&events));
+    // The last answer's AGENTS.md draft, if any, and whether the file exists / was written.
+    v["agentsMdDraft"] = match agents_md::draft(&last_assistant_text(&events)) {
+        Some(_) => json!({
+            "exists": Path::new(&p.workdir).join("AGENTS.md").exists(),
+            "written": agents_md::written_since_last_answer(&events),
+        }),
+        None => Value::Null,
+    };
     v["worktree"] = match app.place(&store, &s, &p)?.worktree {
         Some(wt) => json!({
             "path": wt.path, "branch": wt.branch, "base": wt.base,
