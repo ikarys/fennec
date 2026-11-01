@@ -16,8 +16,8 @@ import { SectionLabel } from '../ui/SectionLabel';
 type BlockerKind = Blocker['kind'];
 
 // These blockers cannot be fixed by an acceptance: the merge has nothing to
-// do, or it cannot succeed.
-const neverAcknowledged = (kind: string) => kind === 'noCommits' || kind === 'conflict';
+// do, it cannot succeed, or it would overwrite the human's uncommitted work.
+const neverAcknowledged = (kind: string) => kind === 'noCommits' || kind === 'conflict' || kind === 'localChanges';
 
 // `protected` has its own badge, shown before these.
 const SIGNAL_LABEL: Record<Exclude<ReviewSignal, 'protected'>, { label: string; tone: BadgeTone; title: string }> = {
@@ -156,7 +156,7 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
   const hasCommits = (preview?.commits.length ?? 0) > 0;
   const hasUncheckedBlocker =
     preview?.blockers.some(
-      (blocker) => blocker.kind === 'conflict' || (!neverAcknowledged(blocker.kind) && !acknowledged[blocker.kind]),
+      (blocker) => blocker.kind === 'conflict' || blocker.kind === 'localChanges' || (!neverAcknowledged(blocker.kind) && !acknowledged[blocker.kind]),
     ) ?? false;
   const integrateDisabled =
     loading || posting || (result === null && (!hasCommits || hasUncheckedBlocker || message.trim() === ''));

@@ -1,13 +1,15 @@
 import type { RunView } from "../../lib/workflowRun";
 import { Button } from "../ui/Button";
 
-/** Above the composer, where the eyes are during a run: says a turn is going on, and which node;
- * holds the auto-scroll switch. */
+/** Above the composer, where the eyes are: holds the auto-scroll switch, always; during a run,
+ * also says a turn is going on, and which node. */
 export function RunningStrip({
+  running,
   run,
   following,
   onFollowChange,
 }: {
+  running: boolean;
   run: RunView | undefined;
   following: boolean;
   onFollowChange: (on: boolean) => void;
@@ -21,21 +23,25 @@ export function RunningStrip({
       className="mx-auto flex w-full max-w-[960px] items-center gap-2 px-1 pb-1.5 text-xs text-muted"
       role="status"
     >
-      <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-accent" />
-      {node ? (
+      {running && (
         <>
-          <span className="truncate">
-            Workflow en cours · <span className="text-text">{node.label}</span>
-            {node.pass > 1 && ` (passe ${node.pass})`}
-          </span>
-          {run?.pauseRequested && (
-            <span className="shrink-0 text-text">
-              Pause demandée · arrêt après cette étape
-            </span>
+          <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-accent" />
+          {node ? (
+            <>
+              <span className="truncate">
+                Workflow en cours · <span className="text-text">{node.label}</span>
+                {node.pass > 1 && ` (passe ${node.pass})`}
+              </span>
+              {run?.pauseRequested && (
+                <span className="shrink-0 text-text">
+                  Pause demandée · arrêt après cette étape
+                </span>
+              )}
+            </>
+          ) : (
+            <span>L'agent travaille…</span>
           )}
         </>
-      ) : (
-        <span>L'agent travaille…</span>
       )}
       <Button
         variant={following ? "secondary" : "ghost"}
