@@ -153,6 +153,9 @@ impl Transcript {
             | Event::RuleApprovalAnswered { .. }
             | Event::WaiverRequested { .. }
             | Event::WaiverAnswered { .. }
+            | Event::QueueAdded { .. }
+            | Event::QueueDrained { .. }
+            | Event::QueueCancelled { .. }
             | Event::AgentsMdWritten { .. }
             | Event::WorktreeDiscarded { .. } => Ok(()),
         };

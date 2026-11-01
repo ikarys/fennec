@@ -429,7 +429,11 @@ pub(super) fn run_top_level_agent_loop(
                     Some(started.elapsed()),
                 );
             }
-            Flow::Continue => {}
+            Flow::Continue => {
+                // A message typed while the turn ran is dropped in here, after
+                // the tools: append-only, so the prompt cache prefix is kept.
+                super::queue::drain(turn)?;
+            }
         }
     }
 
@@ -674,6 +678,75 @@ mod tests {
         let msgs = fold_messages(&events);
         assert_eq!(msgs.last().unwrap()["content"], "done");
         assert_eq!(msgs[3]["role"], "tool");
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn queued_message_is_drained_between_tool_rounds() {
+        let dir = scratch_dir();
+        let call = ToolCall {
+            id: "c1".into(),
+            name: "write_file".into(),
+            arguments: json!({"path": "hello.txt", "content": "hi"}),
+            parse_error: None,
+            raw_arguments: None,
+        };
+        let model = Scripted(RefCell::new(vec![
+            reply("", vec![call]),
+            reply("done", vec![]),
+        ]));
+        let stop = AtomicBool::new(false);
+        let mut harness = Harness::new(Box::new(model), dir.clone(), &stop);
+        let queue_id = new_id();
+        harness
+            .log
+            .append(
+                "s",
+                &Event::QueueAdded {
+                    queue_id: queue_id.clone(),
+                    mode: crate::domain::event::QueueMode::Asap,
+                    content: "queued".into(),
+                    queued_at: 1,
+                },
+            )
+            .unwrap();
+
+        let reason = run_turn(&mut harness.turn(), "prompt", &[]).unwrap();
+        let events = harness.log.events("s").unwrap();
+        assert_eq!(reason, DoneReason::Complete);
+
+        let tool_result = events
+            .iter()
+            .position(|e| matches!(e, Event::ToolResult { .. }))
+            .unwrap();
+        let queued_start = events
+            .iter()
+            .position(|e| {
+                matches!(
+                    e,
+                    Event::MessageStart {
+                        role: Role::User,
+                        content: Some(content),
+                        ..
+                    } if content == "queued"
+                )
+            })
+            .unwrap();
+        let drained = events
+            .iter()
+            .position(|e| matches!(e, Event::QueueDrained { queue_id: id } if id == &queue_id))
+            .unwrap();
+        // The next round's answer comes after the queued message.
+        assert!(events[drained..].iter().any(|e| matches!(
+            e,
+            Event::MessageStart {
+                role: Role::Assistant,
+                ..
+            }
+        )));
+
+        assert!(tool_result < queued_start);
+        assert!(queued_start < drained);
         std::fs::remove_dir_all(dir).ok();
     }
 

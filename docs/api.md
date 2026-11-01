@@ -51,6 +51,9 @@ with camelCase fields.
 | `rule.approval_answered` | `{callId, choice, ruleId}`: the human's answer (`once`/`session`/`always`/`never`), `ruleId` the rule it stored (null for `once`); fennec then appends the call's `tool.result` (run, or refused for `never`) and the turn goes on |
 | `waiver.requested` | `{callId, path, reason}`: the agent's `request_waiver`: it asks the human to waive the protection of one project file; the call stays open, no `tool.result`, and the turn ends `waiting_for_user` (refused at once while the human is away) |
 | `waiver.answered` | `{callId, granted, expiresAt, adr}`: the human's answer, recorded at the click; a grant exempts exactly `path` from protection (file tools and sandbox) in this session until `expiresAt` (ms), and `adr` is the MADR file written for it (`docs/adr/NNNN-waiver-<slug>.md` in the session's workdir); fennec then appends the call's `tool.result` and the turn goes on |
+| `queue.added` | `{queueId, mode, content, queuedAt}`: a message typed while a turn runs; `mode` is `asap` (openfox's `completion` is not ported); `queuedAt` is epoch ms |
+| `queue.drained` | `{queueId}`: the queued message was dropped into the running turn between tool rounds, or started the next turn; the resulting `message.start` / next job follows it in the log |
+| `queue.cancelled` | `{queueId}`: the human removed the queued message, or a stop dropped the whole queue |
 | `worktree.discarded` | `{branch, commits}`: the human discarded the session's worktree and branch; `commits` are the agent's commits that were dropped |
 | `workflow.paused` | `{runId, from, port, to}`: waiting before `to` |
 | `workflow.pause_requested` | `{runId}`: the human asked to pause at the next edge (after the current node) |
@@ -526,6 +529,14 @@ read-only. The human edits them as usual.
   a grant has no `hours` between 1 and 168. A grant writes the waiver's ADR into the
   session's workdir (refused through a symlinked `docs/` or `docs/adr`); the answer is
   recorded as `waiver.answered`, then a turn records the call's result and resumes the loop.
+- `POST /api/sessions/{id}/queue/{queueId}/cancel` `{}` → 200; 404 `no such
+  queued message` when the id is not in the session's pending queue; appends
+  `queue.cancelled`.
+- `POST /api/sessions/{id}/messages` while a turn runs: 202 `{"queued": queueId}`
+  when the message is queued; 409 `images wait for the end of the turn` with
+  attachments, or `a workflow is running in this session` while a workflow run
+  is unfinished. If the turn ended in between, the request falls through to the
+  normal start.
 - `POST /api/sessions/{id}/replay` `{messageId}` → 202; 404 if no session;
   409 if a turn is running; 400 `only a message you typed in the current
   window can be replayed` when the id is not a user-typed message in the
