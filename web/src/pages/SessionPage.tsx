@@ -11,6 +11,7 @@ import type { AssistantItem, Segment } from "../lib/fold";
 import { splitContract } from "../lib/plan";
 import {
   answerRuleApproval,
+  answerWaiver,
   answerWorkflow,
   compactSession,
   continueWorkflow,
@@ -43,6 +44,7 @@ import { ContextPanel } from "../components/session/ContextPanel";
 import { ContextGauge } from "../components/session/ContextGauge";
 import { QuestionCard } from "../components/session/QuestionCard";
 import { RuleApprovalCard } from "../components/session/RuleApprovalCard";
+import { WaiverCard } from "../components/session/WaiverCard";
 import { ThreadItemView } from "../components/session/Thread";
 import { PlanActionsContext, type PlanActions } from "../components/session/PlanActions";
 import {
@@ -597,6 +599,18 @@ export function SessionPage({
     }
   }
 
+  async function handleWaiver(hours: number | null) {
+    if (!sessionId || !view.pendingWaiver) return;
+    setSendError(null);
+    try {
+      await answerWaiver(sessionId, view.pendingWaiver.callId, hours);
+    } catch (error) {
+      setSendError(
+        error instanceof Error ? error.message : "Erreur lors de la dérogation",
+      );
+    }
+  }
+
   return (
     <PreviewContext.Provider value={setPreview}>
       <PreviewWorkdirContext.Provider value={detail?.project.workdir}>
@@ -741,6 +755,16 @@ export function SessionPage({
                         <RuleApprovalCard
                           approval={view.pendingApproval}
                           onAnswer={handleApproval}
+                          disabled={running}
+                        />
+                      )}
+                    {view.pendingWaiver &&
+                      !running &&
+                      !waiting &&
+                      !detail?.parentId && (
+                        <WaiverCard
+                          waiver={view.pendingWaiver}
+                          onAnswer={handleWaiver}
                           disabled={running}
                         />
                       )}
