@@ -15,6 +15,44 @@ pub fn title(text: &str, plan: Option<&str>) -> String {
     finalize(candidate)
 }
 
+/// What a list row shows under the title: the text minus the sentence the title took, or all of it when the title comes from the plan. Whitespace is collapsed.
+pub fn description(text: &str, plan: Option<&str>) -> String {
+    if plan_title(plan).is_some() {
+        return collapse_whitespace(text);
+    }
+
+    let line = first_text_line(text);
+    let sentence = collapse_whitespace(&first_sentence(&line));
+    let full = collapse_whitespace(text);
+    let rest = match full.strip_prefix(&sentence) {
+        Some(rest) => rest,
+        None => return String::new(),
+    };
+    let rest = rest.trim_start_matches(|c: char| {
+        matches!(c, ' ' | '.' | ',' | ';' | ':' | '!' | '?' | '-' | '—')
+    });
+    rest.trim().to_string()
+}
+
+fn collapse_whitespace(s: &str) -> String {
+    let mut out = String::new();
+    let mut prev_space = false;
+
+    for c in s.chars() {
+        if c.is_whitespace() {
+            if !prev_space && !out.is_empty() {
+                out.push(' ');
+                prev_space = true;
+            }
+        } else {
+            out.push(c);
+            prev_space = false;
+        }
+    }
+
+    out.trim().to_string()
+}
+
 fn plan_title(plan: Option<&str>) -> Option<String> {
     let plan = plan?;
     let mut last = None;
@@ -183,5 +221,26 @@ mod tests {
     #[test]
     fn empty_input_is_empty() {
         assert_eq!(title("", None), "");
+    }
+
+    #[test]
+    fn description_drops_first_sentence() {
+        assert_eq!(
+            description("Hello wide world. Second part here.", None),
+            "Second part here."
+        );
+    }
+
+    #[test]
+    fn description_single_sentence_is_empty() {
+        assert_eq!(description("Hello wide world.", None), "");
+    }
+
+    #[test]
+    fn description_with_plan_returns_collapsed_text() {
+        assert_eq!(
+            description("Do  the\nthing", Some("## Plan: X\n")),
+            "Do the thing"
+        );
     }
 }
