@@ -13,6 +13,13 @@ export function formatRelative(ms: number): string {
   return new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' }).format(new Date(ms));
 }
 
+/** A calendar date as YYYY/MM/DD, local time. */
+export function formatDate(ms: number): string {
+  const d = new Date(ms);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())}`;
+}
+
 export function formatDuration(ms?: number): string {
   if (ms == null) return '';
   if (ms < 1000) return `${ms} ms`;

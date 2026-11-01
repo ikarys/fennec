@@ -9,7 +9,6 @@ import { Segmented } from '../../ui/Segmented';
 import { TasksOverview } from './TasksOverview';
 import { QueueBar } from './QueueBar';
 import { StageGroup } from './StageGroup';
-import { DoneTable } from './DoneTable';
 import { NewIdeaDialog } from './NewIdeaDialog';
 import { Button } from '../../ui/Button';
 import { CloseIcon, PlusIcon } from '../../Icons';
@@ -292,7 +291,20 @@ export function TasksSection({
           ) : null}
 
           {backlogView === 'done' ? (
-            <DoneTable ideas={done} onOpenSession={onOpenSession} />
+            done.length > 0 ? (
+              <StageGroup
+                stage="done"
+                ideas={done}
+                projectId={projectId}
+                onFrame={runFrame}
+                onOpenSession={onOpenSession}
+                run={run}
+                caps={board.queue.caps}
+                showLabel={false}
+              />
+            ) : (
+              <p className="m-0 text-sm text-muted">Aucune tâche terminée.</p>
+            )
           ) : null}
         </div>
       ) : null}
