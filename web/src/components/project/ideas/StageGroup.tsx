@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Card } from '../../ui/Card';
 import { SectionLabel } from '../../ui/SectionLabel';
 import { IdeaRow } from './IdeaRow';
+import { ReadyCard } from './ReadyCard';
 import {
   reorderIdeas,
   type IdeaBoard,
@@ -58,7 +59,8 @@ export function StageGroup({
     await run(() => reorderIdeas(projectId, ids));
   };
 
-  // The stages that need the human or show live work stand apart from the flat lists.
+  // The stages that need the human stand apart from the flat lists; the
+  // queue renders its own cards, so it stays a flat section.
   const highlighted = stage === 'yours' || stage === 'running';
 
   const content = (
@@ -68,45 +70,61 @@ export function StageGroup({
       ) : null}
       <div
         className={
-          showLabel && !highlighted ? 'mt-2 flex flex-col gap-1' : 'flex flex-col gap-1'
+          stage === 'queue'
+            ? 'flex flex-col gap-2'
+            : showLabel && !highlighted
+              ? 'mt-2 flex flex-col gap-1'
+              : 'flex flex-col gap-1'
         }
       >
         {stage === 'queue' && ideas.length === 0 ? (
           <p className="m-0 text-sm text-muted">Aucune tâche prête : cadre une idée du backlog.</p>
         ) : null}
-        {ideas.map((idea, index) => (
-          <IdeaRow
-            key={idea.id}
-            idea={idea}
-            projectId={projectId}
-            onFrame={onFrame}
-            onOpenSession={onOpenSession}
-            run={run}
-            caps={caps}
-            position={stage === 'queue' ? idea.position : null}
-            reorder={
-              stage === 'queue' && ideas.length > 1
-                ? {
-                    onDragStart: () => setDragFrom(index),
-                    onDragOver: () => setDragOver(index),
-                    onDrop: () => {
-                      if (dragFrom != null) void move(dragFrom, index);
-                      setDragFrom(null);
-                      setDragOver(null);
-                    },
-                    onDragEnd: () => {
-                      setDragFrom(null);
-                      setDragOver(null);
-                    },
-                    onKeyMove: (d: -1 | 1) => void move(index, index + d),
-                    dragging: dragFrom === index,
-                    over:
-                      dragOver === index && dragFrom !== null && dragFrom !== index,
-                  }
-                : null
-            }
-          />
-        ))}
+        {ideas.map((idea, index) => {
+          const reorder =
+            stage === 'queue' && ideas.length > 1
+              ? {
+                  onDragStart: () => setDragFrom(index),
+                  onDragOver: () => setDragOver(index),
+                  onDrop: () => {
+                    if (dragFrom != null) void move(dragFrom, index);
+                    setDragFrom(null);
+                    setDragOver(null);
+                  },
+                  onDragEnd: () => {
+                    setDragFrom(null);
+                    setDragOver(null);
+                  },
+                  onKeyMove: (d: -1 | 1) => void move(index, index + d),
+                  dragging: dragFrom === index,
+                  over:
+                    dragOver === index && dragFrom !== null && dragFrom !== index,
+                }
+              : null;
+          return stage === 'queue' && reorder ? (
+            <ReadyCard
+              key={idea.id}
+              idea={idea}
+              projectId={projectId}
+              onOpenSession={onOpenSession}
+              run={run}
+              position={idea.position}
+              reorder={reorder}
+            />
+          ) : (
+            <IdeaRow
+              key={idea.id}
+              idea={idea}
+              projectId={projectId}
+              onFrame={onFrame}
+              onOpenSession={onOpenSession}
+              run={run}
+              caps={caps}
+              position={stage === 'queue' ? idea.position : null}
+              reorder={reorder}
+            />
+          );
+        })}
       </div>
     </>
   );

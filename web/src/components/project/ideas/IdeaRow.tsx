@@ -1,5 +1,6 @@
 /**
- * One idea in the board: text, status, meta, one primary action, and a ⋯ menu.
+ * One idea in the board: title, the rest of its text, status, meta, one
+ * primary action, and a ⋯ menu.
  */
 import { useState } from 'react';
 import { Button } from '../../ui/Button';
@@ -16,6 +17,7 @@ import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { Menu, MenuItem } from '../../ui/Menu';
 import { IdeaStatusBadge } from './IdeaStatusBadge';
 import { IdeaMeta } from './IdeaMeta';
+import { formatRelative } from '../../../lib/format';
 import {
   completeIdea,
   dropIdea,
@@ -148,6 +150,11 @@ export function IdeaRow({
     );
   };
 
+  // The title is the text's first sentence; the row shows what is left.
+  const description = idea.text.startsWith(idea.title)
+    ? idea.text.slice(idea.title.length).replace(/^[\s.,;:]+/, '').trim()
+    : '';
+
   return (
     <div
       className={[
@@ -218,6 +225,11 @@ export function IdeaRow({
         <p className="m-0 truncate text-sm text-text" title={idea.text}>
           {idea.title}
         </p>
+        {description ? (
+          <p className="m-0 truncate text-xs text-faint" title={description}>
+            {description}
+          </p>
+        ) : null}
         {idea.attachments.length > 0 ? (
           <div className="mt-1.5 flex flex-wrap gap-1">
             {idea.attachments.map((attachment, i) =>
@@ -252,6 +264,10 @@ export function IdeaRow({
           </div>
         ) : null}
       </div>
+
+      <span className="shrink-0 font-mono text-xs text-faint">
+        {formatRelative(idea.createdAt)}
+      </span>
 
       <div className="flex shrink-0 items-center gap-1">
         {renderAction()}
