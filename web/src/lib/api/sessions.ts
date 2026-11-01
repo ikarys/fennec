@@ -58,6 +58,8 @@ export interface SessionDetail {
     branch: string;
     base: string;
     /** Opens the copy in VS Code (through the WSL remote under WSL). */ editorUrl: string;
+    /** The agent's commits past the base: 0 when there is nothing to integrate. */
+    commits: number;
   } | null;
   project: {
     id: string;
