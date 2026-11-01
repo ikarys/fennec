@@ -69,6 +69,8 @@ Integration, done: an "Intégrer" button runs the cherry-pick of a session's
 worktree branch into the human's repository, on the human's click only, after
 a review gate (commits, files, criteria, protected files touched) whose
 blockers the human must accept one by one (`integration.applied` records it).
+Its commit message starts from an English Conventional subject the model proposes (indicative,
+`domain/commit_subject.rs`), never over the human's edit.
 Decision registry, done: `record_decision` (the turn goes on) records a choice, its reason
 and the alternatives as `decision.recorded`; a "Décisions" block in the context panel.
 Protected tests, done: an unchecked "Protéger les tests intégrés" box in the
@@ -197,6 +199,7 @@ crates/fennec/src/
     test_files.rs      which paths are tests; the lines an integration appends to `.agents/protected`
     integration.rs     the review gate: what blocks an integration until the human accepts it
     diff.rs            the lines a unified diff adds and removes
+    commit_subject.rs  the integration's commit subject the model proposes: its prompt, its answer checked
     bypass.rs          what silences a gate: suppression markers added, tests or assertions removed
     adr.rs             architecture decision records: a MADR file read (number, title, status, date)
     module_map.rs      the project map: modules, their dependencies from the imports, their layout
