@@ -22,15 +22,14 @@ pub(super) const INTERRUPTED_ERROR: &str = "Tool execution was interrupted by us
 const AWAY_ANSWER: &str = "The human is away (autonomous run) and cannot answer. Decide yourself, choosing the safest option that stays within the approved plan, record the question and your choice with record_decision, and continue.";
 /// `propose_criteria`'s result while the human is away.
 const AWAY_CRITERIA: &str = "The human is away (autonomous run): the criteria stay as approved. Record your proposed change with record_decision for the human to review, and continue against the current criteria.";
-const NOT_RUN_AFTER_ASK: &str =
-    "Not run: the turn paused at ask_user. Call it again after the answer if it is still needed.";
+const NOT_RUN_AFTER_ASK: &str = "Not run: the turn paused for the human (a question or an approval). Call it again after the answer if it is still needed.";
 
 pub(super) enum Flow {
     Continue,
     WaitingForUser,
 }
 
-fn record(
+pub(super) fn record(
     turn: &mut Turn,
     message_id: &str,
     call: &ToolCall,
@@ -41,6 +40,42 @@ fn record(
         tool_call_id: call.id.clone(),
         result,
     })
+}
+
+/// Runs one call, streaming its output to the log; `approved` is the human's
+/// "once" for a call fennec paused.
+pub(super) fn run_tool(
+    turn: &mut Turn,
+    agent: &AgentDefinition,
+    message_id: &str,
+    call: &ToolCall,
+    approved: bool,
+) -> Result<ToolResult, String> {
+    let tools = turn.tools;
+    let stop = turn.stop;
+    let mut log_error = None;
+    let mut on_output = |stream, chunk: &str| {
+        if log_error.is_none() {
+            log_error = turn
+                .append(Event::ToolOutput {
+                    message_id: message_id.into(),
+                    tool_call_id: call.id.clone(),
+                    stream,
+                    content: chunk.into(),
+                })
+                .err();
+        }
+    };
+    let (name, args, access) = (&call.name, &call.arguments, agent.commands);
+    let result = if approved {
+        tools.execute_approved(name, args, access, stop, &mut on_output)
+    } else {
+        tools.execute(name, args, access, stop, &mut on_output)
+    };
+    match log_error {
+        Some(e) => Err(e),
+        None => Ok(result),
+    }
 }
 
 /// Port of openfox `executeTools`, sequential for now.
@@ -200,34 +235,19 @@ pub(super) fn execute_tools(
         // The human's rules run before the tool: the model's call never reaches it.
         let tools = turn.tools;
         let check = tools.check_rules(&call.name, &call.arguments);
+        if !turn.autonomous
+            && let rules::Decision::Ask(rule) = check.decision
+        {
+            turn.append(rule_check::approval(&call.id, rule, &check))?;
+            waiting = true; // no result: the human's answer will produce it
+            continue;
+        }
         if let Some(rule) = rule_check::refusal(&check) {
             turn.append(rule_check::event(&call.id, rule, &check.subject))?;
             record(turn, message_id, call, ToolResult::failure(rule.refusal()))?;
             continue;
         }
-        let stop = turn.stop;
-        let mut log_error = None;
-        let r = tools.execute(
-            &call.name,
-            &call.arguments,
-            agent.commands,
-            stop,
-            &mut |stream, chunk| {
-                if log_error.is_none() {
-                    log_error = turn
-                        .append(Event::ToolOutput {
-                            message_id: message_id.into(),
-                            tool_call_id: call.id.clone(),
-                            stream,
-                            content: chunk.into(),
-                        })
-                        .err();
-                }
-            },
-        );
-        if let Some(e) = log_error {
-            return Err(e);
-        }
+        let r = run_tool(turn, agent, message_id, call, false)?;
         record(turn, message_id, call, r)?;
     }
     Ok(if waiting {

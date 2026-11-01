@@ -33,6 +33,7 @@ pub mod protection;
 pub mod replay;
 pub mod review_map;
 pub mod risk;
+pub mod rule_approval;
 pub mod scanner;
 pub mod server;
 pub mod session_name;
