@@ -33,6 +33,20 @@ pub(super) fn answer_rule_approval(
         return error(stream, 409, "no pending approval for this call");
     };
 
+    // Recompute the offered folders from the pending request so the client cannot
+    // answer with a folder the server did not offer.
+    let chosen_pattern = body["pattern"].as_str().map(str::to_string);
+    if let Some(chosen) = &chosen_pattern {
+        let allowed = pending.kind == "path"
+            && rules::broader_folders(&pending.pattern)
+                .iter()
+                .any(|folder| folder.as_str() == chosen.as_str());
+        if !allowed {
+            return error(stream, 400, "pattern is not a folder above the asked path");
+        }
+    }
+    let pattern = chosen_pattern.unwrap_or_else(|| pending.pattern.clone());
+
     // What the answer stores: nothing for "once", a session grant, or a project rule.
     let stored = match choice {
         Choice::Once => None,
@@ -51,7 +65,7 @@ pub(super) fn answer_rule_approval(
             let new_rule = NewRule {
                 scope,
                 kind,
-                pattern: pending.pattern.clone(),
+                pattern: pattern.clone(),
                 access: pending.access.as_deref().and_then(Access::parse),
                 action,
                 note: None,

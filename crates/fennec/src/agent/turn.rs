@@ -42,6 +42,7 @@ use crate::domain::open_calls;
 use crate::domain::preferences::ReasoningEffort;
 use crate::domain::replay::replayable;
 use crate::domain::skill::Skill;
+use crate::domain::workdir_notice;
 use serde_json::Value;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -157,6 +158,7 @@ pub(super) fn answer_or_prompt(
     // tool message. When the open call awaits an answer, the human's
     // input *is* that answer, so no user message is appended on top of it.
     let answered = close_open_calls(turn, prompt)?;
+    ensure_workdir_notice(turn)?;
     ensure_agent_reminder(turn, agent)?;
     if !answered {
         turn.append_user(prompt, false, None, attachments.to_vec())?;
@@ -291,6 +293,15 @@ fn close_open_calls(turn: &mut Turn, prompt: &str) -> Result<bool, String> {
         })?;
     }
     Ok(answered)
+}
+
+/// Tells the model its working directory moved (a workflow opened the
+/// session's worktree after the prompt was frozen): the prompt only grows.
+fn ensure_workdir_notice(turn: &mut Turn) -> Result<(), String> {
+    match workdir_notice::needed(&turn.log.events(turn.session_id)?, turn.workdir) {
+        Some(notice) => turn.append_user(&notice, true, None, Vec::new()),
+        None => Ok(()),
+    }
 }
 
 /// Injects the agent's definition when the last reminder in the model's
@@ -490,6 +501,7 @@ pub fn run_agent_node(turn: &mut Turn, agent_id: &str, prompt: &str) -> Result<D
         })?;
     }
 
+    ensure_workdir_notice(turn)?;
     ensure_agent_reminder(turn, agent)?;
     turn.append_user(prompt, true, None, Vec::new())?;
     run_top_level_agent_loop(turn, agent)

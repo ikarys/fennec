@@ -118,6 +118,8 @@ export interface PendingApproval {
   kind: 'command' | 'tool' | 'path';
   pattern: string;
   access: 'read' | 'write' | 'readWrite' | null;
+  /** The folders the human may grant instead of `pattern`, narrowest first. */
+  folders: string[];
 }
 
 export interface PendingWaiver {
@@ -568,7 +570,8 @@ export function createThreadFold(): ThreadFold {
           subject,
           kind,
           pattern: String(data.pattern ?? ''),
-          access
+          access,
+          folders: Array.isArray(data.folders) ? data.folders.map(String) : []
         };
         const tool = tools.get(callId);
         if (tool) tool.awaitingApproval = true;

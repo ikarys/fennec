@@ -11,7 +11,7 @@ pub mod path;
 mod rule;
 mod store;
 
-pub use answer::{Proposal, proposal};
+pub use answer::{Proposal, broader_folders, proposal};
 pub use command::{CommandPattern, PatternError, segments};
 pub use decide::{Decision, PathRequest, Request};
 pub use rule::{
