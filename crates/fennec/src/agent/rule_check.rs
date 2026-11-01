@@ -28,6 +28,11 @@ pub(super) fn approval(call_id: &str, rule: Option<&Rule>, check: &RuleCheck) ->
         ),
         None => ("tool".to_string(), check.subject.clone(), None),
     };
+    let folders = if kind == "path" {
+        rules::broader_folders(&pattern)
+    } else {
+        Vec::new()
+    };
     Event::RuleApprovalRequested {
         call_id: call_id.to_string(),
         subject: check.subject.clone(),
@@ -35,6 +40,7 @@ pub(super) fn approval(call_id: &str, rule: Option<&Rule>, check: &RuleCheck) ->
         kind,
         pattern,
         access,
+        folders,
     }
 }
 
@@ -133,7 +139,8 @@ mod tests {
                 rule_id,
                 kind,
                 pattern,
-                access
+                access,
+                ..
             } if call_id == "c1"
                 && subject == "touch made"
                 && rule_id == Some("1".into())
@@ -159,7 +166,8 @@ mod tests {
                 rule_id,
                 kind,
                 pattern,
-                access
+                access,
+                ..
             } if call_id == "c2"
                 && subject == "/outside/file"
                 && rule_id.is_none()

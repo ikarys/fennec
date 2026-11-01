@@ -590,11 +590,11 @@ export function SessionPage({
     }
   }
 
-  async function handleApproval(choice: ApprovalChoice) {
+  async function handleApproval(choice: ApprovalChoice, pattern?: string) {
     if (!sessionId || !view.pendingApproval) return;
     setSendError(null);
     try {
-      await answerRuleApproval(sessionId, view.pendingApproval.callId, choice);
+      await answerRuleApproval(sessionId, view.pendingApproval.callId, choice, pattern);
     } catch (error) {
       setSendError(
         error instanceof Error ? error.message : "Erreur lors de l’autorisation",

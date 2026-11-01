@@ -489,10 +489,16 @@ export function replayMessage(id: string, messageId: string): Promise<void> {
 
 export type ApprovalChoice = 'once' | 'session' | 'always' | 'never';
 
-export function answerRuleApproval(id: string, callId: string, choice: ApprovalChoice): Promise<void> {
+/** `pattern`: a folder from the request's `folders`, broader than the proposed one. */
+export function answerRuleApproval(
+  id: string,
+  callId: string,
+  choice: ApprovalChoice,
+  pattern?: string
+): Promise<void> {
   return request<void>(`/api/sessions/${encodeURIComponent(id)}/rule-approval`, {
     method: "POST",
-    body: JSON.stringify({ callId, choice }),
+    body: JSON.stringify({ callId, choice, pattern }),
   });
 }
 
