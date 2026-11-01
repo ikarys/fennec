@@ -1,10 +1,11 @@
-//! Architecture rules from `.agents/architecture`: two kinds. Line rules
+//! Architecture rules from `.agents/architecture`: three kinds. Line rules
 //! (`<path prefix> forbids <text>`) are checked only on the lines an
 //! integration adds, so debt already in the file never blocks the check.
 //! Module rules (`<A> never imports <B>`) are checked on the whole project
-//! map. Rules match text, not syntax (`use crate::{web}` or a `super::` path
-//! slips past line rules), so the check is a tripwire shown to the human, not
-//! a proof.
+//! map. Sensitive zones (`sensitive <pattern>`) mark paths whose change needs
+//! the human's review before integration. Rules match text, not syntax
+//! (`use crate::{web}` or a `super::` path slips past line rules), so the
+//! check is a tripwire shown to the human, not a proof.
 
 /// One `<path prefix> forbids <text>` rule.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -44,6 +45,7 @@ impl std::fmt::Display for ModuleRule {
 pub struct Rules {
     rules: Vec<Rule>,
     module_rules: Vec<ModuleRule>,
+    sensitive: Vec<String>,
 }
 
 impl Rules {
@@ -52,19 +54,37 @@ impl Rules {
         &self.module_rules
     }
 
+    /// Whether `path` is inside one of the sensitive zones.
+    ///
+    /// `path` is project-relative and `/`-separated.
+    pub fn is_sensitive(&self, path: &str) -> bool {
+        self.sensitive
+            .iter()
+            .any(|pattern| rules::path::covers(pattern, path))
+    }
+
     /// Parse the content of `.agents/architecture`.
     ///
-    /// Blank lines and `#` comments are ignored. A line containing the literal
+    /// Blank lines and `#` comments are ignored. A line starting with
+    /// `sensitive ` is a sensitive zone pattern; a line containing the literal
     /// ` never imports ` is a module rule; a line containing ` forbids ` is a
     /// line rule. Lines that do not match a shape are skipped so a malformed
     /// file never panics.
     pub fn parse(content: &str) -> Rules {
         let mut rules = Vec::new();
         let mut module_rules = Vec::new();
+        let mut sensitive = Vec::new();
 
         for line in content.lines() {
             let line = line.trim();
             if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+
+            if let Some(pattern) = line.strip_prefix("sensitive ") {
+                if let Some(p) = rules::path::normalize(pattern.trim()) {
+                    sensitive.push(p);
+                }
                 continue;
             }
 
@@ -101,6 +121,7 @@ impl Rules {
         Rules {
             rules,
             module_rules,
+            sensitive,
         }
     }
 
@@ -307,5 +328,24 @@ a never imports
         assert!(rule.matches("crates/fennec/src/domain/a", "crates/fennec/src/web/b"));
         assert!(!rule.matches("crates/fennec/src/domainx", "crates/fennec/src/web"));
         assert!(!rule.matches("crates/fennec/src/domain", "crates/fennec/src/webx"));
+    }
+
+    #[test]
+    fn parse_reads_sensitive_lines() {
+        let rules = Rules::parse("sensitive src/auth/\nsensitive *.sql\nsensitive\n");
+
+        assert_eq!(rules.sensitive.len(), 2);
+        assert!(rules.is_sensitive("src/auth/login.rs"));
+        assert!(rules.is_sensitive("db/migrate.sql"));
+    }
+
+    #[test]
+    fn sensitive_matches_dir_and_glob_patterns() {
+        let rules = Rules::parse("sensitive src/auth/\nsensitive *.sql\n");
+
+        assert!(rules.is_sensitive("src/auth/login.rs"));
+        assert!(rules.is_sensitive("db/migrate.sql"));
+        assert!(!rules.is_sensitive("src/web/login.rs"));
+        assert!(!rules.is_sensitive("db/migrate.txt"));
     }
 }

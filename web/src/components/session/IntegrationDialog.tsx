@@ -21,6 +21,11 @@ const neverAcknowledged = (kind: string) => kind === 'noCommits' || kind === 'co
 
 // `protected` has its own badge, shown before these.
 const SIGNAL_LABEL: Record<Exclude<ReviewSignal, 'protected'>, { label: string; tone: BadgeTone; title: string }> = {
+  sensitive: {
+    label: 'zone sensible',
+    tone: 'err',
+    title: 'Fichier dans une zone sensible de .agents/architecture : ta revue est obligatoire.'
+  },
   bypass: {
     label: 'contournement',
     tone: 'err',
@@ -80,6 +85,8 @@ function blockerSentence(blocker: Blocker): string {
       return 'Aucun critère : rien n\'a été vérifié.';
     case 'protectedTouched':
       return `Fichiers protégés modifiés : ${blocker.paths.join(', ')}.`;
+    case 'sensitiveTouched':
+      return `Zones sensibles modifiées, ta revue est obligatoire : ${blocker.paths.join(', ')}.`;
     case 'architectureViolated': {
       const shown = blocker.violations.slice(0, 3).map((v) => `${v.path} : « ${v.line} » (interdit : ${v.forbidden})`);
       const more = blocker.violations.length - shown.length;
