@@ -215,7 +215,7 @@ export default function ProjectPage({
             />
           ) : null}
           {activeTab === 'map' ? <MapTab projectId={projectId} /> : null}
-          {activeTab === 'risks' ? <RiskSection projectId={projectId} /> : null}
+          {activeTab === 'risks' ? <RiskSection projectId={projectId} busy={analyzing} onStart={(prompt, mode) => void startSession(prompt, mode)} /> : null}
           {activeTab === 'rules' ? <ProjectRulesSummary projectId={projectId} /> : null}
           {activeTab === 'doc' ? <DocSection projectId={projectId} /> : null}
           {activeTab === 'analyses' ? (

@@ -285,13 +285,15 @@ read-only. The human edits them as usual.
     every workflow `shell`/`criteria` command.
 - `GET /api/projects/{id}/rules` → `{rules, global}`, the project's rules and the global ones that apply to it too
   (read-only: the Settings page's "Règles" tab, `#/settings/rules`, edits them).
-- `GET /api/projects/{id}/risks` → `{files, unreviewedPercent, untested, churning, unreviewed, churnDays, zones}`, the
-  project's risk zones, read from git (verified; 404 if no project). `files` counts the tracked source files, tests
+- `GET /api/projects/{id}/risks` → `{files, unreviewedPercent, untested, churning, unreviewed, churnDays, modules, remedyPrompt}`, the
+  project's risk report, read from git (verified; 404 if no project). `files` counts the tracked source files, tests
   excluded; `unreviewedPercent` the share of their lines (git blame) from AI commits never reviewed: a commit with an
   AI `Co-Authored-By` trailer and no `Fennec-Session` trailer (written only by an integration, the human's review gate).
-  - `zones` `[{path, signals, churn, lines, unreviewedPercent}]`: the files with at least one signal, most signals
-    first, then churn; `signals` among `unreviewed` (every line from such commits), `untested` (no inline tests, no
-    test file of the same stem), `churn` (touched by 5 commits or more in the last `churnDays` days).
+  - `modules` `[{path, unreviewed, untested, churning, zones}]`: risk zones grouped by the zone file's parent directory
+    (`.` for a file at the root), riskiest module first (most total signals, then path); the counts are the number of
+    its zones carrying that signal, and `zones` keeps the report's zone order (`{path, signals, churn, lines,
+    unreviewedPercent}`, most signals first, then churn; `signals` among `unreviewed`, `untested`, `churn` as before).
+  - `remedyPrompt`: the brief the "Remédier" button sends to the `remedy` agent; empty without zones.
 - `GET /api/projects/{id}/worktrees[?fresh=1]` → `{scannedAt, totalBytes, generatedBytes, entries}`: the disk the
   project's session worktrees take, measured from disk (verified; allocated bytes, like `du`). `fresh=1` measures again,
   otherwise a scan younger than 10 minutes is reused; 404 if no project.
