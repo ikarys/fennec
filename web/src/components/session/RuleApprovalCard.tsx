@@ -2,11 +2,13 @@
  * The pending rule approval. It is rendered above the composer so the human
  * can allow or refuse the paused call with one click.
  */
+import { useState } from 'react';
 import type { PendingApproval } from '../../lib/fold';
 import type { ApprovalChoice } from '../../lib/api/sessions';
 import { shortPath } from '../../lib/shortPath';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
+import { Select } from '../ui/Field';
 
 function approvalAction(approval: PendingApproval): string {
   if (approval.kind === 'command') return 'Lancer';
@@ -16,9 +18,12 @@ function approvalAction(approval: PendingApproval): string {
   return 'Lire';
 }
 
-function sessionScope(approval: PendingApproval): { pattern: string; suffix: string | null } {
-  const pattern = approval.pattern;
-  const suffix = approval.kind === 'path' && pattern.endsWith('/') ? ' et ses sous-dossiers' : null;
+function sessionScope(
+  folder: string,
+  kind: PendingApproval['kind']
+): { pattern: string; suffix: string | null } {
+  const pattern = folder;
+  const suffix = kind === 'path' && pattern.endsWith('/') ? ' et ses sous-dossiers' : null;
   return { pattern, suffix };
 }
 
@@ -28,11 +33,18 @@ export function RuleApprovalCard({
   disabled
 }: {
   approval: PendingApproval;
-  onAnswer: (choice: ApprovalChoice) => void;
+  onAnswer: (choice: ApprovalChoice, pattern?: string) => void;
   disabled: boolean;
 }) {
+  const [folder, setFolder] = useState(approval.pattern);
+  const [forCall, setForCall] = useState(approval.callId);
+  if (forCall !== approval.callId) {
+    setForCall(approval.callId);
+    setFolder(approval.pattern);
+  }
+
   const action = approvalAction(approval);
-  const scope = sessionScope(approval);
+  const scope = sessionScope(folder, approval.kind);
 
   return (
     <div className="px-6 py-2">
@@ -44,6 +56,22 @@ export function RuleApprovalCard({
             {approval.kind === 'path' ? shortPath(approval.subject) : approval.subject}
           </span>
           <div className="ml-auto flex flex-wrap items-center gap-1.5">
+            {approval.folders.length > 1 && (
+              <Select
+                aria-label="Dossier accordé par Session, Toujours ou Jamais"
+                title="Dossier accordé par Session, Toujours ou Jamais"
+                className="font-mono text-xs"
+                disabled={disabled}
+                value={folder}
+                onChange={(event) => setFolder(event.target.value)}
+              >
+                {approval.folders.map((candidate) => (
+                  <option key={candidate} value={candidate}>
+                    {shortPath(candidate)}
+                  </option>
+                ))}
+              </Select>
+            )}
             <Button
               type="button"
               variant="primary"
@@ -60,7 +88,9 @@ export function RuleApprovalCard({
               size="sm"
               disabled={disabled}
               title={`Pour cette session : ${scope.pattern}${scope.suffix ?? ''}`}
-              onClick={() => onAnswer('session')}
+              onClick={() =>
+                onAnswer('session', folder !== approval.pattern ? folder : undefined)
+              }
             >
               Session
             </Button>
@@ -70,7 +100,9 @@ export function RuleApprovalCard({
               size="sm"
               disabled={disabled}
               title="Règle du projet, visible et supprimable dans Réglages › Règles"
-              onClick={() => onAnswer('always')}
+              onClick={() =>
+                onAnswer('always', folder !== approval.pattern ? folder : undefined)
+              }
             >
               Toujours
             </Button>
@@ -80,7 +112,9 @@ export function RuleApprovalCard({
               size="sm"
               disabled={disabled}
               title="Refuser et créer une règle du projet (Réglages › Règles)"
-              onClick={() => onAnswer('never')}
+              onClick={() =>
+                onAnswer('never', folder !== approval.pattern ? folder : undefined)
+              }
             >
               Jamais
             </Button>

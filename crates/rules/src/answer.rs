@@ -87,10 +87,76 @@ fn absolute_parent(absolute: &str) -> String {
     }
 }
 
+/// The folders a human may grant instead of a proposed folder pattern: the
+/// pattern itself, then each ancestor, narrowest first. A file pattern has no
+/// broader choice.
+pub fn broader_folders(pattern: &str) -> Vec<String> {
+    let mut folders = vec![pattern.to_string()];
+    if !pattern.ends_with('/') {
+        return folders;
+    }
+
+    let mut current = pattern.to_string();
+    while let Some(ancestor) = parent_folder(&current) {
+        current = ancestor.to_string();
+        folders.push(current.clone());
+    }
+    folders
+}
+
+fn parent_folder(folder: &str) -> Option<&str> {
+    // Keep the trailing slash so every offered choice stays a folder pattern.
+    let prefix = folder.strip_suffix('/')?;
+    let position = prefix.rfind('/')?;
+    let ancestor = &folder[..=position];
+    // The roots would match almost everything, so they are never offered as a broader choice.
+    if ancestor == "/" || ancestor == "~/" || ancestor == "./" {
+        return None;
+    }
+    Some(ancestor)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::decide::PathRequest;
+
+    #[test]
+    fn broader_folders_returns_ancestors_narrowest_first() {
+        assert_eq!(
+            broader_folders("~/workspace/fennec/web/src/lib/"),
+            vec![
+                "~/workspace/fennec/web/src/lib/",
+                "~/workspace/fennec/web/src/",
+                "~/workspace/fennec/web/",
+                "~/workspace/fennec/",
+                "~/workspace/",
+            ]
+        );
+    }
+
+    #[test]
+    fn broader_folders_stops_before_absolute_root() {
+        assert_eq!(
+            broader_folders("/opt/a/b/"),
+            vec!["/opt/a/b/", "/opt/a/", "/opt/"]
+        );
+    }
+
+    #[test]
+    fn broader_folders_stops_before_relative_root() {
+        assert_eq!(broader_folders("src/lib/"), vec!["src/lib/", "src/"]);
+        assert_eq!(broader_folders("src/"), vec!["src/"]);
+    }
+
+    #[test]
+    fn broader_folders_for_non_folder_returns_self() {
+        assert_eq!(
+            broader_folders("src/lib/file.txt"),
+            vec!["src/lib/file.txt"]
+        );
+        assert_eq!(broader_folders("."), vec!["."]);
+    }
 
     #[test]
     fn tool_proposal() {
