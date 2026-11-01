@@ -1,5 +1,5 @@
 import { Segmented } from '../ui/Segmented';
-import type { Agent } from '../../lib/api';
+import type { Agent, AgentPhase } from '../../lib/api';
 
 interface ModePickerProps {
   agents: Agent[];
@@ -8,9 +8,39 @@ interface ModePickerProps {
   disabled?: boolean;
 }
 
+const PHASE_LABELS: Record<AgentPhase, string> = {
+  start: 'Démarrer',
+  frame: 'Cadrer',
+  build: 'Construire',
+  understand: 'Comprendre',
+  check: 'Contrôler',
+};
+
+interface PhaseGroup {
+  label: string;
+  agents: Agent[];
+}
+
+// The server already ordered agents by phase; group only consecutive runs so the
+// select mirrors that order without re-sorting in the UI.
+function phaseGroups(agents: Agent[]): PhaseGroup[] {
+  const groups: PhaseGroup[] = [];
+  for (const agent of agents) {
+    const label = agent.phase ? PHASE_LABELS[agent.phase] : 'Autres';
+    const last = groups[groups.length - 1];
+    if (last && last.label === label) {
+      last.agents.push(agent);
+    } else {
+      groups.push({ label, agents: [agent] });
+    }
+  }
+  return groups;
+}
+
 /**
  * The session's top-level agent. Segmented up to three agents; beyond that a
- * select keeps the composer narrow. Switching applies from the next turn.
+ * select, grouped by the project phase the server ordered them by, keeps the
+ * composer narrow. Switching applies from the next turn.
  */
 export function ModePicker({ agents, mode, onChange, disabled }: ModePickerProps) {
   // A single agent is not a choice; the server's default is enough.
@@ -34,10 +64,14 @@ export function ModePicker({ agents, mode, onChange, disabled }: ModePickerProps
           disabled={disabled}
           className="h-7 rounded-md bg-transparent px-1.5 text-xs text-muted outline-none transition-colors hover:bg-raised hover:text-text"
         >
-          {agents.map((agent) => (
-            <option key={agent.id} value={agent.id} title={agent.description}>
-              {agent.name}
-            </option>
+          {phaseGroups(agents).map((group, index) => (
+            <optgroup key={`${group.label}-${index}`} label={group.label}>
+              {group.agents.map((agent) => (
+                <option key={agent.id} value={agent.id} title={agent.description}>
+                  {agent.name}
+                </option>
+              ))}
+            </optgroup>
           ))}
         </select>
       </div>

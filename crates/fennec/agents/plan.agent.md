@@ -3,6 +3,7 @@ id: plan
 name: Plan
 description: Explores the codebase and plans the task with the human, without changing anything
 subagent: false
+phase: frame
 commands: read-only
 color: '#a855f7'
 allowedTools:
