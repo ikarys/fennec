@@ -6,6 +6,7 @@ use super::ask_user;
 use super::propose_criteria;
 use super::propose_task;
 use super::record_decision;
+use super::rule_check;
 use super::suggest_agent;
 use super::turn::Turn;
 use crate::domain::agent::AgentDefinition;
@@ -196,7 +197,15 @@ pub(super) fn execute_tools(
             record(turn, message_id, call, result)?;
             continue;
         }
-        let (tools, stop) = (turn.tools, turn.stop);
+        // The human's rules run before the tool: the model's call never reaches it.
+        let tools = turn.tools;
+        let check = tools.check_rules(&call.name, &call.arguments);
+        if let Some(rule) = rule_check::refusal(&check) {
+            turn.append(rule_check::event(&call.id, rule, &check.subject))?;
+            record(turn, message_id, call, ToolResult::failure(rule.refusal()))?;
+            continue;
+        }
+        let stop = turn.stop;
         let mut log_error = None;
         let r = tools.execute(
             &call.name,

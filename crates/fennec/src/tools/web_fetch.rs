@@ -366,11 +366,21 @@ mod tests {
         std::fs::write(&file, "# Saved\n").unwrap();
 
         let path = file.display().to_string();
-        let result = super::super::read_file::run(&json!({ "path": path }), &workdir, &cache);
+        let result = super::super::read_file::run(
+            &json!({ "path": path }),
+            &workdir,
+            &cache,
+            &super::super::path_guard::Outside::none(),
+        );
         assert!(result.success, "{:?}", result.error);
         assert!(result.output.unwrap().contains("# Saved"));
 
-        let result = super::super::read_file::run(&json!({ "path": path }), &workdir, &temp_dir());
+        let result = super::super::read_file::run(
+            &json!({ "path": path }),
+            &workdir,
+            &temp_dir(),
+            &super::super::path_guard::Outside::none(),
+        );
         assert!(!result.success);
     }
 }

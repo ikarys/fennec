@@ -7,3 +7,4 @@ export * from "./api/projects";
 export * from "./api/worktrees";
 export * from "./api/workflows";
 export * from "./api/insight";
+export * from "./api/rules";

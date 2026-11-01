@@ -189,6 +189,7 @@ dependencies = [
  "backlog",
  "base64",
  "llm-providers",
+ "rules",
  "rusqlite",
  "serde",
  "serde_json",
@@ -556,6 +557,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "353b74f9810d5b085b6c42c9d86a5f0fdb795553235cdd48753b32e3809d18a7"
 dependencies = [
  "thiserror",
+]
+
+[[package]]
+name = "rules"
+version = "0.1.0"
+dependencies = [
+ "rusqlite",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
