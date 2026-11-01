@@ -109,6 +109,7 @@ export function StageGroup({
               onFrame={onFrame}
               onOpenSession={onOpenSession}
               run={run}
+              caps={caps}
               position={idea.position}
               reorder={reorder}
             />
