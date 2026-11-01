@@ -52,6 +52,8 @@ pub enum Job {
         choice: Choice,
         rule_id: Option<i64>,
     },
+    /// The human answered a waiver request.
+    Waiver { call_id: String },
 }
 
 pub struct Turns {
@@ -217,6 +219,9 @@ fn run(
                 rule_id,
             } => crate::agent::rule_approval::approve_turn(turn, call_id, *choice, *rule_id)
                 .map(|_| ()),
+            Job::Waiver { call_id } => {
+                crate::agent::waiver::answer_waiver(turn, call_id).map(|_| ())
+            }
         },
     )
 }

@@ -11,7 +11,8 @@ use super::proposal_routes;
 use super::{
     assets, backlog_routes, event_stream, idea_routes, integration, model_routes,
     project_dashboard, project_delete, project_routes, rule_approval_routes, rule_routes, servers,
-    session_delete, session_routes, settings_routes, terminal, workflow_routes, worktree_routes,
+    session_delete, session_routes, settings_routes, terminal, waiver_routes, workflow_routes,
+    worktree_routes,
 };
 use serde_json::json;
 use std::net::TcpStream;
@@ -128,6 +129,9 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         }
         ("POST", ["api", "sessions", id, "rule-approval"]) => {
             rule_approval_routes::answer_rule_approval(app, req, stream, id)
+        }
+        ("POST", ["api", "sessions", id, "waiver"]) => {
+            waiver_routes::answer_waiver(app, req, stream, id)
         }
         ("POST", ["api", "sessions", id, "replay"]) => {
             session_routes::replay_message(app, req, stream, id)
