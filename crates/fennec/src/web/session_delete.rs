@@ -3,6 +3,7 @@
 use super::App;
 use super::http::{Request, error, send_json};
 use crate::domain::project::SessionSummary;
+use crate::store::SqliteStore;
 use crate::worktree;
 use serde_json::{Value, json};
 use std::net::TcpStream;
@@ -54,32 +55,47 @@ pub fn delete_sessions(app: &App, req: &Request, stream: &mut TcpStream) -> Resu
     let rule_store =
         rules::RuleStore::open(&app.settings.rules_path()).map_err(|e| e.to_string())?;
     for (id, session, tree) in plans {
-        // A child session shares its root's worktree: removing the root's removes theirs.
-        if let Some(project) = store.project(&session.project_id)?
-            && let Some(wt) = app.place(&store, &session, &project)?.worktree
-        {
-            let Some((top, _)) = worktree::top(Path::new(&project.workdir)) else {
-                failed.push(json!({ "id": id, "error": "the project is not in a git repository" }));
-                continue;
-            };
-            if let Err(e) = worktree::remove(&top, &wt) {
-                failed.push(json!({ "id": id, "error": e }));
-                continue;
-            }
+        match remove_tree(app, &store, &rule_store, &session, &tree) {
+            Ok(None) => deleted.push(id),
+            Ok(Some(e)) => failed.push(json!({ "id": id, "error": e })),
+            Err(e) => return Err(e),
         }
-        store.delete_sessions(&tree)?;
-        for sid in &tree {
-            rule_store.delete_session(sid).map_err(|e| e.to_string())?;
-        }
-        let mut folds = app.skill_folds.lock().unwrap();
-        for sid in &tree {
-            folds.remove(sid);
-        }
-        deleted.push(id);
     }
     send_json(
         stream,
         200,
         &json!({ "deleted": deleted, "failed": failed }),
     )
+}
+
+/// Removes one top-level session and its children: the worktree with its branch, the log, the
+/// session rules, the cached skill folds. `Ok(Some(error))` when the worktree could not be
+/// removed: nothing was deleted, the human can retry.
+pub(super) fn remove_tree(
+    app: &App,
+    store: &SqliteStore,
+    rule_store: &rules::RuleStore,
+    session: &SessionSummary,
+    tree: &[String],
+) -> Result<Option<String>, String> {
+    // A child session shares its root's worktree: removing the root's removes theirs.
+    if let Some(project) = store.project(&session.project_id)?
+        && let Some(wt) = app.place(store, session, &project)?.worktree
+    {
+        let Some((top, _)) = worktree::top(Path::new(&project.workdir)) else {
+            return Ok(Some("the project is not in a git repository".into()));
+        };
+        if let Err(e) = worktree::remove(&top, &wt) {
+            return Ok(Some(e));
+        }
+    }
+    store.delete_sessions(tree).map_err(|e| e.to_string())?;
+    for sid in tree {
+        rule_store.delete_session(sid).map_err(|e| e.to_string())?;
+    }
+    let mut folds = app.skill_folds.lock().unwrap();
+    for sid in tree {
+        folds.remove(sid);
+    }
+    Ok(None)
 }
