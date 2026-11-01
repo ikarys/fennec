@@ -3,6 +3,8 @@ import type { SessionDetail } from '../lib/api';
 import type { ThreadView } from '../lib/fold';
 
 interface UseScrollFollowArgs {
+  /** The session shown: the page stays mounted across sessions, so a new one re-engages follow. */
+  sessionId: string | null;
   /** The thread view: a new view re-pins the bottom and restores a pending offset. */
   view: ThreadView;
   /** The session detail: its worktree path changes the content height. */
@@ -16,7 +18,7 @@ interface UseScrollFollowArgs {
  * on a move up (with hysteresis), and keeps the same messages in view when an
  * older page is prepended.
  */
-export function useScrollFollow({ view, detail, loadOlder }: UseScrollFollowArgs) {
+export function useScrollFollow({ sessionId, view, detail, loadOlder }: UseScrollFollowArgs) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
@@ -57,6 +59,12 @@ export function useScrollFollow({ view, detail, loadOlder }: UseScrollFollowArgs
       setAwayFromBottom(false);
     }
   }
+
+  useEffect(() => {
+    stickToBottom.current = true;
+    setAwayFromBottom(false);
+    restoreScroll.current = null;
+  }, [sessionId]);
 
   useEffect(() => {
     const element = scrollRef.current;

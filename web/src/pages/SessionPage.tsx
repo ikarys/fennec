@@ -67,7 +67,6 @@ import { PreviewPane } from "../components/preview/PreviewPane";
 import { RunRail } from "../components/workflow/session/RunRail";
 import { RunActionCard } from "../components/workflow/session/RunActionCard";
 import { Button, buttonClass } from "../components/ui/Button";
-import { ChevronDownIcon } from "../components/Icons";
 import {
   DEFAULT_WORKFLOW_ID,
   defaultWorkflowSelection,
@@ -175,7 +174,7 @@ export function SessionPage({
     setFollow,
     onScroll,
     handleLoadOlder,
-  } = useScrollFollow({ view, detail, loadOlder });
+  } = useScrollFollow({ sessionId, view, detail, loadOlder });
 
   useEffect(() => {
     onRunningChanged();
@@ -747,20 +746,6 @@ export function SessionPage({
                           ) : null}
                         </div>
                       </div>
-                      {awayFromBottom && !running && (
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          iconOnly
-                          title="Aller en bas et suivre la suite"
-                          onClick={() => setFollow(true)}
-                          aria-label="Aller en bas"
-                          className="absolute bottom-4 right-6 rounded-full shadow-md backdrop-blur"
-                        >
-                          <ChevronDownIcon className="h-4 w-4" />
-                        </Button>
-                      )}
                     </div>
 
                     {view.pendingApproval &&
@@ -831,13 +816,12 @@ export function SessionPage({
                         </a>
                       </div>
                     )}
-                    {running && !detail?.parentId && (
-                      <RunningStrip
-                        run={run}
-                        following={!awayFromBottom}
-                        onFollowChange={setFollow}
-                      />
-                    )}
+                    <RunningStrip
+                      running={running}
+                      run={run}
+                      following={!awayFromBottom}
+                      onFollowChange={setFollow}
+                    />
                     {!detail?.parentId && (
                       <QueuedMessages queued={view.queued} onCancel={handleCancelQueued} />
                     )}
