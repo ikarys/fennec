@@ -8,6 +8,7 @@ use crate::agent::workflow::{WorkflowEnv, WorkflowJob, run_workflow};
 use crate::config::Settings;
 use crate::domain::attachment::Attachment;
 use crate::domain::event::Event;
+use crate::domain::rule_approval::Choice;
 use crate::domain::slash::TurnInput;
 use crate::notifier::Notifier;
 use crate::store::SqliteStore;
@@ -45,6 +46,12 @@ pub enum Job {
     Replay(String),
     /// A workflow run (start, answer, continue, resume, stop).
     Workflow(WorkflowJob),
+    /// The human answered a rule approval.
+    Approval {
+        call_id: String,
+        choice: Choice,
+        rule_id: Option<i64>,
+    },
 }
 
 pub struct Turns {
@@ -204,6 +211,12 @@ fn run(
                 )
                 .map(|_| ())
             }
+            Job::Approval {
+                call_id,
+                choice,
+                rule_id,
+            } => crate::agent::rule_approval::approve_turn(turn, call_id, *choice, *rule_id)
+                .map(|_| ()),
         },
     )
 }

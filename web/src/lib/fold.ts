@@ -23,6 +23,8 @@ export interface ToolCallView {
   exitCode?: number;
   /** The human's rule that refused this call (fennec's own check: verified). */
   blockedBy?: { pattern: string; scope: string };
+  /** fennec paused this call for the human's approval. */
+  awaitingApproval?: boolean;
   addedLines?: number;
   removedLines?: number;
   contentPreview?: string[];
@@ -110,6 +112,14 @@ export interface PendingQuestion {
   }[];
 }
 
+export interface PendingApproval {
+  callId: string;
+  subject: string;
+  kind: 'command' | 'tool' | 'path';
+  pattern: string;
+  access: 'read' | 'write' | 'readWrite' | null;
+}
+
 export type Provenance =
   | { kind: 'verified'; command: string; exitCode?: number; output: string }
   | { kind: 'indicative'; agent: string; reason: string };
@@ -139,6 +149,8 @@ export interface ThreadView {
   lastDone?: string;
   /** The unanswered `ask_user` question, if any. */
   pendingQuestion?: PendingQuestion;
+  /** The tool call waiting for the human's approval, if any. */
+  pendingApproval?: PendingApproval;
   modifiedFiles: ModifiedFile[];
   toolCounts: ToolCount[];
   /**
@@ -315,6 +327,7 @@ export function createThreadFold(): ThreadFold {
   let running = false;
   let lastDone: string | undefined;
   let pendingQuestion: PendingQuestion | undefined;
+  let pendingApproval: PendingApproval | undefined;
   const modified = new Map<string, ModifiedFile>();
   const toolCounts = new Map<string, number>();
   const assistants = new Map<string, AssistantItem>();
@@ -487,8 +500,14 @@ export function createThreadFold(): ThreadFold {
         if (pendingQuestion?.callId === toolCallId) {
           pendingQuestion = undefined;
         }
+        if (pendingApproval?.callId === toolCallId) {
+          pendingApproval = undefined;
+        }
         const tool = tools.get(toolCallId);
         if (!tool) break;
+        if (tool.awaitingApproval) {
+          tool.awaitingApproval = false;
+        }
         const result = data.result ?? {};
         tool.status = result.success ? 'success' : 'error';
         tool.durationMs = typeof result.durationMs === 'number' ? result.durationMs : undefined;
@@ -510,6 +529,42 @@ export function createThreadFold(): ThreadFold {
         if (tool) tool.blockedBy = { pattern: String(data.pattern ?? ''), scope: String(data.scope ?? '') };
         break;
       }
+
+      case 'rule.approval_requested': {
+        const callId = String(data.callId ?? `tool-${index}`);
+        const subject = String(data.subject ?? '');
+        const kind: PendingApproval['kind'] =
+          data.kind === 'tool' ? 'tool' : data.kind === 'path' ? 'path' : 'command';
+        const access: PendingApproval['access'] =
+          data.access === 'read'
+            ? 'read'
+            : data.access === 'write'
+              ? 'write'
+              : data.access === 'readWrite'
+                ? 'readWrite'
+                : null;
+        pendingApproval = {
+          callId,
+          subject,
+          kind,
+          pattern: String(data.pattern ?? ''),
+          access
+        };
+        const tool = tools.get(callId);
+        if (tool) tool.awaitingApproval = true;
+        break;
+      }
+
+      case 'rule.approval_answered': {
+        const callId = String(data.callId ?? '');
+        if (pendingApproval?.callId === callId) {
+          pendingApproval = undefined;
+        }
+        const tool = tools.get(callId);
+        if (tool) tool.awaitingApproval = false;
+        break;
+      }
+
       case 'chat.ask_user': {
         const callId = String(data.callId ?? `tool-${index}`);
         const question = String(data.question ?? '');
@@ -564,6 +619,11 @@ export function createThreadFold(): ThreadFold {
         // A new turn supersedes any unanswered question.
         if (running) {
           pendingQuestion = undefined;
+          if (pendingApproval) {
+            const tool = tools.get(pendingApproval.callId);
+            if (tool) tool.awaitingApproval = false;
+            pendingApproval = undefined;
+          }
         }
         break;
       }
@@ -709,6 +769,17 @@ export function createThreadFold(): ThreadFold {
             pendingQuestion = undefined;
           }
         }
+        if (pendingApproval) {
+          const callId = pendingApproval.callId;
+          const remains = items.some(
+            (item) =>
+              item.kind === 'assistant' &&
+              item.segments.some((segment) => segment.kind === 'tool' && segment.tool.id === callId)
+          );
+          if (!remains) {
+            pendingApproval = undefined;
+          }
+        }
         break;
       }
 
@@ -818,6 +889,7 @@ export function createThreadFold(): ThreadFold {
     running,
     lastDone,
     pendingQuestion,
+    pendingApproval,
     modifiedFiles: Array.from(modified.values()),
     toolCounts: Array.from(toolCounts.entries()).map(([name, count]) => ({ name, count })),
     mode,

@@ -86,6 +86,7 @@ pub(super) fn path_request(
 pub(super) struct Outside<'a> {
     pub rules: &'a Rules,
     pub home: Option<&'a str>,
+    pub(super) approved: bool,
 }
 
 impl<'a> Outside<'a> {
@@ -95,6 +96,7 @@ impl<'a> Outside<'a> {
         Outside {
             rules: &rules::NO_RULES,
             home: None,
+            approved: false,
         }
     }
 
@@ -102,6 +104,10 @@ impl<'a> Outside<'a> {
         let request = path_request(workdir, self.home, p, access)?;
         if request.relative.is_some() {
             return None;
+        }
+
+        if self.approved {
+            return Some(PathBuf::from(request.absolute));
         }
 
         let decision = self.rules.decide(&Request::Path(&request));
@@ -326,6 +332,24 @@ mod tests {
     }
 
     #[test]
+    fn an_approved_call_reaches_outside_the_workdir_without_rules() {
+        let workdir = temp_dir();
+        let outside_dir = temp_dir();
+        std::fs::write(outside_dir.join("note.txt"), "note").unwrap();
+        let outside = Outside {
+            rules: &rules::NO_RULES,
+            home: None,
+            approved: true,
+        };
+        let file = outside_dir.join("note.txt").to_string_lossy().into_owned();
+
+        assert!(resolve_for_reading(&workdir, Vec::new, &outside, &file).is_ok());
+
+        let _ = std::fs::remove_dir_all(&workdir);
+        let _ = std::fs::remove_dir_all(&outside_dir);
+    }
+
+    #[test]
     fn an_allow_read_rule_grants_reading_outside_the_workdir_only() {
         let workdir = temp_dir();
         let outside_dir = temp_dir();
@@ -347,6 +371,7 @@ mod tests {
         let outside = Outside {
             rules: &rules,
             home: None,
+            approved: false,
         };
         let protection = Protection::new(None);
         let file = outside_dir.join("note.txt").to_string_lossy().into_owned();

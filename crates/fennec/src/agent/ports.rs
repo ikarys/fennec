@@ -53,6 +53,7 @@ pub trait EventLog {
 pub struct RuleCheck<'r> {
     pub decision: rules::Decision<'r>,
     pub subject: String,
+    pub proposal: Option<rules::Proposal>,
 }
 
 /// The tools a model can call (adapter: `tools::LocalTools`, on the host).
@@ -69,11 +70,24 @@ pub trait Toolbox {
         stop: &AtomicBool,
         on_output: &mut dyn FnMut(OutputStream, &str),
     ) -> ToolResult;
+    /// Runs a call the human approved once: the rules' path guard lets this one call reach
+    /// outside the workdir. The default runs it as `execute` does.
+    fn execute_approved(
+        &self,
+        name: &str,
+        args: &Value,
+        access: CommandAccess,
+        stop: &AtomicBool,
+        on_output: &mut dyn FnMut(OutputStream, &str),
+    ) -> ToolResult {
+        self.execute(name, args, access, stop, on_output)
+    }
     /// The human's rules on this call, decided before it runs; the default allows.
     fn check_rules(&self, _name: &str, _args: &Value) -> RuleCheck<'_> {
         RuleCheck {
             decision: rules::Decision::Allow(None),
             subject: String::new(),
+            proposal: None,
         }
     }
 }

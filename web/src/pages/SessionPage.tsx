@@ -6,9 +6,11 @@ import type {
   SessionDetail,
   SessionState,
 } from "../lib/api";
+import type { ApprovalChoice } from "../lib/api/sessions";
 import type { AssistantItem, Segment } from "../lib/fold";
 import { splitContract } from "../lib/plan";
 import {
+  answerRuleApproval,
   answerWorkflow,
   compactSession,
   continueWorkflow,
@@ -40,6 +42,7 @@ import { AgentSuggestionCard } from "../components/session/AgentSuggestionCard";
 import { ContextPanel } from "../components/session/ContextPanel";
 import { ContextGauge } from "../components/session/ContextGauge";
 import { QuestionCard } from "../components/session/QuestionCard";
+import { RuleApprovalCard } from "../components/session/RuleApprovalCard";
 import { ThreadItemView } from "../components/session/Thread";
 import { PlanActionsContext, type PlanActions } from "../components/session/PlanActions";
 import {
@@ -582,6 +585,18 @@ export function SessionPage({
     }
   }
 
+  async function handleApproval(choice: ApprovalChoice) {
+    if (!sessionId || !view.pendingApproval) return;
+    setSendError(null);
+    try {
+      await answerRuleApproval(sessionId, view.pendingApproval.callId, choice);
+    } catch (error) {
+      setSendError(
+        error instanceof Error ? error.message : "Erreur lors de l’autorisation",
+      );
+    }
+  }
+
   return (
     <PreviewContext.Provider value={setPreview}>
       <PreviewWorkdirContext.Provider value={detail?.project.workdir}>
@@ -719,6 +734,16 @@ export function SessionPage({
                       )}
                     </div>
 
+                    {view.pendingApproval &&
+                      !running &&
+                      !waiting &&
+                      !detail?.parentId && (
+                        <RuleApprovalCard
+                          approval={view.pendingApproval}
+                          onAnswer={handleApproval}
+                          disabled={running}
+                        />
+                      )}
                     {view.pendingQuestion &&
                       !running &&
                       !waiting &&

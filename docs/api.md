@@ -47,6 +47,8 @@ with camelCase fields.
 | `agents_md.written` | `{replaced}`: the human wrote the AGENTS.md draft of the last answer to the project's root; `replaced` when a file was there |
 | `agent.suggested` | `{callId, agent, reason, brief}`: the `suggest_agent` tool: an agent suggests the human go on in a new session with another agent; nothing switches until the human opens it |
 | `rule.blocked` | `{callId, ruleId, kind, pattern, scope, subject}`: fennec refused a tool call by one of the human's rules (fennec's own check, verified), before the call's failed `tool.result`; `kind` `command`/`tool`/`path`, `scope` `global`/`project`/`session`, `subject` the command, tool name or path refused (workdir-relative inside it, absolute outside) |
+| `rule.approval_requested` | `{callId, subject, ruleId, kind, pattern, access}`: fennec paused a tool call for the human (an "ask" rule, `ruleId` its id, or a file tool outside the workdir, `ruleId` null); the call stays open, no `tool.result`, and the turn ends `waiting_for_user`; `kind`/`pattern`/`access` are the rule the `session`, `always` and `never` answers store (`access` `read`/`write`/`readWrite` for a path, else null) |
+| `rule.approval_answered` | `{callId, choice, ruleId}`: the human's answer (`once`/`session`/`always`/`never`), `ruleId` the rule it stored (null for `once`); fennec then appends the call's `tool.result` (run, or refused for `never`) and the turn goes on |
 | `worktree.discarded` | `{branch, commits}`: the human discarded the session's worktree and branch; `commits` are the agent's commits that were dropped |
 | `workflow.paused` | `{runId, from, port, to}`: waiting before `to` |
 | `workflow.pause_requested` | `{runId}`: the human asked to pause at the next edge (after the current node) |
@@ -505,6 +507,12 @@ read-only. The human edits them as usual.
   A prompt or message starting with `/compact` alone compacts the session
   instead; `/<skill> [text]` asks the model to load that skill; any other text
   is sent as typed. `/compact` takes no attachments (400).
+- `POST /api/sessions/{id}/rule-approval` `{callId, choice}` → 202; 404 if no
+  session; 409 if a turn is running or `no pending approval for this call`; 400
+  for an unknown choice or a pattern the rules store refuses. `session` stores an
+  allow rule for the session, `always` an allow rule and `never` a block rule for
+  the project (origin: the answer), then a turn records `rule.approval_answered`,
+  runs or refuses the recorded call and resumes the loop.
 - `POST /api/sessions/{id}/replay` `{messageId}` → 202; 404 if no session;
   409 if a turn is running; 400 `only a message you typed in the current
   window can be replayed` when the id is not a user-typed message in the
