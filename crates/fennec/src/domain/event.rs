@@ -424,6 +424,19 @@ pub enum Event {
         findings: Vec<u32>,
         idea_ids: Vec<String>,
     },
+    /// An agent proposed a backlog task with propose_task (fennec's own event); the turn goes on.
+    #[serde(rename = "task.proposed", rename_all = "camelCase")]
+    TaskProposed {
+        call_id: String,
+        title: String,
+        text: String,
+    },
+    /// The human accepted a proposed task into the backlog (fennec's own event).
+    #[serde(rename = "task.accepted", rename_all = "camelCase")]
+    TaskAccepted { call_id: String, idea_id: String },
+    /// The human wrote the agent's AGENTS.md draft to the project (fennec's own event).
+    #[serde(rename = "agents_md.written", rename_all = "camelCase")]
+    AgentsMdWritten { replaced: bool },
     /// The human discarded the session's worktree and branch (fennec's own event).
     #[serde(rename = "worktree.discarded", rename_all = "camelCase")]
     WorktreeDiscarded {
@@ -469,6 +482,9 @@ impl Event {
             Event::CriterionUpdated { .. } => "criterion.updated",
             Event::IntegrationApplied { .. } => "integration.applied",
             Event::AuditTasksCreated { .. } => "audit.tasks_created",
+            Event::TaskProposed { .. } => "task.proposed",
+            Event::TaskAccepted { .. } => "task.accepted",
+            Event::AgentsMdWritten { .. } => "agents_md.written",
             Event::WorktreeDiscarded { .. } => "worktree.discarded",
         }
     }

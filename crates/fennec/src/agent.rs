@@ -8,6 +8,7 @@ pub mod ports;
 mod preflight;
 mod prompt;
 mod propose_criteria;
+mod propose_task;
 mod record_decision;
 mod round;
 #[cfg(test)]

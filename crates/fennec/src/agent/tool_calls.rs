@@ -4,6 +4,7 @@
 
 use super::ask_user;
 use super::propose_criteria;
+use super::propose_task;
 use super::record_decision;
 use super::turn::Turn;
 use crate::domain::agent::AgentDefinition;
@@ -163,6 +164,18 @@ pub(super) fn execute_tools(
                 Ok(decision) => {
                     turn.append(record_decision::event(&call.id, decision))?;
                     ToolResult::success(record_decision::RECORDED.into(), false)
+                }
+            };
+            record(turn, message_id, call, result)?;
+            continue;
+        }
+        if call.name == propose_task::NAME {
+            // Not blocking: the proposal is recorded and the turn goes on.
+            let result = match propose_task::parse(&call.arguments) {
+                Err(e) => ToolResult::failure(e),
+                Ok(proposal) => {
+                    turn.append(propose_task::event(&call.id, proposal))?;
+                    ToolResult::success(propose_task::PROPOSED.into(), false)
                 }
             };
             record(turn, message_id, call, result)?;
