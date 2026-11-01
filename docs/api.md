@@ -408,6 +408,7 @@ read-only. The human edits them as usual.
   is null for a detached HEAD; `testFiles` are the integrated test files (paths
   relative to the project) that the protection does not cover yet; protection is read from the project's tree, not
   the worktree's.
+- `POST /api/sessions/{id}/integration/message` → `{message}`: an English Conventional Commit subject the model proposes for the integration (indicative; `null` when the model fails or answers no valid subject; `defaultMessage` stays the fallback). The body is `{}`.
 - `POST /api/sessions/{id}/integrate` `{acknowledged: [kind], message, protectTests?, removeWorktree?}` → `{head, commits, protectedTests, protectError, worktreeRemoved, removeError}`:
   the human's decision. The server recomputes the gate and answers 400 on a
   blank `message`, 409 while a turn runs, while the human has staged changes,

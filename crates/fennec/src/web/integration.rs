@@ -191,6 +191,42 @@ pub fn get_integration(app: &App, stream: &mut TcpStream, id: &str) -> Result<()
     )
 }
 
+/// `POST /api/sessions/{id}/integration/message`: an English commit subject the
+/// model proposes for the integration (indicative; the human edits it), or null.
+pub fn suggest_message(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+    let store = app.store()?;
+    let gate = match gate(&store, app, id)? {
+        Ok(gate) => gate,
+        Err((status, message)) => return error(stream, status, &message),
+    };
+
+    let events = store.events(&gate.session_id)?;
+    let request = crate::domain::conversation::first_request(&events).unwrap_or_default();
+    let commits: Vec<&str> = gate
+        .preview
+        .commits
+        .iter()
+        .map(|commit| commit.subject.as_str())
+        .collect();
+    let files: Vec<(&str, u64, u64)> = gate
+        .preview
+        .files
+        .iter()
+        .map(|path| {
+            let (added, removed) = gate.preview.counts.get(path).copied().unwrap_or_default();
+            (path.as_str(), added, removed)
+        })
+        .collect();
+
+    match super::commit_subject::suggest(&app.settings, &request, &gate.title, &commits, &files) {
+        Ok(message) => send_json(stream, 200, &json!({ "message": message })),
+        Err(e) => {
+            eprintln!("fennec: session {id}: commit subject: {e}");
+            send_json(stream, 200, &json!({ "message": null }))
+        }
+    }
+}
+
 /// The human's repository as it is now, read for every session (with or
 /// without a worktree).
 pub fn get_repo(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
