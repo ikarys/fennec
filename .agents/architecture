@@ -10,3 +10,13 @@ crates/fennec/src/agent/ forbids crate::web
 crates/fennec/src/agent/ forbids crate::store
 crates/fennec/src/domain/ forbids std::fs
 crates/fennec/src/domain/ forbids std::process
+
+# Module rules: checked on every dependency of the project map (the "Carte des modules" tab).
+crates/fennec/src/domain never imports crates/fennec/src/agent
+crates/fennec/src/domain never imports crates/fennec/src/web
+crates/fennec/src/domain never imports crates/fennec/src/store
+crates/fennec/src/domain never imports crates/fennec/src/tools
+crates/fennec/src/domain never imports crates/fennec/src/llm
+crates/fennec/src/agent never imports crates/fennec/src/web
+crates/fennec/src/agent never imports crates/fennec/src/store
+crates/fennec/src/agent never imports crates/fennec/src/tools

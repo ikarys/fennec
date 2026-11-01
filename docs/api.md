@@ -239,13 +239,18 @@ read-only. The human edits them as usual.
   sub-agents and agents without one), discovery order within a phase (`color` null when unset); the modes are the
   ones with `subagent` false, the others only run in a workflow node's fresh context;
   404 if no project
-- `GET /api/projects/{id}/overview` → `{map, mapFile}`, the project page (404 if no project):
-  - `map` `{modules: [{id, files, tests, entry, layer, row}], dependencies: [{from, to, imports}]}`:
+- `GET /api/projects/{id}/overview` → `{map, mapFile, drift}`, the project page (404 if no project):
+  - `map` `{modules: [{id, files, tests, entry, layer, row}], dependencies: [{from, to, imports, violation}]}`:
     the project map, read from the import lines of the files git tracks (Rust `crate::` and workspace
-    crates, TS/JS relative imports; test modules skipped); a module is a directory (`.` the root),
+    crates, TS/JS relative imports; test files and modules skipped); a module is a directory (`.` the root),
     `imports` counts the importing files; `layer`/`row` place it (layers by dependency depth): the UI
     computes nothing. Deterministic (verified).
   - `mapFile` `missing | stale | current`: the project's `docs/map.md` against a fresh render of `map`.
+  - `drift` `{rules, violations: [{from, to, imports, rule}], sinceMap}`: the produced architecture against the
+    intended one (verified). `rules` counts the module rules of `.agents/architecture` (`<A> never imports <B>`, a
+    module matching `A` or below it); `violations` are the map's dependencies breaking one (`rule` its display text,
+    the dependency's `violation` set), in the map's order. `sinceMap` `{added: [{from, to}], removed: [{from, to}]}`
+    compares the dependencies with those of the committed `docs/map.md` (sorted; null when the file is absent).
 - `GET /api/projects/{id}/dashboard` → `{tiles, recent}`, the project page's overview tab (404 if no project):
   - `tiles` `[{id, icon, label, figure, detail, tone, active, href, title}]`, in display order (`sessions`,
     `ideas`, `tokens`, `time`, `cost`, `disk`, `map`, `doc`); every string is final display text. Usage over

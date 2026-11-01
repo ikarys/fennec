@@ -9,7 +9,8 @@ use serde_json::json;
 
 use super::App;
 use super::http::{error, send_json};
-use crate::{adr, doc, module_map, risk};
+use crate::domain::drift;
+use crate::{adr, architecture, doc, module_map, risk};
 
 /// `GET /api/projects/{id}/overview`.
 pub fn get_overview(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
@@ -17,10 +18,17 @@ pub fn get_overview(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), S
         return error(stream, 404, "no such project");
     };
     let workdir = Path::new(&project.workdir);
-    let map = module_map::load(workdir);
+    let mut map = module_map::load(workdir);
+    let map_file = module_map::map_file_state(workdir, &map);
+    let drift = drift::measure(
+        &mut map,
+        &architecture::load(workdir),
+        module_map::committed_map_file(workdir).as_deref(),
+    );
     let body = json!({
-        "mapFile": module_map::map_file_state(workdir, &map),
+        "mapFile": map_file,
         "map": map,
+        "drift": drift,
     });
     send_json(stream, 200, &body)
 }
