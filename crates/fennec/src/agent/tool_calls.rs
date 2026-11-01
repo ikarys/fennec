@@ -6,6 +6,7 @@ use super::ask_user;
 use super::propose_criteria;
 use super::propose_task;
 use super::record_decision;
+use super::request_waiver;
 use super::rule_check;
 use super::suggest_agent;
 use super::turn::Turn;
@@ -22,6 +23,8 @@ pub(super) const INTERRUPTED_ERROR: &str = "Tool execution was interrupted by us
 const AWAY_ANSWER: &str = "The human is away (autonomous run) and cannot answer. Decide yourself, choosing the safest option that stays within the approved plan, record the question and your choice with record_decision, and continue.";
 /// `propose_criteria`'s result while the human is away.
 const AWAY_CRITERIA: &str = "The human is away (autonomous run): the criteria stay as approved. Record your proposed change with record_decision for the human to review, and continue against the current criteria.";
+/// `request_waiver`'s result while the human is away.
+const AWAY_WAIVER: &str = "The human is away (autonomous run): a protected file cannot be waived. Say in your report what should change there and why, and continue.";
 const NOT_RUN_AFTER_ASK: &str = "Not run: the turn paused for the human (a question or an approval). Call it again after the answer if it is still needed.";
 
 pub(super) enum Flow {
@@ -148,6 +151,29 @@ pub(super) fn execute_tools(
                         question: q.question,
                         ask_type: q.ask_type,
                         options: q.options,
+                    })?;
+                    waiting = true;
+                }
+            }
+            continue;
+        }
+        if call.name == request_waiver::NAME {
+            match request_waiver::parse(&call.arguments) {
+                // The model reads the failure and the loop goes on.
+                Err(e) => record(turn, message_id, call, ToolResult::failure(e))?,
+                // A waiver is the human's decision; while they are away it is refused.
+                Ok(_) if turn.autonomous => record(
+                    turn,
+                    message_id,
+                    call,
+                    ToolResult::failure(AWAY_WAIVER.into()),
+                )?,
+                // No result is recorded: the human's answer will be the result.
+                Ok((path, reason)) => {
+                    turn.append(Event::WaiverRequested {
+                        call_id: call.id.clone(),
+                        path,
+                        reason,
                     })?;
                     waiting = true;
                 }

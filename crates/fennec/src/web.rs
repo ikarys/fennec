@@ -37,6 +37,7 @@ mod session_usage;
 mod settings_routes;
 mod terminal;
 mod turns;
+mod waiver_routes;
 mod workflow_routes;
 mod workflow_usage;
 mod worktree_routes;

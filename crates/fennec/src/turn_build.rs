@@ -6,8 +6,10 @@ use crate::agent::ports::EventLog;
 use crate::agent::turn::Turn;
 use crate::agents;
 use crate::config::Settings;
+use crate::domain::clock;
 use crate::domain::event::Event;
 use crate::domain::preferences::ModelRef;
+use crate::domain::waiver;
 use crate::instructions::all_instructions;
 use crate::llm::OpenAiClient;
 use crate::metering::MeteredLog;
@@ -98,12 +100,15 @@ pub fn with_turn<R>(
             }
         })
         .collect();
+    // ponytail: a waiver's expiry is checked when a turn starts, not mid-turn.
+    let waiver_paths = waiver::active(&log.events(session_id)?, clock::now_ms());
     let protection = (if workdir.starts_with(worktree::root(&settings.db_path)) {
         protected::load_for_worktree(workdir)
     } else {
         protected::load(workdir)
     })
-    .with_patterns(&blocked_paths);
+    .with_patterns(&blocked_paths)
+    .exempting(&waiver_paths);
     let tools = LocalTools::new(workdir.to_path_buf())
         .with_search(prefs.search.clone())
         .with_sandbox(
