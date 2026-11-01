@@ -15,35 +15,40 @@ const BARS: Record<BadgeTone, string> = {
   accent: 'bg-accent',
   ok: 'bg-ok',
   err: 'bg-err',
-  neutral: 'bg-border-strong'
+  neutral: 'bg-border-strong',
+  info: 'bg-info'
 };
 
 const ICON_TONES: Record<BadgeTone, string> = {
   accent: 'bg-accent-soft text-accent-strong',
   ok: 'bg-ok-soft text-ok',
   err: 'bg-raised text-err',
-  neutral: 'bg-raised text-muted'
+  neutral: 'bg-raised text-muted',
+  info: 'bg-raised text-info'
 };
 
 const ACTIVE_BORDERS: Record<BadgeTone, string> = {
   accent: 'border-accent-soft',
   ok: 'border-border',
   err: 'border-border',
-  neutral: 'border-border'
+  neutral: 'border-border',
+  info: 'border-border'
 };
 
 const ACTIVE_WASHES: Record<BadgeTone, string> = {
   accent: 'bg-linear-to-br from-accent-soft/60 to-panel',
   ok: 'bg-linear-to-br from-ok-soft/50 to-panel',
   err: 'bg-linear-to-br from-raised to-panel',
-  neutral: 'bg-linear-to-br from-raised to-panel'
+  neutral: 'bg-linear-to-br from-raised to-panel',
+  info: 'bg-linear-to-br from-raised to-panel'
 };
 
 const ACTIVE_FIGURES: Record<BadgeTone, string> = {
   accent: 'text-accent-strong',
   ok: 'text-ok',
   err: 'text-err',
-  neutral: 'text-text'
+  neutral: 'text-text',
+  info: 'text-info'
 };
 
 export function Tile({

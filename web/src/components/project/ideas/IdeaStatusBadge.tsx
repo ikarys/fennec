@@ -1,16 +1,16 @@
 /**
  * The idea's status badge: one table shared by the board and the night report.
  */
-import { Badge } from '../../ui/Badge';
+import { Badge, type BadgeTone } from '../../ui/Badge';
 import type { IdeaStatus } from '../../../lib/ideas';
 
 const STATUS_CONFIG: Record<
   IdeaStatus,
-  { label: string; tone: 'neutral' | 'accent' | 'ok' | 'err'; pulse?: boolean }
+  { label: string; tone: BadgeTone; pulse?: boolean }
 > = {
   inbox: { label: 'idée', tone: 'neutral' },
-  framing: { label: 'en cadrage', tone: 'neutral' },
-  queued: { label: 'prête', tone: 'neutral' },
+  framing: { label: 'en cadrage', tone: 'info' },
+  queued: { label: 'prête', tone: 'info' },
   running: { label: 'en cours', tone: 'accent', pulse: true },
   question: { label: 'question', tone: 'accent' },
   review: { label: 'à relire', tone: 'accent' },
@@ -23,7 +23,7 @@ const STATUS_CONFIG: Record<
 export function IdeaStatusBadge({ status }: { status: IdeaStatus }) {
   const cfg = STATUS_CONFIG[status];
   return (
-    <Badge tone={cfg.tone} dot={cfg.pulse ?? false} pulse={cfg.pulse ?? false}>
+    <Badge tone={cfg.tone} pill dot pulse={cfg.pulse ?? false} title={`Statut : ${cfg.label}`}>
       {cfg.label}
     </Badge>
   );

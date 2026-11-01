@@ -297,10 +297,11 @@ read-only. The human edits them as usual.
 - `GET /api/projects/{id}/worktrees[?fresh=1]` → `{scannedAt, totalBytes, generatedBytes, entries}`: the disk the
   project's session worktrees take, measured from disk (verified; allocated bytes, like `du`). `fresh=1` measures again,
   otherwise a scan younger than 10 minutes is reused; 404 if no project.
-  - `entries` `[{name, sessionId, sessionTitle, running, updatedAt, bytes, generatedBytes, orphan, repoMissing,
+  - `entries` `[{name, sessionId, sessionTitle, running, updatedAt, bytes, generatedBytes, orphan, cache, repoMissing,
     foreignOwned, sudoCommand}]`, largest first: `name` the directory under the worktrees root (the root session's id);
     `generatedBytes` the part in `target`, `node_modules` and `.venv` (rebuilt by a build); `orphan` when no session
-    owns it or git no longer registers it; `repoMissing` when its repository is gone (such orphans show on every
+    owns it or git no longer registers it; `cache` for `.cargo-target`, the Cargo target directories every
+    project's worktrees share (all of it `generatedBytes`, shown on every project page, emptied by `clean`, never an orphan); `repoMissing` when its repository is gone (such orphans show on every
     project page); `sudoCommand` (`sudo rm -rf <path>`) for an orphan holding files of another user (root).
 - `GET /api/worktrees` → `{totalBytes, generatedBytes, alert, largestProjectId}`: every worktree, for the home page;
   `alert` from 5 GiB; `largestProjectId` the project whose worktrees take the most, null when none.
@@ -343,7 +344,7 @@ read-only. The human edits them as usual.
   - `POST /api/projects/{id}/ideas/{ideaId}/framing` `{sessionId}` (`idea.framing`; 404 if the session is not the project's)
   - `POST /api/projects/{id}/ideas/{ideaId}/ready` `{plan}` (`idea.ready`; 400 if empty)
   - `POST /api/projects/{id}/ideas/{ideaId}/edit` `{text}` (`idea.edited`; 400 if empty or over 4000 characters): the human rewrites the idea's text; a dropped or completed idea keeps its text
-  - `POST /api/projects/{id}/ideas/{ideaId}/drop` `{}` (`idea.dropped`)
+  - `POST /api/projects/{id}/ideas/{ideaId}/drop` `{}` (`idea.dropped`): abandons an idea, or removes a done one from the board (menu `remove`)
   - `POST /api/projects/{id}/ideas/{ideaId}/complete` `{}` (`idea.completed`)
   - `POST /api/projects/{id}/ideas/{ideaId}/start` `{}`: builds this idea now, outside the queue: from its plan
     when ready, or when restarting a halted/failed idea that has a plan, else from its text (the workflow plans first;

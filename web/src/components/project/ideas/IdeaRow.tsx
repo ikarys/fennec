@@ -17,7 +17,7 @@ import { IdeaStatusBadge } from "./IdeaStatusBadge";
 import { IdeaMeta } from "./IdeaMeta";
 import { IdeaAttachments } from "./IdeaAttachments";
 import { IdeaMenu } from "./IdeaMenu";
-import { formatRelative } from "../../../lib/format";
+import { formatDate } from "../../../lib/format";
 import {
   startIdea,
   type IdeaAction,
@@ -220,8 +220,8 @@ export function IdeaRow({
         </div>
       </div>
 
-      <span className="shrink-0 font-mono text-xs text-faint">
-        {formatRelative(idea.createdAt)}
+      <span className="shrink-0 font-mono text-xs text-faint" title="Créée le">
+        {formatDate(idea.createdAt)}
       </span>
 
       <div className="flex shrink-0 items-center gap-1">
