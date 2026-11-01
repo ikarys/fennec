@@ -1,6 +1,7 @@
 //! Web adapter: the local server behind the UI. std only, one thread per
 //! connection, bound to 127.0.0.1.
 
+mod agents_md_routes;
 mod assets;
 mod audit_routes;
 mod backlog_routes;
@@ -23,6 +24,7 @@ mod preview;
 mod pricing;
 mod project_dashboard;
 mod project_routes;
+mod proposal_routes;
 mod routes;
 mod servers;
 mod session_delete;

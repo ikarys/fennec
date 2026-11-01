@@ -3,6 +3,7 @@
 
 pub mod adr;
 pub mod agent;
+pub mod agents_md;
 pub mod architecture;
 pub mod attachment;
 pub mod attention;
@@ -38,6 +39,7 @@ pub mod session_skills;
 pub mod skill;
 pub mod slash;
 pub mod stats;
+pub mod task_proposal;
 
 pub mod test_files;
 pub mod vision;

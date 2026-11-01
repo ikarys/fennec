@@ -145,6 +145,9 @@ impl Transcript {
             | Event::IntegrationApplied { .. }
             | Event::AuditTasksCreated { .. }
             | Event::DecisionRecorded { .. }
+            | Event::TaskProposed { .. }
+            | Event::TaskAccepted { .. }
+            | Event::AgentsMdWritten { .. }
             | Event::WorktreeDiscarded { .. } => Ok(()),
         };
         let _ = out.flush();
