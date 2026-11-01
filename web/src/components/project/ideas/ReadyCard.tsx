@@ -1,15 +1,18 @@
 /**
  * One ready idea in the queue, as a card: the plan stands out because it is
- * what the build will run on. The card stays reorderable like a row.
+ * what the build will run on. It keeps what a row shows: status,
+ * attachments, run meta. The card stays reorderable like a row.
  */
 import { useState } from 'react';
 import { Button } from '../../ui/Button';
 import { Card } from '../../ui/Card';
-import { Badge } from '../../ui/Badge';
 import { PlayIcon, EyeIcon, GripIcon } from '../../Icons';
 import { startIdea, type IdeaBoard, type IdeaView } from '../../../lib/ideas';
 import type { RowReorder } from './IdeaRow';
 import { IdeaMenu } from './IdeaMenu';
+import { IdeaMeta } from './IdeaMeta';
+import { IdeaStatusBadge } from './IdeaStatusBadge';
+import { IdeaAttachments } from './IdeaAttachments';
 
 export function ReadyCard({
   idea,
@@ -17,6 +20,7 @@ export function ReadyCard({
   onFrame,
   onOpenSession,
   run,
+  caps,
   position,
   reorder,
 }: {
@@ -25,6 +29,7 @@ export function ReadyCard({
   onFrame: (idea: IdeaView) => Promise<void>;
   onOpenSession: (sessionId: string) => void;
   run: (action: () => Promise<IdeaBoard>) => Promise<boolean>;
+  caps: IdeaBoard['queue']['caps'];
   position: number | null;
   reorder: RowReorder | null;
 }) {
@@ -38,10 +43,6 @@ export function ReadyCard({
       setBusy(false);
     }
   };
-
-  const criteriaCount = idea.criteria
-    ? idea.criteria.passed + idea.criteria.failed + idea.criteria.pending
-    : null;
 
   return (
     <Card
@@ -110,7 +111,13 @@ export function ReadyCard({
       </div>
 
       <div className="min-w-0 grow">
-        <p className="m-0 text-sm font-medium text-text">{idea.title}</p>
+        <div className="flex items-center gap-2">
+          <p className="m-0 truncate text-sm font-medium text-text" title={idea.title}>
+            {idea.title}
+          </p>
+          <IdeaStatusBadge status={idea.status} />
+        </div>
+        <IdeaAttachments attachments={idea.attachments} />
         {idea.plan ? (
           <div className="mt-2 rounded-md border border-border bg-bg p-2.5">
             <p className="m-0 text-xs text-faint">Plan (produit par le modèle, indicatif)</p>
@@ -120,15 +127,8 @@ export function ReadyCard({
           </div>
         ) : null}
         {idea.halted ? <p className="m-0 mt-1 text-xs text-muted">{idea.halted}</p> : null}
-        <div className="mt-2 flex items-center gap-2 text-xs">
-          {criteriaCount != null ? (
-            <Badge>{criteriaCount} critère{criteriaCount > 1 ? 's' : ''}</Badge>
-          ) : null}
-          {idea.decisions.length > 0 ? (
-            <Badge>
-              {idea.decisions.length} décision{idea.decisions.length > 1 ? 's' : ''}
-            </Badge>
-          ) : null}
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+          <IdeaMeta idea={idea} caps={caps} />
         </div>
       </div>
 
