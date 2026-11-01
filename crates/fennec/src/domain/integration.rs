@@ -238,14 +238,15 @@ pub fn blockers(
     out
 }
 
-/// The blockers the human did not acknowledge (by key). `NoCommits` and
-/// `Conflict` can never be acknowledged: there is nothing to integrate, and
-/// accepting a conflict would not make the merge succeed.
+/// The blockers the human did not acknowledge (by key). `NoCommits`,
+/// `Conflict` and `LocalChanges` can never be acknowledged: there is nothing
+/// to integrate, accepting a conflict would not make the merge succeed, and
+/// the pick refuses to overwrite uncommitted work.
 pub fn unacknowledged<'a>(blockers: &'a [Blocker], acknowledged: &[String]) -> Vec<&'a Blocker> {
     blockers
         .iter()
         .filter(|blocker| match blocker {
-            Blocker::NoCommits | Blocker::Conflict { .. } => true,
+            Blocker::NoCommits | Blocker::Conflict { .. } | Blocker::LocalChanges { .. } => true,
             _ => !acknowledged.contains(&blocker.key().to_string()),
         })
         .collect()
@@ -595,13 +596,15 @@ mod tests {
     }
 
     #[test]
-    fn an_acknowledged_local_changes_blocker_is_dropped() {
+    fn a_local_changes_blocker_is_never_acknowledged() {
         let blockers = vec![Blocker::LocalChanges {
             paths: vec!["a.rs".to_string()],
         }];
 
-        assert!(unacknowledged(&blockers, &["localChanges".to_string()]).is_empty());
-        assert_eq!(unacknowledged(&blockers, &[]).len(), 1);
+        assert_eq!(
+            unacknowledged(&blockers, &["localChanges".to_string()]).len(),
+            1
+        );
     }
 
     #[test]
