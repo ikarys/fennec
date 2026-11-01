@@ -15,9 +15,14 @@ pub fn load(workdir: &Path) -> ModuleMap {
     module_map::build(&tracked_files(workdir))
 }
 
+/// The committed map file's text, when present.
+pub fn committed_map_file(workdir: &Path) -> Option<String> {
+    std::fs::read_to_string(workdir.join(MAP_FILE)).ok()
+}
+
 /// How `docs/map.md` compares with the map of the code as it is.
 pub fn map_file_state(workdir: &Path, map: &ModuleMap) -> MapFileState {
-    let on_disk = std::fs::read_to_string(workdir.join(MAP_FILE)).ok();
+    let on_disk = committed_map_file(workdir);
     map_doc::state(on_disk.as_deref(), &map_doc::render(map))
 }
 
