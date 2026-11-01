@@ -11,6 +11,7 @@ pub mod attention;
 pub mod audit;
 pub mod bypass;
 pub mod clock;
+pub mod commit_subject;
 pub mod compaction;
 pub mod context_parts;
 pub mod conversation;

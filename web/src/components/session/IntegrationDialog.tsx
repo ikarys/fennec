@@ -2,7 +2,7 @@ import { DecisionList } from './DecisionList';
 import { useEffect, useState } from 'react';
 import type { Blocker, IntegrationConflict, IntegrationPreview, ReviewSignal } from '../../lib/api';
 import type { IntegrationResult } from '../../lib/api';
-import { createSession, getIntegration, integrate } from '../../lib/api';
+import { createSession, getIntegration, integrate, suggestCommitMessage } from '../../lib/api';
 import { completeIdea } from '../../lib/ideas';
 import { CriterionProvenanceBadge } from './CriteriaSection';
 import { Button } from '../ui/Button';
@@ -118,6 +118,7 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
   const [message, setMessage] = useState('');
   const [protectTests, setProtectTests] = useState(false);
   const [removeWorktree, setRemoveWorktree] = useState(false);
+  const [suggested, setSuggested] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -131,6 +132,7 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
     setAcknowledged({});
     setMessage('');
     setProtectTests(false);
+    setSuggested(null);
     let active = true;
     getIntegration(sessionId)
       .then((data) => {
@@ -138,6 +140,14 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
         setPreview(data);
         setMessage(data.defaultMessage);
         setLoading(false);
+        // The model's English subject replaces the default only if the human has not edited it yet.
+        suggestCommitMessage(sessionId)
+          .then(({ message: proposal }) => {
+            if (!active || !proposal) return;
+            setSuggested(proposal);
+            setMessage((current) => (current === data.defaultMessage ? proposal : current));
+          })
+          .catch(() => {});
       })
       .catch((fetchError: unknown) => {
         if (!active) return;
@@ -366,7 +376,10 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
               <DecisionList decisions={preview.decisions} />
             </section>
 
-            <FieldRow label="Message du commit" hint="Un seul commit, à ton nom, avec la session en provenance (Fennec-Session).">
+            <FieldRow
+              label="Message du commit"
+              hint={`${suggested !== null && message === suggested ? 'Proposé par le modèle (indicatif), à relire. ' : ''}Un seul commit, à ton nom, avec la session en provenance (Fennec-Session).`}
+            >
               <TextArea rows={3} className="w-full font-mono" value={message} onChange={(event) => setMessage(event.target.value)} />
             </FieldRow>
 

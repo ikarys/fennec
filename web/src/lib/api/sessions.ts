@@ -359,6 +359,14 @@ export function getIntegration(sessionId: string): Promise<IntegrationPreview> {
   );
 }
 
+/** An English commit subject the model proposes for the integration (indicative), or null. */
+export function suggestCommitMessage(sessionId: string): Promise<{ message: string | null }> {
+  return request<{ message: string | null }>(`/api/sessions/${encodeURIComponent(sessionId)}/integration/message`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
 /** Creates one commit with the worktree's changes on the human's branch after the accepted blockers. */
 export interface IntegrationResult {
   head: string;
