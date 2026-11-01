@@ -3,6 +3,7 @@ id: ask
 name: Question
 description: Answers a human question about this project, read-only, every claim sourced as path:line
 subagent: false
+phase: understand
 commands: read-only
 color: '#14b8a6'
 allowedTools:

@@ -132,7 +132,9 @@ pub(super) fn list_agents(app: &App, stream: &mut TcpStream, id: &str) -> Result
     let Some(project) = store.project(id)? else {
         return error(stream, 404, "no such project");
     };
-    let list = agents::discover(Path::new(&project.workdir));
+    let mut list = agents::discover(Path::new(&project.workdir));
+    // The menu follows a project's order, so phase comes first.
+    list.sort_by_key(|agent| (agent.phase.is_none(), agent.phase));
     let out: Vec<Value> = list
         .iter()
         .map(|agent| {
@@ -142,6 +144,7 @@ pub(super) fn list_agents(app: &App, stream: &mut TcpStream, id: &str) -> Result
                 "description": agent.description,
                 "color": agent.color,
                 "subagent": agent.subagent,
+                "phase": agent.phase,
             })
         })
         .collect();

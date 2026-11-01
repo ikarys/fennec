@@ -3,6 +3,7 @@ id: builder
 name: Builder
 description: Implements the task by changing code and verifying it
 subagent: false
+phase: build
 color: '#3b82f6'
 allowedTools:
   - read_file
