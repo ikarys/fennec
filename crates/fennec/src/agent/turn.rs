@@ -26,6 +26,7 @@ use super::propose_criteria;
 use super::propose_task;
 use super::record_decision;
 use super::round::{self, Round, RoundPrompt};
+use super::suggest_agent;
 use super::tool_calls::{Flow, INTERRUPTED_ERROR, execute_tools};
 use crate::domain::agent::{AgentDefinition, DEFAULT_COLOR, last_reminder, resolve};
 use crate::domain::attachment::Attachment;
@@ -243,9 +244,10 @@ fn round_prompt_parts(turn: &mut Turn) -> Result<(String, Value), String> {
     Ok((prompt, tools))
 }
 
-/// The loop owns `ask_user`, `propose_criteria`, `record_decision` and
-/// `propose_task`; they are not host tools, so their definitions are added
-/// to the toolbox's.
+/// The loop owns `ask_user`, `propose_criteria`, `record_decision`,
+/// `propose_task` and `suggest_agent`; they are not host tools, so their
+/// definitions are added to the toolbox's. `suggest_agent` lists the
+/// session's agents as of the first turn; definitions are frozen then.
 fn tool_definitions(turn: &Turn) -> Value {
     let mut tool_defs = turn.tools.definitions();
     if let Some(arr) = tool_defs.as_array_mut() {
@@ -253,6 +255,7 @@ fn tool_definitions(turn: &Turn) -> Value {
         arr.push(propose_criteria::definition());
         arr.push(record_decision::definition());
         arr.push(propose_task::definition());
+        arr.push(suggest_agent::definition(turn.agents));
     }
     tool_defs
 }
@@ -1562,8 +1565,10 @@ mod tests {
         let builder_model = RecordingTools::default();
         let stop = AtomicBool::new(false);
 
+        // One session's agents in both modes: suggest_agent's definition lists them.
+        let agents = [builder(), vec![plan()]].concat();
         let mut plan_h = Harness::new(Box::new(plan_model.clone()), PathBuf::from("/tmp"), &stop);
-        plan_h.agents = vec![plan()];
+        plan_h.agents = agents.clone();
         run_turn(&mut plan_h.turn(), "go", &[]).unwrap();
 
         let mut builder_h = Harness::new(
@@ -1571,6 +1576,12 @@ mod tests {
             PathBuf::from("/tmp"),
             &stop,
         );
+        builder_h.agents = agents;
+        builder_h.log.0.borrow_mut().push(Event::ModeChanged {
+            mode: "builder".into(),
+            auto: false,
+            reason: None,
+        });
         run_turn(&mut builder_h.turn(), "go", &[]).unwrap();
 
         assert_eq!(*plan_model.0.borrow(), *builder_model.0.borrow());

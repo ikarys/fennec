@@ -122,6 +122,9 @@ writes the draft to it in one click (`agents_md.written`).
 Agent phases, done: a `phase:` in each agent's frontmatter (start, frame, build, understand, check); the server
 sends the agents in that order and the composer's menu groups them under Démarrer, Cadrer, Construire, Comprendre,
 Contrôler.
+Agent suggestions, done: `suggest_agent` (the turn goes on) lets an agent suggest the human go on in a new
+session with another agent, with a reason and a brief (`agent.suggested`); a card after the turn opens the new
+session's page on that agent with the brief in the composer, and nothing starts until the human sends it.
 Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
 1. Produced architecture and drift (C12), waivers (C7).
@@ -169,6 +172,7 @@ crates/fennec/src/
     risk.rs            risk zones: a commit's authorship from its trailers, the signals, the report
     agents_md.rs       the AGENTS.md draft at the end of an answer, which the human writes in one click
     task_proposal.rs   the backlog tasks an agent proposed with propose_task, and which the human accepted
+    agent_suggestion.rs the agent switch an agent suggested, since the human last wrote
     review_map.rs      the review order of a branch's files: per-file signals (gate checks, churn, tests, size)
     workflow/          a workflow: definition (nodes, ports, edges), template ({{…}} names),
                        validate (the graph rules), run (the run folded from its events, the next step)
@@ -182,6 +186,7 @@ crates/fennec/src/
     tool_calls.rs      openfox chat/execute-tools: runs and records tool calls
     ask_user.rs        openfox tools/ask: the loop's own tool; the turn ends waiting for the human
     propose_task.rs    the loop's propose_task tool: a backlog task proposed, the turn goes on
+    suggest_agent.rs   the loop's own tool: suggests a new session on another agent (the human opens it)
     preflight.rs       runs a plan's checks at the end of the planner's turn, sends it back once
     compaction.rs      openfox context/compactor: the summary round and the new window
     prompt.rs          openfox chat/prompts: the system prompt, plus fennec's working method
