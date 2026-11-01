@@ -89,6 +89,26 @@ impl Protection {
         Protection { patterns }
     }
 
+    /// Only these patterns, no defaults: a path rule's matcher (same syntax as `.agents/protected`).
+    pub fn only(patterns: &[String]) -> Protection {
+        let patterns = patterns
+            .iter()
+            .filter_map(|pattern| normalize_pattern(pattern))
+            .collect();
+        Protection { patterns }
+    }
+
+    /// These patterns on top: the human's blocking path rules, so the file tools refuse
+    /// them and the sandbox mounts them read-only like any protected file.
+    pub fn with_patterns(mut self, patterns: &[String]) -> Protection {
+        self.patterns.extend(
+            patterns
+                .iter()
+                .filter_map(|pattern| normalize_pattern(pattern)),
+        );
+        self
+    }
+
     /// `relative`: a path relative to the project root, `/`-separated, no
     /// leading `./`.
     pub fn is_protected(&self, relative: &str) -> bool {
@@ -220,6 +240,22 @@ fn glob_match(pattern: &[char], text: &[char]) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn only_uses_only_the_given_patterns() {
+        let protection = Protection::only(&["secrets/".to_string()]);
+        assert!(protection.is_protected("secrets/a.txt"));
+        assert!(!protection.is_protected("src/a.rs"));
+    }
+
+    #[test]
+    fn with_patterns_adds_patterns_to_existing_protection() {
+        let protection =
+            Protection::only(&["base/".to_string()]).with_patterns(&["extra/".to_string()]);
+        assert!(protection.is_protected("base/a.txt"));
+        assert!(protection.is_protected("extra/a.txt"));
+        assert!(!protection.is_protected("other/a.txt"));
+    }
+
     use super::*;
 
     #[test]

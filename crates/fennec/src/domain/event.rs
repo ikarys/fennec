@@ -443,6 +443,21 @@ pub enum Event {
         reason: String,
         brief: String,
     },
+
+    /// fennec refused a tool call by a rule the human stored (fennec's own event).
+    #[serde(rename = "rule.blocked", rename_all = "camelCase")]
+    RuleBlocked {
+        call_id: String,
+        rule_id: String,
+        /// "command" | "tool" | "path"
+        kind: String,
+        /// The rule's pattern as the human typed it.
+        pattern: String,
+        /// "global" | "project"
+        scope: String,
+        /// What was refused: the command, the tool name, or the path.
+        subject: String,
+    },
     /// The human wrote the agent's AGENTS.md draft to the project (fennec's own event).
     #[serde(rename = "agents_md.written", rename_all = "camelCase")]
     AgentsMdWritten { replaced: bool },
@@ -494,6 +509,7 @@ impl Event {
             Event::TaskProposed { .. } => "task.proposed",
             Event::TaskAccepted { .. } => "task.accepted",
             Event::AgentSuggested { .. } => "agent.suggested",
+            Event::RuleBlocked { .. } => "rule.blocked",
             Event::AgentsMdWritten { .. } => "agents_md.written",
             Event::WorktreeDiscarded { .. } => "worktree.discarded",
         }

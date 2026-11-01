@@ -6,6 +6,7 @@ use super::ask_user;
 use super::propose_criteria;
 use super::propose_task;
 use super::record_decision;
+use super::rule_check;
 use super::suggest_agent;
 use super::turn::Turn;
 use crate::domain::agent::AgentDefinition;
@@ -194,6 +195,20 @@ pub(super) fn execute_tools(
                 }
             };
             record(turn, message_id, call, result)?;
+            continue;
+        }
+        // The human's rules run before the tool: the model's call never reaches it.
+        // An `Ask` rule is refused too until the approval flow lands.
+        let rules = turn.rules;
+        let workdir = turn.workdir;
+        if let Some(refusal) = rule_check::check(rules, workdir, call) {
+            turn.append(rule_check::event(&call.id, &refusal))?;
+            record(
+                turn,
+                message_id,
+                call,
+                ToolResult::failure(refusal.rule.refusal()),
+            )?;
             continue;
         }
         let (tools, stop) = (turn.tools, turn.stop);

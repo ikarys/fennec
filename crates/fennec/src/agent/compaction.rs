@@ -164,6 +164,7 @@ mod tests {
             compact_at: 0.85,
             reasoning_effort: None,
             autonomous: false,
+            rules: &rules::NO_RULES,
             stop: &stop,
             on_event: &mut on_event,
         };

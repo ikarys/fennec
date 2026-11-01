@@ -68,11 +68,21 @@ pub fn with_turn<R>(
     // A session worktree is the agent's own copy: a new dependency's lockfile
     // may change there, and the integration gate shows it to the human. Outside
     // a worktree the mount list is empty, so this is a no-op for the CLI.
-    let protection = if workdir.starts_with(worktree::root(&settings.db_path)) {
+    // The human's rules: global, plus the session's project's. Loaded per turn, so a rule
+    // changed in the UI applies from the next turn.
+    let rules = match store.session(session_id)? {
+        Some(session) => store.rules_for(&session.project_id)?,
+        None => rules::Rules::default(),
+    };
+    // Path rules are merged into `Protection` so the file tools and sandbox enforce them.
+    // `paths()` also yields `Ask` path rules; in this PR an `Ask` blocks, so that is intended.
+    let blocked_paths: Vec<String> = rules.paths().map(|rule| rule.target.pattern()).collect();
+    let protection = (if workdir.starts_with(worktree::root(&settings.db_path)) {
         protected::load_for_worktree(workdir)
     } else {
         protected::load(workdir)
-    };
+    })
+    .with_patterns(&blocked_paths);
     let tools = LocalTools::new(workdir.to_path_buf())
         .with_search(prefs.search.clone())
         .with_sandbox(
@@ -80,7 +90,8 @@ pub fn with_turn<R>(
                 .protecting(protected::existing_paths(workdir, &protection))
                 .with_mounts(worktree::dependency_mounts(workdir)),
         )
-        .with_protection(protection);
+        .with_protection(protection)
+        .with_rules(rules);
     let mut turn = Turn {
         model: &model,
         log,
@@ -96,6 +107,7 @@ pub fn with_turn<R>(
         compact_at: params.compact_at,
         reasoning_effort: params.reasoning_effort,
         autonomous: options.autonomous,
+        rules: tools.rules(),
         stop,
         on_event: &mut options.on_event,
     };

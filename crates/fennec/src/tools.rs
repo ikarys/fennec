@@ -28,6 +28,7 @@ use crate::domain::agent::CommandAccess;
 use crate::domain::event::{OutputStream, ToolResult};
 use crate::domain::preferences::SearchPrefs;
 use crate::domain::protection::Protection;
+use rules::Rules;
 use serde_json::Value;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
@@ -39,6 +40,7 @@ pub struct LocalTools {
     sandbox: Sandbox,
     protection: Protection,
     web_cache: PathBuf,
+    rules: Rules,
 }
 
 impl LocalTools {
@@ -52,6 +54,7 @@ impl LocalTools {
             // unprotected.
             protection: Protection::default(),
             web_cache: web_fetch::default_cache_dir(),
+            rules: Rules::default(),
         }
     }
 
@@ -68,6 +71,15 @@ impl LocalTools {
     pub fn with_protection(mut self, protection: Protection) -> LocalTools {
         self.protection = protection;
         self
+    }
+
+    pub fn with_rules(mut self, rules: Rules) -> LocalTools {
+        self.rules = rules;
+        self
+    }
+
+    pub fn rules(&self) -> &Rules {
+        &self.rules
     }
 }
 
@@ -130,6 +142,14 @@ impl Toolbox for LocalTools {
 
 impl Commands for LocalTools {
     fn run(&self, command: &str, timeout: Duration, stop: &AtomicBool) -> CommandRun {
+        // A workflow shell node cannot pause for the human: any matching rule refuses it.
+        if let Some(rule) = self.rules.check_command(command) {
+            return CommandRun {
+                exit_code: None,
+                stopped: false,
+                output: rule.refusal(),
+            };
+        }
         let mut on_output = |_: OutputStream, _: &str| {};
         match run_command::process::execute(
             command,

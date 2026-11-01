@@ -148,6 +148,7 @@ impl Transcript {
             | Event::TaskProposed { .. }
             | Event::TaskAccepted { .. }
             | Event::AgentSuggested { .. }
+            | Event::RuleBlocked { .. }
             | Event::AgentsMdWritten { .. }
             | Event::WorktreeDiscarded { .. } => Ok(()),
         };

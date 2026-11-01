@@ -6,6 +6,7 @@ import { TasksSection } from '../components/project/ideas/TasksSection';
 import { MapSection } from '../components/project/MapSection';
 import { DocSection } from '../components/project/DocSection';
 import { RiskSection } from '../components/project/RiskSection';
+import { RulesSection } from '../components/rules/RulesSection';
 import { AnalysesSection } from '../components/project/AnalysesSection';
 import { DiskSection } from '../components/project/DiskSection';
 import { DashboardSection } from '../components/project/DashboardSection';
@@ -22,6 +23,7 @@ const TABS = [
   { id: 'tasks', label: 'Tâches' },
   { id: 'map', label: 'Carte des modules' },
   { id: 'risks', label: 'Risques' },
+  { id: 'rules', label: 'Règles' },
   { id: 'doc', label: 'Doc' },
   { id: 'analyses', label: 'Analyses' },
   { id: 'disk', label: 'Espace disque' },
@@ -191,6 +193,7 @@ export default function ProjectPage({
           ) : null}
           {activeTab === 'map' ? <MapTab projectId={projectId} /> : null}
           {activeTab === 'risks' ? <RiskSection projectId={projectId} /> : null}
+          {activeTab === 'rules' ? <RulesSection projectId={projectId} /> : null}
           {activeTab === 'doc' ? <DocSection projectId={projectId} /> : null}
           {activeTab === 'analyses' ? (
             <AnalysesSection

@@ -41,6 +41,7 @@ use crate::domain::open_calls;
 use crate::domain::preferences::ReasoningEffort;
 use crate::domain::replay::replayable;
 use crate::domain::skill::Skill;
+use rules::Rules;
 use serde_json::Value;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -80,6 +81,8 @@ pub struct Turn<'a> {
     /// The human is away (the ideas queue's night mode): `ask_user` and
     /// `propose_criteria` answer themselves instead of pausing the turn.
     pub autonomous: bool,
+    /// The human's rules, checked before each tool call (fennec's code, never the model).
+    pub rules: &'a Rules,
     /// Set by the human to stop the turn: checked between rounds, while
     /// streaming and while a command runs.
     pub stop: &'a AtomicBool,
@@ -542,6 +545,7 @@ mod tests {
                 compact_at: 0.0,
                 reasoning_effort: None,
                 autonomous: false,
+                rules: &rules::NO_RULES,
                 stop: self.stop,
                 on_event: &mut self.on_event,
             }
@@ -549,6 +553,14 @@ mod tests {
     }
 
     fn run(model: &dyn Model, workdir: &Path) -> (DoneReason, Vec<Event>) {
+        run_with_rules(model, workdir, &rules::NO_RULES)
+    }
+
+    fn run_with_rules(
+        model: &dyn Model,
+        workdir: &Path,
+        rules: &Rules,
+    ) -> (DoneReason, Vec<Event>) {
         let log = MemoryLog::default();
         let tools = LocalTools::new(workdir.to_path_buf());
         let stop = AtomicBool::new(false);
@@ -569,6 +581,7 @@ mod tests {
             compact_at: 0.0,
             reasoning_effort: None,
             autonomous: false,
+            rules,
             stop: &stop,
             on_event: &mut on_event,
         };
@@ -580,6 +593,40 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("fennec-turn-{}", new_id()));
         std::fs::create_dir_all(&dir).unwrap();
         dir
+    }
+
+    #[test]
+    fn a_command_matching_a_rule_is_refused_and_logged() {
+        let dir = scratch_dir();
+        std::fs::create_dir_all(dir.join("target")).unwrap();
+        let call = ToolCall {
+            id: "c1".into(),
+            name: "run_command".into(),
+            arguments: json!({"command": "rm -fr target"}),
+            parse_error: None,
+            raw_arguments: None,
+        };
+        let model = Scripted(RefCell::new(vec![
+            reply("", vec![call]),
+            reply("done", vec![]),
+        ]));
+        let rules = Rules::new(vec![rules::Rule {
+            id: "block-rm".into(),
+            scope: rules::Scope::Global,
+            target: rules::Target::parse(rules::TargetKind::Command, "rm -rf").unwrap(),
+            action: rules::Action::Block,
+            note: None,
+        }]);
+        let (_, events) = run_with_rules(&model, &dir, &rules);
+        assert!(events.iter().any(
+            |e| matches!(e, Event::RuleBlocked { subject, .. } if subject == "rm -fr target")
+        ));
+        assert!(events.iter().any(|e| matches!(
+            e,
+            Event::ToolResult { result, .. } if !result.success && result.error.as_deref().is_some_and(|m| m.contains("rm -rf"))
+        )));
+        assert!(dir.join("target").exists(), "the command never ran");
+        std::fs::remove_dir_all(dir).ok();
     }
 
     #[test]
@@ -797,6 +844,7 @@ mod tests {
             compact_at: 0.0,
             reasoning_effort: None,
             autonomous: false,
+            rules: &rules::NO_RULES,
             stop: &stop,
             on_event: &mut on_event,
         };
@@ -1610,6 +1658,7 @@ mod tests {
             compact_at: 0.0,
             reasoning_effort: None,
             autonomous: false,
+            rules: &rules::NO_RULES,
             stop: &stop,
             on_event: &mut on_event,
         };
