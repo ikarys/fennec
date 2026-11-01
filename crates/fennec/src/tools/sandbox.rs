@@ -157,6 +157,15 @@ impl Sandbox {
         }
     }
 
+    /// The same sandbox with `paths` writable too (bound after the hidden
+    /// dirs, so a path inside fennec's hidden store is reachable).
+    pub fn writing(mut self, paths: Vec<PathBuf>) -> Sandbox {
+        if let Sandbox::Bwrap { writable, .. } = &mut self {
+            writable.extend(paths);
+        }
+        self
+    }
+
     /// The same sandbox with `workdir` itself read-only (later mounts win over
     /// its writable bind); `None` when the human turned the sandbox off, since
     /// nothing could then keep a command from writing.

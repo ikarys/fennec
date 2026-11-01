@@ -239,7 +239,8 @@ crates/fennec/src/
                      to the ledger) and the backfill of past calls; store/calls.rs reads them from the log
   git.rs             what fennec reads from a repository
   worktree.rs        a session's git worktree: a workflow never writes the human's tree; the main
-                     checkout's node_modules/.venv mounted read-only into its sandbox
+                     checkout's node_modules/.venv mounted read-only into its sandbox; one Cargo
+                     target per project shared by its worktrees (`CARGO_TARGET_DIR`)
   integration.rs     the human's integration: preview of a worktree branch, cherry-pick, conflict abort
   instructions.rs    openfox context/instructions: Settings' global instructions + the
                      AGENTS.md files above the workdir, for a new session's prompt
