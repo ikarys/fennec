@@ -67,7 +67,13 @@ pub fn after_turn(events: &[Event], stopped: bool) -> AfterTurn {
     if stopped {
         return AfterTurn::Cancel(pending.into_iter().map(|q| q.queue_id).collect());
     }
-    if super::rule_approval::pending(events).is_some() || super::waiver::pending(events).is_some() {
+    // A workflow still running (waiting on the human, paused) is not a turn to
+    // start beside: its same-session agent nodes drain the queue, and what is
+    // left waits for the run to end.
+    if super::rule_approval::pending(events).is_some()
+        || super::waiver::pending(events).is_some()
+        || super::workflow::run::current_run(events).is_some_and(|run| run.finished.is_none())
+    {
         return AfterTurn::Hold;
     }
     AfterTurn::Start(pending.into_iter().next().expect("pending is not empty"))
@@ -182,6 +188,25 @@ mod tests {
                 call_id: "c1".into(),
                 path: "AGENTS.md".into(),
                 reason: "why".into(),
+            },
+            added("a", "first"),
+        ];
+        assert_eq!(after_turn(&events, false), AfterTurn::Hold);
+    }
+
+    #[test]
+    fn after_turn_holds_while_a_workflow_runs() {
+        let workflow = serde_json::from_value(json!({
+            "id": "w", "name": "w", "nodes": [], "edges": []
+        }))
+        .expect("a minimal workflow");
+        let events = vec![
+            Event::WorkflowStarted {
+                run_id: "r".into(),
+                workflow,
+                task: String::new(),
+                step_by_step: false,
+                started_at: None,
             },
             added("a", "first"),
         ];
