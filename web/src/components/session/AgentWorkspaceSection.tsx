@@ -156,7 +156,7 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
   const hasCommits = (preview?.commits.length ?? 0) > 0;
   // The file list lives in the Fichiers modifiés block; here only what blocks the review.
   const protectedCount = preview?.files.filter((file) => file.protected).length ?? 0;
-  const integrateDisabled = sessionId === null || running || !hasCommits || invite === null;
+  const integrateDisabled = sessionId === null || running || invite === null;
   const conflictFiles =
     preview?.blockers.find(
       (blocker): blocker is Extract<Blocker, { kind: 'conflict' }> => blocker.kind === 'conflict',
@@ -301,16 +301,19 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
                 {conflictError && <div className="text-xs text-err">{conflictError}</div>}
               </div>
             )}
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => invite?.open()}
-              disabled={integrateDisabled}
-              title={running ? 'Attends la fin du tour' : undefined}
-              className="w-full"
-            >
-              Intégrer dans {humanBranch}
-            </Button>
+            {/* A branch with no commit (a read-only agent, or already integrated) has nothing to integrate. */}
+            {hasCommits && (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => invite?.open()}
+                disabled={integrateDisabled}
+                title={running ? 'Attends la fin du tour' : undefined}
+                className="w-full"
+              >
+                Intégrer dans {humanBranch}
+              </Button>
+            )}
 
             {/* Once integrated the branch holds nothing past its base: nothing to abandon. */}
             {hasCommits && (
