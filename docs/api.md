@@ -382,7 +382,7 @@ read-only. The human edits them as usual.
   `request` is the first message the human typed in the session, verbatim, or null;
   `model` is `{provider, model, providerName, contextWindow, compactAt, source}`,
   what the next turn runs on; `source` is `session`, `parent` or `default`;
-  `worktree` is `{path, branch, base, editorUrl}` (`editorUrl` opens the copy in VS Code, through the WSL remote under WSL) when the session (or its root session) runs a workflow in
+  `worktree` is `{path, branch, base, editorUrl, commits}` (`commits`: the agent's commits past the base, 0 when there is nothing to integrate; `editorUrl` opens the copy in VS Code, through the WSL remote under WSL) when the session (or its root session) runs a workflow in
   its own git worktree, else null; the human takes the agent's work with
   `git cherry-pick <base>..<branch>`;
   `mode` is the id of the agent the session resolves to from its event log
