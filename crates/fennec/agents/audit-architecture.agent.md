@@ -10,6 +10,7 @@ allowedTools:
   - read_file
   - run_command
   - load_skill
+  - suggest_agent
 ---
 
 # Audit architecture
