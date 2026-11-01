@@ -5,7 +5,7 @@ use crate::domain::event::OutputStream;
 use crate::tools::sandbox::Sandbox;
 use std::io::BufRead;
 use std::os::unix::process::CommandExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
@@ -27,19 +27,35 @@ pub struct Execution {
     pub duration_ms: u64,
 }
 
+/// What to start and in which world: `workdir` is the writable root, `env`
+/// extra variables (bwrap passes its environment through, so they reach the
+/// command with and without the sandbox).
+pub struct Launch<'a> {
+    pub command: &'a str,
+    pub workdir: &'a Path,
+    pub cwd: &'a Path,
+    pub sandbox: &'a Sandbox,
+    pub env: &'a [(String, PathBuf)],
+}
+
 pub fn execute(
-    command: &str,
-    workdir: &Path,
-    cwd: &Path,
+    launch: Launch,
     timeout: Duration,
     stop: &AtomicBool,
     on_output: &mut dyn FnMut(OutputStream, &str),
-    sandbox: &Sandbox,
 ) -> Result<Execution, String> {
+    let Launch {
+        command,
+        workdir,
+        cwd,
+        sandbox,
+        env,
+    } = launch;
     let started = Instant::now();
     let sandbox_on = matches!(sandbox, Sandbox::Bwrap { .. });
     let mut child = sandbox
         .command(command, workdir, cwd)
+        .envs(env.iter().map(|(name, value)| (name, value)))
         // Its own process group, so a stop or timeout kills what the shell started too:
         // a surviving grandchild keeps the pipes open. Under bwrap, killing the group
         // kills bwrap; --die-with-parent and the PID namespace then end the rest: when
