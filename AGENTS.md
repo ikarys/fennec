@@ -146,7 +146,8 @@ human away, a request is refused.
 Prompt queue, done: a message typed while a turn runs is queued (`queue.added`, openfox's asap mode) and shown above the
 composer, each removable; the loop drops the queued messages into the turn between tool rounds (a slash command waits),
 and the first one left starts the next turn when it ends (`domain/queue.rs`, `agent/queue.rs`). A stop drops the queue;
-a pending approval or waiver holds it until the human answers.
+a pending approval or waiver holds it until the human answers, an unfinished workflow run until it ends (its same-session
+agent nodes drop it in).
 Sensitive zones, done (C2, proportionality): `sensitive <pattern>` lines in `.agents/architecture` (gitignore-like) mark
 the paths where the human's review is mandatory; a branch that changes one gets a `sensitiveTouched` blocker the human
 accepts, and those files lead the review map with a "zone sensible" signal (verified; `domain/architecture.rs`).
