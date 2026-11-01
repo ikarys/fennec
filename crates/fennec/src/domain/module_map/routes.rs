@@ -233,6 +233,7 @@ mod tests {
                 imports: 1,
                 path: String::new(),
                 label: Point { x: 0, y: 0 },
+                violation: false,
             })
             .collect();
         route(&mut ms, &mut ds);

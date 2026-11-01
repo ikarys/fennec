@@ -19,7 +19,9 @@ pub fn is_test_path(relative: &str) -> bool {
         return true;
     }
     let stem_of = |exts: &[&str]| exts.iter().any(|ext| name.ends_with(ext));
-    stem_of(&["_test.rs", "_test.go", "_test.py"])
+    // `tests.rs` is the file of a `#[cfg(test)] mod tests;`, Rust's convention.
+    name == "tests.rs"
+        || stem_of(&["_test.rs", "_test.go", "_test.py"])
         || (name.starts_with("test_") && name.ends_with(".py"))
         || ["test", "spec"].iter().any(|kind| {
             ["ts", "tsx", "js", "jsx"]
@@ -71,6 +73,7 @@ mod tests {
             "src/test/x.java",
             "web/__tests__/a.ts",
             "src/foo_test.rs",
+            "src/agent/workflow/tests.rs",
             "pkg/foo_test.go",
             "test_foo.py",
             "a/foo_test.py",
