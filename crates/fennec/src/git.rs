@@ -119,6 +119,31 @@ pub fn dirty_count(workdir: &Path) -> usize {
     count
 }
 
+/// The sessions whose work reached the checked-out branch: the `Fennec-Session` trailers an
+/// integration writes, read from HEAD's history in one `git log`. Survives the session's deletion.
+pub fn integrated_sessions(workdir: &Path) -> HashSet<String> {
+    let Ok(out) = Command::new("git")
+        .current_dir(workdir)
+        .args([
+            "log",
+            "HEAD",
+            "--format=%(trailers:key=Fennec-Session,valueonly)",
+        ])
+        .output()
+    else {
+        return HashSet::new();
+    };
+    session_trailers(&String::from_utf8_lossy(&out.stdout))
+}
+
+fn session_trailers(log: &str) -> HashSet<String> {
+    log.lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(String::from)
+        .collect()
+}
+
 /// The sessions whose worktree branch holds commits past their base ref: work
 /// still waiting for the human. One `git for-each-ref` per project; sessions
 /// whose branch or base is gone (discarded, never opened) are not listed.
@@ -206,8 +231,15 @@ fn unintegrated(refs: &str) -> HashSet<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{dirty_count, remote_url, unintegrated, web_url};
+    use super::{dirty_count, remote_url, session_trailers, unintegrated, web_url};
+    use std::collections::HashSet;
     use std::process::Command;
+
+    #[test]
+    fn session_trailers_lists_each_integrated_session() {
+        let ids = session_trailers("s1\n\n\n  s2 \n\n");
+        assert_eq!(ids, HashSet::from(["s1".to_string(), "s2".to_string()]));
+    }
 
     #[test]
     fn pending_only_when_branch_moved_past_base() {

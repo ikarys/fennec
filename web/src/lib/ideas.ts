@@ -21,7 +21,7 @@ export type IdeaStatus =
 
 export type IdeaAction = 'frame' | 'resumeFraming' | 'start' | 'open' | 'answer' | 'review';
 
-export type IdeaMenuAction = 'restart' | 'reframe' | 'startUnframed' | 'complete' | 'drop';
+export type IdeaMenuAction = 'restart' | 'reframe' | 'startUnframed' | 'complete' | 'drop' | 'remove';
 
 /** A file or image pinned to an idea, kept as a data URL. */
 export interface IdeaAttachmentView {

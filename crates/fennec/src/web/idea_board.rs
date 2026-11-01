@@ -2,6 +2,8 @@
 //! status from its live session, the queue, the night report. Served by
 //! `idea_routes.rs` per project and gathered by `backlog_routes.rs` across them.
 
+use std::cell::OnceCell;
+use std::collections::HashSet;
 use std::path::Path;
 
 use serde_json::{Value, json};
@@ -27,6 +29,8 @@ pub(super) struct Board<'a> {
     project: &'a Project,
     queue: Vec<&'a Idea>,
     ledger: Option<Ledger>,
+    /// Read from git only when an idea's session is gone (see `integrated_in_git`).
+    integrated_sessions: OnceCell<HashSet<String>>,
 }
 
 impl<'a> Board<'a> {
@@ -43,7 +47,16 @@ impl<'a> Board<'a> {
             project,
             queue: queue_order(backlog),
             ledger: Ledger::open(&app.settings.usage_path()).ok(),
+            integrated_sessions: OnceCell::new(),
         }
+    }
+
+    /// The session's work is on the project's checked-out branch: what still proves an
+    /// integration once the human deleted the session and its log with it.
+    fn integrated_in_git(&self, session_id: &str) -> bool {
+        self.integrated_sessions
+            .get_or_init(|| crate::git::integrated_sessions(Path::new(&self.project.workdir)))
+            .contains(session_id)
     }
 
     /// The status the human sees for one idea of this board.
@@ -202,6 +215,9 @@ fn idea_view(board: &Board, idea: &Idea) -> Result<(Status, Value), String> {
         session = store.session(session_id)?;
         session_state = session.as_ref().map(|s| s.state(running));
         report = app.idea_report(store, session_id)?;
+        if session.is_none() {
+            report.integrated = board.integrated_in_git(session_id);
+        }
     }
 
     // A framing session where the human launched a workflow went past
@@ -330,10 +346,11 @@ fn idea_view(board: &Board, idea: &Idea) -> Result<(Status, Value), String> {
 }
 
 fn progress(state: Option<SessionState>, running: bool, integrated: bool) -> Option<Progress> {
-    let state = state?;
+    // Integration is final: it holds even once the session is gone.
     if integrated {
         return Some(Progress::Integrated);
     }
+    let state = state?;
     if running {
         return Some(Progress::Running);
     }
@@ -514,6 +531,7 @@ mod tests {
             project: &project,
             queue: queue_order(&backlog),
             ledger: None,
+            integrated_sessions: OnceCell::new(),
         };
 
         let (_, value) = idea_view(&board, &backlog.ideas[0]).unwrap();
@@ -525,6 +543,7 @@ mod tests {
     #[test]
     fn progress_maps_each_session_state() {
         assert!(progress(None, false, false).is_none());
+        assert_eq!(progress(None, false, true), Some(Progress::Integrated));
         assert!(matches!(
             progress(Some(SessionState::Idle), false, true),
             Some(Progress::Integrated)
