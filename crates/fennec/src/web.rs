@@ -6,6 +6,7 @@ mod assets;
 mod audit_routes;
 mod backlog_routes;
 mod children;
+mod commit_subject;
 mod context_view;
 mod editor;
 mod event_stream;
