@@ -9,6 +9,7 @@ mod preflight;
 mod prompt;
 mod propose_criteria;
 mod propose_task;
+mod queue;
 mod record_decision;
 mod request_waiver;
 mod round;

@@ -499,6 +499,16 @@ export function answerWaiver(id: string, callId: string, hours: number | null): 
   });
 }
 
+export function cancelQueued(id: string, queueId: string): Promise<void> {
+  return request<void>(
+    `/api/sessions/${encodeURIComponent(id)}/queue/${encodeURIComponent(queueId)}/cancel`,
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    },
+  );
+}
+
 export function setSessionMode(id: string, mode: string): Promise<void> {
   return request<void>(`/api/sessions/${encodeURIComponent(id)}/mode`, {
     method: "POST",

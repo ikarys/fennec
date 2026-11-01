@@ -126,6 +126,11 @@ export interface PendingWaiver {
   reason: string;
 }
 
+export interface QueuedMessage {
+  queueId: string;
+  content: string;
+}
+
 export type Provenance =
   | { kind: 'verified'; command: string; exitCode?: number; output: string }
   | { kind: 'indicative'; agent: string; reason: string };
@@ -159,6 +164,8 @@ export interface ThreadView {
   pendingApproval?: PendingApproval;
   /** The protected-file waiver waiting for the human's answer, if any. */
   pendingWaiver?: PendingWaiver;
+  /** Messages queued while a turn runs, in order. */
+  queued: QueuedMessage[];
   modifiedFiles: ModifiedFile[];
   toolCounts: ToolCount[];
   /**
@@ -337,6 +344,7 @@ export function createThreadFold(): ThreadFold {
   let pendingQuestion: PendingQuestion | undefined;
   let pendingApproval: PendingApproval | undefined;
   let pendingWaiver: PendingWaiver | undefined;
+  const queued = new Map<string, string>();
   const modified = new Map<string, ModifiedFile>();
   const toolCounts = new Map<string, number>();
   const assistants = new Map<string, AssistantItem>();
@@ -594,6 +602,20 @@ export function createThreadFold(): ThreadFold {
         }
         const tool = tools.get(callId);
         if (tool) tool.awaitingApproval = false;
+        break;
+      }
+
+      case 'queue.added': {
+        const queueId = String(data.queueId ?? '');
+        if (queueId) {
+          queued.set(queueId, String(data.content ?? ''));
+        }
+        break;
+      }
+
+      case 'queue.drained':
+      case 'queue.cancelled': {
+        queued.delete(String(data.queueId ?? ''));
         break;
       }
 
@@ -939,6 +961,7 @@ export function createThreadFold(): ThreadFold {
     pendingQuestion,
     pendingApproval,
     pendingWaiver,
+    queued: Array.from(queued.entries()).map(([queueId, content]) => ({ queueId, content })),
     modifiedFiles: Array.from(modified.values()),
     toolCounts: Array.from(toolCounts.entries()).map(([name, count]) => ({ name, count })),
     mode,
