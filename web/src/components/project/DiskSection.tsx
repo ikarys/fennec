@@ -265,6 +265,8 @@ function SessionRow({
         >
           {entry.sessionTitle ? (
             <span>{entry.sessionTitle}</span>
+          ) : entry.cache ? (
+            <span>Cache Cargo partagé</span>
           ) : (
             <span className="font-mono text-xs">{entry.name}</span>
           )}
@@ -295,17 +297,19 @@ function SessionRow({
         >
           <EraserIcon className="h-3.5 w-3.5" />
         </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          iconOnly
-          title="Supprimer le worktree et sa branche"
-          aria-label="Supprimer le worktree et sa branche"
-          disabled={busy || entry.running}
-          onClick={onTrash}
-        >
-          <TrashIcon className="h-3.5 w-3.5" />
-        </Button>
+        {entry.cache ? null : (
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            title="Supprimer le worktree et sa branche"
+            aria-label="Supprimer le worktree et sa branche"
+            disabled={busy || entry.running}
+            onClick={onTrash}
+          >
+            <TrashIcon className="h-3.5 w-3.5" />
+          </Button>
+        )}
       </div>
     </div>
   );

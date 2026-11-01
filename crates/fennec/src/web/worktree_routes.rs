@@ -82,7 +82,7 @@ pub fn clean(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), Str
     let Some(name) = body_name(req) else {
         return error(stream, 400, "invalid worktree name");
     };
-    if !usage::valid_name(&name) {
+    if !usage::valid_name(&name) && name != usage::CARGO_CACHE {
         return error(stream, 400, "invalid worktree name");
     }
 
@@ -244,6 +244,8 @@ fn belongs(
 ) -> bool {
     match session_project {
         Some(project) => project == project_id,
+        // The shared Cargo cache serves every project.
+        None if entry.name == usage::CARGO_CACHE => true,
         // An orphan whose repository is gone has no project left: every page shows it.
         None => {
             repo_missing(entry)
@@ -271,7 +273,8 @@ fn repo_missing(entry: &WorktreeUsage) -> bool {
 }
 
 fn entry_json(entry: &WorktreeUsage, session: Option<(&str, &str, u64)>, running: bool) -> Value {
-    let orphan = session.is_none() || !entry.registered;
+    let cache = entry.name == usage::CARGO_CACHE;
+    let orphan = !cache && (session.is_none() || !entry.registered);
     let repo_missing = repo_missing(entry);
     let sudo_command = if orphan && entry.foreign_owned {
         Some(format!("sudo rm -rf {}", entry.path.display()))
@@ -288,6 +291,7 @@ fn entry_json(entry: &WorktreeUsage, session: Option<(&str, &str, u64)>, running
         "bytes": entry.bytes,
         "generatedBytes": entry.generated_bytes,
         "orphan": orphan,
+        "cache": cache,
         "repoMissing": repo_missing,
         "foreignOwned": entry.foreign_owned,
         "sudoCommand": sudo_command,
@@ -309,6 +313,14 @@ mod tests {
             repo_top,
             registered: true,
         }
+    }
+
+    #[test]
+    fn cargo_cache_belongs_everywhere_and_is_no_orphan() {
+        let mut cache = entry(usage::CARGO_CACHE, None);
+        cache.registered = false;
+        assert!(belongs(&cache, None, "project", Path::new("/tmp/work")));
+        assert_eq!(entry_json(&cache, None, false)["orphan"], false);
     }
 
     #[test]

@@ -26,6 +26,9 @@ pub struct WorktreeUsage {
 /// Directory names holding build output or installed dependencies.
 pub const GENERATED: [&str; 3] = ["target", "node_modules", ".venv"];
 
+/// The shared Cargo target directories (one per project, see `shared_target`): a cache, all of it regenerable.
+pub const CARGO_CACHE: &str = ".cargo-target";
+
 /// Every directory directly under `root`, largest first. A missing root is an empty list.
 pub fn scan(root: &Path) -> Vec<WorktreeUsage> {
     if !root.is_dir() {
@@ -44,7 +47,10 @@ pub fn scan(root: &Path) -> Vec<WorktreeUsage> {
             }
 
             let root_uid = meta.uid();
-            let (bytes, generated_bytes, foreign_owned) = measure(&path, 0, false, root_uid);
+            let (bytes, mut generated_bytes, foreign_owned) = measure(&path, 0, false, root_uid);
+            if entry.file_name() == CARGO_CACHE {
+                generated_bytes = bytes;
+            }
             let (repo_top, registered) = repository(&path);
 
             usages.push(WorktreeUsage {
@@ -74,9 +80,14 @@ pub fn valid_name(name: &str) -> bool {
 /// Empties the generated directories of one worktree: `target` is removed, `node_modules` and `.venv`
 /// are emptied but kept (the sandbox mounts the main checkout's copies on them). Returns the bytes freed.
 /// A permission error is an Err that ends with the command to run: "`sudo rm -rf <dir>`".
+/// The shared Cargo cache is emptied whole.
 pub fn clean_generated(path: &Path) -> Result<u64, String> {
     let mut dirs = Vec::new();
-    generated_dirs(path, 0, &mut dirs);
+    if path.file_name().is_some_and(|name| name == CARGO_CACHE) {
+        dirs.push(path.to_path_buf());
+    } else {
+        generated_dirs(path, 0, &mut dirs);
+    }
     let mut freed = 0;
     for dir in dirs {
         if dir.file_name().is_some_and(|name| name == "target") {
@@ -334,6 +345,22 @@ mod tests {
             0
         );
         assert!(worktree.join("src").exists());
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn cargo_cache_is_all_generated_and_emptied_whole() {
+        let root = temp_dir();
+        let cache = root.join(CARGO_CACHE);
+        write_file(&cache.join("home-me-project/debug"), "lib", 8192);
+
+        let usage = scan(&root).into_iter().next().unwrap();
+        assert_eq!(usage.generated_bytes, usage.bytes);
+
+        assert!(clean_generated(&cache).unwrap() > 0);
+        assert!(cache.is_dir());
+        assert_eq!(fs::read_dir(&cache).unwrap().count(), 0);
 
         let _ = std::fs::remove_dir_all(&root);
     }
