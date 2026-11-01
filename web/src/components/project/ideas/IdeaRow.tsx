@@ -1,9 +1,10 @@
 /**
  * One idea in the board: title, the rest of its text, status, meta, one
- * primary action, and a ⋯ menu.
+ * primary action, and a ⋯ menu. Ready ideas use it too, numbered and
+ * reorderable, with their framing session one click away.
  */
-import { useState } from 'react';
-import { Button } from '../../ui/Button';
+import { useState } from "react";
+import { Button } from "../../ui/Button";
 import {
   EditIcon,
   ReviewIcon,
@@ -11,26 +12,26 @@ import {
   GripIcon,
   PlayIcon,
   ReplyIcon,
-} from '../../Icons';
-import { IdeaStatusBadge } from './IdeaStatusBadge';
-import { IdeaMeta } from './IdeaMeta';
-import { IdeaAttachments } from './IdeaAttachments';
-import { IdeaMenu } from './IdeaMenu';
-import { formatRelative } from '../../../lib/format';
+} from "../../Icons";
+import { IdeaStatusBadge } from "./IdeaStatusBadge";
+import { IdeaMeta } from "./IdeaMeta";
+import { IdeaAttachments } from "./IdeaAttachments";
+import { IdeaMenu } from "./IdeaMenu";
+import { formatRelative } from "../../../lib/format";
 import {
   startIdea,
   type IdeaAction,
   type IdeaBoard,
   type IdeaView,
-} from '../../../lib/ideas';
+} from "../../../lib/ideas";
 
 const ACTION_LABELS: Record<IdeaAction, string> = {
-  frame: 'Cadrer',
-  resumeFraming: 'Reprendre le cadrage',
-  start: 'Lancer',
-  open: 'Voir la session',
-  answer: 'Répondre',
-  review: 'Relire',
+  frame: "Cadrer",
+  resumeFraming: "Reprendre le cadrage",
+  start: "Lancer",
+  open: "Voir la session",
+  answer: "Répondre",
+  review: "Relire",
 };
 
 const ACTION_ICONS: Record<IdeaAction, typeof EditIcon> = {
@@ -67,7 +68,7 @@ export function IdeaRow({
   onFrame: (idea: IdeaView) => Promise<void>;
   onOpenSession: (sessionId: string) => void;
   run: (action: () => Promise<IdeaBoard>) => Promise<boolean>;
-  caps: IdeaBoard['queue']['caps'];
+  caps: IdeaBoard["queue"]["caps"];
   position: number | null;
   reorder: RowReorder | null;
 }) {
@@ -101,9 +102,9 @@ export function IdeaRow({
   // The one primary action the server chose for this idea.
   const renderAction = () => {
     const onClick =
-      idea.action === 'frame'
+      idea.action === "frame"
         ? () => void handleFrame()
-        : idea.action === 'start'
+        : idea.action === "start"
           ? () => void handleStart()
           : idea.sessionId
             ? () => onOpenSession(idea.sessionId as string)
@@ -125,24 +126,28 @@ export function IdeaRow({
     );
   };
 
-
+  // The primary action already opens the session for these.
+  const opensSession =
+    idea.action === "open" ||
+    idea.action === "answer" ||
+    idea.action === "review";
 
   return (
     <div
       className={[
-        'relative flex items-start gap-2 px-2 py-2 hover:bg-raised',
-        reorder?.dragging ? 'opacity-50' : null,
-        reorder?.over ? 'rounded-md ring-1 ring-accent' : null,
+        "relative flex items-start gap-2 px-3 py-2 hover:bg-raised",
+        reorder?.dragging ? "opacity-50" : null,
+        reorder?.over ? "rounded-md ring-1 ring-accent" : null,
       ]
         .filter(Boolean)
-        .join(' ')}
+        .join(" ")}
       draggable={reorder ? true : undefined}
       onDragStart={
         reorder
           ? (e) => {
-              e.dataTransfer.effectAllowed = 'move';
+              e.dataTransfer.effectAllowed = "move";
               // Firefox starts no drag without data.
-              e.dataTransfer.setData('text/plain', idea.id);
+              e.dataTransfer.setData("text/plain", idea.id);
               reorder.onDragStart();
             }
           : undefined
@@ -180,10 +185,10 @@ export function IdeaRow({
           aria-label="Réordonner"
           className="cursor-grab"
           onKeyDown={(e) => {
-            if (e.key === 'ArrowUp') {
+            if (e.key === "ArrowUp") {
               e.preventDefault();
               reorder.onKeyMove(-1);
-            } else if (e.key === 'ArrowDown') {
+            } else if (e.key === "ArrowDown") {
               e.preventDefault();
               reorder.onKeyMove(1);
             }
@@ -198,7 +203,10 @@ export function IdeaRow({
           {idea.title}
         </p>
         {idea.description ? (
-          <p className="m-0 truncate text-xs text-faint" title={idea.description}>
+          <p
+            className="m-0 truncate text-xs text-faint"
+            title={idea.description}
+          >
             {idea.description}
           </p>
         ) : null}
@@ -217,8 +225,25 @@ export function IdeaRow({
       </span>
 
       <div className="flex shrink-0 items-center gap-1">
+        {idea.sessionId && !opensSession ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            title="Ouvrir la session de cadrage"
+            aria-label="Ouvrir la session de cadrage"
+            onClick={() => onOpenSession(idea.sessionId as string)}
+          >
+            <EyeIcon className="h-4 w-4" />
+          </Button>
+        ) : null}
         {renderAction()}
-        <IdeaMenu idea={idea} projectId={projectId} onFrame={onFrame} run={run} />
+        <IdeaMenu
+          idea={idea}
+          projectId={projectId}
+          onFrame={onFrame}
+          run={run}
+        />
       </div>
     </div>
   );

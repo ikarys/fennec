@@ -41,7 +41,11 @@ pub fn root(db_path: &Path) -> PathBuf {
 pub fn find(root: &Path, project_dir: &Path, session_id: &str) -> Option<Worktree> {
     let (_, prefix) = repository(project_dir)?;
     let path = root.join(session_id);
-    path.is_dir().then(|| build(path, &prefix, session_id))
+    // A worktree's top holds a `.git` file; a bare folder left at its path (a
+    // file tool writing to a discarded worktree's old path) is not one.
+    path.join(".git")
+        .is_file()
+        .then(|| build(path, &prefix, session_id))
 }
 
 /// The session's worktree, created on first call; `Ok(None)` when `project_dir`
@@ -427,6 +431,8 @@ mod tests {
         let second = open(&root, &repo, "s1").unwrap().unwrap();
         assert_eq!(first, second);
         assert_eq!(find(&root, &repo, "s1"), Some(first));
+        std::fs::create_dir_all(root.join("s2/web")).unwrap();
+        assert_eq!(find(&root, &repo, "s2"), None);
         let _ = std::fs::remove_dir_all(&base);
     }
 
