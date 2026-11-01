@@ -534,9 +534,9 @@ read-only. The human edits them as usual.
   `queue.cancelled`.
 - `POST /api/sessions/{id}/messages` while a turn runs: 202 `{"queued": queueId}`
   when the message is queued; 409 `images wait for the end of the turn` with
-  attachments, or `a workflow is running in this session` while a workflow run
-  is unfinished. If the turn ended in between, the request falls through to the
-  normal start.
+  attachments. During a workflow run, the run's same-session agent nodes drop it
+  in between tool rounds; what is left waits for the run to end. If the turn
+  ended in between, the request falls through to the normal start.
 - `POST /api/sessions/{id}/replay` `{messageId}` → 202; 404 if no session;
   409 if a turn is running; 400 `only a message you typed in the current
   window can be replayed` when the id is not a user-typed message in the

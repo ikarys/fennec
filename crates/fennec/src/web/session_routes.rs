@@ -33,7 +33,7 @@ use crate::domain::session_skills::missed_always_on;
 use crate::domain::slash::{TurnInput, commands, resolve};
 use crate::domain::task_proposal;
 use crate::domain::vision::seen_images;
-use crate::domain::workflow::run::{Waiting, current_run};
+use crate::domain::workflow::run::Waiting;
 use crate::notifier::NotifyingLog;
 use crate::skills;
 use crate::store::SqliteStore;
@@ -506,9 +506,6 @@ pub(super) fn send_message(
     if app.turns.is_running(id) {
         if !attachments.is_empty() {
             return error(stream, 409, "images wait for the end of the turn");
-        }
-        if current_run(&store.events(id)?).is_some_and(|run| run.finished.is_none()) {
-            return error(stream, 409, "a workflow is running in this session");
         }
         let queue_id = new_id();
         match app.turns.enqueue(id, || {
