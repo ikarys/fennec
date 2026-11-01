@@ -9,7 +9,7 @@ use super::audit_routes;
 use super::http::{Request, error, send, send_json};
 use super::proposal_routes;
 use super::{
-    assets, backlog_routes, event_stream, idea_routes, integration, model_routes,
+    assets, backlog_routes, event_stream, file_manager, idea_routes, integration, model_routes,
     project_dashboard, project_delete, project_routes, rule_approval_routes, rule_routes, servers,
     session_delete, session_routes, settings_routes, terminal, waiver_routes, workflow_routes,
     worktree_routes,
@@ -171,6 +171,7 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
             integration::resolve_conflict(app, req, stream, id)
         }
         ("POST", ["api", "sessions", id, "terminal"]) => terminal::open(app, stream, id),
+        ("POST", ["api", "sessions", id, "files"]) => file_manager::open(app, stream, id),
         ("GET", ["api", "sessions", id, "servers"]) => servers::list(app, stream, id),
         ("POST", ["api", "sessions", id, "servers"]) => servers::save(app, req, stream, id),
         ("POST", ["api", "sessions", id, "servers", "start"]) => {

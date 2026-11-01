@@ -9,6 +9,7 @@ mod children;
 mod context_view;
 mod editor;
 mod event_stream;
+mod file_manager;
 mod guard;
 mod http;
 mod idea_assets;
