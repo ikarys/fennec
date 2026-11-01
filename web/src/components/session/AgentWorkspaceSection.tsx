@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Blocker, IntegrationPreview, RepoState, SessionDetail } from '../../lib/api';
-import { discardWorktree, getIntegration, getRepoState, openTerminal, resolveConflict } from '../../lib/api';
+import { discardWorktree, getIntegration, getRepoState, openFileManager, openTerminal, resolveConflict } from '../../lib/api';
 import { BranchIcon, CheckIcon, CopyIcon, EditIcon, FolderIcon, SpinnerIcon, TerminalIcon } from '../Icons';
 import { useIntegrationInvite } from './IntegrationInvite';
 import { Button, buttonClass } from '../ui/Button';
@@ -117,6 +117,12 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
     if (!sessionId) return;
     setTerminalError(null);
     openTerminal(sessionId).catch((failure) => setTerminalError(failure instanceof Error ? failure.message : 'Erreur'));
+  };
+  const [filesError, setFilesError] = useState<string | null>(null);
+  const handleOpenFiles = () => {
+    if (!sessionId) return;
+    setFilesError(null);
+    openFileManager(sessionId).catch((failure) => setFilesError(failure instanceof Error ? failure.message : 'Erreur'));
   };
   const terminalButton = (
     <Button
@@ -251,10 +257,17 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
             <SectionLabel>Ton dépôt</SectionLabel>
             <div className="flex items-center gap-2">
               <FolderIcon className="h-4 w-4 shrink-0 text-muted" />
-              <span title={repo.dir} className="grow overflow-hidden font-mono text-xs text-ellipsis whitespace-nowrap">
+              <button
+                type="button"
+                onClick={handleOpenFiles}
+                disabled={!sessionId}
+                title={`Ouvrir ${repo.dir} dans l'explorateur de fichiers`}
+                className="grow cursor-pointer overflow-hidden text-left font-mono text-xs text-ellipsis whitespace-nowrap hover:text-accent hover:underline"
+              >
                 {repo.dir.split(/[\\/]/).filter(Boolean).pop() ?? repo.dir}
-              </span>
+              </button>
             </div>
+            {filesError !== null && <div className="text-xs text-err">{filesError}</div>}
             <div className="flex items-center gap-2 text-xs">
               <BranchIcon className="h-4 w-4 shrink-0 text-muted" />
               <span title={repo.branch ?? undefined} className="grow overflow-hidden font-mono text-text text-ellipsis whitespace-nowrap">

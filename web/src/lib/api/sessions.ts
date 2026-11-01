@@ -533,6 +533,13 @@ export function openTerminal(id: string): Promise<void> {
   });
 }
 
+/** Opens the human's file manager in the session's project folder (their repository). */
+export function openFileManager(id: string): Promise<void> {
+  return request<void>(`/api/sessions/${encodeURIComponent(id)}/files`, {
+    method: "POST",
+  });
+}
+
 /** One server the human lists in the project's `.agents/servers.json`. */
 export interface ServerDef {
   name: string;
