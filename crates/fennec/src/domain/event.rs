@@ -486,6 +486,25 @@ pub enum Event {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         rule_id: Option<String>,
     },
+    /// The agent asked the human to waive the protection of one path (fennec's own event).
+    /// The call stays open until the human answers on the waiver card.
+    #[serde(rename = "waiver.requested", rename_all = "camelCase")]
+    WaiverRequested {
+        call_id: String,
+        path: String,
+        reason: String,
+    },
+    /// The human's answer to a `waiver.requested`.
+    #[serde(rename = "waiver.answered", rename_all = "camelCase")]
+    WaiverAnswered {
+        call_id: String,
+        granted: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        expires_at: Option<u64>,
+        /// The ADR file written for the grant, project-relative.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        adr: Option<String>,
+    },
     /// The human wrote the agent's AGENTS.md draft to the project (fennec's own event).
     #[serde(rename = "agents_md.written", rename_all = "camelCase")]
     AgentsMdWritten { replaced: bool },
@@ -540,6 +559,8 @@ impl Event {
             Event::RuleBlocked { .. } => "rule.blocked",
             Event::RuleApprovalRequested { .. } => "rule.approval_requested",
             Event::RuleApprovalAnswered { .. } => "rule.approval_answered",
+            Event::WaiverRequested { .. } => "waiver.requested",
+            Event::WaiverAnswered { .. } => "waiver.answered",
             Event::AgentsMdWritten { .. } => "agents_md.written",
             Event::WorktreeDiscarded { .. } => "worktree.discarded",
         }

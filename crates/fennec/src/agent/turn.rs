@@ -25,6 +25,7 @@ use super::prompt::system_prompt;
 use super::propose_criteria;
 use super::propose_task;
 use super::record_decision;
+use super::request_waiver;
 use super::round::{self, Round, RoundPrompt};
 use super::suggest_agent;
 use super::tool_calls::{Flow, INTERRUPTED_ERROR, execute_tools};
@@ -244,14 +245,16 @@ fn round_prompt_parts(turn: &mut Turn) -> Result<(String, Value), String> {
     Ok((prompt, tools))
 }
 
-/// The loop owns `ask_user`, `propose_criteria`, `record_decision`,
-/// `propose_task` and `suggest_agent`; they are not host tools, so their
-/// definitions are added to the toolbox's. `suggest_agent` lists the
-/// session's agents as of the first turn; definitions are frozen then.
+/// The loop owns `ask_user`, `request_waiver`, `propose_criteria`,
+/// `record_decision`, `propose_task` and `suggest_agent`; they are not host
+/// tools, so their definitions are added to the toolbox's. `suggest_agent`
+/// lists the session's agents as of the first turn; definitions are frozen
+/// then.
 fn tool_definitions(turn: &Turn) -> Value {
     let mut tool_defs = turn.tools.definitions();
     if let Some(arr) = tool_defs.as_array_mut() {
         arr.push(ask_user::definition());
+        arr.push(request_waiver::definition());
         arr.push(propose_criteria::definition());
         arr.push(record_decision::definition());
         arr.push(propose_task::definition());

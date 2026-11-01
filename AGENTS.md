@@ -138,12 +138,17 @@ an "ask" is refused.
 Produced architecture, done (C12): `.agents/architecture` also takes module rules (`<A> never imports <B>`), checked on
 every dependency of the project map; the "Carte des modules" tab lists the breaks, draws them red, and counts the dependencies added or
 removed since the committed `docs/map.md` (verified; `domain/drift.rs`).
+Waivers, done (C7): an agent that needs a protected file calls `request_waiver` (path, reason); the turn pauses on
+a card where only the human grants it, for 1, 8 or 24 hours, or refuses. A grant exempts exactly that path, in that
+session, until it expires (the file tools and the sandbox), and writes a MADR file to the session's `docs/adr/`, which
+goes with the branch to the integration gate (`domain/waiver.rs`, `agent/waiver.rs`, `web/waiver_routes.rs`). With the
+human away, a request is refused.
 Project deletion, done: a trash button on the project page deletes everything fennec holds for a project (sessions,
 worktrees and branches, rules, ideas); its source folder only when the human ticks the box, never the home, the root or
 fennec's store (`web/project_delete.rs`).
 Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
-1. Waivers (C7).
+1. To be chosen among the remaining capabilities C* of the Notion definition.
 Later: sub-agents as tools, when dogfooding shows sessions saturating their context.
 
 ## Layout
@@ -174,6 +179,7 @@ crates/fennec/src/
     attachment.rs      images sent to the model: sniffing, data URLs, limits
     replay.rs          which message the human may replay
     rule_approval.rs   the call paused for the human's approval, folded from the log; the four answers
+    waiver.rs          a protected file's waiver: the pending request, the active grants, the ADR a grant writes
     criteria.rs        acceptance criteria: the plan's "Done when", checks, verdicts, provenance
     preflight.rs       a plan's checks run before any change: fails, passes already, cannot run
     protection.rs      protected files: the defaults, the gitignore-like patterns, the matcher
@@ -205,6 +211,8 @@ crates/fennec/src/
     suggest_agent.rs   the loop's own tool: suggests a new session on another agent (the human opens it)
     rule_check.rs      the rules crate's decision on a tool call: the refusal and its `rule.blocked`, the approval request
     rule_approval.rs   the human's answer to an approval: runs or refuses the recorded call, resumes the loop
+    request_waiver.rs  the loop's own tool: asks the human to waive one protected file; the turn pauses
+    waiver.rs          the human's answer to a waiver (recorded at the click): the call's result, the loop resumed
     preflight.rs       runs a plan's checks at the end of the planner's turn, sends it back once
     compaction.rs      openfox context/compactor: the summary round and the new window
     prompt.rs          openfox chat/prompts: the system prompt, plus fennec's working method
@@ -233,7 +241,7 @@ crates/fennec/src/
                      ~/.agents/workflows, the project's .agents/workflows (the project wins)
   folders.rs         the folders the human browses to open a project
   protected.rs       the project's protected files: .agents/protected read, the existing paths found
-  adr.rs             the project's ADR files in docs/adr/, listed
+  adr.rs             the project's ADR files in docs/adr/, listed; a waiver's ADR written
   module_map.rs      the project map's source files (git ls-files) and docs/map.md read, written
   risk.rs            the risk zones measured from git: AI commits, churn, a parallel blame; the hot
                      files and the files tested on a branch, for the review map
@@ -242,7 +250,7 @@ crates/fennec/src/
                      notifier (wakes streams on append, no polling), turns, assets,
                      workflow_routes, project_routes (the project page), project_delete (a project deleted, its folder on request), project_dashboard (its overview tiles), idea_routes (its ideas board, HTTP only),
                      idea_queue (the queue's thread: starts ready ideas, night-mode caps, queue runs recorded),
-                     model_routes (the composer's model choices, a session's model), rule_routes (the human's rules), rule_approval_routes (an approval answered, its rule stored),
+                     model_routes (the composer's model choices, a session's model), rule_routes (the human's rules), rule_approval_routes (an approval answered, its rule stored), waiver_routes (a waiver answered, its ADR written),
                      children (child sessions for workflow nodes),
                      preview (a project's files in a sandboxed origin), session_usage,
                      workflow_usage, context_view and insight (display-ready token figures: the UI computes none)

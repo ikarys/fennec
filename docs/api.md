@@ -49,6 +49,8 @@ with camelCase fields.
 | `rule.blocked` | `{callId, ruleId, kind, pattern, scope, subject}`: fennec refused a tool call by one of the human's rules (fennec's own check, verified), before the call's failed `tool.result`; `kind` `command`/`tool`/`path`, `scope` `global`/`project`/`session`, `subject` the command, tool name or path refused (workdir-relative inside it, absolute outside) |
 | `rule.approval_requested` | `{callId, subject, ruleId, kind, pattern, access}`: fennec paused a tool call for the human (an "ask" rule, `ruleId` its id, or a file tool outside the workdir, `ruleId` null); the call stays open, no `tool.result`, and the turn ends `waiting_for_user`; `kind`/`pattern`/`access` are the rule the `session`, `always` and `never` answers store (`access` `read`/`write`/`readWrite` for a path, else null) |
 | `rule.approval_answered` | `{callId, choice, ruleId}`: the human's answer (`once`/`session`/`always`/`never`), `ruleId` the rule it stored (null for `once`); fennec then appends the call's `tool.result` (run, or refused for `never`) and the turn goes on |
+| `waiver.requested` | `{callId, path, reason}`: the agent's `request_waiver`: it asks the human to waive the protection of one project file; the call stays open, no `tool.result`, and the turn ends `waiting_for_user` (refused at once while the human is away) |
+| `waiver.answered` | `{callId, granted, expiresAt, adr}`: the human's answer, recorded at the click; a grant exempts exactly `path` from protection (file tools and sandbox) in this session until `expiresAt` (ms), and `adr` is the MADR file written for it (`docs/adr/NNNN-waiver-<slug>.md` in the session's workdir); fennec then appends the call's `tool.result` and the turn goes on |
 | `worktree.discarded` | `{branch, commits}`: the human discarded the session's worktree and branch; `commits` are the agent's commits that were dropped |
 | `workflow.paused` | `{runId, from, port, to}`: waiting before `to` |
 | `workflow.pause_requested` | `{runId}`: the human asked to pause at the next edge (after the current node) |
@@ -519,6 +521,11 @@ read-only. The human edits them as usual.
   allow rule for the session, `always` an allow rule and `never` a block rule for
   the project (origin: the answer), then a turn records `rule.approval_answered`,
   runs or refuses the recorded call and resumes the loop.
+- `POST /api/sessions/{id}/waiver` `{callId, grant, hours?}` → 202; 404 if no
+  session; 409 if a turn is running or `no pending waiver for this call`; 400 when
+  a grant has no `hours` between 1 and 168. A grant writes the waiver's ADR into the
+  session's workdir (refused through a symlinked `docs/` or `docs/adr`); the answer is
+  recorded as `waiver.answered`, then a turn records the call's result and resumes the loop.
 - `POST /api/sessions/{id}/replay` `{messageId}` → 202; 404 if no session;
   409 if a turn is running; 400 `only a message you typed in the current
   window can be replayed` when the id is not a user-typed message in the

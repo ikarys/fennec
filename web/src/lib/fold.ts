@@ -120,6 +120,12 @@ export interface PendingApproval {
   access: 'read' | 'write' | 'readWrite' | null;
 }
 
+export interface PendingWaiver {
+  callId: string;
+  path: string;
+  reason: string;
+}
+
 export type Provenance =
   | { kind: 'verified'; command: string; exitCode?: number; output: string }
   | { kind: 'indicative'; agent: string; reason: string };
@@ -151,6 +157,8 @@ export interface ThreadView {
   pendingQuestion?: PendingQuestion;
   /** The tool call waiting for the human's approval, if any. */
   pendingApproval?: PendingApproval;
+  /** The protected-file waiver waiting for the human's answer, if any. */
+  pendingWaiver?: PendingWaiver;
   modifiedFiles: ModifiedFile[];
   toolCounts: ToolCount[];
   /**
@@ -328,6 +336,7 @@ export function createThreadFold(): ThreadFold {
   let lastDone: string | undefined;
   let pendingQuestion: PendingQuestion | undefined;
   let pendingApproval: PendingApproval | undefined;
+  let pendingWaiver: PendingWaiver | undefined;
   const modified = new Map<string, ModifiedFile>();
   const toolCounts = new Map<string, number>();
   const assistants = new Map<string, AssistantItem>();
@@ -503,6 +512,9 @@ export function createThreadFold(): ThreadFold {
         if (pendingApproval?.callId === toolCallId) {
           pendingApproval = undefined;
         }
+        if (pendingWaiver?.callId === toolCallId) {
+          pendingWaiver = undefined;
+        }
         const tool = tools.get(toolCallId);
         if (!tool) break;
         if (tool.awaitingApproval) {
@@ -559,6 +571,26 @@ export function createThreadFold(): ThreadFold {
         const callId = String(data.callId ?? '');
         if (pendingApproval?.callId === callId) {
           pendingApproval = undefined;
+        }
+        const tool = tools.get(callId);
+        if (tool) tool.awaitingApproval = false;
+        break;
+      }
+
+      case 'waiver.requested': {
+        const callId = String(data.callId ?? `tool-${index}`);
+        const path = String(data.path ?? '');
+        const reason = String(data.reason ?? '');
+        pendingWaiver = { callId, path, reason };
+        const tool = tools.get(callId);
+        if (tool) tool.awaitingApproval = true;
+        break;
+      }
+
+      case 'waiver.answered': {
+        const callId = String(data.callId ?? '');
+        if (pendingWaiver?.callId === callId) {
+          pendingWaiver = undefined;
         }
         const tool = tools.get(callId);
         if (tool) tool.awaitingApproval = false;
@@ -623,6 +655,11 @@ export function createThreadFold(): ThreadFold {
             const tool = tools.get(pendingApproval.callId);
             if (tool) tool.awaitingApproval = false;
             pendingApproval = undefined;
+          }
+          if (pendingWaiver) {
+            const tool = tools.get(pendingWaiver.callId);
+            if (tool) tool.awaitingApproval = false;
+            pendingWaiver = undefined;
           }
         }
         break;
@@ -780,6 +817,17 @@ export function createThreadFold(): ThreadFold {
             pendingApproval = undefined;
           }
         }
+        if (pendingWaiver) {
+          const callId = pendingWaiver.callId;
+          const remains = items.some(
+            (item) =>
+              item.kind === 'assistant' &&
+              item.segments.some((segment) => segment.kind === 'tool' && segment.tool.id === callId)
+          );
+          if (!remains) {
+            pendingWaiver = undefined;
+          }
+        }
         break;
       }
 
@@ -890,6 +938,7 @@ export function createThreadFold(): ThreadFold {
     lastDone,
     pendingQuestion,
     pendingApproval,
+    pendingWaiver,
     modifiedFiles: Array.from(modified.values()),
     toolCounts: Array.from(toolCounts.entries()).map(([name, count]) => ({ name, count })),
     mode,
