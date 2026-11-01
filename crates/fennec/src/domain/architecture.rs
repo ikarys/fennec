@@ -1,8 +1,10 @@
-//! Architecture rules from `.agents/architecture`: the human declares what a
-//! path may not contain. Fennec checks only the lines an integration adds,
-//! so debt already in the file never blocks the check. Rules match text, not
-//! syntax (`use crate::{web}` or a `super::` path slips past them), so the
-//! check is a tripwire shown to the human, not a proof.
+//! Architecture rules from `.agents/architecture`: two kinds. Line rules
+//! (`<path prefix> forbids <text>`) are checked only on the lines an
+//! integration adds, so debt already in the file never blocks the check.
+//! Module rules (`<A> never imports <B>`) are checked on the whole project
+//! map. Rules match text, not syntax (`use crate::{web}` or a `super::` path
+//! slips past line rules), so the check is a tripwire shown to the human, not
+//! a proof.
 
 /// One `<path prefix> forbids <text>` rule.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -11,24 +13,74 @@ pub struct Rule {
     pub forbidden: String,
 }
 
+/// One `<A> never imports <B>` rule: a module id and the module id it must
+/// not import.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModuleRule {
+    pub from: String,
+    pub to: String,
+}
+
+impl ModuleRule {
+    /// A module id matches a rule side when it is the side itself or lives
+    /// under it (`a/b` under `a`), so a rule on a parent covers its children.
+    fn side_matches(id: &str, side: &str) -> bool {
+        id == side || id.starts_with(&format!("{side}/"))
+    }
+
+    /// Whether the dependency `from -> to` breaks this rule.
+    pub fn matches(&self, from: &str, to: &str) -> bool {
+        Self::side_matches(from, &self.from) && Self::side_matches(to, &self.to)
+    }
+}
+
+impl std::fmt::Display for ModuleRule {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} never imports {}", self.from, self.to)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Rules {
     rules: Vec<Rule>,
+    module_rules: Vec<ModuleRule>,
 }
 
 impl Rules {
+    /// The module rules, in file order.
+    pub fn module_rules(&self) -> &[ModuleRule] {
+        &self.module_rules
+    }
+
     /// Parse the content of `.agents/architecture`.
     ///
-    /// Blank lines and `#` comments are ignored. A line is a rule only when it
-    /// contains the literal ` forbids ` separator; everything before it is the
-    /// path prefix, everything after it is the forbidden text. Lines that do
-    /// not match the shape are skipped so a malformed file never panics.
+    /// Blank lines and `#` comments are ignored. A line containing the literal
+    /// ` never imports ` is a module rule; a line containing ` forbids ` is a
+    /// line rule. Lines that do not match a shape are skipped so a malformed
+    /// file never panics.
     pub fn parse(content: &str) -> Rules {
         let mut rules = Vec::new();
+        let mut module_rules = Vec::new();
 
         for line in content.lines() {
             let line = line.trim();
             if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+
+            if let Some((from, to)) = line.split_once(" never imports ") {
+                let from = from.trim();
+                let to = to.trim();
+                let from = from.strip_suffix('/').unwrap_or(from);
+                let to = to.strip_suffix('/').unwrap_or(to);
+                if from.is_empty() || to.is_empty() {
+                    continue;
+                }
+
+                module_rules.push(ModuleRule {
+                    from: from.to_string(),
+                    to: to.to_string(),
+                });
                 continue;
             }
 
@@ -46,7 +98,10 @@ impl Rules {
             }
         }
 
-        Rules { rules }
+        Rules {
+            rules,
+            module_rules,
+        }
     }
 
     /// Check the added lines of `path` against every rule.
@@ -205,5 +260,52 @@ src/ forbids b
                 (String::from("a"), String::from("a")),
             ]
         );
+    }
+
+    #[test]
+    fn parse_module_rules_trims_and_strips_one_trailing_slash() {
+        let rules = Rules::parse(
+            "a/ never imports b/
+ a  never imports  b
+/ never imports b
+a never imports /
+a never imports
+",
+        );
+
+        assert_eq!(
+            rules.module_rules(),
+            &[
+                ModuleRule {
+                    from: "a".into(),
+                    to: "b".into(),
+                },
+                ModuleRule {
+                    from: "a".into(),
+                    to: "b".into(),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn module_rule_lines_are_not_line_rules() {
+        let rules = Rules::parse("src/ never imports std::fs");
+
+        assert!(rules.rules.is_empty());
+        assert_eq!(rules.module_rules().len(), 1);
+    }
+
+    #[test]
+    fn module_rule_matches_exact_and_child_modules() {
+        let rule = ModuleRule {
+            from: "crates/fennec/src/domain".into(),
+            to: "crates/fennec/src/web".into(),
+        };
+
+        assert!(rule.matches("crates/fennec/src/domain", "crates/fennec/src/web"));
+        assert!(rule.matches("crates/fennec/src/domain/a", "crates/fennec/src/web/b"));
+        assert!(!rule.matches("crates/fennec/src/domainx", "crates/fennec/src/web"));
+        assert!(!rule.matches("crates/fennec/src/domain", "crates/fennec/src/webx"));
     }
 }

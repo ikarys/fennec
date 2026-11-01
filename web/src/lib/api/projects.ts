@@ -173,6 +173,8 @@ export interface MapDependency {
   from: string;
   to: string;
   imports: number;
+  /** Breaks one of the human's module rules. */
+  violation: boolean;
   /** The arrow as a finished SVG path: right angles, rounded corners, hops at crossings. */
   path: string;
   /** Where the import count is shown. */
@@ -191,6 +193,33 @@ export interface ModuleMap {
   groups: MapGroup[];
 }
 
+/** A dependency edge without layout data. */
+export interface MapEdge {
+  from: string;
+  to: string;
+}
+
+/** A dependency that breaks a module rule declared in `.agents/architecture`. */
+export interface RuleBreak {
+  from: string;
+  to: string;
+  imports: number;
+  rule: string;
+}
+
+/** Dependencies added or removed since `docs/map.md`. */
+export interface MapChange {
+  added: MapEdge[];
+  removed: MapEdge[];
+}
+
+/** How the code's dependencies compare with the intended architecture. */
+export interface ArchitectureDrift {
+  rules: number;
+  violations: RuleBreak[];
+  sinceMap: MapChange | null;
+}
+
 /** The committed `docs/map.md` against the map of the code as it is. */
 export type MapFileState = "missing" | "stale" | "current";
 
@@ -204,6 +233,7 @@ export interface DocFile {
 export interface ProjectOverview {
   map: ModuleMap;
   mapFile: MapFileState;
+  drift: ArchitectureDrift;
 }
 
 export function getProjectOverview(
