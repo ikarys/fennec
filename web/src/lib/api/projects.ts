@@ -69,6 +69,23 @@ export function createProject(workdir: string): Promise<Project> {
   });
 }
 
+export interface DeleteProjectResult {
+  deleted: boolean;
+  folderDeleted: boolean;
+  folderError: string | null;
+}
+
+/** Delete a project; `deleteFolder` also removes its source folder. */
+export function deleteProject(id: string, deleteFolder: boolean): Promise<DeleteProjectResult> {
+  return request<DeleteProjectResult>(
+    `/api/projects/${encodeURIComponent(id)}/delete`,
+    {
+      method: "POST",
+      body: JSON.stringify({ deleteFolder }),
+    },
+  );
+}
+
 /** One project row on the cross-project Backlog table: its counts and queue state. */
 export interface BacklogProject {
   project: { id: string; name: string };

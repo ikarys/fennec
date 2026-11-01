@@ -400,6 +400,26 @@ impl SqliteStore {
         Ok(())
     }
 
+    /// Deletes a project and everything attached to it: its sessions with
+    /// their events, its ideas backlog events, and the project row.
+    pub fn delete_project(&self, id: &str) -> Result<()> {
+        let tx = self.db.unchecked_transaction()?;
+        tx.execute(
+            "DELETE FROM events WHERE session_id IN (SELECT id FROM sessions WHERE project_id = ?1)",
+            params![id],
+        )?;
+        tx.execute("DELETE FROM sessions WHERE project_id = ?1", params![id])?;
+        // The cascade would do this too, but not if foreign keys are off on
+        // this connection.
+        tx.execute(
+            "DELETE FROM project_events WHERE project_id = ?1",
+            params![id],
+        )?;
+        tx.execute("DELETE FROM projects WHERE id = ?1", params![id])?;
+        tx.commit()?;
+        Ok(())
+    }
+
     /// Ends the turns a crash left open: sessions whose last `running.changed`
     /// says running get `isRunning: false`, so the UI stops waiting on a turn
     /// no process runs. Called at server start, before any turn exists.
@@ -784,6 +804,65 @@ mod tests {
         assert!(store.session(&grandchild).unwrap().is_none());
         assert!(store.events_after(&child, 0).unwrap().is_empty());
         assert!(store.session(&unrelated).unwrap().is_some());
+    }
+
+    #[test]
+    fn delete_project_removes_its_sessions_events_and_ideas() {
+        let store = SqliteStore::in_memory().unwrap();
+        let project = store.project_for("/del").unwrap();
+        let other = store.project_for("/other").unwrap();
+        let sid = store.create_session(&project, "s").unwrap();
+        store
+            .append_idea_event(
+                &project.id,
+                &backlog::BacklogEvent::Added {
+                    idea_id: "i".into(),
+                    text: "t".into(),
+                    attachments: Vec::new(),
+                },
+            )
+            .unwrap();
+        let other_sid = store.create_session(&other, "o").unwrap();
+        store
+            .append_idea_event(
+                &other.id,
+                &backlog::BacklogEvent::Added {
+                    idea_id: "i2".into(),
+                    text: "t".into(),
+                    attachments: Vec::new(),
+                },
+            )
+            .unwrap();
+
+        store.delete_project(&project.id).unwrap();
+
+        assert!(store.project(&project.id).unwrap().is_none());
+        assert!(store.session(&sid).unwrap().is_none());
+        assert!(store.events_after(&sid, 0).unwrap().is_empty());
+        assert_eq!(
+            store
+                .db
+                .query_row(
+                    "SELECT COUNT(*) FROM project_events WHERE project_id = ?1",
+                    [project.id.as_str()],
+                    |r| r.get::<_, i64>(0),
+                )
+                .unwrap(),
+            0
+        );
+        assert!(store.project(&other.id).unwrap().is_some());
+        assert!(store.session(&other_sid).unwrap().is_some());
+        assert_eq!(
+            store
+                .db
+                .query_row(
+                    "SELECT COUNT(*) FROM project_events WHERE project_id = ?1",
+                    [other.id.as_str()],
+                    |r| r.get::<_, i64>(0),
+                )
+                .unwrap(),
+            1
+        );
     }
 
     #[test]
