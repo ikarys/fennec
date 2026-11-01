@@ -73,6 +73,7 @@ function MapTab({ projectId }: { projectId: string }) {
       projectId={projectId}
       map={data.map}
       mapFile={data.mapFile}
+      drift={data.drift}
       onWritten={(state) =>
         setData((prev) => (prev ? { ...prev, mapFile: state } : prev))
       }
