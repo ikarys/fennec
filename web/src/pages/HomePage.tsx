@@ -104,7 +104,7 @@ function ProjectSection({
   const runningCount = project.sessions.filter((session) => session.state === 'running').length;
 
   return (
-    <section className="group/project overflow-hidden rounded-md border border-border bg-panel">
+    <section className="overflow-hidden rounded-md border border-border bg-panel">
       <div className="flex min-h-12 items-center gap-2.5 px-3 py-2">
         <button
           type="button"
@@ -129,7 +129,7 @@ function ProjectSection({
             </span>
           </span>
         </button>
-        <div className="ml-auto flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/project:opacity-100 focus-within:opacity-100">
+        <div className="ml-auto flex shrink-0 items-center gap-0.5">
           <a
             href={'#/project/' + encodeURIComponent(project.id)}
             title="Voir le projet : tâches, carte des modules, doc"
