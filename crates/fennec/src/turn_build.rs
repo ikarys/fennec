@@ -68,11 +68,42 @@ pub fn with_turn<R>(
     // A session worktree is the agent's own copy: a new dependency's lockfile
     // may change there, and the integration gate shows it to the human. Outside
     // a worktree the mount list is empty, so this is a no-op for the CLI.
-    let protection = if workdir.starts_with(worktree::root(&settings.db_path)) {
+    // The human's rules live in the `rules` crate's own database. They are
+    // loaded per turn so a rule changed in the UI applies from the next turn.
+    let rule_store = rules::RuleStore::open(&settings.rules_path()).map_err(|e| e.to_string())?;
+    let session = store.session(session_id)?;
+    let rules = match &session {
+        Some(session) => rule_store
+            .for_turn(&session.project_id, Some(session_id))
+            .map_err(|e| e.to_string())?,
+        None => rules::Rules::default(),
+    };
+    // Only project-relative `Block` path rules that cover writes can be enforced
+    // by the file tools' protection and the sandbox's read-only mounts; the rest
+    // are checked per call by the `rules` crate.
+    let blocked_paths: Vec<String> = rules
+        .all()
+        .iter()
+        .filter_map(|rule| {
+            if !matches!(rule.action, rules::Action::Block) {
+                return None;
+            }
+            match &rule.target {
+                rules::Target::Path { pattern, access }
+                    if access.covers(rules::Access::Write) && pattern.is_relative() =>
+                {
+                    Some(pattern.text().to_string())
+                }
+                _ => None,
+            }
+        })
+        .collect();
+    let protection = (if workdir.starts_with(worktree::root(&settings.db_path)) {
         protected::load_for_worktree(workdir)
     } else {
         protected::load(workdir)
-    };
+    })
+    .with_patterns(&blocked_paths);
     let tools = LocalTools::new(workdir.to_path_buf())
         .with_search(prefs.search.clone())
         .with_sandbox(
@@ -80,7 +111,8 @@ pub fn with_turn<R>(
                 .protecting(protected::existing_paths(workdir, &protection))
                 .with_mounts(worktree::dependency_mounts(workdir)),
         )
-        .with_protection(protection);
+        .with_protection(protection)
+        .with_rules(rules);
     let mut turn = Turn {
         model: &model,
         log,

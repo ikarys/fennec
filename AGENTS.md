@@ -125,12 +125,18 @@ Contrôler.
 Agent suggestions, done: `suggest_agent` (the turn goes on) lets an agent suggest the human go on in a new
 session with another agent, with a reason and a brief (`agent.suggested`); a card after the turn opens the new
 session's page on that agent with the brief in the composer, and nothing starts until the human sends it.
+Rules, done (part 1, block): the human's rules, global, per project or granted to a session, owned by the `rules`
+crate (model, matching, decision, its own SQLite file `rules.db`) and enforced by fennec's code, never the model: a
+command matched on parsed tokens (through `sudo`, `sh -c`, `&&`, `find -exec`), a tool name, or a path read or written
+(project-relative, absolute or `~/…`). A block refuses the call before it runs (`rule.blocked`, a "règle" badge on the
+tool card, verified); workflow shell nodes too. Settings' "Règles" tab (`#/settings/rules`) shows, adds and deletes them
+all; the project page shows its own read-only. An "ask" rule refuses until its approval flow (next PR).
 Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
-1. Produced architecture and drift (C12), waivers (C7).
-Later: sub-agents as tools, when dogfooding shows sessions saturating their context. A rules crate (the human, 2026-11-01):
-rules stored in the database, global or per project, that fennec's Rust code enforces itself, never the model (e.g.
-refuse any `rm -rf` command).
+1. Rules, part 2: "ask" rules pause the turn for the human's approval (`rule.approval_requested`): once, for the
+   session, always, never.
+2. Produced architecture and drift (C12), waivers (C7).
+Later: sub-agents as tools, when dogfooding shows sessions saturating their context.
 
 ## Layout
 
@@ -187,6 +193,7 @@ crates/fennec/src/
     ask_user.rs        openfox tools/ask: the loop's own tool; the turn ends waiting for the human
     propose_task.rs    the loop's propose_task tool: a backlog task proposed, the turn goes on
     suggest_agent.rs   the loop's own tool: suggests a new session on another agent (the human opens it)
+    rule_check.rs      the rules crate's decision on a tool call: the refusal and its `rule.blocked`
     preflight.rs       runs a plan's checks at the end of the planner's turn, sends it back once
     compaction.rs      openfox context/compactor: the summary round and the new window
     prompt.rs          openfox chat/prompts: the system prompt, plus fennec's working method
@@ -194,7 +201,7 @@ crates/fennec/src/
                        workflow/ nodes (one node run), fork (parallel branches), outcome (`Outcome:` line),
                        criteria (the criteria node and the agents' verdicts)
   tools/             Toolbox adapter: one file per tool, path_guard, args; sandbox (the bwrap
-                     world of commands);
+                     world of commands); rule_request (a tool call as the rules crate's requests, paths resolved here);
                      web_search queries the SearXNG instance from the Settings page
   llm/               Model adapter: openai.rs, the Model port over llm-providers (tool-call arguments parsed here)
   store.rs           EventLog adapter: SQLite (openfox's schema), projects and sessions;
@@ -224,13 +231,17 @@ crates/fennec/src/
                      notifier (wakes streams on append, no polling), turns, assets,
                      workflow_routes, project_routes (the project page), project_dashboard (its overview tiles), idea_routes (its ideas board, HTTP only),
                      idea_queue (the queue's thread: starts ready ideas, night-mode caps, queue runs recorded),
-                     model_routes (the composer's model choices, a session's model),
+                     model_routes (the composer's model choices, a session's model), rule_routes (the human's rules),
                      children (child sessions for workflow nodes),
                      preview (a project's files in a sandboxed origin), session_usage,
                      workflow_usage, context_view and insight (display-ready token figures: the UI computes none)
   cli/               terminal adapter: commands, transcript
 crates/backlog/     the ideas backlog, a crate of its own and fennec-free, no I/O: its events folded, the queue
                      order, the night-mode caps, an idea's status, stage and next action, a run's summary
+crates/rules/       the human's rules, a crate of its own and fennec-free, no I/O: a rule (scope, target, action),
+                     the command pattern and the quote-aware splitter that matches it, which rule wins
+crates/rules/       the human's rules, a crate of its own and fennec-free: the model, the command and path matchers,
+                     the decision (block > allow > ask, narrowest scope), its SQLite store `rules.db` (`FENNEC_RULES_DB`)
 crates/token-usage/ the usage ledger, a crate of its own and fennec-free (calls, tokens, speed, savings;
                      SQLite file `usage.db`, `FENNEC_USAGE_DB`): outlives sessions, reusable by other products
 crates/llm-providers/ talking to models, a crate of its own and fennec-free: the OpenAI-compatible client
@@ -277,7 +288,11 @@ docs/dogfooding.md the frictions met while fennec builds fennec, and their statu
    files are refused to the file tools and read-only in the sandbox. **Known
    gaps**: the file tools run in fennec's process with a working-directory
    path guard; a command can still create a new file matching a protected
-   pattern where none existed (the review gate is to catch it).
+   pattern where none existed (the review gate is to catch it). The human's rules are
+   kernel code too; command rules match parsed tokens, so `eval`, a variable (`$X -rf`) or
+   a script written then run slips past them: a guard rail, the sandbox stays the wall. A file
+   tool outside the workdir needs an allow rule; the sandbox does not read the rules (it still hides
+   `~/.ssh` from commands).
 
 ## Build, test, run
 
@@ -306,7 +321,7 @@ target/debug/fennec run "<prompt>"   # CLI, in the repository to work on
 ```
 
 Env: `FENNEC_LLM_URL`, `FENNEC_MODEL`, `FENNEC_API_KEY`, `FENNEC_MAX_TOKENS`,
-`FENNEC_COMPACT_AT` (default 0.85, 0 disables), `FENNEC_DB` (default `~/.local/share/fennec/fennec.db`).
+`FENNEC_COMPACT_AT` (default 0.85, 0 disables), `FENNEC_DB` (default `~/.local/share/fennec/fennec.db`), `FENNEC_RULES_DB` (default `rules.db` next to it).
 The model variables are defaults and define the `local` provider: the Settings page (stored in
 SQLite) adds providers and overrides them per model, from the next turn on. Stored API keys are
 sealed with `secret.key`, next to the store (lose it and the stored keys are lost).

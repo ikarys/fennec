@@ -48,6 +48,13 @@ pub trait EventLog {
     fn events(&self, session_id: &str) -> Result<Vec<Event>, String>;
 }
 
+/// What the human's rules say about one tool call, and what it was about (the command,
+/// the path, the tool name) for the log.
+pub struct RuleCheck<'r> {
+    pub decision: rules::Decision<'r>,
+    pub subject: String,
+}
+
 /// The tools a model can call (adapter: `tools::LocalTools`, on the host).
 /// `access` is what the calling agent's commands may do to the workdir.
 pub trait Toolbox {
@@ -62,6 +69,13 @@ pub trait Toolbox {
         stop: &AtomicBool,
         on_output: &mut dyn FnMut(OutputStream, &str),
     ) -> ToolResult;
+    /// The human's rules on this call, decided before it runs; the default allows.
+    fn check_rules(&self, _name: &str, _args: &Value) -> RuleCheck<'_> {
+        RuleCheck {
+            decision: rules::Decision::Allow(None),
+            subject: String::new(),
+        }
+    }
 }
 
 /// What an agent node run in a child session reports back.
