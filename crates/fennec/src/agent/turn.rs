@@ -23,6 +23,7 @@ use super::ports::{EventLog, Model, Toolbox};
 use super::preflight;
 use super::prompt::system_prompt;
 use super::propose_criteria;
+use super::propose_task;
 use super::record_decision;
 use super::round::{self, Round, RoundPrompt};
 use super::tool_calls::{Flow, INTERRUPTED_ERROR, execute_tools};
@@ -242,14 +243,16 @@ fn round_prompt_parts(turn: &mut Turn) -> Result<(String, Value), String> {
     Ok((prompt, tools))
 }
 
-/// The loop owns `ask_user`, `propose_criteria` and `record_decision`; they
-/// are not host tools, so their definitions are added to the toolbox's.
+/// The loop owns `ask_user`, `propose_criteria`, `record_decision` and
+/// `propose_task`; they are not host tools, so their definitions are added
+/// to the toolbox's.
 fn tool_definitions(turn: &Turn) -> Value {
     let mut tool_defs = turn.tools.definitions();
     if let Some(arr) = tool_defs.as_array_mut() {
         arr.push(ask_user::definition());
         arr.push(propose_criteria::definition());
         arr.push(record_decision::definition());
+        arr.push(propose_task::definition());
     }
     tool_defs
 }

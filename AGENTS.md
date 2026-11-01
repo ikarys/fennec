@@ -114,10 +114,17 @@ its signals (the gate's checks per file, churn, untested, large), read from git 
 Narrative diff, done (C9, part 2): a "Raconter" button in the integration dialog opens a session on the
 read-only `narrate` agent (`crates/fennec/agents/narrate.agent.md`), which tells the branch's change file by
 file in the review order, each claim with its `path:line` source (indicative).
+Project kickoff, done: the read-only `kickoff` agent ("Démarrer le projet" in the Analyses tab) asks what a new
+project is for, has the human choose its stack and architecture (`record_decision`), drafts its AGENTS.md and
+proposes its first tasks in build order, a walking skeleton first, with `propose_task` (`task.proposed`); the human
+adds each to the backlog from a card in the thread (`task.accepted`). AGENTS.md stays protected from agents: the human
+writes the draft to it in one click (`agents_md.written`).
 Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
 1. Produced architecture and drift (C12), waivers (C7).
-Later: sub-agents as tools, when dogfooding shows sessions saturating their context.
+Later: sub-agents as tools, when dogfooding shows sessions saturating their context. A rules crate (the human, 2026-11-01):
+rules stored in the database, global or per project, that fennec's Rust code enforces itself, never the model (e.g.
+refuse any `rm -rf` command).
 
 ## Layout
 
@@ -157,6 +164,8 @@ crates/fennec/src/
     module_map.rs      the project map: modules, their dependencies from the imports, their layout
     map_doc.rs         docs/map.md: the map as Markdown (Mermaid, table), stale or current
     risk.rs            risk zones: a commit's authorship from its trailers, the signals, the report
+    agents_md.rs       the AGENTS.md draft at the end of an answer, which the human writes in one click
+    task_proposal.rs   the backlog tasks an agent proposed with propose_task, and which the human accepted
     review_map.rs      the review order of a branch's files: per-file signals (gate checks, churn, tests, size)
     workflow/          a workflow: definition (nodes, ports, edges), template ({{…}} names),
                        validate (the graph rules), run (the run folded from its events, the next step)
@@ -169,6 +178,7 @@ crates/fennec/src/
     delta_buffer.rs    coalesces streamed chunks into one event per 100 ms
     tool_calls.rs      openfox chat/execute-tools: runs and records tool calls
     ask_user.rs        openfox tools/ask: the loop's own tool; the turn ends waiting for the human
+    propose_task.rs    the loop's propose_task tool: a backlog task proposed, the turn goes on
     preflight.rs       runs a plan's checks at the end of the planner's turn, sends it back once
     compaction.rs      openfox context/compactor: the summary round and the new window
     prompt.rs          openfox chat/prompts: the system prompt, plus fennec's working method
