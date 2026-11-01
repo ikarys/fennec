@@ -669,6 +669,7 @@ mod tests {
             commands: crate::domain::agent::CommandAccess::ReadWrite,
             reasoning_effort: None,
             color: None,
+            phase: None,
             prompt: "prompt".to_string(),
         }
     }

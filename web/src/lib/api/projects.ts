@@ -17,6 +17,9 @@ export interface SlashCommand {
   description: string;
 }
 
+/** The step of a project an agent serves; the server sends agents ordered by it. */
+export type AgentPhase = 'start' | 'frame' | 'build' | 'understand' | 'check';
+
 /** An agent: a mode of the session (`plan`, `builder`, …), or a sub-agent that workflow nodes run in a fresh context. */
 export interface Agent {
   id: string;
@@ -24,6 +27,7 @@ export interface Agent {
   description: string;
   color: string | null;
   subagent: boolean;
+  phase: AgentPhase | null;
 }
 
 export interface Folder {

@@ -3,6 +3,7 @@ id: kickoff
 name: Démarrage
 description: Starts a new project with the human: understands what it is for, drafts its AGENTS.md, and proposes its first backlog tasks, without writing any code
 subagent: false
+phase: start
 commands: read-only
 color: '#f59e0b'
 allowedTools:

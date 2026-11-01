@@ -3,6 +3,7 @@ id: mockup
 name: Maquette
 description: Builds HTML mockups of a screen or a page, shown as screenshots to look at or as an interactive page in fennec's preview; touches nothing but the mockups
 subagent: false
+phase: frame
 color: '#d946ef'
 allowedTools:
   - read_file
