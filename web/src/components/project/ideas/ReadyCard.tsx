@@ -1,7 +1,7 @@
 /**
- * One ready idea in the queue, as a card: the plan stands out because it is
- * what the build will run on. It keeps what a row shows: status,
- * attachments, run meta. The card stays reorderable like a row.
+ * One ready idea in the queue, as a card. It keeps what a row shows: status,
+ * attachments, run meta; the plan stays in its framing session ("Voir le
+ * plan"), too long for a card. The card stays reorderable like a row.
  */
 import { useState } from 'react';
 import { Button } from '../../ui/Button';
@@ -118,14 +118,6 @@ export function ReadyCard({
           <IdeaStatusBadge status={idea.status} />
         </div>
         <IdeaAttachments attachments={idea.attachments} />
-        {idea.plan ? (
-          <div className="mt-2 rounded-md border border-border bg-bg p-2.5">
-            <p className="m-0 text-xs text-faint">Plan (produit par le modèle, indicatif)</p>
-            <p className="m-0 mt-1 whitespace-pre-line text-xs leading-relaxed text-muted">
-              {idea.plan}
-            </p>
-          </div>
-        ) : null}
         {idea.halted ? <p className="m-0 mt-1 text-xs text-muted">{idea.halted}</p> : null}
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
           <IdeaMeta idea={idea} caps={caps} />
