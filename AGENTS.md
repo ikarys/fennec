@@ -119,6 +119,9 @@ project is for, has the human choose its stack and architecture (`record_decisio
 proposes its first tasks in build order, a walking skeleton first, with `propose_task` (`task.proposed`); the human
 adds each to the backlog from a card in the thread (`task.accepted`). AGENTS.md stays protected from agents: the human
 writes the draft to it in one click (`agents_md.written`).
+Agent phases, done: a `phase:` in each agent's frontmatter (start, frame, build, understand, check); the server
+sends the agents in that order and the composer's menu groups them under Démarrer, Cadrer, Construire, Comprendre,
+Contrôler.
 Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
 1. Produced architecture and drift (C12), waivers (C7).
