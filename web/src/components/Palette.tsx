@@ -72,9 +72,15 @@ export function Palette({ open, projects, onClose, onOpenSession, onNewSession, 
     }
 
     const commands: PaletteItem[] = [
-      ...projects.map((project) => ({
+      ...projects.filter((project) => !project.chat).map((project) => ({
         id: `new-${project.id}`,
         title: `Nouvelle session dans ${project.name}`,
+        meta: '⌘N',
+        action: () => onNewSession(project.id)
+      })),
+      ...projects.filter((project) => project.chat).map((project) => ({
+        id: `new-${project.id}`,
+        title: 'Nouveau chat',
         meta: '⌘N',
         action: () => onNewSession(project.id)
       })),

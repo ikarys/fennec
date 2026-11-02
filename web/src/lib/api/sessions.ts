@@ -65,6 +65,8 @@ export interface SessionDetail {
     id: string;
     name: string;
     workdir: string;
+    /** The scratch project behind the chat: no folder, no git. */
+    chat?: boolean;
   };
   /** The idea this session frames, or null. */
   idea: { id: string; state: "inbox" | "framing" | "ready" } | null;

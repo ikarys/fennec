@@ -1,5 +1,7 @@
 /target
 .fennec/
+# Agent config stays local, not versioned (architecture, protected, servers.json, skills/...).
+.agents/
 # No trailing slash: a symlinked node_modules (a git worktree) is ignored too.
 web/node_modules
 web/dist/

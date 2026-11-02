@@ -45,6 +45,7 @@ mod workflow_usage;
 mod worktree_routes;
 
 use crate::agent::ports::EventLog;
+use crate::chat;
 use crate::config::Settings;
 use crate::domain::project::{Project, SessionSummary};
 use crate::domain::session_skills::{SessionSkills, fold_skills};
@@ -215,6 +216,19 @@ pub fn serve(port: u16, settings: Settings) -> Result<(), String> {
     // Fail now rather than on the first request. No turn runs yet, so a log
     // still marked running was cut by a crash.
     let store = app.store()?;
+    // The chat's scratch project and directory: a session with no repository.
+    // Non-fatal: a machine that cannot make it still serves its projects.
+    let chat_dir = chat::workdir(&app.settings.db_path);
+    let chat_init = std::fs::create_dir_all(&chat_dir)
+        .map_err(|e| e.to_string())
+        .and_then(|()| {
+            store
+                .chat_project(&chat_dir.display().to_string())
+                .map_err(|e| e.to_string())
+        });
+    if let Err(e) = chat_init {
+        eprintln!("fennec: chat project: {e}");
+    }
     // Idempotent: calls recorded before the ledger existed join it once.
     let ledger =
         token_usage::Ledger::open(&app.settings.usage_path()).map_err(|e| e.to_string())?;
