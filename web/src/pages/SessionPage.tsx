@@ -158,7 +158,7 @@ export function SessionPage({
     framingIdea,
   });
   // A chat has no folder: it starts in `builder` (talk, act on request), not
-  // in the project's `kickoff` agent, and the header shows "Chat".
+  // in the project's framing agent, and the header shows "Chat".
   const isChat = detail?.project.chat ?? projectId === "chat";
   const {
     modelChoices,
