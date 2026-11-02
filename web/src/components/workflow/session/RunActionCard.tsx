@@ -143,6 +143,26 @@ export function RunActionCard({
             </>
           )}
 
+          {waiting.kind === 'relaunch' && (
+            <>
+              <div className="text-sm leading-snug text-muted">
+                Le workflow s'est terminé en erreur : relancer le nœud qui a
+                échoué ?
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  disabled={isBusy}
+                  onClick={() => handleAction(onResume)}
+                >
+                  Relancer
+                </Button>
+              </div>
+            </>
+          )}
+
           {error && <div className="text-xs text-err">{error}</div>}
         </div>
       </div>

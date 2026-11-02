@@ -19,8 +19,9 @@ look lives in two places only, so a screen can never drift from the others:
 ## Hierarchy
 
 - One primary action per view (`Button variant="primary"`); the rest are
-  `secondary`, or `ghost` in toolbars and lists; `soft` (accent-tinted) for
-  the one action of each row in a list and its add button. Destructive actions are
+  `secondary`, or `ghost` in toolbars and lists, the one action of each row
+  included (a column of tinted buttons is noise); `soft` (accent-tinted) for a
+  list's add button. A row's secondary choices (its `Menu`) show on hover or focus. Destructive actions are
   `danger` and say what they destroy.
 - Buttons are icons (`iconOnly`) with a tooltip (`title`) that says what
   they do; a text label only for a view's single primary action and a
