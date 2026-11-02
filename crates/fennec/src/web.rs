@@ -229,16 +229,14 @@ pub fn serve(port: u16, settings: Settings) -> Result<(), String> {
     // Fail now rather than on the first request. No turn runs yet, so a log
     // still marked running was cut by a crash.
     let store = app.store()?;
-    // The chat's scratch project and directory: a session with no repository.
-    // Non-fatal: a machine that cannot make it still serves its projects.
+    // The chat's scratch project: a session with no repository. Its
+    // per-session scratch directory is created only when a tool first needs
+    // it, so starting the server creates nothing on disk. Non-fatal: a
+    // machine that cannot register it still serves its projects.
     let chat_dir = chat::workdir(&app.settings.db_path);
-    let chat_init = std::fs::create_dir_all(&chat_dir)
-        .map_err(|e| e.to_string())
-        .and_then(|()| {
-            store
-                .chat_project(&chat_dir.display().to_string())
-                .map_err(|e| e.to_string())
-        });
+    let chat_init = store
+        .chat_project(&chat_dir.display().to_string())
+        .map_err(|e| e.to_string());
     if let Err(e) = chat_init {
         eprintln!("fennec: chat project: {e}");
     }
