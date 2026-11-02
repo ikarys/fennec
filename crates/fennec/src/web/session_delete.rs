@@ -2,6 +2,7 @@
 
 use super::App;
 use super::http::{Request, error, send_json};
+use crate::chat;
 use crate::domain::project::SessionSummary;
 use crate::store::SqliteStore;
 use crate::worktree;
@@ -79,14 +80,23 @@ pub(super) fn remove_tree(
     tree: &[String],
 ) -> Result<Option<String>, String> {
     // A child session shares its root's worktree: removing the root's removes theirs.
-    if let Some(project) = store.project(&session.project_id)?
-        && let Some(wt) = app.place(store, session, &project)?.worktree
-    {
-        let Some((top, _)) = worktree::top(Path::new(&project.workdir)) else {
-            return Ok(Some("the project is not in a git repository".into()));
-        };
-        if let Err(e) = worktree::remove(&top, &wt) {
-            return Ok(Some(e));
+    if let Some(project) = store.project(&session.project_id)? {
+        if chat::is_chat(&project) {
+            // The chat's per-session scratch goes with the session; a pure
+            // conversation never created it.
+            let scratch = chat::session_dir(&app.settings.db_path, &session.id);
+            match std::fs::remove_dir_all(&scratch) {
+                Ok(()) => {}
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                Err(e) => return Ok(Some(e.to_string())),
+            }
+        } else if let Some(wt) = app.place(store, session, &project)?.worktree {
+            let Some((top, _)) = worktree::top(Path::new(&project.workdir)) else {
+                return Ok(Some("the project is not in a git repository".into()));
+            };
+            if let Err(e) = worktree::remove(&top, &wt) {
+                return Ok(Some(e));
+            }
         }
     }
     store.delete_sessions(tree).map_err(|e| e.to_string())?;
@@ -98,4 +108,81 @@ pub(super) fn remove_tree(
         folds.remove(sid);
     }
     Ok(None)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::{LlmSettings, Settings};
+    use crate::domain::id::new_id;
+    use crate::domain::preferences::ModelParams;
+    use crate::notifier::Notifier;
+    use crate::web::turns::Turns;
+    use serde_json::json;
+    use std::collections::HashMap;
+    use std::net::TcpListener;
+    use std::sync::{Arc, Mutex};
+
+    /// Deleting a chat session removes its per-session scratch directory.
+    #[test]
+    fn delete_session_removes_the_chat_scratch() {
+        let db_path = std::env::temp_dir().join(format!("fennec-chat-delete-{}.db", new_id()));
+        let settings = Settings {
+            llm: LlmSettings {
+                base_url: "http://localhost".into(),
+                api_key: None,
+                defaults: ModelParams {
+                    provider: "local".into(),
+                    model: "test".into(),
+                    max_tokens: 100,
+                    context_window: 1000,
+                    compact_at: 0.85,
+                    reasoning_effort: None,
+                },
+                listed: Vec::new(),
+            },
+            db_path: db_path.clone(),
+        };
+        let notifier = Arc::new(Notifier::default());
+        let app = App {
+            turns: Turns::new(settings.clone(), notifier.clone()),
+            settings,
+            port: 0,
+            notifier,
+            skill_folds: Mutex::new(HashMap::new()),
+            idea_reports: Mutex::new(HashMap::new()),
+            idea_queues: Mutex::default(),
+            worktree_scan: Mutex::default(),
+            server_runs: Arc::new(Mutex::new(HashMap::new())),
+        };
+        let store = app.store().unwrap();
+        let project = store
+            .chat_project(&chat::workdir(&db_path).display().to_string())
+            .unwrap();
+        let session = store.create_session(&project, "chat").unwrap();
+
+        // The agent wrote a file during the conversation.
+        let scratch = chat::session_dir(&db_path, &session);
+        std::fs::create_dir_all(&scratch).unwrap();
+        std::fs::write(scratch.join("notes.txt"), "hello").unwrap();
+        assert!(scratch.exists());
+
+        let req = Request {
+            method: "POST".into(),
+            path: "/api/sessions/delete".into(),
+            query: String::new(),
+            headers: Vec::new(),
+            body: json!({ "ids": [session] }).to_string().into_bytes(),
+        };
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let _client = TcpStream::connect(addr).unwrap();
+        let mut server = listener.accept().unwrap().0;
+        delete_sessions(&app, &req, &mut server).unwrap();
+
+        assert!(!scratch.exists());
+        assert!(store.session(&session).unwrap().is_none());
+        let _ = std::fs::remove_file(&db_path);
+        let _ = std::fs::remove_dir_all(chat::workdir(&db_path));
+    }
 }

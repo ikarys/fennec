@@ -1,6 +1,6 @@
 //! The chat: a session with no project, folder or git. It runs in a scratch
-//! directory under the store, so the agent's tools have a workdir and the
-//! model can talk without a repository to act on.
+//! directory per session under the store, created when a tool first needs it,
+//! so a plain conversation creates nothing on disk.
 
 use crate::domain::project::Project;
 use std::path::Path;
@@ -11,9 +11,14 @@ pub const ID: &str = "chat";
 /// The chat project's name, as listed to the human.
 pub const NAME: &str = "Chat";
 
-/// The chat's scratch workdir: `chat/` next to the store's database.
+/// The chat's scratch root: `chat/` next to the store's database.
 pub fn workdir(db_path: &Path) -> std::path::PathBuf {
     db_path.parent().unwrap_or(Path::new(".")).join("chat")
+}
+
+/// One chat session's scratch workdir: `chat/<session_id>` under the root.
+pub fn session_dir(db_path: &Path, session_id: &str) -> std::path::PathBuf {
+    workdir(db_path).join(session_id)
 }
 
 /// Whether a project is the chat's scratch project.
@@ -40,6 +45,15 @@ mod tests {
         assert_eq!(
             dir,
             std::path::PathBuf::from("/home/u/.local/share/fennec/chat")
+        );
+    }
+
+    #[test]
+    fn chat_session_dir_is_per_session_under_the_root() {
+        let dir = session_dir(Path::new("/home/u/.local/share/fennec/fennec.db"), "abc123");
+        assert_eq!(
+            dir,
+            std::path::PathBuf::from("/home/u/.local/share/fennec/chat/abc123")
         );
     }
 

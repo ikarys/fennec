@@ -187,6 +187,23 @@ mod tests {
     }
 
     #[test]
+    fn execute_creates_the_workdir() {
+        let dir = temp_dir();
+        // A chat session's scratch did not exist: the first command creates it.
+        let workdir = dir.join("scratch");
+        assert!(!workdir.exists());
+        let mut on_output = no_output();
+
+        let args = serde_json::json!({ "command": "echo hello" });
+        let result = run_tool("run_command", &args, &workdir, &mut on_output);
+        assert!(result.success);
+        assert!(result.output.as_deref().unwrap_or("").contains("hello"));
+        assert!(workdir.exists());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn run_command_timeout_kills() {
         let dir = temp_dir();
         let mut on_output = no_output();
