@@ -99,46 +99,39 @@ struct RawRow {
     generation_speed: f64,
 }
 
-struct LoadedRow {
-    id: i64,
-    at_ms: i64,
-    group_id: String,
-    group_name: String,
-    model: String,
-    kind: String,
-    run_id: String,
-    prompt_tokens: u64,
-    cached_tokens: u64,
-    completion_tokens: u64,
-    total_secs: f64,
-    breakdown: BTreeMap<String, u64>,
-    savings: BTreeMap<String, u64>,
-    labels: BTreeMap<String, String>,
-    prefill_speed: f64,
-    generation_speed: f64,
-    lost_cache_tokens: u64,
+/// One stored call, read back for in-memory grouping: usage, the per-part
+/// `breakdown`/`savings`, labels, and the `lost_cache_tokens` computed in time
+/// order. Oldest first; `id` is the ordering tie-break.
+#[derive(Clone)]
+pub struct CallRow {
+    pub id: i64,
+    pub at_ms: i64,
+    pub group_id: String,
+    pub group_name: String,
+    pub model: String,
+    pub kind: String,
+    pub run_id: String,
+    pub prompt_tokens: u64,
+    pub cached_tokens: u64,
+    pub completion_tokens: u64,
+    pub total_secs: f64,
+    pub breakdown: BTreeMap<String, u64>,
+    pub savings: BTreeMap<String, u64>,
+    pub labels: BTreeMap<String, String>,
+    pub prefill_speed: f64,
+    pub generation_speed: f64,
+    pub lost_cache_tokens: u64,
 }
 
 impl Ledger {
     pub fn summary(&self, f: &Filter) -> Result<Summary, Error> {
-        let rows = self.load_rows(f)?;
-
-        let mut summary = new_summary();
-        for row in rows {
-            if !matches_label(&row.labels, f) {
-                continue;
-            }
-            add_to_summary(&mut summary, &row);
-        }
-
-        finish_summary(&mut summary);
-        Ok(summary)
+        Ok(summary_from_rows(&self.rows(f)?, f))
     }
 
     /// Every call matching `f`, oldest first, with its labels.
     pub fn calls(&self, f: &Filter) -> Result<Vec<CallRecord>, Error> {
         Ok(self
-            .load_rows(f)?
+            .rows(f)?
             .into_iter()
             .filter(|r| matches_label(&r.labels, f))
             .map(|r| CallRecord {
@@ -164,7 +157,7 @@ impl Ledger {
     /// when a filter can match a whole product.
     pub fn latest(&self, f: &Filter) -> Result<Option<LatestCall>, Error> {
         Ok(self
-            .load_rows(f)?
+            .rows(f)?
             .into_iter()
             .rev()
             .find(|r| matches_label(&r.labels, f))
@@ -177,76 +170,12 @@ impl Ledger {
     }
 
     pub fn series(&self, f: &Filter, by: GroupBy) -> Result<Vec<Row>, Error> {
-        let rows = self.load_rows(f)?;
-
-        let mut groups: BTreeMap<String, Summary> = BTreeMap::new();
-        let mut latest_group: BTreeMap<String, (i64, i64, String)> = BTreeMap::new();
-        let mut day_span: Option<(i64, i64)> = None;
-
-        for row in rows {
-            if !matches_label(&row.labels, f) {
-                continue;
-            }
-
-            let key = match by {
-                GroupBy::Day => {
-                    let day = row.at_ms.div_euclid(86_400_000);
-                    day_span =
-                        Some(day_span.map_or((day, day), |(lo, hi)| (lo.min(day), hi.max(day))));
-                    day_key(day)
-                }
-                GroupBy::Group => row.group_id.clone(),
-                GroupBy::Model => row.model.clone(),
-                GroupBy::Kind => row.kind.clone(),
-                GroupBy::Run => row.run_id.clone(),
-            };
-
-            let entry = groups.entry(key.clone()).or_insert_with(new_summary);
-            add_to_summary(entry, &row);
-
-            if by == GroupBy::Group {
-                let current = latest_group.entry(row.group_id.clone()).or_insert((
-                    i64::MIN,
-                    i64::MIN,
-                    String::new(),
-                ));
-
-                if (row.at_ms, row.id) > (current.0, current.1) {
-                    current.0 = row.at_ms;
-                    current.1 = row.id;
-                    current.2 = row.group_name.clone();
-                }
-            }
-        }
-
-        // A chart reads a day series as a continuous axis: the days without a
-        // call between the first and the last one are empty rows, not holes.
-        if let Some((first, last)) = day_span {
-            for day in first..=last {
-                groups.entry(day_key(day)).or_insert_with(new_summary);
-            }
-        }
-
-        let mut out = Vec::with_capacity(groups.len());
-        for (key, mut summary) in groups {
-            finish_summary(&mut summary);
-
-            let name = if by == GroupBy::Group {
-                latest_group
-                    .get(&key)
-                    .map(|(_, _, name)| name.clone())
-                    .unwrap_or_else(|| key.clone())
-            } else {
-                key.clone()
-            };
-
-            out.push(Row { key, name, summary });
-        }
-
-        Ok(out)
+        Ok(group_rows(&self.rows(f)?, f, by))
     }
 
-    fn load_rows(&self, f: &Filter) -> Result<Vec<LoadedRow>, Error> {
+    /// Every call matching `f`, oldest first, with its `breakdown`, `savings`,
+    /// labels and computed `lost_cache_tokens`, for in-memory grouping.
+    pub fn rows(&self, f: &Filter) -> Result<Vec<CallRow>, Error> {
         let conn = self.db.lock().unwrap();
         let (sql, params) = build_query(f);
 
@@ -275,7 +204,7 @@ impl Ledger {
         let mut out = Vec::new();
         for raw in raw_rows {
             let raw = raw?;
-            out.push(LoadedRow {
+            out.push(CallRow {
                 id: raw.id,
                 at_ms: raw.at_ms,
                 group_id: raw.group_id,
@@ -300,6 +229,87 @@ impl Ledger {
 
         Ok(out)
     }
+}
+
+/// The summary of the matching rows, in memory.
+pub fn summary_from_rows(rows: &[CallRow], f: &Filter) -> Summary {
+    let mut summary = new_summary();
+    for row in rows {
+        if matches_label(&row.labels, f) {
+            add_to_summary(&mut summary, row);
+        }
+    }
+
+    finish_summary(&mut summary);
+    summary
+}
+
+/// The matching rows grouped by `by`, in memory.
+pub fn group_rows(rows: &[CallRow], f: &Filter, by: GroupBy) -> Vec<Row> {
+    let mut groups: BTreeMap<String, Summary> = BTreeMap::new();
+    let mut latest_group: BTreeMap<String, (i64, i64, String)> = BTreeMap::new();
+    let mut day_span: Option<(i64, i64)> = None;
+
+    for row in rows {
+        if !matches_label(&row.labels, f) {
+            continue;
+        }
+
+        let key = match by {
+            GroupBy::Day => {
+                let day = row.at_ms.div_euclid(86_400_000);
+                day_span = Some(day_span.map_or((day, day), |(lo, hi)| (lo.min(day), hi.max(day))));
+                day_key(day)
+            }
+            GroupBy::Group => row.group_id.clone(),
+            GroupBy::Model => row.model.clone(),
+            GroupBy::Kind => row.kind.clone(),
+            GroupBy::Run => row.run_id.clone(),
+        };
+
+        let entry = groups.entry(key.clone()).or_insert_with(new_summary);
+        add_to_summary(entry, row);
+
+        if by == GroupBy::Group {
+            let current = latest_group.entry(row.group_id.clone()).or_insert((
+                i64::MIN,
+                i64::MIN,
+                String::new(),
+            ));
+
+            if (row.at_ms, row.id) > (current.0, current.1) {
+                current.0 = row.at_ms;
+                current.1 = row.id;
+                current.2 = row.group_name.clone();
+            }
+        }
+    }
+
+    // A chart reads a day series as a continuous axis: the days without a
+    // call between the first and the last one are empty rows, not holes.
+    if let Some((first, last)) = day_span {
+        for day in first..=last {
+            groups.entry(day_key(day)).or_insert_with(new_summary);
+        }
+    }
+
+    let mut out = Vec::with_capacity(groups.len());
+    for (key, mut summary) in groups {
+        finish_summary(&mut summary);
+
+        let name = if by == GroupBy::Group {
+            latest_group
+                .get(&key)
+                .map(|(_, _, name)| name.clone())
+                .unwrap_or_else(|| key.clone())
+        } else {
+            key.clone()
+        };
+
+        out.push(Row { key, name, summary });
+    }
+
+    out
 }
 
 fn build_query(f: &Filter) -> (String, Vec<Box<dyn ToSql>>) {
@@ -366,7 +376,7 @@ fn matches_label(labels: &BTreeMap<String, String>, f: &Filter) -> bool {
 /// Rows are already in time order. A call counts only when its run has a
 /// previous prompt, the prompt did not shrink, and the cache gap is above
 /// `LOST_CACHE_SLACK`. A shrunken prompt is a rewrite, not a loss.
-fn mark_lost_cache(rows: &mut [LoadedRow]) {
+fn mark_lost_cache(rows: &mut [CallRow]) {
     let mut previous_prompt: HashMap<String, u64> = HashMap::new();
 
     for row in rows.iter_mut() {
@@ -398,7 +408,7 @@ fn new_summary() -> Summary {
     }
 }
 
-fn add_to_summary(summary: &mut Summary, row: &LoadedRow) {
+fn add_to_summary(summary: &mut Summary, row: &CallRow) {
     summary.calls += 1;
     summary.prompt_tokens = summary.prompt_tokens.saturating_add(row.prompt_tokens);
     summary.cached_tokens = summary.cached_tokens.saturating_add(row.cached_tokens);
@@ -503,6 +513,45 @@ mod tests {
             .collect();
         assert_eq!(ids, ["m1", "m2"]);
         assert_eq!(calls[0].usage.prompt_tokens, 10);
+    }
+
+    #[test]
+    fn rows_expose_breakdown_savings_and_lost_cache() {
+        let ledger = Ledger::open_in_memory().unwrap();
+
+        let mut c1 = base_call();
+        c1.at_ms = 10;
+        c1.usage = Usage {
+            prompt_tokens: 5000,
+            cached_tokens: 0,
+            completion_tokens: 0,
+        };
+        c1.breakdown.insert("prompt/base".into(), 42);
+        c1.savings.insert("s".into(), 7);
+        c1.labels.insert("messageId".into(), "m1".into());
+
+        let mut c2 = base_call();
+        c2.at_ms = 20;
+        c2.usage = Usage {
+            prompt_tokens: 6000,
+            cached_tokens: 0,
+            completion_tokens: 0,
+        };
+        c2.labels.insert("messageId".into(), "m2".into());
+
+        ledger.record(&c1).unwrap();
+        ledger.record(&c2).unwrap();
+
+        let rows = ledger.rows(&Filter::default()).unwrap();
+        assert_eq!(rows.len(), 2);
+
+        assert_eq!(rows[0].breakdown["prompt/base"], 42);
+        assert_eq!(rows[0].savings["s"], 7);
+        assert_eq!(rows[0].labels["messageId"], "m1");
+        assert_eq!(rows[0].lost_cache_tokens, 0);
+
+        // 6000 prompt after a 5000 already sent, nothing cached: a loss.
+        assert_eq!(rows[1].lost_cache_tokens, 5000);
     }
 
     #[test]
