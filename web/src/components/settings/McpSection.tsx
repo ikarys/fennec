@@ -22,6 +22,7 @@ function emptyServer(): McpServer {
 }
 
 function ServerCard({
+  index,
   server,
   connecting,
   saved,
@@ -29,6 +30,7 @@ function ServerCard({
   onRemove,
   onConnect
 }: {
+  index: number;
   server: McpServer;
   connecting: boolean;
   saved: boolean;
@@ -130,6 +132,26 @@ function ServerCard({
         )}
       </div>
 
+      <div className="flex items-center gap-2">
+        <label className="text-sm text-text" htmlFor={`mcp-auth-${index}`}>
+          Token d'authentification
+        </label>
+        <TextInput
+          id={`mcp-auth-${index}`}
+          type="password"
+          value={server.authToken ?? ''}
+          onChange={(event) => onPatch({ authToken: event.target.value || null })}
+          placeholder="optionnel"
+          className="w-64"
+          aria-label="Token d'authentification"
+        />
+        <span className="text-xs text-muted">
+          {server.transport === 'http'
+            ? 'envoyé comme entête Bearer'
+            : 'variable d’environnement MCP_AUTH_TOKEN'}
+        </span>
+      </div>
+
       {server.cachedTools.length > 0 && (
         <div className="flex flex-col gap-1">
           {server.cachedTools.map((tool) => (
@@ -200,6 +222,7 @@ export function McpSection({
         value.map((server, index) => (
           <ServerCard
             key={index}
+            index={index}
             server={server}
             connecting={connecting === index}
             saved={savedNames.has(server.name)}

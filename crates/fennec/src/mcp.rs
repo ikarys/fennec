@@ -65,6 +65,13 @@ impl Client {
                 for (key, value) in &server.env {
                     cmd.env(key, value);
                 }
+                if let Some(token) = server
+                    .auth_token
+                    .as_deref()
+                    .filter(|token| !token.trim().is_empty())
+                {
+                    cmd.env("MCP_AUTH_TOKEN", token);
+                }
                 let mut child = cmd
                     .spawn()
                     .map_err(|error| format!("mcp {}: spawn failed: {error}", server.name))?;
@@ -91,7 +98,7 @@ impl Client {
             }
             McpTransport::Http => Transport::Http {
                 url: server.url.clone().unwrap_or_default(),
-                headers: server.headers.clone(),
+                headers: http_headers(server),
             },
         };
         let mut client = Client { transport, timeout };
@@ -193,6 +200,22 @@ fn parse_response(line: &str) -> Option<Result<Value, String>> {
         return Some(Err(format!("mcp error: {error}")));
     }
     Some(Ok(value.get("result").cloned().unwrap_or(Value::Null)))
+}
+
+/// The HTTP headers to send: the server's headers, plus the auth token as a
+/// Bearer `Authorization` header when set (a manual `authorization` header,
+/// in any case, is overridden).
+fn http_headers(server: &McpServer) -> BTreeMap<String, String> {
+    let mut headers = server.headers.clone();
+    if let Some(token) = server
+        .auth_token
+        .as_deref()
+        .filter(|token| !token.trim().is_empty())
+    {
+        headers.retain(|key, _| !key.eq_ignore_ascii_case("authorization"));
+        headers.insert("Authorization".into(), format!("Bearer {token}"));
+    }
+    headers
 }
 
 fn http_request(
@@ -305,6 +328,94 @@ echo '{"jsonrpc":"2.0","id":3,"result":{"content":[{"type":"text","text":"hello 
         assert_eq!(tools[0].input_schema["type"], "object");
         let text = client.call_tool("echo", json!({ "msg": "hi" })).unwrap();
         assert_eq!(text, "hello mcp");
+    }
+
+    #[test]
+    fn http_headers_include_the_bearer_token() {
+        let server = McpServer {
+            transport: McpTransport::Http,
+            auth_token: Some("secret".into()),
+            ..Default::default()
+        };
+        let headers = http_headers(&server);
+        assert_eq!(
+            headers.get("Authorization").map(String::as_str),
+            Some("Bearer secret")
+        );
+    }
+
+    #[test]
+    fn a_token_overrides_a_manual_authorization_header_in_any_case() {
+        let mut server = McpServer {
+            transport: McpTransport::Http,
+            auth_token: Some("secret".into()),
+            ..Default::default()
+        };
+        server
+            .headers
+            .insert("authorization".into(), "Bearer manual".into());
+        let headers = http_headers(&server);
+        assert_eq!(
+            headers.get("Authorization").map(String::as_str),
+            Some("Bearer secret")
+        );
+        assert_eq!(
+            headers
+                .iter()
+                .filter(|(key, _)| key.eq_ignore_ascii_case("authorization"))
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn an_empty_token_sends_no_authorization_header() {
+        let mut server = McpServer {
+            transport: McpTransport::Http,
+            auth_token: Some("".into()),
+            ..Default::default()
+        };
+        server
+            .headers
+            .insert("authorization".into(), "Bearer manual".into());
+        let headers = http_headers(&server);
+        assert_eq!(headers.get("Authorization"), None);
+        assert_eq!(
+            headers.get("authorization").map(String::as_str),
+            Some("Bearer manual")
+        );
+    }
+
+    #[test]
+    fn http_headers_omit_authorization_without_a_token() {
+        let server = McpServer {
+            transport: McpTransport::Http,
+            ..Default::default()
+        };
+        assert!(!http_headers(&server).contains_key("Authorization"));
+    }
+
+    #[test]
+    fn a_stdio_server_receives_the_auth_token_env_var() {
+        // A stdio server that returns its `MCP_AUTH_TOKEN` env var as the tool
+        // result: the client must have passed the configured token to it.
+        let script = r#"
+read line
+echo '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18","capabilities":{},"serverInfo":{"name":"t","version":"0"}}}'
+read line
+echo "{\"jsonrpc\":\"2.0\",\"id\":2,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"$MCP_AUTH_TOKEN\"}]}}"
+"#;
+        let server = McpServer {
+            name: "t".into(),
+            transport: McpTransport::Stdio,
+            command: Some("sh".into()),
+            args: vec!["-c".into(), script.into()],
+            auth_token: Some("secret".into()),
+            ..Default::default()
+        };
+        let mut client = Client::connect(&server, &Sandbox::Off, Path::new(".")).unwrap();
+        let text = client.call_tool("env", json!({})).unwrap();
+        assert_eq!(text, "secret");
     }
 
     #[test]
