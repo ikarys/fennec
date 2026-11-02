@@ -15,6 +15,7 @@ mod git;
 mod instructions;
 mod integration;
 mod llm;
+mod mcp;
 mod metering;
 mod module_map;
 mod notifier;

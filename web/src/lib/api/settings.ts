@@ -99,6 +99,41 @@ export interface Preferences {
   alwaysOnSkills?: string[];
   /** Opt-in embedded workflows the human enabled. */
   enabledWorkflows?: string[];
+  /** MCP servers, configured on the Settings page. */
+  mcp?: McpServer[];
+}
+
+/** One tool of an MCP server, as listed by `tools/list`. */
+export interface McpTool {
+  name: string;
+  description: string | null;
+  inputSchema: unknown;
+}
+
+/** One MCP server as the human configured it on the Settings page. */
+export interface McpServer {
+  name: string;
+  transport: "stdio" | "http";
+  command?: string | null;
+  args: string[];
+  env: Record<string, string>;
+  url?: string | null;
+  headers: Record<string, string>;
+  /** Globally off: the server's tools are not sent to the model. */
+  disabled: boolean;
+  /** Hidden from the composer dropdown; independent of `disabled`. */
+  visible: boolean;
+  /** Tool names the human turned off for this server. */
+  disabledTools: string[];
+  /** The tool list from the last "Connect"; the definitions come from here. */
+  cachedTools: McpTool[];
+  /** Per-call timeout in seconds; 0 keeps the client's default (60). */
+  timeout: number;
+}
+
+/** What `POST /api/settings/mcp/connect` returns: the server with a fresh cache. */
+export interface McpConnectResponse {
+  server: McpServer;
 }
 
 /** Where a resolved parameter value comes from. */
@@ -198,6 +233,14 @@ export function saveSettings(
   return request<SettingsResponse>("/api/settings", {
     method: "POST",
     body: JSON.stringify(preferences),
+  });
+}
+
+/** Open one MCP server, list its tools, and cache the list in the preferences. */
+export function connectMcp(name: string): Promise<McpConnectResponse> {
+  return request<McpConnectResponse>("/api/settings/mcp/connect", {
+    method: "POST",
+    body: JSON.stringify({ name }),
   });
 }
 

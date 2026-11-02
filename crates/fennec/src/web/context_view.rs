@@ -302,6 +302,7 @@ mod tests {
             Event::TurnSnapshot {
                 cached_system_prompt: "prompt".into(),
                 cached_tools: Some(serde_json::json!([])),
+                mcp_tool_names: Vec::new(),
             },
             Event::MessageStart {
                 message_id: "u".into(),

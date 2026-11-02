@@ -157,7 +157,8 @@ impl Transcript {
             | Event::QueueDrained { .. }
             | Event::QueueCancelled { .. }
             | Event::AgentsMdWritten { .. }
-            | Event::WorktreeDiscarded { .. } => Ok(()),
+            | Event::WorktreeDiscarded { .. }
+            | Event::McpDisabled { .. } => Ok(()),
         };
         let _ = out.flush();
     }
