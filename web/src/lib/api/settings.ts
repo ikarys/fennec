@@ -119,6 +119,8 @@ export interface McpServer {
   env: Record<string, string>;
   url?: string | null;
   headers: Record<string, string>;
+  /** Optional auth token: Bearer header (http) / `MCP_AUTH_TOKEN` env var (stdio). */
+  authToken?: string | null;
   /** Globally off: the server's tools are not sent to the model. */
   disabled: boolean;
   /** Hidden from the composer dropdown; independent of `disabled`. */

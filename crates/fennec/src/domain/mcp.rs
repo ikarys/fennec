@@ -55,6 +55,9 @@ pub struct McpServer {
     pub url: Option<String>,
     /// http: request headers.
     pub headers: BTreeMap<String, String>,
+    /// Optional auth token: sent as a Bearer `Authorization` header (http) or
+    /// as the `MCP_AUTH_TOKEN` env var (stdio).
+    pub auth_token: Option<String>,
     /// Globally off: the server's tools are not sent to the model.
     pub disabled: bool,
     /// Hidden from the composer dropdown; independent of `disabled` (a server
@@ -79,6 +82,7 @@ impl Default for McpServer {
             env: BTreeMap::new(),
             url: None,
             headers: BTreeMap::new(),
+            auth_token: None,
             disabled: false,
             visible: true,
             disabled_tools: Vec::new(),
