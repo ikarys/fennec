@@ -4,6 +4,7 @@
 //! session, project and folder handlers live in `session_routes`.
 
 use super::App;
+use super::agent_routes;
 use super::agents_md_routes;
 use super::audit_routes;
 use super::http::{Request, error, send, send_json};
@@ -66,6 +67,10 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         ("POST", ["api", "worktrees", "remove-orphan"]) => {
             worktree_routes::remove_orphan(app, req, stream)
         }
+        ("GET", ["api", "agents"]) => agent_routes::list(app, req, stream),
+        ("POST", ["api", "agents"]) => agent_routes::save(app, req, stream),
+        ("GET", ["api", "agents", id]) => agent_routes::get(stream, id),
+        ("POST", ["api", "agents", id, "delete"]) => agent_routes::delete(app, req, stream, id),
         ("GET", ["api", "rules"]) => rule_routes::list(app, stream),
         ("POST", ["api", "rules"]) => rule_routes::add(app, req, stream),
         ("POST", ["api", "rules", id, "delete"]) => rule_routes::delete(app, stream, id),

@@ -22,3 +22,21 @@ mod tool_calls;
 pub mod turn;
 pub mod waiver;
 pub mod workflow;
+
+#[cfg(test)]
+mod tests {
+    use crate::domain::agent::KNOWN_TOOLS;
+
+    #[test]
+    fn every_loop_tool_is_a_tool_an_agent_may_name() {
+        // A name out of KNOWN_TOOLS would let a custom agent ask for a dead tool.
+        assert!(KNOWN_TOOLS.contains(&"read_file"));
+        assert!(KNOWN_TOOLS.contains(&super::propose_task::NAME));
+        assert!(KNOWN_TOOLS.contains(&super::suggest_agent::NAME));
+        assert!(KNOWN_TOOLS.contains(&super::ask_user::NAME));
+        assert!(KNOWN_TOOLS.contains(&super::record_decision::NAME));
+        assert!(KNOWN_TOOLS.contains(&super::propose_criteria::NAME));
+        assert!(KNOWN_TOOLS.contains(&super::request_waiver::NAME));
+        assert!(!KNOWN_TOOLS.contains(&"rm_rf"));
+    }
+}
