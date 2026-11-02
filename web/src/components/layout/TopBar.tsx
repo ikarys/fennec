@@ -212,7 +212,7 @@ export function TopBar({
         onClick={onNewSession}
         aria-label="Nouveau chat"
         title="Nouveau chat"
-        className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-border px-2 text-xs font-medium text-muted transition-colors hover:border-border-strong hover:text-text"
+        className="flex h-7 shrink-0 items-center gap-1 self-center rounded-md px-2 text-xs font-medium text-muted transition-colors hover:bg-raised hover:text-text"
       >
         <PlusIcon className="h-3.5 w-3.5" />
         <span>Nouveau chat</span>
