@@ -109,6 +109,7 @@ export interface PendingQuestion {
     value: string;
     label: string;
     description?: string;
+    tone?: string;
   }[];
 }
 
@@ -633,7 +634,8 @@ export function createThreadFold(): ThreadFold {
           return {
             value,
             label: String(option?.label ?? value),
-            description: option?.description != null ? String(option.description) : undefined
+            description: option?.description != null ? String(option.description) : undefined,
+            tone: option?.tone != null ? String(option.tone) : undefined
           };
         });
         pendingQuestion = { callId, question, type, options };

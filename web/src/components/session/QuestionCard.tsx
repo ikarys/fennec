@@ -27,12 +27,12 @@ export function QuestionCard({
             {question.question}
           </div>
           {question.type === 'choice' && question.options.length > 0 && (
-            <div className="flex flex-col items-start gap-1.5">
+            <div className="flex flex-wrap gap-1.5">
               {question.options.map((option, index) => (
                 <Button
                   key={option.value || index}
                   type="button"
-                  variant={index === 0 ? 'primary' : 'secondary'}
+                  variant={option.tone === 'danger' ? 'danger' : index === 0 ? 'primary' : 'secondary'}
                   size="sm"
                   multiline
                   disabled={disabled}

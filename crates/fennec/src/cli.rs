@@ -214,6 +214,7 @@ mod tests {
             value: value.into(),
             label: label.into(),
             description: None,
+            tone: None,
         }
     }
 
