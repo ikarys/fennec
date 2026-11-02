@@ -32,6 +32,11 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
                 &json!({ "model": params.model, "contextWindow": params.context_window, "compactAt": params.compact_at }),
             )
         }
+        ("GET", ["api", "version"]) => send_json(
+            stream,
+            200,
+            &json!({ "version": env!("CARGO_PKG_VERSION") }),
+        ),
         ("GET", ["api", "settings"]) => settings_routes::get_settings(app, stream),
         ("GET", ["api", "insight"]) => super::insight::serve(app, req, stream),
         ("GET", ["api", "notices"]) => super::notice_stream::serve(app, stream),
