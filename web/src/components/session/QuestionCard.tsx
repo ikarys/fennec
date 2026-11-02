@@ -61,7 +61,7 @@ export function QuestionCard({
               </Button>
               <Button
                 type="button"
-                variant="secondary"
+                variant="danger"
                 size="sm"
                 disabled={disabled}
                 onClick={() => onAnswer('no')}
