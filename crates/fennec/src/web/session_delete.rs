@@ -126,7 +126,11 @@ mod tests {
     /// Deleting a chat session removes its per-session scratch directory.
     #[test]
     fn delete_session_removes_the_chat_scratch() {
-        let db_path = std::env::temp_dir().join(format!("fennec-chat-delete-{}.db", new_id()));
+        // Its own store directory: the scratch root is `chat/` next to the
+        // database, so a shared `/tmp/chat` would race with other tests.
+        let base = std::env::temp_dir().join(format!("fennec-chat-delete-{}", new_id()));
+        std::fs::create_dir_all(&base).unwrap();
+        let db_path = base.join("fennec.db");
         let settings = Settings {
             llm: LlmSettings {
                 base_url: "http://localhost".into(),
@@ -182,7 +186,6 @@ mod tests {
 
         assert!(!scratch.exists());
         assert!(store.session(&session).unwrap().is_none());
-        let _ = std::fs::remove_file(&db_path);
-        let _ = std::fs::remove_dir_all(chat::workdir(&db_path));
+        let _ = std::fs::remove_dir_all(&base);
     }
 }
