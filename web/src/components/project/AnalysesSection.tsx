@@ -9,18 +9,13 @@ import { QuestionForm } from './QuestionForm';
 /** What a project page can ask an agent to analyse: each one opens a session on a read-only agent. */
 const ANALYSES = [
   {
-    mode: 'kickoff',
-    prompt: 'Start this project with me: ask me what it is for, then draft its AGENTS.md and propose its first tasks.',
-    title: 'Démarrer le projet',
-    description: "Comprend le projet avec toi, rédige un brouillon d'AGENTS.md et propose les premières tâches, dans l'ordre ; aucun code écrit.",
-    confirm: "Un agent en lecture seule te pose quelques questions (but, périmètre, contraintes), te fait choisir la stack et l'architecture, puis propose un brouillon d'AGENTS.md et les premières tâches, un squelette qui tourne d'abord. Tu choisis les tâches qui entrent au backlog.",
-  },
-  {
     mode: 'analyze',
-    prompt: 'Analyze this project and draft the philosophy, layers and rules of its AGENTS.md.',
-    title: 'Analyser le projet',
-    description: "Propose la philosophie, les couches et les règles d'AGENTS.md, chacune sourcée ; tu relis le brouillon.",
-    confirm: "Un agent en lecture seule lit le projet et rédige un brouillon d'AGENTS.md (philosophie, couches, règles), chaque point avec sa source. Rien n'est écrit sans toi.",
+    prompt: 'Frame this project: read what is there and draft its AGENTS.md. If the workdir is empty, ask me what the project is for and propose its first tasks instead.',
+    title: 'Cadrer le projet',
+    description:
+      "Rédige un brouillon d'AGENTS.md, chaque point sourcé ; sur un dossier vide, te pose les questions et propose les premières tâches.",
+    confirm:
+      "Un agent en lecture seule lit le projet et rédige un brouillon d'AGENTS.md (philosophie, couches, règles), chaque point avec sa source. Si le dossier est vide, il te pose quelques questions (but, périmètre, contraintes), te fait choisir la stack et l'architecture, puis propose les premières tâches, un squelette qui tourne d'abord. Rien n'est écrit sans toi.",
   },
   {
     mode: 'audit-architecture',

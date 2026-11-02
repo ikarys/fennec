@@ -2,7 +2,7 @@
 //! in-memory log, so each test module keeps one copy.
 
 use crate::agent::ports::{Completion, Delta, EventLog, Model, Request, Toolbox};
-use crate::domain::agent::{AgentDefinition, CommandAccess};
+use crate::domain::agent::{AgentDefinition, AgentOrigin, CommandAccess};
 use crate::domain::event::{Event, OutputStream, ToolCall, ToolResult};
 use serde_json::{Value, json};
 use std::cell::RefCell;
@@ -80,6 +80,8 @@ pub fn builder() -> Vec<AgentDefinition> {
         reasoning_effort: None,
         color: None,
         prompt: "Build.".into(),
+        origin: AgentOrigin::Default,
+        path: None,
     }]
 }
 
@@ -96,6 +98,8 @@ pub fn plan() -> AgentDefinition {
         reasoning_effort: None,
         color: None,
         prompt: "Plan.".into(),
+        origin: AgentOrigin::Default,
+        path: None,
     }
 }
 

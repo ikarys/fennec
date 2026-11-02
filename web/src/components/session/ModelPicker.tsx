@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { ModelChoice, ModelChoices, ModelRef, ProviderListing } from '../../lib/api';
 import { getSettings } from '../../lib/api';
 import { Badge } from '../ui/Badge';
@@ -6,6 +6,7 @@ import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { SectionLabel } from '../ui/SectionLabel';
 import { TextInput } from '../ui/Field';
+import { useDismissable } from '../../hooks/useDismissable';
 
 /** The model id without its vendor prefix (`org/model` → `model`). */
 export function modelShortName(model: string): string {
@@ -35,33 +36,11 @@ export function ModelPicker({ current, choices, onChange, disabled }: ModelPicke
   const [loadingAll, setLoadingAll] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        setOpen(false);
-      }
-    }
-
-    function handleMouseDown(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-
-    document.addEventListener('keydown', handleKeyDown);
-    document.addEventListener('mousedown', handleMouseDown);
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('mousedown', handleMouseDown);
-    };
-  }, [open]);
-
-  function close() {
+  const close = useCallback(() => {
     setOpen(false);
     setFilter('');
-  }
+  }, []);
+  useDismissable(open, containerRef, close);
 
   function choose(ref: ModelRef) {
     onChange(ref);

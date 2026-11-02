@@ -244,10 +244,11 @@ read-only. The human edits them as usual.
     running queue; `project` `{id, name}`, the counts are its board's stages, `queue` `{running, autonomous, next}`
     (`next` `{id, text, title} | null`); a running queue first, then most `yours`, most `ready`, then by name
 - `GET /api/projects/{id}/commands` → `[{name, description}]`: the slash commands the composer offers (`compact`, then the project's skills); 404 if no project
-- `GET /api/projects/{id}/agents` → `[{id, name, description, color, subagent, phase}]`: the
+- `GET /api/projects/{id}/agents` → `[{id, name, description, color, subagent, phase, origin}]`: the
   project's agents ordered by `phase` (`start`, `frame`, `build`, `understand`, `check`; null last, for
   sub-agents and agents without one), discovery order within a phase (`color` null when unset); the modes are the
-  ones with `subagent` false, the others only run in a workflow node's fresh context;
+  ones with `subagent` false, the others only run in a workflow node's fresh context; `origin` is
+  `default` (embedded in fennec), `user` (`~/.agents/agents`) or `project` (`.agents/agents`);
   404 if no project
 - `GET /api/projects/{id}/overview` → `{map, mapFile, drift}`, the project page (404 if no project):
   - `map` `{modules: [{id, files, tests, entry, layer, row}], dependencies: [{from, to, imports, violation}]}`:
@@ -272,6 +273,28 @@ read-only. The human edits them as usual.
   - `adrs` `[{number, file, title, status, date, body}]`: the MADR files of `docs/adr/` (`NNNN-slug.md`,
     sorted by number; `status` and `date` from the frontmatter, null when absent; the title from the
     first `# ` heading).
+- `GET /api/agents[?projectId=…]` → `{agents, tools, broken}`, the human's agent library (the Settings page's
+  Agents tab). With `projectId` the named project's `.agents/agents` is included, read-only. No agent tool reaches
+  these routes: `.agents` is protected from the file tools, and the CRUD below acts for the human only.
+  - an agent `{id, name, description, color, subagent, phase, origin, path, editable, readOnly, allowedTools}`,
+    ordered by `phase` as `GET /api/projects/{id}/agents` is; `origin` `default`/`user`/`project`, `path` the file it
+    was read from (null for a default), `editable` true only for `user`, `readOnly` whether its commands are
+    read-only by construction.
+  - `tools` the tool names an agent may list in `allowedTools`; `broken` `[{id, error, field}]` the human's
+    `*.agent.md` files discovery had to skip, so a typo does not silently remove an agent from the menu.
+- `GET /api/agents/{id}` → `{id, content, fields}`: the human's `~/.agents/agents/{id}.agent.md`, `content`
+  verbatim and `fields` `{id, name, description, phase, color, subagent, readOnly, reasoningEffort, allowedTools,
+  prompt}` for the edit form (null when the file does not parse, so the human can still see and delete it).
+  400 for an id that is not kebab-case, 404 if no such file.
+- `POST /api/agents[?projectId=…]` with the `fields` shape → `{agent}`: renders the `*.agent.md` from the fields
+  (`domain/agent_file.rs` owns the frontmatter format, so no client writes YAML) and writes
+  `~/.agents/agents/{id}.agent.md`, new or replaced. Refusals carry `{error, field}` (`field` the input at fault:
+  `id`, `prompt`, `allowedTools`, empty when none): 400 for a bad id, an empty `id` or `prompt`, or a tool outside
+  `tools`; 409 when the id belongs to a default or to the project (duplicate it under another id instead); 500 when
+  `HOME` is unset. A default the human already overrode is theirs to edit.
+- `POST /api/agents/{id}/delete[?projectId=…]` → `{ok}`: removes the human's file (404 if none, 409 for a default
+  or a project agent). Agents are files, not rows: they are versionable and editable outside fennec, and a change
+  applies to the next session that lists them.
 - `GET /api/rules` → `{global, projects: [{id, name, rules}], sessions: [{id, title, projectId, rules}]}`, every rule of
   the rules crate's own store (`rules.db`, `FENNEC_RULES_DB`): global ones, per project, and the session grants;
   `POST /api/rules` `{scope: "global" | {project: id}, kind, pattern, access?, action, note?}` adds one → 201 `{rule}`

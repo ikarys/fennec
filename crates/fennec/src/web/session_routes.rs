@@ -149,6 +149,7 @@ pub(super) fn list_agents(app: &App, stream: &mut TcpStream, id: &str) -> Result
                 "color": agent.color,
                 "subagent": agent.subagent,
                 "phase": agent.phase,
+                "origin": agent.origin,
             })
         })
         .collect();
