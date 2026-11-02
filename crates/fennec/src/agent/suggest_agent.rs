@@ -118,7 +118,7 @@ pub fn event(call_id: &str, s: Suggestion) -> Event {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::agent::CommandAccess;
+    use crate::domain::agent::{AgentOrigin, CommandAccess};
 
     fn make_agent(id: &str, name: &str, description: &str, subagent: bool) -> AgentDefinition {
         AgentDefinition {
@@ -132,6 +132,8 @@ mod tests {
             color: None,
             phase: None,
             prompt: "prompt".into(),
+            origin: AgentOrigin::Default,
+            path: None,
         }
     }
 

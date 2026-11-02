@@ -671,6 +671,8 @@ mod tests {
             color: None,
             phase: None,
             prompt: "prompt".to_string(),
+            origin: crate::domain::agent::AgentOrigin::Default,
+            path: None,
         }
     }
 
