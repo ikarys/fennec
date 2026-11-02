@@ -177,6 +177,9 @@ export function createRunFold(): RunFold {
         }
         run.paused = undefined;
         run.open = [];
+        // A resume after a finish (a run relaunched on its error) is active
+        // again: the next workflow.finished ends it.
+        run.finished = undefined;
         run.lastComment =
           typeof data.comment === "string" ? data.comment : undefined;
         return true;
@@ -225,14 +228,19 @@ export function createRunFold(): RunFold {
 export type RunWaiting =
   | { kind: "human"; nodeId: string; question: string; choices: string[] }
   | { kind: "pause"; to: string; toLabel: string }
-  | { kind: "interrupted" };
+  | { kind: "interrupted" }
+  | { kind: "relaunch" };
 
 export function runWaiting(
   run: RunView | undefined,
   running: boolean,
   lastDone: string | undefined,
 ): RunWaiting | undefined {
-  if (!run || run.finished || running) return undefined;
+  if (!run || running) return undefined;
+  if (run.finished) {
+    // A run that ended in error can be relaunched on its failed node.
+    return run.finished.outcome === "error" ? { kind: "relaunch" } : undefined;
+  }
   if (run.paused) {
     const toLabel = labelOf(
       nodeById(run.workflow, run.paused.to),

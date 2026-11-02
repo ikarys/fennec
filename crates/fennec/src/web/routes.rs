@@ -139,6 +139,9 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         ("POST", ["api", "sessions", id, "replay"]) => {
             session_routes::replay_message(app, req, stream, id)
         }
+        ("POST", ["api", "sessions", id, "retry"]) => {
+            session_routes::retry_session(app, stream, id)
+        }
         ("POST", ["api", "sessions", id, "compact"]) => {
             session_routes::compact_session(app, stream, id)
         }
