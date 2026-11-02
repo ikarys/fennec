@@ -4,7 +4,7 @@
 //! fennec ends the turn with `waiting_for_user` and the answer arrives as
 //! the next turn's input, so a pending question survives a restart.
 
-use crate::domain::event::{AskType, ChoiceOption};
+use crate::domain::event::{AskType, ChoiceOption, OptionTone};
 use serde_json::{Value, json};
 
 pub const NAME: &str = "ask_user";
@@ -30,7 +30,7 @@ pub fn definition() -> Value {
                     },
                     "options": {
                         "type": "array",
-                        "description": "Options for choice-type questions. Each entry may be a plain string or an object {value, label, description?} (or legacy {label, description?}). The server normalizes everything to {value, label, description?}.",
+                        "description": "Options for choice-type questions. Each entry may be a plain string or an object {value, label, description?, tone?} (or legacy {label, description?}). Mark the refuse/cancel option with tone \"danger\" so it is shown in red. The server normalizes everything to {value, label, description?, tone?}.",
                         "items": {
                             "oneOf": [
                                 { "type": "string" },
@@ -40,6 +40,11 @@ pub fn definition() -> Value {
                                         "value": { "type": "string" },
                                         "label": { "type": "string" },
                                         "description": { "type": "string" },
+                                        "tone": {
+                                            "type": "string",
+                                            "enum": ["danger"],
+                                            "description": "Render this option as a danger (red) action. Use it for the refuse/cancel option.",
+                                        },
                                     },
                                     "required": ["label"],
                                 },
@@ -148,11 +153,16 @@ fn option_from_object(obj: &serde_json::Map<String, Value>) -> Option<ChoiceOpti
         .and_then(Value::as_str)
         .filter(|d| !d.is_empty())
         .map(str::to_string);
+    let tone = obj
+        .get("tone")
+        .and_then(Value::as_str)
+        .filter(|t| *t == "danger")
+        .map(|_| OptionTone::Danger);
     Some(ChoiceOption {
         value,
         label: label.to_string(),
         description,
-        tone: None,
+        tone,
     })
 }
 
@@ -248,6 +258,43 @@ mod tests {
                     value: "stop".into(),
                     label: "Annuler".into(),
                     description: Some("Stopper".into()),
+                    tone: None,
+                },
+            ])
+        );
+    }
+
+    #[test]
+    fn parse_reads_danger_tone_on_options() {
+        let q = parse(&json!({
+            "question": "Pick:",
+            "type": "choice",
+            "options": [
+                {"label": "Accepter"},
+                {"label": "Refuser", "tone": "danger"},
+                {"label": "Indifferent", "tone": "loud"},
+            ],
+        }))
+        .unwrap();
+        assert_eq!(
+            q.options,
+            Some(vec![
+                ChoiceOption {
+                    value: "Accepter".into(),
+                    label: "Accepter".into(),
+                    description: None,
+                    tone: None,
+                },
+                ChoiceOption {
+                    value: "Refuser".into(),
+                    label: "Refuser".into(),
+                    description: None,
+                    tone: Some(OptionTone::Danger),
+                },
+                ChoiceOption {
+                    value: "Indifferent".into(),
+                    label: "Indifferent".into(),
+                    description: None,
                     tone: None,
                 },
             ])
