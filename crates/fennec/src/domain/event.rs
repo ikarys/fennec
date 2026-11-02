@@ -123,6 +123,13 @@ pub enum AskType {
     Choice,
 }
 
+/// A choice option's visual weight: a destructive option is drawn in red.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum OptionTone {
+    Danger,
+}
+
 /// One option of a `choice` question (openfox `ChoiceOption`).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -131,6 +138,8 @@ pub struct ChoiceOption {
     pub label: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tone: Option<OptionTone>,
 }
 
 /// openfox message `metadata` for an agent reminder: `{type: "agent", name, color, kind}`.

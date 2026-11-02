@@ -127,6 +127,7 @@ fn option_from_string(s: &str) -> ChoiceOption {
         value: trimmed.to_string(),
         label: trimmed.to_string(),
         description: None,
+        tone: None,
     }
 }
 
@@ -151,6 +152,7 @@ fn option_from_object(obj: &serde_json::Map<String, Value>) -> Option<ChoiceOpti
         value,
         label: label.to_string(),
         description,
+        tone: None,
     })
 }
 
@@ -210,11 +212,13 @@ mod tests {
                     value: "A".into(),
                     label: "A".into(),
                     description: None,
+                    tone: None,
                 },
                 ChoiceOption {
                     value: "B".into(),
                     label: "B".into(),
                     description: None,
+                    tone: None,
                 },
             ])
         );
@@ -238,11 +242,13 @@ mod tests {
                     value: "Continuer".into(),
                     label: "Continuer".into(),
                     description: Some("Reprendre".into()),
+                    tone: None,
                 },
                 ChoiceOption {
                     value: "stop".into(),
                     label: "Annuler".into(),
                     description: Some("Stopper".into()),
+                    tone: None,
                 },
             ])
         );
@@ -263,11 +269,13 @@ mod tests {
                     value: "OK".into(),
                     label: "OK".into(),
                     description: None,
+                    tone: None,
                 },
                 ChoiceOption {
                     value: "legacy".into(),
                     label: "legacy".into(),
                     description: None,
+                    tone: None,
                 },
             ])
         );
