@@ -152,6 +152,22 @@ function AttentionBell({ attention, onOpen }: { attention: AttentionItem[]; onOp
   );
 }
 
+/** The binary's version, fetched once; muted next to the wordmark, hidden when the fetch fails. */
+function VersionTag() {
+  const [version, setVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/version')
+      .then((response) => (response.ok ? response.json() : null))
+      .then((body: { version?: string } | null) => {
+        if (body?.version) setVersion(body.version);
+      })
+      .catch(() => undefined);
+  }, []);
+
+  return version ? <span className="text-xs font-normal text-muted">{version}</span> : null;
+}
+
 export type PageId = 'settings' | 'insight' | 'workflows' | 'backlog';
 
 export type TabInfo =
@@ -219,6 +235,7 @@ export function TopBar({
       >
         <FoxIcon className="h-5 w-5 text-accent" />
         <span>fennec</span>
+        <VersionTag />
       </a>
 
       <button
