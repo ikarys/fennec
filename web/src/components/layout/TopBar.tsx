@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { AttentionItem, SessionState } from '../../lib/api';
 import { SessionStateIcon } from '../session/SessionStateIcon';
-import { BellIcon, CloseIcon, FoxIcon, SearchIcon, SettingsIcon, SplitIcon } from '../Icons';
+import { BellIcon, CloseIcon, FoxIcon, PlusIcon, SearchIcon, SettingsIcon, SplitIcon } from '../Icons';
 import { Badge } from '../ui/Badge';
 import { Button, buttonClass } from '../ui/Button';
 
@@ -167,6 +167,7 @@ interface TopBarProps {
   onPickTab: (id: string) => void;
   onCloseTab: (id: string) => void;
   onOpenPalette: () => void;
+  onNewSession: () => void;
   splitActive: boolean;
   onToggleSplit: () => void;
 }
@@ -179,6 +180,7 @@ export function TopBar({
   onPickTab,
   onCloseTab,
   onOpenPalette,
+  onNewSession,
   splitActive,
   onToggleSplit
 }: TopBarProps) {
@@ -204,6 +206,17 @@ export function TopBar({
         <FoxIcon className="h-5 w-5 text-accent" />
         <span>fennec</span>
       </a>
+
+      <button
+        type="button"
+        onClick={onNewSession}
+        aria-label="Nouveau chat"
+        title="Nouveau chat"
+        className="flex h-7 shrink-0 items-center gap-1 self-center rounded-md px-2 text-xs font-medium text-muted transition-colors hover:bg-raised hover:text-text"
+      >
+        <PlusIcon className="h-3.5 w-3.5" />
+        <span>Nouveau chat</span>
+      </button>
 
       <div
         role="tablist"

@@ -16,11 +16,19 @@ web:
 dev:
     #!/usr/bin/env bash
     set -euo pipefail
+    # The port the human opens: $PORT from the fennec servers panel, else 5173.
+    # fennec's API runs on a private port next to it, so worktrees don't fight
+    # over the default 7777; the UI proxies /api to it.
+    UI_PORT="${PORT:-5173}"
+    API_PORT="${PORT:-7777}"
+    if [ "$API_PORT" = "$UI_PORT" ]; then
+      API_PORT=$(( UI_PORT + 1 ))
+    fi
     (cd web && ([ -d node_modules ] || npm ci))
     cargo build -p fennec
-    target/debug/fennec & server=$!
+    target/debug/fennec --port "$API_PORT" & server=$!
     trap 'kill $server' EXIT
-    cd web && npm run dev
+    cd web && FENNEC_API="http://127.0.0.1:$API_PORT" npm run dev -- --port "$UI_PORT"
 
 # Everything CI checks: the conventions (web, lint) and the tests
 check: web lint test

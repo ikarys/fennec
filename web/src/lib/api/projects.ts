@@ -5,6 +5,8 @@ export interface Project {
   id: string;
   name: string;
   workdir: string;
+  /** The scratch project behind the chat: no folder, no git. */
+  chat?: boolean;
   branch: string | null;
   remote: string | null;
   /** Opens the project in VS Code (through the WSL remote under WSL). */
