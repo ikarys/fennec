@@ -15,8 +15,12 @@ pub struct Refusal {
 }
 
 pub fn check(req: &Request, port: u16) -> Result<(), Refusal> {
+    // `port` is this server; `port - 1` is the Vite page when the recipe pairs
+    // the API one port above its UI (the servers panel), so that origin is
+    // allowed too. `DEV_PORT` covers the no-panel recipe, where Vite stays on
+    // its default port.
     let local = |hostport: &str| {
-        [port, DEV_PORT]
+        [port, port.saturating_sub(1), DEV_PORT]
             .iter()
             .any(|p| hostport == format!("127.0.0.1:{p}") || hostport == format!("localhost:{p}"))
     };
@@ -75,6 +79,24 @@ mod tests {
                 JSON
             ]),
             None
+        );
+        // The servers panel: the API is on `port`, the UI page on `port - 1`.
+        assert_eq!(
+            status(&[
+                ("Host", "127.0.0.1:7777"),
+                ("Origin", "http://127.0.0.1:7776"),
+                JSON
+            ]),
+            None
+        );
+        // A non-adjacent foreign port is still refused.
+        assert_eq!(
+            status(&[
+                ("Host", "127.0.0.1:7777"),
+                ("Origin", "http://127.0.0.1:7775"),
+                JSON
+            ]),
+            Some(403)
         );
         // DNS rebinding: a foreign name resolving to 127.0.0.1.
         assert_eq!(status(&[("Host", "evil.example:7777"), JSON]), Some(403));

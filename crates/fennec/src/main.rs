@@ -5,6 +5,7 @@ mod adr;
 mod agent;
 mod agents;
 mod architecture;
+mod chat;
 mod cli;
 mod config;
 mod doc;

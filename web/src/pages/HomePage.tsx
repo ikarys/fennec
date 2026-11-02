@@ -74,6 +74,95 @@ function SessionRow({
   );
 }
 
+/** The shared session list: the active/recent split, the expand toggle and the empty state. */
+function SessionList({
+  sessions,
+  selected,
+  selecting,
+  onToggle,
+  onDelete,
+  onOpenSession,
+  empty,
+  noun,
+  expanded,
+  onExpandedChange
+}: {
+  sessions: SessionSummary[];
+  selected: Set<string>;
+  selecting: boolean;
+  onToggle: (id: string) => void;
+  onDelete: (id: string) => void;
+  onOpenSession: (id: string) => void;
+  empty: string;
+  noun: string;
+  expanded: boolean;
+  onExpandedChange: (value: boolean) => void;
+}) {
+  // The server already returns the sessions newest first.
+  const active = sessions.filter((session) => ACTIVE_STATES.has(session.state));
+  const rest = sessions.filter((session) => !ACTIVE_STATES.has(session.state));
+  const recent = rest.slice(0, RECENT_SESSIONS);
+  const hidden = rest.slice(RECENT_SESSIONS);
+
+  if (sessions.length === 0) {
+    return (
+      <div className="border-t border-border px-3 py-2.5 text-sm text-muted">{empty}</div>
+    );
+  }
+
+  return (
+    <div>
+      {active.length > 0 && <SectionLabel className="px-3 pt-2 pb-1">En cours</SectionLabel>}
+      {active.map((session) => (
+        <SessionRow
+          key={session.id}
+          session={session}
+          selected={selected.has(session.id)}
+          selecting={selecting}
+          onToggle={onToggle}
+          onDelete={onDelete}
+          onOpenSession={onOpenSession}
+        />
+      ))}
+      {active.length > 0 && recent.length > 0 && (
+        <SectionLabel className="px-3 pt-2 pb-1">Récemment</SectionLabel>
+      )}
+      {recent.map((session) => (
+        <SessionRow
+          key={session.id}
+          session={session}
+          selected={selected.has(session.id)}
+          selecting={selecting}
+          onToggle={onToggle}
+          onDelete={onDelete}
+          onOpenSession={onOpenSession}
+        />
+      ))}
+      {rest.length > RECENT_SESSIONS && (
+        <button
+          type="button"
+          onClick={() => onExpandedChange(!expanded)}
+          className="block w-full border-t border-border px-3 py-[7px] text-left text-xs text-faint hover:bg-raised hover:text-text"
+        >
+          {expanded ? 'Replier' : `Afficher les ${hidden.length} autres ${noun}`}
+        </button>
+      )}
+      {expanded &&
+        hidden.map((session) => (
+          <SessionRow
+            key={session.id}
+            session={session}
+            selected={selected.has(session.id)}
+            selecting={selecting}
+            onToggle={onToggle}
+            onDelete={onDelete}
+            onOpenSession={onOpenSession}
+          />
+        ))}
+    </div>
+  );
+}
+
 function ProjectSection({
   project,
   defaultOpen,
@@ -94,12 +183,9 @@ function ProjectSection({
   onDelete: (id: string) => void;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  // The expand state lives here, not in SessionList, so it survives collapsing
+  // and reopening the section.
   const [expanded, setExpanded] = useState(false);
-  // The server already returns the sessions newest first.
-  const active = project.sessions.filter((session) => ACTIVE_STATES.has(session.state));
-  const rest = project.sessions.filter((session) => !ACTIVE_STATES.has(session.state));
-  const recent = rest.slice(0, RECENT_SESSIONS);
-  const hidden = rest.slice(RECENT_SESSIONS);
   // The live badge only appears while this project has running sessions.
   const runningCount = project.sessions.filter((session) => session.state === 'running').length;
 
@@ -162,62 +248,79 @@ function ProjectSection({
         </div>
       </div>
 
-      {open &&
-        (project.sessions.length === 0 ? (
-          <div className="border-t border-border px-3 py-2.5 text-sm text-muted">
-            Aucune session pour ce projet.
-          </div>
-        ) : (
-          <div>
-            {active.length > 0 && <SectionLabel className="px-3 pt-2 pb-1">En cours</SectionLabel>}
-            {active.map((session) => (
-              <SessionRow
-                key={session.id}
-                session={session}
-                selected={selected.has(session.id)}
-                selecting={selecting}
-                onToggle={onToggle}
-                onDelete={onDelete}
-                onOpenSession={onOpenSession}
-              />
-            ))}
-            {active.length > 0 && recent.length > 0 && (
-              <SectionLabel className="px-3 pt-2 pb-1">Récemment</SectionLabel>
-            )}
-            {recent.map((session) => (
-              <SessionRow
-                key={session.id}
-                session={session}
-                selected={selected.has(session.id)}
-                selecting={selecting}
-                onToggle={onToggle}
-                onDelete={onDelete}
-                onOpenSession={onOpenSession}
-              />
-            ))}
-            {rest.length > RECENT_SESSIONS && (
-              <button
-                type="button"
-                onClick={() => setExpanded((value) => !value)}
-                className="block w-full border-t border-border px-3 py-[7px] text-left text-xs text-faint hover:bg-raised hover:text-text"
-              >
-                {expanded ? 'Replier' : `Afficher les ${hidden.length} autres sessions`}
-              </button>
-            )}
-            {expanded &&
-              hidden.map((session) => (
-                <SessionRow
-                  key={session.id}
-                  session={session}
-                  selected={selected.has(session.id)}
-                  selecting={selecting}
-                  onToggle={onToggle}
-                  onDelete={onDelete}
-                  onOpenSession={onOpenSession}
-                />
-              ))}
-          </div>
-        ))}
+      {open && (
+        <SessionList
+          sessions={project.sessions}
+          selected={selected}
+          selecting={selecting}
+          onToggle={onToggle}
+          onDelete={onDelete}
+          onOpenSession={onOpenSession}
+          empty="Aucune session pour ce projet."
+          noun="sessions"
+          expanded={expanded}
+          onExpandedChange={setExpanded}
+        />
+      )}
+    </section>
+  );
+}
+
+/** The chat: conversations with no project, folder or git. */
+function ChatSection({
+  project,
+  onNewSession,
+  onOpenSession,
+  selected,
+  selecting,
+  onToggle,
+  onDelete
+}: {
+  project: Project;
+  onNewSession: () => void;
+  onOpenSession: (sessionId: string) => void;
+  selected: Set<string>;
+  selecting: boolean;
+  onToggle: (id: string) => void;
+  onDelete: (id: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <section className="overflow-hidden rounded-md border border-border bg-panel">
+      <div className="flex min-h-12 items-center gap-2.5 px-3 py-2">
+        <span className="truncate text-sm font-semibold">Chat</span>
+        <span className="ml-1 flex min-w-0 gap-3 font-mono text-xs text-faint">
+          <span className="truncate whitespace-nowrap tabular-nums">
+            {project.sessions.length} conversation{project.sessions.length > 1 ? 's' : ''}
+          </span>
+        </span>
+        <div className="ml-auto flex shrink-0 items-center gap-0.5">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-accent hover:bg-accent-soft hover:text-accent-strong"
+            onClick={onNewSession}
+            title="Nouvelle conversation sans projet, dossier ni git"
+            aria-label="Nouveau chat"
+          >
+            <PlusIcon className="h-3.5 w-3.5" />
+            Nouveau chat
+          </Button>
+        </div>
+      </div>
+
+      <SessionList
+        sessions={project.sessions}
+        selected={selected}
+        selecting={selecting}
+        onToggle={onToggle}
+        onDelete={onDelete}
+        onOpenSession={onOpenSession}
+        empty="Aucune conversation. « Nouveau chat » pour parler sans projet."
+        noun="conversations"
+        expanded={expanded}
+        onExpandedChange={setExpanded}
+      />
     </section>
   );
 }
@@ -247,6 +350,9 @@ export function HomePage({
     (count, project) => count + project.sessions.filter((session) => session.state === 'running').length,
     0
   );
+  // The chat is a scratch project: it gets its own section, not a project one.
+  const chatProject = projects.find((project) => project.chat);
+  const regularProjects = projects.filter((project) => !project.chat);
 
   const toggleSession = (id: string) => {
     setSelected((previous) => {
@@ -316,14 +422,26 @@ export function HomePage({
 
         {loading && projects.length === 0 && <div className="text-sm text-muted">Chargement…</div>}
 
-        {!loading && !error && projects.length === 0 && (
+        {!loading && !error && regularProjects.length === 0 && (
           <p className="m-0 py-10 text-center text-muted">
             Aucun projet ouvert. Ouvre un dossier pour commencer.
           </p>
         )}
 
+        {chatProject && (
+          <ChatSection
+            project={chatProject}
+            onNewSession={() => onNewSession(chatProject.id)}
+            onOpenSession={onOpenSession}
+            selected={selected}
+            selecting={selected.size > 0}
+            onToggle={toggleSession}
+            onDelete={(id) => remove([id])}
+          />
+        )}
+
         {/* The server lists the most recently active project first: it opens unfolded. */}
-        {projects.map((project, index) => (
+        {regularProjects.map((project, index) => (
           <ProjectSection
             key={project.id}
             project={project}
