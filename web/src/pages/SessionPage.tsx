@@ -21,6 +21,7 @@ import {
   pauseWorkflow,
   replayMessage,
   resumeWorkflow,
+  retrySession,
   sendMessage,
   startWorkflow,
   stopSession,
@@ -47,6 +48,7 @@ import { QuestionCard } from "../components/session/QuestionCard";
 import { RuleApprovalCard } from "../components/session/RuleApprovalCard";
 import { WaiverCard } from "../components/session/WaiverCard";
 import { QueuedMessages } from "../components/session/QueuedMessages";
+import { RetryCard } from "../components/session/RetryCard";
 import { ThreadItemView } from "../components/session/Thread";
 import { PlanActionsContext, type PlanActions } from "../components/session/PlanActions";
 import {
@@ -631,6 +633,11 @@ export function SessionPage({
     }
   }
 
+  async function handleRetry(): Promise<void> {
+    if (!sessionId) return;
+    await retrySession(sessionId);
+  }
+
   return (
     <PreviewContext.Provider value={setPreview}>
       <PreviewWorkdirContext.Provider value={detail?.project.workdir}>
@@ -794,6 +801,13 @@ export function SessionPage({
                         disabled={running}
                       />
                     )}
+                    {view.lastDone === "error" &&
+                      !running &&
+                      !view.pendingQuestion &&
+                      !waiting &&
+                      !detail?.parentId && (
+                        <RetryCard onRetry={handleRetry} disabled={running} />
+                      )}
                     {/* A node's session is driven by its workflow: the human answers in the parent. */}
                     {detail?.parentId && (
                       <div className="mx-auto flex max-w-[960px] items-center gap-3 border-t border-border px-1 py-2">

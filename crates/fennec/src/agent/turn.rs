@@ -26,7 +26,7 @@ use super::propose_criteria;
 use super::propose_task;
 use super::record_decision;
 use super::request_waiver;
-use super::round::{self, Round, RoundPrompt};
+use super::round::{self, CONTINUE_AFTER_STREAM_ERROR_PROMPT, Round, RoundPrompt};
 use super::suggest_agent;
 use super::tool_calls::{Flow, INTERRUPTED_ERROR, execute_tools};
 use crate::domain::agent::{AgentDefinition, DEFAULT_COLOR, last_reminder, resolve};
@@ -142,6 +142,47 @@ pub fn replay_turn(turn: &mut Turn, message_id: &str) -> Result<DoneReason, Stri
             message_id: message_id.to_string(),
         })?;
         answer_or_prompt(turn, &content, &attachments)
+    })
+}
+
+/// The human's retry of a turn that ended in an error: a system-generated
+/// continuation prompt re-runs the loop from where it stopped.
+pub fn retry_turn(turn: &mut Turn) -> Result<DoneReason, String> {
+    with_running(turn, |turn| {
+        let events = turn.log.events(turn.session_id)?;
+        if !open_calls::open_calls(&events).is_empty() {
+            return Err("answer the pending question or send a message first".into());
+        }
+        let prompt = retry_prompt(&events)?;
+        let agent = resolve(turn.agents, &events).ok_or("no top-level agent")?;
+        ensure_agent_reminder(turn, agent)?;
+        turn.append_user(&prompt, true, None, Vec::new())?;
+        run_top_level_agent_loop(turn, agent)
+    })
+}
+
+/// The continuation prompt of a retry, with the last error when there is one.
+fn retry_prompt(events: &[Event]) -> Result<String, String> {
+    let last_done = events
+        .iter()
+        .rfind(|e| matches!(e, Event::ChatDone { .. }))
+        .and_then(|e| match e {
+            Event::ChatDone { reason, .. } => Some(*reason),
+            _ => None,
+        })
+        .ok_or("no turn to retry")?;
+    if last_done != DoneReason::Error {
+        return Err("the last turn did not end in an error".into());
+    }
+    let error = events.iter().rev().find_map(|e| match e {
+        Event::ChatError { error, .. } => Some(error.clone()),
+        _ => None,
+    });
+    Ok(match error {
+        Some(error) => format!(
+            "The last turn ended in an error: {error}\n{CONTINUE_AFTER_STREAM_ERROR_PROMPT}"
+        ),
+        None => CONTINUE_AFTER_STREAM_ERROR_PROMPT.to_string(),
     })
 }
 
@@ -1662,6 +1703,84 @@ mod tests {
             err,
             "only a message you typed in the current window can be replayed"
         );
+    }
+
+    /// Fails its first four requests before any content, then answers.
+    struct FailsThenAnswers(RefCell<u32>);
+
+    impl Model for FailsThenAnswers {
+        fn name(&self) -> &str {
+            "fails-then-answers"
+        }
+
+        fn stream(&self, _: &Request, _: &mut dyn FnMut(Delta)) -> Result<Completion, String> {
+            if *self.0.borrow() < 4 {
+                *self.0.borrow_mut() += 1;
+                return Err("LLM HTTP 400".into());
+            }
+            reply("done", vec![])
+        }
+    }
+
+    #[test]
+    fn a_turn_ended_in_error_is_retried_with_a_continuation_prompt() {
+        let model = FailsThenAnswers(RefCell::new(0));
+        let stop = AtomicBool::new(false);
+        let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
+        assert_eq!(
+            run_turn(&mut h.turn(), "go", &[]).unwrap(),
+            DoneReason::Error
+        );
+        assert_eq!(retry_turn(&mut h.turn()).unwrap(), DoneReason::Complete);
+        let events = h.log.0.borrow().clone();
+        let prompts: Vec<String> = events
+            .iter()
+            .filter_map(|e| match e {
+                Event::MessageStart {
+                    role: Role::User,
+                    content: Some(c),
+                    is_system_generated: true,
+                    ..
+                } => Some(c.clone()),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            prompts
+                .iter()
+                .any(|p| p.contains("The last turn ended in an error: LLM HTTP 400"))
+        );
+    }
+
+    #[test]
+    fn retry_is_refused_when_the_last_turn_did_not_fail() {
+        let model = Scripted(RefCell::new(vec![reply("done", vec![])]));
+        let stop = AtomicBool::new(false);
+        let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
+        run_turn(&mut h.turn(), "go", &[]).unwrap();
+        assert_eq!(
+            retry_turn(&mut h.turn()).unwrap_err(),
+            "the last turn did not end in an error"
+        );
+    }
+
+    #[test]
+    fn retry_prompt_carries_the_last_error() {
+        let events = vec![
+            Event::ChatError {
+                error: "boom".into(),
+                recoverable: false,
+            },
+            Event::ChatDone {
+                message_id: "m".into(),
+                reason: DoneReason::Error,
+                duration_ms: None,
+            },
+        ];
+        let prompt = retry_prompt(&events).unwrap();
+        assert!(prompt.contains("boom"));
+        assert!(prompt.contains(CONTINUE_AFTER_STREAM_ERROR_PROMPT));
+        assert_eq!(retry_prompt(&[]).unwrap_err(), "no turn to retry");
     }
 
     #[test]

@@ -24,7 +24,7 @@ use crate::domain::attachment::{Attachment, from_data_url};
 use crate::domain::audit;
 use crate::domain::clock;
 use crate::domain::conversation::{first_request, last_assistant_text};
-use crate::domain::event::{Event, QueueMode};
+use crate::domain::event::{DoneReason, Event, QueueMode};
 use crate::domain::id::new_id;
 use crate::domain::preferences::ModelRef;
 use crate::domain::project::{Project, SessionSummary};
@@ -34,7 +34,7 @@ use crate::domain::session_skills::missed_always_on;
 use crate::domain::slash::{TurnInput, commands, resolve};
 use crate::domain::task_proposal;
 use crate::domain::vision::seen_images;
-use crate::domain::workflow::run::Waiting;
+use crate::domain::workflow::run::{self as run, RunOutcome, Waiting};
 use crate::notifier::NotifyingLog;
 use crate::skills;
 use crate::store::SqliteStore;
@@ -630,6 +630,46 @@ pub(super) fn replay_message(
     }
     let place = app.place(&store, &session, &p)?;
     match app.turns.start(id, place, Job::Replay(message_id)) {
+        Ok(()) => send_json(stream, 202, &json!({})),
+        Err(e) => error(stream, 409, &e),
+    }
+}
+
+/// `POST /api/sessions/{id}/retry`: re-run a turn that ended in an error,
+/// with a system-generated continuation prompt.
+pub(super) fn retry_session(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+    let store = app.store()?;
+    let Some((session, p)) = app.session_and_project(id)? else {
+        return error(stream, 404, "no such session");
+    };
+    if app.turns.is_running(id) {
+        return error(stream, 409, "a turn is already running");
+    }
+    if workflow_routes::waiting_for(app, id)?.is_some() {
+        return error(stream, 409, "a workflow is running in this session");
+    }
+    let events = store.events(id)?;
+    if let Some(state) = run::current_run(&events)
+        && matches!(state.finished, Some((RunOutcome::Error, _)))
+    {
+        return error(
+            stream,
+            409,
+            "the workflow run ended in an error: relaunch it",
+        );
+    }
+    let last = events
+        .iter()
+        .rfind(|e| matches!(e, Event::ChatDone { .. }))
+        .and_then(|e| match e {
+            Event::ChatDone { reason, .. } => Some(*reason),
+            _ => None,
+        });
+    if last != Some(DoneReason::Error) {
+        return error(stream, 400, "the last turn did not end in an error");
+    }
+    let place = app.place(&store, &session, &p)?;
+    match app.turns.start(id, place, Job::Retry) {
         Ok(()) => send_json(stream, 202, &json!({})),
         Err(e) => error(stream, 409, &e),
     }

@@ -1724,6 +1724,288 @@ fn start_with_attachments_puts_them_in_the_session_before_the_run() {
 }
 
 #[test]
+fn relaunch_a_run_that_ended_in_error_reruns_the_open_node() {
+    let workflow = simple_workflow();
+    let model = Scripted(RefCell::new(vec![reply("done", vec![])]));
+    let stop = AtomicBool::new(false);
+    let children = FakeChildren::default();
+    let commands = FakeCommands::default();
+    let env = WorkflowEnv {
+        children: &children,
+        commands: &commands,
+    };
+    let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
+    h.agents = vec![plan()];
+
+    h.log.0.borrow_mut().extend([
+        Event::WorkflowStarted {
+            run_id: "r".into(),
+            workflow: workflow.clone(),
+            task: "do it".into(),
+            step_by_step: false,
+            started_at: None,
+        },
+        Event::WorkflowNodeStarted {
+            run_id: "r".into(),
+            node_id: "start".into(),
+            pass: 1,
+            via: None,
+            child_session_id: None,
+            started_at: None,
+        },
+        Event::WorkflowNodeFinished {
+            run_id: "r".into(),
+            node_id: "start".into(),
+            port: "next".into(),
+            output: "do it".into(),
+            exit_code: None,
+            comment: None,
+            duration_ms: None,
+        },
+        Event::WorkflowNodeStarted {
+            run_id: "r".into(),
+            node_id: "a".into(),
+            pass: 1,
+            via: Some(Via {
+                from: "start".into(),
+                port: "next".into(),
+            }),
+            child_session_id: None,
+            started_at: None,
+        },
+        Event::WorkflowFinished {
+            run_id: "r".into(),
+            outcome: RunOutcome::Error,
+            reason: Some("boom".into()),
+            stats: None,
+        },
+    ]);
+
+    let reason = run_workflow(&mut h.turn(), &env, WorkflowJob::Resume).unwrap();
+    assert_eq!(reason, DoneReason::Complete);
+
+    let events = h.log.0.into_inner();
+    let a_started = events
+        .iter()
+        .filter(|e| matches!(e, Event::WorkflowNodeStarted { node_id, .. } if node_id == "a"))
+        .count();
+    assert_eq!(a_started, 2);
+    let finished = events
+        .iter()
+        .filter(|e| matches!(e, Event::WorkflowFinished { .. }))
+        .count();
+    assert_eq!(finished, 2);
+    assert!(events.iter().any(|e| matches!(
+        e,
+        Event::WorkflowFinished {
+            outcome: RunOutcome::Done,
+            ..
+        }
+    )));
+}
+
+#[test]
+fn relaunch_with_no_reopenable_node_is_refused() {
+    let workflow = simple_workflow();
+    let model = Scripted(RefCell::new(vec![]));
+    let stop = AtomicBool::new(false);
+    let children = FakeChildren::default();
+    let commands = FakeCommands::default();
+    let env = WorkflowEnv {
+        children: &children,
+        commands: &commands,
+    };
+    let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
+    h.agents = vec![plan()];
+
+    h.log.0.borrow_mut().extend([
+        Event::WorkflowStarted {
+            run_id: "r".into(),
+            workflow,
+            task: "do it".into(),
+            step_by_step: false,
+            started_at: None,
+        },
+        Event::WorkflowNodeStarted {
+            run_id: "r".into(),
+            node_id: "start".into(),
+            pass: 1,
+            via: None,
+            child_session_id: None,
+            started_at: None,
+        },
+        Event::WorkflowNodeFinished {
+            run_id: "r".into(),
+            node_id: "start".into(),
+            port: "next".into(),
+            output: "do it".into(),
+            exit_code: None,
+            comment: None,
+            duration_ms: None,
+        },
+        Event::WorkflowFinished {
+            run_id: "r".into(),
+            outcome: RunOutcome::Error,
+            reason: Some("boom".into()),
+            stats: None,
+        },
+    ]);
+
+    let err = run_workflow(&mut h.turn(), &env, WorkflowJob::Resume).unwrap_err();
+    assert!(err.contains("no node can be re-run"));
+}
+
+#[test]
+fn in_branch_flags_nodes_deep_in_a_branch() {
+    let workflow = Workflow {
+        id: "w".into(),
+        name: "w".into(),
+        description: String::new(),
+        max_steps: 50,
+        nodes: vec![
+            Node {
+                id: "start".into(),
+                name: None,
+                position: Position::default(),
+                kind: NodeKind::Start,
+            },
+            Node {
+                id: "p".into(),
+                name: None,
+                position: Position::default(),
+                kind: NodeKind::Parallel,
+            },
+            Node {
+                id: "a".into(),
+                name: None,
+                position: Position::default(),
+                kind: NodeKind::Agent {
+                    agent: "plan".into(),
+                    prompt: "a".into(),
+                    retry_prompt: None,
+                    outputs: vec!["done".into()],
+                    context: AgentContext::Fresh,
+                    verdicts: false,
+                },
+            },
+            Node {
+                id: "b".into(),
+                name: None,
+                position: Position::default(),
+                kind: NodeKind::Agent {
+                    agent: "plan".into(),
+                    prompt: "b".into(),
+                    retry_prompt: None,
+                    outputs: vec!["done".into()],
+                    context: AgentContext::Fresh,
+                    verdicts: false,
+                },
+            },
+            Node {
+                id: "j".into(),
+                name: None,
+                position: Position::default(),
+                kind: NodeKind::Join,
+            },
+        ],
+        edges: vec![
+            Edge {
+                from: "start".into(),
+                port: "next".into(),
+                to: "p".into(),
+                max_passes: None,
+                pause: false,
+            },
+            Edge {
+                from: "p".into(),
+                port: "branch".into(),
+                to: "a".into(),
+                max_passes: None,
+                pause: false,
+            },
+            Edge {
+                from: "a".into(),
+                port: "done".into(),
+                to: "b".into(),
+                max_passes: None,
+                pause: false,
+            },
+            Edge {
+                from: "b".into(),
+                port: "done".into(),
+                to: "j".into(),
+                max_passes: None,
+                pause: false,
+            },
+        ],
+    };
+
+    assert!(in_branch(&workflow, "a"));
+    assert!(in_branch(&workflow, "b"));
+    assert!(!in_branch(&workflow, "start"));
+}
+
+#[test]
+fn open_at_finish_finds_the_last_unfinished_node() {
+    let events = vec![
+        Event::WorkflowStarted {
+            run_id: "r".into(),
+            workflow: simple_workflow(),
+            task: "do it".into(),
+            step_by_step: false,
+            started_at: None,
+        },
+        Event::WorkflowNodeStarted {
+            run_id: "r".into(),
+            node_id: "start".into(),
+            pass: 1,
+            via: None,
+            child_session_id: None,
+            started_at: None,
+        },
+        Event::WorkflowNodeFinished {
+            run_id: "r".into(),
+            node_id: "start".into(),
+            port: "next".into(),
+            output: "do it".into(),
+            exit_code: None,
+            comment: None,
+            duration_ms: None,
+        },
+        Event::WorkflowNodeStarted {
+            run_id: "r".into(),
+            node_id: "a".into(),
+            pass: 1,
+            via: Some(Via {
+                from: "start".into(),
+                port: "next".into(),
+            }),
+            child_session_id: None,
+            started_at: None,
+        },
+    ];
+
+    let found = open_at_finish(&events, "r").unwrap();
+    assert_eq!(found.0, "a");
+    assert!(found.1.is_some());
+}
+
+#[test]
+fn default_via_points_at_the_start_node() {
+    let events = vec![Event::WorkflowStarted {
+        run_id: "r".into(),
+        workflow: simple_workflow(),
+        task: "do it".into(),
+        step_by_step: false,
+        started_at: None,
+    }];
+    let state = run::current_run(&events).unwrap();
+    let via = default_via(&state);
+    assert_eq!(via.from, "start");
+    assert_eq!(via.port, "next");
+}
+
+#[test]
 fn resume_interrupted_agent_keeps_its_pass_and_prompt() {
     let workflow = Workflow {
         id: "w".into(),
