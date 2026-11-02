@@ -152,11 +152,23 @@ function AttentionBell({ attention, onOpen }: { attention: AttentionItem[]; onOp
   );
 }
 
-export interface TabInfo {
-  id: string;
-  title: string;
-  project: string;
-  state: SessionState;
+export type PageId = 'settings' | 'insight' | 'workflows' | 'backlog';
+
+export type TabInfo =
+  | { id: string; title: string; project: string; state: SessionState; kind: 'session' }
+  | { id: string; title: string; kind: 'page'; page: PageId };
+
+function PageIcon({ page, className }: { page: PageId; className?: string }) {
+  switch (page) {
+    case 'settings':
+      return <SettingsIcon className={className} />;
+    case 'insight':
+      return <InsightIcon className={className} />;
+    case 'workflows':
+      return <WorkflowsIcon className={className} />;
+    case 'backlog':
+      return <BacklogIcon className={className} />;
+  }
 }
 
 interface TopBarProps {
@@ -166,6 +178,7 @@ interface TopBarProps {
   onOpenAttention: (id: string) => void;
   onPickTab: (id: string) => void;
   onCloseTab: (id: string) => void;
+  onOpenPage: (page: PageId) => void;
   onOpenPalette: () => void;
   onNewSession: () => void;
   splitActive: boolean;
@@ -179,6 +192,7 @@ export function TopBar({
   onOpenAttention,
   onPickTab,
   onCloseTab,
+  onOpenPage,
   onOpenPalette,
   onNewSession,
   splitActive,
@@ -220,7 +234,7 @@ export function TopBar({
 
       <div
         role="tablist"
-        aria-label="Sessions ouvertes"
+        aria-label="Onglets ouverts"
         onKeyDown={(event) => {
           if (event.key === 'ArrowRight') {
             event.preventDefault();
@@ -244,7 +258,7 @@ export function TopBar({
                 if (node) tabRefs.current.set(tab.id, node);
                 else tabRefs.current.delete(tab.id);
               }}
-              title={`${tab.project} — ${tab.title}`}
+              title={tab.kind === 'session' ? `${tab.project} — ${tab.title}` : tab.title}
               onClick={() => onPickTab(tab.id)}
               onMouseDown={(event) => {
                 // Middle click (wheel) closes the tab, like a browser tab bar.
@@ -269,7 +283,11 @@ export function TopBar({
                   : 'border-transparent text-muted hover:bg-raised/50 hover:text-text'
               }`}
             >
-              <SessionStateIcon state={tab.state} className="h-3.5 w-3.5" />
+              {tab.kind === 'session' ? (
+                <SessionStateIcon state={tab.state} className="h-3.5 w-3.5" />
+              ) : (
+                <PageIcon page={tab.page} className="h-3.5 w-3.5" />
+              )}
               <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-medium">
                 {tab.title}
               </span>
@@ -315,38 +333,42 @@ export function TopBar({
         >
           <SplitIcon className="h-4 w-4" />
         </button>
-        <a
-          href="#/insight"
+        <button
+          type="button"
+          onClick={() => onOpenPage('insight')}
           title="Insight"
           aria-label="Insight"
           className={buttonClass({ variant: 'ghost', size: 'sm' })}
         >
           <InsightIcon className="h-4 w-4" />
-        </a>
-        <a
-          href="#/workflows"
+        </button>
+        <button
+          type="button"
+          onClick={() => onOpenPage('workflows')}
           title="Workflows"
           aria-label="Workflows"
           className={buttonClass({ variant: 'ghost', size: 'sm' })}
         >
           <WorkflowsIcon className="h-4 w-4" />
-        </a>
-        <a
-          href="#/backlog"
+        </button>
+        <button
+          type="button"
+          onClick={() => onOpenPage('backlog')}
           title="Backlog"
           aria-label="Backlog"
           className={buttonClass({ variant: 'ghost', size: 'sm' })}
         >
           <BacklogIcon className="h-4 w-4" />
-        </a>
-        <a
-          href="#/settings"
+        </button>
+        <button
+          type="button"
+          onClick={() => onOpenPage('settings')}
           title="Réglages"
           aria-label="Réglages"
           className={buttonClass({ variant: 'ghost', size: 'sm' })}
         >
           <SettingsIcon className="h-4 w-4" />
-        </a>
+        </button>
       </div>
     </header>
   );
