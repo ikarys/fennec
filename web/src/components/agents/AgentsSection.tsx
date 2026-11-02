@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Section } from '../ui/Section';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { TrashIcon } from '../Icons';
 import { AgentEditor, EMPTY_DRAFT } from './AgentEditor';
 import {
@@ -131,6 +132,7 @@ export function AgentsSection() {
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [formField, setFormField] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<AgentView | null>(null);
 
   const load = async (showLoading = true) => {
     if (showLoading) setLoading(true);
@@ -206,8 +208,7 @@ export function AgentsSection() {
     }
   };
 
-  const remove = async (agent: AgentView) => {
-    if (!window.confirm(`Supprimer l'agent « ${agent.name} » ?`)) return;
+  const doRemove = async (agent: AgentView) => {
     setBusy(true);
     clearError();
     try {
@@ -272,7 +273,7 @@ export function AgentsSection() {
                         busy={busy}
                         onEdit={() => void startEdit(agent.id)}
                         onDuplicate={() => startDuplicate(agent)}
-                        onDelete={() => void remove(agent)}
+                        onDelete={() => setPendingDelete(agent)}
                       />
                     ))}
                   </ul>
@@ -301,7 +302,7 @@ export function AgentsSection() {
                   aria-label="Supprimer"
                   disabled={busy}
                   onClick={() =>
-                    void remove({
+                    setPendingDelete({
                       id: file.id,
                       name: file.id,
                       description: '',
@@ -323,6 +324,21 @@ export function AgentsSection() {
           </ul>
         </Section>
       ) : null}
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={pendingDelete ? `Supprimer l'agent « ${pendingDelete.name} » ?` : ''}
+        body="Le fichier et sa méthode sont supprimés de ~/.agents/agents."
+        confirmLabel="Supprimer"
+        variant="danger"
+        onConfirm={() => {
+          if (!pendingDelete) return;
+          const agent = pendingDelete;
+          setPendingDelete(null);
+          void doRemove(agent);
+        }}
+        onCancel={() => setPendingDelete(null)}
+      />
     </>
   );
 }
