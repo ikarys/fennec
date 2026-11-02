@@ -25,6 +25,7 @@ pub mod frontmatter;
 pub mod id;
 pub mod integration;
 pub mod map_doc;
+pub mod mcp;
 pub mod model_choice;
 pub mod module_map;
 pub mod open_calls;

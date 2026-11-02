@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { addPlannedIdea, frameIdea, framingPrefill, listIdeas, markIdeaReady } from "../lib/ideas";
 import type {
   AttachmentInput,
+  McpSessionView,
   Project,
   SessionDetail,
   SessionState,
@@ -18,11 +19,13 @@ import {
   continueWorkflow,
   createSession,
   getSession,
+  getSessionMcp,
   pauseWorkflow,
   replayMessage,
   resumeWorkflow,
   retrySession,
   sendMessage,
+  setSessionMcp,
   startWorkflow,
   stopSession,
   stopWorkflow,
@@ -119,6 +122,7 @@ export function SessionPage({
   const [backlogSegment, setBacklogSegment] = useState<string | null>(null);
   const [integrationOpen, setIntegrationOpen] = useState(false);
   const [integrationVersion, setIntegrationVersion] = useState(0);
+  const [mcpView, setMcpView] = useState<McpSessionView | null>(null);
   const {
     view,
     hasMore,
@@ -213,6 +217,41 @@ export function SessionPage({
       active = false;
     };
   }, [sessionId, detailVersion]);
+
+  // The composer's MCP dropdown: the session's effective MCP state, refetched
+  // when the session changes or a turn ends (a global flip on the Settings
+  // page shows up on the next turn), the toggle handler updates it directly.
+  useEffect(() => {
+    if (!sessionId) {
+      setMcpView(null);
+      return;
+    }
+    let active = true;
+    getSessionMcp(sessionId)
+      .then((data) => {
+        if (active) setMcpView(data);
+      })
+      .catch(() => {
+        if (active) setMcpView(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [sessionId, detailVersion]);
+
+  function handleMcpToggle(name: string, active: boolean) {
+    if (!sessionId || !mcpView) return;
+    // The disabled set is the full set (last wins), so it must include hidden
+    // servers too: a hidden server left out would silently turn on.
+    const disabled = mcpView.servers
+      .filter((server) => (server.name === name ? !active : !server.active))
+      .map((server) => server.name);
+    setSessionMcp(sessionId, disabled)
+      .then(setMcpView)
+      .catch(() => {
+        // Keep the optimistic view; the next fetch corrects it.
+      });
+  }
 
   useEffect(() => {
     // A workflow's first turn creates the worktree: re-read the detail when
@@ -876,6 +915,8 @@ export function SessionPage({
                         workflows={workflows}
                         workflowSelection={workflowSelection}
                         onWorkflowSelectionChange={setWorkflowSelection}
+                        mcpView={mcpView}
+                        onMcpToggle={handleMcpToggle}
                       />
                     )}
                   </main>

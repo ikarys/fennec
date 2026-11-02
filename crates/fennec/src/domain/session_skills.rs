@@ -305,6 +305,7 @@ mod tests {
             Event::TurnSnapshot {
                 cached_system_prompt: prompt.into(),
                 cached_tools: None,
+                mcp_tool_names: Vec::new(),
             },
             load_call("c1", "beta"),
             result("c1", true),

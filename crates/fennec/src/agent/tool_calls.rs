@@ -89,6 +89,9 @@ pub(super) fn execute_tools(
     calls: &[ToolCall],
 ) -> Result<Flow, String> {
     let mut waiting = false;
+    // MCP tools are a human-configured capability, not part of the agent's
+    // fixed allowed list: allow them here so a `{server}_{tool}` call runs.
+    let mcp_tools = turn.tools.mcp_tool_names();
     for call in calls {
         // The human pressed stop: a `write_file` queued after the stopped
         // command must not run, so record a failure without running it.
@@ -124,7 +127,7 @@ pub(super) fn execute_tools(
         }
         // openfox `createRegistryFromTools` permission check: the mode is
         // enforced here, at execution, so plan stays read-only.
-        if !agent.allows(&call.name) {
+        if !agent.allows(&call.name) && !mcp_tools.contains(&call.name) {
             record(
                 turn,
                 message_id,
@@ -281,4 +284,108 @@ pub(super) fn execute_tools(
     } else {
         Flow::Continue
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::execute_tools;
+    use crate::agent::ports::Toolbox;
+    use crate::agent::test_support::{MemoryLog, Scripted, builder};
+    use crate::domain::agent::CommandAccess;
+    use crate::domain::event::{Event, OutputStream, ToolCall, ToolResult};
+    use serde_json::{Value, json};
+    use std::cell::RefCell;
+    use std::path::PathBuf;
+    use std::rc::Rc;
+    use std::sync::atomic::AtomicBool;
+
+    /// A toolbox that offers one MCP tool and records every call it runs.
+    struct McpToolbox {
+        executed: Rc<RefCell<Vec<String>>>,
+    }
+
+    impl Toolbox for McpToolbox {
+        fn definitions(&self) -> Value {
+            json!([])
+        }
+
+        fn execute(
+            &self,
+            name: &str,
+            _args: &Value,
+            _access: CommandAccess,
+            _stop: &AtomicBool,
+            _on_output: &mut dyn FnMut(OutputStream, &str),
+        ) -> ToolResult {
+            self.executed.borrow_mut().push(name.to_string());
+            ToolResult::success("mcp ran".into(), false)
+        }
+
+        fn mcp_tool_names(&self) -> Vec<String> {
+            vec!["fs_echo".into()]
+        }
+    }
+
+    #[test]
+    fn an_mcp_tool_call_is_allowed_even_if_not_in_the_agents_list() {
+        let executed = Rc::new(RefCell::new(Vec::new()));
+        let tools = McpToolbox {
+            executed: executed.clone(),
+        };
+        let log = MemoryLog::default();
+        let model = Scripted(RefCell::new(vec![]));
+        let stop = AtomicBool::new(false);
+        let agents = builder();
+        let workdir = PathBuf::from("/tmp");
+        let mut on_event = |_: &Event| {};
+        let mut turn = super::Turn {
+            model: &model,
+            log: &log,
+            tools: &tools,
+            session_id: "s",
+            workdir: &workdir,
+            instructions: "",
+            skills: &[],
+            always_on: &[],
+            agents: &agents,
+            max_tokens: 100,
+            context_window: 1000,
+            compact_at: 0.0,
+            reasoning_effort: None,
+            autonomous: false,
+            stop: &stop,
+            on_event: &mut on_event,
+        };
+        let agent = &agents[0];
+        // The builder does not list `fs_echo`; the MCP set is what allows it.
+        assert!(!agent.allows("fs_echo"));
+        let mcp_call = ToolCall {
+            id: "c1".into(),
+            name: "fs_echo".into(),
+            arguments: json!({}),
+            parse_error: None,
+            raw_arguments: None,
+        };
+        execute_tools(&mut turn, agent, "m1", &[mcp_call]).unwrap();
+        assert_eq!(*executed.borrow(), vec!["fs_echo".to_string()]);
+
+        // A non-MCP tool not in the list is still refused and never runs.
+        let refused = ToolCall {
+            id: "c2".into(),
+            name: "web_search".into(),
+            arguments: json!({}),
+            parse_error: None,
+            raw_arguments: None,
+        };
+        execute_tools(&mut turn, agent, "m2", &[refused]).unwrap();
+        assert_eq!(*executed.borrow(), vec!["fs_echo".to_string()]);
+        assert!(
+            log.0
+                .borrow()
+                .iter()
+                .any(|e| matches!(e, Event::ToolResult { result, .. }
+                if !result.success
+                    && result.error.as_deref().is_some_and(|m| m.contains("not available"))))
+        );
+    }
 }

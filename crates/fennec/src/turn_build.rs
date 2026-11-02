@@ -8,6 +8,7 @@ use crate::agents;
 use crate::config::Settings;
 use crate::domain::clock;
 use crate::domain::event::Event;
+use crate::domain::mcp;
 use crate::domain::preferences::ModelRef;
 use crate::domain::waiver;
 use crate::instructions::all_instructions;
@@ -134,7 +135,8 @@ pub fn with_turn<R>(
                 .into_iter()
                 .collect(),
         )
-        .with_rules(rules);
+        .with_rules(rules)
+        .with_mcp(mcp::active_servers(&log.events(session_id)?, &prefs));
     let tools = match project_dir {
         Some(dir) => tools.with_project_dir(dir),
         None => tools,
