@@ -90,6 +90,11 @@ pub trait Toolbox {
             proposal: None,
         }
     }
+    /// The MCP tool names offered; empty when the toolbox has no MCP servers.
+    /// The snapshot re-freezes when this set changes.
+    fn mcp_tool_names(&self) -> Vec<String> {
+        Vec::new()
+    }
 }
 
 /// What an agent node run in a child session reports back.

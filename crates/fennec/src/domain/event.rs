@@ -263,6 +263,10 @@ pub enum Event {
     /// fennec's own (openfox has none): the human chose the session's model.
     #[serde(rename = "model.changed", rename_all = "camelCase")]
     ModelChanged { model: ModelRef },
+    /// fennec's own: the session's disabled MCP servers, set by the composer.
+    /// Carries the full disabled set (not a delta); the last event wins.
+    #[serde(rename = "mcp.disabled", rename_all = "camelCase")]
+    McpDisabled { servers: Vec<String> },
     /// fennec's own (openfox deletes the events instead): the human replayed
     /// `message_id`; the model's view drops that message and everything after
     /// it, the log keeps them.
@@ -378,6 +382,10 @@ pub enum Event {
         /// before they were frozen too.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         cached_tools: Option<Value>,
+        /// The MCP tool names frozen with it; empty in snapshots stored
+        /// before MCP existed. Re-freezing compares this to the current set.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        mcp_tool_names: Vec<String>,
     },
     #[serde(rename = "criteria.set", rename_all = "camelCase")]
     CriteriaSet { criteria: Vec<Criterion> },
@@ -561,6 +569,7 @@ impl Event {
             Event::RunningChanged { .. } => "running.changed",
             Event::ModeChanged { .. } => "mode.changed",
             Event::ModelChanged { .. } => "model.changed",
+            Event::McpDisabled { .. } => "mcp.disabled",
             Event::SessionRewound { .. } => "session.rewound",
             Event::SessionNameGenerated { .. } => "session.name_generated",
             Event::WorkflowStarted { .. } => "workflow.started",

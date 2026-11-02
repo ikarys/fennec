@@ -436,6 +436,7 @@ mod tests {
             Event::TurnSnapshot {
                 cached_system_prompt: "base prompt".into(),
                 cached_tools: None,
+                mcp_tool_names: Vec::new(),
             },
             Event::MessageStart {
                 message_id: "u1".into(),
