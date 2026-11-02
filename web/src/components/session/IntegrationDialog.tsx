@@ -117,7 +117,7 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
   const [acknowledged, setAcknowledged] = useState<Partial<Record<BlockerKind, boolean>>>({});
   const [message, setMessage] = useState('');
   const [protectTests, setProtectTests] = useState(false);
-  const [removeWorktree, setRemoveWorktree] = useState(false);
+  const [removeWorktree, setRemoveWorktree] = useState(true);
   const [suggested, setSuggested] = useState<string | null>(null);
 
   useEffect(() => {
@@ -132,6 +132,7 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
     setAcknowledged({});
     setMessage('');
     setProtectTests(false);
+    setRemoveWorktree(true);
     setSuggested(null);
     let active = true;
     getIntegration(sessionId)
