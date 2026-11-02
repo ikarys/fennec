@@ -104,7 +104,8 @@ impl App {
     }
 
     /// Where the session's turns run (see `Place`). A child session shares
-    /// its root session's worktree.
+    /// its root session's worktree — or, for the chat, its root session's
+    /// scratch directory.
     fn place(
         &self,
         store: &SqliteStore,
@@ -112,6 +113,14 @@ impl App {
         project: &Project,
     ) -> Result<Place, String> {
         let root = self.root_id(store, session)?;
+        if chat::is_chat(project) {
+            return Ok(Place::new(
+                &chat::session_dir(&self.settings.db_path, &root)
+                    .display()
+                    .to_string(),
+                None,
+            ));
+        }
         let found = worktree::find(&self.worktrees(), Path::new(&project.workdir), &root);
         Ok(Place::new(&project.workdir, found))
     }
@@ -129,6 +138,10 @@ impl App {
         worktree: bool,
     ) -> Result<Place, String> {
         if !worktree {
+            return self.place(store, session, project);
+        }
+        if chat::is_chat(project) {
+            // The chat's scratch is not a git repository: no worktree.
             return self.place(store, session, project);
         }
         let root = self.root_id(store, session)?;

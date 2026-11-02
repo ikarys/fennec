@@ -51,6 +51,9 @@ pub fn execute(
         sandbox,
         env,
     } = launch;
+    // The cwd must exist: for the chat, this is where its per-session scratch
+    // directory is created, on the first command.
+    std::fs::create_dir_all(cwd).map_err(|e| format!("create {}: {e}", cwd.display()))?;
     let started = Instant::now();
     let sandbox_on = matches!(sandbox, Sandbox::Bwrap { .. });
     let mut child = sandbox
