@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } fro
 import type { Project, ProviderListing, SettingsResponse } from './lib/api';
 import { createProject, getProjects, getSettings } from './lib/api';
 import { applyTheme, getStoredTheme, type ThemeId } from './lib/theme';
-import { TopBar, type TabInfo } from './components/layout/TopBar';
+import { TopBar, type PageId, type TabInfo } from './components/layout/TopBar';
 import { HomePage } from './pages/HomePage';
 import { SessionPage } from './pages/SessionPage';
 import { SplitPage } from './pages/SplitPage';
@@ -30,6 +30,14 @@ type Route =
 
 const TABS_KEY = 'fennec.tabs';
 const ACTIVE_TAB_KEY = 'fennec.activeTab';
+
+/** The fixed pages that get a tab in the bar, in display order. */
+const PAGE_TABS: { page: PageId; title: string; path: string }[] = [
+  { page: 'settings', title: 'Réglages', path: '#/settings' },
+  { page: 'insight', title: 'Insight', path: '#/insight' },
+  { page: 'workflows', title: 'Workflows', path: '#/workflows' },
+  { page: 'backlog', title: 'Backlog', path: '#/backlog' }
+];
 
 function parseRoute(): Route {
   const hash = window.location.hash;
@@ -80,11 +88,15 @@ function parseRoute(): Route {
   return { name: 'home' };
 }
 
-/** The route of a tab: a pseudo `new:` tab opens the new-session page. */
+/** The route of a tab: a pseudo `new:` tab opens the new-session page, a page tab its page. */
 function tabPath(tabId: string): string {
-  return tabId.startsWith('new:')
-    ? `#/new/${encodeURIComponent(tabId.slice(4))}`
-    : `#/s/${encodeURIComponent(tabId)}`;
+  if (tabId.startsWith('new:')) {
+    return `#/new/${encodeURIComponent(tabId.slice(4))}`;
+  }
+  if (tabId.startsWith('page:')) {
+    return PAGE_TABS.find((page) => page.page === tabId.slice(5))?.path ?? '#/';
+  }
+  return `#/s/${encodeURIComponent(tabId)}`;
 }
 
 /** A split pane's value in the URL: a session id, `new:<projectId>`, or `-` for empty. */
@@ -106,7 +118,9 @@ function loadTabs(): string[] {
     const raw = localStorage.getItem(TABS_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === 'string') : [];
+    return Array.isArray(parsed)
+      ? parsed.filter((value): value is string => typeof value === 'string' && !value.startsWith('page:'))
+      : [];
   } catch {
     return [];
   }
@@ -114,7 +128,9 @@ function loadTabs(): string[] {
 
 function loadActiveTab(): string | null {
   try {
-    return localStorage.getItem(ACTIVE_TAB_KEY);
+    const id = localStorage.getItem(ACTIVE_TAB_KEY);
+    // A page tab persisted by an older build is not a real session.
+    return id && !id.startsWith('page:') ? id : null;
   } catch {
     return null;
   }
@@ -147,8 +163,11 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => {
+    // Only session tabs are persisted: page tabs are re-created by the
+    // route-sync effect from the URL on load, so a one-time visit to a page
+    // must not leave a permanent tab in the bar.
     try {
-      localStorage.setItem(TABS_KEY, JSON.stringify(tabs));
+      localStorage.setItem(TABS_KEY, JSON.stringify(tabs.filter((id) => !id.startsWith('page:'))));
     } catch {
       // Ignore storage errors.
     }
@@ -165,6 +184,21 @@ export default function App() {
       // Ignore storage errors.
     }
   }, [activeTabId]);
+
+  // A page route (settings, insight, workflows, backlog) gets its tab in the
+  // bar the moment it is on screen, so the active page is never unlisted.
+  const pageTabIdForRoute =
+    route.name === 'settings' ||
+    route.name === 'insight' ||
+    route.name === 'backlog' ||
+    route.name === 'workflows'
+      ? `page:${route.name}`
+      : null;
+  useEffect(() => {
+    if (!pageTabIdForRoute) return;
+    setTabs((previous) => (previous.includes(pageTabIdForRoute) ? previous : [...previous, pageTabIdForRoute]));
+    setActiveTabId(pageTabIdForRoute);
+  }, [pageTabIdForRoute]);
 
   // `projectsLoading` is only the first load: a refresh keeps the list on
   // screen instead of flashing a loading state.
@@ -251,7 +285,11 @@ export default function App() {
   }, []);
 
   const tabInfos = useMemo<TabInfo[]>(() => {
-    return tabs.map((id) => {
+    const infos: TabInfo[] = tabs.map((id) => {
+      if (id.startsWith('page:')) {
+        const page = PAGE_TABS.find((candidate) => candidate.page === id.slice(5));
+        return { id, title: page?.title ?? 'Page', kind: 'page', page: page?.page ?? 'settings' };
+      }
       if (id.startsWith('new:')) {
         const projectId = id.slice(4);
         const project = projects.find((candidate) => candidate.id === projectId);
@@ -259,17 +297,19 @@ export default function App() {
           id,
           title: 'Nouvelle session',
           project: project?.name ?? projectId,
-          state: 'idle' as const
+          state: 'idle' as const,
+          kind: 'session' as const
         };
       }
       for (const project of projects) {
         const session = project.sessions.find((candidate) => candidate.id === id);
         if (session) {
-          return { id, title: session.title, project: project.name, state: session.state };
+          return { id, title: session.title, project: project.name, state: session.state, kind: 'session' as const };
         }
       }
-      return { id, title: 'Session', project: '—', state: 'idle' as const };
+      return { id, title: 'Session', project: '—', state: 'idle' as const, kind: 'session' as const };
     });
+    return infos;
   }, [tabs, projects]);
 
   const openSession = useCallback(
@@ -287,12 +327,19 @@ export default function App() {
       setTabs((previous) => {
         const next = previous.filter((id) => id !== tabId);
         if (activeTabId === tabId) {
-          const fallback = next.length > 0 ? next[next.length - 1] : null;
-          setActiveTabId(fallback);
-          if (fallback) {
-            navigate(tabPath(fallback));
-          } else {
+          // A page tab closing while active returns home; a session tab falls
+          // back to the last remaining tab (or home when none are left).
+          if (tabId.startsWith('page:')) {
+            setActiveTabId(null);
             navigate('#/');
+          } else {
+            const fallback = next.length > 0 ? next[next.length - 1] : null;
+            setActiveTabId(fallback);
+            if (fallback) {
+              navigate(tabPath(fallback));
+            } else {
+              navigate('#/');
+            }
           }
         }
         return next;
@@ -409,6 +456,23 @@ export default function App() {
     toggleSplitRef.current = toggleSplit;
   }, [toggleSplit]);
 
+  // Re-clicking the tab of the page already on screen keeps its sub-tab
+  // (settings tab, project id, …) instead of resetting to the page's root.
+  const basePathOf = (hash: string): string => {
+    const segments = hash.slice(1).split('/').filter((segment) => segment.length > 0);
+    return `#/${segments.slice(0, 2).join('/')}`;
+  };
+  const pickTab = useCallback(
+    (id: string) => {
+      setActiveTabId(id);
+      const target = tabPath(id);
+      if (!id.startsWith('page:') || basePathOf(window.location.hash) !== target) {
+        navigate(target);
+      }
+    },
+    [navigate]
+  );
+
   const pseudoTabId = route.name === 'new' ? `new:${route.id}` : null;
 
   return (
@@ -421,11 +485,9 @@ export default function App() {
           activeTabId={activeTabId}
           attention={attention}
           onOpenAttention={openSession}
-          onPickTab={(id) => {
-            setActiveTabId(id);
-            navigate(tabPath(id));
-          }}
+          onPickTab={pickTab}
           onCloseTab={closeTab}
+          onOpenPage={(page) => navigate(PAGE_TABS.find((candidate) => candidate.page === page)?.path ?? '#/')}
           onOpenPalette={() => setPaletteOpen(true)}
           onNewSession={() => startNewSession("chat")}
           splitActive={route.name === 'split'}
