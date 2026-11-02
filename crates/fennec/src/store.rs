@@ -7,6 +7,7 @@ mod ideas;
 mod settings;
 
 use crate::agent::ports::EventLog;
+use crate::chat;
 use crate::domain::clock::now_ms;
 use crate::domain::event::{DoneReason, Event};
 use crate::domain::id::new_id;
@@ -135,6 +136,21 @@ impl SqliteStore {
         Ok(self.db.query_row(
             "SELECT id, name, workdir FROM projects WHERE workdir = ?1",
             [workdir],
+            project_row,
+        )?)
+    }
+
+    /// The chat's scratch project, created on first use: a fixed id and a
+    /// scratch workdir, so a session can run without a repository.
+    pub fn chat_project(&self, workdir: &str) -> Result<Project> {
+        let now = now_ms().to_string();
+        self.db.execute(
+            "INSERT OR IGNORE INTO projects (id, name, workdir, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?4)",
+            params![chat::ID, chat::NAME, workdir, now],
+        )?;
+        Ok(self.db.query_row(
+            "SELECT id, name, workdir FROM projects WHERE id = ?1",
+            [chat::ID],
             project_row,
         )?)
     }
@@ -553,6 +569,20 @@ mod tests {
             .map(|p| p.workdir)
             .collect();
         assert_eq!(workdirs, ["/b", "/a", "/c"]);
+    }
+
+    #[test]
+    fn chat_project_creates_a_fixed_row_and_is_idempotent() {
+        let store = SqliteStore::in_memory().unwrap();
+        let chat = store.chat_project("/scratch/chat").unwrap();
+        assert_eq!(chat.id, chat::ID);
+        assert_eq!(chat.name, chat::NAME);
+        assert_eq!(chat.workdir, "/scratch/chat");
+        // A second call returns the same row, not a duplicate.
+        assert_eq!(store.chat_project("/scratch/chat").unwrap().id, chat.id);
+        // It is reachable by id and marked as the chat.
+        let by_id = store.project(chat::ID).unwrap().unwrap();
+        assert!(chat::is_chat(&by_id));
     }
 
     #[test]
