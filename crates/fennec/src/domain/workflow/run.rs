@@ -186,6 +186,9 @@ impl RunState {
                 // open node): remembered so that start keeps the node's pass.
                 self.interrupted = std::mem::take(&mut self.open);
                 self.paused = None;
+                // A resume after a finish (a run relaunched on its error) is
+                // active again: the next `workflow.finished` ends it.
+                self.finished = None;
                 if !comment.is_empty() {
                     self.comment = comment.clone();
                 }
@@ -666,6 +669,26 @@ mod tests {
                 .get(&("start".to_string(), "next".to_string())),
             Some(&1)
         );
+    }
+
+    #[test]
+    fn a_resume_after_a_finish_reactivates_the_run() {
+        let mut state = state(simple_workflow());
+        state.apply(&Event::WorkflowFinished {
+            run_id: "r".into(),
+            outcome: RunOutcome::Error,
+            reason: Some("an error".into()),
+            stats: None,
+        });
+        assert!(!state.is_active());
+
+        state.apply(&Event::WorkflowResumed {
+            run_id: "r".into(),
+            comment: String::new(),
+        });
+
+        assert!(state.is_active());
+        assert_eq!(state.finished, None);
     }
 
     #[test]

@@ -550,6 +550,11 @@ read-only. The human edits them as usual.
   model's current view; appends `session.rewound` and re-sends that message
   with its images. The model's view drops the message and everything after
   it, the log keeps them; files the agent changed meanwhile are not reverted
+- `POST /api/sessions/{id}/retry` → 202; 404 if no session; 409 if a turn is
+  running or a workflow waits in the session; 400 `the last turn did not end
+  in an error` when the last `chat.done` is not reason `error`. Re-runs the
+  turn with a system-generated continuation prompt (the last `chat.error`
+  included when there is one)
 - `POST /api/sessions/{id}/compact` → 202; 404 if no session; 409 if a turn is
   running; summarises the history and opens a new context window
 - `POST /api/sessions/{id}/mode` `{mode}` → 200 `{mode}`; 404 if no session;
@@ -635,7 +640,10 @@ from the parent's thread.
 - `POST /api/sessions/{id}/workflow/continue` `{runId, comment}` → a pause;
   same statuses
 - `POST /api/sessions/{id}/workflow/resume` `{runId}` → an interrupted run;
-  same statuses
+  same statuses. Also relaunches a run that **ended** in `error`: it re-runs
+  the node that was open when the run ended (a new pass), then continues the
+  walk; 409 `the failed node is in a branch, it cannot be relaunched alone`
+  when that node sits in a parallel branch
 - `POST /api/sessions/{id}/workflow/stop` `{runId}` → ends a run that is
   waiting or interrupted; same statuses
 - `POST /api/sessions/{id}/workflow/pause` `{runId}` → while the run works:

@@ -529,6 +529,13 @@ export function cancelQueued(id: string, queueId: string): Promise<void> {
   );
 }
 
+/** Re-runs a turn that ended in an error, with a continuation prompt. */
+export function retrySession(id: string): Promise<void> {
+  return request<void>(`/api/sessions/${encodeURIComponent(id)}/retry`, {
+    method: "POST",
+  });
+}
+
 export function setSessionMode(id: string, mode: string): Promise<void> {
   return request<void>(`/api/sessions/${encodeURIComponent(id)}/mode`, {
     method: "POST",
