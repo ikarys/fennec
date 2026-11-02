@@ -27,6 +27,7 @@ pub use sandbox::{Sandbox, SandboxHealth, probe};
 use crate::agent::ports::{CommandRun, Commands, RuleCheck, Toolbox};
 use crate::domain::agent::CommandAccess;
 use crate::domain::event::{OutputStream, ToolResult};
+use crate::domain::mcp::{self, McpServer, McpTransport};
 use crate::domain::preferences::SearchPrefs;
 use crate::domain::protection::Protection;
 use rules::{Decision, Request, Rules};
@@ -47,6 +48,9 @@ pub struct LocalTools {
     // The human's project folder when the workdir is a worktree of it;
     // its paths are redirected to the workdir.
     project_dir: Option<PathBuf>,
+    // The session's active MCP servers; their tools are offered to the model
+    // and run on demand in the sandbox world.
+    mcp: Vec<McpServer>,
 }
 
 impl LocalTools {
@@ -67,6 +71,7 @@ impl LocalTools {
             // Extra environment for commands, set by the composition root.
             env: Vec::new(),
             project_dir: None,
+            mcp: Vec::new(),
         }
     }
 
@@ -98,6 +103,13 @@ impl LocalTools {
     /// Track a human checkout only when it differs from the session workdir.
     pub fn with_project_dir(mut self, dir: PathBuf) -> LocalTools {
         self.project_dir = (dir != self.workdir).then_some(dir);
+        self
+    }
+
+    /// The session's active MCP servers; their cached tools are offered to the
+    /// model and run on demand.
+    pub fn with_mcp(mut self, servers: Vec<McpServer>) -> LocalTools {
+        self.mcp = servers;
         self
     }
 
@@ -135,7 +147,7 @@ impl LocalTools {
 
 impl Toolbox for LocalTools {
     fn definitions(&self) -> Value {
-        Value::Array(vec![
+        let mut tools = vec![
             read_file::definition(),
             write_file::definition(),
             edit_file::definition(),
@@ -143,7 +155,17 @@ impl Toolbox for LocalTools {
             load_skill::definition(),
             web_search::definition(),
             web_fetch::definition(),
-        ])
+        ];
+        // MCP tools come last, in a stable order (server order, then tool
+        // order) so the same config yields byte-identical definitions.
+        for server in &self.mcp {
+            for tool in &server.cached_tools {
+                if !server.disabled_tools.contains(&tool.name) {
+                    tools.push(mcp::tool_definition(server, tool));
+                }
+            }
+        }
+        Value::Array(tools)
     }
 
     fn execute(
@@ -173,6 +195,10 @@ impl Toolbox for LocalTools {
         let args = redirected.as_ref().map_or(args, |(a, _, _)| a);
         rule_request::check(&self.rules, &self.workdir, self.home.as_deref(), name, args)
     }
+
+    fn mcp_tool_names(&self) -> Vec<String> {
+        mcp::active_tool_names(&self.mcp)
+    }
 }
 
 impl LocalTools {
@@ -190,6 +216,34 @@ impl LocalTools {
         let redirected = self.redirected(name, args);
         let args = redirected.as_ref().map_or(args, |(a, _, _)| a);
         let workdir = &self.workdir;
+        // MCP tools are `{server}_{tool}`; a live connection is opened for the
+        // call and closed when it returns. In plan mode the stdio server runs
+        // in the read-only sandbox, as `run_command` does.
+        if let Some((server, tool)) = self.mcp_target(name) {
+            // An HTTP MCP call is a direct request the sandbox never touches, so
+            // in plan mode (read-only by construction) it is refused: a remote
+            // side-effect is not a read.
+            if access == CommandAccess::ReadOnly && server.transport == McpTransport::Http {
+                return ToolResult::failure(
+                    "MCP over HTTP is refused in this read-only mode: it can trigger a remote side-effect. Use a builder session to call it.".to_string(),
+                );
+            }
+            let read_only = self.sandbox.read_only(workdir);
+            let sandbox = match access {
+                CommandAccess::ReadWrite => &self.sandbox,
+                CommandAccess::ReadOnly => match &read_only {
+                    Some(sandbox) => sandbox,
+                    None => {
+                        return ToolResult::failure(
+                            "MCP is read-only in this mode and needs fennec's sandbox, which is turned off on the Settings page.".to_string(),
+                        )
+                    }
+                },
+            };
+            let mut result = call_mcp(server, sandbox, workdir, &tool, args);
+            result.duration_ms = start.elapsed().as_millis() as u64;
+            return result;
+        }
         let mut result = match name {
             "read_file" => read_file::run(args, workdir, &self.web_cache, &self.outside(approved)),
             "write_file" => write_file::run(args, workdir, &self.protection, &self.outside(approved)),
@@ -231,6 +285,53 @@ impl LocalTools {
         }
         result.duration_ms = start.elapsed().as_millis() as u64;
         result
+    }
+
+    /// The MCP server and raw tool name behind a `{server}_{tool}` name, if
+    /// any; the longest server-name prefix wins so `a_b` does not match a
+    /// server named `a`.
+    fn mcp_target(&self, name: &str) -> Option<(&McpServer, String)> {
+        let mut best: Option<(&McpServer, String)> = None;
+        for server in &self.mcp {
+            let prefix = format!("{}_", server.name);
+            let Some(rest) = name.strip_prefix(&prefix) else {
+                continue;
+            };
+            if rest.is_empty() {
+                continue;
+            }
+            // Only the server's offered tool names route to it: a prefix match
+            // alone would shadow a built-in (a server named `read` eating
+            // `read_file`). Validation rejects offered names that collide with
+            // built-ins, so this makes shadowing impossible.
+            if !server.tool_names().contains(&name.to_string()) {
+                continue;
+            }
+            if best
+                .as_ref()
+                .is_none_or(|(current, _)| server.name.len() > current.name.len())
+            {
+                best = Some((server, rest.to_string()));
+            }
+        }
+        best
+    }
+}
+
+/// Open a connection to one MCP server, run the tool, close the connection.
+fn call_mcp(
+    server: &McpServer,
+    sandbox: &Sandbox,
+    workdir: &Path,
+    tool: &str,
+    args: &Value,
+) -> ToolResult {
+    match crate::mcp::Client::connect(server, sandbox, workdir) {
+        Ok(mut client) => match client.call_tool(tool, args.clone()) {
+            Ok(text) => ToolResult::success(text, false),
+            Err(error) => ToolResult::failure(error),
+        },
+        Err(error) => ToolResult::failure(error),
     }
 }
 
@@ -344,5 +445,114 @@ mod redirect_tests {
         let tools = tools(Some("/x/proj"));
         let args = json!({ "path": "/x/proj/src/a.ts" });
         assert!(tools.redirected("run_command", &args).is_none());
+    }
+}
+
+#[cfg(test)]
+mod mcp_dispatch_tests {
+    use crate::agent::ports::Toolbox;
+    use crate::domain::agent::CommandAccess;
+    use crate::domain::event::OutputStream;
+    use crate::domain::mcp::{McpServer, McpTool, McpTransport};
+    use serde_json::json;
+    use std::path::PathBuf;
+    use std::sync::atomic::AtomicBool;
+
+    use super::LocalTools;
+
+    fn http_server() -> McpServer {
+        McpServer {
+            name: "api".into(),
+            transport: McpTransport::Http,
+            url: Some("http://127.0.0.1:1/mcp".into()),
+            timeout: 2,
+            cached_tools: vec![McpTool {
+                name: "create_issue".into(),
+                description: None,
+                input_schema: json!({ "type": "object" }),
+            }],
+            ..Default::default()
+        }
+    }
+
+    fn run(tools: &LocalTools, access: CommandAccess) -> crate::domain::event::ToolResult {
+        let stop = AtomicBool::new(false);
+        let mut on_output = |_: OutputStream, _: &str| {};
+        tools.execute(
+            "api_create_issue",
+            &json!({}),
+            access,
+            &stop,
+            &mut on_output,
+        )
+    }
+
+    #[test]
+    fn an_http_mcp_call_is_refused_in_read_only_mode() {
+        let tools = LocalTools::new(PathBuf::from("/wt/1")).with_mcp(vec![http_server()]);
+        let result = run(&tools, CommandAccess::ReadOnly);
+        assert!(!result.success);
+        assert!(
+            result
+                .error
+                .as_deref()
+                .is_some_and(|e| e.contains("refused in this read-only mode"))
+        );
+    }
+
+    #[test]
+    fn an_http_mcp_call_is_not_mode_refused_in_read_write_mode() {
+        // In ReadWrite the call is not refused by the mode: it attempts the
+        // connection (no server here) and fails with a connection error, not
+        // the read-only refusal.
+        let tools = LocalTools::new(PathBuf::from("/wt/1")).with_mcp(vec![http_server()]);
+        let result = run(&tools, CommandAccess::ReadWrite);
+        assert!(
+            !result
+                .error
+                .as_deref()
+                .is_some_and(|e| e.contains("refused in this read-only mode"))
+        );
+    }
+
+    #[test]
+    fn a_server_named_like_a_builtin_prefix_does_not_shadow_the_builtin() {
+        // A stdio server named `read` with no cached tools: `read_file` is a
+        // built-in and must run the built-in, not route to the server.
+        let dir = std::env::temp_dir().join(format!(
+            "fennec-mcp-shadow-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("note.txt"), "hello").unwrap();
+        let server = McpServer {
+            name: "read".into(),
+            transport: McpTransport::Stdio,
+            command: Some("sh".into()),
+            // Would hang if (wrongly) routed here: the built-in must run instead.
+            args: vec!["-c".into(), "sleep 30".into()],
+            cached_tools: vec![],
+            ..Default::default()
+        };
+        let tools = LocalTools::new(dir.clone()).with_mcp(vec![server]);
+        let stop = AtomicBool::new(false);
+        let mut on_output = |_: OutputStream, _: &str| {};
+        let result = tools.execute(
+            "read_file",
+            &json!({ "path": "note.txt" }),
+            CommandAccess::ReadWrite,
+            &stop,
+            &mut on_output,
+        );
+        assert!(
+            result.success,
+            "the built-in read_file should run, got: {:?}",
+            result.error
+        );
+        std::fs::remove_dir_all(&dir).ok();
     }
 }

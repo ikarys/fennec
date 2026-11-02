@@ -184,6 +184,7 @@ impl Sandbox {
             Sandbox::Off => {
                 let mut sh = Command::new("sh");
                 sh.arg("-c").arg(command).current_dir(cwd);
+                strip_secret_env(&mut sh);
                 sh
             }
             Sandbox::Bwrap { .. } => {
@@ -191,13 +192,45 @@ impl Sandbox {
                 bwrap.args(bwrap_args(self, workdir, cwd, command));
                 // bwrap passes fennec's environment through: the model would
                 // read the endpoint key or a token with `env`.
-                for (name, _) in std::env::vars_os() {
-                    if is_secret_name(&name.to_string_lossy()) {
-                        bwrap.env_remove(name);
-                    }
-                }
+                strip_secret_env(&mut bwrap);
                 bwrap
             }
+        }
+    }
+
+    /// `program args…` in `cwd`, wrapped in bwrap unless Off; `workdir` is the
+    /// writable root. The MCP stdio client uses it to run a server in the same
+    /// world as any command (secrets hidden, no network by default).
+    pub fn spawn(&self, program: &str, args: &[String], workdir: &Path, cwd: &Path) -> Command {
+        match self {
+            Sandbox::Off => {
+                let mut cmd = Command::new(program);
+                cmd.args(args).current_dir(cwd);
+                strip_secret_env(&mut cmd);
+                cmd
+            }
+            Sandbox::Bwrap { .. } => {
+                let mut bwrap = Command::new("bwrap");
+                let mut bargs = bwrap_world_args(self, workdir, cwd);
+                bargs.push(OsString::from("--"));
+                bargs.push(OsString::from(program));
+                for arg in args {
+                    bargs.push(OsString::from(arg));
+                }
+                bwrap.args(bargs);
+                strip_secret_env(&mut bwrap);
+                bwrap
+            }
+        }
+    }
+}
+
+/// bwrap and a bare child both inherit fennec's environment: drop the secret
+/// names so a command (or an MCP server) cannot read the endpoint key.
+fn strip_secret_env(cmd: &mut Command) {
+    for (name, _) in std::env::vars_os() {
+        if is_secret_name(&name.to_string_lossy()) {
+            cmd.env_remove(name);
         }
     }
 }
@@ -276,7 +309,10 @@ fn is_secret_name(name: &str) -> bool {
 }
 
 /// The bwrap arguments of a `Bwrap` sandbox; empty for `Off`.
-fn bwrap_args(sandbox: &Sandbox, workdir: &Path, cwd: &Path, command: &str) -> Vec<OsString> {
+/// The bwrap world, everything up to (and including) `--chdir cwd`; the
+/// command tail after `--` is added by the caller, so a `sh -c` string and a
+/// bare program+args (the MCP stdio client) share the same world.
+fn bwrap_world_args(sandbox: &Sandbox, workdir: &Path, cwd: &Path) -> Vec<OsString> {
     let Sandbox::Bwrap {
         network,
         hidden_dirs,
@@ -362,11 +398,15 @@ fn bwrap_args(sandbox: &Sandbox, workdir: &Path, cwd: &Path, command: &str) -> V
 
     args.push(OsString::from("--chdir"));
     args.push(cwd.as_os_str().to_os_string());
+    args
+}
+
+fn bwrap_args(sandbox: &Sandbox, workdir: &Path, cwd: &Path, command: &str) -> Vec<OsString> {
+    let mut args = bwrap_world_args(sandbox, workdir, cwd);
     args.push(OsString::from("--"));
     args.push(OsString::from("sh"));
     args.push(OsString::from("-c"));
     args.push(OsString::from(command));
-
     args
 }
 

@@ -224,6 +224,11 @@ read-only. The human edits them as usual.
   whose refusal may name the limits. A source is `endpoint` or `catalog` (the
   model family's known values, `llm-providers/src/catalog.rs`). Indicative;
   502 with the endpoint's message when the model cannot be called
+- `POST /api/settings/mcp/connect` with `{name}` → 200 `{server}` (the stored
+  server, its `cachedTools` replaced by a live `tools/list`); 400 with the
+  config's problems; 404 for an unknown server; 502 when the server cannot be
+  reached or `tools/list` fails. The cache is what the model's tool definitions
+  come from, so a frozen prompt stays byte-stable
 - `GET /api/models/choices` → `{default, favorites}`, each a
   `{provider, model, providerName}`: what the composer's model picker offers;
   read from the stored preferences, no provider is called
@@ -564,6 +569,14 @@ read-only. The human edits them as usual.
   session's `model` as in `GET /api/sessions/{id}`); 404 if no session; 400 if
   the model is empty or the provider unknown; 409 while a workflow runs;
   appends `model.changed`
+- `GET /api/sessions/{id}/mcp` → `{servers, totalTokens}`: each server with
+  `name, visible, disabled, active, tokens, toolCount, tools` (each tool with
+  `name, enabled, tokens`); `active` is the session's effective state (the
+  global flag, or the session's last `mcp.disabled`); `totalTokens` is the cost
+  of the active tools
+- `POST /api/sessions/{id}/mcp` `{disabled: [name…]}` → 200 with the same body
+  as `GET`; appends `mcp.disabled` (the full disabled set, last wins); 404 if
+  no session
 - `POST /api/sessions/{id}/stop` → 202; the turn ends with `chat.done` reason `"stopped"`
 - `GET /api/notices` → Server-Sent Events. One event when a top-level session's turn ends, so the UI can
   notify the human wherever they are in fennec; child sessions stay silent. Each event is

@@ -9,10 +9,10 @@ use super::audit_routes;
 use super::http::{Request, error, send, send_json};
 use super::proposal_routes;
 use super::{
-    assets, backlog_routes, event_stream, file_manager, idea_routes, integration, model_routes,
-    project_dashboard, project_delete, project_routes, rule_approval_routes, rule_routes, servers,
-    session_delete, session_routes, settings_routes, terminal, waiver_routes, workflow_routes,
-    worktree_routes,
+    assets, backlog_routes, event_stream, file_manager, idea_routes, integration, mcp_routes,
+    model_routes, project_dashboard, project_delete, project_routes, rule_approval_routes,
+    rule_routes, servers, session_delete, session_routes, settings_routes, terminal, waiver_routes,
+    workflow_routes, worktree_routes,
 };
 use serde_json::json;
 use std::net::TcpStream;
@@ -41,6 +41,7 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         ("POST", ["api", "settings", "models", "probe"]) => {
             settings_routes::probe_model(app, req, stream)
         }
+        ("POST", ["api", "settings", "mcp", "connect"]) => mcp_routes::connect(app, req, stream),
         ("GET", ["api", "models", "choices"]) => model_routes::choices(app, stream),
         ("GET", ["api", "folders"]) => session_routes::list_folders(req, stream),
         ("POST", ["api", "folders", "create"]) => session_routes::create_folder(req, stream),
@@ -156,6 +157,10 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
             session_routes::set_session_mode(app, req, stream, id)
         }
         ("POST", ["api", "sessions", id, "model"]) => model_routes::set_model(app, req, stream, id),
+        ("GET", ["api", "sessions", id, "mcp"]) => mcp_routes::session_mcp(app, stream, id),
+        ("POST", ["api", "sessions", id, "mcp"]) => {
+            mcp_routes::set_session_mcp(app, req, stream, id)
+        }
         ("POST", ["api", "sessions", id, "workflow"]) => {
             workflow_routes::start_workflow(app, req, stream, id)
         }

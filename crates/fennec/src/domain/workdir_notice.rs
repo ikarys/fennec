@@ -64,6 +64,7 @@ mod tests {
         Event::TurnSnapshot {
             cached_system_prompt: format!("System\nWorking directory: {workdir}\nPlatform: x"),
             cached_tools: None,
+            mcp_tool_names: Vec::new(),
         }
     }
 

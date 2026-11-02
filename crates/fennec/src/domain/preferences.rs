@@ -6,6 +6,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
+use super::mcp::McpServer;
 pub use llm_providers::{ApiKey, ModelParams, ModelPrefs, ModelRef, Provider, ReasoningEffort};
 
 /// The provider of the environment's endpoint (`FENNEC_LLM_URL`); always there,
@@ -36,6 +37,8 @@ pub struct Preferences {
     pub always_on_skills: Vec<String>,
     /// Opt-in embedded workflows (`workflows::opt_in_defaults`) the human enabled.
     pub enabled_workflows: Vec<String>,
+    /// MCP servers, configured on the Settings page.
+    pub mcp: Vec<McpServer>,
     /// Before providers (one endpoint): read, moved by `migrate`, never written.
     #[serde(rename = "model", skip_serializing)]
     pub(crate) legacy_model: Option<String>,
@@ -264,6 +267,16 @@ impl Preferences {
         {
             return Err("searxng_url must start with http:// or https://".into());
         }
+        let mut seen_mcp = Vec::new();
+        for server in &self.mcp {
+            if seen_mcp.contains(&server.name) {
+                return Err(format!("duplicate mcp server {}", server.name));
+            }
+            seen_mcp.push(server.name.clone());
+            if let Some(problem) = server.problems().into_iter().next() {
+                return Err(problem);
+            }
+        }
         Ok(())
     }
 
@@ -339,6 +352,7 @@ impl Preferences {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::mcp::McpTool;
 
     #[test]
     fn search_prefs_stored_before_web_fetch_allow_it() {
@@ -675,6 +689,55 @@ mod tests {
             model: "m".into(),
         });
         assert!(p.validate().unwrap_err().contains("duplicate favorite"));
+    }
+
+    #[test]
+    fn validate_rejects_duplicate_mcp_server_names() {
+        let mut p = valid();
+        p.mcp = vec![
+            McpServer {
+                name: "fs".into(),
+                command: Some("fs-mcp".into()),
+                ..Default::default()
+            },
+            McpServer {
+                name: "fs".into(),
+                command: Some("fs-mcp".into()),
+                ..Default::default()
+            },
+        ];
+        assert!(p.validate().unwrap_err().contains("duplicate mcp server"));
+    }
+
+    #[test]
+    fn validate_rejects_an_mcp_tool_that_collides_with_a_builtin() {
+        let mut p = valid();
+        p.mcp = vec![McpServer {
+            name: "read".into(),
+            command: Some("read-mcp".into()),
+            cached_tools: vec![McpTool {
+                name: "file".into(),
+                description: None,
+                input_schema: serde_json::json!({}),
+            }],
+            ..Default::default()
+        }];
+        assert!(
+            p.validate()
+                .unwrap_err()
+                .contains("collides with a built-in tool")
+        );
+    }
+
+    #[test]
+    fn validate_accepts_a_well_formed_mcp_server() {
+        let mut p = valid();
+        p.mcp = vec![McpServer {
+            name: "fs".into(),
+            command: Some("fs-mcp".into()),
+            ..Default::default()
+        }];
+        assert!(p.validate().is_ok());
     }
 
     #[test]

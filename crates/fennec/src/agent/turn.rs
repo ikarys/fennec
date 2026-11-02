@@ -265,7 +265,29 @@ pub(super) fn with_running(
 fn round_prompt_parts(turn: &mut Turn) -> Result<(String, Value), String> {
     let events = turn.log.events(turn.session_id)?;
     let (prompt, tools) = frozen_prompt(&events);
+    let current_mcp = turn.tools.mcp_tool_names();
     if let (Some(prompt), Some(tools)) = (prompt, tools) {
+        // The MCP tool set changed since the last freeze (a global flag, a
+        // Connect refresh, or a per-session toggle): re-freeze the tools,
+        // keeping the prompt byte-identical. One deliberate cache miss.
+        let frozen_mcp = events
+            .iter()
+            .rev()
+            .find_map(|event| match event {
+                Event::TurnSnapshot { mcp_tool_names, .. } => Some(mcp_tool_names),
+                _ => None,
+            })
+            .cloned()
+            .unwrap_or_default();
+        if frozen_mcp != current_mcp {
+            let new_tools = tool_definitions(turn);
+            turn.append(Event::TurnSnapshot {
+                cached_system_prompt: prompt.to_string(),
+                cached_tools: Some(new_tools.clone()),
+                mcp_tool_names: current_mcp,
+            })?;
+            return Ok((prompt.to_string(), new_tools));
+        }
         return Ok((prompt.to_string(), tools.clone()));
     }
 
@@ -284,6 +306,7 @@ fn round_prompt_parts(turn: &mut Turn) -> Result<(String, Value), String> {
     turn.append(Event::TurnSnapshot {
         cached_system_prompt: prompt.clone(),
         cached_tools: Some(tools.clone()),
+        mcp_tool_names: current_mcp,
     })?;
     Ok((prompt, tools))
 }
@@ -945,6 +968,7 @@ mod tests {
             &Event::TurnSnapshot {
                 cached_system_prompt: "frozen".into(),
                 cached_tools: Some(json!([])),
+                mcp_tool_names: Vec::new(),
             },
         )
         .unwrap();
@@ -1590,6 +1614,7 @@ mod tests {
         let snapshot = |tools: Option<Value>| Event::TurnSnapshot {
             cached_system_prompt: "frozen".into(),
             cached_tools: tools,
+            mcp_tool_names: Vec::new(),
         };
         let snapshots = |log: &MemoryLog| {
             log.0
@@ -1618,6 +1643,76 @@ mod tests {
         let seen = model.0.borrow();
         assert_eq!(seen.len(), 2);
         assert_eq!(seen[0], seen[1]);
+        assert_eq!(snapshots(&h.log), 2);
+    }
+
+    #[test]
+    fn an_mcp_tool_set_change_refreezes_the_snapshot_once() {
+        use crate::domain::mcp::{McpServer, McpTool, McpTransport};
+
+        let stop = AtomicBool::new(false);
+        let snapshots = |log: &MemoryLog| {
+            log.0
+                .borrow()
+                .iter()
+                .filter(|e| matches!(e, Event::TurnSnapshot { .. }))
+                .count()
+        };
+        let prompts = |log: &MemoryLog| {
+            log.0
+                .borrow()
+                .iter()
+                .filter_map(|e| match e {
+                    Event::TurnSnapshot {
+                        cached_system_prompt,
+                        ..
+                    } => Some(cached_system_prompt.clone()),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+        };
+        let server = |tools: &[&str]| {
+            let mut server = McpServer {
+                name: "fs".into(),
+                transport: McpTransport::Stdio,
+                command: Some("x".into()),
+                ..Default::default()
+            };
+            server.cached_tools = tools
+                .iter()
+                .map(|tool| McpTool {
+                    name: (*tool).into(),
+                    description: None,
+                    input_schema: json!({ "type": "object" }),
+                })
+                .collect();
+            server
+        };
+
+        let model = RecordingTools::default();
+        let mut h = Harness::new(Box::new(model.clone()), PathBuf::from("/tmp"), &stop);
+        h.tools = LocalTools::new(PathBuf::from("/tmp")).with_mcp(vec![server(&["read", "write"])]);
+        run_turn(&mut h.turn(), "one", &[]).unwrap();
+        assert_eq!(snapshots(&h.log), 1);
+        let first_tools = model.0.borrow()[0].clone();
+
+        // The set is unchanged: no re-freeze, same tools sent.
+        run_turn(&mut h.turn(), "two", &[]).unwrap();
+        assert_eq!(snapshots(&h.log), 1);
+        assert_eq!(model.0.borrow()[1], first_tools);
+
+        // A tool is added: one re-freeze, and the prompt stays byte-identical.
+        h.tools = LocalTools::new(PathBuf::from("/tmp"))
+            .with_mcp(vec![server(&["read", "write", "delete"])]);
+        run_turn(&mut h.turn(), "three", &[]).unwrap();
+        assert_eq!(snapshots(&h.log), 2);
+        assert_ne!(model.0.borrow()[2], first_tools);
+        let prompts = prompts(&h.log);
+        assert_eq!(prompts.len(), 2);
+        assert_eq!(prompts[0], prompts[1]);
+
+        // The set is stable again: no further re-freeze.
+        run_turn(&mut h.turn(), "four", &[]).unwrap();
         assert_eq!(snapshots(&h.log), 2);
     }
 
