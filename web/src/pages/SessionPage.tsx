@@ -344,6 +344,8 @@ export function SessionPage({
     projects.find((project) => project.id === projectId)?.name ??
     projectId ??
     "—";
+  // A chat has no folder: the header shows "Chat", not the scratch workdir.
+  const isChat = detail?.project.chat ?? projectId === "chat";
 
   async function handleSend(content?: string) {
     // Attachments belong to the composer; a quick answer (`content`) sends none.
@@ -654,9 +656,9 @@ export function SessionPage({
                         </Badge>
                         <span
                           className="shrink-0 text-xs text-muted"
-                          title={detail?.project.workdir}
+                          title={isChat ? undefined : detail?.project.workdir}
                         >
-                          {projectName}
+                          {isChat ? "Chat" : projectName}
                         </span>
                         <div className="ml-auto">
                           <ContextGauge
