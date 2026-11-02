@@ -49,15 +49,21 @@ pub(super) fn delete_project(
             &json!({ "error": "a turn is running", "running": running }),
         );
     }
+    let mut workdir: Option<PathBuf> = None;
     if delete_folder {
-        let workdir = std::fs::canonicalize(&project.workdir).map_err(|e| e.to_string())?;
-        let home = std::env::var_os("HOME").map(PathBuf::from);
-        // Canonical like the workdir, so a symlinked store is still recognised.
-        let store_dir = app.settings.db_path.parent().unwrap_or(Path::new("/"));
-        let store_dir =
-            std::fs::canonicalize(store_dir).unwrap_or_else(|_| store_dir.to_path_buf());
-        if let Err(reason) = removable_folder(&workdir, home.as_deref(), &store_dir) {
-            return error(stream, 400, &reason);
+        // A chat that never ran a tool has no scratch directory: nothing to
+        // check, nothing to remove.
+        if Path::new(&project.workdir).exists() {
+            let canonical = std::fs::canonicalize(&project.workdir).map_err(|e| e.to_string())?;
+            let home = std::env::var_os("HOME").map(PathBuf::from);
+            // Canonical like the workdir, so a symlinked store is still recognised.
+            let store_dir = app.settings.db_path.parent().unwrap_or(Path::new("/"));
+            let store_dir =
+                std::fs::canonicalize(store_dir).unwrap_or_else(|_| store_dir.to_path_buf());
+            if let Err(reason) = removable_folder(&canonical, home.as_deref(), &store_dir) {
+                return error(stream, 400, &reason);
+            }
+            workdir = Some(canonical);
         }
     }
     let rule_store =
@@ -81,13 +87,12 @@ pub(super) fn delete_project(
     }
     store.delete_project(id).map_err(|e| e.to_string())?;
     rule_store.delete_project(id).map_err(|e| e.to_string())?;
-    let (folder_deleted, folder_error) = if delete_folder {
-        match std::fs::remove_dir_all(&project.workdir) {
+    let (folder_deleted, folder_error) = match workdir {
+        Some(workdir) => match std::fs::remove_dir_all(&workdir) {
             Ok(()) => (true, None),
             Err(e) => (false, Some(e.to_string())),
-        }
-    } else {
-        (false, None)
+        },
+        None => (delete_folder, None),
     };
     send_json(
         stream,

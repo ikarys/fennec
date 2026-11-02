@@ -196,9 +196,9 @@ pub(super) fn create_session(
     }
     let store = app.store()?;
     let project = if body["projectId"].as_str().unwrap_or("") == chat::ID {
-        // The chat's scratch workdir, created on first use: no repository.
+        // The chat's scratch project: its per-session scratch directory is
+        // created only when a tool first needs it.
         let dir = chat::workdir(&app.settings.db_path);
-        std::fs::create_dir_all(&dir).map_err(|e| format!("create {}: {e}", dir.display()))?;
         store.chat_project(&dir.display().to_string())?
     } else {
         let Some(project) = store.project(body["projectId"].as_str().unwrap_or(""))? else {
@@ -770,6 +770,9 @@ mod tests {
     #[test]
     fn create_session_routes_chat_id_to_the_scratch_project() {
         let db_path = std::env::temp_dir().join(format!("fennec-chat-route-{}.db", new_id()));
+        // The scratch root is shared per store directory: start from a clean slate.
+        let scratch = chat::workdir(&db_path);
+        let _ = std::fs::remove_dir_all(&scratch);
         let app = app(db_path.clone());
         let store = app.store().unwrap();
 
@@ -802,6 +805,9 @@ mod tests {
             chat::workdir(&app.settings.db_path).display().to_string()
         );
         assert_eq!(store.sessions(Some(chat::ID)).unwrap().len(), 1);
+        // Talking creates nothing on disk: the scratch appears only when a
+        // tool first needs it.
+        assert!(!scratch.exists());
         let _ = std::fs::remove_file(&db_path);
     }
 
