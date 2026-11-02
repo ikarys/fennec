@@ -188,6 +188,7 @@ read-only. The human edits them as usual.
 
 - `GET /api/config` → `{model, contextWindow, compactAt}`: the resolved parameters of the
   stored preferences; `compactAt` is the fraction at which the session compacts (0 disables)
+- `GET /api/version` → `{version}`: the binary's version, the same string `fennec --version` prints
 - `GET /api/settings` → `{preferences, listings, defaults, skills, optInWorkflows, scanners, sandboxHealth}`
   - `scanners`: `[{id, name, covers, install, url, path}]`, the security scanners the `audit-security`
     agent runs; `path` is where fennec found the executable on PATH, null when absent (verified); fennec
