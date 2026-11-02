@@ -84,6 +84,19 @@ export function ProvidersSection({
     event.stopPropagation();
   }
 
+  function addModel(providerId: string) {
+    const modelId = (modelDrafts[providerId] ?? '').trim();
+    if (modelId === '') return;
+    onAddModel(providerId, modelId);
+    setModelDrafts((previous) => ({ ...previous, [providerId]: '' }));
+  }
+
+  /** Header buttons must not fold the provider they sit in. */
+  function keepOpen(event: React.MouseEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
   return (
     <Section
       title="Providers"
