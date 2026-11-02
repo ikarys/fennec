@@ -14,6 +14,7 @@ use super::{
 use crate::agent::ports::EventLog;
 use crate::agent::workflow::WorkflowJob;
 use crate::agents;
+use crate::chat;
 use crate::domain::agent::{
     resolve as agent_resolve, resolve_mode as agent_resolve_mode, switch_to,
 };
@@ -194,8 +195,16 @@ pub(super) fn create_session(
         return error(stream, 400, "empty prompt");
     }
     let store = app.store()?;
-    let Some(project) = store.project(body["projectId"].as_str().unwrap_or(""))? else {
-        return error(stream, 404, "no such project");
+    let project = if body["projectId"].as_str().unwrap_or("") == chat::ID {
+        // The chat's scratch workdir, created on first use: no repository.
+        let dir = chat::workdir(&app.settings.db_path);
+        std::fs::create_dir_all(&dir).map_err(|e| format!("create {}: {e}", dir.display()))?;
+        store.chat_project(&dir.display().to_string())?
+    } else {
+        let Some(project) = store.project(body["projectId"].as_str().unwrap_or(""))? else {
+            return error(stream, 404, "no such project");
+        };
+        project
     };
     // A workflow start is validated before the session is created.
     let workflow = match &workflow_id {
@@ -709,7 +718,7 @@ fn session_json(app: &App, s: &SessionSummary) -> Value {
 }
 
 fn project_json(p: &Project) -> Value {
-    json!({ "id": p.id, "name": p.name, "workdir": p.workdir })
+    json!({ "id": p.id, "name": p.name, "workdir": p.workdir, "chat": chat::is_chat(p) })
 }
 
 /// Appends a choice the human made (mode, model) and wakes the session's streams.
@@ -741,6 +750,60 @@ mod tests {
     use std::net::TcpListener;
     use std::path::PathBuf;
     use std::sync::{Arc, Mutex};
+
+    #[test]
+    fn project_json_marks_only_the_chat() {
+        let chat = Project {
+            id: chat::ID.into(),
+            name: chat::NAME.into(),
+            workdir: "/scratch".into(),
+        };
+        let other = Project {
+            id: "other".into(),
+            name: "o".into(),
+            workdir: "/w".into(),
+        };
+        assert_eq!(project_json(&chat)["chat"], true);
+        assert_eq!(project_json(&other)["chat"], false);
+    }
+
+    #[test]
+    fn create_session_routes_chat_id_to_the_scratch_project() {
+        let db_path = std::env::temp_dir().join(format!("fennec-chat-route-{}.db", new_id()));
+        let app = app(db_path.clone());
+        let store = app.store().unwrap();
+
+        let req = Request {
+            method: "POST".into(),
+            path: "/api/sessions".into(),
+            query: String::new(),
+            headers: Vec::new(),
+            body: json!({ "prompt": "hello", "projectId": "chat" })
+                .to_string()
+                .into_bytes(),
+        };
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let client = TcpStream::connect(addr).unwrap();
+        let mut server = listener.accept().unwrap().0;
+        {
+            let _client = &client;
+            create_session(&app, &req, &mut server).unwrap();
+        }
+
+        // The chat project now exists with the scratch workdir and holds a session.
+        let chat = store
+            .project(chat::ID)
+            .unwrap()
+            .expect("chat project created");
+        assert_eq!(
+            chat.workdir,
+            chat::workdir(&app.settings.db_path).display().to_string()
+        );
+        assert_eq!(store.sessions(Some(chat::ID)).unwrap().len(), 1);
+        let _ = std::fs::remove_file(&db_path);
+    }
 
     /// A file-backed store: `App::store` opens one connection per call, so an
     /// in-memory DB would be empty on every call.
