@@ -151,6 +151,9 @@ export function SessionPage({
     frameIdeaId,
     framingIdea,
   });
+  // A chat has no folder: it starts in `builder` (talk, act on request), not
+  // in the project's `kickoff` agent, and the header shows "Chat".
+  const isChat = detail?.project.chat ?? projectId === "chat";
   const {
     modelChoices,
     mode,
@@ -162,7 +165,9 @@ export function SessionPage({
     sessionId,
     viewMode: view.mode,
     detailMode: detail?.mode ?? null,
-    fallbackMode: agents[0]?.id ?? null,
+    fallbackMode: isChat
+      ? (agents.find((agent) => agent.id === "builder")?.id ?? agents[0]?.id ?? null)
+      : (agents[0]?.id ?? null),
     detailModel: detail?.model ?? null,
     onError: setSendError,
     onModelApplied: () => setDetailVersion((version) => version + 1),
@@ -344,8 +349,6 @@ export function SessionPage({
     projects.find((project) => project.id === projectId)?.name ??
     projectId ??
     "—";
-  // A chat has no folder: the header shows "Chat", not the scratch workdir.
-  const isChat = detail?.project.chat ?? projectId === "chat";
 
   async function handleSend(content?: string) {
     // Attachments belong to the composer; a quick answer (`content`) sends none.
