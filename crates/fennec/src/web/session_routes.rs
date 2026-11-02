@@ -769,8 +769,11 @@ mod tests {
 
     #[test]
     fn create_session_routes_chat_id_to_the_scratch_project() {
-        let db_path = std::env::temp_dir().join(format!("fennec-chat-route-{}.db", new_id()));
-        // The scratch root is shared per store directory: start from a clean slate.
+        // Its own store directory: the scratch root is `chat/` next to the
+        // database, so a shared `/tmp/chat` would race with other tests.
+        let base = std::env::temp_dir().join(format!("fennec-chat-route-{}", new_id()));
+        std::fs::create_dir_all(&base).unwrap();
+        let db_path = base.join("fennec.db");
         let scratch = chat::workdir(&db_path);
         let _ = std::fs::remove_dir_all(&scratch);
         let app = app(db_path.clone());
@@ -808,7 +811,7 @@ mod tests {
         // Talking creates nothing on disk: the scratch appears only when a
         // tool first needs it.
         assert!(!scratch.exists());
-        let _ = std::fs::remove_file(&db_path);
+        let _ = std::fs::remove_dir_all(&base);
     }
 
     /// A file-backed store: `App::store` opens one connection per call, so an

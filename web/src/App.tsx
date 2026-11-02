@@ -427,7 +427,7 @@ export default function App() {
           }}
           onCloseTab={closeTab}
           onOpenPalette={() => setPaletteOpen(true)}
-          onNewSession={() => startNewSession()}
+          onNewSession={() => startNewSession("chat")}
           splitActive={route.name === 'split'}
           onToggleSplit={toggleSplit}
         />
