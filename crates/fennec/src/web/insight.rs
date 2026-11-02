@@ -6,7 +6,7 @@ use serde::Serialize;
 use serde_json::json;
 use std::net::TcpStream;
 use token_usage::display::{duration, percent, tokens, usd};
-use token_usage::{Filter, GroupBy, Ledger, Row, Summary};
+use token_usage::{CallRow, Filter, GroupBy, Ledger, Row, Summary, group_rows, summary_from_rows};
 
 use super::App;
 use super::context_view::{CompositionView, composition_view};
@@ -212,43 +212,30 @@ pub fn serve(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), Str
         ..Default::default()
     };
 
-    let total = ledger.summary(&base).map_err(|e| e.to_string())?;
-    let days = ledger
-        .series(&base, GroupBy::Day)
+    // Two scans: the period's calls, and (for the picker) every project. Every
+    // figure below is grouped in memory from the period's rows, so one project
+    // never triggers an extra query.
+    let period_rows = ledger.rows(&base).map_err(|e| e.to_string())?;
+    let picker_rows = ledger
+        .rows(&Filter {
+            product: Some("fennec".to_string()),
+            ..Default::default()
+        })
         .map_err(|e| e.to_string())?;
+
+    let total = summary_from_rows(&period_rows, &base);
+    let days = group_rows(&period_rows, &base, GroupBy::Day);
     let projects = if project.is_none() {
-        ledger
-            .series(&base, GroupBy::Group)
-            .map_err(|e| e.to_string())?
+        group_rows(&period_rows, &base, GroupBy::Group)
     } else {
         Vec::new()
     };
-    let models = ledger
-        .series(&base, GroupBy::Model)
-        .map_err(|e| e.to_string())?;
-
-    // The picker needs every project, not only the selected period.
-    let groups = ledger
-        .series(
-            &Filter {
-                product: Some("fennec".to_string()),
-                ..Default::default()
-            },
-            GroupBy::Group,
-        )
-        .map_err(|e| e.to_string())?;
+    let models = group_rows(&period_rows, &base, GroupBy::Model);
+    let groups = group_rows(&picker_rows, &Filter::default(), GroupBy::Group);
 
     let mut project_models: BTreeMap<String, Vec<Row>> = BTreeMap::new();
     for row in &projects {
-        let filter = Filter {
-            product: Some("fennec".to_string()),
-            group_id: Some(row.key.clone()),
-            since_ms: period.since_ms(now_ms()),
-            ..Default::default()
-        };
-        let series = ledger
-            .series(&filter, GroupBy::Model)
-            .map_err(|e| e.to_string())?;
+        let series = project_model_series(&period_rows, &row.key);
         project_models.insert(row.key.clone(), series);
     }
 
@@ -264,6 +251,18 @@ pub fn serve(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), Str
     let prices = prices(&app.store()?.preferences()?);
 
     send_json(stream, 200, &json!(data.view(project.as_deref(), &prices)))
+}
+
+/// One project's model breakdown, from the period's rows. `group_rows` only
+/// applies the label filter, so the `group_id` scoping a DB query would have
+/// done is applied to the rows here.
+fn project_model_series(rows: &[CallRow], group_id: &str) -> Vec<Row> {
+    let scoped: Vec<CallRow> = rows
+        .iter()
+        .filter(|r| r.group_id == group_id)
+        .cloned()
+        .collect();
+    group_rows(&scoped, &Filter::default(), GroupBy::Model)
 }
 
 fn busiest_first(rows: &mut [Row]) {
@@ -455,6 +454,47 @@ mod tests {
             name: name.to_string(),
             summary,
         }
+    }
+
+    fn call_row(id: i64, group_id: &str, model: &str, prompt: u64) -> CallRow {
+        CallRow {
+            id,
+            at_ms: 0,
+            group_id: group_id.to_string(),
+            group_name: group_id.to_string(),
+            model: model.to_string(),
+            kind: String::new(),
+            run_id: String::new(),
+            prompt_tokens: prompt,
+            cached_tokens: 0,
+            completion_tokens: 0,
+            total_secs: 0.0,
+            breakdown: Default::default(),
+            savings: Default::default(),
+            labels: Default::default(),
+            prefill_speed: 0.0,
+            generation_speed: 0.0,
+            lost_cache_tokens: 0,
+        }
+    }
+
+    #[test]
+    fn project_model_series_scopes_to_its_project() {
+        // Two projects, one shared model: the overview must not show each
+        // project the combined model total.
+        let rows = vec![
+            call_row(1, "p1", "m", 100),
+            call_row(2, "p1", "m", 50),
+            call_row(3, "p2", "m", 1_000),
+        ];
+
+        let p1 = project_model_series(&rows, "p1");
+        assert_eq!(p1.len(), 1);
+        assert_eq!(p1[0].key, "m");
+        assert_eq!(p1[0].summary.prompt_tokens, 150, "only p1's calls");
+
+        let p2 = project_model_series(&rows, "p2");
+        assert_eq!(p2[0].summary.prompt_tokens, 1_000, "only p2's calls");
     }
 
     #[test]
