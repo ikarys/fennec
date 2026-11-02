@@ -26,6 +26,7 @@ import { InstructionsSection } from '../components/settings/InstructionsSection'
 import { SearchSection, type SearchForm } from '../components/settings/SearchSection';
 import { SandboxSection } from '../components/settings/SandboxSection';
 import { McpSection } from '../components/settings/McpSection';
+import { AgentsSection } from '../components/agents/AgentsSection';
 import { RulesSection } from '../components/rules/RulesSection';
 import { AutonomySection } from '../components/settings/AutonomySection';
 import { ScannersSection } from '../components/settings/ScannersSection';
@@ -57,7 +58,7 @@ interface SettingsForm {
   mcp: McpServer[];
 }
 
-type SettingsTab = 'models' | 'instructions' | 'skills' | 'workflows' | 'search' | 'sandbox' | 'mcp' | 'rules' | 'security' | 'autonomy' | 'display';
+type SettingsTab = 'models' | 'instructions' | 'skills' | 'workflows' | 'search' | 'sandbox' | 'mcp' | 'agents' | 'rules' | 'security' | 'autonomy' | 'display';
 
 const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'models', label: 'Modèles' },
@@ -67,6 +68,7 @@ const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'search', label: 'Recherche web' },
   { id: 'sandbox', label: 'Bac à sable' },
   { id: 'mcp', label: 'MCP' },
+  { id: 'agents', label: 'Agents' },
   { id: 'rules', label: 'Règles' },
   { id: 'security', label: 'Sécurité' },
   { id: 'autonomy', label: 'Mode nuit' },
@@ -603,6 +605,7 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
                 savedNames={new Set((settings?.preferences.mcp ?? []).map((server) => server.name))}
               />
             )}
+            {tab === 'agents' && <AgentsSection />}
             {tab === 'rules' && <RulesSection />}
             {tab === 'security' && settings && <ScannersSection scanners={settings.scanners ?? []} />}
 

@@ -30,6 +30,8 @@ export interface Agent {
   color: string | null;
   subagent: boolean;
   phase: AgentPhase | null;
+  /** Where its `*.agent.md` came from: a default, the human's, or the project's. */
+  origin: 'default' | 'user' | 'project';
 }
 
 export interface Folder {
