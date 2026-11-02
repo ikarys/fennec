@@ -4,6 +4,7 @@ import type { RefObject } from "react";
 import type {
   Agent,
   AttachmentInput,
+  McpSessionView,
   ModelChoice,
   ModelChoices,
   ModelRef,
@@ -19,6 +20,7 @@ import {
 } from "../Icons";
 import { matchCommands, SlashMenu } from "./SlashMenu";
 import { ModePicker } from "./ModePicker";
+import { McpPicker } from "./McpPicker";
 import { ModelPicker, modelShortName } from "./ModelPicker";
 import { Button } from "../ui/Button";
 import {
@@ -51,6 +53,8 @@ interface ComposerProps {
   workflows?: WorkflowSummary[];
   workflowSelection?: WorkflowSelection;
   onWorkflowSelectionChange?: (selection: WorkflowSelection) => void;
+  mcpView?: McpSessionView | null;
+  onMcpToggle?: (name: string, active: boolean) => void;
 }
 
 export function Composer({
@@ -77,6 +81,8 @@ export function Composer({
   workflows,
   workflowSelection,
   onWorkflowSelectionChange,
+  mcpView,
+  onMcpToggle,
 }: ComposerProps) {
   const [selected, setSelected] = useState(0);
   const [dismissed, setDismissed] = useState(false);
@@ -310,6 +316,9 @@ export function Composer({
               selection={workflowSelection}
               onChange={onWorkflowSelectionChange}
             />
+          )}
+          {mcpView && onMcpToggle && (
+            <McpPicker view={mcpView} onToggle={onMcpToggle} />
           )}
           <div className="ml-auto flex items-center gap-1.5 px-1.5 text-xs text-muted">
             <span className="h-1.5 w-1.5 rounded-full bg-ok" />

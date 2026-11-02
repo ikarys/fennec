@@ -19,6 +19,7 @@ mod idea_queue;
 mod idea_routes;
 mod insight;
 mod integration;
+mod mcp_routes;
 mod model_routes;
 mod model_view;
 mod notice_stream;

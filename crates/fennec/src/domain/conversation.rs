@@ -85,22 +85,26 @@ pub fn first_request(events: &[Event]) -> Option<String> {
     })
 }
 
-/// The system prompt and tool definitions frozen at the first turn: the first
-/// snapshot's prompt and the first snapshot that carries tools (sessions from
-/// before the tools were frozen got them in a later snapshot).
+/// The system prompt and tool definitions for the session: the prompt is the
+/// first snapshot's (byte-stable for the whole session, so the server's prompt
+/// cache holds), the tools are the last snapshot's that carries them (a
+/// re-freeze after an MCP change is picked up; sessions from before the tools
+/// were frozen got them in a later snapshot).
 pub fn frozen_prompt(events: &[Event]) -> (Option<&str>, Option<&Value>) {
-    let mut snapshots = events.iter().filter_map(|e| match e {
-        Event::TurnSnapshot {
-            cached_system_prompt,
-            cached_tools,
-        } => Some((cached_system_prompt.as_str(), cached_tools.as_ref())),
-        _ => None,
-    });
-    let first = snapshots.next();
-    let tools = first
-        .and_then(|(_, tools)| tools)
-        .or_else(|| snapshots.find_map(|(_, tools)| tools));
-    (first.map(|(prompt, _)| prompt), tools)
+    let snapshots: Vec<(&str, Option<&Value>)> = events
+        .iter()
+        .filter_map(|event| match event {
+            Event::TurnSnapshot {
+                cached_system_prompt,
+                cached_tools,
+                ..
+            } => Some((cached_system_prompt.as_str(), cached_tools.as_ref())),
+            _ => None,
+        })
+        .collect();
+    let prompt = snapshots.first().map(|(prompt, _)| *prompt);
+    let tools = snapshots.iter().rev().find_map(|(_, tools)| *tools);
+    (prompt, tools)
 }
 
 /// Folds the log into OpenAI chat messages (without the system prompt). Only
@@ -278,25 +282,28 @@ mod tests {
     }
 
     #[test]
-    fn frozen_prompt_reads_the_first_prompt_and_the_first_tools() {
+    fn frozen_prompt_reads_the_first_prompt_and_the_last_tools() {
         let events = vec![
             Event::TurnSnapshot {
                 cached_system_prompt: "first".into(),
                 cached_tools: None,
+                mcp_tool_names: Vec::new(),
             },
             Event::TurnSnapshot {
                 cached_system_prompt: "second".into(),
                 cached_tools: Some(json!([1])),
+                mcp_tool_names: Vec::new(),
             },
             Event::TurnSnapshot {
                 cached_system_prompt: "third".into(),
                 cached_tools: Some(json!([2])),
+                mcp_tool_names: Vec::new(),
             },
         ];
 
         let (prompt, tools) = frozen_prompt(&events);
         assert_eq!(prompt, Some("first"));
-        assert_eq!(tools, Some(&json!([1])));
+        assert_eq!(tools, Some(&json!([2])));
         assert_eq!(frozen_prompt(&[]), (None, None));
     }
 

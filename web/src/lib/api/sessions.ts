@@ -253,6 +253,42 @@ export function getVision(id: string): Promise<SeenImage[]> {
   );
 }
 
+/** One MCP tool as the composer sees it, with its token cost. */
+export interface McpToolView {
+  name: string;
+  enabled: boolean;
+  tokens: number;
+}
+
+/** One MCP server as the composer sees it. */
+export interface McpServerView {
+  name: string;
+  visible: boolean;
+  disabled: boolean;
+  active: boolean;
+  tokens: number;
+  toolCount: number;
+  tools: McpToolView[];
+}
+
+/** The session's MCP state and token totals (`GET /api/sessions/{id}/mcp`). */
+export interface McpSessionView {
+  servers: McpServerView[];
+  totalTokens: number;
+}
+
+export function getSessionMcp(id: string): Promise<McpSessionView> {
+  return request<McpSessionView>(`/api/sessions/${encodeURIComponent(id)}/mcp`);
+}
+
+/** Record the session's disabled MCP servers (`POST /api/sessions/{id}/mcp`). */
+export function setSessionMcp(id: string, disabled: string[]): Promise<McpSessionView> {
+  return request<McpSessionView>(`/api/sessions/${encodeURIComponent(id)}/mcp`, {
+    method: "POST",
+    body: JSON.stringify({ disabled }),
+  });
+}
+
 /** How a criterion's status was established, as reported by the integration preview. */
 export type IntegrationProvenance =
   | { kind: "verified"; command: string; exitCode?: number; output: string }
