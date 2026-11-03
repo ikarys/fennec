@@ -2,6 +2,7 @@
 //! into a dollar estimate, split by token kind, and explains what is priced
 //! and what is not.
 
+use crate::domain::lang::Lang;
 use crate::domain::preferences::Preferences;
 use llm_providers::{Cost, Price};
 use std::collections::BTreeMap;
@@ -29,13 +30,22 @@ impl Pricing {
     }
 
     /// How the cost was reached, or why there is none (models without a price).
-    pub fn detail(&self) -> String {
+    pub fn detail(&self, lang: Lang) -> String {
         if self.priced == 0 {
-            "aucun modèle n'a de prix : Paramètres, Modèles".to_string()
+            lang.pick(
+                "no model has a price: Settings, Models",
+                "aucun modèle n'a de prix : Paramètres, Modèles",
+            )
+            .to_string()
         } else {
-            let mut detail = "indicatif, au prix de chaque modèle".to_string();
+            let mut detail = lang
+                .pick(
+                    "indicative, at each model's price",
+                    "indicatif, au prix de chaque modèle",
+                )
+                .to_string();
             if !self.unpriced.is_empty() {
-                detail.push_str(" ; sans prix : ");
+                detail.push_str(lang.pick("; without a price: ", " ; sans prix : "));
                 detail.push_str(&self.unpriced.join(", "));
             }
             detail
@@ -138,8 +148,12 @@ mod tests {
             unpriced: vec![],
         };
         assert_eq!(
-            none.detail(),
+            none.detail(Lang::Fr),
             "aucun modèle n'a de prix : Paramètres, Modèles"
+        );
+        assert_eq!(
+            none.detail(Lang::En),
+            "no model has a price: Settings, Models"
         );
 
         let some = Pricing {
@@ -148,8 +162,12 @@ mod tests {
             unpriced: vec!["b".to_string()],
         };
         assert_eq!(
-            some.detail(),
+            some.detail(Lang::Fr),
             "indicatif, au prix de chaque modèle ; sans prix : b"
+        );
+        assert_eq!(
+            some.detail(Lang::En),
+            "indicative, at each model's price; without a price: b"
         );
     }
 }

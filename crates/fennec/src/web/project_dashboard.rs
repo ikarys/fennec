@@ -16,6 +16,7 @@ use super::idea_board::Board;
 use super::insight::Period;
 use super::pricing::{priced, prices};
 use crate::domain::clock::now_ms;
+use crate::domain::lang::Lang;
 use crate::domain::map_doc::MapFileState;
 use crate::{adr, doc, module_map};
 use backlog::Stage;
@@ -152,7 +153,10 @@ fn gather(
     let models = ledger
         .series(&filter, GroupBy::Model)
         .map_err(|e| e.to_string())?;
-    let pricing = priced(&models, &prices(&store.preferences()?));
+    // The dashboard's cost text follows the human's display language.
+    let preferences = store.preferences()?;
+    let lang = Lang::from_code(&preferences.display.language);
+    let pricing = priced(&models, &prices(&preferences));
 
     let map = module_map::load(workdir);
     let map_state = module_map::map_file_state(workdir, &map);
@@ -166,7 +170,7 @@ fn gather(
         idea_stages,
         usage,
         cost_value: pricing.value(),
-        cost_detail: pricing.detail(),
+        cost_detail: pricing.detail(lang),
         map_state,
         module_count,
         doc_count,
