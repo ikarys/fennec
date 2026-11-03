@@ -4,10 +4,13 @@ State on 2026-11-03, `develop` at `fec1d2c`. Delete each item when done, and thi
 
 ## 1. Server-built texts are French
 
-The UI is migrated (`web/src/i18n/`), but the server still builds some display texts in French:
-the Insight tiles' labels and details (`crates/fennec/src/web/insight.rs`), which
-`pages/InsightPage.tsx` also uses as keys for their icons. Send a stable `kind` per tile and
-translate it in the UI; look for other display strings built in `crates/fennec/src/web/`.
+The UI is migrated (`web/src/i18n/`). On the server, the Insight page and the cost detail follow
+`display.language` through `domain/lang.rs` (`Lang::from_code`, `Lang::pick`). Still French:
+
+- display texts built in `web/project_dashboard.rs`, `web/context_view.rs`, `domain/context_parts.rs`,
+  `domain/criteria.rs`, `domain/scanner.rs` (find them with an accent grep on `crates/fennec/src`);
+- the number formats of `crates/token-usage/src/display.rs` (`12,3k`, `4,2 s`, `3,20 $`): a decimal
+  comma in English too.
 
 ## 2. Integration gate after a manual merge
 

@@ -14,6 +14,7 @@ use super::http::{Request, error, send_json};
 use super::pricing::{Pricing, priced, prices};
 use crate::domain::clock::now_ms;
 use crate::domain::context_parts::PartKind;
+use crate::domain::lang::Lang;
 use llm_providers::Price;
 use std::collections::BTreeMap;
 
@@ -64,9 +65,22 @@ pub struct InsightView {
     pub project_options: Vec<ProjectOption>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum CardKind {
+    Calls,
+    Input,
+    Cache,
+    LostCache,
+    Output,
+    Cost,
+}
+
 #[derive(Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CardView {
+    /// The stable id the UI keys its icon on; `label` is display text.
+    pub kind: CardKind,
     pub label: String,
     pub value: String,
     pub detail: String,
@@ -118,7 +132,12 @@ pub struct InsightData {
 }
 
 impl InsightData {
-    pub fn view(self, project: Option<&str>, prices: &BTreeMap<String, Price>) -> InsightView {
+    pub fn view(
+        self,
+        project: Option<&str>,
+        prices: &BTreeMap<String, Price>,
+        lang: Lang,
+    ) -> InsightView {
         let InsightData {
             total,
             days,
@@ -130,7 +149,7 @@ impl InsightData {
 
         let pricing = priced(&models, prices);
 
-        let cards = cards(&total, &pricing);
+        let cards = cards(&total, &pricing, lang);
         let consumers = consumers(&total.breakdown);
 
         let max = days
@@ -143,7 +162,7 @@ impl InsightData {
         let days = days
             .iter()
             .enumerate()
-            .map(|(index, row)| day_view(row, max, index % step == 0))
+            .map(|(index, row)| day_view(row, max, index % step == 0, lang))
             .collect();
 
         let projects = if project.is_none() {
@@ -248,9 +267,16 @@ pub fn serve(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), Str
         project_models,
     };
 
-    let prices = prices(&app.store()?.preferences()?);
+    let preferences = app.store()?.preferences()?;
+    let prices = prices(&preferences);
+    // The human's display language drives the server-built texts.
+    let lang = Lang::from_code(&preferences.display.language);
 
-    send_json(stream, 200, &json!(data.view(project.as_deref(), &prices)))
+    send_json(
+        stream,
+        200,
+        &json!(data.view(project.as_deref(), &prices, lang)),
+    )
 }
 
 /// One project's model breakdown, from the period's rows. `group_rows` only
@@ -274,48 +300,61 @@ fn busiest_first(rows: &mut [Row]) {
     });
 }
 
-fn cards(total: &Summary, pricing: &Pricing) -> Vec<CardView> {
+fn cards(total: &Summary, pricing: &Pricing, lang: Lang) -> Vec<CardView> {
     let fresh = total.prompt_tokens.saturating_sub(total.cached_tokens);
     let cache = percent(total.cached_tokens, total.prompt_tokens);
-    let lost_detail = if total.lost_cache_calls == 0 {
-        "aucun appel n'a relu son préfixe".to_string()
-    } else {
-        format!(
-            "{} appels ont relu ce que le serveur avait déjà vu",
-            total.lost_cache_calls
-        )
+    let lost_detail = match (lang, total.lost_cache_calls) {
+        (Lang::En, 0) => "no call re-read its prefix".to_string(),
+        (Lang::Fr, 0) => "aucun appel n'a relu son préfixe".to_string(),
+        (Lang::En, n) => format!("{n} calls re-read what the server had already seen"),
+        (Lang::Fr, n) => format!("{n} appels ont relu ce que le serveur avait déjà vu"),
     };
 
     vec![
         CardView {
-            label: "Appels".into(),
+            kind: CardKind::Calls,
+            label: lang.pick("Calls", "Appels").into(),
             value: total.calls.to_string(),
-            detail: format!("temps modèle {}", duration(total.total_secs)),
+            detail: match lang {
+                Lang::En => format!("model time {}", duration(total.total_secs)),
+                Lang::Fr => format!("temps modèle {}", duration(total.total_secs)),
+            },
         },
         CardView {
-            label: "Entrée".into(),
+            kind: CardKind::Input,
+            label: lang.pick("Input", "Entrée").into(),
             value: tokens(total.prompt_tokens),
-            detail: format!("{} hors cache", tokens(fresh)),
+            detail: match lang {
+                Lang::En => format!("{} uncached", tokens(fresh)),
+                Lang::Fr => format!("{} hors cache", tokens(fresh)),
+            },
         },
         CardView {
-            label: "Cache".into(),
+            kind: CardKind::Cache,
+            label: lang.pick("Cache", "Cache").into(),
             value: format!("{cache} %"),
-            detail: format!("{} lus du cache", tokens(total.cached_tokens)),
+            detail: match lang {
+                Lang::En => format!("{} read from cache", tokens(total.cached_tokens)),
+                Lang::Fr => format!("{} lus du cache", tokens(total.cached_tokens)),
+            },
         },
         CardView {
-            label: "Cache perdu".into(),
+            kind: CardKind::LostCache,
+            label: lang.pick("Lost cache", "Cache perdu").into(),
             value: tokens(total.lost_cache_tokens),
             detail: lost_detail,
         },
         CardView {
-            label: "Sortie".into(),
+            kind: CardKind::Output,
+            label: lang.pick("Output", "Sortie").into(),
             value: tokens(total.completion_tokens),
-            detail: "tokens générés".into(),
+            detail: lang.pick("generated tokens", "tokens générés").to_string(),
         },
         CardView {
-            label: "Coût estimé".into(),
+            kind: CardKind::Cost,
+            label: lang.pick("Estimated cost", "Coût estimé").into(),
             value: pricing.value(),
-            detail: pricing.detail(),
+            detail: pricing.detail(lang),
         },
     ]
 }
@@ -339,7 +378,7 @@ fn consumers(breakdown: &BTreeMap<String, u64>) -> Option<CompositionView> {
     Some(composition_view(&shares, total, 0))
 }
 
-fn day_view(row: &Row, max: u64, show_label: bool) -> DayView {
+fn day_view(row: &Row, max: u64, show_label: bool, lang: Lang) -> DayView {
     let prompt = row.summary.prompt_tokens;
     let cached = row.summary.cached_tokens;
     let lost = row
@@ -360,9 +399,14 @@ fn day_view(row: &Row, max: u64, show_label: bool) -> DayView {
     let lost_text = tokens(lost);
     let output = tokens(row.summary.completion_tokens);
 
-    let title = format!(
-        "{label} · {calls} appels · entrée {input} (cache {cache} %) · cache perdu {lost_text} · sortie {output}"
-    );
+    let title = match lang {
+        Lang::En => format!(
+            "{label} · {calls} calls · input {input} (cache {cache} %) · lost cache {lost_text} · output {output}"
+        ),
+        Lang::Fr => format!(
+            "{label} · {calls} appels · entrée {input} (cache {cache} %) · cache perdu {lost_text} · sortie {output}"
+        ),
+    };
 
     DayView {
         day: row.key.clone(),
@@ -542,7 +586,7 @@ mod tests {
             groups,
             project_models: BTreeMap::new(),
         }
-        .view(None, &prices);
+        .view(None, &prices, Lang::Fr);
 
         let labels: Vec<&str> = view.cards.iter().map(|c| c.label.as_str()).collect();
         assert_eq!(
@@ -585,7 +629,7 @@ mod tests {
             groups,
             project_models: BTreeMap::new(),
         }
-        .view(Some("p1"), &BTreeMap::new());
+        .view(Some("p1"), &BTreeMap::new(), Lang::Fr);
 
         assert!(view.projects.is_empty());
     }
@@ -595,16 +639,56 @@ mod tests {
         let total = summary(1, 1000, 0, 10, 0, 0, 1.0);
         let models = vec![row("m1", "m1", summary(1, 1000, 0, 10, 0, 0, 1.0))];
         let pricing = priced(&models, &BTreeMap::new());
-        let cards = cards(&total, &pricing);
+        let cards = cards(&total, &pricing, Lang::Fr);
 
         let cost = cards
             .iter()
-            .find(|card| card.label == "Coût estimé")
+            .find(|card| card.kind == CardKind::Cost)
             .expect("cost card");
         assert_eq!(cost.value, "—");
         assert_eq!(
             cost.detail,
             "aucun modèle n'a de prix : Paramètres, Modèles"
+        );
+    }
+
+    #[test]
+    fn view_in_english() {
+        let total = summary(10, 1000, 970, 100, 0, 0, 1.0);
+        let view = InsightData {
+            total,
+            days: vec![],
+            projects: vec![],
+            models: vec![],
+            groups: vec![],
+            project_models: BTreeMap::new(),
+        }
+        .view(None, &BTreeMap::new(), Lang::En);
+
+        let kinds: Vec<CardKind> = view.cards.iter().map(|card| card.kind).collect();
+        assert_eq!(
+            kinds,
+            vec![
+                CardKind::Calls,
+                CardKind::Input,
+                CardKind::Cache,
+                CardKind::LostCache,
+                CardKind::Output,
+                CardKind::Cost
+            ]
+        );
+        assert_eq!(json!(view.cards[3])["kind"], "lostCache");
+        let labels: Vec<&str> = view.cards.iter().map(|card| card.label.as_str()).collect();
+        assert_eq!(
+            labels,
+            vec![
+                "Calls",
+                "Input",
+                "Cache",
+                "Lost cache",
+                "Output",
+                "Estimated cost"
+            ]
         );
     }
 
@@ -647,7 +731,7 @@ mod tests {
             groups: vec![],
             project_models: BTreeMap::new(),
         }
-        .view(None, &BTreeMap::new());
+        .view(None, &BTreeMap::new(), Lang::Fr);
 
         for (index, day) in view.days.iter().enumerate() {
             assert_eq!(day.label.is_empty(), index % 3 != 0);

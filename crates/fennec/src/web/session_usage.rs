@@ -3,6 +3,7 @@
 
 use super::pricing::Pricing;
 use crate::domain::event::Event;
+use crate::domain::lang::Lang;
 use serde::Serialize;
 use std::collections::HashMap;
 use token_usage::{CallRecord, LatestCall, Summary, display};
@@ -36,6 +37,7 @@ impl SessionUsageView {
         summary: &Summary,
         latest: Option<&LatestCall>,
         pricing: &Pricing,
+        lang: Lang,
     ) -> SessionUsageView {
         SessionUsageView {
             calls: summary.calls,
@@ -44,7 +46,7 @@ impl SessionUsageView {
             completion_tokens: summary.completion_tokens,
             cache_percent: (summary.cache_hit_rate * 100.0).round() as u64,
             cost: pricing.value(),
-            cost_detail: pricing.detail(),
+            cost_detail: pricing.detail(lang),
             input_cost: pricing.part(pricing.cost.input + pricing.cost.cached),
             cached_cost: pricing.part(pricing.cost.cached),
             output_cost: pricing.part(pricing.cost.output),
@@ -158,7 +160,7 @@ mod tests {
             priced: 0,
             unpriced: vec![],
         };
-        let view = SessionUsageView::new(&summary, None, &pricing);
+        let view = SessionUsageView::new(&summary, None, &pricing, Lang::Fr);
         assert_eq!(view.calls, 0);
         assert_eq!(view.cache_percent, 0);
         assert_eq!(view.last_generation_speed, None);
@@ -191,7 +193,7 @@ mod tests {
             priced: 0,
             unpriced: vec![],
         };
-        let view = SessionUsageView::new(&summary, Some(&latest), &pricing);
+        let view = SessionUsageView::new(&summary, Some(&latest), &pricing, Lang::Fr);
         assert_eq!(view.cache_percent, 67);
         assert_eq!(view.last_generation_speed, Some(42.5));
         assert_eq!(view.prompt_tokens, 300);
