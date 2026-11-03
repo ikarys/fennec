@@ -2,6 +2,7 @@
 //! provenance. No in-progress state, no attempts history.
 
 use super::event::Event;
+use crate::domain::lang::Lang;
 use serde::{Deserialize, Serialize};
 
 /// The choice that accepts a proposal; anything else leaves the criteria as they are.
@@ -155,11 +156,21 @@ pub fn is_noop(in_force: &[Criterion], proposed: &[Criterion]) -> bool {
         })
 }
 
-/// The question shown to the human (the UI speaks French) for a proposed criteria list.
-pub fn proposal_question(current: &[Criterion], proposed: &[Criterion], reason: &str) -> String {
+/// The question shown to the human, in the human's language, for a proposed
+/// criteria list.
+pub fn proposal_question(
+    current: &[Criterion],
+    proposed: &[Criterion],
+    reason: &str,
+    lang: Lang,
+) -> String {
     if current.is_empty() {
         let mut lines = vec![
-            "L'agent propose les critères :".to_string(),
+            lang.pick(
+                "The agent proposes the criteria:",
+                "L'agent propose les critères :",
+            )
+            .to_string(),
             String::new(),
             reason.to_string(),
             String::new(),
@@ -169,7 +180,7 @@ pub fn proposal_question(current: &[Criterion], proposed: &[Criterion], reason: 
             lines.push(format!(
                 "{}: {}",
                 criterion.id,
-                criterion_description_and_check(criterion)
+                criterion_description_and_check(criterion, lang)
             ));
         }
 
@@ -183,20 +194,23 @@ pub fn proposal_question(current: &[Criterion], proposed: &[Criterion], reason: 
         match current.iter().find(|c| c.id == criterion.id) {
             None => {
                 changes.push(format!(
-                    "{} ajouté : {}",
+                    "{} {} {}",
                     criterion.id,
-                    criterion_description_and_check(criterion)
+                    lang.pick("added:", "ajouté :"),
+                    criterion_description_and_check(criterion, lang)
                 ));
             }
             Some(old) if old != criterion => {
                 changes.push(format!(
-                    "{} modifié : {}",
+                    "{} {} {}",
                     criterion.id,
-                    criterion_description_and_check(criterion)
+                    lang.pick("changed:", "modifié :"),
+                    criterion_description_and_check(criterion, lang)
                 ));
                 changes.push(format!(
-                    "  avant : {}",
-                    criterion_description_and_check(old)
+                    "  {} {}",
+                    lang.pick("before:", "avant :"),
+                    criterion_description_and_check(old, lang)
                 ));
             }
             Some(_) => unchanged.push(criterion.id.clone()),
@@ -209,37 +223,54 @@ pub fn proposal_question(current: &[Criterion], proposed: &[Criterion], reason: 
             .any(|candidate| candidate.id == criterion.id)
         {
             changes.push(format!(
-                "{} retiré : {}",
+                "{} {} {}",
                 criterion.id,
-                criterion_description_and_check(criterion)
+                lang.pick("removed:", "retiré :"),
+                criterion_description_and_check(criterion, lang)
             ));
         }
     }
 
     let mut lines = vec![
-        "L'agent propose de modifier les critères :".to_string(),
+        lang.pick(
+            "The agent proposes to change the criteria:",
+            "L'agent propose de modifier les critères :",
+        )
+        .to_string(),
         String::new(),
         reason.to_string(),
         String::new(),
     ];
 
     if changes.is_empty() {
-        lines.push("Aucun changement par rapport aux critères en vigueur.".to_string());
+        lines.push(
+            lang.pick(
+                "No change from the criteria in force.",
+                "Aucun changement par rapport aux critères en vigueur.",
+            )
+            .to_string(),
+        );
     } else {
         lines.extend(changes);
         if !unchanged.is_empty() {
             lines.push(String::new());
-            lines.push(format!("Inchangés : {}.", unchanged.join(", ")));
+            lines.push(format!(
+                "{} {}.",
+                lang.pick("Unchanged:", "Inchangés :"),
+                unchanged.join(", ")
+            ));
         }
     }
 
     lines.join("\n")
 }
 
-fn criterion_description_and_check(criterion: &Criterion) -> String {
+fn criterion_description_and_check(criterion: &Criterion, lang: Lang) -> String {
     let check = match &criterion.check {
         Some(command) => format!("check `{command}`"),
-        None => "sans check, à juger".to_string(),
+        None => lang
+            .pick("no check, to be judged", "sans check, à juger")
+            .to_string(),
     };
     format!("{} — {}", criterion.description, check)
 }
@@ -711,7 +742,7 @@ C3: pass
         ];
 
         assert_eq!(
-            proposal_question(&[], &proposed, "the old check cannot run"),
+            proposal_question(&[], &proposed, "the old check cannot run", Lang::Fr),
             "L'agent propose les critères :\n\nthe old check cannot run\n\nC1: builds — check `true`\nC2: docs — sans check, à juger"
         );
     }
@@ -763,8 +794,27 @@ C3: pass
         ];
 
         assert_eq!(
-            proposal_question(&current, &proposed, "the old check cannot run"),
+            proposal_question(&current, &proposed, "the old check cannot run", Lang::Fr),
             "L'agent propose de modifier les critères :\n\nthe old check cannot run\n\nC1 modifié : builds faster — check `fast`\n  avant : builds — check `true`\n\nInchangés : C2, C3."
+        );
+    }
+
+    #[test]
+    fn proposal_question_english_modified_criterion() {
+        let current = vec![
+            criterion("C1", "builds", Some("true")),
+            criterion("C2", "docs", None),
+            criterion("C3", "logs", Some("ls")),
+        ];
+        let proposed = vec![
+            criterion("C1", "builds faster", Some("fast")),
+            criterion("C2", "docs", None),
+            criterion("C3", "logs", Some("ls")),
+        ];
+
+        assert_eq!(
+            proposal_question(&current, &proposed, "the old check cannot run", Lang::En),
+            "The agent proposes to change the criteria:\n\nthe old check cannot run\n\nC1 changed: builds faster — check `fast`\n  before: builds — check `true`\n\nUnchanged: C2, C3."
         );
     }
 
@@ -781,7 +831,7 @@ C3: pass
         ];
 
         assert_eq!(
-            proposal_question(&current, &proposed, "the old check cannot run"),
+            proposal_question(&current, &proposed, "the old check cannot run", Lang::Fr),
             "L'agent propose de modifier les critères :\n\nthe old check cannot run\n\nC3 ajouté : logs — check `ls`\n\nInchangés : C1, C2."
         );
     }
@@ -799,7 +849,7 @@ C3: pass
         ];
 
         assert_eq!(
-            proposal_question(&current, &proposed, "the old check cannot run"),
+            proposal_question(&current, &proposed, "the old check cannot run", Lang::Fr),
             "L'agent propose de modifier les critères :\n\nthe old check cannot run\n\nC3 retiré : logs — check `ls`\n\nInchangés : C1, C2."
         );
     }
@@ -812,7 +862,7 @@ C3: pass
         ];
 
         assert_eq!(
-            proposal_question(&criteria, &criteria, "the old check cannot run"),
+            proposal_question(&criteria, &criteria, "the old check cannot run", Lang::Fr),
             "L'agent propose de modifier les critères :\n\nthe old check cannot run\n\nAucun changement par rapport aux critères en vigueur."
         );
     }

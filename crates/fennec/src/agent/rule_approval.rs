@@ -103,6 +103,7 @@ mod tests {
                 compact_at: 0.0,
                 reasoning_effort: None,
                 autonomous,
+                lang: crate::domain::lang::Lang::Fr,
                 stop: self.stop,
                 on_event: &mut self.on_event,
             }
