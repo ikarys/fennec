@@ -44,6 +44,8 @@ jobs:
         run: just web
       - name: Lint
         run: just lint
+      - name: UI tests
+        run: just test-web
 
   # The unit tests, the sandbox's included (they need bwrap).
   tests:
