@@ -1,6 +1,5 @@
 import { request } from "./request";
 import type { ModelRef, SessionModel } from "./settings";
-import type { DecisionView } from "../fold";
 
 export type SessionState =
   | "running"
@@ -276,16 +275,48 @@ export interface QueuedMessage {
   content: string;
 }
 
-/** The session's pending blocks, folded by the server: the UI computes none. */
-export interface ThreadPending {
+/** How a criterion's status was established. */
+export type Provenance =
+  | { kind: "verified"; command: string; exitCode?: number; output: string }
+  | { kind: "indicative"; agent: string; reason: string };
+
+export type CriterionStatus =
+  | { type: "pending" }
+  | { type: "passed" | "failed"; provenance: Provenance };
+
+export interface CriterionView {
+  id: string;
+  description: string;
+  check?: string;
+  status: CriterionStatus;
+  /** Its check passed before any change (last preflight, verified). */
+  passedBefore: boolean;
+}
+
+/** A choice an agent recorded with record_decision: indicative. */
+export interface DecisionView {
+  callId: string;
+  title: string;
+  choice: string;
+  reason: string;
+  alternatives: string[];
+}
+
+/** The session's blocks folded by the server: the UI computes none. */
+export interface ServedThread {
   pendingApproval: PendingApproval | null;
   pendingWaiver: PendingWaiver | null;
   /** Messages queued while a turn runs, in order. */
   queued: QueuedMessage[];
+  /** The criteria in force: the last criteria.set and the updates since. */
+  criteria: CriterionView[];
+  decisions: DecisionView[];
+  /** The ids of the messages the human may replay: typed, in the model's current view. */
+  replayable: string[];
 }
 
-export function getThread(id: string): Promise<ThreadPending> {
-  return request<ThreadPending>(
+export function getThread(id: string): Promise<ServedThread> {
+  return request<ServedThread>(
     `/api/sessions/${encodeURIComponent(id)}/thread`,
   );
 }
@@ -324,24 +355,6 @@ export function setSessionMcp(id: string, disabled: string[]): Promise<McpSessio
     method: "POST",
     body: JSON.stringify({ disabled }),
   });
-}
-
-/** How a criterion's status was established, as reported by the integration preview. */
-export type IntegrationProvenance =
-  | { kind: "verified"; command: string; exitCode?: number; output: string }
-  | { kind: "indicative"; agent: string; reason: string };
-
-export type IntegrationCriterionStatus =
-  | { type: "pending" }
-  | { type: "passed" | "failed"; provenance: IntegrationProvenance };
-
-export interface IntegrationCriterion {
-  id: string;
-  description: string;
-  check?: string;
-  status: IntegrationCriterionStatus;
-  /** Its check passed before any change (last preflight, verified). */
-  passedBefore?: boolean;
 }
 
 export interface ArchitectureViolation {
@@ -406,7 +419,7 @@ export interface IntegrationPreview {
   commonSignals: ReviewSignal[];
   /** Test files (relative to the project) the integration could protect. */
   testFiles: string[];
-  criteria: IntegrationCriterion[];
+  criteria: CriterionView[];
   /** Recorded by the agent: indicative, never a blocker. */
   decisions: DecisionView[];
   blockers: Blocker[];
