@@ -85,6 +85,13 @@ pub fn create(base: &Path, name: &str) -> Result<PathBuf, String> {
     Ok(path)
 }
 
+/// fennec's own store (its database, the sessions' worktrees) is never a
+/// project: an integration or a clean-up could delete it under a session.
+pub fn inside_store(dir: &Path, store_dir: &Path) -> bool {
+    let canon = |p: &Path| p.canonicalize().unwrap_or_else(|_| p.to_path_buf());
+    canon(dir).starts_with(canon(store_dir))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -139,6 +146,24 @@ mod tests {
         assert!(create(&root, "").is_err());
         assert!(create(&root, "a/b").is_err());
         assert!(create(&root, ".hidden").is_err());
+
+        std::fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn refuses_the_store_and_what_it_holds() {
+        let root = std::env::temp_dir().join(format!(
+            "fennec-folders-store-{}",
+            crate::domain::id::new_id()
+        ));
+        let store = root.join("store");
+        std::fs::create_dir_all(store.join("worktrees/x")).unwrap();
+        let other = root.join("other");
+        std::fs::create_dir_all(&other).unwrap();
+
+        assert!(inside_store(&store.join("worktrees/x"), &store));
+        assert!(inside_store(&store, &store));
+        assert!(!inside_store(&other, &store));
 
         std::fs::remove_dir_all(root).ok();
     }

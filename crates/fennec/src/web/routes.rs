@@ -49,7 +49,7 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         }
         ("POST", ["api", "settings", "mcp", "connect"]) => mcp_routes::connect(app, req, stream),
         ("GET", ["api", "models", "choices"]) => model_routes::choices(app, stream),
-        ("GET", ["api", "folders"]) => session_routes::list_folders(req, stream),
+        ("GET", ["api", "folders"]) => session_routes::list_folders(app, req, stream),
         ("POST", ["api", "folders", "create"]) => session_routes::create_folder(req, stream),
         ("GET", ["api", "projects"]) => session_routes::list_projects(app, stream),
         ("GET", ["api", "backlog"]) => backlog_routes::list_backlog(app, stream),

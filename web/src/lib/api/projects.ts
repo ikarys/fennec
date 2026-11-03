@@ -7,6 +7,8 @@ export interface Project {
   workdir: string;
   /** The scratch project behind the chat: no folder, no git. */
   chat?: boolean;
+  /** The workdir is inside fennec's own store: a session's worktree, not a project of the human's. */
+  sessionWorktree?: boolean;
   branch: string | null;
   remote: string | null;
   /** Opens the project in VS Code (through the WSL remote under WSL). */
