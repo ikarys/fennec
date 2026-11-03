@@ -16,7 +16,7 @@ function headerSummary(view: BacklogView): string {
   if (view.total.done > 0)
     parts.push(`${view.total.done} terminée${view.total.done > 1 ? 's' : ''}`);
 
-  parts.push(`sur ${view.total.projects} projet${view.total.projects > 1 ? 's' : ''}`);
+  parts.push(`${view.total.projects} projet${view.total.projects > 1 ? 's' : ''} avec des tâches`);
   return parts.join(' · ');
 }
 
@@ -185,7 +185,7 @@ export default function BacklogPage() {
     <main className="grow overflow-y-auto px-4 py-6 md:px-6 md:py-8">
       <div className="mx-auto max-w-[960px]">
         <div>
-          <h1 className="text-2xl font-semibold">Backlog</h1>
+          <h1 className="text-2xl font-semibold">Tâches</h1>
           {view ? <p className="mt-0.5 text-sm text-muted">{headerSummary(view)}</p> : null}
         </div>
 

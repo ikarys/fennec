@@ -28,11 +28,8 @@ fn backlog_view(app: &App, store: &SqliteStore) -> Result<Value, String> {
     let mut total_ready = 0usize;
     let mut total_drafts = 0usize;
     let mut total_done = 0usize;
-    let mut total_projects = 0usize;
 
     for project in store.projects()? {
-        total_projects += 1;
-
         let backlog = store.backlog(&project.id)?;
         let board = Board::new(app, store, &backlog, &project);
         let board = board_json(&board)?;
@@ -112,7 +109,7 @@ fn backlog_view(app: &App, store: &SqliteStore) -> Result<Value, String> {
             "ready": total_ready,
             "drafts": total_drafts,
             "done": total_done,
-            "projects": total_projects,
+            "projects": rows.len(),
         },
         "projects": rows,
     }))
@@ -222,7 +219,7 @@ mod tests {
 
         let view = backlog_view(&app, &store).unwrap();
 
-        assert_eq!(view["total"]["projects"], 2);
+        assert_eq!(view["total"]["projects"], 1);
         assert_eq!(view["total"]["done"], 1);
         assert_eq!(view["total"]["ready"], 1);
 
