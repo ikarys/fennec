@@ -329,7 +329,8 @@ read-only. The human edits them as usual.
     parent directory (`.` for a file at the root), riskiest module first (most total signals, then path); the counts
     are the number of its zones carrying that signal, `remedyPrompt` is the same brief for this module only, and
     `zones` keeps the report's zone order (`{path, signals, churn, lines, unreviewedPercent}`, most signals first,
-    then churn; `signals` among `unreviewed`, `untested`, `churn` as before).
+    then churn; `signals` among `unreviewed`, `untested`, `churn` as before; `untested` means no test of its own,
+    and skips the files that need none: declaration-only modules, test support, build tooling).
   - `remedyPrompt`: the brief the "Remédier" button sends to the `remedy` agent; empty without zones.
 - `GET /api/projects/{id}/worktrees[?fresh=1]` → `{scannedAt, totalBytes, generatedBytes, entries}`: the disk the
   project's session worktrees take, measured from disk (verified; allocated bytes, like `du`). `fresh=1` measures again,
@@ -432,8 +433,9 @@ read-only. The human edits them as usual.
   what integrating the session's worktree branch would do (409 without a
   worktree). `files` come riskiest first (the review order): `signals` ⊂
   protected, sensitive, bypass, architecture, conflictMarker, testsWeakened (the gate's
-  own checks, per file), hot (5+ commits in 90 days), untested (no inline
-  test, no test file of the same stem on the branch), large (200+ lines
+  own checks, per file), hot (5+ commits in 90 days), untested (no test of its own: no inline
+  test, no test file of the same stem on the branch; declaration-only modules, test support and build tooling
+  need none), large (200+ lines
   changed); deterministic. `commonSignals` are the signals every file carries (empty
   under two files), so the UI says them once. `originBranch` is the branch the run started from (null for
   older worktrees or a detached HEAD). `decisions` are the session's

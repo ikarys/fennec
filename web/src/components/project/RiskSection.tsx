@@ -12,14 +12,14 @@ import { ActivityIcon, AlertIcon, ChevronRightIcon, RefreshIcon, ReviewIcon, Spi
 // One colour per signal, shared by the tiles, the module columns and the file badges, so a colour reads as a signal everywhere.
 const SIGNAL_META: Record<RiskSignal, { tone: BadgeTone; label: (zone: RiskZone) => string }> = {
   unreviewed: { tone: 'err', label: () => 'jamais relu' },
-  untested: { tone: 'attention', label: () => 'sans tests' },
+  untested: { tone: 'attention', label: () => 'sans test propre' },
   churn: { tone: 'info', label: (zone) => `${zone.churn} commits` },
 };
 
 /** A module's count for one signal, in its fixed column; nothing when zero. */
 function Count({ value, tone, title }: { value: number; tone: BadgeTone; title: string }) {
   return (
-    <span className="w-24 shrink-0 text-right">
+    <span className="w-28 shrink-0 text-right">
       {value > 0 ? (
         <Badge tone={tone} pill title={title}>
           {value}
@@ -89,7 +89,7 @@ export function RiskSection({
         />
         <Tile
           icon={<AlertIcon />}
-          label="Sans tests"
+          label="Sans test propre"
           figure={data ? `${data.untested}` : '…'}
           detail={data ? `fichiers sur ${data.files}` : '…'}
           tone="attention"
@@ -143,9 +143,9 @@ export function RiskSection({
               <div className="flex items-center gap-3 border-b border-border bg-raised px-4 py-2 text-xs uppercase tracking-wide text-faint">
                 <span className="w-3.5 shrink-0" />
                 <span className="min-w-0 grow">Module</span>
-                <span className="w-24 shrink-0 text-right">Jamais relu</span>
-                <span className="w-24 shrink-0 text-right">Sans tests</span>
-                <span className="w-24 shrink-0 text-right">Modifiés</span>
+                <span className="w-28 shrink-0 text-right">Jamais relu</span>
+                <span className="w-28 shrink-0 text-right">Sans test propre</span>
+                <span className="w-28 shrink-0 text-right">Modifiés</span>
                 <span className="w-20 shrink-0 text-right">Fichiers</span>
                 <span className="w-7 shrink-0" />
               </div>
@@ -158,7 +158,7 @@ export function RiskSection({
                       {module.path}
                     </span>
                     <Count value={module.unreviewed} tone={SIGNAL_META.unreviewed.tone} title="Fichiers jamais relus" />
-                    <Count value={module.untested} tone={SIGNAL_META.untested.tone} title="Fichiers sans tests" />
+                    <Count value={module.untested} tone={SIGNAL_META.untested.tone} title="Fichiers sans test propre" />
                     <Count value={module.churning} tone={SIGNAL_META.churn.tone} title="Fichiers souvent modifiés" />
                     <span className="w-20 shrink-0 text-right font-mono text-xs text-muted tabular-nums">{module.zones.length}</span>
                     {/* Hidden until hover so the counts stay the row's reading; the summary must not toggle on its click. */}
