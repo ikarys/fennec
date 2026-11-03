@@ -117,3 +117,113 @@ pub fn covers(pattern: &str, relative: &str) -> bool {
     let path_segments = split_segments(relative);
     (1..=path_segments.len()).any(|length| pattern_matches(pattern, &path_segments[..length]))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_pattern_is_trimmed() {
+        assert_eq!(
+            normalize("  node_modules  "),
+            Some(String::from("node_modules"))
+        );
+    }
+
+    #[test]
+    fn a_trailing_slash_is_dropped() {
+        assert_eq!(normalize("docs/"), Some(String::from("docs")));
+    }
+
+    #[test]
+    fn a_leading_slash_is_kept() {
+        assert_eq!(normalize("/Cargo.lock"), Some(String::from("/Cargo.lock")));
+    }
+
+    #[test]
+    fn a_blank_line_is_none() {
+        assert_eq!(normalize("   "), None);
+    }
+
+    #[test]
+    fn a_comment_line_is_none() {
+        assert_eq!(normalize("# ignore"), None);
+    }
+
+    #[test]
+    fn a_negation_line_is_none() {
+        assert_eq!(normalize("!keep"), None);
+    }
+
+    #[test]
+    fn a_lone_slash_is_none() {
+        // A lone slash becomes blank after the trailing slash is dropped.
+        assert_eq!(normalize("/"), None);
+    }
+
+    #[test]
+    fn an_unanchored_name_matches_at_any_depth() {
+        assert!(covers("node_modules", "a/node_modules/x/y.js"));
+    }
+
+    #[test]
+    fn an_anchored_root_pattern_matches_only_at_root() {
+        assert!(covers("/Cargo.lock", "Cargo.lock"));
+        assert!(!covers("/Cargo.lock", "sub/Cargo.lock"));
+    }
+
+    #[test]
+    fn an_inner_slash_pattern_is_anchored_at_root() {
+        assert!(covers(".agents/protected", ".agents/protected"));
+        assert!(!covers(".agents/protected", "x/.agents/protected"));
+    }
+
+    #[test]
+    fn a_star_matches_within_one_segment_only() {
+        assert!(covers("*.lock", "Cargo.lock"));
+        assert!(covers("*.lock", "sub/Cargo.lock"));
+        assert!(!covers("*.lock", "a/b"));
+    }
+
+    #[test]
+    fn a_question_mark_matches_one_character() {
+        assert!(covers("a?c", "abc"));
+        assert!(!covers("a?c", "ac"));
+    }
+
+    #[test]
+    fn a_double_star_prefix_matches_any_depth() {
+        assert!(covers("**/build", "build"));
+        assert!(covers("**/build", "a/build"));
+    }
+
+    #[test]
+    fn a_double_star_middle_matches_zero_segments() {
+        assert!(covers("src/**/mod.rs", "src/mod.rs"));
+    }
+
+    #[test]
+    fn a_double_star_middle_matches_several_segments() {
+        assert!(covers("src/**/mod.rs", "src/a/b/mod.rs"));
+    }
+
+    #[test]
+    fn a_directory_pattern_covers_descendants() {
+        assert!(covers("docs", "docs/adr/001.md"));
+    }
+
+    #[test]
+    fn a_non_matching_path_is_not_covered() {
+        assert!(!covers("Cargo.lock", "Cargo.toml"));
+    }
+
+    #[test]
+    fn a_file_name_starting_with_the_pattern_is_not_covered() {
+        assert!(!covers("Cargo.lock", "Cargo.lock.bak"));
+    }
+
+    #[test]
+    fn empty_path_segments_are_ignored() {
+        assert!(covers("a/b", "a//b"));
+    }
+}
