@@ -1,5 +1,5 @@
 import type { ThreadView } from '../../lib/fold';
-import type { SeenImage, SessionDetail, SessionSkills, SessionUsage } from '../../lib/api';
+import type { SeenImage, ServedThread, SessionDetail, SessionSkills, SessionUsage } from '../../lib/api';
 import { useEffect, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
 import { useDisplayPrefs } from '../../lib/display';
 import { pageBlocks, panelBlock, panelPages, type PanelBlockId } from '../../lib/panelBlocks';
@@ -43,14 +43,14 @@ const RAIL_BLOCKS: readonly { id: PanelBlockId; icon: ReactNode }[] = [
   { id: 'vision', icon: <EyeIcon className="h-4 w-4" /> },
 ];
 
-function railCount(id: PanelBlockId, view: ThreadView, vision: SeenImage[]): number | null {
+function railCount(id: PanelBlockId, view: ThreadView, served: ServedThread, vision: SeenImage[]): number | null {
   switch (id) {
     case 'criteria':
-      return view.criteria.length;
+      return served.criteria.length;
     case 'modifiedFiles':
       return view.modifiedFiles.length;
     case 'decisions':
-      return view.decisions.length;
+      return served.decisions.length;
     case 'vision':
       return vision.length;
     default:
@@ -59,8 +59,8 @@ function railCount(id: PanelBlockId, view: ThreadView, vision: SeenImage[]): num
 }
 
 /** The rail's count badge is tinted only when it signals a state worth seeing. */
-function railCountClass(id: PanelBlockId, view: ThreadView): string {
-  if (id === 'criteria' && view.criteria.some((criterion) => criterion.status === 'failed')) {
+function railCountClass(id: PanelBlockId, served: ServedThread): string {
+  if (id === 'criteria' && served.criteria.some((criterion) => criterion.status.type === 'failed')) {
     return 'text-err';
   }
   return 'text-muted';
@@ -131,9 +131,11 @@ interface ContextPanelProps {
   integrationVersion: number;
   /** The images the model received, computed server-side. */
   vision: SeenImage[];
+  /** The criteria and decisions, folded server-side. */
+  served: ServedThread;
 }
 
-export function ContextPanel({ view, skills, usage, request, hasSession, worktree, sessionId, onWorktreeChanged, integrationVersion, vision }: ContextPanelProps) {
+export function ContextPanel({ view, skills, usage, request, hasSession, worktree, sessionId, onWorktreeChanged, integrationVersion, vision, served }: ContextPanelProps) {
   const t = useT();
   const lang = useLang();
   const [width, setWidth] = useState(loadWidth);
@@ -232,7 +234,7 @@ export function ContextPanel({ view, skills, usage, request, hasSession, worktre
       case 'request':
         return <RequestSection key={id} request={request} />;
       case 'criteria':
-        return <CriteriaSection key={id} criteria={view.criteria} />;
+        return <CriteriaSection key={id} criteria={served.criteria} />;
       case 'modifiedFiles':
         return <ModifiedFilesSection key={id} modifiedFiles={view.modifiedFiles} sessionId={sessionId} />;
       case 'workspace':
@@ -246,7 +248,7 @@ export function ContextPanel({ view, skills, usage, request, hasSession, worktre
       case 'skills':
         return <SkillsSection key={id} skills={skills} hasSession={hasSession} />;
       case 'decisions':
-        return <DecisionsSection key={id} decisions={view.decisions} />;
+        return <DecisionsSection key={id} decisions={served.decisions} />;
       case 'vision':
         return <VisionSection key={id} images={vision} />;
       default: {
@@ -257,7 +259,7 @@ export function ContextPanel({ view, skills, usage, request, hasSession, worktre
   }
 
   function renderRail(className: string) {
-    const openCount = openBlock ? railCount(openBlock, view, vision) : null;
+    const openCount = openBlock ? railCount(openBlock, view, served, vision) : null;
     return (
       <aside
         aria-label={t('sessionContextLabel')}
@@ -303,7 +305,7 @@ export function ContextPanel({ view, skills, usage, request, hasSession, worktre
         </div>
         {RAIL_BLOCKS.filter((block) => block.id !== 'workspace' || sessionId).map((block) => {
           const title = t(panelBlock(block.id).titleKey);
-          const count = railCount(block.id, view, vision);
+          const count = railCount(block.id, view, served, vision);
           return (
             <Button
               key={block.id}
@@ -319,7 +321,7 @@ export function ContextPanel({ view, skills, usage, request, hasSession, worktre
             >
               {block.icon}
               {count ? (
-                <span className={`absolute -top-1 -right-1 rounded-full border border-border bg-raised px-1 font-mono text-[9px] leading-3 tabular-nums ${railCountClass(block.id, view)}`}>
+                <span className={`absolute -top-1 -right-1 rounded-full border border-border bg-raised px-1 font-mono text-[9px] leading-3 tabular-nums ${railCountClass(block.id, served)}`}>
                   {count}
                 </span>
               ) : null}

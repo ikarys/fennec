@@ -271,29 +271,9 @@ describe('createThreadFold', () => {
     expect(fold.view().modifiedFiles).toHaveLength(0);
   });
 
-  it('sets criteria from criteria.set', () => {
-    const fold = createThreadFold();
-    fold.apply(ev('criteria.set', {
-      criteria: [
-        { id: 'c1', description: 'd1', check: 'cmd' },
-        { id: 'c2', description: 'd2' }
-      ]
-    }));
-    expect(fold.view().criteria).toEqual([
-      { id: 'c1', description: 'd1', check: 'cmd', status: 'pending' },
-      { id: 'c2', description: 'd2', check: undefined, status: 'pending' }
-    ]);
-  });
-
-  it('attaches preflight results to an assistant and marks passedBefore', () => {
+  it('attaches preflight results to an assistant', () => {
     const fold = createThreadFold();
     fold.apply(ev('message.start', { messageId: 'a1', role: 'assistant' }));
-    fold.apply(ev('criteria.set', {
-      criteria: [
-        { id: 'c1', description: 'd1' },
-        { id: 'c2', description: 'd2' }
-      ]
-    }));
     fold.apply(ev('criteria.preflight', {
       messageId: 'a1',
       results: [
@@ -306,77 +286,6 @@ describe('createThreadFold', () => {
       { criterionId: 'c1', command: 'cmd', verdict: 'passesAlready', exitCode: 0, output: 'ok' },
       { criterionId: 'c2', command: 'cmd2', verdict: 'fails', exitCode: undefined, output: 'no' }
     ]);
-    expect(fold.view().criteria[0].passedBefore).toBe(true);
-    expect(fold.view().criteria[1].passedBefore).toBeUndefined();
-  });
-
-  it('updates criterion status with verified provenance', () => {
-    const fold = createThreadFold();
-    fold.apply(ev('criteria.set', { criteria: [{ id: 'c1', description: 'd1' }] }));
-    fold.apply(ev('criterion.updated', {
-      criterionId: 'c1',
-      status: {
-        type: 'passed',
-        provenance: { kind: 'verified', command: 'cmd', exitCode: 0, output: 'ok' }
-      }
-    }));
-    expect(fold.view().criteria[0].status).toBe('passed');
-    expect(fold.view().criteria[0].provenance).toEqual({
-      kind: 'verified',
-      command: 'cmd',
-      exitCode: 0,
-      output: 'ok'
-    });
-  });
-
-  it('updates criterion status with indicative provenance', () => {
-    const fold = createThreadFold();
-    fold.apply(ev('criteria.set', { criteria: [{ id: 'c1', description: 'd1' }] }));
-    fold.apply(ev('criterion.updated', {
-      criterionId: 'c1',
-      status: {
-        type: 'failed',
-        provenance: { kind: 'indicative', agent: 'builder', reason: 'not enough' }
-      }
-    }));
-    expect(fold.view().criteria[0].status).toBe('failed');
-    expect(fold.view().criteria[0].provenance).toEqual({
-      kind: 'indicative',
-      agent: 'builder',
-      reason: 'not enough'
-    });
-  });
-
-  it('clears provenance when a criterion returns to pending', () => {
-    const fold = createThreadFold();
-    fold.apply(ev('criteria.set', { criteria: [{ id: 'c1', description: 'd1' }] }));
-    fold.apply(ev('criterion.updated', {
-      criterionId: 'c1',
-      status: { type: 'passed', provenance: { kind: 'indicative', agent: 'a', reason: 'r' } }
-    }));
-    fold.apply(ev('criterion.updated', { criterionId: 'c1', status: { type: 'pending' } }));
-    expect(fold.view().criteria[0].status).toBe('pending');
-    expect(fold.view().criteria[0].provenance).toBeUndefined();
-  });
-
-  it('records a decision', () => {
-    const fold = createThreadFold();
-    fold.apply(ev('decision.recorded', {
-      callId: 'd1',
-      title: 'T',
-      choice: 'C',
-      reason: 'R',
-      alternatives: ['A', 'B', 1]
-    }));
-    expect(fold.view().decisions).toEqual([
-      { callId: 'd1', title: 'T', choice: 'C', reason: 'R', alternatives: ['A', 'B'] }
-    ]);
-  });
-
-  it('ignores a decision without a title', () => {
-    const fold = createThreadFold();
-    fold.apply(ev('decision.recorded', { callId: 'd1', choice: 'C' }));
-    expect(fold.view().decisions).toHaveLength(0);
   });
 
   it('cuts the view back to before a rewound message', () => {

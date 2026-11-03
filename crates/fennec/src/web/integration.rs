@@ -4,9 +4,10 @@
 
 use super::App;
 use super::http::{Request, error, send_json};
+use super::thread_view::CriterionView;
 use crate::agent::ports::EventLog;
 use crate::architecture;
-use crate::domain::criteria::{CriterionState, CriterionStatus};
+use crate::domain::criteria::CriterionState;
 use crate::domain::decision::{Decision, decisions_in_force};
 use crate::domain::event::Event;
 use crate::domain::integration::{
@@ -175,10 +176,10 @@ pub fn get_integration(app: &App, stream: &mut TcpStream, id: &str) -> Result<()
             })
         })
         .collect();
-    let criteria: Vec<Value> = gate
+    let criteria: Vec<CriterionView> = gate
         .criteria
         .iter()
-        .map(|state| criterion_json(state, &gate.passed_before))
+        .map(|state| CriterionView::new(state, &gate.passed_before))
         .collect();
     send_json(
         stream,
@@ -503,23 +504,6 @@ pub fn resolve_conflict(
         202,
         &json!({ "conflicts": conflicts, "started": true }),
     )
-}
-
-fn criterion_json(state: &CriterionState, passed_before: &[String]) -> Value {
-    let provenance = match &state.status {
-        CriterionStatus::Pending => None,
-        CriterionStatus::Passed { provenance } | CriterionStatus::Failed { provenance } => {
-            Some(provenance)
-        }
-    };
-    json!({
-        "id": state.criterion.id,
-        "description": state.criterion.description,
-        "check": state.criterion.check,
-        "status": state.status,
-        "provenance": provenance,
-        "passedBefore": passed_before.contains(&state.criterion.id),
-    })
 }
 
 /// The idea the integration dialog may finish: the session's idea, only while
