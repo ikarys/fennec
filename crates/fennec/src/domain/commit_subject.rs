@@ -1,6 +1,5 @@
-//! Fennec's own (not from openfox) English commit subject: the subject the
-//! model proposes for an integration, built from the session's request,
-//! title, branch commits and changed files.
+//! English commit subject: the subject the model proposes for an integration,
+//! built from the session's request, title, branch commits and changed files.
 
 /// The prompt template; `prompt` fills its placeholders.
 pub const COMMIT_SUBJECT_PROMPT: &str =

@@ -1,6 +1,6 @@
-//! Port of openfox `tools/path-security.ts`, simplified: a path outside the
-//! working directory is denied unless the human's rules allow it (openfox asks;
-//! the ask flow comes later).
+//! The working-directory path guard: a path outside the
+//! working directory is denied unless the human's rules allow it; the ask
+//! flow comes later.
 
 use std::path::{Component, Path, PathBuf};
 

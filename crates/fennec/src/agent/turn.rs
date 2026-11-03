@@ -1,21 +1,18 @@
-//! Port of openfox `chat/agent-loop.ts`: the multi-turn loop. Each round
-//! streams the model (`round`), then runs its tool calls, until it answers
-//! without one.
+//! The multi-turn loop. Each round streams the model (`round`), then runs
+//! its tool calls, until it answers without one.
 //!
-//! Agents/modes are ported: the turn resolves one top-level agent from the
-//! log's last `mode.changed`, injects its reminder when the current window
-//! lacks it, and enforces its tool allow-list at execution.
+//! Agents/modes: the turn resolves one top-level agent from the log's last
+//! `mode.changed`, injects its reminder when the current window lacks it,
+//! and enforces its tool allow-list at execution.
 //!
-//! `ask_user` is ported: the turn ends with `waiting_for_user` and the
-//! answer arrives as the next turn's input, so a pending question survives a
-//! restart.
+//! `ask_user`: the turn ends with `waiting_for_user` and the answer arrives
+//! as the next turn's input, so a pending question survives a restart.
 //!
-//! Compaction is ported: at a threshold the loop asks the model for a
-//! summary and opens a new window from it (`compaction`), and
-//! `compact_session` runs it on demand.
+//! Compaction: at a threshold the loop asks the model for a summary and
+//! opens a new window from it (`compaction`), and `compact_session` runs it
+//! on demand.
 //!
-//! Not ported yet: auto-retry patterns, vision fallback, queue, pause gate,
-//! sub-agents, return_value/step_done, parallel tool batches.
+//! Tool calls run one at a time; sub-agents are not a tool yet.
 
 use super::ask_user;
 use super::compaction::{self, Compacted};
@@ -51,7 +48,7 @@ use std::time::{Duration, Instant};
 const CONTINUE_AFTER_TRUNCATION_PROMPT: &str =
     "Continue your previous response exactly where you left off.";
 const MAX_TRUNCATION_RETRIES: u32 = 3;
-/// openfox loops until aborted; a cap also keeps a confused model from
+/// The loop runs until aborted; a cap also keeps a confused model from
 /// running forever when nobody watches.
 const MAX_ROUNDS: u32 = 200;
 
@@ -62,10 +59,10 @@ pub struct Turn<'a> {
     pub tools: &'a dyn Toolbox,
     pub session_id: &'a str,
     pub workdir: &'a Path,
-    /// openfox `customInstructions`, assembled by the adapter. Only a
+    /// The custom instructions, assembled by the adapter. Only a
     /// session's first turn uses them: the system prompt is frozen then.
     pub instructions: &'a str,
-    /// openfox `skills`: listed in the system prompt, frozen with it.
+    /// `skills`: listed in the system prompt, frozen with it.
     pub skills: &'a [Skill],
     /// Skill ids whose bodies the system prompt carries; frozen with it.
     pub always_on: &'a [String],
@@ -77,7 +74,7 @@ pub struct Turn<'a> {
     pub context_window: u64,
     /// The compaction threshold as a fraction of the window; 0 disables it.
     pub compact_at: f64,
-    /// openfox `reasoningEffort`; `None` sends no `reasoning_effort` field.
+    /// `reasoningEffort`; `None` sends no `reasoning_effort` field.
     pub reasoning_effort: Option<ReasoningEffort>,
     /// The human is away (the ideas queue's night mode): `ask_user` and
     /// `propose_criteria` answer themselves instead of pausing the turn.
@@ -258,10 +255,10 @@ pub(super) fn with_running(
 
 /// The system prompt and tool definitions a round is sent with, built once
 /// so the loop and a manual compaction use an identical cached prefix.
-/// openfox `cachedSystemPrompt`, tools included: frozen at the session's
-/// first turn and read back, so a new day or a new fennec build (a new tool,
-/// a reworded description) does not change the prompt's first bytes and void
-/// the whole session's prompt cache.
+/// The system prompt, tools included: frozen at the session's first turn
+/// and read back, so a new day or a new build (a new tool, a reworded
+/// description) does not change the prompt's first bytes and void the whole
+/// session's prompt cache.
 fn round_prompt_parts(turn: &mut Turn) -> Result<(String, Value), String> {
     let events = turn.log.events(turn.session_id)?;
     let (prompt, tools) = frozen_prompt(&events);

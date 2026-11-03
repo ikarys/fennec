@@ -1,4 +1,5 @@
-//! The human's replay of one of their messages (openfox `POST /api/sessions/:id/replay`, without its event deletion).
+//! The human's replay of one of their messages
+//! (`POST /api/sessions/:id/replay`, without event deletion).
 
 use super::attachment::Attachment;
 use super::compaction::model_view;

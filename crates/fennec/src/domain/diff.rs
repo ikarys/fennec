@@ -1,5 +1,5 @@
-//! fennec's own (openfox has no integration step): the unified-diff lines an
-//! integration adds or removes, parsed from the branch's diff.
+//! The unified-diff lines an integration adds or removes, parsed from the
+//! branch's diff.
 
 /// The lines a diff adds and removes, without their `+`/`-`.
 #[derive(Debug, Clone, PartialEq, Default)]

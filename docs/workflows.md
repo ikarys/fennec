@@ -7,13 +7,12 @@ through the output ports a node declares. Everything a run does is in the
 session's event log, so its state is folded from the log like the rest of
 fennec.
 
-Borrowed from openfox (`src/server/workflows`): steps of kind agent, shell
-and user; first-entry and re-entry prompts; terminal outcomes; an iteration
-cap. Borrowed from Opencode-Workflows: fan-out to parallel lanes with a
-synthesis, and the bounded verification loop. They become nodes here,
-not instructions to a model. Changed from openfox: outputs are ports wired
-in the graph instead of an ordered list of conditions; loops have their own
-cap; parallel branches; nodes keep their position for the editor.
+A workflow has steps of kind agent, shell and user; first-entry and re-entry
+prompts; terminal outcomes; an iteration cap; fan-out to parallel lanes with a
+synthesis, and a bounded verification loop (the last two borrowed from
+Opencode-Workflows). They are nodes, not instructions to a model: outputs are
+ports wired in the graph instead of an ordered list of conditions; loops have
+their own cap; parallel branches; nodes keep their position for the editor.
 
 ## Moving from one node to the next
 

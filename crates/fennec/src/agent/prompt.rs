@@ -1,21 +1,18 @@
-//! Port of openfox `chat/prompts.ts` (`buildBasePrompt`), with the
-//! portable skills section (`buildSkillsSection`).
+//! The system prompt: the base prompt and the skills section.
 //!
-//! Not ported: sub-agents and caveman thinking.
-//!
-//! fennec's own: the "Working method" section (context, search, verification
-//! and reporting habits), kept apart so the openfox text above still maps 1:1.
+//! The "Working method" section (context, search, verification and
+//! reporting habits) is kept apart so the base prompt text stays stable.
 
 use crate::domain::clock;
 use crate::domain::skill::{Skill, always_active_section};
 use std::path::Path;
 
-/// Port of openfox `buildBasePrompt`, without the sections for features
-/// not ported yet (sub-agents, caveman thinking).
+/// Build the base prompt, without sections for sub-agents or caveman
+/// thinking.
 ///
-/// `instructions` (openfox `instructionsSection`) is appended at the end
-/// when non-empty, then the always-active skills' full bodies and the
-/// remaining skills (`buildSkillsSection`) when non-empty.
+/// `instructions` is appended at the end when
+/// non-empty, then the always-active skills' full bodies and the remaining
+/// skills when non-empty.
 pub fn system_prompt(
     workdir: &Path,
     model_name: &str,

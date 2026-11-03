@@ -1,4 +1,5 @@
-//! An audit report (the audit agents' fixed format): its findings parsed from the model's answer, and the backlog task each one becomes. fennec-only, no openfox counterpart.
+//! An audit report (the audit agents' fixed format): its findings parsed from the
+//! model's answer, and the backlog task each one becomes.
 
 use serde::Serialize;
 

@@ -1,15 +1,14 @@
 //! The `ask_user` tool, owned by the loop: it pauses the turn to ask the
-//! human a question. Port of openfox `tools/ask.ts` and
-//! `shared/ask-options.ts`. The in-memory promise machinery is not ported —
-//! fennec ends the turn with `waiting_for_user` and the answer arrives as
-//! the next turn's input, so a pending question survives a restart.
+//! human a question. It has no in-memory promise machinery: fennec ends
+//! the turn with `waiting_for_user` and the answer arrives as the next
+//! turn's input, so a pending question survives a restart.
 
 use crate::domain::event::{AskType, ChoiceOption, OptionTone};
 use serde_json::{Value, json};
 
 pub const NAME: &str = "ask_user";
 
-/// The OpenAI tool definition, copied from openfox `tools/ask.ts`.
+/// The OpenAI tool definition.
 pub fn definition() -> Value {
     json!({
         "type": "function",
@@ -98,11 +97,11 @@ fn parse_ask_type(s: &str) -> AskType {
     }
 }
 
-/// Port of openfox `normalizeAskOptions`: coerce whatever the model handed
-/// us into the canonical `ChoiceOption[]` shape. A string entry becomes
-/// `{value: s, label: s}`; an object requires a non-empty string `label`
-/// (else it is skipped), `value` defaults to `label`, `description` is kept
-/// when present. An empty or missing list is `None`.
+/// Coerce the model's input into the canonical `ChoiceOption[]` shape.
+/// A string entry becomes `{value: s, label: s}`; an object requires a
+/// non-empty string `label` (else it is skipped), `value` defaults to
+/// `label`, `description` is kept when present. An empty or missing list
+/// is `None`.
 fn normalize_options(raw: &Value) -> Option<Vec<ChoiceOption>> {
     match raw {
         Value::Null => None,
@@ -346,7 +345,7 @@ mod tests {
     }
 
     #[test]
-    fn definition_matches_openfox() {
+    fn definition_is_stable() {
         let d = definition();
         assert_eq!(d["function"]["name"], "ask_user");
         assert_eq!(d["function"]["parameters"]["required"], json!(["question"]));

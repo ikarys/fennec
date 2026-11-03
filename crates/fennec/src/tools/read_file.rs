@@ -1,7 +1,7 @@
-//! Port of openfox `tools/read.ts` (text files and images).
-//! The guidance in its errors (where to look, what to run) is fennec's own.
+//! Reads text files and images; its errors say where to look and what to
+//! run.
 //!
-//! Not ported: PDF files, directories.
+//! It does not read PDF files or directories.
 
 use super::args;
 use super::path_guard::{Outside, resolve_for_reading};
