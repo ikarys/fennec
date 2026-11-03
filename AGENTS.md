@@ -133,7 +133,7 @@ Rules, done: the human's rules, global, per project or granted to a session, own
 crate (model, matching, decision, its own SQLite file `rules.db`) and enforced by fennec's code, never the model: a
 command matched on parsed tokens (through `sudo`, `sh -c`, `&&`, `find -exec`), a tool name, or a path read or written
 (project-relative, absolute or `~/…`). A block refuses the call before it runs (`rule.blocked`, a "règle" badge on the
-tool card, verified); workflow shell nodes too. Settings' "Règles" tab (`#/settings/rules`) shows, adds and deletes them
+tool card, verified); workflow shell nodes too. Settings' Security tab (`#/settings/security`) shows, adds and deletes them
 all; the project page shows its own read-only. An "ask" rule, or a file tool reaching outside the workdir, pauses
 the turn with the call open (`rule.approval_requested`); the human answers on a card: once, for the session (a grant
 on the path and its subdirectories, the command, the tool), always or never (a project rule). fennec then runs the
