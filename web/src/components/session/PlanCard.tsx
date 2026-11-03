@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Plan, Report } from '../../lib/plan';
 import type { PreflightResultView } from '../../lib/fold';
-import { CheckIcon, CloseIcon, EditIcon } from '../Icons';
+import { CheckIcon, ChevronRightIcon, CloseIcon, EditIcon } from '../Icons';
 import type { PlanActions } from './PlanActions';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -61,45 +61,59 @@ export function PlanCard({ plan, actions, preflight }: { plan: Plan; actions?: P
           </p>
         )}
         <ol className="m-0 flex flex-col gap-2">
-          {plan.steps.map((step, i) => (
-            <li key={i} className="relative flex gap-3">
-              {i < plan.steps.length - 1 && <span aria-hidden="true" className="absolute -bottom-2 left-3 top-7 w-px bg-border" />}
-              <span
-                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
-                  i === 0 ? 'border border-accent/40 bg-accent-soft text-accent-strong' : 'border border-border bg-panel text-muted'
-                }`}
-              >
-                {step.number}
-              </span>
-              <Card variant="inset" className="min-w-0 flex-1">
-                <div className="text-sm font-medium text-accent-strong">
-                  <Inline>{step.title}</Inline>
-                </div>
-                {step.files.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {step.files.map((f) => (
-                      <code key={f} className={STEP_FILE_CHIP}>
-                        {f}
-                      </code>
-                    ))}
-                  </div>
-                )}
-                {step.change && (
-                  <div className="border-t border-border pt-1.5 text-sm leading-relaxed text-muted">
-                    <Inline>{step.change}</Inline>
-                  </div>
-                )}
-                {step.verify && (
-                  <div className="flex items-start gap-1.5 text-sm text-muted">
-                    <CheckIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                    <span>
-                      <Inline>{t('verifyLine', { verify: step.verify })}</Inline>
-                    </span>
-                  </div>
-                )}
-              </Card>
-            </li>
-          ))}
+          {plan.steps.map((step, i) => {
+            const hasDetails = step.files.length > 0 || step.change || step.verify;
+            return (
+              <li key={i} className="relative flex gap-3">
+                {i < plan.steps.length - 1 && <span aria-hidden="true" className="absolute -bottom-2 left-3 top-7 w-px bg-border" />}
+                <span
+                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                    i === 0 ? 'border border-accent/40 bg-accent-soft text-accent-strong' : 'border border-border bg-panel text-muted'
+                  }`}
+                >
+                  {step.number}
+                </span>
+                <Card variant="inset" className="min-w-0 flex-1">
+                  <details className="group">
+                    <summary className="flex cursor-pointer list-none items-start gap-2 text-sm select-none">
+                      <span className="min-w-0 grow font-medium text-accent-strong">
+                        <Inline>{step.title}</Inline>
+                      </span>
+                      {hasDetails && (
+                        <ChevronRightIcon className="mt-0.5 h-3 w-3 shrink-0 text-muted transition-transform group-hover:text-text group-open:rotate-90" />
+                      )}
+                    </summary>
+                    {hasDetails && (
+                      <div className="flex flex-col gap-2 pt-2">
+                        {step.files.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {step.files.map((f) => (
+                              <code key={f} className={STEP_FILE_CHIP}>
+                                {f}
+                              </code>
+                            ))}
+                          </div>
+                        )}
+                        {step.change && (
+                          <div className="border-t border-border pt-2 text-sm leading-relaxed text-muted">
+                            <Inline>{step.change}</Inline>
+                          </div>
+                        )}
+                        {step.verify && (
+                          <div className="flex items-start gap-1.5 text-sm text-muted">
+                            <CheckIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                            <span>
+                              <Inline>{t('verifyLine', { verify: step.verify })}</Inline>
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </details>
+                </Card>
+              </li>
+            );
+          })}
         </ol>
         {plan.doneWhen.length > 0 && (
           <Card variant="inset">

@@ -7,6 +7,7 @@ import { Section, type SectionSave } from '../ui/Section';
 import { ChevronRightIcon, CloseIcon, PlusIcon, RefreshIcon, SpinnerIcon, TrashIcon } from '../Icons';
 import { FieldRow, Select, TextInput } from '../ui/Field';
 import { formOnlyModels, type ModelForm } from './ModelPrefsSection';
+import { useT } from '../../i18n';
 
 export interface ProviderForm {
   id: string;
@@ -27,7 +28,7 @@ interface ProvidersSectionProps {
   onAdd: (provider: ProviderForm) => void;
   onRemove: (index: number) => void;
   onFetch: (provider: ProviderForm) => Promise<void>;
-  /** The group's own save: its dot and its "Enregistrer". */
+  /** The group's own save: its dot and its "Save". */
   save?: SectionSave;
   onAddModel: (providerId: string, modelId: string) => void;
 }
@@ -51,6 +52,7 @@ export function ProvidersSection({
   save,
   onAddModel
 }: ProvidersSectionProps) {
+  const t = useT();
   const [draft, setDraft] = useState<ProviderDraft>(emptyDraft);
   const [fetchingId, setFetchingId] = useState<string | null>(null);
   const [modelDrafts, setModelDrafts] = useState<Record<string, string>>({});
@@ -90,15 +92,15 @@ export function ProvidersSection({
 
   return (
     <Section
-      title="Providers"
+      title={t('providersSectionTitle')}
       save={save}
       actions={
         <Button
           variant="ghost"
           size="sm"
           iconOnly
-          aria-label="Ajouter un provider"
-          title="Ajouter un provider"
+          aria-label={t('addProvider')}
+          title={t('addProvider')}
           onClick={() => setAddingProvider((current) => !current)}
         >
           <PlusIcon className="h-3.5 w-3.5" />
@@ -108,21 +110,21 @@ export function ProvidersSection({
       {addingProvider && (
         <Card variant="inset">
           <div className="grid gap-2 md:grid-cols-3">
-            <FieldRow label="Identifiant" hint="Sans '/'">
+            <FieldRow label={t('idLabel')} hint={t('idHint')}>
               <TextInput
                 value={draft.id}
                 onChange={(event) => setDraft({ ...draft, id: event.target.value })}
                 className="w-full"
               />
             </FieldRow>
-            <FieldRow label="Nom">
+            <FieldRow label={t('nameLabel')}>
               <TextInput
                 value={draft.name}
                 onChange={(event) => setDraft({ ...draft, name: event.target.value })}
                 className="w-full"
               />
             </FieldRow>
-            <FieldRow label="URL de base">
+            <FieldRow label={t('baseUrlLabel')}>
               <TextInput
                 value={draft.baseUrl}
                 onChange={(event) => setDraft({ ...draft, baseUrl: event.target.value })}
@@ -132,12 +134,12 @@ export function ProvidersSection({
           </div>
           <div className="flex items-center gap-2">
             <Button variant="secondary" size="sm" disabled={draftDisabled} onClick={addProvider}>
-              Ajouter
+              {t('add')}
             </Button>
             <Button variant="ghost" size="sm" onClick={() => setAddingProvider(false)}>
-              Annuler
+              {t('cancel')}
             </Button>
-            <p className="m-0 text-xs text-faint">Ajouter, puis « Récupérer » pour lister ses modèles.</p>
+            <p className="m-0 text-xs text-faint">{t('providerAddHint')}</p>
           </div>
         </Card>
       )}
@@ -165,18 +167,20 @@ export function ProvidersSection({
                   </span>
                   {error ? (
                     <Badge tone="err" title={error}>
-                      erreur
+                      {t('providerError')}
                     </Badge>
                   ) : (
-                    <Badge tone="neutral">{count === 0 ? 'aucun modèle' : `${count} modèle${count > 1 ? 's' : ''}`}</Badge>
+                    <Badge tone="neutral">
+                      {count === 0 ? t('noModels') : t('modelCount', { count, s: count > 1 ? 's' : '' })}
+                    </Badge>
                   )}
                   <span className="ml-auto flex shrink-0 items-center gap-1">
                     <Button
                       variant="ghost"
                       size="sm"
                       iconOnly
-                      aria-label="Ajouter un modèle"
-                      title="Ajouter un modèle par son id (endpoint sans /models)"
+                      aria-label={t('addModelTitle')}
+                      title={t('addModelHint')}
                       onClick={(event) => {
                         keepOpen(event);
                         setAddingModelFor((current) => (current === provider.id ? null : provider.id));
@@ -189,8 +193,8 @@ export function ProvidersSection({
                       size="sm"
                       iconOnly
                       disabled={fetchingId === provider.id}
-                      aria-label="Récupérer"
-                      title={fetchingId === provider.id ? 'Récupération…' : 'Récupérer la liste des modèles (/models)'}
+                      aria-label={t('fetchModels')}
+                      title={fetchingId === provider.id ? t('fetchingModels') : t('fetchModelsTitle')}
                       onClick={(event) => {
                         keepOpen(event);
                         void (async () => {
@@ -212,8 +216,8 @@ export function ProvidersSection({
                         variant="ghost"
                         size="sm"
                         iconOnly
-                        aria-label="Retirer"
-                        title="Retirer ce provider"
+                        aria-label={t('removeProvider')}
+                        title={t('removeProviderTitle')}
                         onClick={(event) => { keepOpen(event); onRemove(index); }}
                       >
                         <TrashIcon className="h-3.5 w-3.5" />
@@ -225,7 +229,7 @@ export function ProvidersSection({
                 <div className="flex flex-col gap-3 pb-4 pt-1">
                   {error && <p className="m-0 text-xs text-err">{error}</p>}
                   <div className="grid gap-2 md:grid-cols-2">
-                    <FieldRow label="Nom">
+                    <FieldRow label={t('nameLabel')}>
                       <TextInput
                         value={provider.name}
                         onChange={(event) => onChange(index, { name: event.target.value })}
@@ -234,8 +238,8 @@ export function ProvidersSection({
                     </FieldRow>
 
                     <FieldRow
-                      label="URL de base"
-                      hint={isLocal ? "Vide : l'URL de l'environnement (FENNEC_LLM_URL)." : undefined}
+                      label={t('baseUrlLabel')}
+                      hint={isLocal ? t('baseUrlLocalHint') : undefined}
                     >
                       <TextInput
                         value={provider.baseUrl}
@@ -245,7 +249,7 @@ export function ProvidersSection({
                       />
                     </FieldRow>
 
-                    <FieldRow label="Clé API">
+                    <FieldRow label={t('apiKeyLabel')}>
                       <Select
                         value={provider.keyKind}
                         onChange={(event) =>
@@ -253,14 +257,14 @@ export function ProvidersSection({
                         }
                         className="w-full"
                       >
-                        <option value="none">Aucune</option>
-                        <option value="env">Variable d'environnement</option>
-                        <option value="stored">Clé enregistrée (chiffrée)</option>
+                        <option value="none">{t('apiKeyNone')}</option>
+                        <option value="env">{t('apiKeyEnv')}</option>
+                        <option value="stored">{t('apiKeyStored')}</option>
                       </Select>
                     </FieldRow>
 
                     {provider.keyKind === 'env' && (
-                      <FieldRow label="Variable d'environnement">
+                      <FieldRow label={t('apiKeyEnv')}>
                         <TextInput
                           value={provider.envVar}
                           placeholder="OPENROUTER_API_KEY"
@@ -271,16 +275,12 @@ export function ProvidersSection({
                     )}
 
                     {provider.keyKind === 'stored' && (
-                      <FieldRow label="Nouvelle clé">
+                      <FieldRow label={t('newKeyLabel')}>
                         <TextInput
                           type="password"
                           autoComplete="off"
                           value={provider.newKey}
-                          placeholder={
-                            provider.sealed
-                              ? "Une clé chiffrée est enregistrée : saisir pour la remplacer"
-                              : "Coller la clé"
-                          }
+                          placeholder={provider.sealed ? t('sealedKeyPlaceholder') : t('pasteKeyPlaceholder')}
                           onChange={(event) => onChange(index, { newKey: event.target.value })}
                           className="w-full"
                         />
@@ -290,7 +290,7 @@ export function ProvidersSection({
 
                   {added.length > 0 && (
                     <p className="m-0 text-xs text-muted">
-                      Ajouté{added.length > 1 ? 's' : ''} : <span className="font-mono">{added.join(', ')}</span> — « Enregistrer » pour garder.
+                      {t('addedModelsNote', { list: added.join(', '), s: added.length > 1 ? 's' : '' })}
                     </p>
                   )}
                 </div>
@@ -308,7 +308,7 @@ export function ProvidersSection({
                       event.preventDefault();
                       addModel(provider.id);
                     }}
-                    placeholder="Id du modèle (endpoint sans /models)"
+                    placeholder={t('modelIdPlaceholder')}
                     className="w-full max-w-xs"
                   />
                   <Button
@@ -317,8 +317,8 @@ export function ProvidersSection({
                     size="sm"
                     iconOnly
                     disabled={modelDraft.trim() === ''}
-                    aria-label="Ajouter"
-                    title="Ajouter le modèle"
+                    aria-label={t('add')}
+                    title={t('addModelBtnTitle')}
                     onClick={() => addModel(provider.id)}
                   >
                     <PlusIcon className="h-3.5 w-3.5" />
@@ -327,8 +327,8 @@ export function ProvidersSection({
                     variant="ghost"
                     size="sm"
                     iconOnly
-                    aria-label="Annuler"
-                    title="Annuler"
+                    aria-label={t('cancel')}
+                    title={t('cancel')}
                     onClick={() => setAddingModelFor(null)}
                   >
                     <CloseIcon className="h-3.5 w-3.5" />

@@ -1,5 +1,6 @@
 import { Section, type SectionSave } from '../ui/Section';
 import { FieldRow, TextInput } from '../ui/Field';
+import { useT } from '../../i18n';
 
 export interface SearchForm {
   url: string;
@@ -14,12 +15,13 @@ export function SearchSection({
 }: {
   value: SearchForm;
   onChange: (value: SearchForm) => void;
-  /** The group's own save: its dot and its "Enregistrer". */
+  /** The group's own save: its dot and its "Save". */
   save?: SectionSave;
 }) {
+  const t = useT();
   return (
-    <Section title="Recherche web" save={save}>
-      <FieldRow label="URL de l’instance SearXNG">
+    <Section title={t('webSearchTitle')} save={save}>
+      <FieldRow label={t('searxngUrlLabel')}>
         <TextInput
           type="url"
           value={value.url}
@@ -28,10 +30,7 @@ export function SearchSection({
           className="w-full"
         />
       </FieldRow>
-      <FieldRow
-        label="Clé d’API (facultative)"
-        hint="Utilisée par l’outil web_search. L’instance doit accepter le format JSON (search.formats: json dans settings.yml)."
-      >
+      <FieldRow label={t('searchApiKeyLabel')} hint={t('searchApiKeyHint')}>
         <TextInput
           type="password"
           value={value.apiKey}
@@ -47,11 +46,9 @@ export function SearchSection({
             onChange={(event) => onChange({ ...value, webFetch: event.target.checked })}
             className="h-4 w-4 accent-[var(--accent)]"
           />
-          Autoriser web_fetch
+          {t('allowWebFetch')}
         </label>
-        <p className="text-xs text-muted">
-          Le modèle télécharge les pages dont il choisit l’URL (adresses locales et privées refusées) ; fennec les garde en cache 7 jours. Indépendant du réseau du bac à sable : fennec l’exécute lui-même.
-        </p>
+        <p className="text-xs text-muted">{t('webFetchHint')}</p>
       </div>
     </Section>
   );
