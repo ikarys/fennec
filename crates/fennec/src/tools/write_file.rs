@@ -41,39 +41,37 @@ pub(super) fn run(
     protection: &Protection,
     outside: &Outside,
 ) -> ToolResult {
-    let path = match args::string(args, "path") {
-        Ok(value) => value,
-        Err(error) => return ToolResult::failure(error),
-    };
+    try_run(args, workdir, protection, outside).unwrap_or_else(ToolResult::failure)
+}
 
-    let content = match args::string(args, "content") {
-        Ok(value) => value,
-        Err(error) => return ToolResult::failure(error),
-    };
-
-    let full_path = match resolve_for_writing(workdir, protection, outside, path) {
-        Ok(value) => value,
-        Err(error) => return ToolResult::failure(error),
-    };
+fn try_run(
+    args: &Value,
+    workdir: &Path,
+    protection: &Protection,
+    outside: &Outside,
+) -> Result<ToolResult, String> {
+    let path = args::string(args, "path")?;
+    let content = args::string(args, "content")?;
+    let full_path = resolve_for_writing(workdir, protection, outside, path)?;
 
     if let Some(parent) = full_path.parent()
         && !parent.as_os_str().is_empty()
         && let Err(error) = std::fs::create_dir_all(parent)
     {
-        return ToolResult::failure(format!("Failed to create parent directories: {error}"));
+        return Err(format!("Failed to create parent directories: {error}"));
     }
 
     if let Err(error) = std::fs::write(&full_path, content) {
-        return ToolResult::failure(format!("Failed to write file: {error}"));
+        return Err(format!("Failed to write file: {error}"));
     }
 
     let line_count = content.split('\n').count();
     let byte_count = content.len();
 
-    ToolResult::success(
+    Ok(ToolResult::success(
         format!("Successfully wrote {line_count} lines ({byte_count} bytes) to {path}"),
         false,
-    )
+    ))
 }
 
 #[cfg(test)]

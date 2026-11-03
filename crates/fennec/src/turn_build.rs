@@ -102,7 +102,8 @@ pub fn with_turn<R>(
         })
         .collect();
     // ponytail: a waiver's expiry is checked when a turn starts, not mid-turn.
-    let waiver_paths = waiver::active(&log.events(session_id)?, clock::now_ms());
+    let events = log.events(session_id)?;
+    let waiver_paths = waiver::active(&events, clock::now_ms());
     let protection = (if workdir.starts_with(worktree::root(&settings.db_path)) {
         protected::load_for_worktree(workdir)
     } else {
@@ -136,7 +137,7 @@ pub fn with_turn<R>(
                 .collect(),
         )
         .with_rules(rules)
-        .with_mcp(mcp::active_servers(&log.events(session_id)?, &prefs));
+        .with_mcp(mcp::active_servers(&events, &prefs));
     let tools = match project_dir {
         Some(dir) => tools.with_project_dir(dir),
         None => tools,

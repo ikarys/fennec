@@ -50,11 +50,12 @@ pub(super) fn definition() -> Value {
 }
 
 pub(super) fn run(args: &Value, cache_dir: &Path) -> ToolResult {
-    let url = match args::string(args, "url") {
-        Ok(value) => value,
-        Err(error) => return ToolResult::failure(error),
-    };
-    fetch(url, cache_dir, address::is_public)
+    try_run(args, cache_dir).unwrap_or_else(ToolResult::failure)
+}
+
+fn try_run(args: &Value, cache_dir: &Path) -> Result<ToolResult, String> {
+    let url = args::string(args, "url")?;
+    Ok(fetch(url, cache_dir, address::is_public))
 }
 
 /// `allow` decides which addresses may be contacted: tests widen it to reach
