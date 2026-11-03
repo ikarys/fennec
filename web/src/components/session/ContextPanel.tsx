@@ -25,7 +25,6 @@ import { RequestSection } from './RequestSection';
 import { ServersSection } from './ServersSection';
 import { SkillsSection } from './SkillsSection';
 import { TokensSection } from './TokensSection';
-import { ToolCountsSection } from './ToolCountsSection';
 import { VisionSection } from './VisionSection';
 
 const WIDTH_KEY = 'fennec.contextPanelWidth';
@@ -245,8 +244,6 @@ export function ContextPanel({ view, skills, usage, request, hasSession, worktre
         return <SkillsSection key={id} skills={skills} hasSession={hasSession} />;
       case 'decisions':
         return <DecisionsSection key={id} decisions={view.decisions} />;
-      case 'tools':
-        return <ToolCountsSection key={id} toolCounts={view.toolCounts} />;
       case 'vision':
         return <VisionSection key={id} images={vision} />;
       default: {

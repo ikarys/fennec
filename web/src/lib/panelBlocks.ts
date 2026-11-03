@@ -2,14 +2,16 @@
  * The context panel's building blocks.
  *
  * A block is one bounded section of the right-hand panel; a page is a named
- * list of optional block ids. The core blocks open the first page (the
- * default one) and cannot be removed from it: they carry the integration
- * decision (what will be integrated, the run's contract). The other pages
- * show only their own blocks, so they stay light.
+ * list of optional block ids. A block is `core` when it carries the
+ * integration decision — the run's contract (criteria), what will be
+ * integrated (modified files), the agent's workspace, and the request that
+ * framed it. The core blocks open the first page and cannot be removed from
+ * it; every other block is optional and the human places it on any page. The
+ * non-core pages show only their own blocks, so they stay light.
  */
 import type { PanelPage } from './api';
 
-export type PanelBlockId = 'request' | 'criteria' | 'modifiedFiles' | 'workspace' | 'servers' | 'tokens' | 'skills' | 'decisions' | 'tools' | 'vision';
+export type PanelBlockId = 'request' | 'criteria' | 'modifiedFiles' | 'workspace' | 'servers' | 'tokens' | 'skills' | 'decisions' | 'vision';
 
 export interface PanelBlock {
   id: PanelBlockId;
@@ -27,15 +29,15 @@ export const PANEL_BLOCKS: readonly PanelBlock[] = [
   { id: 'skills', title: 'Skills', core: false },
   { id: 'decisions', title: 'Décisions', core: false },
   { id: 'tokens', title: 'Tokens', core: false },
-  { id: 'tools', title: 'Outils de ce tour', core: false },
   { id: 'vision', title: 'Vision', core: false }
 ];
 
 export const OPTIONAL_BLOCKS: readonly PanelBlock[] = PANEL_BLOCKS.filter((block) => !block.core);
 
 export const DEFAULT_PANEL_PAGES: readonly PanelPage[] = [
-  { name: 'Défaut', blocks: ['servers', 'skills', 'decisions'] },
-  { name: 'Stats', blocks: ['tokens', 'tools', 'vision'] }
+  { name: 'Décision', blocks: [] },
+  { name: 'Contexte', blocks: ['skills', 'decisions', 'servers'] },
+  { name: 'Stats', blocks: ['tokens', 'vision'] }
 ];
 
 /** The pages to show: the stored ones, or the defaults when none are stored. */
