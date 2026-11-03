@@ -2,7 +2,19 @@ import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } fro
 import type { Project, ProviderListing, SettingsResponse } from './lib/api';
 import { createProject, getProjects, getSettings, setProjectFavorite } from './lib/api';
 import { applyTheme, getStoredTheme, type ThemeId } from './lib/theme';
-import { TopBar, type PageId, type TabInfo } from './components/layout/TopBar';
+import { TopBar, type TabInfo } from './components/layout/TopBar';
+import {
+  ACTIVE_TAB_KEY,
+  PAGE_TABS,
+  TABS_KEY,
+  loadActiveTab,
+  loadTabs,
+  parseRoute,
+  splitPath,
+  tabIdForRoute,
+  tabPath,
+  type Route,
+} from './lib/route';
 import { HomePage } from './pages/HomePage';
 import { SessionPage } from './pages/SessionPage';
 import { SplitPage } from './pages/SplitPage';
@@ -17,147 +29,8 @@ const WorkflowsPage = lazy(() => import('./pages/WorkflowsPage'));
 const ProjectPage = lazy(() => import('./pages/ProjectPage'));
 const BacklogPage = lazy(() => import('./pages/BacklogPage'));
 
-type Route =
-  | { name: 'home' }
-  | { name: 'session'; id: string }
-  | { name: 'new'; id: string; testWorkflowId: string | null; frameIdeaId: string | null; fromSessionId: string | null }
-  | { name: 'settings'; tab: string | null }
-  | { name: 'insight' }
-  | { name: 'backlog' }
-  | { name: 'split'; left: string | null; right: string | null }
-  | { name: 'project'; projectId: string; tab: string | null; sub: string | null }
-  | { name: 'workflows'; projectId: string | null; workflowId: string | null; isNew: boolean };
-
-const TABS_KEY = 'fennec.tabs';
-const ACTIVE_TAB_KEY = 'fennec.activeTab';
-
-/** The fixed pages that get a tab in the bar, in display order. */
-const PAGE_TABS: { page: PageId; title: string; path: string }[] = [
-  { page: 'settings', title: 'Réglages', path: '#/settings' },
-  { page: 'insight', title: 'Insight', path: '#/insight' },
-  { page: 'workflows', title: 'Workflows', path: '#/workflows' },
-  { page: 'backlog', title: 'Tâches', path: '#/backlog' }
-];
-
-function parseRoute(): Route {
-  const hash = window.location.hash;
-  if (hash === '#/settings' || hash.startsWith('#/settings/')) {
-    return { name: 'settings', tab: hash.slice('#/settings/'.length) || null };
-  }
-  if (hash === '#/insight') {
-    return { name: 'insight' };
-  }
-  if (hash === '#/backlog') {
-    return { name: 'backlog' };
-  }
-  if (hash.startsWith('#/project/')) {
-    const [rawId, tab, sub] = hash.slice('#/project/'.length).split('/');
-    return { name: 'project', projectId: decodeURIComponent(rawId), tab: tab ?? null, sub: sub ?? null };
-  }
-  if (hash.startsWith('#/workflows')) {
-    const path = hash.slice(12); // Remove '#/workflows'
-    const segments = path.split('/').filter((s) => s.length > 0);
-    let isNew = false;
-    if (segments.length > 0 && segments[segments.length - 1].includes('?new')) {
-      isNew = true;
-      segments[segments.length - 1] = segments[segments.length - 1].split('?')[0];
-    }
-    const projectId = segments.length >= 1 ? decodeURIComponent(segments[0]) : null;
-    const workflowId = segments.length >= 2 ? decodeURIComponent(segments[1]) : null;
-    return { name: 'workflows', projectId, workflowId, isNew };
-  }
-  if (hash.startsWith('#/split')) {
-    const rest = hash.slice('#/split'.length).replace(/^\//, '');
-    const parts = rest.split('/');
-    return { name: 'split', left: parsePaneToken(parts[0] ?? null), right: parsePaneToken(parts[1] ?? null) };
-  }
-  if (hash.startsWith('#/s/')) {
-    const id = decodeURIComponent(hash.slice(4));
-    if (id.startsWith('new:')) {
-      return { name: 'new', id: id.slice(4), testWorkflowId: null, frameIdeaId: null, fromSessionId: null };
-    }
-    return { name: 'session', id };
-  }
-  if (hash.startsWith('#/new/')) {
-    const [rawId, query] = hash.slice(6).split('?');
-    const testWorkflowId = query ? new URLSearchParams(query).get('test') : null;
-    const frameIdeaId = query ? new URLSearchParams(query).get('frame') : null;
-    const fromSessionId = query ? new URLSearchParams(query).get('from') : null;
-    return { name: 'new', id: decodeURIComponent(rawId), testWorkflowId, frameIdeaId, fromSessionId };
-  }
-  return { name: 'home' };
-}
-
-/** The route of a tab: a pseudo `new:` tab opens the new-session page, a page tab its page. */
-function tabPath(tabId: string): string {
-  if (tabId.startsWith('new:')) {
-    return `#/new/${encodeURIComponent(tabId.slice(4))}`;
-  }
-  if (tabId.startsWith('page:')) {
-    return PAGE_TABS.find((page) => page.page === tabId.slice(5))?.path ?? '#/';
-  }
-  return `#/s/${encodeURIComponent(tabId)}`;
-}
-
-/** The tab id on screen, from the route; null on pages that have no tab (home, project, split). */
-function tabIdForRoute(route: Route): string | null {
-  switch (route.name) {
-    case 'session':
-      return route.id;
-    case 'new':
-      return `new:${route.id}`;
-    case 'settings':
-      return 'page:settings';
-    case 'insight':
-      return 'page:insight';
-    case 'backlog':
-      return 'page:backlog';
-    case 'workflows':
-      return 'page:workflows';
-    default:
-      return null;
-  }
-}
-
-/** A split pane's value in the URL: a session id, `new:<projectId>`, or `-` for empty. */
-function paneToken(value: string | null): string {
-  return value ? encodeURIComponent(value) : '-';
-}
-
-function splitPath(left: string | null, right: string | null): string {
-  return `#/split/${paneToken(left)}/${paneToken(right)}`;
-}
-
-function parsePaneToken(raw: string | null | undefined): string | null {
-  if (!raw || raw === '-') return null;
-  return decodeURIComponent(raw);
-}
-
-function loadTabs(): string[] {
-  try {
-    const raw = localStorage.getItem(TABS_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed)
-      ? parsed.filter((value): value is string => typeof value === 'string' && !value.startsWith('page:'))
-      : [];
-  } catch {
-    return [];
-  }
-}
-
-function loadActiveTab(): string | null {
-  try {
-    const id = localStorage.getItem(ACTIVE_TAB_KEY);
-    // A page tab persisted by an older build is not a real session.
-    return id && !id.startsWith('page:') ? id : null;
-  } catch {
-    return null;
-  }
-}
-
 export default function App() {
-  const [route, setRoute] = useState<Route>(() => parseRoute());
+  const [route, setRoute] = useState<Route>(() => parseRoute(window.location.hash));
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [projectsError, setProjectsError] = useState<string | null>(null);
@@ -173,7 +46,7 @@ export default function App() {
   const toggleSplitRef = useRef<() => void>(() => {});
 
   useEffect(() => {
-    const onHashChange = () => setRoute(parseRoute());
+    const onHashChange = () => setRoute(parseRoute(window.location.hash));
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
@@ -300,7 +173,7 @@ export default function App() {
     if (window.location.hash !== path) {
       window.location.hash = path;
     } else {
-      setRoute(parseRoute());
+      setRoute(parseRoute(window.location.hash));
     }
   }, []);
 
