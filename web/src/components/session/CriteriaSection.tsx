@@ -1,4 +1,4 @@
-import type { CriterionView, Provenance } from '../../lib/fold';
+import type { CriterionStatus, CriterionView, Provenance } from '../../lib/api';
 import { panelBlock } from '../../lib/panelBlocks';
 import { Badge } from '../ui/Badge';
 import { Panel } from '../ui/Panel';
@@ -10,7 +10,7 @@ const DOT_CLASSES = {
 } as const;
 
 /** A full dot for a fact fennec established, a hollow one for an agent's judgement. */
-export function criterionDotClass(status: CriterionView['status'], provenance: Provenance | undefined): string {
+export function criterionDotClass(status: CriterionStatus['type'], provenance: Provenance | undefined): string {
   const tone = status === 'passed' ? 'ok' : status === 'failed' ? 'err' : 'muted';
   return provenance?.kind === 'indicative' ? DOT_CLASSES[tone].hollow : DOT_CLASSES[tone].full;
 }
@@ -38,9 +38,9 @@ export function CriterionProvenanceBadge({ provenance }: { provenance: Provenanc
 }
 
 export function CriteriaSection({ criteria }: { criteria: CriterionView[] }) {
-  const passed = criteria.filter((criterion) => criterion.status === 'passed').length;
-  const failed = criteria.filter((criterion) => criterion.status === 'failed').length;
-  const indicative = criteria.filter((criterion) => criterion.status === 'passed' && criterion.provenance?.kind === 'indicative').length;
+  const passed = criteria.filter((criterion) => criterion.status.type === 'passed').length;
+  const failed = criteria.filter((criterion) => criterion.status.type === 'failed').length;
+  const indicative = criteria.filter((criterion) => criterion.status.type === 'passed' && criterion.status.provenance.kind === 'indicative').length;
 
   return (
     <Panel
@@ -66,8 +66,8 @@ export function CriteriaSection({ criteria }: { criteria: CriterionView[] }) {
             <div className="h-full rounded-full bg-ok" style={{ width: `${(passed / criteria.length) * 100}%` }} />
           </div>
           {criteria.map((criterion) => {
-            const provenance = criterion.provenance;
-            const dotClass = criterionDotClass(criterion.status, provenance);
+            const provenance = criterion.status.type === 'pending' ? undefined : criterion.status.provenance;
+            const dotClass = criterionDotClass(criterion.status.type, provenance);
 
             return (
               <details key={criterion.id}>
@@ -78,7 +78,7 @@ export function CriteriaSection({ criteria }: { criteria: CriterionView[] }) {
                   <PassedBeforeBadge passedBefore={criterion.passedBefore} />
                   <CriterionProvenanceBadge provenance={provenance} />
                 </summary>
-                {(provenance || (criterion.status === 'pending' && criterion.check)) && (
+                {(provenance || (criterion.status.type === 'pending' && criterion.check)) && (
                   <div className="flex flex-col gap-1.5 pb-1 pl-4 pr-1 text-xs">
                     {provenance && provenance.kind === 'verified' && (
                       <>
@@ -94,7 +94,7 @@ export function CriteriaSection({ criteria }: { criteria: CriterionView[] }) {
                     {provenance && provenance.kind === 'indicative' && (
                       <div className="break-words text-text">{provenance.reason}</div>
                     )}
-                    {criterion.status === 'pending' && criterion.check && (
+                    {criterion.status.type === 'pending' && criterion.check && (
                       <div className="font-mono text-muted">$ {criterion.check}</div>
                     )}
                   </div>

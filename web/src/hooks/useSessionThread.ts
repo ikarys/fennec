@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getContext, getThread, getVision, type ContextView, type ThreadPending, getEventPage, getRunEventsBefore, getSkills, getUsage, getUsageCalls, getUsageWorkflow, type WorkflowUsage, type EventPageEntry, type SessionSkills, type CallUsage, type SessionUsage, type SeenImage } from '../lib/api';
+import { getContext, getThread, getVision, type ContextView, type ServedThread, getEventPage, getRunEventsBefore, getSkills, getUsage, getUsageCalls, getUsageWorkflow, type WorkflowUsage, type EventPageEntry, type SessionSkills, type CallUsage, type SessionUsage, type SeenImage } from '../lib/api';
 import { createThreadFold, type FennecEvent, type ThreadFold, type ThreadView } from '../lib/fold';
 
 const PAGE_SIZE = 200;
@@ -12,6 +12,10 @@ const PENDING_CUES = new Set([
   'queue.added',
   'queue.drained',
   'queue.cancelled',
+  'criteria.set',
+  'criteria.preflight',
+  'criterion.updated',
+  'decision.recorded',
   'running.changed',
   'context.compacted',
   'session.rewound',
@@ -48,11 +52,11 @@ export interface SessionThread {
   context: ContextView | null;
   /** The images the model received, computed server-side; [] until the first fetch. */
   vision: SeenImage[];
-  /** The pending approval, waiver and queue, folded server-side; empty until the first fetch. */
-  pending: ThreadPending;
+  /** The pending approval, waiver, queue, criteria and decisions, folded server-side; empty until the first fetch. */
+  served: ServedThread;
 }
 
-const NOTHING_PENDING: ThreadPending = { pendingApproval: null, pendingWaiver: null, queued: [] };
+const EMPTY_SERVED: ServedThread = { pendingApproval: null, pendingWaiver: null, queued: [], criteria: [], decisions: [] };
 
 /**
  * The live thread of a session: the last page of the log (at least 200 events,
@@ -72,7 +76,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
   const [workflowUsage, setWorkflowUsage] = useState<WorkflowUsage>({ nodes: [], runs: [] });
   const [context, setContext] = useState<ContextView | null>(null);
   const [vision, setVision] = useState<SeenImage[]>([]);
-  const [pending, setPending] = useState<ThreadPending>(NOTHING_PENDING);
+  const [served, setServed] = useState<ServedThread>(EMPTY_SERVED);
   const eventsRef = useRef<FennecEvent[]>([]);
   const foldRef = useRef<ThreadFold>(createThreadFold());
   const firstSeqRef = useRef(0);
@@ -148,7 +152,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
     const request = ++threadReqRef.current;
     getThread(sessionId)
       .then((blocks) => {
-        if (request === threadReqRef.current) setPending(blocks);
+        if (request === threadReqRef.current) setServed(blocks);
       })
       .catch(() => {
         // Keep the last blocks: the next request, answer or queue event refetches.
@@ -190,7 +194,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
     setWorkflowUsage({ nodes: [], runs: [] });
     setContext(null);
     setVision([]);
-    setPending(NOTHING_PENDING);
+    setServed(EMPTY_SERVED);
     if (!sessionId) return;
 
     let cancelled = false;
@@ -329,5 +333,5 @@ export function useSessionThread(sessionId: string | null): SessionThread {
     }
   }, [sessionId, loadingOlder, foldAll, refreshSkills]);
 
-  return { view, hasMore, loadingOlder, loadOlder, skills, usage, calls, workflowUsage, context, vision, pending };
+  return { view, hasMore, loadingOlder, loadOlder, skills, usage, calls, workflowUsage, context, vision, served };
 }
