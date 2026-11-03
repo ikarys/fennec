@@ -1,11 +1,20 @@
 import type { ThreadView } from '../../lib/fold';
 import type { SeenImage, SessionDetail, SessionSkills, SessionUsage } from '../../lib/api';
-import { useEffect, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import { useEffect, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
 import { useDisplayPrefs } from '../../lib/display';
-import { pageBlocks, panelPages, type PanelBlockId } from '../../lib/panelBlocks';
+import { pageBlocks, panelBlock, panelPages, type PanelBlockId } from '../../lib/panelBlocks';
 import { Button } from '../ui/Button';
 import { Select } from '../ui/Field';
-import { ChevronsLeftIcon, ChevronsRightIcon } from '../Icons';
+import {
+  BranchIcon,
+  CheckIcon,
+  ChevronsLeftIcon,
+  ChevronsRightIcon,
+  CloseIcon,
+  DecisionIcon,
+  EyeIcon,
+  FileIcon,
+} from '../Icons';
 import { AgentWorkspaceSection } from './AgentWorkspaceSection';
 import { CriteriaSection } from './CriteriaSection';
 import { DecisionsSection } from './DecisionsSection';
@@ -23,6 +32,29 @@ const COLLAPSED_KEY = 'fennec.contextPanel.collapsed';
 const MIN_WIDTH = 240;
 const MAX_WIDTH = 560;
 const DEFAULT_WIDTH = 300;
+
+const RAIL_BLOCKS: readonly { id: PanelBlockId; icon: ReactNode }[] = [
+  { id: 'criteria', icon: <CheckIcon className="h-4 w-4" /> },
+  { id: 'modifiedFiles', icon: <FileIcon className="h-4 w-4" /> },
+  { id: 'workspace', icon: <BranchIcon className="h-4 w-4" /> },
+  { id: 'decisions', icon: <DecisionIcon className="h-4 w-4" /> },
+  { id: 'vision', icon: <EyeIcon className="h-4 w-4" /> },
+];
+
+function railCount(id: PanelBlockId, view: ThreadView, vision: SeenImage[]): number | null {
+  switch (id) {
+    case 'criteria':
+      return view.criteria.length;
+    case 'modifiedFiles':
+      return view.modifiedFiles.length;
+    case 'decisions':
+      return view.decisions.length;
+    case 'vision':
+      return vision.length;
+    default:
+      return null;
+  }
+}
 
 function clampWidth(width: number): number {
   return Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Math.round(width)));
@@ -95,6 +127,7 @@ export function ContextPanel({ view, skills, usage, request, hasSession, worktre
   const [width, setWidth] = useState(loadWidth);
   const [selectedPageName, setSelectedPageName] = useState(loadPageName);
   const [collapsed, setCollapsed] = useState(loadCollapsed);
+  const [openBlock, setOpenBlock] = useState<PanelBlockId | null>(null);
   const pages = panelPages(useDisplayPrefs().panelPages);
   const page = pages.find((candidate) => candidate.name === selectedPageName) ?? pages[0] ?? { name: '', blocks: [] };
 
@@ -109,6 +142,19 @@ export function ContextPanel({ view, skills, usage, request, hasSession, worktre
   useEffect(() => {
     saveCollapsed(collapsed);
   }, [collapsed]);
+
+  useEffect(() => {
+    if (!openBlock) return;
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape') setOpenBlock(null);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [openBlock]);
+
+  useEffect(() => {
+    setOpenBlock(null);
+  }, [sessionId]);
 
   const startResize = (event: PointerEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -159,13 +205,40 @@ export function ContextPanel({ view, skills, usage, request, hasSession, worktre
     }
   }
 
-  if (collapsed) {
+  function renderRail(className: string) {
+    const openCount = openBlock ? railCount(openBlock, view, vision) : null;
     return (
       <aside
         aria-label="Contexte de la session"
-        className="hidden min-h-0 w-10 shrink-0 flex-col border-l border-border bg-bg min-[1100px]:flex"
+        className={`${openBlock ? 'relative ' : ''}w-10 shrink-0 flex-col items-center gap-1 border-l border-border bg-bg py-1 ${className}`}
       >
-        <div className="flex items-center justify-center p-1">
+        {openBlock ? (
+          <div
+            className="absolute inset-y-0 right-full z-20 flex w-[300px] flex-col border-l border-border bg-bg shadow-xl"
+            role="dialog"
+            aria-label={panelBlock(openBlock).title}
+          >
+            <div className="flex items-center gap-1 px-2 py-2">
+              <span className="min-w-0 truncate text-xs font-medium text-text">{panelBlock(openBlock).title}</span>
+              {openCount !== null ? <span className="font-mono text-xs text-muted tabular-nums">{openCount}</span> : null}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                iconOnly
+                aria-label="Fermer"
+                onClick={() => setOpenBlock(null)}
+                className="ml-auto"
+              >
+                <CloseIcon className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            <div className="min-h-0 grow overflow-y-auto [scrollbar-width:thin]">
+              {renderBlock(openBlock)}
+            </div>
+          </div>
+        ) : null}
+        <div className="hidden min-[1100px]:flex">
           <Button
             type="button"
             variant="ghost"
@@ -177,12 +250,43 @@ export function ContextPanel({ view, skills, usage, request, hasSession, worktre
             <ChevronsLeftIcon className="h-3.5 w-3.5" />
           </Button>
         </div>
+        {RAIL_BLOCKS.filter((block) => block.id !== 'workspace' || sessionId).map((block) => {
+          const title = panelBlock(block.id).title;
+          const count = railCount(block.id, view, vision);
+          return (
+            <Button
+              key={block.id}
+              type="button"
+              variant={openBlock === block.id ? 'secondary' : 'ghost'}
+              size="sm"
+              iconOnly
+              aria-label={title}
+              title={title}
+              aria-pressed={openBlock === block.id}
+              onClick={() => setOpenBlock((current) => (current === block.id ? null : block.id))}
+              className="relative"
+            >
+              {block.icon}
+              {count ? (
+                <span className="absolute -top-1 -right-1 rounded-full border border-border bg-raised px-1 font-mono text-[9px] leading-3 text-muted tabular-nums">
+                  {count}
+                </span>
+              ) : null}
+            </Button>
+          );
+        })}
       </aside>
     );
   }
 
+  if (collapsed) {
+    return renderRail('flex');
+  }
+
   return (
-    <div className="relative hidden min-h-0 shrink-0 min-[1100px]:flex" style={{ width }}>
+    <>
+      {renderRail('flex min-[1100px]:hidden')}
+      <div className="relative hidden min-h-0 shrink-0 min-[1100px]:flex" style={{ width }}>
       <div
         role="separator"
         aria-orientation="vertical"
@@ -238,9 +342,10 @@ export function ContextPanel({ view, skills, usage, request, hasSession, worktre
               </Select>
             </label>
           )}
-          {pageBlocks(page, page === pages[0]).map(renderBlock)}
+          {hasSession ? pageBlocks(page, page === pages[0]).map(renderBlock) : <p className="m-0 px-3 py-2 text-xs text-muted">Le contexte apparaît avec le premier message.</p>}
         </div>
       </aside>
-    </div>
+      </div>
+    </>
   );
 }

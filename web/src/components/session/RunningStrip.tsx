@@ -1,5 +1,4 @@
 import type { RunView } from "../../lib/workflowRun";
-import { Button } from "../ui/Button";
 
 /** Above the composer, where the eyes are: holds the auto-scroll switch, always; during a run,
  * also says a turn is going on, and which node. */
@@ -43,20 +42,23 @@ export function RunningStrip({
           )}
         </>
       )}
-      <Button
-        variant={following ? "secondary" : "ghost"}
-        size="sm"
-        className="ml-auto shrink-0 tabular-nums"
-        aria-pressed={following}
+      <label
+        className="ml-auto flex shrink-0 cursor-pointer items-center gap-1.5 select-none"
         title={
           following
-            ? "Défilement auto activé : le fil suit l'agent. Cliquer pour le couper."
-            : "Défilement auto coupé. Cliquer pour aller en bas et suivre l'agent."
+            ? "Le fil suit l'agent. Décocher pour lire sans être ramené en bas."
+            : "Le fil ne suit plus l'agent. Cocher pour revenir en bas et le suivre."
         }
-        onClick={() => onFollowChange(!following)}
       >
-        Autoscroll : <span className={following ? "text-accent" : ""}>{following ? "ON" : "OFF"}</span>
-      </Button>
+        Suivi auto
+        <input
+          type="checkbox"
+          role="switch"
+          checked={following}
+          onChange={(event) => onFollowChange(event.target.checked)}
+          className="relative h-4 w-7 shrink-0 cursor-pointer appearance-none rounded-full bg-raised transition-colors checked:bg-accent before:absolute before:top-0.5 before:left-0.5 before:h-3 before:w-3 before:rounded-full before:bg-muted before:transition-transform checked:before:translate-x-3 checked:before:bg-on-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-soft"
+        />
+      </label>
     </div>
   );
 }

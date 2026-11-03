@@ -36,7 +36,7 @@ export function ContextGauge({ context, compactDisabled, onCompact, compactError
             <span aria-hidden className="absolute inset-y-0 w-px bg-text/60" style={{ left: `${context.compactMark}%` }} />
           )}
         </div>
-        <span className="text-xs text-muted tabular-nums whitespace-nowrap">{context?.line ?? '…'}</span>
+        <span className="text-xs text-muted tabular-nums whitespace-nowrap" title={context?.title}>{context?.line ?? '…'}</span>
         {context && (
           <div
             role="tooltip"

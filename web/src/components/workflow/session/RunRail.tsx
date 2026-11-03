@@ -187,6 +187,30 @@ function RoundRow({
   );
 }
 
+function MiniRail({ run, upcoming, onExpand, className }: { run: RunView; upcoming: UpcomingStep[]; onExpand: () => void; className: string }) {
+  return (
+    <aside aria-label="Workflow" className={`min-h-0 w-10 shrink-0 flex-col border-r border-border bg-panel ${className}`}>
+      <div className="hidden min-[1100px]:flex items-center justify-center p-1">
+        <Button type="button" variant="ghost" size="sm" iconOnly aria-label="Déplier" onClick={onExpand}>
+          <ChevronsRightIcon className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+      <div className="flex min-h-0 grow flex-col items-center gap-2 overflow-y-auto py-2 [scrollbar-width:thin]">
+        {run.runs.map((nodeRun, index) => (
+          <span
+            key={`${nodeRun.nodeId}-${nodeRun.pass}-${index}`}
+            title={nodeRun.state === 'interrupted' ? `${nodeRun.label} — interrompu` : `${nodeRun.label} — ${nodeRun.port || nodeRun.state}`}
+            className={`h-2 w-2 shrink-0 rounded-full ${dotClass(nodeRun)}`}
+          />
+        ))}
+        {upcoming.map((step) => (
+          <span key={`upcoming-${step.nodeId}`} title={`${step.label} — à venir`} className="h-2 w-2 shrink-0 rounded-full border border-dashed border-faint" />
+        ))}
+      </div>
+    </aside>
+  );
+}
+
 export function RunRail({ run }: { run: RunView }) {
   const [collapsed, setCollapsed] = useState(loadCollapsed);
   const [expandedRounds, setExpandedRounds] = useState<Set<number>>(new Set());
@@ -221,31 +245,13 @@ export function RunRail({ run }: { run: RunView }) {
   }, [count, collapsed]);
 
   if (collapsed) {
-    return (
-      <aside aria-label="Workflow" className="flex min-h-0 w-10 shrink-0 flex-col border-r border-border bg-panel">
-        <div className="flex items-center justify-center p-1">
-          <Button type="button" variant="ghost" size="sm" iconOnly aria-label="Déplier" onClick={() => setCollapsed(false)}>
-            <ChevronsRightIcon className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-        <div className="flex min-h-0 grow flex-col items-center gap-2 overflow-y-auto py-2 [scrollbar-width:thin]">
-          {run.runs.map((nodeRun, index) => (
-            <span
-              key={`${nodeRun.nodeId}-${nodeRun.pass}-${index}`}
-              title={nodeRun.state === 'interrupted' ? `${nodeRun.label} — interrompu` : `${nodeRun.label} — ${nodeRun.port || nodeRun.state}`}
-              className={`h-2 w-2 shrink-0 rounded-full ${dotClass(nodeRun)}`}
-            />
-          ))}
-          {upcoming.map((step) => (
-            <span key={`upcoming-${step.nodeId}`} title={`${step.label} — à venir`} className="h-2 w-2 shrink-0 rounded-full border border-dashed border-faint" />
-          ))}
-        </div>
-      </aside>
-    );
+    return <MiniRail run={run} upcoming={upcoming} onExpand={() => setCollapsed(false)} className="flex" />;
   }
 
   return (
-    <aside aria-label="Workflow" className="flex min-h-0 w-56 shrink-0 flex-col border-r border-border bg-panel">
+    <>
+      <MiniRail run={run} upcoming={upcoming} onExpand={() => setCollapsed(false)} className="flex min-[1100px]:hidden" />
+    <aside aria-label="Workflow" className="hidden min-h-0 w-56 shrink-0 flex-col border-r border-border bg-panel min-[1100px]:flex">
       <div className="flex items-center gap-1 px-2 py-2">
         <span className="min-w-0 truncate text-xs font-medium text-text" title={run.workflow.name}>{run.workflow.name}</span>
         <Button type="button" variant="ghost" size="sm" iconOnly aria-label="Replier" onClick={() => setCollapsed(true)} className="ml-auto">
@@ -282,5 +288,6 @@ export function RunRail({ run }: { run: RunView }) {
       </ol>
       <NodeOutputModal nodeRun={outputRun} onClose={() => setOutputRun(null)} />
     </aside>
+    </>
   );
 }
