@@ -20,6 +20,10 @@ pub struct Request<'a> {
     pub reasoning_effort: Option<ReasoningEffort>,
     /// Checked on every streamed line: the stream ends with "Aborted".
     pub stop: &'a AtomicBool,
+    /// The session this prompt belongs to, empty for a one-off call: a local
+    /// endpoint serves a session's rounds back to back so its prefix stays
+    /// cached (`llm::ModelGate`).
+    pub session: &'a str,
 }
 
 #[derive(Debug, Default, PartialEq)]
@@ -39,6 +43,9 @@ pub struct Completion {
 pub trait Model {
     fn name(&self) -> &str;
     fn stream(&self, req: &Request, on: &mut dyn FnMut(Delta)) -> Result<Completion, String>;
+    /// `session`'s turn ended: an adapter keeping the model for it lets the
+    /// other sessions in.
+    fn release(&self, _session: &str) {}
 }
 
 /// The session's append-only event log (adapter: `store::SqliteStore`).
