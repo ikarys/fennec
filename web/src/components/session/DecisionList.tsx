@@ -1,4 +1,5 @@
 import type { DecisionView } from '../../lib/fold';
+import { DecisionIcon } from '../Icons';
 import { Badge } from '../ui/Badge';
 
 /** The recorded decisions, one folded entry each; shared by the context panel and the integration review. */
@@ -9,6 +10,7 @@ export function DecisionList({ decisions }: { decisions: DecisionView[] }) {
       {decisions.map((decision) => (
         <details key={decision.callId || decision.title}>
           <summary className="group flex cursor-pointer list-none items-start gap-2 rounded-md px-1 py-1.5 text-xs select-none hover:bg-accent-soft">
+            <DecisionIcon className="mt-0.5 h-3 w-3 shrink-0 text-muted" />
             <span className="grow break-words text-text group-hover:text-accent-strong">{decision.title}</span>
             <Badge tone="accent" title="Consigné par l'agent : à relire">indicatif</Badge>
           </summary>
