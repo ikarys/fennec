@@ -55,7 +55,7 @@ fn try_run(args: &Value, search: &SearchPrefs) -> Result<ToolResult, String> {
         {
             Some(value) => value,
             None => return Err(
-                "web_search requires a SearXNG instance. Set its URL in Settings > Recherche web."
+                "web_search requires a SearXNG instance. Set its URL in Settings > Behaviour > Web search."
                     .into(),
             ),
         };
@@ -193,7 +193,7 @@ mod tests {
         assert_eq!(
             result.error.as_deref(),
             Some(
-                "web_search requires a SearXNG instance. Set its URL in Settings > Recherche web."
+                "web_search requires a SearXNG instance. Set its URL in Settings > Behaviour > Web search."
             )
         );
     }
@@ -211,7 +211,7 @@ mod tests {
         assert_eq!(
             result.error.as_deref(),
             Some(
-                "web_search requires a SearXNG instance. Set its URL in Settings > Recherche web."
+                "web_search requires a SearXNG instance. Set its URL in Settings > Behaviour > Web search."
             )
         );
     }

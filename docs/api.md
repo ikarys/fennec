@@ -317,7 +317,7 @@ read-only. The human edits them as usual.
   - Rules load once per turn: a change applies from the next turn. They are checked before every agent tool call and
     every workflow `shell`/`criteria` command.
 - `GET /api/projects/{id}/rules` → `{rules, global}`, the project's rules and the global ones that apply to it too
-  (read-only: the Settings page's "Règles" tab, `#/settings/rules`, edits them).
+  (read-only: the Settings page's Security tab, `#/settings/security`, edits them).
 - `GET /api/projects/{id}/risks` → `{files, commits, aiCommits, unreviewedPercent, untested, churning, unreviewed, churnDays, modules, remedyPrompt}`, the
   project's risk report, read from git (verified; 404 if no project). `files` counts the tracked source files, tests
   excluded; `commits` and `aiCommits` report the commits in history and those declaring an AI co-author; the

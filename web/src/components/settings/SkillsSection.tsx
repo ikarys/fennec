@@ -27,7 +27,7 @@ export function SkillsSection({ skills, value, onChange, save }: SkillsSectionPr
       ) : (
         <div className="flex flex-col gap-1">
           {skills.map((skill) => (
-            <div key={skill.id} className="flex flex-col gap-1">
+            <div key={skill.id} className="flex flex-col gap-1 rounded-md px-2 transition-colors hover:bg-accent-soft -mx-2">
               <label className="flex items-center gap-2 text-sm text-text">
                 <input
                   type="checkbox"

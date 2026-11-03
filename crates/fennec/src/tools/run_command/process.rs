@@ -70,7 +70,7 @@ pub fn execute(
         .spawn()
         .map_err(|e| {
             if e.kind() == std::io::ErrorKind::NotFound && sandbox_on {
-                "bwrap is not installed: install bubblewrap, or turn the sandbox off in Settings > Sandbox."
+                "bwrap is not installed: install bubblewrap, or turn the sandbox off in Settings > Security > Sandbox."
                     .to_string()
             } else {
                 format!("Failed to start command: {e}")
