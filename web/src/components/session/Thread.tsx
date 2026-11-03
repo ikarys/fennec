@@ -7,6 +7,7 @@ import { useDisplayPrefs } from '../../lib/display';
 import { splitContract } from '../../lib/plan';
 import { BulbIcon, ChevronRightIcon, ReplayIcon } from '../Icons';
 import { buttonClass } from '../ui/Button';
+import { Card } from '../ui/Card';
 import { CopyButton } from './CopyButton';
 import { useCallUsage } from './CallUsage';
 import { MessageStatsLine } from './MessageStats';
@@ -32,13 +33,13 @@ const ThinkingSegment = memo(function ThinkingSegment({ content }: { content: st
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
-        className="flex min-h-8 items-center gap-2 self-start rounded-lg border border-dashed border-border bg-transparent px-2.5 text-sm text-muted"
+        className="flex min-h-8 items-center gap-2 self-start rounded-lg border border-dashed border-info/50 bg-transparent px-2.5 text-sm text-muted"
       >
-        <BulbIcon className="h-3.5 w-3.5" />
+        <BulbIcon className="h-3.5 w-3.5 text-info" />
         Réflexion · {open ? 'masquer' : 'afficher'}
       </button>
       {open && (
-        <div className="border-l-2 border-border pl-3.5 text-sm whitespace-pre-line text-muted">{content}</div>
+        <div className="border-l-2 border-info/50 pl-3.5 text-sm whitespace-pre-line text-muted">{content}</div>
       )}
     </div>
   );
@@ -55,27 +56,37 @@ const TextSegment = memo(function TextSegment({ content, caret, id, preflight }:
     actions && id !== undefined && actions.segmentId === id && contract?.contract.kind === 'plan'
       ? actions
       : null;
+  // The model's words sit on a surface, like the plan card, so they are told
+  // apart from the thread's chrome at a glance. A plan or report card is itself
+  // a Card: it renders bare, the leading prose is surfaced.
+  if (contract) {
+    return (
+      <>
+        {contract.before && (
+          <Card className="px-3.5 py-2.5">
+            <div className="min-w-0 text-sm leading-relaxed [overflow-wrap:break-word]">
+              <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={markdownComponents}>
+                {contract.before}
+              </ReactMarkdown>
+            </div>
+          </Card>
+        )}
+        {contract.contract.kind === 'plan' ? <PlanCard plan={contract.contract} actions={planActions} preflight={preflight} /> : <ReportCard report={contract.contract} />}
+      </>
+    );
+  }
   return (
-    <div className="min-w-0 text-sm leading-relaxed [overflow-wrap:break-word]">
-      {contract ? (
-        <>
-          {contract.before && (
-            <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={markdownComponents}>
-              {contract.before}
-            </ReactMarkdown>
-          )}
-          {contract.contract.kind === 'plan' ? <PlanCard plan={contract.contract} actions={planActions} preflight={preflight} /> : <ReportCard report={contract.contract} />}
-        </>
-      ) : (
+    <Card className="px-3.5 py-2.5">
+      <div className="min-w-0 text-sm leading-relaxed [overflow-wrap:break-word]">
         <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={markdownComponents}>{content}</ReactMarkdown>
-      )}
-      {caret && <span className="caret ml-0.5 inline-block h-4 w-2 bg-accent align-text-bottom" />}
-    </div>
+        {caret && <span className="caret ml-0.5 inline-block h-4 w-2 bg-accent align-text-bottom" />}
+      </div>
+    </Card>
   );
 });
 
 // A centered note that carries a detail (a compaction, a replay): the detail
-// opens under it as a card, in the same muted tone.
+// opens under it on the text's own surface, never a box inside a box.
 const NoteDetail = memo(function NoteDetail({ text, detail }: { text: string; detail: string }) {
   const [open, setOpen] = useState(false);
   return (
@@ -89,11 +100,7 @@ const NoteDetail = memo(function NoteDetail({ text, detail }: { text: string; de
         <ChevronRightIcon className={`h-3 w-3 transition-transform ${open ? 'rotate-90' : ''}`} />
         {text}
       </button>
-      {open && (
-        <div className="rounded-md border border-border bg-raised px-3 py-2 text-left text-sm">
-          <TextSegment content={detail} caret={false} />
-        </div>
-      )}
+      {open && <TextSegment content={detail} caret={false} />}
     </div>
   );
 });
@@ -173,7 +180,7 @@ export function ThreadItemView({ item, model, running, showHeader, onReplay, pen
     }
     return (
       <div className="group flex max-w-[85%] flex-col self-end">
-        <div className="rounded-xl rounded-br-sm border border-border bg-raised px-3.5 py-2.5 [overflow-wrap:break-word]">
+        <div className="rounded-xl rounded-br-sm border border-accent/30 bg-accent-soft px-3.5 py-2.5 [overflow-wrap:break-word]">
           {item.attachments.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {item.attachments.map((a) => (

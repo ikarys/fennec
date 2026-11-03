@@ -10,6 +10,14 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 
+/** The action family's hue, per docs/ui.md's thread tone map: blue reads, orange writes, amber executes. */
+function toolTone(name: string): string {
+  if (name === 'read_file' || name === 'web_search') return 'text-info';
+  if (name === 'write_file' || name === 'edit_file') return 'text-accent';
+  if (name === 'run_command' || name === 'ask_user') return 'text-attention';
+  return 'text-muted';
+}
+
 /** A silent command still shows it is alive: the time since the card appeared. */
 // ponytail: counts from mount, so a reload restarts it; the events carry no timestamp.
 function RunningSince() {
@@ -54,15 +62,16 @@ export function ToolCard({ tool, awaiting = false }: { tool: ToolCallView; await
   const previewRelative =
     previewKind && workdir ? relativeToWorkdir(previewPath, workdir) : undefined;
 
+  const tone = toolTone(tool.name);
   const icon =
     tool.name === 'run_command' ? (
-      <TerminalIcon className="h-[15px] w-[15px] text-muted" />
+      <TerminalIcon className={`h-[15px] w-[15px] ${tone}`} />
     ) : tool.name === 'edit_file' ? (
-      <EditIcon className="h-[15px] w-[15px] text-muted" />
+      <EditIcon className={`h-[15px] w-[15px] ${tone}`} />
     ) : tool.name === 'web_search' ? (
-      <SearchIcon className="h-[15px] w-[15px] text-muted" />
+      <SearchIcon className={`h-[15px] w-[15px] ${tone}`} />
     ) : (
-      <FileIcon className="h-[15px] w-[15px] text-muted" />
+      <FileIcon className={`h-[15px] w-[15px] ${tone}`} />
     );
 
   return (
@@ -75,7 +84,7 @@ export function ToolCard({ tool, awaiting = false }: { tool: ToolCallView; await
           className="flex min-w-0 grow items-center gap-2.5"
         >
           {icon}
-          <span className="shrink-0 font-mono text-xs font-medium">{tool.name}</span>
+          <span className={`shrink-0 font-mono text-xs font-medium ${tone}`}>{tool.name}</span>
           <span title={arg} className="min-w-0 truncate font-mono text-xs text-muted">
             {arg}
           </span>
