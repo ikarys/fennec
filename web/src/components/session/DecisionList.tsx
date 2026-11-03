@@ -1,4 +1,4 @@
-import type { DecisionView } from '../../lib/fold';
+import type { DecisionView } from '../../lib/api';
 import { DecisionIcon } from '../Icons';
 import { Badge } from '../ui/Badge';
 import { useT } from '../../i18n';

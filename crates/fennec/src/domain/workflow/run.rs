@@ -2,7 +2,8 @@
 
 use super::definition::{BRANCH, ConditionTest, EXHAUSTED, EndOutcome, Node, NodeKind, Workflow};
 use super::template;
-use crate::domain::criteria::{Criterion, CriterionState, CriterionStatus, render_for_prompt};
+use crate::domain::criteria::{Criterion, CriterionState, render_for_prompt};
+use crate::domain::criteria_fold;
 use crate::domain::event::{DoneReason, Event};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -202,26 +203,8 @@ impl RunState {
                 self.finished = Some((*outcome, reason.clone()));
                 self.pause_requested = false;
             }
-            Event::CriteriaSet { criteria } => {
-                self.criteria = criteria
-                    .iter()
-                    .map(|criterion| CriterionState {
-                        criterion: criterion.clone(),
-                        status: CriterionStatus::Pending,
-                    })
-                    .collect();
-            }
-            Event::CriterionUpdated {
-                criterion_id,
-                status,
-            } => {
-                if let Some(state) = self
-                    .criteria
-                    .iter_mut()
-                    .find(|state| state.criterion.id == *criterion_id)
-                {
-                    state.status = status.clone();
-                }
+            Event::CriteriaSet { .. } | Event::CriterionUpdated { .. } => {
+                criteria_fold::apply(&mut self.criteria, event);
             }
             _ => {}
         }
@@ -552,6 +535,7 @@ pub fn evaluate(test: ConditionTest, value: &str, against: Option<&str>) -> bool
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::criteria::CriterionStatus;
     use crate::domain::workflow::definition::{
         AgentContext, Edge, EndOutcome, Node, NodeKind, Position, Workflow,
     };
