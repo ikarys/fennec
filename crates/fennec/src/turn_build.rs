@@ -8,6 +8,7 @@ use crate::agents;
 use crate::config::Settings;
 use crate::domain::clock;
 use crate::domain::event::Event;
+use crate::domain::kernel_rules;
 use crate::domain::mcp;
 use crate::domain::preferences::ModelRef;
 use crate::domain::waiver;
@@ -75,12 +76,13 @@ pub fn with_turn<R>(
     // loaded per turn so a rule changed in the UI applies from the next turn.
     let rule_store = rules::RuleStore::open(&settings.rules_path()).map_err(|e| e.to_string())?;
     let session = store.session(session_id)?;
-    let rules = match &session {
+    // The kernel's own rules come with them, CLI and workflow shell nodes included.
+    let rules = kernel_rules::with_kernel(match &session {
         Some(session) => rule_store
             .for_turn(&session.project_id, Some(session_id))
             .map_err(|e| e.to_string())?,
         None => rules::Rules::default(),
-    };
+    });
     // Only project-relative `Block` path rules that cover writes can be enforced
     // by the file tools' protection and the sandbox's read-only mounts; the rest
     // are checked per call by the `rules` crate.

@@ -110,7 +110,8 @@ impl RuleStore {
             Scope::Session(id) => Some(id.as_str()),
         };
         let origin_session = match &rule.origin {
-            Origin::Human => None,
+            // A kernel rule never reaches the store; the arm only keeps the match exhaustive.
+            Origin::Human | Origin::Fennec => None,
             Origin::Answer { session_id } => Some(session_id.as_str()),
         };
         let created_at = now_ms();

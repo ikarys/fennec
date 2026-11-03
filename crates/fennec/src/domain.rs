@@ -25,6 +25,7 @@ pub mod event;
 pub mod frontmatter;
 pub mod id;
 pub mod integration;
+pub mod kernel_rules;
 pub mod map_doc;
 pub mod mcp;
 pub mod model_choice;
