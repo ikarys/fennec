@@ -392,6 +392,14 @@ export default function App() {
     [navigate, projects]
   );
 
+  // The `+` of the bar: the project of the session on screen, else the most recent one.
+  const currentProjectId = useMemo(() => {
+    const sessionId = route.name === 'session' ? route.id : route.name === 'new' ? route.id : null;
+    if (!sessionId) return undefined;
+    if (route.name === 'new') return sessionId;
+    return projects.find((project) => project.sessions.some((session) => session.id === sessionId))?.id;
+  }, [route, projects]);
+
   const handleSessionCreated = useCallback(
     (newId: string, pseudoId: string | null) => {
       setTabs((previous) => {
@@ -504,9 +512,8 @@ export default function App() {
           onOpenAttention={openSession}
           onPickTab={pickTab}
           onCloseTab={closeTab}
-          onOpenPage={(page) => navigate(PAGE_TABS.find((candidate) => candidate.page === page)?.path ?? '#/')}
           onOpenPalette={() => setPaletteOpen(true)}
-          onNewSession={() => startNewSession("chat")}
+          onNewSession={() => startNewSession(currentProjectId)}
           splitActive={route.name === 'split'}
           onToggleSplit={toggleSplit}
         />
@@ -563,6 +570,8 @@ export default function App() {
               onRenamed={refreshProjects}
               onOpenProjectDialog={() => setProjectDialogOpen(true)}
               onHome={() => navigate('#/')}
+              onOpenPage={(page) => navigate(PAGE_TABS.find((candidate) => candidate.page === page)?.path ?? '#/')}
+              onOpenProject={(projectId) => navigate(`#/project/${encodeURIComponent(projectId)}`)}
             />
           ) : (
             <SessionPage
@@ -588,6 +597,8 @@ export default function App() {
           onNewSession={(projectId) => startNewSession(projectId)}
           onOpenProjectDialog={() => setProjectDialogOpen(true)}
           onHome={() => navigate('#/')}
+          onOpenPage={(page) => navigate(PAGE_TABS.find((candidate) => candidate.page === page)?.path ?? '#/')}
+          onOpenProject={(projectId) => navigate(`#/project/${encodeURIComponent(projectId)}`)}
         />
 
         <ProjectDialog

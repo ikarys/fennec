@@ -4,6 +4,7 @@ import { stateLabel } from '../lib/format';
 import { SessionStateIcon } from './session/SessionStateIcon';
 import { SearchIcon } from './Icons';
 import { SectionLabel } from './ui/SectionLabel';
+import type { PageId } from './layout/TopBar';
 
 interface PaletteItem {
   id: string;
@@ -27,9 +28,11 @@ interface PaletteProps {
   onNewSession: (projectId: string) => void;
   onOpenProjectDialog: () => void;
   onHome: () => void;
+  onOpenPage: (page: PageId) => void;
+  onOpenProject: (projectId: string) => void;
 }
 
-export function Palette({ open, projects, onClose, onOpenSession, onNewSession, onOpenProjectDialog, onHome }: PaletteProps) {
+export function Palette({ open, projects, onClose, onOpenSession, onNewSession, onOpenProjectDialog, onHome, onOpenPage, onOpenProject }: PaletteProps) {
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
 
@@ -54,6 +57,40 @@ export function Palette({ open, projects, onClose, onOpenSession, onNewSession, 
 
     const result: PaletteGroup[] = [];
 
+    const pages: PaletteItem[] = [
+      { id: 'page-home', title: 'Accueil', meta: '', action: onHome },
+      { id: 'page-backlog', title: 'Backlog', meta: '', action: () => onOpenPage('backlog') },
+      { id: 'page-workflows', title: 'Workflows', meta: '', action: () => onOpenPage('workflows') },
+      { id: 'page-insight', title: 'Insight', meta: '', action: () => onOpenPage('insight') },
+      { id: 'page-settings', title: 'Réglages', meta: '', action: () => onOpenPage('settings') }
+    ].filter((page) => !q || page.title.toLowerCase().includes(q));
+
+    if (pages.length > 0) {
+      result.push({ label: 'Pages', items: pages });
+    }
+
+    const projectItems: PaletteItem[] = [];
+    for (const project of projects.filter((project) => !project.chat)) {
+      projectItems.push(
+        {
+          id: `project-${project.id}`,
+          title: project.name,
+          meta: 'page projet',
+          action: () => onOpenProject(project.id)
+        },
+        {
+          id: `new-${project.id}`,
+          title: `Nouvelle session dans ${project.name}`,
+          meta: '',
+          action: () => onNewSession(project.id)
+        }
+      );
+    }
+    const filteredProjectItems = projectItems.filter((item) => !q || item.title.toLowerCase().includes(q));
+    if (filteredProjectItems.length > 0) {
+      result.push({ label: 'Projets', items: filteredProjectItems });
+    }
+
     const recentItems = recent.filter(matchesSession).map(sessionItem);
     if (recentItems.length > 0) {
       result.push({ label: 'Récentes', items: recentItems });
@@ -72,12 +109,6 @@ export function Palette({ open, projects, onClose, onOpenSession, onNewSession, 
     }
 
     const commands: PaletteItem[] = [
-      ...projects.filter((project) => !project.chat).map((project) => ({
-        id: `new-${project.id}`,
-        title: `Nouvelle session dans ${project.name}`,
-        meta: '',
-        action: () => onNewSession(project.id)
-      })),
       ...projects.filter((project) => project.chat).map((project) => ({
         id: `new-${project.id}`,
         title: 'Nouveau chat',
@@ -89,12 +120,6 @@ export function Palette({ open, projects, onClose, onOpenSession, onNewSession, 
         title: 'Ouvrir un projet…',
         meta: '',
         action: onOpenProjectDialog
-      },
-      {
-        id: 'home',
-        title: 'Accueil',
-        meta: '',
-        action: onHome
       }
     ].filter((command) => !q || command.title.toLowerCase().includes(q));
 
@@ -103,7 +128,7 @@ export function Palette({ open, projects, onClose, onOpenSession, onNewSession, 
     }
 
     return result;
-  }, [query, projects, onOpenSession, onNewSession, onOpenProjectDialog]);
+  }, [query, projects, onOpenSession, onNewSession, onOpenProjectDialog, onOpenPage, onOpenProject]);
 
   const flatItems = useMemo(() => groups.flatMap((group) => group.items), [groups]);
 
@@ -164,7 +189,7 @@ export function Palette({ open, projects, onClose, onOpenSession, onNewSession, 
                 onClose();
               }
             }}
-            placeholder="Rechercher une session, un projet, une commande…"
+            placeholder="Rechercher une session, un projet, une page…"
             className="grow min-h-[50px] bg-transparent text-base outline-none"
           />
           <button

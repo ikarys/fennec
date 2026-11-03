@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type PointerEvent, type KeyboardEvent } fr
 import type { Project } from '../lib/api';
 import { SessionPage } from './SessionPage';
 import { Palette } from '../components/Palette';
+import type { PageId } from '../components/layout/TopBar';
 import { Button } from '../components/ui/Button';
 import { PlusIcon } from '../components/Icons';
 
@@ -42,6 +43,8 @@ interface SplitPageProps {
   onRenamed: () => void;
   onOpenProjectDialog: () => void;
   onHome: () => void;
+  onOpenPage: (page: PageId) => void;
+  onOpenProject: (projectId: string) => void;
 }
 
 /**
@@ -60,6 +63,8 @@ export function SplitPage({
   onRenamed,
   onOpenProjectDialog,
   onHome,
+  onOpenPage,
+  onOpenProject,
 }: SplitPageProps) {
   const [leftPct, setLeftPct] = useState(() => loadRatio());
   const [paletteFor, setPaletteFor] = useState<'left' | 'right' | null>(null);
@@ -173,6 +178,8 @@ export function SplitPage({
         }}
         onOpenProjectDialog={onOpenProjectDialog}
         onHome={onHome}
+        onOpenPage={onOpenPage}
+        onOpenProject={onOpenProject}
       />
     </div>
   );
