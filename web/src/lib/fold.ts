@@ -144,6 +144,8 @@ export interface CriterionView {
   check?: string;
   status: 'pending' | 'passed' | 'failed';
   provenance?: Provenance;
+  /** Its check passed before any change (last preflight, verified). */
+  passedBefore?: boolean;
 }
 
 export interface DecisionView {
@@ -357,6 +359,7 @@ export function createThreadFold(): ThreadFold {
   // Null means "no live change yet": the session detail owns the mode.
   let mode: string | null = null;
   let criteria: CriterionView[] = [];
+  let passedBefore = new Set<string>();
   const decisions: DecisionView[] = [];
   let name: string | undefined;
   const runFold = createRunFold();
@@ -704,6 +707,7 @@ export function createThreadFold(): ThreadFold {
         const parsed = parseCriteria(data.criteria);
         if (parsed) {
           criteria = parsed;
+          for (const criterion of criteria) criterion.passedBefore = passedBefore.has(criterion.id) || undefined;
         }
         break;
       }
@@ -729,6 +733,8 @@ export function createThreadFold(): ThreadFold {
             output: typeof result.output === 'string' ? result.output : ''
           });
         }
+        passedBefore = new Set(results.filter((result) => result.verdict === 'passesAlready').map((result) => result.criterionId));
+        for (const criterion of criteria) criterion.passedBefore = passedBefore.has(criterion.id) || undefined;
         assistant.preflight = results;
         break;
       }

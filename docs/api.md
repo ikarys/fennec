@@ -420,13 +420,14 @@ read-only. The human edits them as usual.
   `mode` is the id of the agent the session resolves to from its event log
   (null when there is no top-level agent)
 - `GET /api/sessions/{id}/repo` → `{dir, branch, originBranch, branchChanged, dirty}`: the human's repository now, for any session: its top directory, checked-out branch (null when detached), the branch the session's worktree started from (null without a worktree), whether they differ, and the count of uncommitted entries (`git status --porcelain`); 409 outside a git repository.
-- `GET /api/sessions/{id}/integration` → `{branch, base, originBranch, humanBranch, defaultMessage, commits: [{sha, subject}], files: [{path, protected, carried, added, removed, signals}], testFiles, criteria, decisions, blockers, idea}`:
+- `GET /api/sessions/{id}/integration` → `{branch, base, originBranch, humanBranch, defaultMessage, commits: [{sha, subject}], files: [{path, protected, carried, added, removed, signals}], commonSignals, testFiles, criteria, decisions, blockers, idea}`:
   what integrating the session's worktree branch would do (409 without a
   worktree). `files` come riskiest first (the review order): `signals` ⊂
   protected, sensitive, bypass, architecture, conflictMarker, testsWeakened (the gate's
   own checks, per file), hot (5+ commits in 90 days), untested (no inline
   test, no test file of the same stem on the branch), large (200+ lines
-  changed); deterministic. `originBranch` is the branch the run started from (null for
+  changed); deterministic. `commonSignals` are the signals every file carries (empty
+  under two files), so the UI says them once. `originBranch` is the branch the run started from (null for
   older worktrees or a detached HEAD). `decisions` are the session's
   `decision.recorded` events, `{callId, title, choice, reason, alternatives}`:
   informational (written by the model), never a blocker. `defaultMessage` is fennec's starting

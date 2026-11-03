@@ -3,6 +3,23 @@ import { panelBlock } from '../../lib/panelBlocks';
 import { Badge } from '../ui/Badge';
 import { Panel } from '../ui/Panel';
 
+const DOT_CLASSES = {
+  ok: { full: 'bg-ok', hollow: 'border-2 border-ok bg-transparent' },
+  err: { full: 'bg-err', hollow: 'border-2 border-err bg-transparent' },
+  muted: { full: 'bg-muted', hollow: 'border-2 border-muted bg-transparent' },
+} as const;
+
+/** A full dot for a fact fennec established, a hollow one for an agent's judgement. */
+export function criterionDotClass(status: CriterionView['status'], provenance: Provenance | undefined): string {
+  const tone = status === 'passed' ? 'ok' : status === 'failed' ? 'err' : 'muted';
+  return provenance?.kind === 'indicative' ? DOT_CLASSES[tone].hollow : DOT_CLASSES[tone].full;
+}
+
+export function PassedBeforeBadge({ passedBefore }: { passedBefore: boolean | undefined }) {
+  if (!passedBefore) return null;
+  return <Badge tone="neutral" title="Sa commande passait déjà avant tout changement : il ne prouve pas ce travail">passait déjà</Badge>;
+}
+
 export function CriterionProvenanceBadge({ provenance }: { provenance: Provenance | undefined }) {
   if (!provenance) return null;
   const badge =
@@ -22,23 +39,27 @@ export function CriterionProvenanceBadge({ provenance }: { provenance: Provenanc
 
 export function CriteriaSection({ criteria }: { criteria: CriterionView[] }) {
   const passed = criteria.filter((criterion) => criterion.status === 'passed').length;
+  const indicative = criteria.filter((criterion) => criterion.status === 'passed' && criterion.provenance?.kind === 'indicative').length;
 
   return (
     <Panel
       id="criteria"
       title={panelBlock('criteria').title}
-      summary={criteria.length > 0 ? `${passed}/${criteria.length}` : undefined}
+      summary={
+        criteria.length > 0
+          ? indicative > 0
+            ? `${passed}/${criteria.length} · ${indicative} indicatif`
+            : `${passed}/${criteria.length}`
+          : undefined
+      }
     >
       {criteria.length === 0 ? (
         <div className="text-xs text-muted">Aucun critère : ils viennent du plan validé d'un workflow.</div>
       ) : (
         <div className="flex flex-col">
           {criteria.map((criterion) => {
-            const dotClass =
-              criterion.status === 'passed' ? 'bg-ok' :
-              criterion.status === 'failed' ? 'bg-err' :
-              'bg-muted';
             const provenance = criterion.provenance;
+            const dotClass = criterionDotClass(criterion.status, provenance);
 
             return (
               <details key={criterion.id}>
@@ -46,6 +67,7 @@ export function CriteriaSection({ criteria }: { criteria: CriterionView[] }) {
                   <span aria-hidden className={`mt-1 h-2 w-2 shrink-0 rounded-full ${dotClass}`} />
                   <span className="shrink-0 font-mono text-muted">{criterion.id}</span>
                   <span className="grow break-words text-text">{criterion.description}</span>
+                  <PassedBeforeBadge passedBefore={criterion.passedBefore} />
                   <CriterionProvenanceBadge provenance={provenance} />
                 </summary>
                 {(provenance || (criterion.status === 'pending' && criterion.check)) && (
