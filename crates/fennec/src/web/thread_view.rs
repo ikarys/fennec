@@ -1,4 +1,4 @@
-//! The session's blocks served ready to display: the call waiting for the human's approval, the waiver waiting for an answer, the messages queued for the next rounds, the criteria in force and the decisions recorded. Folded by the domain, the UI computes none.
+//! The session's blocks served ready to display: the call waiting for the human's approval, the waiver waiting for an answer, the messages queued for the next rounds, the criteria in force, the decisions recorded and the messages the human may replay. Folded by the domain, the UI computes none.
 
 use crate::domain::criteria::{CriterionState, CriterionStatus};
 use crate::domain::criteria_fold;
@@ -6,6 +6,7 @@ use crate::domain::decision::{Decision, decisions_in_force};
 use crate::domain::event::Event;
 use crate::domain::preflight;
 use crate::domain::queue;
+use crate::domain::replay;
 use crate::domain::rule_approval;
 use crate::domain::waiver;
 use serde::Serialize;
@@ -55,6 +56,8 @@ pub struct ThreadView {
     pub queued: Vec<QueuedView>,
     pub criteria: Vec<CriterionView>,
     pub decisions: Vec<Decision>,
+    /// The messages the human may replay: typed, in the model's current view.
+    pub replayable: Vec<String>,
 }
 
 impl From<rule_approval::Pending> for ApprovalView {
@@ -117,6 +120,7 @@ pub fn thread_view(events: &[Event]) -> ThreadView {
             .map(|state| CriterionView::new(state, &passed_before))
             .collect(),
         decisions: decisions_in_force(events),
+        replayable: replay::replayable_ids(events),
     }
 }
 
@@ -124,7 +128,7 @@ pub fn thread_view(events: &[Event]) -> ThreadView {
 mod tests {
     use super::{ApprovalView, CriterionView, QueuedView, WaiverView, thread_view};
     use crate::domain::criteria::{Criterion, CriterionState, CriterionStatus, Provenance};
-    use crate::domain::event::{Event, QueueMode, ToolCall};
+    use crate::domain::event::{Event, QueueMode, Role, ToolCall};
     use crate::domain::preflight::{PreflightResult, PreflightVerdict};
 
     fn make_tool_call(id: &str) -> ToolCall {
@@ -348,6 +352,30 @@ mod tests {
     }
 
     #[test]
+    fn serves_the_replayable_messages_of_the_current_view() {
+        let typed = |id: &str, system_generated: bool| Event::MessageStart {
+            message_id: id.into(),
+            role: Role::User,
+            content: Some("text".into()),
+            is_system_generated: system_generated,
+            metadata: None,
+            attachments: Vec::new(),
+        };
+        let events = vec![
+            typed("u0", false),
+            Event::ContextCompacted {
+                before_tokens: 1,
+                after_tokens: 2,
+                summary: "s".into(),
+            },
+            typed("u1", false),
+            typed("u2", true),
+        ];
+
+        assert_eq!(thread_view(&events).replayable, vec!["u1".to_string()]);
+    }
+
+    #[test]
     fn serves_the_decisions_in_order() {
         let events = vec![
             Event::DecisionRecorded {
@@ -388,7 +416,8 @@ mod tests {
                 "pendingWaiver": null,
                 "queued": [],
                 "criteria": [],
-                "decisions": []
+                "decisions": [],
+                "replayable": []
             })
         );
     }

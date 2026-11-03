@@ -8,19 +8,31 @@ use super::event::{Event, Role};
 /// The text and images of `message_id` when the human may replay it: a
 /// message they typed (not system-generated) in the model's current view.
 pub fn replayable(events: &[Event], message_id: &str) -> Option<(String, Vec<Attachment>)> {
+    typed_in_view(events)
+        .find(|(id, _, _)| id.as_str() == message_id)
+        .map(|(_, content, attachments)| (content.clone().unwrap_or_default(), attachments.clone()))
+}
+
+/// The ids of the messages the human may replay, in log order: the UI shows
+/// the replay action on those only, so it never offers what the server refuses.
+pub fn replayable_ids(events: &[Event]) -> Vec<String> {
+    typed_in_view(events).map(|(id, _, _)| id.clone()).collect()
+}
+
+fn typed_in_view(
+    events: &[Event],
+) -> impl Iterator<Item = (&String, &Option<String>, &Vec<Attachment>)> {
     model_view(events)
         .into_iter()
-        .find_map(|event| match event {
+        .filter_map(|event| match event {
             Event::MessageStart {
-                message_id: id,
+                message_id,
                 role: Role::User,
                 is_system_generated: false,
                 content,
                 attachments,
                 ..
-            } if id.as_str() == message_id => {
-                Some((content.clone().unwrap_or_default(), attachments.clone()))
-            }
+            } => Some((message_id, content, attachments)),
             _ => None,
         })
 }
@@ -98,6 +110,26 @@ mod tests {
             user("u1", "new", false),
         ];
         assert_eq!(replayable(&events, "u0"), None);
+    }
+
+    #[test]
+    fn the_replayable_ids_are_the_typed_messages_of_the_current_view() {
+        let events = vec![
+            user("u0", "old", false),
+            Event::ContextCompacted {
+                before_tokens: 1,
+                after_tokens: 2,
+                summary: "s".into(),
+            },
+            user("u1", "new", false),
+            user("u2", "reminder", true),
+            assistant("a1", "answer"),
+            user("u3", "again", false),
+        ];
+        assert_eq!(
+            replayable_ids(&events),
+            vec!["u1".to_string(), "u3".to_string()]
+        );
     }
 
     #[test]

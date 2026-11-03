@@ -311,6 +311,8 @@ export interface ServedThread {
   /** The criteria in force: the last criteria.set and the updates since. */
   criteria: CriterionView[];
   decisions: DecisionView[];
+  /** The ids of the messages the human may replay: typed, in the model's current view. */
+  replayable: string[];
 }
 
 export function getThread(id: string): Promise<ServedThread> {

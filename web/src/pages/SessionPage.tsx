@@ -694,7 +694,7 @@ export function SessionPage({
                               showHeader={
                                 view.items[index - 1]?.kind !== "assistant"
                               }
-                              onReplay={sessionId ? handleReplay : undefined}
+                              onReplay={sessionId && served.replayable.includes(item.id) ? handleReplay : undefined}
                             />
                           ))}
                           {detail && detail.audit && detail.audit.findings.length > 0 && !running ? (

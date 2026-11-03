@@ -532,8 +532,9 @@ read-only. The human edits them as usual.
   `queued` `[{queueId, content}]` the messages queued for the next rounds, in order; `criteria`
   `[{id, description, check?, status, passedBefore}]` the criteria in force (the last `criteria.set` and the
   `criterion.updated` since; `status` as in the integration preview, `passedBefore` from the last preflight);
-  `decisions` `[{callId, title, choice, reason, alternatives}]` those recorded, oldest first; deterministic (the
-  decisions and the indicative statuses record what a model said); 404 if no session.
+  `decisions` `[{callId, title, choice, reason, alternatives}]` those recorded, oldest first; `replayable` the ids
+  of the messages the human may replay (typed, in the model's current view: the UI offers the action on those only);
+  deterministic (the decisions and the indicative statuses record what a model said); 404 if no session.
 - `GET /api/sessions/{id}/usage/calls` → `[{messageId, line, detail, turnRecap}]`, oldest first: what sits under
   each answer, written by the server from the ledger (`line` `↑ 12,3k · cache 82 % · ↓ 345 · 4,2 s`, `detail` the
   tooltip, `turnRecap` on a turn's last call only, null otherwise: the turn's wall clock, `chat.done.durationMs`

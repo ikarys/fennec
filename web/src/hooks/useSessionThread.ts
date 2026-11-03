@@ -56,7 +56,7 @@ export interface SessionThread {
   served: ServedThread;
 }
 
-const EMPTY_SERVED: ServedThread = { pendingApproval: null, pendingWaiver: null, queued: [], criteria: [], decisions: [] };
+const EMPTY_SERVED: ServedThread = { pendingApproval: null, pendingWaiver: null, queued: [], criteria: [], decisions: [], replayable: [] };
 
 /**
  * The live thread of a session: the last page of the log (at least 200 events,
