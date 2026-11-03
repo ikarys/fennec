@@ -1,4 +1,4 @@
-import type { DecisionView } from '../../lib/fold';
+import type { DecisionView } from '../../lib/api';
 import { Badge } from '../ui/Badge';
 
 /** The recorded decisions, one folded entry each; shared by the context panel and the integration review. */

@@ -17,6 +17,7 @@ pub mod compaction;
 pub mod context_parts;
 pub mod conversation;
 pub mod criteria;
+pub mod criteria_fold;
 pub mod decision;
 pub mod diff;
 pub mod doc;
