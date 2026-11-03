@@ -267,7 +267,7 @@ impl LocalTools {
             "web_fetch" => {
                 if !self.search.web_fetch {
                     ToolResult::failure(
-                        "web_fetch is turned off on the Settings page (Recherche web).".to_string(),
+                        "web_fetch is turned off on the Settings page (Behaviour > Web search).".to_string(),
                     )
                 } else {
                     web_fetch::run(args, &self.web_cache)
