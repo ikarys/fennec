@@ -1,6 +1,7 @@
 //! The plan's checks, tested before the builder changes anything: a check
 //! that cannot run or already passes is a contract the builder cannot meet.
 
+use super::event::Event;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -59,6 +60,27 @@ pub fn classify(exit_code: Option<i32>, output: &str) -> PreflightVerdict {
     } else {
         PreflightVerdict::Fails
     }
+}
+
+/// The criteria whose check already passed before any change, from the
+/// last preflight: an integrated run that still lists one proves nothing
+/// by it, and the human should know.
+pub fn passed_before(events: &[Event]) -> Vec<String> {
+    events
+        .iter()
+        .rev()
+        .find_map(|event| match event {
+            Event::CriteriaPreflight { results, .. } => Some(results),
+            _ => None,
+        })
+        .map(|results| {
+            results
+                .iter()
+                .filter(|result| result.verdict == PreflightVerdict::PassesAlready)
+                .map(|result| result.criterion_id.clone())
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 pub fn feedback(results: &[PreflightResult]) -> Option<String> {
@@ -223,5 +245,31 @@ mod tests {
         assert!(feedback.contains("exit none): "));
         assert!(!feedback.contains("\n\n"));
         assert!(feedback.ends_with("Fix these checks and end with the complete revised plan."));
+    }
+
+    #[test]
+    fn passed_before_reads_the_last_preflight() {
+        let first = Event::CriteriaPreflight {
+            message_id: "m".into(),
+            results: vec![result(
+                "C1",
+                "true",
+                PreflightVerdict::PassesAlready,
+                Some(0),
+                "",
+            )],
+        };
+        let last = Event::CriteriaPreflight {
+            message_id: "m".into(),
+            results: vec![result(
+                "C2",
+                "true",
+                PreflightVerdict::PassesAlready,
+                Some(0),
+                "",
+            )],
+        };
+        assert_eq!(passed_before(&[first, last]), vec!["C2"]);
+        assert_eq!(passed_before(&[]), Vec::<String>::new());
     }
 }

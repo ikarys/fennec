@@ -99,6 +99,26 @@ function tabPath(tabId: string): string {
   return `#/s/${encodeURIComponent(tabId)}`;
 }
 
+/** The tab id on screen, from the route; null on pages that have no tab (home, project, split). */
+function tabIdForRoute(route: Route): string | null {
+  switch (route.name) {
+    case 'session':
+      return route.id;
+    case 'new':
+      return `new:${route.id}`;
+    case 'settings':
+      return 'page:settings';
+    case 'insight':
+      return 'page:insight';
+    case 'backlog':
+      return 'page:backlog';
+    case 'workflows':
+      return 'page:workflows';
+    default:
+      return null;
+  }
+}
+
 /** A split pane's value in the URL: a session id, `new:<projectId>`, or `-` for empty. */
 function paneToken(value: string | null): string {
   return value ? encodeURIComponent(value) : '-';
@@ -324,28 +344,25 @@ export default function App() {
 
   const closeTab = useCallback(
     (tabId: string) => {
-      setTabs((previous) => {
-        const next = previous.filter((id) => id !== tabId);
-        if (activeTabId === tabId) {
-          // A page tab closing while active returns home; a session tab falls
-          // back to the last remaining tab (or home when none are left).
-          if (tabId.startsWith('page:')) {
-            setActiveTabId(null);
-            navigate('#/');
-          } else {
-            const fallback = next.length > 0 ? next[next.length - 1] : null;
-            setActiveTabId(fallback);
-            if (fallback) {
-              navigate(tabPath(fallback));
-            } else {
-              navigate('#/');
-            }
-          }
-        }
-        return next;
-      });
+      const next = tabs.filter((id) => id !== tabId);
+      setTabs(next);
+      // Only the tab that is on screen (per the route) triggers a navigation.
+      // activeTabId can be stale when a session was opened by URL/bookmark, so
+      // it is not a reliable "is this tab showing" signal.
+      if (tabIdForRoute(route) !== tabId) return;
+      // A page tab closing while active returns home; a session tab falls back
+      // to the last remaining session tab, or home when none are left. Page
+      // tabs are re-derived from the route, so they are not a close target.
+      if (tabId.startsWith('page:')) {
+        setActiveTabId(null);
+        navigate('#/');
+        return;
+      }
+      const fallback = next.filter((id) => !id.startsWith('page:')).pop() ?? null;
+      setActiveTabId(fallback);
+      navigate(fallback ? tabPath(fallback) : '#/');
     },
-    [activeTabId, navigate]
+    [tabs, route, navigate]
   );
 
   const handleSessionsDeleted = useCallback(

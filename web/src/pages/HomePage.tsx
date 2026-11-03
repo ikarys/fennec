@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Project, SessionSummary } from '../lib/api';
 import { DeleteSessionsDialog, type DeletionTarget } from '../components/session/DeleteSessionsDialog';
-import { formatRelative } from '../lib/format';
+import { formatRelative, formatDateTime } from '../lib/format';
 import { SessionStateIcon } from '../components/session/SessionStateIcon';
 import { BulbIcon, ChevronRightIcon, GlobeIcon, PlusIcon, TrashIcon } from '../components/Icons';
 import { Button, buttonClass } from '../components/ui/Button';
@@ -53,7 +53,7 @@ function SessionRow({
         <SessionStateIcon state={session.state} />
         <span className="min-w-0 grow truncate text-sm text-text">{session.title}</span>
         {session.awaitingIntegration && <Badge tone="accent" solid>à intégrer</Badge>}
-        <span className="w-24 shrink-0 whitespace-nowrap text-right font-mono text-xs text-faint tabular-nums">
+        <span title={formatDateTime(session.createdAt)} className="w-24 shrink-0 whitespace-nowrap text-right font-mono text-xs text-faint tabular-nums">
           {formatRelative(session.updatedAt)}
         </span>
       </button>

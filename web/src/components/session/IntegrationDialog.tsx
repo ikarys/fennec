@@ -4,7 +4,7 @@ import type { Blocker, IntegrationConflict, IntegrationPreview, ReviewSignal } f
 import type { IntegrationResult } from '../../lib/api';
 import { createSession, getIntegration, integrate, suggestCommitMessage } from '../../lib/api';
 import { completeIdea } from '../../lib/ideas';
-import { CriterionProvenanceBadge } from './CriteriaSection';
+import { CriterionProvenanceBadge, PassedBeforeBadge, criterionDotClass } from './CriteriaSection';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import type { BadgeTone } from '../ui/Badge';
@@ -47,7 +47,7 @@ const SIGNAL_LABEL: Record<Exclude<ReviewSignal, 'protected'>, { label: string; 
     title: 'Des tests ou assertions ont été affaiblis dans ce fichier.'
   },
   hot: {
-    label: 'instable',
+    label: 'souvent modifié',
     tone: 'accent',
     title: 'Modifié 5 fois ou plus ces 90 derniers jours.'
   },
@@ -266,20 +266,25 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
         {preview && !loading && !result && (
           <div className="flex flex-col gap-3">
             <section className="flex flex-col gap-1.5">
-              <SectionLabel>
-                Commits{preview.commits.length > 0 && <span className="ml-1 tabular-nums">{preview.commits.length}</span>}
-              </SectionLabel>
+              <SectionLabel>Commits</SectionLabel>
               {preview.commits.length === 0 ? (
                 <div className="text-xs text-muted">Aucun commit.</div>
               ) : (
-                <div className="flex flex-col">
-                  {preview.commits.map((commit) => (
-                    <div key={commit.sha} className="flex items-start gap-2 py-1 text-xs">
-                      <span className="shrink-0 font-mono text-muted">{commit.sha.slice(0, 8)}</span>
-                      <span className="grow break-words text-text">{commit.subject}</span>
-                    </div>
-                  ))}
-                </div>
+                <details className="text-xs">
+                  <summary className="cursor-pointer select-none text-muted hover:text-text">
+                    {preview.commits.length === 1
+                      ? "1 commit de l'agent, repris tel quel sur ta branche"
+                      : `${preview.commits.length} commits de l'agent, écrasés en un seul sur ta branche`}
+                  </summary>
+                  <div className="mt-1 flex flex-col">
+                    {preview.commits.map((commit) => (
+                      <div key={commit.sha} className="flex items-start gap-2 py-1 text-xs">
+                        <span className="shrink-0 font-mono text-muted">{commit.sha.slice(0, 8)}</span>
+                        <span className="grow break-words text-text">{commit.subject}</span>
+                      </div>
+                    ))}
+                  </div>
+                </details>
               )}
             </section>
 
@@ -317,33 +322,47 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
               {preview.files.length === 0 ? (
                 <div className="text-xs text-muted">Aucun fichier.</div>
               ) : (
-                <div className="flex flex-col">
-                  {preview.files.map((file) => (
-                    <div key={file.path} className="flex items-center gap-2 py-1 font-mono text-xs">
-                      <span className="grow overflow-hidden text-left text-ellipsis whitespace-nowrap" title={file.path}>
-                        {file.path}
-                      </span>
-                      {file.protected && <Badge tone="err">protégé</Badge>}
-                      {file.carried && (
-                        <Badge
-                          tone="accent"
-                          title="Le fichier avait des modifications non commitées sur lesquelles l'agent a travaillé : elles entrent dans ce commit."
-                        >
-                          ton travail inclus
-                        </Badge>
-                      )}
-                      {file.signals.map((signal) =>
+                <>
+                  {preview.commonSignals.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted">
+                      <span>Tous les fichiers :</span>
+                      {preview.commonSignals.map((signal) =>
                         signal === 'protected' ? null : (
                           <Badge key={signal} tone={SIGNAL_LABEL[signal].tone} title={SIGNAL_LABEL[signal].title}>
                             {SIGNAL_LABEL[signal].label}
                           </Badge>
                         ),
                       )}
-                      <span className="shrink-0 tabular-nums text-ok">+{file.added}</span>
-                      <span className="shrink-0 tabular-nums text-err">−{file.removed}</span>
                     </div>
-                  ))}
-                </div>
+                  )}
+                  <div className="flex flex-col">
+                    {preview.files.map((file) => (
+                      <div key={file.path} className="flex items-center gap-2 py-1 font-mono text-xs">
+                        <span className="grow overflow-hidden text-left text-ellipsis whitespace-nowrap" title={file.path}>
+                          {file.path}
+                        </span>
+                        {file.protected && <Badge tone="err">protégé</Badge>}
+                        {file.carried && (
+                          <Badge
+                            tone="accent"
+                            title="Le fichier avait des modifications non commitées sur lesquelles l'agent a travaillé : elles entrent dans ce commit."
+                          >
+                            ton travail inclus
+                          </Badge>
+                        )}
+                        {file.signals.map((signal) =>
+                          signal === 'protected' || preview.commonSignals.includes(signal) ? null : (
+                            <Badge key={signal} tone={SIGNAL_LABEL[signal].tone} title={SIGNAL_LABEL[signal].title}>
+                              {SIGNAL_LABEL[signal].label}
+                            </Badge>
+                          ),
+                        )}
+                        <span className="shrink-0 tabular-nums text-ok">+{file.added}</span>
+                        <span className="shrink-0 tabular-nums text-err">−{file.removed}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
               )}
             </section>
 
@@ -354,16 +373,14 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
               ) : (
                 <div className="flex flex-col">
                   {preview.criteria.map((criterion) => {
-                    const dotClass =
-                      criterion.status.type === 'passed' ? 'bg-ok' :
-                      criterion.status.type === 'failed' ? 'bg-err' :
-                      'bg-muted';
                     const provenance = criterion.status.type === 'pending' ? undefined : criterion.status.provenance;
+                    const dotClass = criterionDotClass(criterion.status.type, provenance);
                     return (
                       <div key={criterion.id} className="flex items-start gap-2 py-1.5 text-xs">
                         <span aria-hidden className={`mt-1 h-2 w-2 shrink-0 rounded-full ${dotClass}`} />
                         <span className="shrink-0 font-mono text-muted">{criterion.id}</span>
                         <span className="grow break-words text-text">{criterion.description}</span>
+                        <PassedBeforeBadge passedBefore={criterion.passedBefore} />
                         <CriterionProvenanceBadge provenance={provenance} />
                       </div>
                     );
@@ -385,17 +402,17 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
             </FieldRow>
 
             {preview.testFiles.length > 0 && (
-              <label className="flex items-start gap-1.5 text-xs">
+              <label className="flex items-start gap-1.5 text-xs" title="L'agent ne pourra plus modifier ces fichiers de test : ils sont ajoutés à .agents/protected.">
                 <input type="checkbox" checked={protectTests} onChange={(event) => setProtectTests(event.target.checked)} />
                 <span>
-                  Protéger les tests intégrés ({preview.testFiles.length}) : l'agent ne pourra plus les modifier.
+                  Protéger les tests intégrés ({preview.testFiles.length})
                 </span>
               </label>
             )}
 
-            <label className="flex items-start gap-1.5 text-xs">
+            <label className="flex items-start gap-1.5 text-xs" title="Supprime le dossier et la branche de l'agent après l'intégration : la session n'aura plus de copie de travail.">
               <input type="checkbox" checked={removeWorktree} onChange={(event) => setRemoveWorktree(event.target.checked)} />
-              <span>Supprimer le dossier et la branche de l'agent après l'intégration (la session n'aura plus de copie de travail).</span>
+              <span>Nettoyer l'espace de l'agent</span>
             </label>
 
             {preview.blockers.length > 0 && (

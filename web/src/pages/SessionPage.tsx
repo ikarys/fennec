@@ -31,6 +31,7 @@ import {
   stopWorkflow,
 } from "../lib/api";
 import { readImages } from "../lib/attachments";
+import { formatDateTime } from "../lib/format";
 import { sessionStatus } from "../lib/sessionStatus";
 import { runWaiting } from "../lib/workflowRun";
 import { useSessionThread } from "../hooks/useSessionThread";
@@ -709,6 +710,14 @@ export function SessionPage({
                         >
                           {isChat ? "Chat" : projectName}
                         </span>
+                        {detail && (
+                          <span
+                            className="shrink-0 text-xs text-muted tabular-nums"
+                            title="Date de création de la session"
+                          >
+                            {formatDateTime(detail.createdAt)}
+                          </span>
+                        )}
                         <div className="ml-auto">
                           <ContextGauge
                             context={context}
