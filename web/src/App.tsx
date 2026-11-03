@@ -400,6 +400,11 @@ export default function App() {
     return projects.find((project) => project.sessions.some((session) => session.id === sessionId))?.id;
   }, [route, projects]);
 
+  const currentProject = useMemo(() => {
+    const project = projects.find((candidate) => candidate.id === currentProjectId);
+    return project ? { id: project.id, name: project.name } : null;
+  }, [projects, currentProjectId]);
+
   const handleSessionCreated = useCallback(
     (newId: string, pseudoId: string | null) => {
       setTabs((previous) => {
@@ -513,7 +518,10 @@ export default function App() {
           onPickTab={pickTab}
           onCloseTab={closeTab}
           onOpenPalette={() => setPaletteOpen(true)}
-          onNewSession={() => startNewSession(currentProjectId)}
+          currentProject={currentProject}
+          projects={projects.filter((project) => !project.sessionWorktree).map((project) => ({ id: project.id, name: project.name }))}
+          onNewSession={(projectId) => startNewSession(projectId)}
+          onOpenPage={(page) => navigate(PAGE_TABS.find((candidate) => candidate.page === page)?.path ?? '#/')}
           splitActive={route.name === 'split'}
           onToggleSplit={toggleSplit}
         />

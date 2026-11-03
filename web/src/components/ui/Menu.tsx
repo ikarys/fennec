@@ -18,7 +18,7 @@ const GAP = 4;
 
 type PanelPos = CSSProperties;
 
-export function Menu({ label, children }: { label: string; children: ReactNode }) {
+export function Menu({ label, icon, children }: { label: string; icon?: ReactNode; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<PanelPos | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -79,7 +79,7 @@ export function Menu({ label, children }: { label: string; children: ReactNode }
           aria-expanded={open}
           onClick={toggle}
         >
-          ⋯
+          {icon ?? '⋯'}
         </Button>
       </div>
       {open && pos ? (
