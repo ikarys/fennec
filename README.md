@@ -185,4 +185,4 @@ These are defaults: the Settings page adds providers and overrides parameters pe
 
 fennec is licensed under [AGPL-3.0-only](LICENSE).
 
-fennec's agent loop and web UI started from [openfox](https://github.com/co-l/openfox), ported to Rust; its MIT notice is kept in [THIRD_PARTY.md](THIRD_PARTY.md).
+fennec started from [openfox](https://github.com/co-l/openfox), rewritten in Rust; the MIT notice is kept in [THIRD_PARTY.md](THIRD_PARTY.md).

@@ -1,5 +1,5 @@
-//! fennec's own (openfox has no integration step): the review gate, what the
-//! human must knowingly accept before integrating.
+//! The review gate: what the human must knowingly accept before
+//! integrating.
 
 use serde::Serialize;
 

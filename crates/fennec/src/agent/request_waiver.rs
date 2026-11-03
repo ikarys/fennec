@@ -1,8 +1,7 @@
 //! The `request_waiver` tool, owned by the loop: it pauses the turn to ask
-//! the human to waive the protection of one file. The in-memory promise
-//! machinery is not ported — fennec ends the turn with `waiting_for_user`
-//! and the answer arrives through the waiver card, so a pending request
-//! survives a restart.
+//! the human to waive the protection of one file. Nothing waits in memory:
+//! the turn ends with `waiting_for_user` and the answer arrives through the
+//! waiver card, so a pending request survives a restart.
 
 use serde_json::{Value, json};
 

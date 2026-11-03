@@ -1,6 +1,5 @@
-//! fennec's own protected files (openfox has no protected files): what the
-//! human protects from the model, the guardian of fennec's definition, first
-//! part. Patterns are gitignore-like.
+//! Protected files: what the human protects from the model, the guardian of
+//! fennec's definition, first part. Patterns are gitignore-like.
 
 /// Lockfiles: protected by default in the human's directory, writable in a
 /// session worktree so an agent can add a dependency; the integration gate

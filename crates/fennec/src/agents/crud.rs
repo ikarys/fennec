@@ -1,5 +1,5 @@
-//! The human's own agents: reading, writing and deleting the `*.agent.md`
-//! files of `~/.agents/agents`. fennec's own; openfox has no agent CRUD.
+//! The human's agents: reading, writing and deleting the `*.agent.md`
+//! files of `~/.agents/agents`.
 //!
 //! Only the human reaches this module (the Settings page, through
 //! `web::agent_routes`): it is kernel code, and no agent tool calls it. The

@@ -1,18 +1,17 @@
-//! Port of openfox `context/instructions.ts`: the instructions a new
-//! session's system prompt carries, from the Settings page and the
-//! AGENTS.md files from the filesystem root down to the working directory.
+//! Instructions a new session's system prompt carries, from the Settings
+//! page and the AGENTS.md files from the filesystem root down to the working
+//! directory.
 //!
-//! Not ported: the LANGUAGE setting (the global instructions can say it),
-//! project instructions (a project's AGENTS.md covers them), CLAUDE.md
-//! (fennec reads only the tool-neutral AGENTS.md), and the injected-files
-//! list openfox shows in its UI.
+//! It does not use the LANGUAGE setting (the global instructions can say it),
+//! project instructions (a project's AGENTS.md covers them), CLAUDE.md (it
+//! reads only the tool-neutral AGENTS.md), or the injected-files list.
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
 const INSTRUCTION_FILENAME: &str = "AGENTS.md";
 
-/// openfox `findInstructionFiles`: root first, so a file closer to the
+/// The AGENTS.md files above `workdir`, root first, so a file closer to the
 /// working directory can override its parents.
 fn find_instruction_files(workdir: &Path) -> Vec<PathBuf> {
     let mut dirs: Vec<&Path> = workdir.ancestors().collect();
@@ -23,7 +22,7 @@ fn find_instruction_files(workdir: &Path) -> Vec<PathBuf> {
         .collect()
 }
 
-/// openfox `loadInstructions`: each file under its path; an unreadable one
+/// Each file under its path; an unreadable one
 /// is skipped.
 fn load_instructions(files: &[PathBuf]) -> String {
     let mut sections = Vec::new();
@@ -35,7 +34,7 @@ fn load_instructions(files: &[PathBuf]) -> String {
     sections.join("\n")
 }
 
-/// openfox `getAllInstructions`: the global instructions, then the files;
+/// The global instructions, then the files;
 /// empty when there are none.
 pub fn all_instructions(global: Option<&str>, workdir: &Path) -> String {
     let mut sections = Vec::new();

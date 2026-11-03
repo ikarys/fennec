@@ -1,6 +1,6 @@
-//! Background session-name generation, ported from openfox's
-//! `generateSessionNameForSession`: one model call, no project context, no
-//! thinking, and the result is stored as a `session.name_generated` event.
+//! Background session-name generation:
+//! one model call, no project context, no thinking, and the result is
+//! stored as a `session.name_generated` event.
 
 use crate::agent::ports::{Delta, EventLog, Model, Request};
 use crate::config::Settings;

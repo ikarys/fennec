@@ -1,7 +1,6 @@
-//! fennec's own (openfox has no integration step): what silences a gate. An
-//! agent can make checks pass by silencing them instead of fixing the code;
-//! these are text tripwires shown to the human, not proofs (like the
-//! architecture rules).
+//! What silences a gate. An agent can make checks pass by silencing them
+//! instead of fixing the code; these are text tripwires shown to the human,
+//! not proofs (like the architecture rules).
 
 use super::diff::ChangedLines;
 

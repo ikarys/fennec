@@ -1,4 +1,4 @@
-//! Port of openfox `tools/web-fetch.ts`, with deliberate divergences:
+//! `web_fetch`: a web page fetched for the model, by pointer, not by copy:
 //! - the page is saved as a file in a cache and the model gets a short,
 //!   deterministic pointer (path, size, outline, first lines), not the page:
 //!   it reads the parts it needs with `read_file` or `rg`;
@@ -6,7 +6,7 @@
 //! - private, loopback and link-local addresses are refused (SSRF), redirects
 //!   are followed by hand so each hop is checked.
 //!
-//! Not ported: PDF, images, the cf-mitigated retry.
+//! This module does not handle PDF, images, or the cf-mitigated retry.
 
 mod address;
 mod cache;

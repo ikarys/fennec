@@ -54,7 +54,7 @@ mod tests {
     use super::SessionState;
 
     #[test]
-    fn waiting_for_user_keeps_openfox_wire_name() {
+    fn waiting_for_user_keeps_its_wire_name() {
         let wire = serde_json::to_value(SessionState::WaitingForUser).unwrap();
         assert_eq!(wire, "waiting_for_user");
     }

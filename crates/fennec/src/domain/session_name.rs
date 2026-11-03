@@ -1,8 +1,7 @@
-//! Ports openfox session/name-generator: the name's cleanup. The prompt is
-//! adapted from openfox's to ask for the specific subject of the task.
-//! Not ported: the disableAutoSessionTitle switch, the 'Session N' default check.
+//! Session name cleanup. The prompt asks for the specific subject of the task.
+//! There is no switch to turn it off.
 
-/// Adapted from openfox's `SESSION_NAME_PROMPT`: the only context sent to the model.
+/// The naming prompt: the only context sent to the model.
 pub const SESSION_NAME_PROMPT: &str =
     "Generate a concise, descriptive session name (max 50 characters) based on the user's message.
 Name the specific subject (the feature, file, bug or question), not the kind of step: never a generic name such as \"Next step\", \"Continue\" or \"Follow-up\". Write it in the language of the message.

@@ -1,12 +1,10 @@
-//! Port of openfox `agents/types.ts`, `parseAgentFile` from
-//! `agents/registry.ts`, `buildAgentReminder`/`buildToolPermissionsSection`
-//! from `chat/prompts.ts`, `createPermissionErrorMessage` from
-//! `tools/index.ts`, and the mode fold (`foldMode` of `events/fold-state.ts`).
+//! Agent definitions: the `*.agent.md` file parsed, the reminder and its tool
+//! permissions section, the permission error, and the mode fold.
 //!
-//! Not ported: registry discovery/CRUD (see `crate::agents`), openfox's own
-//! config/`.openfox/agents` dirs, granular `tool:action` permissions, MCP
-//! rules, `results`, sub-agent `return_value`/`step_done` extras, small
-//! reminders, per-agent model overrides, project/DB default agent setting.
+//! This module does not do registry discovery/CRUD (see `crate::agents`),
+//! config `agents` dirs, granular `tool:action` permissions, MCP rules,
+//! `results`, sub-agent `return_value`/`step_done` extras, small reminders,
+//! per-agent model overrides, or project/DB default agent setting.
 
 use super::compaction::model_view;
 use super::event::{Event, MessageMetadata, MetadataSource};
@@ -55,7 +53,7 @@ impl AgentOrigin {
     }
 }
 
-/// openfox `AgentDefinition` (metadata flattened).
+/// `AgentDefinition` (metadata flattened).
 #[derive(Debug, Clone, PartialEq)]
 pub struct AgentDefinition {
     pub id: String,
@@ -102,10 +100,10 @@ pub const KNOWN_TOOLS: [&str; 13] = [
     "suggest_agent",
 ];
 
-/// openfox `resolveDefaultAgentId`'s fallback: a new session plans first,
+/// The default agent: a new session plans first,
 /// nothing is written before the human switches to the builder.
 pub const DEFAULT_AGENT: &str = "plan";
-/// openfox's `color ?? '#6b7280'` for the reminder metadata.
+/// `color ?? '#6b7280'` for the reminder metadata.
 pub const DEFAULT_COLOR: &str = "#6b7280";
 
 /// Why a `*.agent.md` file is not an agent. Discovery ignores a bad file, but
@@ -203,9 +201,10 @@ impl AgentDefinition {
         self.allowed_tools.iter().any(|name| name == tool)
     }
 
-    /// openfox `buildAgentReminder`: `<system-reminder>\n{prompt}{tools}\n</system-reminder>`
-    /// where {tools} is "\n\n## AVAILABLE TOOLS\n\nYou have no tools available." when
-    /// allowed_tools is empty, else "\n\n## AVAILABLE TOOLS\n\nYou have access to these tools: a, b, c" (file order).
+    /// The reminder: `<system-reminder>\n{prompt}{tools}\n</system-reminder>`
+    /// where `{tools}` is `"\n\n## AVAILABLE TOOLS\n\nYou have no tools available."`
+    /// when `allowed_tools` is empty, else `"\n\n## AVAILABLE TOOLS\n\nYou have access to
+    /// these tools: a, b, c"` (file order).
     pub fn reminder(&self) -> String {
         let tools = if self.allowed_tools.is_empty() {
             "\n\n## AVAILABLE TOOLS\n\nYou have no tools available.".to_string()
@@ -233,8 +232,9 @@ impl AgentDefinition {
         }
     }
 
-    /// openfox `createPermissionErrorMessage` with an agent id:
-    /// "Tool '{tool}' is not available in '{id}' mode. Available: {sorted allowed tools joined by ', '}".
+    /// The permission error with an agent id:
+    /// `"Tool '{tool}' is not available in '{id}' mode. Available: {sorted allowed tools
+    /// joined by ', '}"`.
     pub fn denied(&self, tool: &str) -> String {
         let mut available = self.allowed_tools.clone();
         available.sort();
@@ -247,7 +247,7 @@ impl AgentDefinition {
     }
 }
 
-/// openfox `foldMode`: the mode of the last `mode.changed`, None if the human never chose one.
+/// The mode of the last `mode.changed`, None if the human never chose one.
 pub fn chosen_mode(events: &[Event]) -> Option<&str> {
     events.iter().rev().find_map(|event| match event {
         Event::ModeChanged { mode, .. } => Some(mode.as_str()),
@@ -302,7 +302,7 @@ pub fn switch_to(
     })
 }
 
-/// openfox `injectAgentReminder`'s scan: the `name` of the last agent reminder in the
+/// The `name` of the last agent reminder in the
 /// model's current view (`compaction::model_view`), None when the window has none.
 pub fn last_reminder(events: &[Event]) -> Option<&str> {
     model_view(events)
