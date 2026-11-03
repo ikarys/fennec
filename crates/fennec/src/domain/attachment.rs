@@ -1,6 +1,8 @@
-//! Port of openfox shared/types `Attachment` and tools/read `detectImageType`: the images a human attaches to a message or read_file returns, sent to the model as image parts.
+//! `Attachment`: the images a human attaches to a message or
+//! `read_file` returns, sent to the model as image parts.
 //!
-//! Not ported: text/PDF attachments, the vision fallback model for models without vision.
+//! This module does not do text/PDF attachments, the vision fallback model for models
+//! without vision.
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
@@ -19,7 +21,7 @@ pub struct Attachment {
 
 pub const MAX_IMAGE_BYTES: usize = 5 * 1024 * 1024;
 
-/// openfox `detectImageType`: the MIME type of the bytes, from their magic
+/// The MIME type of the bytes, from their magic
 /// bytes; SVG is only trusted for a `.svg` path that starts like XML/SVG.
 pub fn sniff_image(bytes: &[u8], path: &str) -> Option<&'static str> {
     if bytes.starts_with(&[0x89, b'P', b'N', b'G', b'\r', b'\n', 0x1a, b'\n']) {

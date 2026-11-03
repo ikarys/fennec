@@ -1,5 +1,5 @@
-//! The session log's vocabulary: port of openfox `events/types.ts`, the
-//! subset fennec produces. Wire names match openfox.
+//! The session log's vocabulary. Wire names are frozen: stored payloads
+//! depend on them.
 
 use super::attachment::Attachment;
 use super::criteria::{Criterion, CriterionStatus};
@@ -77,7 +77,7 @@ impl ToolResult {
     }
 }
 
-/// openfox tool result `metadata` for an image read_file returned.
+/// Tool result `metadata` for an image `read_file` returned.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ToolResultMetadata {
@@ -101,7 +101,7 @@ pub enum OutputStream {
     Stderr,
 }
 
-/// How a turn ended (openfox `chat.done` reasons fennec produces).
+/// How a turn ended (`chat.done` reasons fennec produces).
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum DoneReason {
@@ -113,7 +113,7 @@ pub enum DoneReason {
     WaitingForUser,
 }
 
-/// The kind of question `ask_user` asks (openfox `type`).
+/// The kind of question `ask_user` asks (`type`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum AskType {
@@ -130,7 +130,7 @@ pub enum OptionTone {
     Danger,
 }
 
-/// One option of a `choice` question (openfox `ChoiceOption`).
+/// One option of a `choice` question (`ChoiceOption`).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChoiceOption {
@@ -142,7 +142,7 @@ pub struct ChoiceOption {
     pub tone: Option<OptionTone>,
 }
 
-/// openfox message `metadata` for an agent reminder: `{type: "agent", name, color, kind}`.
+/// Message `metadata` for an agent reminder: `{type: "agent", name, color, kind}`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MessageMetadata {
     #[serde(rename = "type")]
@@ -158,8 +158,8 @@ pub enum MetadataSource {
     Agent,
 }
 
-/// openfox writes `definition` (the full agent prompt) or `reminder` (a short
-/// nudge each turn); fennec only re-sends the definition when the agent changes.
+/// `definition` (the full agent prompt) or `reminder` (a short nudge each turn)
+/// is written; fennec only re-sends the definition when the agent changes.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ReminderKind {
@@ -167,16 +167,16 @@ pub enum ReminderKind {
     Reminder,
 }
 
-/// openfox also has `completion` (not ported: an asap message left at the end
-/// of the turn starts the next one anyway).
+/// `completion` is not used: an asap message left at the end of the turn
+/// starts the next one anyway.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum QueueMode {
     Asap,
 }
 
-/// The subset of openfox's `TurnEvent` union the agent loop needs. Wire
-/// names and field names match openfox so stored payloads stay comparable.
+/// The subset of the `TurnEvent` union the agent loop needs. Wire
+/// names and field names are frozen: stored payloads depend on them.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", content = "data")]
 pub enum Event {
@@ -190,10 +190,10 @@ pub enum Event {
         content: Option<String>,
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         is_system_generated: bool,
-        /// Set on the agent reminders the loop injects (openfox `metadata`).
+        /// Set on the agent reminders the loop injects (`metadata`).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         metadata: Option<MessageMetadata>,
-        /// openfox `attachments`: images the human sent with the message.
+        /// `attachments`: images the human sent with the message.
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         attachments: Vec<Attachment>,
     },
@@ -251,8 +251,8 @@ pub enum Event {
         compact_at: Option<f64>,
     },
     /// Marks the cut where a new context window started from a summary.
-    /// openfox also carries `closedWindowId`/`newWindowId`; fennec has no
-    /// window ids, so the cut is just this event in the log.
+    /// `closedWindowId`/`newWindowId` are not carried; the cut is just this
+    /// event in the log.
     #[serde(rename = "context.compacted", rename_all = "camelCase")]
     ContextCompacted {
         before_tokens: u64,
@@ -261,7 +261,7 @@ pub enum Event {
     },
     #[serde(rename = "running.changed", rename_all = "camelCase")]
     RunningChanged { is_running: bool },
-    /// The human switched the session's agent (openfox `mode.changed`).
+    /// The human switched the session's agent (`mode.changed`).
     #[serde(rename = "mode.changed", rename_all = "camelCase")]
     ModeChanged {
         mode: String,
@@ -269,20 +269,19 @@ pub enum Event {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         reason: Option<String>,
     },
-    /// fennec's own (openfox has none): the human chose the session's model.
+    /// The human chose the session's model.
     #[serde(rename = "model.changed", rename_all = "camelCase")]
     ModelChanged { model: ModelRef },
     /// fennec's own: the session's disabled MCP servers, set by the composer.
     /// Carries the full disabled set (not a delta); the last event wins.
     #[serde(rename = "mcp.disabled", rename_all = "camelCase")]
     McpDisabled { servers: Vec<String> },
-    /// fennec's own (openfox deletes the events instead): the human replayed
-    /// `message_id`; the model's view drops that message and everything after
-    /// it, the log keeps them.
+    /// The human replayed `message_id`; the model's view drops that message
+    /// and everything after it, the log keeps them.
     #[serde(rename = "session.rewound", rename_all = "camelCase")]
     SessionRewound { message_id: String },
-    /// The model generated a short title for the session (openfox
-    /// `session.name_generated`).
+    /// The model generated a short title for the session
+    /// (`session.name_generated`).
     #[serde(rename = "session.name_generated", rename_all = "camelCase")]
     SessionNameGenerated { name: String },
     /// fennec's own: a workflow run starts; the definition is frozen for the run.
@@ -382,8 +381,8 @@ pub enum Event {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         options: Option<Vec<ChoiceOption>>,
     },
-    /// openfox keeps more in a snapshot; fennec only needs the system
-    /// prompt, frozen for the session so the server's prompt cache holds.
+    /// Only the system prompt is kept in a snapshot, frozen for the session
+    /// so the server's prompt cache holds.
     #[serde(rename = "turn.snapshot", rename_all = "camelCase")]
     TurnSnapshot {
         cached_system_prompt: String,

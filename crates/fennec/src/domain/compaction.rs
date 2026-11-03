@@ -5,10 +5,10 @@
 use super::event::{Event, Role};
 use std::collections::HashSet;
 
-/// openfox `COMPACTION_HEADROOM_TOKENS`: compaction always fires when fewer
+/// `COMPACTION_HEADROOM_TOKENS`: compaction always fires when fewer
 /// than this many tokens remain, regardless of the configured threshold.
 const COMPACTION_HEADROOM_TOKENS: u64 = 5_000;
-/// openfox `COMPACTION_MAX_RATIO`: the effective threshold is capped here.
+/// `COMPACTION_MAX_RATIO`: the effective threshold is capped here.
 const COMPACTION_MAX_RATIO: f64 = 0.95;
 
 /// The slice after the last `ContextCompacted` (the whole slice if none):
@@ -132,7 +132,7 @@ pub fn resume_message(summary: &str, files: &[String], last_request: Option<&str
     msg
 }
 
-/// Port of openfox `shouldCompact`: false when the threshold is disabled;
+/// Whether the window must be compacted: false when the threshold is disabled;
 /// the effective threshold is the minimum of the configured one, the ratio
 /// that leaves `COMPACTION_HEADROOM_TOKENS` of headroom, and
 /// `COMPACTION_MAX_RATIO`; compacts when the context passes it.

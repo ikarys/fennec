@@ -1,6 +1,6 @@
 import { request } from "./request";
 
-/** openfox `ReasoningEffort`: how much a model may think. */
+/** `ReasoningEffort`: how much a model may think. */
 export type ReasoningEffort =
   "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 
@@ -88,9 +88,9 @@ export interface Preferences {
   display: DisplayPrefs;
   /** Models the composer offers as favourites. */
   favorites?: ModelRef[];
-  /** openfox `globalInstructions`: added to the system prompt of new sessions. */
+  /** `globalInstructions`: added to the system prompt of new sessions. */
   globalInstructions?: string | null;
-  /** openfox search.*: the web_search tool's SearXNG instance. */
+  /** `search.*`: the web_search tool's SearXNG instance. */
   search?: SearchPrefs;
   /** fennec's bwrap world: how commands run. */
   sandbox?: SandboxPrefs;

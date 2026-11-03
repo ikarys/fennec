@@ -1,12 +1,7 @@
-//! Port of openfox `agents/registry.ts` discovery (`loadDefaultAgents`,
-//! `loadAllAgents`, `loadProjectAgents`): embedded defaults, then
-//! `~/.agents/agents`, then the project's `.agents/agents`, which overrides
-//! an agent of the same id. fennec's own: each agent carries where it was
-//! found (`AgentOrigin`), and the human's CRUD writes the user ones.
-//!
-//! Not ported: openfox's own config dir and `.openfox/agents`, overrides
-//! listing, per-agent model overrides, project/DB default agent setting,
-//! granular `tool:action` permissions and MCP rules, `results`.
+//! Agent discovery: embedded defaults, then `~/.agents/agents`, then
+//! the project's `.agents/agents`, which overrides an agent of the same id.
+//! Each agent carries where it was found (`AgentOrigin`), and the human's
+//! CRUD writes the user ones.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -29,7 +24,7 @@ pub(crate) const DEFAULTS: [&str; 11] = [
 
 pub mod crud;
 
-/// openfox `loadAllAgents`: the agents a session in `workdir` can use.
+/// The agents a session in `workdir` can use.
 pub fn discover(workdir: &Path) -> Vec<AgentDefinition> {
     discover_in(home().as_deref(), workdir)
 }
@@ -65,7 +60,7 @@ fn discover_in(home: Option<&Path>, workdir: &Path) -> Vec<AgentDefinition> {
     agents
 }
 
-/// openfox `loadAgentsFromDir`; missing dir → empty. A file that does not
+/// The agents of one directory; missing dir → empty. A file that does not
 /// parse is skipped here: discovery must never fail a session. The human sees
 /// the reason through `read_user`, when they open the agent in the settings.
 pub(crate) fn load_agents_directory(dir: &Path, origin: AgentOrigin) -> Vec<AgentDefinition> {

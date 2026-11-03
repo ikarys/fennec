@@ -1,6 +1,5 @@
-//! Storage adapter: openfox's SQLite store (`db/index.ts`, `events/store.ts`),
-//! same `projects`/`sessions`/`events` schema minus the columns fennec does
-//! not use yet. Implements the agent's `EventLog`.
+//! Storage adapter: the SQLite store, `projects`/`sessions`/`events`. The
+//! schema is frozen: stored logs depend on it. Implements the agent's `EventLog`.
 
 pub mod calls;
 mod ideas;
@@ -122,8 +121,7 @@ impl SqliteStore {
         Ok(SqliteStore { db })
     }
 
-    /// The project for `workdir`, created on first use (openfox does the same
-    /// when a directory is opened).
+    /// The project for `workdir`, created on first use.
     pub fn project_for(&self, workdir: &str) -> Result<Project> {
         let name = Path::new(workdir)
             .file_name()

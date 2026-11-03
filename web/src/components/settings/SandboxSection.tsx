@@ -58,7 +58,7 @@ export function SandboxSection({ value, onChange, health }: SandboxSectionProps)
         <p className="text-xs text-muted">
           Les commandes du modèle et les nœuds shell des workflows voient le système en lecture seule, leur dossier de
           travail en écriture, sans tes secrets (~/.ssh, ~/.aws, …) ni la base de fennec. Désactivé : elles tournent sur
-          ta machine, comme dans openfox.
+          ta machine.
         </p>
       </div>
       <div className="flex flex-col gap-1">

@@ -1,5 +1,4 @@
-//! What the model reads back from a command: port of the output format of
-//! openfox `tools/shell.ts`.
+//! What the model reads back from a command.
 
 use super::process::{Ending, Execution};
 use crate::domain::event::ToolResult;
@@ -47,8 +46,8 @@ pub fn report(execution: Execution, timeout_ms: u64) -> ToolResult {
     result
 }
 
-/// Caps the output at `MAX_BYTES` and `MAX_LINES`. openfox keeps the head;
-/// errors and test summaries sit at the end, so fennec drops the middle:
+/// Caps the output at `MAX_BYTES` and `MAX_LINES`. The head is kept;
+/// errors and test summaries sit at the end, so the middle is dropped:
 /// the first 40% and the last 60% of each budget survive, around a marker.
 fn truncate(output: &mut String) -> bool {
     let visible = strip_ansi(output);

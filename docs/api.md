@@ -7,7 +7,7 @@ The server listens on `127.0.0.1:7777`. JSON in, JSON out. Errors are
 ## Events
 
 Every session is an append-only event log (`crates/fennec/src/domain/event.rs`),
-the same wire format as openfox's `TurnEvent`: `{"type": "...", "data": {...}}`
+one wire format, frozen: `{"type": "...", "data": {...}}`
 with camelCase fields.
 
 | type | data |
@@ -51,7 +51,7 @@ with camelCase fields.
 | `rule.approval_answered` | `{callId, choice, ruleId}`: the human's answer (`once`/`session`/`always`/`never`), `ruleId` the rule it stored (null for `once`); fennec then appends the call's `tool.result` (run, or refused for `never`) and the turn goes on |
 | `waiver.requested` | `{callId, path, reason}`: the agent's `request_waiver`: it asks the human to waive the protection of one project file; the call stays open, no `tool.result`, and the turn ends `waiting_for_user` (refused at once while the human is away) |
 | `waiver.answered` | `{callId, granted, expiresAt, adr}`: the human's answer, recorded at the click; a grant exempts exactly `path` from protection (file tools and sandbox) in this session until `expiresAt` (ms), and `adr` is the MADR file written for it (`docs/adr/NNNN-waiver-<slug>.md` in the session's workdir); fennec then appends the call's `tool.result` and the turn goes on |
-| `queue.added` | `{queueId, mode, content, queuedAt}`: a message typed while a turn runs; `mode` is `asap` (openfox's `completion` is not ported); `queuedAt` is epoch ms |
+| `queue.added` | `{queueId, mode, content, queuedAt}`: a message typed while a turn runs; `mode` is always `asap` (dropped in between tool rounds); `queuedAt` is epoch ms |
 | `queue.drained` | `{queueId}`: the queued message was dropped into the running turn between tool rounds, or started the next turn; the resulting `message.start` / next job follows it in the log |
 | `queue.cancelled` | `{queueId}`: the human removed the queued message, or a stop dropped the whole queue |
 | `worktree.discarded` | `{branch, commits}`: the human discarded the session's worktree and branch; `commits` are the agent's commits that were dropped |
@@ -157,12 +157,12 @@ means the UI's default pages), `searxngUrl` blank or starting with `http://`
 or `https://`. `reasoningEffort` is sent as the
 `reasoning_effort` field of the model request when set; `null` omits it.
 
-`globalInstructions` (openfox name) and the AGENTS.md files from the
+`globalInstructions` and the AGENTS.md files from the
 filesystem root down to the session's working directory go into the system
 prompt of a new session; an existing session keeps the prompt of its first
 turn.
 
-`search` (openfox `search.*`, SearXNG only) is the instance the `web_search`
+`search` (SearXNG only) is the instance the `web_search`
 tool queries (`GET {searxngUrl}/search?format=json&q=…`, with
 `Authorization: Bearer {searxngApiKey}` when set). The tool runs in fennec,
 not in a command: the model only chooses the query. `webFetch` (fennec's own, default true) allows the `web_fetch` tool, which also runs in fennec; the model chooses the URL, loopback and private addresses are refused.
@@ -173,7 +173,7 @@ system read-only, the working directory writable, `/tmp` private, the secrets
 under `$HOME` (`.ssh`, `.aws`, `.netrc`…) and fennec's data directory hidden,
 the environment's credential-looking variables removed, every process ended
 with the command, and no network unless `network` is true (npm and cargo are
-then set offline). Disabled, commands run on the host, as in openfox.
+then set offline). Disabled, commands run on the host.
 
 Protected files: a model may read them, never write them. They are fennec's
 defaults (`.agents`, `AGENTS.md`, `CLAUDE.md`, the lockfiles `Cargo.lock`,
@@ -220,7 +220,7 @@ read-only. The human edits them as usual.
 - `POST /api/settings/models/probe` with `{provider, baseUrl, apiKey, model}`
   (endpoint resolved as for `providers/list`) → `{contextWindow, contextSource,
   maxTokens, reasoningEfforts, effortsSource, defaultReasoningEffort}`
-  (openfox auto-config). One-token calls: a baseline, one per effort
+  One-token calls: a baseline, one per effort
   (accepted, deduped by `prompt_tokens`), one with an oversized `max_tokens`
   whose refusal may name the limits. A source is `endpoint` or `catalog` (the
   model family's known values, `llm-providers/src/catalog.rs`). Indicative;

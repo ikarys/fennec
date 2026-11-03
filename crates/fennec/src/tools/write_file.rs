@@ -1,4 +1,4 @@
-//! Port of openfox `tools/write.ts`.
+//! `write_file` tool.
 
 use super::args;
 use super::path_guard::{Outside, resolve_for_writing};

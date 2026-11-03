@@ -1,4 +1,4 @@
-//! Ports openfox `chat/drain-queue.ts`.
+//! Drain the queue.
 
 use super::turn::Turn;
 use crate::domain::event::Event;

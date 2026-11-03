@@ -1,5 +1,5 @@
-//! Ports openfox `session/manager.ts` queue state (`queueMessage`,
-//! `cancelQueuedMessage`, `drainAsapMessages`) as a fold of the log.
+//! Queue state (a message queued, removed, drained)
+//! as a fold of the log.
 
 use super::event::Event;
 use std::collections::HashSet;

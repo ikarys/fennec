@@ -24,7 +24,7 @@ pub struct Preferences {
     /// `local` overrides only what it sets of the environment's endpoint.
     pub providers: Vec<Provider>,
     pub display: Display,
-    /// openfox `globalInstructions`: the human's instructions for every new
+    /// `globalInstructions`: the human's instructions for every new
     /// session; `None` or blank adds nothing.
     pub global_instructions: Option<String>,
     /// The web_search tool's SearXNG instance.
@@ -46,7 +46,7 @@ pub struct Preferences {
     pub(crate) legacy_models: BTreeMap<String, ModelPrefs>,
 }
 
-/// openfox `search.searxngUrl` / `search.searxngApiKey`; fennec's own `webFetch`.
+/// `search.searxngUrl` / `search.searxngApiKey`; `webFetch`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct SearchPrefs {
@@ -66,11 +66,11 @@ impl Default for SearchPrefs {
     }
 }
 
-/// fennec's own (openfox runs commands on the host): the bwrap world of commands.
+/// The bwrap world of commands.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct SandboxPrefs {
-    /// Off runs commands on the host, as openfox does: the human's call.
+    /// Off runs commands on the host: the human's call.
     pub enabled: bool,
     /// Lets commands reach the network (package installs, a dev server on the host).
     pub network: bool,

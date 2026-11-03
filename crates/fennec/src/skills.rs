@@ -1,13 +1,13 @@
-//! Port of openfox `skills/registry.ts` discovery (`loadAllSkills`,
-//! `loadPortableSkills`): embedded bundled defaults, then `~/.agents/skills`,
-//! then the project's `.agents/skills`, which overrides a skill of the same id.
+//! Skill discovery: embedded bundled
+//! defaults, then `~/.agents/skills`, then the project's `.agents/skills`,
+//! which overrides a skill of the same id.
 //!
 //! Bundled defaults are embedded in the binary, never copied to the user's
-//! config, as in openfox.
+//! config.
 //!
-//! Not ported: openfox's own config/`.openfox/skills` dirs, legacy
-//! `.skill.md` files, selected directories, enable/disable settings, name
-//! warnings, installer, HTTP routes/UI, edit/delete.
+//! It does not support legacy `.skill.md` files, selected directories,
+//! enable/disable settings, name warnings, installer, HTTP routes/UI,
+//! edit/delete.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -16,7 +16,7 @@ use crate::domain::skill::{Skill, parse_skill_md};
 
 const DEFAULTS: [&str; 1] = [include_str!("../skills/browser/SKILL.md")];
 
-/// openfox `loadAllSkills`: the skills a session in `workdir` can load.
+/// The skills a session in `workdir` can load.
 pub fn discover(workdir: &Path) -> Vec<Skill> {
     let home = std::env::var_os("HOME").map(PathBuf::from);
     discover_in(home.as_deref(), Some(workdir))
@@ -63,7 +63,7 @@ fn discover_in(home: Option<&Path>, workdir: Option<&Path>) -> Vec<Skill> {
     skills
 }
 
-/// openfox `loadPortableSkills`; missing dir → empty.
+/// The skills of one directory; missing dir → empty.
 fn load_skills_directory(dir: &Path) -> Vec<Skill> {
     let entries = match fs::read_dir(dir) {
         Ok(entries) => entries,

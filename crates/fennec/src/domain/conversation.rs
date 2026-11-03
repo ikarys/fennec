@@ -1,5 +1,4 @@
-//! Port of openfox `events/fold-messages.ts`: the event log read back as the
-//! OpenAI chat messages sent to the model.
+//! The event log read back as the chat messages sent to the model.
 
 use super::compaction::model_view;
 use super::event::{Event, Role, ToolResult};
@@ -25,7 +24,7 @@ fn cap_images(messages: &mut [Value]) {
     }
 }
 
-/// Port of openfox `renderToolResultContent`: the single LLM-facing
+/// `renderToolResultContent`: the single LLM-facing
 /// rendering of a tool result, shared by the live path and the fold.
 pub fn render_tool_result(result: &ToolResult) -> String {
     let error = result.error.as_deref().unwrap_or("");

@@ -1,5 +1,4 @@
-//! Workflow definitions, the graph a human draws. fennec's own; openfox's
-//! `workflows/types.ts` inspired the definition.
+//! Workflow definitions, the graph a human draws.
 
 use serde::{Deserialize, Serialize};
 use std::collections::{HashSet, VecDeque};

@@ -146,7 +146,7 @@ export function getSession(id: string): Promise<SessionDetail> {
   return request<SessionDetail>(`/api/sessions/${encodeURIComponent(id)}`);
 }
 
-/** `message.done` stats of one model call (openfox `MessageStats` subset). */
+/** `message.done` stats of one model call (`MessageStats` subset). */
 export interface MessageStats {
   model: string;
   /** Seconds. */

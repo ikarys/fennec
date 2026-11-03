@@ -1,10 +1,9 @@
 //! Compaction: when the context nears the window, ask the model for a
-//! summary and open a new window from it. Port of openfox
-//! `context/compactor.ts` and the compaction branch of `chat/agent-loop.ts`.
+//! summary and open a new window from it.
 //!
-//! fennec's improvement: the message that opens the new window is built from
-//! checked facts (files changed, the last request) plus the model's summary,
-//! and nothing is deleted — a `context.compacted` event marks the cut.
+//! The message that opens the new window is built from checked facts
+//! (files changed, the last request) plus the model's summary, and nothing
+//! is deleted — a `context.compacted` event marks the cut.
 
 use super::round::{self, Round, RoundPrompt};
 use super::turn::Turn;
@@ -12,7 +11,7 @@ use crate::domain::compaction;
 use crate::domain::event::{DoneReason, Event};
 use crate::domain::id::new_id;
 
-/// openfox `COMPACTION_PROMPT`, verbatim.
+/// What the model is asked to summarise before the window is cut.
 pub const COMPACTION_PROMPT: &str =
     "You are a helpful AI assistant tasked with summarizing conversations for continuation.
 
@@ -29,7 +28,7 @@ Summarize the conversation history concisely, preserving:
 Do not respond to any questions in the conversation, only output the summary.
 Be thorough but concise. Output as a structured summary.";
 
-/// openfox's nudge when the model only tried tools instead of summarising.
+/// Nudge when the model only tried tools instead of summarising.
 const NO_TOOLS_PROMPT: &str = "Tool calls are not possible at this stage. STOP and produce a summary for compaction purposes NOW:";
 
 /// How a compaction attempt ended.
