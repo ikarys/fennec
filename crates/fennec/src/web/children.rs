@@ -5,7 +5,7 @@ use super::turns::with_turn;
 use crate::agent::ports::{AgentRun, ChildSessions};
 use crate::agent::turn::run_child_agent_node;
 use crate::config::Settings;
-use crate::domain::conversation::last_assistant_text;
+use crate::domain::conversation::node_output;
 use crate::notifier::Notifier;
 use crate::store::SqliteStore;
 use std::path::Path;
@@ -45,7 +45,7 @@ impl ChildSessions for Children<'_> {
                 let before = turn.log.events(child_session_id)?.len();
                 let reason = run_child_agent_node(turn, agent_id, prompt)?;
                 let events = turn.log.events(child_session_id)?;
-                let text = last_assistant_text(&events[before..]);
+                let text = node_output(&events[before..]);
                 Ok(AgentRun { reason, text })
             },
         )
