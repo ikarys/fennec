@@ -528,6 +528,7 @@ fn finish(
         reason,
         duration_ms: duration.map(|d| d.as_millis() as u64),
     })?;
+    turn.model.release(turn.session_id);
     Ok(reason)
 }
 

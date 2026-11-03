@@ -245,6 +245,8 @@ crates/fennec/src/
                      world of commands); rule_request (a tool call as the rules crate's requests, paths resolved here);
                      web_search queries the SearXNG instance from the Settings page
   llm/               Model adapter: openai.rs, the Model port over llm-providers (tool-call arguments parsed here)
+                     concurrency.rs the local model's gate: one round at a time, the same session kept between
+                     its rounds so the server's prompt cache stays warm (`FENNEC_MODEL_AFFINITY_SECS`)
   store.rs           EventLog adapter: SQLite (schema frozen: stored logs depend on it), projects and sessions;
                      store/settings.rs the stored preferences; store/ideas.rs the per-project backlog events
   metering.rs        the usage ledger adapter: MeteredLog (an EventLog that also writes each model call

@@ -98,6 +98,7 @@ fn stream_once(
         max_tokens: prompt.max_tokens,
         reasoning_effort: prompt.reasoning_effort,
         stop: turn.stop,
+        session: turn.session_id,
     };
     let model = turn.model;
     let mut buffer = DeltaBuffer::new(message_id, tokens_per_char(&events));
