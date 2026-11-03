@@ -296,11 +296,16 @@ pub(super) fn serve_context(app: &App, stream: &mut TcpStream, id: &str) -> Resu
         return error(stream, 404, "no such session");
     }
     let (chosen, _) = model_routes::session_choice(&store, id)?;
-    let params = app
-        .settings
-        .llm
-        .for_turn(&store.preferences()?, chosen.as_ref());
-    let view = context_view(&store.events(id)?, params.context_window, params.compact_at);
+    // The context gauge's texts follow the human's display language.
+    let preferences = store.preferences()?;
+    let lang = Lang::from_code(&preferences.display.language);
+    let params = app.settings.llm.for_turn(&preferences, chosen.as_ref());
+    let view = context_view(
+        &store.events(id)?,
+        params.context_window,
+        params.compact_at,
+        lang,
+    );
     send_json(stream, 200, &json!(view))
 }
 
@@ -357,7 +362,10 @@ pub(super) fn serve_usage_calls(app: &App, stream: &mut TcpStream, id: &str) -> 
         ..Default::default()
     };
     let calls = ledger.calls(&filter).map_err(|e| e.to_string())?;
-    send_json(stream, 200, &json!(call_views(&events, &calls)))
+    // The call lines follow the human's display language.
+    let preferences = store.preferences()?;
+    let lang = Lang::from_code(&preferences.display.language);
+    send_json(stream, 200, &json!(call_views(&events, &calls, lang)))
 }
 
 pub(super) fn serve_usage_workflow(
@@ -380,10 +388,13 @@ pub(super) fn serve_usage_workflow(
         };
         calls.insert(session, ledger.calls(&filter).map_err(|e| e.to_string())?);
     }
+    // The workflow usage lines follow the human's display language.
+    let preferences = store.preferences()?;
+    let lang = Lang::from_code(&preferences.display.language);
     send_json(
         stream,
         200,
-        &json!(workflow_usage::workflow_usage(id, &events, &calls)),
+        &json!(workflow_usage::workflow_usage(id, &events, &calls, lang)),
     )
 }
 
