@@ -35,6 +35,7 @@ pub fn suggest(
         max_tokens: 4096,
         reasoning_effort: Some(ReasoningEffort::None),
         stop: &stop,
+        session: "",
     };
 
     let mut on_delta = |_: Delta| {};
