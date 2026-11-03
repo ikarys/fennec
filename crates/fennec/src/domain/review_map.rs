@@ -103,6 +103,24 @@ pub fn order(files: &[FileFacts], checks: &DiffChecks) -> Vec<(String, Vec<Revie
         .collect()
 }
 
+/// The signals every file of the map carries: said once above the list,
+/// they differentiate nothing on the rows. Empty under two files.
+pub fn common(entries: &[(String, Vec<ReviewSignal>)]) -> Vec<ReviewSignal> {
+    if entries.len() < 2 {
+        return Vec::new();
+    }
+    let first = &entries[0].1;
+    first
+        .iter()
+        .copied()
+        .filter(|signal| {
+            entries[1..]
+                .iter()
+                .all(|(_, signals)| signals.contains(signal))
+        })
+        .collect()
+}
+
 /// Gate signals are the ones that are also integration blockers.
 fn is_gate(signal: ReviewSignal) -> bool {
     matches!(
@@ -274,5 +292,23 @@ mod tests {
         assert_eq!(ordered[0].0, "src/auth/login.rs");
         assert_eq!(ordered[0].1, vec![ReviewSignal::Sensitive]);
         assert_eq!(ordered[1].1, vec![]);
+    }
+
+    #[test]
+    fn common_keeps_only_the_signals_every_file_carries() {
+        let checks = DiffChecks::default();
+        let large = file("large.rs", 200, 0, false, true, false);
+        let plain = file("plain.rs", 0, 0, false, true, false);
+        let entries = order(
+            &[file("plain.rs", 0, 0, false, true, false), large],
+            &checks,
+        );
+        assert_eq!(
+            common(&entries),
+            vec![ReviewSignal::Hot, ReviewSignal::Untested]
+        );
+
+        let single = order(&[plain], &checks);
+        assert_eq!(common(&single), Vec::<ReviewSignal>::new());
     }
 }

@@ -13,6 +13,7 @@ use crate::domain::integration::{
     Blocker, DiffChecks, Landing, blockers, branch_changed, commit_message, conflict_prompt,
     default_message, unacknowledged,
 };
+use crate::domain::preflight;
 use crate::domain::review_map::{self, FileFacts, ReviewSignal};
 use crate::domain::test_files::new_test_patterns;
 use crate::domain::workflow::run;
@@ -44,6 +45,8 @@ struct Gate {
     blockers: Vec<Blocker>,
     /// Review map, top-relative: riskiest first, with deterministic signals.
     review: Vec<(String, Vec<ReviewSignal>)>,
+    /// Criteria whose check passed before any change (last preflight).
+    passed_before: Vec<String>,
     /// The session's idea the human may finish here, when it is still started.
     idea: Option<(String, String)>,
 }
@@ -107,6 +110,7 @@ fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Result<Gate, (u16, S
     }
     let events = store.events(&session.id)?;
     let decisions = decisions_in_force(&events);
+    let passed_before = preflight::passed_before(&events);
     let criteria = run::current_run(&events)
         .map(|state| state.criteria)
         .unwrap_or_default();
@@ -136,6 +140,7 @@ fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Result<Gate, (u16, S
         test_files,
         blockers,
         review,
+        passed_before,
         idea,
     }))
 }
@@ -170,7 +175,11 @@ pub fn get_integration(app: &App, stream: &mut TcpStream, id: &str) -> Result<()
             })
         })
         .collect();
-    let criteria: Vec<Value> = gate.criteria.iter().map(criterion_json).collect();
+    let criteria: Vec<Value> = gate
+        .criteria
+        .iter()
+        .map(|state| criterion_json(state, &gate.passed_before))
+        .collect();
     send_json(
         stream,
         200,
@@ -182,6 +191,7 @@ pub fn get_integration(app: &App, stream: &mut TcpStream, id: &str) -> Result<()
             "defaultMessage": default_message(&gate.title),
             "commits": gate.preview.commits,
             "files": files,
+            "commonSignals": review_map::common(&gate.review),
             "testFiles": gate.test_files,
             "criteria": criteria,
             "decisions": gate.decisions,
@@ -495,7 +505,7 @@ pub fn resolve_conflict(
     )
 }
 
-fn criterion_json(state: &CriterionState) -> Value {
+fn criterion_json(state: &CriterionState, passed_before: &[String]) -> Value {
     let provenance = match &state.status {
         CriterionStatus::Pending => None,
         CriterionStatus::Passed { provenance } | CriterionStatus::Failed { provenance } => {
@@ -508,6 +518,7 @@ fn criterion_json(state: &CriterionState) -> Value {
         "check": state.criterion.check,
         "status": state.status,
         "provenance": provenance,
+        "passedBefore": passed_before.contains(&state.criterion.id),
     })
 }
 
