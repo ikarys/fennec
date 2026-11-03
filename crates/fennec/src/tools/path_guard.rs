@@ -383,4 +383,199 @@ mod tests {
         let _ = std::fs::remove_dir_all(&workdir);
         let _ = std::fs::remove_dir_all(&outside_dir);
     }
+
+    #[test]
+    fn an_absolute_path_outside_the_workdir_is_denied_for_reading() {
+        let workdir = temp_dir();
+        let outside = temp_dir();
+        let path = outside.join("file.txt").to_string_lossy().into_owned();
+
+        let result = resolve_for_reading(&workdir, Vec::new, &Outside::none(), &path);
+
+        assert!(
+            result
+                .unwrap_err()
+                .contains("Path outside working directory")
+        );
+        let _ = std::fs::remove_dir_all(workdir);
+        let _ = std::fs::remove_dir_all(outside);
+    }
+
+    #[test]
+    fn an_absolute_path_outside_the_workdir_is_denied_for_writing() {
+        let workdir = temp_dir();
+        let outside = temp_dir();
+        let path = outside.join("file.txt").to_string_lossy().into_owned();
+
+        let result = resolve_for_writing(&workdir, &Protection::new(None), &Outside::none(), &path);
+
+        assert!(
+            result
+                .unwrap_err()
+                .contains("Path outside working directory")
+        );
+        let _ = std::fs::remove_dir_all(workdir);
+        let _ = std::fs::remove_dir_all(outside);
+    }
+
+    #[test]
+    fn a_tilde_path_is_treated_as_literal_inside_the_workdir() {
+        let workdir = temp_dir();
+        let canonical = workdir.canonicalize().unwrap();
+
+        // `~` is not expanded; it is an ordinary path component.
+        let resolved =
+            resolve_for_writing(&workdir, &Protection::new(None), &Outside::none(), "~/x").unwrap();
+
+        assert_eq!(resolved, canonical.join("~/x"));
+        let _ = std::fs::remove_dir_all(workdir);
+    }
+
+    #[test]
+    fn a_deep_traversal_outside_the_workdir_is_denied() {
+        let workdir = temp_dir();
+
+        let result = resolve_for_writing(
+            &workdir,
+            &Protection::new(None),
+            &Outside::none(),
+            "a/b/../../../../etc/passwd",
+        );
+
+        assert!(
+            result
+                .unwrap_err()
+                .contains("Path outside working directory")
+        );
+        let _ = std::fs::remove_dir_all(workdir);
+    }
+
+    #[test]
+    fn a_traversal_that_comes_back_inside_is_allowed() {
+        let workdir = temp_dir();
+        let canonical = workdir.canonicalize().unwrap();
+
+        let resolved = resolve_for_writing(
+            &workdir,
+            &Protection::new(None),
+            &Outside::none(),
+            "sub/../inner.txt",
+        )
+        .unwrap();
+
+        assert_eq!(resolved, canonical.join("inner.txt"));
+        let _ = std::fs::remove_dir_all(workdir);
+    }
+
+    #[test]
+    fn dot_and_slash_resolve_to_the_canonical_workdir() {
+        let workdir = temp_dir();
+        let canonical = workdir.canonicalize().unwrap();
+        let protection = Protection::new(None);
+        let outside = Outside::none();
+
+        assert_eq!(
+            resolve_for_writing(&workdir, &protection, &outside, ".").unwrap(),
+            canonical
+        );
+        assert_eq!(
+            resolve_for_writing(&workdir, &protection, &outside, "./").unwrap(),
+            canonical
+        );
+
+        let _ = std::fs::remove_dir_all(workdir);
+    }
+
+    #[test]
+    fn a_symlinked_directory_pointing_outside_denies_files_under_it() {
+        let workdir = temp_dir();
+        let outside = temp_dir();
+        std::os::unix::fs::symlink(&outside, workdir.join("link-dir")).unwrap();
+
+        let result = resolve_for_writing(
+            &workdir,
+            &Protection::new(None),
+            &Outside::none(),
+            "link-dir/file.txt",
+        );
+
+        assert!(
+            result
+                .unwrap_err()
+                .contains("Path outside working directory")
+        );
+        let _ = std::fs::remove_dir_all(workdir);
+        let _ = std::fs::remove_dir_all(outside);
+    }
+
+    #[test]
+    fn a_dangling_symlink_pointing_outside_is_denied_for_writing() {
+        let workdir = temp_dir();
+        let outside = temp_dir();
+        std::os::unix::fs::symlink(outside.join("missing"), workdir.join("link")).unwrap();
+
+        // A dangling symlink still exists as a path entry.
+        let result =
+            resolve_for_writing(&workdir, &Protection::new(None), &Outside::none(), "link");
+
+        // A dangling link cannot be resolved, so it is refused before any wall is checked.
+        assert!(result.unwrap_err().contains("Cannot resolve path"));
+        let _ = std::fs::remove_dir_all(workdir);
+        let _ = std::fs::remove_dir_all(outside);
+    }
+
+    #[test]
+    fn a_symlink_to_a_sibling_file_inside_the_workdir_is_allowed() {
+        let workdir = temp_dir();
+        let canonical = workdir.canonicalize().unwrap();
+        std::fs::File::create(workdir.join("real.txt")).unwrap();
+        std::os::unix::fs::symlink("real.txt", workdir.join("link.txt")).unwrap();
+
+        let resolved = resolve_for_writing(
+            &workdir,
+            &Protection::new(None),
+            &Outside::none(),
+            "link.txt",
+        )
+        .unwrap();
+
+        assert_eq!(resolved, canonical.join("real.txt"));
+        let _ = std::fs::remove_dir_all(workdir);
+    }
+
+    #[test]
+    fn a_new_file_in_a_missing_subdirectory_resolves_inside_the_workdir() {
+        let workdir = temp_dir();
+        let canonical = workdir.canonicalize().unwrap();
+
+        let resolved = resolve_for_writing(
+            &workdir,
+            &Protection::new(None),
+            &Outside::none(),
+            "new/dir/file.txt",
+        )
+        .unwrap();
+
+        assert_eq!(resolved, canonical.join("new/dir/file.txt"));
+        let _ = std::fs::remove_dir_all(workdir);
+    }
+
+    #[test]
+    fn a_denial_error_mentions_the_path_as_given() {
+        let workdir = temp_dir();
+        let outside = temp_dir();
+        std::os::unix::fs::symlink(&outside, workdir.join("link-dir")).unwrap();
+
+        let err = resolve_for_writing(
+            &workdir,
+            &Protection::new(None),
+            &Outside::none(),
+            "link-dir/file.txt",
+        )
+        .unwrap_err();
+
+        assert!(err.contains("link-dir/file.txt"));
+        let _ = std::fs::remove_dir_all(workdir);
+        let _ = std::fs::remove_dir_all(outside);
+    }
 }
