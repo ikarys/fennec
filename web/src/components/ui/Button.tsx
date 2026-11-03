@@ -5,7 +5,7 @@
  */
 import type { ButtonHTMLAttributes } from 'react';
 
-export type ButtonVariant = 'primary' | 'soft' | 'secondary' | 'ghost' | 'danger';
+export type ButtonVariant = 'primary' | 'soft' | 'secondary' | 'ghost' | 'danger' | 'icon';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 // Disabled is faint text on the raised surface, never an opacity: a 50 % muted text fell to 2:1 in Jour.
@@ -21,6 +21,8 @@ const VARIANTS: Record<ButtonVariant, string> = {
   soft: 'bg-accent-soft text-accent-strong hover:bg-accent hover:text-on-accent disabled:bg-raised',
   secondary: 'bg-raised text-text hover:bg-border',
   ghost: 'text-muted hover:bg-raised hover:text-text',
+  /** A quiet icon button that lights up in the accent on hover (tile and nav icons). */
+  icon: 'text-muted hover:bg-raised hover:text-accent',
   danger: 'border border-err/40 text-err hover:bg-del-bg disabled:border-border'
 };
 
