@@ -184,7 +184,12 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
   };
 
   return (
-    <Panel id="workspace" title={panelBlock('workspace').title}>
+    <Panel
+      id="workspace"
+      title={panelBlock('workspace').title}
+      icon={<BranchIcon className="h-3.5 w-3.5" />}
+      iconTone={conflictFiles.length > 0 ? 'err' : 'neutral'}
+    >
       <div className="flex flex-col gap-3">
         {/* One inset card per zone: the header carries the zone's state, the body its rows. */}
         <Card variant="inset" className="group">

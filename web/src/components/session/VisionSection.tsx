@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { SeenImage } from '../../lib/api';
 import { panelBlock } from '../../lib/panelBlocks';
-import { CloseIcon, LocateIcon } from '../Icons';
+import { CloseIcon, EyeIcon, LocateIcon } from '../Icons';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Modal } from '../ui/Modal';
@@ -23,7 +23,12 @@ export function VisionSection({ images }: { images: SeenImage[] }) {
   };
 
   return (
-    <Panel id="vision" title={panelBlock('vision').title} summary={images.length > 0 ? images.length : undefined}>
+    <Panel
+      id="vision"
+      title={panelBlock('vision').title}
+      icon={<EyeIcon className="h-3.5 w-3.5" />}
+      summary={images.length > 0 ? images.length : undefined}
+    >
       <p className="m-0 text-xs text-muted">Les images que le modèle a vues : captures, images lues ou jointes. Grisées : sorties de son contexte.</p>
       {images.length === 0 ? (
         <div className="text-xs text-muted">Aucune image vue.</div>

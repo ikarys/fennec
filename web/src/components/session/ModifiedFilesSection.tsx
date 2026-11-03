@@ -3,7 +3,7 @@ import type { ThreadView } from '../../lib/fold';
 import { previewKindOfPath, relativeToWorkdir, type PreviewKind } from '../../lib/preview';
 import { usePreviewOpener, usePreviewWorkdir } from '../preview/PreviewContext';
 import { panelBlock } from '../../lib/panelBlocks';
-import { EyeIcon } from '../Icons';
+import { EyeIcon, FileIcon } from '../Icons';
 import { Button } from '../ui/Button';
 import { Panel } from '../ui/Panel';
 
@@ -45,6 +45,7 @@ export function ModifiedFilesSection({ modifiedFiles, sessionId }: ModifiedFiles
     <Panel
       id="modifiedFiles"
       title={panelBlock('modifiedFiles').title}
+      icon={<FileIcon className="h-3.5 w-3.5" />}
       summary={mergedFiles.length > 0 ? mergedFiles.length : undefined}
     >
       {mergedFiles.length === 0 && <div className="text-xs text-muted">Aucun fichier modifié.</div>}

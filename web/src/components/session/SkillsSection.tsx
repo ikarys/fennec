@@ -1,5 +1,6 @@
 import type { SessionSkills } from '../../lib/api';
 import { panelBlock } from '../../lib/panelBlocks';
+import { WandIcon } from '../Icons';
 import { Panel } from '../ui/Panel';
 
 interface SkillsSectionProps {
@@ -16,6 +17,7 @@ export function SkillsSection({ skills, hasSession }: SkillsSectionProps) {
     <Panel
       id="skills"
       title={panelBlock('skills').title}
+      icon={<WandIcon className="h-3.5 w-3.5" />}
       summary={skills !== null && loadedCount > 0 ? `${activeCount}/${loadedCount}` : undefined}
     >
       <p className="m-0 text-xs text-muted">Les instructions spécialisées dans le contexte du modèle. Point vert : encore dans son contexte.</p>

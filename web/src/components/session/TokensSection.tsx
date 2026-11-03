@@ -26,6 +26,7 @@ export function TokensSection({ usage }: TokensSectionProps) {
     <Panel
       id="tokens"
       title="Tokens de la session"
+      icon={<CoinIcon className="h-3.5 w-3.5" />}
       summary={hasUsage ? formatTokens(usage.promptTokens + usage.completionTokens) : undefined}
     >
       {(!usage || usage.calls === 0) && <div className="text-xs text-muted">Aucun appel mesuré.</div>}
