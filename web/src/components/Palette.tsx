@@ -75,13 +75,13 @@ export function Palette({ open, projects, onClose, onOpenSession, onNewSession, 
       ...projects.filter((project) => !project.chat).map((project) => ({
         id: `new-${project.id}`,
         title: `Nouvelle session dans ${project.name}`,
-        meta: '⌘N',
+        meta: '',
         action: () => onNewSession(project.id)
       })),
       ...projects.filter((project) => project.chat).map((project) => ({
         id: `new-${project.id}`,
         title: 'Nouveau chat',
-        meta: '⌘N',
+        meta: '',
         action: () => onNewSession(project.id)
       })),
       {
@@ -220,7 +220,6 @@ export function Palette({ open, projects, onClose, onOpenSession, onNewSession, 
         <div className="flex flex-wrap gap-4 border-t border-border px-3.5 py-2">
           <span className="text-xs rounded border border-border px-1.5 text-faint">↑↓ naviguer</span>
           <span className="text-xs rounded border border-border px-1.5 text-faint">↵ ouvrir dans un onglet</span>
-          <span className="text-xs rounded border border-border px-1.5 text-faint">⌘↵ nouvelle session ici</span>
         </div>
       </div>
     </div>

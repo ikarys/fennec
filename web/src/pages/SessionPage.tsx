@@ -78,6 +78,10 @@ import {
   defaultWorkflowSelection,
 } from "../components/workflow/session/WorkflowPicker";
 
+// One unsent draft per session, kept while the app lives: switching tabs must
+// never carry a draft to another agent, and coming back must find it again.
+const drafts = new Map<string, string>();
+
 interface SessionPageProps {
   sessionId: string | null;
   projectId: string | null;
@@ -110,6 +114,16 @@ export function SessionPage({
 }: SessionPageProps) {
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [text, setText] = useState("");
+  const draftKey = sessionId ?? `new:${projectId ?? ""}`;
+  const textRef = useRef(text);
+  textRef.current = text;
+  useEffect(() => {
+    setText(drafts.get(draftKey) ?? "");
+    // Saved when the key changes: the cleanup still sees the old key.
+    return () => {
+      drafts.set(draftKey, textRef.current);
+    };
+  }, [draftKey]);
   const [attachments, setAttachments] = useState<AttachmentInput[]>([]);
   const [sendError, setSendError] = useState<string | null>(null);
   const [compactError, setCompactError] = useState<string | null>(null);
