@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ServerView } from '../../lib/api';
 import { getServers, startServer, stopServer } from '../../lib/api';
-import { ExternalIcon, PlayIcon, SettingsIcon, SpinnerIcon, StopIcon } from '../Icons';
+import { ExternalIcon, PlayIcon, ServerIcon, SettingsIcon, SpinnerIcon, StopIcon } from '../Icons';
 import { Badge } from '../ui/Badge';
 import { Button, buttonClass } from '../ui/Button';
 import { Panel } from '../ui/Panel';
@@ -59,7 +59,13 @@ export function ServersSection({ sessionId }: ServersSectionProps) {
   const summary = servers === null ? undefined : `${runningCount}/${servers.length}`;
 
   return (
-    <Panel id="servers" title={panelBlock('servers').title} summary={summary}>
+    <Panel
+      id="servers"
+      title={panelBlock('servers').title}
+      icon={<ServerIcon className="h-3.5 w-3.5" />}
+      iconTone={runningCount > 0 ? 'accent' : 'neutral'}
+      summary={summary}
+    >
       <div className="flex flex-col gap-1.5">
         <p className="m-0 text-xs text-muted">
           Démarrés dans le worktree de la session, sur le port <code>$PORT</code>.
