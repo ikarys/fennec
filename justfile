@@ -28,7 +28,9 @@ dev:
     cargo build -p fennec
     target/debug/fennec --port "$API_PORT" & server=$!
     trap 'kill $server' EXIT
-    cd web && FENNEC_API="http://127.0.0.1:$API_PORT" npm run dev -- --port "$UI_PORT"
+    # strictPort: a busy UI port fails loudly instead of drifting to a port
+    # the server's origin guard does not know (5174+ → "forbidden origin").
+    cd web && FENNEC_API="http://127.0.0.1:$API_PORT" npm run dev -- --port "$UI_PORT" --strictPort
 
 # Everything CI checks: the conventions (web, lint) and the tests
 check: web lint test test-web
