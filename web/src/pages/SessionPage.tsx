@@ -137,11 +137,11 @@ export function SessionPage({
     workflowUsage,
     context,
     vision,
-    pending,
+    served,
   } = useSessionThread(sessionId);
   const running = view.running;
   const pendingCallId =
-    pending.pendingApproval?.callId ?? pending.pendingWaiver?.callId;
+    served.pendingApproval?.callId ?? served.pendingWaiver?.callId;
   const run = view.run;
   const waiting = runWaiting(run, running, view.lastDone);
   // The detail is fetched once; the event stream says how a turn ended.
@@ -203,8 +203,8 @@ export function SessionPage({
     handleRetry,
   } = useSessionActions({
     sessionId,
-    pendingApproval: pending.pendingApproval,
-    pendingWaiver: pending.pendingWaiver,
+    pendingApproval: served.pendingApproval,
+    pendingWaiver: served.pendingWaiver,
     onError: setSendError,
   });
   const {
@@ -731,22 +731,22 @@ export function SessionPage({
                       </div>
                     </div>
 
-                    {pending.pendingApproval &&
+                    {served.pendingApproval &&
                       !running &&
                       !waiting &&
                       !detail?.parentId && (
                         <RuleApprovalCard
-                          approval={pending.pendingApproval}
+                          approval={served.pendingApproval}
                           onAnswer={handleApproval}
                           disabled={running}
                         />
                       )}
-                    {pending.pendingWaiver &&
+                    {served.pendingWaiver &&
                       !running &&
                       !waiting &&
                       !detail?.parentId && (
                         <WaiverCard
-                          waiver={pending.pendingWaiver}
+                          waiver={served.pendingWaiver}
                           onAnswer={handleWaiver}
                           disabled={running}
                         />
@@ -813,7 +813,7 @@ export function SessionPage({
                       onFollowChange={setFollow}
                     />
                     {!detail?.parentId && (
-                      <QueuedMessages queued={pending.queued} onCancel={handleCancelQueued} />
+                      <QueuedMessages queued={served.queued} onCancel={handleCancelQueued} />
                     )}
                     {!detail?.parentId && (
                       <Composer
@@ -865,6 +865,7 @@ export function SessionPage({
                     }
                     integrationVersion={integrationVersion}
                     vision={vision}
+                    served={served}
                   />
                   {sessionId && integrationOpen && (
                     <IntegrationDialog
