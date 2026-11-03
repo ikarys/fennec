@@ -1,6 +1,8 @@
-/** The plan's pre-flight checks, verified by fennec before any change. */
+/** The plan's pre-flight checks, verified by fennec before any change.
+ * The inset block and its ok edge mark provenance: fennec ran these, the model did not. */
 import type { PreflightResultView } from '../../lib/fold';
 import { Badge } from '../ui/Badge';
+import { Card } from '../ui/Card';
 import { SectionLabel } from '../ui/SectionLabel';
 
 const INLINE_CODE = 'rounded bg-code px-1 py-0.5 font-mono text-xs text-text';
@@ -25,14 +27,14 @@ const VERDICTS: Record<PreflightResultView['verdict'], { tone: 'ok' | 'err'; lab
 
 export function PreflightSection({ results }: { results: PreflightResultView[] }) {
   return (
-    <div className="flex flex-col gap-1.5">
+    <Card variant="inset" className="border-l-2 border-l-ok">
       <div className="flex items-center justify-between gap-2">
         <SectionLabel>Pré-contrôle</SectionLabel>
         <Badge tone="ok" title="Fait établi par fennec : les commandes ont tourné avant tout changement">
           vérifié
         </Badge>
       </div>
-      <ul className="m-0 flex flex-col gap-1">
+      <ul className="m-0 flex flex-col gap-1.5">
         {results.map((result, i) => {
           const verdict = VERDICTS[result.verdict];
           const label = result.exitCode !== undefined ? `${verdict.label} · exit ${result.exitCode}` : verdict.label;
@@ -59,6 +61,6 @@ export function PreflightSection({ results }: { results: PreflightResultView[] }
           );
         })}
       </ul>
-    </div>
+    </Card>
   );
 }
