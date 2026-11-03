@@ -2,7 +2,7 @@
 //! draws it (`GET /api/sessions/{id}/context`).
 
 use crate::domain::compaction::model_view;
-use crate::domain::context_parts::{PartKind, context_parts, spread};
+use crate::domain::context_parts::{PartKind, context_parts, display_label, spread};
 use crate::domain::conversation::{fold_messages, frozen_prompt};
 use crate::domain::event::Event;
 use crate::domain::lang::Lang;
@@ -205,7 +205,9 @@ pub fn composition_view(
     let mut rows: Vec<PartView> = shares
         .iter()
         .take(MAX_PARTS)
-        .map(|(kind, label, share)| part_view(Some(*kind), label.clone(), *share, total, lang))
+        .map(|(kind, label, share)| {
+            part_view(Some(*kind), display_label(label, lang), *share, total, lang)
+        })
         .collect();
     let rest = &shares[rows.len()..];
     if !rest.is_empty() {
