@@ -109,7 +109,7 @@ pub fn conflicts(top: &Path, wt: &Worktree) -> Vec<String> {
     let Ok(ours) = ours_with_carried(top, &carried) else {
         return Vec::new();
     };
-    match merge_tree(top, &ours, wt.branch.as_str(), wt.base.as_str()) {
+    match merge_tree(top, &ours, wt.branch.as_str(), &merge_start(top, wt)) {
         Ok((_, conflicted)) => conflicted,
         Err(_) => Vec::new(),
     }
@@ -121,7 +121,7 @@ pub fn conflicts(top: &Path, wt: &Worktree) -> Vec<String> {
 pub fn update_branch(top: &Path, wt: &Worktree) -> Result<Vec<String>, String> {
     let ours = git(top, &["rev-parse", "HEAD"], None)
         .map(|out| String::from_utf8_lossy(&out).trim().to_string())?;
-    let (tree, conflicted) = merge_tree(top, &ours, wt.branch.as_str(), wt.base.as_str())?;
+    let (tree, conflicted) = merge_tree(top, &ours, wt.branch.as_str(), &merge_start(top, wt))?;
     let message = format!("fennec: bring {} up to date with HEAD", wt.branch);
     let commit = git(
         top,
@@ -357,6 +357,29 @@ fn ours_with_carried(top: &Path, carried: &[String]) -> Result<String, String> {
     }
 }
 
+/// Where the merge starts: the base ref, or the branch's fork point with the
+/// human's HEAD when that is newer. A branch merged by hand leaves the base ref
+/// behind, and its already merged lines would conflict; after an integration,
+/// which squashes, the fork point is the older of the two and the base ref is
+/// right.
+fn merge_start(top: &Path, wt: &Worktree) -> String {
+    let fork_point = git(top, &["merge-base", "HEAD", &wt.branch], None)
+        .map(|out| String::from_utf8_lossy(&out).trim().to_string());
+    match fork_point {
+        Ok(fork_point)
+            if git(
+                top,
+                &["merge-base", "--is-ancestor", &wt.base, &fork_point],
+                None,
+            )
+            .is_ok() =>
+        {
+            fork_point
+        }
+        _ => wt.base.clone(),
+    }
+}
+
 /// `git merge-tree --write-tree --name-only --no-messages --merge-base=<base>
 /// <ours> <branch>`: the merged tree and the conflicted files, computed off
 /// the trees so a dirty working tree does not make git refuse (needs git ≥
@@ -482,7 +505,8 @@ pub fn apply(top: &Path, wt: &Worktree, message: &str) -> Result<String, ApplyEr
 
     // The merge, computed off the trees so a dirty working tree does not make
     // git refuse; a conflict names the files.
-    let (tree, conflicted) = match merge_tree(top, &ours, wt.branch.as_str(), wt.base.as_str()) {
+    let (tree, conflicted) = match merge_tree(top, &ours, wt.branch.as_str(), &merge_start(top, wt))
+    {
         Ok((tree, conflicted)) => (tree, conflicted),
         Err(message) => {
             return Err(ApplyError::Git {
@@ -836,6 +860,33 @@ mod tests {
             ),
             "1"
         );
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn a_branch_merged_by_hand_has_no_false_conflict() {
+        let (base, repo) = setup();
+        let wt = open(&base.join("wt"), &repo, "s1").unwrap().unwrap();
+        std::fs::write(wt.workdir.join("a.txt"), "agent\n").unwrap();
+        assert_eq!(commit(&wt, "agent change"), Ok(true));
+
+        git(&repo, &["merge", "--no-ff", "--no-edit", "fennec/s1"], None).unwrap();
+        std::fs::write(repo.join("a.txt"), "human\n").unwrap();
+        git(&repo, &["add", "-A"], None).unwrap();
+        git(&repo, &["commit", "-q", "-m", "human change"], None).unwrap();
+
+        std::fs::write(wt.workdir.join("b.txt"), "b\n").unwrap();
+        assert_eq!(commit(&wt, "agent work after the merge"), Ok(true));
+
+        let top = top(&repo).unwrap().0;
+        assert!(conflicts(&top, &wt).is_empty());
+
+        apply(&top, &wt, "integrate").unwrap();
+        assert_eq!(
+            std::fs::read_to_string(repo.join("a.txt")).unwrap(),
+            "human\n"
+        );
+        assert_eq!(std::fs::read_to_string(repo.join("b.txt")).unwrap(), "b\n");
         let _ = std::fs::remove_dir_all(&base);
     }
 
