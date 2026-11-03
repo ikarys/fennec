@@ -13,6 +13,8 @@ import { Section } from '../ui/Section';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { TrashIcon } from '../Icons';
 import { AgentEditor, EMPTY_DRAFT } from './AgentEditor';
+import { useT } from '../../i18n';
+import type { MsgKey } from '../../i18n/messages';
 import {
   deleteAgent,
   getAgentSource,
@@ -24,41 +26,41 @@ import {
   type AgentsOverview,
 } from '../../lib/api/agents';
 
-const ORIGIN_SECTIONS: { origin: AgentOrigin; title: string; description: string; empty: string }[] = [
+const ORIGIN_SECTIONS: { origin: AgentOrigin; title: MsgKey; description: MsgKey; empty: MsgKey }[] = [
   {
     origin: 'user',
-    title: 'Les tiens',
-    description: 'Les fichiers de ~/.agents/agents : à toi de les écrire, de les modifier et de les supprimer.',
-    empty: "Aucun agent à toi pour l'instant : duplique un défaut pour partir de sa méthode.",
+    title: 'agentsUserTitle',
+    description: 'agentsUserDescription',
+    empty: 'agentsUserEmpty',
   },
   {
     origin: 'default',
-    title: 'Fournis par fennec',
-    description: 'Embarqués dans le binaire, en lecture seule.',
-    empty: 'Aucun.',
+    title: 'agentsDefaultTitle',
+    description: 'agentsDefaultDescription',
+    empty: 'agentsNone',
   },
   {
     origin: 'project',
-    title: 'Du projet',
-    description: 'Les fichiers de .agents/agents : ils appartiennent au dépôt, modifie-les dans le dépôt.',
-    empty: 'Aucun.',
+    title: 'agentsProjectTitle',
+    description: 'agentsProjectDescription',
+    empty: 'agentsNone',
   },
 ];
 
-const PHASE_LABELS: Record<string, string> = {
-  start: 'Démarrer',
-  frame: 'Cadrer',
-  build: 'Construire',
-  understand: 'Comprendre',
-  check: 'Contrôler',
+const PHASE_LABELS: Record<string, MsgKey> = {
+  start: 'phaseStart',
+  frame: 'phaseFrame',
+  build: 'phaseBuild',
+  understand: 'phaseUnderstand',
+  check: 'phaseCheck',
 };
 
-/** The draft a « Dupliquer » starts from: the default's surface, a free id. */
-function duplicate(agent: AgentView): AgentDraft {
+/** The draft a duplicate starts from: the default's surface, a free id. */
+function duplicate(agent: AgentView, t: (key: MsgKey, vars?: Record<string, string | number>) => string): AgentDraft {
   return {
     ...EMPTY_DRAFT,
     id: `${agent.id}-mien`,
-    name: `${agent.name} (le mien)`,
+    name: t('agentsDuplicateName', { name: agent.name }),
     description: agent.description,
     phase: agent.phase,
     color: agent.color,
@@ -84,6 +86,7 @@ function AgentRow({
   onDuplicate: () => void;
   onDelete: () => void;
 }) {
+  const t = useT();
   return (
     <li className="flex items-center gap-3 py-2.5">
       <div className="min-w-0 grow">
@@ -102,23 +105,23 @@ function AgentRow({
       </div>
       {/* Fixed-width columns, so the phase, the access and the kind line up from row to row. */}
       <span className="w-24 shrink-0">
-        {agent.phase ? <Badge tone="neutral">{PHASE_LABELS[agent.phase] ?? agent.phase}</Badge> : null}
+        {agent.phase ? <Badge tone="neutral">{PHASE_LABELS[agent.phase] ? t(PHASE_LABELS[agent.phase]) : agent.phase}</Badge> : null}
       </span>
-      <span className="w-24 shrink-0">{agent.readOnly ? <Badge tone="ok">lecture seule</Badge> : null}</span>
+      <span className="w-24 shrink-0">{agent.readOnly ? <Badge tone="ok">{t('agentsReadOnly')}</Badge> : null}</span>
       <span className="w-20 shrink-0">
-        {agent.subagent ? <Badge tone="accent" pill>sous-agent</Badge> : <Badge tone="neutral" pill>agent</Badge>}
+        {agent.subagent ? <Badge tone="accent" pill>{t('agentsSubagent')}</Badge> : <Badge tone="neutral" pill>{t('agentsAgent')}</Badge>}
       </span>
       {agent.editable ? (
         <Button variant="ghost" onClick={onEdit} disabled={busy}>
-          Modifier
+          {t('agentsEdit')}
         </Button>
       ) : (
         <Button variant="ghost" onClick={onDuplicate} disabled={busy}>
-          Dupliquer
+          {t('agentsDuplicate')}
         </Button>
       )}
       {agent.editable ? (
-        <Button variant="ghost" iconOnly title="Supprimer" aria-label="Supprimer" disabled={busy} onClick={onDelete}>
+        <Button variant="ghost" iconOnly title={t('delete')} aria-label={t('delete')} disabled={busy} onClick={onDelete}>
           <TrashIcon className="h-4 w-4" />
         </Button>
       ) : (
@@ -129,6 +132,7 @@ function AgentRow({
 }
 
 export function AgentsSection() {
+  const t = useT();
   const [overview, setOverview] = useState<AgentsOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -177,7 +181,7 @@ export function AgentsSection() {
   const startDuplicate = (agent: AgentView) => {
     clearError();
     setNewAgent(true);
-    setDraft(duplicate(agent));
+    setDraft(duplicate(agent, t));
   };
 
   const startEdit = async (id: string) => {
@@ -186,7 +190,7 @@ export function AgentsSection() {
     try {
       const { fields } = await getAgentSource(id);
       if (!fields) {
-        setFormError(`Le fichier de « ${id} » ne se lit pas : corrige-le ou supprime-le.`);
+        setFormError(t('agentsFileUnreadable', { id }));
         return;
       }
       setNewAgent(false);
@@ -230,17 +234,17 @@ export function AgentsSection() {
   return (
     <>
       <Section
-        title="Agents"
-        description="Les modes d'une session : leur méthode et les outils qu'ils ont le droit d'utiliser. Un agent ajouté apparaît dans le menu du composer."
+        title={t('agentsSectionTitle')}
+        description={t('agentsSectionDescription')}
         actions={
           draft ? null : (
             <Button variant="primary" onClick={startNew} disabled={loading || busy}>
-              Nouvel agent
+              {t('agentsNew')}
             </Button>
           )
         }
       >
-        {loading ? <p className="text-xs text-muted">Chargement…</p> : null}
+        {loading ? <p className="text-xs text-muted">{t('loading')}</p> : null}
         {!loading && error ? <p className="text-xs text-err">{error}</p> : null}
         {!loading && !error && draft ? (
           <AgentEditor
@@ -265,9 +269,9 @@ export function AgentsSection() {
             const agents = overview.agents.filter((agent) => agent.origin === origin);
             if (origin === 'project' && agents.length === 0) return null;
             return (
-              <Section key={origin} title={title} description={description} flush>
+              <Section key={origin} title={t(title)} description={t(description)} flush>
                 {agents.length === 0 ? (
-                  <p className="py-3 text-xs text-muted">{empty}</p>
+                  <p className="py-3 text-xs text-muted">{t(empty)}</p>
                 ) : (
                   <ul className="divide-y divide-border">
                     {agents.map((agent) => (
@@ -289,8 +293,8 @@ export function AgentsSection() {
 
       {overview && overview.broken.length > 0 ? (
         <Section
-          title="Fichiers ignorés"
-          description="Ces fichiers de ~/.agents/agents ne se lisent pas : leur agent n'apparaît dans aucun menu."
+          title={t('agentsBrokenTitle')}
+          description={t('agentsBrokenDescription')}
           flush
         >
           <ul className="divide-y divide-border">
@@ -302,8 +306,8 @@ export function AgentsSection() {
                   variant="ghost"
                   iconOnly
                   className="ml-auto"
-                  title="Supprimer"
-                  aria-label="Supprimer"
+                  title={t('delete')}
+                  aria-label={t('delete')}
                   disabled={busy}
                   onClick={() =>
                     setPendingDelete({
@@ -332,9 +336,9 @@ export function AgentsSection() {
 
       <ConfirmDialog
         open={pendingDelete !== null}
-        title={pendingDelete ? `Supprimer l'agent « ${pendingDelete.name} » ?` : ''}
-        body="Le fichier et sa méthode sont supprimés de ~/.agents/agents."
-        confirmLabel="Supprimer"
+        title={pendingDelete ? t('agentsDeleteTitle', { name: pendingDelete.name }) : ''}
+        body={t('agentsDeleteBody')}
+        confirmLabel={t('delete')}
         variant="danger"
         onConfirm={() => {
           if (!pendingDelete) return;

@@ -9,6 +9,8 @@
  * project.
  */
 import { useEffect, useRef, useState } from 'react';
+import { useT } from '../i18n';
+import type { MsgKey } from '../i18n/messages';
 import type { AttentionItem } from '../lib/api';
 
 /** True when the current hash shows this session: `#/s/<id>` or a split pane `#/split/<a>/<b>`. */
@@ -23,22 +25,23 @@ function hashShowsSession(hash: string, sessionId: string): boolean {
   return false;
 }
 
-function bodyFor(item: AttentionItem): string {
+function bodyFor(item: AttentionItem, t: (key: MsgKey, vars?: Record<string, string | number>) => string): string {
   switch (item.kind) {
     case 'question':
-      return item.detail ? `${item.detail} — demande une réponse` : 'Demande une réponse';
+      return item.detail ? t('turnNoticeQuestionDetail', { detail: item.detail }) : t('turnNoticeQuestion');
     case 'workflowPause':
-      return item.detail ? `${item.detail} — choix à faire` : 'Workflow en attente de ton choix';
+      return item.detail ? t('turnNoticeWorkflowPauseDetail', { detail: item.detail }) : t('turnNoticeWorkflowPause');
     case 'awaitingIntegration':
-      return 'Prêt à intégrer';
+      return t('turnNoticeAwaitingIntegration');
     case 'conflict':
-      return item.detail ? `Conflit avec ta branche : ${item.detail}` : 'Conflit avec ta branche';
+      return item.detail ? t('turnNoticeConflictDetail', { detail: item.detail }) : t('turnNoticeConflict');
     case 'error':
-      return item.detail ? `Erreur : ${item.detail}` : 'Une erreur est survenue';
+      return item.detail ? t('turnNoticeErrorDetail', { detail: item.detail }) : t('turnNoticeError');
   }
 }
 
 export function useTurnNotices(onOpen?: (sessionId: string) => void): { items: AttentionItem[] } {
+  const t = useT();
   const [items, setItems] = useState<AttentionItem[]>([]);
   const previous = useRef<Set<string>>(new Set());
   const baseline = useRef(true);
@@ -65,7 +68,7 @@ export function useTurnNotices(onOpen?: (sessionId: string) => void): { items: A
           if (previous.current.has(item.sessionId)) continue;
           if (!document.hidden && hashShowsSession(window.location.hash, item.sessionId)) continue;
           const notification = new Notification(item.title || 'fennec', {
-            body: bodyFor(item),
+            body: bodyFor(item, t),
             tag: item.sessionId,
           });
           notification.onclick = () => {

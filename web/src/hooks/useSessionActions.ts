@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useT } from '../i18n';
 import type { ApprovalChoice, PendingApproval, PendingWaiver } from '../lib/api/sessions';
 import {
   answerRuleApproval,
@@ -30,6 +31,7 @@ export function useSessionActions({
   pendingWaiver,
   onError,
 }: UseSessionActionsArgs) {
+  const t = useT();
   const [compactError, setCompactError] = useState<string | null>(null);
 
   async function report(label: string, action: () => Promise<void>) {
@@ -56,30 +58,30 @@ export function useSessionActions({
     try {
       await compactSession(sessionId);
     } catch (error) {
-      setCompactError(error instanceof Error ? error.message : 'Erreur lors de la compaction');
+      setCompactError(error instanceof Error ? error.message : t('sessionCompactError'));
     }
   }
 
   async function handleReplay(messageId: string) {
     if (!sessionId) return;
-    await report('Erreur lors de la relance', () => replayMessage(sessionId, messageId));
+    await report(t('sessionReplayError'), () => replayMessage(sessionId, messageId));
   }
 
   async function handleApproval(choice: ApprovalChoice, pattern?: string) {
     if (!sessionId || !pendingApproval) return;
-    await report('Erreur lors de l’autorisation', () =>
+    await report(t('sessionApprovalError'), () =>
       answerRuleApproval(sessionId, pendingApproval.callId, choice, pattern),
     );
   }
 
   async function handleCancelQueued(queueId: string) {
     if (!sessionId) return;
-    await report('Erreur lors du retrait de la file', () => cancelQueued(sessionId, queueId));
+    await report(t('sessionCancelQueuedError'), () => cancelQueued(sessionId, queueId));
   }
 
   async function handleWaiver(hours: number | null) {
     if (!sessionId || !pendingWaiver) return;
-    await report('Erreur lors de la dérogation', () => answerWaiver(sessionId, pendingWaiver.callId, hours));
+    await report(t('sessionWaiverError'), () => answerWaiver(sessionId, pendingWaiver.callId, hours));
   }
 
   async function handleRetry(): Promise<void> {

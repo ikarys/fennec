@@ -1,4 +1,5 @@
 import { ChoiceMenu } from '../../ui/ChoiceMenu';
+import { useT } from '../../../i18n';
 import type { WorkflowSummary } from '../../../lib/workflow';
 
 export interface WorkflowSelection {
@@ -9,7 +10,7 @@ export interface WorkflowSelection {
 
 export const DEFAULT_WORKFLOW_ID = 'plan-build-verify';
 
-/** « Aucun workflow » is a value of its own, so the menu can select it. */
+/** 'No workflow' is a value of its own, so the menu can select it. */
 const NONE = '';
 
 export function defaultWorkflowSelection(workflows: WorkflowSummary[]): WorkflowSelection {
@@ -31,6 +32,7 @@ export function WorkflowPicker({
   selection: WorkflowSelection;
   onChange: (selection: WorkflowSelection) => void;
 }) {
+  const t = useT();
   if (workflows.length === 0) {
     return null;
   }
@@ -40,7 +42,7 @@ export function WorkflowPicker({
   return (
     <div className="flex items-center gap-1">
       <ChoiceMenu
-        label="Workflow"
+        label={t('workflowPickerLabel')}
         value={selection.workflowId ?? NONE}
         onChange={(value) =>
           onChange({
@@ -54,13 +56,13 @@ export function WorkflowPicker({
             choices: [
               {
                 value: NONE,
-                label: 'Aucun workflow',
-                description: "Parle directement à l'agent, sans graphe."
+                label: t('workflowPickerNone'),
+                description: t('workflowPickerNoneDescription')
               }
             ]
           },
           {
-            label: 'Workflows',
+            label: t('workflows'),
             choices: workflows.map((workflow) => ({
               value: workflow.id,
               label: workflow.name,
@@ -70,18 +72,18 @@ export function WorkflowPicker({
         ]}
         trigger={
           <span className={selection.workflowId ? 'text-accent-strong' : undefined}>
-            {selected?.name ?? 'Aucun workflow'}
+            {selected?.name ?? t('workflowPickerNone')}
           </span>
         }
       />
       {selection.stepByStep && (
         <button
           type="button"
-          title="Le run s'arrête avant chaque nœud. Clique pour l'enlever."
+          title={t('workflowPickerStepByStepTitle')}
           onClick={() => onChange({ ...selection, stepByStep: false })}
           className="rounded-md border border-accent px-1.5 py-0.5 text-xs text-accent"
         >
-          Pas à pas ✕
+          {t('workflowPickerStepByStep')}
         </button>
       )}
     </div>

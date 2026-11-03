@@ -5,6 +5,7 @@ import {
   type EdgeChange,
   type NodeChange
 } from '@xyflow/react';
+import { useT } from '../../i18n';
 import type { Agent } from '../../lib/api';
 import { listAgents, saveWorkflow, validateWorkflow, WorkflowSaveError } from '../../lib/api';
 import type { NodeKind, Origin, WorkflowDef, WorkflowEdge, WorkflowIssue, WorkflowNode } from '../../lib/workflow';
@@ -18,6 +19,7 @@ interface UseWorkflowEditorArgs {
 }
 
 export function useWorkflowEditor({ initialDef, initialOrigin, projectId }: UseWorkflowEditorArgs) {
+  const t = useT();
   const [def, setDef] = useState<WorkflowDef>(initialDef);
   const [origin, setOrigin] = useState<Origin>(initialOrigin);
   const [scope, setScope] = useState<'project' | 'global'>(initialOrigin === 'default' ? 'project' : initialOrigin);
@@ -190,12 +192,12 @@ export function useWorkflowEditor({ initialDef, initialOrigin, projectId }: UseW
         setIssues(error.issues);
         setSaveError(error.message);
       } else {
-        setSaveError(error instanceof Error ? error.message : 'Échec de l’enregistrement');
+        setSaveError(error instanceof Error ? error.message : t('workflowSaveError'));
       }
     } finally {
       setSaving(false);
     }
-  }, [projectId, def, scope, saving]);
+  }, [projectId, def, scope, saving, t]);
 
   const updateNode = useCallback(
     (node: WorkflowNode) => {

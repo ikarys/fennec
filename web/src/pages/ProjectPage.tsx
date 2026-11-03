@@ -17,15 +17,16 @@ import {
   type ProjectOverview,
 } from '../lib/api';
 import { type IdeaView } from '../lib/ideas';
+import { useT } from '../i18n';
 
 const TABS = [
-  { id: 'overview', label: "Vue d'ensemble" },
-  { id: 'tasks', label: 'Tâches' },
-  { id: 'sessions', label: 'Sessions' },
-  { id: 'map', label: 'Carte des modules' },
-  { id: 'risks', label: 'Risques' },
-  { id: 'doc', label: 'Doc' },
-  { id: 'analyses', label: 'Analyses' },
+  { id: 'overview', label: 'tasksTabOverview' },
+  { id: 'tasks', label: 'tasks' },
+  { id: 'sessions', label: 'sessionsSectionTitle' },
+  { id: 'map', label: 'moduleMapTitle' },
+  { id: 'risks', label: 'risksLabel' },
+  { id: 'doc', label: 'projectPageDoc' },
+  { id: 'analyses', label: 'analysesTitle' },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
@@ -35,6 +36,7 @@ type TabId = (typeof TABS)[number]['id'];
  * tabs do not wait for it.
  */
 function MapTab({ projectId }: { projectId: string }) {
+  const t = useT();
   const [data, setData] = useState<ProjectOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -53,7 +55,7 @@ function MapTab({ projectId }: { projectId: string }) {
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Erreur inconnue');
+          setError(err instanceof Error ? err.message : t('unknownError'));
           setLoading(false);
         }
       });
@@ -62,9 +64,9 @@ function MapTab({ projectId }: { projectId: string }) {
     };
   }, [projectId]);
 
-  if (loading) return <p className="text-muted">Chargement…</p>;
+  if (loading) return <p className="text-muted">{t('loading')}</p>;
   if (error) return <p className="text-err">{error}</p>;
-  if (!data) return <p className="text-muted">Chargement…</p>;
+  if (!data) return <p className="text-muted">{t('loading')}</p>;
 
   return (
     <MapSection
@@ -99,6 +101,7 @@ export default function ProjectPage({
   onDeleted: () => void;
   onSessionsDeleted: (ids: string[]) => void;
 }) {
+  const t = useT();
   const project = projects.find((p) => p.id === projectId) ?? null;
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
@@ -118,7 +121,7 @@ export default function ProjectPage({
       const created = await createSession(projectId, prompt, mode);
       onOpenSession(created.id);
     } catch (err) {
-      setAnalyzeError(err instanceof Error ? err.message : 'Erreur inconnue');
+      setAnalyzeError(err instanceof Error ? err.message : t('unknownError'));
     } finally {
       setAnalyzing(false);
     }
@@ -136,7 +139,7 @@ export default function ProjectPage({
   );
 
   if (!project) {
-    return shell(<p className="text-muted">Projet introuvable.</p>);
+    return shell(<p className="text-muted">{t('projectPageNotFound')}</p>);
   }
 
   const header = (
@@ -145,14 +148,14 @@ export default function ProjectPage({
         <h1 className="text-2xl font-semibold">
           {project.name}
         </h1>
-        <Button variant="primary" size="sm" onClick={() => onNewSession(projectId)} title="Nouvelle session dans ce projet">
+        <Button variant="primary" size="sm" onClick={() => onNewSession(projectId)} title={t('newSessionInProject')}>
           <PlusIcon className="h-4 w-4" />
-          Nouvelle session
+          {t('newSession')}
         </Button>
         <a
           href={project.editorUrl}
-          title="Ouvrir dans VS Code"
-          aria-label="Ouvrir dans VS Code"
+          title={t('openInVsCode')}
+          aria-label={t('openInVsCode')}
           className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
         >
           <ExternalIcon className="h-4 w-4" />
@@ -161,15 +164,15 @@ export default function ProjectPage({
           variant="ghost"
           size="sm"
           iconOnly
-          title="Supprimer le projet"
-          aria-label="Supprimer le projet"
+          title={t('deleteProjectBtn')}
+          aria-label={t('deleteProjectBtn')}
           onClick={() => setDeleting(true)}
         >
           <TrashIcon className="h-4 w-4" />
         </Button>
       </div>
       <p className="mt-0.5 break-all font-mono text-xs text-muted">
-        {project.workdir} · ⎇ {project.branch ?? 'sans branche'}
+        {project.workdir} · ⎇ {project.branch ?? t('noBranch')}
         {project.remote ? (
           <>
             {' · '}
@@ -204,8 +207,8 @@ export default function ProjectPage({
       )}
       <div className="mt-6 flex flex-col gap-6 md:flex-row">
         <Tabs
-          label="Sections du projet"
-          tabs={[...TABS]}
+          label={t('projectPageSectionsLabel')}
+          tabs={TABS.map((item) => ({ ...item, label: t(item.label) }))}
           active={activeTab}
           onSelect={handleTabSelect}
         />

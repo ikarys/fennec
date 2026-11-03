@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useT } from '../../i18n';
 import type { ServerDef } from '../../lib/api';
 import { saveServers } from '../../lib/api';
 import { CloseIcon, PlusIcon, SpinnerIcon, TrashIcon } from '../Icons';
@@ -16,6 +17,7 @@ interface ServerEditorProps {
 }
 
 export function ServerEditor({ open, sessionId, initial, onSaved, onClose }: ServerEditorProps) {
+  const t = useT();
   const [rows, setRows] = useState<ServerDef[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,48 +51,48 @@ export function ServerEditor({ open, sessionId, initial, onSaved, onClose }: Ser
       await saveServers(sessionId, trimmed);
       onSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur');
+      setError(err instanceof Error ? err.message : t('error'));
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <Modal open={open} onClose={onClose} busy={saving} label="Configure les serveurs" width="w-[min(92vw,560px)]">
+    <Modal open={open} onClose={onClose} busy={saving} label={t('serverEditorConfigureLabel')} width="w-[min(92vw,560px)]">
       <Card className="flex max-h-[85vh] w-full flex-col">
         <header className="flex shrink-0 items-start justify-between gap-3 border-b border-border p-4">
           <div className="flex min-w-0 flex-col gap-1">
-            <h2 className="truncate text-base font-semibold text-text">Serveurs</h2>
-            <p className="truncate text-sm text-muted">La liste du projet, dans .agents/servers.json.</p>
+            <h2 className="truncate text-base font-semibold text-text">{t('panelServers')}</h2>
+            <p className="truncate text-sm text-muted">{t('serverEditorListHint')}</p>
           </div>
-          <Button variant="secondary" size="sm" iconOnly onClick={onClose} aria-label="Fermer">
+          <Button variant="secondary" size="sm" iconOnly onClick={onClose} aria-label={t('close')}>
             <CloseIcon className="h-4 w-4" />
           </Button>
         </header>
 
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
-          {rows.length === 0 && <div className="text-sm text-muted">Aucun serveur.</div>}
+          {rows.length === 0 && <div className="text-sm text-muted">{t('serverEditorNone')}</div>}
           {rows.map((row, index) => (
             <div key={index} className="flex items-center gap-2">
               <TextInput
-                aria-label="Nom du serveur"
+                aria-label={t('serverEditorNameLabel')}
                 value={row.name}
                 onChange={(event) => setRow(index, 'name', event.target.value)}
-                placeholder="web"
+                placeholder={t('serverEditorNamePlaceholder')}
                 className="w-28 shrink-0"
               />
               <TextInput
-                aria-label="Commande du serveur"
+                aria-label={t('serverEditorCommandLabel')}
                 value={row.command}
                 onChange={(event) => setRow(index, 'command', event.target.value)}
-                placeholder="npm run dev"
+                placeholder={t('serverEditorCommandPlaceholder')}
                 className="min-w-0 flex-1"
               />
               <Button
                 variant="ghost"
                 size="sm"
                 iconOnly
-                aria-label="Supprimer ce serveur"
+                aria-label={t('serverEditorRemoveServer')}
                 onClick={() => removeRow(index)}
               >
                 <TrashIcon className="h-3.5 w-3.5" />
@@ -99,7 +101,7 @@ export function ServerEditor({ open, sessionId, initial, onSaved, onClose }: Ser
           ))}
           <Button variant="secondary" size="sm" onClick={addRow}>
             <PlusIcon className="h-3.5 w-3.5" />
-            Ajouter un serveur
+            {t('serverEditorAddServer')}
           </Button>
         </div>
 
@@ -107,16 +109,16 @@ export function ServerEditor({ open, sessionId, initial, onSaved, onClose }: Ser
           {error && <div className="text-sm text-err">{error}</div>}
           <div className="flex flex-wrap justify-end gap-2">
             <Button variant="secondary" size="sm" onClick={onClose}>
-              Annuler
+              {t('cancel')}
             </Button>
             <Button variant="primary" size="sm" disabled={saving || invalid} onClick={() => void handleSave()}>
               {saving ? (
                 <>
                   <SpinnerIcon className="h-3.5 w-3.5" />
-                  Enregistrement…
+                  {t('sectionSaving')}
                 </>
               ) : (
-                'Enregistrer'
+                t('agentSave')
               )}
             </Button>
           </div>

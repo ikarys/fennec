@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ThreadItem } from '../../../lib/fold';
 import { formatClock, formatDuration } from '../../../lib/format';
 import type { NodeKind } from '../../../lib/workflow';
-import { useLang } from '../../../i18n';
+import { useLang, useT } from '../../../i18n';
 import { portTone } from '../../../lib/workflowRun';
 import { CheckIcon, ChevronRightIcon, CloseIcon, ExternalIcon, SpinnerIcon } from '../../Icons';
 import { useNodeUsage } from '../../session/CallUsage';
@@ -35,6 +35,7 @@ function nodeKindTone(kind: NodeKind): string {
 
 export function NodeDivider({ item, running }: { item: WorkflowNodeItem; running: boolean }) {
   const lang = useLang();
+  const t = useT();
   const finished = item.port !== undefined;
   const usage = useNodeUsage(item.id);
   const badge = finished ? { port: item.port!, tone: portBadgeTone(item.port!) } : null;
@@ -68,7 +69,7 @@ export function NodeDivider({ item, running }: { item: WorkflowNodeItem; running
           <span className="truncate text-text" title={item.label}>
             {item.label}
           </span>
-          {item.pass > 1 && <Badge tone="neutral">passage {item.pass}</Badge>}
+          {item.pass > 1 && <Badge tone="neutral">{t('nodeDividerPassage', { pass: item.pass })}</Badge>}
           {badge && (
             <span className="shrink-0" aria-label={badge.port}>
               <Badge tone={badge.tone} title={badge.port}>
@@ -89,11 +90,11 @@ export function NodeDivider({ item, running }: { item: WorkflowNodeItem; running
           {!finished && running && (
             <span className="flex items-center gap-1 text-accent-strong">
               <SpinnerIcon className="h-3 w-3" />
-              en cours…
+              {t('nodeDividerRunning')}
               <span className="tabular-nums">{formatClock(elapsedMs)}</span>
             </span>
           )}
-          {!finished && !running && <span>interrompu</span>}
+          {!finished && !running && <span>{t('nodeDividerInterrupted')}</span>}
         </span>
         {hasDetails ? (
           <button
@@ -103,7 +104,7 @@ export function NodeDivider({ item, running }: { item: WorkflowNodeItem; running
             onClick={() => setOpen(!open)}
           >
             <ChevronRightIcon className={`h-3 w-3 transition-transform ${open ? 'rotate-90' : ''}`} />
-            détails
+            {t('nodeDividerDetails')}
           </button>
         ) : (
           <span className="h-px grow bg-border" />
@@ -114,13 +115,13 @@ export function NodeDivider({ item, running }: { item: WorkflowNodeItem; running
           <div className="flex flex-col gap-2.5 rounded-md border border-border bg-raised px-3 py-2 text-left text-xs">
             {item.prompt && (
               <div className="flex flex-col gap-1">
-                <SectionLabel>Prompt</SectionLabel>
+                <SectionLabel>{t('agentFieldsPromptLabel')}</SectionLabel>
                 <div className="max-h-48 overflow-y-auto whitespace-pre-wrap text-muted">{item.prompt}</div>
               </div>
             )}
             {item.output && (
               <div className="flex flex-col gap-1">
-                <SectionLabel>Sortie</SectionLabel>
+                <SectionLabel>{t('outputLabel')}</SectionLabel>
                 {item.nodeKind === 'shell' || item.nodeKind === 'criteria' ? (
                   <pre className="max-h-48 overflow-y-auto whitespace-pre-wrap break-words rounded bg-code p-2 font-mono text-xs text-muted">
                     {item.output}
@@ -130,7 +131,7 @@ export function NodeDivider({ item, running }: { item: WorkflowNodeItem; running
                 )}
                 {item.nodeKind === 'shell' && item.exitCode !== undefined && (
                   <div className="flex justify-end">
-                    <Badge tone={item.exitCode === 0 ? 'ok' : 'err'}>code de sortie : {item.exitCode}</Badge>
+                    <Badge tone={item.exitCode === 0 ? 'ok' : 'err'}>{t('nodeDividerExitCode', { code: item.exitCode })}</Badge>
                   </div>
                 )}
               </div>
@@ -139,7 +140,7 @@ export function NodeDivider({ item, running }: { item: WorkflowNodeItem; running
               <div className="flex justify-end">
                 <a href={`#/s/${item.childSessionId}`} className={buttonClass({ variant: 'ghost', size: 'sm' })}>
                   <ExternalIcon className="h-3 w-3" />
-                  Ouvrir la session
+                  {t('openSession')}
                 </a>
               </div>
             )}
