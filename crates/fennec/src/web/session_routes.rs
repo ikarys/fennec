@@ -44,15 +44,27 @@ use serde_json::{Value, json};
 use std::net::TcpStream;
 use std::path::Path;
 
-pub(super) fn list_folders(req: &Request, stream: &mut TcpStream) -> Result<(), String> {
+pub(super) fn list_folders(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
     let dir = req
         .query_param("path")
         .filter(|p| !p.is_empty())
         .map_or_else(folders::home, Into::into);
+    if folders::inside_store(&dir, store_dir(app)) {
+        return error(
+            stream,
+            400,
+            "fennec's own store cannot be browsed as a project",
+        );
+    }
     match folders::list(&dir) {
         Ok(listing) => send_json(stream, 200, &json!(listing)),
         Err(e) => error(stream, 400, &e),
     }
+}
+
+/// The directory holding fennec's database and the sessions' worktrees.
+fn store_dir(app: &App) -> &Path {
+    app.settings.db_path.parent().unwrap_or(Path::new("/"))
 }
 
 pub(super) fn create_folder(req: &Request, stream: &mut TcpStream) -> Result<(), String> {
@@ -91,7 +103,7 @@ pub(super) fn list_projects(app: &App, stream: &mut TcpStream) -> Result<(), Str
                 v
             })
             .collect();
-        let mut v = project_json(&p);
+        let mut v = project_json(&p, store_dir(app));
         v["branch"] = json!(git::current_branch(Path::new(&p.workdir)));
         v["remote"] = json!(
             git::remote_url(Path::new(&p.workdir))
@@ -114,8 +126,15 @@ pub(super) fn open_project(app: &App, req: &Request, stream: &mut TcpStream) -> 
     let Some(dir) = dir.canonicalize().ok().filter(|d| d.is_dir()) else {
         return error(stream, 400, "not a directory");
     };
+    if folders::inside_store(&dir, store_dir(app)) {
+        return error(
+            stream,
+            400,
+            "fennec's own store cannot be opened as a project",
+        );
+    }
     let p = app.store()?.project_for(&dir.display().to_string())?;
-    send_json(stream, 200, &project_json(&p))
+    send_json(stream, 200, &project_json(&p, store_dir(app)))
 }
 
 pub(super) fn list_commands(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
@@ -299,7 +318,7 @@ pub(super) fn get_session(app: &App, stream: &mut TcpStream, id: &str) -> Result
     let list = agents::discover(Path::new(&p.workdir));
     let mode = agent_resolve(&list, &events).map(|agent| agent.id.clone());
     let mut v = session_json(app, &s);
-    v["project"] = project_json(&p);
+    v["project"] = project_json(&p, store_dir(app));
     v["mode"] = json!(mode);
     v["model"] = model_routes::session_model(app, &store, &s.id)?;
     // The idea this session frames, so its plan card can mark it ready.
@@ -758,8 +777,14 @@ fn session_json(app: &App, s: &SessionSummary) -> Value {
     })
 }
 
-fn project_json(p: &Project) -> Value {
-    json!({ "id": p.id, "name": p.name, "workdir": p.workdir, "chat": chat::is_chat(p) })
+fn project_json(p: &Project, store_dir: &Path) -> Value {
+    json!({
+        "id": p.id,
+        "name": p.name,
+        "workdir": p.workdir,
+        "chat": chat::is_chat(p),
+        "sessionWorktree": folders::inside_store(Path::new(&p.workdir), store_dir),
+    })
 }
 
 /// Appends a choice the human made (mode, model) and wakes the session's streams.
@@ -804,8 +829,12 @@ mod tests {
             name: "o".into(),
             workdir: "/w".into(),
         };
-        assert_eq!(project_json(&chat)["chat"], true);
-        assert_eq!(project_json(&other)["chat"], false);
+        let store_dir = Path::new("/nowhere");
+        let chat_json = project_json(&chat, store_dir);
+        let other_json = project_json(&other, store_dir);
+        assert_eq!(chat_json["chat"], true);
+        assert_eq!(other_json["chat"], false);
+        assert_eq!(chat_json["sessionWorktree"], false);
     }
 
     #[test]

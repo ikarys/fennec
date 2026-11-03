@@ -201,10 +201,15 @@ function ProjectSection({
           <ChevronRightIcon
             className={`h-3 w-3 shrink-0 text-muted transition-transform ${open ? 'rotate-90' : ''}`}
           />
-          <span className="truncate text-sm font-semibold">{project.name}</span>
+          <span className="shrink-0 text-sm font-semibold">{project.name}</span>
           {runningCount > 0 && (
             <Badge tone="accent" solid dot pulse>
               {runningCount} en cours
+            </Badge>
+          )}
+          {project.sessionWorktree && (
+            <Badge tone="err" title="Ce dossier est l'espace de travail d'une session de fennec : une intégration ou un nettoyage peut le supprimer.">
+              worktree d'une session
             </Badge>
           )}
           <span className="ml-1 flex min-w-0 gap-3 font-mono text-xs text-faint">

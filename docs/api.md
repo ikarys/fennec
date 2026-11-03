@@ -233,9 +233,9 @@ read-only. The human edits them as usual.
 - `GET /api/models/choices` → `{default, favorites}`, each a
   `{provider, model, providerName}`: what the composer's model picker offers;
   read from the stored preferences, no provider is called
-- `GET /api/projects` → `[{id, name, workdir, branch, remote, editorUrl, sessions: [{id, title, state, createdAt, updatedAt}]}]`
-  (projects most recently active first, sessions newest first; `createdAt`/`updatedAt` are Unix milliseconds; `branch` and `remote` may be `null`; `editorUrl` opens the workdir in VS Code, through the WSL remote under WSL)
-- `POST /api/projects` `{workdir}` → the project (400 if not a directory)
+- `GET /api/projects` → `[{id, name, workdir, branch, remote, editorUrl, sessionWorktree, sessions: [{id, title, state, createdAt, updatedAt}]}]`
+  (projects most recently active first, sessions newest first; `createdAt`/`updatedAt` are Unix milliseconds; `branch` and `remote` may be `null`; `editorUrl` opens the workdir in VS Code, through the WSL remote under WSL; `sessionWorktree` marks a workdir inside fennec's own store (a session's worktree opened as a project before that was refused))
+- `POST /api/projects` `{workdir}` → the project (400 if not a directory, or inside fennec's store)
 - `POST /api/projects/{id}/delete` `{deleteFolder?}` → `{deleted: true, folderDeleted, folderError}`: deletes the project with every top-level session as `POST /api/sessions/delete` does (logs, children, worktrees, branches, session rules), then its project rules, its ideas backlog and the project. With `deleteFolder: true` the source folder is removed from disk afterwards; a failure there comes back as `folderError` (the project is already gone). 404 for an unknown project; 409 `{error}` while its queue runs, `{error, running}` while one of its sessions runs a turn, `{error, sessionId}` when a worktree cannot be removed (the project and the sessions not yet removed stay); 400 when the folder is the filesystem root, the home directory or an ancestor of it, or holds fennec's store (nothing is deleted then). The usage ledger keeps the calls.
 - `GET /api/backlog` → `{total, projects}`: the cross-project Backlog page, one row per project (the idea lists
   live in each project's Tasks tab):
@@ -394,7 +394,7 @@ read-only. The human edits them as usual.
   - `POST /api/projects/{id}/ideas/queue/stop` `{}`: the queue starts no further idea; the running turn finishes
 - `GET /api/folders?path=<absolute path>` → `{path, parent, folders: [{name, path, hidden, repo}]}`,
   the sub-folders of `path` (the home directory when omitted), sorted by name;
-  `repo` marks a git repository; 400 if `path` cannot be read
+  `repo` marks a git repository; 400 if `path` cannot be read or is inside fennec's store (its database, the sessions' worktrees)
 - `POST /api/sessions/{id}/audit/tasks` `{findings: [number]}` → `{created}`: adds one idea per finding of the
   session's audit report to its project's backlog, the text written by the server; 400 when a number is unknown;
   409 when a finding is already a task; records `audit.tasks_created` in the session's log;
