@@ -3,11 +3,12 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Plan, Report } from '../../lib/plan';
 import type { PreflightResultView } from '../../lib/fold';
-import { CheckIcon, CloseIcon, EditIcon, PlayIcon } from '../Icons';
+import { CheckIcon, CloseIcon, EditIcon } from '../Icons';
 import type { PlanActions } from './PlanActions';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
+import { Menu, MenuItem } from '../ui/Menu';
 import { SectionLabel } from '../ui/SectionLabel';
 import { PreflightSection } from './PreflightSection';
 
@@ -38,8 +39,9 @@ function PathChip({ path }: { path: string }) {
 export function PlanCard({ plan, actions, preflight }: { plan: Plan; actions?: PlanActions | null; preflight?: PreflightResultView[] }) {
   // The worktree decision is made when building a plan, not in the composer.
   const [worktree, setWorktree] = useState(true);
+  // Writing in the human's own folder is the risky choice: the card says so with its border.
   return (
-    <Card className="flex flex-col gap-3 p-4">
+    <Card className={`flex flex-col gap-3 p-4 ${actions && !worktree ? 'border-err/40' : ''}`}>
       <div className="flex items-center gap-2">
         <Badge tone="accent">Plan</Badge>
         <span className="min-w-0 font-semibold text-text">
@@ -127,32 +129,13 @@ export function PlanCard({ plan, actions, preflight }: { plan: Plan; actions?: P
             disabled={actions.disabled}
             title="Lance Plan, build, verify à partir de ce plan : critères vérifiés, vérification et review."
           >
-            Construire
+            Lancer
           </Button>
-          <label
-            className="flex items-center gap-1.5 text-xs text-muted"
-            title="Coché, l'agent travaille dans sa propre copie du dépôt (worktree) et tu intègres ensuite ; décoché, il écrit directement dans ton dossier."
-          >
-            <input
-              type="checkbox"
-              checked={worktree}
-              onChange={(e) => setWorktree(e.target.checked)}
-              disabled={actions.disabled}
-            />
-            Espace séparé
-          </label>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            iconOnly
-            onClick={actions.onBuildAlone}
-            disabled={actions.disabled}
-            title="Exécute le plan avec l'agent Builder seul, sans critères ni review."
-            aria-label="Sans workflow"
-          >
-            <PlayIcon className="h-3.5 w-3.5" />
-          </Button>
+          {!actions.disabled && (
+            <Menu label="Autres façons de lancer">
+              <MenuItem onSelect={actions.onBuildAlone}>Builder seul, sans critères ni review</MenuItem>
+            </Menu>
+          )}
           {actions.ideaReady && (
             <Button
               type="button"
@@ -180,6 +163,16 @@ export function PlanCard({ plan, actions, preflight }: { plan: Plan; actions?: P
             <EditIcon className="h-3.5 w-3.5" />
           </Button>
         </div>
+      )}
+      {actions && (
+        <p className={`m-0 flex flex-wrap items-center gap-1.5 text-xs ${worktree ? 'text-muted' : 'text-err'}`}>
+          {worktree
+            ? "Dans une copie du dépôt (worktree) : tu intègres ensuite."
+            : "Directement dans ton dossier : rien ne sépare le travail de l'agent du tien."}
+          <Button type="button" variant="ghost" size="sm" onClick={() => setWorktree((value) => !value)} disabled={actions.disabled}>
+            changer
+          </Button>
+        </p>
       )}
     </Card>
   );
@@ -221,6 +214,7 @@ export function ReportCard({ report }: { report: Report }) {
           <Inline>{report.title}</Inline>
         </span>
         {report.steps.length > 0 && <Tally done={done} total={report.steps.length} />}
+        <Badge tone="accent" title="Coches déclarées par le modèle, non vérifiées par fennec" className="ml-auto">indicatif</Badge>
       </div>
       {report.summary && (
         <p className="m-0 text-sm leading-relaxed text-text">
@@ -280,7 +274,6 @@ export function ReportCard({ report }: { report: Report }) {
           </div>
         </div>
       )}
-      <p className="m-0 text-xs text-faint">Coches déclarées par le modèle, non vérifiées par fennec.</p>
     </Card>
   );
 }
