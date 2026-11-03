@@ -26,6 +26,7 @@ import { ServersSection } from './ServersSection';
 import { SkillsSection } from './SkillsSection';
 import { TokensSection } from './TokensSection';
 import { VisionSection } from './VisionSection';
+import { useLang, useT } from '../../i18n';
 
 const WIDTH_KEY = 'fennec.contextPanelWidth';
 const PAGE_KEY = 'fennec.contextPanel.page';
@@ -133,11 +134,13 @@ interface ContextPanelProps {
 }
 
 export function ContextPanel({ view, skills, usage, request, hasSession, worktree, sessionId, onWorktreeChanged, integrationVersion, vision }: ContextPanelProps) {
+  const t = useT();
+  const lang = useLang();
   const [width, setWidth] = useState(loadWidth);
   const [selectedPageName, setSelectedPageName] = useState(loadPageName);
   const [collapsed, setCollapsed] = useState(loadCollapsed);
   const [openBlock, setOpenBlock] = useState<PanelBlockId | null>(null);
-  const pages = panelPages(useDisplayPrefs().panelPages);
+  const pages = panelPages(lang, useDisplayPrefs().panelPages);
   const page = pages.find((candidate) => candidate.name === selectedPageName) ?? pages[0] ?? { name: '', blocks: [] };
 
   useEffect(() => {
@@ -196,7 +199,7 @@ export function ContextPanel({ view, skills, usage, request, hasSession, worktre
     if (pages.length > 3) {
       return (
         <ChoiceMenu
-          label="Page du panneau"
+          label={t('panelPageLabel')}
           groups={[{ choices: pages.map((candidate) => ({ value: candidate.name, label: candidate.name })) }]}
           value={page.name}
           onChange={selectPage}
@@ -216,7 +219,7 @@ export function ContextPanel({ view, skills, usage, request, hasSession, worktre
     }
     return (
       <Segmented
-        label="Page du panneau"
+        label={t('panelPageLabel')}
         value={page.name}
         onChange={selectPage}
         segments={pages.map((candidate) => ({ value: candidate.name, label: candidate.name, title: candidate.name }))}
@@ -257,24 +260,24 @@ export function ContextPanel({ view, skills, usage, request, hasSession, worktre
     const openCount = openBlock ? railCount(openBlock, view, vision) : null;
     return (
       <aside
-        aria-label="Contexte de la session"
+        aria-label={t('sessionContextLabel')}
         className={`${openBlock ? 'relative ' : ''}w-10 shrink-0 flex-col items-center gap-1 border-l border-border bg-bg py-1 ${className}`}
       >
         {openBlock ? (
           <div
             className="absolute inset-y-0 right-full z-20 flex w-[300px] flex-col border border-border bg-bg shadow-xl"
             role="dialog"
-            aria-label={panelBlock(openBlock).title}
+            aria-label={t(lang, panelBlock(openBlock).titleKey)}
           >
             <div className="flex items-center gap-1 px-2 py-2">
-              <span className="min-w-0 truncate text-xs font-medium text-text">{panelBlock(openBlock).title}</span>
+              <span className="min-w-0 truncate text-xs font-medium text-text">{t(lang, panelBlock(openBlock).titleKey)}</span>
               {openCount !== null ? <span className="font-mono text-xs text-muted tabular-nums">{openCount}</span> : null}
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
                 iconOnly
-                aria-label="Fermer"
+                aria-label={t('close')}
                 onClick={() => setOpenBlock(null)}
                 className="ml-auto"
               >
@@ -292,14 +295,14 @@ export function ContextPanel({ view, skills, usage, request, hasSession, worktre
             variant="ghost"
             size="sm"
             iconOnly
-            aria-label="Déplier"
+            aria-label={t('expand')}
             onClick={() => setCollapsed(false)}
           >
             <ChevronsLeftIcon className="h-3.5 w-3.5" />
           </Button>
         </div>
         {RAIL_BLOCKS.filter((block) => block.id !== 'workspace' || sessionId).map((block) => {
-          const title = panelBlock(block.id).title;
+          const title = t(lang, panelBlock(block.id).titleKey);
           const count = railCount(block.id, view, vision);
           return (
             <Button
@@ -338,31 +341,31 @@ export function ContextPanel({ view, skills, usage, request, hasSession, worktre
       <div
         role="separator"
         aria-orientation="vertical"
-        aria-label="Largeur du panneau"
+        aria-label={t('panelWidthLabel')}
         aria-valuemin={MIN_WIDTH}
         aria-valuemax={MAX_WIDTH}
         aria-valuenow={width}
         tabIndex={0}
-        title="Glisser pour élargir · double-clic : largeur par défaut"
+        title={t('panelResizeTitle')}
         onPointerDown={startResize}
         onDoubleClick={() => setWidth(DEFAULT_WIDTH)}
         onKeyDown={resizeWithKeys}
         className="absolute inset-y-0 -left-1 z-10 w-2 cursor-col-resize touch-none hover:bg-accent/40 focus-visible:bg-accent/40 focus-visible:outline-none"
       />
       <aside
-        aria-label="Contexte de la session"
+        aria-label={t('sessionContextLabel')}
         className="flex min-h-0 w-full flex-col border-l border-border bg-bg"
       >
         <div className="flex items-center gap-1 px-2 py-2">
-          <span className="min-w-0 truncate text-xs font-medium text-text" title="Contexte de la session">
-            Contexte
+          <span className="min-w-0 truncate text-xs font-medium text-text" title={t('sessionContextLabel')}>
+            {t('panelPageContext')}
           </span>
           <Button
             type="button"
             variant="ghost"
             size="sm"
             iconOnly
-            aria-label="Replier"
+            aria-label={t('collapse')}
             onClick={() => setCollapsed(true)}
             className="ml-auto"
           >
@@ -373,7 +376,7 @@ export function ContextPanel({ view, skills, usage, request, hasSession, worktre
           <div className="px-2 pb-2">{renderPageSwitch()}</div>
         )}
         <div className="min-h-0 grow overflow-y-auto [scrollbar-width:thin]">
-          {hasSession ? pageBlocks(page, page === pages[0]).map(renderBlock) : <p className="m-0 px-3 py-2 text-xs text-muted">Le contexte apparaît avec le premier message.</p>}
+          {hasSession ? pageBlocks(page, page === pages[0]).map(renderBlock) : <p className="m-0 px-3 py-2 text-xs text-muted">{t('contextEmpty')}</p>}
         </div>
       </aside>
       </div>

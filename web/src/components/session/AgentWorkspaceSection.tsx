@@ -7,9 +7,9 @@ import { Button, buttonClass } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Card } from '../ui/Card';
 import { SectionLabel } from '../ui/SectionLabel';
-import { panelBlock } from '../../lib/panelBlocks';
 import { Panel } from '../ui/Panel';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
+import { useT } from '../../i18n';
 
 function shortFolderName(path: string): string {
   const name = path.split(/[\\/]/).filter(Boolean).pop() ?? path;
@@ -26,6 +26,7 @@ function shortAgentBranch(branch: string): string {
 }
 
 export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarded, integrationVersion }: { sessionId: string | null; worktree: NonNullable<SessionDetail['worktree']> | null; running: boolean; onDiscarded: () => void; integrationVersion: number }) {
+  const t = useT();
   const [preview, setPreview] = useState<IntegrationPreview | null>(null);
   const [repo, setRepo] = useState<RepoState | null>(null);
   const [loading, setLoading] = useState(false);
@@ -117,13 +118,13 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
   const handleOpenTerminal = () => {
     if (!sessionId) return;
     setTerminalError(null);
-    openTerminal(sessionId).catch((failure) => setTerminalError(failure instanceof Error ? failure.message : 'Erreur'));
+    openTerminal(sessionId).catch((failure) => setTerminalError(failure instanceof Error ? failure.message : t('error')));
   };
   const [filesError, setFilesError] = useState<string | null>(null);
   const handleOpenFiles = () => {
     if (!sessionId) return;
     setFilesError(null);
-    openFileManager(sessionId).catch((failure) => setFilesError(failure instanceof Error ? failure.message : 'Erreur'));
+    openFileManager(sessionId).catch((failure) => setFilesError(failure instanceof Error ? failure.message : t('error')));
   };
   const terminalButton = (
     <Button
@@ -132,8 +133,8 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
       iconOnly
       onClick={handleOpenTerminal}
       disabled={!sessionId}
-      title="Ouvrir un terminal ici"
-      aria-label="Ouvrir un terminal ici"
+      title={t('openTerminalHere')}
+      aria-label={t('openTerminalHere')}
     >
       <TerminalIcon className="h-3.5 w-3.5" />
     </Button>
@@ -153,13 +154,13 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
       await discardWorktree(sessionId);
       onDiscarded();
     } catch (discardFailure) {
-      setDiscardError(discardFailure instanceof Error ? discardFailure.message : 'Erreur');
+      setDiscardError(discardFailure instanceof Error ? discardFailure.message : t('error'));
     } finally {
       setDiscarding(false);
     }
   };
 
-  const humanBranch = repo?.branch ?? preview?.humanBranch ?? 'ta branche';
+  const humanBranch = repo?.branch ?? preview?.humanBranch ?? t('yourBranch');
   const hasCommits = (preview?.commits.length ?? 0) > 0;
   // The file list lives in the Fichiers modifiés block; here only what blocks the review.
   const protectedCount = preview?.files.filter((file) => file.protected).length ?? 0;
@@ -177,7 +178,7 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
       await resolveConflict(sessionId);
       void fetchPreview();
     } catch (failure) {
-      setConflictError(failure instanceof Error ? failure.message : 'Erreur');
+      setConflictError(failure instanceof Error ? failure.message : t('error'));
     } finally {
       setResolvingConflict(false);
     }
@@ -186,7 +187,7 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
   return (
     <Panel
       id="workspace"
-      title={panelBlock('workspace').title}
+      title={t('panelWorkspace')}
       icon={<BranchIcon className="h-3.5 w-3.5" />}
       iconTone={conflictFiles.length > 0 ? 'err' : 'neutral'}
     >
@@ -195,23 +196,23 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
         <Card variant="inset" className="group">
           <div className="flex items-center gap-2">
             <FolderIcon className="h-4 w-4 shrink-0 text-muted" />
-            <SectionLabel>L'agent</SectionLabel>
+            <SectionLabel>{t('agentZone')}</SectionLabel>
             <span className="ml-auto flex min-w-0 items-center gap-1.5 text-xs">
               {loading && preview === null ? (
                 <span className="flex items-center gap-1 text-muted">
                   <SpinnerIcon className="h-3.5 w-3.5" />
-                  Lecture…
+                  {t('reading')}
                 </span>
               ) : hasCommits ? (
                 <Badge tone="neutral" pill>
-                  {preview?.commits.length ?? 0} commits · {preview?.files.length ?? 0} fichiers
+                  {t('commitsFiles', { commits: preview?.commits.length ?? 0, files: preview?.files.length ?? 0 })}
                 </Badge>
               ) : (
-                <span className="truncate text-faint">Rien à intégrer pour l'instant.</span>
+                <span className="truncate text-faint">{t('nothingToIntegrate')}</span>
               )}
               {protectedCount > 0 && (
                 <Badge tone="err" pill>
-                  {protectedCount} protégé{protectedCount > 1 ? 's' : ''}
+                  {t('protectedCount', { count: protectedCount })}
                 </Badge>
               )}
             </span>
@@ -225,8 +226,8 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
                 <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
                   <a
                     href={worktree.editorUrl}
-                    title="Ouvrir dans VS Code"
-                    aria-label="Ouvrir dans VS Code"
+                    title={t('openInVsCode')}
+                    aria-label={t('openInVsCode')}
                     className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
                   >
                     <ExternalIcon className="h-3.5 w-3.5" />
@@ -237,8 +238,8 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
                     size="sm"
                     iconOnly
                     onClick={handleCopyPath}
-                    title="Copier le chemin"
-                    aria-label="Copier le chemin"
+                    title={t('copyPath')}
+                    aria-label={t('copyPath')}
                   >
                     {copied ? <CheckIcon className="h-3.5 w-3.5 text-ok" /> : <CopyIcon className="h-3.5 w-3.5" />}
                   </Button>
@@ -254,7 +255,7 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
             </div>
           ) : (
             <div className="flex items-center gap-2 text-xs text-muted">
-              <span className="grow">Travaille directement dans ton dossier.</span>
+              <span className="grow">{t('worksInYourFolder')}</span>
               {terminalButton}
             </div>
           )}
@@ -265,11 +266,11 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
           <Card variant="inset">
             <div className="flex items-center gap-2">
               <FolderIcon className="h-4 w-4 shrink-0 text-muted" />
-              <SectionLabel>Ton dépôt</SectionLabel>
+              <SectionLabel>{t('yourRepo')}</SectionLabel>
               <span className="ml-auto inline-flex shrink-0">
                 {repo.dirty > 0 && (
-                  <Badge tone="accent" pill title="Modifications non commitées dans ton dossier">
-                    {repo.dirty} non commité{repo.dirty > 1 ? 's' : ''}
+                  <Badge tone="accent" pill title={t('dirtyTitle')}>
+                    {t('dirtyCount', { count: repo.dirty })}
                   </Badge>
                 )}
               </span>
@@ -278,7 +279,7 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
               type="button"
               onClick={handleOpenFiles}
               disabled={!sessionId}
-              title={`Ouvrir ${repo.dir} dans l'explorateur de fichiers`}
+              title={t('openInExplorer', { dir: repo.dir })}
               className="flex w-full cursor-pointer items-center gap-2 rounded-md px-1 py-0.5 text-left hover:bg-accent-soft"
             >
               <span className="grow overflow-hidden font-mono text-xs text-ellipsis whitespace-nowrap">
@@ -289,12 +290,12 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
             <div className="flex items-center gap-2 text-xs">
               <BranchIcon className="h-4 w-4 shrink-0 text-muted" />
               <span title={repo.branch ?? undefined} className="grow overflow-hidden font-mono text-text text-ellipsis whitespace-nowrap">
-                {repo.branch ?? 'HEAD détachée'}
+                {repo.branch ?? t('detachedHeadBranch')}
               </span>
             </div>
             {repo.branchChanged && (
               <div className="text-xs text-err">
-                Le travail est parti de {repo.originBranch} : tu as changé de branche depuis.
+                {t('branchChangedSince', { branch: repo.originBranch })}
               </div>
             )}
           </Card>
@@ -305,7 +306,7 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
             {conflictFiles.length > 0 && (
               <div className="rounded-lg border border-err/40 bg-err/10 px-2.5 py-2 text-xs flex flex-col gap-1.5">
                 <div>
-                  Conflit avec {humanBranch} sur {conflictFiles.length} fichier(s) : l'intégration est bloquée.
+                  {t('conflictBlocked', { branch: humanBranch, count: conflictFiles.length })}
                 </div>
                 <div className="flex flex-col gap-0.5 font-mono">
                   {conflictFiles.map((file) => (
@@ -318,9 +319,9 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
                   className="w-full"
                   onClick={() => void handleResolveConflict()}
                   disabled={running || resolvingConflict || sessionId === null}
-                  title="L'agent met sa branche à jour et résout les conflits dans cette session"
+                  title={t('resolveConflictTitle')}
                 >
-                  Résoudre avec l'agent
+                  {t('resolveWithAgent')}
                 </Button>
                 {conflictError && <div className="text-xs text-err">{conflictError}</div>}
               </div>
@@ -332,20 +333,20 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
                 size="sm"
                 onClick={() => invite?.open()}
                 disabled={integrateDisabled}
-                title={running ? 'Attends la fin du tour' : undefined}
+                title={running ? t('waitTurnEnd') : undefined}
                 className="w-full"
               >
-                Relire et intégrer…
+                {t('reviewAndIntegrate')}
               </Button>
             )}
 
             {/* The destructive choice sits with the manual one: one primary action per block (docs/ui.md). */}
             <details className="text-xs">
-              <summary className="cursor-pointer select-none text-muted hover:text-text">Le faire à la main, ou abandonner</summary>
+              <summary className="cursor-pointer select-none text-muted hover:text-text">{t('manualOrDiscard')}</summary>
               <div className="mt-1.5">
                 <button
                   type="button"
-                  title="Copier la commande"
+                  title={t('copyCommand')}
                   onClick={() => void navigator.clipboard.writeText(`git cherry-pick ${worktree.base}..${worktree.branch}`)}
                   className="rounded-lg border border-border bg-code px-2 py-1.5 text-left font-mono text-xs break-all text-text hover:border-border-strong"
                 >
@@ -359,7 +360,7 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
                   onClick={openDiscard}
                   disabled={sessionId === null || running || discarding}
                 >
-                  Abandonner ce travail
+                  {t('discardWork')}
                 </Button>
                 {discardError && <div className="text-xs text-err">{discardError}</div>}
               </div>
@@ -369,9 +370,9 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
       </div>
       <ConfirmDialog
         open={pendingDiscard}
-        title="Abandonner ce travail ?"
-        body={`Le dossier et la branche de l'agent seront supprimés, ses ${preview?.commits.length ?? 0} commits perdus. Ton dossier et ta branche ne sont pas touchés.`}
-        confirmLabel="Abandonner"
+        title={t('discardWorkTitle')}
+        body={t('discardWorkBody', { count: preview?.commits.length ?? 0 })}
+        confirmLabel={t('discard')}
         onConfirm={() => void confirmDiscard()}
         onCancel={() => setPendingDiscard(false)}
       />

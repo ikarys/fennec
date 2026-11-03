@@ -8,21 +8,24 @@ import { shortPath } from '../../lib/shortPath';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Select } from '../ui/Field';
+import { useLang, useT } from '../../i18n';
+import { t, type Lang } from '../../i18n/messages';
 
-function approvalAction(approval: PendingApproval): string {
-  if (approval.kind === 'command') return 'Lancer';
-  if (approval.kind === 'tool') return 'Utiliser';
-  if (approval.access === 'write') return 'Écrire';
-  if (approval.access === 'readWrite') return 'Lire et écrire';
-  return 'Lire';
+function approvalAction(lang: Lang, approval: PendingApproval): string {
+  if (approval.kind === 'command') return t(lang, 'runAction');
+  if (approval.kind === 'tool') return t(lang, 'useAction');
+  if (approval.access === 'write') return t(lang, 'writeAction');
+  if (approval.access === 'readWrite') return t(lang, 'readWriteAction');
+  return t(lang, 'readAction');
 }
 
 function sessionScope(
+  lang: Lang,
   folder: string,
   kind: PendingApproval['kind']
 ): { pattern: string; suffix: string | null } {
   const pattern = folder;
-  const suffix = kind === 'path' && pattern.endsWith('/') ? ' et ses sous-dossiers' : null;
+  const suffix = kind === 'path' && pattern.endsWith('/') ? t(lang, 'andSubfolders') : null;
   return { pattern, suffix };
 }
 
@@ -35,6 +38,8 @@ export function RuleApprovalCard({
   onAnswer: (choice: ApprovalChoice, pattern?: string) => void;
   disabled: boolean;
 }) {
+  const t = useT();
+  const lang = useLang();
   const [folder, setFolder] = useState(approval.pattern);
   const [forCall, setForCall] = useState(approval.callId);
   if (forCall !== approval.callId) {
@@ -42,8 +47,8 @@ export function RuleApprovalCard({
     setFolder(approval.pattern);
   }
 
-  const action = approvalAction(approval);
-  const scope = sessionScope(folder, approval.kind);
+  const action = approvalAction(lang, approval);
+  const scope = sessionScope(lang, folder, approval.kind);
 
   return (
     <div className="px-6 py-2">
@@ -57,8 +62,8 @@ export function RuleApprovalCard({
           <div className="ml-auto flex flex-wrap items-center gap-1.5">
             {approval.folders.length > 1 && (
               <Select
-                aria-label="Dossier accordé par Session, Toujours ou Jamais"
-                title="Dossier accordé par Session, Toujours ou Jamais"
+                aria-label={t('folderScopeLabel')}
+                title={t('folderScopeLabel')}
                 className="font-mono text-xs"
                 disabled={disabled}
                 value={folder}
@@ -76,46 +81,46 @@ export function RuleApprovalCard({
               variant="primary"
               size="sm"
               disabled={disabled}
-              title="Autoriser cet appel seulement"
+              title={t('onceTitle')}
               onClick={() => onAnswer('once')}
             >
-              Une fois
+              {t('once')}
             </Button>
             <Button
               type="button"
               variant="secondary"
               size="sm"
               disabled={disabled}
-              title={`Pour cette session : ${scope.pattern}${scope.suffix ?? ''}`}
+              title={t('sessionTitle', { scope: scope.pattern + (scope.suffix ?? '') })}
               onClick={() =>
                 onAnswer('session', folder !== approval.pattern ? folder : undefined)
               }
             >
-              Session
+              {t('session')}
             </Button>
             <Button
               type="button"
               variant="secondary"
               size="sm"
               disabled={disabled}
-              title="Règle du projet, visible et supprimable dans Réglages › Règles"
+              title={t('alwaysTitle')}
               onClick={() =>
                 onAnswer('always', folder !== approval.pattern ? folder : undefined)
               }
             >
-              Toujours
+              {t('always')}
             </Button>
             <Button
               type="button"
               variant="danger"
               size="sm"
               disabled={disabled}
-              title="Refuser et créer une règle du projet (Réglages › Règles)"
+              title={t('neverTitle')}
               onClick={() =>
                 onAnswer('never', folder !== approval.pattern ? folder : undefined)
               }
             >
-              Jamais
+              {t('never')}
             </Button>
           </div>
         </div>

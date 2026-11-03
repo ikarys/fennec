@@ -1,6 +1,7 @@
 // The integration dialog's words and its gate as the UI applies it: what a blocker says, what the
-// narrate agent is asked, when the Intégrer button is enabled. Pure, so it is tested without a browser.
+// narrate agent is asked, when the Integrate button is enabled. Pure, so it is tested without a browser.
 import type { Blocker, IntegrationPreview, IntegrationResult } from './api';
+import { t, type Lang } from '../i18n/messages';
 
 export type BlockerKind = Blocker['kind'];
 
@@ -21,36 +22,45 @@ export function narrativePrompt(preview: IntegrationPreview): string {
   return `Narrate the change of branch \`${preview.branch}\` since base \`${preview.base}\`, file by file in this review order:\n${lines.join('\n')}\nUse \`git diff ${preview.base} ${preview.branch} -- <path>\` for each file.`;
 }
 
-export function blockerSentence(blocker: Blocker): string {
+export function blockerSentence(lang: Lang, blocker: Blocker): string {
   switch (blocker.kind) {
     case 'noCommits':
-      return 'Aucun commit à intégrer.';
+      return t(lang, 'noCommits');
     case 'conflict':
-      return `Conflit avec ta branche : ${blocker.files.join(', ')}.`;
+      return t(lang, 'conflict', { files: blocker.files.join(', ') });
     case 'criteriaNotPassed':
-      return `Critères non passés : ${blocker.criteria.join(', ')}.`;
+      return t(lang, 'criteriaNotPassed', { criteria: blocker.criteria.join(', ') });
     case 'noCriteria':
-      return 'Aucun critère : rien n\'a été vérifié.';
+      return t(lang, 'noCriteria');
     case 'protectedTouched':
-      return `Fichiers protégés modifiés : ${blocker.paths.join(', ')}.`;
+      return t(lang, 'protectedTouched', { paths: blocker.paths.join(', ') });
     case 'sensitiveTouched':
-      return `Zones sensibles modifiées, ta revue est obligatoire : ${blocker.paths.join(', ')}.`;
+      return t(lang, 'sensitiveTouched', { paths: blocker.paths.join(', ') });
     case 'architectureViolated': {
-      const shown = blocker.violations.slice(0, 3).map((v) => `${v.path} : « ${v.line} » (interdit : ${v.forbidden})`);
+      const shown = blocker.violations
+        .slice(0, 3)
+        .map((v) => `${v.path} : « ${v.line} » (${t(lang, 'architectureForbidden', { what: v.forbidden })})`);
       const more = blocker.violations.length - shown.length;
-      return `Règles d'architecture violées : ${shown.join(' ; ')}${more > 0 ? ` (+${more})` : ''}.`;
+      return t(lang, 'architectureViolated', { list: shown.join(' ; '), more: more > 0 ? ` (+${more})` : '' });
     }
     case 'suppressionsAdded': {
       const shown = blocker.suppressions.slice(0, 3).map((s) => `${s.path} : « ${s.line} » (${s.marker})`);
       const more = blocker.suppressions.length - shown.length;
-      return `Vérifications désactivées dans les lignes ajoutées : ${shown.join(' ; ')}${more > 0 ? ` (+${more})` : ''}.`;
+      return t(lang, 'suppressionsAdded', { list: shown.join(' ; '), more: more > 0 ? ` (+${more})` : '' });
     }
     case 'testsWeakened':
-      return `Tests affaiblis : ${blocker.testsRemoved} test(s) et ${blocker.assertionsRemoved} assertion(s) en moins (${blocker.paths.join(', ')}).`;
+      return t(lang, 'testsWeakened', {
+        tests: blocker.testsRemoved,
+        assertions: blocker.assertionsRemoved,
+        paths: blocker.paths.join(', ')
+      });
     case 'branchChanged':
-      return `Le run est parti de ${blocker.from}, tu es maintenant sur ${blocker.to ?? 'un HEAD détaché'} : les commits iraient ailleurs.`;
+      return t(lang, 'branchChanged', {
+        from: blocker.from,
+        to: blocker.to ?? t(lang, 'detachedHead')
+      });
     case 'localChanges':
-      return `Changements non commités seraient écrasés : ${blocker.paths.join(', ')} — committe-les ou stash-les avant d'intégrer.`;
+      return t(lang, 'localChanges', { paths: blocker.paths.join(', ') });
   }
 }
 

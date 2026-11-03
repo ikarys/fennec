@@ -5,6 +5,7 @@ import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
 import { Card } from "../ui/Card";
 import { Modal } from "../ui/Modal";
+import { useT } from "../../i18n";
 
 export interface DeletionTarget {
   session: SessionSummary;
@@ -20,6 +21,7 @@ export function DeleteSessionsDialog({
   onClose: () => void;
   onDeleted: (ids: string[]) => void;
 }) {
+  const t = useT();
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<{ id: string; error: string }[]>([]);
   const [thrown, setThrown] = useState<string | null>(null);
@@ -41,7 +43,7 @@ export function DeleteSessionsDialog({
       setThrown(
         error instanceof Error
           ? error.message
-          : "Impossible de supprimer les sessions",
+          : t("deleteSessionsError"),
       );
     } finally {
       setBusy(false);
@@ -59,12 +61,12 @@ export function DeleteSessionsDialog({
   );
 
   return (
-    <Modal open onClose={onClose} busy={busy} label="Supprimer">
+    <Modal open onClose={onClose} busy={busy} label={t("delete")}>
       <Card className="flex flex-col gap-3 p-4">
         <h2 className="m-0 text-sm font-semibold">
           {targets.length === 1
-            ? "Supprimer la session"
-            : `Supprimer ${targets.length} sessions`}
+            ? t("deleteSessionTitle")
+            : t("deleteSessionsTitle", { count: targets.length })}
         </h2>
 
         <ul className="max-h-56 overflow-y-auto rounded-md border border-border">
@@ -80,7 +82,7 @@ export function DeleteSessionsDialog({
                 {target.projectName}
               </span>
               {target.session.awaitingIntegration && (
-                <Badge tone="accent">à intégrer</Badge>
+                <Badge tone="accent">{t("toIntegrate")}</Badge>
               )}
             </li>
           ))}
@@ -89,15 +91,13 @@ export function DeleteSessionsDialog({
         {awaitingCount > 0 && (
           <div className="rounded-md border border-err/40 bg-del-bg px-3 py-2 text-sm text-err">
             {awaitingCount === 1
-              ? "1 session a du travail non intégré : ses commits seront perdus. Intègre-la d'abord pour les garder."
-              : `${awaitingCount} sessions ont du travail non intégré : leurs commits seront perdus. Intègre-les d'abord pour les garder.`}
+              ? t("deleteAwaitingOne")
+              : t("deleteAwaitingMany", { count: awaitingCount })}
           </div>
         )}
 
         <p className="m-0 text-xs text-muted">
-          Supprimés : le fil, les étapes de workflow, l'espace de l'agent et sa
-          branche git. Gardés : les chiffres d'usage (Insight). C'est
-          définitif.
+          {t("deleteDetails")}
         </p>
 
         {failed.length > 0 && (
@@ -118,14 +118,14 @@ export function DeleteSessionsDialog({
             disabled={busy}
             onClick={onClose}
           >
-            Annuler
+            {t("cancel")}
           </Button>
           <Button
             variant="danger"
             disabled={busy}
             onClick={() => void confirm()}
           >
-            {busy ? "Suppression…" : "Supprimer"}
+            {busy ? t("deleting") : t("delete")}
           </Button>
         </div>
       </Card>
