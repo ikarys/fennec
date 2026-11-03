@@ -283,7 +283,9 @@ crates/fennec/src/
   llm/concurrency.rs the model's concurrency gate (a process-wide counting semaphore)
   web/               HTTP adapter: http, guard (who may call), routes, settings_routes, event_stream (SSE),
                      notifier (wakes streams on append, no polling), turns, assets,
-                     workflow_routes, project_routes (the project page), project_delete (a project deleted, its folder on request), project_dashboard (its overview tiles), idea_routes (its ideas board, HTTP only),
+                     session_routes (one session: created, read, written to, replayed, compacted, streamed),
+                     folder_routes (the folders browsed), project_list_routes (the home's projects, favorites, a project's commands and agents),
+                     test_support (the App the web tests build), workflow_routes, project_routes (the project page), project_delete (a project deleted, its folder on request), project_dashboard (its overview tiles), idea_routes (its ideas board, HTTP only),
                      idea_queue (the queue's thread: starts ready ideas, night-mode caps, queue runs recorded),
                      model_routes (the composer's model choices, a session's model), rule_routes (the human's rules), rule_approval_routes (an approval answered, its rule stored), waiver_routes (a waiver answered, its ADR written),
                      children (child sessions for workflow nodes),
