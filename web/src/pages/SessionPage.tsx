@@ -7,28 +7,15 @@ import type {
   SessionDetail,
   SessionState,
 } from "../lib/api";
-import type { ApprovalChoice } from "../lib/api/sessions";
 import type { AssistantItem, Segment } from "../lib/fold";
 import { splitContract } from "../lib/plan";
 import {
-  answerRuleApproval,
-  answerWaiver,
-  cancelQueued,
-  answerWorkflow,
-  compactSession,
-  continueWorkflow,
   createSession,
   getSession,
   getSessionMcp,
-  pauseWorkflow,
-  replayMessage,
-  resumeWorkflow,
-  retrySession,
   sendMessage,
   setSessionMcp,
   startWorkflow,
-  stopSession,
-  stopWorkflow,
 } from "../lib/api";
 import { readImages } from "../lib/attachments";
 import { formatDateTime } from "../lib/format";
@@ -38,6 +25,8 @@ import { useSessionThread } from "../hooks/useSessionThread";
 import { useProjectOptions } from "../hooks/useProjectOptions";
 import { useModeAndModel } from "../hooks/useModeAndModel";
 import { useScrollFollow } from "../hooks/useScrollFollow";
+import { useSessionActions } from "../hooks/useSessionActions";
+import { useWorkflowActions } from "../hooks/useWorkflowActions";
 import { Composer } from "../components/session/Composer";
 import { RunningStrip } from "../components/session/RunningStrip";
 import { modelShortName } from "../components/session/ModelPicker";
@@ -126,7 +115,6 @@ export function SessionPage({
   }, [draftKey]);
   const [attachments, setAttachments] = useState<AttachmentInput[]>([]);
   const [sendError, setSendError] = useState<string | null>(null);
-  const [compactError, setCompactError] = useState<string | null>(null);
   // A session framing a backlog idea only talks: its messages must not start
   // the default build workflow (a "go on" there once ran a whole build).
   const framingIdea = detail?.idea?.state === "framing";
@@ -201,6 +189,28 @@ export function SessionPage({
     onScroll,
     handleLoadOlder,
   } = useScrollFollow({ sessionId, view, detail, loadOlder });
+  const {
+    compactError,
+    handleStop,
+    handleCompact,
+    handleReplay,
+    handleApproval,
+    handleCancelQueued,
+    handleWaiver,
+    handleRetry,
+  } = useSessionActions({
+    sessionId,
+    pendingApproval: view.pendingApproval,
+    pendingWaiver: view.pendingWaiver,
+    onError: setSendError,
+  });
+  const {
+    handleStopWorkflow,
+    handlePauseWorkflow,
+    handleAnswerWorkflow,
+    handleContinueWorkflow,
+    handleResumeWorkflow,
+  } = useWorkflowActions({ sessionId, run });
 
   useEffect(() => {
     onRunningChanged();
@@ -583,113 +593,6 @@ export function SessionPage({
     // The revision is an ordinary message to the planner, not a workflow start.
     setWorkflowSelection((selection) => ({ ...selection, workflowId: null }));
     textareaRef.current?.focus();
-  }
-
-  async function handleStop() {
-    if (!sessionId) return;
-    try {
-      await stopSession(sessionId);
-    } catch {
-      // Stop is best-effort; the event stream reports the final state.
-    }
-  }
-
-  async function handleStopWorkflow() {
-    if (!sessionId || !run) return;
-    try {
-      await stopWorkflow(sessionId, run.runId);
-    } catch {
-      // Stop is best-effort; the event stream reports the final state.
-    }
-  }
-
-  async function handlePauseWorkflow() {
-    if (!sessionId || !run) return;
-    try {
-      await pauseWorkflow(sessionId, run.runId);
-    } catch {
-      // Pause is best-effort; the event stream reports the final state.
-    }
-  }
-
-  async function handleAnswerWorkflow(choice: string, comment: string) {
-    if (!sessionId || !run) return;
-    await answerWorkflow(sessionId, run.runId, choice, comment);
-  }
-
-  async function handleContinueWorkflow(comment: string) {
-    if (!sessionId || !run) return;
-    await continueWorkflow(sessionId, run.runId, comment);
-  }
-
-  async function handleResumeWorkflow() {
-    if (!sessionId || !run) return;
-    await resumeWorkflow(sessionId, run.runId);
-  }
-
-  async function handleCompact() {
-    if (!sessionId) return;
-    setCompactError(null);
-    try {
-      await compactSession(sessionId);
-    } catch (error) {
-      setCompactError(
-        error instanceof Error ? error.message : "Erreur lors de la compaction",
-      );
-    }
-  }
-
-  async function handleReplay(messageId: string) {
-    if (!sessionId) return;
-    setSendError(null);
-    try {
-      await replayMessage(sessionId, messageId);
-    } catch (error) {
-      setSendError(
-        error instanceof Error ? error.message : "Erreur lors de la relance",
-      );
-    }
-  }
-
-  async function handleApproval(choice: ApprovalChoice, pattern?: string) {
-    if (!sessionId || !view.pendingApproval) return;
-    setSendError(null);
-    try {
-      await answerRuleApproval(sessionId, view.pendingApproval.callId, choice, pattern);
-    } catch (error) {
-      setSendError(
-        error instanceof Error ? error.message : "Erreur lors de l’autorisation",
-      );
-    }
-  }
-
-  async function handleCancelQueued(queueId: string) {
-    if (!sessionId) return;
-    setSendError(null);
-    try {
-      await cancelQueued(sessionId, queueId);
-    } catch (error) {
-      setSendError(
-        error instanceof Error ? error.message : "Erreur lors du retrait de la file",
-      );
-    }
-  }
-
-  async function handleWaiver(hours: number | null) {
-    if (!sessionId || !view.pendingWaiver) return;
-    setSendError(null);
-    try {
-      await answerWaiver(sessionId, view.pendingWaiver.callId, hours);
-    } catch (error) {
-      setSendError(
-        error instanceof Error ? error.message : "Erreur lors de la dérogation",
-      );
-    }
-  }
-
-  async function handleRetry(): Promise<void> {
-    if (!sessionId) return;
-    await retrySession(sessionId);
   }
 
   return (
