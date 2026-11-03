@@ -1,13 +1,15 @@
 import type { AssistantItem } from '../../lib/fold';
 import { formatSpeed } from '../../lib/format';
 import { useCallUsage } from './CallUsage';
+import { useT } from '../../i18n';
 
 /** Under each answer: the live speed while it streams, then what the server measured. */
 export function MessageStatsLine({ item, streaming }: { item: AssistantItem; streaming: boolean }) {
+  const t = useT();
   if (streaming) {
     if (item.liveSpeed == null) return null;
     return (
-      <div className="text-xs text-muted tabular-nums" title="Estimé d'après le texte reçu, mesuré à la fin du message">
+      <div className="text-xs text-muted tabular-nums" title={t('speedEstimated')}>
         ≈ {formatSpeed(item.liveSpeed)}
       </div>
     );

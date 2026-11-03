@@ -11,6 +11,7 @@ import { PlusIcon } from '../Icons';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
+import { useT } from '../../i18n';
 
 export function ProposedTasksCard({
   tasks,
@@ -23,6 +24,7 @@ export function ProposedTasksCard({
   projectId: string | null;
   onAccepted: () => void;
 }) {
+  const t = useT();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,15 +37,13 @@ export function ProposedTasksCard({
     return (
       <Card className="p-4">
         <p className="m-0 flex items-center gap-2 text-sm text-muted">
-          {count === 1
-            ? 'La tâche proposée est dans le backlog.'
-            : `Les ${count} tâches proposées sont dans le backlog.`}
+          {count === 1 ? t('taskInBacklog') : t('tasksInBacklog', { count })}
           {projectId ? (
             <a
               href={'#/project/' + encodeURIComponent(projectId) + '/tasks'}
               className="text-xs text-accent-strong underline"
             >
-              Voir les tâches
+              {t('viewTasks')}
             </a>
           ) : null}
         </p>
@@ -61,7 +61,7 @@ export function ProposedTasksCard({
       await acceptProposedTask(sessionId, callId);
       onAccepted();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur inconnue');
+      setError(err instanceof Error ? err.message : t('unknownError'));
     } finally {
       setBusy(false);
     }
@@ -77,7 +77,7 @@ export function ProposedTasksCard({
         onAccepted();
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur inconnue');
+      setError(err instanceof Error ? err.message : t('unknownError'));
     } finally {
       setBusy(false);
     }
@@ -86,9 +86,9 @@ export function ProposedTasksCard({
   return (
     <Card className="flex flex-col gap-3 p-4">
       <div className="flex flex-col gap-1">
-        <p className="m-0 text-sm font-medium text-text">Ajouter quelles tâches au backlog ?</p>
+        <p className="m-0 text-sm font-medium text-text">{t('whichTasksQuestion')}</p>
         <p className="m-0 text-xs text-muted">
-          Proposées par l'agent (indicatif), dans l'ordre de construction : chaque tâche ajoutée se cadre ensuite depuis la page du projet.
+          {t('proposedTasksHint')}
         </p>
       </div>
       <ul className="m-0 flex list-none flex-col gap-2 p-0">
@@ -99,14 +99,14 @@ export function ProposedTasksCard({
               {task.title}
             </span>
             {task.ideaId ? (
-              <Badge tone="ok">dans le backlog</Badge>
+              <Badge tone="ok">{t('inBacklogBadge')}</Badge>
             ) : (
               <Button
                 variant="secondary"
                 size="sm"
                 iconOnly
-                title="Ajouter au backlog"
-                aria-label="Ajouter au backlog"
+                title={t('addToBacklog')}
+                aria-label={t('addToBacklog')}
                 onClick={() => acceptOne(task.callId)}
                 disabled={busy}
               >
@@ -122,9 +122,9 @@ export function ProposedTasksCard({
           size="md"
           onClick={acceptAll}
           disabled={remaining.length === 0 || busy}
-          title="Ajoute les tâches restantes au backlog du projet"
+          title={t('addAllTitle')}
         >
-          Tout ajouter
+          {t('addAll')}
         </Button>
       </div>
       {error ? <p className="m-0 text-xs text-err">{error}</p> : null}

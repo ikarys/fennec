@@ -1,5 +1,6 @@
 // Routes and tabs: the hash read as a route, a tab's path, what localStorage keeps of the tabs.
 // Pure, so the parsing is tested without a browser.
+import type { MsgKey } from '../i18n/messages';
 
 /** The fixed pages a tab can show. */
 export type PageId = 'settings' | 'insight' | 'workflows' | 'backlog';
@@ -19,11 +20,11 @@ export const TABS_KEY = 'fennec.tabs';
 export const ACTIVE_TAB_KEY = 'fennec.activeTab';
 
 /** The fixed pages that get a tab in the bar, in display order. */
-export const PAGE_TABS: { page: PageId; title: string; path: string }[] = [
-  { page: 'settings', title: 'Réglages', path: '#/settings' },
-  { page: 'insight', title: 'Insight', path: '#/insight' },
-  { page: 'workflows', title: 'Workflows', path: '#/workflows' },
-  { page: 'backlog', title: 'Tâches', path: '#/backlog' }
+export const PAGE_TABS: { page: PageId; titleKey: MsgKey; path: string }[] = [
+  { page: 'settings', titleKey: 'settings', path: '#/settings' },
+  { page: 'insight', titleKey: 'insight', path: '#/insight' },
+  { page: 'workflows', titleKey: 'workflows', path: '#/workflows' },
+  { page: 'backlog', titleKey: 'tasks', path: '#/backlog' }
 ];
 
 export function parseRoute(hash: string): Route {

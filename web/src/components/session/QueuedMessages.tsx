@@ -6,6 +6,7 @@ import type { QueuedMessage } from '../../lib/api/sessions';
 import { CloseIcon } from '../Icons';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
+import { useT } from '../../i18n';
 
 export function QueuedMessages({
   queued,
@@ -14,6 +15,7 @@ export function QueuedMessages({
   queued: QueuedMessage[];
   onCancel: (queueId: string) => void;
 }) {
+  const t = useT();
   if (queued.length === 0) return null;
 
   return (
@@ -24,14 +26,14 @@ export function QueuedMessages({
             key={message.queueId}
             className="flex items-center gap-2 rounded-lg border border-border bg-panel px-2.5 py-1.5"
           >
-            <Badge>En file</Badge>
+            <Badge>{t('queuedBadge')}</Badge>
             <span className="min-w-0 truncate text-sm text-text" title={message.content}>
               {message.content}
             </span>
             <Button
               variant="ghost"
               iconOnly
-              aria-label="Retirer de la file"
+              aria-label={t('removeFromQueue')}
               onClick={() => onCancel(message.queueId)}
               className="ml-auto"
             >

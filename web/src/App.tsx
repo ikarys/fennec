@@ -23,6 +23,9 @@ import { InsightPage } from './pages/InsightPage';
 import { Palette } from './components/Palette';
 import { ProjectDialog } from './components/project/ProjectDialog';
 import { DisplayPrefsProvider, defaultDisplayPrefs } from './lib/display';
+import { I18nProvider } from './i18n';
+import { t } from './i18n/messages';
+import type { Lang } from './i18n/messages';
 import { useTurnNotices } from './hooks/useTurnNotices';
 
 const WorkflowsPage = lazy(() => import('./pages/WorkflowsPage'));
@@ -95,17 +98,20 @@ export default function App() {
 
   // `projectsLoading` is only the first load: a refresh keeps the list on
   // screen instead of flashing a loading state.
+  const displayPrefs = settings?.preferences.display ?? defaultDisplayPrefs;
+  // The UI's language: the stored choice, else English (the default).
+  const language: Lang = displayPrefs.language ?? 'en';
   const refreshProjects = useCallback(async () => {
     try {
       const data = await getProjects();
       setProjects(data);
       setProjectsError(null);
     } catch (error) {
-      setProjectsError(error instanceof Error ? error.message : 'Impossible de charger les projets');
+      setProjectsError(error instanceof Error ? error.message : t(language, 'projectsLoadError'));
     } finally {
       setProjectsLoading(false);
     }
-  }, []);
+  }, [language]);
 
   useEffect(() => {
     refreshProjects();
@@ -160,8 +166,6 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
-  const displayPrefs = settings?.preferences.display ?? defaultDisplayPrefs;
-
   // The chosen size scales the text only: every text size is in rem, set
   // from the root font size (16px for the default 14px body), while the
   // layout's spacing stays in px (styles/app.css).
@@ -181,14 +185,14 @@ export default function App() {
     const infos: TabInfo[] = tabs.map((id) => {
       if (id.startsWith('page:')) {
         const page = PAGE_TABS.find((candidate) => candidate.page === id.slice(5));
-        return { id, title: page?.title ?? 'Page', kind: 'page', page: page?.page ?? 'settings' };
+        return { id, title: page ? t(language, page.titleKey) : t(language, 'page'), kind: 'page', page: page?.page ?? 'settings' };
       }
       if (id.startsWith('new:')) {
         const projectId = id.slice(4);
         const project = projects.find((candidate) => candidate.id === projectId);
         return {
           id,
-          title: 'Nouvelle session',
+          title: t(language, 'newSession'),
           project: project?.name ?? projectId,
           state: 'idle' as const,
           kind: 'session' as const
@@ -200,10 +204,10 @@ export default function App() {
           return { id, title: session.title, project: project.name, state: session.state, kind: 'session' as const };
         }
       }
-      return { id, title: 'Session', project: '—', state: 'idle' as const, kind: 'session' as const };
+      return { id, title: t(language, 'session'), project: '—', state: 'idle' as const, kind: 'session' as const };
     });
     return infos;
-  }, [tabs, projects]);
+  }, [tabs, projects, language]);
 
   const openSession = useCallback(
     (sessionId: string) => {
@@ -302,12 +306,12 @@ export default function App() {
         setProjectDialogOpen(false);
         await refreshProjects();
       } catch (error) {
-        setProjectError(error instanceof Error ? error.message : 'Impossible d’ouvrir le projet');
+        setProjectError(error instanceof Error ? error.message : t(language, 'projectOpenError'));
       } finally {
         setProjectSubmitting(false);
       }
     },
-    [refreshProjects]
+    [refreshProjects, language]
   );
 
   // Split view: the two panes' ids live in the URL; each pane is an independent
@@ -379,6 +383,7 @@ export default function App() {
   const pseudoTabId = route.name === 'new' ? `new:${route.id}` : null;
 
   return (
+    <I18nProvider lang={language}>
     <DisplayPrefsProvider value={displayPrefs}>
       {/* h-full: the html/body/#root chain is 100%, which no page-level
           scaling can push past the window. */}
@@ -422,7 +427,7 @@ export default function App() {
               onListing={handleListing}
             />
           ) : route.name === 'workflows' ? (
-            <Suspense fallback={<div className="flex grow items-center justify-center text-muted">Chargement…</div>}>
+            <Suspense fallback={<div className="flex grow items-center justify-center text-muted">{t(language, 'loading')}</div>}>
               <WorkflowsPage
                 projects={projects}
                 projectId={route.projectId}
@@ -431,13 +436,13 @@ export default function App() {
               />
             </Suspense>
           ) : route.name === 'project' ? (
-            <Suspense fallback={<div className="flex grow items-center justify-center text-muted">Chargement…</div>}>
+            <Suspense fallback={<div className="flex grow items-center justify-center text-muted">{t(language, 'loading')}</div>}>
               <ProjectPage projects={projects} projectId={route.projectId} tab={route.tab} sub={route.sub} onOpenSession={openSession} onNewSession={(projectId) => startNewSession(projectId)} onDeleted={refreshProjects} onSessionsDeleted={handleSessionsDeleted} />
             </Suspense>
           ) : route.name === 'insight' ? (
             <InsightPage />
           ) : route.name === 'backlog' ? (
-            <Suspense fallback={<div className="flex grow items-center justify-center text-muted">Chargement…</div>}>
+            <Suspense fallback={<div className="flex grow items-center justify-center text-muted">{t(language, 'loading')}</div>}>
               <BacklogPage />
             </Suspense>
           ) : route.name === 'split' ? (
@@ -492,5 +497,6 @@ export default function App() {
         />
       </div>
     </DisplayPrefsProvider>
+    </I18nProvider>
   );
 }

@@ -2,6 +2,7 @@ import type { ContextView } from '../../lib/api';
 import { CompressIcon } from '../Icons';
 import { Button } from '../ui/Button';
 import { ContextComposition } from './ContextComposition';
+import { useT } from '../../i18n';
 
 interface ContextGaugeProps {
   /** Computed by the server; null until the first fetch. */
@@ -18,11 +19,12 @@ const TONE_CLASS: Record<ContextView['tone'], string> = {
 };
 
 export function ContextGauge({ context, compactDisabled, onCompact, compactError }: ContextGaugeProps) {
+  const t = useT();
   const percent = context?.percent ?? 0;
   return (
     <div
       role="meter"
-      aria-label="Contexte du modèle"
+      aria-label={t('contextOfModel')}
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={percent}
@@ -53,12 +55,12 @@ export function ContextGauge({ context, compactDisabled, onCompact, compactError
         iconOnly
         disabled={compactDisabled}
         onClick={onCompact}
-        title="Résumer la conversation pour libérer le contexte"
-        aria-label="Compacter"
+        title={t('compactTitle')}
+        aria-label={t('compact')}
       >
         <CompressIcon className="h-4 w-4" />
       </Button>
-      {compactError && <span className="text-xs text-err" title={compactError}>échec</span>}
+      {compactError && <span className="text-xs text-err" title={compactError}>{t('failure')}</span>}
     </div>
   );
 }

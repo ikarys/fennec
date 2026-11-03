@@ -10,12 +10,14 @@ import { createAuditTasks, type Audit } from '../../lib/api';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
+import { useLang, useT } from '../../i18n';
+import type { MsgKey } from '../../i18n/messages';
 
-const SEVERITY = {
-  high: { label: 'haute', tone: 'err' },
-  medium: { label: 'moyenne', tone: 'neutral' },
-  low: { label: 'basse', tone: 'neutral' },
-} as const;
+const SEVERITY: Record<'high' | 'medium' | 'low', { label: MsgKey; tone: 'err' | 'neutral' }> = {
+  high: { label: 'severityHigh', tone: 'err' },
+  medium: { label: 'severityMedium', tone: 'neutral' },
+  low: { label: 'severityLow', tone: 'neutral' },
+};
 
 export function AuditCard({
   audit,
@@ -28,6 +30,8 @@ export function AuditCard({
   projectId: string | null;
   onCreated: () => void;
 }) {
+  const t = useT();
+  const lang = useLang();
   const [checked, setChecked] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
   const [created, setCreated] = useState<number | null>(null);
@@ -43,15 +47,13 @@ export function AuditCard({
     return (
       <Card className="p-4">
         <p className="m-0 flex items-center gap-2 text-sm text-muted">
-          {count === 1
-            ? 'Le constat de cet audit est dans le backlog.'
-            : `Les ${count} constats de cet audit sont dans le backlog.`}
+          {count === 1 ? t('findingInBacklog') : t('findingsInBacklog', { count })}
           {projectId ? (
             <a
               href={'#/project/' + encodeURIComponent(projectId) + '/tasks'}
               className="text-xs text-accent-strong underline"
             >
-              Voir les tâches
+              {t('viewTasks')}
             </a>
           ) : null}
         </p>
@@ -88,7 +90,7 @@ export function AuditCard({
       setChecked(new Set());
       onCreated();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur inconnue');
+      setError(err instanceof Error ? err.message : t('unknownError'));
     } finally {
       setBusy(false);
     }
@@ -97,9 +99,9 @@ export function AuditCard({
   return (
     <Card className="flex flex-col gap-3 p-4">
       <div className="flex flex-col gap-1">
-        <p className="m-0 text-sm font-medium text-text">Garder quels constats ?</p>
+        <p className="m-0 text-sm font-medium text-text">{t('whichFindingsQuestion')}</p>
         <p className="m-0 text-xs text-muted">
-          Proposés par l'agent (indicatif) : chaque constat coché devient une tâche du projet, que tu cadreras ensuite.
+          {t('findingsHint')}
         </p>
       </div>
       <ul className="m-0 flex list-none flex-col gap-2 p-0">
@@ -120,10 +122,10 @@ export function AuditCard({
                 />
                 <span className="tabular-nums text-xs text-muted">{finding.number}.</span>
                 <Badge tone={SEVERITY[finding.severity].tone} dot>
-                  {SEVERITY[finding.severity].label}
+                  {t(lang, SEVERITY[finding.severity].label)}
                 </Badge>
                 <span className="min-w-0 text-text">{finding.title}</span>
-                {isTaken ? <Badge tone="ok">tâche créée</Badge> : null}
+                {isTaken ? <Badge tone="ok">{t('taskCreatedBadge')}</Badge> : null}
               </label>
             </li>
           );
@@ -131,30 +133,28 @@ export function AuditCard({
       </ul>
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="sm" onClick={toggleAll} disabled={busy}>
-          {allChecked ? 'Tout décocher' : 'Tout cocher'}
+          {allChecked ? t('uncheckAll') : t('checkAll')}
         </Button>
         <Button
           variant="primary"
           size="md"
           onClick={handleCreate}
           disabled={checked.size === 0 || busy}
-          title="Ajoute les constats cochés au backlog du projet"
+          title={t('createFindingsTitle')}
         >
-          {checked.size === 0
-            ? 'Créer les tâches'
-            : `Créer ${checked.size} tâche${checked.size > 1 ? 's' : ''}`}
+          {checked.size === 0 ? t('createTasks') : t('createTasksCount', { count: checked.size })}
         </Button>
       </div>
       {error ? <p className="m-0 text-xs text-err">{error}</p> : null}
       {created !== null ? (
         <div className="flex items-center gap-2">
-          <p className="m-0 text-xs text-ok">{created} tâche(s) ajoutée(s) au backlog.</p>
+          <p className="m-0 text-xs text-ok">{t('tasksAddedNote', { count: created })}</p>
           {projectId ? (
             <a
               href={'#/project/' + encodeURIComponent(projectId) + '/tasks'}
               className="text-xs text-accent-strong underline"
             >
-              Voir les tâches
+              {t('viewTasks')}
             </a>
           ) : null}
         </div>

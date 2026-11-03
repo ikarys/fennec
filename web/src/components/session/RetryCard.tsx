@@ -6,6 +6,7 @@
 import { useState } from 'react';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
+import { useT } from '../../i18n';
 
 export function RetryCard({
   onRetry,
@@ -14,6 +15,7 @@ export function RetryCard({
   onRetry: () => Promise<void>;
   disabled: boolean;
 }) {
+  const t = useT();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const isBusy = busy || disabled;
@@ -25,7 +27,7 @@ export function RetryCard({
     try {
       await onRetry();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur');
+      setError(err instanceof Error ? err.message : t('error'));
     } finally {
       setBusy(false);
     }
@@ -37,10 +39,10 @@ export function RetryCard({
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-1.5 text-xs font-semibold">
             <span className="text-err">!</span>
-            <span className="text-err">Erreur</span>
+            <span className="text-err">{t('error')}</span>
           </div>
           <div className="text-sm leading-snug whitespace-pre-wrap [overflow-wrap:break-word]">
-            Le tour s'est terminé en erreur : réessayer ?
+            {t('retryPrompt')}
           </div>
           <div className="flex gap-1.5">
             <Button
@@ -50,7 +52,7 @@ export function RetryCard({
               disabled={isBusy}
               onClick={handleRetry}
             >
-              Réessayer
+              {t('retry')}
             </Button>
           </div>
           {error && <div className="text-xs text-err">{error}</div>}

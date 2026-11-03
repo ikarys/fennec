@@ -19,9 +19,12 @@ import { Card } from '../ui/Card';
 import { Modal } from '../ui/Modal';
 import { FieldRow, TextArea } from '../ui/Field';
 import { SectionLabel } from '../ui/SectionLabel';
+import { useLang, useT } from '../../i18n';
 
 
 export function IntegrationDialog({ sessionId, open, onClose, projectId }: { sessionId: string; open: boolean; onClose: () => void; projectId: string | null }) {
+  const t = useT();
+  const lang = useLang();
   const [narrating, setNarrating] = useState(false);
   const [preview, setPreview] = useState<IntegrationPreview | null>(null);
   const [loading, setLoading] = useState(false);
@@ -67,7 +70,7 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
       })
       .catch((fetchError: unknown) => {
         if (!active) return;
-        setError(fetchError instanceof Error ? fetchError.message : 'Erreur');
+        setError(fetchError instanceof Error ? fetchError.message : t('error'));
         setLoading(false);
       });
     return () => {
@@ -109,7 +112,7 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
       if (conflictValue) {
         setConflict(conflictValue);
       } else {
-        setError(integrateError instanceof Error ? integrateError.message : 'Erreur');
+        setError(integrateError instanceof Error ? integrateError.message : t('error'));
       }
     } finally {
       setPosting(false);
@@ -125,64 +128,64 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
       await completeIdea(preview.idea.projectId, preview.idea.id);
       closeDialog();
     } catch (finishError) {
-      setError(finishError instanceof Error ? finishError.message : 'Erreur');
+      setError(finishError instanceof Error ? finishError.message : t('error'));
     } finally {
       setPosting(false);
     }
   };
 
   return (
-    <Modal open={open} onClose={onClose} busy={posting} label="Intégrer" width="w-[min(92vw,720px)]">
+    <Modal open={open} onClose={onClose} busy={posting} label={t('integrate')} width="w-[min(92vw,720px)]">
       <Card className="overflow-hidden">
         {preview ? (
           <div className="border-b border-border bg-accent-soft px-4 py-3">
             <div className="flex items-center gap-2.5">
               <span className="flex shrink-0 items-center gap-1.5 rounded border border-border bg-raised px-2 py-0.5 font-mono text-xs">
                 <BranchIcon className="h-3 w-3 text-accent" />
-                {preview.humanBranch ?? 'ta branche'}
+                {preview.humanBranch ?? t('yourBranch')}
               </span>
               <h2 className="m-0 min-w-0 truncate text-sm font-semibold">
-                Intégrer dans {preview.humanBranch ?? 'ta branche'}
+                {t('integrateInto', { branch: preview.humanBranch ?? t('yourBranch') })}
               </h2>
               <span className="ml-auto shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-xs text-muted">
-                {preview.commits.length} commit{preview.commits.length !== 1 ? 's' : ''}
+                {preview.commits.length} {t(preview.commits.length === 1 ? 'commit' : 'commits')}
               </span>
             </div>
             <div className="mt-1 pl-[33px] text-xs text-muted">
-              {preview.files.length} fichier{preview.files.length !== 1 ? 's' : ''} ·{' '}
+              {t('filesCount', { count: preview.files.length })} ·{' '}
               <span className="text-ok">+{preview.files.reduce((sum, file) => sum + file.added, 0)}</span>{' '}
-              <span className="text-err">−{preview.files.reduce((sum, file) => sum + file.removed, 0)}</span> · les
-              changements de l'agent deviennent un commit sur ta branche — rien n'est intégré sans ton clic
+              <span className="text-err">−{preview.files.reduce((sum, file) => sum + file.removed, 0)}</span> ·{' '}
+              {t('becomesCommit')}
             </div>
           </div>
         ) : (
           <div className="border-b border-border px-4 py-3">
-            <h2 className="m-0 text-sm font-semibold">Intégrer</h2>
+            <h2 className="m-0 text-sm font-semibold">{t('integrate')}</h2>
           </div>
         )}
         <div className="flex flex-col gap-3 p-4">
 
-          {loading && <div className="text-xs text-muted">Chargement…</div>}
+          {loading && <div className="text-xs text-muted">{t('loading')}</div>}
           {conflict ? (
             <div className="rounded-lg border border-err/40 bg-err/10 p-3 text-xs flex flex-col gap-2">
-              <div className="font-semibold text-err">Conflit : rien n'a été intégré</div>
-              <div>Ta branche a modifié les mêmes lignes que l'agent depuis le début de son travail. Le cherry-pick a été annulé : ton dossier est tel qu'avant.</div>
+              <div className="font-semibold text-err">{t('conflictNothingIntegrated')}</div>
+              <div>{t('conflictNothingIntegratedBody')}</div>
               <div className="flex flex-col gap-1">
                 {conflict.files.map((file) => (
                   <div key={file} className="font-mono">{file}</div>
                 ))}
               </div>
               <div className="flex flex-col gap-1">
-                <div>Pour résoudre à la main :</div>
+                <div>{t('resolveByHand')}</div>
                 <button
                   type="button"
-                  title="Copier la commande"
+                  title={t('copyCommand')}
                   onClick={() => void navigator.clipboard.writeText(conflict.command)}
                   className="rounded-lg border border-border bg-code px-2 py-1.5 text-left font-mono text-xs break-all text-text hover:border-border-strong"
                 >
                   <code>{conflict.command}</code>
                 </button>
-                <div className="text-muted">Ou abandonne ce travail s'il n'est plus utile.</div>
+                <div className="text-muted">{t('orDiscardWork')}</div>
               </div>
             </div>
           ) : error ? (
@@ -191,11 +194,11 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
 
           {result && (
             <div className="text-xs text-ok">
-              Intégré : {result.commits.length} commits, HEAD {result.head.slice(0, 8)}.
-              {result.protectedTests.length > 0 && ` ${result.protectedTests.length} tests protégés.`}
-              {result.protectError && <span className="text-err"> Tests non protégés : {result.protectError}</span>}
-              {result.worktreeRemoved && ' Dossier de l\'agent supprimé.'}
-              {result.removeError && <span className="text-err"> Dossier non supprimé : {result.removeError}</span>}
+              {t('integratedResult', { commits: result.commits.length, head: result.head.slice(0, 8) })}
+              {result.protectedTests.length > 0 && ` ${t('testsProtectedResult', { count: result.protectedTests.length })}`}
+              {result.protectError && <span className="text-err"> {t('testsNotProtected', { error: result.protectError })}</span>}
+              {result.worktreeRemoved && ` ${t('worktreeRemovedResult')}`}
+              {result.removeError && <span className="text-err"> {t('worktreeNotRemoved', { error: result.removeError })}</span>}
             </div>
           )}
 
@@ -204,17 +207,17 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
               <IntegrationReview preview={preview} projectId={projectId} narrating={narrating} onNarrate={handleNarrate} />
 
               <FieldRow
-                label="Message du commit"
+                label={t('commitMessageLabel')}
                 hint={
                   <>
                     {suggested !== null && message === suggested && (
-                      <Badge tone="accent" title="Consigné par l'agent : à relire">
-                        indicatif
+                      <Badge tone="accent" title={t('commitMessageIndicativeTitle')}>
+                        {t('indicative')}
                       </Badge>
                     )}
                     <span>
-                      {suggested !== null && message === suggested ? ' Proposé par le modèle, à relire. ' : ''}
-                      Un seul commit, à ton nom, avec la session en provenance (Fennec-Session).
+                      {suggested !== null && message === suggested ? ` ${t('commitMessageSuggested')} ` : ''}
+                      {t('commitMessageSingle')}
                     </span>
                   </>
                 }
@@ -225,19 +228,19 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
               {preview.testFiles.length > 0 && (
                 <label
                   className="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-xs hover:bg-accent-soft"
-                  title="L'agent ne pourra plus modifier ces fichiers de test : ils sont ajoutés à .agents/protected."
+                  title={t('protectTestsTitle')}
                 >
                   <input type="checkbox" className="accent-accent" checked={protectTests} onChange={(event) => setProtectTests(event.target.checked)} />
-                  Protéger les tests intégrés ({preview.testFiles.length})
+                  {t('protectTests', { count: preview.testFiles.length })}
                 </label>
               )}
 
               <label
                 className="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-xs hover:bg-accent-soft"
-                title="Supprime le dossier et la branche de l'agent après l'intégration : la session n'aura plus de copie de travail."
+                title={t('removeWorktreeTitle')}
               >
                 <input type="checkbox" className="accent-accent" checked={removeWorktree} onChange={(event) => setRemoveWorktree(event.target.checked)} />
-                Nettoyer l'espace de l'agent
+                {t('removeWorktree')}
               </label>
 
               {preview.blockers.length > 0 && (
@@ -245,13 +248,13 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
                   <SectionLabel className="flex items-center">
                     <span className="flex items-center gap-1.5 text-attention">
                       <AlertIcon className="h-3.5 w-3.5" />
-                      À accepter
+                      {t('toAccept')}
                     </span>
                   </SectionLabel>
                   <div className="flex flex-col gap-1.5">
                     {preview.blockers.map((blocker) => (
                       <div key={blocker.kind} className="flex items-start justify-between gap-2 text-xs">
-                        <span className="grow break-words text-text">{blockerSentence(blocker)}</span>
+                        <span className="grow break-words text-text">{blockerSentence(lang, blocker)}</span>
                         {!neverAcknowledged(blocker.kind) && (
                           <label className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs">
                             <input
@@ -262,7 +265,7 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
                                 setAcknowledged((current) => ({ ...current, [blocker.kind]: event.target.checked } as Record<BlockerKind, boolean>));
                               }}
                             />
-                            Je l'accepte
+                            {t('acceptBlocker')}
                           </label>
                         )}
                       </div>
@@ -275,12 +278,12 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
 
           {canFinish && (
             <p className="text-xs text-muted">
-              Rien à intégrer : si le travail est déjà dans ta branche (intégré à la main), termine la tâche.
+              {t('nothingToFinishHint')}
             </p>
           )}
           <div className="flex justify-end gap-2">
             <Button variant="secondary" size="md" onClick={closeDialog}>
-              Annuler
+              {t('cancel')}
             </Button>
             <Button
               variant="primary"
@@ -296,7 +299,7 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
               }}
               disabled={canFinish ? posting : integrateDisabled}
             >
-              {canFinish ? 'Terminer la tâche' : result ? 'Fermer' : 'Intégrer'}
+              {canFinish ? t('finishTask') : result ? t('close') : t('integrate')}
             </Button>
           </div>
         </div>

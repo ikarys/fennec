@@ -10,39 +10,43 @@
  * non-core pages show only their own blocks, so they stay light.
  */
 import type { PanelPage } from './api';
+import { t, type Lang, type MsgKey } from '../i18n/messages';
 
 export type PanelBlockId = 'request' | 'criteria' | 'modifiedFiles' | 'workspace' | 'servers' | 'tokens' | 'skills' | 'decisions' | 'vision';
 
 export interface PanelBlock {
   id: PanelBlockId;
-  title: string;
+  titleKey: MsgKey;
   core: boolean;
 }
 
 /** In display order: core blocks first. */
 export const PANEL_BLOCKS: readonly PanelBlock[] = [
-  { id: 'request', title: 'Demande', core: true },
-  { id: 'criteria', title: 'Critères', core: true },
-  { id: 'modifiedFiles', title: 'Fichiers modifiés', core: true },
-  { id: 'workspace', title: "Espace de l'agent", core: true },
-  { id: 'servers', title: 'Serveurs', core: false },
-  { id: 'skills', title: 'Skills', core: false },
-  { id: 'decisions', title: 'Décisions', core: false },
-  { id: 'tokens', title: 'Tokens', core: false },
-  { id: 'vision', title: 'Vision', core: false }
+  { id: 'request', titleKey: 'panelRequest', core: true },
+  { id: 'criteria', titleKey: 'panelCriteria', core: true },
+  { id: 'modifiedFiles', titleKey: 'panelModifiedFiles', core: true },
+  { id: 'workspace', titleKey: 'panelWorkspace', core: true },
+  { id: 'servers', titleKey: 'panelServers', core: false },
+  { id: 'skills', titleKey: 'panelSkills', core: false },
+  { id: 'decisions', titleKey: 'panelDecisions', core: false },
+  { id: 'tokens', titleKey: 'panelTokens', core: false },
+  { id: 'vision', titleKey: 'panelVision', core: false }
 ];
 
 export const OPTIONAL_BLOCKS: readonly PanelBlock[] = PANEL_BLOCKS.filter((block) => !block.core);
 
-export const DEFAULT_PANEL_PAGES: readonly PanelPage[] = [
-  { name: 'Décision', blocks: [] },
-  { name: 'Contexte', blocks: ['skills', 'decisions', 'servers'] },
-  { name: 'Stats', blocks: ['tokens', 'vision'] }
-];
+/** The default pages, named in the UI's language; stored pages keep their names. */
+export function defaultPanelPages(lang: Lang): PanelPage[] {
+  return [
+    { name: t(lang, 'panelPageDecision'), blocks: [] },
+    { name: t(lang, 'panelPageContext'), blocks: ['skills', 'decisions', 'servers'] },
+    { name: t(lang, 'panelPageStats'), blocks: ['tokens', 'vision'] }
+  ];
+}
 
 /** The pages to show: the stored ones, or the defaults when none are stored. */
-export function panelPages(stored: PanelPage[] | null | undefined): PanelPage[] {
-  return stored ?? [...DEFAULT_PANEL_PAGES];
+export function panelPages(lang: Lang, stored: PanelPage[] | null | undefined): PanelPage[] {
+  return stored ?? defaultPanelPages(lang);
 }
 
 function isOptionalBlockId(value: string): value is PanelBlockId {
