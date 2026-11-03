@@ -15,7 +15,7 @@ export function FavoriteButton({
   const label = project.favorite ? t('removeFavorite') : t('addFavorite');
   return (
     <Button
-      variant="ghost"
+      variant="icon"
       size="sm"
       iconOnly
       className={project.favorite ? 'text-accent' : ''}

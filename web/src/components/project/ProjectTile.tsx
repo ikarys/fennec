@@ -53,7 +53,7 @@ export function ProjectTile({
         <div className="relative z-10 ml-auto flex shrink-0 items-center gap-0.5">
           <FavoriteButton project={project} onToggle={onToggleFavorite} />
           <Button
-            variant="ghost"
+            variant="icon"
             size="sm"
             iconOnly
             title={t('newSessionInProject')}
@@ -66,7 +66,7 @@ export function ProjectTile({
             href={'#/project/' + encodeURIComponent(project.id) + '/tasks'}
             title={t('viewProjectTasks')}
             aria-label={t('projectTasksAria')}
-            className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
+            className={buttonClass({ variant: 'icon', size: 'sm', iconOnly: true })}
           >
             <BulbIcon className="h-3.5 w-3.5" />
           </a>
