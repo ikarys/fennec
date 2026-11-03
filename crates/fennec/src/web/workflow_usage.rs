@@ -5,6 +5,7 @@
 //! ledger holds the figures.
 
 use crate::domain::event::Event;
+use crate::domain::lang::Lang;
 use serde::Serialize;
 use std::collections::HashMap;
 use token_usage::{CallRecord, display};
@@ -85,6 +86,7 @@ pub fn workflow_usage(
     session_id: &str,
     events: &[Event],
     calls: &HashMap<String, Vec<CallRecord>>,
+    lang: Lang,
 ) -> WorkflowUsageView {
     let by_message: HashMap<&str, &CallRecord> = calls
         .get(session_id)
@@ -149,22 +151,35 @@ pub fn workflow_usage(
                 view.nodes.push(NodeUsageView {
                     item_id: format!("wf-{run_id}-{node_id}-{pass}"),
                     line: [
-                        Some(format!("↑ {}", display::tokens(t.prompt))),
-                        Some(format!("↓ {}", display::tokens(t.completion))),
+                        Some(format!("↑ {}", display::tokens(t.prompt, lang.locale()))),
+                        Some(format!(
+                            "↓ {}",
+                            display::tokens(t.completion, lang.locale())
+                        )),
                         speed.clone(),
                     ]
                     .into_iter()
                     .flatten()
                     .collect::<Vec<_>>()
                     .join(" · "),
-                    detail: format!(
-                        "Entrée {} tokens dont {} en cache · sortie {} tokens · {} appel{}",
-                        t.prompt,
-                        t.cached,
-                        t.completion,
-                        t.calls,
-                        if t.calls > 1 { "s" } else { "" }
-                    ),
+                    detail: match lang {
+                        Lang::En => format!(
+                            "Input {} tokens, {} cached · output {} tokens · {} call{}",
+                            t.prompt,
+                            t.cached,
+                            t.completion,
+                            t.calls,
+                            if t.calls > 1 { "s" } else { "" }
+                        ),
+                        Lang::Fr => format!(
+                            "Entrée {} tokens dont {} en cache · sortie {} tokens · {} appel{}",
+                            t.prompt,
+                            t.cached,
+                            t.completion,
+                            t.calls,
+                            if t.calls > 1 { "s" } else { "" }
+                        ),
+                    },
                 });
             }
             Event::WorkflowFinished { run_id, .. } => {
@@ -181,8 +196,8 @@ pub fn workflow_usage(
                 view.runs.push(RunUsageView {
                     run_id: run_id.clone(),
                     calls: t.calls.to_string(),
-                    generated: display::tokens(t.completion),
-                    read: display::tokens(t.prompt),
+                    generated: display::tokens(t.completion, lang.locale()),
+                    read: display::tokens(t.prompt, lang.locale()),
                     cache: format!("{} % cache", display::percent(t.cached, t.prompt)),
                 });
             }
@@ -276,7 +291,7 @@ mod tests {
         calls.insert("s".to_string(), vec![call("m1", 1000, 500, 100)]);
         calls.insert("child".to_string(), vec![call("c1", 3000, 0, 200)]);
 
-        let view = workflow_usage("s", &events, &calls);
+        let view = workflow_usage("s", &events, &calls, Lang::Fr);
 
         let ids: Vec<&str> = view.nodes.iter().map(|n| n.item_id.as_str()).collect();
         assert_eq!(ids, ["wf-r-a-1", "wf-r-b-1"], "c made no call");
@@ -284,7 +299,20 @@ mod tests {
         assert!(view.nodes[0].detail.contains("1 appel"));
         assert_eq!(view.runs.len(), 1);
         assert_eq!(view.runs[0].calls, "2");
-        assert_eq!(view.runs[0].read, display::tokens(4000));
+        assert_eq!(view.runs[0].read, display::tokens(4000, Lang::Fr.locale()));
         assert_eq!(view.runs[0].cache, "13 % cache");
+    }
+
+    #[test]
+    fn a_node_detail_is_english_when_the_language_is_english() {
+        let events = vec![started("a", None), done("m1"), finished("a")];
+        let mut calls = HashMap::new();
+        calls.insert("s".to_string(), vec![call("m1", 1000, 500, 100)]);
+
+        let view = workflow_usage("s", &events, &calls, Lang::En);
+        assert_eq!(
+            view.nodes[0].detail,
+            "Input 1000 tokens, 500 cached · output 100 tokens · 1 call"
+        );
     }
 }

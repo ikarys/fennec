@@ -19,6 +19,14 @@ impl Lang {
             Lang::Fr => fr,
         }
     }
+
+    /// How the figures are written for this language.
+    pub fn locale(self) -> token_usage::display::Locale {
+        match self {
+            Lang::En => token_usage::display::Locale::En,
+            Lang::Fr => token_usage::display::Locale::Fr,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -36,5 +44,17 @@ mod tests {
     fn pick_returns_the_chosen_language_text() {
         assert_eq!(Lang::En.pick("hello", "bonjour"), "hello");
         assert_eq!(Lang::Fr.pick("hello", "bonjour"), "bonjour");
+    }
+
+    #[test]
+    fn locale_maps_to_the_display_locale() {
+        assert!(matches!(
+            Lang::En.locale(),
+            token_usage::display::Locale::En
+        ));
+        assert!(matches!(
+            Lang::Fr.locale(),
+            token_usage::display::Locale::Fr
+        ));
     }
 }

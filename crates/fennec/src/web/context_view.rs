@@ -5,6 +5,7 @@ use crate::domain::compaction::model_view;
 use crate::domain::context_parts::{PartKind, context_parts, spread};
 use crate::domain::conversation::{fold_messages, frozen_prompt};
 use crate::domain::event::Event;
+use crate::domain::lang::Lang;
 use serde::Serialize;
 use serde_json::Value;
 use token_usage::display::{self, tokens};
@@ -67,7 +68,7 @@ pub struct PartView {
 
 /// From the last `context.state` the model still sees; `window` and
 /// `compact_at` are the current settings, used when no event says otherwise.
-pub fn context_view(events: &[Event], window: u64, compact_at: f64) -> ContextView {
+pub fn context_view(events: &[Event], window: u64, compact_at: f64, lang: Lang) -> ContextView {
     let last = model_view(events).iter().rev().find_map(|e| match **e {
         Event::ContextState {
             current_tokens,
@@ -110,28 +111,39 @@ pub fn context_view(events: &[Event], window: u64, compact_at: f64) -> ContextVi
     let line = if max > 0 {
         format!("{} %", percent)
     } else {
-        format!("{} tokens", tokens(current))
+        format!("{} tokens", tokens(current, lang.locale()))
     };
 
     let title = if max > 0 {
-        let mut title = format!(
-            "{} pris · {} restants · {} total",
-            tokens(current),
-            tokens(max.saturating_sub(current)),
-            tokens(max)
-        );
+        let mut title = match lang {
+            Lang::En => format!(
+                "{} taken · {} left · {} total",
+                tokens(current, lang.locale()),
+                tokens(max.saturating_sub(current), lang.locale()),
+                tokens(max, lang.locale())
+            ),
+            Lang::Fr => format!(
+                "{} pris · {} restants · {} total",
+                tokens(current, lang.locale()),
+                tokens(max.saturating_sub(current), lang.locale()),
+                tokens(max, lang.locale())
+            ),
+        };
         if let Some(mark) = compact_mark {
-            title.push_str(&format!(" · compaction à {mark} %"));
+            title.push_str(&match lang {
+                Lang::En => format!(" · compaction at {mark} %"),
+                Lang::Fr => format!(" · compaction à {mark} %"),
+            });
         } else {
-            title.push_str(" · compaction désactivée");
+            title.push_str(lang.pick(" · compaction off", " · compaction désactivée"));
         }
         title
     } else {
-        format!("{} tokens", tokens(current))
+        format!("{} tokens", tokens(current, lang.locale()))
     };
 
     let composition = (current > 0)
-        .then(|| composition(events, current))
+        .then(|| composition(events, current, lang))
         .flatten();
 
     ContextView {
@@ -145,7 +157,7 @@ pub fn context_view(events: &[Event], window: u64, compact_at: f64) -> ContextVi
 }
 
 /// What the context holds, ready to draw; none when nothing is known.
-fn composition(events: &[Event], current: u64) -> Option<CompositionView> {
+fn composition(events: &[Event], current: u64, lang: Lang) -> Option<CompositionView> {
     let (prompt, tools) = frozen_prompt(events);
     let parts = context_parts(
         prompt.unwrap_or(""),
@@ -162,7 +174,7 @@ fn composition(events: &[Event], current: u64) -> Option<CompositionView> {
         .zip(shares)
         .map(|(part, share)| (part.kind, part.label, share))
         .collect();
-    Some(composition_view(&shares, current, parts.images))
+    Some(composition_view(&shares, current, parts.images, lang))
 }
 
 /// A composition ready to draw from shares already in tokens, largest first;
@@ -171,6 +183,7 @@ pub fn composition_view(
     shares: &[(PartKind, String, u64)],
     total: u64,
     images: u64,
+    lang: Lang,
 ) -> CompositionView {
     let mut kinds: Vec<KindView> = Vec::new();
     for kind in [PartKind::Prompt, PartKind::Conversation, PartKind::Tools] {
@@ -182,8 +195,8 @@ pub fn composition_view(
         if share > 0 {
             kinds.push(KindView {
                 kind,
-                label: kind_label(kind).into(),
-                tokens: tokens(share),
+                label: kind_label(kind, lang).into(),
+                tokens: tokens(share, lang.locale()),
                 percent: display::percent(share, total),
             });
         }
@@ -192,15 +205,19 @@ pub fn composition_view(
     let mut rows: Vec<PartView> = shares
         .iter()
         .take(MAX_PARTS)
-        .map(|(kind, label, share)| part_view(Some(*kind), label.clone(), *share, total))
+        .map(|(kind, label, share)| part_view(Some(*kind), label.clone(), *share, total, lang))
         .collect();
     let rest = &shares[rows.len()..];
     if !rest.is_empty() {
         rows.push(part_view(
             None,
-            format!("{} autres parts", rest.len()),
+            match lang {
+                Lang::En => format!("{} other parts", rest.len()),
+                Lang::Fr => format!("{} autres parts", rest.len()),
+            },
             rest.iter().map(|(_, _, share)| share).sum(),
             total,
+            lang,
         ));
     }
 
@@ -209,26 +226,38 @@ pub fn composition_view(
         parts: rows,
         images: match images {
             0 => None,
-            1 => Some("+ 1 image, non estimée".into()),
-            n => Some(format!("+ {n} images, non estimées")),
+            1 => Some(
+                lang.pick("+ 1 image, not estimated", "+ 1 image, non estimée")
+                    .to_string(),
+            ),
+            n => Some(match lang {
+                Lang::En => format!("+ {n} images, not estimated"),
+                Lang::Fr => format!("+ {n} images, non estimées"),
+            }),
         },
     }
 }
 
-fn part_view(kind: Option<PartKind>, label: String, share: u64, current: u64) -> PartView {
+fn part_view(
+    kind: Option<PartKind>,
+    label: String,
+    share: u64,
+    current: u64,
+    lang: Lang,
+) -> PartView {
     PartView {
         kind,
         label,
-        tokens: tokens(share),
+        tokens: tokens(share, lang.locale()),
         percent: display::percent(share, current),
     }
 }
 
-fn kind_label(kind: PartKind) -> &'static str {
+fn kind_label(kind: PartKind, lang: Lang) -> &'static str {
     match kind {
-        PartKind::Prompt => "Prompt système",
+        PartKind::Prompt => lang.pick("System prompt", "Prompt système"),
         PartKind::Conversation => "Conversation",
-        PartKind::Tools => "Outils",
+        PartKind::Tools => lang.pick("Tools", "Outils"),
     }
 }
 
@@ -250,7 +279,7 @@ mod tests {
 
     #[test]
     fn no_event_uses_the_settings() {
-        let view = context_view(&[], 200_000, 0.85);
+        let view = context_view(&[], 200_000, 0.85, Lang::Fr);
         assert_eq!(view.percent, 0);
         assert_eq!(view.tone, Tone::Ok);
         assert_eq!(view.compact_mark, Some(85));
@@ -260,7 +289,7 @@ mod tests {
     #[test]
     fn the_last_visible_event_wins_and_sets_the_tone() {
         let events = [state(170_000, 200_000, Some(0.9))];
-        let view = context_view(&events, 100_000, 0.5);
+        let view = context_view(&events, 100_000, 0.5, Lang::Fr);
         assert_eq!(view.percent, 85);
         assert_eq!(view.tone, Tone::Err);
         assert_eq!(view.compact_mark, Some(90));
@@ -270,11 +299,19 @@ mod tests {
     #[test]
     fn compaction_off_has_no_mark_and_says_so() {
         let events = [state(50_000, 100_000, Some(0.0))];
-        let view = context_view(&events, 100_000, 0.5);
+        let view = context_view(&events, 100_000, 0.5, Lang::Fr);
         assert_eq!(view.percent, 50);
         assert_eq!(view.tone, Tone::Ok);
         assert_eq!(view.compact_mark, None);
         assert!(view.title.ends_with("compaction désactivée"));
+    }
+
+    #[test]
+    fn compaction_off_has_no_mark_and_says_so_in_english() {
+        let events = [state(50_000, 100_000, Some(0.0))];
+        let view = context_view(&events, 100_000, 0.5, Lang::En);
+        assert_eq!(view.compact_mark, None);
+        assert!(view.title.ends_with("compaction off"));
     }
 
     #[test]
@@ -283,7 +320,7 @@ mod tests {
             state(10_000, 100_000, Some(0.8)),
             state(90_000, 100_000, Some(0.9)),
         ];
-        let view = context_view(&events, 100_000, 0.5);
+        let view = context_view(&events, 100_000, 0.5, Lang::Fr);
         assert_eq!(view.percent, 90);
         assert_eq!(view.compact_mark, Some(90));
     }
@@ -291,7 +328,7 @@ mod tests {
     #[test]
     fn an_unknown_window_shows_only_the_tokens() {
         let events = [state(500, 0, None)];
-        let view = context_view(&events, 0, 0.85);
+        let view = context_view(&events, 0, 0.85, Lang::Fr);
         assert_eq!(view.percent, 0);
         assert_eq!(view.line, "500 tokens");
     }
@@ -314,7 +351,7 @@ mod tests {
             },
             state(100, 1000, Some(0.85)),
         ];
-        let view = context_view(&events, 1000, 0.85);
+        let view = context_view(&events, 1000, 0.85, Lang::Fr);
         let composition = view.composition.expect("composition");
         let kinds: Vec<PartKind> = composition.kinds.iter().map(|k| k.kind).collect();
         assert_eq!(kinds, [PartKind::Prompt, PartKind::Conversation]);
