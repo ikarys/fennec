@@ -5,7 +5,6 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { Tabs } from '../../ui/Tabs';
-import { Segmented } from '../../ui/Segmented';
 import { TasksOverview } from './TasksOverview';
 import { QueueBar } from './QueueBar';
 import { StageGroup } from './StageGroup';
@@ -21,13 +20,12 @@ import {
 
 export type TasksSub = 'overview' | 'yours' | 'backlog' | 'ready' | 'done';
 
-type TopTabId = 'overview' | 'yours' | 'queue';
-type BacklogView = 'backlog' | 'ready' | 'done';
-
-const TOP_TABS: readonly { id: TopTabId; label: string }[] = [
+const TOP_TABS: readonly { id: TasksSub; label: string }[] = [
   { id: 'overview', label: 'Vue d’ensemble' },
   { id: 'yours', label: 'À décider' },
-  { id: 'queue', label: 'Backlog' },
+  { id: 'ready', label: 'Prêtes' },
+  { id: 'backlog', label: 'Brouillons' },
+  { id: 'done', label: 'Terminées' },
 ];
 
 function normalizeSub(sub: string | null): TasksSub {
@@ -41,17 +39,6 @@ function normalizeSub(sub: string | null): TasksSub {
     return sub;
   }
   return 'overview';
-}
-
-function topTabFor(sub: TasksSub): TopTabId {
-  if (sub === 'overview') return 'overview';
-  if (sub === 'yours') return 'yours';
-  return 'queue';
-}
-
-function backlogViewFor(sub: TasksSub): BacklogView {
-  if (sub === 'ready' || sub === 'done') return sub;
-  return 'backlog';
 }
 
 export function TasksSection({
@@ -153,8 +140,6 @@ export function TasksSection({
   const done = board.groups.find((g) => g.stage === 'done')?.ideas ?? [];
 
   const activeSub = normalizeSub(sub);
-  const activeTopTab = topTabFor(activeSub);
-  const backlogView = backlogViewFor(activeSub);
 
   return (
     <section className="flex flex-col gap-4">
@@ -167,19 +152,16 @@ export function TasksSection({
           count:
             t.id === 'yours'
               ? yours.length
-              : t.id === 'queue'
-                ? drafts.length + queue.length
-                : undefined,
+              : t.id === 'ready'
+                ? queue.length
+                : t.id === 'backlog'
+                  ? drafts.length
+                  : t.id === 'done'
+                    ? done.length
+                    : undefined,
         }))}
-        active={activeTopTab}
-        onSelect={(id) => {
-          const tab = id as TopTabId;
-          if (tab === 'queue') {
-            onSelectSub('backlog');
-          } else {
-            onSelectSub(tab);
-          }
-        }}
+        active={activeSub}
+        onSelect={(id) => onSelectSub(id as TasksSub)}
       />
 
       {actionError ? (
@@ -200,7 +182,7 @@ export function TasksSection({
         </div>
       ) : null}
 
-      {activeTopTab === 'overview' ? (
+      {activeSub === 'overview' ? (
         <TasksOverview
           board={board}
           projectId={projectId}
@@ -212,7 +194,7 @@ export function TasksSection({
         />
       ) : null}
 
-      {activeTopTab === 'yours' ? (
+      {activeSub === 'yours' ? (
         yours.length > 0 ? (
           <StageGroup
             stage="yours"
@@ -229,21 +211,11 @@ export function TasksSection({
         )
       ) : null}
 
-      {activeTopTab === 'queue' ? (
+      {activeSub === 'ready' || activeSub === 'backlog' ? (
         <div className="flex flex-col gap-4">
           <QueueBar queue={board.queue} projectId={projectId} run={run} />
 
           <div className="flex items-center gap-2">
-            <Segmented
-              label="Vue du backlog"
-              segments={[
-                { value: 'backlog' as const, label: `Idées (${drafts.length})` },
-                { value: 'ready' as const, label: `Prêtes (${queue.length})` },
-                { value: 'done' as const, label: `Terminées (${done.length})` },
-              ]}
-              value={backlogView}
-              onChange={(view) => onSelectSub(view as BacklogView)}
-            />
             <div className="ml-auto">
               <Button
                 variant="secondary"
@@ -257,14 +229,14 @@ export function TasksSection({
             </div>
           </div>
 
-          {backlogView === 'backlog' && drafts.length === 0 ? (
+          {activeSub === 'backlog' && drafts.length === 0 ? (
             <p className="m-0 text-sm text-muted">Aucune idée en attente de cadrage.</p>
           ) : null}
-          {backlogView === 'ready' && queue.length === 0 ? (
+          {activeSub === 'ready' && queue.length === 0 ? (
             <p className="m-0 text-sm text-muted">Aucune idée cadrée dans la file.</p>
           ) : null}
 
-          {backlogView === 'backlog' ? (
+          {activeSub === 'backlog' ? (
             <StageGroup
               stage="drafts"
               ideas={drafts}
@@ -277,7 +249,7 @@ export function TasksSection({
             />
           ) : null}
 
-          {backlogView === 'ready' ? (
+          {activeSub === 'ready' ? (
             <StageGroup
               stage="queue"
               ideas={queue}
@@ -289,24 +261,24 @@ export function TasksSection({
               showLabel={false}
             />
           ) : null}
-
-          {backlogView === 'done' ? (
-            done.length > 0 ? (
-              <StageGroup
-                stage="done"
-                ideas={done}
-                projectId={projectId}
-                onFrame={runFrame}
-                onOpenSession={onOpenSession}
-                run={run}
-                caps={board.queue.caps}
-                showLabel={false}
-              />
-            ) : (
-              <p className="m-0 text-sm text-muted">Aucune tâche terminée.</p>
-            )
-          ) : null}
         </div>
+      ) : null}
+
+      {activeSub === 'done' ? (
+        done.length > 0 ? (
+          <StageGroup
+            stage="done"
+            ideas={done}
+            projectId={projectId}
+            onFrame={runFrame}
+            onOpenSession={onOpenSession}
+            run={run}
+            caps={board.queue.caps}
+            showLabel={false}
+          />
+        ) : (
+          <p className="m-0 text-sm text-muted">Aucune tâche terminée.</p>
+        )
       ) : null}
 
       <NewIdeaDialog

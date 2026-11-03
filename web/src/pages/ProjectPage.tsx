@@ -1,15 +1,13 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Tabs } from '../components/ui/Tabs';
 import { Button, buttonClass } from '../components/ui/Button';
-import { EditIcon, TrashIcon } from '../components/Icons';
+import { EditIcon, PlusIcon, TrashIcon } from '../components/Icons';
 import { DeleteProjectDialog } from '../components/project/DeleteProjectDialog';
 import { TasksSection } from '../components/project/ideas/TasksSection';
 import { MapSection } from '../components/project/MapSection';
 import { DocSection } from '../components/project/DocSection';
 import { RiskSection } from '../components/project/RiskSection';
-import { ProjectRulesSummary } from '../components/rules/RulesSection';
 import { AnalysesSection } from '../components/project/AnalysesSection';
-import { DiskSection } from '../components/project/DiskSection';
 import { DashboardSection } from '../components/project/DashboardSection';
 import {
   createSession,
@@ -24,10 +22,8 @@ const TABS = [
   { id: 'tasks', label: 'Tâches' },
   { id: 'map', label: 'Carte des modules' },
   { id: 'risks', label: 'Risques' },
-  { id: 'rules', label: 'Règles' },
   { id: 'doc', label: 'Doc' },
   { id: 'analyses', label: 'Analyses' },
-  { id: 'disk', label: 'Espace disque' },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
@@ -87,12 +83,14 @@ export default function ProjectPage({
   tab,
   sub,
   onOpenSession,
+  onNewSession,
 }: {
   projects: Project[];
   projectId: string;
   tab: string | null;
   sub: string | null;
   onOpenSession: (sessionId: string) => void;
+  onNewSession: (projectId: string) => void;
 }) {
   const project = projects.find((p) => p.id === projectId) ?? null;
   const [analyzing, setAnalyzing] = useState(false);
@@ -140,6 +138,10 @@ export default function ProjectPage({
         <h1 className="text-2xl font-semibold">
           {project.name}
         </h1>
+        <Button variant="primary" size="sm" onClick={() => onNewSession(projectId)} title="Nouvelle session dans ce projet">
+          <PlusIcon className="h-4 w-4" />
+          Nouvelle session
+        </Button>
         <a
           href={project.editorUrl}
           title="Ouvrir dans VS Code"
@@ -216,7 +218,6 @@ export default function ProjectPage({
           ) : null}
           {activeTab === 'map' ? <MapTab projectId={projectId} /> : null}
           {activeTab === 'risks' ? <RiskSection projectId={projectId} busy={analyzing} onStart={(prompt, mode) => void startSession(prompt, mode)} /> : null}
-          {activeTab === 'rules' ? <ProjectRulesSummary projectId={projectId} /> : null}
           {activeTab === 'doc' ? <DocSection projectId={projectId} /> : null}
           {activeTab === 'analyses' ? (
             <AnalysesSection
@@ -227,7 +228,6 @@ export default function ProjectPage({
               onOpenSession={onOpenSession}
             />
           ) : null}
-          {activeTab === 'disk' ? <DiskSection projectId={projectId} onOpenSession={onOpenSession} /> : null}
         </div>
       </div>
     </>,

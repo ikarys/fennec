@@ -36,7 +36,7 @@ const PAGE_TABS: { page: PageId; title: string; path: string }[] = [
   { page: 'settings', title: 'Réglages', path: '#/settings' },
   { page: 'insight', title: 'Insight', path: '#/insight' },
   { page: 'workflows', title: 'Workflows', path: '#/workflows' },
-  { page: 'backlog', title: 'Backlog', path: '#/backlog' }
+  { page: 'backlog', title: 'Tâches', path: '#/backlog' }
 ];
 
 function parseRoute(): Route {
@@ -550,7 +550,7 @@ export default function App() {
             </Suspense>
           ) : route.name === 'project' ? (
             <Suspense fallback={<div className="flex grow items-center justify-center text-muted">Chargement…</div>}>
-              <ProjectPage projects={projects} projectId={route.projectId} tab={route.tab} sub={route.sub} onOpenSession={openSession} />
+              <ProjectPage projects={projects} projectId={route.projectId} tab={route.tab} sub={route.sub} onOpenSession={openSession} onNewSession={(projectId) => startNewSession(projectId)} />
             </Suspense>
           ) : route.name === 'insight' ? (
             <InsightPage />

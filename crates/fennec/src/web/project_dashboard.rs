@@ -191,7 +191,7 @@ fn tiles(project_id: &str, facts: &Facts) -> Vec<TileView> {
         tokens_tile(&facts.usage),
         time_tile(&facts.usage),
         cost_tile(&facts.cost_value, &facts.cost_detail),
-        disk_tile(project_id, facts.disk),
+        disk_tile(facts.disk),
         map_tile(project_id, &facts.map_state, facts.module_count),
         doc_tile(project_id, facts.doc_count, facts.adr_count),
     ]
@@ -286,7 +286,7 @@ fn cost_tile(value: &str, detail: &str) -> TileView {
     }
 }
 
-fn disk_tile(project_id: &str, disk: Option<(u64, u64)>) -> TileView {
+fn disk_tile(disk: Option<(u64, u64)>) -> TileView {
     let (figure, detail, tone, active) = match disk {
         Some((total, generated)) => {
             let alert = total >= worktree_routes::ALERT_BYTES;
@@ -313,7 +313,7 @@ fn disk_tile(project_id: &str, disk: Option<(u64, u64)>) -> TileView {
         detail,
         tone,
         active,
-        href: Some(format!("#/project/{project_id}/disk")),
+        href: None,
         title: Some("Mesuré sur le disque, scan de moins de 10 min réutilisé".into()),
     }
 }

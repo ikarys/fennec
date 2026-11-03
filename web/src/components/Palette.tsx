@@ -59,7 +59,7 @@ export function Palette({ open, projects, onClose, onOpenSession, onNewSession, 
 
     const pages: PaletteItem[] = [
       { id: 'page-home', title: 'Accueil', meta: '', action: onHome },
-      { id: 'page-backlog', title: 'Backlog', meta: '', action: () => onOpenPage('backlog') },
+      { id: 'page-backlog', title: 'Tâches', meta: '', action: () => onOpenPage('backlog') },
       { id: 'page-workflows', title: 'Workflows', meta: '', action: () => onOpenPage('workflows') },
       { id: 'page-insight', title: 'Insight', meta: '', action: () => onOpenPage('insight') },
       { id: 'page-settings', title: 'Réglages', meta: '', action: () => onOpenPage('settings') }

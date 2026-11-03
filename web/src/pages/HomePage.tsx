@@ -243,12 +243,12 @@ function ProjectSection({
           </Button>
           <a
             href={'#/project/' + encodeURIComponent(project.id) + '/tasks'}
-            title="Ajouter une idée au backlog"
-            aria-label="Ajouter une idée au backlog"
+            title="Voir les tâches du projet"
+            aria-label="Tâches du projet"
             className={buttonClass({ variant: 'ghost', size: 'sm' })}
           >
             <BulbIcon className="h-3.5 w-3.5" />
-            Backlog
+            Tâches
           </a>
         </div>
       </div>
