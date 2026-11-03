@@ -7,6 +7,7 @@
 import { type AgentSuggestion } from '../../lib/api';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
+import { useT } from '../../i18n';
 
 export function AgentSuggestionCard({
   suggestion,
@@ -17,6 +18,7 @@ export function AgentSuggestionCard({
   sessionId: string;
   projectId: string;
 }) {
+  const t = useT();
   return (
     <Card className="flex flex-col gap-3 p-4">
       <div className="flex flex-col gap-1">
@@ -25,22 +27,22 @@ export function AgentSuggestionCard({
             className="h-1.5 w-1.5 rounded-full bg-muted"
             style={suggestion.color ? { backgroundColor: suggestion.color } : undefined}
           />
-          Basculer sur {suggestion.name} ?
+          {t('switchTo', { name: suggestion.name })}
         </p>
         <p className="m-0 text-xs text-muted">
-          {suggestion.reason} Suggéré par l'agent (indicatif) : rien ne change sans vous.
+          {suggestion.reason} {t('suggestedHint')}
         </p>
       </div>
       <div className="flex items-center gap-2">
         <Button
           variant="primary"
           size="md"
-          title="Ouvre une nouvelle session sur cet agent, le brief prêt dans le composer"
+          title={t('suggestionTitle')}
           onClick={() => {
             window.location.hash = `#/new/${encodeURIComponent(projectId)}?from=${encodeURIComponent(sessionId)}`;
           }}
         >
-          Nouvelle session
+          {t('newSession')}
         </Button>
       </div>
     </Card>

@@ -1,6 +1,8 @@
 import { Segmented } from '../ui/Segmented';
 import { ChoiceDot, ChoiceMenu, type ChoiceGroup } from '../ui/ChoiceMenu';
 import type { Agent, AgentPhase } from '../../lib/api';
+import { t, type Lang } from '../../i18n/messages';
+import { useLang, useT } from '../../i18n';
 
 interface ModePickerProps {
   agents: Agent[];
@@ -9,20 +11,20 @@ interface ModePickerProps {
   disabled?: boolean;
 }
 
-const PHASE_LABELS: Record<AgentPhase, string> = {
-  start: 'Démarrer',
-  frame: 'Cadrer',
-  build: 'Construire',
-  understand: 'Comprendre',
-  check: 'Contrôler',
+const PHASE_KEYS: Record<AgentPhase, 'phaseStart' | 'phaseFrame' | 'phaseBuild' | 'phaseUnderstand' | 'phaseCheck'> = {
+  start: 'phaseStart',
+  frame: 'phaseFrame',
+  build: 'phaseBuild',
+  understand: 'phaseUnderstand',
+  check: 'phaseCheck',
 };
 
 // The server already ordered agents by phase; group only consecutive runs so the
 // menu mirrors that order without re-sorting in the UI.
-function phaseGroups(agents: Agent[]): ChoiceGroup[] {
+function phaseGroups(lang: Lang, agents: Agent[]): ChoiceGroup[] {
   const groups: ChoiceGroup[] = [];
   for (const agent of agents) {
-    const label = agent.phase ? PHASE_LABELS[agent.phase] : 'Autres';
+    const label = agent.phase ? t(lang, PHASE_KEYS[agent.phase]) : t(lang, 'phaseOther');
     const choice = { value: agent.id, label: agent.name, description: agent.description, color: agent.color };
     const last = groups[groups.length - 1];
     if (last && last.label === label) {
@@ -40,6 +42,8 @@ function phaseGroups(agents: Agent[]): ChoiceGroup[] {
  * composer narrow. Switching applies from the next turn.
  */
 export function ModePicker({ agents, mode, onChange, disabled }: ModePickerProps) {
+  const t = useT();
+  const lang = useLang();
   // A single agent is not a choice; the server's default is enough.
   if (agents.length < 2) {
     return null;
@@ -50,16 +54,16 @@ export function ModePicker({ agents, mode, onChange, disabled }: ModePickerProps
     const selected = agents.find((agent) => agent.id === mode);
     return (
       <ChoiceMenu
-        label="Agent de la session"
-        title={selected ? `Agent de la session : ${selected.name}${selected.description ? ` — ${selected.description}` : ''}` : 'Agent de la session'}
-        groups={phaseGroups(agents)}
+        label={t('sessionAgent')}
+        title={selected ? t('sessionAgentOf', { name: `${selected.name}${selected.description ? ` — ${selected.description}` : ''}` }) : t('sessionAgent')}
+        groups={phaseGroups(lang, agents)}
         value={mode}
         onChange={onChange}
         disabled={disabled}
         trigger={
           <>
             <ChoiceDot color={selected?.color ?? null} />
-            {selected?.name ?? 'Mode'}
+            {selected?.name ?? t('mode')}
           </>
         }
       />
@@ -68,13 +72,13 @@ export function ModePicker({ agents, mode, onChange, disabled }: ModePickerProps
 
   return (
     <Segmented
-      label="Agent de la session"
+      label={t('sessionAgent')}
       value={mode}
       onChange={onChange}
       disabled={disabled}
       segments={agents.map((agent) => ({
         value: agent.id,
-        title: `Agent de la session : ${agent.name}${agent.description ? ` — ${agent.description}` : ''}`,
+        title: t('sessionAgentOf', { name: `${agent.name}${agent.description ? ` — ${agent.description}` : ''}` }),
         label: (
           <>
             <ChoiceDot color={agent.color} />
