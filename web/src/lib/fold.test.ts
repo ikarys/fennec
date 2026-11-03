@@ -219,17 +219,6 @@ describe('createThreadFold', () => {
     expect(tool?.blockedBy).toEqual({ pattern: 'rm', scope: 'global' });
   });
 
-  it('counts tool calls', () => {
-    const fold = createThreadFold();
-    fold.apply(ev('tool.call', { messageId: 'a1', toolCall: { id: 't1', name: 'read_file', arguments: {} } }));
-    fold.apply(ev('tool.call', { messageId: 'a1', toolCall: { id: 't2', name: 'read_file', arguments: {} } }));
-    fold.apply(ev('tool.call', { messageId: 'a1', toolCall: { id: 't3', name: 'write_file', arguments: {} } }));
-    expect(fold.view().toolCounts).toEqual([
-      { name: 'read_file', count: 2 },
-      { name: 'write_file', count: 1 }
-    ]);
-  });
-
   it('folds write_file into modified files and content preview', () => {
     const fold = createThreadFold();
     fold.apply(ev('tool.call', {
@@ -280,7 +269,6 @@ describe('createThreadFold', () => {
       toolCall: { id: 't1', name: 'read_file', arguments: { path: 'a.ts' } }
     }));
     expect(fold.view().modifiedFiles).toHaveLength(0);
-    expect(fold.view().toolCounts).toEqual([{ name: 'read_file', count: 1 }]);
   });
 
   it('sets criteria from criteria.set', () => {

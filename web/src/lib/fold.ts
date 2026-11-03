@@ -94,11 +94,6 @@ export interface ModifiedFile {
   removed: number;
 }
 
-export interface ToolCount {
-  name: string;
-  count: number;
-}
-
 export interface PendingQuestion {
   callId: string;
   question: string;
@@ -144,7 +139,6 @@ export interface ThreadView {
   pendingQuestion?: PendingQuestion;
   /** The tool call waiting for the human's approval, if any. */
   modifiedFiles: ModifiedFile[];
-  toolCounts: ToolCount[];
   /**
    * The last `mode.changed` value, or null when the session detail should
    * provide the server's resolved mode.
@@ -261,9 +255,7 @@ function parseWorkflowStats(value: unknown): WorkflowStats | undefined {
   };
 }
 
-function updateToolStats(tool: ToolCallView, modified: Map<string, ModifiedFile>, toolCounts: Map<string, number>): void {
-  toolCounts.set(tool.name, (toolCounts.get(tool.name) ?? 0) + 1);
-
+function updateToolStats(tool: ToolCallView, modified: Map<string, ModifiedFile>): void {
   if (tool.name === 'write_file') {
     const path = String(tool.args.path ?? '');
     const content = String(tool.args.content ?? '');
@@ -320,7 +312,6 @@ export function createThreadFold(): ThreadFold {
   let lastDone: string | undefined;
   let pendingQuestion: PendingQuestion | undefined;
   const modified = new Map<string, ModifiedFile>();
-  const toolCounts = new Map<string, number>();
   const assistants = new Map<string, AssistantItem>();
   const tools = new Map<string, ToolCallView>();
   let index = 0;
@@ -465,7 +456,7 @@ export function createThreadFold(): ThreadFold {
         if (name === 'ask_user' && typeof args.question === 'string') {
           tool.question = args.question;
         }
-        updateToolStats(tool, modified, toolCounts);
+        updateToolStats(tool, modified);
 
         const assistant = assistants.get(messageId) ?? newAssistant(messageId);
         assistant.segments.push({ kind: 'tool', id: toolId, tool });
@@ -829,7 +820,6 @@ export function createThreadFold(): ThreadFold {
     lastDone,
     pendingQuestion,
     modifiedFiles: Array.from(modified.values()),
-    toolCounts: Array.from(toolCounts.entries()).map(([name, count]) => ({ name, count })),
     mode,
     name,
     run: runFold.view()
