@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
+import { Card } from '../ui/Card';
 import { Section } from '../ui/Section';
 import { Tile } from '../ui/Tile';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
@@ -149,7 +150,8 @@ export function DiskSection({
           label="Espace disque"
           figure={data ? formatBytes(data.totalBytes) : '…'}
           detail={data ? `mesuré ${formatRelative(data.scannedAt)}` : "Mesure de l'espace disque…"}
-          tone="neutral"
+          tone="info"
+          active={data ? data.totalBytes > 0 : false}
         />
         <Tile
           icon={<EraserIcon />}
@@ -168,7 +170,7 @@ export function DiskSection({
         flush
         actions={
           <>
-            {data ? <Badge tone="neutral" title="Mesuré sur le disque">vérifié</Badge> : null}
+            {data ? <Badge tone="ok" pill title="Mesuré sur le disque">vérifié</Badge> : null}
             <Button
               variant="ghost"
               size="sm"
@@ -184,20 +186,28 @@ export function DiskSection({
         }
       >
         {sessions.length === 0 ? (
-          <div className="px-4 py-3 text-sm text-muted">Aucun worktree.</div>
+          <Card className="px-4 py-6 text-center text-sm text-muted">Aucun worktree.</Card>
         ) : (
-          sessions.map((entry, index) => (
-            <SessionRow
-              key={entry.name}
-              entry={entry}
-              first={index === 0}
-              busy={Boolean(busy[entry.name])}
-              error={errors[entry.name]}
-              onOpenSession={onOpenSession}
-              onClean={() => void runAction(entry.name, () => cleanWorktree(entry.name))}
-              onTrash={() => setConfirm(entry)}
-            />
-          ))
+          <Card className="overflow-hidden">
+            <div className="flex items-center gap-3 border-b border-border bg-raised px-4 py-2 text-xs uppercase tracking-wide text-faint">
+              <span className="min-w-0 grow">Worktree</span>
+              <span className="w-32 shrink-0 text-right">Taille</span>
+              <span className="w-16 shrink-0" />
+            </div>
+            <ul className="divide-y divide-border">
+              {sessions.map((entry) => (
+                <SessionRow
+                  key={entry.name}
+                  entry={entry}
+                  busy={Boolean(busy[entry.name])}
+                  error={errors[entry.name]}
+                  onOpenSession={onOpenSession}
+                  onClean={() => void runAction(entry.name, () => cleanWorktree(entry.name))}
+                  onTrash={() => setConfirm(entry)}
+                />
+              ))}
+            </ul>
+          </Card>
         )}
       </Section>
 
@@ -207,16 +217,24 @@ export function DiskSection({
           description="Des dossiers qu'aucune session ou que git ne connaît plus : fennec ne les supprime jamais seul."
           flush
         >
-          {orphans.map((entry, index) => (
-            <OrphanRow
-              key={entry.name}
-              entry={entry}
-              first={index === 0}
-              busy={Boolean(busy[entry.name])}
-              error={errors[entry.name]}
-              onTrash={() => setConfirm(entry)}
-            />
-          ))}
+          <Card className="overflow-hidden">
+            <div className="flex items-center gap-3 border-b border-border bg-raised px-4 py-2 text-xs uppercase tracking-wide text-faint">
+              <span className="min-w-0 grow">Dossier</span>
+              <span className="w-32 shrink-0 text-right">Taille</span>
+              <span className="w-16 shrink-0" />
+            </div>
+            <ul className="divide-y divide-border">
+              {orphans.map((entry) => (
+                <OrphanRow
+                  key={entry.name}
+                  entry={entry}
+                  busy={Boolean(busy[entry.name])}
+                  error={errors[entry.name]}
+                  onTrash={() => setConfirm(entry)}
+                />
+              ))}
+            </ul>
+          </Card>
         </Section>
       ) : null}
 
@@ -234,7 +252,6 @@ export function DiskSection({
 
 function SessionRow({
   entry,
-  first,
   busy,
   error,
   onOpenSession,
@@ -242,7 +259,6 @@ function SessionRow({
   onTrash,
 }: {
   entry: WorktreeEntry;
-  first: boolean;
   busy: boolean;
   error?: string;
   onOpenSession: (sessionId: string) => void;
@@ -250,15 +266,11 @@ function SessionRow({
   onTrash: () => void;
 }) {
   return (
-    <div
-      className={`flex flex-wrap items-center gap-3 px-4 py-3 text-sm ${
-        first ? '' : 'border-t border-border'
-      }`}
-    >
-      <div className="min-w-0 flex-1">
+    <li className="group relative flex items-center gap-3 px-4 py-3 text-sm transition-colors before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-accent before:transition-opacity hover:bg-accent-soft hover:before:opacity-100 before:opacity-0">
+      <div className="min-w-0 grow">
         <button
           type="button"
-          className="text-left hover:underline"
+          className="text-left group-hover:text-accent-strong"
           onClick={() => {
             if (entry.sessionId) onOpenSession(entry.sessionId);
           }}
@@ -280,14 +292,14 @@ function SessionRow({
         {error ? <p className="mt-1 text-err text-xs">{error}</p> : null}
       </div>
 
-      <div className="text-right tabular-nums">
+      <div className="w-32 shrink-0 text-right tabular-nums">
         <div>{formatBytes(entry.bytes)}</div>
         <div className="text-xs text-muted">dont {formatBytes(entry.generatedBytes)} de cache</div>
       </div>
 
-      <div className="flex items-center gap-1">
+      <div className="flex w-16 shrink-0 items-center justify-end gap-1">
         <Button
-          variant="ghost"
+          variant="soft"
           size="sm"
           iconOnly
           title={`Libérer le cache de build (${formatBytes(entry.generatedBytes)})`}
@@ -297,44 +309,36 @@ function SessionRow({
         >
           <EraserIcon className="h-3.5 w-3.5" />
         </Button>
-        {entry.cache ? null : (
-          <Button
-            variant="ghost"
-            size="sm"
-            iconOnly
-            title="Supprimer le worktree et sa branche"
-            aria-label="Supprimer le worktree et sa branche"
-            disabled={busy || entry.running}
-            onClick={onTrash}
-          >
-            <TrashIcon className="h-3.5 w-3.5" />
-          </Button>
-        )}
+        <Button
+          variant="danger"
+          size="sm"
+          iconOnly
+          title="Supprimer le worktree et sa branche"
+          aria-label="Supprimer le worktree et sa branche"
+          disabled={busy || entry.running}
+          onClick={onTrash}
+        >
+          <TrashIcon className="h-3.5 w-3.5" />
+        </Button>
       </div>
-    </div>
+    </li>
   );
 }
 
 function OrphanRow({
   entry,
-  first,
   busy,
   error,
   onTrash,
 }: {
   entry: WorktreeEntry;
-  first: boolean;
   busy: boolean;
   error?: string;
   onTrash: () => void;
 }) {
   return (
-    <div
-      className={`flex flex-wrap items-center gap-3 px-4 py-3 text-sm ${
-        first ? '' : 'border-t border-border'
-      }`}
-    >
-      <div className="min-w-0 flex-1">
+    <li className="group relative flex items-center gap-3 px-4 py-3 text-sm transition-colors before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-accent before:transition-opacity hover:bg-accent-soft hover:before:opacity-100 before:opacity-0">
+      <div className="min-w-0 grow">
         <div className="font-mono text-xs">{entry.name}</div>
         <div className="mt-1 text-xs text-muted">
           {entry.repoMissing ? 'dépôt introuvable' : 'inconnu de git ou sans session'}
@@ -353,21 +357,23 @@ function OrphanRow({
         {error ? <p className="mt-1 text-err text-xs">{error}</p> : null}
       </div>
 
-      <div className="text-right tabular-nums">{formatBytes(entry.bytes)}</div>
+      <div className="w-32 shrink-0 text-right tabular-nums">{formatBytes(entry.bytes)}</div>
 
-      {entry.sudoCommand ? null : (
-        <Button
-          variant="ghost"
-          size="sm"
-          iconOnly
-          title="Supprimer ce dossier"
-          aria-label="Supprimer ce dossier"
-          disabled={busy}
-          onClick={onTrash}
-        >
-          <TrashIcon className="h-3.5 w-3.5" />
-        </Button>
-      )}
-    </div>
+      <div className="flex w-16 shrink-0 items-center justify-end gap-1">
+        {entry.sudoCommand ? null : (
+          <Button
+            variant="danger"
+            size="sm"
+            iconOnly
+            title="Supprimer ce dossier"
+            aria-label="Supprimer ce dossier"
+            disabled={busy}
+            onClick={onTrash}
+          >
+            <TrashIcon className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </div>
+    </li>
   );
 }

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Blocker, IntegrationPreview, RepoState, SessionDetail } from '../../lib/api';
 import { discardWorktree, getIntegration, getRepoState, openFileManager, openTerminal, resolveConflict } from '../../lib/api';
-import { BranchIcon, CheckIcon, CopyIcon, EditIcon, FolderIcon, SpinnerIcon, TerminalIcon } from '../Icons';
+import { BranchIcon, CheckIcon, CopyIcon, ExternalIcon, FolderIcon, SpinnerIcon, TerminalIcon } from '../Icons';
 import { useIntegrationInvite } from './IntegrationInvite';
 import { Button, buttonClass } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -201,7 +201,7 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
                     aria-label="Ouvrir dans VS Code"
                     className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
                   >
-                    <EditIcon className="h-3.5 w-3.5" />
+                    <ExternalIcon className="h-3.5 w-3.5" />
                   </a>
                   {terminalButton}
                   <Button

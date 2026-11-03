@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { ModelRef, ParamSource, ProviderListing, ReasoningEffort, SettingsDefaults } from '../../lib/api';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { Section } from '../ui/Section';
+import { Section, type SectionSave } from '../ui/Section';
 import { SectionLabel } from '../ui/SectionLabel';
 import { ChevronRightIcon, CloseIcon, HeartIcon, PinIcon, StarIcon } from '../Icons';
 import { FieldRow, Select, TextInput } from '../ui/Field';
@@ -29,6 +29,8 @@ interface ModelPrefsSectionProps {
   onSetDefault: (key: string) => void;
   onChange: (key: string, field: keyof ModelForm, value: string) => void;
   onRemoveModel: (providerId: string, modelId: string) => void;
+  /** The group's own save: its dot and its "Enregistrer". */
+  save?: SectionSave;
 }
 
 /** The model ids of `provider` edited in the form but absent from its listing: added by hand. */
@@ -350,6 +352,7 @@ export function ModelPrefsSection({
   defaultModel,
   onSetDefault,
   onChange,
+  save,
   onRemoveModel
 }: ModelPrefsSectionProps) {
   // A model with saved overrides opens by itself: that is what the human came to edit.
@@ -362,7 +365,7 @@ export function ModelPrefsSection({
   const toggleOpen = (key: string) => setOpen((previous) => ({ ...previous, [key]: !isOpen(key) }));
 
   return (
-    <Section title="Paramètres par modèle">
+    <Section title="Paramètres par modèle" save={save}>
       {listings.length === 0 && <p className="m-0 text-sm text-muted">Aucun modèle listé.</p>}
       <div className="flex flex-col">
         {listings.map((listing) => {
@@ -420,4 +423,3 @@ export function ModelPrefsSection({
     </Section>
   );
 }
-

@@ -9,9 +9,12 @@ export interface RiskModule {
   untested: number;
   churning: number;
   zones: RiskZone[];
+  remedyPrompt: string;
 }
 export interface RiskReport {
   files: number;
+  commits: number;
+  aiCommits: number;
   unreviewedPercent: number;
   untested: number;
   churning: number;

@@ -138,33 +138,6 @@ pub fn remove_orphan(app: &App, req: &Request, stream: &mut TcpStream) -> Result
     }
 }
 
-/// The project's disk usage from the cached scan only: the dashboard must not
-/// trigger a scan.
-pub(super) fn project_disk(
-    app: &App,
-    store: &crate::store::SqliteStore,
-    project: &crate::domain::project::Project,
-) -> Result<Option<(u64, u64)>, String> {
-    // Cloned out so the store reads below do not hold the scan's lock.
-    let Some((_, entries)) = app.worktree_scan.lock().unwrap().clone() else {
-        return Ok(None);
-    };
-
-    let project_workdir = Path::new(&project.workdir);
-    let project_entries = project_entries(store, &entries, &project.id, project_workdir)?;
-
-    let total_bytes = project_entries
-        .iter()
-        .map(|item| item.entry.bytes)
-        .sum::<u64>();
-    let generated_bytes = project_entries
-        .iter()
-        .map(|item| item.entry.generated_bytes)
-        .sum::<u64>();
-
-    Ok(Some((total_bytes, generated_bytes)))
-}
-
 fn cached_scan(app: &App, fresh: bool) -> (u64, Vec<WorktreeUsage>) {
     let now = clock::now_ms();
     let mut scan = app.worktree_scan.lock().unwrap();
