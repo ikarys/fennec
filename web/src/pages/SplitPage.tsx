@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent, type KeyboardEvent } from 'react';
+import { useT } from '../i18n';
 import type { Project } from '../lib/api';
 import { SessionPage } from './SessionPage';
 import { Palette } from '../components/Palette';
@@ -66,6 +67,7 @@ export function SplitPage({
   onOpenPage,
   onOpenProject,
 }: SplitPageProps) {
+  const t = useT();
   const [leftPct, setLeftPct] = useState(() => loadRatio());
   const [paletteFor, setPaletteFor] = useState<'left' | 'right' | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -109,10 +111,10 @@ export function SplitPage({
     if (value === null) {
       return (
         <div className="flex min-h-0 min-w-0 grow flex-col items-center justify-center gap-3 p-6 text-center">
-          <p className="text-sm text-muted">Sélectionne une session pour ce volet</p>
+          <p className="text-sm text-muted">{t('splitEmptyPane')}</p>
           <Button onClick={() => setPaletteFor(side)}>
             <PlusIcon className="h-4 w-4" />
-            Choisir une session
+            {t('splitChooseSession')}
           </Button>
         </div>
       );
@@ -143,12 +145,12 @@ export function SplitPage({
       <div
         role="separator"
         aria-orientation="vertical"
-        aria-label="Largeur du volet de gauche"
+        aria-label={t('splitDividerAria')}
         aria-valuemin={MIN_PCT}
         aria-valuemax={MAX_PCT}
         aria-valuenow={leftPct}
         tabIndex={0}
-        title="Glisser pour redimensionner · double-clic : 50/50"
+        title={t('splitDividerTitle')}
         onPointerDown={handleDividerDown}
         onPointerMove={handleDividerMove}
         onPointerUp={handleDividerUp}

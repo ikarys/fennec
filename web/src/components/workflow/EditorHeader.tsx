@@ -1,4 +1,6 @@
 import type { Origin, WorkflowDef } from '../../lib/workflow';
+import type { MsgKey } from '../../i18n/messages';
+import { useT } from '../../i18n';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { PlayIcon } from '../Icons';
@@ -19,10 +21,10 @@ interface EditorHeaderProps {
   canTest: boolean;
 }
 
-const ORIGIN_LABELS: Record<Origin, string> = {
-  project: 'Projet',
-  global: 'Global',
-  default: 'Par défaut'
+const ORIGIN_LABELS: Record<Origin, MsgKey> = {
+  project: 'workflowOriginProject',
+  global: 'workflowOriginGlobal',
+  default: 'workflowOriginDefault'
 };
 
 export function EditorHeader({
@@ -39,34 +41,35 @@ export function EditorHeader({
   onTest,
   canTest
 }: EditorHeaderProps) {
+  const t = useT();
   return (
     <header className="flex shrink-0 items-center gap-3 border-b border-border bg-panel px-4 py-2">
       <TextInput
         type="text"
         value={def.name}
         onChange={(event) => onNameChange(event.target.value)}
-        aria-label="Nom du workflow"
+        aria-label={t('workflowEditorNameAria')}
         className="w-48 font-semibold"
       />
       <TextInput
         type="text"
         value={def.description ?? ''}
         onChange={(event) => onDescriptionChange(event.target.value)}
-        placeholder="Description"
-        aria-label="Description"
+        placeholder={t('agentDescriptionLabel')}
+        aria-label={t('agentDescriptionLabel')}
         className="grow"
       />
-      <Badge tone="neutral">{ORIGIN_LABELS[origin]}</Badge>
+      <Badge tone="neutral">{t(ORIGIN_LABELS[origin])}</Badge>
       <Select
         value={scope}
         onChange={(event) => onScopeChange(event.target.value as 'project' | 'global')}
-        aria-label="Portée d’enregistrement"
+        aria-label={t('workflowEditorScopeAria')}
       >
-        <option value="project">Projet</option>
-        <option value="global">Global</option>
+        <option value="project">{t('workflowOriginProject')}</option>
+        <option value="global">{t('workflowOriginGlobal')}</option>
       </Select>
-      {dirty && <span className="text-xs text-accent" title="Modifications non enregistrées">●</span>}
-      {issueCount > 0 && <span className="text-xs text-err">{issueCount} problème(s)</span>}
+      {dirty && <span className="text-xs text-accent" title={t('sectionUnsavedChanges')}>●</span>}
+      {issueCount > 0 && <span className="text-xs text-err">{t('workflowEditorIssueCount', { count: issueCount })}</span>}
       {onTest && (
         <Button
           variant="secondary"
@@ -75,14 +78,14 @@ export function EditorHeader({
           iconOnly
           onClick={onTest}
           disabled={!canTest}
-          aria-label="Tester pas à pas"
-          title={canTest ? "Ouvre une nouvelle session avec ce workflow, en pas à pas." : "Enregistre le workflow avant de le tester."}
+          aria-label={t('workflowEditorTestAria')}
+          title={canTest ? t('workflowEditorTestTitle') : t('workflowEditorTestSaveTitle')}
         >
           <PlayIcon className="h-4 w-4" />
         </Button>
       )}
       <Button variant="primary" size="sm" type="button" onClick={onSave} disabled={saving}>
-        {saving ? 'Enregistrement…' : 'Enregistrer'}
+        {saving ? t('sectionSaving') : t('agentSave')}
       </Button>
     </header>
   );

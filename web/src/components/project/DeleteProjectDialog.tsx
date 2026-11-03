@@ -1,5 +1,6 @@
 /** Asks the human to delete a project, showing exactly what is removed. */
 import { useState } from "react";
+import { useT } from "../../i18n";
 import { deleteProject, type Project } from "../../lib/api";
 import { Button } from "../ui/Button";
 import { Card } from "../ui/Card";
@@ -14,6 +15,7 @@ export function DeleteProjectDialog({
   onClose: () => void;
   onDeleted: () => void;
 }) {
+  const t = useT();
   const [busy, setBusy] = useState(false);
   const [deleteFolder, setDeleteFolder] = useState(false);
   const [thrown, setThrown] = useState<string | null>(null);
@@ -34,7 +36,7 @@ export function DeleteProjectDialog({
       setThrown(
         error instanceof Error
           ? error.message
-          : "Impossible de supprimer le projet",
+          : t("deleteProjectError"),
       );
     } finally {
       setBusy(false);
@@ -46,17 +48,17 @@ export function DeleteProjectDialog({
       open
       onClose={folderError ? onDeleted : onClose}
       busy={busy}
-      label="Supprimer"
+      label={t("delete")}
     >
       <Card className="flex flex-col gap-3 p-4">
         <h2 className="m-0 text-sm font-semibold">
-          Supprimer le projet {project.name}
+          {t("deleteProjectTitle", { name: project.name })}
         </h2>
 
         <ul className="m-0 list-disc space-y-1 pl-4 text-sm text-muted">
-          <li>ses {project.sessions.length} sessions et leurs journaux</li>
-          <li>les worktrees et branches fennec de ses sessions</li>
-          <li>ses règles et ses idées</li>
+          <li>{t("deleteProjectSessions", { count: project.sessions.length })}</li>
+          <li>{t("deleteProjectWorktrees")}</li>
+          <li>{t("deleteProjectRules")}</li>
         </ul>
 
         <div className="flex flex-col gap-1">
@@ -67,15 +69,14 @@ export function DeleteProjectDialog({
               onChange={(event) => setDeleteFolder(event.target.checked)}
               className="h-4 w-4 accent-[var(--accent)]"
             />
-            Supprimer aussi le dossier du code source
+            {t("deleteProjectFolder")}
           </label>
           <code className="break-all font-mono text-xs text-muted">
             {project.workdir}
           </code>
           {deleteFolder && (
             <p className="m-0 text-xs text-err">
-              Le dossier et tout son contenu seront effacés du disque, sans
-              corbeille.
+              {t("deleteProjectFolderWarning")}
             </p>
           )}
         </div>
@@ -86,7 +87,7 @@ export function DeleteProjectDialog({
         {folderError ? (
           <div className="flex justify-end">
             <Button variant="secondary" autoFocus onClick={onDeleted}>
-              Fermer
+              {t("close")}
             </Button>
           </div>
         ) : (
@@ -97,7 +98,7 @@ export function DeleteProjectDialog({
               disabled={busy}
               onClick={onClose}
             >
-              Annuler
+              {t("cancel")}
             </Button>
             <Button
               variant="danger"
@@ -105,10 +106,10 @@ export function DeleteProjectDialog({
               onClick={() => void confirm()}
             >
               {busy
-                ? "Suppression…"
+                ? t("deleting")
                 : deleteFolder
-                  ? "Supprimer le projet et le dossier"
-                  : "Supprimer le projet"}
+                  ? t("deleteProjectFolderBtn")
+                  : t("deleteProjectBtn")}
             </Button>
           </div>
         )}

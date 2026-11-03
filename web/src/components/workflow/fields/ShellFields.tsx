@@ -1,6 +1,7 @@
 import type { WorkflowNode } from '../../../lib/workflow';
 import { TemplateChips } from '../TemplateChips';
 import { FieldRow, TextArea, TextInput } from '../../ui/Field';
+import { useT } from '../../../i18n';
 
 interface ShellFieldsProps {
   node: WorkflowNode;
@@ -9,6 +10,7 @@ interface ShellFieldsProps {
 }
 
 export function ShellFields({ node, names, onChange }: ShellFieldsProps) {
+  const t = useT();
   const insertTemplate = (name: string) => {
     const current = (node.command as string) ?? '';
     onChange('command', current + `{{${name}}}`);
@@ -18,7 +20,7 @@ export function ShellFields({ node, names, onChange }: ShellFieldsProps) {
 
   return (
     <>
-      <FieldRow label="Commande">
+      <FieldRow label={t('shellCommand')}>
         <TextArea
           value={(node.command as string) ?? ''}
           onChange={(event) => onChange('command', event.target.value)}
@@ -27,7 +29,7 @@ export function ShellFields({ node, names, onChange }: ShellFieldsProps) {
         />
         <TemplateChips names={names} onInsert={insertTemplate} />
       </FieldRow>
-      <FieldRow label="Délai (s)">
+      <FieldRow label={t('shellTimeoutSecs')}>
         <TextInput
           type="number"
           value={timeoutSecs}
@@ -35,7 +37,7 @@ export function ShellFields({ node, names, onChange }: ShellFieldsProps) {
           className="w-full"
         />
       </FieldRow>
-      <FieldRow label="Codes de succès">
+      <FieldRow label={t('shellSuccessCodes')}>
         <TextInput
           type="text"
           value={((node.successCodes as number[]) ?? [0]).join(',')}

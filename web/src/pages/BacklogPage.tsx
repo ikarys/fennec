@@ -5,18 +5,23 @@ import { Badge } from '../components/ui/Badge';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { MoonIcon, PlayIcon, StopIcon } from '../components/Icons';
+import { useT } from '../i18n';
+import type { MsgKey } from '../i18n/messages';
 
-function headerSummary(view: BacklogView): string {
+function headerSummary(
+  view: BacklogView,
+  t: (key: MsgKey, vars?: Record<string, string | number>) => string
+): string {
   const parts: string[] = [];
 
-  if (view.total.yours > 0) parts.push(`${view.total.yours} à décider`);
-  if (view.total.running > 0) parts.push(`${view.total.running} en cours`);
+  if (view.total.yours > 0) parts.push(t('backlogYoursCount', { count: view.total.yours }));
+  if (view.total.running > 0) parts.push(t('backlogRunningCount', { count: view.total.running }));
   if (view.total.ready > 0)
-    parts.push(`${view.total.ready} prête${view.total.ready > 1 ? 's' : ''}`);
+    parts.push(t('backlogReadyCount', { count: view.total.ready, plural: view.total.ready > 1 ? 's' : '' }));
   if (view.total.done > 0)
-    parts.push(`${view.total.done} terminée${view.total.done > 1 ? 's' : ''}`);
+    parts.push(t('backlogDoneCount', { count: view.total.done, plural: view.total.done > 1 ? 's' : '' }));
 
-  parts.push(`${view.total.projects} projet${view.total.projects > 1 ? 's' : ''} avec des tâches`);
+  parts.push(t('backlogProjectsWithTasks', { count: view.total.projects, plural: view.total.projects > 1 ? 's' : '' }));
   return parts.join(' · ');
 }
 
@@ -52,6 +57,7 @@ function ProjectRow({
   first: boolean;
   onChanged: () => void;
 }) {
+  const t = useT();
   const [busy, setBusy] = useState(false);
   const projectId = row.project.id;
 
@@ -79,7 +85,7 @@ function ProjectRow({
             className="block max-w-[22rem] truncate text-xs text-muted"
             title={row.queue.next.text}
           >
-            Prochaine : {row.queue.next.title}
+            {t('nextLabel', { title: row.queue.next.title })}
           </span>
         ) : null}
       </td>
@@ -113,10 +119,10 @@ function ProjectRow({
           {row.queue.running ? (
             <>
               <Badge tone="accent" dot pulse>
-                en cours
+                {t('backlogRunningBadge')}
               </Badge>
               {row.queue.autonomous ? (
-                <span className="text-muted" title="mode nuit">
+                <span className="text-muted" title={t('backlogNightModeTitle')}>
                   <MoonIcon className="h-3.5 w-3.5" />
                 </span>
               ) : null}
@@ -125,8 +131,8 @@ function ProjectRow({
                 size="sm"
                 iconOnly
                 disabled={busy}
-                title="Arrêter la file après la tâche en cours"
-                aria-label="Arrêter la file après la tâche en cours"
+                title={t('stopQueueAfter')}
+                aria-label={t('stopQueueAfter')}
                 onClick={() => act(() => stopQueue(projectId))}
               >
                 <StopIcon className="h-4 w-4" />
@@ -139,8 +145,8 @@ function ProjectRow({
                 size="sm"
                 iconOnly
                 disabled={row.ready === 0 || busy}
-                title="Lancer la file en mode nuit : l'agent tranche seul ses questions"
-                aria-label="Lancer la file en mode nuit : l'agent tranche seul ses questions"
+                title={t('backlogStartNightQueueTitle')}
+                aria-label={t('backlogStartNightQueueTitle')}
                 onClick={() => act(() => startQueue(projectId, true))}
               >
                 <MoonIcon className="h-4 w-4" />
@@ -150,8 +156,8 @@ function ProjectRow({
                 size="sm"
                 iconOnly
                 disabled={row.ready === 0 || busy}
-                title="Lancer la file"
-                aria-label="Lancer la file"
+                title={t('startQueue')}
+                aria-label={t('startQueue')}
                 onClick={() => act(() => startQueue(projectId, false))}
               >
                 <PlayIcon className="h-4 w-4" />
@@ -165,6 +171,7 @@ function ProjectRow({
 }
 
 export default function BacklogPage() {
+  const t = useT();
   const [view, setView] = useState<BacklogView | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -175,9 +182,9 @@ export default function BacklogPage() {
         setError(null);
       })
       .catch((fetchError) => {
-        setError(fetchError instanceof Error ? fetchError.message : 'Impossible de charger le backlog');
+        setError(fetchError instanceof Error ? fetchError.message : t('backlogLoadError'));
       });
-  }, []);
+  }, [t]);
 
   useEffect(load, [load]);
 
@@ -185,19 +192,19 @@ export default function BacklogPage() {
     <main className="grow overflow-y-auto px-4 py-6 md:px-6 md:py-8">
       <div className="mx-auto max-w-[960px]">
         <div>
-          <h1 className="text-2xl font-semibold">Tâches</h1>
-          {view ? <p className="mt-0.5 text-sm text-muted">{headerSummary(view)}</p> : null}
+          <h1 className="text-2xl font-semibold">{t('tasks')}</h1>
+          {view ? <p className="mt-0.5 text-sm text-muted">{headerSummary(view, t)}</p> : null}
         </div>
 
         {error ? <p className="mt-4 text-err">{error}</p> : null}
-        {!view && !error ? <div className="mt-4 text-muted">Chargement…</div> : null}
+        {!view && !error ? <div className="mt-4 text-muted">{t('loading')}</div> : null}
 
         {view ? (
           <div className="mt-4">
             {view.projects.length === 0 ? (
               <Card className="p-4">
                 <p className="text-sm text-muted">
-                  Aucune tâche pour l'instant : les idées s'ajoutent depuis la page d'un projet.
+                  {t('backlogEmpty')}
                 </p>
               </Card>
             ) : (
@@ -205,12 +212,12 @@ export default function BacklogPage() {
                 <table className="w-full text-sm tabular-nums">
                   <thead>
                     <tr>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-muted">Projet</th>
-                      <th className="px-3 py-2 text-right text-xs font-medium text-muted">À décider</th>
-                      <th className="px-3 py-2 text-right text-xs font-medium text-muted">En cours</th>
-                      <th className="px-3 py-2 text-right text-xs font-medium text-muted">Prêtes</th>
-                      <th className="px-3 py-2 text-right text-xs font-medium text-muted">Terminées</th>
-                      <th className="px-3 py-2 text-right text-xs font-medium text-muted">File</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-muted">{t('homeProject')}</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-muted">{t('tasksTabYours')}</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-muted">{t('stageRunning')}</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-muted">{t('tasksTabReady')}</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-muted">{t('tasksTabDone')}</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-muted">{t('queue')}</th>
                     </tr>
                   </thead>
                   <tbody>

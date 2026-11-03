@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Project, SessionState } from '../lib/api';
 import { stateLabel } from '../lib/format';
 import { SessionStateIcon } from './session/SessionStateIcon';
-import { useLang } from '../i18n';
+import { useLang, useT } from '../i18n';
 import { SearchIcon } from './Icons';
 import { SectionLabel } from './ui/SectionLabel';
 import type { PageId } from './layout/TopBar';
@@ -35,6 +35,7 @@ interface PaletteProps {
 
 export function Palette({ open, projects, onClose, onOpenSession, onNewSession, onOpenProjectDialog, onHome, onOpenPage, onOpenProject }: PaletteProps) {
   const lang = useLang();
+  const t = useT();
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
 
@@ -60,15 +61,15 @@ export function Palette({ open, projects, onClose, onOpenSession, onNewSession, 
     const result: PaletteGroup[] = [];
 
     const pages: PaletteItem[] = [
-      { id: 'page-home', title: 'Accueil', meta: '', action: onHome },
-      { id: 'page-backlog', title: 'Tâches', meta: '', action: () => onOpenPage('backlog') },
-      { id: 'page-workflows', title: 'Workflows', meta: '', action: () => onOpenPage('workflows') },
-      { id: 'page-insight', title: 'Insight', meta: '', action: () => onOpenPage('insight') },
-      { id: 'page-settings', title: 'Réglages', meta: '', action: () => onOpenPage('settings') }
+      { id: 'page-home', title: t('paletteHome'), meta: '', action: onHome },
+      { id: 'page-backlog', title: t('tasks'), meta: '', action: () => onOpenPage('backlog') },
+      { id: 'page-workflows', title: t('workflows'), meta: '', action: () => onOpenPage('workflows') },
+      { id: 'page-insight', title: t('insight'), meta: '', action: () => onOpenPage('insight') },
+      { id: 'page-settings', title: t('settings'), meta: '', action: () => onOpenPage('settings') }
     ].filter((page) => !q || page.title.toLowerCase().includes(q));
 
     if (pages.length > 0) {
-      result.push({ label: 'Pages', items: pages });
+      result.push({ label: t('palettePages'), items: pages });
     }
 
     const projectItems: PaletteItem[] = [];
@@ -77,12 +78,12 @@ export function Palette({ open, projects, onClose, onOpenSession, onNewSession, 
         {
           id: `project-${project.id}`,
           title: project.name,
-          meta: 'page projet',
+          meta: t('paletteProjectPage'),
           action: () => onOpenProject(project.id)
         },
         {
           id: `new-${project.id}`,
-          title: `Nouvelle session dans ${project.name}`,
+          title: t('paletteNewSessionIn', { name: project.name }),
           meta: '',
           action: () => onNewSession(project.id)
         }
@@ -90,12 +91,12 @@ export function Palette({ open, projects, onClose, onOpenSession, onNewSession, 
     }
     const filteredProjectItems = projectItems.filter((item) => !q || item.title.toLowerCase().includes(q));
     if (filteredProjectItems.length > 0) {
-      result.push({ label: 'Projets', items: filteredProjectItems });
+      result.push({ label: t('paletteProjects'), items: filteredProjectItems });
     }
 
     const recentItems = recent.filter(matchesSession).map(sessionItem);
     if (recentItems.length > 0) {
-      result.push({ label: 'Récentes', items: recentItems });
+      result.push({ label: t('paletteRecent'), items: recentItems });
     }
 
     // Without a query the recent list is enough; per-project groups would
@@ -113,20 +114,20 @@ export function Palette({ open, projects, onClose, onOpenSession, onNewSession, 
     const commands: PaletteItem[] = [
       ...projects.filter((project) => project.chat).map((project) => ({
         id: `new-${project.id}`,
-        title: 'Nouveau chat',
+        title: t('paletteNewChat'),
         meta: '',
         action: () => onNewSession(project.id)
       })),
       {
         id: 'open-project',
-        title: 'Ouvrir un projet…',
+        title: t('paletteOpenProject'),
         meta: '',
         action: onOpenProjectDialog
       }
     ].filter((command) => !q || command.title.toLowerCase().includes(q));
 
     if (commands.length > 0) {
-      result.push({ label: 'Commandes', items: commands });
+      result.push({ label: t('paletteCommands'), items: commands });
     }
 
     return result;
@@ -157,7 +158,7 @@ export function Palette({ open, projects, onClose, onOpenSession, onNewSession, 
       className="fixed inset-0 z-50 flex justify-center bg-scrim p-4 pt-[12vh]"
       role="dialog"
       aria-modal="true"
-      aria-label="Palette de sessions"
+      aria-label={t('paletteAria')}
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -166,7 +167,7 @@ export function Palette({ open, projects, onClose, onOpenSession, onNewSession, 
         <div className="flex items-center gap-2.5 border-b border-border px-3.5">
           <SearchIcon className="h-4 w-4 text-muted" />
           <label htmlFor="palette-q" className="absolute h-px w-px overflow-hidden clip-[rect(0_0_0_0)]">
-            Rechercher
+            {t('paletteSearchLabel')}
           </label>
           <input
             id="palette-q"
@@ -191,21 +192,21 @@ export function Palette({ open, projects, onClose, onOpenSession, onNewSession, 
                 onClose();
               }
             }}
-            placeholder="Rechercher une session, un projet, une page…"
+            placeholder={t('paletteSearchPlaceholder')}
             className="grow min-h-[50px] bg-transparent text-base outline-none"
           />
           <button
             type="button"
             onClick={onClose}
-            aria-label="Fermer la palette"
+            aria-label={t('paletteCloseAria')}
             className="text-xs rounded border border-border px-1.5 text-faint"
           >
-            Échap
+            {t('paletteEscape')}
           </button>
         </div>
 
         <div className="max-h-[420px] overflow-y-auto p-1.5">
-          {flatItems.length === 0 && <div className="px-2.5 py-6 text-center text-sm text-muted">Aucun résultat</div>}
+          {flatItems.length === 0 && <div className="px-2.5 py-6 text-center text-sm text-muted">{t('paletteNoResults')}</div>}
           {groups.map((group) => (
             <div key={group.label}>
               <div className="px-2.5 pt-2.5 pb-1">
@@ -245,8 +246,8 @@ export function Palette({ open, projects, onClose, onOpenSession, onNewSession, 
         </div>
 
         <div className="flex flex-wrap gap-4 border-t border-border px-3.5 py-2">
-          <span className="text-xs rounded border border-border px-1.5 text-faint">↑↓ naviguer</span>
-          <span className="text-xs rounded border border-border px-1.5 text-faint">↵ ouvrir dans un onglet</span>
+          <span className="text-xs rounded border border-border px-1.5 text-faint">{t('paletteNavigate')}</span>
+          <span className="text-xs rounded border border-border px-1.5 text-faint">{t('paletteOpenTab')}</span>
         </div>
       </div>
     </div>

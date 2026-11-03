@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
+import { useT } from '../../i18n';
 import { CheckIcon, CopyIcon } from '../Icons';
 import { Button } from '../ui/Button';
 
 export function CopyButton({ text }: { text: string }) {
+  const t = useT();
   const [copied, setCopied] = useState(false);
   const timer = useRef<number | null>(null);
 
@@ -33,8 +35,8 @@ export function CopyButton({ text }: { text: string }) {
       variant="ghost"
       size="sm"
       iconOnly
-      aria-label="Copier"
-      title="Copier"
+      aria-label={t('copyButton')}
+      title={t('copyButton')}
       onClick={handleClick}
       className="shrink-0"
     >
