@@ -212,7 +212,7 @@ pub fn suggest_message(app: &App, stream: &mut TcpStream, id: &str) -> Result<()
     };
 
     let events = store.events(&gate.session_id)?;
-    let request = crate::domain::conversation::first_request(&events).unwrap_or_default();
+    let request = crate::domain::commit_subject::request_since_integration(&events);
     let commits: Vec<&str> = gate
         .preview
         .commits

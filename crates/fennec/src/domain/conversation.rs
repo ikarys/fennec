@@ -72,16 +72,21 @@ pub fn last_assistant_text(events: &[Event]) -> String {
 /// The content of the first message the human typed (not system-generated,
 /// not a loop reminder): what the session was opened for.
 pub fn first_request(events: &[Event]) -> Option<String> {
-    events.iter().find_map(|event| match event {
+    events.iter().find_map(human_request).map(str::to_string)
+}
+
+/// The text of a message the human typed (not one fennec generated), if it is one.
+pub fn human_request(event: &Event) -> Option<&str> {
+    match event {
         Event::MessageStart {
             role: Role::User,
             is_system_generated: false,
             metadata: None,
             content: Some(content),
             ..
-        } if !content.trim().is_empty() => Some(content.clone()),
+        } if !content.trim().is_empty() => Some(content),
         _ => None,
-    })
+    }
 }
 
 /// The system prompt and tool definitions for the session: the prompt is the
