@@ -41,9 +41,9 @@ const SIGNAL_LABEL: Record<Exclude<ReviewSignal, 'protected'>, { label: string; 
     title: 'Modifié 5 fois ou plus ces 90 derniers jours.'
   },
   untested: {
-    label: 'sans test',
+    label: 'sans test propre',
     tone: 'accent',
-    title: 'Aucun test en ligne et aucun fichier de test du même nom sur la branche.'
+    title: 'Aucun test en ligne et aucun fichier de test du même nom sur la branche ; les modules de déclaration seule, le support de test et l’outillage de build ne comptent pas.'
   },
   large: {
     label: 'gros changement',
