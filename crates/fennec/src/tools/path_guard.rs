@@ -205,6 +205,16 @@ fn lexical_normalize(workdir: &Path, p: &str) -> PathBuf {
     }
 }
 
+/// The message for a file the model named but which does not exist: it
+/// points at the search to run rather than letting the model guess paths.
+pub(super) fn not_found(path: &str) -> String {
+    let name = Path::new(path)
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_else(|| path.to_string());
+    format!("File not found: {path}. Find it with: rg --files | rg '{name}'")
+}
+
 #[cfg(test)]
 mod tests {
     use super::{Outside, resolve_for_reading, resolve_for_writing};
