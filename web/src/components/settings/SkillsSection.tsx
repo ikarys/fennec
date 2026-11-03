@@ -1,13 +1,15 @@
 import type { SkillSummary } from '../../lib/api';
-import { Section } from '../ui/Section';
+import { Section, type SectionSave } from '../ui/Section';
 
 interface SkillsSectionProps {
   skills: SkillSummary[];
   value: string[];
   onChange: (value: string[]) => void;
+  /** The group's own save: its dot and its "Enregistrer". */
+  save?: SectionSave;
 }
 
-export function SkillsSection({ skills, value, onChange }: SkillsSectionProps) {
+export function SkillsSection({ skills, value, onChange, save }: SkillsSectionProps) {
   function toggle(id: string, checked: boolean) {
     onChange(checked ? [...value, id] : value.filter((skillId) => skillId !== id));
   }
@@ -16,6 +18,7 @@ export function SkillsSection({ skills, value, onChange }: SkillsSectionProps) {
     <Section
       title="Skills toujours actifs"
       description="Leurs instructions entrent dans le prompt système des nouvelles sessions, sans load_skill. Une session déjà commencée garde son prompt."
+      save={save}
     >
       {skills.length === 0 ? (
         <p className="text-xs text-muted">Aucun skill trouvé.</p>

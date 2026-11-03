@@ -233,10 +233,11 @@ read-only. The human edits them as usual.
 - `GET /api/models/choices` → `{default, favorites}`, each a
   `{provider, model, providerName}`: what the composer's model picker offers;
   read from the stored preferences, no provider is called
-- `GET /api/projects` → `[{id, name, workdir, branch, remote, editorUrl, sessionWorktree, sessions: [{id, title, state, createdAt, updatedAt}]}]`
-  (projects most recently active first, sessions newest first; `createdAt`/`updatedAt` are Unix milliseconds; `branch` and `remote` may be `null`; `editorUrl` opens the workdir in VS Code, through the WSL remote under WSL; `sessionWorktree` marks a workdir inside fennec's own store (a session's worktree opened as a project before that was refused))
+- `GET /api/projects` → `[{id, name, workdir, favorite, branch, remote, editorUrl, sessionWorktree, sessions: [{id, title, state, createdAt, updatedAt}]}]`
+  (favourites first, then most recently active, sessions newest first; `createdAt`/`updatedAt` are Unix milliseconds; `favorite` is `true` when the project is pinned; `branch` and `remote` may be `null`; `editorUrl` opens the workdir in VS Code, through the WSL remote under WSL; `sessionWorktree` marks a workdir inside fennec's own store (a session's worktree opened as a project before that was refused))
 - `POST /api/projects` `{workdir}` → the project (400 if not a directory, or inside fennec's store)
 - `POST /api/projects/{id}/delete` `{deleteFolder?}` → `{deleted: true, folderDeleted, folderError}`: deletes the project with every top-level session as `POST /api/sessions/delete` does (logs, children, worktrees, branches, session rules), then its project rules, its ideas backlog and the project. With `deleteFolder: true` the source folder is removed from disk afterwards; a failure there comes back as `folderError` (the project is already gone). 404 for an unknown project; 409 `{error}` while its queue runs, `{error, running}` while one of its sessions runs a turn, `{error, sessionId}` when a worktree cannot be removed (the project and the sessions not yet removed stay); 400 when the folder is the filesystem root, the home directory or an ancestor of it, or holds fennec's store (nothing is deleted then). The usage ledger keeps the calls.
+- `POST /api/projects/{id}/favorite` `{favorite}` → `{ok: true}`: pins or unpins the project (400 if `favorite` is missing or not a boolean; 404 for an unknown project)
 - `GET /api/backlog` → `{total, projects}`: the cross-project Backlog page, one row per project (the idea lists
   live in each project's Tasks tab):
   - `total` `{yours, running, ready, drafts, done, projects}`: counts across all projects; `ready` sums each
@@ -317,14 +318,18 @@ read-only. The human edits them as usual.
     every workflow `shell`/`criteria` command.
 - `GET /api/projects/{id}/rules` → `{rules, global}`, the project's rules and the global ones that apply to it too
   (read-only: the Settings page's "Règles" tab, `#/settings/rules`, edits them).
-- `GET /api/projects/{id}/risks` → `{files, unreviewedPercent, untested, churning, unreviewed, churnDays, modules, remedyPrompt}`, the
+- `GET /api/projects/{id}/risks` → `{files, commits, aiCommits, unreviewedPercent, untested, churning, unreviewed, churnDays, modules, remedyPrompt}`, the
   project's risk report, read from git (verified; 404 if no project). `files` counts the tracked source files, tests
-  excluded; `unreviewedPercent` the share of their lines (git blame) from AI commits never reviewed: a commit with an
-  AI `Co-Authored-By` trailer and no `Fennec-Session` trailer (written only by an integration, the human's review gate).
-  - `modules` `[{path, unreviewed, untested, churning, zones}]`: risk zones grouped by the zone file's parent directory
-    (`.` for a file at the root), riskiest module first (most total signals, then path); the counts are the number of
-    its zones carrying that signal, and `zones` keeps the report's zone order (`{path, signals, churn, lines,
-    unreviewedPercent}`, most signals first, then churn; `signals` among `unreviewed`, `untested`, `churn` as before).
+  excluded; `commits` and `aiCommits` report the commits in history and those declaring an AI co-author; the
+  unreviewed signal sees only declared ones; `unreviewedPercent` the share of their lines (git blame) from AI commits
+  never integrated through fennec, where a file is unreviewed when more than half of its lines come from such commits:
+  a commit with an AI `Co-Authored-By` trailer and no `Fennec-Session` trailer (written only by an integration, the
+  human's review gate).
+  - `modules` `[{path, unreviewed, untested, churning, zones, remedyPrompt}]`: risk zones grouped by the zone file's
+    parent directory (`.` for a file at the root), riskiest module first (most total signals, then path); the counts
+    are the number of its zones carrying that signal, `remedyPrompt` is the same brief for this module only, and
+    `zones` keeps the report's zone order (`{path, signals, churn, lines, unreviewedPercent}`, most signals first,
+    then churn; `signals` among `unreviewed`, `untested`, `churn` as before).
   - `remedyPrompt`: the brief the "Remédier" button sends to the `remedy` agent; empty without zones.
 - `GET /api/projects/{id}/worktrees[?fresh=1]` → `{scannedAt, totalBytes, generatedBytes, entries}`: the disk the
   project's session worktrees take, measured from disk (verified; allocated bytes, like `du`). `fresh=1` measures again,

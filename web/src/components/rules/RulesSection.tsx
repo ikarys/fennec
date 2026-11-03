@@ -3,7 +3,8 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { FieldRow, Select, TextInput } from '../ui/Field';
 import { Section } from '../ui/Section';
-import { ExternalIcon, TrashIcon } from '../Icons';
+import { ExternalIcon, PinIcon, TrashIcon } from '../Icons';
+import { Tile } from '../ui/Tile';
 import {
   addRule,
   deleteRule,
@@ -391,7 +392,7 @@ export function RulesSection() {
   );
 }
 
-export function ProjectRulesLine({ projectId }: { projectId: string }) {
+export function ProjectRulesTile({ projectId }: { projectId: string }) {
   const [rules, setRules] = useState<RuleView[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -411,15 +412,17 @@ export function ProjectRulesLine({ projectId }: { projectId: string }) {
     };
   }, [projectId]);
 
-  if (error) return <p className="text-xs text-err">{error}</p>;
-  if (!rules) return null;
-
   return (
-    <p className="text-xs text-muted">
-      Règles du projet · {rules.length} ·{' '}
-      <a href="#/settings/rules" className="text-accent-strong underline">
-        gérer dans les Réglages
-      </a>
-    </p>
+    <Tile
+      icon={<PinIcon />}
+      label="Règles"
+      figure={rules ? String(rules.length) : error ? '—' : '…'}
+      detail={error ?? 'du projet · gérer dans les Réglages'}
+      tone="accent"
+      active={rules ? rules.length > 0 : false}
+      onClick={() => {
+        window.location.hash = '#/settings/rules';
+      }}
+    />
   );
 }

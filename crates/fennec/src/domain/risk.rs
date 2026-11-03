@@ -60,12 +60,21 @@ pub struct RiskModule {
     pub untested: usize,
     pub churning: usize,
     pub zones: Vec<RiskZone>,
+    pub remedy_prompt: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct History {
+    pub commits: usize,
+    pub ai_commits: usize,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RiskReport {
     pub files: usize,
+    pub commits: usize,
+    pub ai_commits: usize,
     pub unreviewed_percent: u8,
     pub untested: usize,
     pub churning: usize,
@@ -94,7 +103,7 @@ pub fn authorship(message: &str) -> Authorship {
     }
 }
 
-pub fn report(files: Vec<FileFacts>) -> RiskReport {
+pub fn report(files: Vec<FileFacts>, history: History) -> RiskReport {
     let measured = files.len();
     let total_lines: usize = files.iter().map(|file| file.lines).sum();
     let unreviewed_lines: usize = files.iter().map(|file| file.unreviewed_lines).sum();
@@ -133,6 +142,7 @@ pub fn report(files: Vec<FileFacts>) -> RiskReport {
                 untested,
                 churning,
                 zones: vec![zone],
+                remedy_prompt: String::new(),
             });
         }
     }
@@ -143,15 +153,24 @@ pub fn report(files: Vec<FileFacts>) -> RiskReport {
             .then_with(|| left.path.cmp(&right.path))
     });
 
-    let remedy_prompt = remedy_prompt(&modules);
+    // Each module carries its own brief so the UI can remediate it in isolation.
+    let mut scoped_modules: Vec<RiskModule> = Vec::with_capacity(modules.len());
+    for mut module in modules {
+        module.remedy_prompt = remedy_prompt(std::slice::from_ref(&module));
+        scoped_modules.push(module);
+    }
+
+    let remedy_prompt = remedy_prompt(&scoped_modules);
     RiskReport {
         files: measured,
+        commits: history.commits,
+        ai_commits: history.ai_commits,
         unreviewed_percent: percent_round(unreviewed_lines, total_lines),
         untested,
         churning,
         unreviewed,
         churn_days: CHURN_DAYS,
-        modules,
+        modules: scoped_modules,
         remedy_prompt,
     }
 }
@@ -175,7 +194,7 @@ fn remedy_prompt(modules: &[RiskModule]) -> String {
 
     let mut lines = Vec::new();
     lines.push(format!(
-        "Remediate the risk zones of this project, measured from git, riskiest module first. Signals: unreviewed = every line comes from an AI commit never integrated through fennec; untested = no inline test and no test file of the same stem; churn = touched by {HOT_CHURN} commits or more in the last {CHURN_DAYS} days."
+        "Remediate the risk zones of this project, measured from git, riskiest module first. Signals: unreviewed = more than half of its lines come from AI commits never integrated through fennec; untested = no inline test and no test file of the same stem; churn = touched by {HOT_CHURN} commits or more in the last {CHURN_DAYS} days."
     ));
     lines.push(String::new());
 
@@ -202,7 +221,7 @@ fn is_ai_coauthor(line: &str) -> bool {
 }
 
 fn is_unreviewed_file(file: &FileFacts) -> bool {
-    file.lines > 0 && file.unreviewed_lines == file.lines
+    file.lines > 0 && file.unreviewed_lines * 2 > file.lines
 }
 
 fn zone_for(file: FileFacts) -> Option<RiskZone> {
@@ -367,24 +386,26 @@ mod tests {
             },
         ];
 
-        let report = report(files);
+        let report = report(files, History::default());
 
         assert_eq!(report.files, 4);
+        assert_eq!(report.commits, 0);
+        assert_eq!(report.ai_commits, 0);
         assert_eq!(report.unreviewed_percent, 46);
         assert_eq!(report.untested, 1);
         assert_eq!(report.churning, 3);
-        assert_eq!(report.unreviewed, 1);
+        assert_eq!(report.unreviewed, 2);
         assert_eq!(report.churn_days, CHURN_DAYS);
 
         assert_eq!(report.modules.len(), 1);
         let module = &report.modules[0];
         assert_eq!(module.path, ".");
-        assert_eq!(module.unreviewed, 1);
+        assert_eq!(module.unreviewed, 2);
         assert_eq!(module.untested, 1);
         assert_eq!(module.churning, 3);
 
         let paths: Vec<&str> = module.zones.iter().map(|zone| zone.path.as_str()).collect();
-        assert_eq!(paths, vec!["b.rs", "a.rs", "c.rs"]);
+        assert_eq!(paths, vec!["a.rs", "b.rs", "c.rs"]);
     }
 
     #[test]
@@ -397,7 +418,7 @@ mod tests {
             tested: false,
         }];
 
-        let report = report(files);
+        let report = report(files, History::default());
         let zone = &report.modules[0].zones[0];
 
         assert_eq!(
@@ -439,7 +460,7 @@ mod tests {
             },
         ];
 
-        let report = report(files);
+        let report = report(files, History::default());
 
         let module_paths: Vec<&str> = report
             .modules
@@ -492,6 +513,7 @@ mod tests {
                         unreviewed_percent: 0,
                     },
                 ],
+                remedy_prompt: String::new(),
             },
             RiskModule {
                 path: "web/src".into(),
@@ -505,11 +527,12 @@ mod tests {
                     lines: 20,
                     unreviewed_percent: 100,
                 }],
+                remedy_prompt: String::new(),
             },
         ];
 
         let expected = format!(
-            "Remediate the risk zones of this project, measured from git, riskiest module first. Signals: unreviewed = every line comes from an AI commit never integrated through fennec; untested = no inline test and no test file of the same stem; churn = touched by {HOT_CHURN} commits or more in the last {CHURN_DAYS} days.\n\n## crates/fennec/src/agent\n- crates/fennec/src/agent/turn.rs: unreviewed, untested, churn (12 commits)\n- crates/fennec/src/agent/round.rs: untested\n\n## web/src\n- web/src/app.tsx: unreviewed\n"
+            "Remediate the risk zones of this project, measured from git, riskiest module first. Signals: unreviewed = more than half of its lines come from AI commits never integrated through fennec; untested = no inline test and no test file of the same stem; churn = touched by {HOT_CHURN} commits or more in the last {CHURN_DAYS} days.\n\n## crates/fennec/src/agent\n- crates/fennec/src/agent/turn.rs: unreviewed, untested, churn (12 commits)\n- crates/fennec/src/agent/round.rs: untested\n\n## web/src\n- web/src/app.tsx: unreviewed\n"
         );
 
         assert_eq!(remedy_prompt(&modules), expected);
@@ -518,6 +541,65 @@ mod tests {
     #[test]
     fn remedy_prompt_is_empty_without_zones() {
         assert_eq!(remedy_prompt(&[]), "");
+    }
+
+    #[test]
+    fn is_unreviewed_file_uses_majority_threshold() {
+        let majority = FileFacts {
+            path: "majority.rs".into(),
+            lines: 10,
+            unreviewed_lines: 6,
+            churn: 0,
+            tested: true,
+        };
+        let half = FileFacts {
+            path: "half.rs".into(),
+            lines: 10,
+            unreviewed_lines: 5,
+            churn: 0,
+            tested: true,
+        };
+
+        assert!(is_unreviewed_file(&majority));
+        assert!(!is_unreviewed_file(&half));
+    }
+
+    #[test]
+    fn module_remedy_prompt_is_scoped_to_its_module() {
+        let files = vec![
+            FileFacts {
+                path: "src/alpha/one.rs".into(),
+                lines: 10,
+                unreviewed_lines: 6,
+                churn: 0,
+                tested: true,
+            },
+            FileFacts {
+                path: "src/beta/two.rs".into(),
+                lines: 10,
+                unreviewed_lines: 6,
+                churn: 0,
+                tested: true,
+            },
+        ];
+
+        let report = report(files, History::default());
+
+        let alpha = report
+            .modules
+            .iter()
+            .find(|module| module.path == "src/alpha")
+            .expect("alpha module");
+        let beta = report
+            .modules
+            .iter()
+            .find(|module| module.path == "src/beta")
+            .expect("beta module");
+
+        assert!(alpha.remedy_prompt.contains("src/alpha/one.rs"));
+        assert!(!alpha.remedy_prompt.contains("src/beta/two.rs"));
+        assert!(beta.remedy_prompt.contains("src/beta/two.rs"));
+        assert!(!beta.remedy_prompt.contains("src/alpha/one.rs"));
     }
 
     #[test]

@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Section } from '../ui/Section';
+import { Section, type SectionSave } from '../ui/Section';
 import { TextInput, Select } from '../ui/Field';
 import { Button } from '../ui/Button';
+import { Card } from '../ui/Card';
 import { connectMcp, type McpServer } from '../../lib/api';
 
 function emptyServer(): McpServer {
@@ -46,7 +47,7 @@ function ServerCard({
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-border p-3">
+    <Card variant="inset">
       <div className="flex items-center gap-2">
         <TextInput
           value={server.name}
@@ -170,18 +171,21 @@ function ServerCard({
           ))}
         </div>
       )}
-    </div>
+    </Card>
   );
 }
 
 export function McpSection({
   value,
   onChange,
-  savedNames
+  savedNames,
+  save
 }: {
   value: McpServer[];
   onChange: (value: McpServer[]) => void;
   savedNames: Set<string>;
+  /** The group's own save: its dot and its "Enregistrer". */
+  save?: SectionSave;
 }) {
   const [connecting, setConnecting] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -210,10 +214,11 @@ export function McpSection({
       title="MCP"
       description="Les serveurs d'outils du modèle (Model Context Protocol). « Actif » envoie leurs outils au modèle ; « Affiché » les montre dans le dropdown du composer. Connecter liste les outils d'un serveur. Le réglage par session du composer prime sur « Actif »."
       actions={
-        <Button variant="soft" size="sm" onClick={() => onChange([...value, emptyServer()])}>
-          Ajouter
+        <Button variant="primary" onClick={() => onChange([...value, emptyServer()])}>
+          Nouveau serveur
         </Button>
       }
+      save={save}
     >
       {error ? <p className="text-xs text-err">{error}</p> : null}
       {value.length === 0 ? (

@@ -1,22 +1,23 @@
 // Project page overview tab: the server's dashboard tiles and recent sessions.
 import { useEffect, useState, type ReactNode } from 'react';
 import { Badge } from '../ui/Badge';
+import { Button } from '../ui/Button';
+import { Card } from '../ui/Card';
 import { Section } from '../ui/Section';
 import { Tile } from '../ui/Tile';
 import {
   ClockIcon,
   CoinIcon,
   FileIcon,
-  HardDriveIcon,
   LayersIcon,
   ProjectIcon,
   ReviewIcon,
   TokensIcon,
 } from '../Icons';
 import { getProjectDashboard, type DashboardIcon, type ProjectDashboard } from '../../lib/api';
-import { formatRelative } from '../../lib/format';
+import { formatDateTime, formatRelative } from '../../lib/format';
 import { DiskSection } from './DiskSection';
-import { ProjectRulesLine } from '../rules/RulesSection';
+import { ProjectRulesTile } from '../rules/RulesSection';
 
 const ICONS: Record<DashboardIcon, ReactNode> = {
   sessions: <LayersIcon />,
@@ -24,7 +25,6 @@ const ICONS: Record<DashboardIcon, ReactNode> = {
   tokens: <TokensIcon />,
   time: <ClockIcon />,
   cost: <CoinIcon />,
-  disk: <HardDriveIcon />,
   map: <ProjectIcon />,
   doc: <FileIcon />,
 };
@@ -89,36 +89,65 @@ export function DashboardSection({
             />
           );
         })}
+        <ProjectRulesTile projectId={projectId} />
       </div>
 
-      <ProjectRulesLine projectId={projectId} />
-
-      <Section title="Sessions récentes" flush>
+      <Section
+        title="Sessions récentes"
+        flush
+        actions={
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              window.location.hash = '#/project/' + encodeURIComponent(projectId) + '/sessions';
+            }}
+          >
+            Toutes les sessions
+          </Button>
+        }
+      >
         {data.recent.length === 0 ? (
-          <div className="px-4 py-3 text-sm text-muted">Aucune session.</div>
+          <Card className="px-4 py-6 text-center text-sm text-muted">Aucune session.</Card>
         ) : (
-          data.recent.map((session, index) => (
-            <div
-              key={session.id}
-              className={`flex items-center gap-3 px-4 py-3 text-sm ${
-                index === 0 ? '' : 'border-t border-border'
-              }`}
-            >
-              <div className="min-w-0 flex-1">
-                <button
-                  type="button"
-                  className="block w-full truncate text-left hover:underline"
-                  onClick={() => onOpenSession(session.id)}
-                >
-                  {session.title}
-                </button>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                {session.running ? <Badge tone="accent" dot pulse>en cours</Badge> : null}
-                <span className="text-xs text-muted">{formatRelative(session.updatedAt)}</span>
-              </div>
+          <Card className="overflow-hidden">
+            <div className="flex items-center gap-3 border-b border-border bg-raised px-4 py-2 text-xs uppercase tracking-wide text-faint">
+              <span className="min-w-0 grow">Titre</span>
+              <span className="w-28 shrink-0">Statut</span>
+              <span className="w-24 shrink-0 text-right">Modifié</span>
             </div>
-          ))
+            <ul className="divide-y divide-border">
+              {data.recent.map((session) => (
+                <li key={session.id}>
+                  <button
+                    type="button"
+                    className="w-full text-left group relative flex cursor-pointer items-center gap-3 px-4 py-2.5 transition-colors before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-accent before:transition-opacity hover:bg-accent-soft hover:before:opacity-100 before:opacity-0"
+                    onClick={() => onOpenSession(session.id)}
+                  >
+                    <span
+                      className="min-w-0 grow truncate text-sm text-text group-hover:text-accent-strong"
+                      title={session.title}
+                    >
+                      {session.title}
+                    </span>
+                    <span className="w-28 shrink-0">
+                      {session.running ? (
+                        <Badge tone="accent" dot pulse>en cours</Badge>
+                      ) : session.awaiting ? (
+                        <Badge tone="accent" solid>à intégrer</Badge>
+                      ) : null}
+                    </span>
+                    <span
+                      className="w-24 shrink-0 text-right font-mono text-xs text-faint tabular-nums"
+                      title={formatDateTime(session.updatedAt)}
+                    >
+                      {formatRelative(session.updatedAt)}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </Card>
         )}
       </Section>
 

@@ -11,7 +11,8 @@ import {
   type EdgeProps,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Button } from '../ui/Button';
+import { Segmented } from '../ui/Segmented';
+import { EyeIcon } from '../Icons';
 import { ModuleDetails } from './ModuleDetails';
 import type { ModuleMap } from '../../lib/api';
 
@@ -96,7 +97,7 @@ export function ProjectMap({ map }: { map: ModuleMap }) {
               </span>
               <button
                 type="button"
-                className="shrink-0 rounded px-1 text-muted hover:text-accent"
+                className="shrink-0 rounded p-0.5 text-muted hover:bg-accent-soft hover:text-accent-strong"
                 title="À quoi correspond ce module"
                 aria-label="À quoi correspond ce module"
                 onClick={(event) => {
@@ -104,7 +105,7 @@ export function ProjectMap({ map }: { map: ModuleMap }) {
                   setDetailsId(module.id);
                 }}
               >
-                ⓘ
+                <EyeIcon className="h-3 w-3" />
               </button>
             </div>
             <div className="text-xs text-muted">
@@ -117,10 +118,10 @@ export function ProjectMap({ map }: { map: ModuleMap }) {
         width: 260,
         height: 46,
         boxSizing: 'border-box',
-        background: 'var(--surface)',
+        background: module.entry ? 'var(--accent-soft)' : 'var(--raised)',
         color: 'var(--text)',
         border: `1px solid ${module.entry ? 'var(--accent)' : 'var(--border)'}`,
-        borderRadius: 6,
+        borderRadius: 8,
         padding: '6px 8px',
         textAlign: 'left' as const,
         cursor: 'pointer',
@@ -151,7 +152,7 @@ export function ProjectMap({ map }: { map: ModuleMap }) {
             label: String(dependency.imports),
             style: { stroke: 'var(--err)' },
             labelStyle: { fill: 'var(--text)', fontSize: 10 },
-            labelBgStyle: { fill: 'var(--surface)' },
+            labelBgStyle: { fill: 'var(--panel)' },
           };
         }
         if (focus === null) return { ...base, style: { stroke: 'var(--muted)', opacity: 0.5 } };
@@ -161,7 +162,7 @@ export function ProjectMap({ map }: { map: ModuleMap }) {
             label: String(dependency.imports),
             style: { stroke: 'var(--accent)' },
             labelStyle: { fill: 'var(--text)', fontSize: 10 },
-            labelBgStyle: { fill: 'var(--surface)' },
+            labelBgStyle: { fill: 'var(--panel)' },
           };
         }
         return { ...base, style: { stroke: 'var(--muted)', opacity: 0.08 } };
@@ -175,27 +176,27 @@ export function ProjectMap({ map }: { map: ModuleMap }) {
 
   return (
     <>
+      {/* The tab's body is a flex column: the wrapper keeps the control at its own width. */}
       {groups.length > 1 && (
-        <div className="flex flex-wrap gap-1">
-          {map.groups.map((group) => (
-            <Button
-              key={group.name}
-              size="sm"
-              variant={group.name === selected ? 'secondary' : 'ghost'}
-              onClick={() => {
-                setSelectedGroup(group.name);
-                setFocusedModuleId(null);
-              }}
-            >
-              {group.name === '' ? 'Autres' : group.name} ({group.modules})
-            </Button>
-          ))}
+        <div className="flex">
+          <Segmented
+            label="Groupe de modules"
+            segments={map.groups.map((group) => ({
+              value: group.name,
+              label: `${group.name === '' ? 'Autres' : group.name} · ${group.modules}`,
+            }))}
+            value={selected}
+            onChange={(name) => {
+              setSelectedGroup(name);
+              setFocusedModuleId(null);
+            }}
+          />
         </div>
       )}
       {/* The handles are connection points for editing; this map is read-only and they hide the arrow heads. */}
       <div
         ref={frame}
-        className="mt-2 flex h-[560px] overflow-hidden rounded border border-border bg-bg [&:fullscreen]:h-screen [&:fullscreen]:rounded-none [&_.react-flow__handle]:invisible"
+        className="mt-3 flex h-[600px] overflow-hidden rounded-md border border-border bg-panel [&:fullscreen]:h-screen [&:fullscreen]:rounded-none [&_.react-flow__handle]:invisible"
       >
         <div className="h-full min-w-0 grow">
           <ReactFlow
@@ -223,7 +224,7 @@ export function ProjectMap({ map }: { map: ModuleMap }) {
         {details && <ModuleDetails module={details} onOpen={openModule} onClose={() => setDetailsId(null)} />}
       </div>
       <p className="mt-2 text-xs text-muted">
-        Cliquez un module pour ne voir que ses liens, sur ⓘ pour savoir à quoi il correspond ; le nombre sur une
+        Cliquez un module pour ne voir que ses liens, sur l'œil pour savoir à quoi il correspond ; le nombre sur une
         flèche compte les fichiers qui importent.
       </p>
     </>

@@ -6,20 +6,24 @@ use std::process::Command;
 use std::thread::{available_parallelism, scope};
 
 use crate::domain::module_map::SourceFile;
-use crate::domain::risk::{self, Authorship, FileFacts, RiskReport};
+use crate::domain::risk::{self, Authorship, FileFacts, History, RiskReport};
 
 pub fn load(workdir: &Path) -> RiskReport {
     let sources = crate::module_map::tracked_files(workdir);
 
     let Some(ai_log) = git_stdout(workdir, &["log", "--format=%x1e%H%x1f%B"]) else {
-        return risk::report(Vec::new());
+        return risk::report(Vec::new(), History::default());
     };
-    let ai_hashes = ai_commits(&ai_log);
+    let (ai_hashes, commit_count) = ai_commits(&ai_log);
+    let history = History {
+        commits: commit_count,
+        ai_commits: ai_hashes.len(),
+    };
 
     let since = churn_since();
     let Some(churn_log) = git_stdout(workdir, &["log", &since, "--format=%x1e", "--name-only"])
     else {
-        return risk::report(Vec::new());
+        return risk::report(Vec::new(), History::default());
     };
     let churn = churn_counts(&churn_log);
 
@@ -55,7 +59,7 @@ pub fn load(workdir: &Path) -> RiskReport {
             .collect()
     });
 
-    risk::report(facts)
+    risk::report(facts, history)
 }
 
 /// The `--since` argument shared by the risk report and the hot-file lookup.
@@ -140,8 +144,9 @@ fn measure_source(
     }
 }
 
-fn ai_commits(log: &str) -> HashSet<String> {
+fn ai_commits(log: &str) -> (HashSet<String>, usize) {
     let mut ai_hashes = HashSet::new();
+    let mut commits = 0;
 
     for record in log.split('\x1e') {
         let Some((hash, message)) = record.split_once('\x1f') else {
@@ -153,12 +158,13 @@ fn ai_commits(log: &str) -> HashSet<String> {
             continue;
         }
 
+        commits += 1;
         if risk::authorship(message) == Authorship::Ai {
             ai_hashes.insert(hash.to_string());
         }
     }
 
-    ai_hashes
+    (ai_hashes, commits)
 }
 
 fn churn_counts(log: &str) -> HashMap<String, usize> {
@@ -253,8 +259,9 @@ mod tests {
             "\x1e{human}\x1fHuman commit\n\x1e{ai}\x1fAI commit\n\nCo-Authored-By: Claude <bot@example.com>\n\x1e{integrated}\x1fIntegrated\n\nFennec-Session: 1\nCo-Authored-By: Claude <bot@example.com>"
         );
 
-        let hashes = ai_commits(&log);
+        let (hashes, commits) = ai_commits(&log);
 
+        assert_eq!(commits, 3);
         assert_eq!(hashes.len(), 1);
         assert!(hashes.contains(&ai));
     }

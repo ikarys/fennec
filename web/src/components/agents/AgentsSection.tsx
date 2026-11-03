@@ -85,14 +85,11 @@ function AgentRow({
   onDelete: () => void;
 }) {
   return (
-    <li className="flex items-center gap-3 px-4 py-2.5">
+    <li className="flex items-center gap-3 py-2.5">
       <div className="min-w-0 grow">
         <div className="flex items-baseline gap-2">
           <span className="truncate text-sm font-medium">{agent.name}</span>
           <span className="truncate font-mono text-xs text-faint">{agent.id}</span>
-          {agent.phase ? <Badge tone="neutral">{PHASE_LABELS[agent.phase] ?? agent.phase}</Badge> : null}
-          {agent.readOnly ? <Badge tone="ok">lecture seule</Badge> : null}
-          {agent.subagent ? <Badge tone="accent">sous-agent</Badge> : null}
         </div>
         <div className="truncate text-xs text-muted" title={agent.description}>
           {agent.description}
@@ -103,6 +100,14 @@ function AgentRow({
           </div>
         ) : null}
       </div>
+      {/* Fixed-width columns, so the phase, the access and the kind line up from row to row. */}
+      <span className="w-24 shrink-0">
+        {agent.phase ? <Badge tone="neutral">{PHASE_LABELS[agent.phase] ?? agent.phase}</Badge> : null}
+      </span>
+      <span className="w-24 shrink-0">{agent.readOnly ? <Badge tone="ok">lecture seule</Badge> : null}</span>
+      <span className="w-20 shrink-0">
+        {agent.subagent ? <Badge tone="accent" pill>sous-agent</Badge> : <Badge tone="neutral" pill>agent</Badge>}
+      </span>
       {agent.editable ? (
         <Button variant="ghost" onClick={onEdit} disabled={busy}>
           Modifier
@@ -254,7 +259,6 @@ export function AgentsSection() {
           />
         ) : null}
         {!loading && !error && !draft && formError ? <p className="text-xs text-err">{formError}</p> : null}
-      </Section>
 
       {!loading && !error && overview
         ? ORIGIN_SECTIONS.map(({ origin, title, description, empty }) => {
@@ -263,7 +267,7 @@ export function AgentsSection() {
             return (
               <Section key={origin} title={title} description={description} flush>
                 {agents.length === 0 ? (
-                  <p className="px-4 py-3 text-xs text-muted">{empty}</p>
+                  <p className="py-3 text-xs text-muted">{empty}</p>
                 ) : (
                   <ul className="divide-y divide-border">
                     {agents.map((agent) => (
@@ -291,7 +295,7 @@ export function AgentsSection() {
         >
           <ul className="divide-y divide-border">
             {overview.broken.map((file) => (
-              <li key={file.id} className="flex items-center gap-3 px-4 py-2.5">
+              <li key={file.id} className="flex items-center gap-3 py-2.5">
                 <span className="font-mono text-sm">{file.id}</span>
                 <span className="text-xs text-err">{file.error}</span>
                 <Button
@@ -324,6 +328,7 @@ export function AgentsSection() {
           </ul>
         </Section>
       ) : null}
+      </Section>
 
       <ConfirmDialog
         open={pendingDelete !== null}
