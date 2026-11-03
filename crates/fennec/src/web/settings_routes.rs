@@ -4,6 +4,7 @@
 use super::App;
 use super::http::{Request, error, send_json};
 use super::model_view;
+use crate::domain::lang::Lang;
 use crate::domain::preferences::{LOCAL_PROVIDER, Preferences, Provider};
 use crate::domain::scanner::SCANNERS;
 use crate::scanners;
@@ -56,7 +57,7 @@ pub fn get_settings(app: &App, stream: &mut TcpStream) -> Result<(), String> {
             json!({
                 "id": scanner.id,
                 "name": scanner.name,
-                "covers": scanner.covers,
+                "covers": scanner.covers(Lang::from_code(&prefs.display.language)),
                 "install": scanner.install,
                 "url": scanner.url,
                 "path": scanners::find(scanner.binary),

@@ -79,6 +79,8 @@ pub struct Turn<'a> {
     /// The human is away (the ideas queue's night mode): `ask_user` and
     /// `propose_criteria` answer themselves instead of pausing the turn.
     pub autonomous: bool,
+    /// The language the human reads fennec in: the questions the loop builds follow it.
+    pub lang: crate::domain::lang::Lang,
     /// Set by the human to stop the turn: checked between rounds, while
     /// streaming and while a command runs.
     pub stop: &'a AtomicBool,
@@ -623,6 +625,7 @@ mod tests {
                 compact_at: 0.0,
                 reasoning_effort: None,
                 autonomous: false,
+                lang: crate::domain::lang::Lang::Fr,
                 stop: self.stop,
                 on_event: &mut self.on_event,
             }
@@ -658,6 +661,7 @@ mod tests {
             compact_at: 0.0,
             reasoning_effort: None,
             autonomous: false,
+            lang: crate::domain::lang::Lang::Fr,
             stop: &stop,
             on_event: &mut on_event,
         };
@@ -991,6 +995,7 @@ mod tests {
             compact_at: 0.0,
             reasoning_effort: None,
             autonomous: false,
+            lang: crate::domain::lang::Lang::Fr,
             stop: &stop,
             on_event: &mut on_event,
         };
@@ -1953,6 +1958,7 @@ mod tests {
             compact_at: 0.0,
             reasoning_effort: None,
             autonomous: false,
+            lang: crate::domain::lang::Lang::Fr,
             stop: &stop,
             on_event: &mut on_event,
         };

@@ -13,7 +13,7 @@ use super::context_view::{CompositionView, composition_view};
 use super::http::{Request, error, send_json};
 use super::pricing::{Pricing, priced, prices};
 use crate::domain::clock::now_ms;
-use crate::domain::context_parts::PartKind;
+use crate::domain::context_parts::{PartKind, display_label};
 use crate::domain::lang::Lang;
 use llm_providers::Price;
 use std::collections::BTreeMap;
@@ -375,7 +375,7 @@ fn consumers(breakdown: &BTreeMap<String, u64>, lang: Lang) -> Option<Compositio
         .iter()
         .filter_map(|(key, &tokens)| {
             let (kind, label) = PartKind::split_key(key)?;
-            Some((kind, label.to_string(), tokens))
+            Some((kind, display_label(label, lang), tokens))
         })
         .filter(|(_, _, tokens)| *tokens > 0)
         .collect();

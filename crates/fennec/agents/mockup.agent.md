@@ -54,7 +54,7 @@ cd mockups && (python3 -m http.server 8765 >/dev/null 2>&1 &) && sleep 1 \
 
 `--browser chromium` uses the Chromium Playwright downloads, not an installed Chrome. For mobile, open with `--device "iphone 15"` instead of `resize`.
 
-If a command fails for lack of network (npx not cached yet), say so: the human can turn the network on in Settings > Bac à sable. The interactive file still stands without the images.
+If a command fails for lack of network (npx not cached yet), say so: the human can turn the network on in Settings > Sandbox. The interactive file still stands without the images.
 
 ## Answer format
 
