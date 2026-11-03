@@ -30,7 +30,7 @@ export function WorktreeAlert() {
     <a
       className={buttonClass({ variant: 'ghost', size: 'sm' })}
       title={`dont ${formatBytes(summary.generatedBytes)} de cache de build — voir l'espace disque du projet`}
-      href={'#/project/' + encodeURIComponent(largestProjectId) + '/disk'}
+      href={'#/project/' + encodeURIComponent(largestProjectId)}
     >
       <HardDriveIcon className="h-3.5 w-3.5" />
       Worktrees : {formatBytes(summary.totalBytes)}
