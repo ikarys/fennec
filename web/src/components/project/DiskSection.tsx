@@ -17,6 +17,7 @@ import {
 } from '../../lib/api/worktrees';
 import { discardWorktree } from '../../lib/api';
 import { formatBytes, formatRelative } from '../../lib/format';
+import { useLang } from '../../i18n';
 
 export function DiskSection({
   projectId,
@@ -25,6 +26,7 @@ export function DiskSection({
   projectId: string;
   onOpenSession: (sessionId: string) => void;
 }) {
+  const lang = useLang();
   const [data, setData] = useState<ProjectWorktrees | null>(null);
   const [measuring, setMeasuring] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -148,15 +150,15 @@ export function DiskSection({
         <Tile
           icon={<HardDriveIcon />}
           label="Espace disque"
-          figure={data ? formatBytes(data.totalBytes) : '…'}
-          detail={data ? `mesuré ${formatRelative(data.scannedAt)}` : "Mesure de l'espace disque…"}
+          figure={data ? formatBytes(lang, data.totalBytes) : '…'}
+          detail={data ? `mesuré ${formatRelative(lang, data.scannedAt)}` : "Mesure de l'espace disque…"}
           tone="info"
           active={data ? data.totalBytes > 0 : false}
         />
         <Tile
           icon={<EraserIcon />}
           label="Cache de build"
-          figure={data ? formatBytes(data.generatedBytes) : '…'}
+          figure={data ? formatBytes(lang, data.generatedBytes) : '…'}
           detail="target, node_modules, .venv : rebâti par une compilation"
           tone="accent"
           active={data ? data.generatedBytes > 0 : false}
@@ -265,6 +267,7 @@ function SessionRow({
   onClean: () => void;
   onTrash: () => void;
 }) {
+  const lang = useLang();
   return (
     <li className="group relative flex items-center gap-3 px-4 py-3 text-sm transition-colors before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-accent before:transition-opacity hover:bg-accent-soft hover:before:opacity-100 before:opacity-0">
       <div className="min-w-0 grow">
@@ -285,7 +288,7 @@ function SessionRow({
         </button>
         <div className="mt-1 flex items-center gap-2">
           {entry.updatedAt ? (
-            <span className="text-xs text-muted">modifiée {formatRelative(entry.updatedAt)}</span>
+            <span className="text-xs text-muted">modifiée {formatRelative(lang, entry.updatedAt)}</span>
           ) : null}
           {entry.running ? <Badge tone="accent" dot pulse>en cours</Badge> : null}
         </div>
@@ -293,8 +296,8 @@ function SessionRow({
       </div>
 
       <div className="w-32 shrink-0 text-right tabular-nums">
-        <div>{formatBytes(entry.bytes)}</div>
-        <div className="text-xs text-muted">dont {formatBytes(entry.generatedBytes)} de cache</div>
+        <div>{formatBytes(lang, entry.bytes)}</div>
+        <div className="text-xs text-muted">dont {formatBytes(lang, entry.generatedBytes)} de cache</div>
       </div>
 
       <div className="flex w-16 shrink-0 items-center justify-end gap-1">
@@ -302,8 +305,8 @@ function SessionRow({
           variant="soft"
           size="sm"
           iconOnly
-          title={`Libérer le cache de build (${formatBytes(entry.generatedBytes)})`}
-          aria-label={`Libérer le cache de build (${formatBytes(entry.generatedBytes)})`}
+          title={`Libérer le cache de build (${formatBytes(lang, entry.generatedBytes)})`}
+          aria-label={`Libérer le cache de build (${formatBytes(lang, entry.generatedBytes)})`}
           disabled={busy || entry.running || entry.generatedBytes === 0}
           onClick={onClean}
         >
@@ -336,6 +339,7 @@ function OrphanRow({
   error?: string;
   onTrash: () => void;
 }) {
+  const lang = useLang();
   return (
     <li className="group relative flex items-center gap-3 px-4 py-3 text-sm transition-colors before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-accent before:transition-opacity hover:bg-accent-soft hover:before:opacity-100 before:opacity-0">
       <div className="min-w-0 grow">
@@ -357,7 +361,7 @@ function OrphanRow({
         {error ? <p className="mt-1 text-err text-xs">{error}</p> : null}
       </div>
 
-      <div className="w-32 shrink-0 text-right tabular-nums">{formatBytes(entry.bytes)}</div>
+      <div className="w-32 shrink-0 text-right tabular-nums">{formatBytes(lang, entry.bytes)}</div>
 
       <div className="flex w-16 shrink-0 items-center justify-end gap-1">
         {entry.sudoCommand ? null : (

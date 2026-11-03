@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ThreadItem } from '../../../lib/fold';
 import { formatClock, formatDuration } from '../../../lib/format';
 import type { NodeKind } from '../../../lib/workflow';
+import { useLang } from '../../../i18n';
 import { portTone } from '../../../lib/workflowRun';
 import { CheckIcon, ChevronRightIcon, CloseIcon, ExternalIcon, SpinnerIcon } from '../../Icons';
 import { useNodeUsage } from '../../session/CallUsage';
@@ -33,6 +34,7 @@ function nodeKindTone(kind: NodeKind): string {
 }
 
 export function NodeDivider({ item, running }: { item: WorkflowNodeItem; running: boolean }) {
+  const lang = useLang();
   const finished = item.port !== undefined;
   const usage = useNodeUsage(item.id);
   const badge = finished ? { port: item.port!, tone: portBadgeTone(item.port!) } : null;
@@ -77,7 +79,7 @@ export function NodeDivider({ item, running }: { item: WorkflowNodeItem; running
             </span>
           )}
           {finished && item.durationMs != null && (
-            <span className="tabular-nums">{formatDuration(item.durationMs)}</span>
+            <span className="tabular-nums">{formatDuration(lang, item.durationMs)}</span>
           )}
           {finished && usage && (
             <span className="tabular-nums text-muted" title={usage.detail}>

@@ -3,6 +3,7 @@
  */
 import { formatDuration, formatTokens } from '../../../lib/format';
 import type { IdeaBoard, IdeaView } from '../../../lib/ideas';
+import { useLang } from '../../../i18n';
 import { CheckIcon, ClockIcon, CommitIcon, DecisionIcon, FileIcon, TokensIcon } from '../../Icons';
 import { Stat } from '../../ui/Stat';
 
@@ -25,6 +26,7 @@ export function IdeaMeta({
   >;
   caps: IdeaBoard['queue']['caps'];
 }) {
+  const lang = useLang();
   return (
     <>
       {idea.durationMs != null ? (
@@ -32,11 +34,11 @@ export function IdeaMeta({
           icon={<ClockIcon />}
           title={
             idea.autonomous && caps.maxMinutes > 0
-              ? `Durée ${formatDuration(idea.durationMs)} sur un plafond de ${caps.maxMinutes} min (mode nuit)`
-              : `Durée ${formatDuration(idea.durationMs)}`
+              ? `Durée ${formatDuration(lang, idea.durationMs)} sur un plafond de ${caps.maxMinutes} min (mode nuit)`
+              : `Durée ${formatDuration(lang, idea.durationMs)}`
           }
         >
-          {formatDuration(idea.durationMs)}
+          {formatDuration(lang, idea.durationMs)}
         </Stat>
       ) : null}
       {idea.tokens != null ? (
@@ -44,11 +46,11 @@ export function IdeaMeta({
           icon={<TokensIcon />}
           title={
             idea.autonomous && caps.maxTokens > 0
-              ? `${formatTokens(idea.tokens)} tokens sur un plafond de ${formatTokens(caps.maxTokens)}`
-              : `${formatTokens(idea.tokens)} tokens`
+              ? `${formatTokens(lang, idea.tokens)} tokens sur un plafond de ${formatTokens(lang, caps.maxTokens)}`
+              : `${formatTokens(lang, idea.tokens)} tokens`
           }
         >
-          {formatTokens(idea.tokens)}
+          {formatTokens(lang, idea.tokens)}
         </Stat>
       ) : null}
       {idea.criteria && idea.criteria.passed + idea.criteria.failed + idea.criteria.pending > 0 ? (

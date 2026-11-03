@@ -451,7 +451,7 @@ describe('createThreadFold', () => {
   });
 
   it('adds an error note from chat.done', () => {
-    const fold = createThreadFold();
+    const fold = createThreadFold('fr');
     fold.apply(ev('chat.done', { reason: 'error' }));
     expect(fold.view().items[0]).toMatchObject({ kind: 'note', text: 'Erreur' });
   });
