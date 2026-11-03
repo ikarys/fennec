@@ -169,7 +169,8 @@ function VersionTag() {
   return version ? <span className="text-xs font-normal text-muted">{version}</span> : null;
 }
 
-export type PageId = 'settings' | 'insight' | 'workflows' | 'backlog';
+import type { PageId } from '../../lib/route';
+export type { PageId };
 
 /** The fixed pages, in the bar's order; `PageIcon` draws each. */
 const PAGES: { page: PageId; title: string }[] = [
