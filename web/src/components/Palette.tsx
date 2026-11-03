@@ -160,7 +160,7 @@ export function Palette({ open, projects, onClose, onOpenSession, onNewSession, 
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div className="w-full max-w-[640px] self-start overflow-hidden rounded-[14px] border border-border-strong bg-panel shadow-2xl">
+      <div className="w-full max-w-[640px] self-start overflow-hidden rounded-lg border border-border-strong bg-panel shadow-float">
         <div className="flex items-center gap-2.5 border-b border-border px-3.5">
           <SearchIcon className="h-4 w-4 text-muted" />
           <label htmlFor="palette-q" className="absolute h-px w-px overflow-hidden clip-[rect(0_0_0_0)]">

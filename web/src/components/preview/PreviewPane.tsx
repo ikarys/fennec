@@ -98,7 +98,7 @@ export function PreviewPane({ sessionId, target, onClose }: PreviewPaneProps) {
           sandbox="allow-scripts"
           src={previewUrl(sessionId, target.path)}
           title="Aperçu"
-          className="w-full grow bg-white"
+          className="w-full grow bg-panel"
         />
       ) : (
         <div className="min-h-0 grow overflow-y-auto p-6">

@@ -4,7 +4,7 @@
  */
 import type { ReactNode } from 'react';
 
-export type BadgeTone = 'neutral' | 'accent' | 'ok' | 'err' | 'info';
+export type BadgeTone = 'neutral' | 'accent' | 'ok' | 'err' | 'attention' | 'info';
 
 /** Colour says the state; only what needs the human (accent) gets a background. */
 const TONES: Record<BadgeTone, string> = {
@@ -12,6 +12,7 @@ const TONES: Record<BadgeTone, string> = {
   accent: 'bg-accent-soft text-accent-strong',
   ok: 'text-ok',
   err: 'text-err',
+  attention: 'text-attention',
   info: 'text-info'
 };
 
@@ -21,6 +22,7 @@ const PILLS: Record<BadgeTone, string> = {
   accent: 'border-accent/40 bg-accent-soft text-accent-strong',
   ok: 'border-ok/40 bg-ok-soft text-ok',
   err: 'border-err/40 bg-err/10 text-err',
+  attention: 'border-attention/40 bg-attention/10 text-attention',
   info: 'border-info/40 bg-info/10 text-info'
 };
 
@@ -29,6 +31,7 @@ const DOTS: Record<BadgeTone, string> = {
   accent: 'bg-accent',
   ok: 'bg-ok',
   err: 'bg-err',
+  attention: 'bg-attention',
   info: 'bg-info'
 };
 

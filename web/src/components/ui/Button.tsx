@@ -8,19 +8,20 @@ import type { ButtonHTMLAttributes } from 'react';
 export type ButtonVariant = 'primary' | 'soft' | 'secondary' | 'ghost' | 'danger';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
+// Disabled is faint text on the raised surface, never an opacity: a 50 % muted text fell to 2:1 in Jour.
 const BASE =
-  'inline-flex items-center gap-1.5 rounded-md font-medium transition-colors disabled:pointer-events-none disabled:opacity-50';
+  'inline-flex items-center gap-1.5 rounded-md font-medium transition-colors disabled:pointer-events-none disabled:text-faint';
 /** One line that never shrinks (the default), or a choice whose text wraps. */
 const SINGLE_LINE = 'shrink-0 justify-center whitespace-nowrap';
 const MULTILINE = 'min-w-0 justify-start py-1 text-left whitespace-normal';
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  primary: 'bg-accent text-on-accent hover:bg-accent-strong',
+  primary: 'bg-accent text-on-accent hover:bg-accent-strong disabled:bg-raised',
   /** A row's own action: coloured, quieter than the screen's primary. */
-  soft: 'bg-accent-soft text-accent-strong hover:bg-accent hover:text-on-accent',
+  soft: 'bg-accent-soft text-accent-strong hover:bg-accent hover:text-on-accent disabled:bg-raised',
   secondary: 'bg-raised text-text hover:bg-border',
   ghost: 'text-muted hover:bg-raised hover:text-text',
-  danger: 'border border-err/40 text-err hover:bg-del-bg'
+  danger: 'border border-err/40 text-err hover:bg-del-bg disabled:border-border'
 };
 
 /** `wrap` is `text` whose height is a minimum: a wrapping choice grows with its text. */
