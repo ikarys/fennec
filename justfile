@@ -31,7 +31,7 @@ dev:
     cd web && FENNEC_API="http://127.0.0.1:$API_PORT" npm run dev -- --port "$UI_PORT"
 
 # Everything CI checks: the conventions (web, lint) and the tests
-check: web lint test
+check: web lint test test-web
 
 # The UI primitives rule, formatting, clippy
 lint:
@@ -42,6 +42,10 @@ lint:
 # The unit tests of every crate
 test:
     cargo test
+
+# The unit tests of the UI's pure modules (the folds, the plan contract)
+test-web:
+    cd web && npm test
 
 # Once per clone: use the repository's git hooks (Conventional Commits, no direct push to main/develop)
 setup:
