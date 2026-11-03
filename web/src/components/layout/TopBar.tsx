@@ -194,7 +194,6 @@ interface TopBarProps {
   onOpenAttention: (id: string) => void;
   onPickTab: (id: string) => void;
   onCloseTab: (id: string) => void;
-  onOpenPage: (page: PageId) => void;
   onOpenPalette: () => void;
   onNewSession: () => void;
   splitActive: boolean;
@@ -208,7 +207,6 @@ export function TopBar({
   onOpenAttention,
   onPickTab,
   onCloseTab,
-  onOpenPage,
   onOpenPalette,
   onNewSession,
   splitActive,
@@ -241,12 +239,11 @@ export function TopBar({
       <button
         type="button"
         onClick={onNewSession}
-        aria-label="Nouveau chat"
-        title="Nouveau chat"
-        className="flex h-7 shrink-0 items-center gap-1 self-center rounded-md px-2 text-xs font-medium text-muted transition-colors hover:bg-raised hover:text-text"
+        aria-label="Nouvelle session"
+        title="Nouvelle session dans le projet courant"
+        className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true }, 'self-center')}
       >
-        <PlusIcon className="h-3.5 w-3.5" />
-        <span>Nouveau chat</span>
+        <PlusIcon className="h-4 w-4" />
       </button>
 
       <div
@@ -349,42 +346,6 @@ export function TopBar({
           className={buttonClass({ variant: 'ghost', size: 'sm' }, splitActive ? 'text-accent' : undefined)}
         >
           <SplitIcon className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={() => onOpenPage('insight')}
-          title="Insight"
-          aria-label="Insight"
-          className={buttonClass({ variant: 'ghost', size: 'sm' })}
-        >
-          <InsightIcon className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={() => onOpenPage('workflows')}
-          title="Workflows"
-          aria-label="Workflows"
-          className={buttonClass({ variant: 'ghost', size: 'sm' })}
-        >
-          <WorkflowsIcon className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={() => onOpenPage('backlog')}
-          title="Backlog"
-          aria-label="Backlog"
-          className={buttonClass({ variant: 'ghost', size: 'sm' })}
-        >
-          <BacklogIcon className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={() => onOpenPage('settings')}
-          title="Réglages"
-          aria-label="Réglages"
-          className={buttonClass({ variant: 'ghost', size: 'sm' })}
-        >
-          <SettingsIcon className="h-4 w-4" />
         </button>
       </div>
     </header>
