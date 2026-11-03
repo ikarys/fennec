@@ -3,8 +3,7 @@
  * can allow or refuse the paused call with one click.
  */
 import { useState } from 'react';
-import type { PendingApproval } from '../../lib/fold';
-import type { ApprovalChoice } from '../../lib/api/sessions';
+import type { ApprovalChoice, PendingApproval } from '../../lib/api/sessions';
 import { shortPath } from '../../lib/shortPath';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';

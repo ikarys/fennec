@@ -26,7 +26,8 @@ function RunningSince() {
   );
 }
 
-export function ToolCard({ tool }: { tool: ToolCallView }) {
+/** `awaiting`: fennec paused this call for the human's approval (served by the thread view). */
+export function ToolCard({ tool, awaiting = false }: { tool: ToolCallView; awaiting?: boolean }) {
   const display = useDisplayPrefs();
   const [open, setOpen] = useState(display.toolResultsOpen);
 
@@ -111,7 +112,7 @@ export function ToolCard({ tool }: { tool: ToolCallView }) {
             vérifié · règle
           </Badge>
         )}
-        {tool.awaitingApproval && (
+        {awaiting && (
           <Badge tone="accent" className="shrink-0" title="fennec attend ton autorisation pour cet appel">
             en attente
           </Badge>
