@@ -317,7 +317,8 @@ web/src/           React + Vite + Tailwind v4 UI
                      workflow/ the editor (canvas, node shapes, panels) and session/ a run in the thread;
                      preview/ the preview pane and previewable code blocks
   hooks/             useSessionThread: the SSE stream of a session, folded
-  lib/               api (typed fetch), route (the hash as a route, tab paths, stored tabs), fold (events → thread view), format, theme,
+  lib/               api (typed fetch), route (the hash as a route, tab paths, stored tabs), settingsForm (the Settings form
+                     read from and written back as preferences), integration (the gate's words and button state), fold (events → thread view), format, theme,
                      attachments (images read in the browser), plan (the plan/report contract),
                      workflow (definition types and edits), workflowRun (a run folded from its events),
                      preview (what can be previewed, its URL), vision (the images the model saw),
