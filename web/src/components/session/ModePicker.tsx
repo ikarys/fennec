@@ -50,7 +50,8 @@ export function ModePicker({ agents, mode, onChange, disabled }: ModePickerProps
     const selected = agents.find((agent) => agent.id === mode);
     return (
       <ChoiceMenu
-        label="Mode"
+        label="Agent de la session"
+        title={selected ? `Agent de la session : ${selected.name}${selected.description ? ` — ${selected.description}` : ''}` : 'Agent de la session'}
         groups={phaseGroups(agents)}
         value={mode}
         onChange={onChange}
@@ -67,13 +68,13 @@ export function ModePicker({ agents, mode, onChange, disabled }: ModePickerProps
 
   return (
     <Segmented
-      label="Mode"
+      label="Agent de la session"
       value={mode}
       onChange={onChange}
       disabled={disabled}
       segments={agents.map((agent) => ({
         value: agent.id,
-        title: agent.description,
+        title: `Agent de la session : ${agent.name}${agent.description ? ` — ${agent.description}` : ''}`,
         label: (
           <>
             <ChoiceDot color={agent.color} />
