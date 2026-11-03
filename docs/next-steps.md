@@ -13,19 +13,13 @@ hand, for the merge only.
 - Proposed test: after an integration, the base ref stays the merge's start (the squash leaves the
   fork point older). Tests need the human's approval first.
 
-## 2. Misleading commit subject
-
-After a conflict resolution, the integration dialog's model proposed
-`fix: resolve merge conflicts with develop branch` for what was i18n work: it reads the branch's
-commit subjects. See `domain/commit_subject.rs`.
-
-## 3. Housekeeping
+## 2. Housekeeping
 
 - Delete the remote branches whose PRs are merged: `feat/prompt-queue`, `feat/rules`, `feat/waivers`.
 - Delete the local `feat/agent-crud` (nothing in it is missing from `develop`).
 - `main` is behind `develop`: `just promote` when a release is wanted.
 
-## 4. Then
+## 3. Then
 
 The next capability is still to be chosen among the remaining C* of the Notion definition (see
 "Next" in `AGENTS.md`).

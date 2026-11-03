@@ -1,6 +1,8 @@
 //! English commit subject: the subject the model proposes for an integration,
 //! built from the session's request, title, branch commits and changed files.
 
+use super::event::Event;
+
 /// The prompt template; `prompt` fills its placeholders.
 pub const COMMIT_SUBJECT_PROMPT: &str =
     "Write ONE Conventional Commits subject line in English for the change
@@ -10,8 +12,9 @@ Type must be one of: feat, fix, docs, refactor, test, chore, perf, build, ci, st
 Use imperative mood, lowercase after the colon, no trailing period, at most 72
 characters.
 Return ONLY the line.
+Describe the commits and files below, not the session as a whole.
 
-Request:
+The human's requests since the last integration:
 {request}
 
 Session title:
@@ -38,6 +41,30 @@ pub fn prompt(request: &str, title: &str, commits: &[&str], files: &[(&str, u64,
         .replace("{title}", title)
         .replace("{commits}", &commits)
         .replace("{files}", &files)
+}
+
+/// The human's requests since the last integration; a session integrated twice
+/// must not be described by its first request again.
+pub fn request_since_integration(events: &[Event]) -> String {
+    let start = match events
+        .iter()
+        .rposition(|event| matches!(event, Event::IntegrationApplied { .. }))
+    {
+        Some(index) => index + 1,
+        None => 0,
+    };
+
+    let requests: Vec<&str> = events
+        .iter()
+        .skip(start)
+        .filter_map(crate::domain::conversation::human_request)
+        .collect();
+
+    if requests.is_empty() {
+        crate::domain::conversation::first_request(events).unwrap_or_default()
+    } else {
+        requests.join("\n\n")
+    }
 }
 
 /// Cleans the model's answer into a valid English Conventional Commit subject.
@@ -120,11 +147,12 @@ fn strip_surrounding(subject: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::event::Role;
 
     #[test]
     fn prompt_includes_the_request() {
         let p = prompt("add the feature", "Title", &[], &[]);
-        assert!(p.contains("Request:\nadd the feature"));
+        assert!(p.contains("The human's requests since the last integration:\nadd the feature"));
     }
 
     #[test]
@@ -157,5 +185,50 @@ mod tests {
         let long = "feat: ".to_string() + &"x".repeat(84);
         assert_eq!(clean(&long), None);
         assert_eq!(clean(""), None);
+    }
+
+    fn user_request(id: &str, content: &str) -> Event {
+        Event::MessageStart {
+            message_id: id.into(),
+            role: Role::User,
+            content: Some(content.into()),
+            is_system_generated: false,
+            metadata: None,
+            attachments: Vec::new(),
+        }
+    }
+
+    fn integration_applied() -> Event {
+        Event::IntegrationApplied {
+            branch: "branch".into(),
+            base: "base".into(),
+            commits: Vec::new(),
+            head: "head".into(),
+            message: String::new(),
+            acknowledged: Vec::new(),
+            protected_tests: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn request_since_integration_returns_only_requests_after_last_integration() {
+        let events = vec![
+            user_request("1", "first"),
+            integration_applied(),
+            user_request("2", "second"),
+        ];
+        assert_eq!(request_since_integration(&events), "second");
+    }
+
+    #[test]
+    fn request_since_integration_joins_all_requests_without_integration() {
+        let events = vec![user_request("1", "first"), user_request("2", "second")];
+        assert_eq!(request_since_integration(&events), "first\n\nsecond");
+    }
+
+    #[test]
+    fn request_since_integration_falls_back_to_first_request() {
+        let events = vec![user_request("1", "first"), integration_applied()];
+        assert_eq!(request_since_integration(&events), "first");
     }
 }
