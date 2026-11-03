@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contexte — headers des blocs</title>
+<style>
+  :root {
+    --bg: #0E1013;
+    --panel: #15181D;
+    --raised: #20252D;
+    --border: #272C34;
+    --border-strong: #6E7989;
+    --text: #E7E9EC;
+    --muted: #9AA2AE;
+    --faint: #7D848F;
+    --accent: #F08A4B;
+    --accent-strong: #F6A876;
+    --accent-soft: rgba(240, 138, 75, 0.14);
+    --on-accent: #16110D;
+    --ok: #4CC38A;
+    --ok-soft: rgba(76, 195, 138, 0.14);
+    --err: #F2555A;
+    --err-soft: rgba(242, 85, 90, 0.10);
+    --attention: #E8C547;
+    --info: #6AA6F2;
+    --code: #0B0D10;
+    --sans: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: #08090B; color: var(--text);
+    font-family: var(--sans); font-size: 13px;
+    min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 28px 20px; gap: 12px;
+  }
+  .stage { display: flex; gap: 40px; align-items: flex-start; }
+  .col { display: flex; flex-direction: column; gap: 10px; }
+  .tag { font-size: 10.5px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--faint); }
+  .tag .letter { color: var(--accent-strong); margin-right: 6px; }
+  .hint { font-size: 10.5px; color: var(--faint); text-align: center; }
+
+  .panel {
+    width: 300px; height: 680px;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .phead { display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; flex-shrink: 0; }
+  .phead .title { font-size: 12px; font-weight: 500; }
+  .phead .chev { margin-left: auto; color: var(--muted); display: flex; }
+  .pbody { min-height: 0; flex: 1; overflow-y: auto; scrollbar-width: thin; }
+
+  /* Sections : <details> réels, le header est le summary */
+  details { border-top: 1px solid var(--border); }
+  details:first-child { border-top: none; }
+  summary { list-style: none; cursor: pointer; user-select: none; }
+  summary::-webkit-details-marker { display: none; }
+
+  .sname { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .scount { font-family: var(--mono); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .scount.tone-ok { color: var(--ok); }
+  .scount.tone-err { color: var(--err); }
+  .bar { height: 4px; background: var(--raised); border-radius: 2px; overflow: hidden; display: inline-block; }
+  .bar > i { display: block; height: 100%; background: var(--ok); border-radius: 2px; }
+  .sbody { padding: 8px 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+
+  /* ——— Aujourd'hui : header unique ——— */
+  .h-today {
+    display: flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px;
+    position: sticky; top: 0; background: var(--bg); z-index: 2;
+  }
+  .h-today .chev { color: var(--muted); display: flex; transition: transform .15s; }
+  details[open] > .h-today .chev { transform: rotate(90deg); }
+  .h-today .sum { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+
+  /* ——— A : l'état dans le résumé ——— */
+  .h-a { display: flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; position: sticky; top: 0; background: var(--bg); z-index: 2; }
+  .h-a .chev { color: var(--muted); display: flex; transition: transform .15s; }
+  details[open] > .h-a .chev { transform: rotate(90deg); }
+  .h-a .sum { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+
+  /* ——— B : deux poids ——— */
+  .h-b { display: flex; align-items: center; gap: 7px; height: 36px; padding: 0 12px; position: sticky; top: 0; z-index: 2; background: var(--panel); }
+  .h-b .chev { color: var(--muted); display: flex; transition: transform .15s; }
+  details[open] > .h-b .chev { transform: rotate(90deg); }
+  .h-b .sname { color: var(--text); font-weight: 700; }
+  .h-b .sum { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+  .pill {
+    font-family: var(--mono); font-size: 10px; font-weight: 500;
+    padding: 1px 7px; border-radius: 999px; font-variant-numeric: tabular-nums;
+  }
+  .pill.err { color: var(--err); border: 1px solid rgba(242,85,90,.4); background: var(--err-soft); }
+  .pill.ok { color: var(--ok); border: 1px solid rgba(76,195,138,.4); background: var(--ok-soft); }
+  .pill.neutral { color: var(--muted); border: 1px solid var(--border); background: var(--raised); }
+  .h-b2 { display: flex; align-items: center; gap: 7px; height: 30px; padding: 0 12px; position: sticky; top: 0; background: var(--bg); z-index: 2; }
+  .h-b2 .chev { color: var(--faint); display: flex; transition: transform .15s; }
+  details[open] > .h-b2 .chev { transform: rotate(90deg); }
+  .h-b2 .sname { font-size: 10px; }
+
+  /* ——— C : identité par icône ——— */
+  .h-c { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px; position: sticky; top: 0; background: var(--bg); z-index: 2; }
+  .h-c .bicon { display: flex; color: var(--faint); }
+  .h-c .bicon.tone-err { color: var(--err); }
+  .h-c .bicon.tone-ok { color: var(--ok); }
+  .h-c .sum { margin-left: auto; display: flex; align-items: center; gap: 7px; }
+  .h-c .chev { color: var(--faint); display: flex; transition: transform .15s; }
+  details[open] > .h-c .chev { transform: rotate(90deg); }
+
+  /* Contenu, identique partout */
+  .crit {
+    background: var(--panel); border: 1px solid var(--border); border-left: 2px solid var(--faint);
+    border-radius: 4px; padding: 6px 9px 7px;
+  }
+  .crit.ok { border-left-color: var(--ok); }
+  .crit.err { border-left-color: var(--err); }
+  .crit .chead { display: flex; align-items: center; gap: 6px; }
+  .crit .cid { font-family: var(--mono); font-size: 10.5px; color: var(--muted); flex-shrink: 0; }
+  .crit .txt { flex: 1; font-size: 11px; line-height: 1.45; }
+  .badge { font-size: 9.5px; font-weight: 500; white-space: nowrap; padding: 1px 6px; border-radius: 999px; flex-shrink: 0; }
+  .badge.ok { color: var(--ok); border: 1px solid rgba(76,195,138,.4); background: var(--ok-soft); }
+  .badge.err { color: var(--err); border: 1px solid rgba(242,85,90,.4); background: var(--err-soft); }
+  .f-row { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11px; padding: 4px 8px; border-radius: 6px; }
+  .f-row:hover { background: var(--accent-soft); }
+  .f-row .path { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .add { color: var(--ok); font-variant-numeric: tabular-nums; }
+  .del { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .ghost { align-self: flex-start; background: none; border: none; cursor: pointer; font-size: 11px; color: var(--muted); padding: 3px 6px; border-radius: 5px; font-family: var(--sans); }
+  .ghost:hover { background: var(--accent-soft); color: var(--accent-strong); }
+  .kv { display: flex; align-items: baseline; justify-content: space-between; font-size: 11px; }
+  .kv .k { color: var(--muted); }
+  .kv .v { font-variant-numeric: tabular-nums; }
+  .costline .top { display: flex; align-items: center; gap: 7px; font-size: 11.5px; padding: 2px 8px 0; }
+  .costline .coin { color: var(--faint); display: flex; }
+  .costline .k { color: var(--muted); }
+  .costline .detail { font-size: 10.5px; color: var(--faint); margin-top: 3px; padding-left: 22px; }
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <!-- ============ AUJOURD'HUI ============ -->
+  <div class="col">
+    <div class="tag">Aujourd'hui</div>
+    <aside class="panel">
+      <div class="phead"><span class="title">Contexte</span>
+        <span class="chev"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></span>
+      </div>
+      <div class="pbody">
+        <details open>
+          <summary class="h-today">
+            <span class="chev"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 18l6-6-6-6"/></svg></span>
+            <span class="sname">Critères</span>
+            <span class="sum"><span class="scount">5/7</span></span>
+          </summary>
+          <div class="sbody">
+            <div class="crit ok"><div class="chead"><span class="cid">C1</span><span class="txt">Les droits sont par group</span><span class="badge ok">vérifié</span></div></div>
+            <div class="crit err"><div class="chead"><span class="cid">C2</span><span class="txt">Le test e2e du filtre matrice + client assignable existe</span><span class="badge err">échec</span></div></div>
+            <div class="crit"><div class="chead"><span class="cid">C3</span><span class="txt">Les data contexts sont restaurés</span></div></div>
+          </div>
+        </details>
+        <details open>
+          <summary class="h-today">
+            <span class="chev"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 18l6-6-6-6"/></svg></span>
+            <span class="sname">Fichiers modifiés</span>
+            <span class="sum"><span class="scount">23</span></span>
+          </summary>
+          <div class="sbody">
+            <div class="f-row"><span class="path">src/app/state.rs</span><span class="add">+7</span><span class="del">−5</span></div>
+            <div class="f-row"><span class="path">src/app/token_service.rs</span><span class="add">+135</span><span class="del">−108</span></div>
+            <div class="f-row"><span class="path">src/domain/assignment.rs</span><span class="add">+38</span><span class="del">−0</span></div>
+            <button class="ghost">+ 20 autres</button>
+          </div>
+        </details>
+        <details>
+          <summary class="h-today">
+            <span class="chev"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 18l6-6-6-6"/></svg></span>
+            <span class="sname">Espace de l'agent</span>
+          </summary>
+          <div class="sbody"><div class="f-row"><span class="path">worktree: session/perm-matrix</span></div></div>
+        </details>
+        <details>
+          <summary class="h-today">
+            <span class="chev"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 18l6-6-6-6"/></svg></span>
+            <span class="sname">Serveurs</span>
+            <span class="sum"><span class="scount">0/1</span></span>
+          </summary>
+          <div class="sbody"><div class="kv"><span class="k">searxng</span><span class="v">arrêté</span></div></div>
+        </details>
+        <details open>
+          <summary class="h-today">
+            <span class="chev"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 18l6-6-6-6"/></svg></span>
+            <span class="sname">Tokens de la session</span>
+            <span class="sum"><span class="scount">19,5M</span></span>
+          </summary>
+          <div class="sbody">
+            <div class="costline">
+              <div class="top"><span class="coin"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span><span class="k">Coût</span><span>—</span></div>
+              <div class="detail">aucun modèle n'a de prix · Paramètres</div>
+            </div>
+            <div><div class="kv"><span class="k">Cache</span><span class="v">98 %</span></div><div class="bar" style="margin:4px 8px 0;width:calc(100% - 16px)"><i style="width:98%"></i></div></div>
+            <div style="padding:0 8px"><div class="kv"><span class="k">Entrée</span><span class="v">19.4M</span></div><div class="kv"><span class="k">Appels</span><span class="v">198</span></div></div>
+          </div>
+        </details>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ============ A · L'ÉTAT DANS LE RÉSUMÉ ============ -->
+  <div class="col">
+    <div class="tag"><span class="letter">A</span>L'état dans le résumé</div>
+    <aside class="panel">
+      <div class="phead"><span class="title">Contexte</span>
+        <span class="chev"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></span>
+      </div>
+      <div class="pbody">
+        <details open>
+          <summary class="h-a">
+            <span class="chev"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 18l6-6-6-6"/></svg></span>
+            <span class="sname">Critères</span>
+            <span class="sum"><span class="bar" style="width:44px"><i style="width:71%"></i></span><span class="scount tone-err">5/7</span></span>
+          </summary>
+          <div class="sbody">
+            <div class="crit ok"><div class="chead"><span class="cid">C1</span><span class="txt">Les droits sont par group</span><span class="badge ok">vérifié</span></div></div>
+            <div class="crit err"><div class="chead"><span class="cid">C2</span><span class="txt">Le test e2e du filtre matrice + client assignable existe</span><span class="badge err">échec</span></div></div>
+            <div class="crit"><div class="chead"><span class="cid">C3</span><span class="txt">Les data contexts sont restaurés</span></div></div>
+          </div>
+        </details>
+        <details open>
+          <summary class="h-a">
+            <span class="chev"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 18l6-6-6-6"/></svg></span>
+            <span class="sname">Fichiers modifiés</span>
+            <span class="sum"><span class="scount">23</span></span>
+          </summary>
+          <div class="sbody">
+            <div class="f-row"><span class="path">src/app/state.rs</span><span class="add">+7</span><span class="del">−5</span></div>
+            <div class="f-row"><span class="path">src/app/token_service.rs</span><span class="add">+135</span><span class="del">−108</span></div>
+            <div class="f-row"><span class="path">src/domain/assignment.rs</span><span class="add">+38</span><span class="del">−0</span></div>
+            <button class="ghost">+ 20 autres</button>
+          </div>
+        </details>
+        <details>
+          <summary class="h-a">
+            <span class="chev"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 18l6-6-6-6"/></svg></span>
+            <span class="sname">Espace de l'agent</span>
+          </summary>
+          <div class="sbody"><div class="f-row"><span class="path">worktree: session/perm-matrix</span></div></div>
+        </details>
+        <details>
+          <summary class="h-a">
+            <span class="chev"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 18l6-6-6-6"/></svg></span>
+            <span class="sname">Serveurs</span>
+            <span class="sum"><span class="scount">0/1</span></span>
+          </summary>
+          <div class="sbody"><div class="kv"><span class="k">searxng</span><span class="v">arrêté</span></div></div>
+        </details>
+        <details open>
+          <summary class="h-a">
+            <span class="chev"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 18l6-6-6-6"/></svg></span>
+            <span class="sname">Tokens de la session</span>
+            <span class="sum"><span class="scount">19,5M</span></span>
+          </summary>
+          <div class="sbody">
+            <div class="costline">
+              <div class="top"><span class="coin"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span><span class="k">Coût</span><span>—</span></div>
+              <div class="detail">aucun modèle n'a de prix · Paramètres</div>
+            </div>
+            <div><div class="kv"><span class="k">Cache</span><span class="v">98 %</span></div><div class="bar" style="margin:4px 8px 0;width:calc(100% - 16px)"><i style="width:98%"></i></div></div>
+            <div style="padding:0 8px"><div class="kv"><span class="k">Entrée</span><span class="v">19.4M</span></div><div class="kv"><span class="k">Appels</span><span class="v">198</span></div></div>
+          </div>
+        </details>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ============ B · DEUX POIDS ============ -->
+  <div class="col">
+    <div class="tag"><span class="letter">B</span>Deux poids</div>
+    <aside class="panel">
+      <div class="phead"><span class="title">Contexte</span>
+        <span class="chev"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></span>
+      </div>
+      <div class="pbody">
+        <details open>
+          <summary class="h-b">
+            <span class="chev"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 18l6-6-6-6"/></svg></span>
+            <span class="sname">Critères</span>
+            <span class="sum"><span class="bar" style="width:44px"><i style="width:71%"></i></span><span class="pill err">5/7</span></span>
+          </summary>
+          <div class="sbody">
+            <div class="crit ok"><div class="chead"><span class="cid">C1</span><span class="txt">Les droits sont par group</span><span class="badge ok">vérifié</span></div></div>
+            <div class="crit err"><div class="chead"><span class="cid">C2</span><span class="txt">Le test e2e du filtre matrice + client assignable existe</span><span class="badge err">échec</span></div></div>
+            <div class="crit"><div class="chead"><span class="cid">C3</span><span class="txt">Les data contexts sont restaurés</span></div></div>
+          </div>
+        </details>
+        <details open>
+          <summary class="h-b">
+            <span class="chev"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 18l6-6-6-6"/></svg></span>
+            <span class="sname">Fichiers modifiés</span>
+            <span class="sum"><span class="pill neutral">23</span></span>
+          </summary>
+          <div class="sbody">
+            <div class="f-row"><span class="path">src/app/state.rs</span><span class="add">+7</span><span class="del">−5</span></div>
+            <div class="f-row"><span class="path">src/app/token_service.rs</span><span class="add">+135</span><span class="del">−108</span></div>
+            <div class="f-row"><span class="path">src/domain/assignment.rs</span><span class="add">+38</span><span class="del">−0</span></div>
+            <button class="ghost">+ 20 autres</button>
+          </div>
+        </details>
+        <details>
+          <summary class="h-b2">
+            <span class="chev"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 18l6-6-6-6"/></svg></span>
+            <span class="sname">Espace de l'agent</span>
+          </summary>
+          <div class="sbody"><div class="f-row"><span class="path">worktree: session/perm-matrix</span></div></div>
+        </details>
+        <details>
+          <summary class="h-b2">
+            <span class="chev"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 18l6-6-6-6"/></svg></span>
+            <span class="sname">Serveurs</span>
+            <span class="sum"><span class="scount">0/1</span></span>
+          </summary>
+          <div class="sbody"><div class="kv"><span class="k">searxng</span><span class="v">arrêté</span></div></div>
+        </details>
+        <details open>
+          <summary class="h-b2">
+            <span class="chev"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 18l6-6-6-6"/></svg></span>
+            <span class="sname">Tokens de la session</span>
+            <span class="sum"><span class="scount">19,5M</span></span>
+          </summary>
+          <div class="sbody">
+            <div class="costline">
+              <div class="top"><span class="coin"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span><span class="k">Coût</span><span>—</span></div>
+              <div class="detail">aucun modèle n'a de prix · Paramètres</div>
+            </div>
+            <div><div class="kv"><span class="k">Cache</span><span class="v">98 %</span></div><div class="bar" style="margin:4px 8px 0;width:calc(100% - 16px)"><i style="width:98%"></i></div></div>
+            <div style="padding:0 8px"><div class="kv"><span class="k">Entrée</span><span class="v">19.4M</span></div><div class="kv"><span class="k">Appels</span><span class="v">198</span></div></div>
+          </div>
+        </details>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ============ C · IDENTITÉ PAR ICÔNE ============ -->
+  <div class="col">
+    <div class="tag"><span class="letter">C</span>Identité par icône</div>
+    <aside class="panel">
+      <div class="phead"><span class="title">Contexte</span>
+        <span class="chev"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></span>
+      </div>
+      <div class="pbody">
+        <details open>
+          <summary class="h-c">
+            <span class="bicon tone-err"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
+            <span class="sname">Critères</span>
+            <span class="sum"><span class="scount tone-err">5/7</span><span class="chev"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 18l6-6-6-6"/></svg></span></span>
+          </summary>
+          <div class="sbody">
+            <div class="crit ok"><div class="chead"><span class="cid">C1</span><span class="txt">Les droits sont par group</span><span class="badge ok">vérifié</span></div></div>
+            <div class="crit err"><div class="chead"><span class="cid">C2</span><span class="txt">Le test e2e du filtre matrice + client assignable existe</span><span class="badge err">échec</span></div></div>
+            <div class="crit"><div class="chead"><span class="cid">C3</span><span class="txt">Les data contexts sont restaurés</span></div></div>
+          </div>
+        </details>
+        <details open>
+          <summary class="h-c">
+            <span class="bicon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span>
+            <span class="sname">Fichiers modifiés</span>
+            <span class="sum"><span class="scount">23</span><span class="chev"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 18l6-6-6-6"/></svg></span></span>
+          </summary>
+          <div class="sbody">
+            <div class="f-row"><span class="path">src/app/state.rs</span><span class="add">+7</span><span class="del">−5</span></div>
+            <div class="f-row"><span class="path">src/app/token_service.rs</span><span class="add">+135</span><span class="del">−108</span></div>
+            <div class="f-row"><span class="path">src/domain/assignment.rs</span><span class="add">+38</span><span class="del">−0</span></div>
+            <button class="ghost">+ 20 autres</button>
+          </div>
+        </details>
+        <details>
+          <summary class="h-c">
+            <span class="bicon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M6 8.5v7"/><path d="M18 8.5a8 8 0 0 1-8 8"/></svg></span>
+            <span class="sname">Espace de l'agent</span>
+            <span class="sum"><span class="chev"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 18l6-6-6-6"/></svg></span></span>
+          </summary>
+          <div class="sbody"><div class="f-row"><span class="path">worktree: session/perm-matrix</span></div></div>
+        </details>
+        <details>
+          <summary class="h-c">
+            <span class="bicon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v6H4z"/><path d="M4 13h16v6H4z"/><path d="M8 8h.01M8 16h.01"/></svg></span>
+            <span class="sname">Serveurs</span>
+            <span class="sum"><span class="scount">0/1</span><span class="chev"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 18l6-6-6-6"/></svg></span></span>
+          </summary>
+          <div class="sbody"><div class="kv"><span class="k">searxng</span><span class="v">arrêté</span></div></div>
+        </details>
+        <details open>
+          <summary class="h-c">
+            <span class="bicon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
+            <span class="sname">Tokens de la session</span>
+            <span class="sum"><span class="scount">19,5M</span><span class="chev"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 18l6-6-6-6"/></svg></span></span>
+          </summary>
+          <div class="sbody">
+            <div class="costline">
+              <div class="top"><span class="coin"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span><span class="k">Coût</span><span>—</span></div>
+              <div class="detail">aucun modèle n'a de prix · Paramètres</div>
+            </div>
+            <div><div class="kv"><span class="k">Cache</span><span class="v">98 %</span></div><div class="bar" style="margin:4px 8px 0;width:calc(100% - 16px)"><i style="width:98%"></i></div></div>
+            <div style="padding:0 8px"><div class="kv"><span class="k">Entrée</span><span class="v">19.4M</span></div><div class="kv"><span class="k">Appels</span><span class="v">198</span></div></div>
+          </div>
+        </details>
+      </div>
+    </aside>
+  </div>
+
+</div>
+<div class="hint">headers cliquables · C : l'icône porte l'état du bloc (⚠ un échec, ✓ tout passe)</div>
+</body>
+</html>

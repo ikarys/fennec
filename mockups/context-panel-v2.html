@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contexte — panneau retravaillé</title>
+<style>
+  /* Tokens : theme nuit de web/src/styles/app.css */
+  :root {
+    --bg: #0E1013;
+    --panel: #15181D;
+    --raised: #20252D;
+    --border: #272C34;
+    --border-strong: #6E7989;
+    --text: #E7E9EC;
+    --muted: #9AA2AE;
+    --faint: #7D848F;
+    --accent: #F08A4B;
+    --accent-strong: #F6A876;
+    --accent-soft: rgba(240, 138, 75, 0.14);
+    --on-accent: #16110D;
+    --ok: #4CC38A;
+    --ok-soft: rgba(76, 195, 138, 0.14);
+    --err: #F2555A;
+    --attention: #E8C547;
+    --info: #6AA6F2;
+    --code: #0B0D10;
+    --sans: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: #08090B;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 24px;
+  }
+  .stage { display: flex; gap: 56px; align-items: flex-start; }
+  .col { display: flex; flex-direction: column; gap: 10px; }
+  .colhead { display: flex; align-items: center; justify-content: space-between; }
+  .tag {
+    font-size: 10.5px; font-weight: 600; letter-spacing: 0.09em;
+    text-transform: uppercase; color: var(--faint);
+  }
+  .tag.after { color: var(--accent-strong); }
+
+  /* Le panneau, à sa vraie largeur */
+  .panel {
+    width: 300px; height: 856px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .phead {
+    display: flex; align-items: center; gap: 6px;
+    height: 36px; padding: 0 12px; flex-shrink: 0;
+  }
+  .phead .title { font-size: 12px; font-weight: 500; }
+  .phead .chev { margin-left: auto; color: var(--muted); display: flex; }
+  .pbody { min-height: 0; flex: 1; overflow-y: auto; scrollbar-width: thin; }
+
+  /* Segmented (Défaut / Stats) */
+  .tabs {
+    display: flex; margin: 0 8px 8px;
+    border: 1px solid var(--border); border-radius: 10px;
+    overflow: hidden; flex-shrink: 0;
+  }
+  .tab {
+    flex: 1; text-align: center; font-size: 11.5px;
+    padding: 6px 0; color: var(--muted); cursor: pointer;
+    border-right: 1px solid var(--border);
+  }
+  .tab:last-child { border-right: none; }
+  .tab.on { background: var(--accent); color: var(--on-accent); font-weight: 500; }
+
+  /* Section : header sticky, hairline entre les blocs */
+  .section { border-top: 1px solid var(--border); }
+  .section:first-child { border-top: none; }
+  .shead {
+    display: flex; align-items: center; gap: 7px;
+    height: 32px; padding: 0 12px;
+    position: sticky; top: 0; background: var(--bg); z-index: 2;
+    cursor: default;
+  }
+  .shead .chev { color: var(--muted); display: flex; }
+  .shead .name {
+    font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .shead .sum {
+    margin-left: auto; font-family: var(--mono);
+    font-size: 11px; color: var(--muted);
+    display: flex; align-items: center; gap: 6px;
+    font-variant-numeric: tabular-nums;
+  }
+  .sbody { padding: 8px 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+
+  .bar { height: 4px; background: var(--raised); border-radius: 2px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: var(--ok); border-radius: 2px; transition: width .25s; }
+
+  /* ——— Aujourd'hui : lignes plates ——— */
+  .c-row { display: flex; gap: 8px; padding: 5px 8px; border-radius: 6px; }
+  .c-row:hover { background: var(--accent-soft); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+  .dot.muted { background: var(--faint); }
+  .dot.ok { background: var(--ok); }
+  .dot.err { background: var(--err); }
+  .dot.hollow-accent { background: transparent; border: 2px solid var(--accent); width: 8px; height: 8px; }
+  .c-id { font-family: var(--mono); font-size: 11px; color: var(--muted); flex-shrink: 0; }
+  .c-txt { font-size: 11.5px; line-height: 1.5; color: var(--text); }
+  .c-txt b { font-weight: 600; }
+
+  .f-row {
+    display: flex; align-items: center; gap: 8px;
+    font-family: var(--mono); font-size: 11px;
+    padding: 5px 8px; border-radius: 6px;
+  }
+  .f-row:hover { background: var(--accent-soft); }
+  .f-row .path { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .add { color: var(--ok); font-variant-numeric: tabular-nums; }
+  .del { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .ghost {
+    align-self: flex-start; background: none; border: none; cursor: pointer;
+    font-size: 11px; color: var(--muted); padding: 3px 6px; border-radius: 5px;
+    font-family: var(--sans);
+  }
+  .ghost:hover { background: var(--accent-soft); color: var(--accent-strong); }
+
+  /* Tile coût (état actuel) */
+  .tile {
+    border: 1px solid var(--border); background: var(--panel);
+    border-radius: 6px; padding: 12px;
+  }
+  .tile .trow { display: flex; align-items: center; gap: 10px; }
+  .tile .icon {
+    width: 32px; height: 32px; border-radius: 6px; background: var(--raised);
+    display: flex; align-items: center; justify-content: center; color: var(--muted);
+  }
+  .tile .tlabel { font-size: 12px; font-weight: 500; }
+  .tile .tfig { font-size: 24px; font-weight: 600; margin-top: 10px; font-variant-numeric: tabular-nums; }
+  .tile .tdetail { font-size: 11px; color: var(--muted); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .kv { display: flex; align-items: baseline; justify-content: space-between; font-size: 11px; }
+  .kv .k { color: var(--muted); }
+  .kv .v { font-variant-numeric: tabular-nums; }
+
+  /* ——— Retravaillé : cartes d'état ——— */
+  .crit {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 2px solid var(--faint);
+    border-radius: 4px;
+    padding: 7px 9px 8px;
+    cursor: pointer;
+    transition: background .12s;
+  }
+  .crit:hover { background: var(--accent-soft); }
+  .crit.st-ok { border-left-color: var(--ok); }
+  .crit.st-err { border-left-color: var(--err); }
+  .crit.st-ind { border-left-color: var(--accent); }
+  .crit .chead { display: flex; align-items: center; gap: 6px; }
+  .crit .txt { flex: 1; font-size: 11.5px; line-height: 1.5; }
+  .crit .txt b { font-weight: 600; }
+  .badge {
+    font-size: 9.5px; font-weight: 500; white-space: nowrap;
+    padding: 1px 6px; border-radius: 999px; flex-shrink: 0;
+  }
+  .badge.ok { color: var(--ok); border: 1px solid rgba(76,195,138,.4); background: var(--ok-soft); }
+  .badge.ind { color: var(--accent-strong); border: 1px solid rgba(240,138,75,.4); background: var(--accent-soft); }
+  .badge.neutral { color: var(--muted); border: 1px solid var(--border); background: var(--raised); }
+  .crit .more {
+    display: none; margin-top: 7px; padding-top: 7px;
+    border-top: 1px solid var(--border);
+    font-family: var(--mono); font-size: 10.5px; color: var(--muted);
+  }
+  .crit[open] .more, .crit.open .more { display: block; }
+  .crit .more pre {
+    margin-top: 5px; background: var(--code); border-radius: 4px;
+    padding: 6px 8px; font-size: 10px; line-height: 1.5; color: var(--muted);
+    white-space: pre-wrap;
+  }
+  .crit .more .why { font-family: var(--sans); font-size: 11px; line-height: 1.5; color: var(--text); }
+
+  .glabel {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 10px; color: var(--faint);
+    padding: 4px 8px 2px;
+  }
+  .glabel .n { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+  /* Coût : une ligne, pas une tuile, quand il n'y a pas de prix */
+  .costline { padding: 2px 8px 4px; }
+  .costline .top { display: flex; align-items: center; gap: 7px; font-size: 11.5px; }
+  .costline .top .coin { color: var(--faint); display: flex; }
+  .costline .top .k { color: var(--muted); }
+  .costline .top .v { font-weight: 500; }
+  .costline .detail { font-size: 10.5px; color: var(--faint); margin-top: 3px; padding-left: 22px; }
+
+  /* Toggle d'état au-dessus du panneau retravaillé */
+  .state-toggle { display: flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
+  .state-toggle button {
+    background: none; border: none; cursor: pointer;
+    font-family: var(--mono); font-size: 10.5px; color: var(--muted);
+    padding: 3px 9px; font-variant-numeric: tabular-nums;
+  }
+  .state-toggle button.on { background: var(--raised); color: var(--text); }
+  .hint { font-size: 10.5px; color: var(--faint); text-align: center; }
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <!-- ============ AUJOURD'HUI ============ -->
+  <div class="col">
+    <div class="colhead"><span class="tag">Aujourd'hui</span></div>
+    <aside class="panel" aria-label="Panneau contexte, version actuelle">
+      <div class="phead">
+        <span class="title">Contexte</span>
+        <span class="chev"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></span>
+      </div>
+      <div class="tabs">
+        <div class="tab on">Défaut</div>
+        <div class="tab">Stats</div>
+      </div>
+      <div class="pbody">
+        <div class="section">
+          <div class="shead">
+            <span class="chev"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 18l6-6-6-6"/></svg></span>
+            <span class="name">Critères</span>
+            <span class="sum">0/7</span>
+          </div>
+          <div class="sbody">
+            <div class="bar"><i style="width:0%"></i></div>
+            <div class="c-row"><span class="dot muted"></span><span class="c-id">C1</span><span class="c-txt">Les droits sont par group</span></div>
+            <div class="c-row"><span class="dot muted"></span><span class="c-id">C2</span><span class="c-txt">Le test e2e du filtre matrice + client assignable existe</span></div>
+            <div class="c-row"><span class="dot muted"></span><span class="c-id">C3</span><span class="c-txt">Les data contexts sont restaurés</span></div>
+            <div class="c-row"><span class="dot muted"></span><span class="c-id">C4</span><span class="c-txt"><b>Garde contre régression uniquement</b> — ce check passe déjà avant que les changements et ne prouve pas le travail; il vérifie seulement que la suite de tests existante ne casse pas pendant les étapes</span></div>
+            <div class="c-row"><span class="dot muted"></span><span class="c-id">C5</span><span class="c-txt">L'endpoint /api/v1/permissions renvoie les contextes par scope (forme <code>{type: [values]}</code>)</span></div>
+            <div class="c-row"><span class="dot muted"></span><span class="c-id">C6</span><span class="c-txt">L'UI montre, dans « Vérifier », les droits refusés par la matrice de l'Application — juge : lecteur</span></div>
+            <div class="c-row"><span class="dot muted"></span><span class="c-id">C7</span><span class="c-txt">Le type-check UI passe (tsc --noEmit) — juge : lecteur (le check n'est pas exécutable dans le sandbox : 'ui/node_modules' y est monté vide)</span></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="shead">
+            <span class="chev"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 18l6-6-6-6"/></svg></span>
+            <span class="name">Fichiers modifiés</span>
+            <span class="sum">23</span>
+          </div>
+          <div class="sbody">
+            <div class="f-row"><span class="path">src/app/state.rs</span><span class="add">+7</span><span class="del">−5</span></div>
+            <div class="f-row"><span class="path">src/app/token_service.rs</span><span class="add">+135</span><span class="del">−108</span></div>
+            <div class="f-row"><span class="path">src/domain/assignment.rs</span><span class="add">+38</span><span class="del">−0</span></div>
+            <div class="f-row"><span class="path">src/domain/client.rs</span><span class="add">+31</span><span class="del">−27</span></div>
+            <div class="f-row"><span class="path">src/domain/data_context.rs</span><span class="add">+29</span><span class="del">−0</span></div>
+            <div class="f-row"><span class="path">src/domain/mod.rs</span><span class="add">+4</span><span class="del">−3</span></div>
+            <button class="ghost">+ 17 autres</button>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="shead">
+            <span class="chev"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></span>
+            <span class="name">Espace de l'agent</span>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="shead">
+            <span class="chev"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></span>
+            <span class="name">Serveurs</span>
+            <span class="sum">0/1</span>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="shead">
+            <span class="chev"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 18l6-6-6-6"/></svg></span>
+            <span class="name">Tokens de la session</span>
+            <span class="sum">19,5M</span>
+          </div>
+          <div class="sbody">
+            <div class="tile">
+              <div class="trow">
+                <span class="icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
+                <span class="tlabel">Coût estimé</span>
+              </div>
+              <div class="tfig">—</div>
+              <div class="tdetail">aucun modèle n'a de prix : Paramètres, …</div>
+            </div>
+            <div>
+              <div class="kv"><span class="k">Cache</span><span class="v">98 %</span></div>
+              <div class="bar" style="margin-top:4px"><i style="width:98%"></i></div>
+            </div>
+            <div>
+              <div class="kv"><span class="k">Entrée</span><span class="v">19.4M</span></div>
+              <div class="kv"><span class="k">Sortie</span><span class="v">143.1k</span></div>
+              <div class="kv"><span class="k">Dernier appel</span><span class="v">192 tok/s</span></div>
+              <div class="kv"><span class="k">Appels</span><span class="v">198</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ============ RETRAVAILLÉ ============ -->
+  <div class="col">
+    <div class="colhead">
+      <span class="tag after">Retravaillé</span>
+      <div class="state-toggle" role="group" aria-label="État simulé">
+        <button id="st0" class="on" type="button">0/7</button>
+        <button id="st1" type="button">4/7</button>
+      </div>
+    </div>
+    <aside class="panel" aria-label="Panneau contexte, version retravaillée">
+      <div class="phead">
+        <span class="title">Contexte</span>
+        <span class="chev"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></span>
+      </div>
+      <div class="tabs">
+        <div class="tab on">Défaut</div>
+        <div class="tab">Stats</div>
+      </div>
+      <div class="pbody">
+        <div class="section">
+          <div class="shead">
+            <span class="chev"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 18l6-6-6-6"/></svg></span>
+            <span class="name">Critères</span>
+            <span class="sum"><span class="bar" style="width:44px" id="critbar"><i id="critfill" style="width:0%"></i></span><span id="critcount">0/7</span></span>
+          </div>
+          <div class="sbody" id="critlist"><!-- rendu par JS --></div>
+        </div>
+
+        <div class="section">
+          <div class="shead">
+            <span class="chev"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 18l6-6-6-6"/></svg></span>
+            <span class="name">Fichiers modifiés</span>
+            <span class="sum">23</span>
+          </div>
+          <div class="sbody">
+            <div class="glabel"><span>src/app</span><span class="n">2</span></div>
+            <div class="f-row"><span class="path">state.rs</span><span class="add">+7</span><span class="del">−5</span></div>
+            <div class="f-row"><span class="path">token_service.rs</span><span class="add">+135</span><span class="del">−108</span></div>
+            <div class="glabel"><span>src/domain</span><span class="n">4</span></div>
+            <div class="f-row"><span class="path">assignment.rs</span><span class="add">+38</span><span class="del">−0</span></div>
+            <div class="f-row"><span class="path">client.rs</span><span class="add">+31</span><span class="del">−27</span></div>
+            <div class="f-row"><span class="path">data_context.rs</span><span class="add">+29</span><span class="del">−0</span></div>
+            <div class="f-row"><span class="path">mod.rs</span><span class="add">+4</span><span class="del">−3</span></div>
+            <button class="ghost" id="morefiles">+ 17 autres</button>
+            <div id="morefileslst" style="display:none">
+              <div class="glabel"><span>src/web</span><span class="n">2</span></div>
+              <div class="f-row"><span class="path">permissions_routes.rs</span><span class="add">+42</span><span class="del">−8</span></div>
+              <div class="f-row"><span class="path">mod.rs</span><span class="add">+6</span><span class="del">−1</span></div>
+              <div class="glabel"><span>web/src</span><span class="n">2</span></div>
+              <div class="f-row"><span class="path">components/permissions/VerifyDialog.tsx</span><span class="add">+88</span><span class="del">−12</span></div>
+              <div class="f-row"><span class="path">lib/api.ts</span><span class="add">+24</span><span class="del">−6</span></div>
+              <div style="font-size:10.5px;color:var(--faint);padding:2px 8px">… 11 fichiers de plus</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="shead">
+            <span class="chev"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></span>
+            <span class="name">Espace de l'agent</span>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="shead">
+            <span class="chev"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></span>
+            <span class="name">Serveurs</span>
+            <span class="sum">0/1</span>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="shead">
+            <span class="chev"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 18l6-6-6-6"/></svg></span>
+            <span class="name">Tokens de la session</span>
+            <span class="sum">19,5M</span>
+          </div>
+          <div class="sbody">
+            <div class="costline">
+              <div class="top">
+                <span class="coin"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
+                <span class="k">Coût</span>
+                <span class="v">—</span>
+              </div>
+              <div class="detail">aucun modèle n'a de prix · Paramètres</div>
+            </div>
+            <div>
+              <div class="kv"><span class="k">Cache</span><span class="v">98 %</span></div>
+              <div class="bar" style="margin-top:4px"><i style="width:98%"></i></div>
+            </div>
+            <div>
+              <div class="kv"><span class="k">Entrée</span><span class="v">19.4M</span></div>
+              <div class="kv"><span class="k">Sortie</span><span class="v">143.1k</span></div>
+              <div class="kv"><span class="k">Dernier appel</span><span class="v">192 tok/s</span></div>
+              <div class="kv"><span class="k">Appels</span><span class="v">198</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+    <div class="hint">état simulé · clic sur un critère : son check / son jugement</div>
+  </div>
+
+</div>
+
+<script>
+  // Les critères, dans les deux états. status: pending | passed ; kind: verified | indicative ; pb: passedBefore
+  const CRITERIA = [
+    { id: 'C1', txt: 'Les droits sont par group',
+      states: [ { s: 'pending', check: 'cargo test --lib domain::assignment' },
+                { s: 'passed', kind: 'verified', cmd: 'cargo test --lib domain::assignment', code: 0, out: 'running 3 tests\ntest domain::assignment::scope_by_group ... ok\ntest result: ok. 3 passed' } ] },
+    { id: 'C2', txt: 'Le test e2e du filtre matrice + client assignable existe',
+      states: [ { s: 'pending', check: 'cargo test -p app permissions_e2e' },
+                { s: 'passed', kind: 'verified', cmd: 'cargo test -p app permissions_e2e', code: 0, out: 'test app::permissions_e2e::matrix_filter_assignable ... ok' } ] },
+    { id: 'C3', txt: 'Les data contexts sont restaurés',
+      states: [ { s: 'pending', check: 'cargo test --lib data_context' },
+                { s: 'pending', check: 'cargo test --lib data_context' } ] },
+    { id: 'C4', txt: '<b>Garde contre régression uniquement</b> — vérifie que la suite existante ne casse pas pendant les étapes',
+      states: [ { s: 'pending', pb: true, check: 'cargo test --workspace' },
+                { s: 'passed', pb: true, kind: 'verified', cmd: 'cargo test --workspace', code: 0, out: 'test result: ok. 214 passed, 0 failed' } ] },
+    { id: 'C5', txt: 'L\u2019endpoint /api/v1/permissions renvoie les contextes par scope (forme <code>{type: [values]}</code>)',
+      states: [ { s: 'pending', check: 'cargo test permissions_scope_shape' },
+                { s: 'pending', check: 'cargo test permissions_scope_shape' } ] },
+    { id: 'C6', txt: 'L\u2019UI montre, dans « Vérifier », les droits refusés par la matrice — juge : lecteur',
+      states: [ { s: 'pending' },
+                { s: 'passed', kind: 'indicative', reason: 'La matrice est lue dans web/src/components/permissions/VerifyDialog.tsx:41 ; le cas « refusé » est branché sur le scope du rôle, pas sur une liste en dur.' } ] },
+    { id: 'C7', txt: 'Le type-check UI passe (tsc --noEmit) — non exécutable dans le sandbox : ui/node_modules y est monté vide',
+      states: [ { s: 'pending', check: 'tsc --noEmit (hors sandbox)' },
+                { s: 'pending', check: 'tsc --noEmit (hors sandbox)' } ] },
+  ];
+
+  const list = document.getElementById('critlist');
+  const fill = document.getElementById('critfill');
+  const count = document.getElementById('critcount');
+
+  function render(stateIndex) {
+    const passed = CRITERIA.filter(c => c.states[stateIndex].s === 'passed').length;
+    fill.style.width = (passed / CRITERIA.length * 100) + '%';
+    count.textContent = passed + '/' + CRITERIA.length;
+    list.innerHTML = CRITERIA.map((c, i) => {
+      const st = c.states[stateIndex];
+      const cls = st.s === 'passed' ? (st.kind === 'indicative' ? 'st-ind' : 'st-ok') : '';
+      const dot = st.s === 'pending' ? 'muted' : (st.kind === 'indicative' ? 'hollow-accent' : 'ok');
+      let badge = '';
+      if (st.pb) badge += '<span class="badge neutral">passait déjà</span>';
+      if (st.kind === 'verified') badge += '<span class="badge ok">vérifié</span>';
+      if (st.kind === 'indicative') badge += '<span class="badge ind">indicatif</span>';
+      let more = '';
+      if (st.kind === 'verified') {
+        more = '<div class="more">$ ' + st.cmd + '\n' + '<pre>' + st.out.replace(/\n/g, '<br>') + '</pre></div>';
+      } else if (st.kind === 'indicative') {
+        more = '<div class="more"><div class="why">' + st.reason + '</div></div>';
+      } else if (st.check) {
+        more = '<div class="more">$ ' + st.check + '</div>';
+      }
+      return '<div class="crit ' + cls + '" data-i="' + i + '">' +
+        '<div class="chead">' +
+        '<span class="c-id">' + c.id + '</span>' +
+        '<span class="txt">' + c.txt + '</span>' +
+        badge +
+        '</div>' +
+        more + '</div>';
+    }).join('');
+    list.querySelectorAll('.crit').forEach(el => {
+      el.addEventListener('click', () => el.classList.toggle('open'));
+    });
+  }
+
+  const st0 = document.getElementById('st0');
+  const st1 = document.getElementById('st1');
+  st0.addEventListener('click', () => { st0.classList.add('on'); st1.classList.remove('on'); render(0); });
+  st1.addEventListener('click', () => { st1.classList.add('on'); st0.classList.remove('on'); render(1); });
+  render(location.hash === '#st1' ? 1 : 0);
+  if (location.hash === '#st1') { st1.classList.add('on'); st0.classList.remove('on'); }
+
+  document.getElementById('morefiles').addEventListener('click', function () {
+    const box = document.getElementById('morefileslst');
+    const open = box.style.display !== 'block';
+    box.style.display = open ? 'block' : 'none';
+    this.textContent = open ? 'réduire' : '+ 17 autres';
+  });
+</script>
+</body>
+</html>
