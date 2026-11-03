@@ -214,7 +214,9 @@ pub(super) fn execute_tools(
                             ),
                         )?;
                     } else {
-                        for event in propose_criteria::events(&call.id, proposal, &in_force) {
+                        for event in
+                            propose_criteria::events(&call.id, proposal, &in_force, turn.lang)
+                        {
                             turn.append(event)?;
                         }
                         waiting = true;
@@ -404,6 +406,7 @@ mod tests {
                 compact_at: 0.0,
                 reasoning_effort: None,
                 autonomous,
+                lang: crate::domain::lang::Lang::Fr,
                 stop: self.stop,
                 on_event: &mut self.on_event,
             }
@@ -482,6 +485,7 @@ mod tests {
             compact_at: 0.0,
             reasoning_effort: None,
             autonomous: false,
+            lang: crate::domain::lang::Lang::Fr,
             stop: &stop,
             on_event: &mut on_event,
         };

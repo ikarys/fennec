@@ -9,6 +9,7 @@ use crate::config::Settings;
 use crate::domain::clock;
 use crate::domain::event::Event;
 use crate::domain::kernel_rules;
+use crate::domain::lang::Lang;
 use crate::domain::mcp;
 use crate::domain::preferences::ModelRef;
 use crate::domain::waiver;
@@ -159,6 +160,7 @@ pub fn with_turn<R>(
         compact_at: params.compact_at,
         reasoning_effort: params.reasoning_effort,
         autonomous: options.autonomous,
+        lang: Lang::from_code(&prefs.display.language),
         stop,
         on_event: &mut options.on_event,
     };

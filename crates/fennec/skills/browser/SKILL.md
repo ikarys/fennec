@@ -21,7 +21,7 @@ npx -y @playwright/cli <command>
 fennec may run your commands in a sandbox (bwrap). Two consequences:
 
 - Every process a command started ends with that command: the browser and any server you started do not survive to the next `run_command`. Chain a whole browser session in one command: `npx -y @playwright/cli open <url> && npx -y @playwright/cli snapshot && npx -y @playwright/cli screenshot; npx -y @playwright/cli close`. For several steps, put the commands in a script in the working directory and run it.
-- Without network (the default), npx works from its cache only, and the browser reaches only servers started inside the same command, not one on the human's machine. If a command fails for lack of network, say so: the human can turn the network on in Settings > Bac à sable.
+- Without network (the default), npx works from its cache only, and the browser reaches only servers started inside the same command, not one on the human's machine. If a command fails for lack of network, say so: the human can turn the network on in Settings > Sandbox.
 
 ## Core Workflow
 
