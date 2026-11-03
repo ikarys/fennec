@@ -15,7 +15,7 @@ use super::turn::{self, Turn};
 use crate::domain::attachment::Attachment;
 use crate::domain::clock::now_ms;
 use crate::domain::compaction::files_changed;
-use crate::domain::conversation::last_assistant_text;
+use crate::domain::conversation::node_output;
 use crate::domain::event::{DoneReason, Event};
 use crate::domain::id::new_id;
 use crate::domain::workflow::definition::{AgentContext, NodeKind, Workflow};
@@ -542,7 +542,7 @@ fn agent_input(
     let before = events.len();
     let reason = turn::answer_or_prompt(turn, prompt, attachments)?;
     let events = turn.log.events(turn.session_id)?;
-    let text = last_assistant_text(&events[before..]);
+    let text = node_output(&events[before..]);
     let label = node.label();
 
     let end = nodes::agent_end(label, outputs, reason, text, |reminder| {
@@ -649,7 +649,7 @@ fn session_agent(
     let before = turn.log.events(turn.session_id)?.len();
     let reason = turn::run_agent_node(turn, agent, &prompt)?;
     let events = turn.log.events(turn.session_id)?;
-    let text = last_assistant_text(&events[before..]);
+    let text = node_output(&events[before..]);
     let label = input.node.label();
 
     nodes::agent_end(label, outputs, reason, text, |reminder| {
@@ -665,7 +665,7 @@ fn session_send(
     let before = turn.log.events(turn.session_id)?.len();
     let reason = turn::run_agent_node(turn, agent, prompt)?;
     let events = turn.log.events(turn.session_id)?;
-    let text = last_assistant_text(&events[before..]);
+    let text = node_output(&events[before..]);
     Ok((reason, text))
 }
 
