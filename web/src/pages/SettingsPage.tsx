@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import type {
   ApiKey,
   DisplayPrefs,
@@ -15,8 +15,10 @@ import type {
 } from '../lib/api';
 import { listProvider, saveSettings } from '../lib/api';
 import { type ThemeId } from '../lib/theme';
-import { Button } from '../components/ui/Button';
 import { Tabs } from '../components/ui/Tabs';
+import { GroupJumps } from '../components/settings/GroupJumps';
+import { Card } from '../components/ui/Card';
+import type { SectionSave } from '../components/ui/Section';
 import { ModelSection } from '../components/settings/ModelSection';
 import { ProvidersSection, type ProviderForm } from '../components/settings/ProvidersSection';
 import { ModelPrefsSection, percentFromFraction, type ModelForm } from '../components/settings/ModelPrefsSection';
@@ -81,6 +83,38 @@ const LEGACY_TABS: Record<string, SettingsTab> = {
   workflows: 'library',
   agents: 'library',
   mcp: 'library'
+};
+
+type SaveGroup =
+  | 'model'
+  | 'providers'
+  | 'modelPrefs'
+  | 'instructions'
+  | 'search'
+  | 'sandbox'
+  | 'autonomy'
+  | 'skills'
+  | 'workflows'
+  | 'mcp'
+  | 'display';
+
+/**
+ * What each group saves: its preference keys (stored on top of the others, so the other groups'
+ * unsaved edits stay pending) and the form fields it reloads from the answer (a typed API key
+ * comes back sealed). Providers and per-model parameters share `providers`.
+ */
+const SAVE_GROUPS: Record<SaveGroup, { prefs: (keyof Preferences)[]; form: (keyof SettingsForm)[] }> = {
+  model: { prefs: ['selected'], form: ['model'] },
+  providers: { prefs: ['providers'], form: ['providers', 'models'] },
+  modelPrefs: { prefs: ['providers', 'favorites'], form: ['providers', 'models', 'favorites'] },
+  instructions: { prefs: ['globalInstructions'], form: ['instructions'] },
+  search: { prefs: ['search'], form: ['search'] },
+  sandbox: { prefs: ['sandbox'], form: ['sandbox'] },
+  autonomy: { prefs: ['autonomy'], form: ['autonomy'] },
+  skills: { prefs: ['alwaysOnSkills'], form: ['alwaysOnSkills'] },
+  workflows: { prefs: ['enabledWorkflows'], form: ['enabledWorkflows'] },
+  mcp: { prefs: ['mcp'], form: ['mcp'] },
+  display: { prefs: ['display'], form: ['display'] }
 };
 
 const emptyModelForm: ModelForm = {
@@ -296,12 +330,11 @@ function buildPreferences(form: SettingsForm, settings: SettingsResponse): Prefe
 export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSaved, onListing }: SettingsPageProps) {
   const [form, setForm] = useState<SettingsForm | null>(null);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const [tab, setTab] = useState<SettingsTab>(
     () => TABS.find((t) => t.id === initialTab)?.id ?? (initialTab ? LEGACY_TABS[initialTab] : undefined) ?? 'models'
   );
-  const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
     if (settings && form === null) {
@@ -309,19 +342,11 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
     }
   }, [settings, form]);
 
-  function markDirty() {
-    setSaved(false);
-    setError(null);
-    setDirty(true);
-  }
-
   function updateModel(value: string) {
-    markDirty();
     setForm((previous) => (previous ? { ...previous, model: value } : previous));
   }
 
   function toggleFavorite(ref: ModelRef) {
-    markDirty();
     setForm((previous) => {
       if (!previous) return previous;
       const exists = previous.favorites.some(
@@ -337,7 +362,6 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
   }
 
   function updateModelField(key: string, field: keyof ModelForm, value: string) {
-    markDirty();
     setForm((previous) => {
       if (!previous) return previous;
       const current = previous.models[key] ?? emptyModelForm;
@@ -352,7 +376,6 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
   }
 
   function updateProvider(index: number, patch: Partial<ProviderForm>) {
-    markDirty();
     setForm((previous) => {
       if (!previous) return previous;
       return {
@@ -365,7 +388,6 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
   }
 
   function addProvider(provider: ProviderForm) {
-    markDirty();
     setForm((previous) =>
       previous ? { ...previous, providers: [...previous.providers, provider] } : previous
     );
@@ -373,7 +395,6 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
 
   /** Adds a model by hand: an entry with no listed source, saved as an override. */
   function addModel(providerId: string, modelId: string) {
-    markDirty();
     setForm((previous) => {
       if (!previous) return previous;
       const key = `${providerId}/${modelId}`;
@@ -384,7 +405,6 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
 
   /** Removes a hand-added model: its entry and everything that pointed at it. */
   function removeModel(providerId: string, modelId: string) {
-    markDirty();
     setForm((previous) => {
       if (!previous) return previous;
       const key = `${providerId}/${modelId}`;
@@ -400,7 +420,6 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
   }
 
   function removeProvider(index: number) {
-    markDirty();
     setForm((previous) => {
       if (!previous) return previous;
       const provider = previous.providers[index];
@@ -445,42 +464,34 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
   }
 
   function updateDisplay(display: DisplayPrefs) {
-    markDirty();
     setForm((previous) => (previous ? { ...previous, display } : previous));
   }
 
   function updateInstructions(instructions: string) {
-    markDirty();
     setForm((previous) => (previous ? { ...previous, instructions } : previous));
   }
 
   function updateSearch(search: SearchForm) {
-    markDirty();
     setForm((previous) => (previous ? { ...previous, search } : previous));
   }
 
   function updateSandbox(sandbox: SandboxPrefs) {
-    markDirty();
     setForm((previous) => (previous ? { ...previous, sandbox } : previous));
   }
 
   function updateMcp(mcp: McpServer[]) {
-    markDirty();
     setForm((previous) => (previous ? { ...previous, mcp } : previous));
   }
 
   function updateAutonomy(autonomy: AutonomyPrefs) {
-    markDirty();
     setForm((previous) => (previous ? { ...previous, autonomy } : previous));
   }
 
   function updateAlwaysOnSkills(alwaysOnSkills: string[]) {
-    markDirty();
     setForm((previous) => (previous ? { ...previous, alwaysOnSkills } : previous));
   }
 
   function updateEnabledWorkflows(enabledWorkflows: string[]) {
-    markDirty();
     setForm((previous) => (previous ? { ...previous, enabledWorkflows } : previous));
   }
 
@@ -507,20 +518,44 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
     event.preventDefault();
     if (!settings || !form || saving) return;
     setSaving(true);
-    setSaved(false);
     setError(null);
     try {
       const response = await saveSettings(buildPreferences(form, settings));
       setForm(toForm(response.preferences, response.listings));
-      setSaved(true);
-      setDirty(false);
       onSaved(response);
     } catch (err) {
-      setSaved(false);
       setError(err instanceof Error ? err.message : 'Impossible d’enregistrer les réglages');
     } finally {
       setSaving(false);
     }
+  }
+
+  // Dirty is computed, not tracked: the form as it would be stored against the stored preferences
+  // passed through the same form, so a value the form only normalises never reads as an edit.
+  const baseline = useMemo(
+    () => (settings ? buildPreferences(toForm(settings.preferences, settings.listings), settings) : null),
+    [settings]
+  );
+  const current = useMemo(() => (settings && form ? buildPreferences(form, settings) : null), [settings, form]);
+
+  function groupSave(group: SaveGroup): SectionSave {
+    const { prefs, form: fields } = SAVE_GROUPS[group];
+    return {
+      dirty:
+        baseline !== null &&
+        current !== null &&
+        prefs.some((key) => JSON.stringify(current[key]) !== JSON.stringify(baseline[key])),
+      onSave: async () => {
+        if (!settings || !current) return;
+        const patch = Object.fromEntries(prefs.map((key) => [key, current[key]])) as Partial<Preferences>;
+        const response = await saveSettings({ ...settings.preferences, ...patch });
+        const fresh = toForm(response.preferences, response.listings);
+        setForm((previous) =>
+          previous ? { ...previous, ...Object.fromEntries(fields.map((key) => [key, fresh[key]])) } : previous
+        );
+        onSaved(response);
+      }
+    };
   }
 
   if (!settings || !form) {
@@ -536,21 +571,27 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
   }
 
   return (
-    <main className="grow overflow-y-auto px-4 pt-6 md:px-6 md:pt-8">
-      <div className="mx-auto flex max-w-[960px] flex-col gap-6">
+    <main className="grow overflow-y-auto px-4 md:px-6">
+      {/* The top padding sits inside the scroller, so the jump bar sticks at its very top. */}
+      <div className="mx-auto flex max-w-[960px] flex-col gap-6 pt-6 md:pt-8">
         <div>
           <h1 className="text-2xl font-semibold">Réglages</h1>
           <p className="mt-0.5 text-muted">S'applique au prochain tour, sans redémarrage.</p>
         </div>
 
-        <div className="flex flex-col gap-6 md:flex-row">
+        <Card className="flex flex-col md:flex-row">
           {/* One form across the tabs: an edit on one tab is kept when switching. */}
-          <Tabs label="Sections des réglages" tabs={TABS} active={tab} onSelect={setTab} />
+          <div className="shrink-0 border-b border-border p-2 md:border-r md:border-b-0">
+            <Tabs label="Sections des réglages" tabs={TABS} active={tab} onSelect={setTab} />
+          </div>
 
-          <form onSubmit={handleSubmit} className="flex min-w-0 grow flex-col gap-6">
+          <form ref={formRef} onSubmit={handleSubmit} className="flex min-w-0 grow flex-col gap-8 p-5">
+            <GroupJumps container={formRef} deps={tab} />
+            {error && <p className="m-0 text-xs text-err">{error}</p>}
             {tab === 'models' && (
               <>
                 <ModelSection
+                  save={groupSave('model')}
                   value={form.model}
                   listings={settings.listings}
                   stored={settings.preferences.selected}
@@ -558,6 +599,7 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
                   onChange={updateModel}
                 />
                 <ProvidersSection
+                  save={groupSave('providers')}
                   providers={form.providers}
                   listings={settings.listings}
                   values={form.models}
@@ -568,6 +610,7 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
                   onAddModel={addModel}
                 />
                 <ModelPrefsSection
+                  save={groupSave('modelPrefs')}
                   listings={settings.listings}
                   values={form.models}
                   defaults={settings.defaults}
@@ -583,11 +626,11 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
 
             {tab === 'behaviour' && (
               <>
-                <InstructionsSection value={form.instructions} onChange={updateInstructions} />
-                <SearchSection value={form.search} onChange={updateSearch} />
-                <SandboxSection value={form.sandbox} onChange={updateSandbox} health={settings?.sandboxHealth} />
+                <InstructionsSection save={groupSave('instructions')} value={form.instructions} onChange={updateInstructions} />
+                <SearchSection save={groupSave('search')} value={form.search} onChange={updateSearch} />
+                <SandboxSection save={groupSave('sandbox')} value={form.sandbox} onChange={updateSandbox} health={settings?.sandboxHealth} />
                 <ScannersSection scanners={settings.scanners ?? []} />
-                <AutonomySection value={form.autonomy} onChange={updateAutonomy} />
+                <AutonomySection save={groupSave('autonomy')} value={form.autonomy} onChange={updateAutonomy} />
               </>
             )}
 
@@ -596,17 +639,20 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
             {tab === 'library' && (
               <>
                 <SkillsSection
+                  save={groupSave('skills')}
                   skills={settings.skills}
                   value={form.alwaysOnSkills}
                   onChange={updateAlwaysOnSkills}
                 />
                 <WorkflowsSection
+                  save={groupSave('workflows')}
                   workflows={settings.optInWorkflows}
                   value={form.enabledWorkflows}
                   onChange={updateEnabledWorkflows}
                 />
                 <AgentsSection />
                 <McpSection
+                  save={groupSave('mcp')}
                   value={form.mcp}
                   onChange={updateMcp}
                   savedNames={new Set((settings.preferences.mcp ?? []).map((server) => server.name))}
@@ -615,32 +661,24 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
             )}
 
             {tab === 'display' && (
-              <div className="flex flex-col gap-4">
+              <>
                 <DisplaySection
+                  save={groupSave('display')}
                   value={form.display}
                   onChange={updateDisplay}
                   theme={theme}
                   onThemeChange={onThemeChange}
                 />
                 <PanelPagesSection
+                  save={groupSave('display')}
                   value={form.display.panelPages ?? null}
                   onChange={(panelPages) => updateDisplay({ ...form.display, panelPages })}
                 />
-              </div>
+              </>
             )}
 
-            {tab !== 'rules' && (
-              <div className="sticky bottom-0 -mx-1 flex items-center gap-3 border-t border-border bg-bg px-1 py-3">
-                <Button type="submit" variant="primary" size="md" disabled={saving}>
-                  {saving ? 'Enregistrement…' : 'Enregistrer'}
-                </Button>
-                {dirty && !saving && <span className="text-xs text-muted">Modifications non enregistrées</span>}
-                {saved && <span className="text-xs text-ok">Enregistré</span>}
-                {error && <span className="text-xs text-err">{error}</span>}
-              </div>
-            )}
           </form>
-        </div>
+        </Card>
       </div>
     </main>
   );

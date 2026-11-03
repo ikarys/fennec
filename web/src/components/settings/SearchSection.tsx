@@ -1,4 +1,4 @@
-import { Section } from '../ui/Section';
+import { Section, type SectionSave } from '../ui/Section';
 import { FieldRow, TextInput } from '../ui/Field';
 
 export interface SearchForm {
@@ -7,9 +7,18 @@ export interface SearchForm {
   webFetch: boolean;
 }
 
-export function SearchSection({ value, onChange }: { value: SearchForm; onChange: (value: SearchForm) => void }) {
+export function SearchSection({
+  value,
+  onChange,
+  save,
+}: {
+  value: SearchForm;
+  onChange: (value: SearchForm) => void;
+  /** The group's own save: its dot and its "Enregistrer". */
+  save?: SectionSave;
+}) {
   return (
-    <Section title="Recherche web">
+    <Section title="Recherche web" save={save}>
       <FieldRow label="URL de l’instance SearXNG">
         <TextInput
           type="url"

@@ -103,7 +103,7 @@ and the decisions taken, for the morning. Each queue run is recorded (`idea.queu
 restart closes it); the board (groups by stage, one next action per idea, the night report until read) is computed by
 the server.
 Risk zones, done (C11): a "Risques" tab on the project page lists the source files that churn, have
-no tests, or whose every line (git blame) comes from an AI commit never integrated through fennec (an AI
+no tests, or more than half of whose lines (git blame) come from AI commits never integrated through fennec (an AI
 `Co-Authored-By` trailer, no `Fennec-Session`), read from git (verified; `domain/risk.rs`, `risk.rs`), folded by module. A "Remédier" button
 opens a session on the read-only `remedy` agent (`crates/fennec/agents/remedy.agent.md`) with the zones as its brief;
 it proposes at most five test tasks with `propose_task` and lists the files the human should read first (indicative).
@@ -427,6 +427,9 @@ far as they help, never blindly:
   no file loose at a source root (Rust or web).
 - Code written by a model (the local LLM included) is reviewed against
   these rules before it is committed, not only against the tests.
+- The UI is never dull (`docs/ui.md`, "Never dull"): lists sit in a `Card` with a tinted header row,
+  openable rows and cards react with the accent and open as a whole, figures are `Tile`s with a
+  tone, row actions are icons (the delete always visible, `danger`), meanings are tinted badges.
 - Resources are a feature: fennec must stay light in RAM and CPU. Measure before and after a change that could cost them.
 
 **The prompt only grows.** The local inference server reuses its cache only

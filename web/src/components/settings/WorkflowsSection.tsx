@@ -1,13 +1,15 @@
 import type { WorkflowOptIn } from '../../lib/api';
-import { Section } from '../ui/Section';
+import { Section, type SectionSave } from '../ui/Section';
 
 interface WorkflowsSectionProps {
   workflows: WorkflowOptIn[];
   value: string[];
   onChange: (value: string[]) => void;
+  /** The group's own save: its dot and its "Enregistrer". */
+  save?: SectionSave;
 }
 
-export function WorkflowsSection({ workflows, value, onChange }: WorkflowsSectionProps) {
+export function WorkflowsSection({ workflows, value, onChange, save }: WorkflowsSectionProps) {
   function toggle(id: string, checked: boolean) {
     onChange(checked ? [...value, id] : value.filter((workflowId) => workflowId !== id));
   }
@@ -16,6 +18,7 @@ export function WorkflowsSection({ workflows, value, onChange }: WorkflowsSectio
     <Section
       title="Workflows optionnels"
       description="Embarqués dans fennec, désactivés par défaut. Cochés, ils apparaissent dans la liste des workflows de chaque projet."
+      save={save}
     >
       {workflows.length === 0 ? (
         <p className="text-xs text-muted">Aucun workflow optionnel.</p>

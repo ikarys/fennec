@@ -1,15 +1,17 @@
 import type { AutonomyPrefs } from '../../lib/api';
-import { Section } from '../ui/Section';
+import { Section, type SectionSave } from '../ui/Section';
 import { FieldRow, TextInput } from '../ui/Field';
 
 interface AutonomySectionProps {
   value: AutonomyPrefs;
   onChange: (value: AutonomyPrefs) => void;
+  /** The group's own save: its dot and its "Enregistrer". */
+  save?: SectionSave;
 }
 
-export function AutonomySection({ value, onChange }: AutonomySectionProps) {
+export function AutonomySection({ value, onChange, save }: AutonomySectionProps) {
   return (
-    <Section title="Mode nuit">
+    <Section title="Mode nuit" save={save}>
       <p className="text-xs text-muted">
         Lorsque la file tourne en mode autonome, l'agent n'attend pas ta réponse : il tranche ses questions lui-même et
         les note comme décisions. Une idée qui dépasse un plafond est arrêtée et la file passe à la suivante.

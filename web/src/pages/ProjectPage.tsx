@@ -1,13 +1,14 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Tabs } from '../components/ui/Tabs';
 import { Button, buttonClass } from '../components/ui/Button';
-import { EditIcon, PlusIcon, TrashIcon } from '../components/Icons';
+import { ExternalIcon, PlusIcon, TrashIcon } from '../components/Icons';
 import { DeleteProjectDialog } from '../components/project/DeleteProjectDialog';
 import { TasksSection } from '../components/project/ideas/TasksSection';
 import { MapSection } from '../components/project/MapSection';
 import { DocSection } from '../components/project/DocSection';
 import { RiskSection } from '../components/project/RiskSection';
 import { AnalysesSection } from '../components/project/AnalysesSection';
+import { SessionsSection } from '../components/project/SessionsSection';
 import { DashboardSection } from '../components/project/DashboardSection';
 import {
   createSession,
@@ -20,6 +21,7 @@ import { type IdeaView } from '../lib/ideas';
 const TABS = [
   { id: 'overview', label: "Vue d'ensemble" },
   { id: 'tasks', label: 'Tâches' },
+  { id: 'sessions', label: 'Sessions' },
   { id: 'map', label: 'Carte des modules' },
   { id: 'risks', label: 'Risques' },
   { id: 'doc', label: 'Doc' },
@@ -84,6 +86,8 @@ export default function ProjectPage({
   sub,
   onOpenSession,
   onNewSession,
+  onDeleted,
+  onSessionsDeleted,
 }: {
   projects: Project[];
   projectId: string;
@@ -91,6 +95,9 @@ export default function ProjectPage({
   sub: string | null;
   onOpenSession: (sessionId: string) => void;
   onNewSession: (projectId: string) => void;
+  /** Home and project pages both show the list, so going home does not refresh it. */
+  onDeleted: () => void;
+  onSessionsDeleted: (ids: string[]) => void;
 }) {
   const project = projects.find((p) => p.id === projectId) ?? null;
   const [analyzing, setAnalyzing] = useState(false);
@@ -148,7 +155,7 @@ export default function ProjectPage({
           aria-label="Ouvrir dans VS Code"
           className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
         >
-          <EditIcon className="h-4 w-4" />
+          <ExternalIcon className="h-4 w-4" />
         </a>
         <Button
           variant="ghost"
@@ -190,6 +197,7 @@ export default function ProjectPage({
           onClose={() => setDeleting(false)}
           onDeleted={() => {
             setDeleting(false);
+            onDeleted();
             window.location.hash = '#/';
           }}
         />
@@ -216,6 +224,7 @@ export default function ProjectPage({
               }}
             />
           ) : null}
+          {activeTab === 'sessions' ? <SessionsSection projectName={project.name} sessions={project.sessions} onOpenSession={onOpenSession} onSessionsDeleted={onSessionsDeleted} /> : null}
           {activeTab === 'map' ? <MapTab projectId={projectId} /> : null}
           {activeTab === 'risks' ? <RiskSection projectId={projectId} busy={analyzing} onStart={(prompt, mode) => void startSession(prompt, mode)} /> : null}
           {activeTab === 'doc' ? <DocSection projectId={projectId} /> : null}

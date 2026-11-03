@@ -78,10 +78,10 @@ export function Tabs<T extends string>({
           role="tab"
           aria-selected={tab.id === active}
           onClick={() => onSelect(tab.id)}
-          className={`whitespace-nowrap rounded-md px-3 py-2 text-left text-sm transition-colors ${
+          className={`whitespace-nowrap rounded-r-md border-l-2 px-3 py-2 text-left text-sm transition-colors ${
             tab.id === active
-              ? 'bg-raised font-medium text-text'
-              : 'text-muted hover:bg-raised hover:text-text'
+              ? 'border-accent bg-raised font-medium text-text'
+              : 'border-transparent text-muted hover:bg-raised hover:text-text'
           }`}
         >
           {renderLabel(tab)}

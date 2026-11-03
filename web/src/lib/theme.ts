@@ -3,14 +3,13 @@ export type ThemeId = 'nuit' | 'jour' | 'ardoise' | 'cyber';
 export interface ThemeOption {
   id: ThemeId;
   label: string;
-  swatch: string;
 }
 
 export const themes: ThemeOption[] = [
-  { id: 'nuit', label: 'Nuit', swatch: '#0E1013' },
-  { id: 'jour', label: 'Jour', swatch: '#F6F6F3' },
-  { id: 'ardoise', label: 'Ardoise', swatch: '#1E2332' },
-  { id: 'cyber', label: 'Cyber', swatch: '#000300' }
+  { id: 'nuit', label: 'Nuit' },
+  { id: 'jour', label: 'Jour' },
+  { id: 'ardoise', label: 'Ardoise' },
+  { id: 'cyber', label: 'Cyber' }
 ];
 
 const STORAGE_KEY = 'fennec.theme';

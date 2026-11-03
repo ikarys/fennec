@@ -1,7 +1,7 @@
 import type { SandboxHealth, SandboxPrefs } from '../../lib/api';
 import { CopyButton } from '../session/CopyButton';
 import { Badge } from '../ui/Badge';
-import { Section } from '../ui/Section';
+import { Section, type SectionSave } from '../ui/Section';
 
 const FIX =
   "echo 'kernel.apparmor_restrict_unprivileged_userns=0' | sudo tee /etc/sysctl.d/60-bwrap-userns.conf && sudo sysctl --system";
@@ -10,11 +10,13 @@ interface SandboxSectionProps {
   value: SandboxPrefs;
   onChange: (value: SandboxPrefs) => void;
   health?: SandboxHealth;
+  /** The group's own save: its dot and its "Enregistrer". */
+  save?: SectionSave;
 }
 
-export function SandboxSection({ value, onChange, health }: SandboxSectionProps) {
+export function SandboxSection({ value, onChange, health, save }: SandboxSectionProps) {
   return (
-    <Section title="Bac à sable">
+    <Section title="Bac à sable" save={save}>
       {value.enabled && health && health.status !== 'ready' && (
         <div className="flex flex-col gap-1 rounded-md border border-err p-3">
           <Badge tone="err" className="self-start">bwrap indisponible</Badge>

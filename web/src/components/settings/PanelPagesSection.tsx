@@ -1,7 +1,8 @@
 import type { PanelPage } from '../../lib/api';
 import { OPTIONAL_BLOCKS, PANEL_BLOCKS, pageOptionalBlocks, panelBlock, panelPages, type PanelBlockId } from '../../lib/panelBlocks';
 import { Button } from '../ui/Button';
-import { Section } from '../ui/Section';
+import { Card } from '../ui/Card';
+import { Section, type SectionSave } from '../ui/Section';
 import { TextInput } from '../ui/Field';
 import { ChevronDownIcon, ChevronUpIcon, PlusIcon, TrashIcon } from '../Icons';
 
@@ -38,9 +39,11 @@ function uniquePageName(pages: PanelPage[]): string {
 interface PanelPagesSectionProps {
   value: PanelPage[] | null;
   onChange: (value: PanelPage[] | null) => void;
+  /** The group's own save: its dot and its "Enregistrer". */
+  save?: SectionSave;
 }
 
-export function PanelPagesSection({ value, onChange }: PanelPagesSectionProps) {
+export function PanelPagesSection({ value, onChange, save }: PanelPagesSectionProps) {
   const pages = panelPages(value);
   const alwaysShown = `La première page affiche toujours : ${PANEL_BLOCKS.filter((block) => block.core).map((block) => block.title).join(', ')}.`;
 
@@ -60,19 +63,19 @@ export function PanelPagesSection({ value, onChange }: PanelPagesSectionProps) {
   };
 
   return (
-    <Section title="Panneau de contexte" description={alwaysShown}>
+    <Section title="Panneau de contexte" description={alwaysShown} save={save}>
       <div className="flex flex-col gap-4">
         {pages.map((page, index) => {
           // Edits work on what the panel shows, so unknown stored ids drop out on the first change.
           const blocks = pageOptionalBlocks(page);
           return (
-            <div key={index} className="flex flex-col gap-2">
+            <Card key={index} variant="inset">
               <div className="flex items-center gap-2">
                 <TextInput
                   aria-label="Nom de la page"
                   value={page.name}
                   onChange={(event) => updatePage(index, { ...page, name: event.target.value })}
-                  className="grow"
+                  className="max-w-xs grow"
                 />
                 <Button
                   variant="ghost"
@@ -134,7 +137,7 @@ export function PanelPagesSection({ value, onChange }: PanelPagesSectionProps) {
                   </label>
                 ))}
               </div>
-            </div>
+            </Card>
           );
         })}
       </div>

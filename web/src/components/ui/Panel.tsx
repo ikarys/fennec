@@ -1,6 +1,6 @@
 /**
- * A collapsible section of a side column: a sticky tinted band with hairlines marks where each
- * block starts. The header stays visible when folded and shows a summary so the state
+ * A collapsible section of a side column: a sticky title on the column's own background, a
+ * hairline between blocks marks where each starts. The header stays visible when folded and shows a summary so the state
  * is readable at a glance; open state is remembered per section in localStorage.
  */
 import { useState, type ReactNode } from 'react';
@@ -47,11 +47,11 @@ export function Panel({ id, title, summary, defaultOpen = true, children }: Pane
         setOpen(nextOpen);
         saveOpen(id, nextOpen);
       }}
-      className="group shrink-0 -mt-px"
+      className="group shrink-0 border-t border-border first:border-t-0"
     >
-      <summary className="sticky top-0 z-10 flex h-7 cursor-pointer list-none items-center gap-2 border-y border-border bg-raised px-3 select-none hover:bg-border [&::-webkit-details-marker]:hidden">
-        <ChevronRightIcon className="h-3 w-3 shrink-0 text-muted transition-transform group-open:rotate-90" />
-        <SectionLabel className="font-semibold text-text">{title}</SectionLabel>
+      <summary className="sticky top-0 z-10 flex h-8 cursor-pointer list-none items-center gap-2 bg-bg px-3 select-none hover:text-text [&::-webkit-details-marker]:hidden">
+        <ChevronRightIcon className="h-3 w-3 shrink-0 text-muted transition-transform group-hover:text-text group-open:rotate-90" />
+        <SectionLabel>{title}</SectionLabel>
         <span className="ml-auto flex items-center gap-1.5 font-mono text-xs text-muted tabular-nums">
           {summary}
         </span>

@@ -2,7 +2,8 @@ import { useState } from 'react';
 import type { ProviderListing } from '../../lib/api';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { Section } from '../ui/Section';
+import { Card } from '../ui/Card';
+import { Section, type SectionSave } from '../ui/Section';
 import { ChevronRightIcon, CloseIcon, PlusIcon, RefreshIcon, SpinnerIcon, TrashIcon } from '../Icons';
 import { FieldRow, Select, TextInput } from '../ui/Field';
 import { formOnlyModels, type ModelForm } from './ModelPrefsSection';
@@ -26,6 +27,8 @@ interface ProvidersSectionProps {
   onAdd: (provider: ProviderForm) => void;
   onRemove: (index: number) => void;
   onFetch: (provider: ProviderForm) => Promise<void>;
+  /** The group's own save: its dot and its "Enregistrer". */
+  save?: SectionSave;
   onAddModel: (providerId: string, modelId: string) => void;
 }
 
@@ -45,6 +48,7 @@ export function ProvidersSection({
   onAdd,
   onRemove,
   onFetch,
+  save,
   onAddModel
 }: ProvidersSectionProps) {
   const [draft, setDraft] = useState<ProviderDraft>(emptyDraft);
@@ -87,6 +91,7 @@ export function ProvidersSection({
   return (
     <Section
       title="Providers"
+      save={save}
       actions={
         <Button
           variant="ghost"
@@ -101,7 +106,7 @@ export function ProvidersSection({
       }
     >
       {addingProvider && (
-        <div className="flex flex-col gap-2 rounded-md border border-border p-3">
+        <Card variant="inset">
           <div className="grid gap-2 md:grid-cols-3">
             <FieldRow label="Identifiant" hint="Sans '/'">
               <TextInput
@@ -134,7 +139,7 @@ export function ProvidersSection({
             </Button>
             <p className="m-0 text-xs text-faint">Ajouter, puis « Récupérer » pour lister ses modèles.</p>
           </div>
-        </div>
+        </Card>
       )}
 
       <div className="flex flex-col">
