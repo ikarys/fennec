@@ -8,48 +8,50 @@ import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import type { BadgeTone } from '../ui/Badge';
 import { SectionLabel } from '../ui/SectionLabel';
+import { useLang, useT } from '../../i18n';
+import type { MsgKey } from '../../i18n/messages';
 
 // `protected` has its own badge, shown before these.
-const SIGNAL_LABEL: Record<Exclude<ReviewSignal, 'protected'>, { label: string; tone: BadgeTone; title: string }> = {
+const SIGNAL_KEYS: Record<Exclude<ReviewSignal, 'protected'>, { label: MsgKey; tone: BadgeTone; title: MsgKey }> = {
   sensitive: {
-    label: 'zone sensible',
+    label: 'signalSensitiveLabel',
     tone: 'err',
-    title: 'Fichier dans une zone sensible de .agents/architecture : ta revue est obligatoire.'
+    title: 'signalSensitiveTitle'
   },
   bypass: {
-    label: 'contournement',
+    label: 'signalBypassLabel',
     tone: 'err',
-    title: 'Les lignes ajoutées font taire un lint, un contrôle de types ou un test.'
+    title: 'signalBypassTitle'
   },
   architecture: {
-    label: 'architecture',
+    label: 'signalArchitectureLabel',
     tone: 'err',
-    title: "Le fichier viole une règle d'architecture."
+    title: 'signalArchitectureTitle'
   },
   conflictMarker: {
-    label: 'marqueurs de conflit',
+    label: 'signalConflictLabel',
     tone: 'err',
-    title: 'Des marqueurs de conflit git restent dans les lignes ajoutées.'
+    title: 'signalConflictTitle'
   },
   testsWeakened: {
-    label: 'tests affaiblis',
+    label: 'signalTestsLabel',
     tone: 'err',
-    title: 'Des tests ou assertions ont été affaiblis dans ce fichier.'
+    title: 'signalTestsTitle'
   },
   hot: {
-    label: 'souvent modifié',
+    label: 'signalHotLabel',
     tone: 'accent',
-    title: 'Modifié 5 fois ou plus ces 90 derniers jours.'
+    title: 'signalHotTitle'
   },
   untested: {
-    label: 'sans test propre',
+    label: 'signalUntestedLabel',
     tone: 'accent',
-    title: 'Aucun test en ligne et aucun fichier de test du même nom sur la branche ; les modules de déclaration seule, le support de test et l’outillage de build ne comptent pas.'
+    title: 'signalUntestedTitle'
   },
   large: {
-    label: 'gros changement',
+    label: 'signalLargeLabel',
     tone: 'neutral',
-    title: '200 lignes ou plus modifiées.'
+    title: 'signalLargeTitle'
   }
 };
 
@@ -63,19 +65,21 @@ interface IntegrationReviewProps {
 }
 
 export function IntegrationReview({ preview, projectId, narrating, onNarrate }: IntegrationReviewProps) {
+  const t = useT();
+  const lang = useLang();
   return (
     <>
       <section className="flex flex-col gap-1.5">
-        <SectionLabel>Commits</SectionLabel>
+        <SectionLabel>{t('reviewCommits')}</SectionLabel>
         {preview.commits.length === 0 ? (
-          <div className="text-xs text-muted">Aucun commit.</div>
+          <div className="text-xs text-muted">{t('noCommitsPlain')}</div>
         ) : (
           <details className="group text-xs">
             <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md px-1.5 py-1 select-none text-muted hover:bg-accent-soft hover:text-text [&::-webkit-details-marker]:hidden">
               <ChevronRightIcon className="h-3 w-3 shrink-0 transition-transform group-open:rotate-90" />
               {preview.commits.length === 1
-                ? "1 commit de l'agent, repris tel quel sur ta branche"
-                : `${preview.commits.length} commits de l'agent, écrasés en un seul sur ta branche`}
+                ? t('commitOneTaken')
+                : t('commitsSquashed', { count: preview.commits.length })}
             </summary>
             <div className="flex flex-col pl-6">
               {preview.commits.map((commit) => (
@@ -91,7 +95,7 @@ export function IntegrationReview({ preview, projectId, narrating, onNarrate }: 
 
       <section className="flex flex-col gap-1.5">
         <SectionLabel className="flex items-center">
-          Fichiers
+          {t('filesLabel')}
           {preview.files.length > 0 && (
             <span className="ml-1 rounded border border-border bg-raised px-1.5 text-[11px] tabular-nums text-text">
               {preview.files.length}
@@ -99,9 +103,9 @@ export function IntegrationReview({ preview, projectId, narrating, onNarrate }: 
           )}
           {preview.files.length > 0 && (
             <>
-              <span className="ml-2 text-xs text-muted">ordre de relecture ·</span>
-              <Badge tone="ok" className="ml-1.5" title="Calculé par fennec à partir du journal">
-                vérifié
+              <span className="ml-2 text-xs text-muted">{t('reviewOrder')}</span>
+              <Badge tone="ok" className="ml-1.5" title={t('verifiedFromLog')}>
+                {t('verified')}
               </Badge>
             </>
           )}
@@ -110,25 +114,25 @@ export function IntegrationReview({ preview, projectId, narrating, onNarrate }: 
               variant="secondary"
               size="sm"
               className="ml-auto"
-              title="Un agent en lecture seule raconte le changement fichier par fichier, dans cet ordre ; son récit est indicatif."
+              title={t('narrateTitle')}
               disabled={narrating}
               onClick={onNarrate}
             >
-              Raconter
+              {t('narrate')}
             </Button>
           )}
         </SectionLabel>
         {preview.files.length === 0 ? (
-          <div className="text-xs text-muted">Aucun fichier.</div>
+          <div className="text-xs text-muted">{t('noFilesPlain')}</div>
         ) : (
           <div className="overflow-hidden rounded-lg border border-border bg-raised">
             {preview.commonSignals.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-3 py-1.5 text-xs text-muted">
-                <span>Tous les fichiers :</span>
+                <span>{t('allFiles')}</span>
                 {preview.commonSignals.map((signal) =>
                   signal === 'protected' ? null : (
-                    <Badge key={signal} tone={SIGNAL_LABEL[signal].tone} title={SIGNAL_LABEL[signal].title}>
-                      {SIGNAL_LABEL[signal].label}
+                    <Badge key={signal} tone={SIGNAL_KEYS[signal].tone} title={t(lang, SIGNAL_KEYS[signal].title)}>
+                      {t(lang, SIGNAL_KEYS[signal].label)}
                     </Badge>
                   ),
                 )}
@@ -143,19 +147,19 @@ export function IntegrationReview({ preview, projectId, narrating, onNarrate }: 
                   >
                     {file.path}
                   </span>
-                  {file.protected && <Badge tone="err">protégé</Badge>}
+                  {file.protected && <Badge tone="err">{t('protectedBadge')}</Badge>}
                   {file.carried && (
                     <Badge
                       tone="accent"
-                      title="Le fichier avait des modifications non commitées sur lesquelles l'agent a travaillé : elles entrent dans ce commit."
+                      title={t('carriedTitle')}
                     >
-                      ton travail inclus
+                      {t('carriedBadge')}
                     </Badge>
                   )}
                   {file.signals.map((signal) =>
                     signal === 'protected' || preview.commonSignals.includes(signal) ? null : (
-                      <Badge key={signal} tone={SIGNAL_LABEL[signal].tone} title={SIGNAL_LABEL[signal].title}>
-                        {SIGNAL_LABEL[signal].label}
+                      <Badge key={signal} tone={SIGNAL_KEYS[signal].tone} title={t(lang, SIGNAL_KEYS[signal].title)}>
+                        {t(lang, SIGNAL_KEYS[signal].label)}
                       </Badge>
                     ),
                   )}
@@ -169,9 +173,9 @@ export function IntegrationReview({ preview, projectId, narrating, onNarrate }: 
       </section>
 
       <section className="flex flex-col gap-1.5">
-        <SectionLabel>Critères</SectionLabel>
+        <SectionLabel>{t('panelCriteria')}</SectionLabel>
         {preview.criteria.length === 0 ? (
-          <div className="text-xs text-muted">Aucun critère.</div>
+          <div className="text-xs text-muted">{t('noCriteriaPlain')}</div>
         ) : (
           <div className="flex flex-col">
             {preview.criteria.map((criterion) => {
@@ -192,7 +196,7 @@ export function IntegrationReview({ preview, projectId, narrating, onNarrate }: 
       </section>
 
       <section className="flex flex-col gap-1.5">
-        <SectionLabel>Décisions</SectionLabel>
+        <SectionLabel>{t('panelDecisions')}</SectionLabel>
         <DecisionList decisions={preview.decisions} />
       </section>
     </>

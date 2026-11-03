@@ -112,9 +112,15 @@ pub const FONT_SIZE_RANGE: std::ops::RangeInclusive<u16> = 13..=16;
 pub const MAX_PANEL_PAGES: usize = 12;
 /// The longest panel page name, in characters.
 pub const MAX_PANEL_PAGE_NAME: usize = 40;
+/// The UI's display language when none is stored.
+pub const DEFAULT_LANGUAGE: &str = "en";
 
 fn default_font_size() -> u16 {
     DEFAULT_FONT_SIZE
+}
+
+fn default_language() -> String {
+    DEFAULT_LANGUAGE.to_string()
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -126,6 +132,9 @@ pub struct Display {
     pub font_size: u16,
     /// `None` means the UI's default pages.
     pub panel_pages: Option<Vec<PanelPage>>,
+    /// The UI's display language: `en` (default) or `fr`.
+    #[serde(default = "default_language")]
+    pub language: String,
 }
 
 /// fennec's own: a named list of the context panel's blocks; the UI owns the block ids.
@@ -143,6 +152,7 @@ impl Default for Display {
             tool_results_open: false,
             font_size: DEFAULT_FONT_SIZE,
             panel_pages: None,
+            language: DEFAULT_LANGUAGE.to_string(),
         }
     }
 }
@@ -256,6 +266,9 @@ impl Preferences {
 
         if !FONT_SIZE_RANGE.contains(&self.display.font_size) {
             return Err(format!("font_size must be in {FONT_SIZE_RANGE:?}"));
+        }
+        if !matches!(self.display.language.as_str(), "en" | "fr") {
+            return Err(format!("display.language must be \"en\" or \"fr\""));
         }
         if let Some(pages) = &self.display.panel_pages {
             Self::validate_panel_pages(pages)?;
@@ -647,6 +660,10 @@ mod tests {
         assert!(p.validate().unwrap_err().contains("font_size"));
 
         let mut p = valid();
+        p.display.language = "de".into();
+        assert!(p.validate().unwrap_err().contains("display.language"));
+
+        let mut p = valid();
         p.search.searxng_url = Some("ftp://example.com".into());
         assert!(p.validate().unwrap_err().contains("searxng_url"));
     }
@@ -769,6 +786,7 @@ mod tests {
         };
         p.display.reasoning_open = false;
         p.display.font_size = 15;
+        p.display.language = "fr".into();
         p.global_instructions = Some("Be terse.".into());
         p.sandbox = SandboxPrefs {
             enabled: false,
@@ -781,6 +799,7 @@ mod tests {
         assert!(json.contains("\"maxTokens\""));
         assert!(json.contains("\"reasoningEffort\""));
         assert!(json.contains("\"fontSize\""));
+        assert!(json.contains("\"language\""));
         assert!(json.contains("\"globalInstructions\""));
         assert!(json.contains("\"sandbox\""));
         assert_eq!(serde_json::from_str::<Preferences>(&json).unwrap(), p);
@@ -798,6 +817,7 @@ mod tests {
         .unwrap();
         p.migrate();
         assert_eq!(p.display.font_size, DEFAULT_FONT_SIZE);
+        assert_eq!(p.display.language, DEFAULT_LANGUAGE);
         assert_eq!(
             p.provider(LOCAL_PROVIDER)
                 .unwrap()

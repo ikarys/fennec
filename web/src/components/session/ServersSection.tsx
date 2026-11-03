@@ -7,12 +7,15 @@ import { Button, buttonClass } from '../ui/Button';
 import { Panel } from '../ui/Panel';
 import { panelBlock } from '../../lib/panelBlocks';
 import { ServerEditor } from './ServerEditor';
+import { useLang, useT } from '../../i18n';
 
 interface ServersSectionProps {
   sessionId: string | null;
 }
 
 export function ServersSection({ sessionId }: ServersSectionProps) {
+  const t = useT();
+  const lang = useLang();
   const [servers, setServers] = useState<ServerView[] | null>(null);
   const [busyName, setBusyName] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -61,23 +64,23 @@ export function ServersSection({ sessionId }: ServersSectionProps) {
   return (
     <Panel
       id="servers"
-      title={panelBlock('servers').title}
+      title={t(lang, panelBlock('servers').titleKey)}
       icon={<ServerIcon className="h-3.5 w-3.5" />}
       iconTone={runningCount > 0 ? 'accent' : 'neutral'}
       summary={summary}
     >
       <div className="flex flex-col gap-1.5">
         <p className="m-0 text-xs text-muted">
-          Démarrés dans le worktree de la session, sur le port <code>$PORT</code>.
+          {t('serversStartedNote')} <code>$PORT</code>.
         </p>
-        {servers === null && <div className="text-xs text-muted">Chargement…</div>}
+        {servers === null && <div className="text-xs text-muted">{t('loading')}</div>}
         {servers !== null && servers.length === 0 && (
-          <div className="text-xs text-muted">Aucun serveur configuré.</div>
+          <div className="text-xs text-muted">{t('noServersConfigured')}</div>
         )}
         {servers?.map((server) => (
           <div key={server.name} className="flex items-center gap-2 rounded-md px-1 py-1 hover:bg-accent-soft">
             <Badge tone={server.running ? 'ok' : 'neutral'} dot pulse={server.running}>
-              {server.running ? 'en cours' : 'arrêt'}
+              {server.running ? t('serverRunning') : t('serverStopped')}
             </Badge>
             <span className="min-w-0 grow truncate font-mono text-xs" title={server.command}>
               {server.name}
@@ -88,8 +91,8 @@ export function ServersSection({ sessionId }: ServersSectionProps) {
                 target="_blank"
                 rel="noreferrer"
                 className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
-                aria-label={`Ouvrir ${server.url}`}
-                title={`Ouvrir ${server.url}`}
+                aria-label={t('openUrl', { url: server.url })}
+                title={t('openUrl', { url: server.url })}
               >
                 <ExternalIcon className="h-3.5 w-3.5" />
               </a>
@@ -99,7 +102,7 @@ export function ServersSection({ sessionId }: ServersSectionProps) {
               size="sm"
               iconOnly
               disabled={busyName !== null}
-              aria-label={server.running ? `Arrêter ${server.name}` : `Démarrer ${server.name}`}
+              aria-label={server.running ? t('stopServer', { name: server.name }) : t('startServer', { name: server.name })}
               title={server.command}
               onClick={() => void toggle(server)}
             >
@@ -115,7 +118,7 @@ export function ServersSection({ sessionId }: ServersSectionProps) {
         ))}
         <Button variant="soft" size="sm" onClick={() => setEditorOpen(true)}>
           <SettingsIcon className="h-3.5 w-3.5" />
-          Configurer
+          {t('configure')}
         </Button>
       </div>
       <ServerEditor

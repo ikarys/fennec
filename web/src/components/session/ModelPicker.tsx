@@ -7,6 +7,7 @@ import { Card } from '../ui/Card';
 import { SectionLabel } from '../ui/SectionLabel';
 import { TextInput } from '../ui/Field';
 import { useDismissable } from '../../hooks/useDismissable';
+import { useT } from '../../i18n';
 
 /** The model id without its vendor prefix (`org/model` → `model`). */
 export function modelShortName(model: string): string {
@@ -30,6 +31,7 @@ function sameRef(a: ModelRef, b: ModelRef): boolean {
  * provider's models on demand (listing them calls each provider).
  */
 export function ModelPicker({ current, choices, onChange, disabled }: ModelPickerProps) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState('');
   const [allModels, setAllModels] = useState<ProviderListing[] | null>(null);
@@ -91,7 +93,7 @@ export function ModelPicker({ current, choices, onChange, disabled }: ModelPicke
         <span className="flex w-full items-center gap-1.5">
           <span className="w-3 shrink-0 text-left">{isCurrent ? '✓' : ''}</span>
           <span className="min-w-0 grow">{modelShortName(choice.model)}</span>
-          {isDefault && <Badge tone="neutral">défaut</Badge>}
+          {isDefault && <Badge tone="neutral">{t('defaultBadge')}</Badge>}
         </span>
       </Button>
     );
@@ -115,19 +117,19 @@ export function ModelPicker({ current, choices, onChange, disabled }: ModelPicke
               autoFocus
               value={filter}
               onChange={(event) => setFilter(event.target.value)}
-              placeholder="Filtrer…"
+              placeholder={t('filter')}
               className="w-full"
             />
             {showCurrentFirst && current && entry(current, true)}
             {showDefault && entry(choices.default, false)}
             {favorites.length > 0 && (
               <div className="flex flex-col gap-1">
-                <SectionLabel>Favoris</SectionLabel>
+                <SectionLabel>{t('favorites')}</SectionLabel>
                 {favorites.map((favorite) => entry(favorite, current ? sameRef(favorite, current) : false))}
               </div>
             )}
             <Button variant="ghost" size="sm" className="w-full" onClick={loadAll} disabled={loadingAll}>
-              {loadingAll ? 'Chargement…' : 'Tous les modèles…'}
+              {loadingAll ? t('loading') : t('allModels')}
             </Button>
             {allModels && allModels.length > 0 && (
               <div className="flex flex-col gap-2">
@@ -153,7 +155,7 @@ export function ModelPicker({ current, choices, onChange, disabled }: ModelPicke
                 })}
               </div>
             )}
-            {allModels && allModels.length === 0 && <p className="m-0 text-xs text-muted">Aucun modèle listé.</p>}
+            {allModels && allModels.length === 0 && <p className="m-0 text-xs text-muted">{t('noModelsListed')}</p>}
           </div>
         </Card>
       )}

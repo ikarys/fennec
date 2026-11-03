@@ -3,6 +3,7 @@ import type { McpSessionView, McpServerView } from '../../lib/api';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { SectionLabel } from '../ui/SectionLabel';
+import { useT } from '../../i18n';
 
 interface McpPickerProps {
   view: McpSessionView | null;
@@ -16,6 +17,7 @@ interface McpPickerProps {
  * disabled set; the dropdown only lists the servers the human showed.
  */
 export function McpPicker({ view, onToggle, disabled }: McpPickerProps) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -64,7 +66,7 @@ export function McpPicker({ view, onToggle, disabled }: McpPickerProps) {
         />
         <span className="min-w-0 grow truncate">{server.name}</span>
         <span className="shrink-0 text-xs text-muted">
-          {server.toolCount} outil{server.toolCount > 1 ? 's' : ''}
+          {t('toolsCount', { count: server.toolCount })}
         </span>
         {server.active && server.tokens > 0 && (
           <span className="shrink-0 text-xs text-muted">{server.tokens}</span>
@@ -79,7 +81,7 @@ export function McpPicker({ view, onToggle, disabled }: McpPickerProps) {
         variant="ghost"
         size="sm"
         disabled={disabled}
-        title="Serveurs MCP de la session"
+        title={t('mcpSessionTitle')}
         onClick={() => setOpen((value) => !value)}
       >
         <span className="flex items-center gap-1.5">
@@ -93,10 +95,10 @@ export function McpPicker({ view, onToggle, disabled }: McpPickerProps) {
       </Button>
       {open && (
         <Card className="absolute bottom-full right-0 z-10 mb-1 w-72 max-h-80 overflow-y-auto p-2">
-          <SectionLabel>Serveurs MCP</SectionLabel>
+          <SectionLabel>{t('mcpServersLabel')}</SectionLabel>
           {visible.length === 0 ? (
             <p className="m-0 px-1.5 text-xs text-muted">
-              Aucun serveur affiché. Ajoutez-en dans les réglages (MCP).
+              {t('mcpNoneShown')}
             </p>
           ) : (
             <div className="flex flex-col gap-0.5">{visible.map(row)}</div>
