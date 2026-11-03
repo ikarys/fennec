@@ -190,6 +190,18 @@ body {
   a {
     color: inherit;
   }
+  /* GFM task lists (a plan's criteria in the thread): the checkbox leaves the
+     text flow so every text line, wrapped ones included, starts in one column,
+     and the box centres on its line instead of sitting on the baseline.
+     Without :has() the list renders as before. */
+  li:has(> input[type="checkbox"]) {
+    padding-left: 1.125rem;
+  }
+  li:has(> input[type="checkbox"]) > input[type="checkbox"] {
+    margin-left: -1.125rem;
+    margin-right: 0.25rem;
+    vertical-align: middle;
+  }
 }
 
 /* The browser's own surfaces carry the theme too. */
