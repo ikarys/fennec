@@ -29,9 +29,14 @@ look lives in two places only, so a screen can never drift from the others:
 - Buttons are icons (`iconOnly`) with a tooltip (`title`) that says what
   they do; a text label only for a view's single primary action and a
   dialog's confirm. Text on every button makes the UI heavy.
-- State is shown by form as well as words: a `Badge` tone (ok, err, accent
-  for "needs you" or "running"), a dot that pulses while something runs.
-  The accent is for action and attention, not decoration.
+- State is shown by form as well as words: a `Badge` tone (ok, err,
+  attention for "needs you", accent for "running"), a dot that pulses while
+  something runs. The accent is for action, `attention` (amber) for what
+  waits on the human, never `err`: an error and a question read apart.
+- Borders: `border-border` separates (decorative, low contrast),
+  `border-border-strong` bounds a component (a field, a secondary button, a
+  pill): it is the one at 3:1 in every theme. What floats over the thread
+  (the palette, the composer, a tooltip) uses `shadow-float` and `rounded-lg`.
 - Cards only for what stands apart (a plan, a dialog, a question waiting for
   the human). A settings page's groups are `Section`s: a bordered block with
   a tinted header band (title, description, actions such as a `+`). Inside,

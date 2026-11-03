@@ -40,7 +40,7 @@ export function ContextGauge({ context, compactDisabled, onCompact, compactError
         {context && (
           <div
             role="tooltip"
-            className="invisible absolute top-full left-0 z-30 mt-2 flex w-96 flex-col gap-3 rounded-xl border border-border-strong bg-panel p-4 opacity-0 shadow-2xl transition-opacity duration-150 group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100"
+            className="invisible absolute top-full left-0 z-30 mt-2 flex w-96 flex-col gap-3 rounded-lg border border-border-strong bg-panel p-4 opacity-0 shadow-float transition-opacity duration-150 group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100"
           >
             <p className="m-0 text-xs text-muted">{context.title}</p>
             {context.composition && <ContextComposition composition={context.composition} />}
