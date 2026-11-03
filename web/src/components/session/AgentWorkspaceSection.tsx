@@ -5,6 +5,7 @@ import { BranchIcon, CheckIcon, CopyIcon, ExternalIcon, FolderIcon, SpinnerIcon,
 import { useIntegrationInvite } from './IntegrationInvite';
 import { Button, buttonClass } from '../ui/Button';
 import { Badge } from '../ui/Badge';
+import { Card } from '../ui/Card';
 import { SectionLabel } from '../ui/SectionLabel';
 import { panelBlock } from '../../lib/panelBlocks';
 import { Panel } from '../ui/Panel';
@@ -185,16 +186,38 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
   return (
     <Panel id="workspace" title={panelBlock('workspace').title}>
       <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-1.5">
-          <SectionLabel>L'agent</SectionLabel>
+        {/* One inset card per zone: the header carries the zone's state, the body its rows. */}
+        <Card variant="inset" className="group">
+          <div className="flex items-center gap-2">
+            <FolderIcon className="h-4 w-4 shrink-0 text-muted" />
+            <SectionLabel>L'agent</SectionLabel>
+            <span className="ml-auto flex min-w-0 items-center gap-1.5 text-xs">
+              {loading && preview === null ? (
+                <span className="flex items-center gap-1 text-muted">
+                  <SpinnerIcon className="h-3.5 w-3.5" />
+                  Lecture…
+                </span>
+              ) : hasCommits ? (
+                <Badge tone="neutral" pill>
+                  {preview?.commits.length ?? 0} commits · {preview?.files.length ?? 0} fichiers
+                </Badge>
+              ) : (
+                <span className="truncate text-faint">Rien à intégrer pour l'instant.</span>
+              )}
+              {protectedCount > 0 && (
+                <Badge tone="err" pill>
+                  {protectedCount} protégé{protectedCount > 1 ? 's' : ''}
+                </Badge>
+              )}
+            </span>
+          </div>
           {worktree !== null ? (
-            <>
+            <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
-                <FolderIcon className="h-4 w-4 shrink-0 text-muted" />
                 <span title={worktree.path} className="grow overflow-hidden text-left font-mono text-xs text-ellipsis whitespace-nowrap">
                   {shortFolderName(worktree.path)}
                 </span>
-                <div className="flex shrink-0 items-center gap-1">
+                <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
                   <a
                     href={worktree.editorUrl}
                     title="Ouvrir dans VS Code"
@@ -222,27 +245,8 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
                 <span title={worktree.branch} className="grow overflow-hidden font-mono text-muted text-ellipsis whitespace-nowrap">
                   {shortAgentBranch(worktree.branch)}
                 </span>
-                <div className="flex shrink-0 items-center gap-1 text-muted">
-                  {loading && preview === null ? (
-                    <>
-                      <SpinnerIcon className="h-3.5 w-3.5" />
-                      Lecture…
-                    </>
-                  ) : (
-                    <>
-                      <span>
-                        {hasCommits ? `${preview?.commits.length ?? 0} commits · ${preview?.files.length ?? 0} fichiers` : "Rien à intégrer pour l'instant."}
-                      </span>
-                      {protectedCount > 0 && (
-                        <Badge tone="err">
-                          {protectedCount} protégé{protectedCount > 1 ? 's' : ''}
-                        </Badge>
-                      )}
-                    </>
-                  )}
-                </div>
               </div>
-            </>
+            </div>
           ) : (
             <div className="flex items-center gap-2 text-xs text-muted">
               <span className="grow">Travaille directement dans ton dossier.</span>
@@ -250,43 +254,45 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
             </div>
           )}
           {terminalError !== null && <div className="text-xs text-err">{terminalError}</div>}
-        </div>
+        </Card>
 
         {repo !== null && (
-          <div className="flex flex-col gap-1.5">
-            <SectionLabel>Ton dépôt</SectionLabel>
+          <Card variant="inset">
             <div className="flex items-center gap-2">
               <FolderIcon className="h-4 w-4 shrink-0 text-muted" />
-              <button
-                type="button"
-                onClick={handleOpenFiles}
-                disabled={!sessionId}
-                title={`Ouvrir ${repo.dir} dans l'explorateur de fichiers`}
-                className="grow cursor-pointer overflow-hidden text-left font-mono text-xs text-ellipsis whitespace-nowrap hover:text-accent hover:underline"
-              >
-                {repo.dir.split(/[\\/]/).filter(Boolean).pop() ?? repo.dir}
-              </button>
+              <SectionLabel>Ton dépôt</SectionLabel>
+              <span className="ml-auto inline-flex shrink-0">
+                {repo.dirty > 0 && (
+                  <Badge tone="accent" pill title="Modifications non commitées dans ton dossier">
+                    {repo.dirty} non commité{repo.dirty > 1 ? 's' : ''}
+                  </Badge>
+                )}
+              </span>
             </div>
+            <button
+              type="button"
+              onClick={handleOpenFiles}
+              disabled={!sessionId}
+              title={`Ouvrir ${repo.dir} dans l'explorateur de fichiers`}
+              className="flex w-full cursor-pointer items-center gap-2 rounded-md px-1 py-0.5 text-left hover:bg-accent-soft"
+            >
+              <span className="grow overflow-hidden font-mono text-xs text-ellipsis whitespace-nowrap">
+                {repo.dir.split(/[\\/]/).filter(Boolean).pop() ?? repo.dir}
+              </span>
+            </button>
             {filesError !== null && <div className="text-xs text-err">{filesError}</div>}
             <div className="flex items-center gap-2 text-xs">
               <BranchIcon className="h-4 w-4 shrink-0 text-muted" />
               <span title={repo.branch ?? undefined} className="grow overflow-hidden font-mono text-text text-ellipsis whitespace-nowrap">
                 {repo.branch ?? 'HEAD détachée'}
               </span>
-              {repo.dirty > 0 && (
-                <span title="Modifications non commitées dans ton dossier" className="inline-flex shrink-0">
-                  <Badge tone="accent">
-                    {repo.dirty} non commité{repo.dirty > 1 ? 's' : ''}
-                  </Badge>
-                </span>
-              )}
             </div>
             {repo.branchChanged && (
               <div className="text-xs text-err">
                 Le travail est parti de {repo.originBranch} : tu as changé de branche depuis.
               </div>
             )}
-          </div>
+          </Card>
         )}
 
         {worktree !== null && (
