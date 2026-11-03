@@ -300,7 +300,11 @@ impl Target {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Origin {
     Human,
-    Answer { session_id: String },
+    Answer {
+        session_id: String,
+    },
+    /// A rule fennec's kernel builds in code: never stored, never deleted, applied with the human's.
+    Fennec,
 }
 
 /// A single stored rule.

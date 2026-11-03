@@ -191,6 +191,7 @@ crates/fennec/src/
     attachment.rs      images sent to the model: sniffing, data URLs, limits
     replay.rs          which message the human may replay
     rule_approval.rs   the call paused for the human's approval, folded from the log; the four answers
+    kernel_rules.rs    the rules fennec's kernel enforces itself: the git commands that push or move a branch, blocked
     waiver.rs          a protected file's waiver: the pending request, the active grants, the ADR a grant writes
     queue.rs           the messages queued while a turn runs: pending, those the loop may drop in, what a turn's end does
     criteria.rs        acceptance criteria: the plan's "Done when", checks, verdicts, provenance
@@ -350,10 +351,11 @@ tests.
    kernel code too; command rules match parsed tokens, so `eval`, a variable (`$X -rf`) or
    a script written then run slips past them: a guard rail, the sandbox stays the wall. A file
    tool outside the workdir needs an allow rule or the human's approval; the sandbox does not read the rules (it still hides
-   `~/.ssh` from commands). With the sandbox off, a session's worktree shares its refs with the human's repository: a
-   command could then push, move or delete a branch (default block rules are the fix to come). With the sandbox off, a session's worktree shares its
-   `.git/worktrees/<id>` with the human's repository: a command can move or push refs
-   (`git update-ref`, `git push`); command rules are the only wall then.
+   `~/.ssh` from commands). A session's worktree shares its `.git/worktrees/<id>`, so its refs, with the human's
+   repository: with the sandbox off a command could push, move or delete a branch, and `git push` reaches the remote
+   even sandboxed when the network is on. The kernel's own block rules (`domain/kernel_rules.rs`: `git push`,
+   `update-ref`, `branch -D`, `worktree`, `gh pr merge`…) refuse those commands before they run, with the same
+   token-matching limits as the human's rules.
 
 ## Build, test, run
 
