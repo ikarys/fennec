@@ -20,6 +20,12 @@ export function formatDate(ms: number): string {
   return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())}`;
 }
 
+/** A creation timestamp as a full local date + time, always showing the date (2026/10/25 · 23:33). */
+export function formatDateTime(ms: number): string {
+  const time = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(new Date(ms));
+  return `${formatDate(ms)} · ${time}`;
+}
+
 export function formatDuration(ms?: number): string {
   if (ms == null) return '';
   if (ms < 1000) return `${ms} ms`;

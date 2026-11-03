@@ -46,6 +46,8 @@ export interface SessionDetail {
   id: string;
   title: string;
   state: SessionState;
+  /** When the session was created, Unix ms; the server always sends it. */
+  createdAt: number;
   /** The session's model, resolved by the server. */
   model: SessionModel;
   /** The agent id the session resolves to, or null when it has none. */
