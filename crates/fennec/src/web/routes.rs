@@ -134,6 +134,7 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
             session_routes::serve_context(app, stream, id)
         }
         ("GET", ["api", "sessions", id, "vision"]) => session_routes::serve_vision(app, stream, id),
+        ("GET", ["api", "sessions", id, "thread"]) => session_routes::serve_thread(app, stream, id),
         ("GET", ["api", "sessions", id, "usage", "workflow"]) => {
             session_routes::serve_usage_workflow(app, stream, id)
         }

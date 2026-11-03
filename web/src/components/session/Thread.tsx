@@ -98,7 +98,7 @@ const NoteDetail = memo(function NoteDetail({ text, detail }: { text: string; de
   );
 });
 
-function AssistantItemView({ item, model, running, showHeader }: { item: AssistantItem; model: string; running: boolean; showHeader: boolean }) {
+function AssistantItemView({ item, model, running, showHeader, pendingCallId }: { item: AssistantItem; model: string; running: boolean; showHeader: boolean; pendingCallId?: string }) {
   const lastTextId = [...item.segments].reverse().find((segment): segment is Extract<Segment, { kind: 'text' }> => segment.kind === 'text')?.id;
   const streaming = running && !item.done;
   const copyText = item.done
@@ -127,7 +127,7 @@ function AssistantItemView({ item, model, running, showHeader }: { item: Assista
         if (segment.kind === 'text') {
           return <TextSegment key={segment.id} id={segment.id} content={segment.content} caret={streaming && segment.id === lastTextId} preflight={segment.id === lastTextId ? item.preflight : undefined} />;
         }
-        return <ToolCard key={segment.id} tool={segment.tool} />;
+        return <ToolCard key={segment.id} tool={segment.tool} awaiting={segment.tool.id === pendingCallId} />;
       })}
       {showCopy && showStats ? (
         <div className="flex items-center justify-between gap-3">
@@ -149,7 +149,7 @@ function AssistantItemView({ item, model, running, showHeader }: { item: Assista
   );
 }
 
-export function ThreadItemView({ item, model, running, showHeader, onReplay }: { item: ThreadItem; model: string; running: boolean; showHeader: boolean; onReplay?: (messageId: string) => void }) {
+export function ThreadItemView({ item, model, running, showHeader, onReplay, pendingCallId }: { item: ThreadItem; model: string; running: boolean; showHeader: boolean; onReplay?: (messageId: string) => void; pendingCallId?: string }) {
   if (item.kind === 'mode') {
     // A mode change is a divider, not a message: the agent's color marks the
     // switch without taking bubble space.
@@ -203,7 +203,7 @@ export function ThreadItemView({ item, model, running, showHeader, onReplay }: {
   }
 
   if (item.kind === 'assistant') {
-    return <AssistantItemView item={item} model={model} running={running} showHeader={showHeader} />;
+    return <AssistantItemView item={item} model={model} running={running} showHeader={showHeader} pendingCallId={pendingCallId} />;
   }
 
   if (item.kind === 'error') {

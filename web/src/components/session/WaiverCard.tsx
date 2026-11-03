@@ -3,7 +3,7 @@
  * human can grant a time-limited waiver or refuse it.
  */
 import { useState } from 'react';
-import type { PendingWaiver } from '../../lib/fold';
+import type { PendingWaiver } from '../../lib/api/sessions';
 import { shortPath } from '../../lib/shortPath';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';

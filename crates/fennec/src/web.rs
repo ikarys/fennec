@@ -44,6 +44,7 @@ mod settings_routes;
 mod terminal;
 #[cfg(test)]
 mod test_support;
+mod thread_view;
 mod turns;
 mod waiver_routes;
 mod workflow_routes;
