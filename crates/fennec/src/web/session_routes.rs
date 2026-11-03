@@ -6,6 +6,7 @@ use super::editor;
 use super::folder_routes::store_dir;
 use super::http::{Request, error, send_json};
 use super::project_list_routes::project_json;
+use super::thread_view;
 use super::{
     context_view::context_view,
     model_routes, session_name,
@@ -265,6 +266,22 @@ pub(super) fn serve_skills(app: &App, stream: &mut TcpStream, id: &str) -> Resul
             "alwaysOn": folded.always_on,
             "missedAlwaysOn": missed
         }),
+    )
+}
+
+/// The session's pending blocks (approval, waiver, queue), folded by the domain.
+/// `GET /api/sessions/{id}/thread`.
+pub(super) fn serve_thread(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+    let store = app.store()?;
+    if app.session_and_project(id)?.is_none() {
+        return error(stream, 404, "no such session");
+    }
+    let events = store.events(id)?;
+    let view = thread_view::thread_view(&events);
+    send_json(
+        stream,
+        200,
+        &serde_json::to_value(view).map_err(|e| e.to_string())?,
     )
 }
 
