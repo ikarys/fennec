@@ -93,6 +93,7 @@ struct Facts {
     module_count: usize,
     doc_count: usize,
     adr_count: usize,
+    lang: Lang,
 }
 
 /// `GET /api/projects/{id}/dashboard`.
@@ -104,7 +105,7 @@ pub fn serve(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> 
     let workdir = Path::new(&project.workdir);
 
     let facts = gather(app, &store, &project, workdir)?;
-    let view = view(id, &facts);
+    let view = view(id, &facts, facts.lang);
     send_json(stream, 200, &to_value(view).map_err(|e| e.to_string())?)
 }
 
@@ -169,47 +170,56 @@ fn gather(
         sessions,
         idea_stages,
         usage,
-        cost_value: pricing.value(),
+        cost_value: pricing.value(lang.locale()),
         cost_detail: pricing.detail(lang),
         map_state,
         module_count,
         doc_count,
         adr_count,
+        lang,
     })
 }
 
-fn view(project_id: &str, facts: &Facts) -> DashboardView {
+fn view(project_id: &str, facts: &Facts, lang: Lang) -> DashboardView {
     DashboardView {
-        tiles: tiles(project_id, facts),
+        tiles: tiles(project_id, facts, lang),
         recent: recent(facts),
     }
 }
 
-fn tiles(project_id: &str, facts: &Facts) -> Vec<TileView> {
+fn tiles(project_id: &str, facts: &Facts, lang: Lang) -> Vec<TileView> {
     vec![
-        sessions_tile(project_id, facts),
-        ideas_tile(project_id, facts),
-        tokens_tile(&facts.usage),
-        time_tile(&facts.usage),
-        cost_tile(&facts.cost_value, &facts.cost_detail, facts.usage.calls > 0),
-        map_tile(project_id, &facts.map_state, facts.module_count),
-        doc_tile(project_id, facts.doc_count, facts.adr_count),
+        sessions_tile(project_id, facts, lang),
+        ideas_tile(project_id, facts, lang),
+        tokens_tile(&facts.usage, lang),
+        time_tile(&facts.usage, lang),
+        cost_tile(
+            &facts.cost_value,
+            &facts.cost_detail,
+            facts.usage.calls > 0,
+            lang,
+        ),
+        map_tile(project_id, &facts.map_state, facts.module_count, lang),
+        doc_tile(project_id, facts.doc_count, facts.adr_count, lang),
     ]
 }
 
-fn sessions_tile(project_id: &str, facts: &Facts) -> TileView {
+fn sessions_tile(project_id: &str, facts: &Facts, lang: Lang) -> TileView {
     let running = facts.sessions.iter().filter(|s| s.running).count();
     let awaiting = facts.sessions.iter().filter(|s| s.awaiting).count();
     let detail = if running == 0 && awaiting == 0 {
-        "aucune en cours".to_string()
+        lang.pick("none running", "aucune en cours").to_string()
     } else {
-        format!("{running} en cours · {awaiting} à intégrer")
+        match lang {
+            Lang::En => format!("{running} running · {awaiting} to integrate"),
+            Lang::Fr => format!("{running} en cours · {awaiting} à intégrer"),
+        }
     };
 
     TileView {
         id: "sessions".into(),
         icon: TileIcon::Sessions,
-        label: "Sessions".into(),
+        label: lang.pick("Sessions", "Sessions").into(),
         figure: facts.sessions.len().to_string(),
         detail,
         tone: Tone::Accent,
@@ -220,7 +230,7 @@ fn sessions_tile(project_id: &str, facts: &Facts) -> TileView {
     }
 }
 
-fn ideas_tile(project_id: &str, facts: &Facts) -> TileView {
+fn ideas_tile(project_id: &str, facts: &Facts, lang: Lang) -> TileView {
     let count = |stage: Stage| facts.idea_stages.iter().filter(|s| **s == stage).count();
     let (yours, running, queue, done) = (
         count(Stage::Yours),
@@ -232,9 +242,12 @@ fn ideas_tile(project_id: &str, facts: &Facts) -> TileView {
     TileView {
         id: "ideas".into(),
         icon: TileIcon::Ideas,
-        label: "À décider".into(),
+        label: lang.pick("To decide", "À décider").into(),
         figure: yours.to_string(),
-        detail: format!("{running} en cours · {queue} prêtes · {done} terminées"),
+        detail: match lang {
+            Lang::En => format!("{running} running · {queue} ready · {done} done"),
+            Lang::Fr => format!("{running} en cours · {queue} prêtes · {done} terminées"),
+        },
         tone: Tone::Accent,
         active: yours > 0,
         href: Some(format!("#/project/{project_id}/tasks")),
@@ -242,16 +255,22 @@ fn ideas_tile(project_id: &str, facts: &Facts) -> TileView {
     }
 }
 
-fn tokens_tile(usage: &Summary) -> TileView {
-    let figure = tokens(usage.prompt_tokens.saturating_add(usage.completion_tokens));
+fn tokens_tile(usage: &Summary, lang: Lang) -> TileView {
+    let figure = tokens(
+        usage.prompt_tokens.saturating_add(usage.completion_tokens),
+        lang.locale(),
+    );
     let cache = percent(usage.cached_tokens, usage.prompt_tokens);
 
     TileView {
         id: "tokens".into(),
         icon: TileIcon::Tokens,
-        label: "Tokens · 30 j".into(),
+        label: lang.pick("Tokens · 30 d", "Tokens · 30 j").into(),
         figure,
-        detail: format!("{cache} % relus du cache"),
+        detail: match lang {
+            Lang::En => format!("{cache} % re-read from cache"),
+            Lang::Fr => format!("{cache} % relus du cache"),
+        },
         // Colour the tile only when the ledger has calls; an empty window stays neutral.
         tone: if usage.calls > 0 {
             Tone::Ok
@@ -264,13 +283,16 @@ fn tokens_tile(usage: &Summary) -> TileView {
     }
 }
 
-fn time_tile(usage: &Summary) -> TileView {
+fn time_tile(usage: &Summary, lang: Lang) -> TileView {
     TileView {
         id: "time".into(),
         icon: TileIcon::Time,
-        label: "Temps modèle · 30 j".into(),
-        figure: duration(usage.total_secs),
-        detail: format!("{} appels", usage.calls),
+        label: lang.pick("Model time · 30 d", "Temps modèle · 30 j").into(),
+        figure: duration(usage.total_secs, lang.locale()),
+        detail: match lang {
+            Lang::En => format!("{} calls", usage.calls),
+            Lang::Fr => format!("{} appels", usage.calls),
+        },
         // Model time is informational when present; no calls means no figure to highlight.
         tone: if usage.calls > 0 {
             Tone::Info
@@ -283,12 +305,14 @@ fn time_tile(usage: &Summary) -> TileView {
     }
 }
 
-fn cost_tile(value: &str, detail: &str, active: bool) -> TileView {
+fn cost_tile(value: &str, detail: &str, active: bool, lang: Lang) -> TileView {
     // Cost is the most decision-relevant usage figure, so it gets attention when present.
     TileView {
         id: "cost".into(),
         icon: TileIcon::Cost,
-        label: "Coût estimé · 30 j".into(),
+        label: lang
+            .pick("Estimated cost · 30 d", "Coût estimé · 30 j")
+            .into(),
         figure: value.to_string(),
         detail: detail.to_string(),
         tone: if active {
@@ -302,17 +326,32 @@ fn cost_tile(value: &str, detail: &str, active: bool) -> TileView {
     }
 }
 
-fn map_tile(project_id: &str, state: &MapFileState, module_count: usize) -> TileView {
+fn map_tile(project_id: &str, state: &MapFileState, module_count: usize, lang: Lang) -> TileView {
     let (detail, tone, active) = match state {
-        MapFileState::Current => ("docs/map.md à jour".to_string(), Tone::Ok, false),
-        MapFileState::Stale => ("docs/map.md périmé".to_string(), Tone::Accent, true),
-        MapFileState::Missing => ("pas de docs/map.md".to_string(), Tone::Accent, true),
+        MapFileState::Current => (
+            lang.pick("docs/map.md up to date", "docs/map.md à jour")
+                .to_string(),
+            Tone::Ok,
+            false,
+        ),
+        MapFileState::Stale => (
+            lang.pick("docs/map.md stale", "docs/map.md périmé")
+                .to_string(),
+            Tone::Accent,
+            true,
+        ),
+        MapFileState::Missing => (
+            lang.pick("no docs/map.md", "pas de docs/map.md")
+                .to_string(),
+            Tone::Accent,
+            true,
+        ),
     };
 
     TileView {
         id: "map".into(),
         icon: TileIcon::Map,
-        label: "Carte des modules".into(),
+        label: lang.pick("Module map", "Carte des modules").into(),
         figure: module_count.to_string(),
         detail,
         tone,
@@ -322,11 +361,11 @@ fn map_tile(project_id: &str, state: &MapFileState, module_count: usize) -> Tile
     }
 }
 
-fn doc_tile(project_id: &str, doc_count: usize, adr_count: usize) -> TileView {
+fn doc_tile(project_id: &str, doc_count: usize, adr_count: usize, lang: Lang) -> TileView {
     TileView {
         id: "doc".into(),
         icon: TileIcon::Doc,
-        label: "Documentation".into(),
+        label: lang.pick("Documentation", "Documentation").into(),
         figure: doc_count.to_string(),
         detail: format!("{adr_count} ADR"),
         tone: Tone::Neutral,
@@ -419,12 +458,13 @@ mod tests {
             module_count: 0,
             doc_count: 0,
             adr_count: 0,
+            lang: Lang::Fr,
         }
     }
 
     #[test]
     fn view_tiles_are_in_order() {
-        let view = view("p", &facts());
+        let view = view("p", &facts(), Lang::Fr);
         let ids: Vec<&str> = view.tiles.iter().map(|tile| tile.id.as_str()).collect();
 
         assert_eq!(
@@ -437,10 +477,10 @@ mod tests {
     fn ideas_tile_is_active_only_when_yours_is_positive() {
         let mut facts = facts();
         facts.idea_stages = vec![Stage::Queue];
-        assert!(!view("p", &facts).tiles[1].active);
+        assert!(!view("p", &facts, Lang::Fr).tiles[1].active);
 
         facts.idea_stages = vec![Stage::Yours];
-        assert!(view("p", &facts).tiles[1].active);
+        assert!(view("p", &facts, Lang::Fr).tiles[1].active);
     }
 
     #[test]
@@ -448,18 +488,25 @@ mod tests {
         let mut facts = facts();
 
         facts.map_state = MapFileState::Current;
-        let map = &view("p", &facts).tiles[5];
+        let map = &view("p", &facts, Lang::Fr).tiles[5];
         assert_eq!(map.tone, Tone::Ok);
         assert!(!map.active);
 
         facts.map_state = MapFileState::Stale;
-        let map = &view("p", &facts).tiles[5];
+        let map = &view("p", &facts, Lang::Fr).tiles[5];
         assert_eq!(map.tone, Tone::Accent);
         assert!(map.active);
 
         facts.map_state = MapFileState::Missing;
-        let map = &view("p", &facts).tiles[5];
+        let map = &view("p", &facts, Lang::Fr).tiles[5];
         assert_eq!(map.tone, Tone::Accent);
         assert!(map.active);
+    }
+
+    #[test]
+    fn tiles_are_english_when_the_language_is_english() {
+        let view = view("p", &facts(), Lang::En);
+        assert_eq!(view.tiles[1].label, "To decide");
+        assert_eq!(view.tiles[2].label, "Tokens · 30 d");
     }
 }

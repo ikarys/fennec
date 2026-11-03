@@ -21,11 +21,11 @@ pub struct Pricing {
 
 impl Pricing {
     /// The dollars, or "—" when no model had a price: zero would claim a free run.
-    pub fn value(&self) -> String {
+    pub fn value(&self, locale: token_usage::display::Locale) -> String {
         if self.priced == 0 {
             "—".to_string()
         } else {
-            usd(self.cost.total())
+            usd(self.cost.total(), locale)
         }
     }
 
@@ -53,11 +53,11 @@ impl Pricing {
     }
 
     /// One part of the estimate, or none when no model had a price.
-    pub fn part(&self, dollars: f64) -> Option<String> {
+    pub fn part(&self, dollars: f64, locale: token_usage::display::Locale) -> Option<String> {
         if self.priced == 0 {
             None
         } else {
-            Some(usd(dollars))
+            Some(usd(dollars, locale))
         }
     }
 }

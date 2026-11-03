@@ -4,13 +4,15 @@ State on 2026-11-03, `develop` at `fec1d2c`. Delete each item when done, and thi
 
 ## 1. Server-built texts are French
 
-The UI is migrated (`web/src/i18n/`). On the server, the Insight page and the cost detail follow
-`display.language` through `domain/lang.rs` (`Lang::from_code`, `Lang::pick`). Still French:
+The UI is migrated (`web/src/i18n/`). On the server, the Insight page, the project dashboard, the
+context view, the session and workflow usage and the number formats (`token_usage::display::Locale`)
+follow `display.language` through `domain/lang.rs`. Still French:
 
-- display texts built in `web/project_dashboard.rs`, `web/context_view.rs`, `domain/context_parts.rs`,
-  `domain/criteria.rs`, `domain/scanner.rs` (find them with an accent grep on `crates/fennec/src`);
-- the number formats of `crates/token-usage/src/display.rs` (`12,3k`, `4,2 s`, `3,20 $`): a decimal
-  comma in English too.
+- the criteria proposal question (`domain/criteria.rs`, built in `agent/propose_criteria.rs` and
+  recorded in the log: the language must reach the agent layer);
+- the context part labels of `domain/context_parts.rs` ("Prompt système", "Résultat : …"): stored in
+  `usage.db`, so they must be translated at display time;
+- the scanners' `covers` texts (`domain/scanner.rs`).
 
 ## 2. Integration gate after a manual merge
 

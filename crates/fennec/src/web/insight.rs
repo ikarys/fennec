@@ -150,7 +150,7 @@ impl InsightData {
         let pricing = priced(&models, prices);
 
         let cards = cards(&total, &pricing, lang);
-        let consumers = consumers(&total.breakdown);
+        let consumers = consumers(&total.breakdown, lang);
 
         let max = days
             .iter()
@@ -172,9 +172,9 @@ impl InsightData {
                 .map(|row| {
                     let cost = project_models
                         .get(&row.key)
-                        .map(|rows| priced(rows, prices).value())
+                        .map(|rows| priced(rows, prices).value(lang.locale()))
                         .unwrap_or_else(|| "—".to_string());
-                    row_view(&row, false, &cost)
+                    row_view(&row, false, &cost, lang)
                 })
                 .collect()
         } else {
@@ -189,14 +189,17 @@ impl InsightData {
                 let cost = prices
                     .get(&row.key)
                     .map(|price| {
-                        usd(price.cost(
-                            row.summary.prompt_tokens,
-                            row.summary.cached_tokens,
-                            row.summary.completion_tokens,
-                        ))
+                        usd(
+                            price.cost(
+                                row.summary.prompt_tokens,
+                                row.summary.cached_tokens,
+                                row.summary.completion_tokens,
+                            ),
+                            lang.locale(),
+                        )
                     })
                     .unwrap_or_else(|| "—".to_string());
-                row_view(&row, true, &cost)
+                row_view(&row, true, &cost, lang)
             })
             .collect();
 
@@ -316,17 +319,17 @@ fn cards(total: &Summary, pricing: &Pricing, lang: Lang) -> Vec<CardView> {
             label: lang.pick("Calls", "Appels").into(),
             value: total.calls.to_string(),
             detail: match lang {
-                Lang::En => format!("model time {}", duration(total.total_secs)),
-                Lang::Fr => format!("temps modèle {}", duration(total.total_secs)),
+                Lang::En => format!("model time {}", duration(total.total_secs, lang.locale())),
+                Lang::Fr => format!("temps modèle {}", duration(total.total_secs, lang.locale())),
             },
         },
         CardView {
             kind: CardKind::Input,
             label: lang.pick("Input", "Entrée").into(),
-            value: tokens(total.prompt_tokens),
+            value: tokens(total.prompt_tokens, lang.locale()),
             detail: match lang {
-                Lang::En => format!("{} uncached", tokens(fresh)),
-                Lang::Fr => format!("{} hors cache", tokens(fresh)),
+                Lang::En => format!("{} uncached", tokens(fresh, lang.locale())),
+                Lang::Fr => format!("{} hors cache", tokens(fresh, lang.locale())),
             },
         },
         CardView {
@@ -334,26 +337,32 @@ fn cards(total: &Summary, pricing: &Pricing, lang: Lang) -> Vec<CardView> {
             label: lang.pick("Cache", "Cache").into(),
             value: format!("{cache} %"),
             detail: match lang {
-                Lang::En => format!("{} read from cache", tokens(total.cached_tokens)),
-                Lang::Fr => format!("{} lus du cache", tokens(total.cached_tokens)),
+                Lang::En => format!(
+                    "{} read from cache",
+                    tokens(total.cached_tokens, lang.locale())
+                ),
+                Lang::Fr => format!(
+                    "{} lus du cache",
+                    tokens(total.cached_tokens, lang.locale())
+                ),
             },
         },
         CardView {
             kind: CardKind::LostCache,
             label: lang.pick("Lost cache", "Cache perdu").into(),
-            value: tokens(total.lost_cache_tokens),
+            value: tokens(total.lost_cache_tokens, lang.locale()),
             detail: lost_detail,
         },
         CardView {
             kind: CardKind::Output,
             label: lang.pick("Output", "Sortie").into(),
-            value: tokens(total.completion_tokens),
+            value: tokens(total.completion_tokens, lang.locale()),
             detail: lang.pick("generated tokens", "tokens générés").to_string(),
         },
         CardView {
             kind: CardKind::Cost,
             label: lang.pick("Estimated cost", "Coût estimé").into(),
-            value: pricing.value(),
+            value: pricing.value(lang.locale()),
             detail: pricing.detail(lang),
         },
     ]
@@ -361,7 +370,7 @@ fn cards(total: &Summary, pricing: &Pricing, lang: Lang) -> Vec<CardView> {
 
 /// The ledger's `<kind>/<label>` keys, largest first; keys of another
 /// shape (an older or foreign writer) are left out.
-fn consumers(breakdown: &BTreeMap<String, u64>) -> Option<CompositionView> {
+fn consumers(breakdown: &BTreeMap<String, u64>, lang: Lang) -> Option<CompositionView> {
     let mut shares: Vec<(PartKind, String, u64)> = breakdown
         .iter()
         .filter_map(|(key, &tokens)| {
@@ -375,7 +384,7 @@ fn consumers(breakdown: &BTreeMap<String, u64>) -> Option<CompositionView> {
     }
     shares.sort_by(|a, b| b.2.cmp(&a.2).then_with(|| a.1.cmp(&b.1)));
     let total = shares.iter().map(|(_, _, tokens)| tokens).sum();
-    Some(composition_view(&shares, total, 0))
+    Some(composition_view(&shares, total, 0, lang))
 }
 
 fn day_view(row: &Row, max: u64, show_label: bool, lang: Lang) -> DayView {
@@ -394,10 +403,10 @@ fn day_view(row: &Row, max: u64, show_label: bool, lang: Lang) -> DayView {
         String::new()
     };
     let calls = row.summary.calls;
-    let input = tokens(prompt);
+    let input = tokens(prompt, lang.locale());
     let cache = percent(cached, prompt);
-    let lost_text = tokens(lost);
-    let output = tokens(row.summary.completion_tokens);
+    let lost_text = tokens(lost, lang.locale());
+    let output = tokens(row.summary.completion_tokens, lang.locale());
 
     let title = match lang {
         Lang::En => format!(
@@ -418,7 +427,7 @@ fn day_view(row: &Row, max: u64, show_label: bool, lang: Lang) -> DayView {
     }
 }
 
-fn row_view(row: &Row, model: bool, cost: &str) -> RowView {
+fn row_view(row: &Row, model: bool, cost: &str, lang: Lang) -> RowView {
     let name = if model {
         row.key.clone()
     } else {
@@ -428,19 +437,19 @@ fn row_view(row: &Row, model: bool, cost: &str) -> RowView {
     let lost = if row.summary.lost_cache_tokens == 0 {
         "—".to_string()
     } else {
-        tokens(row.summary.lost_cache_tokens)
+        tokens(row.summary.lost_cache_tokens, lang.locale())
     };
 
     RowView {
         key: row.key.clone(),
         name,
         calls: row.summary.calls.to_string(),
-        input: tokens(row.summary.prompt_tokens),
+        input: tokens(row.summary.prompt_tokens, lang.locale()),
         cache: format!("{cache} %"),
-        output: tokens(row.summary.completion_tokens),
+        output: tokens(row.summary.completion_tokens, lang.locale()),
         lost,
         cost: cost.to_string(),
-        time: duration(row.summary.total_secs),
+        time: duration(row.summary.total_secs, lang.locale()),
     }
 }
 
@@ -690,6 +699,10 @@ mod tests {
                 "Estimated cost"
             ]
         );
+        assert_eq!(
+            view.cards[5].detail,
+            "no model has a price: Settings, Models"
+        );
     }
 
     #[test]
@@ -701,7 +714,7 @@ mod tests {
             ("legacy".to_string(), 999),
         ]
         .into();
-        let view = consumers(&breakdown).expect("consumers");
+        let view = consumers(&breakdown, Lang::Fr).expect("consumers");
 
         let labels: Vec<&str> = view.parts.iter().map(|p| p.label.as_str()).collect();
         assert_eq!(
@@ -710,7 +723,7 @@ mod tests {
         );
         assert_eq!(view.parts[0].percent, 60);
         assert_eq!(view.kinds.len(), 3);
-        assert!(consumers(&BTreeMap::new()).is_none());
+        assert!(consumers(&BTreeMap::new(), Lang::Fr).is_none());
     }
 
     #[test]
