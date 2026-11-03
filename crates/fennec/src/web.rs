@@ -12,6 +12,7 @@ mod context_view;
 mod editor;
 mod event_stream;
 mod file_manager;
+mod folder_routes;
 mod guard;
 mod http;
 mod idea_assets;
@@ -28,6 +29,7 @@ mod preview;
 mod pricing;
 mod project_dashboard;
 mod project_delete;
+mod project_list_routes;
 mod project_routes;
 mod proposal_routes;
 mod routes;
@@ -40,6 +42,8 @@ mod session_routes;
 mod session_usage;
 mod settings_routes;
 mod terminal;
+#[cfg(test)]
+mod test_support;
 mod turns;
 mod waiver_routes;
 mod workflow_routes;
@@ -282,9 +286,7 @@ fn handle(app: &Arc<App>, stream: &mut TcpStream) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{LlmSettings, Settings};
     use crate::domain::event::{Event, ToolCall};
-    use crate::domain::preferences::ModelParams;
     use crate::domain::skill::Skill;
     use crate::store::SqliteStore;
     use serde_json::json;
@@ -297,34 +299,7 @@ mod tests {
     }
 
     fn app_with_db(db_path: PathBuf) -> App {
-        let settings = Settings {
-            llm: LlmSettings {
-                base_url: "http://localhost".into(),
-                api_key: None,
-                defaults: ModelParams {
-                    provider: "local".into(),
-                    model: "test".into(),
-                    max_tokens: 100,
-                    context_window: 1000,
-                    compact_at: 0.85,
-                    reasoning_effort: None,
-                },
-                listed: Vec::new(),
-            },
-            db_path,
-        };
-        let notifier = Arc::new(Notifier::default());
-        App {
-            turns: Turns::new(settings.clone(), notifier.clone()),
-            settings,
-            port: 0,
-            notifier,
-            skill_folds: Mutex::new(HashMap::new()),
-            idea_reports: Mutex::new(HashMap::new()),
-            idea_queues: Mutex::default(),
-            worktree_scan: Mutex::default(),
-            server_runs: Arc::new(Mutex::new(HashMap::new())),
-        }
+        test_support::app(db_path)
     }
 
     fn skill(id: &str) -> Skill {
