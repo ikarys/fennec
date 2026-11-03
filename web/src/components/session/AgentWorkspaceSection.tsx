@@ -324,26 +324,13 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
                 title={running ? 'Attends la fin du tour' : undefined}
                 className="w-full"
               >
-                Intégrer dans {humanBranch}
+                Relire et intégrer…
               </Button>
             )}
 
-            {/* Once integrated the branch holds nothing past its base: nothing to abandon. */}
-            {hasCommits && (
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={openDiscard}
-                disabled={sessionId === null || running || discarding}
-                className="w-full"
-              >
-                Abandonner ce travail
-              </Button>
-            )}
-            {discardError && <div className="text-xs text-err">{discardError}</div>}
-
+            {/* The destructive choice sits with the manual one: one primary action per block (docs/ui.md). */}
             <details className="text-xs">
-              <summary className="cursor-pointer select-none text-muted hover:text-text">Le faire à la main</summary>
+              <summary className="cursor-pointer select-none text-muted hover:text-text">Le faire à la main, ou abandonner</summary>
               <div className="mt-1.5">
                 <button
                   type="button"
@@ -353,6 +340,17 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
                 >
                   <code>git cherry-pick {worktree.base}..{worktree.branch}</code>
                 </button>
+              </div>
+              <div className="mt-2 flex flex-col gap-1">
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={openDiscard}
+                  disabled={sessionId === null || running || discarding}
+                >
+                  Abandonner ce travail
+                </Button>
+                {discardError && <div className="text-xs text-err">{discardError}</div>}
               </div>
             </details>
           </div>

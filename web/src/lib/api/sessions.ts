@@ -46,6 +46,8 @@ export interface SessionDetail {
   id: string;
   title: string;
   state: SessionState;
+  /** When the session was created, Unix ms; the server always sends it. */
+  createdAt: number;
   /** The session's model, resolved by the server. */
   model: SessionModel;
   /** The agent id the session resolves to, or null when it has none. */
@@ -303,6 +305,8 @@ export interface IntegrationCriterion {
   description: string;
   check?: string;
   status: IntegrationCriterionStatus;
+  /** Its check passed before any change (last preflight, verified). */
+  passedBefore?: boolean;
 }
 
 export interface ArchitectureViolation {
@@ -363,6 +367,8 @@ export interface IntegrationPreview {
     /** Deterministic review signals, riskiest files first (server order). */
     signals: ReviewSignal[];
   }[];
+  /** Signals every file carries (server-computed): shown once above the list, hidden on the rows. */
+  commonSignals: ReviewSignal[];
   /** Test files (relative to the project) the integration could protect. */
   testFiles: string[];
   criteria: IntegrationCriterion[];
