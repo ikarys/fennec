@@ -8,6 +8,7 @@ import { Card } from '../../ui/Card';
 import { Tile } from '../../ui/Tile';
 import { useRunUsage } from '../../session/CallUsage';
 import { useIntegrationInvite } from '../../session/IntegrationInvite';
+import { useLang } from '../../../i18n';
 
 type WorkflowEndItem = Extract<ThreadItem, { kind: 'workflow-end' }>;
 
@@ -26,6 +27,7 @@ function outcomeView(outcome: WorkflowEndItem['outcome']): { header: string; ton
 }
 
 export function RunEndCard({ item }: { item: WorkflowEndItem }) {
+  const lang = useLang();
   const outcome = outcomeView(item.outcome);
   const stats = item.stats;
   const invite = useIntegrationInvite();
@@ -63,8 +65,8 @@ export function RunEndCard({ item }: { item: WorkflowEndItem }) {
         </div>
         {startAt != null && endAt != null && (
           <div className="mt-0.5 pl-6 text-xs text-muted tabular-nums" title="Durée de la course, pauses comprises">
-            départ {formatClockTime(startAt)} → fin {formatClockTime(endAt)}
-            {totalMs != null ? ` · durée ${formatDuration(totalMs)}` : ''}
+            départ {formatClockTime(lang, startAt)} → fin {formatClockTime(lang, endAt)}
+            {totalMs != null ? ` · durée ${formatDuration(lang, totalMs)}` : ''}
           </div>
         )}
       </div>
@@ -77,9 +79,9 @@ export function RunEndCard({ item }: { item: WorkflowEndItem }) {
             <Tile
               size="sm"
               icon={<ClockIcon />}
-              figure={formatDuration(stats.workingMs)}
+              figure={formatDuration(lang, stats.workingMs)}
               label="Temps de travail"
-              detail={totalMs != null ? `sur ${formatDuration(totalMs)} de durée` : undefined}
+              detail={totalMs != null ? `sur ${formatDuration(lang, totalMs)} de durée` : undefined}
             />
             <Tile size="sm" icon={<WandIcon />} figure={usage?.calls ?? '–'} label="Appels au modèle" />
             <Tile size="sm" icon={<TokensIcon />} figure={usage?.generated ?? '–'} label="Tokens générés" />
@@ -102,7 +104,7 @@ export function RunEndCard({ item }: { item: WorkflowEndItem }) {
                 <ChevronRightIcon className="h-3 w-3 shrink-0 transition-transform group-open:rotate-90" />
                 <span>Détail du temps</span>
                 <span className="ml-auto tabular-nums text-faint">
-                  {formatDuration(stats.workingMs)} · {stats.nodes.length} nœud{stats.nodes.length > 1 ? 's' : ''}
+                  {formatDuration(lang, stats.workingMs)} · {stats.nodes.length} nœud{stats.nodes.length > 1 ? 's' : ''}
                 </span>
               </summary>
               <div className="flex flex-col px-4 pb-3">
@@ -124,7 +126,7 @@ export function RunEndCard({ item }: { item: WorkflowEndItem }) {
                       />
                     </span>
                     <span className="whitespace-nowrap text-right text-muted tabular-nums">
-                      {formatDuration(node.workingMs)}
+                      {formatDuration(lang, node.workingMs)}
                     </span>
                   </div>
                 ))}

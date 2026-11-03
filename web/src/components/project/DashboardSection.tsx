@@ -18,6 +18,7 @@ import { getProjectDashboard, type DashboardIcon, type ProjectDashboard } from '
 import { formatDateTime, formatRelative } from '../../lib/format';
 import { DiskSection } from './DiskSection';
 import { ProjectRulesTile } from '../rules/RulesSection';
+import { useLang } from '../../i18n';
 
 const ICONS: Record<DashboardIcon, ReactNode> = {
   sessions: <LayersIcon />,
@@ -36,6 +37,7 @@ export function DashboardSection({
   projectId: string;
   onOpenSession: (sessionId: string) => void;
 }) {
+  const lang = useLang();
   const [data, setData] = useState<ProjectDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -139,9 +141,9 @@ export function DashboardSection({
                     </span>
                     <span
                       className="w-24 shrink-0 text-right font-mono text-xs text-faint tabular-nums"
-                      title={formatDateTime(session.updatedAt)}
+                      title={formatDateTime(lang, session.updatedAt)}
                     >
-                      {formatRelative(session.updatedAt)}
+                      {formatRelative(lang, session.updatedAt)}
                     </span>
                   </button>
                 </li>

@@ -295,7 +295,7 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
             </div>
             {repo.branchChanged && (
               <div className="text-xs text-err">
-                {t('branchChangedSince', { branch: repo.originBranch })}
+                {t('branchChangedSince', { branch: repo.originBranch ?? '' })}
               </div>
             )}
           </Card>

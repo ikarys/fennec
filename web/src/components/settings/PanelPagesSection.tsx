@@ -5,6 +5,7 @@ import { Card } from '../ui/Card';
 import { Section, type SectionSave } from '../ui/Section';
 import { TextInput } from '../ui/Field';
 import { ChevronDownIcon, ChevronUpIcon, PlusIcon, TrashIcon } from '../Icons';
+import { useLang, useT } from '../../i18n';
 
 const MAX_PAGES = 12;
 
@@ -44,8 +45,10 @@ interface PanelPagesSectionProps {
 }
 
 export function PanelPagesSection({ value, onChange, save }: PanelPagesSectionProps) {
-  const pages = panelPages(value);
-  const alwaysShown = `La première page affiche toujours : ${PANEL_BLOCKS.filter((block) => block.core).map((block) => block.title).join(', ')}.`;
+  const t = useT();
+  const lang = useLang();
+  const pages = panelPages(lang, value);
+  const alwaysShown = `La première page affiche toujours : ${PANEL_BLOCKS.filter((block) => block.core).map((block) => t(block.titleKey)).join(', ')}.`;
 
   const updatePage = (index: number, next: PanelPage): void => {
     onChange(pages.map((page, i) => (i === index ? next : page)));
@@ -99,7 +102,7 @@ export function PanelPagesSection({ value, onChange, save }: PanelPagesSectionPr
                         onChange={() => updatePage(index, { ...page, blocks: toggleBlock(blocks, id) })}
                         className="h-4 w-4 accent-[var(--accent)]"
                       />
-                      <span>{panelBlock(id).title}</span>
+                      <span>{t(panelBlock(id).titleKey)}</span>
                     </label>
                     <Button
                       variant="ghost"
@@ -133,7 +136,7 @@ export function PanelPagesSection({ value, onChange, save }: PanelPagesSectionPr
                       onChange={() => updatePage(index, { ...page, blocks: toggleBlock(blocks, block.id) })}
                       className="h-4 w-4 accent-[var(--accent)]"
                     />
-                    <span className="grow">{block.title}</span>
+                    <span className="grow">{t(block.titleKey)}</span>
                   </label>
                 ))}
               </div>

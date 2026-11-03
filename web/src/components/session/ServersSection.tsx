@@ -7,7 +7,7 @@ import { Button, buttonClass } from '../ui/Button';
 import { Panel } from '../ui/Panel';
 import { panelBlock } from '../../lib/panelBlocks';
 import { ServerEditor } from './ServerEditor';
-import { useLang, useT } from '../../i18n';
+import { useT } from '../../i18n';
 
 interface ServersSectionProps {
   sessionId: string | null;
@@ -15,7 +15,6 @@ interface ServersSectionProps {
 
 export function ServersSection({ sessionId }: ServersSectionProps) {
   const t = useT();
-  const lang = useLang();
   const [servers, setServers] = useState<ServerView[] | null>(null);
   const [busyName, setBusyName] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -64,7 +63,7 @@ export function ServersSection({ sessionId }: ServersSectionProps) {
   return (
     <Panel
       id="servers"
-      title={t(lang, panelBlock('servers').titleKey)}
+      title={t(panelBlock('servers').titleKey)}
       icon={<ServerIcon className="h-3.5 w-3.5" />}
       iconTone={runningCount > 0 ? 'accent' : 'neutral'}
       summary={summary}

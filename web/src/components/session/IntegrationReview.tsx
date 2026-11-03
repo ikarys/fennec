@@ -8,7 +8,7 @@ import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import type { BadgeTone } from '../ui/Badge';
 import { SectionLabel } from '../ui/SectionLabel';
-import { useLang, useT } from '../../i18n';
+import { useT } from '../../i18n';
 import type { MsgKey } from '../../i18n/messages';
 
 // `protected` has its own badge, shown before these.
@@ -66,7 +66,6 @@ interface IntegrationReviewProps {
 
 export function IntegrationReview({ preview, projectId, narrating, onNarrate }: IntegrationReviewProps) {
   const t = useT();
-  const lang = useLang();
   return (
     <>
       <section className="flex flex-col gap-1.5">
@@ -131,8 +130,8 @@ export function IntegrationReview({ preview, projectId, narrating, onNarrate }: 
                 <span>{t('allFiles')}</span>
                 {preview.commonSignals.map((signal) =>
                   signal === 'protected' ? null : (
-                    <Badge key={signal} tone={SIGNAL_KEYS[signal].tone} title={t(lang, SIGNAL_KEYS[signal].title)}>
-                      {t(lang, SIGNAL_KEYS[signal].label)}
+                    <Badge key={signal} tone={SIGNAL_KEYS[signal].tone} title={t(SIGNAL_KEYS[signal].title)}>
+                      {t(SIGNAL_KEYS[signal].label)}
                     </Badge>
                   ),
                 )}
@@ -158,8 +157,8 @@ export function IntegrationReview({ preview, projectId, narrating, onNarrate }: 
                   )}
                   {file.signals.map((signal) =>
                     signal === 'protected' || preview.commonSignals.includes(signal) ? null : (
-                      <Badge key={signal} tone={SIGNAL_KEYS[signal].tone} title={t(lang, SIGNAL_KEYS[signal].title)}>
-                        {t(lang, SIGNAL_KEYS[signal].label)}
+                      <Badge key={signal} tone={SIGNAL_KEYS[signal].tone} title={t(SIGNAL_KEYS[signal].title)}>
+                        {t(SIGNAL_KEYS[signal].label)}
                       </Badge>
                     ),
                   )}

@@ -8,6 +8,7 @@ import { CheckIcon, ChevronDownIcon, ChevronRightIcon, MoonIcon, ReviewIcon } fr
 import { Card } from '../../ui/Card';
 import { formatRelative } from '../../../lib/format';
 import { IdeaStatusBadge } from './IdeaStatusBadge';
+import { useLang } from '../../../i18n';
 import { IdeaMeta } from './IdeaMeta';
 import type { IdeaBoard } from '../../../lib/ideas';
 
@@ -31,6 +32,7 @@ export function NightReport({
 }) {
   // Open by default: the report is what the human reads first after a run.
   const [open, setOpen] = useState(true);
+  const lang = useLang();
 
   const badges: { label: string; tone: 'accent' | 'ok' | 'err' }[] = [];
   if (report.summary.review > 0)
@@ -67,7 +69,7 @@ export function NightReport({
           {report.autonomous ? 'Rapport de la nuit' : 'Rapport de la dernière file'}
         </h3>
         <span className="text-xs text-muted" title={report.reason}>
-          {formatRelative(report.finishedAt)}
+          {formatRelative(lang, report.finishedAt)}
         </span>
         {badges.length > 0 ? (
           <div className="flex flex-wrap items-center gap-1.5">

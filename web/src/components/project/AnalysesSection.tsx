@@ -6,6 +6,7 @@ import { AlertIcon, ExternalIcon, LayersIcon, PlayIcon, WandIcon } from '../Icon
 import { type SessionSummary } from '../../lib/api';
 import { formatDateTime, formatRelative } from '../../lib/format';
 import { QuestionForm } from './QuestionForm';
+import { useLang } from '../../i18n';
 
 /** What a project page can ask an agent to analyse: each one opens a session on a read-only agent. */
 const ANALYSES = [
@@ -54,6 +55,7 @@ export function AnalysesSection({
   onStart: (prompt: string, mode: string) => void;
   onOpenSession: (sessionId: string) => void;
 }) {
+  const lang = useLang();
   const [pending, setPending] = useState<Analysis | null>(null);
 
   return (
@@ -110,7 +112,7 @@ export function AnalysesSection({
                     <span
                       role="link"
                       tabIndex={0}
-                      title={formatDateTime(lastFinished.updatedAt)}
+                      title={formatDateTime(lang, lastFinished.updatedAt)}
                       className="text-xs text-faint underline-offset-2 hover:text-accent-strong hover:underline"
                       onClick={(event) => {
                         event.stopPropagation();
@@ -123,7 +125,7 @@ export function AnalysesSection({
                         }
                       }}
                     >
-                      Dernière : {formatRelative(lastFinished.updatedAt)}
+                      Dernière : {formatRelative(lang, lastFinished.updatedAt)}
                     </span>
                   ) : (
                     <span aria-hidden="true" />

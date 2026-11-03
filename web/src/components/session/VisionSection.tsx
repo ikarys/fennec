@@ -6,8 +6,10 @@ import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Modal } from '../ui/Modal';
 import { Panel } from '../ui/Panel';
+import { useT } from '../../i18n';
 
 export function VisionSection({ images }: { images: SeenImage[] }) {
+  const t = useT();
   const [selected, setSelected] = useState<SeenImage | null>(null);
 
   const closeDialog = () => {
@@ -25,7 +27,7 @@ export function VisionSection({ images }: { images: SeenImage[] }) {
   return (
     <Panel
       id="vision"
-      title={panelBlock('vision').title}
+      title={t(panelBlock('vision').titleKey)}
       icon={<EyeIcon className="h-3.5 w-3.5" />}
       summary={images.length > 0 ? images.length : undefined}
     >
