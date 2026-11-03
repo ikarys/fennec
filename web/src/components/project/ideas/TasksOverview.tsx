@@ -10,10 +10,7 @@ import { StageGroup } from './StageGroup';
 import { ReviewIcon, PlayIcon, BulbIcon, CheckIcon } from '../../Icons';
 import type { TasksSub } from './TasksSection';
 import type { IdeaBoard, IdeaView } from '../../../lib/ideas';
-
-function singularForm(count: number, singular: string, plural: string): string {
-  return count === 0 || count === 1 ? singular : plural;
-}
+import { useT } from '../../../i18n';
 
 export function TasksOverview({
   board,
@@ -36,15 +33,20 @@ export function TasksOverview({
   const running = board.groups.find((g) => g.stage === 'running')?.ideas ?? [];
   const done = board.groups.find((g) => g.stage === 'done')?.ideas ?? [];
   const summary = board.summary;
+  const t = useT();
 
   const attentionParts: string[] = [];
-  if (summary.review > 0) attentionParts.push(`${summary.review} à relire`);
+  if (summary.review > 0) attentionParts.push(t('attentionToReview', { count: summary.review }));
   if (summary.question > 0) {
-    attentionParts.push(`${summary.question} ${singularForm(summary.question, 'question', 'questions')}`);
+    attentionParts.push(
+      t('attentionQuestions', { count: summary.question, s: summary.question > 1 ? 's' : '' })
+    );
   }
   const attentionCount = summary.halted + summary.failed;
   if (attentionCount > 0) {
-    attentionParts.push(`${attentionCount} ${singularForm(attentionCount, 'arrêtée', 'arrêtées')}`);
+    attentionParts.push(
+      t('attentionHalted', { count: attentionCount, s: attentionCount > 1 ? 's' : '' })
+    );
   }
   const yoursDetail = attentionParts.join(' · ');
 
@@ -54,7 +56,7 @@ export function TasksOverview({
         <Tile
           icon={<ReviewIcon />}
           figure={yours.length}
-          label="À décider"
+          label={t('tasksTabYours')}
           detail={yoursDetail}
           tone="accent"
           active={yours.length > 0}
@@ -63,13 +65,13 @@ export function TasksOverview({
         <Tile
           icon={<PlayIcon />}
           figure={running.length}
-          label="En cours"
+          label={t('stageRunning')}
           detail={
             board.queue.running
               ? board.queue.autonomous
-                ? 'file en cours · mode nuit'
-                : 'file en cours'
-              : 'file arrêtée'
+                ? t('queueRunningNight')
+                : t('queueRunning')
+              : t('queueStopped')
           }
           tone="accent"
           active={running.length > 0}
@@ -78,8 +80,8 @@ export function TasksOverview({
         <Tile
           icon={<BulbIcon />}
           figure={board.queue.ready}
-          label="Prêtes"
-          detail={board.queue.next ? `Prochaine : ${board.queue.next.title}` : 'Rien de cadré'}
+          label={t('tasksTabReady')}
+          detail={board.queue.next ? t('nextLabel', { title: board.queue.next.title }) : t('nothingFramed')}
           tone="neutral"
           active={board.queue.ready > 0}
           title={board.queue.next?.text}
@@ -88,8 +90,11 @@ export function TasksOverview({
         <Tile
           icon={<CheckIcon />}
           figure={done.length}
-          label="Terminées"
-          detail={`${summary.integrated} ${singularForm(summary.integrated, 'intégrée', 'intégrées')}`}
+          label={t('tasksTabDone')}
+          detail={t('integratedCount', {
+            count: summary.integrated,
+            s: summary.integrated > 1 ? 's' : ''
+          })}
           tone="ok"
           active={done.length > 0}
           onClick={() => onSelect('done')}

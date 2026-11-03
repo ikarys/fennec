@@ -3,14 +3,9 @@
  */
 import { formatDuration, formatTokens } from '../../../lib/format';
 import type { IdeaBoard, IdeaView } from '../../../lib/ideas';
-import { useLang } from '../../../i18n';
 import { CheckIcon, ClockIcon, CommitIcon, DecisionIcon, FileIcon, TokensIcon } from '../../Icons';
 import { Stat } from '../../ui/Stat';
-
-// French run labels keep the singular for both 0 and 1.
-function frSingularOrPlural(count: number, singular: string): string {
-  return count === 0 || count === 1 ? singular : `${singular}s`;
-}
+import { useT, useLang } from '../../../i18n';
 
 /**
  * The prop is the fields this component reads, so both board ideas and the
@@ -26,6 +21,7 @@ export function IdeaMeta({
   >;
   caps: IdeaBoard['queue']['caps'];
 }) {
+  const t = useT();
   const lang = useLang();
   return (
     <>
@@ -34,8 +30,8 @@ export function IdeaMeta({
           icon={<ClockIcon />}
           title={
             idea.autonomous && caps.maxMinutes > 0
-              ? `Durée ${formatDuration(lang, idea.durationMs)} sur un plafond de ${caps.maxMinutes} min (mode nuit)`
-              : `Durée ${formatDuration(lang, idea.durationMs)}`
+              ? t('durationOnCap', { duration: formatDuration(lang, idea.durationMs), max: caps.maxMinutes })
+              : t('durationPlain', { duration: formatDuration(lang, idea.durationMs) })
           }
         >
           {formatDuration(lang, idea.durationMs)}
@@ -46,8 +42,8 @@ export function IdeaMeta({
           icon={<TokensIcon />}
           title={
             idea.autonomous && caps.maxTokens > 0
-              ? `${formatTokens(lang, idea.tokens)} tokens sur un plafond de ${formatTokens(lang, caps.maxTokens)}`
-              : `${formatTokens(lang, idea.tokens)} tokens`
+              ? t('tokensOnCap', { tokens: formatTokens(lang, idea.tokens), max: formatTokens(lang, caps.maxTokens) })
+              : t('tokensPlain', { tokens: formatTokens(lang, idea.tokens) })
           }
         >
           {formatTokens(lang, idea.tokens)}
@@ -63,7 +59,12 @@ export function IdeaMeta({
                 ? 'ok'
                 : 'neutral'
           }
-          title={`Critères : ${idea.criteria.passed} ${frSingularOrPlural(idea.criteria.passed, 'validé')} · ${idea.criteria.failed} ${frSingularOrPlural(idea.criteria.failed, 'échoué')} · ${idea.criteria.pending} en attente`}
+          title={t('criteriaTitle', {
+            passed: idea.criteria.passed,
+            failed: idea.criteria.failed,
+            pending: idea.criteria.pending,
+            s: idea.criteria.passed > 1 || idea.criteria.failed > 1 ? 's' : ''
+          })}
         >
           {`${idea.criteria.passed}/${idea.criteria.passed + idea.criteria.failed + idea.criteria.pending}`}
         </Stat>
@@ -71,7 +72,7 @@ export function IdeaMeta({
       {idea.decisions.length > 0 ? (
         <Stat
           icon={<DecisionIcon />}
-          title={`${idea.decisions.length} ${frSingularOrPlural(idea.decisions.length, 'décision')}\n${idea.decisions.map((d) => `${d.title} : ${d.choice}`).join('\n')}`}
+          title={`${t('decisionsTitle', { count: idea.decisions.length, s: idea.decisions.length > 1 ? 's' : '' })}\n${idea.decisions.map((d) => `${d.title} : ${d.choice}`).join('\n')}`}
         >
           {idea.decisions.length}
         </Stat>
@@ -80,14 +81,14 @@ export function IdeaMeta({
         <>
           <Stat
             icon={<CommitIcon />}
-            title={`${idea.commits} ${frSingularOrPlural(idea.commits, 'commit')}`}
+            title={t('commitsCount', { count: idea.commits, s: idea.commits > 1 ? 's' : '' })}
           >
             {idea.commits}
           </Stat>
           {idea.files != null ? (
             <Stat
               icon={<FileIcon />}
-              title={`${idea.files} ${frSingularOrPlural(idea.files, 'fichier')} ${frSingularOrPlural(idea.files, 'modifié')}`}
+              title={t('filesModified', { count: idea.files, s: idea.files > 1 ? 's' : '' })}
             >
               {idea.files}
             </Stat>

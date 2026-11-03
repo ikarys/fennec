@@ -1,5 +1,6 @@
 import { Section, type SectionSave } from '../ui/Section';
 import { FieldRow, TextArea } from '../ui/Field';
+import { useT } from '../../i18n';
 
 export function InstructionsSection({
   value,
@@ -8,20 +9,18 @@ export function InstructionsSection({
 }: {
   value: string;
   onChange: (value: string) => void;
-  /** The group's own save: its dot and its "Enregistrer". */
+  /** The group's own save: its dot and its "Save". */
   save?: SectionSave;
 }) {
+  const t = useT();
   return (
-    <Section title="Instructions globales" save={save}>
-      <FieldRow
-        label="Instructions"
-        hint="Ajoutées au prompt système de chaque nouvelle session, avant les fichiers AGENTS.md du projet. Une session en cours garde le prompt de son premier tour."
-      >
+    <Section title={t('globalInstructionsTitle')} save={save}>
+      <FieldRow label={t('instructionsLabel')} hint={t('instructionsHint')}>
         <TextArea
           rows={16}
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          placeholder="Ex. : Réponds en français, en quelques lignes, sans récapitulatif."
+          placeholder={t('instructionsPlaceholder')}
           className="w-full"
         />
       </FieldRow>

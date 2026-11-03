@@ -9,7 +9,7 @@ import { TextArea } from '../../ui/Field';
 import { CloseIcon, FileIcon, PaperclipIcon } from '../../Icons';
 import { addIdea, type IdeaBoard } from '../../../lib/ideas';
 import { readFiles, type FileAttachmentInput } from '../../../lib/attachments';
-import { useLang } from '../../../i18n';
+import { useT, useLang } from '../../../i18n';
 
 export function NewIdeaDialog({
   projectId,
@@ -23,6 +23,7 @@ export function NewIdeaDialog({
   onClose: () => void;
 }) {
   const lang = useLang();
+  const t = useT();
   const [text, setText] = useState('');
   const [attachments, setAttachments] = useState<FileAttachmentInput[]>([]);
   const [attachError, setAttachError] = useState<string | null>(null);
@@ -82,16 +83,16 @@ export function NewIdeaDialog({
   };
 
   return (
-    <Modal open={open} onClose={onClose} busy={busy} label="Nouvelle idée">
+    <Modal open={open} onClose={onClose} busy={busy} label={t('newIdea')}>
       <div className="flex flex-col gap-3 p-4">
         <div className="flex items-center justify-between">
-          <h2 className="m-0 text-sm font-medium">Nouvelle idée</h2>
+          <h2 className="m-0 text-sm font-medium">{t('newIdea')}</h2>
           <Button
             variant="ghost"
             size="sm"
             iconOnly
-            title="Fermer"
-            aria-label="Fermer"
+            title={t('close')}
+            aria-label={t('close')}
             onClick={onClose}
           >
             <CloseIcon className="h-4 w-4" />
@@ -101,7 +102,7 @@ export function NewIdeaDialog({
         <TextArea
           autoFocus
           rows={4}
-          placeholder={'L’idée, en quelques lignes…\nCe qu’elle doit changer, pourquoi, ce qui la rendra faite.'}
+          placeholder={t('newIdeaPlaceholder')}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onPaste={handlePaste}
@@ -119,7 +120,7 @@ export function NewIdeaDialog({
                   />
                   <button
                     type="button"
-                    aria-label={`Retirer ${attachment.filename}`}
+                    aria-label={t('removeAttachment', { name: attachment.filename })}
                     onClick={() =>
                       setAttachments((current) => current.filter((_, j) => j !== i))
                     }
@@ -139,7 +140,7 @@ export function NewIdeaDialog({
                   </span>
                   <button
                     type="button"
-                    aria-label={`Retirer ${attachment.filename}`}
+                    aria-label={t('removeAttachment', { name: attachment.filename })}
                     onClick={() =>
                       setAttachments((current) => current.filter((_, j) => j !== i))
                     }
@@ -153,9 +154,7 @@ export function NewIdeaDialog({
           </div>
         ) : null}
 
-        <p className="m-0 text-xs text-faint">
-          Coller une image avec Ctrl+V, ou joindre un fichier
-        </p>
+        <p className="m-0 text-xs text-faint">{t('pasteImageHint')}</p>
         {attachError ? <p className="m-0 text-xs text-err">{attachError}</p> : null}
 
         <div className="flex items-center justify-between border-t border-border pt-3">
@@ -171,8 +170,8 @@ export function NewIdeaDialog({
               variant="ghost"
               size="sm"
               iconOnly
-              title="Joindre un fichier ou une image"
-              aria-label="Joindre un fichier ou une image"
+              title={t('attachFileTitle')}
+              aria-label={t('attachFileTitle')}
               onClick={() => fileInputRef.current?.click()}
             >
               <PaperclipIcon className="h-4 w-4" />
@@ -180,14 +179,14 @@ export function NewIdeaDialog({
           </div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" onClick={onClose}>
-              Annuler
+              {t('cancel')}
             </Button>
             <Button
               variant="primary"
               disabled={!text.trim() || busy}
               onClick={() => void handleAdd()}
             >
-              Ajouter l’idée
+              {t('addIdeaBtn')}
             </Button>
           </div>
         </div>

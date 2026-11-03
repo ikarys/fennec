@@ -2,6 +2,7 @@
 import type { Project } from '../../lib/api';
 import { StarIcon } from '../Icons';
 import { Button } from '../ui/Button';
+import { useT } from '../../i18n';
 
 export function FavoriteButton({
   project,
@@ -10,7 +11,8 @@ export function FavoriteButton({
   project: Project;
   onToggle: (projectId: string, favorite: boolean) => void;
 }) {
-  const label = project.favorite ? 'Retirer des favoris' : 'Mettre en favori';
+  const t = useT();
+  const label = project.favorite ? t('removeFavorite') : t('addFavorite');
   return (
     <Button
       variant="ghost"

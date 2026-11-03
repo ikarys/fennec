@@ -18,7 +18,7 @@ import { getProjectDashboard, type DashboardIcon, type ProjectDashboard } from '
 import { formatDateTime, formatRelative } from '../../lib/format';
 import { DiskSection } from './DiskSection';
 import { ProjectRulesTile } from '../rules/RulesSection';
-import { useLang } from '../../i18n';
+import { useT, useLang } from '../../i18n';
 
 const ICONS: Record<DashboardIcon, ReactNode> = {
   sessions: <LayersIcon />,
@@ -38,6 +38,7 @@ export function DashboardSection({
   onOpenSession: (sessionId: string) => void;
 }) {
   const lang = useLang();
+  const t = useT();
   const [data, setData] = useState<ProjectDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +57,7 @@ export function DashboardSection({
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Erreur inconnue');
+          setError(err instanceof Error ? err.message : t('unknownError'));
           setLoading(false);
         }
       });
@@ -65,9 +66,9 @@ export function DashboardSection({
     };
   }, [projectId]);
 
-  if (loading) return <p className="text-muted">Chargement…</p>;
+  if (loading) return <p className="text-muted">{t('loading')}</p>;
   if (error) return <p className="text-err">{error}</p>;
-  if (!data) return <p className="text-muted">Chargement…</p>;
+  if (!data) return <p className="text-muted">{t('loading')}</p>;
 
   return (
     <div className="flex flex-col gap-4">
@@ -95,7 +96,7 @@ export function DashboardSection({
       </div>
 
       <Section
-        title="Sessions récentes"
+        title={t('recentSessions')}
         flush
         actions={
           <Button
@@ -105,18 +106,18 @@ export function DashboardSection({
               window.location.hash = '#/project/' + encodeURIComponent(projectId) + '/sessions';
             }}
           >
-            Toutes les sessions
+            {t('allSessions')}
           </Button>
         }
       >
         {data.recent.length === 0 ? (
-          <Card className="px-4 py-6 text-center text-sm text-muted">Aucune session.</Card>
+          <Card className="px-4 py-6 text-center text-sm text-muted">{t('noSessions')}</Card>
         ) : (
           <Card className="overflow-hidden">
             <div className="flex items-center gap-3 border-b border-border bg-raised px-4 py-2 text-xs uppercase tracking-wide text-faint">
-              <span className="min-w-0 grow">Titre</span>
-              <span className="w-28 shrink-0">Statut</span>
-              <span className="w-24 shrink-0 text-right">Modifié</span>
+              <span className="min-w-0 grow">{t('titleCol')}</span>
+              <span className="w-28 shrink-0">{t('statusCol')}</span>
+              <span className="w-24 shrink-0 text-right">{t('modifiedCol')}</span>
             </div>
             <ul className="divide-y divide-border">
               {data.recent.map((session) => (
@@ -134,9 +135,9 @@ export function DashboardSection({
                     </span>
                     <span className="w-28 shrink-0">
                       {session.running ? (
-                        <Badge tone="accent" dot pulse>en cours</Badge>
+                        <Badge tone="accent" dot pulse>{t('running')}</Badge>
                       ) : session.awaiting ? (
-                        <Badge tone="accent" solid>à intégrer</Badge>
+                        <Badge tone="accent" solid>{t('toIntegrateBadge')}</Badge>
                       ) : null}
                     </span>
                     <span

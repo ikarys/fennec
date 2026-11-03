@@ -40,7 +40,7 @@ function uniquePageName(pages: PanelPage[]): string {
 interface PanelPagesSectionProps {
   value: PanelPage[] | null;
   onChange: (value: PanelPage[] | null) => void;
-  /** The group's own save: its dot and its "Enregistrer". */
+  /** The group's own save: its dot and its "Save". */
   save?: SectionSave;
 }
 
@@ -48,7 +48,9 @@ export function PanelPagesSection({ value, onChange, save }: PanelPagesSectionPr
   const t = useT();
   const lang = useLang();
   const pages = panelPages(lang, value);
-  const alwaysShown = `La première page affiche toujours : ${PANEL_BLOCKS.filter((block) => block.core).map((block) => t(block.titleKey)).join(', ')}.`;
+  const alwaysShown = t('panelFirstPageAlways', {
+    blocks: PANEL_BLOCKS.filter((block) => block.core).map((block) => t(block.titleKey)).join(', ')
+  });
 
   const updatePage = (index: number, next: PanelPage): void => {
     onChange(pages.map((page, i) => (i === index ? next : page)));
@@ -66,7 +68,7 @@ export function PanelPagesSection({ value, onChange, save }: PanelPagesSectionPr
   };
 
   return (
-    <Section title="Panneau de contexte" description={alwaysShown} save={save}>
+    <Section title={t('contextPanelTitle')} description={alwaysShown} save={save}>
       <div className="flex flex-col gap-4">
         {pages.map((page, index) => {
           // Edits work on what the panel shows, so unknown stored ids drop out on the first change.
@@ -75,7 +77,7 @@ export function PanelPagesSection({ value, onChange, save }: PanelPagesSectionPr
             <Card key={index} variant="inset">
               <div className="flex items-center gap-2">
                 <TextInput
-                  aria-label="Nom de la page"
+                  aria-label={t('panelPageNameLabel')}
                   value={page.name}
                   onChange={(event) => updatePage(index, { ...page, name: event.target.value })}
                   className="max-w-xs grow"
@@ -84,8 +86,8 @@ export function PanelPagesSection({ value, onChange, save }: PanelPagesSectionPr
                   variant="ghost"
                   size="sm"
                   iconOnly
-                  aria-label="Supprimer"
-                  title="Supprimer la page"
+                  aria-label={t('mcpRemove')}
+                  title={t('panelPageRemoveTitle')}
                   onClick={() => removePage(index)}
                   disabled={index === 0}
                 >
@@ -110,8 +112,8 @@ export function PanelPagesSection({ value, onChange, save }: PanelPagesSectionPr
                       iconOnly
                       onClick={() => updatePage(index, { ...page, blocks: moveBlock(blocks, id, -1) })}
                       disabled={blockIndex === 0}
-                      aria-label="Monter"
-                      title="Monter"
+                      aria-label={t('panelMoveUp')}
+                      title={t('panelMoveUp')}
                     >
                       <ChevronUpIcon className="h-4 w-4" />
                     </Button>
@@ -121,8 +123,8 @@ export function PanelPagesSection({ value, onChange, save }: PanelPagesSectionPr
                       iconOnly
                       onClick={() => updatePage(index, { ...page, blocks: moveBlock(blocks, id, 1) })}
                       disabled={blockIndex === blocks.length - 1}
-                      aria-label="Descendre"
-                      title="Descendre"
+                      aria-label={t('panelMoveDown')}
+                      title={t('panelMoveDown')}
                     >
                       <ChevronDownIcon className="h-4 w-4" />
                     </Button>
@@ -149,15 +151,15 @@ export function PanelPagesSection({ value, onChange, save }: PanelPagesSectionPr
           variant="secondary"
           size="sm"
           iconOnly
-          aria-label="Ajouter une page"
-          title="Ajouter une page"
+          aria-label={t('panelAddPage')}
+          title={t('panelAddPage')}
           onClick={addPage}
           disabled={pages.length >= MAX_PAGES}
         >
           <PlusIcon className="h-4 w-4" />
         </Button>
         <Button variant="ghost" size="sm" onClick={() => onChange(null)} disabled={value === null}>
-          Réinitialiser
+          {t('reset')}
         </Button>
       </div>
     </Section>

@@ -4,6 +4,7 @@ import { TextInput, Select } from '../ui/Field';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { connectMcp, type McpServer } from '../../lib/api';
+import { useT } from '../../i18n';
 
 function emptyServer(): McpServer {
   return {
@@ -46,21 +47,22 @@ function ServerCard({
     onPatch({ disabledTools: disabled });
   }
 
+  const t = useT();
   return (
     <Card variant="inset">
       <div className="flex items-center gap-2">
         <TextInput
           value={server.name}
           onChange={(event) => onPatch({ name: event.target.value })}
-          placeholder="nom"
+          placeholder={t('mcpNamePlaceholder')}
           className="w-40"
-          aria-label="Nom du serveur MCP"
+          aria-label={t('mcpNameLabel')}
         />
         <Select
           value={server.transport}
           onChange={(event) => onPatch({ transport: event.target.value as McpServer['transport'] })}
           className="w-28"
-          aria-label="Transport"
+          aria-label={t('mcpTransportLabel')}
         >
           <option value="stdio">stdio</option>
           <option value="http">http</option>
@@ -70,27 +72,27 @@ function ServerCard({
             <TextInput
               value={server.command ?? ''}
               onChange={(event) => onPatch({ command: event.target.value })}
-              placeholder="commande"
+              placeholder={t('mcpCommandPlaceholder')}
               className="w-40"
-              aria-label="Commande"
+              aria-label={t('mcpCommandLabel')}
             />
             <TextInput
               value={server.args.join(' ')}
               onChange={(event) =>
                 onPatch({ args: event.target.value.split(/\s+/).filter((part) => part !== '') })
               }
-              placeholder="arguments"
+              placeholder={t('mcpArgsPlaceholder')}
               className="w-40"
-              aria-label="Arguments"
+              aria-label={t('mcpArgsLabel')}
             />
           </>
         ) : (
           <TextInput
             value={server.url ?? ''}
             onChange={(event) => onPatch({ url: event.target.value })}
-            placeholder="https://…"
+            placeholder={t('mcpUrlPlaceholder')}
             className="w-64"
-            aria-label="URL"
+            aria-label={t('mcpUrlLabel')}
           />
         )}
         <div className="ml-auto flex items-center gap-2">
@@ -99,11 +101,11 @@ function ServerCard({
             size="sm"
             onClick={onConnect}
             disabled={connecting || server.name === '' || !saved}
-            title={!saved ? 'Enregistrez les réglages d’abord' : undefined}
+            title={!saved ? t('mcpSaveFirst') : undefined}
           >
-            {connecting ? 'Connexion…' : 'Connecter'}
+            {connecting ? t('mcpConnecting') : t('mcpConnect')}
           </Button>
-          <Button variant="ghost" size="sm" iconOnly onClick={onRemove} aria-label="Supprimer">
+          <Button variant="ghost" size="sm" iconOnly onClick={onRemove} aria-label={t('mcpRemove')}>
             ×
           </Button>
         </div>
@@ -117,7 +119,7 @@ function ServerCard({
             onChange={(event) => onPatch({ disabled: !event.target.checked })}
             className="h-4 w-4 accent-[var(--accent)]"
           />
-          Actif
+          {t('mcpActive')}
         </label>
         <label className="flex items-center gap-2 text-sm text-text">
           <input
@@ -126,30 +128,30 @@ function ServerCard({
             onChange={(event) => onPatch({ visible: event.target.checked })}
             className="h-4 w-4 accent-[var(--accent)]"
           />
-          Affiché dans le composer
+          {t('mcpShown')}
         </label>
         {server.cachedTools.length > 0 && (
-          <span className="text-xs text-muted">{server.cachedTools.length} outil(s)</span>
+          <span className="text-xs text-muted">
+            {t('mcpToolCount', { count: server.cachedTools.length, s: server.cachedTools.length > 1 ? 's' : '' })}
+          </span>
         )}
       </div>
 
       <div className="flex items-center gap-2">
         <label className="text-sm text-text" htmlFor={`mcp-auth-${index}`}>
-          Token d'authentification
+          {t('mcpAuthTokenLabel')}
         </label>
         <TextInput
           id={`mcp-auth-${index}`}
           type="password"
           value={server.authToken ?? ''}
           onChange={(event) => onPatch({ authToken: event.target.value || null })}
-          placeholder="optionnel"
+          placeholder={t('mcpAuthTokenPlaceholder')}
           className="w-64"
-          aria-label="Token d'authentification"
+          aria-label={t('mcpAuthTokenLabel')}
         />
         <span className="text-xs text-muted">
-          {server.transport === 'http'
-            ? 'envoyé comme entête Bearer'
-            : 'variable d’environnement MCP_AUTH_TOKEN'}
+          {server.transport === 'http' ? t('mcpAuthTokenBearer') : t('mcpAuthTokenEnv')}
         </span>
       </div>
 
@@ -184,9 +186,10 @@ export function McpSection({
   value: McpServer[];
   onChange: (value: McpServer[]) => void;
   savedNames: Set<string>;
-  /** The group's own save: its dot and its "Enregistrer". */
+  /** The group's own save: its dot and its "Save". */
   save?: SectionSave;
 }) {
+  const t = useT();
   const [connecting, setConnecting] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -211,18 +214,18 @@ export function McpSection({
 
   return (
     <Section
-      title="MCP"
-      description="Les serveurs d'outils du modèle (Model Context Protocol). « Actif » envoie leurs outils au modèle ; « Affiché » les montre dans le dropdown du composer. Connecter liste les outils d'un serveur. Le réglage par session du composer prime sur « Actif »."
+      title={t('mcpTitle')}
+      description={t('mcpHint')}
       actions={
         <Button variant="primary" onClick={() => onChange([...value, emptyServer()])}>
-          Nouveau serveur
+          {t('newServer')}
         </Button>
       }
       save={save}
     >
       {error ? <p className="text-xs text-err">{error}</p> : null}
       {value.length === 0 ? (
-        <p className="text-sm text-muted">Aucun serveur MCP.</p>
+        <p className="text-sm text-muted">{t('noMcpServers')}</p>
       ) : (
         value.map((server, index) => (
           <ServerCard
