@@ -160,7 +160,8 @@ worktrees and branches, rules, ideas); its source folder only when the human tic
 fennec's store (`web/project_delete.rs`).
 UI languages, done: English by default, French on the Settings page; every UI string comes from `web/src/i18n/messages.ts`,
 whose `fr` is typed against `en`'s keys (a missing translation is a compile error); components call `useT()`, pure
-lib functions take a `lang`. The texts the server builds (the Insight tiles) are still French.
+lib functions take a `lang`. The server's display texts follow the same choice through `domain/lang.rs` (the Insight
+page and the cost detail so far; the rest is listed in `docs/next-steps.md`).
 Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
 1. To be chosen among the remaining capabilities C* of the Notion definition.
@@ -225,6 +226,7 @@ crates/fennec/src/
     workdir_notice.rs  tells the model its working directory moved; session_name.rs the session name's prompt and cleanup
     agent_file.rs      an agent as the Settings form edits it; session_skills.rs a session's skills folded from the log
     module_map/notes.rs what the map says about a module, read from its leading comment
+    lang.rs            the language the human reads fennec in (Settings); the server-built texts follow it
     id.rs, clock.rs
     (domain uses `rules::path`, the gitignore-like matcher, as a library: one matcher for rules, protection and architecture)
   agent/             application layer: the agent loop

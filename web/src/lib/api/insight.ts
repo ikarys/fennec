@@ -2,6 +2,7 @@ import { request } from "./request";
 import type { ContextComposition } from "./sessions";
 
 export interface InsightCard {
+  kind: 'calls' | 'input' | 'cache' | 'lostCache' | 'output' | 'cost';
   label: string;
   value: string;
   detail: string;

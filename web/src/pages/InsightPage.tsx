@@ -1,5 +1,5 @@
 import { useEffect, useState, type ComponentType } from 'react';
-import { getInsight, type InsightPeriod, type InsightRow, type InsightView } from '../lib/api';
+import { getInsight, type InsightCard, type InsightPeriod, type InsightRow, type InsightView } from '../lib/api';
 import {
   ActivityIcon,
   AlertIcon,
@@ -29,18 +29,18 @@ const PERIOD_SEGMENTS: Segment<InsightPeriod>[] = [
   { value: 'all', label: 'insightPeriodAll' }
 ];
 
-/** One tone per KPI tile, keyed on the server's label; the same Tile as the risks tab. */
-const CARD_TONE: Record<string, { Icon: Icon; tone: BadgeTone }> = {
-  'Appels': { Icon: ActivityIcon, tone: 'accent' },
-  'Entrée': { Icon: InboxIcon, tone: 'neutral' },
-  'Cache': { Icon: LayersIcon, tone: 'ok' },
-  'Cache perdu': { Icon: AlertIcon, tone: 'err' },
-  'Sortie': { Icon: ArrowUpIcon, tone: 'neutral' },
-  'Coût estimé': { Icon: CoinIcon, tone: 'attention' }
+/** One tone per KPI tile, keyed on the server's stable kind; the same Tile as the risks tab. */
+const CARD_TONE: Record<InsightCard['kind'], { Icon: Icon; tone: BadgeTone }> = {
+  calls: { Icon: ActivityIcon, tone: 'accent' },
+  input: { Icon: InboxIcon, tone: 'neutral' },
+  cache: { Icon: LayersIcon, tone: 'ok' },
+  lostCache: { Icon: AlertIcon, tone: 'err' },
+  output: { Icon: ArrowUpIcon, tone: 'neutral' },
+  cost: { Icon: CoinIcon, tone: 'attention' }
 };
 
-function KpiCard({ label, value, detail }: { label: string; value: string; detail: string }) {
-  const { Icon, tone } = CARD_TONE[label] ?? { Icon: ActivityIcon, tone: 'neutral' };
+function KpiCard({ kind, label, value, detail }: { kind: InsightCard['kind']; label: string; value: string; detail: string }) {
+  const { Icon, tone } = CARD_TONE[kind];
   return <Tile icon={<Icon />} label={label} figure={value} detail={detail} title={detail} tone={tone} active={tone !== 'neutral'} />;
 }
 
@@ -202,7 +202,7 @@ export function InsightPage() {
             {view.cards.length > 0 ? (
               <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
                 {view.cards.map((card) => (
-                  <KpiCard key={card.label} label={card.label} value={card.value} detail={card.detail} />
+                  <KpiCard key={card.kind} kind={card.kind} label={card.label} value={card.value} detail={card.detail} />
                 ))}
               </div>
             ) : null}
