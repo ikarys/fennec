@@ -1,110 +1,23 @@
-import { DecisionList } from './DecisionList';
 import { useEffect, useState } from 'react';
-import type { Blocker, IntegrationConflict, IntegrationPreview, ReviewSignal } from '../../lib/api';
-import type { IntegrationResult } from '../../lib/api';
+import type { IntegrationConflict, IntegrationPreview, IntegrationResult } from '../../lib/api';
 import { createSession, getIntegration, integrate, suggestCommitMessage } from '../../lib/api';
 import { completeIdea } from '../../lib/ideas';
-import { CriterionProvenanceBadge, PassedBeforeBadge, criterionDotClass } from './CriteriaSection';
+import { IntegrationReview } from './IntegrationReview';
+import {
+  acknowledgedKinds,
+  blockerSentence,
+  gateState,
+  narrativePrompt,
+  neverAcknowledged,
+  type Acknowledged,
+  type BlockerKind,
+} from '../../lib/integration';
 import { Button } from '../ui/Button';
-import { Badge } from '../ui/Badge';
-import type { BadgeTone } from '../ui/Badge';
 import { Card } from '../ui/Card';
 import { Modal } from '../ui/Modal';
 import { FieldRow, TextArea } from '../ui/Field';
 import { SectionLabel } from '../ui/SectionLabel';
 
-type BlockerKind = Blocker['kind'];
-
-// These blockers cannot be fixed by an acceptance: the merge has nothing to
-// do, it cannot succeed, or it would overwrite the human's uncommitted work.
-const neverAcknowledged = (kind: string) => kind === 'noCommits' || kind === 'conflict' || kind === 'localChanges';
-
-// `protected` has its own badge, shown before these.
-const SIGNAL_LABEL: Record<Exclude<ReviewSignal, 'protected'>, { label: string; tone: BadgeTone; title: string }> = {
-  sensitive: {
-    label: 'zone sensible',
-    tone: 'err',
-    title: 'Fichier dans une zone sensible de .agents/architecture : ta revue est obligatoire.'
-  },
-  bypass: {
-    label: 'contournement',
-    tone: 'err',
-    title: 'Les lignes ajoutées font taire un lint, un contrôle de types ou un test.'
-  },
-  architecture: {
-    label: 'architecture',
-    tone: 'err',
-    title: "Le fichier viole une règle d'architecture."
-  },
-  conflictMarker: {
-    label: 'marqueurs de conflit',
-    tone: 'err',
-    title: 'Des marqueurs de conflit git restent dans les lignes ajoutées.'
-  },
-  testsWeakened: {
-    label: 'tests affaiblis',
-    tone: 'err',
-    title: 'Des tests ou assertions ont été affaiblis dans ce fichier.'
-  },
-  hot: {
-    label: 'souvent modifié',
-    tone: 'accent',
-    title: 'Modifié 5 fois ou plus ces 90 derniers jours.'
-  },
-  untested: {
-    label: 'sans test',
-    tone: 'accent',
-    title: 'Aucun test en ligne et aucun fichier de test du même nom sur la branche.'
-  },
-  large: {
-    label: 'gros changement',
-    tone: 'neutral',
-    title: '200 lignes ou plus modifiées.'
-  }
-};
-
-/** The narrate agent's prompt: the branch, its base and the files in the server's review order. */
-function narrativePrompt(preview: IntegrationPreview): string {
-  const lines = preview.files.map((file, index) => {
-    const signals = file.signals.length ? ` — signals: ${file.signals.join(', ')}` : '';
-    return `${index + 1}. ${file.path} (+${file.added} −${file.removed})${signals}`;
-  });
-
-  return `Narrate the change of branch \`${preview.branch}\` since base \`${preview.base}\`, file by file in this review order:\n${lines.join('\n')}\nUse \`git diff ${preview.base} ${preview.branch} -- <path>\` for each file.`;
-}
-
-function blockerSentence(blocker: Blocker): string {
-  switch (blocker.kind) {
-    case 'noCommits':
-      return 'Aucun commit à intégrer.';
-    case 'conflict':
-      return `Conflit avec ta branche : ${blocker.files.join(', ')}.`;
-    case 'criteriaNotPassed':
-      return `Critères non passés : ${blocker.criteria.join(', ')}.`;
-    case 'noCriteria':
-      return 'Aucun critère : rien n\'a été vérifié.';
-    case 'protectedTouched':
-      return `Fichiers protégés modifiés : ${blocker.paths.join(', ')}.`;
-    case 'sensitiveTouched':
-      return `Zones sensibles modifiées, ta revue est obligatoire : ${blocker.paths.join(', ')}.`;
-    case 'architectureViolated': {
-      const shown = blocker.violations.slice(0, 3).map((v) => `${v.path} : « ${v.line} » (interdit : ${v.forbidden})`);
-      const more = blocker.violations.length - shown.length;
-      return `Règles d'architecture violées : ${shown.join(' ; ')}${more > 0 ? ` (+${more})` : ''}.`;
-    }
-    case 'suppressionsAdded': {
-      const shown = blocker.suppressions.slice(0, 3).map((s) => `${s.path} : « ${s.line} » (${s.marker})`);
-      const more = blocker.suppressions.length - shown.length;
-      return `Vérifications désactivées dans les lignes ajoutées : ${shown.join(' ; ')}${more > 0 ? ` (+${more})` : ''}.`;
-    }
-    case 'testsWeakened':
-      return `Tests affaiblis : ${blocker.testsRemoved} test(s) et ${blocker.assertionsRemoved} assertion(s) en moins (${blocker.paths.join(', ')}).`;
-    case 'branchChanged':
-      return `Le run est parti de ${blocker.from}, tu es maintenant sur ${blocker.to ?? 'un HEAD détaché'} : les commits iraient ailleurs.`;
-    case 'localChanges':
-      return `Changements non commités seraient écrasés : ${blocker.paths.join(', ')} — committe-les ou stash-les avant d'intégrer.`;
-  }
-}
 
 export function IntegrationDialog({ sessionId, open, onClose, projectId }: { sessionId: string; open: boolean; onClose: () => void; projectId: string | null }) {
   const [narrating, setNarrating] = useState(false);
@@ -114,7 +27,7 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
   const [conflict, setConflict] = useState<IntegrationConflict | null>(null);
   const [posting, setPosting] = useState(false);
   const [result, setResult] = useState<IntegrationResult | null>(null);
-  const [acknowledged, setAcknowledged] = useState<Partial<Record<BlockerKind, boolean>>>({});
+  const [acknowledged, setAcknowledged] = useState<Acknowledged>({});
   const [message, setMessage] = useState('');
   const [protectTests, setProtectTests] = useState(false);
   const [removeWorktree, setRemoveWorktree] = useState(true);
@@ -164,25 +77,29 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
     onClose();
   };
 
-  const hasCommits = (preview?.commits.length ?? 0) > 0;
-  const hasUncheckedBlocker =
-    preview?.blockers.some(
-      (blocker) => blocker.kind === 'conflict' || blocker.kind === 'localChanges' || (!neverAcknowledged(blocker.kind) && !acknowledged[blocker.kind]),
-    ) ?? false;
-  const integrateDisabled =
-    loading || posting || (result === null && (!hasCommits || hasUncheckedBlocker || message.trim() === ''));
-  const canFinish = preview !== null && result === null && !hasCommits && preview.idea !== null;
+  const { integrateDisabled, canFinish } = gateState({ preview, acknowledged, result, message, busy: loading || posting });
+
+  const handleNarrate = async () => {
+    if (!preview || !projectId) return;
+    setNarrating(true);
+    try {
+      const created = await createSession(projectId, narrativePrompt(preview), 'narrate');
+      window.location.hash = '#/s/' + encodeURIComponent(created.id);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setNarrating(false);
+    }
+  };
 
   const handleIntegrate = async () => {
     if (!preview) return;
     setPosting(true);
     setError(null);
     setConflict(null);
-    const acknowledgedKinds = preview.blockers
-      .filter((blocker) => !neverAcknowledged(blocker.kind) && acknowledged[blocker.kind])
-      .map((blocker) => blocker.kind);
     try {
-      const response = await integrate(sessionId, acknowledgedKinds, message, protectTests, removeWorktree);
+      const response = await integrate(sessionId, acknowledgedKinds(preview, acknowledged), message, protectTests, removeWorktree);
       setResult(response);
     } catch (integrateError) {
       // A 409 keeps the dialog open: the message says what to do.
@@ -265,134 +182,7 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
 
         {preview && !loading && !result && (
           <div className="flex flex-col gap-3">
-            <section className="flex flex-col gap-1.5">
-              <SectionLabel>Commits</SectionLabel>
-              {preview.commits.length === 0 ? (
-                <div className="text-xs text-muted">Aucun commit.</div>
-              ) : (
-                <details className="text-xs">
-                  <summary className="cursor-pointer select-none text-muted hover:text-text">
-                    {preview.commits.length === 1
-                      ? "1 commit de l'agent, repris tel quel sur ta branche"
-                      : `${preview.commits.length} commits de l'agent, écrasés en un seul sur ta branche`}
-                  </summary>
-                  <div className="mt-1 flex flex-col">
-                    {preview.commits.map((commit) => (
-                      <div key={commit.sha} className="flex items-start gap-2 py-1 text-xs">
-                        <span className="shrink-0 font-mono text-muted">{commit.sha.slice(0, 8)}</span>
-                        <span className="grow break-words text-text">{commit.subject}</span>
-                      </div>
-                    ))}
-                  </div>
-                </details>
-              )}
-            </section>
-
-            <section className="flex flex-col gap-1.5">
-              <SectionLabel className="flex items-center">
-                Fichiers{preview.files.length > 0 && <span className="ml-1 tabular-nums">{preview.files.length}</span>}
-                {preview.files.length > 0 && (
-                  <span className="ml-2 text-xs text-muted">ordre de relecture · vérifié</span>
-                )}
-                {preview.files.length > 0 && projectId && (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="ml-auto"
-                    title="Un agent en lecture seule raconte le changement fichier par fichier, dans cet ordre ; son récit est indicatif."
-                    disabled={narrating}
-                    onClick={async () => {
-                      if (!projectId) return;
-                      setNarrating(true);
-                      try {
-                        const created = await createSession(projectId, narrativePrompt(preview), 'narrate');
-                        window.location.hash = '#/s/' + encodeURIComponent(created.id);
-                        onClose();
-                      } catch (err) {
-                        setError(err instanceof Error ? err.message : String(err));
-                      } finally {
-                        setNarrating(false);
-                      }
-                    }}
-                  >
-                    Raconter
-                  </Button>
-                )}
-              </SectionLabel>
-              {preview.files.length === 0 ? (
-                <div className="text-xs text-muted">Aucun fichier.</div>
-              ) : (
-                <>
-                  {preview.commonSignals.length > 0 && (
-                    <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted">
-                      <span>Tous les fichiers :</span>
-                      {preview.commonSignals.map((signal) =>
-                        signal === 'protected' ? null : (
-                          <Badge key={signal} tone={SIGNAL_LABEL[signal].tone} title={SIGNAL_LABEL[signal].title}>
-                            {SIGNAL_LABEL[signal].label}
-                          </Badge>
-                        ),
-                      )}
-                    </div>
-                  )}
-                  <div className="flex flex-col">
-                    {preview.files.map((file) => (
-                      <div key={file.path} className="flex items-center gap-2 py-1 font-mono text-xs">
-                        <span className="grow overflow-hidden text-left text-ellipsis whitespace-nowrap" title={file.path}>
-                          {file.path}
-                        </span>
-                        {file.protected && <Badge tone="err">protégé</Badge>}
-                        {file.carried && (
-                          <Badge
-                            tone="accent"
-                            title="Le fichier avait des modifications non commitées sur lesquelles l'agent a travaillé : elles entrent dans ce commit."
-                          >
-                            ton travail inclus
-                          </Badge>
-                        )}
-                        {file.signals.map((signal) =>
-                          signal === 'protected' || preview.commonSignals.includes(signal) ? null : (
-                            <Badge key={signal} tone={SIGNAL_LABEL[signal].tone} title={SIGNAL_LABEL[signal].title}>
-                              {SIGNAL_LABEL[signal].label}
-                            </Badge>
-                          ),
-                        )}
-                        <span className="shrink-0 tabular-nums text-ok">+{file.added}</span>
-                        <span className="shrink-0 tabular-nums text-err">−{file.removed}</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-            </section>
-
-            <section className="flex flex-col gap-1.5">
-              <SectionLabel>Critères</SectionLabel>
-              {preview.criteria.length === 0 ? (
-                <div className="text-xs text-muted">Aucun critère.</div>
-              ) : (
-                <div className="flex flex-col">
-                  {preview.criteria.map((criterion) => {
-                    const provenance = criterion.status.type === 'pending' ? undefined : criterion.status.provenance;
-                    const dotClass = criterionDotClass(criterion.status.type, provenance);
-                    return (
-                      <div key={criterion.id} className="flex items-start gap-2 py-1.5 text-xs">
-                        <span aria-hidden className={`mt-1 h-2 w-2 shrink-0 rounded-full ${dotClass}`} />
-                        <span className="shrink-0 font-mono text-muted">{criterion.id}</span>
-                        <span className="grow break-words text-text">{criterion.description}</span>
-                        <PassedBeforeBadge passedBefore={criterion.passedBefore} />
-                        <CriterionProvenanceBadge provenance={provenance} />
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </section>
-
-            <section className="flex flex-col gap-1.5">
-              <SectionLabel>Décisions</SectionLabel>
-              <DecisionList decisions={preview.decisions} />
-            </section>
+            <IntegrationReview preview={preview} projectId={projectId} narrating={narrating} onNarrate={handleNarrate} />
 
             <FieldRow
               label="Message du commit"
