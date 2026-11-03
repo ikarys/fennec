@@ -20,7 +20,7 @@ export function TextArea({ className = '', ...props }: TextareaHTMLAttributes<HT
 }
 
 /** A label above its field, with an optional hint below. */
-export function FieldRow({ label, hint, htmlFor, children }: { label: string; hint?: string; htmlFor?: string; children: React.ReactNode }) {
+export function FieldRow({ label, hint, htmlFor, children }: { label: string; hint?: React.ReactNode; htmlFor?: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
       <label htmlFor={htmlFor} className="text-xs font-medium text-muted">

@@ -12,6 +12,8 @@ import {
   type Acknowledged,
   type BlockerKind,
 } from '../../lib/integration';
+import { AlertIcon, BranchIcon } from '../Icons';
+import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Modal } from '../ui/Modal';
@@ -131,132 +133,172 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
 
   return (
     <Modal open={open} onClose={onClose} busy={posting} label="Intégrer" width="w-[min(92vw,720px)]">
-      <Card className="flex flex-col gap-3 p-4">
-        <div className="flex flex-col gap-1">
-          <h2 className="m-0 text-sm font-semibold">
-            {preview ? `Intégrer dans ${preview.humanBranch ?? 'ta branche'}` : 'Intégrer'}
-          </h2>
-          {preview && (
-            <p className="m-0 text-xs text-muted">
-              Les changements de l'agent deviennent un commit sur ta branche. Rien n'est intégré sans ton clic.
+      <Card className="overflow-hidden">
+        {preview ? (
+          <div className="border-b border-border bg-accent-soft px-4 py-3">
+            <div className="flex items-center gap-2.5">
+              <span className="flex shrink-0 items-center gap-1.5 rounded border border-border bg-raised px-2 py-0.5 font-mono text-xs">
+                <BranchIcon className="h-3 w-3 text-accent" />
+                {preview.humanBranch ?? 'ta branche'}
+              </span>
+              <h2 className="m-0 min-w-0 truncate text-sm font-semibold">
+                Intégrer dans {preview.humanBranch ?? 'ta branche'}
+              </h2>
+              <span className="ml-auto shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-xs text-muted">
+                {preview.commits.length} commit{preview.commits.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+            <div className="mt-1 pl-[33px] text-xs text-muted">
+              {preview.files.length} fichier{preview.files.length !== 1 ? 's' : ''} ·{' '}
+              <span className="text-ok">+{preview.files.reduce((sum, file) => sum + file.added, 0)}</span>{' '}
+              <span className="text-err">−{preview.files.reduce((sum, file) => sum + file.removed, 0)}</span> · les
+              changements de l'agent deviennent un commit sur ta branche — rien n'est intégré sans ton clic
+            </div>
+          </div>
+        ) : (
+          <div className="border-b border-border px-4 py-3">
+            <h2 className="m-0 text-sm font-semibold">Intégrer</h2>
+          </div>
+        )}
+        <div className="flex flex-col gap-3 p-4">
+
+          {loading && <div className="text-xs text-muted">Chargement…</div>}
+          {conflict ? (
+            <div className="rounded-lg border border-err/40 bg-err/10 p-3 text-xs flex flex-col gap-2">
+              <div className="font-semibold text-err">Conflit : rien n'a été intégré</div>
+              <div>Ta branche a modifié les mêmes lignes que l'agent depuis le début de son travail. Le cherry-pick a été annulé : ton dossier est tel qu'avant.</div>
+              <div className="flex flex-col gap-1">
+                {conflict.files.map((file) => (
+                  <div key={file} className="font-mono">{file}</div>
+                ))}
+              </div>
+              <div className="flex flex-col gap-1">
+                <div>Pour résoudre à la main :</div>
+                <button
+                  type="button"
+                  title="Copier la commande"
+                  onClick={() => void navigator.clipboard.writeText(conflict.command)}
+                  className="rounded-lg border border-border bg-code px-2 py-1.5 text-left font-mono text-xs break-all text-text hover:border-border-strong"
+                >
+                  <code>{conflict.command}</code>
+                </button>
+                <div className="text-muted">Ou abandonne ce travail s'il n'est plus utile.</div>
+              </div>
+            </div>
+          ) : error ? (
+            <div className="text-xs text-err">{error}</div>
+          ) : null}
+
+          {result && (
+            <div className="text-xs text-ok">
+              Intégré : {result.commits.length} commits, HEAD {result.head.slice(0, 8)}.
+              {result.protectedTests.length > 0 && ` ${result.protectedTests.length} tests protégés.`}
+              {result.protectError && <span className="text-err"> Tests non protégés : {result.protectError}</span>}
+              {result.worktreeRemoved && ' Dossier de l\'agent supprimé.'}
+              {result.removeError && <span className="text-err"> Dossier non supprimé : {result.removeError}</span>}
+            </div>
+          )}
+
+          {preview && !loading && !result && (
+            <div className="flex flex-col gap-3">
+              <IntegrationReview preview={preview} projectId={projectId} narrating={narrating} onNarrate={handleNarrate} />
+
+              <FieldRow
+                label="Message du commit"
+                hint={
+                  <>
+                    {suggested !== null && message === suggested && (
+                      <Badge tone="accent" title="Consigné par l'agent : à relire">
+                        indicatif
+                      </Badge>
+                    )}
+                    <span>
+                      {suggested !== null && message === suggested ? ' Proposé par le modèle, à relire. ' : ''}
+                      Un seul commit, à ton nom, avec la session en provenance (Fennec-Session).
+                    </span>
+                  </>
+                }
+              >
+                <TextArea rows={3} className="w-full font-mono" value={message} onChange={(event) => setMessage(event.target.value)} />
+              </FieldRow>
+
+              {preview.testFiles.length > 0 && (
+                <label
+                  className="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-xs hover:bg-accent-soft"
+                  title="L'agent ne pourra plus modifier ces fichiers de test : ils sont ajoutés à .agents/protected."
+                >
+                  <input type="checkbox" className="accent-accent" checked={protectTests} onChange={(event) => setProtectTests(event.target.checked)} />
+                  Protéger les tests intégrés ({preview.testFiles.length})
+                </label>
+              )}
+
+              <label
+                className="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-xs hover:bg-accent-soft"
+                title="Supprime le dossier et la branche de l'agent après l'intégration : la session n'aura plus de copie de travail."
+              >
+                <input type="checkbox" className="accent-accent" checked={removeWorktree} onChange={(event) => setRemoveWorktree(event.target.checked)} />
+                Nettoyer l'espace de l'agent
+              </label>
+
+              {preview.blockers.length > 0 && (
+                <section className="flex flex-col gap-1.5 rounded-lg border border-attention/35 bg-attention/10 p-3">
+                  <SectionLabel className="flex items-center">
+                    <span className="flex items-center gap-1.5 text-attention">
+                      <AlertIcon className="h-3.5 w-3.5" />
+                      À accepter
+                    </span>
+                  </SectionLabel>
+                  <div className="flex flex-col gap-1.5">
+                    {preview.blockers.map((blocker) => (
+                      <div key={blocker.kind} className="flex items-start justify-between gap-2 text-xs">
+                        <span className="grow break-words text-text">{blockerSentence(blocker)}</span>
+                        {!neverAcknowledged(blocker.kind) && (
+                          <label className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs">
+                            <input
+                              type="checkbox"
+                              className="accent-accent"
+                              checked={Boolean(acknowledged[blocker.kind])}
+                              onChange={(event) => {
+                                setAcknowledged((current) => ({ ...current, [blocker.kind]: event.target.checked } as Record<BlockerKind, boolean>));
+                              }}
+                            />
+                            Je l'accepte
+                          </label>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+            </div>
+          )}
+
+          {canFinish && (
+            <p className="text-xs text-muted">
+              Rien à intégrer : si le travail est déjà dans ta branche (intégré à la main), termine la tâche.
             </p>
           )}
-        </div>
-
-        {loading && <div className="text-xs text-muted">Chargement…</div>}
-        {conflict ? (
-          <div className="rounded-lg border border-err/40 bg-err/10 p-3 text-xs flex flex-col gap-2">
-            <div className="font-semibold text-err">Conflit : rien n'a été intégré</div>
-            <div>Ta branche a modifié les mêmes lignes que l'agent depuis le début de son travail. Le cherry-pick a été annulé : ton dossier est tel qu'avant.</div>
-            <div className="flex flex-col gap-1">
-              {conflict.files.map((file) => (
-                <div key={file} className="font-mono">{file}</div>
-              ))}
-            </div>
-            <div className="flex flex-col gap-1">
-              <div>Pour résoudre à la main :</div>
-              <button
-                type="button"
-                title="Copier la commande"
-                onClick={() => void navigator.clipboard.writeText(conflict.command)}
-                className="rounded-lg border border-border bg-code px-2 py-1.5 text-left font-mono text-xs break-all text-text hover:border-border-strong"
-              >
-                <code>{conflict.command}</code>
-              </button>
-              <div className="text-muted">Ou abandonne ce travail s'il n'est plus utile.</div>
-            </div>
-          </div>
-        ) : error ? (
-          <div className="text-xs text-err">{error}</div>
-        ) : null}
-
-        {result && (
-          <div className="text-xs text-ok">
-            Intégré : {result.commits.length} commits, HEAD {result.head.slice(0, 8)}.
-            {result.protectedTests.length > 0 && ` ${result.protectedTests.length} tests protégés.`}
-            {result.protectError && <span className="text-err"> Tests non protégés : {result.protectError}</span>}
-            {result.worktreeRemoved && ' Dossier de l\'agent supprimé.'}
-            {result.removeError && <span className="text-err"> Dossier non supprimé : {result.removeError}</span>}
-          </div>
-        )}
-
-        {preview && !loading && !result && (
-          <div className="flex flex-col gap-3">
-            <IntegrationReview preview={preview} projectId={projectId} narrating={narrating} onNarrate={handleNarrate} />
-
-            <FieldRow
-              label="Message du commit"
-              hint={`${suggested !== null && message === suggested ? 'Proposé par le modèle (indicatif), à relire. ' : ''}Un seul commit, à ton nom, avec la session en provenance (Fennec-Session).`}
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" size="md" onClick={closeDialog}>
+              Annuler
+            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => {
+                if (canFinish) {
+                  void handleFinish();
+                } else if (result) {
+                  closeDialog();
+                } else {
+                  void handleIntegrate();
+                }
+              }}
+              disabled={canFinish ? posting : integrateDisabled}
             >
-              <TextArea rows={3} className="w-full font-mono" value={message} onChange={(event) => setMessage(event.target.value)} />
-            </FieldRow>
-
-            {preview.testFiles.length > 0 && (
-              <label className="flex items-start gap-1.5 text-xs" title="L'agent ne pourra plus modifier ces fichiers de test : ils sont ajoutés à .agents/protected.">
-                <input type="checkbox" checked={protectTests} onChange={(event) => setProtectTests(event.target.checked)} />
-                <span>
-                  Protéger les tests intégrés ({preview.testFiles.length})
-                </span>
-              </label>
-            )}
-
-            <label className="flex items-start gap-1.5 text-xs" title="Supprime le dossier et la branche de l'agent après l'intégration : la session n'aura plus de copie de travail.">
-              <input type="checkbox" checked={removeWorktree} onChange={(event) => setRemoveWorktree(event.target.checked)} />
-              <span>Nettoyer l'espace de l'agent</span>
-            </label>
-
-            {preview.blockers.length > 0 && (
-              <section className="flex flex-col gap-1.5">
-                <SectionLabel>À accepter</SectionLabel>
-                <div className="flex flex-col gap-1.5">
-                  {preview.blockers.map((blocker) => (
-                    <div key={blocker.kind} className="flex items-start justify-between gap-2 text-xs">
-                      <span className="grow break-words text-text">{blockerSentence(blocker)}</span>
-                      {!neverAcknowledged(blocker.kind) && (
-                        <label className="flex shrink-0 items-center gap-1.5 text-xs">
-                          <input
-                            type="checkbox"
-                            checked={Boolean(acknowledged[blocker.kind])}
-                            onChange={(event) => {
-                              setAcknowledged((current) => ({ ...current, [blocker.kind]: event.target.checked } as Record<BlockerKind, boolean>));
-                            }}
-                          />
-                          Je l'accepte
-                        </label>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
+              {canFinish ? 'Terminer la tâche' : result ? 'Fermer' : 'Intégrer'}
+            </Button>
           </div>
-        )}
-
-        {canFinish && (
-          <p className="text-xs text-muted">
-            Rien à intégrer : si le travail est déjà dans ta branche (intégré à la main), termine la tâche.
-          </p>
-        )}
-        <div className="flex justify-end gap-2">
-          <Button variant="secondary" size="md" onClick={closeDialog}>
-            Annuler
-          </Button>
-          <Button
-            variant="primary"
-            size="md"
-            onClick={() => {
-              if (canFinish) {
-                void handleFinish();
-              } else if (result) {
-                closeDialog();
-              } else {
-                void handleIntegrate();
-              }
-            }}
-            disabled={canFinish ? posting : integrateDisabled}
-          >
-            {canFinish ? 'Terminer la tâche' : result ? 'Fermer' : 'Intégrer'}
-          </Button>
         </div>
       </Card>
     </Modal>
