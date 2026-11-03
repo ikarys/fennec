@@ -422,7 +422,21 @@ export function SessionPage({
     projectId ??
     "—";
 
+  // A send in flight: a second Enter or click before the server answers would
+  // create a second session (or send the message twice).
+  const sending = useRef(false);
+
   async function handleSend(content?: string) {
+    if (sending.current) return;
+    sending.current = true;
+    try {
+      await send(content);
+    } finally {
+      sending.current = false;
+    }
+  }
+
+  async function send(content?: string) {
     // Attachments belong to the composer; a quick answer (`content`) sends none.
     const fromComposer = content === undefined;
     const value = (content ?? text).trim();
