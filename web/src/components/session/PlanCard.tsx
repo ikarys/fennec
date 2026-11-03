@@ -36,144 +36,155 @@ function PathChip({ path }: { path: string }) {
   return <code className="rounded bg-code px-1.5 py-0.5 font-mono text-xs text-text">{path}</code>;
 }
 
+// A step's files, on the raised inset: bg-panel keeps them lighter than bg-code.
+const STEP_FILE_CHIP = 'rounded bg-panel px-1.5 py-0.5 font-mono text-xs text-text';
+
 export function PlanCard({ plan, actions, preflight }: { plan: Plan; actions?: PlanActions | null; preflight?: PreflightResultView[] }) {
   // The worktree decision is made when building a plan, not in the composer.
   const [worktree, setWorktree] = useState(true);
   // Writing in the human's own folder is the risky choice: the card says so with its border.
   return (
-    <Card className={`flex flex-col gap-3 p-4 ${actions && !worktree ? 'border-err/40' : ''}`}>
-      <div className="flex items-center gap-2">
+    <Card className={`overflow-hidden ${actions && !worktree ? 'border-err/40' : ''}`}>
+      <div className="flex items-center gap-2 border-b border-border bg-accent-soft/50 px-4 py-2.5">
         <Badge tone="accent">Plan</Badge>
         <span className="min-w-0 font-semibold text-text">
           <Inline>{plan.title}</Inline>
         </span>
       </div>
-      {plan.goal && (
-        <p className="m-0 text-sm leading-relaxed text-muted">
-          <Inline>{plan.goal}</Inline>
-        </p>
-      )}
-      <ol className="m-0">
-        {plan.steps.map((step, i) => (
-          <li key={i} className="relative flex gap-3 pb-4 last:pb-0">
-            {i < plan.steps.length - 1 && <span aria-hidden="true" className="absolute bottom-0 left-3 top-6 w-px bg-border" />}
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-raised text-xs font-semibold text-muted">
-              {step.number}
-            </span>
-            <div className="flex min-w-0 flex-col gap-1.5">
-              <div className="text-sm font-medium text-text">
-                <Inline>{step.title}</Inline>
-              </div>
-              {step.files.length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  {step.files.map((f) => (
-                    <PathChip key={f} path={f} />
-                  ))}
+      <div className="flex flex-col gap-4 p-4">
+        {plan.goal && (
+          <p className="m-0 text-sm leading-relaxed text-muted">
+            <Inline>{plan.goal}</Inline>
+          </p>
+        )}
+        <ol className="m-0 flex flex-col gap-2">
+          {plan.steps.map((step, i) => (
+            <li key={i} className="relative flex gap-3">
+              {i < plan.steps.length - 1 && <span aria-hidden="true" className="absolute -bottom-2 left-3 top-7 w-px bg-border" />}
+              <span
+                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                  i === 0 ? 'border border-accent/40 bg-accent-soft text-accent-strong' : 'border border-border bg-panel text-muted'
+                }`}
+              >
+                {step.number}
+              </span>
+              <Card variant="inset" className="min-w-0 flex-1">
+                <div className="text-sm font-medium text-accent-strong">
+                  <Inline>{step.title}</Inline>
                 </div>
-              )}
-              {step.change && (
-                <div className="text-sm leading-relaxed text-muted">
-                  <Inline>{step.change}</Inline>
-                </div>
-              )}
-              {step.verify && (
-                <div className="flex items-start gap-1.5 text-sm text-muted">
-                  <CheckIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                {step.files.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {step.files.map((f) => (
+                      <code key={f} className={STEP_FILE_CHIP}>
+                        {f}
+                      </code>
+                    ))}
+                  </div>
+                )}
+                {step.change && (
+                  <div className="border-t border-border pt-1.5 text-sm leading-relaxed text-muted">
+                    <Inline>{step.change}</Inline>
+                  </div>
+                )}
+                {step.verify && (
+                  <div className="flex items-start gap-1.5 text-sm text-muted">
+                    <CheckIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <span>
+                      <Inline>{`Vérif. : ${step.verify}`}</Inline>
+                    </span>
+                  </div>
+                )}
+              </Card>
+            </li>
+          ))}
+        </ol>
+        {plan.doneWhen.length > 0 && (
+          <Card variant="inset">
+            <SectionLabel>Terminé quand</SectionLabel>
+            <ul className="m-0 flex flex-col gap-1.5">
+              {plan.doneWhen.map((criterion, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-text">
+                  <span aria-hidden="true" className="mt-1 h-3.5 w-3.5 shrink-0 rounded-sm border border-border-strong bg-panel" />
                   <span>
-                    <Inline>{`Vérif. : ${step.verify}`}</Inline>
+                    <Inline>{criterion}</Inline>
                   </span>
-                </div>
-              )}
-            </div>
-          </li>
-        ))}
-      </ol>
-      {plan.doneWhen.length > 0 && (
-        <div className="flex flex-col gap-1.5">
-          <SectionLabel>Terminé quand</SectionLabel>
-          <ul className="m-0 flex flex-col gap-1">
-            {plan.doneWhen.map((criterion, i) => (
-              <li key={i} className="flex items-start gap-2 text-sm text-text">
-                <span aria-hidden="true" className="mt-1 h-3.5 w-3.5 shrink-0 rounded-sm border border-border" />
-                <span>
-                  <Inline>{criterion}</Inline>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {preflight && preflight.length > 0 && <PreflightSection results={preflight} />}
-      {plan.risks.length > 0 && (
-        <div className="flex flex-col gap-1.5">
-          <SectionLabel>Risques</SectionLabel>
-          <ul className="m-0 flex flex-col gap-1">
-            {plan.risks.map((risk, i) => (
-              <li key={i} className="flex items-start gap-2 text-sm text-err">
-                <span aria-hidden="true" className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-current" />
-                <span>
-                  <Inline>{risk}</Inline>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {actions && (
-        <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
-          <Button
-            type="button"
-            variant="primary"
-            size="sm"
-            onClick={() => actions.onBuild(worktree)}
-            disabled={actions.disabled}
-            title="Lance Plan, build, verify à partir de ce plan : critères vérifiés, vérification et review."
-          >
-            Lancer
-          </Button>
-          {!actions.disabled && (
-            <Menu label="Autres façons de lancer">
-              <MenuItem onSelect={actions.onBuildAlone}>Builder seul, sans critères ni review</MenuItem>
-            </Menu>
-          )}
-          {actions.ideaReady && (
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+        {preflight && preflight.length > 0 && <PreflightSection results={preflight} />}
+        {plan.risks.length > 0 && (
+          <div className="flex flex-col gap-1.5">
+            <SectionLabel>Risques</SectionLabel>
+            <ul className="m-0 flex flex-col gap-1">
+              {plan.risks.map((risk, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-err">
+                  <span aria-hidden="true" className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-current" />
+                  <span>
+                    <Inline>{risk}</Inline>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {actions && (
+          <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              onClick={() => actions.onBuild(worktree)}
+              disabled={actions.disabled}
+              title="Lance Plan, build, verify à partir de ce plan : critères vérifiés, vérification et review."
+            >
+              Lancer
+            </Button>
+            {!actions.disabled && (
+              <Menu label="Autres façons de lancer">
+                <MenuItem onSelect={actions.onBuildAlone}>Builder seul, sans critères ni review</MenuItem>
+              </Menu>
+            )}
+            {actions.ideaReady && (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={actions.ideaReady.onMark}
+                disabled={actions.disabled || actions.ideaReady.idea === 'saved'}
+                className="ml-auto"
+                title="Garde ce plan dans le backlog du projet, sans le lancer maintenant."
+              >
+                {IDEA_LABELS[actions.ideaReady.idea]}
+              </Button>
+            )}
             <Button
               type="button"
               variant="secondary"
               size="sm"
-              onClick={actions.ideaReady.onMark}
-              disabled={actions.disabled || actions.ideaReady.idea === 'saved'}
-              className="ml-auto"
-              title="Garde ce plan dans le backlog du projet, sans le lancer maintenant."
+              iconOnly
+              onClick={actions.onRevise}
+              disabled={actions.disabled}
+              className={actions.ideaReady ? undefined : 'ml-auto'}
+              title="Revoir le plan avec l'agent"
+              aria-label="Revoir"
             >
-              {IDEA_LABELS[actions.ideaReady.idea]}
+              <EditIcon className="h-3.5 w-3.5" />
             </Button>
-          )}
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            iconOnly
-            onClick={actions.onRevise}
-            disabled={actions.disabled}
-            className={actions.ideaReady ? undefined : 'ml-auto'}
-            title="Revoir le plan avec l'agent"
-            aria-label="Revoir"
-          >
-            <EditIcon className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      )}
-      {actions && (
-        <p className={`m-0 flex flex-wrap items-center gap-1.5 text-xs ${worktree ? 'text-muted' : 'text-err'}`}>
-          {worktree
-            ? "Dans une copie du dépôt (worktree) : tu intègres ensuite."
-            : "Directement dans ton dossier : rien ne sépare le travail de l'agent du tien."}
-          <Button type="button" variant="ghost" size="sm" onClick={() => setWorktree((value) => !value)} disabled={actions.disabled}>
-            changer
-          </Button>
-        </p>
-      )}
+          </div>
+        )}
+        {actions && (
+          <p className={`m-0 flex flex-wrap items-center gap-1.5 text-xs ${worktree ? 'text-muted' : 'text-err'}`}>
+            {worktree
+              ? "Dans une copie du dépôt (worktree) : tu intègres ensuite."
+              : "Directement dans ton dossier : rien ne sépare le travail de l'agent du tien."}
+            <Button type="button" variant="ghost" size="sm" onClick={() => setWorktree((value) => !value)} disabled={actions.disabled}>
+              changer
+            </Button>
+          </p>
+        )}
+      </div>
     </Card>
   );
 }
