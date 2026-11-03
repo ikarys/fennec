@@ -288,11 +288,12 @@ pub(super) fn execute_tools(
 
 #[cfg(test)]
 mod tests {
-    use super::execute_tools;
-    use crate::agent::ports::Toolbox;
-    use crate::agent::test_support::{MemoryLog, Scripted, builder};
-    use crate::domain::agent::CommandAccess;
+    use super::{Turn, execute_tools};
+    use crate::agent::ports::{RuleCheck, Toolbox};
+    use crate::agent::test_support::{MemoryLog, Scripted, builder, plan};
+    use crate::domain::agent::{AgentDefinition, CommandAccess};
     use crate::domain::event::{Event, OutputStream, ToolCall, ToolResult};
+    use rules::{Action, Origin, Request, Rule, Rules, Scope, Target, TargetKind};
     use serde_json::{Value, json};
     use std::cell::RefCell;
     use std::path::PathBuf;
@@ -326,6 +327,134 @@ mod tests {
         }
     }
 
+    struct RecordingToolbox {
+        executed: Rc<RefCell<Vec<String>>>,
+        rules: Rules,
+    }
+
+    impl Toolbox for RecordingToolbox {
+        fn definitions(&self) -> Value {
+            json!([])
+        }
+
+        fn execute(
+            &self,
+            name: &str,
+            _args: &Value,
+            _access: CommandAccess,
+            _stop: &AtomicBool,
+            _on_output: &mut dyn FnMut(OutputStream, &str),
+        ) -> ToolResult {
+            self.executed.borrow_mut().push(name.to_string());
+            ToolResult::success("ran".into(), false)
+        }
+
+        fn check_rules(&self, name: &str, _args: &Value) -> RuleCheck<'_> {
+            RuleCheck {
+                decision: self.rules.decide(&Request::Tool(name)),
+                subject: name.to_string(),
+                proposal: None,
+            }
+        }
+
+        fn mcp_tool_names(&self) -> Vec<String> {
+            Vec::new()
+        }
+    }
+
+    struct Harness<'a> {
+        log: MemoryLog,
+        model: Scripted,
+        tools: RecordingToolbox,
+        stop: &'a AtomicBool,
+        workdir: PathBuf,
+        on_event: Box<dyn FnMut(&Event) + 'a>,
+        agents: Vec<AgentDefinition>,
+    }
+
+    impl<'a> Harness<'a> {
+        fn new(rules: Rules, stop: &'a AtomicBool, agents: Vec<AgentDefinition>) -> Self {
+            Harness {
+                log: MemoryLog::default(),
+                model: Scripted(RefCell::new(vec![])),
+                tools: RecordingToolbox {
+                    executed: Rc::new(RefCell::new(Vec::new())),
+                    rules,
+                },
+                stop,
+                workdir: PathBuf::from("/tmp"),
+                on_event: Box::new(|_: &Event| {}),
+                agents,
+            }
+        }
+
+        fn turn(&mut self, autonomous: bool) -> Turn<'_> {
+            Turn {
+                model: &self.model,
+                log: &self.log,
+                tools: &self.tools,
+                session_id: "s",
+                workdir: &self.workdir,
+                instructions: "",
+                skills: &[],
+                always_on: &[],
+                agents: &self.agents,
+                max_tokens: 100,
+                context_window: 1000,
+                compact_at: 0.0,
+                reasoning_effort: None,
+                autonomous,
+                stop: self.stop,
+                on_event: &mut self.on_event,
+            }
+        }
+
+        fn turn_with_agent(&mut self, autonomous: bool) -> (Turn<'_>, AgentDefinition) {
+            let agent = self.agents[0].clone();
+            (self.turn(autonomous), agent)
+        }
+    }
+
+    fn rule(id: i64, tool: &str, action: Action) -> Rule {
+        Rule {
+            id,
+            scope: Scope::Global,
+            target: Target::parse(TargetKind::Tool, tool, None).unwrap(),
+            action,
+            note: None,
+            origin: Origin::Human,
+        }
+    }
+
+    fn call(id: &str, name: &str, args: Value) -> ToolCall {
+        ToolCall {
+            id: id.into(),
+            name: name.into(),
+            arguments: args,
+            parse_error: None,
+            raw_arguments: None,
+        }
+    }
+
+    fn results(log: &MemoryLog) -> Vec<(String, ToolResult)> {
+        log.0
+            .borrow()
+            .iter()
+            .filter_map(|event| match event {
+                Event::ToolResult {
+                    tool_call_id,
+                    result,
+                    ..
+                } => Some((tool_call_id.clone(), result.clone())),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn count(log: &MemoryLog, pred: impl Fn(&Event) -> bool) -> usize {
+        log.0.borrow().iter().filter(|e| pred(e)).count()
+    }
+
     #[test]
     fn an_mcp_tool_call_is_allowed_even_if_not_in_the_agents_list() {
         let executed = Rc::new(RefCell::new(Vec::new()));
@@ -338,7 +467,7 @@ mod tests {
         let agents = builder();
         let workdir = PathBuf::from("/tmp");
         let mut on_event = |_: &Event| {};
-        let mut turn = super::Turn {
+        let mut turn = Turn {
             model: &model,
             log: &log,
             tools: &tools,
@@ -387,5 +516,360 @@ mod tests {
                 if !result.success
                     && result.error.as_deref().is_some_and(|m| m.contains("not available"))))
         );
+    }
+
+    #[test]
+    fn stop_true_records_interrupted_and_continues() {
+        let stop = AtomicBool::new(true);
+        let mut h = Harness::new(Rules::new(Vec::new()), &stop, builder());
+        let (mut turn, agent) = h.turn_with_agent(false);
+        let flow = execute_tools(
+            &mut turn,
+            &agent,
+            "m1",
+            &[
+                call("c1", "read_file", json!({})),
+                call("c2", "write_file", json!({})),
+            ],
+        )
+        .unwrap();
+
+        assert!(matches!(flow, super::Flow::Continue));
+        assert!(h.tools.executed.borrow().is_empty());
+
+        let results = results(&h.log);
+        let ids = results
+            .iter()
+            .map(|(id, _)| id.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(ids, vec!["c1", "c2"]);
+        for (_, result) in &results {
+            assert!(!result.success);
+            assert_eq!(result.error.as_deref(), Some(super::INTERRUPTED_ERROR));
+        }
+    }
+
+    #[test]
+    fn ask_user_pauses_later_calls_not_run() {
+        let stop = AtomicBool::new(false);
+        let mut h = Harness::new(Rules::new(Vec::new()), &stop, builder());
+        let (mut turn, agent) = h.turn_with_agent(false);
+        let flow = execute_tools(
+            &mut turn,
+            &agent,
+            "m1",
+            &[
+                call("c1", "ask_user", json!({"question": "Which?"})),
+                call("c2", "read_file", json!({})),
+            ],
+        )
+        .unwrap();
+
+        assert!(matches!(flow, super::Flow::WaitingForUser));
+        assert!(h.tools.executed.borrow().is_empty());
+        assert_eq!(
+            results(&h.log),
+            vec![(
+                "c2".to_string(),
+                ToolResult::failure(super::NOT_RUN_AFTER_ASK.into())
+            )]
+        );
+        assert_eq!(
+            count(
+                &h.log,
+                |e| matches!(e, Event::ChatAskUser { call_id, .. } if call_id == "c1")
+            ),
+            1
+        );
+    }
+
+    #[test]
+    fn parse_error_failure_contains_message_and_does_not_run() {
+        let stop = AtomicBool::new(false);
+        let mut h = Harness::new(Rules::new(Vec::new()), &stop, builder());
+        let (mut turn, agent) = h.turn_with_agent(false);
+        let bad_call = ToolCall {
+            id: "c1".into(),
+            name: "read_file".into(),
+            arguments: json!({}),
+            parse_error: Some("bad json".into()),
+            raw_arguments: None,
+        };
+        let flow = execute_tools(&mut turn, &agent, "m1", &[bad_call]).unwrap();
+
+        assert!(matches!(flow, super::Flow::Continue));
+        assert!(h.tools.executed.borrow().is_empty());
+
+        let results = results(&h.log);
+        assert_eq!(results.len(), 1);
+        let error = results[0].1.error.as_deref().unwrap();
+        assert!(error.contains("Failed to parse tool call arguments"));
+        assert!(error.contains("bad json"));
+    }
+
+    #[test]
+    fn plan_agent_denies_write_file_allows_read_file() {
+        let stop = AtomicBool::new(false);
+        let mut h = Harness::new(Rules::new(Vec::new()), &stop, vec![plan()]);
+        let (mut turn, agent) = h.turn_with_agent(false);
+        let flow = execute_tools(
+            &mut turn,
+            &agent,
+            "m1",
+            &[
+                call("c1", "write_file", json!({})),
+                call("c2", "read_file", json!({})),
+            ],
+        )
+        .unwrap();
+
+        assert!(matches!(flow, super::Flow::Continue));
+        assert_eq!(*h.tools.executed.borrow(), vec!["read_file".to_string()]);
+
+        let results = results(&h.log);
+        assert_eq!(results.len(), 2);
+        let denied = agent.denied("write_file");
+        assert_eq!(results[0].0, "c1");
+        assert!(!results[0].1.success);
+        assert_eq!(results[0].1.error.as_deref(), Some(denied.as_str()));
+        assert_eq!(results[1].0, "c2");
+        assert!(results[1].1.success);
+        assert_eq!(results[1].1.output.as_deref(), Some("ran"));
+    }
+
+    #[test]
+    fn autonomous_away_results_for_special_tools() {
+        let stop = AtomicBool::new(false);
+        let mut h = Harness::new(Rules::new(Vec::new()), &stop, builder());
+        let (mut turn, agent) = h.turn_with_agent(true);
+        let flow = execute_tools(
+            &mut turn,
+            &agent,
+            "m1",
+            &[
+                call("c1", "ask_user", json!({"question": "Which?"})),
+                call(
+                    "c2",
+                    "request_waiver",
+                    json!({"path": "AGENTS.md", "reason": "need it"}),
+                ),
+                call(
+                    "c3",
+                    "propose_criteria",
+                    json!({
+                        "criteria": [{"description": "tests pass"}],
+                        "reason": "needed"
+                    }),
+                ),
+            ],
+        )
+        .unwrap();
+
+        assert!(matches!(flow, super::Flow::Continue));
+        assert!(h.tools.executed.borrow().is_empty());
+        assert_eq!(
+            results(&h.log),
+            vec![
+                (
+                    "c1".to_string(),
+                    ToolResult::success(super::AWAY_ANSWER.into(), false)
+                ),
+                (
+                    "c2".to_string(),
+                    ToolResult::failure(super::AWAY_WAIVER.into())
+                ),
+                (
+                    "c3".to_string(),
+                    ToolResult::failure(super::AWAY_CRITERIA.into())
+                ),
+            ]
+        );
+        assert_eq!(count(&h.log, |e| matches!(e, Event::ChatAskUser { .. })), 0);
+        assert_eq!(
+            count(&h.log, |e| matches!(e, Event::WaiverRequested { .. })),
+            0
+        );
+        assert_eq!(
+            count(&h.log, |e| matches!(e, Event::CriteriaProposed { .. })),
+            0
+        );
+    }
+
+    #[test]
+    fn invalid_ask_user_arguments_are_failure_not_pause() {
+        let stop = AtomicBool::new(false);
+        let mut h = Harness::new(Rules::new(Vec::new()), &stop, builder());
+        let (mut turn, agent) = h.turn_with_agent(false);
+        let flow = execute_tools(
+            &mut turn,
+            &agent,
+            "m1",
+            &[call("c1", "ask_user", json!({}))],
+        )
+        .unwrap();
+
+        assert!(matches!(flow, super::Flow::Continue));
+        assert!(h.tools.executed.borrow().is_empty());
+
+        let results = results(&h.log);
+        assert_eq!(results.len(), 1);
+        assert!(!results[0].1.success);
+        assert!(results[0].1.error.is_some());
+        assert_eq!(count(&h.log, |e| matches!(e, Event::ChatAskUser { .. })), 0);
+    }
+
+    #[test]
+    fn block_rule_records_rule_blocked_and_failure() {
+        let stop = AtomicBool::new(false);
+        let rule = rule(7, "read_file", Action::Block);
+        let refusal = rule.refusal();
+        let mut h = Harness::new(Rules::new(vec![rule]), &stop, builder());
+        let (mut turn, agent) = h.turn_with_agent(false);
+        let flow = execute_tools(
+            &mut turn,
+            &agent,
+            "m1",
+            &[call("c1", "read_file", json!({}))],
+        )
+        .unwrap();
+
+        assert!(matches!(flow, super::Flow::Continue));
+        assert!(h.tools.executed.borrow().is_empty());
+
+        let results = results(&h.log);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0, "c1");
+        assert!(!results[0].1.success);
+        assert_eq!(results[0].1.error.as_deref(), Some(refusal.as_str()));
+
+        let events = h.log.0.borrow();
+        let blocked = events.iter().position(|e| {
+            matches!(e, Event::RuleBlocked { call_id, rule_id, .. }
+                if call_id == "c1" && rule_id == "7")
+        });
+        let result = events.iter().position(|e| {
+            matches!(e, Event::ToolResult { tool_call_id, .. }
+                if tool_call_id == "c1")
+        });
+        assert!(blocked.is_some_and(|b| result.is_some_and(|r| b < r)));
+    }
+
+    #[test]
+    fn ask_rule_with_human_requests_approval_and_not_run_after_ask() {
+        let stop = AtomicBool::new(false);
+        let mut h = Harness::new(
+            Rules::new(vec![rule(7, "read_file", Action::Ask)]),
+            &stop,
+            builder(),
+        );
+        let (mut turn, agent) = h.turn_with_agent(false);
+        let flow = execute_tools(
+            &mut turn,
+            &agent,
+            "m1",
+            &[
+                call("c1", "read_file", json!({})),
+                call("c2", "write_file", json!({})),
+            ],
+        )
+        .unwrap();
+
+        assert!(matches!(flow, super::Flow::WaitingForUser));
+        assert!(h.tools.executed.borrow().is_empty());
+        assert_eq!(
+            results(&h.log),
+            vec![(
+                "c2".to_string(),
+                ToolResult::failure(super::NOT_RUN_AFTER_ASK.into())
+            )]
+        );
+        assert_eq!(
+            count(
+                &h.log,
+                |e| matches!(e, Event::RuleApprovalRequested { call_id, rule_id, .. }
+                    if call_id == "c1" && rule_id.as_deref() == Some("7"))
+            ),
+            1
+        );
+    }
+
+    #[test]
+    fn ask_rule_autonomous_records_rule_blocked_and_failure() {
+        let stop = AtomicBool::new(false);
+        let rule = rule(7, "read_file", Action::Ask);
+        let refusal = rule.refusal();
+        let mut h = Harness::new(Rules::new(vec![rule]), &stop, builder());
+        let (mut turn, agent) = h.turn_with_agent(true);
+        let flow = execute_tools(
+            &mut turn,
+            &agent,
+            "m1",
+            &[call("c1", "read_file", json!({}))],
+        )
+        .unwrap();
+
+        assert!(matches!(flow, super::Flow::Continue));
+        assert!(h.tools.executed.borrow().is_empty());
+
+        let results = results(&h.log);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0, "c1");
+        assert!(!results[0].1.success);
+        assert_eq!(results[0].1.error.as_deref(), Some(refusal.as_str()));
+        assert_eq!(
+            count(&h.log, |e| matches!(e, Event::RuleApprovalRequested { .. })),
+            0
+        );
+        assert_eq!(
+            count(
+                &h.log,
+                |e| matches!(e, Event::RuleBlocked { call_id, rule_id, .. }
+                    if call_id == "c1" && rule_id == "7")
+            ),
+            1
+        );
+    }
+
+    #[test]
+    fn record_decision_and_propose_task_do_not_pause() {
+        let stop = AtomicBool::new(false);
+        let mut agents = builder();
+        agents[0].allowed_tools.push("propose_task".into());
+        let mut h = Harness::new(Rules::new(Vec::new()), &stop, agents);
+        let (mut turn, agent) = h.turn_with_agent(false);
+        let flow = execute_tools(
+            &mut turn,
+            &agent,
+            "m1",
+            &[
+                call(
+                    "c1",
+                    "record_decision",
+                    json!({
+                        "title": "use SQLite",
+                        "choice": "use SQLite",
+                        "reason": "bundled",
+                        "alternatives": ["postgres"]
+                    }),
+                ),
+                call(
+                    "c2",
+                    "propose_task",
+                    json!({"title": "Add tests", "text": "cover the loop"}),
+                ),
+                call("c3", "read_file", json!({})),
+            ],
+        )
+        .unwrap();
+
+        assert!(matches!(flow, super::Flow::Continue));
+        assert_eq!(*h.tools.executed.borrow(), vec!["read_file".to_string()]);
+
+        let results = results(&h.log);
+        assert_eq!(results.len(), 3);
+        assert!(results[0].1.success);
+        assert!(results[1].1.success);
+        assert!(results[2].1.success);
+        assert_eq!(results[2].1.output.as_deref(), Some("ran"));
     }
 }
