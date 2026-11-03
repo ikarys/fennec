@@ -7,6 +7,7 @@ import { SectionLabel } from '../ui/SectionLabel';
 import { ChevronRightIcon, CloseIcon, HeartIcon, PinIcon, StarIcon } from '../Icons';
 import { FieldRow, Select, TextInput } from '../ui/Field';
 import { ModelProbe } from './ModelProbe';
+import { percentFromFraction } from '../../lib/settingsForm';
 
 export interface ModelForm {
   maxTokens: string;
@@ -72,10 +73,6 @@ function ResolvedRow({
       <span className={`ml-auto ${badge === 'envoyé' ? 'text-ok' : 'text-faint'}`}>{badge}</span>
     </div>
   );
-}
-
-export function percentFromFraction(fraction: number): string {
-  return String(Number((fraction * 100).toFixed(2)));
 }
 
 /** The compact line of a model row: what its turn runs with, at a glance. */
