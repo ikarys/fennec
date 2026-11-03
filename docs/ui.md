@@ -80,7 +80,8 @@ dead: every list and grid shows the human where they are and what reacts.
 - Provenance is visible (rule 3 of AGENTS.md): verified results and model
   output never share a look.
 - Side columns are stacks of `Panel` blocks split by a hairline, each
-  header (chevron, title, summary when folded) always visible.
+  header (the block's identity icon carrying its state, the title, the summary
+  when folded, the chevron) always visible.
 
 ## Sizes
 

@@ -1,5 +1,7 @@
 import type { CriterionView, Provenance } from '../../lib/fold';
 import { panelBlock } from '../../lib/panelBlocks';
+import { CheckIcon } from '../Icons';
+import type { BadgeTone } from '../ui/Badge';
 import { Badge } from '../ui/Badge';
 import { Panel } from '../ui/Panel';
 
@@ -41,20 +43,23 @@ export function CriteriaSection({ criteria }: { criteria: CriterionView[] }) {
   const passed = criteria.filter((criterion) => criterion.status === 'passed').length;
   const failed = criteria.filter((criterion) => criterion.status === 'failed').length;
   const indicative = criteria.filter((criterion) => criterion.status === 'passed' && criterion.provenance?.kind === 'indicative').length;
+  // The header's icon reports the block's state: red when a check failed, green when all pass.
+  const iconTone: BadgeTone = failed > 0 ? 'err' : criteria.length > 0 && passed === criteria.length ? 'ok' : 'neutral';
 
   return (
     <Panel
       id="criteria"
       title={panelBlock('criteria').title}
+      icon={<CheckIcon className="h-3.5 w-3.5" />}
+      iconTone={iconTone}
       summary={
         criteria.length > 0 ? (
-          <Badge
-            tone={failed > 0 ? 'err' : passed === criteria.length ? 'ok' : 'neutral'}
-            pill
+          <span
+            className={failed > 0 ? 'text-err' : passed === criteria.length ? 'text-ok' : undefined}
             title={indicative > 0 ? `${passed}/${criteria.length} · ${indicative} indicatif` : undefined}
           >
             {passed}/{criteria.length}
-          </Badge>
+          </span>
         ) : undefined
       }
     >
