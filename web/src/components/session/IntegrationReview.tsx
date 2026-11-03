@@ -3,6 +3,7 @@
 import type { IntegrationPreview, ReviewSignal } from '../../lib/api';
 import { DecisionList } from './DecisionList';
 import { CriterionProvenanceBadge, PassedBeforeBadge, criterionDotClass } from './CriteriaSection';
+import { ChevronRightIcon } from '../Icons';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import type { BadgeTone } from '../ui/Badge';
@@ -69,13 +70,14 @@ export function IntegrationReview({ preview, projectId, narrating, onNarrate }: 
         {preview.commits.length === 0 ? (
           <div className="text-xs text-muted">Aucun commit.</div>
         ) : (
-          <details className="text-xs">
-            <summary className="cursor-pointer select-none text-muted hover:text-text">
+          <details className="group text-xs">
+            <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md px-1.5 py-1 select-none text-muted hover:bg-accent-soft hover:text-text [&::-webkit-details-marker]:hidden">
+              <ChevronRightIcon className="h-3 w-3 shrink-0 transition-transform group-open:rotate-90" />
               {preview.commits.length === 1
                 ? "1 commit de l'agent, repris tel quel sur ta branche"
                 : `${preview.commits.length} commits de l'agent, écrasés en un seul sur ta branche`}
             </summary>
-            <div className="mt-1 flex flex-col">
+            <div className="flex flex-col pl-6">
               {preview.commits.map((commit) => (
                 <div key={commit.sha} className="flex items-start gap-2 py-1 text-xs">
                   <span className="shrink-0 font-mono text-muted">{commit.sha.slice(0, 8)}</span>
@@ -89,9 +91,19 @@ export function IntegrationReview({ preview, projectId, narrating, onNarrate }: 
 
       <section className="flex flex-col gap-1.5">
         <SectionLabel className="flex items-center">
-          Fichiers{preview.files.length > 0 && <span className="ml-1 tabular-nums">{preview.files.length}</span>}
+          Fichiers
           {preview.files.length > 0 && (
-            <span className="ml-2 text-xs text-muted">ordre de relecture · vérifié</span>
+            <span className="ml-1 rounded border border-border bg-raised px-1.5 text-[11px] tabular-nums text-text">
+              {preview.files.length}
+            </span>
+          )}
+          {preview.files.length > 0 && (
+            <>
+              <span className="ml-2 text-xs text-muted">ordre de relecture ·</span>
+              <Badge tone="ok" className="ml-1.5" title="Calculé par fennec à partir du journal">
+                vérifié
+              </Badge>
+            </>
           )}
           {preview.files.length > 0 && projectId && (
             <Button
@@ -109,9 +121,9 @@ export function IntegrationReview({ preview, projectId, narrating, onNarrate }: 
         {preview.files.length === 0 ? (
           <div className="text-xs text-muted">Aucun fichier.</div>
         ) : (
-          <>
+          <div className="overflow-hidden rounded-lg border border-border bg-raised">
             {preview.commonSignals.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted">
+              <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-3 py-1.5 text-xs text-muted">
                 <span>Tous les fichiers :</span>
                 {preview.commonSignals.map((signal) =>
                   signal === 'protected' ? null : (
@@ -122,10 +134,13 @@ export function IntegrationReview({ preview, projectId, narrating, onNarrate }: 
                 )}
               </div>
             )}
-            <div className="flex flex-col">
+            <div className="divide-y divide-border">
               {preview.files.map((file) => (
-                <div key={file.path} className="flex items-center gap-2 py-1 font-mono text-xs">
-                  <span className="grow overflow-hidden text-left text-ellipsis whitespace-nowrap" title={file.path}>
+                <div key={file.path} className="group flex items-center gap-2 px-3 py-2 font-mono text-xs transition-colors hover:bg-accent-soft">
+                  <span
+                    className="min-w-0 grow overflow-hidden text-left text-ellipsis whitespace-nowrap text-text group-hover:text-accent-strong"
+                    title={file.path}
+                  >
                     {file.path}
                   </span>
                   {file.protected && <Badge tone="err">protégé</Badge>}
@@ -149,7 +164,7 @@ export function IntegrationReview({ preview, projectId, narrating, onNarrate }: 
                 </div>
               ))}
             </div>
-          </>
+          </div>
         )}
       </section>
 
