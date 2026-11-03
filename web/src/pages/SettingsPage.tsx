@@ -43,7 +43,7 @@ import { useT } from '../i18n';
 import type { MsgKey } from '../i18n/messages';
 
 interface SettingsPageProps {
-  /** The tab named in the address (`#/settings/rules`), when it names one. */
+  /** The tab named in the address (`#/settings/security`), when it names one. */
   initialTab?: string | null;
   settings: SettingsResponse | null;
   theme: ThemeId;
@@ -52,14 +52,14 @@ interface SettingsPageProps {
   onListing: (listing: ProviderListing) => void;
 }
 
-type SettingsTab = 'models' | 'behaviour' | 'rules' | 'library' | 'display';
+type SettingsTab = 'models' | 'behaviour' | 'security' | 'library' | 'display';
 
-// Five groups, not twelve tabs: what tunes the model, how an agent behaves, the human's rules,
-// the catalogues of content (skills, workflows, agents, MCP) and the display.
+// Five groups, not twelve tabs: what tunes the model, how an agent behaves, what it is allowed to touch
+// (sandbox, scanners, the human's rules), the catalogues of content (skills, workflows, agents, MCP) and the display.
 const TABS: { id: SettingsTab; labelKey: MsgKey }[] = [
   { id: 'models', labelKey: 'settingsTabModels' },
   { id: 'behaviour', labelKey: 'settingsTabBehaviour' },
-  { id: 'rules', labelKey: 'settingsTabRules' },
+  { id: 'security', labelKey: 'settingsTabSecurity' },
   { id: 'library', labelKey: 'settingsTabLibrary' },
   { id: 'display', labelKey: 'settingsTabDisplay' }
 ];
@@ -68,8 +68,9 @@ const TABS: { id: SettingsTab; labelKey: MsgKey }[] = [
 const LEGACY_TABS: Record<string, SettingsTab> = {
   instructions: 'behaviour',
   search: 'behaviour',
-  sandbox: 'behaviour',
-  security: 'behaviour',
+  sandbox: 'security',
+  security: 'security',
+  rules: 'security',
   autonomy: 'behaviour',
   skills: 'library',
   workflows: 'library',
@@ -380,13 +381,17 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
               <>
                 <InstructionsSection save={groupSave('instructions')} value={form.instructions} onChange={updateInstructions} />
                 <SearchSection save={groupSave('search')} value={form.search} onChange={updateSearch} />
-                <SandboxSection save={groupSave('sandbox')} value={form.sandbox} onChange={updateSandbox} health={settings?.sandboxHealth} />
-                <ScannersSection scanners={settings.scanners ?? []} />
                 <AutonomySection save={groupSave('autonomy')} value={form.autonomy} onChange={updateAutonomy} />
               </>
             )}
 
-            {tab === 'rules' && <RulesSection />}
+            {tab === 'security' && (
+              <>
+                <SandboxSection save={groupSave('sandbox')} value={form.sandbox} onChange={updateSandbox} health={settings?.sandboxHealth} />
+                <ScannersSection scanners={settings.scanners ?? []} />
+                <RulesSection />
+              </>
+            )}
 
             {tab === 'library' && (
               <>

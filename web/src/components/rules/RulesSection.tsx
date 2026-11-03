@@ -83,7 +83,7 @@ function RuleRow({
 }) {
   const t = useT();
   return (
-    <li className="grid grid-cols-[5.5rem_minmax(0,1fr)_auto_2rem] items-center gap-3 px-4 py-2.5">
+    <li className="grid grid-cols-[5.5rem_minmax(0,1fr)_auto_2rem] items-center gap-3 px-4 py-2.5 transition-colors hover:bg-accent-soft">
       <Badge tone="neutral">{t(KIND_LABELS[rule.kind])}</Badge>
       <div className="min-w-0">
         <div className="flex items-baseline gap-2">
@@ -427,7 +427,7 @@ export function ProjectRulesTile({ projectId }: { projectId: string }) {
       tone="accent"
       active={rules ? rules.length > 0 : false}
       onClick={() => {
-        window.location.hash = '#/settings/rules';
+        window.location.hash = '#/settings/security';
       }}
     />
   );

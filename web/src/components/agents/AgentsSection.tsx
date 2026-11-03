@@ -88,7 +88,7 @@ function AgentRow({
 }) {
   const t = useT();
   return (
-    <li className="flex items-center gap-3 py-2.5">
+    <li className="flex items-center gap-3 py-2.5 transition-colors hover:bg-accent-soft">
       <div className="min-w-0 grow">
         <div className="flex items-baseline gap-2">
           <span className="truncate text-sm font-medium">{agent.name}</span>
