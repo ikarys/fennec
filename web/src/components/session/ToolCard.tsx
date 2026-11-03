@@ -9,6 +9,7 @@ import { toolAnchorId } from '../../lib/vision';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
+import { useLang, useT } from '../../i18n';
 
 /** The action family's hue, per docs/ui.md's thread tone map: blue reads, orange writes, amber executes. */
 function toolTone(name: string): string {
@@ -21,6 +22,8 @@ function toolTone(name: string): string {
 /** A silent command still shows it is alive: the time since the card appeared. */
 // ponytail: counts from mount, so a reload restarts it; the events carry no timestamp.
 function RunningSince() {
+  const t = useT();
+  const lang = useLang();
   const [start] = useState(() => Date.now());
   const [now, setNow] = useState(start);
   useEffect(() => {
@@ -29,13 +32,15 @@ function RunningSince() {
   }, []);
   return (
     <div className="text-muted">
-      En cours, pas encore de sortie · {formatDuration(now - start)}
+      {t('runningNoOutput', { duration: formatDuration(lang, now - start) })}
     </div>
   );
 }
 
 /** `awaiting`: fennec paused this call for the human's approval (served by the thread view). */
 export function ToolCard({ tool, awaiting = false }: { tool: ToolCallView; awaiting?: boolean }) {
+  const t = useT();
+  const lang = useLang();
   const display = useDisplayPrefs();
   const [open, setOpen] = useState(display.toolResultsOpen);
 
@@ -101,8 +106,8 @@ export function ToolCard({ tool, awaiting = false }: { tool: ToolCallView; await
               opener({ path: previewRelative, kind: previewKind });
             }}
             className="shrink-0"
-            title="Aperçu"
-            aria-label="Aperçu"
+            title={t('preview')}
+            aria-label={t('preview')}
           >
             <EyeIcon className="h-4 w-4" />
           </Button>
@@ -114,29 +119,29 @@ export function ToolCard({ tool, awaiting = false }: { tool: ToolCallView; await
           </>
         )}
         {tool.name === 'read_file' && lineCount > 0 && (
-          <span className="shrink-0 text-xs whitespace-nowrap text-muted">{lineCount} lignes</span>
+          <span className="shrink-0 text-xs whitespace-nowrap text-muted">{t('linesCount', { count: lineCount })}</span>
         )}
         {tool.blockedBy && (
-          <Badge tone="err" className="shrink-0" title={`Refusé par la règle ${tool.blockedBy.scope === 'global' ? 'globale' : 'du projet'} « ${tool.blockedBy.pattern} »`}>
-            vérifié · règle
+          <Badge tone="err" className="shrink-0" title={t('ruleRefusedTitle', { scope: tool.blockedBy.scope === 'global' ? t('ruleScopeGlobal') : t('ruleScopeProject'), pattern: tool.blockedBy.pattern })}>
+            {t('verifiedRule')}
           </Badge>
         )}
         {awaiting && (
-          <Badge tone="accent" className="shrink-0" title="fennec attend ton autorisation pour cet appel">
-            en attente
+          <Badge tone="accent" className="shrink-0" title={t('awaitingApproval')}>
+            {t('awaiting')}
           </Badge>
         )}
         {tool.name === 'run_command' && tool.status !== 'running' && tool.exitCode != null && (
           <Badge tone={tool.exitCode === 0 ? 'ok' : 'err'} className="shrink-0">
-            vérifié · exit {tool.exitCode}
+            {t('verifiedExit', { code: tool.exitCode })}
           </Badge>
         )}
         {tool.durationMs != null && (
-          <span className="shrink-0 text-xs whitespace-nowrap text-muted">{formatDuration(tool.durationMs)}</span>
+          <span className="shrink-0 text-xs whitespace-nowrap text-muted">{formatDuration(lang, tool.durationMs)}</span>
         )}
         {tool.status === 'running' && tool.name !== 'ask_user' && <SpinnerIcon className="h-4 w-4 text-accent" />}
         {tool.status === 'running' && tool.name === 'ask_user' && (
-          <span className="shrink-0 text-xs whitespace-nowrap text-muted">en attente</span>
+          <span className="shrink-0 text-xs whitespace-nowrap text-muted">{t('awaiting')}</span>
         )}
         {tool.status === 'success' && <span className="text-xs font-semibold text-ok">✓</span>}
         {tool.status === 'error' && <span className="text-xs font-semibold text-err">✗</span>}
@@ -149,7 +154,7 @@ export function ToolCard({ tool, awaiting = false }: { tool: ToolCallView; await
               <img src={tool.image.dataUrl} alt={tool.output} className="max-h-80 p-2.5" />
             ) : (
               <pre className="overflow-x-auto bg-code p-2.5 font-mono text-xs text-muted whitespace-pre">
-                {tool.output || 'Aucune sortie'}
+                {tool.output || t('noOutput')}
               </pre>
             )
           )}
@@ -159,7 +164,7 @@ export function ToolCard({ tool, awaiting = false }: { tool: ToolCallView; await
               {/* w-max: line backgrounds span the longest line when scrolled. */}
               <div className="w-max min-w-full">
                 {(tool.diff?.removed.length ?? 0) === 0 && (tool.diff?.added.length ?? 0) === 0 && (
-                  <div className="px-3.5 py-1 text-muted">Aucun changement</div>
+                  <div className="px-3.5 py-1 text-muted">{t('noChange')}</div>
                 )}
                 {tool.diff?.removed.map((line, index) => (
                   <div key={`removed-${index}`} className="bg-del-bg px-3.5 py-px whitespace-pre text-text">
@@ -179,7 +184,7 @@ export function ToolCard({ tool, awaiting = false }: { tool: ToolCallView; await
 
           {tool.name === 'write_file' && (
             <pre className="overflow-x-auto bg-code p-2.5 font-mono text-xs text-muted whitespace-pre">
-              {(tool.contentPreview ?? []).join('\n') || 'Aucun contenu'}
+              {(tool.contentPreview ?? []).join('\n') || t('noContent')}
             </pre>
           )}
 
@@ -192,14 +197,14 @@ export function ToolCard({ tool, awaiting = false }: { tool: ToolCallView; await
                   {!tool.stdout && !tool.stderr && <RunningSince />}
                 </>
               ) : (
-                <div>{tool.output || tool.error || 'Aucune sortie'}</div>
+                <div>{tool.output || tool.error || t('noOutput')}</div>
               )}
             </div>
           )}
 
           {tool.name === 'ask_user' && (
             <pre className="overflow-x-auto bg-code p-2.5 font-mono text-xs text-muted whitespace-pre">
-              {tool.output || tool.error || 'En attente de réponse'}
+              {tool.output || tool.error || t('awaitingAnswer')}
             </pre>
           )}
         </div>

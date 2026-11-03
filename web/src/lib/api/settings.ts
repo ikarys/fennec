@@ -24,6 +24,8 @@ export interface DisplayPrefs {
   fontSize: number;
   /** The context panel's pages; null means the UI's defaults (lib/panelBlocks). */
   panelPages: PanelPage[] | null;
+  /** The UI's display language (server default "en"). */
+  language?: 'en' | 'fr';
 }
 
 export interface SearchPrefs {

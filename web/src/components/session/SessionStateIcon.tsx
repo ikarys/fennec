@@ -1,6 +1,7 @@
 /** A session's state as a coloured glyph, its label in the tooltip: a list reads by colour, not by words. */
 import type { SessionState } from '../../lib/api';
 import { stateLabel } from '../../lib/format';
+import { useLang } from '../../i18n';
 
 // Filled discs carry a mark cut out in the panel colour; idle stays a hollow ring.
 const DISC: Partial<Record<SessionState, { color: string; mark: string }>> = {
@@ -12,7 +13,8 @@ const DISC: Partial<Record<SessionState, { color: string; mark: string }>> = {
 };
 
 export function SessionStateIcon({ state, className = 'h-4 w-4' }: { state: SessionState; className?: string }) {
-  const label = stateLabel(state);
+  const lang = useLang();
+  const label = stateLabel(lang, state);
   if (state === 'running') {
     return (
       <span title={label} aria-label={label} role="img" className={`inline-flex shrink-0 items-center justify-center ${className}`}>

@@ -1,9 +1,9 @@
 import type { CriterionView, Provenance } from '../../lib/fold';
-import { panelBlock } from '../../lib/panelBlocks';
 import { CheckIcon } from '../Icons';
 import type { BadgeTone } from '../ui/Badge';
 import { Badge } from '../ui/Badge';
 import { Panel } from '../ui/Panel';
+import { useT } from '../../i18n';
 
 const DOT_CLASSES = {
   ok: { full: 'bg-ok', hollow: 'border-2 border-ok bg-transparent' },
@@ -18,28 +18,31 @@ export function criterionDotClass(status: CriterionView['status'], provenance: P
 }
 
 export function PassedBeforeBadge({ passedBefore }: { passedBefore: boolean | undefined }) {
+  const t = useT();
   if (!passedBefore) return null;
-  return <Badge tone="neutral" title="Sa commande passait déjà avant tout changement : il ne prouve pas ce travail">passait déjà</Badge>;
+  return <Badge tone="neutral" title={t('passedBeforeTitle')}>{t('passedAlready')}</Badge>;
 }
 
 export function CriterionProvenanceBadge({ provenance }: { provenance: Provenance | undefined }) {
+  const t = useT();
   if (!provenance) return null;
   const badge =
     provenance.kind === 'verified'
       ? {
-          label: 'vérifié',
-          title: 'Fait établi par fennec : la commande a tourné',
+          label: t('verified'),
+          title: t('verifiedTitle'),
           tone: 'ok' as const
         }
       : {
-          label: 'indicatif',
-          title: `Jugement d'un agent (${provenance.agent}) : à relire`,
+          label: t('indicative'),
+          title: t('indicativeTitle', { agent: provenance.agent }),
           tone: 'accent' as const
         };
   return <Badge tone={badge.tone} title={badge.title}>{badge.label}</Badge>;
 }
 
 export function CriteriaSection({ criteria }: { criteria: CriterionView[] }) {
+  const t = useT();
   const passed = criteria.filter((criterion) => criterion.status === 'passed').length;
   const failed = criteria.filter((criterion) => criterion.status === 'failed').length;
   const indicative = criteria.filter((criterion) => criterion.status === 'passed' && criterion.provenance?.kind === 'indicative').length;
@@ -49,14 +52,14 @@ export function CriteriaSection({ criteria }: { criteria: CriterionView[] }) {
   return (
     <Panel
       id="criteria"
-      title={panelBlock('criteria').title}
+      title={t('panelCriteria')}
       icon={<CheckIcon className="h-3.5 w-3.5" />}
       iconTone={iconTone}
       summary={
         criteria.length > 0 ? (
           <span
             className={failed > 0 ? 'text-err' : passed === criteria.length ? 'text-ok' : undefined}
-            title={indicative > 0 ? `${passed}/${criteria.length} · ${indicative} indicatif` : undefined}
+            title={indicative > 0 ? t('indicativeCount', { passed, total: criteria.length, indicative }) : undefined}
           >
             {passed}/{criteria.length}
           </span>
@@ -64,7 +67,7 @@ export function CriteriaSection({ criteria }: { criteria: CriterionView[] }) {
       }
     >
       {criteria.length === 0 ? (
-        <div className="text-xs text-muted">Aucun critère : ils viennent du plan validé d'un workflow.</div>
+        <div className="text-xs text-muted">{t('noCriteriaHint')}</div>
       ) : (
         <div className="flex flex-col">
           <div className="h-1 w-full overflow-hidden rounded-full bg-raised">
@@ -89,7 +92,7 @@ export function CriteriaSection({ criteria }: { criteria: CriterionView[] }) {
                       <>
                         <div className="font-mono text-muted">$ {provenance.command}</div>
                         {typeof provenance.exitCode === 'number' && (
-                          <div className="text-xs text-muted">Code de sortie : {provenance.exitCode}</div>
+                          <div className="text-xs text-muted">{t('exitCode', { code: provenance.exitCode })}</div>
                         )}
                         <pre className="max-h-40 overflow-auto rounded bg-code p-2 font-mono text-xs text-muted">
                           {provenance.output}

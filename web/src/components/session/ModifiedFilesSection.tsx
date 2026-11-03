@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ThreadView } from '../../lib/fold';
 import { previewKindOfPath, relativeToWorkdir, type PreviewKind } from '../../lib/preview';
 import { usePreviewOpener, usePreviewWorkdir } from '../preview/PreviewContext';
-import { panelBlock } from '../../lib/panelBlocks';
 import { EyeIcon, FileIcon } from '../Icons';
 import { Button } from '../ui/Button';
 import { Panel } from '../ui/Panel';
+import { useT } from '../../i18n';
 
 interface ModifiedFilesSectionProps {
   modifiedFiles: ThreadView['modifiedFiles'];
@@ -13,6 +13,7 @@ interface ModifiedFilesSectionProps {
 }
 
 export function ModifiedFilesSection({ modifiedFiles, sessionId }: ModifiedFilesSectionProps) {
+  const t = useT();
   const opener = usePreviewOpener();
   const workdir = usePreviewWorkdir();
   const [filesExpanded, setFilesExpanded] = useState(false);
@@ -44,11 +45,11 @@ export function ModifiedFilesSection({ modifiedFiles, sessionId }: ModifiedFiles
   return (
     <Panel
       id="modifiedFiles"
-      title={panelBlock('modifiedFiles').title}
+      title={t('panelModifiedFiles')}
       icon={<FileIcon className="h-3.5 w-3.5" />}
       summary={mergedFiles.length > 0 ? mergedFiles.length : undefined}
     >
-      {mergedFiles.length === 0 && <div className="text-xs text-muted">Aucun fichier modifié.</div>}
+      {mergedFiles.length === 0 && <div className="text-xs text-muted">{t('noModifiedFiles')}</div>}
       {visibleModifiedFiles.map((file) => {
         const relative = workdir ? file.key : undefined;
         const kind = file.kind;
@@ -79,8 +80,8 @@ export function ModifiedFilesSection({ modifiedFiles, sessionId }: ModifiedFiles
             type="button"
             className={`group ${rowClass}`}
             onClick={() => opener({ path: relative, kind })}
-            title="Aperçu"
-            aria-label={`Aperçu ${file.key}`}
+            title={t('preview')}
+            aria-label={t('previewOf', { name: file.key })}
           >
             {row}
           </button>
@@ -97,7 +98,7 @@ export function ModifiedFilesSection({ modifiedFiles, sessionId }: ModifiedFiles
           onClick={() => setFilesExpanded((value) => !value)}
           className="self-start"
         >
-          {filesExpanded ? 'Réduire' : `+ ${hiddenModifiedCount} autres`}
+          {filesExpanded ? t('collapse') : t('moreFiles', { count: hiddenModifiedCount })}
         </Button>
       )}
     </Panel>

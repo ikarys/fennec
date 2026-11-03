@@ -27,6 +27,7 @@ import {
   WorkflowPicker,
   type WorkflowSelection,
 } from "../workflow/session/WorkflowPicker";
+import { useT } from "../../i18n";
 
 interface ComposerProps {
   text: string;
@@ -87,6 +88,7 @@ export function Composer({
   const [selected, setSelected] = useState(0);
   const [dismissed, setDismissed] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const t = useT();
   const matches = matchCommands(text, commands ?? []);
   const menuOpen = matches.length > 0 && !dismissed;
   const matchKey = matches.map((command) => command.name).join("\n");
@@ -167,7 +169,7 @@ export function Composer({
           htmlFor="prompt"
           className="absolute h-px w-px overflow-hidden clip-[rect(0_0_0_0)]"
         >
-          Message
+          {t("composerLabel")}
         </label>
         {attachments && attachments.length > 0 && (
           <div className="flex flex-wrap gap-2 px-3.5 pt-3">
@@ -180,7 +182,7 @@ export function Composer({
                 />
                 <button
                   type="button"
-                  aria-label={`Retirer ${a.filename}`}
+                  aria-label={t("removeAttachment", { name: a.filename })}
                   onClick={() => onRemoveAttachment?.(i)}
                   className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full border border-border-strong bg-bg text-muted hover:text-text"
                 >
@@ -231,7 +233,7 @@ export function Composer({
             }}
             placeholder={
               placeholder ??
-              "Demande quelque chose… (@ pour un fichier, / pour une commande)"
+              t("composerPlaceholder")
             }
             className="max-h-60 min-w-0 grow resize-none bg-transparent py-1.5 leading-relaxed outline-none placeholder:text-faint"
           />
@@ -240,11 +242,11 @@ export function Composer({
               variant="secondary"
               size="lg"
               iconOnly
-              aria-label="Pause"
+              aria-label={t("pause")}
               title={
                 pauseRequested
-                  ? "Pause demandée : le workflow s'arrête après l'étape en cours"
-                  : "Mettre en pause après l'étape en cours"
+                  ? t("pauseRequested")
+                  : t("pauseAfterStep")
               }
               disabled={pauseRequested}
               onClick={onPause}
@@ -257,8 +259,8 @@ export function Composer({
               variant="danger"
               size="lg"
               iconOnly
-              aria-label="Arrêter"
-              title="Arrêter le tour (vide la file)"
+              aria-label={t("stop")}
+              title={t("stopTurn")}
               onClick={onStop}
             >
               <StopIcon className="h-4 w-4" />
@@ -268,11 +270,11 @@ export function Composer({
             variant={running ? "secondary" : "primary"}
             size="lg"
             iconOnly
-            aria-label={running ? "Mettre en file" : "Envoyer"}
+            aria-label={running ? t("queue") : t("send")}
             title={
               running
-                ? "Mettre en file (Entrée) : glissé à l'agent après ses outils en cours"
-                : "Envoyer (Entrée) · nouvelle ligne : Maj+Entrée"
+                ? t("queueTitle")
+                : t("sendTitle")
             }
             onClick={onSend}
             disabled={!canSend}
@@ -287,8 +289,8 @@ export function Composer({
               <Button
                 variant="ghost"
                 iconOnly
-                aria-label="Joindre une image"
-                title="Joindre une image (ou colle-la, ou glisse-la)"
+                aria-label={t("attachImage")}
+                title={t("attachImageTitle")}
                 onClick={() => fileInputRef.current?.click()}
               >
                 <PaperclipIcon className="h-3.5 w-3.5" />
