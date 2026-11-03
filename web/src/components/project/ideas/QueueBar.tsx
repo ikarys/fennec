@@ -8,7 +8,7 @@ import { Badge } from '../../ui/Badge';
 import { EditIcon, MoonIcon, PlayIcon, SettingsIcon, StopIcon } from '../../Icons';
 import { formatTokens } from '../../../lib/format';
 import { startQueue, stopQueue, type IdeaBoard } from '../../../lib/ideas';
-import { useLang } from '../../../i18n';
+import { useT, useLang } from '../../../i18n';
 
 export function QueueBar({
   queue,
@@ -20,6 +20,7 @@ export function QueueBar({
   run: (action: () => Promise<IdeaBoard>) => Promise<boolean>;
 }) {
   const lang = useLang();
+  const t = useT();
   const [autonomous, setAutonomous] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -41,12 +42,12 @@ export function QueueBar({
     }
   };
 
-  // Show only the caps that are set; 0 on both means one "sans limite".
+  // Show only the caps that are set; 0 on both means one "no limit".
   const capParts: string[] = [];
   if (queue.caps.maxMinutes > 0) capParts.push(`max ${queue.caps.maxMinutes} min`);
   if (queue.caps.maxTokens > 0)
     capParts.push(`${formatTokens(lang, queue.caps.maxTokens)} tokens`);
-  const caps = capParts.length === 0 ? 'sans limite' : capParts.join(' · ');
+  const caps = capParts.length === 0 ? t('noCap') : capParts.join(' · ');
 
   if (queue.running) {
     return (
@@ -54,12 +55,12 @@ export function QueueBar({
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1.5 text-sm font-medium text-text">
             <Badge tone="accent" dot pulse>
-              file en cours
+              {t('queueRunning')}
             </Badge>
             {queue.autonomous ? (
               <>
                 <MoonIcon className="h-3.5 w-3.5 text-muted" />
-                <span className="text-xs text-muted">mode nuit · {caps} par idée</span>
+                <span className="text-xs text-muted">{t('nightModeCaps', { caps })}</span>
               </>
             ) : null}
           </span>
@@ -68,8 +69,8 @@ export function QueueBar({
             size="sm"
             disabled={busy}
             iconOnly
-            title="Arrêter la file après la tâche en cours"
-            aria-label="Arrêter la file"
+            title={t('stopQueueAfter')}
+            aria-label={t('stopQueue')}
             className="ml-auto"
             onClick={handleStop}
           >
@@ -84,11 +85,11 @@ export function QueueBar({
     <Card className="flex flex-col gap-2 px-4 py-3">
       <div className="flex items-center gap-3">
         <span className="text-sm font-medium text-text tabular-nums whitespace-nowrap">
-          {queue.ready} {queue.ready === 0 || queue.ready === 1 ? 'prête' : 'prêtes'}
+          {t('readyCount', { count: queue.ready, s: queue.ready > 1 ? 's' : '' })}
         </span>
         {queue.next ? (
           <span className="min-w-0 truncate text-xs text-muted" title={queue.next.text}>
-            Prochaine : {queue.next.title}
+            {t('nextLabel', { title: queue.next.title })}
           </span>
         ) : null}
 
@@ -101,15 +102,15 @@ export function QueueBar({
               className="h-4 w-4 accent-[var(--accent)]"
             />
             <MoonIcon className="h-3.5 w-3.5" />
-            Mode nuit
+            {t('nightMode')}
           </label>
 
           <Button
             variant="ghost"
             size="sm"
             iconOnly
-            title="Plafonds du mode nuit (Paramètres)"
-            aria-label="Plafonds du mode nuit (Paramètres)"
+            title={t('nightCapsTitle')}
+            aria-label={t('nightCapsTitle')}
             onClick={() => {
               window.location.hash = '#/settings';
             }}
@@ -122,26 +123,24 @@ export function QueueBar({
             variant="primary"
             size="md"
             disabled={busy || queue.ready === 0}
-            title={queue.ready === 0 ? 'Aucune idée prête : cadre une idée du backlog' : undefined}
+            title={queue.ready === 0 ? t('noReadyIdea') : undefined}
             onClick={handleStart}
           >
             <PlayIcon className="h-4 w-4" />
-            Lancer la file
+            {t('startQueue')}
           </Button>
         </div>
       </div>
 
       {queue.ready === 0 ? (
         <p className="m-0 flex items-center gap-1 text-xs text-muted">
-          Rien n'est prêt : cadre une idée du backlog avec
+          {t('nothingReadyPrefix')}
           <EditIcon className="h-3.5 w-3.5" />
-          pour l'ajouter à la file.
+          {t('nothingReadySuffix')}
         </p>
       ) : autonomous ? (
         <p className="m-0 text-xs text-muted">
-          {caps === 'sans limite'
-            ? "L'agent tranche seul ses questions et note chaque décision ; une idée n'a pas de plafond et la file passe à la suivante."
-            : `L'agent tranche seul ses questions et note chaque décision ; une idée s'arrête à ${caps} et la file passe à la suivante.`}
+          {caps === t('noCap') ? t('autonomousNoCap') : t('autonomousWithCap', { caps })}
         </p>
       ) : null}
     </Card>

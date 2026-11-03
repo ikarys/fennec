@@ -24,14 +24,16 @@ import {
   type IdeaBoard,
   type IdeaView,
 } from "../../../lib/ideas";
+import type { MsgKey } from "../../../i18n/messages";
+import { useT } from "../../../i18n";
 
-const ACTION_LABELS: Record<IdeaAction, string> = {
-  frame: "Cadrer",
-  resumeFraming: "Reprendre le cadrage",
-  start: "Lancer",
-  open: "Voir la session",
-  answer: "Répondre",
-  review: "Relire",
+const ACTION_LABELS: Record<IdeaAction, MsgKey> = {
+  frame: "actionFrame",
+  resumeFraming: "actionResumeFraming",
+  start: "actionStart",
+  open: "actionOpen",
+  answer: "actionAnswer",
+  review: "actionReview",
 };
 
 const ACTION_ICONS: Record<IdeaAction, typeof EditIcon> = {
@@ -73,6 +75,7 @@ export function IdeaRow({
   reorder: RowReorder | null;
 }) {
   const [busy, setBusy] = useState(false);
+  const t = useT();
 
   const showMeta =
     idea.durationMs != null ||
@@ -111,14 +114,15 @@ export function IdeaRow({
             : null;
     if (!onClick || !idea.action) return null;
     const Icon = ACTION_ICONS[idea.action];
+    const actionLabel = t(ACTION_LABELS[idea.action]);
     return (
       <Button
         variant="soft"
         size="sm"
         iconOnly
         disabled={busy}
-        title={ACTION_LABELS[idea.action]}
-        aria-label={ACTION_LABELS[idea.action]}
+        title={actionLabel}
+        aria-label={actionLabel}
         onClick={onClick}
       >
         <Icon className="h-4 w-4" />
@@ -181,8 +185,8 @@ export function IdeaRow({
           variant="ghost"
           size="sm"
           iconOnly
-          title="Glisser pour réordonner (↑/↓ au clavier)"
-          aria-label="Réordonner"
+          title={t('reorderTitle')}
+          aria-label={t('reorder')}
           className="cursor-grab"
           onKeyDown={(e) => {
             if (e.key === "ArrowUp") {
@@ -220,7 +224,7 @@ export function IdeaRow({
         </div>
       </div>
 
-      <span className="shrink-0 font-mono text-xs text-faint" title="Créée le">
+      <span className="shrink-0 font-mono text-xs text-faint" title={t('createdOn')}>
         {formatDate(idea.createdAt)}
       </span>
 
@@ -230,8 +234,8 @@ export function IdeaRow({
             variant="ghost"
             size="sm"
             iconOnly
-            title="Ouvrir la session de cadrage"
-            aria-label="Ouvrir la session de cadrage"
+            title={t('openFramingSession')}
+            aria-label={t('openFramingSession')}
             onClick={() => onOpenSession(idea.sessionId as string)}
           >
             <EyeIcon className="h-4 w-4" />

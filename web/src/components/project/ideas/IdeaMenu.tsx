@@ -11,6 +11,7 @@ import {
   type IdeaBoard,
   type IdeaView,
 } from '../../../lib/ideas';
+import { useT } from '../../../i18n';
 
 export function IdeaMenu({
   idea,
@@ -25,6 +26,7 @@ export function IdeaMenu({
 }) {
   // Both drop and remove end in `idea.dropped`; only the wording differs.
   const [pendingDrop, setPendingDrop] = useState<'drop' | 'remove' | null>(null);
+  const t = useT();
   if (idea.menu.length === 0) {
     return null;
   }
@@ -40,43 +42,43 @@ export function IdeaMenu({
 
   return (
     <>
-      <Menu label="Actions">
+      <Menu label={t('menuActions')}>
         {idea.menu.map((action) => {
           switch (action) {
             case 'reframe':
               return (
                 <MenuItem key={action} onSelect={handleFrame}>
-                  Recadrer
+                  {t('menuReframe')}
                 </MenuItem>
               );
             case 'startUnframed':
               return (
                 <MenuItem key={action} onSelect={handleStart}>
-                  Lancer sans cadrage
+                  {t('menuStartUnframed')}
                 </MenuItem>
               );
             case 'restart':
               return (
                 <MenuItem key={action} onSelect={handleStart}>
-                  Relancer
+                  {t('menuRestart')}
                 </MenuItem>
               );
             case 'complete':
               return (
                 <MenuItem key={action} onSelect={handleComplete}>
-                  Marquer comme faite
+                  {t('menuComplete')}
                 </MenuItem>
               );
             case 'drop':
               return (
                 <MenuItem key={action} tone="danger" onSelect={() => setPendingDrop('drop')}>
-                  Abandonner
+                  {t('menuDrop')}
                 </MenuItem>
               );
             case 'remove':
               return (
                 <MenuItem key={action} tone="danger" onSelect={() => setPendingDrop('remove')}>
-                  Supprimer
+                  {t('menuRemove')}
                 </MenuItem>
               );
           }
@@ -84,13 +86,9 @@ export function IdeaMenu({
       </Menu>
       <ConfirmDialog
         open={pendingDrop !== null}
-        title={pendingDrop === 'remove' ? 'Supprimer cette tâche ?' : 'Abandonner cette idée ?'}
-        body={
-          pendingDrop === 'remove'
-            ? 'La tâche sort du tableau ; sa session et son historique restent. Cette action est définitive.'
-            : "L'idée sort de la file. Cette action est définitive."
-        }
-        confirmLabel={pendingDrop === 'remove' ? 'Supprimer' : 'Abandonner'}
+        title={pendingDrop === 'remove' ? t('confirmRemoveTask') : t('confirmDropIdea')}
+        body={pendingDrop === 'remove' ? t('confirmRemoveBody') : t('confirmDropBody')}
+        confirmLabel={pendingDrop === 'remove' ? t('menuRemove') : t('menuDrop')}
         onConfirm={handleDrop}
         onCancel={() => setPendingDrop(null)}
       />

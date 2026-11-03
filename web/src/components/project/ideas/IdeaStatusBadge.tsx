@@ -3,28 +3,29 @@
  */
 import { Badge, type BadgeTone } from '../../ui/Badge';
 import type { IdeaStatus } from '../../../lib/ideas';
+import type { MsgKey } from '../../../i18n/messages';
+import { useT } from '../../../i18n';
 
-const STATUS_CONFIG: Record<
-  IdeaStatus,
-  { label: string; tone: BadgeTone; pulse?: boolean }
-> = {
-  inbox: { label: 'idée', tone: 'neutral' },
-  framing: { label: 'en cadrage', tone: 'info' },
-  queued: { label: 'prête', tone: 'info' },
-  running: { label: 'en cours', tone: 'accent', pulse: true },
-  question: { label: 'question', tone: 'accent' },
-  review: { label: 'à relire', tone: 'accent' },
-  halted: { label: 'arrêtée', tone: 'err' },
-  failed: { label: 'échouée', tone: 'err' },
-  integrated: { label: 'intégrée', tone: 'ok' },
-  completed: { label: 'faite', tone: 'ok' },
+const STATUS_CONFIG: Record<IdeaStatus, { labelKey: MsgKey; tone: BadgeTone; pulse?: boolean }> = {
+  inbox: { labelKey: 'statusInbox', tone: 'neutral' },
+  framing: { labelKey: 'statusFraming', tone: 'info' },
+  queued: { labelKey: 'statusQueued', tone: 'info' },
+  running: { labelKey: 'statusRunning', tone: 'accent', pulse: true },
+  question: { labelKey: 'statusQuestion', tone: 'accent' },
+  review: { labelKey: 'statusReview', tone: 'accent' },
+  halted: { labelKey: 'statusHalted', tone: 'err' },
+  failed: { labelKey: 'statusFailed', tone: 'err' },
+  integrated: { labelKey: 'statusIntegrated', tone: 'ok' },
+  completed: { labelKey: 'statusCompleted', tone: 'ok' },
 };
 
 export function IdeaStatusBadge({ status }: { status: IdeaStatus }) {
+  const t = useT();
   const cfg = STATUS_CONFIG[status];
+  const label = t(cfg.labelKey);
   return (
-    <Badge tone={cfg.tone} pill dot pulse={cfg.pulse ?? false} title={`Statut : ${cfg.label}`}>
-      {cfg.label}
+    <Badge tone={cfg.tone} pill dot pulse={cfg.pulse ?? false} title={t('statusLabel', { label })}>
+      {label}
     </Badge>
   );
 }

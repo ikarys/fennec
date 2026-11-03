@@ -39,6 +39,8 @@ import { AutonomySection } from '../components/settings/AutonomySection';
 import { ScannersSection } from '../components/settings/ScannersSection';
 import { SkillsSection } from '../components/settings/SkillsSection';
 import { WorkflowsSection } from '../components/settings/WorkflowsSection';
+import { useT } from '../i18n';
+import type { MsgKey } from '../i18n/messages';
 
 interface SettingsPageProps {
   /** The tab named in the address (`#/settings/rules`), when it names one. */
@@ -54,12 +56,12 @@ type SettingsTab = 'models' | 'behaviour' | 'rules' | 'library' | 'display';
 
 // Five groups, not twelve tabs: what tunes the model, how an agent behaves, the human's rules,
 // the catalogues of content (skills, workflows, agents, MCP) and the display.
-const TABS: { id: SettingsTab; label: string }[] = [
-  { id: 'models', label: 'Modèles' },
-  { id: 'behaviour', label: 'Comportement' },
-  { id: 'rules', label: 'Règles' },
-  { id: 'library', label: 'Bibliothèque' },
-  { id: 'display', label: 'Affichage' }
+const TABS: { id: SettingsTab; labelKey: MsgKey }[] = [
+  { id: 'models', labelKey: 'settingsTabModels' },
+  { id: 'behaviour', labelKey: 'settingsTabBehaviour' },
+  { id: 'rules', labelKey: 'settingsTabRules' },
+  { id: 'library', labelKey: 'settingsTabLibrary' },
+  { id: 'display', labelKey: 'settingsTabDisplay' }
 ];
 
 /** The old per-section addresses (`#/settings/skills`) still open the group that holds the section. */
@@ -76,13 +78,15 @@ const LEGACY_TABS: Record<string, SettingsTab> = {
 };
 
 export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSaved, onListing }: SettingsPageProps) {
+  const t = useT();
   const [form, setForm] = useState<SettingsForm | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const [tab, setTab] = useState<SettingsTab>(
-    () => TABS.find((t) => t.id === initialTab)?.id ?? (initialTab ? LEGACY_TABS[initialTab] : undefined) ?? 'models'
+    () => TABS.find((item) => item.id === initialTab)?.id ?? (initialTab ? LEGACY_TABS[initialTab] : undefined) ?? 'models'
   );
+  const tabs = TABS.map((item) => ({ id: item.id, label: t(item.labelKey) }));
 
   useEffect(() => {
     if (settings && form === null) {
@@ -250,7 +254,7 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
     try {
       onSaved(await saveSettings({ ...settings.preferences, ...patch }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Impossible d’enregistrer les réglages');
+      setError(err instanceof Error ? err.message : t('settingsSaveError'));
     }
   }
 
@@ -272,7 +276,7 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
       setForm(toForm(response.preferences, response.listings));
       onSaved(response);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Impossible d’enregistrer les réglages');
+      setError(err instanceof Error ? err.message : t('settingsSaveError'));
     } finally {
       setSaving(false);
     }
@@ -310,9 +314,9 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
     return (
       <main className="grow overflow-y-auto px-4 pt-6 md:px-6 md:pt-8">
         <div className="mx-auto max-w-[960px]">
-          <h1 className="text-2xl font-semibold">Réglages</h1>
-          <p className="mt-0.5 text-muted">S'applique au prochain tour, sans redémarrage.</p>
-          <div className="mt-6 text-sm text-muted">Chargement…</div>
+          <h1 className="text-2xl font-semibold">{t('settingsTitle')}</h1>
+          <p className="mt-0.5 text-muted">{t('settingsSubtle')}</p>
+          <div className="mt-6 text-sm text-muted">{t('loading')}</div>
         </div>
       </main>
     );
@@ -323,14 +327,14 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
       {/* The top padding sits inside the scroller, so the jump bar sticks at its very top. */}
       <div className="mx-auto flex max-w-[960px] flex-col gap-6 pt-6 md:pt-8">
         <div>
-          <h1 className="text-2xl font-semibold">Réglages</h1>
-          <p className="mt-0.5 text-muted">S'applique au prochain tour, sans redémarrage.</p>
+          <h1 className="text-2xl font-semibold">{t('settingsTitle')}</h1>
+          <p className="mt-0.5 text-muted">{t('settingsSubtle')}</p>
         </div>
 
         <Card className="flex flex-col md:flex-row">
           {/* One form across the tabs: an edit on one tab is kept when switching. */}
           <div className="shrink-0 border-b border-border p-2 md:border-r md:border-b-0">
-            <Tabs label="Sections des réglages" tabs={TABS} active={tab} onSelect={setTab} />
+            <Tabs label={t('settingsSectionsLabel')} tabs={tabs} active={tab} onSelect={setTab} />
           </div>
 
           <form ref={formRef} onSubmit={handleSubmit} className="flex min-w-0 grow flex-col gap-8 p-5">

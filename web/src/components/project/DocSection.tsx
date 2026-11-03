@@ -11,6 +11,7 @@ import { SectionLabel } from '../ui/SectionLabel';
 import { Select } from '../ui/Field';
 import { markdownComponents } from '../session/markdownComponents';
 import { getProjectDocs, type Adr, type DocFile } from '../../lib/api';
+import { useT } from '../../i18n';
 
 const REMARK_PLUGINS = [remarkGfm];
 
@@ -27,6 +28,7 @@ function statusTone(status: string) {
 }
 
 function AdrRow({ adr, first }: { adr: Adr; first: boolean }) {
+  const t = useT();
   return (
     <details className={first ? undefined : 'border-t border-border'}>
       <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 text-sm hover:bg-raised select-none">
@@ -38,8 +40,8 @@ function AdrRow({ adr, first }: { adr: Adr; first: boolean }) {
         {adr.status ? (
           <Badge tone={statusTone(adr.status)}>{adr.status}</Badge>
         ) : null}
-        <Badge tone="neutral" title="Lu depuis le fichier">
-          vérifié
+        <Badge tone="neutral" title={t('docVerifiedTitle')}>
+          {t('verified')}
         </Badge>
       </summary>
       <div className="border-t border-border px-4 py-3 text-sm">
@@ -61,6 +63,7 @@ export function DocSection({ projectId }: { projectId: string }) {
   const [selected, setSelected] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const t = useT();
 
   useEffect(() => {
     let cancelled = false;
@@ -77,7 +80,7 @@ export function DocSection({ projectId }: { projectId: string }) {
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        setError(err instanceof Error ? err.message : 'Erreur inconnue');
+        setError(err instanceof Error ? err.message : t('unknownError'));
         setLoading(false);
       });
 
@@ -92,7 +95,7 @@ export function DocSection({ projectId }: { projectId: string }) {
   return (
     <section>
       {loading ? (
-        <p className="text-muted">Chargement…</p>
+        <p className="text-muted">{t('loading')}</p>
       ) : error ? (
         <p className="text-err">{error}</p>
       ) : (
@@ -100,10 +103,10 @@ export function DocSection({ projectId }: { projectId: string }) {
           {file ? (
             <>
               <div className="flex items-center gap-2">
-                <SectionLabel>Documentation</SectionLabel>
+                <SectionLabel>{t('documentation')}</SectionLabel>
                 {files.length > 1 ? (
                   <Select
-                    aria-label="Fichier de doc"
+                    aria-label={t('docFileAria')}
                     value={file.path}
                     onChange={(event) => setSelected(event.target.value)}
                     className="min-w-0"
@@ -131,17 +134,13 @@ export function DocSection({ projectId }: { projectId: string }) {
               </Card>
             </>
           ) : (
-            <p className="text-xs text-muted">
-              Aucun fichier de doc (AGENTS.md, README, docs/).
-            </p>
+            <p className="text-xs text-muted">{t('noDocFiles')}</p>
           )}
 
           <div className="mt-6">
             <SectionLabel>ADR ({adrs.length})</SectionLabel>
             {adrs.length === 0 ? (
-              <p className="mt-3 text-xs text-muted">
-                Aucun ADR dans docs/adr/.
-              </p>
+              <p className="mt-3 text-xs text-muted">{t('noAdrs')}</p>
             ) : (
               <Card className="mt-3">
                 {adrs.map((adr, index) => (

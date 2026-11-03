@@ -2,6 +2,7 @@ import { useRef, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { Folder } from '../../lib/api';
 import { FolderIcon, RepoIcon, SpinnerIcon } from '../Icons';
 import { Badge } from '../ui/Badge';
+import { useT } from '../../i18n';
 
 interface FolderListProps {
   folders: Folder[];
@@ -16,6 +17,7 @@ interface FolderListProps {
 /** The sub-folders of the current folder: click selects, double click or Enter opens. */
 export function FolderList({ folders, parent, selected, loading, loadError, onSelect, onOpen }: FolderListProps) {
   const rowRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const t = useT();
 
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
@@ -48,7 +50,7 @@ export function FolderList({ folders, parent, selected, loading, loadError, onSe
     <div
       tabIndex={0}
       onKeyDown={handleKeyDown}
-      aria-label="Liste des dossiers"
+      aria-label={t('folderListAria')}
       className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-border bg-raised p-2 outline-none focus-visible:ring-2 focus-visible:ring-accent"
     >
       {loading ? (
@@ -59,7 +61,7 @@ export function FolderList({ folders, parent, selected, loading, loadError, onSe
         <>
           {loadError && <div className="mb-2 text-sm text-err">{loadError}</div>}
           {folders.length === 0 ? (
-            <p className="py-4 text-center text-sm text-muted">Aucun sous-dossier</p>
+            <p className="py-4 text-center text-sm text-muted">{t('noSubfolders')}</p>
           ) : (
             <ul className="space-y-1">
               {folders.map((folder, index) => {

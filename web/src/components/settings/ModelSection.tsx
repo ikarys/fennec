@@ -1,6 +1,7 @@
 import type { ModelRef, ProviderListing } from '../../lib/api';
 import { Section, type SectionSave } from '../ui/Section';
 import { FieldRow, Select } from '../ui/Field';
+import { useT } from '../../i18n';
 
 interface ModelSectionProps {
   value: string;
@@ -13,6 +14,7 @@ interface ModelSectionProps {
 }
 
 export function ModelSection({ value, listings, stored, defaultModel, onChange, save }: ModelSectionProps) {
+  const t = useT();
   const listedValues = new Set<string>();
   for (const listing of listings) {
     for (const model of listing.models) {
@@ -27,10 +29,10 @@ export function ModelSection({ value, listings, stored, defaultModel, onChange, 
     : '';
 
   return (
-    <Section title="Modèle" save={save}>
-      <FieldRow label="Modèle par défaut">
+    <Section title={t('modelSectionTitle')} save={save}>
+      <FieldRow label={t('defaultModelLabel')}>
         <Select value={value} onChange={(event) => onChange(event.target.value)} className="w-full">
-          <option value="">Défaut de l'environnement ({defaultModel})</option>
+          <option value="">{t('envDefaultOption', { model: defaultModel })}</option>
           {listings.map((listing) => (
             <optgroup key={listing.provider} label={listing.name}>
               {listing.models.map((model) => (
@@ -42,13 +44,13 @@ export function ModelSection({ value, listings, stored, defaultModel, onChange, 
           ))}
           {unlistedStored && (
             <option value={`${unlistedStored.provider}/${unlistedStored.model}`}>
-              {unlistedStored.model} — {unlistedProviderName} (non listé)
+              {t('unlistedModelOption', { model: unlistedStored.model, provider: unlistedProviderName })}
             </option>
           )}
         </Select>
       </FieldRow>
       <p className="m-0 text-xs text-muted">
-        Les nouvelles sessions l'utilisent ; le composer change celui d'une session. Le modèle par défaut est marqué ★ ; les favoris (♥) sont proposés dans le composer.
+        {t('modelSectionHint')}
       </p>
     </Section>
   );

@@ -8,6 +8,8 @@ import { ChevronRightIcon, CloseIcon, HeartIcon, PinIcon, StarIcon } from '../Ic
 import { FieldRow, Select, TextInput } from '../ui/Field';
 import { ModelProbe } from './ModelProbe';
 import { percentFromFraction } from '../../lib/settingsForm';
+import { useLang, useT } from '../../i18n';
+import { t, type Lang, type MsgKey } from '../../i18n/messages';
 
 export interface ModelForm {
   maxTokens: string;
@@ -47,10 +49,10 @@ export function formOnlyModels(values: Record<string, ModelForm>, providerId: st
 
 const REASONING_EFFORTS: ReasoningEffort[] = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
 
-const SOURCE_LABELS: Record<ParamSource, string> = {
-  perModel: 'par modèle',
-  listed: 'listing',
-  default: 'défaut'
+const SOURCE_LABELS: Record<ParamSource, MsgKey> = {
+  perModel: 'sourcePerModel',
+  listed: 'sourceListed',
+  default: 'sourceDefault'
 };
 
 /** One line of the effective-parameters read-out for a model. */
@@ -63,14 +65,15 @@ function ResolvedRow({
   label: string;
   value: string;
   source: ParamSource;
-  badge: string;
+  badge: MsgKey;
 }) {
+  const t = useT();
   return (
     <div className="flex items-center gap-2 text-xs">
       <span className="w-24 shrink-0 text-muted">{label}</span>
       <span className="font-mono tabular-nums">{value}</span>
-      <span className="text-faint">({SOURCE_LABELS[source]})</span>
-      <span className={`ml-auto ${badge === 'envoyé' ? 'text-ok' : 'text-faint'}`}>{badge}</span>
+      <span className="text-faint">({t(SOURCE_LABELS[source])})</span>
+      <span className={`ml-auto ${badge === 'badgeSent' ? 'text-ok' : 'text-faint'}`}>{t(badge)}</span>
     </div>
   );
 }
@@ -81,11 +84,11 @@ function priceSuffix(base: string, value: ModelForm): string {
   return `${base} · $${value.priceInput || '0'}/$${value.priceOutput || '0'}`;
 }
 
-function summary(value: ModelForm, model: ProviderListing['models'][number] | null, defaults: SettingsDefaults): string {
+function summary(lang: Lang, value: ModelForm, model: ProviderListing['models'][number] | null, defaults: SettingsDefaults): string {
   const parts: string[] = [];
   if (model === null) {
     // A hand-added model: nothing is resolved until it is saved and used.
-    const base = value.contextWindow !== '' ? `ctx ${value.contextWindow}` : 'paramètres par défaut';
+    const base = value.contextWindow !== '' ? `ctx ${value.contextWindow}` : t(lang, 'modelDefaultParams');
     return priceSuffix(base, value);
   }
   const window = value.contextWindow !== '' ? value.contextWindow : String(model.resolved.contextWindow.value);
@@ -95,7 +98,7 @@ function summary(value: ModelForm, model: ProviderListing['models'][number] | nu
   const effort =
     value.reasoningEffort !== ''
       ? value.reasoningEffort
-      : (model.resolved.reasoningEffort.value ?? `défaut ${defaults.reasoningEffort ?? '—'}`);
+      : (model.resolved.reasoningEffort.value ?? t(lang, 'modelDefaultEffort', { effort: defaults.reasoningEffort ?? '—' }));
   parts.push(`effort ${effort}`);
   return priceSuffix(parts.join(' · '), value);
 }
@@ -131,6 +134,8 @@ function ModelRow({
   open: boolean;
   onToggleOpen: () => void;
 }) {
+  const t = useT();
+  const lang = useLang();
   const key = `${providerId}/${modelId}`;
   const value = values[key] ?? { maxTokens: '', contextWindow: '', compactionThreshold: '', reasoningEffort: '', priceInput: '', priceCached: '', priceOutput: '' };
   const isFavorite = favorites.some((favorite) => favorite.provider === providerId && favorite.model === modelId);
@@ -146,16 +151,16 @@ function ModelRow({
         >
           <ChevronRightIcon className={`h-3 w-3 shrink-0 text-muted transition-transform ${open ? 'rotate-90' : ''}`} />
           <span className="max-w-[60%] shrink-0 truncate font-mono text-xs">{modelId}</span>
-          {model === null && <Badge tone="neutral">manuel</Badge>}
-          <span className="min-w-0 truncate text-xs text-faint tabular-nums">{summary(value, model, defaults)}</span>
+          {model === null && <Badge tone="neutral">{t('manualBadge')}</Badge>}
+          <span className="min-w-0 truncate text-xs text-faint tabular-nums">{summary(lang, value, model, defaults)}</span>
         </button>
         <Button
           variant="ghost"
           size="sm"
           iconOnly
           aria-pressed={isDefault}
-          aria-label="Modèle par défaut"
-          title={isDefault ? 'Modèle par défaut des nouvelles sessions (cliquer pour retirer)' : 'Utiliser par défaut dans les nouvelles sessions'}
+          aria-label={t('defaultModelLabel')}
+          title={isDefault ? t('defaultModelOn') : t('defaultModelOff')}
           onClick={() => onSetDefault(isDefault ? '' : key)}
           className={`text-base ${isDefault ? 'text-accent' : 'text-faint'}`}
         >
@@ -166,8 +171,8 @@ function ModelRow({
           size="sm"
           iconOnly
           aria-pressed={isFavorite}
-          aria-label="Afficher dans le composer"
-          title={isFavorite ? 'Retirer des favoris' : 'Afficher dans le composer'}
+          aria-label={t('showInComposer')}
+          title={isFavorite ? t('removeFavorite') : t('showInComposer')}
           onClick={() => onToggleFavorite({ provider: providerId, model: modelId })}
           className={`text-base ${isFavorite ? 'text-accent' : 'text-faint'}`}
         >
@@ -178,8 +183,8 @@ function ModelRow({
             variant="ghost"
             size="sm"
             iconOnly
-            aria-label="Retirer le modèle"
-            title="Retirer ce modèle manuel"
+            aria-label={t('removeModel')}
+            title={t('removeManualModel')}
             onClick={() => onRemoveModel(providerId, modelId)}
           >
             <CloseIcon className="h-3 w-3" />
@@ -199,7 +204,7 @@ function ModelRow({
             }}
           />
           <div className="grid gap-2 md:grid-cols-2">
-            <FieldRow label="Tokens max par réponse">
+            <FieldRow label={t('maxTokensLabel')}>
               <TextInput
                 type="number"
                 min={1}
@@ -210,7 +215,7 @@ function ModelRow({
                 className="w-full"
               />
             </FieldRow>
-            <FieldRow label="Fenêtre de contexte">
+            <FieldRow label={t('contextWindowLabel')}>
               <TextInput
                 type="number"
                 min={1024}
@@ -221,7 +226,7 @@ function ModelRow({
                 className="w-full"
               />
             </FieldRow>
-            <FieldRow label="Compaction à (%)" hint="0 désactive la compaction automatique.">
+            <FieldRow label={t('compactionLabel')} hint={t('compactionHint')}>
               <TextInput
                 type="number"
                 min={0}
@@ -233,13 +238,13 @@ function ModelRow({
                 className="w-full"
               />
             </FieldRow>
-            <FieldRow label="Effort de réflexion">
+            <FieldRow label={t('effortLabel')}>
               <Select
                 value={value.reasoningEffort}
                 onChange={(event) => onChange(key, 'reasoningEffort', event.target.value)}
                 className="w-full"
               >
-                <option value="">Auto (sans effort)</option>
+                <option value="">{t('effortAuto')}</option>
                 {REASONING_EFFORTS.map((effort) => (
                   <option key={effort} value={effort}>
                     {effort}
@@ -250,9 +255,9 @@ function ModelRow({
           </div>
           <div className="grid gap-2 md:grid-cols-3">
             <p className="m-0 text-xs font-medium text-muted md:col-span-3">
-              Prix ($ par million de tokens, pour l'estimation d'Insight)
+              {t('priceHeader')}
             </p>
-            <FieldRow label="Entrée">
+            <FieldRow label={t('inputLabel')}>
               <TextInput
                 type="number"
                 min={0}
@@ -263,7 +268,7 @@ function ModelRow({
                 className="w-full"
               />
             </FieldRow>
-            <FieldRow label="Cache">
+            <FieldRow label={t('cacheLabel')}>
               <TextInput
                 type="number"
                 min={0}
@@ -274,7 +279,7 @@ function ModelRow({
                 className="w-full"
               />
             </FieldRow>
-            <FieldRow label="Sortie">
+            <FieldRow label={t('outputLabel')}>
               <TextInput
                 type="number"
                 min={0}
@@ -290,34 +295,34 @@ function ModelRow({
           {model !== null && (
             <div className="flex flex-col gap-1.5 border-l border-border pl-3">
               <p className="m-0 text-xs font-medium text-muted">
-                Envoyé au modèle{' '}
+                {t('sentToModel')}{' '}
                 <span className="font-normal text-faint">
-                  — valeurs enregistrées, « Enregistrer » pour appliquer
+                  {t('sentToModelSuffix')}
                 </span>
               </p>
               <ResolvedRow
-                label="Tokens max"
+                label={t('resolvedMaxTokens')}
                 value={String(model.resolved.maxTokens.value)}
                 source={model.resolved.maxTokens.source}
-                badge={model.resolved.maxTokens.wire ? 'envoyé' : 'local'}
+                badge={model.resolved.maxTokens.wire ? 'badgeSent' : 'badgeLocal'}
               />
               <ResolvedRow
-                label="Contexte"
+                label={t('resolvedContext')}
                 value={String(model.resolved.contextWindow.value)}
                 source={model.resolved.contextWindow.source}
-                badge="local"
+                badge="badgeLocal"
               />
               <ResolvedRow
-                label="Compaction"
+                label={t('resolvedCompaction')}
                 value={`${percentFromFraction(model.resolved.compactAt.value)} %`}
                 source={model.resolved.compactAt.source}
-                badge="local"
+                badge="badgeLocal"
               />
               <ResolvedRow
-                label="Effort"
+                label={t('resolvedEffort')}
                 value={model.resolved.reasoningEffort.value ?? '—'}
                 source={model.resolved.reasoningEffort.source}
-                badge={model.resolved.reasoningEffort.wire ? 'envoyé' : 'non envoyé'}
+                badge={model.resolved.reasoningEffort.wire ? 'badgeSent' : 'badgeNotSent'}
               />
               {model.resolved.contextWindow.source === 'listed' && (
                 <Button
@@ -325,8 +330,8 @@ function ModelRow({
                   size="sm"
                   iconOnly
                   className="mt-1 self-start"
-                  aria-label="Figer"
-                  title="Figer la fenêtre de contexte"
+                  aria-label={t('pin')}
+                  title={t('pinContext')}
                   onClick={() => onChange(key, 'contextWindow', String(model.resolved.contextWindow.value))}
                 >
                   <PinIcon className="h-3 w-3" />
@@ -352,6 +357,7 @@ export function ModelPrefsSection({
   save,
   onRemoveModel
 }: ModelPrefsSectionProps) {
+  const t = useT();
   // A model with saved overrides opens by itself: that is what the human came to edit.
   const hasOverrides = (key: string) => {
     const value = values[key];
@@ -362,8 +368,8 @@ export function ModelPrefsSection({
   const toggleOpen = (key: string) => setOpen((previous) => ({ ...previous, [key]: !isOpen(key) }));
 
   return (
-    <Section title="Paramètres par modèle" save={save}>
-      {listings.length === 0 && <p className="m-0 text-sm text-muted">Aucun modèle listé.</p>}
+    <Section title={t('modelPrefsTitle')} save={save}>
+      {listings.length === 0 && <p className="m-0 text-sm text-muted">{t('noModelsListed')}</p>}
       <div className="flex flex-col">
         {listings.map((listing) => {
           const formOnly = formOnlyModels(values, listing.provider, listing);
@@ -375,7 +381,7 @@ export function ModelPrefsSection({
                 {count > 0 && <span className="text-faint"> · {count}</span>}
               </SectionLabel>
               {listing.models.length === 0 && formOnly.length === 0 && (
-                <p className="m-0 pb-2 text-xs text-faint">Aucun modèle listé.</p>
+                <p className="m-0 pb-2 text-xs text-faint">{t('noModelsListed')}</p>
               )}
               {listing.models.map((model) => (
                 <ModelRow
