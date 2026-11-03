@@ -2,6 +2,10 @@
 
 use serde::Serialize;
 
+mod test_subject;
+
+pub use test_subject::needs_own_test;
+
 pub const CHURN_DAYS: u32 = 90;
 pub const HOT_CHURN: usize = 5;
 
@@ -175,8 +179,10 @@ pub fn report(files: Vec<FileFacts>, history: History) -> RiskReport {
     }
 }
 
+/// Whether the untested signal stays quiet: the file has a test of its own
+/// (inline, or a test file of the same stem) or needs none.
 pub fn is_tested(path: &str, content: &str, test_paths: &[&str]) -> bool {
-    if is_inline_test(path, content) {
+    if !needs_own_test(path, content) || is_inline_test(path, content) {
         return true;
     }
 
@@ -194,7 +200,7 @@ fn remedy_prompt(modules: &[RiskModule]) -> String {
 
     let mut lines = Vec::new();
     lines.push(format!(
-        "Remediate the risk zones of this project, measured from git, riskiest module first. Signals: unreviewed = more than half of its lines come from AI commits never integrated through fennec; untested = no inline test and no test file of the same stem; churn = touched by {HOT_CHURN} commits or more in the last {CHURN_DAYS} days."
+        "Remediate the risk zones of this project, measured from git, riskiest module first. Signals: unreviewed = more than half of its lines come from AI commits never integrated through fennec; untested = no test of its own, neither inline nor a test file of the same stem (declaration-only modules, test support and build tooling are not counted); churn = touched by {HOT_CHURN} commits or more in the last {CHURN_DAYS} days."
     ));
     lines.push(String::new());
 
@@ -532,7 +538,7 @@ mod tests {
         ];
 
         let expected = format!(
-            "Remediate the risk zones of this project, measured from git, riskiest module first. Signals: unreviewed = more than half of its lines come from AI commits never integrated through fennec; untested = no inline test and no test file of the same stem; churn = touched by {HOT_CHURN} commits or more in the last {CHURN_DAYS} days.\n\n## crates/fennec/src/agent\n- crates/fennec/src/agent/turn.rs: unreviewed, untested, churn (12 commits)\n- crates/fennec/src/agent/round.rs: untested\n\n## web/src\n- web/src/app.tsx: unreviewed\n"
+            "Remediate the risk zones of this project, measured from git, riskiest module first. Signals: unreviewed = more than half of its lines come from AI commits never integrated through fennec; untested = no test of its own, neither inline nor a test file of the same stem (declaration-only modules, test support and build tooling are not counted); churn = touched by {HOT_CHURN} commits or more in the last {CHURN_DAYS} days.\n\n## crates/fennec/src/agent\n- crates/fennec/src/agent/turn.rs: unreviewed, untested, churn (12 commits)\n- crates/fennec/src/agent/round.rs: untested\n\n## web/src\n- web/src/app.tsx: unreviewed\n"
         );
 
         assert_eq!(remedy_prompt(&modules), expected);
@@ -648,6 +654,17 @@ mod tests {
             &["tests/test_cli.py"]
         ));
         assert!(is_tested("src/turn.rs", "fn turn() {}", &["tests/turn.rs"]));
+    }
+
+    #[test]
+    fn is_tested_skips_files_that_need_no_test_of_their_own() {
+        assert!(is_tested("crates/fennec/build.rs", "fn main() {}", &[]));
+        assert!(is_tested("src/web/test_support.rs", "pub fn log() {}", &[]));
+        assert!(is_tested(
+            "src/domain.rs",
+            "pub mod risk;\npub mod event;\n",
+            &[]
+        ));
     }
 
     #[test]
