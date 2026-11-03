@@ -64,7 +64,7 @@ export function Panel({ id, title, summary, defaultOpen = true, icon, iconTone =
       }}
       className="group shrink-0 border-t border-border first:border-t-0"
     >
-      <summary className="sticky top-0 z-10 flex h-8 cursor-pointer list-none items-center gap-2 bg-bg px-3 select-none hover:text-text [&::-webkit-details-marker]:hidden">
+      <summary className="sticky top-0 z-10 flex h-8 cursor-pointer list-none items-center gap-2 bg-bg px-3 select-none hover:bg-accent-soft [&::-webkit-details-marker]:hidden">
         {icon !== undefined ? (
           <span aria-hidden className={`shrink-0 ${ICON_TONES[iconTone]}`}>
             {icon}
