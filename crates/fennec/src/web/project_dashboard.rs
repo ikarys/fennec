@@ -15,7 +15,6 @@ use super::http::{error, send_json};
 use super::idea_board::Board;
 use super::insight::Period;
 use super::pricing::{priced, prices};
-use super::worktree_routes;
 use crate::domain::clock::now_ms;
 use crate::domain::map_doc::MapFileState;
 use crate::{adr, doc, module_map};
@@ -26,7 +25,9 @@ use backlog::Stage;
 /// The UI's `BadgeTone`; no tile is in error yet.
 pub enum Tone {
     Accent,
+    Info,
     Ok,
+    Attention,
     Neutral,
 }
 
@@ -38,7 +39,6 @@ pub enum TileIcon {
     Tokens,
     Time,
     Cost,
-    Disk,
     Map,
     Doc,
 }
@@ -64,6 +64,7 @@ pub struct RecentView {
     pub title: String,
     pub updated_at: u64,
     pub running: bool,
+    pub awaiting: bool,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize)]
@@ -87,7 +88,6 @@ struct Facts {
     usage: Summary,
     cost_value: String,
     cost_detail: String,
-    disk: Option<(u64, u64)>,
     map_state: MapFileState,
     module_count: usize,
     doc_count: usize,
@@ -154,8 +154,6 @@ fn gather(
         .map_err(|e| e.to_string())?;
     let pricing = priced(&models, &prices(&store.preferences()?));
 
-    let disk = worktree_routes::project_disk(app, store, project)?;
-
     let map = module_map::load(workdir);
     let map_state = module_map::map_file_state(workdir, &map);
     let module_count = map.modules.len();
@@ -169,7 +167,6 @@ fn gather(
         usage,
         cost_value: pricing.value(),
         cost_detail: pricing.detail(),
-        disk,
         map_state,
         module_count,
         doc_count,
@@ -186,18 +183,17 @@ fn view(project_id: &str, facts: &Facts) -> DashboardView {
 
 fn tiles(project_id: &str, facts: &Facts) -> Vec<TileView> {
     vec![
-        sessions_tile(facts),
+        sessions_tile(project_id, facts),
         ideas_tile(project_id, facts),
         tokens_tile(&facts.usage),
         time_tile(&facts.usage),
-        cost_tile(&facts.cost_value, &facts.cost_detail),
-        disk_tile(facts.disk),
+        cost_tile(&facts.cost_value, &facts.cost_detail, facts.usage.calls > 0),
         map_tile(project_id, &facts.map_state, facts.module_count),
         doc_tile(project_id, facts.doc_count, facts.adr_count),
     ]
 }
 
-fn sessions_tile(facts: &Facts) -> TileView {
+fn sessions_tile(project_id: &str, facts: &Facts) -> TileView {
     let running = facts.sessions.iter().filter(|s| s.running).count();
     let awaiting = facts.sessions.iter().filter(|s| s.awaiting).count();
     let detail = if running == 0 && awaiting == 0 {
@@ -214,7 +210,8 @@ fn sessions_tile(facts: &Facts) -> TileView {
         detail,
         tone: Tone::Accent,
         active: running > 0 || awaiting > 0,
-        href: None,
+        // The project page has a Sessions tab, so the tile deep-links to it.
+        href: Some(format!("#/project/{project_id}/sessions")),
         title: None,
     }
 }
@@ -251,8 +248,13 @@ fn tokens_tile(usage: &Summary) -> TileView {
         label: "Tokens · 30 j".into(),
         figure,
         detail: format!("{cache} % relus du cache"),
-        tone: Tone::Neutral,
-        active: false,
+        // Colour the tile only when the ledger has calls; an empty window stays neutral.
+        tone: if usage.calls > 0 {
+            Tone::Ok
+        } else {
+            Tone::Neutral
+        },
+        active: usage.calls > 0,
         href: Some("#/insight".into()),
         title: None,
     }
@@ -265,56 +267,34 @@ fn time_tile(usage: &Summary) -> TileView {
         label: "Temps modèle · 30 j".into(),
         figure: duration(usage.total_secs),
         detail: format!("{} appels", usage.calls),
-        tone: Tone::Neutral,
-        active: false,
+        // Model time is informational when present; no calls means no figure to highlight.
+        tone: if usage.calls > 0 {
+            Tone::Info
+        } else {
+            Tone::Neutral
+        },
+        active: usage.calls > 0,
         href: Some("#/insight".into()),
         title: None,
     }
 }
 
-fn cost_tile(value: &str, detail: &str) -> TileView {
+fn cost_tile(value: &str, detail: &str, active: bool) -> TileView {
+    // Cost is the most decision-relevant usage figure, so it gets attention when present.
     TileView {
         id: "cost".into(),
         icon: TileIcon::Cost,
         label: "Coût estimé · 30 j".into(),
         figure: value.to_string(),
         detail: detail.to_string(),
-        tone: Tone::Neutral,
-        active: false,
+        tone: if active {
+            Tone::Attention
+        } else {
+            Tone::Neutral
+        },
+        active,
         href: Some("#/insight".into()),
         title: Some(detail.to_string()),
-    }
-}
-
-fn disk_tile(disk: Option<(u64, u64)>) -> TileView {
-    let (figure, detail, tone, active) = match disk {
-        Some((total, generated)) => {
-            let alert = total >= worktree_routes::ALERT_BYTES;
-            (
-                bytes(total),
-                format!("dont {} de cache de build", bytes(generated)),
-                if alert { Tone::Accent } else { Tone::Neutral },
-                alert,
-            )
-        }
-        None => (
-            "—".to_string(),
-            "pas encore mesuré".to_string(),
-            Tone::Neutral,
-            false,
-        ),
-    };
-
-    TileView {
-        id: "disk".into(),
-        icon: TileIcon::Disk,
-        label: "Espace disque".into(),
-        figure,
-        detail,
-        tone,
-        active,
-        href: None,
-        title: Some("Mesuré sur le disque, scan de moins de 10 min réutilisé".into()),
     }
 }
 
@@ -368,10 +348,12 @@ fn recent(facts: &Facts) -> Vec<RecentView> {
             title: session.title.clone(),
             updated_at: session.updated_at,
             running: session.running,
+            awaiting: session.awaiting,
         })
         .collect()
 }
 
+#[cfg(test)]
 fn bytes(value: u64) -> String {
     if value < 1024 {
         return format!("{value} o");
@@ -387,6 +369,7 @@ fn bytes(value: u64) -> String {
     format_size(size, "To")
 }
 
+#[cfg(test)]
 fn format_size(size: f64, unit: &str) -> String {
     if size < 10.0 {
         format!("{size:.1} {unit}").replace('.', ",")
@@ -428,7 +411,6 @@ mod tests {
             usage: summary(),
             cost_value: "—".into(),
             cost_detail: "aucun modèle n'a de prix : Paramètres, Modèles".into(),
-            disk: None,
             map_state: MapFileState::Missing,
             module_count: 0,
             doc_count: 0,
@@ -443,9 +425,7 @@ mod tests {
 
         assert_eq!(
             ids,
-            [
-                "sessions", "ideas", "tokens", "time", "cost", "disk", "map", "doc"
-            ]
+            ["sessions", "ideas", "tokens", "time", "cost", "map", "doc"]
         );
     }
 
@@ -460,32 +440,21 @@ mod tests {
     }
 
     #[test]
-    fn disk_tile_not_measured() {
-        let view = view("p", &facts());
-        let disk = &view.tiles[5];
-
-        assert_eq!(disk.figure, "—");
-        assert_eq!(disk.detail, "pas encore mesuré");
-        assert_eq!(disk.tone, Tone::Neutral);
-        assert!(!disk.active);
-    }
-
-    #[test]
     fn map_tile_tone_follows_map_file_state() {
         let mut facts = facts();
 
         facts.map_state = MapFileState::Current;
-        let map = &view("p", &facts).tiles[6];
+        let map = &view("p", &facts).tiles[5];
         assert_eq!(map.tone, Tone::Ok);
         assert!(!map.active);
 
         facts.map_state = MapFileState::Stale;
-        let map = &view("p", &facts).tiles[6];
+        let map = &view("p", &facts).tiles[5];
         assert_eq!(map.tone, Tone::Accent);
         assert!(map.active);
 
         facts.map_state = MapFileState::Missing;
-        let map = &view("p", &facts).tiles[6];
+        let map = &view("p", &facts).tiles[5];
         assert_eq!(map.tone, Tone::Accent);
         assert!(map.active);
     }

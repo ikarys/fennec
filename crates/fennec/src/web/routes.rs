@@ -106,6 +106,9 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         ("POST", ["api", "projects", id, "delete"]) => {
             project_delete::delete_project(app, req, stream, id)
         }
+        ("POST", ["api", "projects", id, "favorite"]) => {
+            session_routes::set_favorite(app, req, stream, id)
+        }
         ("GET", ["api", "projects", id, "workflows"]) => {
             workflow_routes::list_workflows(app, stream, id)
         }

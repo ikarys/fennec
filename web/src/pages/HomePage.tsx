@@ -3,11 +3,15 @@ import type { Project, SessionSummary } from '../lib/api';
 import { DeleteSessionsDialog, type DeletionTarget } from '../components/session/DeleteSessionsDialog';
 import { formatRelative, formatDateTime } from '../lib/format';
 import { SessionStateIcon } from '../components/session/SessionStateIcon';
-import { BulbIcon, ChevronRightIcon, GlobeIcon, PlusIcon, TrashIcon } from '../components/Icons';
+import { BulbIcon, ChevronRightIcon, GlobeIcon, PlusIcon, SearchIcon, TrashIcon } from '../components/Icons';
 import { Button, buttonClass } from '../components/ui/Button';
 import { WorktreeAlert } from '../components/project/WorktreeAlert';
 import { Badge } from '../components/ui/Badge';
 import { SectionLabel } from '../components/ui/SectionLabel';
+import { TextInput } from '../components/ui/Field';
+import { Segmented } from '../components/ui/Segmented';
+import { ProjectTile } from '../components/project/ProjectTile';
+import { FavoriteButton } from '../components/project/FavoriteButton';
 
 /** How many non-active sessions a project section shows before the toggle appears. */
 const RECENT_SESSIONS = 5;
@@ -168,6 +172,7 @@ function ProjectSection({
   defaultOpen,
   onNewSession,
   onOpenSession,
+  onToggleFavorite,
   selected,
   selecting,
   onToggle,
@@ -177,6 +182,7 @@ function ProjectSection({
   defaultOpen: boolean;
   onNewSession: (projectId: string) => void;
   onOpenSession: (sessionId: string) => void;
+  onToggleFavorite: (projectId: string, favorite: boolean) => void;
   selected: Set<string>;
   selecting: boolean;
   onToggle: (id: string) => void;
@@ -221,6 +227,7 @@ function ProjectSection({
           </span>
         </button>
         <div className="ml-auto flex shrink-0 items-center gap-0.5">
+          <FavoriteButton project={project} onToggle={onToggleFavorite} />
           <a
             href={'#/project/' + encodeURIComponent(project.id)}
             title="Voir le projet : tâches, carte des modules, doc"
@@ -338,6 +345,7 @@ interface HomePageProps {
   onNewSession: (projectId: string) => void;
   onOpenSession: (sessionId: string) => void;
   onSessionsDeleted: (ids: string[]) => void;
+  onToggleFavorite: (projectId: string, favorite: boolean) => void;
 }
 
 export function HomePage({
@@ -347,10 +355,19 @@ export function HomePage({
   onOpenProjectDialog,
   onNewSession,
   onOpenSession,
-  onSessionsDeleted
+  onSessionsDeleted,
+  onToggleFavorite
 }: HomePageProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pendingDelete, setPendingDelete] = useState<DeletionTarget[] | null>(null);
+  const [query, setQuery] = useState('');
+  const [view, setView] = useState<'tiles' | 'rows'>(() => {
+    try {
+      return localStorage.getItem('fennec.home.view') === 'rows' ? 'rows' : 'tiles';
+    } catch {
+      return 'tiles';
+    }
+  });
   const runningCount = projects.reduce(
     (count, project) => count + project.sessions.filter((session) => session.state === 'running').length,
     0
@@ -358,6 +375,13 @@ export function HomePage({
   // The chat is a scratch project: it gets its own section, not a project one.
   const chatProject = projects.find((project) => project.chat);
   const regularProjects = projects.filter((project) => !project.chat);
+  const needle = query.toLowerCase();
+  const filteredProjects = needle
+    ? regularProjects.filter((project) =>
+        [project.name, project.workdir, project.branch ?? '']
+          .some((value) => value.toLowerCase().includes(needle))
+      )
+    : regularProjects;
 
   const toggleSession = (id: string) => {
     setSelected((previous) => {
@@ -411,6 +435,37 @@ export function HomePage({
           </Button>
         </div>
 
+        <div className="flex items-center gap-3">
+          <div className="relative min-w-0 grow">
+            <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-faint" />
+            <TextInput
+              className="pl-8"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') setQuery('');
+              }}
+              placeholder="Filtrer les projets…"
+              aria-label="Filtrer les projets"
+            />
+          </div>
+          <Segmented<'tiles' | 'rows'>
+            label="Affichage des projets"
+            segments={[
+              { value: 'tiles', label: 'Tuiles' },
+              { value: 'rows', label: 'Liste' }
+            ]}
+            value={view}
+            onChange={(value) => {
+              setView(value);
+              // A blocked storage only loses the choice on reload.
+              try {
+                localStorage.setItem('fennec.home.view', value);
+              } catch {}
+            }}
+          />
+        </div>
+
         {selected.size > 0 && (
           <div className="sticky top-0 z-10 flex items-center gap-3 rounded-md border border-border bg-raised px-3 py-2">
             {selected.size === 1 ? '1 session sélectionnée' : `${selected.size} sessions sélectionnées`}
@@ -445,20 +500,33 @@ export function HomePage({
           />
         )}
 
-        {/* The server lists the most recently active project first: it opens unfolded. */}
-        {regularProjects.map((project, index) => (
-          <ProjectSection
-            key={project.id}
-            project={project}
-            defaultOpen={index === 0}
-            onNewSession={onNewSession}
-            onOpenSession={onOpenSession}
-            selected={selected}
-            selecting={selected.size > 0}
-            onToggle={toggleSession}
-            onDelete={(id) => remove([id])}
-          />
-        ))}
+        {needle && regularProjects.length > 0 && filteredProjects.length === 0 && (
+          <p className="m-0 py-6 text-center text-sm text-muted">Aucun projet ne correspond à « {query} ».</p>
+        )}
+
+        {view === 'tiles' ? (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {filteredProjects.map((project) => (
+              <ProjectTile key={project.id} project={project} onNewSession={onNewSession} onToggleFavorite={onToggleFavorite} />
+            ))}
+          </div>
+        ) : (
+          // The server lists favourites first, then the most recently active: the first one opens unfolded.
+          filteredProjects.map((project, index) => (
+            <ProjectSection
+              key={project.id}
+              project={project}
+              defaultOpen={index === 0}
+              onNewSession={onNewSession}
+              onOpenSession={onOpenSession}
+              onToggleFavorite={onToggleFavorite}
+              selected={selected}
+              selecting={selected.size > 0}
+              onToggle={toggleSession}
+              onDelete={(id) => remove([id])}
+            />
+          ))
+        )}
       </div>
 
       {pendingDelete && (

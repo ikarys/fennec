@@ -84,6 +84,7 @@ pub(super) fn create_folder(req: &Request, stream: &mut TcpStream) -> Result<(),
 
 pub(super) fn list_projects(app: &App, stream: &mut TcpStream) -> Result<(), String> {
     let store = app.store()?;
+    let favorites = store.favorite_projects()?;
     let mut out = Vec::new();
     for p in store.projects()? {
         // The log says a workflow ended; git says whether its work still waits.
@@ -104,6 +105,7 @@ pub(super) fn list_projects(app: &App, stream: &mut TcpStream) -> Result<(), Str
             })
             .collect();
         let mut v = project_json(&p, store_dir(app));
+        v["favorite"] = json!(favorites.contains(&p.id));
         v["branch"] = json!(git::current_branch(Path::new(&p.workdir)));
         v["remote"] = json!(
             git::remote_url(Path::new(&p.workdir))
@@ -118,6 +120,24 @@ pub(super) fn list_projects(app: &App, stream: &mut TcpStream) -> Result<(), Str
         out.push(v);
     }
     send_json(stream, 200, &Value::Array(out))
+}
+
+pub(super) fn set_favorite(
+    app: &App,
+    req: &Request,
+    stream: &mut TcpStream,
+    id: &str,
+) -> Result<(), String> {
+    let store = app.store()?;
+    let body = req.json()?;
+    let favorite = match body["favorite"].as_bool() {
+        Some(favorite) => favorite,
+        None => return error(stream, 400, "favorite must be a bool"),
+    };
+    if !store.set_favorite(id, favorite)? {
+        return error(stream, 404, "no such project");
+    }
+    send_json(stream, 200, &json!({ "ok": true }))
 }
 
 pub(super) fn open_project(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), String> {

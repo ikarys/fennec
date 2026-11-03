@@ -1,5 +1,5 @@
 import type { ModelRef, ProviderListing } from '../../lib/api';
-import { Section } from '../ui/Section';
+import { Section, type SectionSave } from '../ui/Section';
 import { FieldRow, Select } from '../ui/Field';
 
 interface ModelSectionProps {
@@ -8,9 +8,11 @@ interface ModelSectionProps {
   stored: ModelRef | null;
   defaultModel: string;
   onChange: (value: string) => void;
+  /** The group's own save: its dot and its "Enregistrer". */
+  save?: SectionSave;
 }
 
-export function ModelSection({ value, listings, stored, defaultModel, onChange }: ModelSectionProps) {
+export function ModelSection({ value, listings, stored, defaultModel, onChange, save }: ModelSectionProps) {
   const listedValues = new Set<string>();
   for (const listing of listings) {
     for (const model of listing.models) {
@@ -25,7 +27,7 @@ export function ModelSection({ value, listings, stored, defaultModel, onChange }
     : '';
 
   return (
-    <Section title="Modèle">
+    <Section title="Modèle" save={save}>
       <FieldRow label="Modèle par défaut">
         <Select value={value} onChange={(event) => onChange(event.target.value)} className="w-full">
           <option value="">Défaut de l'environnement ({defaultModel})</option>

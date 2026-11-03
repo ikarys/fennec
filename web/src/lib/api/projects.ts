@@ -9,6 +9,8 @@ export interface Project {
   chat?: boolean;
   /** The workdir is inside fennec's own store: a session's worktree, not a project of the human's. */
   sessionWorktree?: boolean;
+  /** Pinned by the human: the server lists favourites first. */
+  favorite: boolean;
   branch: string | null;
   remote: string | null;
   /** Opens the project in VS Code (through the WSL remote under WSL). */
@@ -90,6 +92,14 @@ export function deleteProject(id: string, deleteFolder: boolean): Promise<Delete
       body: JSON.stringify({ deleteFolder }),
     },
   );
+}
+
+/** Pin or unpin a project; the server lists favourites first. */
+export function setProjectFavorite(id: string, favorite: boolean): Promise<void> {
+  return request<void>(`/api/projects/${encodeURIComponent(id)}/favorite`, {
+    method: "POST",
+    body: JSON.stringify({ favorite }),
+  });
 }
 
 /** One project row on the cross-project Backlog table: its counts and queue state. */
@@ -272,7 +282,7 @@ export function writeMapFile(
 }
 
 // The project dashboard: display-ready tiles and recent sessions.
-export type DashboardIcon = 'sessions' | 'ideas' | 'tokens' | 'time' | 'cost' | 'disk' | 'map' | 'doc';
+export type DashboardIcon = 'sessions' | 'ideas' | 'tokens' | 'time' | 'cost' | 'map' | 'doc';
 
 export interface DashboardTile {
   id: string;
@@ -291,6 +301,7 @@ export interface RecentSession {
   title: string;
   updatedAt: number;
   running: boolean;
+  awaiting: boolean;
 }
 
 export interface ProjectDashboard {

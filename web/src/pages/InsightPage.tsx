@@ -10,7 +10,9 @@ import {
   LayersIcon,
   ProjectIcon
 } from '../components/Icons';
+import { type BadgeTone } from '../components/ui/Badge';
 import { Card } from '../components/ui/Card';
+import { Tile } from '../components/ui/Tile';
 import { ContextComposition } from '../components/session/ContextComposition';
 import { SectionLabel } from '../components/ui/SectionLabel';
 import { Segmented, type Segment } from '../components/ui/Segmented';
@@ -25,34 +27,19 @@ const PERIOD_SEGMENTS: Segment<InsightPeriod>[] = [
   { value: 'all', label: 'Tout' }
 ];
 
-/** One tinted chip per KPI card, keyed on the server's label. */
-const CARD_TONE: Record<string, { Icon: Icon; chip: string }> = {
-  'Appels': { Icon: ActivityIcon, chip: 'bg-accent-soft text-accent' },
-  'Entrée': { Icon: InboxIcon, chip: 'bg-raised text-text' },
-  'Cache': { Icon: LayersIcon, chip: 'bg-ok-soft text-ok' },
-  'Cache perdu': { Icon: AlertIcon, chip: 'bg-del-bg text-err' },
-  'Sortie': { Icon: ArrowUpIcon, chip: 'bg-raised text-text' },
-  'Coût estimé': { Icon: CoinIcon, chip: 'bg-accent-soft text-accent' }
+/** One tone per KPI tile, keyed on the server's label; the same Tile as the risks tab. */
+const CARD_TONE: Record<string, { Icon: Icon; tone: BadgeTone }> = {
+  'Appels': { Icon: ActivityIcon, tone: 'accent' },
+  'Entrée': { Icon: InboxIcon, tone: 'neutral' },
+  'Cache': { Icon: LayersIcon, tone: 'ok' },
+  'Cache perdu': { Icon: AlertIcon, tone: 'err' },
+  'Sortie': { Icon: ArrowUpIcon, tone: 'neutral' },
+  'Coût estimé': { Icon: CoinIcon, tone: 'attention' }
 };
 
-function cardTone(label: string) {
-  return CARD_TONE[label] ?? { Icon: ActivityIcon, chip: 'bg-raised text-text' };
-}
-
 function KpiCard({ label, value, detail }: { label: string; value: string; detail: string }) {
-  const { Icon, chip } = cardTone(label);
-  return (
-    <Card className="p-4 transition-colors hover:border-border-strong">
-      <div className="flex items-start justify-between gap-2">
-        <SectionLabel>{label}</SectionLabel>
-        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${chip}`}>
-          <Icon className="h-4 w-4" />
-        </span>
-      </div>
-      <div className="mt-2 text-2xl font-semibold tabular-nums">{value}</div>
-      <div className="mt-1 text-xs text-muted">{detail}</div>
-    </Card>
-  );
+  const { Icon, tone } = CARD_TONE[label] ?? { Icon: ActivityIcon, tone: 'neutral' };
+  return <Tile icon={<Icon />} label={label} figure={value} detail={detail} title={detail} tone={tone} active={tone !== 'neutral'} />;
 }
 
 function SectionHeader({ icon: Icon, title }: { icon?: Icon; title: string }) {

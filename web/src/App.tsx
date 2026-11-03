@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react';
 import type { Project, ProviderListing, SettingsResponse } from './lib/api';
-import { createProject, getProjects, getSettings } from './lib/api';
+import { createProject, getProjects, getSettings, setProjectFavorite } from './lib/api';
 import { applyTheme, getStoredTheme, type ThemeId } from './lib/theme';
 import { TopBar, type PageId, type TabInfo } from './components/layout/TopBar';
 import { HomePage } from './pages/HomePage';
@@ -536,6 +536,7 @@ export default function App() {
               onNewSession={(projectId) => startNewSession(projectId)}
               onOpenSession={openSession}
               onSessionsDeleted={handleSessionsDeleted}
+              onToggleFavorite={(projectId, favorite) => void setProjectFavorite(projectId, favorite).then(refreshProjects)}
             />
           ) : route.name === 'settings' ? (
             <SettingsPage
@@ -558,7 +559,7 @@ export default function App() {
             </Suspense>
           ) : route.name === 'project' ? (
             <Suspense fallback={<div className="flex grow items-center justify-center text-muted">Chargement…</div>}>
-              <ProjectPage projects={projects} projectId={route.projectId} tab={route.tab} sub={route.sub} onOpenSession={openSession} onNewSession={(projectId) => startNewSession(projectId)} />
+              <ProjectPage projects={projects} projectId={route.projectId} tab={route.tab} sub={route.sub} onOpenSession={openSession} onNewSession={(projectId) => startNewSession(projectId)} onDeleted={refreshProjects} onSessionsDeleted={handleSessionsDeleted} />
             </Suspense>
           ) : route.name === 'insight' ? (
             <InsightPage />
