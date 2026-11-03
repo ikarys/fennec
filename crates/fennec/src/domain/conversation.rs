@@ -36,10 +36,8 @@ pub fn render_tool_result(result: &ToolResult) -> String {
     }
 }
 
-/// The text of the last assistant message that has any, among `events`
-/// (its start content plus its deltas); "" when none. A workflow node's
-/// output.
-pub fn last_assistant_text(events: &[Event]) -> String {
+/// The assistant texts among `events`, in order (start content plus deltas), empty ones skipped.
+fn assistant_texts(events: &[Event]) -> Vec<String> {
     let mut texts: Vec<(&str, String)> = Vec::new();
     for event in events {
         match event {
@@ -63,10 +61,42 @@ pub fn last_assistant_text(events: &[Event]) -> String {
     }
     texts
         .into_iter()
-        .rev()
         .map(|(_, text)| text)
-        .find(|text| !text.trim().is_empty())
-        .unwrap_or_default()
+        .filter(|text| !text.trim().is_empty())
+        .collect()
+}
+
+/// The text of the last assistant message that has any, among `events`
+/// (its start content plus its deltas); "" when none. A workflow node's
+/// output.
+pub fn last_assistant_text(events: &[Event]) -> String {
+    assistant_texts(events).pop().unwrap_or_default()
+}
+
+/// A workflow agent node's output among `events`: the last assistant text
+/// holding a plan or report contract (a `## Plan: …` or `## Report: …`
+/// heading, level 2 or 3), else the last assistant text. A closing line the
+/// model writes after its plan must not replace the plan.
+pub fn node_output(events: &[Event]) -> String {
+    let texts = assistant_texts(events);
+    texts
+        .iter()
+        .rev()
+        .find(|text| holds_contract(text))
+        .cloned()
+        .unwrap_or_else(|| texts.last().cloned().unwrap_or_default())
+}
+
+fn holds_contract(text: &str) -> bool {
+    text.lines().any(|line| {
+        let trimmed = line.trim();
+        let rest = trimmed
+            .strip_prefix("### ")
+            .or_else(|| trimmed.strip_prefix("## "))
+            .map(str::trim)
+            .unwrap_or_default();
+        rest.starts_with("Plan:") || rest.starts_with("Report:")
+    })
 }
 
 /// The content of the first message the human typed (not system-generated,
@@ -246,6 +276,39 @@ mod tests {
         ];
         assert_eq!(last_assistant_text(&events), "first answer");
         assert_eq!(last_assistant_text(&events[3..]), "");
+    }
+
+    #[test]
+    fn node_output_prefers_plan_over_closing_line() {
+        let delta = |id: &str, text: &str| Event::MessageDelta {
+            message_id: id.into(),
+            content: text.into(),
+            tokens_per_second: None,
+        };
+        let events = vec![
+            start("p", Role::Assistant, None, false),
+            delta("p", "## Plan: build\n## Done when\n- done"),
+            start("c", Role::Assistant, Some("Plan ready."), false),
+        ];
+        assert_eq!(node_output(&events), "## Plan: build\n## Done when\n- done");
+    }
+
+    #[test]
+    fn node_output_falls_back_to_last_assistant_text_without_contract() {
+        let events = vec![
+            start("a", Role::Assistant, Some("hello"), false),
+            start("b", Role::Assistant, Some("world"), false),
+        ];
+        assert_eq!(node_output(&events), last_assistant_text(&events));
+    }
+
+    #[test]
+    fn node_output_prefers_later_report_over_plan() {
+        let events = vec![
+            start("p", Role::Assistant, Some("## Plan: y"), false),
+            start("r", Role::Assistant, Some("### Report: x"), false),
+        ];
+        assert_eq!(node_output(&events), "### Report: x");
     }
 
     #[test]
