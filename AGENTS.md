@@ -161,7 +161,7 @@ fennec's store (`web/project_delete.rs`).
 UI languages, done: English by default, French on the Settings page; every UI string comes from `web/src/i18n/messages.ts`,
 whose `fr` is typed against `en`'s keys (a missing translation is a compile error); components call `useT()`, pure
 lib functions take a `lang`. The server's display texts follow the same choice through `domain/lang.rs` (the Insight
-page and the cost detail so far; the rest is listed in `docs/next-steps.md`).
+page, the dashboard, the context and usage views, the number formats; the rest is listed in `docs/next-steps.md`).
 Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
 1. To be chosen among the remaining capabilities C* of the Notion definition.
