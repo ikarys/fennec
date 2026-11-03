@@ -155,8 +155,7 @@ export function RunEndCard({ item }: { item: WorkflowEndItem }) {
             )}
 
             <div className="flex items-center gap-2 text-xs text-muted">
-              <span>Calculé par fennec à partir du journal</span>
-              <Badge tone="ok">vérifié</Badge>
+              <Badge tone="ok" title="Calculé par fennec à partir du journal">vérifié</Badge>
             </div>
           </div>
         )}

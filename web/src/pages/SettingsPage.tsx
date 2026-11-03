@@ -58,22 +58,30 @@ interface SettingsForm {
   mcp: McpServer[];
 }
 
-type SettingsTab = 'models' | 'instructions' | 'skills' | 'workflows' | 'search' | 'sandbox' | 'mcp' | 'agents' | 'rules' | 'security' | 'autonomy' | 'display';
+type SettingsTab = 'models' | 'behaviour' | 'rules' | 'library' | 'display';
 
+// Five groups, not twelve tabs: what tunes the model, how an agent behaves, the human's rules,
+// the catalogues of content (skills, workflows, agents, MCP) and the display.
 const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'models', label: 'Modèles' },
-  { id: 'instructions', label: 'Instructions' },
-  { id: 'skills', label: 'Skills' },
-  { id: 'workflows', label: 'Workflows' },
-  { id: 'search', label: 'Recherche web' },
-  { id: 'sandbox', label: 'Bac à sable' },
-  { id: 'mcp', label: 'MCP' },
-  { id: 'agents', label: 'Agents' },
+  { id: 'behaviour', label: 'Comportement' },
   { id: 'rules', label: 'Règles' },
-  { id: 'security', label: 'Sécurité' },
-  { id: 'autonomy', label: 'Mode nuit' },
+  { id: 'library', label: 'Bibliothèque' },
   { id: 'display', label: 'Affichage' }
 ];
+
+/** The old per-section addresses (`#/settings/skills`) still open the group that holds the section. */
+const LEGACY_TABS: Record<string, SettingsTab> = {
+  instructions: 'behaviour',
+  search: 'behaviour',
+  sandbox: 'behaviour',
+  security: 'behaviour',
+  autonomy: 'behaviour',
+  skills: 'library',
+  workflows: 'library',
+  agents: 'library',
+  mcp: 'library'
+};
 
 const emptyModelForm: ModelForm = {
   maxTokens: '',
@@ -290,7 +298,9 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<SettingsTab>(() => TABS.find((t) => t.id === initialTab)?.id ?? 'models');
+  const [tab, setTab] = useState<SettingsTab>(
+    () => TABS.find((t) => t.id === initialTab)?.id ?? (initialTab ? LEGACY_TABS[initialTab] : undefined) ?? 'models'
+  );
   const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
@@ -571,46 +581,37 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
               </>
             )}
 
-            {tab === 'instructions' && (
-              <InstructionsSection value={form.instructions} onChange={updateInstructions} />
+            {tab === 'behaviour' && (
+              <>
+                <InstructionsSection value={form.instructions} onChange={updateInstructions} />
+                <SearchSection value={form.search} onChange={updateSearch} />
+                <SandboxSection value={form.sandbox} onChange={updateSandbox} health={settings?.sandboxHealth} />
+                <ScannersSection scanners={settings.scanners ?? []} />
+                <AutonomySection value={form.autonomy} onChange={updateAutonomy} />
+              </>
             )}
 
-            {tab === 'skills' && (
-              <SkillsSection
-                skills={settings.skills}
-                value={form.alwaysOnSkills}
-                onChange={updateAlwaysOnSkills}
-              />
-            )}
-
-            {tab === 'workflows' && (
-              <WorkflowsSection
-                workflows={settings.optInWorkflows}
-                value={form.enabledWorkflows}
-                onChange={updateEnabledWorkflows}
-              />
-            )}
-
-            {tab === 'search' && (
-              <SearchSection value={form.search} onChange={updateSearch} />
-            )}
-
-            {tab === 'sandbox' && (
-              <SandboxSection value={form.sandbox} onChange={updateSandbox} health={settings?.sandboxHealth} />
-            )}
-            {tab === 'mcp' && (
-              <McpSection
-                value={form.mcp}
-                onChange={updateMcp}
-                savedNames={new Set((settings?.preferences.mcp ?? []).map((server) => server.name))}
-              />
-            )}
-            {tab === 'agents' && <AgentsSection />}
             {tab === 'rules' && <RulesSection />}
-            {tab === 'security' && settings && <ScannersSection scanners={settings.scanners ?? []} />}
 
-            {tab === 'autonomy' && (
-              <AutonomySection value={form.autonomy} onChange={updateAutonomy} />
+            {tab === 'library' && (
+              <>
+                <SkillsSection
+                  skills={settings.skills}
+                  value={form.alwaysOnSkills}
+                  onChange={updateAlwaysOnSkills}
+                />
+                <WorkflowsSection
+                  workflows={settings.optInWorkflows}
+                  value={form.enabledWorkflows}
+                  onChange={updateEnabledWorkflows}
+                />
+                <AgentsSection />
+                <McpSection
+                  value={form.mcp}
+                  onChange={updateMcp}
+                  savedNames={new Set((settings.preferences.mcp ?? []).map((server) => server.name))}
+                />
+              </>
             )}
 
             {tab === 'display' && (
@@ -628,7 +629,7 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
               </div>
             )}
 
-            {tab !== 'security' && (
+            {tab !== 'rules' && (
               <div className="sticky bottom-0 -mx-1 flex items-center gap-3 border-t border-border bg-bg px-1 py-3">
                 <Button type="submit" variant="primary" size="md" disabled={saving}>
                   {saving ? 'Enregistrement…' : 'Enregistrer'}

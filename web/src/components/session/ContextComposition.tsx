@@ -21,7 +21,7 @@ export function ContextComposition({ composition, title = 'Composition' }: { com
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-2">
         <SectionLabel>{title}</SectionLabel>
-        <Badge title="Le total est mesuré ; la répartition est estimée au prorata du texte">estimée</Badge>
+        <Badge tone="accent" title="Le total est mesuré ; la répartition est estimée au prorata du texte">indicatif</Badge>
       </div>
 
       <div className="flex h-2 w-full gap-px overflow-hidden rounded-full bg-raised">
