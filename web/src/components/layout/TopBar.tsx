@@ -393,7 +393,7 @@ export function TopBar({
               aria-label={t(title)}
               aria-pressed={active}
               title={t(title)}
-              className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true }, active ? 'text-accent' : undefined)}
+              className={buttonClass({ variant: 'icon', size: 'sm', iconOnly: true }, active ? 'text-accent' : undefined)}
             >
               <PageIcon page={page} className="h-4 w-4" />
             </button>
