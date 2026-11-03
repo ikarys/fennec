@@ -694,7 +694,8 @@ export function SessionPage({
 
   return (
     <PreviewContext.Provider value={setPreview}>
-      <PreviewWorkdirContext.Provider value={detail?.project.workdir}>
+      {/* The agent writes in its worktree when it has one: paths are relative to it, and the preview route resolves them there too. */}
+      <PreviewWorkdirContext.Provider value={detail?.worktree?.path ?? detail?.project.workdir}>
         <PlanActionsContext.Provider value={planActions}>
           <IntegrationInviteContext.Provider value={integrationInvite}>
             <CallUsageContext.Provider value={calls}>
@@ -704,9 +705,9 @@ export function SessionPage({
                   <main className="flex min-h-0 min-w-0 flex-[999_1_560px] flex-col">
                     {/* A shadow under the title: the thread fades under it instead of meeting a hard edge. */}
                     <div className="relative z-10 flex items-center gap-2 px-4 md:px-6 py-2.5 after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-5 after:bg-linear-to-b after:from-black/45 after:to-transparent">
-                      <div className="mx-auto flex w-full max-w-[960px] flex-wrap items-center gap-x-2 gap-y-1">
+                      <div className="mx-auto flex w-full max-w-[960px] items-center gap-2">
                         <h1
-                          className="w-full min-w-0 truncate text-base font-semibold sm:w-auto"
+                          className="min-w-0 truncate text-base font-semibold"
                           title={title}
                         >
                           {title}

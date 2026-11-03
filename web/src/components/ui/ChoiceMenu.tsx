@@ -41,6 +41,7 @@ export function ChoiceMenu({
   value,
   onChange,
   disabled,
+  title,
   trigger,
   align = 'left',
   width = 'w-56',
@@ -51,6 +52,8 @@ export function ChoiceMenu({
   value: string | null;
   onChange: (value: string) => void;
   disabled?: boolean;
+  /** The trigger's tooltip; the selected choice's description when absent. */
+  title?: string;
   /** The closed button's content. */
   trigger: ReactNode;
   align?: 'left' | 'right';
@@ -72,7 +75,7 @@ export function ChoiceMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={label}
-        title={selected?.description}
+        title={title ?? selected?.description}
         onClick={() => setOpen((isOpen) => !isOpen)}
       >
         {trigger}

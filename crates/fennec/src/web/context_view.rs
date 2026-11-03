@@ -25,7 +25,7 @@ pub struct ContextView {
     pub tone: Tone,
     /// Where the threshold mark sits, 0 to 100; none when compaction is off.
     pub compact_mark: Option<u64>,
-    /// `12,3k / 200,0k · 6 %`, or `12,3k tokens` when the window is unknown.
+    /// `6 %`, or `12,3k tokens` when the window is unknown.
     pub line: String,
     /// The tooltip's first line: taken, left, total, threshold.
     pub title: String,
@@ -108,7 +108,7 @@ pub fn context_view(events: &[Event], window: u64, compact_at: f64) -> ContextVi
     let compact_mark = (compact > 0.0).then(|| (compact * 100.0).round() as u64);
 
     let line = if max > 0 {
-        format!("{} / {} · {} %", tokens(current), tokens(max), percent)
+        format!("{} %", percent)
     } else {
         format!("{} tokens", tokens(current))
     };
@@ -254,7 +254,7 @@ mod tests {
         assert_eq!(view.percent, 0);
         assert_eq!(view.tone, Tone::Ok);
         assert_eq!(view.compact_mark, Some(85));
-        assert_eq!(view.line, "0 / 200,0k · 0 %");
+        assert_eq!(view.line, "0 %");
     }
 
     #[test]
@@ -264,7 +264,7 @@ mod tests {
         assert_eq!(view.percent, 85);
         assert_eq!(view.tone, Tone::Err);
         assert_eq!(view.compact_mark, Some(90));
-        assert_eq!(view.line, "170,0k / 200,0k · 85 %");
+        assert_eq!(view.line, "85 %");
     }
 
     #[test]
