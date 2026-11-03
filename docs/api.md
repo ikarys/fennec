@@ -46,7 +46,7 @@ with camelCase fields.
 | `task.accepted` | `{callId, ideaId}`: the human added the proposed task `callId` to the project's backlog as `ideaId` |
 | `agents_md.written` | `{replaced}`: the human wrote the AGENTS.md draft of the last answer to the project's root; `replaced` when a file was there |
 | `agent.suggested` | `{callId, agent, reason, brief}`: the `suggest_agent` tool: an agent suggests the human go on in a new session with another agent; nothing switches until the human opens it |
-| `rule.blocked` | `{callId, ruleId, kind, pattern, scope, subject}`: fennec refused a tool call by one of the human's rules (fennec's own check, verified), before the call's failed `tool.result`; `kind` `command`/`tool`/`path`, `scope` `global`/`project`/`session`, `subject` the command, tool name or path refused (workdir-relative inside it, absolute outside) |
+| `rule.blocked` | `{callId, ruleId, kind, pattern, scope, subject}`: fennec refused a tool call by one of the human's rules (fennec's own check, verified), before the call's failed `tool.result`; `kind` `command`/`tool`/`path`, `scope` `global`/`project`/`session`, `subject` the command, tool name or path refused (workdir-relative inside it, absolute outside); a negative `ruleId` is one of the kernel's own rules (`GET /api/rules` `fennec`) |
 | `rule.approval_requested` | `{callId, subject, ruleId, kind, pattern, access, folders}`:; `folders` (a path only) the folders the human may grant instead, narrowest first, never `/` or `~/` fennec paused a tool call for the human (an "ask" rule, `ruleId` its id, or a file tool outside the workdir, `ruleId` null); the call stays open, no `tool.result`, and the turn ends `waiting_for_user`; `kind`/`pattern`/`access` are the rule the `session`, `always` and `never` answers store (`access` `read`/`write`/`readWrite` for a path, else null) |
 | `rule.approval_answered` | `{callId, choice, ruleId}`: the human's answer (`once`/`session`/`always`/`never`), `ruleId` the rule it stored (null for `once`); fennec then appends the call's `tool.result` (run, or refused for `never`) and the turn goes on |
 | `waiver.requested` | `{callId, path, reason}`: the agent's `request_waiver`: it asks the human to waive the protection of one project file; the call stays open, no `tool.result`, and the turn ends `waiting_for_user` (refused at once while the human is away) |
@@ -296,8 +296,11 @@ read-only. The human edits them as usual.
 - `POST /api/agents/{id}/delete[?projectId=…]` → `{ok}`: removes the human's file (404 if none, 409 for a default
   or a project agent). Agents are files, not rows: they are versionable and editable outside fennec, and a change
   applies to the next session that lists them.
-- `GET /api/rules` → `{global, projects: [{id, name, rules}], sessions: [{id, title, projectId, rules}]}`, every rule of
-  the rules crate's own store (`rules.db`, `FENNEC_RULES_DB`): global ones, per project, and the session grants;
+- `GET /api/rules` → `{global, projects: [{id, name, rules}], sessions: [{id, title, projectId, rules}], fennec}`, every rule of
+  the rules crate's own store (`rules.db`, `FENNEC_RULES_DB`): global ones, per project, and the session grants; `fennec` lists
+  the kernel's own block rules (`git push`, `git update-ref`, `git branch -D`, `git worktree`, `gh pr merge`…: fennec integrates,
+  the model never pushes nor moves a branch), built in code with negative ids, origin `"fennec"`, applied to every turn before
+  the human's and never deleted;
   `POST /api/rules` `{scope: "global" | {project: id}, kind, pattern, access?, action, note?}` adds one → 201 `{rule}`
   (400 with `{error}` when the pattern does not parse: empty, flags only, `..`, over 500 characters; 404 if no project);
   `POST /api/rules/{id}/delete` → `{ok}` (404 if none). A rule is never edited: delete it and add another. No agent tool
