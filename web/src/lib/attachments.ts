@@ -1,4 +1,5 @@
 import type { AttachmentInput } from './api';
+import { t, type Lang } from '../i18n/messages';
 
 export const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/bmp', 'image/svg+xml'];
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -23,31 +24,32 @@ function readAsDataUrl(file: File): Promise<string> {
 
 /** Any file to a data URL: images and files alike, capped like images. */
 export async function readFiles(
+  lang: Lang,
   files: File[],
   current: number,
 ): Promise<{ attachments: FileAttachmentInput[]; error: string | null }> {
   const remaining = MAX_ATTACHMENTS - current;
   if (remaining <= 0) {
-    return { attachments: [], error: '10 fichiers au maximum' };
+    return { attachments: [], error: t(lang, 'maxFiles') };
   }
 
   const valid: File[] = [];
   for (const file of files) {
     if (file.size > MAX_IMAGE_BYTES) {
-      return { attachments: [], error: `« ${file.name || 'fichier'} » dépasse 5 Mo` };
+      return { attachments: [], error: t(lang, 'fileTooBig', { name: file.name || t(lang, 'fileNameFallback') }) };
     }
     valid.push(file);
   }
 
   if (valid.length > remaining) {
-    return { attachments: [], error: '10 fichiers au maximum' };
+    return { attachments: [], error: t(lang, 'maxFiles') };
   }
 
   const attachments: FileAttachmentInput[] = [];
   for (const file of valid) {
     const data = await readAsDataUrl(file);
     attachments.push({
-      filename: file.name || 'fichier',
+      filename: file.name || t(lang, 'fileNameFallback'),
       mimeType: file.type || 'application/octet-stream',
       size: file.size,
       data,
@@ -57,25 +59,25 @@ export async function readFiles(
   return { attachments, error: null };
 }
 
-export async function readImages(files: File[], current: number): Promise<{ attachments: AttachmentInput[]; error: string | null }> {
+export async function readImages(lang: Lang, files: File[], current: number): Promise<{ attachments: AttachmentInput[]; error: string | null }> {
   const remaining = MAX_ATTACHMENTS - current;
   if (remaining <= 0) {
-    return { attachments: [], error: '10 images au maximum' };
+    return { attachments: [], error: t(lang, 'maxImages') };
   }
 
   const valid: File[] = [];
   for (const file of files) {
     if (!IMAGE_TYPES.includes(file.type)) {
-      return { attachments: [], error: `« ${file.name || 'image.png'} » n’est pas une image` };
+      return { attachments: [], error: t(lang, 'notAnImage', { name: file.name || 'image.png' }) };
     }
     if (file.size > MAX_IMAGE_BYTES) {
-      return { attachments: [], error: `« ${file.name || 'image.png'} » dépasse 5 Mo` };
+      return { attachments: [], error: t(lang, 'fileTooBig', { name: file.name || 'image.png' }) };
     }
     valid.push(file);
   }
 
   if (valid.length > remaining) {
-    return { attachments: [], error: '10 images au maximum' };
+    return { attachments: [], error: t(lang, 'maxImages') };
   }
 
   const attachments: AttachmentInput[] = [];

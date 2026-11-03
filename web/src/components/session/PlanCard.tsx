@@ -11,6 +11,8 @@ import { Card } from '../ui/Card';
 import { Menu, MenuItem } from '../ui/Menu';
 import { SectionLabel } from '../ui/SectionLabel';
 import { PreflightSection } from './PreflightSection';
+import { useT } from '../../i18n';
+import type { MsgKey } from '../../i18n/messages';
 
 const REMARK_PLUGINS = [remarkGfm];
 
@@ -40,13 +42,14 @@ function PathChip({ path }: { path: string }) {
 const STEP_FILE_CHIP = 'rounded bg-panel px-1.5 py-0.5 font-mono text-xs text-text';
 
 export function PlanCard({ plan, actions, preflight }: { plan: Plan; actions?: PlanActions | null; preflight?: PreflightResultView[] }) {
+  const t = useT();
   // The worktree decision is made when building a plan, not in the composer.
   const [worktree, setWorktree] = useState(true);
   // Writing in the human's own folder is the risky choice: the card says so with its border.
   return (
     <Card className={`overflow-hidden ${actions && !worktree ? 'border-err/40' : ''}`}>
       <div className="flex items-center gap-2 border-b border-border bg-accent-soft/50 px-4 py-2.5">
-        <Badge tone="accent">Plan</Badge>
+        <Badge tone="accent">{t('planBadge')}</Badge>
         <span className="min-w-0 font-semibold text-text">
           <Inline>{plan.title}</Inline>
         </span>
@@ -90,7 +93,7 @@ export function PlanCard({ plan, actions, preflight }: { plan: Plan; actions?: P
                   <div className="flex items-start gap-1.5 text-sm text-muted">
                     <CheckIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                     <span>
-                      <Inline>{`Vérif. : ${step.verify}`}</Inline>
+                      <Inline>{t('verifyLine', { verify: step.verify })}</Inline>
                     </span>
                   </div>
                 )}
@@ -100,7 +103,7 @@ export function PlanCard({ plan, actions, preflight }: { plan: Plan; actions?: P
         </ol>
         {plan.doneWhen.length > 0 && (
           <Card variant="inset">
-            <SectionLabel>Terminé quand</SectionLabel>
+            <SectionLabel>{t('doneWhen')}</SectionLabel>
             <ul className="m-0 flex flex-col gap-1.5">
               {plan.doneWhen.map((criterion, i) => (
                 <li key={i} className="flex items-start gap-2 text-sm text-text">
@@ -116,7 +119,7 @@ export function PlanCard({ plan, actions, preflight }: { plan: Plan; actions?: P
         {preflight && preflight.length > 0 && <PreflightSection results={preflight} />}
         {plan.risks.length > 0 && (
           <div className="flex flex-col gap-1.5">
-            <SectionLabel>Risques</SectionLabel>
+            <SectionLabel>{t('risksLabel')}</SectionLabel>
             <ul className="m-0 flex flex-col gap-1">
               {plan.risks.map((risk, i) => (
                 <li key={i} className="flex items-start gap-2 text-sm text-err">
@@ -137,13 +140,13 @@ export function PlanCard({ plan, actions, preflight }: { plan: Plan; actions?: P
               size="sm"
               onClick={() => actions.onBuild(worktree)}
               disabled={actions.disabled}
-              title="Lance Plan, build, verify à partir de ce plan : critères vérifiés, vérification et review."
+              title={t('launchPlanTitle')}
             >
-              Lancer
+              {t('launch')}
             </Button>
             {!actions.disabled && (
-              <Menu label="Autres façons de lancer">
-                <MenuItem onSelect={actions.onBuildAlone}>Builder seul, sans critères ni review</MenuItem>
+              <Menu label={t('otherLaunchesLabel')}>
+                <MenuItem onSelect={actions.onBuildAlone}>{t('buildAlone')}</MenuItem>
               </Menu>
             )}
             {actions.ideaReady && (
@@ -154,9 +157,9 @@ export function PlanCard({ plan, actions, preflight }: { plan: Plan; actions?: P
                 onClick={actions.ideaReady.onMark}
                 disabled={actions.disabled || actions.ideaReady.idea === 'saved'}
                 className="ml-auto"
-                title="Garde ce plan dans le backlog du projet, sans le lancer maintenant."
+                title={t('saveToBacklogTitle')}
               >
-                {IDEA_LABELS[actions.ideaReady.idea]}
+                {t(IDEA_LABELS[actions.ideaReady.idea])}
               </Button>
             )}
             <Button
@@ -167,8 +170,8 @@ export function PlanCard({ plan, actions, preflight }: { plan: Plan; actions?: P
               onClick={actions.onRevise}
               disabled={actions.disabled}
               className={actions.ideaReady ? undefined : 'ml-auto'}
-              title="Revoir le plan avec l'agent"
-              aria-label="Revoir"
+              title={t('revisePlanTitle')}
+              aria-label={t('revise')}
             >
               <EditIcon className="h-3.5 w-3.5" />
             </Button>
@@ -176,11 +179,9 @@ export function PlanCard({ plan, actions, preflight }: { plan: Plan; actions?: P
         )}
         {actions && (
           <p className={`m-0 flex flex-wrap items-center gap-1.5 text-xs ${worktree ? 'text-muted' : 'text-err'}`}>
-            {worktree
-              ? "Dans une copie du dépôt (worktree) : tu intègres ensuite."
-              : "Directement dans ton dossier : rien ne sépare le travail de l'agent du tien."}
+            {worktree ? t('worktreeNote') : t('inPlaceNote')}
             <Button type="button" variant="ghost" size="sm" onClick={() => setWorktree((value) => !value)} disabled={actions.disabled}>
-              changer
+              {t('change')}
             </Button>
           </p>
         )}
@@ -190,8 +191,9 @@ export function PlanCard({ plan, actions, preflight }: { plan: Plan; actions?: P
 }
 
 function Tally({ done, total }: { done: number; total: number }) {
+  const t = useT();
   const all = total > 0 && done === total;
-  return <span className={all ? 'text-ok' : 'text-err'}>{done}/{total} étapes</span>;
+  return <span className={all ? 'text-ok' : 'text-err'}>{t('stepsTally', { done, total })}</span>;
 }
 
 function CheckRow({ checked, text, detail }: { checked: boolean; text: string; detail: string }) {
@@ -216,16 +218,17 @@ function CheckRow({ checked, text, detail }: { checked: boolean; text: string; d
 }
 
 export function ReportCard({ report }: { report: Report }) {
+  const t = useT();
   const done = report.steps.filter((s) => s.checked).length;
   return (
     <Card className="flex flex-col gap-3 p-4">
       <div className="flex items-center gap-2">
-        <Badge tone="accent">Rapport</Badge>
+        <Badge tone="accent">{t('reportBadge')}</Badge>
         <span className="min-w-0 font-semibold text-text">
           <Inline>{report.title}</Inline>
         </span>
         {report.steps.length > 0 && <Tally done={done} total={report.steps.length} />}
-        <Badge tone="accent" title="Coches déclarées par le modèle, non vérifiées par fennec" className="ml-auto">indicatif</Badge>
+        <Badge tone="accent" title={t('reportIndicativeTitle')} className="ml-auto">{t('indicative')}</Badge>
       </div>
       {report.summary && (
         <p className="m-0 text-sm leading-relaxed text-text">
@@ -234,17 +237,17 @@ export function ReportCard({ report }: { report: Report }) {
       )}
       {report.steps.length > 0 && (
         <div className="flex flex-col gap-1.5">
-          <SectionLabel>Étapes</SectionLabel>
+          <SectionLabel>{t('stepsLabel')}</SectionLabel>
           <ul className="m-0 flex flex-col gap-1.5">
             {report.steps.map((step, i) => (
-              <CheckRow key={i} checked={step.checked} text={`Étape ${step.number} · ${step.text}`} detail={step.detail} />
+              <CheckRow key={i} checked={step.checked} text={t('stepRow', { number: step.number, text: step.text })} detail={step.detail} />
             ))}
           </ul>
         </div>
       )}
       {report.doneWhen.length > 0 && (
         <div className="flex flex-col gap-1.5">
-          <SectionLabel>Terminé quand</SectionLabel>
+          <SectionLabel>{t('doneWhen')}</SectionLabel>
           <ul className="m-0 flex flex-col gap-1.5">
             {report.doneWhen.map((item, i) => (
               <CheckRow key={i} checked={item.checked} text={item.text} detail={item.detail} />
@@ -254,7 +257,7 @@ export function ReportCard({ report }: { report: Report }) {
       )}
       {report.changed.length > 0 && (
         <div className="flex flex-col gap-1.5">
-          <SectionLabel>Fichiers modifiés</SectionLabel>
+          <SectionLabel>{t('panelModifiedFiles')}</SectionLabel>
           <ul className="m-0 flex flex-col gap-1.5">
             {report.changed.map((c, i) => (
               <li key={i} className="flex items-start gap-2 text-sm">
@@ -271,7 +274,7 @@ export function ReportCard({ report }: { report: Report }) {
       )}
       {report.test && (
         <div className="flex flex-col gap-1.5">
-          <SectionLabel>À tester</SectionLabel>
+          <SectionLabel>{t('toTest')}</SectionLabel>
           <div className="text-sm text-text">
             <Inline>{report.test}</Inline>
           </div>
@@ -279,7 +282,7 @@ export function ReportCard({ report }: { report: Report }) {
       )}
       {report.todo && (
         <div className="flex flex-col gap-1.5">
-          <SectionLabel>À faire</SectionLabel>
+          <SectionLabel>{t('toDo')}</SectionLabel>
           <div className="text-sm text-text">
             <Inline>{report.todo}</Inline>
           </div>
@@ -289,9 +292,9 @@ export function ReportCard({ report }: { report: Report }) {
   );
 }
 
-const IDEA_LABELS = {
-  none: 'Mettre au backlog',
-  framing: 'Idée prête',
-  ready: "Mettre à jour l'idée",
-  saved: 'Dans le backlog ✓',
-} as const;
+const IDEA_LABELS: Record<'none' | 'framing' | 'ready' | 'saved', MsgKey> = {
+  none: 'ideaSaveToBacklog',
+  framing: 'ideaReady',
+  ready: 'ideaUpdate',
+  saved: 'ideaInBacklog',
+};

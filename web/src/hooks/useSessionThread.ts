@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getContext, getThread, getVision, type ContextView, type ThreadPending, getEventPage, getRunEventsBefore, getSkills, getUsage, getUsageCalls, getUsageWorkflow, type WorkflowUsage, type EventPageEntry, type SessionSkills, type CallUsage, type SessionUsage, type SeenImage } from '../lib/api';
 import { createThreadFold, type FennecEvent, type ThreadFold, type ThreadView } from '../lib/fold';
+import { useLang } from '../i18n';
 
 const PAGE_SIZE = 200;
 
@@ -63,6 +64,7 @@ const NOTHING_PENDING: ThreadPending = { pendingApproval: null, pendingWaiver: n
  * strip: its `workflow.*` events are fetched once and fed to the run fold only.
  */
 export function useSessionThread(sessionId: string | null): SessionThread {
+  const lang = useLang();
   const [view, setView] = useState<ThreadView>(EMPTY);
   const [hasMore, setHasMore] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
@@ -74,7 +76,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
   const [vision, setVision] = useState<SeenImage[]>([]);
   const [pending, setPending] = useState<ThreadPending>(NOTHING_PENDING);
   const eventsRef = useRef<FennecEvent[]>([]);
-  const foldRef = useRef<ThreadFold>(createThreadFold());
+  const foldRef = useRef<ThreadFold>(createThreadFold(lang));
   const firstSeqRef = useRef(0);
   const lastSeqRef = useRef(0);
   const runPrefixRef = useRef<EventPageEntry[]>([]);
@@ -156,7 +158,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
   }, [sessionId]);
 
   const foldAll = useCallback(() => {
-    const fresh = createThreadFold();
+    const fresh = createThreadFold(lang);
     const firstSeq = firstSeqRef.current;
     for (const entry of runPrefixRef.current) {
       if (entry.seq < firstSeq) {
@@ -168,11 +170,11 @@ export function useSessionThread(sessionId: string | null): SessionThread {
     }
     foldRef.current = fresh;
     setView(fresh.view());
-  }, []);
+  }, [lang]);
 
   useEffect(() => {
     eventsRef.current = [];
-    foldRef.current = createThreadFold();
+    foldRef.current = createThreadFold(lang);
     firstSeqRef.current = 0;
     lastSeqRef.current = 0;
     runPrefixRef.current = [];
@@ -300,7 +302,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
       source?.close();
       cancelAnimationFrame(frame);
     };
-  }, [sessionId, foldAll, refreshSkills, refreshUsage, refreshContext, refreshVision, refreshThread]);
+  }, [sessionId, lang, foldAll, refreshSkills, refreshUsage, refreshContext, refreshVision, refreshThread]);
 
   // Returns true when the view was updated, so the caller knows whether a
   // scroll restore is armed for the upcoming view change.

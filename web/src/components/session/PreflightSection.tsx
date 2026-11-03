@@ -4,40 +4,44 @@ import type { PreflightResultView } from '../../lib/fold';
 import { Badge } from '../ui/Badge';
 import { Card } from '../ui/Card';
 import { SectionLabel } from '../ui/SectionLabel';
+import { useLang, useT } from '../../i18n';
+import type { MsgKey } from '../../i18n/messages';
 
 const INLINE_CODE = 'rounded bg-code px-1 py-0.5 font-mono text-xs text-text';
 
-const VERDICTS: Record<PreflightResultView['verdict'], { tone: 'ok' | 'err'; label: string; title: string }> = {
+const VERDICTS: Record<PreflightResultView['verdict'], { tone: 'ok' | 'err'; label: MsgKey; title: MsgKey }> = {
   fails: {
     tone: 'ok',
-    label: 'échoue avant le travail',
-    title: "Attendu : le critère n'est pas encore rempli"
+    label: 'verdictFailsLabel',
+    title: 'verdictFailsTitle'
   },
   passesAlready: {
     tone: 'err',
-    label: 'passe déjà',
-    title: 'Ne prouve rien : renvoyé au planificateur'
+    label: 'verdictPassesLabel',
+    title: 'verdictPassesTitle'
   },
   cannotRun: {
     tone: 'err',
-    label: 'ne peut pas tourner ici',
-    title: 'Environnement : renvoyé au planificateur'
+    label: 'verdictCannotLabel',
+    title: 'verdictCannotTitle'
   }
 };
 
 export function PreflightSection({ results }: { results: PreflightResultView[] }) {
+  const t = useT();
+  const lang = useLang();
   return (
     <Card variant="inset" className="border-l-2 border-l-ok">
       <div className="flex items-center justify-between gap-2">
-        <SectionLabel>Pré-contrôle</SectionLabel>
-        <Badge tone="ok" title="Fait établi par fennec : les commandes ont tourné avant tout changement">
-          vérifié
+        <SectionLabel>{t('preflightTitle')}</SectionLabel>
+        <Badge tone="ok" title={t('preflightVerifiedTitle')}>
+          {t('verified')}
         </Badge>
       </div>
       <ul className="m-0 flex flex-col gap-1.5">
         {results.map((result, i) => {
           const verdict = VERDICTS[result.verdict];
-          const label = result.exitCode !== undefined ? `${verdict.label} · exit ${result.exitCode}` : verdict.label;
+          const label = result.exitCode !== undefined ? `${t(lang, verdict.label)} · ${t('exitCode', { code: result.exitCode })}` : t(lang, verdict.label);
           return (
             <li key={`${result.criterionId}-${i}`} className="flex flex-col gap-1">
               <div className="flex flex-wrap items-center gap-2">
@@ -45,13 +49,13 @@ export function PreflightSection({ results }: { results: PreflightResultView[] }
                 <code className={`min-w-0 max-w-full truncate ${INLINE_CODE}`} title={result.command}>
                   {result.command}
                 </code>
-                <Badge tone={verdict.tone} title={verdict.title}>
+                <Badge tone={verdict.tone} title={t(lang, verdict.title)}>
                   {label}
                 </Badge>
               </div>
               {result.output && (
                 <details>
-                  <summary className="cursor-pointer text-xs text-muted">Sortie</summary>
+                  <summary className="cursor-pointer text-xs text-muted">{t('outputLabel')}</summary>
                   <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded bg-code p-2 font-mono text-xs text-muted">
                     {result.output}
                   </pre>

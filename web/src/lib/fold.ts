@@ -1,4 +1,6 @@
-import { formatTokens } from './format';
+import { formatTokens, stateLabel } from './format';
+import type { SessionState } from './api';
+import { t, type Lang } from '../i18n/messages';
 import type { NodeKind } from './workflow';
 import { createRunFold, type RunView } from './workflowRun';
 
@@ -306,7 +308,7 @@ export interface ThreadFold {
  * messages and tool calls are found through indexes: a long session costs
  * memory for what is shown, and each event a constant amount of work.
  */
-export function createThreadFold(): ThreadFold {
+export function createThreadFold(lang: Lang = 'en'): ThreadFold {
   const items: ThreadItem[] = [];
   let running = false;
   let lastDone: string | undefined;
@@ -551,7 +553,10 @@ export function createThreadFold(): ThreadFold {
         pushItem({
           kind: 'note',
           id: `compacted-${index}`,
-          text: `Contexte compacté · ${formatTokens(beforeTokens)} → ~${formatTokens(afterTokens)} tokens`,
+          text: t(lang, 'compactedNote', {
+            before: formatTokens(lang, beforeTokens),
+            after: formatTokens(lang, afterTokens)
+          }),
           detail: summary
         });
         break;
@@ -644,8 +649,7 @@ export function createThreadFold(): ThreadFold {
         lastDone = reason;
         // The question card is the signal for `waiting_for_user`; no note is needed.
         if (reason !== 'complete' && reason !== 'waiting_for_user') {
-          const text =
-            reason === 'stopped' ? 'Arrêtée' : reason === 'truncated' ? 'Tronquée' : reason === 'error' ? 'Erreur' : 'Terminée';
+          const text = stateLabel(lang, reason as SessionState);
           pushItem({ kind: 'note', id: `done-${index}`, text });
         }
         break;
@@ -655,7 +659,7 @@ export function createThreadFold(): ThreadFold {
         pushItem({
           kind: 'error',
           id: `error-${index}`,
-          message: String(data.error ?? 'Erreur inconnue')
+          message: String(data.error ?? t(lang, 'unknownError'))
         });
         break;
       }
@@ -669,12 +673,15 @@ export function createThreadFold(): ThreadFold {
           detailParts.push(commits.join(' '));
         }
         if (acknowledged.length > 0) {
-          detailParts.push(`Accepté malgré : ${acknowledged.join(', ')}`);
+          detailParts.push(t(lang, 'acceptedDespite', { kinds: acknowledged.join(', ') }));
         }
         pushItem({
           kind: 'note',
           id: `integration-applied-${index}`,
-          text: `Intégré par toi · ${commits.length} commit${commits.length === 1 ? '' : 's'} dans HEAD ${head.slice(0, 8)}`,
+          text: t(lang, 'integratedNote', {
+            commits: `${commits.length} ${t(lang, commits.length === 1 ? 'commit' : 'commits')}`,
+            head: head.slice(0, 8)
+          }),
           detail: detailParts.length > 0 ? detailParts.join('\n') : undefined
         });
         break;
@@ -685,7 +692,9 @@ export function createThreadFold(): ThreadFold {
         pushItem({
           kind: 'note',
           id: `worktree-discarded-${index}`,
-          text: `Travail de l'agent abandonné · ${commits.length} commit${commits.length === 1 ? '' : 's'}`,
+          text: t(lang, 'discardedNote', {
+            commits: `${commits.length} ${t(lang, commits.length === 1 ? 'commit' : 'commits')}`
+          }),
           detail: commits.length > 0 ? commits.join(' ') : undefined
         });
         break;

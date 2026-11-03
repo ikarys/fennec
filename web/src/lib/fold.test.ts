@@ -410,7 +410,7 @@ describe('createThreadFold', () => {
   });
 
   it('adds a compaction note and removes the summarized assistant', () => {
-    const fold = createThreadFold();
+    const fold = createThreadFold('fr');
     fold.apply(ev('message.start', { messageId: 'a1', role: 'assistant' }));
     fold.apply(ev('message.delta', { messageId: 'a1', content: 'summary' }));
     fold.apply(ev('context.compacted', { beforeTokens: 100, afterTokens: 20, summary: 'summary' }));
@@ -438,14 +438,14 @@ describe('createThreadFold', () => {
   });
 
   it('adds a stopped note from chat.done', () => {
-    const fold = createThreadFold();
+    const fold = createThreadFold('fr');
     fold.apply(ev('chat.done', { reason: 'stopped' }));
     expect(fold.view().lastDone).toBe('stopped');
     expect(fold.view().items[0]).toMatchObject({ kind: 'note', text: 'Arrêtée' });
   });
 
   it('adds a truncated note from chat.done', () => {
-    const fold = createThreadFold();
+    const fold = createThreadFold('fr');
     fold.apply(ev('chat.done', { reason: 'truncated' }));
     expect(fold.view().items[0]).toMatchObject({ kind: 'note', text: 'Tronquée' });
   });

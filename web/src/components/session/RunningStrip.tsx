@@ -1,4 +1,5 @@
 import type { RunView } from "../../lib/workflowRun";
+import { useT } from "../../i18n";
 
 /** Above the composer, where the eyes are: holds the auto-scroll switch, always; during a run,
  * also says a turn is going on, and which node. */
@@ -13,6 +14,7 @@ export function RunningStrip({
   following: boolean;
   onFollowChange: (on: boolean) => void;
 }) {
+  const t = useT();
   const node =
     run && !run.finished
       ? [...run.runs].reverse().find((r) => r.state === "running")
@@ -28,17 +30,17 @@ export function RunningStrip({
           {node ? (
             <>
               <span className="truncate">
-                Workflow en cours · <span className="text-text">{node.label}</span>
-                {node.pass > 1 && ` (passe ${node.pass})`}
+                {t("workflowRunningNode", { label: node.label })}
+                {node.pass > 1 && t("passN", { n: node.pass })}
               </span>
               {run?.pauseRequested && (
                 <span className="shrink-0 text-text">
-                  Pause demandée · arrêt après cette étape
+                  {t("pauseRequestedStop")}
                 </span>
               )}
             </>
           ) : (
-            <span>L'agent travaille…</span>
+            <span>{t("agentWorking")}</span>
           )}
         </>
       )}
@@ -46,11 +48,11 @@ export function RunningStrip({
         className="ml-auto flex shrink-0 cursor-pointer items-center gap-1.5 select-none"
         title={
           following
-            ? "Le fil suit l'agent. Décocher pour lire sans être ramené en bas."
-            : "Le fil ne suit plus l'agent. Cocher pour revenir en bas et le suivre."
+            ? t("followOn")
+            : t("followOff")
         }
       >
-        Suivi auto
+        {t("autoFollow")}
         <input
           type="checkbox"
           role="switch"

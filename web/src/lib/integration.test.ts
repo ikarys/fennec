@@ -7,6 +7,7 @@ import {
   narrativePrompt,
   neverAcknowledged,
 } from './integration';
+import { t } from '../i18n/messages';
 
 function preview(overrides: Partial<IntegrationPreview> = {}): IntegrationPreview {
   return {
@@ -89,43 +90,44 @@ describe('narrative prompt', () => {
 
 describe('blocker sentence', () => {
   it('renders no commits', () => {
-    const sentence = blockerSentence(blocker({ kind: 'noCommits' }));
+    const sentence = blockerSentence('fr', blocker({ kind: 'noCommits' }));
 
-    expect(sentence).toBe('Aucun commit à intégrer.');
+    expect(sentence).toBe(t('fr', 'noCommits'));
   });
 
   it('renders conflict', () => {
-    const sentence = blockerSentence(blocker({ kind: 'conflict', files: ['a.rs', 'b.rs'] }));
+    const sentence = blockerSentence('fr', blocker({ kind: 'conflict', files: ['a.rs', 'b.rs'] }));
 
-    expect(sentence).toBe('Conflit avec ta branche : a.rs, b.rs.');
+    expect(sentence).toBe(t('fr', 'conflict', { files: 'a.rs, b.rs' }));
   });
 
   it('renders criteria not passed', () => {
-    const sentence = blockerSentence(blocker({ kind: 'criteriaNotPassed', criteria: ['ci', 'lint'] }));
+    const sentence = blockerSentence('fr', blocker({ kind: 'criteriaNotPassed', criteria: ['ci', 'lint'] }));
 
-    expect(sentence).toBe('Critères non passés : ci, lint.');
+    expect(sentence).toBe(t('fr', 'criteriaNotPassed', { criteria: 'ci, lint' }));
   });
 
   it('renders no criteria', () => {
-    const sentence = blockerSentence(blocker({ kind: 'noCriteria' }));
+    const sentence = blockerSentence('fr', blocker({ kind: 'noCriteria' }));
 
-    expect(sentence).toBe('Aucun critère : rien n\'a été vérifié.');
+    expect(sentence).toBe(t('fr', 'noCriteria'));
   });
 
   it('renders protected touched', () => {
-    const sentence = blockerSentence(blocker({ kind: 'protectedTouched', paths: ['core.rs'] }));
+    const sentence = blockerSentence('fr', blocker({ kind: 'protectedTouched', paths: ['core.rs'] }));
 
-    expect(sentence).toBe('Fichiers protégés modifiés : core.rs.');
+    expect(sentence).toBe(t('fr', 'protectedTouched', { paths: 'core.rs' }));
   });
 
   it('renders sensitive touched', () => {
-    const sentence = blockerSentence(blocker({ kind: 'sensitiveTouched', paths: ['auth.rs'] }));
+    const sentence = blockerSentence('fr', blocker({ kind: 'sensitiveTouched', paths: ['auth.rs'] }));
 
-    expect(sentence).toBe('Zones sensibles modifiées, ta revue est obligatoire : auth.rs.');
+    expect(sentence).toBe(t('fr', 'sensitiveTouched', { paths: 'auth.rs' }));
   });
 
   it('renders architecture violated', () => {
     const sentence = blockerSentence(
+      'fr',
       blocker({
         kind: 'architectureViolated',
         violations: [
@@ -134,11 +136,12 @@ describe('blocker sentence', () => {
       }),
     );
 
-    expect(sentence).toBe('Règles d\'architecture violées : a.rs : « l1 » (interdit : f1).');
+    expect(sentence).toBe(t('fr', 'architectureViolated', { list: 'a.rs : « l1 » (interdit : f1)', more: '' }));
   });
 
   it('renders architecture violated with more than three violations', () => {
     const sentence = blockerSentence(
+      'fr',
       blocker({
         kind: 'architectureViolated',
         violations: [
@@ -152,12 +155,16 @@ describe('blocker sentence', () => {
     );
 
     expect(sentence).toBe(
-      'Règles d\'architecture violées : a.rs : « l1 » (interdit : f1) ; b.rs : « l2 » (interdit : f2) ; c.rs : « l3 » (interdit : f3) (+2).',
+      t('fr', 'architectureViolated', {
+        list: 'a.rs : « l1 » (interdit : f1) ; b.rs : « l2 » (interdit : f2) ; c.rs : « l3 » (interdit : f3)',
+        more: ' (+2)'
+      }),
     );
   });
 
   it('renders suppressions added', () => {
     const sentence = blockerSentence(
+      'fr',
       blocker({
         kind: 'suppressionsAdded',
         suppressions: [
@@ -166,11 +173,12 @@ describe('blocker sentence', () => {
       }),
     );
 
-    expect(sentence).toBe('Vérifications désactivées dans les lignes ajoutées : a.rs : « l1 » (m1).');
+    expect(sentence).toBe(t('fr', 'suppressionsAdded', { list: 'a.rs : « l1 » (m1)', more: '' }));
   });
 
   it('renders suppressions added with more than three suppressions', () => {
     const sentence = blockerSentence(
+      'fr',
       blocker({
         kind: 'suppressionsAdded',
         suppressions: [
@@ -184,12 +192,16 @@ describe('blocker sentence', () => {
     );
 
     expect(sentence).toBe(
-      'Vérifications désactivées dans les lignes ajoutées : a.rs : « l1 » (m1) ; b.rs : « l2 » (m2) ; c.rs : « l3 » (m3) (+2).',
+      t('fr', 'suppressionsAdded', {
+        list: 'a.rs : « l1 » (m1) ; b.rs : « l2 » (m2) ; c.rs : « l3 » (m3)',
+        more: ' (+2)'
+      }),
     );
   });
 
   it('renders tests weakened', () => {
     const sentence = blockerSentence(
+      'fr',
       blocker({
         kind: 'testsWeakened',
         testsRemoved: 2,
@@ -198,19 +210,19 @@ describe('blocker sentence', () => {
       }),
     );
 
-    expect(sentence).toBe('Tests affaiblis : 2 test(s) et 5 assertion(s) en moins (a.test.ts, b.test.ts).');
+    expect(sentence).toBe(t('fr', 'testsWeakened', { tests: 2, assertions: 5, paths: 'a.test.ts, b.test.ts' }));
   });
 
   it('renders branch changed to a detached head', () => {
-    const sentence = blockerSentence(blocker({ kind: 'branchChanged', from: 'abc', to: null }));
+    const sentence = blockerSentence('fr', blocker({ kind: 'branchChanged', from: 'abc', to: null }));
 
-    expect(sentence).toBe('Le run est parti de abc, tu es maintenant sur un HEAD détaché : les commits iraient ailleurs.');
+    expect(sentence).toBe(t('fr', 'branchChanged', { from: 'abc', to: t('fr', 'detachedHead') }));
   });
 
   it('renders local changes', () => {
-    const sentence = blockerSentence(blocker({ kind: 'localChanges', paths: ['a.rs', 'b.rs'] }));
+    const sentence = blockerSentence('fr', blocker({ kind: 'localChanges', paths: ['a.rs', 'b.rs'] }));
 
-    expect(sentence).toBe('Changements non commités seraient écrasés : a.rs, b.rs — committe-les ou stash-les avant d\'intégrer.');
+    expect(sentence).toBe(t('fr', 'localChanges', { paths: 'a.rs, b.rs' }));
   });
 });
 
