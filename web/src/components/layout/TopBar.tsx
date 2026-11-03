@@ -4,6 +4,7 @@ import { SessionStateIcon } from '../session/SessionStateIcon';
 import { BellIcon, CloseIcon, FoxIcon, PlusIcon, SearchIcon, SettingsIcon, SplitIcon } from '../Icons';
 import { Badge } from '../ui/Badge';
 import { Button, buttonClass } from '../ui/Button';
+import { Menu, MenuItem } from '../ui/Menu';
 
 function InsightIcon({ className }: { className?: string }) {
   return (
@@ -170,6 +171,14 @@ function VersionTag() {
 
 export type PageId = 'settings' | 'insight' | 'workflows' | 'backlog';
 
+/** The fixed pages, in the bar's order; `PageIcon` draws each. */
+const PAGES: { page: PageId; title: string }[] = [
+  { page: 'backlog', title: 'Tâches' },
+  { page: 'workflows', title: 'Workflows' },
+  { page: 'insight', title: 'Insight' },
+  { page: 'settings', title: 'Réglages' }
+];
+
 export type TabInfo =
   | { id: string; title: string; project: string; state: SessionState; kind: 'session' }
   | { id: string; title: string; kind: 'page'; page: PageId };
@@ -195,7 +204,12 @@ interface TopBarProps {
   onPickTab: (id: string) => void;
   onCloseTab: (id: string) => void;
   onOpenPalette: () => void;
-  onNewSession: () => void;
+  /** The project of the open session, when there is one: the "+" targets it. */
+  currentProject: { id: string; name: string } | null;
+  /** The projects the "+" offers when no session is open. */
+  projects: { id: string; name: string }[];
+  onNewSession: (projectId?: string) => void;
+  onOpenPage: (page: PageId) => void;
   splitActive: boolean;
   onToggleSplit: () => void;
 }
@@ -208,7 +222,10 @@ export function TopBar({
   onPickTab,
   onCloseTab,
   onOpenPalette,
+  currentProject,
+  projects,
   onNewSession,
+  onOpenPage,
   splitActive,
   onToggleSplit
 }: TopBarProps) {
@@ -236,15 +253,38 @@ export function TopBar({
         <VersionTag />
       </a>
 
-      <button
-        type="button"
-        onClick={onNewSession}
-        aria-label="Nouvelle session"
-        title="Nouvelle session dans le projet courant"
-        className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true }, 'self-center')}
-      >
-        <PlusIcon className="h-4 w-4" />
-      </button>
+      {/* The "+" never guesses a project. */}
+      {currentProject ? (
+        <button
+          type="button"
+          onClick={() => onNewSession(currentProject.id)}
+          aria-label="Nouvelle session"
+          title={`Nouvelle session dans ${currentProject.name}`}
+          className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true }, 'self-center')}
+        >
+          <PlusIcon className="h-4 w-4" />
+        </button>
+      ) : projects.length > 0 ? (
+        <div className="self-center">
+          <Menu label="Nouvelle session dans…" icon={<PlusIcon className="h-4 w-4" />}>
+            {projects.map((project) => (
+              <MenuItem key={project.id} onSelect={() => onNewSession(project.id)}>
+                {project.name}
+              </MenuItem>
+            ))}
+          </Menu>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => onNewSession()}
+          aria-label="Nouvelle session"
+          title="Nouvelle session"
+          className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true }, 'self-center')}
+        >
+          <PlusIcon className="h-4 w-4" />
+        </button>
+      )}
 
       <div
         role="tablist"
@@ -336,6 +376,24 @@ export function TopBar({
         </button>
 
         <AttentionBell attention={attention} onOpen={onOpenAttention} />
+
+        {/* The page's icon is lit when its tab is active, so the tab and the icon show one state. */}
+        {PAGES.map(({ page, title }) => {
+          const active = activeTabId === `page:${page}`;
+          return (
+            <button
+              key={page}
+              type="button"
+              onClick={() => onOpenPage(page)}
+              aria-label={title}
+              aria-pressed={active}
+              title={title}
+              className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true }, active ? 'text-accent' : undefined)}
+            >
+              <PageIcon page={page} className="h-4 w-4" />
+            </button>
+          );
+        })}
 
         <button
           type="button"
