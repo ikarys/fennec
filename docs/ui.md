@@ -30,6 +30,11 @@ dead: every list and grid shows the human where they are and what reacts.
   tinted background (`bg-accent-soft`), an accent edge or border, its title in
   `text-accent-strong`; the whole row opens it, its actions appear on hover.
 - Labels that carry a meaning (an agent, a state) are tinted badges, not plain text.
+- The session thread tones its item types by action family, one tone per meaning:
+  the model's text sits on a `Card` surface (a plan or report card stays unboxed in
+  it), the human's bubble is `accent-soft` (the author), reflections and reads
+  (`read_file`, `web_search`) are `info`, writes are `accent`, executions and asks
+  are `attention`.
 - A figure (a count, a cost, a share) is a `Tile` with a tone, `active` when it
   calls for attention: one tone per meaning, kept on every screen that shows it
   (the risks' unreviewed `err`, untested `attention`, churn `info`; usage, cost).
