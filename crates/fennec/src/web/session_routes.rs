@@ -27,6 +27,7 @@ use crate::domain::clock;
 use crate::domain::conversation::{first_request, last_assistant_text};
 use crate::domain::event::{DoneReason, Event, QueueMode};
 use crate::domain::id::new_id;
+use crate::domain::lang::Lang;
 use crate::domain::preferences::ModelRef;
 use crate::domain::project::SessionSummary;
 use crate::domain::queue;
@@ -327,11 +328,19 @@ pub(super) fn serve_usage(app: &App, stream: &mut TcpStream, id: &str) -> Result
     let rows = ledger
         .series(&filter, token_usage::GroupBy::Model)
         .map_err(|e| e.to_string())?;
-    let pricing = super::pricing::priced(&rows, &super::pricing::prices(&store.preferences()?));
+    // The usage panel's cost text follows the human's display language.
+    let preferences = store.preferences()?;
+    let lang = Lang::from_code(&preferences.display.language);
+    let pricing = super::pricing::priced(&rows, &super::pricing::prices(&preferences));
     send_json(
         stream,
         200,
-        &json!(SessionUsageView::new(&summary, latest.as_ref(), &pricing)),
+        &json!(SessionUsageView::new(
+            &summary,
+            latest.as_ref(),
+            &pricing,
+            lang
+        )),
     )
 }
 
