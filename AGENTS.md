@@ -350,7 +350,8 @@ tests.
    kernel code too; command rules match parsed tokens, so `eval`, a variable (`$X -rf`) or
    a script written then run slips past them: a guard rail, the sandbox stays the wall. A file
    tool outside the workdir needs an allow rule or the human's approval; the sandbox does not read the rules (it still hides
-   `~/.ssh` from commands). With the sandbox off, a session's worktree shares its
+   `~/.ssh` from commands). With the sandbox off, a session's worktree shares its refs with the human's repository: a
+   command could then push, move or delete a branch (default block rules are the fix to come). With the sandbox off, a session's worktree shares its
    `.git/worktrees/<id>` with the human's repository: a command can move or push refs
    (`git update-ref`, `git push`); command rules are the only wall then.
 
