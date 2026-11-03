@@ -3,6 +3,7 @@ import { Segmented } from '../ui/Segmented';
 import { Section, type SectionSave } from '../ui/Section';
 import { themes, type ThemeId } from '../../lib/theme';
 import { useT } from '../../i18n';
+import type { MsgKey } from '../../i18n/messages';
 
 interface DisplaySectionProps {
   value: DisplayPrefs;
@@ -16,9 +17,9 @@ interface DisplaySectionProps {
 const FONT_SIZES = [13, 14, 15, 16];
 
 // Language names stay in their own language, in both UIs.
-const LANGUAGES: { value: 'en' | 'fr'; label: string }[] = [
-  { value: 'en', label: 'English' },
-  { value: 'fr', label: 'Français' }
+const LANGUAGES: { value: 'en' | 'fr'; label: MsgKey }[] = [
+  { value: 'en', label: 'displayLanguageEnglish' },
+  { value: 'fr', label: 'displayLanguageFrench' }
 ];
 
 export function DisplaySection({ value, onChange, theme, onThemeChange, save }: DisplaySectionProps) {
@@ -44,7 +45,7 @@ export function DisplaySection({ value, onChange, theme, onThemeChange, save }: 
           label={t('displayLanguage')}
           value={value.language ?? 'en'}
           onChange={(language) => onChange({ ...value, language })}
-          segments={LANGUAGES.map((language) => ({ value: language.value, label: language.label }))}
+          segments={LANGUAGES.map((language) => ({ value: language.value, label: t(language.label) }))}
         />
       </div>
       <label className="flex items-center gap-2 text-sm text-text">

@@ -769,7 +769,7 @@ export function BellIcon({ className }: IconProps) {
   );
 }
 
-/** Pulse line: model calls, the Insight "Appels" card and the daily chart. */
+/** Pulse line: model calls, the Insight "Calls" card and the daily chart. */
 export function ActivityIcon({ className }: IconProps) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -799,7 +799,7 @@ export function LayersIcon({ className }: IconProps) {
   );
 }
 
-/** Warning triangle: cache lost, the Insight "Cache perdu" card. */
+/** Warning triangle: cache lost, the Insight "Lost cache" card. */
 export function AlertIcon({ className }: IconProps) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -810,7 +810,7 @@ export function AlertIcon({ className }: IconProps) {
   );
 }
 
-/** Up arrow: tokens out, the Insight "Sortie" card. */
+/** Up arrow: tokens out, the Insight "Output" card. */
 export function ArrowUpIcon({ className }: IconProps) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -820,7 +820,7 @@ export function ArrowUpIcon({ className }: IconProps) {
   );
 }
 
-/** Dollar: estimated cost, the Insight "Coût estimé" card. */
+/** Dollar: estimated cost, the Insight "Estimated cost" card. */
 export function CoinIcon({ className }: IconProps) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -871,7 +871,7 @@ export function HardDriveIcon({ className }: IconProps) {
   );
 }
 
-/** Chip: a model, the "Modèles" table header. */
+/** Chip: a model, the "Models" table header. */
 export function CpuIcon({ className }: IconProps) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

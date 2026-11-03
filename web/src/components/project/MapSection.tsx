@@ -4,6 +4,7 @@
  * intended architecture. The tab's content.
  */
 import { useState } from 'react';
+import { useT } from '../../i18n';
 import {
   AlertIcon,
   BranchIcon,
@@ -39,6 +40,7 @@ export function MapSection({
   drift: ArchitectureDrift;
   onWritten: (state: MapFileState) => void;
 }) {
+  const t = useT();
   const [writing, setWriting] = useState(false);
   const [writeError, setWriteError] = useState<string | null>(null);
 
@@ -49,7 +51,7 @@ export function MapSection({
       const result = await writeMapFile(projectId);
       onWritten(result.mapFile);
     } catch (err) {
-      setWriteError(err instanceof Error ? err.message : 'Erreur inconnue');
+      setWriteError(err instanceof Error ? err.message : t('unknownError'));
     } finally {
       setWriting(false);
     }
@@ -62,24 +64,24 @@ export function MapSection({
 
   return (
     <Section
-      title="Carte des modules"
-      description="Une flèche A → B : du code de A importe du code de B (nombre de fichiers). docs/map.md, commité, donne cette carte aux agents et aux développeurs qui arrivent sur le projet."
+      title={t('moduleMapTitle')}
+      description={t('moduleMapDescription')}
       actions={
         <div className="flex items-center gap-2">
-          <Badge tone="ok" pill title="Extraite des imports du code, sans modèle">
-            vérifié
+          <Badge tone="ok" pill title={t('mapVerifiedTitle')}>
+            {t('verified')}
           </Badge>
           {mapFile === 'current' ? (
             <Badge tone="ok" pill>
-              docs/map.md à jour
+              {t('mapCurrent')}
             </Badge>
           ) : mapFile === 'stale' ? (
             <Badge tone="attention" pill>
-              docs/map.md périmé
+              {t('mapStale')}
             </Badge>
           ) : (
             <Badge tone="neutral" pill>
-              docs/map.md absent
+              {t('mapMissing')}
             </Badge>
           )}
           {mapFile !== 'current' ? (
@@ -96,10 +98,10 @@ export function MapSection({
                   <RefreshIcon className="h-3.5 w-3.5" />
                 )}
                 {writing
-                  ? 'Écriture…'
+                  ? t('mapWriting')
                   : mapFile === 'missing'
-                    ? 'Écrire docs/map.md'
-                    : 'Mettre à jour docs/map.md'}
+                    ? t('mapWrite')
+                    : t('mapUpdate')}
               </span>
             </Button>
           ) : null}
@@ -113,30 +115,30 @@ export function MapSection({
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Tile
             icon={<LayersIcon />}
-            label="Modules"
+            label={t('modulesTile')}
             figure={map.modules.length}
-            detail={`${entries} point(s) d'entrée`}
+            detail={t('entryPoints', { count: entries })}
             tone="accent"
             active
           />
           <Tile
             icon={<BranchIcon />}
-            label="Dépendances"
+            label={t('dependenciesTile')}
             figure={map.dependencies.length}
-            detail="entre modules, lues des imports"
+            detail={t('dependenciesDetail')}
             tone="info"
             active
           />
           <Tile
             icon={<PinIcon />}
-            label="Règles de modules"
+            label={t('moduleRulesTile')}
             figure={drift.rules}
             detail={
               drift.rules === 0
-                ? "aucune dans .agents/architecture"
+                ? t('rulesNone')
                 : drift.violations.length === 0
-                  ? "toutes respectées"
-                  : `${drift.violations.length} dépendance(s) contre l'architecture voulue`
+                  ? t('rulesAllRespected')
+                  : t('rulesViolated', { count: drift.violations.length })
             }
             tone={
               drift.rules === 0
@@ -149,16 +151,16 @@ export function MapSection({
           />
           <Tile
             icon={<ClockIcon />}
-            label="Depuis docs/map.md"
+            label={t('sinceMapTile')}
             figure={
               drift.sinceMap === null ? '—' : `+${added} / −${removed}`
             }
             detail={
               drift.sinceMap === null
-                ? "pas de docs/map.md commité"
+                ? t('sinceMapNone')
                 : hasChanges
-                  ? "dépendances ajoutées / retirées"
-                  : "aucune dépendance changée"
+                  ? t('sinceMapChanged')
+                  : t('sinceMapUnchanged')
             }
             tone={
               drift.sinceMap === null
@@ -173,8 +175,7 @@ export function MapSection({
 
         {drift.rules === 0 ? (
           <p className="text-xs text-muted">
-            Aucune règle de modules dans <code>.agents/architecture</code> (
-            <code>A never imports B</code>) : rien à comparer.
+            {t('noModuleRules')}
           </p>
         ) : null}
 
@@ -183,9 +184,9 @@ export function MapSection({
           <Card className="overflow-hidden">
             <div className="flex items-center gap-3 border-b border-border bg-raised px-4 py-2 text-xs uppercase tracking-wide text-faint">
               <span className="w-3.5" aria-hidden />
-              <span className="grow">Dépendance interdite</span>
-              <span className="w-20 text-right">Fichiers</span>
-              <span className="w-64">Règle</span>
+              <span className="grow">{t('forbiddenDependency')}</span>
+              <span className="w-20 text-right">{t('filesCol')}</span>
+              <span className="w-64">{t('ruleCol')}</span>
             </div>
             <ul className="divide-y divide-border">
               {drift.violations.map((violation) => (
@@ -216,7 +217,7 @@ export function MapSection({
         {drift.sinceMap !== null && hasChanges ? (
           <Card className="overflow-hidden">
             <div className="flex items-center gap-3 border-b border-border bg-raised px-4 py-2 text-xs uppercase tracking-wide text-faint">
-              <span className="grow">Écarts depuis docs/map.md</span>
+              <span className="grow">{t('driftSinceMap')}</span>
               <Badge tone="ok" pill>
                 +{added}
               </Badge>

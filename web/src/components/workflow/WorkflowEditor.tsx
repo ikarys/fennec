@@ -11,6 +11,7 @@ import {
   type NodeTypes
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import { useT } from '../../i18n';
 import type { WorkflowDef, WorkflowNode } from '../../lib/workflow';
 import { EditorHeader } from './EditorHeader';
 import { EdgeLegend } from './EdgeLegend';
@@ -69,6 +70,7 @@ interface WorkflowEditorProps {
 }
 
 function WorkflowEditorInner({ initialDef, initialOrigin, projectId }: WorkflowEditorProps) {
+  const t = useT();
   const editor = useWorkflowEditor({ initialDef, initialOrigin, projectId });
 
   return (
@@ -131,7 +133,7 @@ function WorkflowEditorInner({ initialDef, initialOrigin, projectId }: WorkflowE
           ) : (
             <div className="flex flex-col gap-3 p-3">
               <div>
-                <label className="mb-1 block text-sm text-muted">Nom</label>
+                <label className="mb-1 block text-sm text-muted">{t('nameLabel')}</label>
                 <input
                   type="text"
                   value={editor.def.name}
@@ -140,7 +142,7 @@ function WorkflowEditorInner({ initialDef, initialOrigin, projectId }: WorkflowE
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm text-muted">Description</label>
+                <label className="mb-1 block text-sm text-muted">{t('agentDescriptionLabel')}</label>
                 <textarea
                   value={editor.def.description ?? ''}
                   onChange={(event) =>
@@ -151,7 +153,7 @@ function WorkflowEditorInner({ initialDef, initialOrigin, projectId }: WorkflowE
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm text-muted">Passages max</label>
+                <label className="mb-1 block text-sm text-muted">{t('edgeMaxPasses')}</label>
                 <input
                   type="number"
                   value={editor.def.maxSteps ?? 50}
@@ -163,7 +165,7 @@ function WorkflowEditorInner({ initialDef, initialOrigin, projectId }: WorkflowE
               </div>
               {editor.issues.length > 0 && (
                 <div className="flex flex-col gap-1">
-                  <div className="text-sm font-medium text-err">Problèmes</div>
+                  <div className="text-sm font-medium text-err">{t('edgeIssues')}</div>
                   {editor.issues.map((issue, index) => (
                     <button
                       key={index}
@@ -183,7 +185,7 @@ function WorkflowEditorInner({ initialDef, initialOrigin, projectId }: WorkflowE
                 </div>
               )}
               {editor.saveError && <div className="text-xs text-err">{editor.saveError}</div>}
-              {editor.saved && <div className="text-xs text-ok">Enregistré</div>}
+              {editor.saved && <div className="text-xs text-ok">{t('workflowEditorSaved')}</div>}
             </div>
           )}
         </aside>

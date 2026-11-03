@@ -31,17 +31,17 @@ export function VisionSection({ images }: { images: SeenImage[] }) {
       icon={<EyeIcon className="h-3.5 w-3.5" />}
       summary={images.length > 0 ? images.length : undefined}
     >
-      <p className="m-0 text-xs text-muted">Les images que le modèle a vues : captures, images lues ou jointes. Grisées : sorties de son contexte.</p>
+      <p className="m-0 text-xs text-muted">{t('visionImagesHint')}</p>
       {images.length === 0 ? (
-        <div className="text-xs text-muted">Aucune image vue.</div>
+        <div className="text-xs text-muted">{t('visionNoImages')}</div>
       ) : (
         <div className="grid grid-cols-3 gap-1.5">
           {images.map((image, index) => (
             <button
               key={`${image.anchorId}-${index}`}
               type="button"
-              aria-label={`Agrandir ${image.label}`}
-              title={image.inContext ? image.label : 'Plus dans le contexte du modèle'}
+              aria-label={t('visionEnlarge', { label: image.label })}
+              title={image.inContext ? image.label : t('outOfContext')}
               onClick={() => setSelected(image)}
               className={`block w-full overflow-hidden rounded-md ${image.inContext ? '' : 'opacity-40'}`}
             >
@@ -53,7 +53,7 @@ export function VisionSection({ images }: { images: SeenImage[] }) {
       <Modal
         open={selected !== null}
         onClose={closeDialog}
-        label={selected?.label ?? 'Vision'}
+        label={selected?.label ?? t('panelVision')}
         width="w-auto max-w-[min(90vw,1100px)]"
       >
         {selected && (
@@ -61,7 +61,7 @@ export function VisionSection({ images }: { images: SeenImage[] }) {
             <img src={selected.src} alt={selected.label} className="max-h-[75vh] max-w-full object-contain" />
             <div className="flex flex-col gap-1">
               <div className="font-mono text-xs text-muted">{selected.label}</div>
-              {!selected.inContext && <div className="text-xs text-muted">Plus dans le contexte du modèle</div>}
+              {!selected.inContext && <div className="text-xs text-muted">{t('outOfContext')}</div>}
             </div>
             <div className="flex justify-end gap-2">
               <Button
@@ -69,8 +69,8 @@ export function VisionSection({ images }: { images: SeenImage[] }) {
                 size="sm"
                 iconOnly
                 onClick={jumpToThread}
-                title="Voir dans le fil"
-                aria-label="Voir dans le fil"
+                title={t('visionViewInThread')}
+                aria-label={t('visionViewInThread')}
               >
                 <LocateIcon className="h-4 w-4" />
               </Button>
@@ -79,8 +79,8 @@ export function VisionSection({ images }: { images: SeenImage[] }) {
                 size="sm"
                 iconOnly
                 onClick={closeDialog}
-                title="Fermer"
-                aria-label="Fermer"
+                title={t('close')}
+                aria-label={t('close')}
               >
                 <CloseIcon className="h-4 w-4" />
               </Button>

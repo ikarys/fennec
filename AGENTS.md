@@ -158,6 +158,9 @@ accepts, and those files lead the review map with a "zone sensible" signal (veri
 Project deletion, done: a trash button on the project page deletes everything fennec holds for a project (sessions,
 worktrees and branches, rules, ideas); its source folder only when the human ticks the box, never the home, the root or
 fennec's store (`web/project_delete.rs`).
+UI languages, done: English by default, French on the Settings page; every UI string comes from `web/src/i18n/messages.ts`,
+whose `fr` is typed against `en`'s keys (a missing translation is a compile error); components call `useT()`, pure
+lib functions take a `lang`. The texts the server builds (the Insight tiles) are still French.
 Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
 1. To be chosen among the remaining capabilities C* of the Notion definition.
@@ -325,6 +328,7 @@ web/src/           React + Vite + Tailwind v4 UI
                      workflow (definition types and edits), workflowRun (a run folded from its events),
                      preview (what can be previewed, its URL), vision (the images the model saw),
                      panelBlocks (the context panel's blocks and pages)
+  i18n/              messages (the en and fr dictionaries, `t`), index (`useT`, `useLang`: the language chosen in Settings)
   styles/app.css     theme tokens: one CSS variable block per theme, mapped into Tailwind
 docs/api.md        the HTTP API and event wire format, shared by server and UI
 docs/workflows.md  the workflow format, run semantics and editor

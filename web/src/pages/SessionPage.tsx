@@ -21,7 +21,7 @@ import { readImages } from "../lib/attachments";
 import { formatDateTime } from "../lib/format";
 import { sessionStatus } from "../lib/sessionStatus";
 import { runWaiting } from "../lib/workflowRun";
-import { useLang } from "../i18n";
+import { useLang, useT } from "../i18n";
 import { useSessionThread } from "../hooks/useSessionThread";
 import { useProjectOptions } from "../hooks/useProjectOptions";
 import { useModeAndModel } from "../hooks/useModeAndModel";
@@ -141,6 +141,7 @@ export function SessionPage({
     served,
   } = useSessionThread(sessionId);
   const lang = useLang();
+  const t = useT();
   const running = view.running;
   const pendingCallId =
     served.pendingApproval?.callId ?? served.pendingWaiver?.callId;
@@ -357,7 +358,7 @@ export function SessionPage({
   }, [sessionId]);
 
   const title =
-    view.name ?? detail?.title ?? (sessionId ? "Session" : "Nouvelle session");
+    view.name ?? detail?.title ?? (sessionId ? t('session') : t('newSession'));
 
   const lastAssistant = [...view.items]
     .reverse()
@@ -496,7 +497,7 @@ export function SessionPage({
       }
     } catch (error) {
       setSendError(
-        error instanceof Error ? error.message : "Erreur lors de l’envoi",
+        error instanceof Error ? error.message : t('sessionPageSendError'),
       );
     }
   }
@@ -520,7 +521,7 @@ export function SessionPage({
     // Sent directly, not through handleSend: a workflow picked in the
     // composer would otherwise take this message as its task.
     if (modeChanged && sessionId) {
-      await sendMessage(sessionId, "Exécute le plan ci-dessus.");
+      await sendMessage(sessionId, t('sessionPageExecutePlanAbove'));
     }
   }
 
@@ -540,7 +541,7 @@ export function SessionPage({
             .find(
               (item): item is Extract<typeof item, { kind: "user" }> =>
                 item.kind === "user" && !item.isSystemGenerated,
-            )?.content ?? "Exécute le plan approuvé.";
+            )?.content ?? t('sessionPageExecuteApprovedPlan');
         await startWorkflow(
           sessionId,
           DEFAULT_WORKFLOW_ID,
@@ -557,7 +558,7 @@ export function SessionPage({
       }
     } catch (err) {
       setSendError(
-        err instanceof Error ? err.message : "Impossible d’envoyer le message",
+        err instanceof Error ? err.message : t('sessionPageSendMessageError'),
       );
     } finally {
       setPlanBuildInFlight(false);
@@ -576,7 +577,7 @@ export function SessionPage({
       setBacklogSegment(lastTextSegment.id);
       setDetailVersion((version) => version + 1);
     } catch (err) {
-      setSendError(err instanceof Error ? err.message : "Erreur inconnue");
+      setSendError(err instanceof Error ? err.message : t('unknownError'));
     }
   }
 
@@ -588,7 +589,7 @@ export function SessionPage({
       await runPlanBuildAlone();
     } catch (err) {
       setSendError(
-        err instanceof Error ? err.message : "Impossible d’envoyer le message",
+        err instanceof Error ? err.message : t('sessionPageSendMessageError'),
       );
     } finally {
       setPlanBuildInFlight(false);
@@ -632,12 +633,12 @@ export function SessionPage({
                           className="shrink-0 text-xs text-muted"
                           title={isChat ? undefined : detail?.project.workdir}
                         >
-                          {isChat ? "Chat" : projectName}
+                          {isChat ? t('sessionPageChat') : projectName}
                         </span>
                         {detail && (
                           <span
                             className="shrink-0 text-xs text-muted tabular-nums"
-                            title="Date de création de la session"
+                            title={t('sessionPageCreatedTitle')}
                           >
                             {formatDateTime(lang, detail.createdAt)}
                           </span>
@@ -674,13 +675,13 @@ export function SessionPage({
                               disabled={loadingOlder}
                             >
                               {loadingOlder
-                                ? "Chargement…"
-                                : "Charger les messages précédents"}
+                                ? t('loading')
+                                : t('sessionPageLoadOlderMessages')}
                             </Button>
                           )}
                           {view.items.length === 0 && !sessionId && (
                             <div className="py-10 text-center text-sm text-muted">
-                              Nouvelle session · écris ton premier message.
+                              {t('sessionPageNewSessionHint')}
                             </div>
                           )}
                           {view.items.map((item, index) => (
@@ -691,7 +692,7 @@ export function SessionPage({
                               model={
                                 currentModel
                                   ? modelShortName(currentModel.model)
-                                  : "modèle"
+                                  : t('sessionPageModelFallback')
                               }
                               running={running}
                               showHeader={
@@ -790,12 +791,11 @@ export function SessionPage({
                         <div className="min-w-0 grow">
                           <div className="text-sm font-medium text-text">
                             {running
-                              ? "Ce nœud du workflow tourne…"
-                              : "Ce nœud du workflow est terminé."}
+                              ? t('sessionPageWorkflowNodeRunning')
+                              : t('sessionPageWorkflowNodeFinished')}
                           </div>
                           <div className="text-xs text-muted">
-                            Session pilotée par le workflow, en lecture seule :
-                            la suite se passe dans la session parente.
+                            {t('sessionPageWorkflowDrivenSessionHint')}
                           </div>
                         </div>
                         <a
@@ -805,7 +805,7 @@ export function SessionPage({
                             "shrink-0",
                           )}
                         >
-                          ← Retour au workflow
+                          {t('sessionPageBackToWorkflow')}
                         </a>
                       </div>
                     )}
@@ -834,9 +834,9 @@ export function SessionPage({
                         textareaRef={textareaRef}
                         placeholder={
                           workflowSelection.workflowId
-                            ? "Décris la tâche du workflow…"
+                            ? t('sessionPageWorkflowTaskPlaceholder')
                             : view.pendingQuestion && !running
-                              ? "Ta réponse…"
+                              ? t('sessionPageAnswerPlaceholder')
                               : undefined
                         }
                         commands={commands}

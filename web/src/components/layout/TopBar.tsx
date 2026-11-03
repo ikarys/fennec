@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { useT } from '../../i18n';
+import type { MsgKey } from '../../i18n/messages';
 import type { AttentionItem, SessionState } from '../../lib/api';
 import { SessionStateIcon } from '../session/SessionStateIcon';
 import { BellIcon, CloseIcon, FoxIcon, PlusIcon, SearchIcon, SettingsIcon, SplitIcon } from '../Icons';
@@ -68,23 +70,24 @@ function BacklogIcon({ className }: { className?: string }) {
   );
 }
 
-function kindLabel(kind: AttentionItem['kind']): string {
+function kindLabel(kind: AttentionItem['kind'], t: (key: MsgKey, vars?: Record<string, string | number>) => string): string {
   switch (kind) {
     case 'question':
-      return 'Question';
+      return t('questionHeader');
     case 'workflowPause':
-      return 'Workflow';
+      return t('workflowPickerLabel');
     case 'awaitingIntegration':
-      return 'À intégrer';
+      return t('topBarAwaitingIntegration');
     case 'conflict':
-      return 'Conflit';
+      return t('topBarConflict');
     case 'error':
-      return 'Erreur';
+      return t('error');
   }
 }
 
-/** The "N à regarder" bell: what needs the human, from any session, anywhere. */
+/** The attention bell: what needs the human, from any session, anywhere. */
 function AttentionBell({ attention, onOpen }: { attention: AttentionItem[]; onOpen: (id: string) => void }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const count = attention.length;
@@ -111,10 +114,10 @@ function AttentionBell({ attention, onOpen }: { attention: AttentionItem[]; onOp
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        aria-label="À regarder"
+        aria-label={t('topBarAttentionAria')}
         aria-haspopup="true"
         aria-expanded={open}
-        title={count > 0 ? `${count} à regarder` : 'Rien à regarder'}
+        title={count > 0 ? t('topBarAttentionCount', { count }) : t('topBarAttentionNone')}
         className={buttonClass({ variant: 'ghost', size: 'sm' }, count > 0 ? 'text-attention' : undefined)}
       >
         <span className="flex items-center gap-1">
@@ -125,7 +128,7 @@ function AttentionBell({ attention, onOpen }: { attention: AttentionItem[]; onOp
       {open ? (
         <div className="absolute right-0 top-full z-10 mt-1 max-h-[70vh] w-72 overflow-y-auto rounded-md border border-border bg-panel p-1 shadow-lg">
           {count === 0 ? (
-            <div className="px-2 py-1.5 text-xs text-muted">Rien à regarder.</div>
+            <div className="px-2 py-1.5 text-xs text-muted">{t('topBarAttentionEmpty')}</div>
           ) : (
             attention.map((item) => (
               <button
@@ -139,7 +142,7 @@ function AttentionBell({ attention, onOpen }: { attention: AttentionItem[]; onOp
               >
                 <div className="flex items-center gap-1.5">
                   <Badge tone={item.kind === 'error' ? 'err' : 'attention'} dot>
-                    {kindLabel(item.kind)}
+                    {kindLabel(item.kind, t)}
                   </Badge>
                   <span className="min-w-0 flex-1 truncate text-xs font-medium text-text">{item.title}</span>
                 </div>
@@ -173,11 +176,11 @@ import type { PageId } from '../../lib/route';
 export type { PageId };
 
 /** The fixed pages, in the bar's order; `PageIcon` draws each. */
-const PAGES: { page: PageId; title: string }[] = [
-  { page: 'backlog', title: 'Tâches' },
-  { page: 'workflows', title: 'Workflows' },
-  { page: 'insight', title: 'Insight' },
-  { page: 'settings', title: 'Réglages' }
+const PAGES: { page: PageId; title: MsgKey }[] = [
+  { page: 'backlog', title: 'tasks' },
+  { page: 'workflows', title: 'workflows' },
+  { page: 'insight', title: 'insight' },
+  { page: 'settings', title: 'settings' }
 ];
 
 export type TabInfo =
@@ -230,6 +233,7 @@ export function TopBar({
   splitActive,
   onToggleSplit
 }: TopBarProps) {
+  const t = useT();
   const tabRefs = useRef(new Map<string, HTMLDivElement>());
 
   // ARIA tablist navigation: arrows move the selection and the focus.
@@ -246,7 +250,7 @@ export function TopBar({
     <header className="flex min-h-12 shrink-0 items-stretch gap-1 border-b border-border bg-panel px-3">
       <a
         href="#/"
-        aria-label="Accueil fennec"
+        aria-label={t('topBarHomeAria')}
         className="flex items-center gap-2 py-2 pl-1 pr-3 text-base font-semibold tracking-[-0.01em] text-text"
       >
         <FoxIcon className="h-5 w-5 text-accent" />
@@ -259,15 +263,15 @@ export function TopBar({
         <button
           type="button"
           onClick={() => onNewSession(currentProject.id)}
-          aria-label="Nouvelle session"
-          title={`Nouvelle session dans ${currentProject.name}`}
+          aria-label={t('newSession')}
+          title={t('paletteNewSessionIn', { name: currentProject.name })}
           className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true }, 'self-center')}
         >
           <PlusIcon className="h-4 w-4" />
         </button>
       ) : projects.length > 0 ? (
         <div className="self-center">
-          <Menu label="Nouvelle session dans…" icon={<PlusIcon className="h-4 w-4" />}>
+          <Menu label={t('topBarNewSessionMenuLabel')} icon={<PlusIcon className="h-4 w-4" />}>
             {projects.map((project) => (
               <MenuItem key={project.id} onSelect={() => onNewSession(project.id)}>
                 {project.name}
@@ -279,8 +283,8 @@ export function TopBar({
         <button
           type="button"
           onClick={() => onNewSession()}
-          aria-label="Nouvelle session"
-          title="Nouvelle session"
+          aria-label={t('newSession')}
+          title={t('newSession')}
           className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true }, 'self-center')}
         >
           <PlusIcon className="h-4 w-4" />
@@ -289,7 +293,7 @@ export function TopBar({
 
       <div
         role="tablist"
-        aria-label="Onglets ouverts"
+        aria-label={t('topBarTabsAria')}
         onKeyDown={(event) => {
           if (event.key === 'ArrowRight') {
             event.preventDefault();
@@ -313,7 +317,7 @@ export function TopBar({
                 if (node) tabRefs.current.set(tab.id, node);
                 else tabRefs.current.delete(tab.id);
               }}
-              title={tab.kind === 'session' ? `${tab.project} — ${tab.title}` : tab.title}
+              title={tab.kind === 'session' ? t('topBarSessionTabTitle', { project: tab.project, title: tab.title }) : tab.title}
               onClick={() => onPickTab(tab.id)}
               onMouseDown={(event) => {
                 // Middle click (wheel) closes the tab, like a browser tab bar.
@@ -350,7 +354,7 @@ export function TopBar({
                 variant="ghost"
                 size="sm"
                 iconOnly
-                aria-label="Fermer l'onglet"
+                aria-label={t('topBarCloseTabAria')}
                 onClick={(event) => {
                   event.stopPropagation();
                   onCloseTab(tab.id);
@@ -368,11 +372,11 @@ export function TopBar({
         <button
           type="button"
           onClick={onOpenPalette}
-          aria-label="Rechercher"
+          aria-label={t('paletteSearchLabel')}
           className="flex h-8 items-center gap-2 rounded-lg border border-border px-2.5 text-sm text-muted transition-colors hover:border-border-strong hover:text-text"
         >
           <SearchIcon className="h-3.5 w-3.5" />
-          <span className="hidden text-left md:inline">Rechercher…</span>
+          <span className="hidden text-left md:inline">{t('topBarSearchPlaceholder')}</span>
           <kbd className="rounded-md border border-border px-1.5 py-px text-xs text-muted">⌘K</kbd>
         </button>
 
@@ -386,9 +390,9 @@ export function TopBar({
               key={page}
               type="button"
               onClick={() => onOpenPage(page)}
-              aria-label={title}
+              aria-label={t(title)}
               aria-pressed={active}
-              title={title}
+              title={t(title)}
               className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true }, active ? 'text-accent' : undefined)}
             >
               <PageIcon page={page} className="h-4 w-4" />
@@ -399,9 +403,9 @@ export function TopBar({
         <button
           type="button"
           onClick={onToggleSplit}
-          aria-label="Vue scindée"
+          aria-label={t('topBarSplitAria')}
           aria-pressed={splitActive}
-          title="Vue scindée (⌘\)"
+          title={t('topBarSplitTitle')}
           className={buttonClass({ variant: 'ghost', size: 'sm' }, splitActive ? 'text-accent' : undefined)}
         >
           <SplitIcon className="h-4 w-4" />

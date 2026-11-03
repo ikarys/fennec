@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm';
 import { Button, buttonClass } from '../ui/Button';
 import { CloseIcon, RefreshIcon } from '../Icons';
 import { markdownComponents } from '../session/markdownComponents';
+import { useT } from '../../i18n';
 import { previewUrl } from '../../lib/preview';
 import type { PreviewTarget } from './PreviewContext';
 
@@ -16,6 +17,7 @@ interface PreviewPaneProps {
 }
 
 export function PreviewPane({ sessionId, target, onClose }: PreviewPaneProps) {
+  const t = useT();
   const [reloadKey, setReloadKey] = useState(0);
   const [markdown, setMarkdown] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -58,7 +60,7 @@ export function PreviewPane({ sessionId, target, onClose }: PreviewPaneProps) {
       })
       .catch((err: unknown) => {
         if (active) {
-          setError(err instanceof Error ? err.message : 'Erreur de chargement');
+          setError(err instanceof Error ? err.message : t('previewLoadError'));
           setLoading(false);
         }
       });
@@ -74,8 +76,8 @@ export function PreviewPane({ sessionId, target, onClose }: PreviewPaneProps) {
         <Button
           variant="ghost"
           iconOnly
-          title="Recharger"
-          aria-label="Recharger"
+          title={t('previewReload')}
+          aria-label={t('previewReload')}
           onClick={() => setReloadKey((value) => value + 1)}
         >
           <RefreshIcon className="h-4 w-4" />
@@ -86,9 +88,9 @@ export function PreviewPane({ sessionId, target, onClose }: PreviewPaneProps) {
           rel="noreferrer"
           className={buttonClass()}
         >
-          Ouvrir dans un onglet
+          {t('previewOpenTab')}
         </a>
-        <Button variant="ghost" iconOnly title="Fermer" aria-label="Fermer" onClick={onClose}>
+        <Button variant="ghost" iconOnly title={t('close')} aria-label={t('close')} onClick={onClose}>
           <CloseIcon className="h-4 w-4" />
         </Button>
       </header>
@@ -97,13 +99,13 @@ export function PreviewPane({ sessionId, target, onClose }: PreviewPaneProps) {
           key={reloadKey}
           sandbox="allow-scripts"
           src={previewUrl(sessionId, target.path)}
-          title="Aperçu"
+          title={t('preview')}
           className="w-full grow bg-panel"
         />
       ) : (
         <div className="min-h-0 grow overflow-y-auto p-6">
           {loading ? (
-            <div className="text-sm text-muted">Chargement…</div>
+            <div className="text-sm text-muted">{t('loading')}</div>
           ) : error ? (
             <div className="text-sm text-err">{error}</div>
           ) : markdown != null ? (

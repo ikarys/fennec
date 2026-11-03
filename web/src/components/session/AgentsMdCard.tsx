@@ -6,6 +6,7 @@
  */
 import { useState } from 'react';
 
+import { useT } from '../../i18n';
 import { writeAgentsMd } from '../../lib/api';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
@@ -23,6 +24,7 @@ export function AgentsMdCard({
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const t = useT();
 
   if (!sessionId) return null;
 
@@ -30,7 +32,7 @@ export function AgentsMdCard({
     return (
       <Card className="p-4">
         <p className="m-0 text-sm text-muted">
-          AGENTS.md écrit depuis ce brouillon. Relis-le et commite-le.
+          {t('agentsMdWritten')}
         </p>
       </Card>
     );
@@ -45,7 +47,7 @@ export function AgentsMdCard({
       setOpen(false);
       onWritten();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur inconnue');
+      setError(err instanceof Error ? err.message : t('unknownError'));
       setOpen(false);
     } finally {
       setBusy(false);
@@ -55,27 +57,26 @@ export function AgentsMdCard({
   return (
     <Card className="flex flex-col gap-3 p-4">
       <div className="flex flex-col gap-1">
-        <p className="m-0 text-sm font-medium text-text">Écrire le brouillon dans AGENTS.md ?</p>
+        <p className="m-0 text-sm font-medium text-text">{t('agentsMdWriteQuestion')}</p>
         <p className="m-0 text-xs text-muted">
-          Les agents lisent AGENTS.md mais ne peuvent pas l'écrire : c'est toi qui fais entrer ces
-          règles dans le projet. Le fichier est écrit à la racine, sans commit.
+          {t('agentsMdWriteHint')}
         </p>
       </div>
       <div className="flex items-center gap-2">
         <Button variant="primary" size="md" onClick={() => setOpen(true)} disabled={busy}>
-          Écrire AGENTS.md
+          {t('agentsMdWrite')}
         </Button>
       </div>
       {error ? <p className="m-0 text-xs text-err">{error}</p> : null}
       <ConfirmDialog
         open={open}
-        title="Écrire AGENTS.md"
+        title={t('agentsMdWrite')}
         body={
           draft.exists
-            ? "Un AGENTS.md existe déjà : il sera remplacé par le brouillon de l'agent. Relis le brouillon ci-dessus avant."
-            : "AGENTS.md sera créé à la racine du projet avec le brouillon ci-dessus."
+            ? t('agentsMdConfirmBodyExists')
+            : t('agentsMdConfirmBodyCreate')
         }
-        confirmLabel={draft.exists ? 'Remplacer' : 'Écrire'}
+        confirmLabel={draft.exists ? t('agentsMdReplace') : t('writeAction')}
         variant={draft.exists ? 'danger' : undefined}
         onConfirm={confirm}
         onCancel={() => setOpen(false)}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useT } from '../../i18n';
 import { markdownComponents } from '../session/markdownComponents';
 import type { PreviewKind } from '../../lib/preview';
 
@@ -19,6 +20,7 @@ function useSettled(source: string): string {
 }
 
 export function CodeBlockWithPreview({ kind, source }: { kind: PreviewKind; source: string }) {
+  const t = useT();
   // An HTML block is mostly a page to look at; its source stays one click away.
   const [showPreview, setShowPreview] = useState(kind === 'html');
   const settledSource = useSettled(source);
@@ -36,7 +38,7 @@ export function CodeBlockWithPreview({ kind, source }: { kind: PreviewKind; sour
               !showPreview ? 'bg-accent-soft text-accent-strong' : 'text-muted hover:text-text'
             }`}
           >
-            Code
+            {t('previewCode')}
           </button>
           <button
             type="button"
@@ -46,7 +48,7 @@ export function CodeBlockWithPreview({ kind, source }: { kind: PreviewKind; sour
               showPreview ? 'bg-accent-soft text-accent-strong' : 'text-muted hover:text-text'
             }`}
           >
-            Aperçu
+            {t('preview')}
           </button>
         </div>
       </div>
@@ -55,7 +57,7 @@ export function CodeBlockWithPreview({ kind, source }: { kind: PreviewKind; sour
           <iframe
             sandbox="allow-scripts"
             srcDoc={settledSource}
-            title="Aperçu HTML"
+            title={t('previewHtmlTitle')}
             className="block h-[60vh] w-full bg-panel"
           />
         ) : (

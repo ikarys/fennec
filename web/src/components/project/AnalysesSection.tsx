@@ -6,34 +6,32 @@ import { AlertIcon, ExternalIcon, LayersIcon, PlayIcon, WandIcon } from '../Icon
 import { type SessionSummary } from '../../lib/api';
 import { formatDateTime, formatRelative } from '../../lib/format';
 import { QuestionForm } from './QuestionForm';
-import { useLang } from '../../i18n';
+import { useLang, useT } from '../../i18n';
 
 /** What a project page can ask an agent to analyse: each one opens a session on a read-only agent. */
 const ANALYSES = [
   {
     mode: 'analyze',
     prompt: 'Frame this project: read what is there and draft its AGENTS.md. If the workdir is empty, ask me what the project is for and propose its first tasks instead.',
-    title: 'Cadrer le projet',
-    description:
-      "Rédige un brouillon d'AGENTS.md, chaque point sourcé ; sur un dossier vide, te pose les questions et propose les premières tâches.",
-    confirm:
-      "Un agent en lecture seule lit le projet et rédige un brouillon d'AGENTS.md (philosophie, couches, règles), chaque point avec sa source. Si le dossier est vide, il te pose quelques questions (but, périmètre, contraintes), te fait choisir la stack et l'architecture, puis propose les premières tâches, un squelette qui tourne d'abord. Rien n'est écrit sans toi.",
+    title: 'analyzeTitle',
+    description: 'analyzeDescription',
+    confirm: 'analyzeConfirm',
     icon: WandIcon,
   },
   {
     mode: 'audit-architecture',
     prompt: 'Audit the software architecture of this project.',
-    title: "Auditer l'architecture",
-    description: 'Responsabilités, couches, modularité, KISS, SOLID, front ; les constats peuvent devenir des tâches.',
-    confirm: "Un agent en lecture seule lit le projet et rapporte ses constats (responsabilités, couches, modularité, KISS, SOLID, front). Sur un gros projet, l'audit peut consommer beaucoup de tokens. Tu choisiras ensuite les constats à transformer en tâches.",
+    title: 'auditArchTitle',
+    description: 'auditArchDescription',
+    confirm: 'auditArchConfirm',
     icon: LayersIcon,
   },
   {
     mode: 'audit-security',
     prompt: 'Audit the security of this project.',
-    title: 'Auditer la sécurité',
-    description: 'Scanners installés, puis secrets, injections, entrées non bornées, dépendances, CI ; les constats peuvent devenir des tâches.',
-    confirm: "Un agent en lecture seule lance les scanners installés (Paramètres, Sécurité) puis lit le code : secrets, injections, entrées non bornées, fuites de ressources, dépendances, CI. Il n'attaque rien et n'installe rien. Sur un gros projet, l'audit peut consommer beaucoup de tokens. Tu choisiras ensuite les constats à transformer en tâches.",
+    title: 'auditSecurityTitle',
+    description: 'auditSecurityDescription',
+    confirm: 'auditSecurityConfirm',
     icon: AlertIcon,
   },
 ] as const;
@@ -56,14 +54,15 @@ export function AnalysesSection({
   onOpenSession: (sessionId: string) => void;
 }) {
   const lang = useLang();
+  const t = useT();
   const [pending, setPending] = useState<Analysis | null>(null);
 
   return (
     <div className="flex flex-col gap-3">
       <QuestionForm busy={busy} onAsk={(question) => onStart(question, 'ask')} />
       <Section
-        title="Analyses"
-        description="Chaque analyse ouvre une session sur un agent en lecture seule : il ne modifie rien, son rapport est une proposition."
+        title={t('analysesTitle')}
+        description={t('analysesDescription')}
         flush
       >
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -85,8 +84,8 @@ export function AnalysesSection({
                 key={analysis.mode}
                 type="button"
                 disabled={busy && !isRunning}
-                title={`${analysis.title}…`}
-                aria-label={isRunning ? `Ouvrir ${analysis.title}` : analysis.title}
+                title={`${t(analysis.title)}…`}
+                aria-label={isRunning ? t('openAnalysis', { title: t(analysis.title) }) : t(analysis.title)}
                 onClick={() => {
                   if (running) onOpenSession(running.id);
                   else setPending(analysis);
@@ -98,14 +97,14 @@ export function AnalysesSection({
                     <Icon className="h-4 w-4" />
                   </span>
                   {isRunning ? (
-                    <Badge tone="accent" dot pulse title="Analyse en cours">
-                      En cours
+                    <Badge tone="accent" dot pulse title={t('analysisRunning')}>
+                      {t('running')}
                     </Badge>
                   ) : null}
                 </div>
 
-                <p className="text-sm font-semibold text-text group-hover:text-accent-strong">{analysis.title}</p>
-                <p className="text-xs text-muted">{analysis.description}</p>
+                <p className="text-sm font-semibold text-text group-hover:text-accent-strong">{t(analysis.title)}</p>
+                <p className="text-xs text-muted">{t(analysis.description)}</p>
 
                 <div className="mt-auto flex items-center justify-between gap-2 pt-1">
                   {lastFinished ? (
@@ -125,14 +124,14 @@ export function AnalysesSection({
                         }
                       }}
                     >
-                      Dernière : {formatRelative(lang, lastFinished.updatedAt)}
+                      {t('lastLabel', { when: formatRelative(lang, lastFinished.updatedAt) })}
                     </span>
                   ) : (
                     <span aria-hidden="true" />
                   )}
 
                   <span className="flex items-center gap-1 text-xs font-medium text-accent-strong">
-                    {isRunning ? 'Ouvrir' : 'Lancer'}
+                    {isRunning ? t('openAction') : t('launchAction')}
                     {isRunning ? <ExternalIcon className="h-3.5 w-3.5" /> : <PlayIcon className="h-3.5 w-3.5" />}
                   </span>
                 </div>
@@ -144,9 +143,9 @@ export function AnalysesSection({
       </Section>
       <ConfirmDialog
         open={pending !== null}
-        title={pending ? `${pending.title} ?` : ''}
-        body={pending?.confirm ?? ''}
-        confirmLabel="Lancer"
+        title={pending ? `${t(pending.title)} ?` : ''}
+        body={pending ? t(pending.confirm) : ''}
+        confirmLabel={t('launchAction')}
         variant="primary"
         onConfirm={() => {
           if (!pending) return;

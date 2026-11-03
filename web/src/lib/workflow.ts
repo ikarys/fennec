@@ -1,16 +1,18 @@
+import type { MsgKey } from '../i18n/messages';
+
 export type NodeKind = 'start' | 'agent' | 'shell' | 'human' | 'condition' | 'parallel' | 'join' | 'end' | 'criteria';
 
-/** How the editor names each kind, in the palette and the node panel. */
-export const NODE_KIND_LABELS: Record<NodeKind, string> = {
-  start: 'Démarrage',
-  end: 'Fin',
-  agent: 'Agent',
-  shell: 'Shell',
-  human: 'Humain',
-  condition: 'Condition',
-  parallel: 'Parallèle',
-  join: 'Convergence',
-  criteria: 'Critères'
+/** The dictionary key naming each kind in the editor. */
+export const NODE_KIND_LABELS: Record<NodeKind, MsgKey> = {
+  start: 'workflowNodeKindStart',
+  end: 'workflowNodeKindEnd',
+  agent: 'workflowNodeKindAgent',
+  shell: 'workflowNodeKindShell',
+  human: 'workflowNodeKindHuman',
+  condition: 'workflowNodeKindCondition',
+  parallel: 'workflowNodeKindParallel',
+  join: 'workflowNodeKindJoin',
+  criteria: 'workflowNodeKindCriteria'
 };
 
 export type Origin = 'project' | 'global' | 'default';

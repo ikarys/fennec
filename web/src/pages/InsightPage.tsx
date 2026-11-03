@@ -17,14 +17,16 @@ import { ContextComposition } from '../components/session/ContextComposition';
 import { SectionLabel } from '../components/ui/SectionLabel';
 import { Segmented, type Segment } from '../components/ui/Segmented';
 import { Select } from '../components/ui/Field';
+import { useT } from '../i18n';
+import { type MsgKey } from '../i18n/messages';
 
 type Icon = ComponentType<{ className?: string }>;
 
 const PERIOD_SEGMENTS: Segment<InsightPeriod>[] = [
-  { value: '7', label: '7 j' },
-  { value: '30', label: '30 j' },
-  { value: '90', label: '90 j' },
-  { value: 'all', label: 'Tout' }
+  { value: '7', label: 'insightPeriod7' },
+  { value: '30', label: 'insightPeriod30' },
+  { value: '90', label: 'insightPeriod90' },
+  { value: 'all', label: 'insightPeriodAll' }
 ];
 
 /** One tone per KPI tile, keyed on the server's label; the same Tile as the risks tab. */
@@ -62,6 +64,7 @@ function InsightTable({
   rows: InsightRow[];
   onNameClick?: (key: string) => void;
 }) {
+  const t = useT();
   return (
     <Card className="p-4">
       <SectionHeader icon={Icon} title={title} />
@@ -79,14 +82,14 @@ function InsightTable({
           </colgroup>
           <thead>
             <tr>
-              <th className="py-2 pr-3 pl-0 text-left text-xs font-normal text-muted">Nom</th>
-              <th className="px-3 py-2 text-right text-xs font-normal text-muted">Appels</th>
-              <th className="px-3 py-2 text-right text-xs font-normal text-muted">Entrée</th>
-              <th className="px-3 py-2 text-right text-xs font-normal text-muted">Cache</th>
-              <th className="px-3 py-2 text-right text-xs font-normal text-muted">Sortie</th>
-              <th className="px-3 py-2 text-right text-xs font-normal text-muted">Cache perdu</th>
-              <th className="px-3 py-2 text-right text-xs font-normal text-muted" title="Estimation au tarif de référence (Paramètres, Coût)">Coût</th>
-              <th className="py-2 pr-0 pl-3 text-right text-xs font-normal text-muted">Temps</th>
+              <th className="py-2 pr-3 pl-0 text-left text-xs font-normal text-muted">{t('nameLabel')}</th>
+              <th className="px-3 py-2 text-right text-xs font-normal text-muted">{t('callsLabel')}</th>
+              <th className="px-3 py-2 text-right text-xs font-normal text-muted">{t('inputLabel')}</th>
+              <th className="px-3 py-2 text-right text-xs font-normal text-muted">{t('cacheLabel')}</th>
+              <th className="px-3 py-2 text-right text-xs font-normal text-muted">{t('outputLabel')}</th>
+              <th className="px-3 py-2 text-right text-xs font-normal text-muted">{t('insightTableLostCache')}</th>
+              <th className="px-3 py-2 text-right text-xs font-normal text-muted" title={t('insightTableCostTitle')}>{t('insightTableCost')}</th>
+              <th className="py-2 pr-0 pl-3 text-right text-xs font-normal text-muted">{t('insightTableTime')}</th>
             </tr>
           </thead>
           <tbody>
@@ -125,6 +128,7 @@ function InsightTable({
 }
 
 export function InsightPage() {
+  const t = useT();
   const [period, setPeriod] = useState<InsightPeriod>('30');
   const [project, setProject] = useState<string | null>(null);
   const [view, setView] = useState<InsightView | null>(null);
@@ -144,7 +148,7 @@ export function InsightPage() {
       })
       .catch((fetchError) => {
         if (!cancelled) {
-          setError(fetchError instanceof Error ? fetchError.message : 'Impossible de charger l’insight');
+          setError(fetchError instanceof Error ? fetchError.message : t('insightLoadError'));
         }
       });
 
@@ -162,18 +166,18 @@ export function InsightPage() {
               <ActivityIcon className="h-4 w-4" />
             </span>
             <div>
-              <h1 className="text-2xl font-semibold">Insight</h1>
-              <p className="text-xs text-muted">Usage du modèle sur la période</p>
+              <h1 className="text-2xl font-semibold">{t('insight')}</h1>
+              <p className="text-xs text-muted">{t('insightUsageSubtitle')}</p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <Select
-              aria-label="Projet"
+              aria-label={t('homeProject')}
               value={project ?? ''}
               onChange={(event) => setProject(event.target.value === '' ? null : event.target.value)}
             >
-              <option value="">Tous les projets</option>
+              <option value="">{t('insightAllProjects')}</option>
               {(view?.projectOptions ?? []).map((option) => (
                 <option key={option.id} value={option.id}>
                   {option.name}
@@ -182,8 +186,8 @@ export function InsightPage() {
             </Select>
 
             <Segmented
-              label="Période"
-              segments={PERIOD_SEGMENTS}
+              label={t('insightPeriodLabel')}
+              segments={PERIOD_SEGMENTS.map((segment) => ({ ...segment, label: t(segment.label as MsgKey) }))}
               value={period}
               onChange={setPeriod}
             />
@@ -191,7 +195,7 @@ export function InsightPage() {
         </div>
 
         {error ? <p className="text-err">{error}</p> : null}
-        {!view && !error ? <div className="text-muted">Chargement…</div> : null}
+        {!view && !error ? <div className="text-muted">{t('loading')}</div> : null}
 
         {view ? (
           <>
@@ -204,7 +208,7 @@ export function InsightPage() {
             ) : null}
 
             <Card className="p-4">
-              <SectionHeader icon={ActivityIcon} title="Entrée par jour" />
+              <SectionHeader icon={ActivityIcon} title={t('insightDailyInput')} />
 
               {view.days.length > 0 ? (
                 <>
@@ -231,34 +235,34 @@ export function InsightPage() {
                   <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-muted">
                     <span className="flex items-center gap-1.5">
                       <span className="h-2.5 w-2.5 rounded-full bg-accent/35" />
-                      cache
+                      {t('insightLegendCache')}
                     </span>
                     <span className="flex items-center gap-1.5">
                       <span className="h-2.5 w-2.5 rounded-full bg-accent" />
-                      hors cache
+                      {t('insightLegendFresh')}
                     </span>
                     <span className="flex items-center gap-1.5">
                       <span className="h-2.5 w-2.5 rounded-full bg-err" />
-                      cache perdu
+                      {t('insightLegendLostCache')}
                     </span>
                   </div>
                 </>
               ) : (
-                <p className="mt-3 text-muted">Aucun appel sur la période.</p>
+                <p className="mt-3 text-muted">{t('insightNoCalls')}</p>
               )}
             </Card>
 
             {view.consumers ? (
               <Card className="p-4">
-                <ContextComposition composition={view.consumers} title="Ce qui consomme l'entrée" />
+                <ContextComposition composition={view.consumers} title={t('insightConsumersTitle')} />
               </Card>
             ) : null}
 
             {view.projects.length > 0 ? (
-              <InsightTable title="Par projet" icon={ProjectIcon} rows={view.projects} onNameClick={(key) => setProject(key)} />
+              <InsightTable title={t('insightByProject')} icon={ProjectIcon} rows={view.projects} onNameClick={(key) => setProject(key)} />
             ) : null}
 
-            <InsightTable title="Modèles" icon={CpuIcon} rows={view.models} />
+            <InsightTable title={t('settingsTabModels')} icon={CpuIcon} rows={view.models} />
           </>
         ) : null}
       </div>

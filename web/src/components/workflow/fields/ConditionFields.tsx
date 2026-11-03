@@ -1,4 +1,5 @@
 import type { WorkflowNode } from '../../../lib/workflow';
+import { useT } from '../../../i18n';
 import { TemplateChips } from '../TemplateChips';
 import { FieldRow, Select, TextInput } from '../../ui/Field';
 
@@ -9,6 +10,7 @@ interface ConditionFieldsProps {
 }
 
 export function ConditionFields({ node, names, onChange }: ConditionFieldsProps) {
+  const t = useT();
   const insertTemplate = (name: string) => {
     const current = (node.value as string) ?? '';
     onChange('value', current + `{{${name}}}`);
@@ -16,7 +18,7 @@ export function ConditionFields({ node, names, onChange }: ConditionFieldsProps)
 
   return (
     <>
-      <FieldRow label="Valeur">
+      <FieldRow label={t('conditionValueLabel')}>
         <TextInput
           type="text"
           value={(node.value as string) ?? ''}
@@ -25,19 +27,19 @@ export function ConditionFields({ node, names, onChange }: ConditionFieldsProps)
         />
         <TemplateChips names={names} onInsert={insertTemplate} />
       </FieldRow>
-      <FieldRow label="Test">
+      <FieldRow label={t('conditionTestLabel')}>
         <Select
           value={(node.test as string) ?? 'equals'}
           onChange={(event) => onChange('test', event.target.value)}
           className="w-full"
         >
-          <option value="equals">equals</option>
-          <option value="contains">contains</option>
-          <option value="empty">empty</option>
+          <option value="equals">{t('conditionTestEquals')}</option>
+          <option value="contains">{t('conditionTestContains')}</option>
+          <option value="empty">{t('conditionTestEmpty')}</option>
         </Select>
       </FieldRow>
       {(node.test as string) !== 'empty' && (
-        <FieldRow label="Comparer à">
+        <FieldRow label={t('conditionCompareLabel')}>
           <TextInput
             type="text"
             value={(node.against as string) ?? ''}

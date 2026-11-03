@@ -1,5 +1,7 @@
 // Project page risks tab: server-measured risk tiles and zones with a re-measure action.
 import { useEffect, useState } from 'react';
+import { useT } from '../../i18n';
+import type { MsgKey } from '../../i18n/messages';
 import { getProjectRisks, type RiskReport, type RiskSignal, type RiskZone } from '../../lib/api/risks';
 import { Badge, type BadgeTone } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -9,11 +11,13 @@ import { Section } from '../ui/Section';
 import { Tile } from '../ui/Tile';
 import { ActivityIcon, AlertIcon, ChevronRightIcon, RefreshIcon, ReviewIcon, SpinnerIcon, WandIcon } from '../Icons';
 
+type T = (key: MsgKey, vars?: Record<string, string | number>) => string;
+
 // One colour per signal, shared by the tiles, the module columns and the file badges, so a colour reads as a signal everywhere.
-const SIGNAL_META: Record<RiskSignal, { tone: BadgeTone; label: (zone: RiskZone) => string }> = {
-  unreviewed: { tone: 'err', label: () => 'jamais relu' },
-  untested: { tone: 'attention', label: () => 'sans test propre' },
-  churn: { tone: 'info', label: (zone) => `${zone.churn} commits` },
+const SIGNAL_META: Record<RiskSignal, { tone: BadgeTone; label: (zone: RiskZone, t: T) => string }> = {
+  unreviewed: { tone: 'err', label: (_zone, t) => t('signalNeverReviewed') },
+  untested: { tone: 'attention', label: (_zone, t) => t('signalNoTest') },
+  churn: { tone: 'info', label: (zone, t) => t('signalChurn', { count: zone.churn }) },
 };
 
 /** A module's count for one signal, in its fixed column; nothing when zero. */
@@ -41,6 +45,7 @@ export function RiskSection({
   busy: boolean;
   onStart: (prompt: string, mode: string) => void;
 }) {
+  const t = useT();
   const [data, setData] = useState<RiskReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [measuring, setMeasuring] = useState(false);
@@ -80,35 +85,35 @@ export function RiskSection({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Tile
           icon={<ReviewIcon />}
-          label="Jamais relu"
+          label={t('neverReviewed')}
           figure={data ? `${data.unreviewedPercent} %` : '…'}
-          detail={data ? `des lignes · ${data.aiCommits} commits IA déclarés sur ${data.commits}` : '…'}
-          title="Part des lignes (git blame) venant de commits IA jamais intégrés par fennec. Seuls les commits avec un co-auteur IA déclaré comptent : les autres passent pour humains."
+          detail={data ? t('neverReviewedDetail', { ai: data.aiCommits, total: data.commits }) : '…'}
+          title={t('neverReviewedTitle')}
           tone="err"
           active={data ? data.unreviewed > 0 : false}
         />
         <Tile
           icon={<AlertIcon />}
-          label="Sans test propre"
+          label={t('noOwnTest')}
           figure={data ? `${data.untested}` : '…'}
-          detail={data ? `fichiers sur ${data.files}` : '…'}
+          detail={data ? t('riskNoOwnTestFilesOn', { total: data.files }) : '…'}
           tone="attention"
           active={data ? data.untested > 0 : false}
         />
         <Tile
           icon={<ActivityIcon />}
-          label="Souvent modifiés"
+          label={t('oftenModified')}
           figure={data ? `${data.churning}` : '…'}
-          detail={data ? `5 commits ou plus en ${data.churnDays} jours` : '…'}
+          detail={data ? t('oftenModifiedDetail', { days: data.churnDays }) : '…'}
           tone="info"
           active={data ? data.churning > 0 : false}
         />
       </div>
       {error ? <div className="px-4 pb-2 text-err text-xs">{error}</div> : null}
       <Section
-        title="Zones à risque"
+        title={t('riskZones')}
         flush
-        description="Un commit IA non relu porte un co-auteur IA (Co-Authored-By) sans trailer Fennec-Session : l'intégration par fennec est la revue humaine."
+        description={t('riskZonesDescription')}
         actions={
           <>
             <Button
@@ -116,19 +121,19 @@ export function RiskSection({
               size="sm"
               disabled={busy || !data?.remedyPrompt}
               onClick={() => data && setConfirming(data.remedyPrompt)}
-              title="Proposer des tâches pour ces zones"
+              title={t('proposeTasks')}
             >
-              Remédier
+              {t('remedy')}
             </Button>
-            <Badge tone="ok" pill title="Calculé depuis git, sans modèle">
-              vérifié
+            <Badge tone="ok" pill title={t('computedFromGit')}>
+              {t('verified')}
             </Badge>
             <Button
               variant="ghost"
               size="sm"
               iconOnly
-              title="Mesurer à nouveau"
-              aria-label="Mesurer à nouveau"
+              title={t('measureAgain')}
+              aria-label={t('measureAgain')}
               disabled={measuring}
               onClick={refresh}
             >
@@ -142,11 +147,11 @@ export function RiskSection({
             <Card className="overflow-hidden">
               <div className="flex items-center gap-3 border-b border-border bg-raised px-4 py-2 text-xs uppercase tracking-wide text-faint">
                 <span className="w-3.5 shrink-0" />
-                <span className="min-w-0 grow">Module</span>
-                <span className="w-28 shrink-0 text-right">Jamais relu</span>
-                <span className="w-28 shrink-0 text-right">Sans test propre</span>
-                <span className="w-28 shrink-0 text-right">Modifiés</span>
-                <span className="w-20 shrink-0 text-right">Fichiers</span>
+                <span className="min-w-0 grow">{t('moduleCol')}</span>
+                <span className="w-28 shrink-0 text-right">{t('filesNeverReviewed')}</span>
+                <span className="w-28 shrink-0 text-right">{t('filesNoTest')}</span>
+                <span className="w-28 shrink-0 text-right">{t('filesOftenModified')}</span>
+                <span className="w-20 shrink-0 text-right">{t('filesCol')}</span>
                 <span className="w-7 shrink-0" />
               </div>
               {data.modules.map((module, index) => (
@@ -157,9 +162,9 @@ export function RiskSection({
                     <span className="min-w-0 grow truncate font-mono text-xs text-text group-open:text-accent-strong" title={module.path}>
                       {module.path}
                     </span>
-                    <Count value={module.unreviewed} tone={SIGNAL_META.unreviewed.tone} title="Fichiers jamais relus" />
-                    <Count value={module.untested} tone={SIGNAL_META.untested.tone} title="Fichiers sans test propre" />
-                    <Count value={module.churning} tone={SIGNAL_META.churn.tone} title="Fichiers souvent modifiés" />
+                    <Count value={module.unreviewed} tone={SIGNAL_META.unreviewed.tone} title={t('filesNeverReviewed')} />
+                    <Count value={module.untested} tone={SIGNAL_META.untested.tone} title={t('filesNoTest')} />
+                    <Count value={module.churning} tone={SIGNAL_META.churn.tone} title={t('filesOftenModified')} />
                     <span className="w-20 shrink-0 text-right font-mono text-xs text-muted tabular-nums">{module.zones.length}</span>
                     {/* Hidden until hover so the counts stay the row's reading; the summary must not toggle on its click. */}
                     <Button
@@ -167,8 +172,8 @@ export function RiskSection({
                       size="sm"
                       iconOnly
                       className="opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100"
-                      title="Remédier ce module"
-                      aria-label={`Remédier ${module.path}`}
+                      title={t('remedyModule')}
+                      aria-label={t('remedyModuleAria', { path: module.path })}
                       disabled={busy}
                       onClick={(event) => {
                         event.preventDefault();
@@ -189,25 +194,25 @@ export function RiskSection({
                       </span>
                       {zone.signals.map((signal) => (
                         <Badge key={signal} tone={SIGNAL_META[signal].tone} pill>
-                          {SIGNAL_META[signal].label(zone)}
+                          {SIGNAL_META[signal].label(zone, t)}
                         </Badge>
                       ))}
-                      <span className="w-20 shrink-0 text-right font-mono text-xs text-faint tabular-nums">{zone.lines} lignes</span>
+                      <span className="w-20 shrink-0 text-right font-mono text-xs text-faint tabular-nums">{t('linesUnit', { count: zone.lines })}</span>
                     </div>
                   ))}
                 </details>
               ))}
             </Card>
           ) : (
-            <div className="px-4 py-3 text-sm text-muted">Aucune zone à risque.</div>
+            <div className="px-4 py-3 text-sm text-muted">{t('noRiskZones')}</div>
           )
         ) : null}
       </Section>
       <ConfirmDialog
         open={confirming !== null}
-        title="Remédier ?"
-        body="Un agent en lecture seule lit les modules les plus risqués et propose quelques tâches (5 au plus), les plus risqués d'abord ; les fichiers sans logique sont écartés. Tu choisis celles qui entrent au backlog. Relire reste ton travail : il te dit quels fichiers lire d'abord."
-        confirmLabel="Lancer"
+        title={t('remedyQuestion')}
+        body={t('remedyBody')}
+        confirmLabel={t('launch')}
         variant="primary"
         onConfirm={() => {
           if (confirming === null) return;
