@@ -359,7 +359,8 @@ tests.
 
 ```bash
 just                # build the UI and run the release server on :7777
-just check          # the gate before any commit: fmt, clippy -D warnings, tests, UI build
+just check          # the gate before any commit: fmt, clippy -D warnings, tests, UI lint, UI tests, UI build
+just test-web       # the Vitest tests of the UI's pure modules (folds, plan contract)
 just dev            # server + Vite dev server on :5173
 just setup          # once per clone: the git hooks (Conventional Commits, no direct push to main/develop)
 just promote        # open the PR develop → main; release-please then prepares the release
@@ -375,7 +376,8 @@ cargo build
 cargo test
 cargo clippy --all-targets   # must be clean
 cargo fmt --all
-(cd web && npm ci && npm run build)  # before cargo build, to embed the UI
+(cd web && npm ci && npm test)             # the UI's unit tests (Vitest)
+(cd web && npm run build)  # before cargo build, to embed the UI
 target/debug/fennec                  # http://127.0.0.1:7777
 target/debug/fennec run "<prompt>"   # CLI, in the repository to work on
 (cd web && npm run dev)              # UI dev server on :5173, proxies /api to :7777
