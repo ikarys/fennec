@@ -391,57 +391,35 @@ export function RulesSection() {
   );
 }
 
-export function ProjectRulesSummary({ projectId }: { projectId: string }) {
-  const [data, setData] = useState<{ rules: RuleView[]; global: RuleView[] } | null>(null);
-  const [loading, setLoading] = useState(true);
+export function ProjectRulesLine({ projectId }: { projectId: string }) {
+  const [rules, setRules] = useState<RuleView[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
+    setRules(null);
     setError(null);
     getProjectRules(projectId)
       .then((res) => {
-        if (active) setData(res);
+        if (active) setRules(res.rules);
       })
       .catch((err: unknown) => {
         if (active) setError(err instanceof Error ? err.message : String(err));
-      })
-      .finally(() => {
-        if (active) setLoading(false);
       });
     return () => {
       active = false;
     };
   }, [projectId]);
 
+  if (error) return <p className="text-xs text-err">{error}</p>;
+  if (!rules) return null;
+
   return (
-    <>
-      <Section
-        title="Règles du projet"
-        actions={
-          <IconLink
-            href="#/settings/rules"
-            title="Gérer les règles dans les Réglages"
-            label="Gérer les règles dans les Réglages"
-          >
-            <ExternalIcon className="h-4 w-4" />
-          </IconLink>
-        }
-        flush
-      >
-        {loading ? <p className="px-4 py-3 text-xs text-muted">Chargement…</p> : null}
-        {!loading && error ? <p className="px-4 py-3 text-xs text-err">{error}</p> : null}
-        {!loading && !error ? <RuleList rules={data?.rules ?? []} editable={false} deletingId={null} /> : null}
-      </Section>
-      {!loading && !error ? (
-        <>
-          <p className="text-xs text-muted">Les règles globales s'appliquent aussi :</p>
-          <Section title="Règles globales" flush>
-            <RuleList rules={data?.global ?? []} editable={false} deletingId={null} />
-          </Section>
-        </>
-      ) : null}
-    </>
+    <p className="text-xs text-muted">
+      Règles du projet · {rules.length} ·{' '}
+      <a href="#/settings/rules" className="text-accent-strong underline">
+        gérer dans les Réglages
+      </a>
+    </p>
   );
 }

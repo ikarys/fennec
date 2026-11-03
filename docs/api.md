@@ -240,7 +240,7 @@ read-only. The human edits them as usual.
 - `GET /api/backlog` → `{total, projects}`: the cross-project Backlog page, one row per project (the idea lists
   live in each project's Tasks tab):
   - `total` `{yours, running, ready, drafts, done, projects}`: counts across all projects; `ready` sums each
-    project's `queue.ready`, `projects` counts every project
+    project's `queue.ready`, `projects` counts the projects with a row
   - `projects` `[{project, yours, running, ready, drafts, done, queue}]`: the projects with at least one idea or a
     running queue; `project` `{id, name}`, the counts are its board's stages, `queue` `{running, autonomous, next}`
     (`next` `{id, text, title} | null`); a running queue first, then most `yours`, most `ready`, then by name

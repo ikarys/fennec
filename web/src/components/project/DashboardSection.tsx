@@ -15,6 +15,8 @@ import {
 } from '../Icons';
 import { getProjectDashboard, type DashboardIcon, type ProjectDashboard } from '../../lib/api';
 import { formatRelative } from '../../lib/format';
+import { DiskSection } from './DiskSection';
+import { ProjectRulesLine } from '../rules/RulesSection';
 
 const ICONS: Record<DashboardIcon, ReactNode> = {
   sessions: <LayersIcon />,
@@ -89,6 +91,8 @@ export function DashboardSection({
         })}
       </div>
 
+      <ProjectRulesLine projectId={projectId} />
+
       <Section title="Sessions récentes" flush>
         {data.recent.length === 0 ? (
           <div className="px-4 py-3 text-sm text-muted">Aucune session.</div>
@@ -117,6 +121,8 @@ export function DashboardSection({
           ))
         )}
       </Section>
+
+      <DiskSection projectId={projectId} onOpenSession={onOpenSession} />
     </div>
   );
 }

@@ -51,7 +51,7 @@ export function IdeaMeta({
           {formatTokens(idea.tokens)}
         </Stat>
       ) : null}
-      {idea.criteria ? (
+      {idea.criteria && idea.criteria.passed + idea.criteria.failed + idea.criteria.pending > 0 ? (
         <Stat
           icon={<CheckIcon />}
           tone={
