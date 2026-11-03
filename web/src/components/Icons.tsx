@@ -778,7 +778,7 @@ export function ActivityIcon({ className }: IconProps) {
   );
 }
 
-/** Tray: tokens going in, the Insight "Entrée" card. */
+/** Tray: tokens going in, the Insight "Entry" card. */
 export function InboxIcon({ className }: IconProps) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

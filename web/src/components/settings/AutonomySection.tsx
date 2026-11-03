@@ -1,24 +1,23 @@
 import type { AutonomyPrefs } from '../../lib/api';
 import { Section, type SectionSave } from '../ui/Section';
 import { FieldRow, TextInput } from '../ui/Field';
+import { useT } from '../../i18n';
 
 interface AutonomySectionProps {
   value: AutonomyPrefs;
   onChange: (value: AutonomyPrefs) => void;
-  /** The group's own save: its dot and its "Enregistrer". */
+  /** The group's own save: its dot and its "Save". */
   save?: SectionSave;
 }
 
 export function AutonomySection({ value, onChange, save }: AutonomySectionProps) {
+  const t = useT();
   return (
-    <Section title="Mode nuit" save={save}>
-      <p className="text-xs text-muted">
-        Lorsque la file tourne en mode autonome, l'agent n'attend pas ta réponse : il tranche ses questions lui-même et
-        les note comme décisions. Une idée qui dépasse un plafond est arrêtée et la file passe à la suivante.
-      </p>
+    <Section title={t('nightModeTitle')} save={save}>
+      <p className="text-xs text-muted">{t('nightModeHint')}</p>
 
       <div className="grid gap-2 md:grid-cols-2">
-        <FieldRow label="Durée max par idée (minutes)" hint="0 : pas de limite.">
+        <FieldRow label={t('maxMinutesPerIdeaLabel')} hint={t('maxMinutesPerIdeaHint')}>
           <TextInput
             type="number"
             min={0}
@@ -34,7 +33,7 @@ export function AutonomySection({ value, onChange, save }: AutonomySectionProps)
           />
         </FieldRow>
 
-        <FieldRow label="Tokens max par idée" hint="Tokens non cachés + générés. 0 : pas de limite.">
+        <FieldRow label={t('maxTokensPerIdeaLabel')} hint={t('maxTokensPerIdeaHint')}>
           <TextInput
             type="number"
             min={0}

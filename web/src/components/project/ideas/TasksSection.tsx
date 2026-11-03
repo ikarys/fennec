@@ -17,15 +17,17 @@ import {
   type IdeaBoard,
   type IdeaView,
 } from '../../../lib/ideas';
+import type { MsgKey } from '../../../i18n/messages';
+import { useT } from '../../../i18n';
 
 export type TasksSub = 'overview' | 'yours' | 'backlog' | 'ready' | 'done';
 
-const TOP_TABS: readonly { id: TasksSub; label: string }[] = [
-  { id: 'overview', label: 'Vue d’ensemble' },
-  { id: 'yours', label: 'À décider' },
-  { id: 'ready', label: 'Prêtes' },
-  { id: 'backlog', label: 'Brouillons' },
-  { id: 'done', label: 'Terminées' },
+const TOP_TABS: readonly { id: TasksSub; labelKey: MsgKey }[] = [
+  { id: 'overview', labelKey: 'tasksTabOverview' },
+  { id: 'yours', labelKey: 'tasksTabYours' },
+  { id: 'ready', labelKey: 'tasksTabReady' },
+  { id: 'backlog', labelKey: 'tasksTabBacklog' },
+  { id: 'done', labelKey: 'tasksTabDone' },
 ];
 
 function normalizeSub(sub: string | null): TasksSub {
@@ -59,6 +61,7 @@ export function TasksSection({
   const [actionError, setActionError] = useState<string | null>(null);
   // The add dialog stays closed until asked for.
   const [newIdeaOpen, setNewIdeaOpen] = useState(false);
+  const t = useT();
 
   // Every user action goes through this one path so failures are visible.
   const run = useCallback(async (action: () => Promise<IdeaBoard>) => {
@@ -68,7 +71,7 @@ export function TasksSection({
       setActionError(null);
       return true;
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Erreur inconnue');
+      setActionError(err instanceof Error ? err.message : t('unknownError'));
       return false;
     }
   }, []);
@@ -99,7 +102,7 @@ export function TasksSection({
         }
       })
       .catch((err: unknown) => {
-        if (!cancelled) setLoadError(err instanceof Error ? err.message : 'Erreur inconnue');
+        if (!cancelled) setLoadError(err instanceof Error ? err.message : t('unknownError'));
       });
 
     return () => {
@@ -129,7 +132,7 @@ export function TasksSection({
     return loadError ? (
       <p className="text-xs text-err">{loadError}</p>
     ) : (
-      <p className="text-muted">Chargement…</p>
+      <p className="text-muted">{t('loading')}</p>
     );
   }
 
@@ -144,19 +147,19 @@ export function TasksSection({
   return (
     <section className="flex flex-col gap-4">
       <Tabs
-        label="Sections des tâches"
+        label={t('tasksSectionsLabel')}
         orientation="horizontal"
-        tabs={TOP_TABS.map((t) => ({
-          id: t.id,
-          label: t.label,
+        tabs={TOP_TABS.map((tab) => ({
+          id: tab.id,
+          label: t(tab.labelKey),
           count:
-            t.id === 'yours'
+            tab.id === 'yours'
               ? yours.length
-              : t.id === 'ready'
+              : tab.id === 'ready'
                 ? queue.length
-                : t.id === 'backlog'
+                : tab.id === 'backlog'
                   ? drafts.length
-                  : t.id === 'done'
+                  : tab.id === 'done'
                     ? done.length
                     : undefined,
         }))}
@@ -173,8 +176,8 @@ export function TasksSection({
             variant="ghost"
             size="sm"
             iconOnly
-            title="Fermer"
-            aria-label="Fermer"
+            title={t('close')}
+            aria-label={t('close')}
             onClick={() => setActionError(null)}
           >
             <CloseIcon className="h-4 w-4" />
@@ -207,7 +210,7 @@ export function TasksSection({
             showLabel={false}
           />
         ) : (
-          <p className="text-sm text-muted">Rien ne t’attend.</p>
+          <p className="text-sm text-muted">{t('nothingToDecide')}</p>
         )
       ) : null}
 
@@ -220,20 +223,20 @@ export function TasksSection({
               <Button
                 variant="secondary"
                 size="sm"
-                title="Ajouter une idée au backlog"
+                title={t('addIdeaToBacklog')}
                 onClick={() => setNewIdeaOpen(true)}
               >
                 <PlusIcon className="h-4 w-4" />
-                Nouvelle idée
+                {t('newIdea')}
               </Button>
             </div>
           </div>
 
           {activeSub === 'backlog' && drafts.length === 0 ? (
-            <p className="m-0 text-sm text-muted">Aucune idée en attente de cadrage.</p>
+            <p className="m-0 text-sm text-muted">{t('noDraftsPending')}</p>
           ) : null}
           {activeSub === 'ready' && queue.length === 0 ? (
-            <p className="m-0 text-sm text-muted">Aucune idée cadrée dans la file.</p>
+            <p className="m-0 text-sm text-muted">{t('noQueuedFramed')}</p>
           ) : null}
 
           {activeSub === 'backlog' ? (
@@ -277,7 +280,7 @@ export function TasksSection({
             showLabel={false}
           />
         ) : (
-          <p className="m-0 text-sm text-muted">Aucune tâche terminée.</p>
+          <p className="m-0 text-sm text-muted">{t('noDoneTasks')}</p>
         )
       ) : null}
 

@@ -11,13 +11,15 @@ import {
   type IdeaView,
   type Stage,
 } from "../../../lib/ideas";
+import type { MsgKey } from "../../../i18n/messages";
+import { useT } from "../../../i18n";
 
-const STAGE_LABELS: Record<Stage, string> = {
-  yours: "À décider",
-  running: "En cours",
-  queue: "File",
-  drafts: "Idées",
-  done: "Terminées",
+const STAGE_LABELS: Record<Stage, MsgKey> = {
+  yours: "stageYours",
+  running: "stageRunning",
+  queue: "stageQueue",
+  drafts: "stageDrafts",
+  done: "stageDone",
 };
 
 /** The highlighted stages' card already frames them; the other lists get one. */
@@ -62,6 +64,7 @@ export function StageGroup({
 }) {
   const [dragFrom, setDragFrom] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
+  const t = useT();
 
   const move = async (from: number, to: number) => {
     if (
@@ -85,13 +88,11 @@ export function StageGroup({
   const content = (
     <>
       {showLabel ? (
-        <SectionLabel as="h2">{STAGE_LABELS[stage]}</SectionLabel>
+        <SectionLabel as="h2">{t(STAGE_LABELS[stage])}</SectionLabel>
       ) : null}
       <ListFrame highlighted={highlighted} spaced={showLabel}>
         {stage === "queue" && ideas.length === 0 ? (
-          <p className="m-0 px-3 py-2 text-sm text-muted">
-            Aucune tâche prête : cadre une idée du backlog.
-          </p>
+          <p className="m-0 px-3 py-2 text-sm text-muted">{t('noReadyTasks')}</p>
         ) : null}
         {ideas.map((idea, index) => {
           const reorder =

@@ -8,16 +8,11 @@ import { CheckIcon, ChevronDownIcon, ChevronRightIcon, MoonIcon, ReviewIcon } fr
 import { Card } from '../../ui/Card';
 import { formatRelative } from '../../../lib/format';
 import { IdeaStatusBadge } from './IdeaStatusBadge';
-import { useLang } from '../../../i18n';
 import { IdeaMeta } from './IdeaMeta';
 import type { IdeaBoard } from '../../../lib/ideas';
+import { useT, useLang } from '../../../i18n';
 
 type Report = NonNullable<IdeaBoard['nightReport']>;
-
-// French summary labels keep the singular for 1 and the plural for 2+.
-function frCount(n: number, word: string): string {
-  return `${n} ${n === 1 ? word : `${word}s`}`;
-}
 
 export function NightReport({
   report,
@@ -32,23 +27,48 @@ export function NightReport({
 }) {
   // Open by default: the report is what the human reads first after a run.
   const [open, setOpen] = useState(true);
+  const t = useT();
   const lang = useLang();
 
   const badges: { label: string; tone: 'accent' | 'ok' | 'err' }[] = [];
   if (report.summary.review > 0)
-    badges.push({ label: `${report.summary.review} à relire`, tone: 'accent' });
+    badges.push({ label: t('attentionToReview', { count: report.summary.review }), tone: 'accent' });
   if (report.summary.question > 0)
-    badges.push({ label: frCount(report.summary.question, 'question'), tone: 'accent' });
+    badges.push({
+      label: t('attentionQuestions', {
+        count: report.summary.question,
+        s: report.summary.question > 1 ? 's' : ''
+      }),
+      tone: 'accent'
+    });
   if (report.summary.halted > 0)
-    badges.push({ label: frCount(report.summary.halted, 'arrêtée'), tone: 'err' });
+    badges.push({
+      label: t('attentionHalted', {
+        count: report.summary.halted,
+        s: report.summary.halted > 1 ? 's' : ''
+      }),
+      tone: 'err'
+    });
   if (report.summary.failed > 0)
-    badges.push({ label: frCount(report.summary.failed, 'échouée'), tone: 'err' });
+    badges.push({
+      label: t('reportFailed', {
+        count: report.summary.failed,
+        s: report.summary.failed > 1 ? 's' : ''
+      }),
+      tone: 'err'
+    });
   if (report.summary.integrated > 0)
-    badges.push({ label: frCount(report.summary.integrated, 'intégrée'), tone: 'ok' });
+    badges.push({
+      label: t('integratedCount', {
+        count: report.summary.integrated,
+        s: report.summary.integrated > 1 ? 's' : ''
+      }),
+      tone: 'ok'
+    });
   if (report.summary.running > 0)
-    badges.push({ label: `${report.summary.running} en cours`, tone: 'accent' });
+    badges.push({ label: t('reportRunning', { count: report.summary.running }), tone: 'accent' });
 
-  const toggleLabel = open ? 'Masquer les idées' : 'Voir les idées';
+  const toggleLabel = open ? t('hideIdeas') : t('showIdeas');
 
   return (
     <Card className="flex flex-col px-4 py-2.5">
@@ -66,7 +86,7 @@ export function NightReport({
         </Button>
         {report.autonomous ? <MoonIcon className="h-4 w-4 text-muted" /> : null}
         <h3 className="m-0 text-sm font-medium">
-          {report.autonomous ? 'Rapport de la nuit' : 'Rapport de la dernière file'}
+          {report.autonomous ? t('nightReportTitle') : t('queueReportTitle')}
         </h3>
         <span className="text-xs text-muted" title={report.reason}>
           {formatRelative(lang, report.finishedAt)}
@@ -85,8 +105,8 @@ export function NightReport({
           variant="ghost"
           size="sm"
           iconOnly
-          title="Marquer comme lu"
-          aria-label="Marquer comme lu"
+          title={t('markRead')}
+          aria-label={t('markRead')}
           onClick={() => void onDismiss()}
         >
           <CheckIcon className="h-4 w-4" />
@@ -118,8 +138,8 @@ export function NightReport({
                     variant="ghost"
                     size="sm"
                     iconOnly
-                    title="Relire"
-                    aria-label="Relire"
+                    title={t('reread')}
+                    aria-label={t('reread')}
                     onClick={() => onOpenSession(sid)}
                   >
                     <ReviewIcon className="h-4 w-4" />
