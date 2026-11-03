@@ -111,32 +111,8 @@ export interface PendingQuestion {
   }[];
 }
 
-export type Provenance =
-  | { kind: 'verified'; command: string; exitCode?: number; output: string }
-  | { kind: 'indicative'; agent: string; reason: string };
-
-export interface CriterionView {
-  id: string;
-  description: string;
-  check?: string;
-  status: 'pending' | 'passed' | 'failed';
-  provenance?: Provenance;
-  /** Its check passed before any change (last preflight, verified). */
-  passedBefore?: boolean;
-}
-
-export interface DecisionView {
-  callId: string;
-  title: string;
-  choice: string;
-  reason: string;
-  alternatives: string[];
-}
-
 export interface ThreadView {
   items: ThreadItem[];
-  criteria: CriterionView[];
-  decisions: DecisionView[];
   running: boolean;
   /** Reason of the last `chat.done`: the session state once a turn ends. */
   lastDone?: string;
@@ -178,52 +154,6 @@ function parseArgs(value: unknown): Record<string, unknown> {
 function parseExitCode(output: string): number | undefined {
   const match = output.match(/\[Exit code: (\d+)\]/);
   return match ? Number(match[1]) : undefined;
-}
-
-function parseProvenance(value: unknown): Provenance | undefined {
-  if (typeof value !== 'object' || value === null) return undefined;
-  const provenance = value as Record<string, unknown>;
-  if (provenance.kind === 'verified') {
-    const command = typeof provenance.command === 'string' ? provenance.command : undefined;
-    const output = typeof provenance.output === 'string' ? provenance.output : undefined;
-    if (command === undefined || output === undefined) return undefined;
-    return {
-      kind: 'verified',
-      command,
-      exitCode: typeof provenance.exitCode === 'number' ? provenance.exitCode : undefined,
-      output
-    };
-  }
-  if (provenance.kind === 'indicative') {
-    const agent = typeof provenance.agent === 'string' ? provenance.agent : undefined;
-    const reason = typeof provenance.reason === 'string' ? provenance.reason : undefined;
-    if (agent === undefined || reason === undefined) return undefined;
-    return { kind: 'indicative', agent, reason };
-  }
-  return undefined;
-}
-
-function parseCriterionStatus(value: unknown): CriterionView['status'] | undefined {
-  if (typeof value !== 'object' || value === null) return undefined;
-  const status = value as Record<string, unknown>;
-  if (status.type === 'pending') return 'pending';
-  if (status.type === 'passed' || status.type === 'failed') return status.type;
-  return undefined;
-}
-
-function parseCriteria(value: unknown): CriterionView[] | null {
-  if (!Array.isArray(value)) return null;
-  let criteria: CriterionView[] = [];
-  for (const raw of value) {
-    if (typeof raw !== 'object' || raw === null) continue;
-    const criterion = raw as Record<string, unknown>;
-    const id = typeof criterion.id === 'string' ? criterion.id : undefined;
-    const description = typeof criterion.description === 'string' ? criterion.description : undefined;
-    if (id === undefined || description === undefined) continue;
-    const check = typeof criterion.check === 'string' ? criterion.check : undefined;
-    criteria.push({ id, description, check, status: 'pending' });
-  }
-  return criteria;
 }
 
 function isFiniteNumber(value: unknown): value is number {
@@ -327,9 +257,6 @@ export function createThreadFold(): ThreadFold {
   // Tokens generated since the last `chat.done`, for the turn recap.
   // Null means "no live change yet": the session detail owns the mode.
   let mode: string | null = null;
-  let criteria: CriterionView[] = [];
-  let passedBefore = new Set<string>();
-  const decisions: DecisionView[] = [];
   let name: string | undefined;
   const runFold = createRunFold();
   type WorkflowNodeItem = Extract<ThreadItem, { kind: 'workflow-node' }>;
@@ -583,15 +510,6 @@ export function createThreadFold(): ThreadFold {
         break;
       }
 
-      case 'criteria.set': {
-        const parsed = parseCriteria(data.criteria);
-        if (parsed) {
-          criteria = parsed;
-          for (const criterion of criteria) criterion.passedBefore = passedBefore.has(criterion.id) || undefined;
-        }
-        break;
-      }
-
       case 'criteria.preflight': {
         const assistant = assistants.get(String(data.messageId ?? ''));
         if (!assistant) break;
@@ -613,38 +531,7 @@ export function createThreadFold(): ThreadFold {
             output: typeof result.output === 'string' ? result.output : ''
           });
         }
-        passedBefore = new Set(results.filter((result) => result.verdict === 'passesAlready').map((result) => result.criterionId));
-        for (const criterion of criteria) criterion.passedBefore = passedBefore.has(criterion.id) || undefined;
         assistant.preflight = results;
-        break;
-      }
-
-      case 'decision.recorded': {
-        const text = (value: unknown) => (typeof value === 'string' ? value : '');
-        const title = text(data.title);
-        if (!title) break;
-        decisions.push({
-          callId: text(data.callId),
-          title,
-          choice: text(data.choice),
-          reason: text(data.reason),
-          alternatives: Array.isArray(data.alternatives) ? data.alternatives.filter((a: unknown) => typeof a === 'string') : []
-        });
-        break;
-      }
-
-      case 'criterion.updated': {
-        const criterionId = String(data.criterionId ?? '');
-        const status = parseCriterionStatus(data.status);
-        if (!criterionId || !status) break;
-        const criterion = criteria.find((item) => item.id === criterionId);
-        if (!criterion) break;
-        criterion.status = status;
-        if (status === 'pending') {
-          criterion.provenance = undefined;
-        } else {
-          criterion.provenance = parseProvenance(data.status?.provenance);
-        }
         break;
       }
 
@@ -823,8 +710,6 @@ export function createThreadFold(): ThreadFold {
 
   const view = (): ThreadView => ({
     items: [...items],
-    criteria: [...criteria],
-    decisions: [...decisions],
     running,
     lastDone,
     pendingQuestion,
