@@ -40,11 +40,12 @@ export function Segmented<T extends string | number>({
             aria-pressed={selected}
             disabled={disabled}
             onClick={() => onChange(segment.value)}
-            className={`flex h-7 items-center gap-1.5 px-3 text-xs transition-colors disabled:opacity-60 ${
+            className={`flex h-7 min-w-0 items-center gap-1.5 px-3 text-xs transition-colors disabled:opacity-60 ${
               selected ? 'bg-accent font-medium text-on-accent' : 'text-muted hover:bg-raised hover:text-text'
             }`}
           >
-            {segment.label}
+            {/* Long labels (user-set panel page names) truncate instead of clipping the segment. */}
+            <span className="min-w-0 truncate">{segment.label}</span>
           </button>
         );
       })}

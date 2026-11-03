@@ -69,7 +69,7 @@ export function ServersSection({ sessionId }: ServersSectionProps) {
           <div className="text-xs text-muted">Aucun serveur configuré.</div>
         )}
         {servers?.map((server) => (
-          <div key={server.name} className="flex items-center gap-2 py-1">
+          <div key={server.name} className="flex items-center gap-2 rounded-md px-1 py-1 hover:bg-accent-soft">
             <Badge tone={server.running ? 'ok' : 'neutral'} dot pulse={server.running}>
               {server.running ? 'en cours' : 'arrêt'}
             </Badge>
@@ -107,7 +107,7 @@ export function ServersSection({ sessionId }: ServersSectionProps) {
             </Button>
           </div>
         ))}
-        <Button variant="secondary" size="sm" onClick={() => setEditorOpen(true)}>
+        <Button variant="soft" size="sm" onClick={() => setEditorOpen(true)}>
           <SettingsIcon className="h-3.5 w-3.5" />
           Configurer
         </Button>

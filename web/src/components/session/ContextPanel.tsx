@@ -4,10 +4,12 @@ import { useEffect, useState, type KeyboardEvent, type PointerEvent, type ReactN
 import { useDisplayPrefs } from '../../lib/display';
 import { pageBlocks, panelBlock, panelPages, type PanelBlockId } from '../../lib/panelBlocks';
 import { Button } from '../ui/Button';
-import { Select } from '../ui/Field';
+import { ChoiceMenu } from '../ui/ChoiceMenu';
+import { Segmented } from '../ui/Segmented';
 import {
   BranchIcon,
   CheckIcon,
+  ChevronDownIcon,
   ChevronsLeftIcon,
   ChevronsRightIcon,
   CloseIcon,
@@ -54,6 +56,14 @@ function railCount(id: PanelBlockId, view: ThreadView, vision: SeenImage[]): num
     default:
       return null;
   }
+}
+
+/** The rail's count badge is tinted only when it signals a state worth seeing. */
+function railCountClass(id: PanelBlockId, view: ThreadView): string {
+  if (id === 'criteria' && view.criteria.some((criterion) => criterion.status === 'failed')) {
+    return 'text-err';
+  }
+  return 'text-muted';
 }
 
 function clampWidth(width: number): number {
@@ -174,6 +184,47 @@ export function ContextPanel({ view, skills, usage, request, hasSession, worktre
     }
   };
 
+  function selectPage(name: string) {
+    setSelectedPageName(name);
+    savePageName(name);
+  }
+
+  /**
+   * The panel's page, themed like the composer's agent pick: a segmented
+   * control up to three pages, a menu beyond (docs/ui.md: no native select).
+   */
+  function renderPageSwitch() {
+    if (pages.length > 3) {
+      return (
+        <ChoiceMenu
+          label="Page du panneau"
+          groups={[{ choices: pages.map((candidate) => ({ value: candidate.name, label: candidate.name })) }]}
+          value={page.name}
+          onChange={selectPage}
+          direction="down"
+          className="w-full"
+          trigger={
+            // The trigger fills the panel width so a long page name truncates instead of overflowing.
+            <span className="flex w-full items-center justify-between gap-1.5">
+              <span className="min-w-0 truncate" title={page.name}>
+                {page.name}
+              </span>
+              <ChevronDownIcon className="h-3.5 w-3.5 shrink-0" />
+            </span>
+          }
+        />
+      );
+    }
+    return (
+      <Segmented
+        label="Page du panneau"
+        value={page.name}
+        onChange={selectPage}
+        segments={pages.map((candidate) => ({ value: candidate.name, label: candidate.name, title: candidate.name }))}
+      />
+    );
+  }
+
   function renderBlock(id: PanelBlockId) {
     switch (id) {
       case 'request':
@@ -214,7 +265,7 @@ export function ContextPanel({ view, skills, usage, request, hasSession, worktre
       >
         {openBlock ? (
           <div
-            className="absolute inset-y-0 right-full z-20 flex w-[300px] flex-col border-l border-border bg-bg shadow-xl"
+            className="absolute inset-y-0 right-full z-20 flex w-[300px] flex-col border border-border bg-bg shadow-xl"
             role="dialog"
             aria-label={panelBlock(openBlock).title}
           >
@@ -268,7 +319,7 @@ export function ContextPanel({ view, skills, usage, request, hasSession, worktre
             >
               {block.icon}
               {count ? (
-                <span className="absolute -top-1 -right-1 rounded-full border border-border bg-raised px-1 font-mono text-[9px] leading-3 text-muted tabular-nums">
+                <span className={`absolute -top-1 -right-1 rounded-full border border-border bg-raised px-1 font-mono text-[9px] leading-3 tabular-nums ${railCountClass(block.id, view)}`}>
                   {count}
                 </span>
               ) : null}
@@ -321,27 +372,10 @@ export function ContextPanel({ view, skills, usage, request, hasSession, worktre
             <ChevronsRightIcon className="h-3.5 w-3.5" />
           </Button>
         </div>
+        {pages.length > 1 && (
+          <div className="px-2 pb-2">{renderPageSwitch()}</div>
+        )}
         <div className="min-h-0 grow overflow-y-auto [scrollbar-width:thin]">
-          {pages.length > 1 && (
-            <label className="flex items-center gap-2 px-3 py-2 text-xs text-muted">Vue
-              <Select
-                aria-label="Page du panneau"
-                value={page.name}
-                onChange={(event) => {
-                  const name = event.target.value;
-                  setSelectedPageName(name);
-                  savePageName(name);
-                }}
-                className="min-w-0 grow"
-              >
-                {pages.map((candidate) => (
-                  <option key={candidate.name} value={candidate.name}>
-                    {candidate.name}
-                  </option>
-                ))}
-              </Select>
-            </label>
-          )}
           {hasSession ? pageBlocks(page, page === pages[0]).map(renderBlock) : <p className="m-0 px-3 py-2 text-xs text-muted">Le contexte apparaît avec le premier message.</p>}
         </div>
       </aside>
