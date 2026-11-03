@@ -6,7 +6,13 @@ import type { ReactNode } from 'react';
 import type { BadgeTone } from './Badge';
 
 const SHELL =
-  'group relative flex flex-col gap-3 overflow-hidden rounded-md border px-4 py-3.5 text-left transition-colors';
+  'group relative flex flex-col overflow-hidden rounded-md border text-left transition-colors';
+
+// Sizes: md is the dashboard figure, sm the in-thread figure (a run's end card).
+const SIZES = {
+  md: { shell: 'gap-3 px-4 py-3.5', icon: 'h-8 w-8 [&>svg]:h-4 [&>svg]:w-4', figure: 'text-3xl', label: 'text-sm' },
+  sm: { shell: 'gap-2 px-3 py-2.5', icon: 'h-6 w-6 [&>svg]:h-3.5 [&>svg]:w-3.5', figure: 'text-lg', label: 'text-xs' },
+} as const;
 
 const INTERACTIVE =
   'cursor-pointer hover:border-border-strong focus-visible:outline-2 focus-visible:outline-accent';
@@ -64,6 +70,7 @@ export function Tile({
   tone = 'neutral',
   active = false,
   pulse = false,
+  size = 'md',
   title,
   onClick
 }: {
@@ -74,14 +81,16 @@ export function Tile({
   tone?: BadgeTone;
   active?: boolean;
   pulse?: boolean;
+  size?: keyof typeof SIZES;
   title?: string;
   onClick?: () => void;
 }) {
+  const s = SIZES[size];
   const stateClass = active
     ? `${ACTIVE_BORDERS[tone]} ${ACTIVE_WASHES[tone]}`
     : 'border-border bg-panel';
 
-  const className = `${SHELL} ${stateClass}${onClick ? ` ${INTERACTIVE}` : ''}`;
+  const className = `${SHELL} ${s.shell} ${stateClass}${onClick ? ` ${INTERACTIVE}` : ''}`;
 
   const content = (
     <>
@@ -91,17 +100,17 @@ export function Tile({
 
       <div className="flex items-center gap-2.5">
         <span
-          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md [&>svg]:h-4 [&>svg]:w-4 ${ICON_TONES[tone]}`}
+          className={`flex shrink-0 items-center justify-center rounded-md ${s.icon} ${ICON_TONES[tone]}`}
         >
           {icon}
         </span>
-        <span className="text-sm font-medium text-text">{label}</span>
+        <span className={`${s.label} font-medium text-text`}>{label}</span>
         {pulse ? <span className="ml-auto h-2 w-2 rounded-full animate-pulse bg-accent" /> : null}
       </div>
 
       <div className="flex flex-col gap-1.5">
         <span
-          className={`text-3xl font-semibold leading-none tabular-nums ${
+          className={`font-semibold leading-none tabular-nums ${s.figure} ${
             active ? ACTIVE_FIGURES[tone] : 'text-text'
           }`}
         >
