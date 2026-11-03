@@ -2,7 +2,7 @@ import type { SessionSkills } from '../../lib/api';
 import { panelBlock } from '../../lib/panelBlocks';
 import { WandIcon } from '../Icons';
 import { Panel } from '../ui/Panel';
-import { useLang, useT } from '../../i18n';
+import { useT } from '../../i18n';
 
 interface SkillsSectionProps {
   skills: SessionSkills | null;
@@ -11,7 +11,6 @@ interface SkillsSectionProps {
 
 export function SkillsSection({ skills, hasSession }: SkillsSectionProps) {
   const t = useT();
-  const lang = useLang();
   const loadedCount = skills === null ? 0 : new Set([...skills.loaded, ...skills.alwaysOn]).size;
   const activeCount = skills === null ? 0 : new Set([...skills.active, ...skills.alwaysOn]).size;
   const alwaysOnOnly = skills ? skills.alwaysOn.filter((id) => !skills.loaded.includes(id)) : [];
@@ -19,7 +18,7 @@ export function SkillsSection({ skills, hasSession }: SkillsSectionProps) {
   return (
     <Panel
       id="skills"
-      title={t(lang, panelBlock('skills').titleKey)}
+      title={t(panelBlock('skills').titleKey)}
       icon={<WandIcon className="h-3.5 w-3.5" />}
       summary={skills !== null && loadedCount > 0 ? `${activeCount}/${loadedCount}` : undefined}
     >

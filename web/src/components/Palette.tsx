@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Project, SessionState } from '../lib/api';
 import { stateLabel } from '../lib/format';
 import { SessionStateIcon } from './session/SessionStateIcon';
+import { useLang } from '../i18n';
 import { SearchIcon } from './Icons';
 import { SectionLabel } from './ui/SectionLabel';
 import type { PageId } from './layout/TopBar';
@@ -33,6 +34,7 @@ interface PaletteProps {
 }
 
 export function Palette({ open, projects, onClose, onOpenSession, onNewSession, onOpenProjectDialog, onHome, onOpenPage, onOpenProject }: PaletteProps) {
+  const lang = useLang();
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
 
@@ -50,7 +52,7 @@ export function Palette({ open, projects, onClose, onOpenSession, onNewSession, 
     const sessionItem = (session: (typeof allSessions)[number]): PaletteItem => ({
       id: `session-${session.id}`,
       title: session.title,
-      meta: `${session.project} · ${stateLabel(session.state)}`,
+      meta: `${session.project} · ${stateLabel(lang, session.state)}`,
       state: session.state,
       action: () => onOpenSession(session.id)
     });
@@ -128,7 +130,7 @@ export function Palette({ open, projects, onClose, onOpenSession, onNewSession, 
     }
 
     return result;
-  }, [query, projects, onOpenSession, onNewSession, onOpenProjectDialog, onOpenPage, onOpenProject]);
+  }, [query, projects, lang, onOpenSession, onNewSession, onOpenProjectDialog, onOpenPage, onOpenProject]);
 
   const flatItems = useMemo(() => groups.flatMap((group) => group.items), [groups]);
 

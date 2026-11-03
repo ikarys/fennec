@@ -3,6 +3,7 @@ import type { Project, SessionSummary } from '../lib/api';
 import { DeleteSessionsDialog, type DeletionTarget } from '../components/session/DeleteSessionsDialog';
 import { formatRelative, formatDateTime } from '../lib/format';
 import { SessionStateIcon } from '../components/session/SessionStateIcon';
+import { useLang } from '../i18n';
 import { BulbIcon, ChevronRightIcon, GlobeIcon, PlusIcon, SearchIcon, TrashIcon } from '../components/Icons';
 import { Button, buttonClass } from '../components/ui/Button';
 import { WorktreeAlert } from '../components/project/WorktreeAlert';
@@ -34,6 +35,7 @@ function SessionRow({
   onDelete: (id: string) => void;
   onOpenSession: (id: string) => void;
 }) {
+  const lang = useLang();
   const running = session.state === 'running';
   // The checkbox stays hidden until the row is hovered/focused or a selection exists.
   const hidden = selecting || selected ? '' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100';
@@ -57,8 +59,8 @@ function SessionRow({
         <SessionStateIcon state={session.state} />
         <span className="min-w-0 grow truncate text-sm text-text">{session.title}</span>
         {session.awaitingIntegration && <Badge tone="accent" solid>à intégrer</Badge>}
-        <span title={formatDateTime(session.createdAt)} className="w-24 shrink-0 whitespace-nowrap text-right font-mono text-xs text-faint tabular-nums">
-          {formatRelative(session.updatedAt)}
+        <span title={formatDateTime(lang, session.createdAt)} className="w-24 shrink-0 whitespace-nowrap text-right font-mono text-xs text-faint tabular-nums">
+          {formatRelative(lang, session.updatedAt)}
         </span>
       </button>
       {!running && (

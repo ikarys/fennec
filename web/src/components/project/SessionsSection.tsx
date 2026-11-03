@@ -6,6 +6,7 @@ import { EyeIcon, TrashIcon } from '../Icons';
 import { SessionStateIcon } from '../session/SessionStateIcon';
 import { formatRelative, formatDateTime, stateLabel } from '../../lib/format';
 import { Badge } from '../ui/Badge';
+import { useLang } from '../../i18n';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Section } from '../ui/Section';
@@ -21,6 +22,7 @@ export function SessionsSection({
   onOpenSession: (id: string) => void;
   onSessionsDeleted: (ids: string[]) => void;
 }) {
+  const lang = useLang();
   const [pendingDelete, setPendingDelete] = useState<SessionSummary[] | null>(null);
   // Selection mode: a row click toggles it instead of opening the session.
   const [selecting, setSelecting] = useState(false);
@@ -130,15 +132,15 @@ export function SessionsSection({
                     <span className="flex w-32 shrink-0 flex-col gap-1">
                       <span className="flex items-center gap-1.5 text-xs text-muted">
                         <SessionStateIcon state={s.state} />
-                        {stateLabel(s.state)}
+                        {stateLabel(lang, s.state)}
                       </span>
                       {s.awaitingIntegration ? <Badge tone="accent" solid>à intégrer</Badge> : null}
                     </span>
                     <span
                       className="w-24 shrink-0 text-right font-mono text-xs text-faint tabular-nums"
-                      title={formatDateTime(s.updatedAt)}
+                      title={formatDateTime(lang, s.updatedAt)}
                     >
-                      {formatRelative(s.updatedAt)}
+                      {formatRelative(lang, s.updatedAt)}
                     </span>
                     <span className="flex w-16 shrink-0 items-center justify-end gap-1">
                       <Button

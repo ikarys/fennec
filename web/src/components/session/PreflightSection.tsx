@@ -4,7 +4,7 @@ import type { PreflightResultView } from '../../lib/fold';
 import { Badge } from '../ui/Badge';
 import { Card } from '../ui/Card';
 import { SectionLabel } from '../ui/SectionLabel';
-import { useLang, useT } from '../../i18n';
+import { useT } from '../../i18n';
 import type { MsgKey } from '../../i18n/messages';
 
 const INLINE_CODE = 'rounded bg-code px-1 py-0.5 font-mono text-xs text-text';
@@ -29,7 +29,6 @@ const VERDICTS: Record<PreflightResultView['verdict'], { tone: 'ok' | 'err'; lab
 
 export function PreflightSection({ results }: { results: PreflightResultView[] }) {
   const t = useT();
-  const lang = useLang();
   return (
     <Card variant="inset" className="border-l-2 border-l-ok">
       <div className="flex items-center justify-between gap-2">
@@ -41,7 +40,7 @@ export function PreflightSection({ results }: { results: PreflightResultView[] }
       <ul className="m-0 flex flex-col gap-1.5">
         {results.map((result, i) => {
           const verdict = VERDICTS[result.verdict];
-          const label = result.exitCode !== undefined ? `${t(lang, verdict.label)} · ${t('exitCode', { code: result.exitCode })}` : t(lang, verdict.label);
+          const label = result.exitCode !== undefined ? `${t(verdict.label)} · ${t('exitCode', { code: result.exitCode })}` : t(verdict.label);
           return (
             <li key={`${result.criterionId}-${i}`} className="flex flex-col gap-1">
               <div className="flex flex-wrap items-center gap-2">
@@ -49,7 +48,7 @@ export function PreflightSection({ results }: { results: PreflightResultView[] }
                 <code className={`min-w-0 max-w-full truncate ${INLINE_CODE}`} title={result.command}>
                   {result.command}
                 </code>
-                <Badge tone={verdict.tone} title={t(lang, verdict.title)}>
+                <Badge tone={verdict.tone} title={t(verdict.title)}>
                   {label}
                 </Badge>
               </div>

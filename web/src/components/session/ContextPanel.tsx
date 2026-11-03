@@ -267,10 +267,10 @@ export function ContextPanel({ view, skills, usage, request, hasSession, worktre
           <div
             className="absolute inset-y-0 right-full z-20 flex w-[300px] flex-col border border-border bg-bg shadow-xl"
             role="dialog"
-            aria-label={t(lang, panelBlock(openBlock).titleKey)}
+            aria-label={t(panelBlock(openBlock).titleKey)}
           >
             <div className="flex items-center gap-1 px-2 py-2">
-              <span className="min-w-0 truncate text-xs font-medium text-text">{t(lang, panelBlock(openBlock).titleKey)}</span>
+              <span className="min-w-0 truncate text-xs font-medium text-text">{t(panelBlock(openBlock).titleKey)}</span>
               {openCount !== null ? <span className="font-mono text-xs text-muted tabular-nums">{openCount}</span> : null}
               <Button
                 type="button"
@@ -302,7 +302,7 @@ export function ContextPanel({ view, skills, usage, request, hasSession, worktre
           </Button>
         </div>
         {RAIL_BLOCKS.filter((block) => block.id !== 'workspace' || sessionId).map((block) => {
-          const title = t(lang, panelBlock(block.id).titleKey);
+          const title = t(panelBlock(block.id).titleKey);
           const count = railCount(block.id, view, vision);
           return (
             <Button

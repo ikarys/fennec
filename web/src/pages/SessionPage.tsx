@@ -21,6 +21,7 @@ import { readImages } from "../lib/attachments";
 import { formatDateTime } from "../lib/format";
 import { sessionStatus } from "../lib/sessionStatus";
 import { runWaiting } from "../lib/workflowRun";
+import { useLang } from "../i18n";
 import { useSessionThread } from "../hooks/useSessionThread";
 import { useProjectOptions } from "../hooks/useProjectOptions";
 import { useModeAndModel } from "../hooks/useModeAndModel";
@@ -139,6 +140,7 @@ export function SessionPage({
     vision,
     pending,
   } = useSessionThread(sessionId);
+  const lang = useLang();
   const running = view.running;
   const pendingCallId =
     pending.pendingApproval?.callId ?? pending.pendingWaiver?.callId;
@@ -148,7 +150,7 @@ export function SessionPage({
   const state: SessionState = running
     ? "running"
     : ((view.lastDone as SessionState | undefined) ?? detail?.state ?? "idle");
-  const status = sessionStatus(state, run, waiting);
+  const status = sessionStatus(lang, state, run, waiting);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const previousRunning = useRef(running);
   const {
@@ -501,6 +503,7 @@ export function SessionPage({
 
   async function handleAttach(files: File[]) {
     const { attachments: read, error } = await readImages(
+      lang,
       files,
       attachments.length,
     );
@@ -636,7 +639,7 @@ export function SessionPage({
                             className="shrink-0 text-xs text-muted tabular-nums"
                             title="Date de création de la session"
                           >
-                            {formatDateTime(detail.createdAt)}
+                            {formatDateTime(lang, detail.createdAt)}
                           </span>
                         )}
                         <div className="ml-auto">

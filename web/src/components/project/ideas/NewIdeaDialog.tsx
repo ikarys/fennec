@@ -9,6 +9,7 @@ import { TextArea } from '../../ui/Field';
 import { CloseIcon, FileIcon, PaperclipIcon } from '../../Icons';
 import { addIdea, type IdeaBoard } from '../../../lib/ideas';
 import { readFiles, type FileAttachmentInput } from '../../../lib/attachments';
+import { useLang } from '../../../i18n';
 
 export function NewIdeaDialog({
   projectId,
@@ -21,13 +22,14 @@ export function NewIdeaDialog({
   run: (action: () => Promise<IdeaBoard>) => Promise<boolean>;
   onClose: () => void;
 }) {
+  const lang = useLang();
   const [text, setText] = useState('');
   const [attachments, setAttachments] = useState<FileAttachmentInput[]>([]);
   const [attachError, setAttachError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const handleAttach = async (files: File[]) => {
-    const { attachments: read, error } = await readFiles(files, attachments.length);
+    const { attachments: read, error } = await readFiles(lang, files, attachments.length);
     if (error) {
       setAttachError(error);
       return;

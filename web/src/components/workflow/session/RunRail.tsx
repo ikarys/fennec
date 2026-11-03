@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { portTone, runRounds, upcomingSteps, type NodeRun, type RunView, type UpcomingStep } from '../../../lib/workflowRun';
 import { formatClock, formatDuration } from '../../../lib/format';
 import { ChevronDownIcon, ChevronRightIcon, ChevronsLeftIcon, ChevronsRightIcon } from '../../Icons';
+import { useLang } from '../../../i18n';
 import { Button } from '../../ui/Button';
 import { NodeOutputModal } from './NodeOutputModal';
 
@@ -62,6 +63,7 @@ function barClass(step: RailStep): string {
 }
 
 function StepRow({ step, onShowOutput }: { step: RailStep; onShowOutput: (run: NodeRun) => void }) {
+  const lang = useLang();
   const bar = barClass(step);
   const label = step.kind === 'run' ? step.run.label : step.step.label;
   const nodeRun = step.kind === 'run' ? step.run : null;
@@ -89,7 +91,7 @@ function StepRow({ step, onShowOutput }: { step: RailStep; onShowOutput: (run: N
     : isRunning
       ? formatClock(elapsedMs)
       : nodeRun?.durationMs != null
-        ? formatDuration(nodeRun.durationMs)
+        ? formatDuration(lang, nodeRun.durationMs)
         : nodeRun?.state === 'ended' && elapsedMs > 0
           ? formatClock(elapsedMs)
           : null;
@@ -154,6 +156,7 @@ function RoundRow({
   onToggle: (index: number) => void;
   onShowOutput: (run: NodeRun) => void;
 }) {
+  const lang = useLang();
   const last = round[round.length - 1];
   if (!last) return null;
   const bar = barClass({ kind: 'run', run: last, key: '' });
@@ -169,7 +172,7 @@ function RoundRow({
         <span className="flex items-baseline gap-1.5 whitespace-nowrap text-xs text-muted">
           {last.port ? <PortLabel port={last.port} /> : null}
           <span className="tabular-nums">{round.length} étape{round.length > 1 ? 's' : ''}</span>
-          {hasDuration && <span className="ml-auto font-mono text-faint tabular-nums">{formatDuration(totalDuration)}</span>}
+          {hasDuration && <span className="ml-auto font-mono text-faint tabular-nums">{formatDuration(lang, totalDuration)}</span>}
         </span>
       </button>
       {expanded ? (

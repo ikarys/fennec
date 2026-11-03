@@ -268,7 +268,7 @@ impl Preferences {
             return Err(format!("font_size must be in {FONT_SIZE_RANGE:?}"));
         }
         if !matches!(self.display.language.as_str(), "en" | "fr") {
-            return Err(format!("display.language must be \"en\" or \"fr\""));
+            return Err("display.language must be \"en\" or \"fr\"".to_string());
         }
         if let Some(pages) = &self.display.panel_pages {
             Self::validate_panel_pages(pages)?;

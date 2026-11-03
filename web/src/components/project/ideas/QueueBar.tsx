@@ -8,6 +8,7 @@ import { Badge } from '../../ui/Badge';
 import { EditIcon, MoonIcon, PlayIcon, SettingsIcon, StopIcon } from '../../Icons';
 import { formatTokens } from '../../../lib/format';
 import { startQueue, stopQueue, type IdeaBoard } from '../../../lib/ideas';
+import { useLang } from '../../../i18n';
 
 export function QueueBar({
   queue,
@@ -18,6 +19,7 @@ export function QueueBar({
   projectId: string;
   run: (action: () => Promise<IdeaBoard>) => Promise<boolean>;
 }) {
+  const lang = useLang();
   const [autonomous, setAutonomous] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -43,7 +45,7 @@ export function QueueBar({
   const capParts: string[] = [];
   if (queue.caps.maxMinutes > 0) capParts.push(`max ${queue.caps.maxMinutes} min`);
   if (queue.caps.maxTokens > 0)
-    capParts.push(`${formatTokens(queue.caps.maxTokens)} tokens`);
+    capParts.push(`${formatTokens(lang, queue.caps.maxTokens)} tokens`);
   const caps = capParts.length === 0 ? 'sans limite' : capParts.join(' · ');
 
   if (queue.running) {

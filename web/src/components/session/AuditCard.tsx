@@ -10,7 +10,7 @@ import { createAuditTasks, type Audit } from '../../lib/api';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
-import { useLang, useT } from '../../i18n';
+import { useT } from '../../i18n';
 import type { MsgKey } from '../../i18n/messages';
 
 const SEVERITY: Record<'high' | 'medium' | 'low', { label: MsgKey; tone: 'err' | 'neutral' }> = {
@@ -31,7 +31,6 @@ export function AuditCard({
   onCreated: () => void;
 }) {
   const t = useT();
-  const lang = useLang();
   const [checked, setChecked] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
   const [created, setCreated] = useState<number | null>(null);
@@ -122,7 +121,7 @@ export function AuditCard({
                 />
                 <span className="tabular-nums text-xs text-muted">{finding.number}.</span>
                 <Badge tone={SEVERITY[finding.severity].tone} dot>
-                  {t(lang, SEVERITY[finding.severity].label)}
+                  {t(SEVERITY[finding.severity].label)}
                 </Badge>
                 <span className="min-w-0 text-text">{finding.title}</span>
                 {isTaken ? <Badge tone="ok">{t('taskCreatedBadge')}</Badge> : null}
