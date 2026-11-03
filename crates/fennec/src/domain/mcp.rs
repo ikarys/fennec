@@ -151,7 +151,6 @@ impl McpServer {
 }
 
 /// The tool definition sent to the model for one tool, named `{server}_{tool}`
-/// as openfox does.
 pub fn tool_definition(server: &McpServer, tool: &McpTool) -> Value {
     json!({
         "type": "function",
@@ -163,7 +162,7 @@ pub fn tool_definition(server: &McpServer, tool: &McpTool) -> Value {
     })
 }
 
-/// openfox's estimate: ceil(JSON bytes / 4).
+/// Estimate: ceil(JSON bytes / 4).
 pub fn estimate_tokens(definition: &Value) -> u64 {
     (definition.to_string().len() as u64).div_ceil(4)
 }

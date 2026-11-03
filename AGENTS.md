@@ -12,9 +12,9 @@ The full definition lives in the Notion page "Définition de Fennec (v1)".
 
 **Approach since 2026-10-25**: the earlier code (fennec-os, fennec-lead) is
 removed (git history and `~/workspace/fennec_project` keep it). fennec is
-rebuilt as a **Rust port of openfox** (https://github.com/co-l/openfox, MIT),
-**one component at a time**, each one working end to end before the next.
-Ported from openfox commit `0694574d` (v2.0.161); see THIRD_PARTY.md.
+rebuilt in Rust, **one component at a time**, each one working end to end
+before the next. Its agent loop, web UI and session log started from openfox
+(see "Origin" below); fennec's vocabulary is its own.
 
 Component 1, done: the agent loop on the command line.
 Component 2, done: the web UI (session tabs, ⌘K palette, home, themes).
@@ -48,9 +48,9 @@ Preview: ```html and ```md blocks of a message, and the .html/.md files an
 agent wrote, rendered in fennec (a sandboxed origin for model HTML).
 Dogfooding, started (`docs/dogfooding.md`): a session that runs a workflow
 works in its own git worktree and branch; the human cherry-picks.
-Web search, done: openfox's `web_search` (SearXNG only), its instance set on
+Web search, done: the `web_search` tool (SearXNG only), its instance set on
 the Settings page.
-Browser and vision, done: openfox's `browser` skill embedded as a default
+Browser and vision, done: the `browser` skill embedded as a default
 (`@playwright/cli` through run_command, screenshots read back with read_file,
 kept out of the worktree's commits), and a Vision section in the context panel:
 the images the model saw, those a compaction dropped dimmed.
@@ -147,7 +147,7 @@ a card where only the human grants it, for 1, 8 or 24 hours, or refuses. A grant
 session, until it expires (the file tools and the sandbox), and writes a MADR file to the session's `docs/adr/`, which
 goes with the branch to the integration gate (`domain/waiver.rs`, `agent/waiver.rs`, `web/waiver_routes.rs`). With the
 human away, a request is refused.
-Prompt queue, done: a message typed while a turn runs is queued (`queue.added`, openfox's asap mode) and shown above the
+Prompt queue, done: a message typed while a turn runs is queued (`queue.added`, asap mode) and shown above the
 composer, each removable; the loop drops the queued messages into the turn between tool rounds (a slash command waits),
 and the first one left starts the next turn when it ends (`domain/queue.rs`, `agent/queue.rs`). A stop drops the queue;
 a pending approval or waiver holds it until the human answers, an unfinished workflow run until it ends (its same-session
@@ -176,17 +176,17 @@ crates/fennec/src/
   main.rs            composition root: command line → settings → web or cli adapter
   config.rs          settings from the environment (model endpoint, store path): the defaults
   domain/            the vocabulary, no I/O
-    event.rs           openfox events/types: Event, ToolCall, ToolResult, Role, DoneReason
-    stats.rs           openfox MessageStats: tokens (in, cached, out) and speeds of a call
+    event.rs           the session log's vocabulary: Event, ToolCall, ToolResult, Role, DoneReason (wire names frozen)
+    stats.rs           MessageStats: tokens (in, cached, out) and speeds of a call
     project.rs         Project, SessionSummary, SessionState
-    conversation.rs    openfox events/fold-messages: the log read back as model messages
+    conversation.rs    the log read back as model messages
     context_parts.rs   what the model's context is made of, by part (indicative: bytes, pro rata)
     open_calls.rs      tool calls left without a result (ask_user, stop, crash)
     compaction.rs      where the model's view starts, when to compact, the resume message
     preferences.rs     what the human chose on the Settings page; resolves a turn's model parameters
     model_choice.rs    the model a session runs on: its last `model.changed`
-    skill.rs           openfox skills/types: a SKILL.md package, its frontmatter, the text load_skill returns
-    slash.rs           openfox tasks/slash: what a typed /compact or /<skill> stands for
+    skill.rs           a SKILL.md package, its frontmatter, the text load_skill returns
+    slash.rs           what a typed /compact or /<skill> stands for
     agent.rs           an agent (mode) and its reminder; frontmatter.rs the shared YAML header
     attachment.rs      images sent to the model: sniffing, data URLs, limits
     replay.rs          which message the human may replay
@@ -213,24 +213,31 @@ crates/fennec/src/
     workflow/          a workflow: definition (nodes, ports, edges), template ({{…}} names),
                        validate (the graph rules), run (the run folded from its events, the next step)
     doc.rs             the project's documentation: markdown files and ADRs, as the Doc tab lists them
+    mcp.rs             MCP servers as the human configured them; server.rs the project's servers (`.agents/servers.json`)
+    scanner.rs         the security scanners the audit-security agent may run; attention.rs what a finished turn leaves for the human's eye
+    audit.rs           an audit report parsed from the model's answer, and the backlog task each finding becomes
+    workdir_notice.rs  tells the model its working directory moved; session_name.rs the session name's prompt and cleanup
+    agent_file.rs      an agent as the Settings form edits it; session_skills.rs a session's skills folded from the log
+    module_map/notes.rs what the map says about a module, read from its leading comment
     id.rs, clock.rs
+    (domain uses `rules::path`, the gitignore-like matcher, as a library: one matcher for rules, protection and architecture)
   agent/             application layer: the agent loop
     ports.rs           Model, EventLog, Toolbox, ChildSessions, Commands: what the loop needs from outside
-    turn.rs            openfox chat/agent-loop: the multi-turn loop
+    turn.rs            the multi-turn loop
     round.rs           one model round: streaming, retries, continuation, timing
     delta_buffer.rs    coalesces streamed chunks into one event per 100 ms
-    tool_calls.rs      openfox chat/execute-tools: runs and records tool calls
-    ask_user.rs        openfox tools/ask: the loop's own tool; the turn ends waiting for the human
+    tool_calls.rs      runs and records tool calls
+    ask_user.rs        the loop's own tool; the turn ends waiting for the human
     propose_task.rs    the loop's propose_task tool: a backlog task proposed, the turn goes on
     suggest_agent.rs   the loop's own tool: suggests a new session on another agent (the human opens it)
     rule_check.rs      the rules crate's decision on a tool call: the refusal and its `rule.blocked`, the approval request
     rule_approval.rs   the human's answer to an approval: runs or refuses the recorded call, resumes the loop
     request_waiver.rs  the loop's own tool: asks the human to waive one protected file; the turn pauses
     waiver.rs          the human's answer to a waiver (recorded at the click): the call's result, the loop resumed
-    queue.rs           openfox chat/drain-queue: the queued messages dropped into the turn between tool rounds
+    queue.rs           the queued messages dropped into the turn between tool rounds
     preflight.rs       runs a plan's checks at the end of the planner's turn, sends it back once
-    compaction.rs      openfox context/compactor: the summary round and the new window
-    prompt.rs          openfox chat/prompts: the system prompt, plus fennec's working method
+    compaction.rs      the summary round and the new window
+    prompt.rs          the system prompt, plus fennec's working method
     workflow.rs        the workflow walk and its jobs (start, answer, continue, resume, stop);
                        workflow/ nodes (one node run), fork (parallel branches), outcome (`Outcome:` line),
                        criteria (the criteria node and the agents' verdicts)
@@ -238,7 +245,7 @@ crates/fennec/src/
                      world of commands); rule_request (a tool call as the rules crate's requests, paths resolved here);
                      web_search queries the SearXNG instance from the Settings page
   llm/               Model adapter: openai.rs, the Model port over llm-providers (tool-call arguments parsed here)
-  store.rs           EventLog adapter: SQLite (openfox's schema), projects and sessions;
+  store.rs           EventLog adapter: SQLite (schema frozen: stored logs depend on it), projects and sessions;
                      store/settings.rs the stored preferences; store/ideas.rs the per-project backlog events
   metering.rs        the usage ledger adapter: MeteredLog (an EventLog that also writes each model call
                      to the ledger) and the backfill of past calls; store/calls.rs reads them from the log
@@ -247,11 +254,11 @@ crates/fennec/src/
                      checkout's node_modules/.venv mounted read-only into its sandbox; one Cargo
                      target per project shared by its worktrees (`CARGO_TARGET_DIR`)
   integration.rs     the human's integration: preview of a worktree branch, cherry-pick, conflict abort
-  instructions.rs    openfox context/instructions: Settings' global instructions + the
+  instructions.rs    Settings' global instructions + the
                      AGENTS.md files above the workdir, for a new session's prompt
   agents.rs          the *.agent.md files: embedded defaults (crates/fennec/agents/), ~/.agents/agents,
                      the project's .agents/agents (the project wins)
-  skills.rs          openfox skills/registry: embedded defaults (crates/fennec/skills/), the SKILL.md
+  skills.rs          embedded defaults (crates/fennec/skills/), the SKILL.md
                      packages in ~/.agents/skills and the project's .agents/skills (the project wins)
   workflows.rs       the *.workflow.json files: embedded defaults (crates/fennec/workflows/),
                      ~/.agents/workflows, the project's .agents/workflows (the project wins)
@@ -262,6 +269,15 @@ crates/fennec/src/
   risk.rs            the risk zones measured from git: AI commits, churn, a parallel blame; the hot
                      files and the files tested on a branch, for the review map
   doc.rs             the project's markdown files read for the Doc tab
+  chat.rs            a session with no project: runs in a scratch folder
+  turn_build.rs      the composition of a Turn, shared by both adapters (CLI, web): store, model, tools, sandbox
+  mcp.rs             the synchronous MCP client (JSON-RPC over stdio); servers.rs the project's servers on disk
+  scanners.rs        the security scanners found on PATH
+  notifier.rs        wakes event streams when a turn appends to a log, so an open tab costs nothing idle
+  architecture.rs    `.agents/architecture` read from disk
+  agents/crud.rs     the human's own agents read, written, deleted (Settings)
+  worktree/usage.rs  the disk the worktrees take, measured and freed on the human's click
+  llm/concurrency.rs the model's concurrency gate (a process-wide counting semaphore)
   web/               HTTP adapter: http, guard (who may call), routes, settings_routes, event_stream (SSE),
                      notifier (wakes streams on append, no polling), turns, assets,
                      workflow_routes, project_routes (the project page), project_delete (a project deleted, its folder on request), project_dashboard (its overview tiles), idea_routes (its ideas board, HTTP only),
@@ -269,7 +285,12 @@ crates/fennec/src/
                      model_routes (the composer's model choices, a session's model), rule_routes (the human's rules), rule_approval_routes (an approval answered, its rule stored), waiver_routes (a waiver answered, its ADR written),
                      children (child sessions for workflow nodes),
                      preview (a project's files in a sandboxed origin), session_usage,
-                     workflow_usage, context_view and insight (display-ready token figures: the UI computes none)
+                     workflow_usage, context_view and insight (display-ready token figures: the UI computes none),
+                     notice_stream (the human's attention server-wide, SSE), idea_board (the ideas board, read side),
+                     servers (a project's servers started and stopped), terminal, editor, file_manager (the human's own
+                     tools opened on a folder), pricing, model_view, worktree_routes (disk usage), agent_routes,
+                     audit_routes, backlog_routes, idea_assets, mcp_routes, proposal_routes, session_delete,
+                     agents_md_routes, session_name (background naming)
   cli/               terminal adapter: commands, transcript
 crates/backlog/     the ideas backlog, a crate of its own and fennec-free, no I/O: its events folded, the queue
                      order, the night-mode caps, an idea's status, stage and next action, a run's summary
@@ -281,7 +302,7 @@ crates/llm-providers/ talking to models, a crate of its own and fennec-free: the
                      and its SSE parser, the /models listing, providers and their per-model parameters
                      (Provider, ModelRef, ModelPrefs, ReasoningEffort), API keys sealed at rest (MasterKey)
 crates/fennec/build.rs   embeds web/dist (placeholder page when not built)
-web/src/           React + Vite + Tailwind v4 UI (same layout as openfox's web/src)
+web/src/           React + Vite + Tailwind v4 UI
   pages/             one component per route: HomePage, SessionPage, SettingsPage, InsightPage,
                      ProjectPage, WorkflowsPage (lazy)
   components/        ui/ the primitives every screen uses (Button, Badge, SectionLabel, Card, Panel, fields);
@@ -303,13 +324,15 @@ docs/ui.md         the UI's design rules: tokens and primitives, never per-file 
 docs/dogfooding.md the frictions met while fennec builds fennec, and their status
 ```
 
-## Porting rules
+## Origin
 
-- Each module's header comment names the openfox files it ports and what is
-  not ported yet. Keep openfox's names (events, fields, tool names, prompts)
-  so a later port maps 1:1.
-- Port only what the current component needs; skip the rest explicitly.
-- Port the matching openfox `*.test.ts` cases with the code.
+fennec started as a Rust port of openfox (https://github.com/co-l/openfox, MIT,
+commit `0694574d`, v2.0.161); THIRD_PARTY.md keeps the notice. The code does not
+advertise it: no "port of" headers, no origin names in comments, test names or UI
+strings; name things after fennec's domain. What stays compatible on purpose is
+named for what it is: the event wire names and the SQLite schema are frozen because
+stored logs depend on them. Port only what the current component needs, with its
+tests.
 
 ## Trust zones
 
@@ -325,7 +348,9 @@ docs/dogfooding.md the frictions met while fennec builds fennec, and their statu
    kernel code too; command rules match parsed tokens, so `eval`, a variable (`$X -rf`) or
    a script written then run slips past them: a guard rail, the sandbox stays the wall. A file
    tool outside the workdir needs an allow rule or the human's approval; the sandbox does not read the rules (it still hides
-   `~/.ssh` from commands).
+   `~/.ssh` from commands). With the sandbox off, a session's worktree shares its
+   `.git/worktrees/<id>` with the human's repository: a command can move or push refs
+   (`git update-ref`, `git push`); command rules are the only wall then.
 
 ## Build, test, run
 
@@ -370,9 +395,9 @@ sealed with `secret.key`, next to the store (lose it and the stored keys are los
 4. **The server only answers local pages**: `Host` and `Origin` must be
    127.0.0.1/localhost (DNS rebinding, CSRF) and POST bodies must be JSON.
    Never relax this: any web page could otherwise drive the agent.
-5. **Storage is SQLite** (`rusqlite`, bundled), as in openfox. No other new
+5. **Storage is SQLite** (`rusqlite`, bundled). No other new
    dependency without a stated reason in the commit body. Stdlib first.
-6. Licence: AGPL-3.0-only; openfox's MIT notice is kept in THIRD_PARTY.md.
+6. Licence: AGPL-3.0-only; the MIT notice of the code fennec started from is kept in THIRD_PARTY.md.
    The repository stays private until contribution terms are decided.
 
 ## Style
@@ -395,8 +420,7 @@ far as they help, never blindly:
   no file loose at a source root (Rust or web).
 - Code written by a model (the local LLM included) is reviewed against
   these rules before it is committed, not only against the tests.
-- Resources are a feature: fennec must stay light in RAM and CPU (openfox
-  is not). Measure before and after a change that could cost them.
+- Resources are a feature: fennec must stay light in RAM and CPU. Measure before and after a change that could cost them.
 
 **The prompt only grows.** The local inference server reuses its cache only
 for an exact prefix of an earlier request. Within a session, never rewrite

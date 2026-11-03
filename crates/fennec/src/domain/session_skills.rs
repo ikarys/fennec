@@ -2,7 +2,6 @@
 //! (successful `load_skill` calls, `/<skill>` messages), those frozen into
 //! the session's system prompt as always-active, and those still in the
 //! model's view (not dropped by a compaction, not cut by a replay).
-//! fennec's own feature; openfox has no such fold.
 
 use super::compaction::model_view;
 use super::conversation::frozen_prompt;

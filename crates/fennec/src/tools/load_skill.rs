@@ -1,8 +1,8 @@
-//! Port of openfox `tools/load-skill.ts`. Skills are read again at call
-//! time, as in openfox: an edited skill loads fresh while the list in the
-//! frozen system prompt stays as it was.
+//! Skills are read again at call time: an edited
+//! skill loads fresh while the list in the frozen system prompt stays as it
+//! was.
 //!
-//! Not ported: the enabled check (no enable/disable setting yet).
+//! It has no enabled check (no enable/disable setting yet).
 
 use super::args;
 use crate::domain::event::ToolResult;

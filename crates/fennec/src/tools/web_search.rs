@@ -1,7 +1,8 @@
-//! Port of openfox `tools/web-search.ts`: SearXNG only.
+//! `web_search`: SearXNG only.
 //!
-//! Not ported: Tavily, the engine choice, the SEARXNG_* environment variables
-//! (the Settings page holds the instance), web_fetch.
+//! This module does not support Tavily, engine choice, `SEARXNG_*`
+//! environment variables (the Settings page holds the instance), or
+//! `web_fetch`.
 
 use super::args;
 use crate::domain::event::ToolResult;
@@ -218,7 +219,7 @@ mod tests {
     }
 
     #[test]
-    fn format_results_matches_openfox() {
+    fn format_results_is_stable() {
         let results = vec![
             SearchResult {
                 title: "A".into(),

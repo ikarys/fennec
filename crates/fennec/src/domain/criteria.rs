@@ -1,6 +1,5 @@
-//! Port of openfox's `Criterion` / `CriterionStatus` (shared/types.ts)
-//! reshaped for fennec: a criterion's status carries its provenance; not
-//! ported: in_progress/completed statuses, attempts history.
+//! `Criterion` / `CriterionStatus`: a criterion's status carries its
+//! provenance. No in-progress state, no attempts history.
 
 use super::event::Event;
 use serde::{Deserialize, Serialize};

@@ -1,4 +1,4 @@
-//! The host toolbox: openfox's `read_file`, `write_file`, `edit_file` and
+//! The host toolbox: `read_file`, `write_file`, `edit_file` and
 //! `run_command`, plus `load_skill`, run inside one working directory, and
 //! `web_search`, which queries the human's SearXNG instance: the model only
 //! chooses the query, and `web_fetch`, which saves a page in a cache and returns

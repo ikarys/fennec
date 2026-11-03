@@ -1,8 +1,8 @@
-//! Adapter from fennec's `Model` port to `llm_providers`.
+//! Adapter from `Model` to `llm_providers`.
 //!
-//! Not ported yet: the provider shims of openfox `requestBody`
-//! (llama.cpp `chat_template_kwargs.thinking`, Qwen3 `enable_thinking`);
-//! the standard `reasoning_effort` field is sent when set.
+//! It sends no provider shims in the request body for llama.cpp
+//! `chat_template_kwargs.thinking` or Qwen3 `enable_thinking`; the standard
+//! `reasoning_effort` field is sent when set.
 
 use super::ModelGate;
 use crate::agent::ports::{Completion, Delta, Model, Request};

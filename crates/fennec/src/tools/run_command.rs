@@ -1,4 +1,5 @@
-//! Port of openfox `tools/shell.ts`: `run_command`.
+//! `run_command`: a shell command run in the working directory, in the
+//! sandbox when the human enabled it; what the model reads back is `report`.
 
 pub(super) mod process;
 mod report;

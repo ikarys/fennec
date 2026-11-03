@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 use std::cell::RefCell;
 use std::sync::atomic::AtomicBool;
 
-/// Plays back one scripted reply per call, like openfox's mock LLM.
+/// Plays back one scripted reply per call.
 pub struct Scripted(pub RefCell<Vec<Result<Completion, String>>>);
 
 impl Model for Scripted {

@@ -1,16 +1,15 @@
-//! Port of openfox `skills/types.ts` and the `SKILL.md` parsing of
-//! `skills/registry.ts` (gray-matter there), for portable and embedded
+//! Skill definitions and `SKILL.md` parsing for portable and embedded
 //! packages.
 //!
-//! Not ported: openfox's own config/`.openfox/skills`
-//! dirs, legacy `.skill.md` files, selected directories, enable/disable
-//! settings, name warnings, installer, HTTP routes/UI, edit/delete.
+//! It does not support legacy `.skill.md` files, selected directories,
+//! enable/disable settings, name warnings, installer, HTTP routes/UI,
+//! edit/delete.
 
 use std::path::PathBuf;
 
 use crate::domain::frontmatter::split;
 
-/// openfox `SkillDefinition`, portable and embedded packages.
+/// `SkillDefinition` for portable and embedded packages.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Skill {
     pub id: String,
@@ -36,7 +35,7 @@ pub fn parse_skill_md(content: &str) -> Option<(String, String, String)> {
     Some((name.to_string(), description.to_string(), body))
 }
 
-/// openfox `formatSkillPrompt` for a skill.
+/// The text `load_skill` returns for a skill.
 pub fn format_skill_prompt(skill: &Skill) -> String {
     match &skill.directory {
         Some(directory) => format!(

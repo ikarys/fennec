@@ -1,10 +1,7 @@
 //! Shared frontmatter parser for `*.agent.md` and `SKILL.md` files.
 //!
-//! Port of the YAML-subset parsing openfox does with gray-matter for
-//! `skills/registry.ts` and `agents/registry.ts`.
-//!
-//! Not ported: full YAML (anchors, maps, nested lists, multi-document) and
-//! gray-matter options.
+//! It does not parse full YAML (anchors, maps, nested lists, multi-document)
+//! or gray-matter options.
 
 /// A frontmatter value: fennec reads scalars and lists of scalars only.
 #[derive(Debug, Clone, PartialEq)]

@@ -1,6 +1,5 @@
-//! Port of openfox `tools/edit.ts`: exact string replacement that keeps the
-//! file's line endings.
-//! The guidance in its errors (where to look, what to run) is fennec's own.
+//! Exact string replacement that keeps the file's line endings; its errors
+//! say where to look and what to run.
 
 use super::args;
 use super::path_guard::{Outside, resolve_for_writing};

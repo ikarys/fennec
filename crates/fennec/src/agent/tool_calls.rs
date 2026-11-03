@@ -16,7 +16,7 @@ use crate::domain::event::{Event, ToolCall, ToolResult};
 use crate::domain::workflow::run;
 use std::sync::atomic::Ordering;
 
-/// openfox `INTERRUPTED_ERROR`: a call the human stopped before it ran.
+/// `INTERRUPTED_ERROR`: a call the human stopped before it ran.
 pub(super) const INTERRUPTED_ERROR: &str = "Tool execution was interrupted by user";
 /// A call queued after an `ask_user` that paused the turn.
 /// `ask_user`'s result while the human is away (`Turn::autonomous`).
@@ -81,7 +81,7 @@ pub(super) fn run_tool(
     }
 }
 
-/// Port of openfox `executeTools`, sequential for now.
+/// Runs the round's tool calls, sequential for now.
 pub(super) fn execute_tools(
     turn: &mut Turn,
     agent: &AgentDefinition,
@@ -125,7 +125,7 @@ pub(super) fn execute_tools(
             )?;
             continue;
         }
-        // openfox `createRegistryFromTools` permission check: the mode is
+        // The agent's allow-list check: the mode is
         // enforced here, at execution, so plan stays read-only.
         if !agent.allows(&call.name) && !mcp_tools.contains(&call.name) {
             record(

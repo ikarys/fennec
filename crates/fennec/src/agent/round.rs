@@ -1,6 +1,6 @@
 //! One model round: stream the model's answer into the log, retrying a
-//! request that fails before any content (openfox case 1) and asking to
-//! continue after a stream that breaks mid-answer (case 2).
+//! request that fails before any content (case 1) and asking to continue
+//! after a stream that breaks mid-answer (case 2).
 
 use super::delta_buffer::{DeltaBuffer, DeltaKind, tokens_per_char};
 use super::ports::{Completion, Delta, Request};

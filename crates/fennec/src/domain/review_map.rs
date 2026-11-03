@@ -1,5 +1,5 @@
-//! fennec's own (openfox has no review step): the order in which the human
-//! reviews a branch's files, from deterministic signals.
+//! The order in which the human reviews a branch's files, from
+//! deterministic signals.
 
 use std::cmp::Reverse;
 
