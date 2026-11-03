@@ -5,16 +5,18 @@
  */
 import { FieldRow, Select, TextArea, TextInput } from '../ui/Field';
 import { Button } from '../ui/Button';
+import { useT } from '../../i18n';
 import type { AgentDraft } from '../../lib/api/agents';
 import type { ReasoningEffort } from '../../lib/api/settings';
 import type { AgentPhase } from '../../lib/api/projects';
+import type { MsgKey } from '../../i18n/messages';
 
-const PHASES: { id: AgentPhase; label: string }[] = [
-  { id: 'start', label: 'Démarrer' },
-  { id: 'frame', label: 'Cadrer' },
-  { id: 'build', label: 'Construire' },
-  { id: 'understand', label: 'Comprendre' },
-  { id: 'check', label: 'Contrôler' },
+const PHASES: { id: AgentPhase; label: MsgKey }[] = [
+  { id: 'start', label: 'phaseStart' },
+  { id: 'frame', label: 'phaseFrame' },
+  { id: 'build', label: 'phaseBuild' },
+  { id: 'understand', label: 'phaseUnderstand' },
+  { id: 'check', label: 'phaseCheck' },
 ];
 
 const EFFORTS: ReasoningEffort[] = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
@@ -55,6 +57,7 @@ export function AgentEditor({
   onSave: () => void;
   onCancel: () => void;
 }) {
+  const t = useT();
   const set = <K extends keyof AgentDraft>(key: K, value: AgentDraft[K]) =>
     onChange({ ...draft, [key]: value });
 
@@ -69,41 +72,41 @@ export function AgentEditor({
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <FieldRow label="Identifiant" htmlFor="agent-id" hint="Minuscules, chiffres et tirets.">
+        <FieldRow label={t('agentIdLabel')} htmlFor="agent-id" hint={t('agentIdHint')}>
           <TextInput
             id="agent-id"
             className={`w-full font-mono${field === 'id' ? ' border-err' : ''}`}
             value={draft.id}
-            placeholder="mon-agent"
+            placeholder={t('agentIdPlaceholder')}
             disabled={!newAgent}
             onChange={(e) => set('id', e.target.value)}
           />
         </FieldRow>
-        <FieldRow label="Nom" htmlFor="agent-name">
+        <FieldRow label={t('nameLabel')} htmlFor="agent-name">
           <TextInput
             id="agent-name"
             className="w-full"
             value={draft.name}
-            placeholder="Mon agent"
+            placeholder={t('agentNamePlaceholder')}
             onChange={(e) => set('name', e.target.value)}
           />
         </FieldRow>
-        <FieldRow label="Phase" htmlFor="agent-phase" hint="Le groupe du menu du composer.">
+        <FieldRow label={t('agentPhaseLabel')} htmlFor="agent-phase" hint={t('agentPhaseHint')}>
           <Select
             id="agent-phase"
             className="w-full"
             value={draft.phase ?? ''}
             onChange={(e) => set('phase', (e.target.value || null) as AgentPhase | null)}
           >
-            <option value="">Aucune</option>
+            <option value="">{t('agentPhaseNone')}</option>
             {PHASES.map((phase) => (
               <option key={phase.id} value={phase.id}>
-                {phase.label}
+                {t(phase.label)}
               </option>
             ))}
           </Select>
         </FieldRow>
-        <FieldRow label="Couleur" htmlFor="agent-color" hint="Optionnelle, comme #a855f7.">
+        <FieldRow label={t('agentColorLabel')} htmlFor="agent-color" hint={t('agentColorHint')}>
           <TextInput
             id="agent-color"
             className="w-full font-mono"
@@ -114,7 +117,7 @@ export function AgentEditor({
         </FieldRow>
       </div>
 
-      <FieldRow label="Description" htmlFor="agent-description" hint="Une ligne : ce que fait cet agent.">
+      <FieldRow label={t('agentDescriptionLabel')} htmlFor="agent-description" hint={t('agentDescriptionHint')}>
         <TextInput
           id="agent-description"
           className="w-full"
@@ -124,25 +127,25 @@ export function AgentEditor({
       </FieldRow>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <FieldRow label="Commandes" htmlFor="agent-commands">
+        <FieldRow label={t('agentCommandsLabel')} htmlFor="agent-commands">
           <Select
             id="agent-commands"
             className="w-full"
             value={draft.readOnly ? 'readOnly' : 'all'}
             onChange={(e) => set('readOnly', e.target.value === 'readOnly')}
           >
-            <option value="readOnly">lecture seule</option>
-            <option value="all">écriture autorisée</option>
+            <option value="readOnly">{t('agentCommandsReadOnly')}</option>
+            <option value="all">{t('agentCommandsWrite')}</option>
           </Select>
         </FieldRow>
-        <FieldRow label="Effort de raisonnement" htmlFor="agent-effort">
+        <FieldRow label={t('effortLabel')} htmlFor="agent-effort">
           <Select
             id="agent-effort"
             className="w-full"
             value={draft.reasoningEffort ?? ''}
             onChange={(e) => set('reasoningEffort', (e.target.value || null) as ReasoningEffort | null)}
           >
-            <option value="">Celui du modèle</option>
+            <option value="">{t('agentEffortModel')}</option>
             {EFFORTS.map((effort) => (
               <option key={effort} value={effort}>
                 {effort}
@@ -150,20 +153,20 @@ export function AgentEditor({
             ))}
           </Select>
         </FieldRow>
-        <FieldRow label="Lancement" htmlFor="agent-subagent" hint="Un sous-agent ne tourne que dans un nœud de workflow.">
+        <FieldRow label={t('launch')} htmlFor="agent-subagent" hint={t('agentSubagentHint')}>
           <Select
             id="agent-subagent"
             className="w-full"
             value={draft.subagent ? 'subagent' : 'mode'}
             onChange={(e) => set('subagent', e.target.value === 'subagent')}
           >
-            <option value="mode">mode de session</option>
-            <option value="subagent">sous-agent</option>
+            <option value="mode">{t('agentLaunchMode')}</option>
+            <option value="subagent">{t('agentLaunchSubagent')}</option>
           </Select>
         </FieldRow>
       </div>
 
-      <FieldRow label="Outils">
+      <FieldRow label={t('agentToolsLabel')}>
         <div className={`flex flex-wrap gap-x-4 gap-y-1.5${field === 'allowedTools' ? ' rounded-md border border-err p-2' : ''}`}>
           {tools.map((tool) => (
             <label key={tool} className="flex items-center gap-1.5 text-sm">
@@ -178,7 +181,7 @@ export function AgentEditor({
         </div>
       </FieldRow>
 
-      <FieldRow label="Méthode" htmlFor="agent-prompt" hint="Le prompt de l'agent : sa méthode, étape par étape, et le format de sa sortie.">
+      <FieldRow label={t('agentMethodLabel')} htmlFor="agent-prompt" hint={t('agentMethodHint')}>
         <TextArea
           id="agent-prompt"
           className={`w-full text-xs${field === 'prompt' ? ' border-err' : ''}`}
@@ -195,10 +198,10 @@ export function AgentEditor({
           onClick={onSave}
           disabled={busy || !draft.id.trim() || !draft.name.trim() || !draft.prompt.trim()}
         >
-          Enregistrer
+          {t('agentSave')}
         </Button>
         <Button variant="ghost" onClick={onCancel} disabled={busy}>
-          Annuler
+          {t('cancel')}
         </Button>
       </div>
     </div>

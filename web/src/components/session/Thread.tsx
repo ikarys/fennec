@@ -18,12 +18,14 @@ import { RunEndCard } from '../workflow/session/RunEndCard';
 import { markdownComponents } from './markdownComponents';
 import { attachmentAnchorId } from '../../lib/vision';
 import { usePlanActions } from './PlanActions';
+import { useT } from '../../i18n';
 
 
 
 // Memoised on their text: while one message streams, the others are not
 // parsed again on every frame.
 const ThinkingSegment = memo(function ThinkingSegment({ content }: { content: string }) {
+  const t = useT();
   const display = useDisplayPrefs();
   const [open, setOpen] = useState(display.reasoningOpen);
   if (!content) return null;
@@ -36,7 +38,7 @@ const ThinkingSegment = memo(function ThinkingSegment({ content }: { content: st
         className="flex min-h-8 items-center gap-2 self-start rounded-lg border border-dashed border-info/50 bg-transparent px-2.5 text-sm text-muted"
       >
         <BulbIcon className="h-3.5 w-3.5 text-info" />
-        Réflexion · {open ? 'masquer' : 'afficher'}
+        {t(open ? 'thinkingHide' : 'thinkingShow')}
       </button>
       {open && (
         <div className="border-l-2 border-info/50 pl-3.5 text-sm whitespace-pre-line text-muted">{content}</div>
@@ -106,6 +108,7 @@ const NoteDetail = memo(function NoteDetail({ text, detail }: { text: string; de
 });
 
 function AssistantItemView({ item, model, running, showHeader, pendingCallId }: { item: AssistantItem; model: string; running: boolean; showHeader: boolean; pendingCallId?: string }) {
+  const t = useT();
   const lastTextId = [...item.segments].reverse().find((segment): segment is Extract<Segment, { kind: 'text' }> => segment.kind === 'text')?.id;
   const streaming = running && !item.done;
   const copyText = item.done
@@ -124,7 +127,7 @@ function AssistantItemView({ item, model, running, showHeader, pendingCallId }: 
         <div className="flex items-center gap-2 text-xs text-muted">
           {/* The model that answered, from the ledger; the session's current one while it streams. */}
           <span className="font-semibold text-text">{call ? modelShortName(call.model) : model}</span>
-          <span className="rounded border border-border px-1.5 text-xs">produit par le modèle</span>
+          <span className="rounded border border-border px-1.5 text-xs">{t('assistantProducedByModel')}</span>
         </div>
       )}
       {item.segments.map((segment) => {
@@ -157,6 +160,7 @@ function AssistantItemView({ item, model, running, showHeader, pendingCallId }: 
 }
 
 export function ThreadItemView({ item, model, running, showHeader, onReplay, pendingCallId }: { item: ThreadItem; model: string; running: boolean; showHeader: boolean; onReplay?: (messageId: string) => void; pendingCallId?: string }) {
+  const t = useT();
   if (item.kind === 'mode') {
     // A mode change is a divider, not a message: the agent's color marks the
     // switch without taking bubble space.
@@ -166,7 +170,7 @@ export function ThreadItemView({ item, model, running, showHeader, onReplay, pen
     return (
       <div className="flex items-center gap-2 text-xs text-muted">
         <span className="h-px grow bg-border" style={lineStyle} />
-        <span style={textStyle}>{item.name} mode</span>
+        <span style={textStyle}>{item.name} {t('threadMode')}</span>
         <span className="h-px grow bg-border" style={lineStyle} />
       </div>
     );
@@ -195,8 +199,8 @@ export function ThreadItemView({ item, model, running, showHeader, onReplay, pen
           {onReplay && (
             <button
               type="button"
-              aria-label="Rejouer"
-              title="Rejouer"
+              aria-label={t('threadReplay')}
+              title={t('threadReplay')}
               disabled={running}
               onClick={() => onReplay(item.id)}
               className="rounded-md p-1 text-muted transition-colors hover:text-text disabled:opacity-60"

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { MsgKey } from '../../../i18n/messages';
 import type { ThreadItem } from '../../../lib/fold';
 import { formatClockTime, formatDuration } from '../../../lib/format';
 import { AlertIcon, CheckIcon, ChevronRightIcon, ClockIcon, CloseIcon, CpuIcon, FileIcon, PauseIcon, TokensIcon, WandIcon } from '../../Icons';
@@ -8,27 +9,31 @@ import { Card } from '../../ui/Card';
 import { Tile } from '../../ui/Tile';
 import { useRunUsage } from '../../session/CallUsage';
 import { useIntegrationInvite } from '../../session/IntegrationInvite';
-import { useLang } from '../../../i18n';
+import { useLang, useT } from '../../../i18n';
 
 type WorkflowEndItem = Extract<ThreadItem, { kind: 'workflow-end' }>;
 
 /** The outcome's form: a tinted header, a state icon, a word. */
-function outcomeView(outcome: WorkflowEndItem['outcome']): { header: string; tone: string; icon: ReactNode; text: string } {
+function outcomeView(
+  outcome: WorkflowEndItem['outcome'],
+  t: (key: MsgKey, vars?: Record<string, string | number>) => string,
+): { header: string; tone: string; icon: ReactNode; text: string } {
   switch (outcome) {
     case 'done':
-      return { header: 'bg-ok-soft', tone: 'text-ok', icon: <CheckIcon className="h-4 w-4" />, text: 'Workflow terminé' };
+      return { header: 'bg-ok-soft', tone: 'text-ok', icon: <CheckIcon className="h-4 w-4" />, text: t('workflowDone') };
     case 'blocked':
-      return { header: 'bg-err/10', tone: 'text-err', icon: <AlertIcon className="h-4 w-4" />, text: 'Workflow bloqué' };
+      return { header: 'bg-err/10', tone: 'text-err', icon: <AlertIcon className="h-4 w-4" />, text: t('workflowBlocked') };
     case 'stopped':
-      return { header: 'bg-raised', tone: 'text-muted', icon: <PauseIcon className="h-4 w-4" />, text: 'Workflow arrêté' };
+      return { header: 'bg-raised', tone: 'text-muted', icon: <PauseIcon className="h-4 w-4" />, text: t('workflowStopped') };
     case 'error':
-      return { header: 'bg-err/10', tone: 'text-err', icon: <CloseIcon className="h-4 w-4" />, text: 'Workflow en erreur' };
+      return { header: 'bg-err/10', tone: 'text-err', icon: <CloseIcon className="h-4 w-4" />, text: t('workflowError') };
   }
 }
 
 export function RunEndCard({ item }: { item: WorkflowEndItem }) {
   const lang = useLang();
-  const outcome = outcomeView(item.outcome);
+  const t = useT();
+  const outcome = outcomeView(item.outcome, t);
   const stats = item.stats;
   const invite = useIntegrationInvite();
   const usage = useRunUsage(item.runId);
@@ -45,7 +50,12 @@ export function RunEndCard({ item }: { item: WorkflowEndItem }) {
         : ('err' as const)
       : ('neutral' as const);
   const criteriaDetail = stats
-    ? `${stats.criteriaVerified} vérifié${stats.criteriaVerified > 1 ? 's' : ''} · ${stats.criteriaTotal - stats.criteriaVerified} indicatif${stats.criteriaTotal - stats.criteriaVerified > 1 ? 's' : ''}`
+    ? t('runEndCriteriaDetail', {
+        verified: stats.criteriaVerified,
+        verifiedPlural: stats.criteriaVerified > 1 ? 's' : '',
+        indicative: stats.criteriaTotal - stats.criteriaVerified,
+        indicativePlural: stats.criteriaTotal - stats.criteriaVerified > 1 ? 's' : '',
+      })
     : undefined;
 
   const nodeTotalMs = stats ? stats.nodes.reduce((sum, node) => sum + node.workingMs, 0) : 0;
@@ -59,14 +69,14 @@ export function RunEndCard({ item }: { item: WorkflowEndItem }) {
             {outcome.icon}
             {outcome.text}
           </span>
-          <Badge tone="ok" title="Calculé par fennec à partir du journal">
-            vérifié
+          <Badge tone="ok" title={t('verifiedFromLog')}>
+            {t('verified')}
           </Badge>
         </div>
         {startAt != null && endAt != null && (
-          <div className="mt-0.5 pl-6 text-xs text-muted tabular-nums" title="Durée de la course, pauses comprises">
-            départ {formatClockTime(lang, startAt)} → fin {formatClockTime(lang, endAt)}
-            {totalMs != null ? ` · durée ${formatDuration(lang, totalMs)}` : ''}
+          <div className="mt-0.5 pl-6 text-xs text-muted tabular-nums" title={t('runEndDurationTitle')}>
+            {t('runEndStartEnd', { start: formatClockTime(lang, startAt), end: formatClockTime(lang, endAt) })}
+            {totalMs != null ? t('runEndDurationSuffix', { duration: formatDuration(lang, totalMs) }) : ''}
           </div>
         )}
       </div>
@@ -80,20 +90,20 @@ export function RunEndCard({ item }: { item: WorkflowEndItem }) {
               size="sm"
               icon={<ClockIcon />}
               figure={formatDuration(lang, stats.workingMs)}
-              label="Temps de travail"
-              detail={totalMs != null ? `sur ${formatDuration(lang, totalMs)} de durée` : undefined}
+              label={t('runEndWorkingTime')}
+              detail={totalMs != null ? t('runEndOfDuration', { duration: formatDuration(lang, totalMs) }) : undefined}
             />
-            <Tile size="sm" icon={<WandIcon />} figure={usage?.calls ?? '–'} label="Appels au modèle" />
-            <Tile size="sm" icon={<TokensIcon />} figure={usage?.generated ?? '–'} label="Tokens générés" />
-            <Tile size="sm" icon={<CpuIcon />} figure={usage?.read ?? '–'} label="Tokens lus" detail={usage?.cache} />
-            <Tile size="sm" icon={<FileIcon />} figure={stats.filesChanged} label="Fichiers modifiés" />
+            <Tile size="sm" icon={<WandIcon />} figure={usage?.calls ?? '–'} label={t('runEndModelCalls')} />
+            <Tile size="sm" icon={<TokensIcon />} figure={usage?.generated ?? '–'} label={t('runEndGeneratedTokens')} />
+            <Tile size="sm" icon={<CpuIcon />} figure={usage?.read ?? '–'} label={t('runEndReadTokens')} detail={usage?.cache} />
+            <Tile size="sm" icon={<FileIcon />} figure={stats.filesChanged} label={t('panelModifiedFiles')} />
             <Tile
               size="sm"
               tone={criteriaTone}
               active={criteriaTone !== 'neutral'}
               icon={<CheckIcon />}
               figure={`${stats.criteriaPassed}/${stats.criteriaTotal}`}
-              label="Critères"
+              label={t('panelCriteria')}
               detail={criteriaDetail}
             />
           </div>
@@ -102,9 +112,13 @@ export function RunEndCard({ item }: { item: WorkflowEndItem }) {
             <details className="group border-t border-border">
               <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-2 text-xs text-muted select-none hover:text-text [&::-webkit-details-marker]:hidden">
                 <ChevronRightIcon className="h-3 w-3 shrink-0 transition-transform group-open:rotate-90" />
-                <span>Détail du temps</span>
+                <span>{t('runEndTimeDetail')}</span>
                 <span className="ml-auto tabular-nums text-faint">
-                  {formatDuration(lang, stats.workingMs)} · {stats.nodes.length} nœud{stats.nodes.length > 1 ? 's' : ''}
+                  {t('runEndNodesSummary', {
+                    duration: formatDuration(lang, stats.workingMs),
+                    count: stats.nodes.length,
+                    plural: stats.nodes.length > 1 ? 's' : '',
+                  })}
                 </span>
               </summary>
               <div className="flex flex-col px-4 pb-3">
@@ -138,9 +152,9 @@ export function RunEndCard({ item }: { item: WorkflowEndItem }) {
 
       {item.outcome === 'done' && invite && invite.lastRunEndId === item.id && (
         <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-2.5">
-          <span className="text-xs text-muted">Le travail est prêt dans l'espace de l'agent.</span>
+          <span className="text-xs text-muted">{t('runEndWorkReady')}</span>
           <Button variant="primary" size="sm" onClick={invite.open}>
-            Relire et intégrer…
+            {t('reviewAndIntegrate')}
           </Button>
         </div>
       )}

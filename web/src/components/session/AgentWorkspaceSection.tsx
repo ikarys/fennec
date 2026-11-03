@@ -162,7 +162,7 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
 
   const humanBranch = repo?.branch ?? preview?.humanBranch ?? t('yourBranch');
   const hasCommits = (preview?.commits.length ?? 0) > 0;
-  // The file list lives in the Fichiers modifiés block; here only what blocks the review.
+  // The file list lives in the Modified files block; here only what blocks the review.
   const protectedCount = preview?.files.filter((file) => file.protected).length ?? 0;
   const integrateDisabled = sessionId === null || running || invite === null;
   const conflictFiles =

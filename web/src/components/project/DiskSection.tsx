@@ -17,7 +17,7 @@ import {
 } from '../../lib/api/worktrees';
 import { discardWorktree } from '../../lib/api';
 import { formatBytes, formatRelative } from '../../lib/format';
-import { useLang } from '../../i18n';
+import { useLang, useT } from '../../i18n';
 
 export function DiskSection({
   projectId,
@@ -27,6 +27,7 @@ export function DiskSection({
   onOpenSession: (sessionId: string) => void;
 }) {
   const lang = useLang();
+  const t = useT();
   const [data, setData] = useState<ProjectWorktrees | null>(null);
   const [measuring, setMeasuring] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -137,11 +138,11 @@ export function DiskSection({
   const sessions = data?.entries.filter((entry) => !entry.orphan) ?? [];
   const orphans = data?.entries.filter((entry) => entry.orphan) ?? [];
 
-  const confirmTitle = confirm?.orphan ? 'Supprimer ce dossier ?' : 'Supprimer le worktree ?';
+  const confirmTitle = confirm?.orphan ? t('deleteFolderQuestion') : t('deleteWorktreeQuestion');
   const confirmBody = confirm
     ? confirm.orphan
-      ? `${confirm.name} et ce que git en garde (branche, références) sont supprimés.`
-      : `Le dossier et la branche fennec/${confirm.name} sont supprimés, avec les commits de l'agent non intégrés. Le journal de la session reste.`
+      ? t('deleteFolderBody', { name: confirm.name })
+      : t('deleteWorktreeBody', { name: confirm.name })
     : '';
 
   return (
@@ -149,17 +150,17 @@ export function DiskSection({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Tile
           icon={<HardDriveIcon />}
-          label="Espace disque"
+          label={t('diskSpace')}
           figure={data ? formatBytes(lang, data.totalBytes) : '…'}
-          detail={data ? `mesuré ${formatRelative(lang, data.scannedAt)}` : "Mesure de l'espace disque…"}
+          detail={data ? t('measuredAt', { when: formatRelative(lang, data.scannedAt) }) : t('measuringDisk')}
           tone="info"
           active={data ? data.totalBytes > 0 : false}
         />
         <Tile
           icon={<EraserIcon />}
-          label="Cache de build"
+          label={t('buildCache')}
           figure={data ? formatBytes(lang, data.generatedBytes) : '…'}
-          detail="target, node_modules, .venv : rebâti par une compilation"
+          detail={t('buildCacheDetail')}
           tone="accent"
           active={data ? data.generatedBytes > 0 : false}
         />
@@ -168,17 +169,17 @@ export function DiskSection({
       {loadError ? <div className="px-4 pb-2 text-err text-xs">{loadError}</div> : null}
 
       <Section
-        title="Worktrees des sessions"
+        title={t('sessionWorktrees')}
         flush
         actions={
           <>
-            {data ? <Badge tone="ok" pill title="Mesuré sur le disque">vérifié</Badge> : null}
+            {data ? <Badge tone="ok" pill title={t('measuredOnDisk')}>{t('verified')}</Badge> : null}
             <Button
               variant="ghost"
               size="sm"
               iconOnly
-              title="Mesurer à nouveau"
-              aria-label="Mesurer à nouveau"
+              title={t('measureAgain')}
+              aria-label={t('measureAgain')}
               disabled={measuring}
               onClick={() => void refresh()}
             >
@@ -188,12 +189,12 @@ export function DiskSection({
         }
       >
         {sessions.length === 0 ? (
-          <Card className="px-4 py-6 text-center text-sm text-muted">Aucun worktree.</Card>
+          <Card className="px-4 py-6 text-center text-sm text-muted">{t('noWorktrees')}</Card>
         ) : (
           <Card className="overflow-hidden">
             <div className="flex items-center gap-3 border-b border-border bg-raised px-4 py-2 text-xs uppercase tracking-wide text-faint">
-              <span className="min-w-0 grow">Worktree</span>
-              <span className="w-32 shrink-0 text-right">Taille</span>
+              <span className="min-w-0 grow">{t('worktreeCol')}</span>
+              <span className="w-32 shrink-0 text-right">{t('sizeCol')}</span>
               <span className="w-16 shrink-0" />
             </div>
             <ul className="divide-y divide-border">
@@ -215,14 +216,14 @@ export function DiskSection({
 
       {orphans.length > 0 ? (
         <Section
-          title="Orphelins"
-          description="Des dossiers qu'aucune session ou que git ne connaît plus : fennec ne les supprime jamais seul."
+          title={t('orphans')}
+          description={t('orphansDescription')}
           flush
         >
           <Card className="overflow-hidden">
             <div className="flex items-center gap-3 border-b border-border bg-raised px-4 py-2 text-xs uppercase tracking-wide text-faint">
-              <span className="min-w-0 grow">Dossier</span>
-              <span className="w-32 shrink-0 text-right">Taille</span>
+              <span className="min-w-0 grow">{t('folderCol')}</span>
+              <span className="w-32 shrink-0 text-right">{t('sizeCol')}</span>
               <span className="w-16 shrink-0" />
             </div>
             <ul className="divide-y divide-border">
@@ -244,7 +245,7 @@ export function DiskSection({
         open={confirm !== null}
         title={confirmTitle}
         body={confirmBody}
-        confirmLabel="Supprimer"
+        confirmLabel={t('delete')}
         onConfirm={() => void handleConfirm()}
         onCancel={() => setConfirm(null)}
       />
@@ -268,6 +269,7 @@ function SessionRow({
   onTrash: () => void;
 }) {
   const lang = useLang();
+  const t = useT();
   return (
     <li className="group relative flex items-center gap-3 px-4 py-3 text-sm transition-colors before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-accent before:transition-opacity hover:bg-accent-soft hover:before:opacity-100 before:opacity-0">
       <div className="min-w-0 grow">
@@ -281,23 +283,23 @@ function SessionRow({
           {entry.sessionTitle ? (
             <span>{entry.sessionTitle}</span>
           ) : entry.cache ? (
-            <span>Cache Cargo partagé</span>
+            <span>{t('sharedCargoCache')}</span>
           ) : (
             <span className="font-mono text-xs">{entry.name}</span>
           )}
         </button>
         <div className="mt-1 flex items-center gap-2">
           {entry.updatedAt ? (
-            <span className="text-xs text-muted">modifiée {formatRelative(lang, entry.updatedAt)}</span>
+            <span className="text-xs text-muted">{t('modifiedAt', { when: formatRelative(lang, entry.updatedAt) })}</span>
           ) : null}
-          {entry.running ? <Badge tone="accent" dot pulse>en cours</Badge> : null}
+          {entry.running ? <Badge tone="accent" dot pulse>{t('running')}</Badge> : null}
         </div>
         {error ? <p className="mt-1 text-err text-xs">{error}</p> : null}
       </div>
 
       <div className="w-32 shrink-0 text-right tabular-nums">
         <div>{formatBytes(lang, entry.bytes)}</div>
-        <div className="text-xs text-muted">dont {formatBytes(lang, entry.generatedBytes)} de cache</div>
+        <div className="text-xs text-muted">{t('ofWhichCache', { bytes: formatBytes(lang, entry.generatedBytes) })}</div>
       </div>
 
       <div className="flex w-16 shrink-0 items-center justify-end gap-1">
@@ -305,8 +307,8 @@ function SessionRow({
           variant="soft"
           size="sm"
           iconOnly
-          title={`Libérer le cache de build (${formatBytes(lang, entry.generatedBytes)})`}
-          aria-label={`Libérer le cache de build (${formatBytes(lang, entry.generatedBytes)})`}
+          title={t('freeBuildCache', { bytes: formatBytes(lang, entry.generatedBytes) })}
+          aria-label={t('freeBuildCache', { bytes: formatBytes(lang, entry.generatedBytes) })}
           disabled={busy || entry.running || entry.generatedBytes === 0}
           onClick={onClean}
         >
@@ -316,8 +318,8 @@ function SessionRow({
           variant="danger"
           size="sm"
           iconOnly
-          title="Supprimer le worktree et sa branche"
-          aria-label="Supprimer le worktree et sa branche"
+          title={t('deleteWorktreeBranch')}
+          aria-label={t('deleteWorktreeBranch')}
           disabled={busy || entry.running}
           onClick={onTrash}
         >
@@ -340,12 +342,13 @@ function OrphanRow({
   onTrash: () => void;
 }) {
   const lang = useLang();
+  const t = useT();
   return (
     <li className="group relative flex items-center gap-3 px-4 py-3 text-sm transition-colors before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-accent before:transition-opacity hover:bg-accent-soft hover:before:opacity-100 before:opacity-0">
       <div className="min-w-0 grow">
         <div className="font-mono text-xs">{entry.name}</div>
         <div className="mt-1 text-xs text-muted">
-          {entry.repoMissing ? 'dépôt introuvable' : 'inconnu de git ou sans session'}
+          {entry.repoMissing ? t('repoNotFound') : t('unknownToGit')}
         </div>
         {entry.sudoCommand ? (
           <div className="mt-2">
@@ -354,7 +357,7 @@ function OrphanRow({
               <CopyButton text={entry.sudoCommand} />
             </div>
             <p className="mt-1 text-xs text-muted">
-              Des fichiers appartiennent à root : à lancer dans un terminal.
+              {t('rootFilesHint')}
             </p>
           </div>
         ) : null}
@@ -369,8 +372,8 @@ function OrphanRow({
             variant="danger"
             size="sm"
             iconOnly
-            title="Supprimer ce dossier"
-            aria-label="Supprimer ce dossier"
+            title={t('deleteThisFolder')}
+            aria-label={t('deleteThisFolder')}
             disabled={busy}
             onClick={onTrash}
           >

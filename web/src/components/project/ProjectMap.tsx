@@ -13,6 +13,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import { Segmented } from '../ui/Segmented';
 import { EyeIcon } from '../Icons';
+import { useT } from '../../i18n';
 import { ModuleDetails } from './ModuleDetails';
 import type { ModuleMap } from '../../lib/api';
 
@@ -41,6 +42,7 @@ function RoutedEdge({
 const edgeTypes = { routed: RoutedEdge };
 
 export function ProjectMap({ map }: { map: ModuleMap }) {
+  const t = useT();
   const groups = map.groups.map((group) => group.name);
 
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
@@ -98,8 +100,8 @@ export function ProjectMap({ map }: { map: ModuleMap }) {
               <button
                 type="button"
                 className="shrink-0 rounded p-0.5 text-muted hover:bg-accent-soft hover:text-accent-strong"
-                title="À quoi correspond ce module"
-                aria-label="À quoi correspond ce module"
+                title={t('whatModuleIs')}
+                aria-label={t('whatModuleIs')}
                 onClick={(event) => {
                   event.stopPropagation();
                   setDetailsId(module.id);
@@ -109,7 +111,7 @@ export function ProjectMap({ map }: { map: ModuleMap }) {
               </button>
             </div>
             <div className="text-xs text-muted">
-              {module.files} fichiers · {module.tests} testés{module.entry ? ' · entrée' : ''}
+              {t('moduleStats', { files: module.files, tests: module.tests, entry: module.entry ? t('moduleEntry') : '' })}
             </div>
           </div>
         ),
@@ -128,7 +130,7 @@ export function ProjectMap({ map }: { map: ModuleMap }) {
         opacity: focus !== null && module.id !== focus && !adjacent.has(module.id) ? 0.3 : 1,
       },
     }));
-  }, [map.modules, map.dependencies, selected, focus, groupModuleIds]);
+  }, [map.modules, map.dependencies, selected, focus, groupModuleIds, t]);
 
   const edges = useMemo<Edge[]>(() =>
     map.dependencies
@@ -167,11 +169,11 @@ export function ProjectMap({ map }: { map: ModuleMap }) {
         }
         return { ...base, style: { stroke: 'var(--muted)', opacity: 0.08 } };
       }),
-    [map.dependencies, groupModuleIds, focus],
+    [map.dependencies, groupModuleIds, focus, t],
   );
 
   if (map.modules.length === 0) {
-    return <p className="text-xs text-muted">Aucun fichier source trouvé (le projet est-il un dépôt git ?).</p>;
+    return <p className="text-xs text-muted">{t('noSourceFiles')}</p>;
   }
 
   return (
@@ -180,10 +182,10 @@ export function ProjectMap({ map }: { map: ModuleMap }) {
       {groups.length > 1 && (
         <div className="flex">
           <Segmented
-            label="Groupe de modules"
+            label={t('moduleGroup')}
             segments={map.groups.map((group) => ({
               value: group.name,
-              label: `${group.name === '' ? 'Autres' : group.name} · ${group.modules}`,
+              label: t('moduleGroupOption', { name: group.name === '' ? t('otherGroup') : group.name, count: group.modules }),
             }))}
             value={selected}
             onChange={(name) => {
@@ -215,7 +217,7 @@ export function ProjectMap({ map }: { map: ModuleMap }) {
           >
             <Background color="var(--faint)" />
             <Controls showInteractive={false}>
-              <ControlButton onClick={toggleFullscreen} title="Plein écran" aria-label="Plein écran">
+              <ControlButton onClick={toggleFullscreen} title={t('fullscreen')} aria-label={t('fullscreen')}>
                 ⛶
               </ControlButton>
             </Controls>
@@ -224,8 +226,7 @@ export function ProjectMap({ map }: { map: ModuleMap }) {
         {details && <ModuleDetails module={details} onOpen={openModule} onClose={() => setDetailsId(null)} />}
       </div>
       <p className="mt-2 text-xs text-muted">
-        Cliquez un module pour ne voir que ses liens, sur l'œil pour savoir à quoi il correspond ; le nombre sur une
-        flèche compte les fichiers qui importent.
+        {t('mapHint')}
       </p>
     </>
   );

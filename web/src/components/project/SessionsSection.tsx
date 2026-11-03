@@ -6,7 +6,7 @@ import { EyeIcon, TrashIcon } from '../Icons';
 import { SessionStateIcon } from '../session/SessionStateIcon';
 import { formatRelative, formatDateTime, stateLabel } from '../../lib/format';
 import { Badge } from '../ui/Badge';
-import { useLang } from '../../i18n';
+import { useLang, useT } from '../../i18n';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Section } from '../ui/Section';
@@ -23,6 +23,7 @@ export function SessionsSection({
   onSessionsDeleted: (ids: string[]) => void;
 }) {
   const lang = useLang();
+  const t = useT();
   const [pendingDelete, setPendingDelete] = useState<SessionSummary[] | null>(null);
   // Selection mode: a row click toggles it instead of opening the session.
   const [selecting, setSelecting] = useState(false);
@@ -49,36 +50,40 @@ export function SessionsSection({
   return (
     <>
       <Section
-        title="Sessions"
+        title={t('sessionsSectionTitle')}
         description={
-          sessions.length === 1
-            ? '1 session de ce projet, la dernière créée en haut.'
-            : `${sessions.length} sessions de ce projet, la dernière créée en haut.`
+          t('sessionsDescription', {
+            count: sessions.length,
+            s: sessions.length > 1 ? 's' : '',
+          })
         }
         actions={
           deletable.length === 0 ? null : selecting ? (
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted">
-                {chosen.length} sélectionnée{chosen.length > 1 ? 's' : ''}
+                {t('sessionsSelectedCount', {
+                  count: chosen.length,
+                  s: chosen.length > 1 ? 's' : '',
+                })}
               </span>
               <Button variant="danger" disabled={chosen.length === 0} onClick={() => setPendingDelete(chosen)}>
                 <TrashIcon className="h-3.5 w-3.5" />
-                Supprimer
+                {t('delete')}
               </Button>
               <Button variant="ghost" onClick={stopSelecting}>
-                Annuler
+                {t('cancel')}
               </Button>
             </div>
           ) : (
             <Button variant="secondary" onClick={() => setSelecting(true)}>
-              Sélectionner plusieurs
+              {t('selectMultiple')}
             </Button>
           )
         }
         flush
       >
         {sessions.length === 0 ? (
-          <p className="py-3 text-xs text-muted">Aucune session pour l'instant.</p>
+          <p className="py-3 text-xs text-muted">{t('noSessionsYet')}</p>
         ) : (
           <Card className="overflow-hidden">
             <div className="flex items-center gap-3 border-b border-border bg-raised px-4 py-2 text-xs uppercase tracking-wide text-faint">
@@ -86,15 +91,15 @@ export function SessionsSection({
                 <input
                   type="checkbox"
                   className="h-3.5 w-3.5 shrink-0 accent-[var(--color-accent)]"
-                  aria-label="Tout sélectionner"
+                  aria-label={t('selectAllAria')}
                   checked={allChosen}
                   onChange={() => setSelected(allChosen ? new Set() : new Set(deletable.map((s) => s.id)))}
                 />
               ) : null}
-              <span className="min-w-0 grow">Titre</span>
-              <span className="w-28 shrink-0">Agent</span>
-              <span className="w-32 shrink-0">Statut</span>
-              <span className="w-24 shrink-0 text-right">Modifié</span>
+              <span className="min-w-0 grow">{t('titleCol')}</span>
+              <span className="w-28 shrink-0">{t('agentCol')}</span>
+              <span className="w-32 shrink-0">{t('statusCol')}</span>
+              <span className="w-24 shrink-0 text-right">{t('modifiedCol')}</span>
               <span className="w-16 shrink-0" />
             </div>
             <ul className="divide-y divide-border">
@@ -114,10 +119,10 @@ export function SessionsSection({
                       <input
                         type="checkbox"
                         className="h-3.5 w-3.5 shrink-0 accent-[var(--color-accent)]"
-                        aria-label={`Sélectionner ${s.title}`}
+                        aria-label={t('selectSessionAria', { title: s.title })}
                         checked={isSelected}
                         disabled={running}
-                        title={running ? 'Une session en cours ne peut pas être supprimée' : undefined}
+                        title={running ? t('runningNotDeletable') : undefined}
                         onClick={(event) => event.stopPropagation()}
                         onChange={() => toggle(s.id)}
                       />
@@ -134,7 +139,7 @@ export function SessionsSection({
                         <SessionStateIcon state={s.state} />
                         {stateLabel(lang, s.state)}
                       </span>
-                      {s.awaitingIntegration ? <Badge tone="accent" solid>à intégrer</Badge> : null}
+                      {s.awaitingIntegration ? <Badge tone="accent" solid>{t('toIntegrateBadge')}</Badge> : null}
                     </span>
                     <span
                       className="w-24 shrink-0 text-right font-mono text-xs text-faint tabular-nums"
@@ -147,8 +152,8 @@ export function SessionsSection({
                         variant="soft"
                         size="sm"
                         iconOnly
-                        title="Ouvrir la session"
-                        aria-label="Ouvrir la session"
+                        title={t('openSession')}
+                        aria-label={t('openSession')}
                         onClick={(event) => {
                           event.stopPropagation();
                           onOpenSession(s.id);
@@ -163,8 +168,8 @@ export function SessionsSection({
                           variant="danger"
                           size="sm"
                           iconOnly
-                          title="Supprimer la session"
-                          aria-label="Supprimer la session"
+                          title={t('deleteSession')}
+                          aria-label={t('deleteSession')}
                           onClick={(event) => {
                             event.stopPropagation();
                             setPendingDelete([s]);

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useT } from '../i18n';
 import type { ModelChoice, ModelChoices, ModelRef } from '../lib/api';
 import { getModelChoices, setSessionModel, setSessionMode } from '../lib/api';
 
@@ -31,6 +32,7 @@ export function useModeAndModel({
   onError,
   onModelApplied,
 }: UseModeAndModelArgs) {
+  const t = useT();
   // Optimistic mode while `setSessionMode` is in flight; cleared once the
   // server's mode (event stream or detail) matches it.
   const [pendingMode, setPendingMode] = useState<string | null>(null);
@@ -118,7 +120,7 @@ export function useModeAndModel({
       onError(
         error instanceof Error
           ? error.message
-          : 'Erreur lors du changement de mode',
+          : t('modeChangeError'),
       );
       return false;
     }
@@ -148,7 +150,7 @@ export function useModeAndModel({
       onError(
         error instanceof Error
           ? error.message
-          : 'Erreur lors du changement de modèle',
+          : t('modelChangeError'),
       );
       return false;
     }
