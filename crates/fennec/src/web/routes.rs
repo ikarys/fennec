@@ -10,10 +10,10 @@ use super::audit_routes;
 use super::http::{Request, error, send, send_json};
 use super::proposal_routes;
 use super::{
-    assets, backlog_routes, event_stream, file_manager, idea_routes, integration, mcp_routes,
-    model_routes, project_dashboard, project_delete, project_routes, rule_approval_routes,
-    rule_routes, servers, session_delete, session_routes, settings_routes, terminal, waiver_routes,
-    workflow_routes, worktree_routes,
+    assets, backlog_routes, event_stream, file_manager, folder_routes, idea_routes, integration,
+    mcp_routes, model_routes, project_dashboard, project_delete, project_list_routes,
+    project_routes, rule_approval_routes, rule_routes, servers, session_delete, session_routes,
+    settings_routes, terminal, waiver_routes, workflow_routes, worktree_routes,
 };
 use serde_json::json;
 use std::net::TcpStream;
@@ -49,15 +49,17 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         }
         ("POST", ["api", "settings", "mcp", "connect"]) => mcp_routes::connect(app, req, stream),
         ("GET", ["api", "models", "choices"]) => model_routes::choices(app, stream),
-        ("GET", ["api", "folders"]) => session_routes::list_folders(app, req, stream),
-        ("POST", ["api", "folders", "create"]) => session_routes::create_folder(req, stream),
-        ("GET", ["api", "projects"]) => session_routes::list_projects(app, stream),
+        ("GET", ["api", "folders"]) => folder_routes::list_folders(app, req, stream),
+        ("POST", ["api", "folders", "create"]) => folder_routes::create_folder(req, stream),
+        ("GET", ["api", "projects"]) => project_list_routes::list_projects(app, stream),
         ("GET", ["api", "backlog"]) => backlog_routes::list_backlog(app, stream),
-        ("POST", ["api", "projects"]) => session_routes::open_project(app, req, stream),
+        ("POST", ["api", "projects"]) => project_list_routes::open_project(app, req, stream),
         ("GET", ["api", "projects", id, "commands"]) => {
-            session_routes::list_commands(app, stream, id)
+            project_list_routes::list_commands(app, stream, id)
         }
-        ("GET", ["api", "projects", id, "agents"]) => session_routes::list_agents(app, stream, id),
+        ("GET", ["api", "projects", id, "agents"]) => {
+            project_list_routes::list_agents(app, stream, id)
+        }
         ("GET", ["api", "projects", id, "overview"]) => {
             project_routes::get_overview(app, stream, id)
         }
@@ -107,7 +109,7 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
             project_delete::delete_project(app, req, stream, id)
         }
         ("POST", ["api", "projects", id, "favorite"]) => {
-            session_routes::set_favorite(app, req, stream, id)
+            project_list_routes::set_favorite(app, req, stream, id)
         }
         ("GET", ["api", "projects", id, "workflows"]) => {
             workflow_routes::list_workflows(app, stream, id)

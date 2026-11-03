@@ -1,9 +1,11 @@
-//! The session, project and folder handlers the dispatcher in `routes` routes
-//! to. Kept in their own module so `routes` stays a thin dispatcher.
+//! The session handlers the dispatcher in `routes` routes to: created, read,
+//! written to, replayed, compacted, streamed.
 
 use super::App;
 use super::editor;
+use super::folder_routes::store_dir;
 use super::http::{Request, error, send_json};
+use super::project_list_routes::project_json;
 use super::{
     context_view::context_view,
     model_routes, session_name,
@@ -15,9 +17,7 @@ use crate::agent::ports::EventLog;
 use crate::agent::workflow::WorkflowJob;
 use crate::agents;
 use crate::chat;
-use crate::domain::agent::{
-    resolve as agent_resolve, resolve_mode as agent_resolve_mode, switch_to,
-};
+use crate::domain::agent::{resolve as agent_resolve, switch_to};
 use crate::domain::agent_suggestion;
 use crate::domain::agents_md;
 use crate::domain::attachment::{Attachment, from_data_url};
@@ -27,173 +27,22 @@ use crate::domain::conversation::{first_request, last_assistant_text};
 use crate::domain::event::{DoneReason, Event, QueueMode};
 use crate::domain::id::new_id;
 use crate::domain::preferences::ModelRef;
-use crate::domain::project::{Project, SessionSummary};
+use crate::domain::project::SessionSummary;
 use crate::domain::queue;
 use crate::domain::replay::replayable;
 use crate::domain::session_skills::missed_always_on;
-use crate::domain::slash::{TurnInput, commands, resolve};
+use crate::domain::slash::{TurnInput, resolve};
 use crate::domain::task_proposal;
 use crate::domain::vision::seen_images;
 use crate::domain::workflow::run::{self as run, RunOutcome, Waiting};
 use crate::notifier::NotifyingLog;
 use crate::skills;
 use crate::store::SqliteStore;
-use crate::{folders, git, workflows};
+use crate::{git, workflows};
 use backlog::idea_for_session;
 use serde_json::{Value, json};
 use std::net::TcpStream;
 use std::path::Path;
-
-pub(super) fn list_folders(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
-    let dir = req
-        .query_param("path")
-        .filter(|p| !p.is_empty())
-        .map_or_else(folders::home, Into::into);
-    if folders::inside_store(&dir, store_dir(app)) {
-        return error(
-            stream,
-            400,
-            "fennec's own store cannot be browsed as a project",
-        );
-    }
-    match folders::list(&dir) {
-        Ok(listing) => send_json(stream, 200, &json!(listing)),
-        Err(e) => error(stream, 400, &e),
-    }
-}
-
-/// The directory holding fennec's database and the sessions' worktrees.
-fn store_dir(app: &App) -> &Path {
-    app.settings.db_path.parent().unwrap_or(Path::new("/"))
-}
-
-pub(super) fn create_folder(req: &Request, stream: &mut TcpStream) -> Result<(), String> {
-    let body = req.json()?;
-    let base = body["path"].as_str().unwrap_or("");
-    let name = body["name"].as_str().unwrap_or("");
-    let base = if base.is_empty() {
-        folders::home()
-    } else {
-        Path::new(base).into()
-    };
-    match folders::create(&base, name) {
-        Ok(path) => send_json(stream, 200, &json!({ "path": path.display().to_string() })),
-        Err(e) => error(stream, 400, &e),
-    }
-}
-
-pub(super) fn list_projects(app: &App, stream: &mut TcpStream) -> Result<(), String> {
-    let store = app.store()?;
-    let favorites = store.favorite_projects()?;
-    let mut out = Vec::new();
-    for p in store.projects()? {
-        // The log says a workflow ended; git says whether its work still waits.
-        let pending = git::sessions_with_unintegrated_work(Path::new(&p.workdir));
-        // Each session's agent, so the project page can tell an analysis apart.
-        let list = agents::discover(Path::new(&p.workdir));
-        let sessions: Vec<Value> = store
-            .sessions(Some(&p.id))?
-            .iter()
-            .map(|s| {
-                let mut v = session_json(app, s);
-                v["awaitingIntegration"] = json!(s.awaiting_integration && pending.contains(&s.id));
-                let mode = store.last_mode(&s.id).ok().flatten().and_then(|m| {
-                    agent_resolve_mode(&list, Some(m.as_str())).map(|a| a.id.clone())
-                });
-                v["mode"] = json!(mode);
-                v
-            })
-            .collect();
-        let mut v = project_json(&p, store_dir(app));
-        v["favorite"] = json!(favorites.contains(&p.id));
-        v["branch"] = json!(git::current_branch(Path::new(&p.workdir)));
-        v["remote"] = json!(
-            git::remote_url(Path::new(&p.workdir))
-                .as_deref()
-                .and_then(git::web_url)
-        );
-        v["editorUrl"] = json!(editor::vscode_link(
-            &p.workdir,
-            std::env::var("WSL_DISTRO_NAME").ok().as_deref(),
-        ));
-        v["sessions"] = Value::Array(sessions);
-        out.push(v);
-    }
-    send_json(stream, 200, &Value::Array(out))
-}
-
-pub(super) fn set_favorite(
-    app: &App,
-    req: &Request,
-    stream: &mut TcpStream,
-    id: &str,
-) -> Result<(), String> {
-    let store = app.store()?;
-    let body = req.json()?;
-    let favorite = match body["favorite"].as_bool() {
-        Some(favorite) => favorite,
-        None => return error(stream, 400, "favorite must be a bool"),
-    };
-    if !store.set_favorite(id, favorite)? {
-        return error(stream, 404, "no such project");
-    }
-    send_json(stream, 200, &json!({ "ok": true }))
-}
-
-pub(super) fn open_project(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
-    let body = req.json()?;
-    let dir = Path::new(body["workdir"].as_str().unwrap_or(""));
-    let Some(dir) = dir.canonicalize().ok().filter(|d| d.is_dir()) else {
-        return error(stream, 400, "not a directory");
-    };
-    if folders::inside_store(&dir, store_dir(app)) {
-        return error(
-            stream,
-            400,
-            "fennec's own store cannot be opened as a project",
-        );
-    }
-    let p = app.store()?.project_for(&dir.display().to_string())?;
-    send_json(stream, 200, &project_json(&p, store_dir(app)))
-}
-
-pub(super) fn list_commands(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
-    let store = app.store()?;
-    let Some(project) = store.project(id)? else {
-        return error(stream, 404, "no such project");
-    };
-    let list = commands(&skills::discover(Path::new(&project.workdir)));
-    let out: Vec<Value> = list
-        .into_iter()
-        .map(|command| json!({ "name": command.name, "description": command.description }))
-        .collect();
-    send_json(stream, 200, &Value::Array(out))
-}
-
-pub(super) fn list_agents(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
-    let store = app.store()?;
-    let Some(project) = store.project(id)? else {
-        return error(stream, 404, "no such project");
-    };
-    let mut list = agents::discover(Path::new(&project.workdir));
-    // The menu follows a project's order, so phase comes first.
-    list.sort_by_key(|agent| (agent.phase.is_none(), agent.phase));
-    let out: Vec<Value> = list
-        .iter()
-        .map(|agent| {
-            json!({
-                "id": agent.id,
-                "name": agent.name,
-                "description": agent.description,
-                "color": agent.color,
-                "subagent": agent.subagent,
-                "phase": agent.phase,
-                "origin": agent.origin,
-            })
-        })
-        .collect();
-    send_json(stream, 200, &Value::Array(out))
-}
 
 pub(super) fn parse_attachments(body: &Value) -> Result<Vec<Attachment>, String> {
     let Some(attachments) = body.get("attachments").filter(|v| !v.is_null()) else {
@@ -789,21 +638,11 @@ pub(super) fn serve_run_events(
     send_json(stream, 200, &Value::Array(out))
 }
 
-fn session_json(app: &App, s: &SessionSummary) -> Value {
+pub(super) fn session_json(app: &App, s: &SessionSummary) -> Value {
     json!({
         "id": s.id, "title": s.title, "state": s.state(app.turns.is_running(&s.id)),
         "createdAt": s.created_at, "updatedAt": s.updated_at, "parentId": s.parent_id,
         "awaitingIntegration": s.awaiting_integration,
-    })
-}
-
-fn project_json(p: &Project, store_dir: &Path) -> Value {
-    json!({
-        "id": p.id,
-        "name": p.name,
-        "workdir": p.workdir,
-        "chat": chat::is_chat(p),
-        "sessionWorktree": folders::inside_store(Path::new(&p.workdir), store_dir),
     })
 }
 
@@ -827,35 +666,8 @@ pub(super) fn append_human_event(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{LlmSettings, Settings};
-    use crate::domain::preferences::ModelParams;
-    use crate::notifier::Notifier;
-    use crate::web::turns::Turns;
-    use std::collections::HashMap;
-    use std::io::Read;
+    use crate::web::test_support::app;
     use std::net::TcpListener;
-    use std::path::PathBuf;
-    use std::sync::{Arc, Mutex};
-
-    #[test]
-    fn project_json_marks_only_the_chat() {
-        let chat = Project {
-            id: chat::ID.into(),
-            name: chat::NAME.into(),
-            workdir: "/scratch".into(),
-        };
-        let other = Project {
-            id: "other".into(),
-            name: "o".into(),
-            workdir: "/w".into(),
-        };
-        let store_dir = Path::new("/nowhere");
-        let chat_json = project_json(&chat, store_dir);
-        let other_json = project_json(&other, store_dir);
-        assert_eq!(chat_json["chat"], true);
-        assert_eq!(other_json["chat"], false);
-        assert_eq!(chat_json["sessionWorktree"], false);
-    }
 
     #[test]
     fn create_session_routes_chat_id_to_the_scratch_project() {
@@ -902,79 +714,5 @@ mod tests {
         // tool first needs it.
         assert!(!scratch.exists());
         let _ = std::fs::remove_dir_all(&base);
-    }
-
-    /// A file-backed store: `App::store` opens one connection per call, so an
-    /// in-memory DB would be empty on every call.
-    fn app(db_path: PathBuf) -> App {
-        let settings = Settings {
-            llm: LlmSettings {
-                base_url: "http://localhost".into(),
-                api_key: None,
-                defaults: ModelParams {
-                    provider: "local".into(),
-                    model: "test".into(),
-                    max_tokens: 100,
-                    context_window: 1000,
-                    compact_at: 0.85,
-                    reasoning_effort: None,
-                },
-                listed: Vec::new(),
-            },
-            db_path,
-        };
-        let notifier = Arc::new(Notifier::default());
-        App {
-            turns: Turns::new(settings.clone(), notifier.clone()),
-            settings,
-            port: 0,
-            notifier,
-            skill_folds: Mutex::new(HashMap::new()),
-            idea_reports: Mutex::new(HashMap::new()),
-            idea_queues: Mutex::default(),
-            worktree_scan: Mutex::default(),
-            server_runs: Arc::new(Mutex::new(HashMap::new())),
-        }
-    }
-
-    #[test]
-    fn list_projects_includes_session_mode() {
-        let db_path = std::env::temp_dir().join(format!("fennec-routes-test-{}.db", new_id()));
-        let app = app(db_path.clone());
-        let store = app.store().unwrap();
-        let project = store.project_for("/tmp/analyze-mode").unwrap();
-        let session = store.create_session(&project, "analyze").unwrap();
-        store
-            .append(
-                &session,
-                &Event::ModeChanged {
-                    mode: "analyze".into(),
-                    auto: false,
-                    reason: None,
-                },
-            )
-            .unwrap();
-
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let addr = listener.local_addr().unwrap();
-        let client = TcpStream::connect(addr).unwrap();
-        let mut server = listener.accept().unwrap().0;
-        {
-            let mut client = client;
-            list_projects(&app, &mut client).unwrap();
-        }
-        let mut body = String::new();
-        server.read_to_string(&mut body).unwrap();
-        let json = body
-            .rsplit("\r\n\r\n")
-            .next()
-            .expect("a response body after the headers");
-        let projects: Value = serde_json::from_str(json).unwrap();
-        let mode = projects[0]["sessions"]
-            .as_array()
-            .and_then(|s| s.iter().find(|s| s["id"] == session))
-            .and_then(|s| s["mode"].as_str());
-        assert_eq!(mode, Some("analyze"));
-        let _ = std::fs::remove_file(&db_path);
     }
 }
