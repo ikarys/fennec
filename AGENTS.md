@@ -237,7 +237,7 @@ crates/fennec/src/
     queue.rs           the queued messages dropped into the turn between tool rounds
     preflight.rs       runs a plan's checks at the end of the planner's turn, sends it back once
     compaction.rs      the summary round and the new window
-    prompt.rs          the system prompt, plus fennec's working method
+    prompt.rs          the system prompt: what fennec does around the agent, the working method, the style
     workflow.rs        the workflow walk and its jobs (start, answer, continue, resume, stop);
                        workflow/ nodes (one node run), fork (parallel branches), outcome (`Outcome:` line),
                        criteria (the criteria node and the agents' verdicts)
