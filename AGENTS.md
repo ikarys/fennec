@@ -206,7 +206,8 @@ crates/fennec/src/
     module_map.rs      the project map: modules, their dependencies from the imports, their layout
     map_doc.rs         docs/map.md: the map as Markdown (Mermaid, table), stale or current; its edges read back
     drift.rs           the produced architecture against the human's module rules and the committed docs/map.md
-    risk.rs            risk zones: a commit's authorship from its trailers, the signals, the report
+    risk.rs            risk zones: a commit's authorship from its trailers, the signals, the report;
+                       risk/test_subject.rs which files need a test of their own (the untested signal skips the rest)
     agents_md.rs       the AGENTS.md draft at the end of an answer, which the human writes in one click
     task_proposal.rs   the backlog tasks an agent proposed with propose_task, and which the human accepted
     agent_suggestion.rs the agent switch an agent suggested, since the human last wrote
