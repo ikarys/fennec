@@ -71,6 +71,18 @@ export function RunActionCard({
                     {choice}
                   </Button>
                 ))}
+                <Button
+                  type="button"
+                  variant="danger"
+                  size="sm"
+                  iconOnly
+                  disabled={isBusy}
+                  onClick={() => handleAction(onStop)}
+                  title={t('runActionCardStopWorkflowTitle')}
+                  aria-label={t('stop')}
+                >
+                  <StopIcon className="h-4 w-4" />
+                </Button>
               </div>
             </>
           )}
