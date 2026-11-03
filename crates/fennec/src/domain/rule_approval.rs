@@ -41,9 +41,11 @@ pub struct Pending {
     pub call_id: String,
     pub message_id: String,
     pub call: ToolCall,
+    pub subject: String,
     pub kind: String,
     pub pattern: String,
     pub access: Option<String>,
+    pub folders: Vec<String>,
 }
 
 /// The last `rule.approval_requested` whose call is still open and has no
@@ -65,9 +67,11 @@ pub fn pending(events: &[Event]) -> Option<Pending> {
     view.iter().rev().find_map(|event| match event {
         Event::RuleApprovalRequested {
             call_id,
+            subject,
             kind,
             pattern,
             access,
+            folders,
             ..
         } if open.contains(call_id) && !answered.contains(call_id.as_str()) => view
             .iter()
@@ -82,9 +86,11 @@ pub fn pending(events: &[Event]) -> Option<Pending> {
                 call_id: call_id.clone(),
                 message_id,
                 call,
+                subject: subject.clone(),
                 kind: kind.clone(),
                 pattern: pattern.clone(),
                 access: access.clone(),
+                folders: folders.clone(),
             }),
         _ => None,
     })

@@ -137,8 +137,11 @@ export function SessionPage({
     workflowUsage,
     context,
     vision,
+    pending,
   } = useSessionThread(sessionId);
   const running = view.running;
+  const pendingCallId =
+    pending.pendingApproval?.callId ?? pending.pendingWaiver?.callId;
   const run = view.run;
   const waiting = runWaiting(run, running, view.lastDone);
   // The detail is fetched once; the event stream says how a turn ended.
@@ -200,8 +203,8 @@ export function SessionPage({
     handleRetry,
   } = useSessionActions({
     sessionId,
-    pendingApproval: view.pendingApproval,
-    pendingWaiver: view.pendingWaiver,
+    pendingApproval: pending.pendingApproval,
+    pendingWaiver: pending.pendingWaiver,
     onError: setSendError,
   });
   const {
@@ -681,6 +684,7 @@ export function SessionPage({
                             <ThreadItemView
                               key={item.id}
                               item={item}
+                              pendingCallId={pendingCallId}
                               model={
                                 currentModel
                                   ? modelShortName(currentModel.model)
@@ -727,22 +731,22 @@ export function SessionPage({
                       </div>
                     </div>
 
-                    {view.pendingApproval &&
+                    {pending.pendingApproval &&
                       !running &&
                       !waiting &&
                       !detail?.parentId && (
                         <RuleApprovalCard
-                          approval={view.pendingApproval}
+                          approval={pending.pendingApproval}
                           onAnswer={handleApproval}
                           disabled={running}
                         />
                       )}
-                    {view.pendingWaiver &&
+                    {pending.pendingWaiver &&
                       !running &&
                       !waiting &&
                       !detail?.parentId && (
                         <WaiverCard
-                          waiver={view.pendingWaiver}
+                          waiver={pending.pendingWaiver}
                           onAnswer={handleWaiver}
                           disabled={running}
                         />
@@ -809,7 +813,7 @@ export function SessionPage({
                       onFollowChange={setFollow}
                     />
                     {!detail?.parentId && (
-                      <QueuedMessages queued={view.queued} onCancel={handleCancelQueued} />
+                      <QueuedMessages queued={pending.queued} onCancel={handleCancelQueued} />
                     )}
                     {!detail?.parentId && (
                       <Composer

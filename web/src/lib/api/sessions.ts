@@ -255,6 +255,41 @@ export function getVision(id: string): Promise<SeenImage[]> {
   );
 }
 
+export interface PendingApproval {
+  callId: string;
+  subject: string;
+  kind: 'command' | 'tool' | 'path';
+  pattern: string;
+  access: 'read' | 'write' | 'readWrite' | null;
+  /** The folders the human may grant instead of `pattern`, narrowest first. */
+  folders: string[];
+}
+
+export interface PendingWaiver {
+  callId: string;
+  path: string;
+  reason: string;
+}
+
+export interface QueuedMessage {
+  queueId: string;
+  content: string;
+}
+
+/** The session's pending blocks, folded by the server: the UI computes none. */
+export interface ThreadPending {
+  pendingApproval: PendingApproval | null;
+  pendingWaiver: PendingWaiver | null;
+  /** Messages queued while a turn runs, in order. */
+  queued: QueuedMessage[];
+}
+
+export function getThread(id: string): Promise<ThreadPending> {
+  return request<ThreadPending>(
+    `/api/sessions/${encodeURIComponent(id)}/thread`,
+  );
+}
+
 /** One MCP tool as the composer sees it, with its token cost. */
 export interface McpToolView {
   name: string;

@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import type { ApprovalChoice } from '../lib/api/sessions';
-import type { PendingApproval, PendingWaiver } from '../lib/fold';
+import type { ApprovalChoice, PendingApproval, PendingWaiver } from '../lib/api/sessions';
 import {
   answerRuleApproval,
   answerWaiver,
@@ -15,9 +14,9 @@ interface UseSessionActionsArgs {
   /** The session to act on, or null when no session is selected. */
   sessionId: string | null;
   /** The pending rule approval, if any. */
-  pendingApproval: PendingApproval | undefined;
+  pendingApproval: PendingApproval | null;
   /** The pending waiver, if any. */
-  pendingWaiver: PendingWaiver | undefined;
+  pendingWaiver: PendingWaiver | null;
   /** The page's send-error state: action failures are shown there. */
   onError: (message: string | null) => void;
 }

@@ -2,7 +2,7 @@
  * Messages queued while a turn runs. Rendered above the composer so the human
  * can see what will be dropped into the turn, and remove one.
  */
-import type { QueuedMessage } from '../../lib/fold';
+import type { QueuedMessage } from '../../lib/api/sessions';
 import { CloseIcon } from '../Icons';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
