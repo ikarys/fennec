@@ -56,7 +56,7 @@ export function CodeBlockWithPreview({ kind, source }: { kind: PreviewKind; sour
             sandbox="allow-scripts"
             srcDoc={settledSource}
             title="Aperçu HTML"
-            className="block h-[60vh] w-full bg-white"
+            className="block h-[60vh] w-full bg-panel"
           />
         ) : (
           <div className="px-4 py-2">

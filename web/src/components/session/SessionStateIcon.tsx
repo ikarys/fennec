@@ -6,7 +6,7 @@ import { stateLabel } from '../../lib/format';
 const DISC: Partial<Record<SessionState, { color: string; mark: string }>> = {
   complete: { color: 'text-ok', mark: 'M8 12.5l2.5 2.5L16 9.5' },
   error: { color: 'text-err', mark: 'M12 7.5v5.5M12 16.5h.01' },
-  waiting_for_user: { color: 'text-accent', mark: 'M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5M12 16.5h.01' },
+  waiting_for_user: { color: 'text-attention', mark: 'M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5M12 16.5h.01' },
   stopped: { color: 'text-muted', mark: 'M9.5 9.5h5v5h-5z' },
   truncated: { color: 'text-muted', mark: 'M8 12h.01M12 12h.01M16 12h.01' },
 };

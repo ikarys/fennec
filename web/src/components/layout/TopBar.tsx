@@ -114,11 +114,11 @@ function AttentionBell({ attention, onOpen }: { attention: AttentionItem[]; onOp
         aria-haspopup="true"
         aria-expanded={open}
         title={count > 0 ? `${count} à regarder` : 'Rien à regarder'}
-        className={buttonClass({ variant: 'ghost', size: 'sm' }, count > 0 ? 'text-accent' : undefined)}
+        className={buttonClass({ variant: 'ghost', size: 'sm' }, count > 0 ? 'text-attention' : undefined)}
       >
         <span className="flex items-center gap-1">
           <BellIcon className="h-4 w-4" />
-          {count > 0 ? <Badge tone="accent">{count}</Badge> : null}
+          {count > 0 ? <Badge tone="attention">{count}</Badge> : null}
         </span>
       </button>
       {open ? (
@@ -137,7 +137,7 @@ function AttentionBell({ attention, onOpen }: { attention: AttentionItem[]; onOp
                 className="block w-full rounded px-2 py-1.5 text-left hover:bg-raised"
               >
                 <div className="flex items-center gap-1.5">
-                  <Badge tone={item.kind === 'error' ? 'err' : 'accent'} dot>
+                  <Badge tone={item.kind === 'error' ? 'err' : 'attention'} dot>
                     {kindLabel(item.kind)}
                   </Badge>
                   <span className="min-w-0 flex-1 truncate text-xs font-medium text-text">{item.title}</span>
