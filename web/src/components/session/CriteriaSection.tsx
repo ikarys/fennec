@@ -39,6 +39,7 @@ export function CriterionProvenanceBadge({ provenance }: { provenance: Provenanc
 
 export function CriteriaSection({ criteria }: { criteria: CriterionView[] }) {
   const passed = criteria.filter((criterion) => criterion.status === 'passed').length;
+  const failed = criteria.filter((criterion) => criterion.status === 'failed').length;
   const indicative = criteria.filter((criterion) => criterion.status === 'passed' && criterion.provenance?.kind === 'indicative').length;
 
   return (
@@ -46,27 +47,34 @@ export function CriteriaSection({ criteria }: { criteria: CriterionView[] }) {
       id="criteria"
       title={panelBlock('criteria').title}
       summary={
-        criteria.length > 0
-          ? indicative > 0
-            ? `${passed}/${criteria.length} · ${indicative} indicatif`
-            : `${passed}/${criteria.length}`
-          : undefined
+        criteria.length > 0 ? (
+          <Badge
+            tone={failed > 0 ? 'err' : passed === criteria.length ? 'ok' : 'neutral'}
+            pill
+            title={indicative > 0 ? `${passed}/${criteria.length} · ${indicative} indicatif` : undefined}
+          >
+            {passed}/{criteria.length}
+          </Badge>
+        ) : undefined
       }
     >
       {criteria.length === 0 ? (
         <div className="text-xs text-muted">Aucun critère : ils viennent du plan validé d'un workflow.</div>
       ) : (
         <div className="flex flex-col">
+          <div className="h-1 w-full overflow-hidden rounded-full bg-raised">
+            <div className="h-full rounded-full bg-ok" style={{ width: `${(passed / criteria.length) * 100}%` }} />
+          </div>
           {criteria.map((criterion) => {
             const provenance = criterion.provenance;
             const dotClass = criterionDotClass(criterion.status, provenance);
 
             return (
               <details key={criterion.id}>
-                <summary className="flex cursor-pointer list-none items-start gap-2 py-1.5 text-xs select-none">
+                <summary className="group flex cursor-pointer list-none items-start gap-2 rounded-md px-1 py-1.5 text-xs select-none hover:bg-accent-soft">
                   <span aria-hidden className={`mt-1 h-2 w-2 shrink-0 rounded-full ${dotClass}`} />
                   <span className="shrink-0 font-mono text-muted">{criterion.id}</span>
-                  <span className="grow break-words text-text">{criterion.description}</span>
+                  <span className="grow break-words text-text group-hover:text-accent-strong">{criterion.description}</span>
                   <PassedBeforeBadge passedBefore={criterion.passedBefore} />
                   <CriterionProvenanceBadge provenance={provenance} />
                 </summary>

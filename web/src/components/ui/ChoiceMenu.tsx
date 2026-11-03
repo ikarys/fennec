@@ -45,6 +45,8 @@ export function ChoiceMenu({
   trigger,
   align = 'left',
   width = 'w-56',
+  direction = 'up',
+  className = '',
 }: {
   /** Names the menu for screen readers. */
   label: string;
@@ -58,6 +60,10 @@ export function ChoiceMenu({
   trigger: ReactNode;
   align?: 'left' | 'right';
   width?: string;
+  /** The menu opens above the trigger (the composer's toolbar); 'down' when it sits at the top of a column. */
+  direction?: 'up' | 'down';
+  /** Layout classes for the trigger button (`w-full` in a fixed-width column). */
+  className?: string;
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -76,6 +82,7 @@ export function ChoiceMenu({
         aria-expanded={open}
         aria-label={label}
         title={title ?? selected?.description}
+        className={className}
         onClick={() => setOpen((isOpen) => !isOpen)}
       >
         {trigger}
@@ -84,9 +91,9 @@ export function ChoiceMenu({
         <Card
           role="menu"
           aria-label={label}
-          className={`absolute bottom-full z-10 mb-1 max-h-80 overflow-y-auto p-1 ${width} ${
+          className={`absolute z-20 max-h-80 overflow-y-auto p-1 ${width} ${
             align === 'right' ? 'right-0' : 'left-0'
-          }`}
+          } ${direction === 'down' ? 'top-full mt-1' : 'bottom-full mb-1'}`}
         >
           {groups.map((group, index) => (
             <div key={group.label ?? `group-${index}`}>

@@ -51,30 +51,41 @@ export function ModifiedFilesSection({ modifiedFiles, sessionId }: ModifiedFiles
       {visibleModifiedFiles.map((file) => {
         const relative = workdir ? file.key : undefined;
         const kind = file.kind;
-        return (
-          <div key={file.key} className="flex items-center gap-2 py-1.5 font-mono text-xs">
+        const previewable = kind !== undefined && relative !== undefined && opener !== undefined;
+        // A previewable file is a whole-row button: the accent wash is the only hover cue.
+        const rowClass = `flex w-full items-center gap-2 py-1.5 font-mono text-xs text-left${
+          previewable ? ' cursor-pointer rounded-md hover:bg-accent-soft' : ''
+        }`;
+        const pathClass = `grow overflow-hidden text-left text-ellipsis whitespace-nowrap${
+          previewable ? ' group-hover:text-accent-strong' : ''
+        }`;
+        const row = (
+          <>
             {/* Cut on the left: the file name is what tells files apart. */}
-            <span
-              dir="rtl"
-              title={file.key}
-              className="grow overflow-hidden text-left text-ellipsis whitespace-nowrap"
-            >
+            <span dir="rtl" title={file.key} className={pathClass}>
               <bdi>{file.key}</bdi>
             </span>
             <span className="text-ok tabular-nums">+{file.added}</span>
             <span className="text-muted tabular-nums">−{file.removed}</span>
-            {kind && relative && opener && (
-              <Button
-                variant="ghost"
-                size="sm"
-                iconOnly
-                onClick={() => opener({ path: relative, kind })}
-                title="Aperçu"
-                aria-label="Aperçu"
-              >
-                <EyeIcon className="h-4 w-4" />
-              </Button>
+            {previewable && (
+              <EyeIcon className="h-3.5 w-3.5 shrink-0 text-muted opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100" />
             )}
+          </>
+        );
+        return previewable ? (
+          <button
+            key={file.key}
+            type="button"
+            className={`group ${rowClass}`}
+            onClick={() => opener({ path: relative, kind })}
+            title="Aperçu"
+            aria-label={`Aperçu ${file.key}`}
+          >
+            {row}
+          </button>
+        ) : (
+          <div key={file.key} className={rowClass}>
+            {row}
           </div>
         );
       })}
