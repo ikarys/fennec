@@ -9,6 +9,7 @@ use serde_json::{Value, json};
 
 use super::App;
 use super::http::{Request, error, send_json};
+use crate::domain::kernel_rules;
 use rules::{Access, Action, NewRule, Origin, Rule, RuleStore, Scope, TargetKind};
 
 const MAX_PATTERN_CHARS: usize = 500;
@@ -101,6 +102,8 @@ pub fn list(app: &App, stream: &mut TcpStream) -> Result<(), String> {
         stream,
         200,
         &json!({
+            // Read-only: the UI can show why a call was refused by a rule nobody can delete.
+            "fennec": kernel_rules::all().iter().map(view).collect::<Vec<_>>(),
             "global": global,
             "projects": projects,
             "sessions": sessions,
@@ -276,6 +279,7 @@ fn view(rule: &Rule) -> Value {
 fn origin_json(origin: &Origin) -> Value {
     match origin {
         Origin::Human => json!("human"),
+        Origin::Fennec => json!("fennec"),
         Origin::Answer { session_id } => json!({ "session": session_id }),
     }
 }
