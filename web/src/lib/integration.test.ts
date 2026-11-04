@@ -6,7 +6,7 @@ import {
   gateState,
   narrativePrompt,
   neverAcknowledged,
-  scansSentence,
+  scanBadge,
 } from './integration';
 import { t } from '../i18n/messages';
 
@@ -184,15 +184,6 @@ describe('blocker sentence', () => {
     );
   });
 
-  it('says which scanners ran and why the others did not', () => {
-    expect(
-      scansSentence('en', [
-        { scanner: 'gitleaks', state: 'ran', findings: 2 },
-        { scanner: 'cargo-audit', state: 'notApplicable' },
-        { scanner: 'semgrep', state: 'failed', reason: 'timed out' },
-      ]),
-    ).toBe('Security scanners: gitleaks ran (2 found), cargo-audit not needed, semgrep failed (timed out).');
-  });
 
   it('renders suppressions added', () => {
     const sentence = blockerSentence(
@@ -273,6 +264,21 @@ describe('acknowledged kinds', () => {
 });
 
 describe('gate state', () => {
+  it('keeps integration disabled while a security scan runs, even acknowledged', () => {
+    const state = gateState({
+      preview: preview({
+        commits: [{ sha: 'c1', subject: 'feat' }],
+        blockers: [{ kind: 'securityScanRunning' }],
+      }),
+      acknowledged: { securityScanRunning: true },
+      result: null,
+      message: 'feat: x',
+      busy: false,
+    });
+
+    expect(state.integrateDisabled).toBe(true);
+  });
+
   it('disables integration and finishing when preview is null', () => {
     const state = gateState({
       preview: null,
@@ -487,5 +493,31 @@ describe('gate state', () => {
 
     expect(state.integrateDisabled).toBe(false);
     expect(state.canFinish).toBe(false);
+  });
+});
+
+describe('scanBadge', () => {
+  it('renders a running scanner as info', () => {
+    const badge = scanBadge('en', { scanner: 'gitleaks', state: 'running', seconds: 4 });
+
+    expect(badge).toEqual({
+      text: 'gitleaks running (4 s)',
+      tone: 'info',
+      running: true,
+    });
+  });
+
+  it('renders a ran scanner with findings as err', () => {
+    const badge = scanBadge('en', { scanner: 'gitleaks', state: 'ran', findings: 2 });
+
+    expect(badge.tone).toBe('err');
+    expect(badge.running).toBe(false);
+  });
+
+  it('renders a ran scanner with no findings as ok', () => {
+    const badge = scanBadge('en', { scanner: 'gitleaks', state: 'ran', findings: 0 });
+
+    expect(badge.tone).toBe('ok');
+    expect(badge.running).toBe(false);
   });
 });
