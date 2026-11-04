@@ -5,7 +5,7 @@
 use super::App;
 use super::http::{error, percent_decode, send_with};
 use std::net::TcpStream;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 const MAX_PREVIEW_BYTES: u64 = 10 * 1024 * 1024;
 
@@ -15,29 +15,14 @@ pub(super) fn serve(
     session_id: &str,
     segments: &[&str],
 ) -> Result<(), String> {
-    let store = app.store()?;
-    let Some((session, project)) = app.session_and_project(session_id)? else {
-        return error(stream, 404, "no such session");
-    };
     let Some(relative) = relative_path_from_segments(segments) else {
         return error(stream, 404, "not found");
     };
-    // Canonical paths: a symlink out of the place is refused like `..`.
-    let workdir = app
-        .place(&store, &session, &project)?
-        .workdir
-        .canonicalize();
-    let full = workdir
-        .as_ref()
-        .ok()
-        .and_then(|workdir| workdir.join(&relative).canonicalize().ok())
-        .filter(|full| workdir.as_ref().is_ok_and(|w| full.starts_with(w)) && full.is_file());
-    let Some(full) = full else {
-        return error(stream, 404, "not found");
+    let full = match session_file(app, session_id, &relative)? {
+        SessionFile::Found(full) => full,
+        SessionFile::Missing => return error(stream, 404, "not found"),
+        SessionFile::TooLarge => return error(stream, 413, "file too large"),
     };
-    if std::fs::metadata(&full).map_err(|e| e.to_string())?.len() > MAX_PREVIEW_BYTES {
-        return error(stream, 413, "file too large");
-    }
     let content_type = content_type_of(&full);
     let body = std::fs::read(&full).map_err(|e| e.to_string())?;
     send_with(
@@ -47,6 +32,44 @@ pub(super) fn serve(
         &[("Content-Security-Policy", "sandbox allow-scripts")],
         &body,
     )
+}
+
+/// A file of a session's working directory, as the preview and the canvas may read it.
+pub(super) enum SessionFile {
+    Found(PathBuf),
+    /// No such session or file, or outside the working directory.
+    Missing,
+    TooLarge,
+}
+
+/// Resolves a project-relative path in the session's working directory (its
+/// worktree when it has one).
+pub(super) fn session_file(
+    app: &App,
+    session_id: &str,
+    relative: &str,
+) -> Result<SessionFile, String> {
+    let store = app.store()?;
+    let Some((session, project)) = app.session_and_project(session_id)? else {
+        return Ok(SessionFile::Missing);
+    };
+    // Canonical paths: a symlink out of the place is refused like `..`.
+    let workdir = app
+        .place(&store, &session, &project)?
+        .workdir
+        .canonicalize();
+    let full = workdir
+        .as_ref()
+        .ok()
+        .and_then(|workdir| workdir.join(relative).canonicalize().ok())
+        .filter(|full| workdir.as_ref().is_ok_and(|w| full.starts_with(w)) && full.is_file());
+    let Some(full) = full else {
+        return Ok(SessionFile::Missing);
+    };
+    if std::fs::metadata(&full).map_err(|e| e.to_string())?.len() > MAX_PREVIEW_BYTES {
+        return Ok(SessionFile::TooLarge);
+    }
+    Ok(SessionFile::Found(full))
 }
 
 fn relative_path_from_segments(segments: &[&str]) -> Option<String> {

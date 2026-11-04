@@ -179,6 +179,11 @@ its port answers, ready, exited with its code), the URL it printed and its last 
 worktree for CLI projects. With no `.agents/servers.json`, a command guessed from the project (Justfile, package.json,
 Makefile, Cargo) is saved on the human's confirmation; the main checkout's gitignored `.env*` files are linked, never
 copied, and servers share the project's Cargo target (`web/servers.rs`, `domain/server.rs`).
+Canvas, done: a document the human and the agent iterate on (HTML, Markdown, SVG, images), pinned from the
+preview pane or a message's ```html/```md block, each version kept and browsable in a side pane; the human annotates
+the whole page, a quote or a drawn region, and the note lands in the composer as text the agent reads. The `canvas`
+crate owns it all (its own `canvas.db`, `FENNEC_CANVAS_DB`); a project's Canvas tab lists and deletes them, and deleting
+a session or a project deletes its artifacts, never the file. A file's versions are taken when the canvas is read.
 Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
 1. To be chosen among the remaining capabilities C* of the Notion definition.
@@ -324,12 +329,14 @@ crates/fennec/src/
                      servers (a project's servers started and stopped), terminal, editor, file_manager (the human's own
                      tools opened on a folder), pricing, model_view, worktree_routes (disk usage), agent_routes,
                      audit_routes, backlog_routes, idea_assets, mcp_routes, proposal_routes, session_delete,
-                     agents_md_routes, session_name (background naming)
+                     agents_md_routes, session_name (background naming), canvas_routes (the canvas crate over HTTP)
   cli/               terminal adapter: commands, transcript
 crates/backlog/     the ideas backlog, a crate of its own and fennec-free, no I/O: its events folded, the queue
                      order, the night-mode caps, an idea's status, stage and next action, a run's summary
 crates/rules/       the human's rules, a crate of its own and fennec-free: the model, the command and path matchers,
                      the decision (block > allow > ask, narrowest scope), its SQLite store `rules.db` (`FENNEC_RULES_DB`)
+crates/canvas/      the canvas, a crate of its own and fennec-free: artifacts (a pinned file or a message block), their
+                     versions' bytes, the human's annotations and the message each becomes; SQLite file `canvas.db`
 crates/token-usage/ the usage ledger, a crate of its own and fennec-free (calls, tokens, speed, savings;
                      SQLite file `usage.db`, `FENNEC_USAGE_DB`): outlives sessions, reusable by other products
 crates/llm-providers/ talking to models, a crate of its own and fennec-free: the OpenAI-compatible client
