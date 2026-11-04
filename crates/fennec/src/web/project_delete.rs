@@ -87,6 +87,10 @@ pub(super) fn delete_project(
     }
     store.delete_project(id).map_err(|e| e.to_string())?;
     rule_store.delete_project(id).map_err(|e| e.to_string())?;
+    // Artifacts are deleted per session above; this also catches any left by a session already gone.
+    canvas::CanvasStore::open(&app.settings.canvas_path())
+        .and_then(|canvas| canvas.delete_project(id))
+        .map_err(|e| e.to_string())?;
     let (folder_deleted, folder_error) = match workdir {
         Some(workdir) => match std::fs::remove_dir_all(&workdir) {
             Ok(()) => (true, None),

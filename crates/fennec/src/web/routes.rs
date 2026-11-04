@@ -10,8 +10,8 @@ use super::audit_routes;
 use super::http::{Request, error, send, send_json};
 use super::proposal_routes;
 use super::{
-    assets, backlog_routes, event_stream, file_manager, folder_routes, idea_routes, integration,
-    mcp_routes, model_routes, plugin_routes, project_dashboard, project_delete,
+    assets, backlog_routes, canvas_routes, event_stream, file_manager, folder_routes, idea_routes,
+    integration, mcp_routes, model_routes, plugin_routes, project_dashboard, project_delete,
     project_list_routes, project_routes, rule_approval_routes, rule_routes, servers,
     session_delete, session_routes, settings_routes, terminal, waiver_routes, workflow_routes,
     worktree_routes,
@@ -224,6 +224,15 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         }
         ("GET", ["api", "sessions", id, "workflow", "run"]) => {
             session_routes::serve_run_events(app, req, stream, id)
+        }
+        ("GET", ["api", "sessions", id, "canvas"]) => canvas_routes::list_session(app, stream, id),
+        ("POST", ["api", "sessions", id, "canvas"]) => canvas_routes::create(app, req, stream, id),
+        ("GET", ["api", "projects", id, "canvas"]) => canvas_routes::list_project(app, stream, id),
+        ("GET", ["api", "canvas", id]) => canvas_routes::detail(app, stream, id),
+        ("GET", ["api", "canvas", id, "versions", n]) => canvas_routes::content(app, stream, id, n),
+        ("POST", ["api", "canvas", id, "delete"]) => canvas_routes::delete(app, stream, id),
+        ("POST", ["api", "canvas", id, "annotations"]) => {
+            canvas_routes::annotate(app, req, stream, id)
         }
         ("GET", ["api", "sessions", id, "preview", rest @ ..]) => {
             super::preview::serve(app, stream, id, rest)

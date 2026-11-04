@@ -5,6 +5,7 @@ export * from "./api/settings";
 export * from "./api/sessions";
 export * from "./api/projects";
 export * from "./api/worktrees";
+export * from "./api/canvas";
 export * from "./api/workflows";
 export * from "./api/insight";
 export * from "./api/rules";
