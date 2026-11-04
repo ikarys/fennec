@@ -157,6 +157,19 @@ impl Sandbox {
         }
     }
 
+    /// The same sandbox with its network flag set (a plugin's network is its
+    /// own choice, independent of the command sandbox's).
+    pub fn with_network(mut self, network: bool) -> Sandbox {
+        if let Sandbox::Bwrap {
+            network: ref mut flag,
+            ..
+        } = self
+        {
+            *flag = network;
+        }
+        self
+    }
+
     /// The same sandbox with `paths` writable too (bound after the hidden
     /// dirs, so a path inside fennec's hidden store is reachable).
     pub fn writing(mut self, paths: Vec<PathBuf>) -> Sandbox {

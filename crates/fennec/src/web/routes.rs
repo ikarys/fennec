@@ -11,9 +11,10 @@ use super::http::{Request, error, send, send_json};
 use super::proposal_routes;
 use super::{
     assets, backlog_routes, event_stream, file_manager, folder_routes, idea_routes, integration,
-    mcp_routes, model_routes, project_dashboard, project_delete, project_list_routes,
-    project_routes, rule_approval_routes, rule_routes, servers, session_delete, session_routes,
-    settings_routes, terminal, waiver_routes, workflow_routes, worktree_routes,
+    mcp_routes, model_routes, plugin_routes, project_dashboard, project_delete,
+    project_list_routes, project_routes, rule_approval_routes, rule_routes, servers,
+    session_delete, session_routes, settings_routes, terminal, waiver_routes, workflow_routes,
+    worktree_routes,
 };
 use serde_json::json;
 use std::net::TcpStream;
@@ -110,6 +111,11 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         }
         ("POST", ["api", "projects", id, "favorite"]) => {
             project_list_routes::set_favorite(app, req, stream, id)
+        }
+        ("GET", ["api", "projects", id, "plugins"]) => plugin_routes::list(app, stream, id),
+        ("POST", ["api", "projects", id, "plugins"]) => plugin_routes::set(app, req, stream, id),
+        ("GET", ["api", "sessions", id, "plugins"]) => {
+            plugin_routes::session_blocks(app, stream, id)
         }
         ("GET", ["api", "projects", id, "workflows"]) => {
             workflow_routes::list_workflows(app, stream, id)
