@@ -6,6 +6,7 @@ mod agents_md_routes;
 mod assets;
 mod audit_routes;
 mod backlog_routes;
+mod canvas_routes;
 mod children;
 mod commit_subject;
 mod context_view;

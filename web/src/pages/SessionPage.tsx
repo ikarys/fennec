@@ -62,6 +62,9 @@ import {
   type PreviewTarget,
 } from "../components/preview/PreviewContext";
 import { PreviewPane } from "../components/preview/PreviewPane";
+import { CanvasPane } from "../components/canvas/CanvasPane";
+import { SessionCanvasMenu } from "../components/canvas/SessionCanvasMenu";
+import { CanvasOpenerContext, CanvasSessionContext } from "../components/canvas/CanvasContext";
 import { RunRail } from "../components/workflow/session/RunRail";
 import { RunActionCard } from "../components/workflow/session/RunActionCard";
 import { Button, buttonClass } from "../components/ui/Button";
@@ -123,6 +126,7 @@ export function SessionPage({
   const framingIdea = detail?.idea?.state === "framing";
   const [planBuildInFlight, setPlanBuildInFlight] = useState(false);
   const [preview, setPreview] = useState<PreviewTarget | null>(null);
+  const [canvasId, setCanvasId] = useState<number | null>(null);
   const [detailVersion, setDetailVersion] = useState(0);
   // The plan last put in the backlog: its button says so until a new plan comes.
   const [backlogSegment, setBacklogSegment] = useState<string | null>(null);
@@ -358,6 +362,7 @@ export function SessionPage({
   // A preview belongs to one session; do not leak it across tabs.
   useEffect(() => {
     setPreview(null);
+    setCanvasId(null);
   }, [sessionId]);
 
   const title =
@@ -621,6 +626,8 @@ export function SessionPage({
 
   return (
     <PreviewContext.Provider value={setPreview}>
+     <CanvasOpenerContext.Provider value={setCanvasId}>
+      <CanvasSessionContext.Provider value={sessionId ?? undefined}>
       {/* The agent writes in its worktree when it has one: paths are relative to it, and the preview route resolves them there too. */}
       <PreviewWorkdirContext.Provider value={detail?.worktree?.path ?? detail?.project.workdir}>
         <PlanActionsContext.Provider value={planActions}>
@@ -671,6 +678,9 @@ export function SessionPage({
                           >
                             <PlayIcon className="h-3.5 w-3.5" />
                           </Button>
+                        )}
+                        {sessionId && (
+                          <SessionCanvasMenu sessionId={sessionId} refreshKey={view} onOpen={setCanvasId} />
                         )}
                         <div className="ml-auto">
                           <ContextGauge
@@ -920,12 +930,24 @@ export function SessionPage({
                       onClose={() => setPreview(null)}
                     />
                   )}
+                  {canvasId != null && (
+                    <CanvasPane
+                      artifactId={canvasId}
+                      refreshKey={view}
+                      onClose={() => setCanvasId(null)}
+                      onAnnotate={(message) =>
+                        setText((current) => (current.trim() ? `${current}\n\n${message}` : message))
+                      }
+                    />
+                  )}
                 </div>
               </WorkflowUsageContext.Provider>
             </CallUsageContext.Provider>
           </IntegrationInviteContext.Provider>
         </PlanActionsContext.Provider>
       </PreviewWorkdirContext.Provider>
+      </CanvasSessionContext.Provider>
+     </CanvasOpenerContext.Provider>
     </PreviewContext.Provider>
   );
 }

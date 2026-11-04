@@ -3,6 +3,9 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useT } from '../../i18n';
 import { markdownComponents } from '../session/markdownComponents';
+import { PinButton } from '../canvas/PinButton';
+import { useCanvasSession } from '../canvas/CanvasContext';
+import { pinCanvasBlock } from '../../lib/api/canvas';
 import type { PreviewKind } from '../../lib/preview';
 
 const REMARK_PLUGINS = [remarkGfm];
@@ -21,6 +24,7 @@ function useSettled(source: string): string {
 
 export function CodeBlockWithPreview({ kind, source }: { kind: PreviewKind; source: string }) {
   const t = useT();
+  const session = useCanvasSession();
   // An HTML block is mostly a page to look at; its source stays one click away.
   const [showPreview, setShowPreview] = useState(kind === 'html');
   const settledSource = useSettled(source);
@@ -29,7 +33,10 @@ export function CodeBlockWithPreview({ kind, source }: { kind: PreviewKind; sour
     <div className="my-2 overflow-hidden rounded-md border border-border">
       <div className="flex items-center justify-between gap-2 border-b border-border bg-raised px-2.5 py-1.5 text-xs">
         <span className="font-mono text-muted">{kind}</span>
-        <div className="flex gap-1">
+        <div className="flex items-center gap-1">
+          {session ? (
+            <PinButton pin={async () => pinCanvasBlock(session, kind, source)} />
+          ) : null}
           <button
             type="button"
             aria-pressed={!showPreview}

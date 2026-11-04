@@ -70,7 +70,7 @@ pub fn delete_sessions(app: &App, req: &Request, stream: &mut TcpStream) -> Resu
 }
 
 /// Removes one top-level session and its children: the worktree with its branch, the log, the
-/// session rules, the cached skill folds. `Ok(Some(error))` when the worktree could not be
+/// session rules, the canvas artifacts, the cached skill folds. `Ok(Some(error))` when the worktree could not be
 /// removed: nothing was deleted, the human can retry.
 pub(super) fn remove_tree(
     app: &App,
@@ -100,8 +100,11 @@ pub(super) fn remove_tree(
         }
     }
     store.delete_sessions(tree).map_err(|e| e.to_string())?;
+    let canvas =
+        canvas::CanvasStore::open(&app.settings.canvas_path()).map_err(|e| e.to_string())?;
     for sid in tree {
         rule_store.delete_session(sid).map_err(|e| e.to_string())?;
+        canvas.delete_session(sid).map_err(|e| e.to_string())?;
     }
     let mut folds = app.skill_folds.lock().unwrap();
     for sid in tree {

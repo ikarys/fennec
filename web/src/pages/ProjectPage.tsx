@@ -10,6 +10,7 @@ import { RiskSection } from '../components/project/RiskSection';
 import { AnalysesSection } from '../components/project/AnalysesSection';
 import { SessionsSection } from '../components/project/SessionsSection';
 import { DashboardSection } from '../components/project/DashboardSection';
+import { CanvasSection } from '../components/project/CanvasSection';
 import {
   createSession,
   getProjectOverview,
@@ -26,6 +27,7 @@ const TABS = [
   { id: 'map', label: 'moduleMapTitle' },
   { id: 'risks', label: 'risksLabel' },
   { id: 'doc', label: 'projectPageDoc' },
+  { id: 'canvas', label: 'canvasLibraryTab' },
   { id: 'analyses', label: 'analysesTitle' },
 ] as const;
 
@@ -231,6 +233,7 @@ export default function ProjectPage({
           {activeTab === 'map' ? <MapTab projectId={projectId} /> : null}
           {activeTab === 'risks' ? <RiskSection projectId={projectId} busy={analyzing} onStart={(prompt, mode) => void startSession(prompt, mode)} /> : null}
           {activeTab === 'doc' ? <DocSection projectId={projectId} /> : null}
+          {activeTab === 'canvas' ? <CanvasSection projectId={projectId} /> : null}
           {activeTab === 'analyses' ? (
             <AnalysesSection
               busy={analyzing}
