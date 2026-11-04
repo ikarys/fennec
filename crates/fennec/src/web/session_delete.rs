@@ -161,7 +161,9 @@ mod tests {
             plugins: Arc::new(crate::plugins::PluginManager::new(
                 crate::tools::Sandbox::Off,
                 std::env::temp_dir(),
+                std::env::temp_dir(),
             )),
+            agents_home: std::env::temp_dir(),
         };
         let store = app.store().unwrap();
         let project = store
