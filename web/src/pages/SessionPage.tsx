@@ -127,6 +127,7 @@ export function SessionPage({
   const [planBuildInFlight, setPlanBuildInFlight] = useState(false);
   const [preview, setPreview] = useState<PreviewTarget | null>(null);
   const [canvasId, setCanvasId] = useState<number | null>(null);
+  const [runComment, setRunComment] = useState("");
   const [detailVersion, setDetailVersion] = useState(0);
   // The plan last put in the backlog: its button says so until a new plan comes.
   const [backlogSegment, setBacklogSegment] = useState<string | null>(null);
@@ -363,6 +364,7 @@ export function SessionPage({
   useEffect(() => {
     setPreview(null);
     setCanvasId(null);
+    setRunComment("");
   }, [sessionId]);
 
   const title =
@@ -812,6 +814,8 @@ export function SessionPage({
                         onResume={handleResumeWorkflow}
                         onStop={handleStopWorkflow}
                         disabled={running}
+                        comment={runComment}
+                        onCommentChange={setRunComment}
                       />
                     )}
                     {view.lastDone === "error" &&
@@ -935,9 +939,13 @@ export function SessionPage({
                       artifactId={canvasId}
                       refreshKey={view}
                       onClose={() => setCanvasId(null)}
-                      onAnnotate={(message) =>
-                        setText((current) => (current.trim() ? `${current}\n\n${message}` : message))
-                      }
+                      onAnnotate={(message) => {
+                        // The run waiting on a choice or a pause refuses the composer: the note goes to its comment.
+                        const append = (current: string) =>
+                          current.trim() ? `${current}\n\n${message}` : message;
+                        if (waiting?.kind === "human" || waiting?.kind === "pause") setRunComment(append);
+                        else setText(append);
+                      }}
                     />
                   )}
                 </div>
