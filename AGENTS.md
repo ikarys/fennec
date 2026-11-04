@@ -168,6 +168,10 @@ changed definition or file deactivates one (SHA-256 code hash). Each runs out of
 sandbox off), its code read-only, no project mounted, the network only if granted; it gets the session events it asked
 for over JSON-RPC on stdio and answers with data-only blocks (text, figures, badges) the core renders in the session's
 left bar or on the Plugins tab (`plugins.rs`, `plugins/`, `domain/plugin.rs`, `store/plugins.rs`).
+Security gate, done (C23, part 1): the integration gate runs the security scanners found on PATH itself, in the
+read-only sandbox without network (gitleaks on the branch's commits, cargo-audit when a Cargo.lock changed, semgrep with
+the human's own `.semgrep.yml` on the changed files); each finding is a `securityFindings` blocker the human accepts, a
+scanner missing or failing a status line (verified, zero model tokens; `domain/security_scan.rs`, `security_scan.rs`).
 Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
 1. To be chosen among the remaining capabilities C* of the Notion definition.
@@ -227,7 +231,8 @@ crates/fennec/src/
                        validate (the graph rules), run (the run folded from its events, the next step)
     doc.rs             the project's documentation: markdown files and ADRs, as the Doc tab lists them
     mcp.rs             MCP servers as the human configured them; server.rs the project's servers (`.agents/servers.json`)
-    scanner.rs         the security scanners the audit-security agent may run; attention.rs what a finished turn leaves for the human's eye
+    scanner.rs         the security scanners fennec knows (the gate, the audit-security agent);
+    security_scan.rs   the scanners' JSON reports parsed into findings; which lockfiles a branch changed; attention.rs what a finished turn leaves for the human's eye
     audit.rs           an audit report parsed from the model's answer, and the backlog task each finding becomes
     workdir_notice.rs  tells the model its working directory moved; session_name.rs the session name's prompt and cleanup
     agent_file.rs      an agent as the Settings form edits it; session_skills.rs a session's skills folded from the log
@@ -292,6 +297,7 @@ crates/fennec/src/
   turn_build.rs      the composition of a Turn, shared by both adapters (CLI, web): store, model, tools, sandbox
   mcp.rs             the synchronous MCP client (JSON-RPC over stdio); servers.rs the project's servers on disk
   scanners.rs        the security scanners found on PATH
+  security_scan.rs   the gate's scanners run in the read-only sandbox, cached per (base, branch)
   notifier.rs        wakes event streams when a turn appends to a log, so an open tab costs nothing idle
   architecture.rs    `.agents/architecture` read from disk
   agents/crud.rs     the human's own agents read, written, deleted (Settings)

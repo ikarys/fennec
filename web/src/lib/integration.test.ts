@@ -6,6 +6,7 @@ import {
   gateState,
   narrativePrompt,
   neverAcknowledged,
+  scansSentence,
 } from './integration';
 import { t } from '../i18n/messages';
 
@@ -19,6 +20,7 @@ function preview(overrides: Partial<IntegrationPreview> = {}): IntegrationPrevie
     commits: [],
     files: [],
     commonSignals: [],
+    securityScans: [],
     blockers: [],
     criteria: [],
     decisions: [],
@@ -160,6 +162,36 @@ describe('blocker sentence', () => {
         more: ' (+2)'
       }),
     );
+  });
+
+  it('renders security findings, line optional', () => {
+    const sentence = blockerSentence(
+      'en',
+      blocker({
+        kind: 'securityFindings',
+        findings: [
+          { scanner: 'gitleaks', rule: 'aws-access-token', path: 's.py', line: 1, detail: 'AWS key' },
+          { scanner: 'cargo-audit', rule: 'RUSTSEC-1', path: 'Cargo.lock', line: null, detail: 'x 1.0: bad' },
+        ],
+      }),
+    );
+
+    expect(sentence).toBe(
+      t('en', 'securityFindings', {
+        list: 's.py:1 (gitleaks aws-access-token: AWS key) ; Cargo.lock (cargo-audit RUSTSEC-1: x 1.0: bad)',
+        more: '',
+      }),
+    );
+  });
+
+  it('says which scanners ran and why the others did not', () => {
+    expect(
+      scansSentence('en', [
+        { scanner: 'gitleaks', state: 'ran', findings: 2 },
+        { scanner: 'cargo-audit', state: 'notApplicable' },
+        { scanner: 'semgrep', state: 'failed', reason: 'timed out' },
+      ]),
+    ).toBe('Security scanners: gitleaks ran (2 found), cargo-audit not needed, semgrep failed (timed out).');
   });
 
   it('renders suppressions added', () => {

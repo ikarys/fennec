@@ -8,6 +8,7 @@ import {
   blockerSentence,
   gateState,
   narrativePrompt,
+  scansSentence,
   neverAcknowledged,
   type Acknowledged,
   type BlockerKind,
@@ -242,6 +243,10 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
                 <input type="checkbox" className="accent-accent" checked={removeWorktree} onChange={(event) => setRemoveWorktree(event.target.checked)} />
                 {t('removeWorktree')}
               </label>
+
+              {preview.securityScans.length > 0 && (
+                <p className="px-1.5 text-xs text-muted">{scansSentence(lang, preview.securityScans)}</p>
+              )}
 
               {preview.blockers.length > 0 && (
                 <section className="flex flex-col gap-1.5 rounded-lg border border-attention/35 bg-attention/10 p-3">
