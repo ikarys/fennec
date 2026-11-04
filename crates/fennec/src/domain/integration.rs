@@ -23,6 +23,8 @@ pub struct DiffChecks {
     /// The security scanners' hits on the branch (filled by the adapter that
     /// ran them: the diff alone cannot tell).
     pub security: Vec<SecurityFinding>,
+    /// A scanner still runs: `security` is not complete yet.
+    pub scanning: bool,
 }
 
 impl DiffChecks {
@@ -51,6 +53,7 @@ impl DiffChecks {
             markers,
             sensitive,
             security: Vec::new(),
+            scanning: false,
         }
     }
 }
@@ -93,6 +96,9 @@ pub enum Blocker {
     /// Files in the sensitive zones of `.agents/architecture`: the human's
     /// review is mandatory there.
     SensitiveTouched { paths: Vec<String> },
+    /// A security scanner still runs: its findings are unknown, so nothing
+    /// may be integrated until it ends.
+    SecurityScanRunning,
     /// What the security scanners found on the branch: secrets, vulnerable
     /// dependencies, the human's own Semgrep rules.
     SecurityFindings { findings: Vec<SecurityFinding> },
@@ -120,6 +126,7 @@ impl Blocker {
             Blocker::NoCriteria => "noCriteria",
             Blocker::ProtectedTouched { .. } => "protectedTouched",
             Blocker::SensitiveTouched { .. } => "sensitiveTouched",
+            Blocker::SecurityScanRunning => "securityScanRunning",
             Blocker::SecurityFindings { .. } => "securityFindings",
             Blocker::ArchitectureViolated { .. } => "architectureViolated",
             Blocker::SuppressionsAdded { .. } => "suppressionsAdded",
@@ -149,7 +156,7 @@ pub struct Landing<'a> {
 /// The blockers of an integration, in the order the UI shows them:
 /// `NoCommits` first, then a merge conflict, then the branch, then the
 /// human's uncommitted changes, then the criteria, then the protected files,
-/// then the sensitive zones, then the security findings, then the architecture rules, then the added
+/// then the sensitive zones, then a security scan still running, then its findings, then the architecture rules, then the added
 /// suppressions, then the weakened tests.
 pub fn blockers(
     commits: usize,
@@ -224,6 +231,10 @@ pub fn blockers(
         });
     }
 
+    if checks.scanning {
+        out.push(Blocker::SecurityScanRunning);
+    }
+
     if !checks.security.is_empty() {
         out.push(Blocker::SecurityFindings {
             findings: checks.security.clone(),
@@ -261,7 +272,10 @@ pub fn unacknowledged<'a>(blockers: &'a [Blocker], acknowledged: &[String]) -> V
     blockers
         .iter()
         .filter(|blocker| match blocker {
-            Blocker::NoCommits | Blocker::Conflict { .. } | Blocker::LocalChanges { .. } => true,
+            Blocker::NoCommits
+            | Blocker::Conflict { .. }
+            | Blocker::LocalChanges { .. }
+            | Blocker::SecurityScanRunning => true,
             _ => !acknowledged.contains(&blocker.key().to_string()),
         })
         .collect()
@@ -464,6 +478,7 @@ mod tests {
             markers: vec![],
             sensitive: vec![],
             security: vec![finding.clone()],
+            scanning: true,
         };
 
         let found = blockers(1, &[], &[], &checks, &Landing::default());
@@ -472,6 +487,7 @@ mod tests {
             found,
             vec![
                 Blocker::NoCriteria,
+                Blocker::SecurityScanRunning,
                 Blocker::SecurityFindings {
                     findings: vec![finding]
                 },
@@ -630,6 +646,16 @@ mod tests {
         assert_eq!(
             unacknowledged(&blockers, &["localChanges".to_string()]).len(),
             1
+        );
+    }
+
+    #[test]
+    fn a_running_security_scan_is_never_acknowledged() {
+        let found = [Blocker::SecurityScanRunning];
+
+        assert_eq!(
+            unacknowledged(&found, &["securityScanRunning".into()]),
+            vec![&Blocker::SecurityScanRunning]
         );
     }
 
