@@ -183,7 +183,7 @@ Canvas, done: a document the human and the agent iterate on (HTML, Markdown, SVG
 preview pane or a message's ```html/```md block, each version kept and browsable in a side pane; the human annotates
 the whole page, a quote or a drawn region, and the note lands in the composer as text the agent reads. The `canvas`
 crate owns it all (its own `canvas.db`, `FENNEC_CANVAS_DB`); a project's Canvas tab lists and deletes them, and deleting
-a session or a project deletes its artifacts, never the file. A file's versions are taken when the canvas is read.
+a session or a project deletes its artifacts, never the file. A file's versions are taken when the canvas is read; a pinned block's, from the blocks of its format the agent writes after it (`canvas::revisions`).
 Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
 1. To be chosen among the remaining capabilities C* of the Notion definition.
