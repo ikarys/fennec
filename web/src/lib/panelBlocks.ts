@@ -85,3 +85,32 @@ export function panelBlock(id: PanelBlockId): PanelBlock {
 export function pageOptionalBlocks(page: PanelPage): PanelBlockId[] {
   return pageBlocks(page, false);
 }
+
+/** A block being dragged: from a page, or from the chips of blocks a page does not show (`page: null`). */
+export interface BlockDrag {
+  id: PanelBlockId;
+  page: number | null;
+}
+
+/**
+ * Drops a dragged block into a page before the block at `toIndex` (the end when past it).
+ * From another page it moves, from the chips it is added; a drop where it already is changes nothing.
+ */
+export function dropBlock(pages: PanelPage[], drag: BlockDrag, toPage: number, toIndex: number): PanelPage[] {
+  const inRange = (page: number): boolean => Number.isInteger(page) && page >= 0 && page < pages.length;
+  if (!inRange(toPage) || (drag.page !== null && !inRange(drag.page))) return pages;
+  const fromOtherPage = drag.page !== null && drag.page !== toPage;
+  const target = pageOptionalBlocks(pages[toPage]);
+  const index = Math.min(Math.max(toIndex, 0), target.length);
+  const from = target.indexOf(drag.id);
+  if (!fromOtherPage && from !== -1 && (index === from || index === from + 1)) return pages;
+  const blocks = target.filter((block) => block !== drag.id);
+  blocks.splice(from !== -1 && from < index ? index - 1 : index, 0, drag.id);
+  const next = [...pages];
+  if (fromOtherPage && drag.page !== null) {
+    const source = pages[drag.page];
+    next[drag.page] = { ...source, blocks: pageOptionalBlocks(source).filter((block) => block !== drag.id) };
+  }
+  next[toPage] = { ...pages[toPage], blocks };
+  return next;
+}
