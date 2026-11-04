@@ -370,6 +370,21 @@ export interface Suppression {
   marker: string;
 }
 
+export interface SecurityFinding {
+  scanner: string;
+  rule: string;
+  path: string;
+  line: number | null;
+  detail: string;
+}
+
+export type ScanStatus = { scanner: string } & (
+  | { state: 'ran'; findings: number }
+  | { state: 'notInstalled' }
+  | { state: 'notApplicable' }
+  | { state: 'failed'; reason: string }
+);
+
 export type Blocker =
   | { kind: "noCommits" }
   | { kind: "conflict"; files: string[] }
@@ -377,6 +392,7 @@ export type Blocker =
   | { kind: "noCriteria" }
   | { kind: "protectedTouched"; paths: string[] }
   | { kind: "sensitiveTouched"; paths: string[] }
+  | { kind: "securityFindings"; findings: SecurityFinding[] }
   | { kind: "architectureViolated"; violations: ArchitectureViolation[] }
   | { kind: "suppressionsAdded"; suppressions: Suppression[] }
   | {
@@ -415,6 +431,8 @@ export interface IntegrationPreview {
     /** Deterministic review signals, riskiest files first (server order). */
     signals: ReviewSignal[];
   }[];
+  /** Which security scanners ran on the branch (verified), and why the others did not. */
+  securityScans: ScanStatus[];
   /** Signals every file carries (server-computed): shown once above the list, hidden on the rows. */
   commonSignals: ReviewSignal[];
   /** Test files (relative to the project) the integration could protect. */

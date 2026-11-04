@@ -44,6 +44,7 @@ pub mod review_map;
 pub mod risk;
 pub mod rule_approval;
 pub mod scanner;
+pub mod security_scan;
 pub mod server;
 pub mod session_name;
 pub mod session_skills;
