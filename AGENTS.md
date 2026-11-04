@@ -162,6 +162,12 @@ UI languages, done: English by default, French on the Settings page; every UI st
 whose `fr` is typed against `en`'s keys (a missing translation is a compile error); components call `useT()`, pure
 lib functions take a `lang`. The server's display texts follow the same choice through `domain/lang.rs`; the context part labels, stored
 French in the usage ledger, are translated at display time (`context_parts::display_label`).
+Plugins, done: the human's own extensions, global only: defined in `~/.agents/plugins.json`, code in
+`~/.agents/plugins/<name>/` (never read from a project), activated on Settings' Plugins tab (`#/settings/plugins`); a
+changed definition or file deactivates one (SHA-256 code hash). Each runs out of process in bwrap (refused with the
+sandbox off), its code read-only, no project mounted, the network only if granted; it gets the session events it asked
+for over JSON-RPC on stdio and answers with data-only blocks (text, figures, badges) the core renders in the session's
+left bar or on the Plugins tab (`plugins.rs`, `plugins/`, `domain/plugin.rs`, `store/plugins.rs`).
 Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
 1. To be chosen among the remaining capabilities C* of the Notion definition.
@@ -279,6 +285,9 @@ crates/fennec/src/
   risk.rs            the risk zones measured from git: AI commits, churn, a parallel blame; the hot
                      files and the files tested on a branch, for the review map
   doc.rs             the project's markdown files read for the Doc tab
+  plugins.rs         the plugin manager: one sandboxed host per active plugin, server-wide; plugins/ config (the
+                     definitions in ~/.agents, an activation's validity), host (one plugin's process and its blocks),
+                     pump (the new session events fed to the hosts, woken by the notifier)
   chat.rs            a session with no project: runs in a scratch folder
   turn_build.rs      the composition of a Turn, shared by both adapters (CLI, web): store, model, tools, sandbox
   mcp.rs             the synchronous MCP client (JSON-RPC over stdio); servers.rs the project's servers on disk

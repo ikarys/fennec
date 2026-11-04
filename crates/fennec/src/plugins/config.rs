@@ -1,15 +1,17 @@
-//! The project's plugin definitions (`.agents/plugins.json`) and the validity
-//! of an activation: a plugin runs only when the human activated it and its
-//! definition and code have not changed since. A changed definition or a
-//! changed file deactivates it, so a clone of a repository runs nothing.
+//! The human's plugin definitions (`~/.agents/plugins.json`) and the
+//! validity of an activation: a plugin runs only when the human activated it
+//! and its definition and code have not changed since. A changed definition
+//! or a changed file deactivates it, so a clone of the home runs nothing.
+//! Plugins are global: nothing is read from a project's `.agents`.
 
 use crate::domain::plugin::{PluginActivation, PluginDef, code_hash};
 use std::path::{Path, PathBuf};
 
-/// The project's usable plugin definitions, empty when `.agents/plugins.json`
-/// is absent or unreadable; a definition with problems is left out.
-pub fn read_defs(workdir: &Path) -> Vec<PluginDef> {
-    let path = workdir.join(".agents").join("plugins.json");
+/// The human's usable plugin definitions, empty when
+/// `<agents_home>/plugins.json` is absent or unreadable; a definition with
+/// problems is left out.
+pub fn read_defs(agents_home: &Path) -> Vec<PluginDef> {
+    let path = agents_home.join("plugins.json");
     let defs: Vec<PluginDef> = std::fs::read_to_string(path)
         .ok()
         .and_then(|text| serde_json::from_str(&text).ok())
@@ -19,15 +21,15 @@ pub fn read_defs(workdir: &Path) -> Vec<PluginDef> {
         .collect()
 }
 
-/// The plugin's code directory, `.agents/plugins/<name>/`.
-pub fn code_dir(workdir: &Path, name: &str) -> PathBuf {
-    workdir.join(".agents").join("plugins").join(name)
+/// The plugin's code directory, `<agents_home>/plugins/<name>/`.
+pub fn code_dir(agents_home: &Path, name: &str) -> PathBuf {
+    agents_home.join("plugins").join(name)
 }
 
 /// The code directory's files as (relative path, content), sorted by path.
 /// Empty when the directory is absent.
-pub fn code_files(workdir: &Path, name: &str) -> Vec<(String, String)> {
-    let dir = code_dir(workdir, name);
+pub fn code_files(agents_home: &Path, name: &str) -> Vec<(String, String)> {
+    let dir = code_dir(agents_home, name);
     let mut out = Vec::new();
     collect(&dir, &dir, &mut out);
     out.sort_by(|a, b| a.0.cmp(&b.0));
@@ -51,15 +53,19 @@ fn collect(root: &Path, path: &Path, out: &mut Vec<(String, String)>) {
 }
 
 /// The hash of a definition and its code, recomputed from disk.
-pub fn compute_hash(workdir: &Path, def: &PluginDef) -> String {
-    code_hash(def, &code_files(workdir, &def.name))
+pub fn compute_hash(agents_home: &Path, def: &PluginDef) -> String {
+    code_hash(def, &code_files(agents_home, &def.name))
 }
 
 /// Whether a plugin is active: the human enabled it, and its definition and
 /// code have not changed since it was activated (the stored hash matches).
-pub fn is_active(workdir: &Path, def: &PluginDef, activation: Option<&PluginActivation>) -> bool {
+pub fn is_active(
+    agents_home: &Path,
+    def: &PluginDef,
+    activation: Option<&PluginActivation>,
+) -> bool {
     match activation {
-        Some(a) if a.enabled && a.name == def.name => compute_hash(workdir, def) == a.code_hash,
+        Some(a) if a.enabled && a.name == def.name => compute_hash(agents_home, def) == a.code_hash,
         _ => false,
     }
 }
@@ -69,8 +75,8 @@ mod tests {
     use super::*;
     use std::io::Write;
 
-    fn write(workdir: &Path, rel: &str, content: &str) {
-        let path = workdir.join(rel);
+    fn write(dir: &Path, rel: &str, content: &str) {
+        let path = dir.join(rel);
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).unwrap();
         }
@@ -98,17 +104,42 @@ mod tests {
     }
 
     #[test]
+    fn a_project_definitions_file_is_ignored() {
+        // Plugins are global: a project's `.agents/plugins.json` is never
+        // read, only the agents home's.
+        let base =
+            std::env::temp_dir().join(format!("fennec-plugin-cfg-{}", crate::domain::id::new_id()));
+        let agents_home = base.join("agents");
+        let workdir = base.join("repo");
+        write(
+            &agents_home,
+            "plugins.json",
+            r#"[{"name":"counter","command":"python3","args":["counter.py"]}]"#,
+        );
+        write(
+            &workdir,
+            ".agents/plugins.json",
+            r#"[{"name":"local","command":"python3","args":["local.py"]}]"#,
+        );
+
+        let defs = read_defs(&agents_home);
+        assert_eq!(defs.len(), 1);
+        assert_eq!(defs[0].name, "counter");
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
     fn a_changed_definition_or_code_deactivates() {
         let dir =
             std::env::temp_dir().join(format!("fennec-plugin-cfg-{}", crate::domain::id::new_id()));
-        write(&dir, ".agents/plugins.json", "[]");
-        write(&dir, ".agents/plugins/counter/counter.py", "print(1)");
+        write(&dir, "plugins.json", "[]");
+        write(&dir, "plugins/counter/counter.py", "print(1)");
 
         let d = def("counter");
         let hash = compute_hash(&dir, &d);
         let activation = PluginActivation {
             name: "counter".into(),
-            path: ".agents/plugins/counter".into(),
+            path: "plugins/counter".into(),
             code_hash: hash.clone(),
             network: false,
             enabled: true,
@@ -116,7 +147,7 @@ mod tests {
         assert!(is_active(&dir, &d, Some(&activation)));
 
         // A changed code file changes the hash, so the activation no longer matches.
-        write(&dir, ".agents/plugins/counter/counter.py", "print(2)");
+        write(&dir, "plugins/counter/counter.py", "print(2)");
         assert!(!is_active(&dir, &d, Some(&activation)));
 
         // A disabled activation is not active even with a matching hash.
@@ -143,13 +174,13 @@ mod tests {
         // longer matches the definition on disk.
         let dir =
             std::env::temp_dir().join(format!("fennec-plugin-act-{}", crate::domain::id::new_id()));
-        write(&dir, ".agents/plugins/counter/counter.py", "print(1)");
+        write(&dir, "plugins/counter/counter.py", "print(1)");
 
         let d = def("counter");
         let hash = compute_hash(&dir, &d);
         let activation = PluginActivation {
             name: "counter".into(),
-            path: ".agents/plugins/counter".into(),
+            path: "plugins/counter".into(),
             code_hash: hash,
             network: false,
             enabled: true,
@@ -171,19 +202,19 @@ mod tests {
             "fennec-plugin-code-{}",
             crate::domain::id::new_id()
         ));
-        write(&dir, ".agents/plugins/counter/counter.py", "print(1)");
+        write(&dir, "plugins/counter/counter.py", "print(1)");
 
         let d = def("counter");
         let activation = PluginActivation {
             name: "counter".into(),
-            path: ".agents/plugins/counter".into(),
+            path: "plugins/counter".into(),
             code_hash: compute_hash(&dir, &d),
             network: false,
             enabled: true,
         };
         assert!(is_active(&dir, &d, Some(&activation)));
 
-        write(&dir, ".agents/plugins/counter/counter.py", "print(2)");
+        write(&dir, "plugins/counter/counter.py", "print(2)");
         assert!(!is_active(&dir, &d, Some(&activation)));
 
         let _ = std::fs::remove_dir_all(&dir);

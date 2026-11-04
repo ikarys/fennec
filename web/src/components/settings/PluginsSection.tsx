@@ -1,13 +1,13 @@
-// Project page plugins tab: the human's activations (enabled, network) and
-// the project-scope blocks the active plugins emitted, each with its
+// Settings' Plugins tab: the human's global activations (enabled, network)
+// and the global-scope blocks the active plugins emitted, each with its
 // provenance badge. The core renders the blocks, never HTML.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useT } from '../../i18n';
 import {
-  getProjectPlugins,
-  setProjectPlugin,
+  getGlobalPlugins,
+  setGlobalPlugin,
   type PluginTone,
-  type ProjectPlugin,
+  type GlobalPlugin,
   type ServedPluginBlock,
 } from '../../lib/api';
 import { Badge, type BadgeTone } from '../ui/Badge';
@@ -59,9 +59,9 @@ function BlockContent({ block }: { block: ServedPluginBlock }) {
   );
 }
 
-export function PluginsSection({ projectId }: { projectId: string }) {
+export function PluginsSection() {
   const t = useT();
-  const [plugins, setPlugins] = useState<ProjectPlugin[] | null>(null);
+  const [plugins, setPlugins] = useState<GlobalPlugin[] | null>(null);
   const [blocks, setBlocks] = useState<ServedPluginBlock[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busyName, setBusyName] = useState<string | null>(null);
@@ -70,7 +70,7 @@ export function PluginsSection({ projectId }: { projectId: string }) {
   const fetchAll = useCallback(async () => {
     const id = ++fetchId.current;
     try {
-      const data = await getProjectPlugins(projectId);
+      const data = await getGlobalPlugins();
       if (id === fetchId.current) {
         setPlugins(data.plugins);
         setBlocks(data.blocks);
@@ -81,7 +81,7 @@ export function PluginsSection({ projectId }: { projectId: string }) {
         setError(loadError instanceof Error ? loadError.message : String(loadError));
       }
     }
-  }, [projectId]);
+  }, []);
 
   useEffect(() => {
     setPlugins(null);
@@ -89,12 +89,11 @@ export function PluginsSection({ projectId }: { projectId: string }) {
     void fetchAll();
   }, [fetchAll]);
 
-  const toggle = async (plugin: ProjectPlugin, patch: { enabled?: boolean; network?: boolean }) => {
+  const toggle = async (plugin: GlobalPlugin, patch: { enabled?: boolean; network?: boolean }) => {
     if (busyName !== null) return;
     setBusyName(plugin.name);
     try {
-      await setProjectPlugin(
-        projectId,
+      await setGlobalPlugin(
         plugin.name,
         patch.enabled ?? plugin.enabled,
         patch.network ?? plugin.network,
@@ -143,6 +142,18 @@ export function PluginsSection({ projectId }: { projectId: string }) {
                   <span className="block truncate text-xs text-faint" title={`${plugin.command} ${plugin.args.join(' ')}`}>
                     {plugin.command} {plugin.args.join(' ')}
                   </span>
+                  {Object.keys(plugin.env).length > 0 ? (
+                    <span
+                      className="block truncate font-mono text-xs text-faint"
+                      title={Object.entries(plugin.env)
+                        .map(([key, value]) => `${key}=${value}`)
+                        .join(' ')}
+                    >
+                      {t('pluginEnv')}: {Object.entries(plugin.env)
+                        .map(([key, value]) => `${key}=${value}`)
+                        .join(' ')}
+                    </span>
+                  ) : null}
                 </div>
                 <Button
                   variant="ghost"

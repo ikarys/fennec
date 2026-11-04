@@ -489,20 +489,21 @@ read-only. The human edits them as usual.
 - `POST /api/sessions/{id}/files` → 202 `{path}`: opens the human's own file
   manager in the session's project folder (their repository, not the worktree):
   Explorer under WSL, `open` on macOS, else `xdg-open`. 500 if it cannot start.
-- `GET /api/projects/{id}/plugins` → `{plugins: [{name, command, args, blocks, enabled, network, active}], blocks}`:
-  the project's plugin definitions (`.agents/plugins.json`, a definition with problems left out; a plugin's code
-  lives in `.agents/plugins/<name>/`) and the human's activation of each, stored in fennec's store, never in the
-  repository; `active` when enabled and the SHA-256 of its definition and code still matches the one taken at
-  activation (a changed file deactivates it). `blocks` the project-scope blocks served:
-  `[{plugin, title, scope, content: {elements: [{kind: "text"|"figure"|"badge", …}]}}]` (data only, rendered by the
-  UI, indicative). 404 if no project.
-- `POST /api/projects/{id}/plugins` `{name, enabled, network}` → `{name, enabled, network, active}`: the human
-  activates or deactivates a plugin, hashing its definition and code now, and restarts the project's plugin hosts.
-  A plugin always runs in the bwrap world (never with the sandbox off), the project read-only, a private scratch
-  writable, the network only when `network`. 400 on an empty name or an invalid definition; 404 if no project or
-  no such plugin.
-- `GET /api/sessions/{id}/plugins` → `{blocks}`: the session-scope blocks of the session's project plugins, same
-  shape. 404 if no session.
+- `GET /api/plugins` → `{plugins: [{name, command, args, env, blocks, enabled, network, active}], blocks}`:
+  the human's plugin definitions (`~/.agents/plugins.json`, a definition with problems left out; a plugin's code
+  lives in `~/.agents/plugins/<name>/`; nothing is read from a project) and the human's global activation of
+  each, stored in fennec's store; `active` when enabled and the SHA-256 of its definition and code still matches
+  the one taken at activation (a changed file deactivates it). `blocks` the global-scope blocks served:
+  `[{plugin, title, scope, content: {elements: [{kind: "text"|"figure"|"badge", …}]}}]` (data only, rendered by
+  the UI, indicative).
+- `POST /api/plugins` `{name, enabled, network}` → `{name, enabled, network, active}`: the human activates or
+  deactivates a plugin, hashing its definition and code now, and restarts the plugin hosts. A plugin always runs
+  in the bwrap world (never with the sandbox off), its code directory read-only (and its working directory), a
+  private scratch writable, no project mounted, the network only when `network`. 400 on an empty name or an
+  invalid definition; 404 if no such plugin.
+- `GET /api/sessions/{id}/plugins` → `{blocks}`: the session-scope blocks of the session's plugins, same shape.
+  404 if no session. The event feed a plugin receives carries the `session` and `project` ids; a session seen
+  for the first time by the pump is not replayed.
 - `GET /api/sessions/{id}/servers` → `[{name, command, running, url}]`: the project's
   servers (`.agents/servers.json`) and whether each runs in this session; `url` is
   `http://127.0.0.1:{port}` when it runs in this session, `null` otherwise. 404 if no session.
