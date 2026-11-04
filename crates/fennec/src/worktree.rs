@@ -369,6 +369,50 @@ pub(crate) fn git(dir: &Path, args: &[&str], stdin: Option<&[u8]>) -> Result<Vec
     }
 }
 
+/// A worktree lacks the gitignored `.env` files a dev server reads; a link,
+/// never a copy, so the secret stays in one place; only ignored files, so the
+/// link is never committed.
+pub fn link_env_files(workdir: &Path) -> Result<(), String> {
+    let Some(main) = main_checkout(workdir) else {
+        return Ok(());
+    };
+
+    let entries = std::fs::read_dir(&main).map_err(|e| format!("read {main:?}: {e}"))?;
+
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("read dir entry: {e}"))?;
+        let path = entry.path();
+        let file_name = entry.file_name();
+        let Some(name) = file_name.to_str() else {
+            continue;
+        };
+
+        if !name.starts_with(".env") {
+            continue;
+        }
+
+        let Ok(metadata) = std::fs::metadata(&path) else {
+            continue;
+        };
+        if !metadata.is_file() {
+            continue;
+        }
+
+        if git(&main, &["check-ignore", "-q", name], None).is_err() {
+            continue;
+        }
+
+        let target = workdir.join(name);
+        if std::fs::symlink_metadata(&target).is_ok() {
+            continue;
+        }
+
+        std::os::unix::fs::symlink(&path, &target).map_err(|e| format!("link {name}: {e}"))?;
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -592,6 +636,34 @@ mod tests {
         assert_eq!(link_dependencies(&wt.workdir), Ok(()));
         assert!(dependency_mounts(&wt.workdir).is_empty());
         assert_eq!(commit(&wt, "nothing"), Ok(false));
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn link_env_files_links_only_ignored_env_files() {
+        let (base, repo) = setup();
+
+        std::fs::write(repo.join(".gitignore"), ".env\n").unwrap();
+        std::fs::write(repo.join(".env.example"), "EXAMPLE=1\n").unwrap();
+        git(&repo, &["add", "-A"], None).unwrap();
+        git(&repo, &["commit", "-q", "-m", "x"], None).unwrap();
+        std::fs::write(repo.join(".env"), "SECRET=1\n").unwrap();
+
+        let wt = open(&base.join("wt"), &repo, "s1").unwrap().unwrap();
+        link_env_files(&wt.workdir).unwrap();
+
+        let env_link = wt.workdir.join(".env");
+        let meta = std::fs::symlink_metadata(&env_link).unwrap();
+        assert!(meta.is_symlink());
+        assert_eq!(std::fs::read_link(&env_link).unwrap(), repo.join(".env"));
+
+        let example = wt.workdir.join(".env.example");
+        assert!(std::fs::metadata(&example).unwrap().is_file());
+        assert!(!std::fs::symlink_metadata(&example).unwrap().is_symlink());
+
+        link_env_files(&wt.workdir).unwrap();
+        assert_eq!(commit(&wt, "nothing"), Ok(false));
+
         let _ = std::fs::remove_dir_all(&base);
     }
 }

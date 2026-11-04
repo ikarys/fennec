@@ -1,12 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import type { ServerView } from '../../lib/api';
-import { getServers, startServer, stopServer } from '../../lib/api';
-import { ExternalIcon, PlayIcon, ServerIcon, SettingsIcon, SpinnerIcon, StopIcon } from '../Icons';
-import { Badge } from '../ui/Badge';
-import { Button, buttonClass } from '../ui/Button';
+import { ServerIcon } from '../Icons';
 import { Panel } from '../ui/Panel';
 import { panelBlock } from '../../lib/panelBlocks';
 import { ServerEditor } from './ServerEditor';
+import { ServerList } from './ServerList';
 import { useT } from '../../i18n';
 
 interface ServersSectionProps {
@@ -16,48 +14,14 @@ interface ServersSectionProps {
 export function ServersSection({ sessionId }: ServersSectionProps) {
   const t = useT();
   const [servers, setServers] = useState<ServerView[] | null>(null);
-  const [busyName, setBusyName] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
-  const fetchId = useRef(0);
-
-  const fetchServers = useCallback(async () => {
-    if (!sessionId) {
-      fetchId.current += 1;
-      setServers(null);
-      return;
-    }
-    const id = ++fetchId.current;
-    try {
-      const data = await getServers(sessionId);
-      if (id === fetchId.current) setServers(data);
-    } catch {
-      if (id === fetchId.current) setServers([]);
-    }
-  }, [sessionId]);
-
-  useEffect(() => {
-    void fetchServers();
-  }, [fetchServers]);
-
-  const toggle = async (server: ServerView) => {
-    if (!sessionId || busyName !== null) return;
-    setBusyName(server.name);
-    try {
-      if (server.running) await stopServer(sessionId, server.name);
-      else await startServer(sessionId, server.name);
-      await fetchServers();
-    } catch {
-      // The state is re-read on the next action; a failed start shows as stopped.
-    } finally {
-      setBusyName(null);
-    }
-  };
+  const [refreshKey, setRefreshKey] = useState(0);
 
   if (sessionId === null) {
     return null;
   }
 
-  const runningCount = servers?.filter((s) => s.running).length ?? 0;
+  const runningCount = servers?.filter((server) => server.running).length ?? 0;
   const summary = servers === null ? undefined : `${runningCount}/${servers.length}`;
 
   return (
@@ -72,64 +36,25 @@ export function ServersSection({ sessionId }: ServersSectionProps) {
         <p className="m-0 text-xs text-muted">
           {t('serversStartedNote')} <code>$PORT</code>.
         </p>
-        {servers === null && <div className="text-xs text-muted">{t('loading')}</div>}
-        {servers !== null && servers.length === 0 && (
-          <div className="text-xs text-muted">{t('noServersConfigured')}</div>
-        )}
-        {servers?.map((server) => (
-          <div key={server.name} className="flex items-center gap-2 rounded-md px-1 py-1 hover:bg-accent-soft">
-            <Badge tone={server.running ? 'ok' : 'neutral'} dot pulse={server.running}>
-              {server.running ? t('serverRunning') : t('serverStopped')}
-            </Badge>
-            <span className="min-w-0 grow truncate font-mono text-xs" title={server.command}>
-              {server.name}
-            </span>
-            {server.url !== null && (
-              <a
-                href={server.url}
-                target="_blank"
-                rel="noreferrer"
-                className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
-                aria-label={t('openUrl', { url: server.url })}
-                title={t('openUrl', { url: server.url })}
-              >
-                <ExternalIcon className="h-3.5 w-3.5" />
-              </a>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              iconOnly
-              disabled={busyName !== null}
-              aria-label={server.running ? t('stopServer', { name: server.name }) : t('startServer', { name: server.name })}
-              title={server.command}
-              onClick={() => void toggle(server)}
-            >
-              {busyName === server.name ? (
-                <SpinnerIcon className="h-3.5 w-3.5" />
-              ) : server.running ? (
-                <StopIcon className="h-3.5 w-3.5" />
-              ) : (
-                <PlayIcon className="h-3.5 w-3.5" />
-              )}
-            </Button>
-          </div>
-        ))}
-        <Button variant="soft" size="sm" onClick={() => setEditorOpen(true)}>
-          <SettingsIcon className="h-3.5 w-3.5" />
-          {t('configure')}
-        </Button>
+
+        <ServerList
+          key={refreshKey}
+          sessionId={sessionId}
+          onServers={setServers}
+          onConfigure={() => setEditorOpen(true)}
+        />
+
+        <ServerEditor
+          open={editorOpen}
+          sessionId={sessionId}
+          initial={servers ?? []}
+          onSaved={() => {
+            setEditorOpen(false);
+            setRefreshKey((key) => key + 1);
+          }}
+          onClose={() => setEditorOpen(false)}
+        />
       </div>
-      <ServerEditor
-        open={editorOpen}
-        sessionId={sessionId}
-        initial={servers ?? []}
-        onSaved={() => {
-          setEditorOpen(false);
-          void fetchServers();
-        }}
-        onClose={() => setEditorOpen(false)}
-      />
     </Panel>
   );
 }
