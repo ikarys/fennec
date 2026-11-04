@@ -1,4 +1,4 @@
-//! The security scanners the audit-security agent runs when it finds them on PATH; fennec shows which are installed and how to install the others, it never installs one.
+//! The security scanners fennec runs when it finds them on PATH (the integration gate, the audit-security agent); fennec shows which are installed and how to install the others, it never installs one.
 
 use crate::domain::lang::Lang;
 

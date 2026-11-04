@@ -1,6 +1,6 @@
 // The integration dialog's words and its gate as the UI applies it: what a blocker says, what the
 // narrate agent is asked, when the Integrate button is enabled. Pure, so it is tested without a browser.
-import type { Blocker, IntegrationPreview, IntegrationResult } from './api';
+import type { Blocker, IntegrationPreview, IntegrationResult, ScanStatus } from './api';
 import { t, type Lang } from '../i18n/messages';
 
 export type BlockerKind = Blocker['kind'];
@@ -36,6 +36,13 @@ export function blockerSentence(lang: Lang, blocker: Blocker): string {
       return t(lang, 'protectedTouched', { paths: blocker.paths.join(', ') });
     case 'sensitiveTouched':
       return t(lang, 'sensitiveTouched', { paths: blocker.paths.join(', ') });
+    case 'securityFindings': {
+      const shown = blocker.findings
+        .slice(0, 3)
+        .map((f) => `${f.path}${f.line != null ? `:${f.line}` : ''} (${f.scanner} ${f.rule}: ${f.detail})`);
+      const more = blocker.findings.length - shown.length;
+      return t(lang, 'securityFindings', { list: shown.join(' ; '), more: more > 0 ? ` (+${more})` : '' });
+    }
     case 'architectureViolated': {
       const shown = blocker.violations
         .slice(0, 3)
@@ -89,4 +96,22 @@ export function gateState({ preview, acknowledged, result, message, busy }: Gate
   const integrateDisabled = busy || (result === null && (!hasCommits || hasUncheckedBlocker || message.trim() === ''));
   const canFinish = preview !== null && result === null && !hasCommits && preview.idea !== null;
   return { integrateDisabled, canFinish };
+}
+
+/** One line on the security scanners of the gate: which ran, which could not and why. */
+export function scansSentence(lang: Lang, scans: ScanStatus[]): string {
+  const list = scans.map((scan) => {
+    const name = scan.scanner;
+    switch (scan.state) {
+      case 'ran':
+        return t(lang, 'scanRan', { name, count: scan.findings });
+      case 'notInstalled':
+        return t(lang, 'scanNotInstalled', { name });
+      case 'notApplicable':
+        return t(lang, 'scanNotApplicable', { name });
+      case 'failed':
+        return t(lang, 'scanFailed', { name, reason: scan.reason });
+    }
+  });
+  return t(lang, 'securityScans', { list: list.join(', ') });
 }

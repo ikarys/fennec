@@ -7,6 +7,7 @@ use super::architecture::{Rules, Violation};
 use super::bypass::{self, Suppression, TestsWeakened};
 use super::criteria::{CriterionState, CriterionStatus};
 use super::diff::ChangedLines;
+use super::security_scan::SecurityFinding;
 
 /// What the branch's diff tells the gate, checked on its lines.
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -19,6 +20,9 @@ pub struct DiffChecks {
     pub markers: Vec<String>,
     /// Changed files inside the human's sensitive zones.
     pub sensitive: Vec<String>,
+    /// The security scanners' hits on the branch (filled by the adapter that
+    /// ran them: the diff alone cannot tell).
+    pub security: Vec<SecurityFinding>,
 }
 
 impl DiffChecks {
@@ -46,6 +50,7 @@ impl DiffChecks {
             weakened: bypass::tests_weakened(files),
             markers,
             sensitive,
+            security: Vec::new(),
         }
     }
 }
@@ -88,6 +93,9 @@ pub enum Blocker {
     /// Files in the sensitive zones of `.agents/architecture`: the human's
     /// review is mandatory there.
     SensitiveTouched { paths: Vec<String> },
+    /// What the security scanners found on the branch: secrets, vulnerable
+    /// dependencies, the human's own Semgrep rules.
+    SecurityFindings { findings: Vec<SecurityFinding> },
     /// Added lines that break the project's `.agents/architecture` rules.
     ArchitectureViolated { violations: Vec<Violation> },
     /// Added lines that silence a lint, a type check or a test.
@@ -112,6 +120,7 @@ impl Blocker {
             Blocker::NoCriteria => "noCriteria",
             Blocker::ProtectedTouched { .. } => "protectedTouched",
             Blocker::SensitiveTouched { .. } => "sensitiveTouched",
+            Blocker::SecurityFindings { .. } => "securityFindings",
             Blocker::ArchitectureViolated { .. } => "architectureViolated",
             Blocker::SuppressionsAdded { .. } => "suppressionsAdded",
             Blocker::TestsWeakened { .. } => "testsWeakened",
@@ -140,7 +149,7 @@ pub struct Landing<'a> {
 /// The blockers of an integration, in the order the UI shows them:
 /// `NoCommits` first, then a merge conflict, then the branch, then the
 /// human's uncommitted changes, then the criteria, then the protected files,
-/// then the sensitive zones, then the architecture rules, then the added
+/// then the sensitive zones, then the security findings, then the architecture rules, then the added
 /// suppressions, then the weakened tests.
 pub fn blockers(
     commits: usize,
@@ -212,6 +221,12 @@ pub fn blockers(
     if !checks.sensitive.is_empty() {
         out.push(Blocker::SensitiveTouched {
             paths: checks.sensitive.clone(),
+        });
+    }
+
+    if !checks.security.is_empty() {
+        out.push(Blocker::SecurityFindings {
+            findings: checks.security.clone(),
         });
     }
 
@@ -431,6 +446,13 @@ mod tests {
             line: "#[allow(x)]".into(),
             marker: "#[allow(".into(),
         };
+        let finding = SecurityFinding {
+            scanner: "gitleaks".into(),
+            rule: "github-pat".into(),
+            path: "a.rs".into(),
+            line: Some(3),
+            detail: "GitHub token".into(),
+        };
         let checks = DiffChecks {
             violations: vec![violation.clone()],
             suppressions: vec![suppression.clone()],
@@ -441,6 +463,7 @@ mod tests {
             }),
             markers: vec![],
             sensitive: vec![],
+            security: vec![finding.clone()],
         };
 
         let found = blockers(1, &[], &[], &checks, &Landing::default());
@@ -449,6 +472,9 @@ mod tests {
             found,
             vec![
                 Blocker::NoCriteria,
+                Blocker::SecurityFindings {
+                    findings: vec![finding]
+                },
                 Blocker::ArchitectureViolated {
                     violations: vec![violation]
                 },
