@@ -95,6 +95,9 @@ struct App {
     server_runs: Arc<Mutex<HashMap<String, RunningServer>>>,
     /// The active plugin hosts and the event pump that feeds them.
     plugins: Arc<crate::plugins::PluginManager>,
+    /// The agents home (`<home>/.agents`): where the global plugin
+    /// definitions live.
+    agents_home: std::path::PathBuf,
 }
 
 impl App {
@@ -226,6 +229,11 @@ pub fn serve(port: u16, settings: Settings) -> Result<(), String> {
         settings.llm.defaults.model
     );
     let notifier = Arc::new(Notifier::default());
+    // The agents home (`<home>/.agents`), resolved the way skills and agents
+    // resolve it: the plugins live only there, never in a project.
+    let agents_home = std::env::var_os("HOME")
+        .map(|home| std::path::PathBuf::from(home).join(".agents"))
+        .unwrap_or_else(|| std::path::PathBuf::from(".agents"));
     // The plugin manager's sandbox world and scratch root, from the stored
     // preferences. A plugin's network is its own choice, set per activation.
     let boot_store = SqliteStore::open(&settings.db_path)?;
@@ -237,6 +245,7 @@ pub fn serve(port: u16, settings: Settings) -> Result<(), String> {
         .unwrap_or_else(|| std::path::PathBuf::from("plugins"));
     let plugins = Arc::new(crate::plugins::PluginManager::new(
         Sandbox::for_store(&prefs.sandbox, &settings.db_path),
+        agents_home.clone(),
         plugins_temp,
     ));
     let app = Arc::new(App {
@@ -250,6 +259,7 @@ pub fn serve(port: u16, settings: Settings) -> Result<(), String> {
         worktree_scan: Mutex::default(),
         server_runs: Arc::new(Mutex::new(HashMap::new())),
         plugins: plugins.clone(),
+        agents_home,
     });
     // The event pump feeds the active plugins; it reads the store only.
     app.plugins

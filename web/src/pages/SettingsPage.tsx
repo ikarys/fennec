@@ -37,6 +37,7 @@ import { AgentsSection } from '../components/agents/AgentsSection';
 import { RulesSection } from '../components/rules/RulesSection';
 import { AutonomySection } from '../components/settings/AutonomySection';
 import { ScannersSection } from '../components/settings/ScannersSection';
+import { PluginsSection } from '../components/settings/PluginsSection';
 import { SkillsSection } from '../components/settings/SkillsSection';
 import { WorkflowsSection } from '../components/settings/WorkflowsSection';
 import { useT } from '../i18n';
@@ -52,14 +53,15 @@ interface SettingsPageProps {
   onListing: (listing: ProviderListing) => void;
 }
 
-type SettingsTab = 'models' | 'behaviour' | 'security' | 'library' | 'display';
+type SettingsTab = 'models' | 'behaviour' | 'security' | 'plugins' | 'library' | 'display';
 
-// Five groups, not twelve tabs: what tunes the model, how an agent behaves, what it is allowed to touch
-// (sandbox, scanners, the human's rules), the catalogues of content (skills, workflows, agents, MCP) and the display.
+// Six groups, not twelve tabs: what tunes the model, how an agent behaves, what it is allowed to touch
+// (sandbox, scanners, the human's rules), the human's plugins, the catalogues of content (skills, workflows, agents, MCP) and the display.
 const TABS: { id: SettingsTab; labelKey: MsgKey }[] = [
   { id: 'models', labelKey: 'settingsTabModels' },
   { id: 'behaviour', labelKey: 'settingsTabBehaviour' },
   { id: 'security', labelKey: 'settingsTabSecurity' },
+  { id: 'plugins', labelKey: 'settingsTabPlugins' },
   { id: 'library', labelKey: 'settingsTabLibrary' },
   { id: 'display', labelKey: 'settingsTabDisplay' }
 ];
@@ -392,6 +394,8 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
                 <RulesSection />
               </>
             )}
+
+            {tab === 'plugins' && <PluginsSection />}
 
             {tab === 'library' && (
               <>

@@ -1,7 +1,6 @@
-//! Plugin routes: the project's plugin definitions and the human's
-//! activations (the Settings page), and the block data the active plugins have
-//! emitted. Activation writes the store only; the definitions live in the
-//! project's protected `.agents` files.
+//! Plugin routes: the human's plugin definitions (`~/.agents/plugins.json`)
+//! and their global activations (the Settings page), and the block data the
+//! active plugins have emitted. Activation writes the store only.
 
 use super::App;
 use super::http::{Request, error, send_json};
@@ -9,20 +8,13 @@ use crate::domain::plugin::PluginActivation;
 use crate::plugins::config;
 use serde_json::{Value, json};
 use std::net::TcpStream;
-use std::path::Path;
 
-/// `GET /api/projects/{id}/plugins`: the definitions, their activation state,
-/// and the project blocks the active plugins have emitted.
-pub(super) fn list(app: &App, stream: &mut TcpStream, project_id: &str) -> Result<(), String> {
+/// `GET /api/plugins`: the global definitions, their activation state, and
+/// the global blocks the active plugins have emitted.
+pub(super) fn list(app: &App, stream: &mut TcpStream) -> Result<(), String> {
     let store = app.store()?;
-    let Some(project) = store.project(project_id).map_err(|e| e.to_string())? else {
-        return error(stream, 404, "no such project");
-    };
-    let workdir = Path::new(&project.workdir);
-    let defs = config::read_defs(workdir);
-    let activations = store
-        .plugin_activations(project_id)
-        .map_err(|e| e.to_string())?;
+    let defs = config::read_defs(&app.agents_home);
+    let activations = store.plugin_activations().map_err(|e| e.to_string())?;
     let plugins: Vec<Value> = defs
         .iter()
         .map(|def| {
@@ -31,14 +23,15 @@ pub(super) fn list(app: &App, stream: &mut TcpStream, project_id: &str) -> Resul
                 "name": def.name,
                 "command": def.command,
                 "args": def.args,
+                "env": def.env,
                 "blocks": def.blocks,
                 "enabled": activation.is_some_and(|a| a.enabled),
                 "network": activation.is_some_and(|a| a.network),
-                "active": config::is_active(workdir, def, activation),
+                "active": config::is_active(&app.agents_home, def, activation),
             })
         })
         .collect();
-    let blocks = app.plugins.blocks_for_project(project_id);
+    let blocks = app.plugins.blocks_global();
     send_json(
         stream,
         200,
@@ -50,21 +43,16 @@ pub(super) fn list(app: &App, stream: &mut TcpStream, project_id: &str) -> Resul
 /// plugins have emitted, for the left bar.
 pub(super) fn session_blocks(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
     let store = app.store()?;
-    let Some(session) = store.session(id).map_err(|e| e.to_string())? else {
+    if store.session(id).map_err(|e| e.to_string())?.is_none() {
         return error(stream, 404, "no such session");
-    };
-    let blocks = app.plugins.blocks_for_session(&session.project_id, id);
+    }
+    let blocks = app.plugins.blocks_for_session(id);
     send_json(stream, 200, &json!({ "blocks": blocks }))
 }
 
-/// `POST /api/projects/{id}/plugins`: set a plugin's activation (enabled,
-/// network), hashing its definition and code so a later change deactivates it.
-pub(super) fn set(
-    app: &App,
-    req: &Request,
-    stream: &mut TcpStream,
-    project_id: &str,
-) -> Result<(), String> {
+/// `POST /api/plugins`: set a plugin's activation (enabled, network),
+/// hashing its definition and code so a later change deactivates it.
+pub(super) fn set(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
     let body = req.json()?;
     let name = body["name"].as_str().unwrap_or("").to_string();
     let network = body["network"].as_bool().unwrap_or(false);
@@ -73,11 +61,7 @@ pub(super) fn set(
         return error(stream, 400, "name is empty");
     }
     let store = app.store()?;
-    let Some(project) = store.project(project_id).map_err(|e| e.to_string())? else {
-        return error(stream, 404, "no such project");
-    };
-    let workdir = Path::new(&project.workdir);
-    let Some(def) = config::read_defs(workdir)
+    let Some(def) = config::read_defs(&app.agents_home)
         .into_iter()
         .find(|d| d.name == name)
     else {
@@ -88,16 +72,16 @@ pub(super) fn set(
     }
     let activation = PluginActivation {
         name: def.name.clone(),
-        path: format!(".agents/plugins/{}", def.name),
-        code_hash: config::compute_hash(workdir, &def),
+        path: format!("plugins/{}", def.name),
+        code_hash: config::compute_hash(&app.agents_home, &def),
         network,
         enabled,
     };
     store
-        .save_plugin_activation(project_id, &activation)
+        .save_plugin_activation(&activation)
         .map_err(|e| e.to_string())?;
-    // A changed activation starts the host afresh.
-    app.plugins.restart_project(project_id, &store);
+    // A changed activation starts the hosts afresh.
+    app.plugins.restart(&store);
     send_json(
         stream,
         200,
@@ -105,7 +89,7 @@ pub(super) fn set(
             "name": def.name,
             "enabled": enabled,
             "network": network,
-            "active": config::is_active(workdir, &def, Some(&activation)),
+            "active": config::is_active(&app.agents_home, &def, Some(&activation)),
         }),
     )
 }
@@ -122,13 +106,9 @@ mod tests {
             "fennec-plugin-route-{}",
             crate::domain::id::new_id()
         ));
-        let workdir = base.join("repo");
-        std::fs::create_dir_all(workdir.join(".agents/plugins/counter")).unwrap();
-        std::fs::write(
-            workdir.join(".agents/plugins/counter/counter.py"),
-            "print(1)",
-        )
-        .unwrap();
+        let agents_home = base.join("agents");
+        std::fs::create_dir_all(agents_home.join("plugins/counter")).unwrap();
+        std::fs::write(agents_home.join("plugins/counter/counter.py"), "print(1)").unwrap();
         let def = PluginDef {
             name: "counter".into(),
             command: "python3".into(),
@@ -136,7 +116,7 @@ mod tests {
             env: Default::default(),
             blocks: Vec::new(),
         };
-        let hash = config::compute_hash(&workdir, &def);
+        let hash = config::compute_hash(&agents_home, &def);
         assert!(!hash.is_empty());
         let _ = std::fs::remove_dir_all(&base);
     }

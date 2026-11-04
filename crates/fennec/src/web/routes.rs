@@ -112,8 +112,8 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         ("POST", ["api", "projects", id, "favorite"]) => {
             project_list_routes::set_favorite(app, req, stream, id)
         }
-        ("GET", ["api", "projects", id, "plugins"]) => plugin_routes::list(app, stream, id),
-        ("POST", ["api", "projects", id, "plugins"]) => plugin_routes::set(app, req, stream, id),
+        ("GET", ["api", "plugins"]) => plugin_routes::list(app, stream),
+        ("POST", ["api", "plugins"]) => plugin_routes::set(app, req, stream),
         ("GET", ["api", "sessions", id, "plugins"]) => {
             plugin_routes::session_blocks(app, stream, id)
         }
