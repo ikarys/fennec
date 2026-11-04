@@ -19,6 +19,7 @@ mod mcp;
 mod metering;
 mod module_map;
 mod notifier;
+mod plugins;
 mod protected;
 mod risk;
 mod scanners;

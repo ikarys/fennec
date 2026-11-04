@@ -8,4 +8,5 @@ export * from "./api/worktrees";
 export * from "./api/workflows";
 export * from "./api/insight";
 export * from "./api/rules";
+export * from "./api/plugins";
 export * from "./api/agents";
