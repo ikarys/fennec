@@ -16,11 +16,13 @@ import {
   DecisionIcon,
   EyeIcon,
   FileIcon,
+  PuzzleIcon,
 } from '../Icons';
 import { AgentWorkspaceSection } from './AgentWorkspaceSection';
 import { CriteriaSection } from './CriteriaSection';
 import { DecisionsSection } from './DecisionsSection';
 import { ModifiedFilesSection } from './ModifiedFilesSection';
+import { PluginsSection } from './PluginsSection';
 import { RequestSection } from './RequestSection';
 import { ServersSection } from './ServersSection';
 import { SkillsSection } from './SkillsSection';
@@ -41,6 +43,7 @@ const RAIL_BLOCKS: readonly { id: PanelBlockId; icon: ReactNode }[] = [
   { id: 'workspace', icon: <BranchIcon className="h-4 w-4" /> },
   { id: 'decisions', icon: <DecisionIcon className="h-4 w-4" /> },
   { id: 'vision', icon: <EyeIcon className="h-4 w-4" /> },
+  { id: 'plugins', icon: <PuzzleIcon className="h-4 w-4" /> },
 ];
 
 function railCount(id: PanelBlockId, view: ThreadView, served: ServedThread, vision: SeenImage[]): number | null {
@@ -251,6 +254,8 @@ export function ContextPanel({ view, skills, usage, request, hasSession, worktre
         return <DecisionsSection key={id} decisions={served.decisions} />;
       case 'vision':
         return <VisionSection key={id} images={vision} />;
+      case 'plugins':
+        return <PluginsSection key={id} sessionId={sessionId} />;
       default: {
         const exhaustive: never = id;
         return exhaustive;

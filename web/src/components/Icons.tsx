@@ -303,6 +303,23 @@ export function ServerIcon({ className }: IconProps) {
   );
 }
 
+export function PuzzleIcon({ className }: IconProps) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M8 4h3a2 2 0 1 1 4 0h3v4a2 2 0 1 1 0 4v4H8v-4a2 2 0 1 0 0-4V4z" />
+    </svg>
+  );
+}
+
 export function GlobeIcon({ className }: IconProps) {
   return (
     <svg

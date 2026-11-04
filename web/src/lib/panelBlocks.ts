@@ -12,7 +12,7 @@
 import type { PanelPage } from './api';
 import { t, type Lang, type MsgKey } from '../i18n/messages';
 
-export type PanelBlockId = 'request' | 'criteria' | 'modifiedFiles' | 'workspace' | 'servers' | 'tokens' | 'skills' | 'decisions' | 'vision';
+export type PanelBlockId = 'request' | 'criteria' | 'modifiedFiles' | 'workspace' | 'servers' | 'tokens' | 'skills' | 'decisions' | 'vision' | 'plugins';
 
 export interface PanelBlock {
   id: PanelBlockId;
@@ -30,7 +30,8 @@ export const PANEL_BLOCKS: readonly PanelBlock[] = [
   { id: 'skills', titleKey: 'panelSkills', core: false },
   { id: 'decisions', titleKey: 'panelDecisions', core: false },
   { id: 'tokens', titleKey: 'panelTokens', core: false },
-  { id: 'vision', titleKey: 'panelVision', core: false }
+  { id: 'vision', titleKey: 'panelVision', core: false },
+  { id: 'plugins', titleKey: 'panelPlugins', core: false }
 ];
 
 export const OPTIONAL_BLOCKS: readonly PanelBlock[] = PANEL_BLOCKS.filter((block) => !block.core);
@@ -39,7 +40,7 @@ export const OPTIONAL_BLOCKS: readonly PanelBlock[] = PANEL_BLOCKS.filter((block
 export function defaultPanelPages(lang: Lang): PanelPage[] {
   return [
     { name: t(lang, 'panelPageDecision'), blocks: [] },
-    { name: t(lang, 'panelPageContext'), blocks: ['skills', 'decisions', 'servers'] },
+    { name: t(lang, 'panelPageContext'), blocks: ['skills', 'decisions', 'servers', 'plugins'] },
     { name: t(lang, 'panelPageStats'), blocks: ['tokens', 'vision'] }
   ];
 }

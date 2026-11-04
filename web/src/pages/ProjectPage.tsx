@@ -7,6 +7,7 @@ import { TasksSection } from '../components/project/ideas/TasksSection';
 import { MapSection } from '../components/project/MapSection';
 import { DocSection } from '../components/project/DocSection';
 import { RiskSection } from '../components/project/RiskSection';
+import { PluginsSection } from '../components/project/PluginsSection';
 import { AnalysesSection } from '../components/project/AnalysesSection';
 import { SessionsSection } from '../components/project/SessionsSection';
 import { DashboardSection } from '../components/project/DashboardSection';
@@ -25,6 +26,7 @@ const TABS = [
   { id: 'sessions', label: 'sessionsSectionTitle' },
   { id: 'map', label: 'moduleMapTitle' },
   { id: 'risks', label: 'risksLabel' },
+  { id: 'plugins', label: 'panelPlugins' },
   { id: 'doc', label: 'projectPageDoc' },
   { id: 'analyses', label: 'analysesTitle' },
 ] as const;
@@ -230,6 +232,7 @@ export default function ProjectPage({
           {activeTab === 'sessions' ? <SessionsSection projectName={project.name} sessions={project.sessions} onOpenSession={onOpenSession} onSessionsDeleted={onSessionsDeleted} /> : null}
           {activeTab === 'map' ? <MapTab projectId={projectId} /> : null}
           {activeTab === 'risks' ? <RiskSection projectId={projectId} busy={analyzing} onStart={(prompt, mode) => void startSession(prompt, mode)} /> : null}
+          {activeTab === 'plugins' ? <PluginsSection projectId={projectId} /> : null}
           {activeTab === 'doc' ? <DocSection projectId={projectId} /> : null}
           {activeTab === 'analyses' ? (
             <AnalysesSection
