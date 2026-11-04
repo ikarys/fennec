@@ -189,6 +189,7 @@ dependencies = [
  "backlog",
  "base64",
  "llm-providers",
+ "ring",
  "rules",
  "rusqlite",
  "serde",

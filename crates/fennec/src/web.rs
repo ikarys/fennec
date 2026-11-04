@@ -25,6 +25,7 @@ mod mcp_routes;
 mod model_routes;
 mod model_view;
 mod notice_stream;
+mod plugin_routes;
 mod preview;
 mod pricing;
 mod project_dashboard;
@@ -59,6 +60,7 @@ use crate::domain::session_skills::{SessionSkills, fold_skills};
 use crate::domain::skill::Skill;
 use crate::notifier::Notifier;
 use crate::store::SqliteStore;
+use crate::tools::Sandbox;
 use crate::worktree;
 use serde_json::json;
 use servers::RunningServer;
@@ -91,6 +93,8 @@ struct App {
     worktree_scan: Mutex<Option<(u64, Vec<crate::worktree::usage::WorktreeUsage>)>>,
     /// Servers running per (session, name): the pid of each process group.
     server_runs: Arc<Mutex<HashMap<String, RunningServer>>>,
+    /// The active plugin hosts and the event pump that feeds them.
+    plugins: Arc<crate::plugins::PluginManager>,
 }
 
 impl App {
@@ -222,17 +226,34 @@ pub fn serve(port: u16, settings: Settings) -> Result<(), String> {
         settings.llm.defaults.model
     );
     let notifier = Arc::new(Notifier::default());
+    // The plugin manager's sandbox world and scratch root, from the stored
+    // preferences. A plugin's network is its own choice, set per activation.
+    let boot_store = SqliteStore::open(&settings.db_path)?;
+    let prefs = boot_store.preferences()?;
+    let plugins_temp = settings
+        .db_path
+        .parent()
+        .map(|dir| dir.join("plugins"))
+        .unwrap_or_else(|| std::path::PathBuf::from("plugins"));
+    let plugins = Arc::new(crate::plugins::PluginManager::new(
+        Sandbox::for_store(&prefs.sandbox, &settings.db_path),
+        plugins_temp,
+    ));
     let app = Arc::new(App {
         turns: Turns::new(settings.clone(), notifier.clone()),
         settings,
         port,
-        notifier,
+        notifier: notifier.clone(),
         skill_folds: Mutex::new(HashMap::new()),
         idea_reports: Mutex::new(HashMap::new()),
         idea_queues: Mutex::default(),
         worktree_scan: Mutex::default(),
         server_runs: Arc::new(Mutex::new(HashMap::new())),
+        plugins: plugins.clone(),
     });
+    // The event pump feeds the active plugins; it reads the store only.
+    app.plugins
+        .start_pump(app.plugins.clone(), &app.settings.db_path, &app.notifier);
     // Fail now rather than on the first request. No turn runs yet, so a log
     // still marked running was cut by a crash.
     let store = app.store()?;

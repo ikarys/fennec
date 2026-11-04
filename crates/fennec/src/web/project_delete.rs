@@ -87,6 +87,8 @@ pub(super) fn delete_project(
     }
     store.delete_project(id).map_err(|e| e.to_string())?;
     rule_store.delete_project(id).map_err(|e| e.to_string())?;
+    // The deleted project's plugin hosts go with it.
+    app.plugins.remove_project(id);
     let (folder_deleted, folder_error) = match workdir {
         Some(workdir) => match std::fs::remove_dir_all(&workdir) {
             Ok(()) => (true, None),

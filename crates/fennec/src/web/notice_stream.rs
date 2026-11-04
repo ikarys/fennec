@@ -258,6 +258,10 @@ mod tests {
             idea_queues: Mutex::default(),
             worktree_scan: Mutex::default(),
             server_runs: Arc::new(Mutex::new(HashMap::new())),
+            plugins: Arc::new(crate::plugins::PluginManager::new(
+                crate::tools::Sandbox::Off,
+                std::env::temp_dir(),
+            )),
         }
     }
 

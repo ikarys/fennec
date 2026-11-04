@@ -3,6 +3,7 @@
 
 pub mod calls;
 mod ideas;
+mod plugins;
 mod settings;
 
 use crate::agent::ports::EventLog;
@@ -110,6 +111,7 @@ impl SqliteStore {
     fn init(db: Connection) -> Result<SqliteStore> {
         db.execute_batch(SCHEMA)?;
         db.execute_batch(ideas::SCHEMA)?;
+        db.execute_batch(plugins::SCHEMA)?;
         // Old databases predate child sessions; add the column then.
         let has_parent = db
             .prepare("PRAGMA table_info(sessions)")?
