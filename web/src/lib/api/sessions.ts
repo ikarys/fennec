@@ -383,9 +383,11 @@ export type ScanStatus = { scanner: string } & (
   | { state: 'notInstalled' }
   | { state: 'notApplicable' }
   | { state: 'failed'; reason: string }
+  | { state: 'running'; seconds: number }
 );
 
 export type Blocker =
+  | { kind: "securityScanRunning" }
   | { kind: "noCommits" }
   | { kind: "conflict"; files: string[] }
   | { kind: "criteriaNotPassed"; criteria: string[] }

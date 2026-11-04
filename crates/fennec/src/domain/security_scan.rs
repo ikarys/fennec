@@ -21,10 +21,18 @@ pub struct SecurityFinding {
     rename_all_fields = "camelCase"
 )]
 pub enum ScanState {
-    Ran { findings: usize },
+    Ran {
+        findings: usize,
+    },
     NotInstalled,
     NotApplicable,
-    Failed { reason: String },
+    Failed {
+        reason: String,
+    },
+    /// Still running in the background, for that many seconds.
+    Running {
+        seconds: u64,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -40,6 +48,15 @@ pub struct ScanStatus {
 pub struct ScanReport {
     pub findings: Vec<SecurityFinding>,
     pub scans: Vec<ScanStatus>,
+}
+
+impl ScanReport {
+    /// A scanner still runs: its findings are not in yet.
+    pub fn running(&self) -> bool {
+        self.scans
+            .iter()
+            .any(|scan| matches!(scan.state, ScanState::Running { .. }))
+    }
 }
 
 fn truncate(s: &str, max: usize) -> String {

@@ -1,5 +1,6 @@
 // The integration dialog's words and its gate as the UI applies it: what a blocker says, what the
 // narrate agent is asked, when the Integrate button is enabled. Pure, so it is tested without a browser.
+import type { BadgeTone } from '../components/ui/Badge';
 import type { Blocker, IntegrationPreview, IntegrationResult, ScanStatus } from './api';
 import { t, type Lang } from '../i18n/messages';
 
@@ -10,7 +11,7 @@ export type Acknowledged = Partial<Record<BlockerKind, boolean>>;
 
 // These blockers cannot be fixed by an acceptance: the merge has nothing to
 // do, it cannot succeed, or it would overwrite the human's uncommitted work.
-export const neverAcknowledged = (kind: string) => kind === 'noCommits' || kind === 'conflict' || kind === 'localChanges';
+export const neverAcknowledged = (kind: string) => kind === 'noCommits' || kind === 'conflict' || kind === 'localChanges' || kind === 'securityScanRunning';
 
 /** The narrate agent's prompt: the branch, its base and the files in the server's review order. */
 export function narrativePrompt(preview: IntegrationPreview): string {
@@ -36,6 +37,8 @@ export function blockerSentence(lang: Lang, blocker: Blocker): string {
       return t(lang, 'protectedTouched', { paths: blocker.paths.join(', ') });
     case 'sensitiveTouched':
       return t(lang, 'sensitiveTouched', { paths: blocker.paths.join(', ') });
+    case 'securityScanRunning':
+      return t(lang, 'securityScanRunning');
     case 'securityFindings': {
       const shown = blocker.findings
         .slice(0, 3)
@@ -91,27 +94,47 @@ export function gateState({ preview, acknowledged, result, message, busy }: Gate
   const hasCommits = (preview?.commits.length ?? 0) > 0;
   const hasUncheckedBlocker =
     preview?.blockers.some(
-      (blocker) => blocker.kind === 'conflict' || blocker.kind === 'localChanges' || (!neverAcknowledged(blocker.kind) && !acknowledged[blocker.kind]),
+      (blocker) => blocker.kind !== 'noCommits' && (neverAcknowledged(blocker.kind) || !acknowledged[blocker.kind]),
     ) ?? false;
   const integrateDisabled = busy || (result === null && (!hasCommits || hasUncheckedBlocker || message.trim() === ''));
   const canFinish = preview !== null && result === null && !hasCommits && preview.idea !== null;
   return { integrateDisabled, canFinish };
 }
 
-/** One line on the security scanners of the gate: which ran, which could not and why. */
-export function scansSentence(lang: Lang, scans: ScanStatus[]): string {
-  const list = scans.map((scan) => {
-    const name = scan.scanner;
-    switch (scan.state) {
-      case 'ran':
-        return t(lang, 'scanRan', { name, count: scan.findings });
-      case 'notInstalled':
-        return t(lang, 'scanNotInstalled', { name });
-      case 'notApplicable':
-        return t(lang, 'scanNotApplicable', { name });
-      case 'failed':
-        return t(lang, 'scanFailed', { name, reason: scan.reason });
-    }
-  });
-  return t(lang, 'securityScans', { list: list.join(', ') });
+/** One badge per gate scanner: its state in words and the tone that carries it. */
+export function scanBadge(lang: Lang, scan: ScanStatus): { text: string; tone: BadgeTone; running: boolean } {
+  const name = scan.scanner;
+
+  switch (scan.state) {
+    case 'ran':
+      return {
+        text: t(lang, 'scanRan', { name, count: scan.findings }),
+        tone: scan.findings === 0 ? 'ok' : 'err',
+        running: false,
+      };
+    case 'notInstalled':
+      return {
+        text: t(lang, 'scanNotInstalled', { name }),
+        tone: 'neutral',
+        running: false,
+      };
+    case 'notApplicable':
+      return {
+        text: t(lang, 'scanNotApplicable', { name }),
+        tone: 'neutral',
+        running: false,
+      };
+    case 'failed':
+      return {
+        text: t(lang, 'scanFailed', { name, reason: scan.reason }),
+        tone: 'attention',
+        running: false,
+      };
+    case 'running':
+      return {
+        text: t(lang, 'scanRunning', { name, seconds: scan.seconds }),
+        tone: 'info',
+        running: true,
+      };
+  }
 }

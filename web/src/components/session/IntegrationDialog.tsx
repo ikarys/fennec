@@ -8,12 +8,12 @@ import {
   blockerSentence,
   gateState,
   narrativePrompt,
-  scansSentence,
+  scanBadge,
   neverAcknowledged,
   type Acknowledged,
   type BlockerKind,
 } from '../../lib/integration';
-import { AlertIcon, BranchIcon } from '../Icons';
+import { AlertIcon, BranchIcon, SpinnerIcon } from '../Icons';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
@@ -78,6 +78,26 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
       active = false;
     };
   }, [open, sessionId]);
+
+  // The scanners run in the background: re-read the gate each second until they end.
+  useEffect(() => {
+    if (!open || !preview) return;
+    if (!preview.securityScans.some((scan) => scan.state === 'running')) return;
+
+    let active = true;
+    const timer = window.setTimeout(() => {
+      getIntegration(sessionId)
+        .then((data) => {
+          if (active) setPreview(data);
+        })
+        .catch(() => {});
+    }, 1000);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [open, preview, sessionId]);
 
   const closeDialog = () => {
     onClose();
@@ -245,8 +265,20 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
               </label>
 
               {preview.securityScans.length > 0 && (
-                <p className="px-1.5 text-xs text-muted">{scansSentence(lang, preview.securityScans)}</p>
+                <div className="flex flex-wrap items-center gap-1.5 px-1.5">
+                  <span className="text-xs text-muted">{t('securityScansLabel')}</span>
+                  {preview.securityScans.map((scan) => {
+                    const b = scanBadge(lang, scan);
+                    return (
+                      <Badge key={scan.scanner} tone={b.tone} pill>
+                        {b.running && <SpinnerIcon className="h-3 w-3" />}
+                        {b.text}
+                      </Badge>
+                    );
+                  })}
+                </div>
               )}
+
 
               {preview.blockers.length > 0 && (
                 <section className="flex flex-col gap-1.5 rounded-lg border border-attention/35 bg-attention/10 p-3">
