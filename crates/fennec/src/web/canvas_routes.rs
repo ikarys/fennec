@@ -11,6 +11,8 @@ use serde_json::{Value, json};
 use super::App;
 use super::http::{self, Request};
 use super::preview::{SessionFile, session_file};
+use crate::agent::ports::EventLog;
+use crate::domain::conversation::assistant_texts;
 
 const CREATE_BODY_ERROR: &str =
     "body must be {\"path\": ...} or {\"language\": ..., \"content\": ...}";
@@ -81,17 +83,44 @@ pub(super) fn create(
 
 // ponytail: versions are taken when the canvas is read, so two writes between reads make one version; hook the file tools if the steps matter.
 pub(super) fn sync(app: &App, store: &CanvasStore, artifact: &Artifact) -> Result<(), String> {
-    let Source::File { path } = &artifact.source else {
-        return Ok(());
+    let contents = match &artifact.source {
+        Source::File { path } => {
+            let SessionFile::Found(file) = session_file(app, &artifact.session_id, path)? else {
+                return Ok(());
+            };
+            vec![std::fs::read(&file).map_err(|e| e.to_string())?]
+        }
+        Source::Message => block_revisions(app, store, artifact)?,
     };
-    let SessionFile::Found(file) = session_file(app, &artifact.session_id, path)? else {
-        return Ok(());
-    };
-    let content = std::fs::read(&file).map_err(|e| e.to_string())?;
-    match store.record_version(artifact.id, &content) {
-        Ok(_) | Err(StoreError::Empty | StoreError::TooLarge) => Ok(()),
-        Err(e) => Err(e.to_string()),
+    for content in contents {
+        match store.record_version(artifact.id, &content) {
+            Ok(_) | Err(StoreError::Empty | StoreError::TooLarge) => {}
+            Err(e) => return Err(e.to_string()),
+        }
     }
+    Ok(())
+}
+
+// ponytail: any later block of the same format becomes a version, even one about something
+// else; tie the blocks to the annotation they answer if that misfires.
+/// The blocks of the artifact's format the agent wrote after the one its latest version holds.
+fn block_revisions(
+    app: &App,
+    store: &CanvasStore,
+    artifact: &Artifact,
+) -> Result<Vec<Vec<u8>>, String> {
+    let Some(latest) = store
+        .content(artifact.id, artifact.latest_version)
+        .map_err(|e| e.to_string())?
+    else {
+        return Ok(Vec::new());
+    };
+    let events = app.store()?.events(&artifact.session_id)?;
+    let texts = assistant_texts(&events);
+    Ok(canvas::revisions(&texts, artifact.format, &latest)
+        .into_iter()
+        .map(String::into_bytes)
+        .collect())
 }
 
 pub(super) fn detail(app: &App, stream: &mut TcpStream, artifact_id: &str) -> Result<(), String> {

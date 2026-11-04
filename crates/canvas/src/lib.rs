@@ -6,6 +6,7 @@
 mod annotation;
 mod artifact;
 mod format;
+mod revision;
 mod store;
 
 pub use annotation::{
@@ -13,4 +14,5 @@ pub use annotation::{
 };
 pub use artifact::{Artifact, NewArtifact, Source, Version, title_for};
 pub use format::{Format, MAX_CONTENT_BYTES, SANDBOX_CSP};
+pub use revision::{blocks, revisions};
 pub use store::{CanvasStore, StoreError};
