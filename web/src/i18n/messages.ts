@@ -430,6 +430,9 @@ export const en = {
   panelMoveUp: 'Move up',
   panelMoveDown: 'Move down',
   panelAddPage: 'Add a page',
+  panelBlocksAvailable: 'Add',
+  panelPageEmpty: 'No block yet: add one below.',
+  panelBlockHide: 'Hide from this page',
   reset: 'Reset',
   // Project: ideas board (components/project/ideas)
   durationPlain: 'Duration {duration}',
@@ -1657,6 +1660,9 @@ export const fr: Record<MsgKey, string> = {
   panelMoveUp: 'Monter',
   panelMoveDown: 'Descendre',
   panelAddPage: 'Ajouter une page',
+  panelBlocksAvailable: 'Ajouter',
+  panelPageEmpty: 'Aucun bloc : ajoutez-en un ci-dessous.',
+  panelBlockHide: 'Retirer de cette page',
   reset: 'Réinitialiser',
   // Project: ideas board (components/project/ideas)
   durationPlain: 'Durée {duration}',
