@@ -3,6 +3,7 @@ import type { IntegrationConflict, IntegrationPreview, IntegrationResult } from 
 import { createSession, getIntegration, integrate, suggestCommitMessage } from '../../lib/api';
 import { completeIdea } from '../../lib/ideas';
 import { IntegrationReview } from './IntegrationReview';
+import { ServerList } from './ServerList';
 import {
   acknowledgedKinds,
   blockerSentence,
@@ -26,6 +27,7 @@ import { useLang, useT } from '../../i18n';
 export function IntegrationDialog({ sessionId, open, onClose, projectId }: { sessionId: string; open: boolean; onClose: () => void; projectId: string | null }) {
   const t = useT();
   const lang = useLang();
+  const [tryOpen, setTryOpen] = useState(false);
   const [narrating, setNarrating] = useState(false);
   const [preview, setPreview] = useState<IntegrationPreview | null>(null);
   const [loading, setLoading] = useState(false);
@@ -312,6 +314,19 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
               )}
             </div>
           )}
+
+          {/* The change runs where it lives, its worktree: tried before it reaches the human's branch. */}
+          <section className="flex flex-col gap-1.5">
+            <SectionLabel>{t('tryBeforeIntegrating')}</SectionLabel>
+            <details onToggle={(event) => setTryOpen(event.currentTarget.open)}>
+              <summary className="cursor-pointer text-xs text-muted">{t('tryBeforeIntegratingHint')}</summary>
+              {tryOpen && (
+                <div className="mt-1.5">
+                  <ServerList sessionId={sessionId} />
+                </div>
+              )}
+            </details>
+          </section>
 
           {canFinish && (
             <p className="text-xs text-muted">

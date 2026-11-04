@@ -4,7 +4,7 @@
 use std::fs;
 use std::path::Path;
 
-use crate::domain::server::ServerDef;
+use crate::domain::server::{ProjectFiles, ServerDef, guess_command};
 
 const FILE: &str = "servers.json";
 
@@ -23,6 +23,30 @@ pub fn write(workdir: &Path, defs: &[ServerDef]) -> Result<(), String> {
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let content = serde_json::to_string_pretty(defs).map_err(|e| e.to_string())?;
     fs::write(dir.join(FILE), content).map_err(|e| e.to_string())
+}
+
+/// Guesses a default dev server from common project files.
+pub fn guess(project_dir: &Path) -> Option<ServerDef> {
+    let justfile = std::fs::read_to_string(project_dir.join("Justfile"))
+        .ok()
+        .or_else(|| std::fs::read_to_string(project_dir.join("justfile")).ok());
+    let package_json = std::fs::read_to_string(project_dir.join("package.json")).ok();
+    let makefile = std::fs::read_to_string(project_dir.join("Makefile"))
+        .ok()
+        .or_else(|| std::fs::read_to_string(project_dir.join("makefile")).ok());
+    let cargo_toml = project_dir.join("Cargo.toml").is_file();
+
+    let command = guess_command(&ProjectFiles {
+        justfile: justfile.as_deref(),
+        package_json: package_json.as_deref(),
+        makefile: makefile.as_deref(),
+        cargo_toml,
+    })?;
+
+    Some(ServerDef {
+        name: "dev".into(),
+        command,
+    })
 }
 
 #[cfg(test)]

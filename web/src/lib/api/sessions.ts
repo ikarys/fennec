@@ -678,11 +678,18 @@ export interface ServerDef {
   name: string;
   command: string;
 }
+/** A server's state in this session: `starting` until its port answers. */
+/** A server's state in this session:  until its port answers. */
+export type ServerState = 'stopped' | 'starting' | 'ready' | 'exited';
 
 /** A server with its running state in this session. */
 export interface ServerView extends ServerDef {
+  suggested: boolean;
+  state: ServerState;
   running: boolean;
   url: string | null;
+  exitCode: number | null;
+  output: string[];
 }
 
 export function getServers(id: string): Promise<ServerView[]> {
