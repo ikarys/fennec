@@ -89,6 +89,7 @@ fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Result<Gate, (u16, S
     // read-only, like any command.
     let sandbox = Sandbox::for_store(&store.preferences()?.sandbox, &app.settings.db_path);
     let scan = security_scan::scan(&top, &wt, &preview.files, &sandbox);
+    checks.scanning = scan.running();
     checks.security = scan.findings;
     let hot = risk::hot_files(&top);
     let tested = risk::tested_on_branch(&top, &wt.branch, &preview.files);

@@ -12,24 +12,115 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 // ponytail: one entry, the last gate opened; a map if several dialogs alternate.
-static CACHE: Mutex<Option<(String, ScanReport)>> = Mutex::new(None);
+static CACHE: Mutex<Option<Entry>> = Mutex::new(None);
 
+struct Entry {
+    key: String,
+    started: Instant,
+    slots: Vec<Slot>,
+}
+
+struct Slot {
+    scanner: &'static str,
+    done: Option<(ScanState, Vec<SecurityFinding>)>,
+}
+
+/// The gate's scan of a branch, never waiting on a scanner: the first call
+/// starts them in the background, the next ones read how far they got.
 pub fn scan(top: &Path, wt: &Worktree, files: &[String], sandbox: &Sandbox) -> ScanReport {
     let key = cache_key(top, wt);
 
-    if let Some(key) = key.as_ref()
-        && let Some(report) = cached_report(key)
-    {
-        return report;
-    }
-
-    let report = run_scan(top, wt, files, sandbox);
-
     if let Some(key) = key {
-        store_report(key, &report);
+        let (key, report) = {
+            let mut cache = CACHE.lock().unwrap_or_else(|e| e.into_inner());
+
+            if let Some(entry) = cache.as_ref()
+                && entry.key == key
+            {
+                return snapshot(entry);
+            }
+
+            let entry = fresh_entry(key.clone());
+            let report = snapshot(&entry);
+            *cache = Some(entry);
+            (key, report)
+        };
+
+        let top = top.to_path_buf();
+        let wt = wt.clone();
+        let files = files.to_vec();
+        let sandbox = sandbox.clone();
+
+        thread::spawn(move || {
+            thread::scope(|s| {
+                s.spawn(|| finish(&key, "gitleaks", scan_gitleaks(&top, &wt, &files, &sandbox)));
+                s.spawn(|| finish(&key, "cargo-audit", scan_cargo_audit(&wt, &files, &sandbox)));
+                s.spawn(|| finish(&key, "semgrep", scan_semgrep(&top, &wt, &files, &sandbox)));
+            });
+        });
+
+        report
+    } else {
+        run_scan(top, wt, files, sandbox)
+    }
+}
+
+fn fresh_entry(key: String) -> Entry {
+    Entry {
+        key,
+        started: Instant::now(),
+        slots: vec![
+            Slot {
+                scanner: "gitleaks",
+                done: None,
+            },
+            Slot {
+                scanner: "cargo-audit",
+                done: None,
+            },
+            Slot {
+                scanner: "semgrep",
+                done: None,
+            },
+        ],
+    }
+}
+
+fn finish(key: &str, scanner: &str, result: (ScanState, Vec<SecurityFinding>)) {
+    // A newer gate may have replaced this entry while the scanner was running.
+    let mut cache = CACHE.lock().unwrap_or_else(|e| e.into_inner());
+
+    if let Some(entry) = cache.as_mut()
+        && entry.key == key
+        && let Some(slot) = entry.slots.iter_mut().find(|slot| slot.scanner == scanner)
+    {
+        slot.done = Some(result);
+    }
+}
+
+fn snapshot(entry: &Entry) -> ScanReport {
+    let mut findings = Vec::new();
+    let mut scans = Vec::new();
+
+    for slot in &entry.slots {
+        match &slot.done {
+            Some((state, slot_findings)) => {
+                findings.extend(slot_findings.iter().cloned());
+                scans.push(ScanStatus {
+                    scanner: slot.scanner.to_string(),
+                    state: state.clone(),
+                });
+            }
+            None => scans.push(ScanStatus {
+                scanner: slot.scanner.to_string(),
+                state: ScanState::Running {
+                    seconds: entry.started.elapsed().as_secs(),
+                },
+            }),
+        }
     }
 
-    report
+    ScanReport { findings, scans }
 }
 
 fn cache_key(top: &Path, wt: &Worktree) -> Option<String> {
@@ -53,43 +144,29 @@ fn resolve_sha(top: &Path, r: &str) -> Option<String> {
     if sha.is_empty() { None } else { Some(sha) }
 }
 
-fn cached_report(key: &str) -> Option<ScanReport> {
-    let cache = CACHE.lock().ok()?;
-    cache
-        .as_ref()
-        .filter(|(k, _)| k == key)
-        .map(|(_, report)| report.clone())
-}
-
-fn store_report(key: String, report: &ScanReport) {
-    if let Ok(mut cache) = CACHE.lock() {
-        *cache = Some((key, report.clone()));
-    }
-}
-
 fn run_scan(top: &Path, wt: &Worktree, files: &[String], sandbox: &Sandbox) -> ScanReport {
     let mut findings = Vec::new();
     let mut scans = Vec::new();
 
-    let (gitleaks_state, gitleaks_findings) = scan_gitleaks(top, wt, files, sandbox);
-    findings.extend(gitleaks_findings);
+    let (state, mut scanner_findings) = scan_gitleaks(top, wt, files, sandbox);
+    findings.append(&mut scanner_findings);
     scans.push(ScanStatus {
         scanner: "gitleaks".to_string(),
-        state: gitleaks_state,
+        state,
     });
 
-    let (cargo_audit_state, cargo_audit_findings) = scan_cargo_audit(wt, files, sandbox);
-    findings.extend(cargo_audit_findings);
+    let (state, mut scanner_findings) = scan_cargo_audit(wt, files, sandbox);
+    findings.append(&mut scanner_findings);
     scans.push(ScanStatus {
         scanner: "cargo-audit".to_string(),
-        state: cargo_audit_state,
+        state,
     });
 
-    let (semgrep_state, semgrep_findings) = scan_semgrep(top, wt, files, sandbox);
-    findings.extend(semgrep_findings);
+    let (state, mut scanner_findings) = scan_semgrep(top, wt, files, sandbox);
+    findings.append(&mut scanner_findings);
     scans.push(ScanStatus {
         scanner: "semgrep".to_string(),
-        state: semgrep_state,
+        state,
     });
 
     ScanReport { findings, scans }
@@ -419,7 +496,7 @@ mod tests {
     /// The real scanner in the real sandbox: a read-only world must still let
     /// gitleaks read the repository and write its report.
     #[test]
-    fn gitleaks_flags_a_secret_committed_on_the_branch_inside_the_sandbox() {
+    fn gitleaks_flags_a_secret_committed_on_the_branch_in_the_background_sandbox() {
         if scanners::find("gitleaks").is_none()
             || !matches!(crate::tools::probe(), crate::tools::SandboxHealth::Ready)
         {
@@ -455,7 +532,22 @@ mod tests {
             Path::new(""),
         );
 
-        let report = run_scan(&top, &wt, &["s.py".to_string()], &sandbox);
+        let files = ["s.py".to_string()];
+
+        // The first call answers at once, every scanner still running.
+        let first = scan(&top, &wt, &files, &sandbox);
+        assert!(
+            first
+                .scans
+                .iter()
+                .all(|s| matches!(s.state, ScanState::Running { .. }))
+        );
+        let deadline = Instant::now() + Duration::from_secs(60);
+        let mut report = scan(&top, &wt, &files, &sandbox);
+        while report.running() && Instant::now() < deadline {
+            thread::sleep(Duration::from_millis(50));
+            report = scan(&top, &wt, &files, &sandbox);
+        }
 
         assert_eq!(
             report.scans[0].state,

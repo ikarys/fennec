@@ -171,7 +171,8 @@ left bar or on the Plugins tab (`plugins.rs`, `plugins/`, `domain/plugin.rs`, `s
 Security gate, done (C23, part 1): the integration gate runs the security scanners found on PATH itself, in the
 read-only sandbox without network (gitleaks on the branch's commits, cargo-audit when a Cargo.lock changed, semgrep with
 the human's own `.semgrep.yml` on the changed files); each finding is a `securityFindings` blocker the human accepts, a
-scanner missing or failing a status line (verified, zero model tokens; `domain/security_scan.rs`, `security_scan.rs`).
+scanner missing or failing a status line; they run in the background, each one's progress shown in the dialog and
+integrating refused until they end (verified, zero model tokens; `domain/security_scan.rs`, `security_scan.rs`).
 Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
 1. To be chosen among the remaining capabilities C* of the Notion definition.
