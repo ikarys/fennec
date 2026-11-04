@@ -54,6 +54,8 @@ import {
   type IntegrationInvite,
 } from "../components/session/IntegrationInvite";
 import { IntegrationDialog } from "../components/session/IntegrationDialog";
+import { TryDialog } from "../components/session/TryDialog";
+import { PlayIcon } from "../components/Icons";
 import {
   PreviewContext,
   PreviewWorkdirContext,
@@ -125,6 +127,7 @@ export function SessionPage({
   // The plan last put in the backlog: its button says so until a new plan comes.
   const [backlogSegment, setBacklogSegment] = useState<string | null>(null);
   const [integrationOpen, setIntegrationOpen] = useState(false);
+  const [tryOpen, setTryOpen] = useState(false);
   const [integrationVersion, setIntegrationVersion] = useState(0);
   const [mcpView, setMcpView] = useState<McpSessionView | null>(null);
   const {
@@ -657,6 +660,18 @@ export function SessionPage({
                             {formatDateTime(lang, detail.createdAt)}
                           </span>
                         )}
+                        {sessionId && !isChat && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            iconOnly
+                            title={t('tryChange')}
+                            aria-label={t('tryChange')}
+                            onClick={() => setTryOpen(true)}
+                          >
+                            <PlayIcon className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                         <div className="ml-auto">
                           <ContextGauge
                             context={context}
@@ -894,6 +909,9 @@ export function SessionPage({
                         setIntegrationVersion((version) => version + 1);
                       }}
                     />
+                  )}
+                  {sessionId && tryOpen && (
+                    <TryDialog sessionId={sessionId} open onClose={() => setTryOpen(false)} />
                   )}
                   {preview && sessionId && (
                     <PreviewPane

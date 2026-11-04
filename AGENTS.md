@@ -173,6 +173,12 @@ read-only sandbox without network (gitleaks on the branch's commits, cargo-audit
 the human's own `.semgrep.yml` on the changed files); each finding is a `securityFindings` blocker the human accepts, a
 scanner missing or failing a status line; they run in the background, each one's progress shown in the dialog and
 integrating refused until they end (verified, zero model tokens; `domain/security_scan.rs`, `security_scan.rs`).
+Try the change, done: a play button in the session header and a "Tester" section in the integration dialog start
+the project's servers in the session's worktree, with no git step for the human. Each shows its state (starting until
+its port answers, ready, exited with its code), the URL it printed and its last output lines; a terminal opens in the
+worktree for CLI projects. With no `.agents/servers.json`, a command guessed from the project (Justfile, package.json,
+Makefile, Cargo) is saved on the human's confirmation; the main checkout's gitignored `.env*` files are linked, never
+copied, and servers share the project's Cargo target (`web/servers.rs`, `domain/server.rs`).
 Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
 1. To be chosen among the remaining capabilities C* of the Notion definition.
