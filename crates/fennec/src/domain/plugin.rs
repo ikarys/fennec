@@ -16,10 +16,10 @@ pub const MAX_BLOCKS: usize = 16;
 /// untrusted plugin cannot flood the server with fresh data.
 pub const MIN_UPDATE_INTERVAL_MS: u64 = 100;
 
-/// One plugin as the human defined it in `.agents/plugins.json`. The code it
-/// runs lives under `.agents/plugins/<name>/`; whether it is enabled, and its
-/// network access, are not here — they are the human's store decision
-/// (`PluginActivation`).
+/// One plugin as the human defined it in `~/.agents/plugins.json`. The code
+/// it runs lives under `~/.agents/plugins/<name>/`; whether it is enabled,
+/// and its network access, are not here — they are the human's store
+/// decision (`PluginActivation`).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct PluginDef {
@@ -67,24 +67,25 @@ pub struct PluginBlockDef {
     pub scope: BlockScope,
 }
 
-/// Where a block shows. A session block is per session (the left bar); a
-/// project block is for the whole project (the project page).
+/// Where a block shows. A session block is per session (the session's left
+/// bar); a global block is for the whole server (the Settings' Plugins tab).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum BlockScope {
     Session,
     #[default]
-    Project,
+    Global,
 }
 
 /// The human's decision to run one plugin, stored in SQLite: the definition's
 /// path, a hash of its code, and the network access and enabled flag. A
 /// changed definition or code makes the hash no longer match, deactivating it.
+/// Activation is global: one row per plugin, for every project.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PluginActivation {
     pub name: String,
-    /// The plugin's code directory, e.g. `.agents/plugins/counter`.
+    /// The plugin's code directory, e.g. `~/.agents/plugins/counter`.
     pub path: String,
     pub code_hash: String,
     pub network: bool,
@@ -140,7 +141,7 @@ pub enum Tone {
 }
 
 /// Where a block's data is stored in the host: its id, and the session it is
-/// for (a project block has none).
+/// for (a global block has none).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct BlockKey {
     pub block_id: String,
@@ -241,7 +242,7 @@ mod tests {
             blocks: vec![PluginBlockDef {
                 id: "calls".into(),
                 title: "Tool calls".into(),
-                scope: BlockScope::Project,
+                scope: BlockScope::Global,
             }],
         };
         let json = serde_json::to_string(&def).unwrap();

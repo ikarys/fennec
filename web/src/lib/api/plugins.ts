@@ -18,16 +18,18 @@ export interface PluginBlockContent {
 export interface ServedPluginBlock {
   plugin: string;
   title: string;
-  scope: "session" | "project";
+  scope: "session" | "global";
   content: PluginBlockContent;
 }
 
-/** One plugin as defined in the project's protected `.agents/plugins.json`. */
-export interface ProjectPlugin {
+/** One plugin as defined in the global `~/.agents/plugins.json`. */
+export interface GlobalPlugin {
   name: string;
   command: string;
   args: string[];
-  blocks: { id: string; title: string; scope: "session" | "project" }[];
+  /** The environment the plugin's process sees: the human must see what runs. */
+  env: Record<string, string>;
+  blocks: { id: string; title: string; scope: "session" | "global" }[];
   /** The human's activation, stored in fennec's store. */
   enabled: boolean;
   network: boolean;
@@ -35,24 +37,22 @@ export interface ProjectPlugin {
   active: boolean;
 }
 
-/** `GET /api/projects/{id}/plugins`: the definitions, their state, the project blocks. */
-export function getProjectPlugins(
-  projectId: string,
-): Promise<{ plugins: ProjectPlugin[]; blocks: ServedPluginBlock[] }> {
-  return request<{ plugins: ProjectPlugin[]; blocks: ServedPluginBlock[] }>(
-    `/api/projects/${encodeURIComponent(projectId)}/plugins`,
-  );
+/** `GET /api/plugins`: the global definitions, their state, the global blocks. */
+export function getGlobalPlugins(): Promise<{
+  plugins: GlobalPlugin[];
+  blocks: ServedPluginBlock[];
+}> {
+  return request<{ plugins: GlobalPlugin[]; blocks: ServedPluginBlock[] }>(`/api/plugins`);
 }
 
-/** `POST /api/projects/{id}/plugins`: the human's activation (enabled, network). */
-export function setProjectPlugin(
-  projectId: string,
+/** `POST /api/plugins`: the human's activation (enabled, network). */
+export function setGlobalPlugin(
   name: string,
   enabled: boolean,
   network: boolean,
 ): Promise<{ name: string; enabled: boolean; network: boolean; active: boolean }> {
   return request<{ name: string; enabled: boolean; network: boolean; active: boolean }>(
-    `/api/projects/${encodeURIComponent(projectId)}/plugins`,
+    `/api/plugins`,
     {
       method: "POST",
       body: JSON.stringify({ name, enabled, network }),
