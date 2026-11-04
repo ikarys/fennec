@@ -678,6 +678,22 @@ read-only. The human edits them as usual.
   `Content-Security-Policy: sandbox allow-scripts`, so a page runs in an
   opaque origin whose requests the guard refuses.
 
+## Canvas
+
+Artifacts the human and the agent iterate on, each version kept (the `canvas` crate, its own `canvas.db`). Deleting a session or a project deletes its artifacts.
+
+- `GET /api/sessions/{id}/canvas` → the canvas artifacts pinned in the session; 404 when the session is missing.
+- `POST /api/sessions/{id}/canvas` → pin a project-relative file with `{"path": "<path>"}` or promote a message block with `{"language": "html"|"md"|"markdown"|"svg", "content": "<text>"}`; 400 for an unsupported file/language, empty content, or invalid body, 404 for a missing session/file, 413 above 10 MiB; 200 with `{"artifact": Artifact}` when the file was already pinned, 201 with `{"artifact": Artifact}` when a new artifact is created.
+- `GET /api/projects/{id}/canvas` → the canvas artifacts in the project; 404 when the project is missing.
+- `GET /api/canvas/{id}` → `{"artifact": Artifact, "versions": [Version], "annotations": [Annotation]}`; 404 when the artifact is missing. Versions of a file are taken when this route reads it, and identical content makes no new version.
+- `GET /api/canvas/{id}/versions/{n}` → the raw bytes of version `n`, with the artifact's `Content-Type` and `Content-Security-Policy: sandbox allow-scripts`; 404 when the artifact or version is missing.
+- `POST /api/canvas/{id}/delete` → delete the artifact from the library; 404 when it is missing. Deleting never touches the file in the session's working directory.
+- `POST /api/canvas/{id}/annotations` → add an annotation with `{"version": <u32>, "anchor": Anchor, "note": "<text>"}`; 400 for a missing/invalid field, 404 when the artifact is missing; 201 with `{"annotation": Annotation, "message": <string>}`.
+- `Artifact` is `{id, projectId, sessionId, title, format, source: {kind: "file", path} | {kind: "message"}, createdAt, updatedAt, latestVersion}`.
+- `Version` is `{number, size, createdAt}`.
+- `Annotation` is `{id, artifactId, version, anchor, note, createdAt}`.
+- `Anchor` is `{kind: "whole"} | {kind: "quote", text} | {kind: "region", x, y, width, height}`.
+
 ## Workflows
 
 A session summary carries `awaitingIntegration`: true when a workflow ended `done` and no

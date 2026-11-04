@@ -6,6 +6,8 @@ import { CloseIcon, RefreshIcon } from '../Icons';
 import { markdownComponents } from '../session/markdownComponents';
 import { useT } from '../../i18n';
 import { previewUrl } from '../../lib/preview';
+import { pinCanvasFile } from '../../lib/api/canvas';
+import { PinButton } from '../canvas/PinButton';
 import type { PreviewTarget } from './PreviewContext';
 
 const REMARK_PLUGINS = [remarkGfm];
@@ -73,6 +75,13 @@ export function PreviewPane({ sessionId, target, onClose }: PreviewPaneProps) {
     <div className="fixed inset-y-0 right-0 z-40 flex w-[min(960px,92vw)] flex-col border-l border-border bg-bg shadow-xl">
       <header className="flex items-center gap-2 border-b border-border px-4 py-3">
         <span className="min-w-0 grow truncate font-mono text-xs text-muted">{target.path}</span>
+        <PinButton
+          pin={async () => {
+            const artifact = await pinCanvasFile(sessionId, target.path);
+            window.setTimeout(onClose, 0);
+            return artifact;
+          }}
+        />
         <Button
           variant="ghost"
           iconOnly

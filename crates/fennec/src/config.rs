@@ -87,6 +87,15 @@ impl Settings {
             None => self.db_path.with_file_name("rules.db"),
         }
     }
+
+    /// `FENNEC_CANVAS_DB`, default `canvas.db` next to the store. A file of its
+    /// own: the artifacts are owned by the `canvas` crate, not fennec's store.
+    pub fn canvas_path(&self) -> PathBuf {
+        match std::env::var_os("FENNEC_CANVAS_DB") {
+            Some(p) => PathBuf::from(p),
+            None => self.db_path.with_file_name("canvas.db"),
+        }
+    }
 }
 
 impl LlmSettings {
