@@ -1,10 +1,11 @@
 import type { PanelPage } from '../../lib/api';
-import { OPTIONAL_BLOCKS, PANEL_BLOCKS, pageOptionalBlocks, panelBlock, panelPages, type PanelBlockId } from '../../lib/panelBlocks';
+import { useState, type DragEvent, type KeyboardEvent } from 'react';
+import { OPTIONAL_BLOCKS, PANEL_BLOCKS, dropBlock, pageOptionalBlocks, panelBlock, panelPages, type BlockDrag, type PanelBlockId } from '../../lib/panelBlocks';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Section, type SectionSave } from '../ui/Section';
 import { Badge } from '../ui/Badge';
-import { ChevronDownIcon, ChevronUpIcon, CloseIcon, PlusIcon, TrashIcon } from '../Icons';
+import { CloseIcon, GripIcon, PlusIcon, TrashIcon } from '../Icons';
 import { useLang, useT } from '../../i18n';
 
 const MAX_PAGES = 12;
@@ -67,6 +68,59 @@ export function PanelPagesSection({ value, onChange, save }: PanelPagesSectionPr
     onChange([...pages, { name: uniquePageName(pages), blocks: [] }]);
   };
 
+  const [drag, setDrag] = useState<BlockDrag | null>(null);
+  const [over, setOver] = useState<{ page: number; index: number } | null>(null);
+
+  const startDrag = (event: DragEvent, next: BlockDrag): void => {
+    event.dataTransfer.effectAllowed = 'move';
+    // Firefox starts a drag only when some data is set.
+    event.dataTransfer.setData('text/plain', next.id);
+    setDrag(next);
+  };
+
+  const endDrag = (): void => {
+    setDrag(null);
+    setOver(null);
+  };
+
+  /** Over a row: before it in its upper half, after it in its lower half. */
+  const overRow = (event: DragEvent<HTMLElement>, page: number, index: number): void => {
+    if (!drag) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const box = event.currentTarget.getBoundingClientRect();
+    setOver({ page, index: event.clientY > box.top + box.height / 2 ? index + 1 : index });
+  };
+
+  const overPage = (event: DragEvent, page: number, end: number): void => {
+    if (!drag) return;
+    event.preventDefault();
+    if (over?.page !== page) setOver({ page, index: end });
+  };
+
+  const drop = (event: DragEvent): void => {
+    event.preventDefault();
+    if (drag && over) onChange(dropBlock(pages, drag, over.page, over.index));
+    endDrag();
+  };
+
+  /** A row dragged back onto the chips leaves its page. */
+  const dropOnChips = (event: DragEvent, page: number): void => {
+    event.preventDefault();
+    if (drag?.page === page) {
+      const blocks = pageOptionalBlocks(pages[page]);
+      updatePage(page, { ...pages[page], blocks: toggleBlock(blocks, drag.id) });
+    }
+    endDrag();
+  };
+
+  /** The keyboard's drag: Alt+↑/↓ moves the focused block. */
+  const moveWithKeys = (event: KeyboardEvent, page: number, blocks: PanelBlockId[], id: PanelBlockId): void => {
+    if (!event.altKey || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return;
+    event.preventDefault();
+    updatePage(page, { ...pages[page], blocks: moveBlock(blocks, id, event.key === 'ArrowUp' ? -1 : 1) });
+  };
+
   return (
     <Section title={t('contextPanelTitle')} description={alwaysShown} save={save}>
       <div className="grid gap-3 lg:grid-cols-2">
@@ -101,62 +155,64 @@ export function PanelPagesSection({ value, onChange, save }: PanelPagesSectionPr
                   </Button>
                 )}
               </div>
-              <ol className="flex flex-col gap-1 p-2">
-                {blocks.length === 0 && <li className="px-2 py-3 text-xs text-faint">{t('panelPageEmpty')}</li>}
+              <ol
+                className="flex grow flex-col p-2"
+                onDragOver={(event) => overPage(event, index, blocks.length)}
+                onDrop={drop}
+              >
+                {blocks.length === 0 && (
+                  <li className={`rounded-md border border-dashed px-2 py-3 text-center text-xs ${over?.page === index ? 'border-accent bg-accent-soft text-accent-strong' : 'border-transparent text-faint'}`}>
+                    {t('panelPageEmpty')}
+                  </li>
+                )}
                 {blocks.map((id, blockIndex) => (
                   <li
                     key={id}
-                    className="group flex items-center gap-2 rounded-md px-2 py-1 text-sm text-text transition-colors hover:bg-accent-soft"
+                    draggable
+                    tabIndex={0}
+                    title={t('panelBlockDrag')}
+                    onDragStart={(event) => startDrag(event, { id, page: index })}
+                    onDragEnd={endDrag}
+                    onDragOver={(event) => overRow(event, index, blockIndex)}
+                    onKeyDown={(event) => moveWithKeys(event, index, blocks, id)}
+                    className={`group relative flex cursor-grab items-center gap-2 rounded-md px-2 py-1.5 text-sm text-text transition-colors outline-none hover:bg-accent-soft focus-visible:ring-1 focus-visible:ring-accent active:cursor-grabbing ${drag?.page === index && drag.id === id ? 'opacity-40' : ''}`}
                   >
-                    <span className="w-4 text-right text-xs tabular-nums text-faint">{blockIndex + 1}</span>
+                    {over?.page === index && over.index === blockIndex && <DropLine edge="top" />}
+                    {over?.page === index && over.index === blocks.length && blockIndex === blocks.length - 1 && <DropLine edge="bottom" />}
+                    <GripIcon className="h-4 w-4 shrink-0 text-faint group-hover:text-accent" />
                     <span className="grow group-hover:text-accent-strong">{t(panelBlock(id).titleKey)}</span>
-                    <div className="flex items-center opacity-60 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-                      <Button
-                        variant="icon"
-                        size="sm"
-                        iconOnly
-                        onClick={() => updatePage(index, { ...page, blocks: moveBlock(blocks, id, -1) })}
-                        disabled={blockIndex === 0}
-                        aria-label={t('panelMoveUp')}
-                        title={t('panelMoveUp')}
-                      >
-                        <ChevronUpIcon className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="icon"
-                        size="sm"
-                        iconOnly
-                        onClick={() => updatePage(index, { ...page, blocks: moveBlock(blocks, id, 1) })}
-                        disabled={blockIndex === blocks.length - 1}
-                        aria-label={t('panelMoveDown')}
-                        title={t('panelMoveDown')}
-                      >
-                        <ChevronDownIcon className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        iconOnly
-                        onClick={() => updatePage(index, { ...page, blocks: toggleBlock(blocks, id) })}
-                        aria-label={t('panelBlockHide')}
-                        title={t('panelBlockHide')}
-                        className="hover:text-err"
-                      >
-                        <CloseIcon className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      iconOnly
+                      onClick={() => updatePage(index, { ...page, blocks: toggleBlock(blocks, id) })}
+                      aria-label={t('panelBlockHide')}
+                      title={t('panelBlockHide')}
+                      className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 hover:text-err"
+                    >
+                      <CloseIcon className="h-3.5 w-3.5" />
+                    </Button>
                   </li>
                 ))}
               </ol>
-              {available.length > 0 && (
-                <div className="mt-auto flex flex-wrap items-center gap-1.5 border-t border-border px-3 py-2">
-                  <span className="text-xs text-faint">{t('panelBlocksAvailable')}</span>
+              {(available.length > 0 || drag?.page === index) && (
+                <div
+                  onDragOver={(event) => drag?.page === index && event.preventDefault()}
+                  onDrop={(event) => dropOnChips(event, index)}
+                  className={`flex flex-wrap items-center gap-1.5 border-t px-3 py-2 transition-colors ${drag?.page === index ? 'border-err/40 bg-err/10' : 'border-border'}`}
+                >
+                  <span className={`text-xs ${drag?.page === index ? 'text-err' : 'text-faint'}`}>
+                    {t(drag?.page === index ? 'panelDropToRemove' : 'panelBlocksAvailable')}
+                  </span>
                   {available.map((block) => (
                     <button
                       key={block.id}
                       type="button"
+                      draggable
+                      onDragStart={(event) => startDrag(event, { id: block.id, page: null })}
+                      onDragEnd={endDrag}
                       onClick={() => updatePage(index, { ...page, blocks: toggleBlock(blocks, block.id) })}
-                      className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-2 py-0.5 text-xs text-muted transition-colors hover:border-accent hover:bg-accent-soft hover:text-accent-strong"
+                      className="inline-flex cursor-grab items-center gap-1 rounded-full border border-dashed border-border px-2 py-0.5 text-xs text-muted active:cursor-grabbing transition-colors hover:border-accent hover:bg-accent-soft hover:text-accent-strong"
                     >
                       <PlusIcon className="h-3 w-3" />
                       {t(block.titleKey)}
@@ -185,4 +241,9 @@ export function PanelPagesSection({ value, onChange, save }: PanelPagesSectionPr
       </div>
     </Section>
   );
+}
+
+/** Where a dragged block will land: an accent line on the edge of a row. */
+function DropLine({ edge }: { edge: 'top' | 'bottom' }) {
+  return <span className={`pointer-events-none absolute inset-x-1 h-0.5 rounded-full bg-accent ${edge === 'top' ? '-top-px' : '-bottom-px'}`} />;
 }
