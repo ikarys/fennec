@@ -16,13 +16,16 @@ use crate::domain::integration::{
 };
 use crate::domain::preflight;
 use crate::domain::review_map::{self, FileFacts, ReviewSignal};
+use crate::domain::security_scan::ScanStatus;
 use crate::domain::test_files::new_test_patterns;
 use crate::domain::workflow::run;
 use crate::integration::{self, ApplyError, Preview};
 use crate::notifier::NotifyingLog;
 use crate::protected;
 use crate::risk;
+use crate::security_scan;
 use crate::store::SqliteStore;
+use crate::tools::Sandbox;
 use crate::worktree::{self, Worktree};
 use serde_json::{Value, json};
 use std::net::TcpStream;
@@ -44,6 +47,8 @@ struct Gate {
     /// The test files under the project, relative to it, not yet protected.
     test_files: Vec<String>,
     blockers: Vec<Blocker>,
+    /// Which security scanners ran on the branch, and why the others did not.
+    security_scans: Vec<ScanStatus>,
     /// Review map, top-relative: riskiest first, with deterministic signals.
     review: Vec<(String, Vec<ReviewSignal>)>,
     /// Criteria whose check passed before any change (last preflight).
@@ -79,7 +84,12 @@ fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Result<Gate, (u16, S
     let test_files = new_test_patterns(&in_project, &protection);
     let rules = architecture::load(Path::new(&project.workdir));
     let changed = integration::changed_files(&top, &wt, &preview.files, &prefix);
-    let checks = DiffChecks::of(&rules, &changed);
+    let mut checks = DiffChecks::of(&rules, &changed);
+    // The scanners read model-written files: they run in the human's sandbox,
+    // read-only, like any command.
+    let sandbox = Sandbox::for_store(&store.preferences()?.sandbox, &app.settings.db_path);
+    let scan = security_scan::scan(&top, &wt, &preview.files, &sandbox);
+    checks.security = scan.findings;
     let hot = risk::hot_files(&top);
     let tested = risk::tested_on_branch(&top, &wt.branch, &preview.files);
     let facts: Vec<FileFacts> = preview
@@ -140,6 +150,7 @@ fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Result<Gate, (u16, S
         protected_touched,
         test_files,
         blockers,
+        security_scans: scan.scans,
         review,
         passed_before,
         idea,
@@ -197,6 +208,7 @@ pub fn get_integration(app: &App, stream: &mut TcpStream, id: &str) -> Result<()
             "criteria": criteria,
             "decisions": gate.decisions,
             "blockers": gate.blockers,
+            "securityScans": gate.security_scans,
             "idea": idea_json(gate.idea.as_ref()),
         }),
     )

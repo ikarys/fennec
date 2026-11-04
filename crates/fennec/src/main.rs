@@ -23,6 +23,7 @@ mod plugins;
 mod protected;
 mod risk;
 mod scanners;
+mod security_scan;
 mod servers;
 mod skills;
 mod store;
