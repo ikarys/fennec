@@ -37,7 +37,7 @@ pub fn render_tool_result(result: &ToolResult) -> String {
 }
 
 /// The assistant texts among `events`, in order (start content plus deltas), empty ones skipped.
-fn assistant_texts(events: &[Event]) -> Vec<String> {
+pub fn assistant_texts(events: &[Event]) -> Vec<String> {
     let mut texts: Vec<(&str, String)> = Vec::new();
     for event in events {
         match event {

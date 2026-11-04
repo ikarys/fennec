@@ -143,6 +143,14 @@ pub fn message(artifact: &Artifact, annotation: &Annotation) -> String {
 
     lines.push(String::new());
     lines.push(annotation.note.trim().to_string());
+    // A block has no file to edit: the agent's next block of this format is the next version.
+    if artifact.source == Source::Message {
+        lines.push(String::new());
+        lines.push(format!(
+            "Answer with the whole revised document in one ```{} block: it becomes the canvas's next version.",
+            artifact.format.as_str()
+        ));
+    }
     lines.join("\n")
 }
 
@@ -214,7 +222,7 @@ mod tests {
         };
         assert_eq!(
             message(&artifact(), &annotation),
-            "On the canvas \"Doc\" (version 2):\n\nmake it better"
+            "On the canvas \"Doc\" (version 2):\n\nmake it better\n\nAnswer with the whole revised document in one ```html block: it becomes the canvas's next version."
         );
     }
 
@@ -232,7 +240,7 @@ mod tests {
         };
         assert_eq!(
             message(&artifact(), &annotation),
-            "On the canvas \"Doc\" (version 1):\n> line one\n> line two\n\nnote"
+            "On the canvas \"Doc\" (version 1):\n> line one\n> line two\n\nnote\n\nAnswer with the whole revised document in one ```html block: it becomes the canvas's next version."
         );
     }
 
@@ -253,7 +261,7 @@ mod tests {
         };
         assert_eq!(
             message(&artifact(), &annotation),
-            "On the canvas \"Doc\" (version 3):\nRegion: x 10%–40%, y 20%–60% of the rendered page.\n\nnote"
+            "On the canvas \"Doc\" (version 3):\nRegion: x 10%–40%, y 20%–60% of the rendered page.\n\nnote\n\nAnswer with the whole revised document in one ```html block: it becomes the canvas's next version."
         );
     }
 
