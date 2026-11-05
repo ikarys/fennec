@@ -1,6 +1,8 @@
 //! Which files are tests, and what the human's `.agents/protected` gains when
 //! they protect the tests an integration brings (they are validated by then).
 
+use super::compaction::files_changed;
+use super::event::Event;
 use super::protection::Protection;
 
 /// The comment that heads the lines an integration appends.
@@ -28,6 +30,32 @@ pub fn is_test_path(relative: &str) -> bool {
                 .iter()
                 .any(|ext| name.ends_with(&format!(".{kind}.{ext}")))
         })
+}
+
+/// The test files written so far in a session's log: what the human validates at the test gate.
+pub fn written(events: &[Event]) -> Vec<String> {
+    files_changed(events)
+        .into_iter()
+        .filter(|file| is_test_path(file))
+        .collect()
+}
+
+/// The test files the human validated in this session, protected from then on.
+pub fn approved(events: &[Event]) -> Vec<String> {
+    let mut files = Vec::new();
+    for event in events {
+        if let Event::TestsApproved {
+            files: approved, ..
+        } = event
+        {
+            for file in approved {
+                if !files.contains(file) {
+                    files.push(file.clone());
+                }
+            }
+        }
+    }
+    files
 }
 
 /// The test files among `files` (relative to the project root) that the
@@ -65,6 +93,66 @@ pub fn append_to(existing: &str, paths: &[String]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn written_filters_the_test_files_from_the_log() {
+        let events = vec![
+            Event::ToolCall {
+                message_id: "m".into(),
+                tool_call: crate::domain::event::ToolCall {
+                    id: "c1".into(),
+                    name: "write_file".into(),
+                    arguments: serde_json::json!({"path": "tests/a.rs"}),
+                    parse_error: None,
+                    raw_arguments: None,
+                },
+            },
+            Event::ToolResult {
+                message_id: "m".into(),
+                tool_call_id: "c1".into(),
+                result: crate::domain::event::ToolResult::success("ok".into(), false),
+            },
+            Event::ToolCall {
+                message_id: "m".into(),
+                tool_call: crate::domain::event::ToolCall {
+                    id: "c2".into(),
+                    name: "write_file".into(),
+                    arguments: serde_json::json!({"path": "src/lib.rs"}),
+                    parse_error: None,
+                    raw_arguments: None,
+                },
+            },
+            Event::ToolResult {
+                message_id: "m".into(),
+                tool_call_id: "c2".into(),
+                result: crate::domain::event::ToolResult::success("ok".into(), false),
+            },
+        ];
+        assert_eq!(written(&events), vec!["tests/a.rs".to_string()]);
+    }
+
+    #[test]
+    fn approved_unions_test_files_in_first_seen_order() {
+        let events = vec![
+            Event::TestsApproved {
+                run_id: "r".into(),
+                files: vec!["tests/a.rs".into(), "tests/b.rs".into()],
+            },
+            Event::TestsApproved {
+                run_id: "r".into(),
+                files: vec!["tests/b.rs".into(), "tests/c.rs".into()],
+            },
+        ];
+        assert_eq!(
+            approved(&events),
+            vec![
+                "tests/a.rs".to_string(),
+                "tests/b.rs".to_string(),
+                "tests/c.rs".to_string()
+            ]
+        );
+        assert_eq!(approved(&[]), Vec::<String>::new());
+    }
 
     #[test]
     fn recognises_test_paths() {

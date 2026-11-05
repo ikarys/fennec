@@ -215,6 +215,11 @@ AI commits outside fennec, sensitive integrations without a comprehension dialog
 the violations accepted and the active waivers, scanner findings accepted, the month's cost per integration, the map and
 ADRs, integrations tied to an approved plan, the blockers accepted per integration (`domain/indicators.rs`,
 `web/indicator_routes.rs`, `store/project_events.rs`).
+Test gate, done (C4): the default workflow writes the tests before the code: once the plan is approved, the `tests` agent
+(`crates/fennec/agents/tests.agent.md`, `writes: tests`: its file tools refuse anything but test files) writes the tests derived
+from the "Done when" criteria, and a human node asks to validate them. "Validate" records `tests.approved` with the test files
+written so far (the kernel's choice, at the human's click); from the next turn on they are protected for the rest of the session
+like `.agents/protected` (`domain/test_files.rs`, `turn_build.rs`), so the builder makes them pass without weakening them.
 Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
 1. To be chosen among the remaining capabilities C* of the Notion definition.
@@ -255,7 +260,7 @@ crates/fennec/src/
     criteria_fold.rs   the criteria in force, folded from the log (a workflow run's state and the served thread share it)
     preflight.rs       a plan's checks run before any change: fails, passes already, cannot run
     protection.rs      protected files: the defaults, the gitignore-like patterns, the matcher
-    test_files.rs      which paths are tests; the lines an integration appends to `.agents/protected`
+    test_files.rs      which paths are tests; the lines an integration appends to `.agents/protected`; the tests validated at the gate
     integration.rs     the review gate: what blocks an integration until the human accepts it
     diff.rs            the lines a unified diff adds and removes
     commit_subject.rs  the integration's commit subject the model proposes: its prompt, its answer checked

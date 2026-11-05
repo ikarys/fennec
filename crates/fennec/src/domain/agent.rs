@@ -21,6 +21,15 @@ pub enum CommandAccess {
     ReadOnly,
 }
 
+/// Which files an agent's file tools may write: `writes: tests` in the frontmatter limits them to test files
+/// (the agent that writes the tests before the code may not touch the code).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum WriteScope {
+    #[default]
+    Any,
+    Tests,
+}
+
 /// fennec's own: `phase` in the frontmatter, the step of a project an agent serves; the composer groups its menu by it, in this order.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
@@ -63,6 +72,8 @@ pub struct AgentDefinition {
     pub allowed_tools: Vec<String>,
     /// fennec's own: `commands: read-only` in the frontmatter.
     pub commands: CommandAccess,
+    /// fennec's own: `writes: tests` in the frontmatter.
+    pub writes: WriteScope,
     /// fennec's own: `reasoningEffort` in the frontmatter; overrides the model's default effort for this agent's rounds.
     pub reasoning_effort: Option<ReasoningEffort>,
     pub color: Option<String>,
@@ -166,6 +177,11 @@ pub fn parse_agent_md(content: &str) -> Result<AgentDefinition, AgentParseError>
     } else {
         CommandAccess::ReadWrite
     };
+    let writes = if fields.scalar("writes") == Some("tests") {
+        WriteScope::Tests
+    } else {
+        WriteScope::Any
+    };
     let reasoning_effort = fields.scalar("reasoningEffort").and_then(|value| {
         serde_json::from_value::<ReasoningEffort>(serde_json::Value::String(value.to_string())).ok()
     });
@@ -184,6 +200,7 @@ pub fn parse_agent_md(content: &str) -> Result<AgentDefinition, AgentParseError>
         subagent,
         allowed_tools,
         commands,
+        writes,
         reasoning_effort,
         color,
         phase,
@@ -337,6 +354,7 @@ mod tests {
             subagent,
             allowed_tools: tools.iter().map(|tool| tool.to_string()).collect(),
             commands: CommandAccess::ReadWrite,
+            writes: WriteScope::Any,
             reasoning_effort: None,
             color: None,
             phase: None,
@@ -479,6 +497,15 @@ body
 
         let read_write = parse_agent_md("---\nid: plan\n---\nbody\n").unwrap();
         assert_eq!(read_write.commands, CommandAccess::ReadWrite);
+    }
+
+    #[test]
+    fn writes_scope_is_parsed() {
+        let tests = parse_agent_md("---\nid: tests\nwrites: tests\n---\nbody\n").unwrap();
+        assert_eq!(tests.writes, WriteScope::Tests);
+
+        let any = parse_agent_md("---\nid: plan\n---\nbody\n").unwrap();
+        assert_eq!(any.writes, WriteScope::Any);
     }
 
     #[test]
