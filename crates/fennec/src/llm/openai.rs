@@ -1,4 +1,4 @@
-//! Adapter from `Model` to `llm_providers`.
+//! Adapter from `Model` to `llm_providers_connector`.
 //!
 //! It sends no provider shims in the request body for llama.cpp
 //! `chat_template_kwargs.thinking` or Qwen3 `enable_thinking`; the standard
@@ -9,7 +9,7 @@ use crate::agent::ports::{Completion, Delta, Model, Request};
 use crate::config;
 use crate::domain::event::ToolCall;
 use crate::domain::id::new_id;
-use llm_providers::{ChatRequest, Endpoint, StreamedToolCall};
+use llm_providers_connector::{ChatRequest, Endpoint, StreamedToolCall};
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::net::IpAddr;
@@ -114,7 +114,8 @@ impl Model for OpenAiClient {
             max_tokens: req.max_tokens,
             reasoning_effort: req.reasoning_effort,
         };
-        let streamed = llm_providers::stream(&self.endpoint, &chat_request, req.stop, on)?;
+        let streamed =
+            llm_providers_connector::stream(&self.endpoint, &chat_request, req.stop, on)?;
         Ok(Completion {
             content: streamed.content,
             thinking: streamed.thinking,

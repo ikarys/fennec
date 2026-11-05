@@ -226,7 +226,7 @@ read-only. The human edits them as usual.
   One-token calls: a baseline, one per effort
   (accepted, deduped by `prompt_tokens`), one with an oversized `max_tokens`
   whose refusal may name the limits. A source is `endpoint` or `catalog` (the
-  model family's known values, `llm-providers/src/catalog.rs`). Indicative;
+  model family's known values, `catalog.rs` in llm-providers-connector). Indicative;
   502 with the endpoint's message when the model cannot be called
 - `POST /api/settings/mcp/connect` with `{name}` → 200 `{server}` (the stored
   server, its `cachedTools` replaced by a live `tools/list`); 400 with the

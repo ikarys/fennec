@@ -11,7 +11,7 @@ use crate::scanners;
 use crate::skills;
 use crate::tools::{SandboxHealth, probe};
 use crate::workflows;
-use llm_providers::{
+use llm_providers_connector::{
     ApiKey, Endpoint, ListedModel, MasterKey, ModelParams, ModelPrefs, list_models,
 };
 use serde_json::{Value, json};
@@ -200,7 +200,7 @@ pub fn probe_model(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(
     else {
         return error(stream, 400, "model must not be empty");
     };
-    match llm_providers::probe_model(&endpoint, model) {
+    match llm_providers_connector::probe_model(&endpoint, model) {
         Ok(probed) => send_json(stream, 200, &json!(probed)),
         Err(e) => error(stream, 502, &e),
     }
@@ -285,7 +285,7 @@ fn reuse_stored_key(requested: &str, stored: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{model_entries, reuse_stored_key};
-    use llm_providers::{ListedModel, ModelParams, ModelPrefs};
+    use llm_providers_connector::{ListedModel, ModelParams, ModelPrefs};
     use std::collections::BTreeMap;
 
     fn defaults() -> ModelParams {
