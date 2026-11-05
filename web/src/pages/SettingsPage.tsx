@@ -30,6 +30,7 @@ import { ModelPrefsSection, type ModelForm } from '../components/settings/ModelP
 import { DisplaySection } from '../components/settings/DisplaySection';
 import { PanelPagesSection } from '../components/settings/PanelPagesSection';
 import { InstructionsSection } from '../components/settings/InstructionsSection';
+import { ServerSection } from '../components/settings/ServerSection';
 import { SearchSection, type SearchForm } from '../components/settings/SearchSection';
 import { SandboxSection } from '../components/settings/SandboxSection';
 import { McpSection } from '../components/settings/McpSection';
@@ -392,6 +393,7 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
                 <SandboxSection save={groupSave('sandbox')} value={form.sandbox} onChange={updateSandbox} health={settings?.sandboxHealth} />
                 <ScannersSection scanners={settings.scanners ?? []} />
                 <RulesSection />
+                <ServerSection />
               </>
             )}
 
