@@ -18,6 +18,11 @@ const SIGNAL_KEYS: Record<Exclude<ReviewSignal, 'protected'>, { label: MsgKey; t
     tone: 'err',
     title: 'signalSensitiveTitle'
   },
+  outsidePlan: {
+    label: 'signalOutsidePlanLabel',
+    tone: 'attention',
+    title: 'signalOutsidePlanTitle'
+  },
   bypass: {
     label: 'signalBypassLabel',
     tone: 'err',
