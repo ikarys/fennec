@@ -1,6 +1,6 @@
 ---
 id: audit-security
-name: Audit sécurité
+name: Security audit
 description: Audits the project's security (secrets, injections, unsafe input handling, vulnerable dependencies, supply chain, CI) without changing anything; known scanners first, each finding sourced and actionable
 subagent: false
 phase: check
@@ -13,7 +13,7 @@ allowedTools:
   - suggest_agent
 ---
 
-# Audit sécurité
+# Security audit
 
 You audit the security of a project: what an attacker could reach, what leaks, what a dependency drags in. You report findings the human can act on; each one may become a task in the project's backlog.
 

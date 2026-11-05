@@ -1725,7 +1725,7 @@ export const fr: Record<MsgKey, string> = {
   maxTokensPerIdeaHint: 'Tokens non cachés + générés. 0 : pas de limite.',
   securityTitle: 'Sécurité',
   scannersHint:
-    "L'agent « Audit sécurité » lance les scanners qu'il trouve sur ta machine, puis lit le code. fennec ne les installe pas : copie la commande et lance-la dans ton terminal, puis recharge cette page. Ceux qui interrogent une base en ligne (cargo audit, OSV-Scanner, Semgrep) ont besoin du réseau dans le bac à sable.",
+    "L'agent « Security audit » lance les scanners qu'il trouve sur ta machine, puis lit le code. fennec ne les installe pas : copie la commande et lance-la dans ton terminal, puis recharge cette page. Ceux qui interrogent une base en ligne (cargo audit, OSV-Scanner, Semgrep) ont besoin du réseau dans le bac à sable.",
   scannerInstalled: 'installé',
   scannerAbsent: 'absent',
   alwaysActiveSkillsTitle: 'Skills toujours actifs',
