@@ -14,6 +14,7 @@ use crate::domain::integration::{
     Blocker, DiffChecks, Landing, blockers, branch_changed, commit_message, conflict_prompt,
     default_message, unacknowledged,
 };
+use crate::domain::plan_scope;
 use crate::domain::preflight;
 use crate::domain::review_map::{self, FileFacts, ReviewSignal};
 use crate::domain::security_scan::ScanStatus;
@@ -103,6 +104,15 @@ fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Result<Gate, (u16, S
         None => Understanding::None,
     };
     checks.understood = understanding.held();
+    // The plan is the contract the human approved: files it does not list are
+    // a deviation the gate must name.
+    let plan = run::current_run(&events)
+        .as_ref()
+        .and_then(run::plan_output)
+        .map(plan_scope::plan_files)
+        .unwrap_or_default();
+    let changed_paths: Vec<String> = changed.iter().map(|(path, _)| path.clone()).collect();
+    checks.outside_plan = plan_scope::outside(&plan, &changed_paths);
     let hot = risk::hot_files(&top);
     let tested = risk::tested_on_branch(&top, &wt.branch, &preview.files);
     let facts: Vec<FileFacts> = preview
