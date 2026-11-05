@@ -6,6 +6,7 @@ subagent: false
 phase: frame
 commands: read-only
 color: '#a855f7'
+workflow: plan-build-verify
 allowedTools:
   - read_file
   - run_command

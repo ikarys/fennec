@@ -36,6 +36,8 @@ export interface Agent {
   /** The composer offers it; false for the agents fennec launches itself with a brief. */
   composer: boolean;
   phase: AgentPhase | null;
+  /** The workflow a message to this agent starts by default in the composer. */
+  workflow: string | null;
   /** Where its `*.agent.md` came from: a default, the human's, or the project's. */
   origin: 'default' | 'user' | 'project';
 }

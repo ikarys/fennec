@@ -27,6 +27,7 @@ export const EMPTY_DRAFT: AgentDraft = {
   name: '',
   description: '',
   phase: 'build',
+  workflow: null,
   color: null,
   subagent: false,
   readOnly: true,
@@ -126,7 +127,7 @@ export function AgentEditor({
         />
       </FieldRow>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <FieldRow label={t('agentCommandsLabel')} htmlFor="agent-commands">
           <Select
             id="agent-commands"
@@ -163,6 +164,15 @@ export function AgentEditor({
             <option value="mode">{t('agentLaunchMode')}</option>
             <option value="subagent">{t('agentLaunchSubagent')}</option>
           </Select>
+        </FieldRow>
+        <FieldRow label={t('agentWorkflowLabel')} htmlFor="agent-workflow" hint={t('agentWorkflowHint')}>
+          <TextInput
+            id="agent-workflow"
+            className="w-full font-mono"
+            value={draft.workflow ?? ''}
+            placeholder="plan-build-verify"
+            onChange={(e) => set('workflow', e.target.value || null)}
+          />
         </FieldRow>
       </div>
 

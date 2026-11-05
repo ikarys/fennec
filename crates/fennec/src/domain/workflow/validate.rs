@@ -672,6 +672,7 @@ mod tests {
             reasoning_effort: None,
             color: None,
             phase: None,
+            workflow: None,
             prompt: "prompt".to_string(),
             origin: crate::domain::agent::AgentOrigin::Default,
             path: None,

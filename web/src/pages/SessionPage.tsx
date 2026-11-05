@@ -196,10 +196,17 @@ export function SessionPage({
     onError: setSendError,
     onModelApplied: () => setDetailVersion((version) => version + 1),
   });
-  // Picking an agent means talking to it: the default workflow would
-  // otherwise take the message and start with its planner instead.
+  // Picking an agent means talking to it: the composer's default workflow
+  // would otherwise take the message and start with its planner instead —
+  // unless the agent carries its own default, kept only while the project
+  // offers that workflow.
   function chooseAgent(agent: string) {
-    setWorkflowSelection((selection) => ({ ...selection, workflowId: null }));
+    const workflow = agents.find((a) => a.id === agent)?.workflow ?? null;
+    setWorkflowSelection((selection) => ({
+      ...selection,
+      workflowId: workflow && workflows.some((w) => w.id === workflow) ? workflow : null,
+      stepByStep: false,
+    }));
     return handleModeChange(agent);
   }
   const {
