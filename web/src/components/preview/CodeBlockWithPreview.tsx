@@ -6,7 +6,9 @@ import { markdownComponents } from '../session/markdownComponents';
 import { PinButton } from '../canvas/PinButton';
 import { useCanvasSession } from '../canvas/CanvasContext';
 import { pinCanvasBlock } from '../../lib/api/canvas';
-import type { PreviewKind } from '../../lib/preview';
+import type { BlockPreviewKind } from '../../lib/preview';
+import { MermaidDiagram } from './MermaidDiagram';
+import { JsonView } from './JsonView';
 
 const REMARK_PLUGINS = [remarkGfm];
 /** How long the source must stay still before the iframe reloads it. */
@@ -22,11 +24,11 @@ function useSettled(source: string): string {
   return settled;
 }
 
-export function CodeBlockWithPreview({ kind, source }: { kind: PreviewKind; source: string }) {
+export function CodeBlockWithPreview({ kind, source }: { kind: BlockPreviewKind; source: string }) {
   const t = useT();
   const session = useCanvasSession();
-  // An HTML block is mostly a page to look at; its source stays one click away.
-  const [showPreview, setShowPreview] = useState(kind === 'html');
+  // Pictures are mostly to look at; text stays one click away.
+  const [showPreview, setShowPreview] = useState(kind === 'html' || kind === 'svg' || kind === 'mermaid');
   const settledSource = useSettled(source);
 
   return (
@@ -67,6 +69,22 @@ export function CodeBlockWithPreview({ kind, source }: { kind: PreviewKind; sour
             title={t('previewHtmlTitle')}
             className="block h-[60vh] w-full bg-panel"
           />
+        ) : kind === 'svg' ? (
+          <div className="flex justify-center bg-panel p-4">
+            <img
+              src={'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(settledSource)}
+              alt={t('previewSvgTitle')}
+              className="max-w-full"
+            />
+          </div>
+        ) : kind === 'mermaid' ? (
+          <div className="flex justify-center p-4">
+            <MermaidDiagram source={settledSource} />
+          </div>
+        ) : kind === 'json' ? (
+          <div className="px-4 py-2">
+            <JsonView source={source} />
+          </div>
         ) : (
           <div className="px-4 py-2">
             <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={markdownComponents}>

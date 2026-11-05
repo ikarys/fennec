@@ -8,6 +8,9 @@ pub enum Format {
     Html,
     Markdown,
     Svg,
+    Pdf,
+    Mermaid,
+    Json,
     Png,
     Jpeg,
     Gif,
@@ -22,6 +25,9 @@ impl Format {
             "html" | "htm" => Some(Self::Html),
             "md" | "markdown" => Some(Self::Markdown),
             "svg" => Some(Self::Svg),
+            "pdf" => Some(Self::Pdf),
+            "mmd" | "mermaid" => Some(Self::Mermaid),
+            "json" => Some(Self::Json),
             "png" => Some(Self::Png),
             "jpg" | "jpeg" => Some(Self::Jpeg),
             "gif" => Some(Self::Gif),
@@ -36,6 +42,8 @@ impl Format {
             "html" => Some(Self::Html),
             "md" | "markdown" => Some(Self::Markdown),
             "svg" => Some(Self::Svg),
+            "mermaid" => Some(Self::Mermaid),
+            "json" => Some(Self::Json),
             _ => None,
         }
     }
@@ -46,6 +54,9 @@ impl Format {
             Self::Html => "html",
             Self::Markdown => "markdown",
             Self::Svg => "svg",
+            Self::Pdf => "pdf",
+            Self::Mermaid => "mermaid",
+            Self::Json => "json",
             Self::Png => "png",
             Self::Jpeg => "jpeg",
             Self::Gif => "gif",
@@ -59,6 +70,9 @@ impl Format {
             "html" => Some(Self::Html),
             "markdown" => Some(Self::Markdown),
             "svg" => Some(Self::Svg),
+            "pdf" => Some(Self::Pdf),
+            "mermaid" => Some(Self::Mermaid),
+            "json" => Some(Self::Json),
             "png" => Some(Self::Png),
             "jpeg" => Some(Self::Jpeg),
             "gif" => Some(Self::Gif),
@@ -73,6 +87,9 @@ impl Format {
             Self::Html => "text/html; charset=utf-8",
             Self::Markdown => "text/markdown; charset=utf-8",
             Self::Svg => "image/svg+xml; charset=utf-8",
+            Self::Pdf => "application/pdf",
+            Self::Mermaid => "text/plain; charset=utf-8",
+            Self::Json => "application/json; charset=utf-8",
             Self::Png => "image/png",
             Self::Jpeg => "image/jpeg",
             Self::Gif => "image/gif",
@@ -82,7 +99,22 @@ impl Format {
 
     /// Whether the content is text that can be edited as a string.
     pub fn is_text(self) -> bool {
-        matches!(self, Self::Html | Self::Markdown | Self::Svg)
+        matches!(
+            self,
+            Self::Html | Self::Markdown | Self::Svg | Self::Mermaid | Self::Json
+        )
+    }
+
+    /// The Content-Security-Policy to serve these bytes with; None only for a real PDF.
+    ///
+    /// Browser PDF viewers refuse sandboxed documents; they run in an isolated origin,
+    /// `X-Content-Type-Options: nosniff` keeps it from being read as HTML, and the magic
+    /// check keeps a mislabelled file sandboxed.
+    pub fn sandbox_csp(self, bytes: &[u8]) -> Option<&'static str> {
+        if self == Self::Pdf && bytes.starts_with(b"%PDF-") {
+            return None;
+        }
+        Some(SANDBOX_CSP)
     }
 }
 
@@ -103,6 +135,10 @@ mod tests {
         assert_eq!(Format::of_path("a.jpeg"), Some(Format::Jpeg));
         assert_eq!(Format::of_path("dir.v2/a.JPG"), Some(Format::Jpeg));
         assert_eq!(Format::of_path("page.htm"), Some(Format::Html));
+        assert_eq!(Format::of_path("a.pdf"), Some(Format::Pdf));
+        assert_eq!(Format::of_path("a.mmd"), Some(Format::Mermaid));
+        assert_eq!(Format::of_path("a.mermaid"), Some(Format::Mermaid));
+        assert_eq!(Format::of_path("a.json"), Some(Format::Json));
         assert_eq!(Format::of_path("noext"), None);
         assert_eq!(Format::of_path("a.unknown"), None);
     }
@@ -111,6 +147,9 @@ mod tests {
     fn detects_languages() {
         assert_eq!(Format::of_language(" HTML "), Some(Format::Html));
         assert_eq!(Format::of_language("markdown"), Some(Format::Markdown));
+        assert_eq!(Format::of_language("mermaid"), Some(Format::Mermaid));
+        assert_eq!(Format::of_language("json"), Some(Format::Json));
+        assert_eq!(Format::of_language("pdf"), None);
         assert_eq!(Format::of_language("rust"), None);
     }
 
@@ -120,6 +159,9 @@ mod tests {
             Format::Html,
             Format::Markdown,
             Format::Svg,
+            Format::Pdf,
+            Format::Mermaid,
+            Format::Json,
             Format::Png,
             Format::Jpeg,
             Format::Gif,
@@ -132,8 +174,24 @@ mod tests {
     #[test]
     fn content_types_and_text() {
         assert_eq!(Format::Html.content_type(), "text/html; charset=utf-8");
+        assert_eq!(Format::Pdf.content_type(), "application/pdf");
+        assert_eq!(Format::Mermaid.content_type(), "text/plain; charset=utf-8");
+        assert_eq!(
+            Format::Json.content_type(),
+            "application/json; charset=utf-8"
+        );
         assert_eq!(Format::Jpeg.content_type(), "image/jpeg");
         assert!(Format::Svg.is_text());
+        assert!(Format::Mermaid.is_text());
+        assert!(Format::Json.is_text());
+        assert!(!Format::Pdf.is_text());
         assert!(!Format::Png.is_text());
+    }
+
+    #[test]
+    fn sandbox_csp_is_none_only_for_real_pdf() {
+        assert_eq!(Format::Pdf.sandbox_csp(b"%PDF-1.7"), None);
+        assert_eq!(Format::Pdf.sandbox_csp(b"not a pdf"), Some(SANDBOX_CSP));
+        assert_eq!(Format::Html.sandbox_csp(b"<html>"), Some(SANDBOX_CSP));
     }
 }
