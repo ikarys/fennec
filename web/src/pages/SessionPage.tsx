@@ -463,6 +463,7 @@ export function SessionPage({
     // message, not a workflow start.
     const workflowId =
       fromComposer &&
+      !isChat &&
       workflowSelection.workflowId &&
       !running &&
       (!run || run.finished) &&
@@ -876,20 +877,21 @@ export function SessionPage({
                         error={sendError}
                         textareaRef={textareaRef}
                         placeholder={
-                          workflowSelection.workflowId
+                          workflowSelection.workflowId && !isChat
                             ? t('sessionPageWorkflowTaskPlaceholder')
                             : view.pendingQuestion && !running
                               ? t('sessionPageAnswerPlaceholder')
                               : undefined
                         }
                         commands={commands}
-                        agents={agents}
+                        // A chat talks to builder only: no agent nor workflow to pick.
+                        agents={isChat ? undefined : agents}
                         mode={mode}
                         onModeChange={handleModeChange}
                         attachments={attachments}
                         onAttach={handleAttach}
                         onRemoveAttachment={handleRemoveAttachment}
-                        workflows={workflows}
+                        workflows={isChat ? undefined : workflows}
                         workflowSelection={workflowSelection}
                         onWorkflowSelectionChange={setWorkflowSelection}
                         mcpView={mcpView}
