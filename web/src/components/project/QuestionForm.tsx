@@ -3,24 +3,30 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { TextArea } from '../ui/Field';
-import { ReplyIcon, SendIcon } from '../Icons';
+import { BulbIcon, ReplyIcon, SendIcon } from '../Icons';
 import { useT } from '../../i18n';
 
 export function QuestionForm({
   busy,
   onAsk,
+  onUnderstand,
 }: {
   busy: boolean;
   onAsk: (question: string) => void;
+  onUnderstand: (topic: string) => void;
 }) {
   const [question, setQuestion] = useState('');
   const trimmed = question.trim();
   const t = useT();
 
-  const submit = () => {
+  const send = (callback: (text: string) => void) => {
     if (busy || !trimmed) return;
-    onAsk(trimmed);
+    callback(trimmed);
     setQuestion('');
+  };
+
+  const submit = () => {
+    send(onAsk);
   };
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -59,17 +65,31 @@ export function QuestionForm({
         />
         <div className="flex items-center justify-between gap-2">
           <p className="text-xs text-muted">{t('questionHint')}</p>
-          <Button
-            type="submit"
-            variant="primary"
-            size="sm"
-            iconOnly
-            disabled={busy || !trimmed}
-            title={t('sendQuestion')}
-            aria-label={t('sendQuestion')}
-          >
-            <SendIcon className="h-3.5 w-3.5" />
-          </Button>
+          <div className="flex items-center gap-1.5">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              iconOnly
+              disabled={busy || !trimmed}
+              title={t('understandTopic')}
+              aria-label={t('understandTopic')}
+              onClick={() => send(onUnderstand)}
+            >
+              <BulbIcon className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              size="sm"
+              iconOnly
+              disabled={busy || !trimmed}
+              title={t('sendQuestion')}
+              aria-label={t('sendQuestion')}
+            >
+              <SendIcon className="h-3.5 w-3.5" />
+            </Button>
+          </div>
         </div>
       </form>
     </Card>
