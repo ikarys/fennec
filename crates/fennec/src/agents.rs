@@ -8,9 +8,10 @@ use std::path::{Path, PathBuf};
 
 use crate::domain::agent::{AgentDefinition, AgentOrigin, parse_agent_md};
 
-pub(crate) const DEFAULTS: [&str; 14] = [
+pub(crate) const DEFAULTS: [&str; 15] = [
     include_str!("../agents/plan.agent.md"),
     include_str!("../agents/builder.agent.md"),
+    include_str!("../agents/tests.agent.md"),
     include_str!("../agents/verify.agent.md"),
     include_str!("../agents/review.agent.md"),
     include_str!("../agents/analyze.agent.md"),
