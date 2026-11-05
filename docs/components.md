@@ -143,8 +143,7 @@ guideline; the human appends the new ones in one click (`architecture.rules_adde
 
 Composer agents, done: `composer: false` in an agent's frontmatter keeps it out of the composer's menu; it is for agents
 fennec launches itself with a brief it builds (Analyses: `analyze`, `audit-architecture`, `audit-security`; gate: `narrate`,
-`understand`; Risks: `remedy`; test node: `tests`), so the composer offers only agents one talks to freely (`plan`, `mockup`,
-`builder`, `ask`); `subagent: true` marks workflow-only ones (`review`, `verify`) (`domain/agent.rs`, `web/project_list_routes.rs`).
+`understand`; Risks: `remedy`; test node: `tests`), so the composer offers only agents one talks to freely (`plan`, `builder`, `ask`); `subagent: true` marks workflow-only ones (`review`, `verify`) (`domain/agent.rs`, `web/project_list_routes.rs`).
 Produced architecture, done (C12): `.agents/architecture` also takes module rules (`<A> never imports <B>`), checked on
 every dependency of the project map; the "Carte des modules" tab lists the breaks, draws them red, and counts the dependencies added or
 removed since the committed `docs/map.md` (verified; `domain/drift.rs`).
