@@ -157,6 +157,7 @@ impl Transcript {
             | Event::QueueDrained { .. }
             | Event::QueueCancelled { .. }
             | Event::AgentsMdWritten { .. }
+            | Event::UnderstandingStarted { .. }
             | Event::WorktreeDiscarded { .. }
             | Event::McpDisabled { .. } => Ok(()),
         };

@@ -118,6 +118,12 @@ its signals (the gate's checks per file, churn, untested, large), read from git 
 Narrative diff, done (C9, part 2): a "Raconter" button in the integration dialog opens a session on the
 read-only `narrate` agent (`crates/fennec/agents/narrate.agent.md`), which tells the branch's change file by
 file in the review order, each claim with its `path:line` source (indicative).
+Comprehension dialogue, done (C10, part 2): an "Understand" button in the integration dialog opens a session on the
+read-only `understand` agent (`crates/fennec/agents/understand.agent.md`), which asks the human two or three questions
+about the branch, explains what they missed with `path:line` sources and checks again; not an exam, no score. The link is
+`understanding.started` in the reviewed session's log; the dialogue counts as held once the human answered on the branch's
+current head (verified; `domain/understanding.rs`). A branch that changes a sensitive zone without one gets an
+`understandingMissing` blocker the human accepts.
 Project kickoff, done: the read-only `kickoff` agent ("Démarrer le projet" in the Analyses tab) asks what a new
 project is for, has the human choose its stack and architecture (`record_decision`), drafts its AGENTS.md and
 proposes its first tasks in build order, a walking skeleton first, with `propose_task` (`task.proposed`); the human
@@ -241,6 +247,7 @@ crates/fennec/src/
     agents_md.rs       the AGENTS.md draft at the end of an answer, which the human writes in one click
     task_proposal.rs   the backlog tasks an agent proposed with propose_task, and which the human accepted
     agent_suggestion.rs the agent switch an agent suggested, since the human last wrote
+    understanding.rs   the comprehension dialogue on a branch: its link, held once the human answered on the current head
     review_map.rs      the review order of a branch's files: per-file signals (gate checks, churn, tests, size)
     workflow/          a workflow: definition (nodes, ports, edges), template ({{…}} names),
                        validate (the graph rules), run (the run folded from its events, the next step)
