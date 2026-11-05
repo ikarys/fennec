@@ -6,7 +6,7 @@
   "nodes": [
     { "id": "start", "kind": "start", "position": { "x": 0, "y": 0 } },
     { "id": "build", "kind": "agent", "name": "Build", "agent": "builder",
-      "prompt": "{{task}}\n\nThen end with the report.",
+      "prompt": "{{task}}\n\nThen end by calling submit_report with the report.",
       "position": { "x": 0, "y": 140 } },
     { "id": "done", "kind": "end", "outcome": "done", "position": { "x": 0, "y": 280 } }
   ],

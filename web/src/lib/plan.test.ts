@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { planFromProposal, splitContract, type Plan, type Report } from './plan';
+import { planFromProposal, reportFromSubmission, splitContract, type Plan, type Report } from './plan';
 
 const split = (text: string) => splitContract(text);
 
@@ -227,5 +227,51 @@ describe('planFromProposal', () => {
     expect(plan.steps).toEqual([]);
     expect(plan.doneWhen).toEqual([]);
     expect(plan.risks).toEqual([]);
+  });
+});
+
+describe('reportFromSubmission', () => {
+  it('builds the recorded report, numbering the steps and keeping the checks', () => {
+    const report = reportFromSubmission({
+      title: 'Ship',
+      summary: 'What changed',
+      steps: [
+        { title: 'Add code', done: true, note: 'implemented' },
+        { title: 'Docs', done: false }
+      ],
+      doneWhen: [
+        { text: 'tests pass', met: true, how: 'cargo test' },
+        { text: 'docs updated', met: false }
+      ],
+      changed: [{ path: 'a.ts', what: 'the code' }],
+      test: 'Open the UI',
+      todo: ''
+    });
+    expect(report).toEqual({
+      kind: 'report',
+      title: 'Ship',
+      summary: 'What changed',
+      steps: [
+        { number: 1, checked: true, text: 'Add code', detail: 'implemented' },
+        { number: 2, checked: false, text: 'Docs', detail: '' }
+      ],
+      doneWhen: [
+        { checked: true, text: 'tests pass', detail: 'cargo test' },
+        { checked: false, text: 'docs updated', detail: '' }
+      ],
+      changed: [{ path: 'a.ts', what: 'the code' }],
+      test: 'Open the UI',
+      todo: ''
+    });
+  });
+
+  it('keeps empty values when the optional fields are absent', () => {
+    const report = reportFromSubmission({ title: 'R', summary: 's' });
+    expect(report.kind).toBe('report');
+    expect(report.steps).toEqual([]);
+    expect(report.doneWhen).toEqual([]);
+    expect(report.changed).toEqual([]);
+    expect(report.test).toBe('');
+    expect(report.todo).toBe('');
   });
 });

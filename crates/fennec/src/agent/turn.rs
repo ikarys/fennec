@@ -25,6 +25,7 @@ use super::propose_task;
 use super::record_decision;
 use super::request_waiver;
 use super::round::{self, CONTINUE_AFTER_STREAM_ERROR_PROMPT, Round, RoundPrompt};
+use super::submit_report;
 use super::suggest_agent;
 use super::tool_calls::{Flow, INTERRUPTED_ERROR, execute_tools};
 use crate::domain::agent::{AgentDefinition, DEFAULT_COLOR, last_reminder, resolve};
@@ -316,7 +317,8 @@ fn round_prompt_parts(turn: &mut Turn) -> Result<(String, Value), String> {
 }
 
 /// The loop owns `ask_user`, `request_waiver`, `propose_criteria`,
-/// `record_decision`, `propose_task`, `propose_plan` and `suggest_agent`;
+/// `record_decision`, `propose_task`, `propose_plan`, `submit_report` and
+/// `suggest_agent`;
 /// they are not host tools, so their definitions are added to the toolbox's.
 /// `suggest_agent` lists the session's agents as of the first turn;
 /// definitions are frozen then.
@@ -329,6 +331,7 @@ fn tool_definitions(turn: &Turn) -> Value {
         arr.push(record_decision::definition());
         arr.push(propose_task::definition());
         arr.push(propose_plan::definition());
+        arr.push(submit_report::definition());
         arr.push(suggest_agent::definition(turn.agents));
     }
     tool_defs
@@ -512,7 +515,8 @@ pub(super) fn run_top_level_agent_loop(
                     Some(started.elapsed()),
                 );
             }
-            // `propose_plan` recorded the plan: the human reviews it.
+            // `propose_plan` recorded the plan, or `submit_report` the
+            // report: the human reviews it.
             Flow::Done => {
                 return finish(
                     turn,
