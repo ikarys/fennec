@@ -112,33 +112,21 @@ just            # build the UI, then run the release server on http://127.0.0.1:
 just check      # the contributor gate: formatting, clippy, tests, UI build
 ```
 
-### Start at boot (Linux)
+### Run as a service, update (Linux)
 
-A systemd user service keeps fennec running in the background:
-
-```ini
-# ~/.config/systemd/user/fennec.service
-[Unit]
-Description=fennec
-
-[Service]
-ExecStart=%h/.local/bin/fennec serve
-# The model variables of "Configuration", if you use them:
-# Environment=FENNEC_LLM_URL=http://127.0.0.1:8000/v1
-Restart=on-failure
-
-[Install]
-WantedBy=default.target
-```
+`install.sh` also writes a systemd user service (`~/.config/systemd/user/fennec.service`, never overwritten
+once there) and starts it; `FENNEC_SERVICE=none` skips that. Without a systemd user session, run `fennec serve`
+yourself. Put the model variables of "Configuration" in the unit as `Environment=` lines if you use them.
 
 ```bash
-systemctl --user daemon-reload
-systemctl --user enable --now fennec   # start now and at each login
-sudo loginctl enable-linger "$USER"    # start at boot, before any login
 journalctl --user -u fennec -f         # its logs
+sudo loginctl enable-linger "$USER"    # start at boot, before any login
+fennec update --check                  # is a newer release out?
+fennec update                          # install it (the service restarts on it)
 ```
 
-Under WSL, systemd must be on (`[boot]` `systemd=true` in `/etc/wsl.conf`).
+The top bar shows an arrow when a newer release is out; a click installs it and the server restarts on it
+(refused while a turn runs). Under WSL, systemd must be on (`[boot]` `systemd=true` in `/etc/wsl.conf`).
 
 ## Quick start
 

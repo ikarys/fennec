@@ -44,6 +44,7 @@ pub mod pricing;
 pub mod project;
 pub mod protection;
 pub mod queue;
+pub mod release;
 pub mod replay;
 pub mod report;
 pub mod review_map;

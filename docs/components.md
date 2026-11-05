@@ -218,3 +218,9 @@ commits the human's branch lacks; a click adopts one into a new session's worktr
 its base at the merge-base with the human's HEAD), so a colleague's work goes through the same integration gate as an
 agent's (blockers, scanners, review map, comprehension dialogue). Only a listed branch is adopted; nothing merges on its
 own (`git::contributions`, `web/contribution_routes.rs`).
+
+Update, done: `fennec update [--check]` and the top bar's arrow read the latest GitHub release (`/releases/latest`'s
+redirect, cached 6 h for the UI), compare versions (`domain/release.rs`) and, on the human's click only, run the
+embedded `install.sh` over the binary (checksum verified, atomic rename); the server then re-executes itself, same PID,
+so a systemd service keeps tracking it. Refused while a turn runs. `install.sh` writes and starts a systemd user service
+(`update.rs`, `cli/update.rs`, `web/update_routes.rs`, `components/layout/UpdateNotice.tsx`).

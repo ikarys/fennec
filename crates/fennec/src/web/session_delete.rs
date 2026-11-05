@@ -168,6 +168,7 @@ mod tests {
                 notifier,
             )),
             agents_home: std::env::temp_dir(),
+            update_check: Default::default(),
         };
         let store = app.store().unwrap();
         let project = store
