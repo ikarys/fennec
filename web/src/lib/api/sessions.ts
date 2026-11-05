@@ -404,7 +404,8 @@ export type Blocker =
       paths: string[];
     }
   | { kind: "branchChanged"; from: string; to: string | null }
-  | { kind: "localChanges"; paths: string[] };
+  | { kind: "localChanges"; paths: string[] }
+  | { kind: "understandingMissing" };
 
 export type ReviewSignal =
   | 'protected'
@@ -416,6 +417,12 @@ export type ReviewSignal =
   | 'hot'
   | 'untested'
   | 'large';
+
+/** Whether a comprehension dialogue was opened on the branch's current head. */
+export type Understanding =
+  | { state: 'none' }
+  | { state: 'started'; sessionId: string }
+  | { state: 'held'; sessionId: string };
 
 export interface IntegrationPreview {
   branch: string;
@@ -443,6 +450,8 @@ export interface IntegrationPreview {
   /** Recorded by the agent: indicative, never a blocker. */
   decisions: DecisionView[];
   blockers: Blocker[];
+  /** Whether a comprehension dialogue was opened on the branch's current head. */
+  understanding: Understanding;
   /** The session's idea the human may finish here, or null. */
   idea: { projectId: string; id: string } | null;
   /** A starting commit message (feat: <session title>); the human edits it. */
@@ -468,6 +477,17 @@ export function getRepoState(sessionId: string): Promise<RepoState> {
 export function getIntegration(sessionId: string): Promise<IntegrationPreview> {
   return request<IntegrationPreview>(
     `/api/sessions/${encodeURIComponent(sessionId)}/integration`,
+  );
+}
+
+/** Records that `dialogueId` is the comprehension dialogue of the reviewed session. */
+export function startUnderstanding(sessionId: string, dialogueId: string): Promise<{ understanding: Understanding }> {
+  return request<{ understanding: Understanding }>(
+    `/api/sessions/${encodeURIComponent(sessionId)}/understanding`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ dialogueId }),
+    },
   );
 }
 

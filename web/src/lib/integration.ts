@@ -1,5 +1,5 @@
 // The integration dialog's words and its gate as the UI applies it: what a blocker says, what the
-// narrate agent is asked, when the Integrate button is enabled. Pure, so it is tested without a browser.
+// narrate and understand agents are asked, when the Integrate button is enabled. Pure, so it is tested without a browser.
 import type { BadgeTone } from '../components/ui/Badge';
 import type { Blocker, IntegrationPreview, IntegrationResult, ScanStatus } from './api';
 import { t, type Lang } from '../i18n/messages';
@@ -23,6 +23,16 @@ export function narrativePrompt(preview: IntegrationPreview): string {
   return `Narrate the change of branch \`${preview.branch}\` since base \`${preview.base}\`, file by file in this review order:\n${lines.join('\n')}\nUse \`git diff ${preview.base} ${preview.branch} -- <path>\` for each file.`;
 }
 
+/** The understand agent's prompt: the branch, its base, the files in the server's review order, then questions. */
+export function understandingPrompt(preview: IntegrationPreview): string {
+  const lines = preview.files.map((file, index) => {
+    const signals = file.signals.length ? ` — signals: ${file.signals.join(', ')}` : '';
+    return `${index + 1}. ${file.path} (+${file.added} −${file.removed})${signals}`;
+  });
+
+  return `Hold a comprehension dialogue with me on the change of branch \`${preview.branch}\` since base \`${preview.base}\`. The files, in review order:\n${lines.join('\n')}\nUse \`git diff ${preview.base} ${preview.branch} -- <path>\` for each file, then ask me your questions.`;
+}
+
 export function blockerSentence(lang: Lang, blocker: Blocker): string {
   switch (blocker.kind) {
     case 'noCommits':
@@ -37,6 +47,8 @@ export function blockerSentence(lang: Lang, blocker: Blocker): string {
       return t(lang, 'protectedTouched', { paths: blocker.paths.join(', ') });
     case 'sensitiveTouched':
       return t(lang, 'sensitiveTouched', { paths: blocker.paths.join(', ') });
+    case 'understandingMissing':
+      return t(lang, 'understandingMissing');
     case 'securityScanRunning':
       return t(lang, 'securityScanRunning');
     case 'securityFindings': {
