@@ -254,9 +254,11 @@ read-only. The human edits them as usual.
     running queue; `project` `{id, name}`, the counts are its board's stages, `queue` `{running, autonomous, next}`
     (`next` `{id, text, title} | null`); a running queue first, then most `yours`, most `ready`, then by name
 - `GET /api/projects/{id}/commands` → `[{name, description}]`: the slash commands the composer offers (`compact`, then the project's skills); 404 if no project
-- `GET /api/projects/{id}/agents` → `[{id, name, description, color, subagent, composer, phase, origin}]`: the
+- `GET /api/projects/{id}/agents` → `[{id, name, description, color, subagent, composer, phase, workflow, origin}]`: the
   project's agents ordered by `phase` (`start`, `frame`, `build`, `understand`, `check`; null last, for
-  sub-agents and agents without one), discovery order within a phase (`color` null when unset); the composer's
+  sub-agents and agents without one), discovery order within a phase (`color` null when unset; `workflow` the
+  id of the workflow a message to this agent starts by default in the composer, null when the frontmatter
+  names none); the composer's
   menu is the ones with `composer` true: `subagent` true only runs in a workflow node's fresh context, and
   `composer: false` in the frontmatter marks an agent fennec launches itself with a brief (a tile, the gate, a
   workflow node); `origin` is
@@ -288,14 +290,14 @@ read-only. The human edits them as usual.
 - `GET /api/agents[?projectId=…]` → `{agents, tools, broken}`, the human's agent library (the Settings page's
   Agents tab). With `projectId` the named project's `.agents/agents` is included, read-only. No agent tool reaches
   these routes: `.agents` is protected from the file tools, and the CRUD below acts for the human only.
-  - an agent `{id, name, description, color, subagent, phase, origin, path, editable, readOnly, allowedTools}`,
+  - an agent `{id, name, description, color, subagent, phase, workflow, origin, path, editable, readOnly, allowedTools}`,
     ordered by `phase` as `GET /api/projects/{id}/agents` is; `origin` `default`/`user`/`project`, `path` the file it
     was read from (null for a default), `editable` true only for `user`, `readOnly` whether its commands are
     read-only by construction.
   - `tools` the tool names an agent may list in `allowedTools`; `broken` `[{id, error, field}]` the human's
     `*.agent.md` files discovery had to skip, so a typo does not silently remove an agent from the menu.
 - `GET /api/agents/{id}` → `{id, content, fields}`: the human's `~/.agents/agents/{id}.agent.md`, `content`
-  verbatim and `fields` `{id, name, description, phase, color, subagent, readOnly, reasoningEffort, allowedTools,
+  verbatim and `fields` `{id, name, description, phase, workflow, color, subagent, readOnly, reasoningEffort, allowedTools,
   prompt}` for the edit form (null when the file does not parse, so the human can still see and delete it).
   400 for an id that is not kebab-case, 404 if no such file.
 - `POST /api/agents[?projectId=…]` with the `fields` shape → `{agent}`: renders the `*.agent.md` from the fields

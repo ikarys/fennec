@@ -13,6 +13,8 @@ export interface AgentView {
   color: string | null;
   subagent: boolean;
   phase: AgentPhase | null;
+  /** The workflow a message to this agent starts by default in the composer. */
+  workflow: string | null;
   origin: AgentOrigin;
   path: string | null;
   editable: boolean;
@@ -26,6 +28,8 @@ export interface AgentDraft {
   name: string;
   description: string;
   phase: AgentPhase | null;
+  /** The workflow a message to this agent starts by default in the composer. */
+  workflow: string | null;
   color: string | null;
   subagent: boolean;
   /** `commands: read-only`: this agent's commands may not write. */

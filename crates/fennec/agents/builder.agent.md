@@ -5,6 +5,7 @@ description: Implements the task by changing code and verifying it
 subagent: false
 phase: build
 color: '#3b82f6'
+workflow: quick
 allowedTools:
   - read_file
   - write_file
