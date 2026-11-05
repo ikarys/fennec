@@ -23,7 +23,7 @@ pub(super) fn definition() -> Value {
         "function": {
             "name": "canvas",
             "description": concat!(
-                "Show the human a document (HTML page or mockup, Markdown document, SVG) in fennec's canvas pane, ",
+                "Show the human a document (HTML page or mockup, Markdown document, SVG, Mermaid diagram, JSON data) in fennec's canvas pane, ",
                 "where they read it, browse its versions and annotate it. Call it again with the same title and the ",
                 "whole revised document to make a new version; their notes come back to you as messages. Prefer it to a ",
                 "code block when the human wants to see or iterate on a document."
@@ -37,12 +37,12 @@ pub(super) fn definition() -> Value {
                     },
                     "format": {
                         "type": "string",
-                        "enum": ["html", "markdown", "svg"],
+                        "enum": ["html", "markdown", "svg", "mermaid", "json"],
                         "description": "The document format."
                     },
                     "content": {
                         "type": "string",
-                        "description": "The whole document, self-contained: CSS and scripts inline, no CDN."
+                        "description": "The whole document, self-contained: CSS and scripts inline, no CDN. Mermaid: the diagram source only, no fences."
                     }
                 },
                 "required": ["title", "format", "content"]
@@ -67,12 +67,21 @@ fn try_run(args: &Value, target: Option<&CanvasTarget>) -> Result<ToolResult, St
 
     let raw_format = args::string(args, "format")?;
     let format = Format::parse(raw_format)
-        .filter(|format| matches!(format, Format::Html | Format::Markdown | Format::Svg))
-        .ok_or_else(|| "format must be html, markdown or svg.".to_string())?;
+        .filter(|format| {
+            matches!(
+                format,
+                Format::Html | Format::Markdown | Format::Svg | Format::Mermaid | Format::Json
+            )
+        })
+        .ok_or_else(|| "format must be html, markdown, svg, mermaid or json.".to_string())?;
 
     let content = args::string(args, "content")?;
     if content.trim().is_empty() {
         return Err("canvas requires a non-empty 'content'.".to_string());
+    }
+    if format == Format::Json {
+        serde_json::from_str::<Value>(content)
+            .map_err(|e| format!("canvas content is not valid JSON: {e}."))?;
     }
 
     let store = CanvasStore::open(&target.db).map_err(|e| e.to_string())?;
@@ -177,7 +186,31 @@ mod tests {
             "content": "x"
         });
         let result = run(&args, Some(&target));
-        assert!(text(&result).contains("format must be html, markdown or svg."));
+        assert!(text(&result).contains("format must be html, markdown, svg, mermaid or json."));
+    }
+
+    #[test]
+    fn creates_mermaid_canvas() {
+        let target = target();
+        let args = json!({
+            "title": "Diagram",
+            "format": "mermaid",
+            "content": "graph TD; A --> B"
+        });
+        let result = run(&args, Some(&target));
+        assert!(text(&result).contains("created (version 1)"));
+    }
+
+    #[test]
+    fn refuses_invalid_json() {
+        let target = target();
+        let args = json!({
+            "title": "Data",
+            "format": "json",
+            "content": "{ not json"
+        });
+        let result = run(&args, Some(&target));
+        assert!(text(&result).contains("canvas content is not valid JSON:"));
     }
 
     #[test]
