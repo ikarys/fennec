@@ -12,9 +12,6 @@ use std::collections::BTreeMap;
 pub const MAX_CONTENT_BYTES: usize = 32 * 1024;
 pub const MAX_ELEMENTS: usize = 200;
 pub const MAX_BLOCKS: usize = 16;
-/// The minimum interval, per block, between two accepted `block.update`s: an
-/// untrusted plugin cannot flood the server with fresh data.
-pub const MIN_UPDATE_INTERVAL_MS: u64 = 100;
 
 /// One plugin as the human defined it in `~/.agents/plugins.json`. The code
 /// it runs lives under `~/.agents/plugins/<name>/`; whether it is enabled,
