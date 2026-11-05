@@ -13,6 +13,7 @@ use super::test_files::is_test_path;
 pub enum ReviewSignal {
     Protected,
     Sensitive,
+    OutsidePlan,
     Bypass,
     Architecture,
     ConflictMarker,
@@ -44,6 +45,9 @@ pub fn signals(file: &FileFacts, checks: &DiffChecks) -> Vec<ReviewSignal> {
     }
     if checks.sensitive.contains(&file.path) {
         out.push(ReviewSignal::Sensitive);
+    }
+    if checks.outside_plan.contains(&file.path) {
+        out.push(ReviewSignal::OutsidePlan);
     }
     if checks
         .suppressions
@@ -127,6 +131,7 @@ fn is_gate(signal: ReviewSignal) -> bool {
         signal,
         ReviewSignal::Protected
             | ReviewSignal::Sensitive
+            | ReviewSignal::OutsidePlan
             | ReviewSignal::Bypass
             | ReviewSignal::Architecture
             | ReviewSignal::ConflictMarker
@@ -292,6 +297,22 @@ mod tests {
         assert_eq!(ordered[0].0, "src/auth/login.rs");
         assert_eq!(ordered[0].1, vec![ReviewSignal::Sensitive]);
         assert_eq!(ordered[1].1, vec![]);
+    }
+
+    #[test]
+    fn outside_plan_file_carries_its_signal_and_ranks_before_a_plain_file() {
+        let checks = DiffChecks {
+            outside_plan: vec!["o.rs".into()],
+            ..Default::default()
+        };
+        let plain = file("a.rs", 0, 0, false, false, true);
+        let outside = file("o.rs", 0, 0, false, false, true);
+
+        let ordered = order(&[plain, outside], &checks);
+
+        assert_eq!(ordered[0].0, "o.rs");
+        assert_eq!(ordered[0].1, vec![ReviewSignal::OutsidePlan]);
+        assert_eq!(ordered[1].0, "a.rs");
     }
 
     #[test]

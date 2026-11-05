@@ -263,6 +263,24 @@ pub fn current_run(events: &[Event]) -> Option<RunState> {
     Some(state)
 }
 
+/// The plan node's output: the Markdown plan the human approved, read from
+/// the run's results; `None` when the run has no criteria node or it has not
+/// produced output yet.
+pub fn plan_output(state: &RunState) -> Option<&str> {
+    let plan_id = state
+        .workflow
+        .nodes
+        .iter()
+        .find_map(|node| match &node.kind {
+            NodeKind::Criteria { plan, .. } => Some(plan.clone()),
+            _ => None,
+        })?;
+    state
+        .results
+        .get(&plan_id)
+        .map(|result| result.output.as_str())
+}
+
 /// Where an active run waits for the human.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Waiting {
@@ -826,6 +844,25 @@ mod tests {
         assert_eq!(run.run_id, "new");
         assert_eq!(run.task, "new");
         assert!(run.step_by_step);
+    }
+
+    #[test]
+    fn plan_output_reads_the_criteria_node_result() {
+        let mut workflow = simple_workflow();
+        workflow.nodes[1].kind = NodeKind::Criteria {
+            plan: "plan".into(),
+        };
+        let mut state = state(workflow);
+        state.results.insert(
+            "plan".to_string(),
+            NodeResult {
+                port: "done".into(),
+                output: "plan text".into(),
+                exit_code: None,
+            },
+        );
+
+        assert_eq!(plan_output(&state), Some("plan text"));
     }
 
     #[test]

@@ -47,6 +47,8 @@ export function blockerSentence(lang: Lang, blocker: Blocker): string {
       return t(lang, 'protectedTouched', { paths: blocker.paths.join(', ') });
     case 'sensitiveTouched':
       return t(lang, 'sensitiveTouched', { paths: blocker.paths.join(', ') });
+    case 'outsidePlan':
+      return t(lang, 'outsidePlan', { paths: blocker.paths.join(', ') });
     case 'understandingMissing':
       return t(lang, 'understandingMissing');
     case 'securityScanRunning':
