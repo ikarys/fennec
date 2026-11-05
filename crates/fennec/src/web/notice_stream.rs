@@ -7,6 +7,8 @@
 use super::App;
 use crate::agent::ports::EventLog;
 use crate::domain::attention::{self, Attention};
+use crate::domain::budget::BudgetStatus;
+use crate::domain::lang::Lang;
 use crate::domain::project::SessionSummary;
 use crate::git;
 use crate::store::SqliteStore;
@@ -16,9 +18,13 @@ use std::io::Write;
 use std::net::TcpStream;
 use std::path::Path;
 use std::time::{Duration, Instant};
+use token_usage::display::usd;
 
 /// A comment line now and then, so a closed browser tab is noticed.
 const PING: Duration = Duration::from_secs(15);
+
+/// The budgets are recomputed at most this often on a wake.
+const BUDGET_REFRESH: Duration = Duration::from_secs(30);
 
 /// The attention set and the last log seq read per session.
 type AttentionSet = (HashMap<String, Attention>, HashMap<String, u64>);
@@ -29,20 +35,31 @@ pub fn serve(app: &App, stream: &mut TcpStream) -> Result<(), String> {
     // it changes; a running turn is recomputed when it stops, dropped when it
     // starts.
     let (mut attention, mut last_seq) = current_attention(app, &store)?;
+    let mut budgets = budget_notices(app, &store)?;
+    let mut last_budgets = Instant::now();
     stream
         .write_all(
             b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-store\r\nConnection: keep-alive\r\n\r\n",
         )
         .map_err(|e| e.to_string())?;
-    if !write_frame(stream, &snapshot(&attention)) {
+    if !write_frame(stream, &snapshot(&attention, &budgets)) {
         return Ok(()); // the browser went away
     }
     let mut last_write = Instant::now();
     loop {
         let seen = app.notifier.generation();
-        let changed = refresh(app, &store, &mut attention, &mut last_seq)?;
+        let mut changed = refresh(app, &store, &mut attention, &mut last_seq)?;
+        // ponytail: an alert shows up to 30 s late; upgrade: recompute when a turn ends.
+        if last_budgets.elapsed() >= BUDGET_REFRESH {
+            let fresh = budget_notices(app, &store)?;
+            if fresh != budgets {
+                budgets = fresh;
+                changed = true;
+            }
+            last_budgets = Instant::now();
+        }
         if changed {
-            if !write_frame(stream, &snapshot(&attention)) {
+            if !write_frame(stream, &snapshot(&attention, &budgets)) {
                 return Ok(());
             }
             last_write = Instant::now();
@@ -201,15 +218,52 @@ fn mark_conflict(
     }
 }
 
+/// The projects whose monthly budget is at alert or exceeded, sorted by id.
+fn budget_notices(app: &App, store: &SqliteStore) -> Result<Vec<Value>, String> {
+    let lang = Lang::from_code(&store.preferences()?.display.language);
+    let mut notices = Vec::new();
+    for project in store.projects()? {
+        let Some(budget) = crate::budget::of_project(&app.settings, store, &project.id)? else {
+            continue;
+        };
+        let status = match budget.status {
+            BudgetStatus::Alert => "alert",
+            BudgetStatus::Exceeded => "exceeded",
+            BudgetStatus::Under => continue,
+        };
+        let detail = crate::domain::budget::alert(
+            lang,
+            &usd(budget.spent, lang.locale()),
+            &usd(budget.limit, lang.locale()),
+        );
+        notices.push(json!({
+            "projectId": project.id,
+            "project": project.name,
+            "status": status,
+            "detail": detail,
+        }));
+    }
+    notices.sort_by(|a, b| {
+        a["projectId"]
+            .as_str()
+            .unwrap_or("")
+            .cmp(b["projectId"].as_str().unwrap_or(""))
+    });
+    Ok(notices)
+}
+
 /// The snapshot as a `data:` frame, ordered by session so it is stable.
-fn snapshot(set: &HashMap<String, Attention>) -> String {
+fn snapshot(set: &HashMap<String, Attention>, budgets: &[Value]) -> String {
     let mut items: Vec<&Attention> = set.values().collect();
     items.sort_by(|a, b| a.session_id.cmp(&b.session_id));
     let payload: Vec<Value> = items
         .iter()
         .map(|a| serde_json::to_value(a).unwrap())
         .collect();
-    format!("data: {}\n\n", json!({ "items": payload }))
+    format!(
+        "data: {}\n\n",
+        json!({ "items": payload, "budgets": budgets })
+    )
 }
 
 fn write_frame(stream: &mut TcpStream, frame: &str) -> bool {
@@ -438,7 +492,7 @@ mod tests {
                 detail: "boom".into(),
             },
         )]);
-        let frame = snapshot(&set);
+        let frame = snapshot(&set, &[]);
         assert!(frame.starts_with("data: "));
         let body = frame.trim_start_matches("data: ").trim_end();
         let value: Value = serde_json::from_str(body).unwrap();

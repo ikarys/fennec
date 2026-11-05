@@ -348,7 +348,8 @@ pub(super) fn serve_usage(app: &App, stream: &mut TcpStream, id: &str) -> Result
     // The usage panel's cost text follows the human's display language.
     let preferences = store.preferences()?;
     let lang = Lang::from_code(&preferences.display.language);
-    let pricing = super::pricing::priced(&rows, &super::pricing::prices(&preferences));
+    let pricing =
+        crate::domain::pricing::priced(&rows, &crate::domain::pricing::prices(&preferences));
     send_json(
         stream,
         200,
@@ -454,6 +455,11 @@ pub(super) fn send_message(
     let Some((session, p)) = app.session_and_project(id)? else {
         return error(stream, 404, "no such session");
     };
+    // Refused before the message is recorded, so the composer keeps the text;
+    // `turn_build` refuses the other paths.
+    if let Err(refusal) = crate::budget::check(&app.settings, &store, &p.id) {
+        return error(stream, 409, &refusal);
+    }
     if app.turns.is_running(id) {
         if !attachments.is_empty() {
             return error(stream, 409, "images wait for the end of the turn");
