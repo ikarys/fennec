@@ -113,9 +113,8 @@ current head (verified; `domain/understanding.rs`). A branch that changes a sens
 `understandingMissing` blocker the human accepts.
 The same agent holds the dialogue on any part of the project the human names (a module, a flow, a design choice): a
 bulb button next to the Analyses tab's question form, which reads the current code and asks architecture-level questions.
-Learning mode, done (C24): the read-only `mentor` agent (`crates/fennec/agents/mentor.agent.md`, under Construire in the
-composer's menu) splits a task into small steps the human writes themselves, reads their diff after each one, points at
-what goes wrong with a hint rather than a fix, and closes with what they built and learned; it never writes the code.
+Learning mode, dropped (2026-11-05): the `mentor` agent was `ask` with a "do not write it for me" instruction; the
+human writes that in their message when they want it.
 Project kickoff, done: the read-only `kickoff` agent ("Démarrer le projet" in the Analyses tab) asks what a new
 project is for, has the human choose its stack and architecture (`record_decision`), drafts its AGENTS.md and
 proposes its first tasks in build order, a walking skeleton first, with `propose_task` (`task.proposed`); the human
@@ -145,7 +144,7 @@ guideline; the human appends the new ones in one click (`architecture.rules_adde
 Composer agents, done: `composer: false` in an agent's frontmatter keeps it out of the composer's menu; it is for agents
 fennec launches itself with a brief it builds (Analyses: `analyze`, `audit-architecture`, `audit-security`; gate: `narrate`,
 `understand`; Risks: `remedy`; test node: `tests`), so the composer offers only agents one talks to freely (`plan`, `mockup`,
-`builder`, `mentor`, `ask`); `subagent: true` marks workflow-only ones (`review`, `verify`) (`domain/agent.rs`, `web/project_list_routes.rs`).
+`builder`, `ask`); `subagent: true` marks workflow-only ones (`review`, `verify`) (`domain/agent.rs`, `web/project_list_routes.rs`).
 Produced architecture, done (C12): `.agents/architecture` also takes module rules (`<A> never imports <B>`), checked on
 every dependency of the project map; the "Carte des modules" tab lists the breaks, draws them red, and counts the dependencies added or
 removed since the committed `docs/map.md` (verified; `domain/drift.rs`).
