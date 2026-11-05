@@ -346,3 +346,29 @@ export function setProjectBudget(
     },
   );
 }
+
+export type IndicatorId =
+  | 'integrity'
+  | 'sensitiveReview'
+  | 'understanding'
+  | 'architecture'
+  | 'security'
+  | 'cost'
+  | 'transmission'
+  | 'traceability'
+  | 'reviewLoad';
+
+export interface IndicatorView {
+  id: IndicatorId;
+  label: string;
+  figure: string;
+  detail: string;
+  tone: DashboardTile['tone'];
+}
+
+/** The project's verified indicators, read from recorded facts. */
+export function getProjectIndicators(projectId: string): Promise<IndicatorView[]> {
+  return request<{ indicators: IndicatorView[] }>(
+    `/api/projects/${encodeURIComponent(projectId)}/indicators`,
+  ).then((body) => body.indicators);
+}

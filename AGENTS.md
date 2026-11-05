@@ -210,6 +210,11 @@ Budgets, done (C18): a monthly cost budget per project, set from a tile of the p
 once reached, fennec's kernel refuses to start any turn on the project (`turn_build`, every path: web, CLI, the queue,
 workflow children; the message route answers 409 first so the typed text stays) until the human raises or removes it
 (`domain/budget.rs`, `budget.rs`, `web/budget_routes.rs`).
+Indicators, done (C19): an "Indicators" tab on the project page measures the project from recorded facts only (verified):
+AI commits outside fennec, sensitive integrations without a comprehension dialogue, dialogues held, module rule breaks with
+the violations accepted and the active waivers, scanner findings accepted, the month's cost per integration, the map and
+ADRs, integrations tied to an approved plan, the blockers accepted per integration (`domain/indicators.rs`,
+`web/indicator_routes.rs`, `store/project_events.rs`).
 Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
 1. To be chosen among the remaining capabilities C* of the Notion definition.
@@ -280,6 +285,7 @@ crates/fennec/src/
     module_map/notes.rs what the map says about a module, read from its leading comment
     budget.rs          a project's monthly budget: its status (under, alert at 80 %, exceeded), the refusal and alert texts
     pricing.rs         the ledger's model rows priced at the models' prices, split by token kind
+    indicators.rs      the project's indicators counted from the integrations the gate recorded
     lang.rs            the language the human reads fennec in (Settings); the server-built texts follow it
     id.rs, clock.rs
     (domain uses `rules::path`, the gitignore-like matcher, as a library: one matcher for rules, protection and architecture)
@@ -362,7 +368,8 @@ crates/fennec/src/
                      tools opened on a folder), model_view, worktree_routes (disk usage), agent_routes,
                      audit_routes, backlog_routes, idea_assets, mcp_routes, proposal_routes, session_delete,
                      agents_md_routes, session_name (background naming), canvas_routes (the canvas crate over HTTP),
-                     budget_routes (a project's budget, read and set)
+                     budget_routes (a project's budget, read and set),
+                     indicator_routes (a project's indicators from its logs, git and the ledger)
   cli/               terminal adapter: commands, transcript
 crates/backlog/     the ideas backlog, a crate of its own and fennec-free, no I/O: its events folded, the queue
                      order, the night-mode caps, an idea's status, stage and next action, a run's summary

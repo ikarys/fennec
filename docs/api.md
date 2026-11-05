@@ -242,6 +242,7 @@ read-only. The human edits them as usual.
 - `POST /api/projects/{id}/favorite` `{favorite}` → `{ok: true}`: pins or unpins the project (400 if `favorite` is missing or not a boolean; 404 for an unknown project)
 - `GET /api/projects/{id}/budget` → `{limitUsd, label, figure, detail, tone, active}`: the project's monthly budget and what it spent this month, display-ready; 404 if no project. `limitUsd` is null when none is set; `tone` is `ok`, `attention`, `err` or `neutral`; `active` is true when a budget is set
 - `POST /api/projects/{id}/budget` `{limitUsd: number | null}` → the same as `GET`; 400 when `limitUsd` is not a finite number > 0 (null removes the budget); 404 if no project
+- `GET /api/projects/{id}/indicators` → `{indicators: [{id, label, figure, detail, tone}]}`: the project's indicators, display-ready and verified (computed from the session logs, git and the usage ledger, never from a model); 404 if no project. `id` is one of `integrity`, `sensitiveReview`, `understanding`, `architecture`, `security`, `cost`, `transmission`, `traceability`, `reviewLoad`; `tone` as the dashboard tiles'
 - `GET /api/backlog` → `{total, projects}`: the cross-project Backlog page, one row per project (the idea lists
   live in each project's Tasks tab):
   - `total` `{yours, running, ready, drafts, done, projects}`: counts across all projects; `ready` sums each
