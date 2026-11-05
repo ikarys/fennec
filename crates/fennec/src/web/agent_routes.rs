@@ -156,6 +156,7 @@ mod tests {
             name: "Mine".into(),
             description: "does things".into(),
             subagent: false,
+            composer: true,
             allowed_tools: vec!["read_file".into()],
             commands: CommandAccess::ReadOnly,
             writes: WriteScope::Any,

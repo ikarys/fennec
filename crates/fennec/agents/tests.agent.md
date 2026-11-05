@@ -3,6 +3,7 @@ id: tests
 name: Tests
 description: Writes the tests derived from the approved plan's criteria, before any code; the human validates them, then they are protected
 subagent: false
+composer: false
 phase: build
 writes: tests
 color: '#10b981'

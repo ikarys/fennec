@@ -126,6 +126,7 @@ mod tests {
             name: name.into(),
             description: description.into(),
             subagent,
+            composer: true,
             allowed_tools: Vec::new(),
             commands: CommandAccess::ReadOnly,
             writes: crate::domain::agent::WriteScope::Any,

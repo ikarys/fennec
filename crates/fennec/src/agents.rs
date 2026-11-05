@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 use crate::domain::agent::{AgentDefinition, AgentOrigin, parse_agent_md};
 
-pub(crate) const DEFAULTS: [&str; 15] = [
+pub(crate) const DEFAULTS: [&str; 14] = [
     include_str!("../agents/plan.agent.md"),
     include_str!("../agents/builder.agent.md"),
     include_str!("../agents/tests.agent.md"),
@@ -23,7 +23,6 @@ pub(crate) const DEFAULTS: [&str; 15] = [
     include_str!("../agents/mockup.agent.md"),
     include_str!("../agents/remedy.agent.md"),
     include_str!("../agents/mentor.agent.md"),
-    include_str!("../agents/rules.agent.md"),
 ];
 
 pub mod crud;
@@ -222,7 +221,6 @@ mod tests {
             "mentor",
             "narrate",
             "remedy",
-            "rules",
             "understand",
         ] {
             let agent = agents.iter().find(|agent| agent.id == id).unwrap();

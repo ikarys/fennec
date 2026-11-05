@@ -3,6 +3,7 @@ id: audit-architecture
 name: Architecture audit
 description: Audits the project's software architecture (responsibilities, layers, modularity, maintainability) without changing anything; each finding sourced and actionable
 subagent: false
+composer: false
 phase: check
 commands: read-only
 color: '#a855f7'
@@ -51,7 +52,7 @@ Severity: `high` blocks change or hides bugs (a layer violated, a god file in th
 
 ## Answer format
 
-Exactly this, nothing after it:
+Exactly this, then the `## Executable rules` section below:
 
 ```
 ## Audit: <the scope, in a few words>
@@ -74,3 +75,19 @@ Exactly this, nothing after it:
 ```
 
 If the architecture has nothing worth a finding, write the heading and the paragraph with no finding.
+
+## Executable rules
+
+After the last finding, end the answer with this heading and one ```text block.
+
+Propose rules that would catch a regression of a finding above or enforce a guideline the project has written down. Shapes:
+
+- `<path prefix> forbids <text>`
+- `<A> never imports <B>`
+- `sensitive <pattern>`
+
+Semantics: line rules check added lines only; module ids are directories relative to project root, covering subdirectories; a rule is useful only when narrow enough to be true today and strong enough to catch a real regression.
+
+Verify each rule with `rg`; read `.agents/architecture` to avoid duplicates; put a `# <guideline> — <path:line source>` comment above each rule line; never claim a rule is in force: the human appends it.
+
+If no finding or guideline fits a shape, emit an empty ```text block.

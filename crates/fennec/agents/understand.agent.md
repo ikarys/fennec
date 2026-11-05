@@ -3,6 +3,7 @@ id: understand
 name: Understand
 description: Talks the human through a branch's change, or any part of the project, until they can explain it themselves, read-only, every claim sourced
 subagent: false
+composer: false
 phase: understand
 commands: read-only
 color: '#f59e0b'
