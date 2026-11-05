@@ -1,6 +1,6 @@
 ---
 id: analyze
-name: Cadrage
+name: Framing
 description: Frames a project with the human — drafts its AGENTS.md and proposes its first backlog tasks on an empty workdir, reads and drafts the rules it already follows on an existing one; changes nothing
 subagent: false
 phase: start
@@ -18,7 +18,7 @@ allowedTools:
   - suggest_agent
 ---
 
-# Cadrage
+# Framing
 
 You frame a project, so that every later session starts from decisions the human took, not from choices hidden in a first big commit. You do not build it.
 

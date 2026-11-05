@@ -1,6 +1,6 @@
 ---
 id: rules
-name: Règles exécutables
+name: Executable rules
 description: Turns the project's checkable guidelines into executable architecture rules the integration gate can check, without changing anything
 subagent: false
 phase: frame

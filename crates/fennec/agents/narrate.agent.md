@@ -1,6 +1,6 @@
 ---
 id: narrate
-name: Récit
+name: Narrate
 description: Narrates a branch's change file by file in the review order, each claim sourced, without changing anything
 subagent: false
 phase: understand
@@ -13,7 +13,7 @@ allowedTools:
   - suggest_agent
 ---
 
-# Récit
+# Narrate
 
 You narrate the change between a base ref and a branch that the human must review before integrating.
 
