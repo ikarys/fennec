@@ -54,9 +54,10 @@ pub enum ApplyError {
     Git { message: String },
 }
 
-/// The agent's commits and files since the base ref, plus the human's branch.
+/// The agent's commits and files since the merge start, plus the human's branch.
 pub fn preview(top: &Path, wt: &Worktree) -> Result<Preview, String> {
-    let range = format!("{}..{}", wt.base, wt.branch);
+    let start = merge_start(top, wt);
+    let range = format!("{}..{}", start, wt.branch);
     let log = git(
         top,
         &["log", "--reverse", "--format=%H%x09%s", &range],
@@ -72,16 +73,16 @@ pub fn preview(top: &Path, wt: &Worktree) -> Result<Preview, String> {
         })
         .collect();
 
-    let files = touched_files(top, wt)?;
+    let files = touched_files(top, wt, &start)?;
     let numstat = git(
         top,
-        &["diff", "--numstat", "--no-renames", &wt.base, &wt.branch],
+        &["diff", "--numstat", "--no-renames", &start, &wt.branch],
         None,
     )?;
     let counts = parse_numstat(&String::from_utf8_lossy(&numstat));
 
     let (carried_changes, local_changes) =
-        uncommitted_split(top, wt.base.as_str(), wt.branch.as_str(), &files);
+        uncommitted_split(top, start.as_str(), wt.branch.as_str(), &files);
 
     // The preview reports a conflict before the click; a git failure here is
     // not a conflict, the click will report it.
@@ -102,14 +103,15 @@ pub fn preview(top: &Path, wt: &Worktree) -> Result<Preview, String> {
 /// The files the merge of the branch onto the human's HEAD conflicts on;
 /// empty when it merges cleanly or git fails.
 pub fn conflicts(top: &Path, wt: &Worktree) -> Vec<String> {
-    let Ok(files) = touched_files(top, wt) else {
+    let start = merge_start(top, wt);
+    let Ok(files) = touched_files(top, wt, &start) else {
         return Vec::new();
     };
-    let (carried, _) = uncommitted_split(top, wt.base.as_str(), wt.branch.as_str(), &files);
+    let (carried, _) = uncommitted_split(top, start.as_str(), wt.branch.as_str(), &files);
     let Ok(ours) = ours_with_carried(top, &carried) else {
         return Vec::new();
     };
-    match merge_tree(top, &ours, wt.branch.as_str(), &merge_start(top, wt)) {
+    match merge_tree(top, &ours, wt.branch.as_str(), &start) {
         Ok((_, conflicted)) => conflicted,
         Err(_) => Vec::new(),
     }
@@ -134,11 +136,11 @@ pub fn update_branch(top: &Path, wt: &Worktree) -> Result<Vec<String>, String> {
     Ok(conflicted)
 }
 
-/// The agent's touched files: `git diff --name-only --no-renames base branch`.
-fn touched_files(top: &Path, wt: &Worktree) -> Result<Vec<String>, String> {
+/// The agent's touched files: `git diff --name-only --no-renames start branch`.
+fn touched_files(top: &Path, wt: &Worktree, start: &str) -> Result<Vec<String>, String> {
     let out = git(
         top,
-        &["diff", "--name-only", "--no-renames", &wt.base, &wt.branch],
+        &["diff", "--name-only", "--no-renames", start, &wt.branch],
         None,
     )?;
     Ok(String::from_utf8_lossy(&out)
@@ -257,13 +259,14 @@ pub fn changed_files(
     files: &[String],
     prefix: &str,
 ) -> Vec<(String, ChangedLines)> {
+    let start = merge_start(top, wt);
     files
         .iter()
         .filter_map(|file| Some((file, file.strip_prefix(prefix)?)))
         .map(|(file, relative)| {
             let diff = git(
                 top,
-                &["diff", "--unified=0", &wt.base, &wt.branch, "--", file],
+                &["diff", "--unified=0", &start, &wt.branch, "--", file],
                 None,
             )
             .map(|out| String::from_utf8_lossy(&out).into_owned())
@@ -482,8 +485,9 @@ pub fn apply(top: &Path, wt: &Worktree, message: &str) -> Result<String, ApplyEr
         });
     }
 
-    let files = touched_files(top, wt).map_err(|message| ApplyError::Git { message })?;
-    let (carried, local) = uncommitted_split(top, wt.base.as_str(), wt.branch.as_str(), &files);
+    let start = merge_start(top, wt);
+    let files = touched_files(top, wt, &start).map_err(|message| ApplyError::Git { message })?;
+    let (carried, local) = uncommitted_split(top, start.as_str(), wt.branch.as_str(), &files);
 
     // An uncommitted edit the agent's work would overwrite: refuse, naming it.
     if !local.is_empty() {
@@ -495,8 +499,19 @@ pub fn apply(top: &Path, wt: &Worktree, message: &str) -> Result<String, ApplyEr
         });
     }
 
-    let range = format!("{}..{}", wt.base, wt.branch);
+    let range = format!("{}..{}", start, wt.branch);
     let command = format!("git cherry-pick --no-commit {range}");
+
+    // The branch is already merged when the range is empty; refuse before
+    // making a commit.
+    let count = git(top, &["rev-list", "--count", &range], None)
+        .map(|out| String::from_utf8_lossy(&out).trim().to_string())
+        .map_err(|message| ApplyError::Git { message })?;
+    if count == "0" {
+        return Err(ApplyError::Git {
+            message: "nothing to integrate: the branch is already merged".into(),
+        });
+    }
 
     // `ours`: HEAD, or a temporary commit of HEAD plus the carried files'
     // working content, so the merge carries the human's uncommitted work the
@@ -505,8 +520,7 @@ pub fn apply(top: &Path, wt: &Worktree, message: &str) -> Result<String, ApplyEr
 
     // The merge, computed off the trees so a dirty working tree does not make
     // git refuse; a conflict names the files.
-    let (tree, conflicted) = match merge_tree(top, &ours, wt.branch.as_str(), &merge_start(top, wt))
-    {
+    let (tree, conflicted) = match merge_tree(top, &ours, wt.branch.as_str(), &start) {
         Ok((tree, conflicted)) => (tree, conflicted),
         Err(message) => {
             return Err(ApplyError::Git {
@@ -860,6 +874,54 @@ mod tests {
             ),
             "1"
         );
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn preview_after_a_merge_by_hand_lists_only_the_newer_work() {
+        let (base, repo) = setup();
+        let wt = open(&base.join("wt"), &repo, "s1").unwrap().unwrap();
+        std::fs::write(wt.workdir.join("a.txt"), "agent\n").unwrap();
+        assert_eq!(commit(&wt, "agent change"), Ok(true));
+
+        git(&repo, &["merge", "--no-ff", "--no-edit", "fennec/s1"], None).unwrap();
+        std::fs::write(wt.workdir.join("b.txt"), "b\n").unwrap();
+        assert_eq!(commit(&wt, "agent work after the merge"), Ok(true));
+
+        let top = top(&repo).unwrap().0;
+        let preview = preview(&top, &wt).unwrap();
+
+        assert_eq!(
+            preview.commits,
+            vec![Commit {
+                sha: text(&repo, &["rev-parse", "fennec/s1"]),
+                subject: "agent work after the merge".into(),
+            }]
+        );
+        assert_eq!(preview.files, vec!["b.txt".to_string()]);
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn a_branch_fully_merged_by_hand_has_nothing_to_integrate() {
+        let (base, repo) = setup();
+        let wt = open(&base.join("wt"), &repo, "s1").unwrap().unwrap();
+        std::fs::write(wt.workdir.join("a.txt"), "agent\n").unwrap();
+        assert_eq!(commit(&wt, "agent change"), Ok(true));
+
+        git(&repo, &["merge", "--no-ff", "--no-edit", "fennec/s1"], None).unwrap();
+
+        let top = top(&repo).unwrap().0;
+        let before_head = text(&repo, &["rev-parse", "HEAD"]);
+        let preview = preview(&top, &wt).unwrap();
+        assert!(preview.commits.is_empty());
+        assert!(preview.files.is_empty());
+
+        let Err(ApplyError::Git { message }) = apply(&top, &wt, "integrate") else {
+            panic!("expected nothing to integrate");
+        };
+        assert!(message.contains("nothing to integrate"));
+        assert_eq!(text(&repo, &["rev-parse", "HEAD"]), before_head);
         let _ = std::fs::remove_dir_all(&base);
     }
 
