@@ -69,7 +69,6 @@ impl PluginManager {
                 &sandbox,
                 &config::code_dir(&self.agents_home, &def.name),
                 &self.temp_root,
-                Arc::new(crate::domain::clock::now_ms),
             ) {
                 Ok(host) => managed.push(ManagedHost {
                     def: def.clone(),
@@ -91,14 +90,11 @@ impl PluginManager {
             .is_some_and(|h| !h.is_empty())
     }
 
-    /// Drop and restart the hosts, after an activation changed.
-    pub fn restart(&self, store: &SqliteStore) {
-        *self.hosts.lock().unwrap() = None;
-        let _ = self.ensure_started(store);
-    }
-
-    /// Drop every host; the tests use it to free the child processes before cleaning up.
-    #[cfg(test)]
+    /// Drop every host, after an activation changed; the pump's next wake
+    /// starts the active ones afresh. Spawning is left to the pump on purpose:
+    /// bwrap's `--die-with-parent` kills a plugin when the *thread* that
+    /// spawned it ends, so a host started from a request's thread would die
+    /// with the response.
     pub fn shutdown(&self) {
         *self.hosts.lock().unwrap() = None;
     }
@@ -251,10 +247,6 @@ for line in sys.stdin:
 
         let payload = r#"{"type":"tool.call","data":{}}"#;
         manager.push_event("p", "s", 1, "tool.call", payload);
-        // Past the block's minimum update interval, so the second update lands.
-        std::thread::sleep(std::time::Duration::from_millis(
-            crate::domain::plugin::MIN_UPDATE_INTERVAL_MS + 20,
-        ));
         manager.push_event("p", "s", 2, "tool.call", payload);
 
         let mut blocks = Vec::new();
@@ -284,7 +276,7 @@ for line in sys.stdin:
     }
 
     #[test]
-    fn a_restart_drops_the_old_hosts() {
+    fn a_shutdown_drops_the_old_hosts() {
         let base =
             std::env::temp_dir().join(format!("fennec-plugin-mgr-{}", crate::domain::id::new_id()));
         let agents_home = agents_home(&base);

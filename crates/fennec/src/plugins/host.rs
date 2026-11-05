@@ -3,9 +3,7 @@
 //! back; the core stores that data and renders it. A plugin is always
 //! sandboxed — a turned-off sandbox is a refusal to start, not a fallback.
 
-use crate::domain::plugin::{
-    BlockContent, BlockKey, MAX_BLOCKS, MIN_UPDATE_INTERVAL_MS, PluginBlockUpdate, PluginDef,
-};
+use crate::domain::plugin::{BlockContent, BlockKey, MAX_BLOCKS, PluginBlockUpdate, PluginDef};
 use crate::tools::Sandbox;
 use serde_json::{Value, json};
 use std::collections::{BTreeSet, HashMap};
@@ -40,7 +38,6 @@ impl Host {
         sandbox: &Sandbox,
         code_dir: &Path,
         temp_root: &Path,
-        clock: Arc<dyn Fn() -> u64 + Send + Sync>,
     ) -> Result<Host, String> {
         // A plugin is always sandboxed: Off is a refusal, not a bare process.
         let read_only = match sandbox {
@@ -79,8 +76,6 @@ impl Host {
         let blocks = Arc::new(RwLock::new(HashMap::new()));
         let (init_tx, init_rx) = mpsc::channel();
         let reader_blocks = blocks.clone();
-        let reader_last = Mutex::new(HashMap::new());
-        let reader_clock = clock;
         std::thread::spawn(move || {
             let mut init_sent = false;
             for line in BufReader::new(stdout).lines() {
@@ -96,7 +91,7 @@ impl Host {
                         && let Ok(update) =
                             serde_json::from_value::<PluginBlockUpdate>(params.clone())
                     {
-                        apply_update(&reader_blocks, &reader_last, reader_clock(), &update);
+                        apply_update(&reader_blocks, &update);
                     }
                 } else if value.get("id").is_some() {
                     // A response. After the `init` reply, one is an answer to a
@@ -186,33 +181,20 @@ impl Host {
     }
 }
 
-/// Store one capped `block.update`: too large, too full, too many blocks, or
-/// too frequent is dropped, so an untrusted plugin cannot grow the server's
-/// RAM or flood it. `now` is the clock's millisecond reading.
-fn apply_update(
-    blocks: &RwLock<HashMap<BlockKey, BlockContent>>,
-    last: &Mutex<HashMap<BlockKey, u64>>,
-    now: u64,
-    update: &PluginBlockUpdate,
-) {
+/// Store one capped `block.update`: too large, too full or too many blocks is
+/// dropped, so an untrusted plugin cannot grow the server's RAM. Frequency is
+/// not capped: the line is already parsed, the store is one map insert, and
+/// the UI reads a snapshot, so a burst costs nothing and the latest state wins.
+fn apply_update(blocks: &RwLock<HashMap<BlockKey, BlockContent>>, update: &PluginBlockUpdate) {
     if !update.within_caps() {
         return;
     }
     let key = update.key();
-    if last
-        .lock()
-        .unwrap()
-        .get(&key)
-        .is_some_and(|since| now.saturating_sub(*since) < MIN_UPDATE_INTERVAL_MS)
-    {
-        return;
-    }
     let mut map = blocks.write().unwrap();
     if map.len() >= MAX_BLOCKS && !map.contains_key(&key) {
         return;
     }
-    map.insert(key.clone(), update.content.clone());
-    last.lock().unwrap().insert(key, now);
+    map.insert(key, update.content.clone());
 }
 
 impl Drop for Host {
@@ -237,10 +219,6 @@ mod tests {
             "fennec-plugin-host-{}",
             crate::domain::id::new_id()
         ))
-    }
-
-    fn clock() -> Arc<dyn Fn() -> u64 + Send + Sync> {
-        Arc::new(crate::domain::clock::now_ms)
     }
 
     /// A tiny stdio plugin: on `init` it asks for `tool.call` and emits a block
@@ -294,16 +272,11 @@ for line in sys.stdin:
             &sandbox(),
             &agents_home.join("plugins/echo"),
             &temp(),
-            clock(),
         )
         .unwrap();
 
         let payload = r#"{"type":"tool.call","data":{}}"#;
         host.push_event("p", "s", 1, "tool.call", payload);
-        // Past the block's minimum update interval, so the second update lands.
-        std::thread::sleep(std::time::Duration::from_millis(
-            MIN_UPDATE_INTERVAL_MS + 20,
-        ));
         host.push_event("p", "s", 2, "tool.call", payload);
         // A type it did not ask for is not fed to it.
         host.push_event("p", "s", 3, "message.done", r#"{"type":"message.done"}"#);
@@ -366,15 +339,11 @@ for line in sys.stdin:
             &sandbox(),
             &agents_home.join("plugins/stray"),
             &temp(),
-            clock(),
         )
         .unwrap();
 
         let payload = r#"{"type":"tool.call","data":{}}"#;
         host.push_event("p", "s", 1, "tool.call", payload);
-        std::thread::sleep(std::time::Duration::from_millis(
-            MIN_UPDATE_INTERVAL_MS + 20,
-        ));
         host.push_event("p", "s", 2, "tool.call", payload);
 
         let mut seen = None;
@@ -476,7 +445,6 @@ send({"jsonrpc": "2.0", "method": "block.update", "params": {"block": "probe", "
             &sandbox,
             &agents_home.join("plugins/probe"),
             &base.join("scratch"),
-            clock(),
         )
         .unwrap();
 
@@ -510,7 +478,7 @@ send({"jsonrpc": "2.0", "method": "block.update", "params": {"block": "probe", "
             blocks: Vec::new(),
         };
         let off = Sandbox::Off;
-        let err = match Host::spawn(&def, false, &off, &code_dir, &temp(), clock()) {
+        let err = match Host::spawn(&def, false, &off, &code_dir, &temp()) {
             Ok(_) => panic!("a plugin starts with the sandbox off"),
             Err(err) => err,
         };
@@ -521,7 +489,6 @@ send({"jsonrpc": "2.0", "method": "block.update", "params": {"block": "probe", "
     fn plugin_block_caps() {
         // Exercise the caps directly on the store side.
         let blocks = Arc::new(RwLock::new(HashMap::new()));
-        let last = Mutex::new(HashMap::new());
         // A content beyond the element cap is not stored.
         let update = PluginBlockUpdate {
             block: "big".into(),
@@ -533,11 +500,10 @@ send({"jsonrpc": "2.0", "method": "block.update", "params": {"block": "probe", "
                 ],
             },
         };
-        apply_update(&blocks, &last, 0, &update);
+        apply_update(&blocks, &update);
         assert!(blocks.read().unwrap().is_empty());
 
-        // A too-frequent update on the same block is dropped; one after the
-        // minimum interval is stored.
+        // Updates in a burst are all stored: the latest wins.
         let text = |value: &str| PluginBlockUpdate {
             block: "calls".into(),
             session: None,
@@ -545,21 +511,9 @@ send({"jsonrpc": "2.0", "method": "block.update", "params": {"block": "probe", "
                 elements: vec![BlockElement::Text { text: value.into() }],
             },
         };
-        apply_update(&blocks, &last, 0, &text("1"));
-        apply_update(&blocks, &last, MIN_UPDATE_INTERVAL_MS - 1, &text("2"));
-        {
-            let stored = blocks.read().unwrap();
-            assert_eq!(
-                stored.get(&BlockKey {
-                    block_id: "calls".into(),
-                    session_id: None
-                }),
-                Some(&BlockContent {
-                    elements: vec![BlockElement::Text { text: "1".into() }]
-                })
-            );
-        }
-        apply_update(&blocks, &last, MIN_UPDATE_INTERVAL_MS, &text("3"));
+        apply_update(&blocks, &text("1"));
+        apply_update(&blocks, &text("2"));
+        apply_update(&blocks, &text("3"));
         assert_eq!(
             blocks
                 .read()

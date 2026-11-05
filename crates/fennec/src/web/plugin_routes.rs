@@ -80,8 +80,9 @@ pub(super) fn set(app: &App, req: &Request, stream: &mut TcpStream) -> Result<()
     store
         .save_plugin_activation(&activation)
         .map_err(|e| e.to_string())?;
-    // A changed activation starts the hosts afresh.
-    app.plugins.restart(&store);
+    // A changed activation starts the hosts afresh, from the pump's thread.
+    app.plugins.shutdown();
+    app.notifier.notify();
     send_json(
         stream,
         200,

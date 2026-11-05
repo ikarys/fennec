@@ -187,14 +187,9 @@ for line in sys.stdin:
         assert_eq!(high_water.get(&session), Some(&4));
         assert!(manager.blocks_global().is_empty());
 
-        // New events after the first sight are fed, one per wake, past the
-        // block's minimum update interval so neither update is dropped.
-        std::thread::sleep(std::time::Duration::from_millis(5));
+        // New events after the first sight are fed, one per wake.
         store.append(&session, &call()).unwrap();
         step(&manager, &store, &mut high_water);
-        std::thread::sleep(std::time::Duration::from_millis(
-            crate::domain::plugin::MIN_UPDATE_INTERVAL_MS + 20,
-        ));
         store.append(&session, &call()).unwrap();
         step(&manager, &store, &mut high_water);
 
