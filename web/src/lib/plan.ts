@@ -255,8 +255,10 @@ export function splitContract(text: string): { before: string; contract: Plan | 
   let kind: 'plan' | 'report' = 'plan';
   let title = '';
   // The contract is the last such heading: the models may restate it mid-message.
+  // A short qualifier before the colon ("Plan révisé :", "Revised Plan:") is the model's
+  // wording, not another heading: the revised plan must render as the first one did.
   for (let i = lines.length - 1; i >= 0; i--) {
-    const m = lines[i].match(/^#{2,3}\s+(Plan|Report)\s*:\s*(.+?)\s*$/);
+    const m = lines[i].match(/^#{2,3}\s+(?:[^\s:]+\s+)?(Plan|Report)(?:\s+[^:]{1,20}?)?\s*:\s*(.+?)\s*$/);
     if (m) {
       start = i;
       kind = m[1] === 'Plan' ? 'plan' : 'report';
