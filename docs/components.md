@@ -224,3 +224,8 @@ redirect, cached 6 h for the UI), compare versions (`domain/release.rs`) and, on
 embedded `install.sh` over the binary (checksum verified, atomic rename); the server then re-executes itself, same PID,
 so a systemd service keeps tracking it. Refused while a turn runs. `install.sh` writes and starts a systemd user service
 (`update.rs`, `cli/update.rs`, `web/update_routes.rs`, `components/layout/UpdateNotice.tsx`).
+
+Server port, done: `~/.config/fennec/settings.yaml` (`$XDG_CONFIG_HOME`) holds `port:`; `--port` wins over it, 7777
+otherwise. Settings > Security edits it (the line replaced in place, other lines kept) and restarts the server, the page
+following it to the new port (`domain/server_config.rs`, `server_config.rs`, `web/server_routes.rs`,
+`components/settings/ServerSection.tsx`).

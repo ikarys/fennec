@@ -58,6 +58,14 @@ pub fn split(content: &str) -> Option<(Frontmatter, String)> {
     Some((frontmatter, body))
 }
 
+/// The fields of a whole document of `key: value` lines (a settings file), no `---` block.
+pub fn parse(content: &str) -> Frontmatter {
+    // A BOM is not a field, so drop it before treating every line as data.
+    let content = content.strip_prefix('\u{feff}').unwrap_or(content);
+    let lines = content.lines().collect::<Vec<_>>();
+    parse_fields(&lines)
+}
+
 fn parse_fields(lines: &[&str]) -> Frontmatter {
     let mut fields = Vec::new();
     let mut index = 0;
@@ -276,6 +284,12 @@ fn parse_block_scalar(indicator: &str, lines: &[&str]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parse_reads_a_settings_line() {
+        let fields = super::parse("port: 8080\n");
+        assert_eq!(fields.scalar("port"), Some("8080"));
+    }
 
     #[test]
     fn parses_quoted_values() {
