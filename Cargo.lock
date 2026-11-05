@@ -445,7 +445,7 @@ checksum = "4744e383959f0db86ede514b809b1c53251889093803c05267acc7d4e7030d70"
 [[package]]
 name = "llm-providers-connector"
 version = "0.1.0"
-source = "git+ssh://git@github.com/ikarys/llm-providers-connector.git?tag=v0.1.0#f3eddf616ae60cd967a21e8102cd3cfd987ed0cf"
+source = "git+https://github.com/ikarys/llm-providers-connector.git?tag=v0.1.0#f3eddf616ae60cd967a21e8102cd3cfd987ed0cf"
 dependencies = [
  "chacha20poly1305",
  "serde",
