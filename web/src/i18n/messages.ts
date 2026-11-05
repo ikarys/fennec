@@ -1298,7 +1298,12 @@ export const en = {
   canvasLibraryTitle: 'Canvas library',
   canvasLibraryEmpty: 'No canvas artifacts in this project yet',
   canvasFromMessage: 'From a message',
-  canvasRegionMode: 'Region mode'
+  canvasRegionMode: 'Region mode',
+  budgetEdit: 'Set the monthly budget',
+  budgetPlaceholder: 'Monthly budget in $',
+  budgetSave: 'Save the budget',
+  budgetRemove: 'Remove the budget',
+  budgetCancel: 'Cancel'
 };
 
 export type MsgKey = keyof typeof en;
@@ -1328,6 +1333,11 @@ export const fr: Record<MsgKey, string> = {
   canvasLibraryEmpty: 'Aucun artefact canvas dans ce projet',
   canvasFromMessage: 'Depuis un message',
   canvasRegionMode: 'Mode région',
+  budgetEdit: 'Fixer le budget mensuel',
+  budgetPlaceholder: 'Budget mensuel en $',
+  budgetSave: 'Enregistrer le budget',
+  budgetRemove: 'Retirer le budget',
+  budgetCancel: 'Annuler',
   loading: 'Chargement…',
   integrateInto: 'Intégrer dans {branch}',
   displayTitle: 'Affichage',

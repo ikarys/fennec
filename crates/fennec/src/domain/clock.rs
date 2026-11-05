@@ -23,6 +23,13 @@ pub fn format_utc(ms: u64) -> String {
     )
 }
 
+/// The midnight UTC of the first day of `ms`'s calendar month.
+pub fn month_start_ms(ms: u64) -> u64 {
+    let days = (ms / 86_400_000) as i64;
+    let (_, _, day) = civil_from_days(days);
+    ((days - i64::from(day - 1)) * 86_400_000) as u64
+}
+
 /// Days since 1970-01-01 to (year, month, day), Howard Hinnant's algorithm;
 /// avoids a date crate for one date in the prompt.
 fn civil_from_days(z: i64) -> (i64, u32, u32) {
@@ -52,5 +59,12 @@ mod tests {
         assert_eq!(format_utc(0), "1970-01-01 00:00");
         let ms = 20_751 * 86_400_000 + 13 * 3_600_000 + 37 * 60_000;
         assert_eq!(format_utc(ms), "2026-10-25 13:37");
+    }
+
+    #[test]
+    fn month_start_ms_starts_the_utc_month() {
+        assert_eq!(month_start_ms(0), 0);
+        let ms = 20_751 * 86_400_000 + 13 * 3_600_000 + 37 * 60_000;
+        assert_eq!(month_start_ms(ms), 20_727 * 86_400_000);
     }
 }

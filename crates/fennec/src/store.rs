@@ -1,6 +1,7 @@
 //! Storage adapter: the SQLite store, `projects`/`sessions`/`events`. The
 //! schema is frozen: stored logs depend on it. Implements the agent's `EventLog`.
 
+mod budgets;
 pub mod calls;
 mod ideas;
 mod plugins;
@@ -464,6 +465,11 @@ impl SqliteStore {
             params![id],
         )?;
         tx.execute("DELETE FROM projects WHERE id = ?1", params![id])?;
+        // The budget row is a setting keyed by the project id.
+        tx.execute(
+            "DELETE FROM settings WHERE key = 'budget:' || ?1",
+            params![id],
+        )?;
         tx.commit()?;
         Ok(())
     }

@@ -16,6 +16,7 @@ import {
 } from '../Icons';
 import { getProjectDashboard, type DashboardIcon, type ProjectDashboard } from '../../lib/api';
 import { formatDateTime, formatRelative } from '../../lib/format';
+import { BudgetTile } from './BudgetTile';
 import { DiskSection } from './DiskSection';
 import { ProjectRulesTile } from '../rules/RulesSection';
 import { useT, useLang } from '../../i18n';
@@ -93,6 +94,7 @@ export function DashboardSection({
           );
         })}
         <ProjectRulesTile projectId={projectId} />
+        <BudgetTile projectId={projectId} />
       </div>
 
       <Section

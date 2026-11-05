@@ -1,9 +1,9 @@
 //! What the Tokens panel shows, computed here so the UI only draws it:
 //! a session's totals from the usage ledger (`GET /api/sessions/{id}/usage`).
 
-use super::pricing::Pricing;
 use crate::domain::event::Event;
 use crate::domain::lang::Lang;
+use crate::domain::pricing::Pricing;
 use serde::Serialize;
 use std::collections::HashMap;
 use token_usage::{CallRecord, LatestCall, Summary, display};
