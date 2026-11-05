@@ -465,12 +465,11 @@ for line in sys.stdin:
         let store = activated_store(&agents_home, "multi");
         let manager = started_manager(&base, &agents_home, &store);
 
-        let before = manager.version();
-        wait_for(|| manager.blocks_global().first().map(|_| ()));
-        assert!(
-            manager.version() > before,
-            "an accepted block.update must move the version"
-        );
+        // A new manager starts at 0; the plugin's update may land before any
+        // read, and the block is stored just before the version moves, so
+        // wait on the version itself.
+        wait_for(|| (manager.version() > 0).then_some(()));
+        assert!(!manager.blocks_global().is_empty());
         manager.shutdown();
         let _ = std::fs::remove_dir_all(&base);
     }
