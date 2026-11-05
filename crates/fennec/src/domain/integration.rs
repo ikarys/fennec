@@ -20,6 +20,9 @@ pub struct DiffChecks {
     pub markers: Vec<String>,
     /// Changed files inside the human's sensitive zones.
     pub sensitive: Vec<String>,
+    /// Changed files no step of the approved plan lists (set by the adapter,
+    /// which reads the run's plan).
+    pub outside_plan: Vec<String>,
     /// The security scanners' hits on the branch (filled by the adapter that
     /// ran them: the diff alone cannot tell).
     pub security: Vec<SecurityFinding>,
@@ -55,6 +58,7 @@ impl DiffChecks {
             weakened: bypass::tests_weakened(files),
             markers,
             sensitive,
+            outside_plan: Vec::new(),
             security: Vec::new(),
             scanning: false,
             understood: false,
@@ -100,6 +104,9 @@ pub enum Blocker {
     /// Files in the sensitive zones of `.agents/architecture`: the human's
     /// review is mandatory there.
     SensitiveTouched { paths: Vec<String> },
+    /// Changed files no step of the approved plan lists: the human did not
+    /// approve them in the plan.
+    OutsidePlan { paths: Vec<String> },
     /// The branch changes a sensitive zone and the human held no
     /// comprehension dialogue on its current head: the definition makes it
     /// mandatory there.
@@ -134,6 +141,7 @@ impl Blocker {
             Blocker::NoCriteria => "noCriteria",
             Blocker::ProtectedTouched { .. } => "protectedTouched",
             Blocker::SensitiveTouched { .. } => "sensitiveTouched",
+            Blocker::OutsidePlan { .. } => "outsidePlan",
             Blocker::UnderstandingMissing => "understandingMissing",
             Blocker::SecurityScanRunning => "securityScanRunning",
             Blocker::SecurityFindings { .. } => "securityFindings",
@@ -165,9 +173,10 @@ pub struct Landing<'a> {
 /// The blockers of an integration, in the order the UI shows them:
 /// `NoCommits` first, then a merge conflict, then the branch, then the
 /// human's uncommitted changes, then the criteria, then the protected files,
-/// then the sensitive zones, then a missing comprehension dialogue, then a
-/// security scan still running, then its findings, then the architecture
-/// rules, then the added suppressions, then the weakened tests.
+/// then the sensitive zones, then files outside the plan, then a missing
+/// comprehension dialogue, then a security scan still running, then its
+/// findings, then the architecture rules, then the added suppressions, then
+/// the weakened tests.
 pub fn blockers(
     commits: usize,
     criteria: &[CriterionState],
@@ -239,9 +248,14 @@ pub fn blockers(
         out.push(Blocker::SensitiveTouched {
             paths: checks.sensitive.clone(),
         });
-        if !checks.understood {
-            out.push(Blocker::UnderstandingMissing);
-        }
+    }
+    if !checks.outside_plan.is_empty() {
+        out.push(Blocker::OutsidePlan {
+            paths: checks.outside_plan.clone(),
+        });
+    }
+    if !checks.sensitive.is_empty() && !checks.understood {
+        out.push(Blocker::UnderstandingMissing);
     }
 
     if checks.scanning {
@@ -491,6 +505,7 @@ mod tests {
             }),
             markers: vec![],
             sensitive: vec![],
+            outside_plan: Vec::new(),
             security: vec![finding.clone()],
             scanning: true,
             understood: false,
@@ -612,6 +627,70 @@ mod tests {
         let found = blockers(1, &[], &[], &DiffChecks::default(), &Landing::default());
 
         assert!(!found.contains(&Blocker::UnderstandingMissing));
+    }
+
+    #[test]
+    fn outside_plan_blocker_is_pushed_when_non_empty() {
+        let checks = DiffChecks {
+            outside_plan: vec!["src/a.rs".into()],
+            ..Default::default()
+        };
+
+        let found = blockers(1, &[], &[], &checks, &Landing::default());
+
+        assert!(found.contains(&Blocker::OutsidePlan {
+            paths: vec!["src/a.rs".into()],
+        }));
+    }
+
+    #[test]
+    fn outside_plan_blocker_is_absent_when_empty() {
+        let found = blockers(1, &[], &[], &DiffChecks::default(), &Landing::default());
+
+        assert!(!found.contains(&Blocker::OutsidePlan { paths: Vec::new() }));
+    }
+
+    #[test]
+    fn outside_plan_has_its_key() {
+        assert_eq!(
+            Blocker::OutsidePlan {
+                paths: vec!["a.rs".into()]
+            }
+            .key(),
+            "outsidePlan"
+        );
+    }
+
+    #[test]
+    fn outside_plan_is_pushed_after_sensitive_and_before_understanding() {
+        let rules = Rules::parse("sensitive src/auth/");
+        let files = vec![(
+            "src/auth/login.rs".to_string(),
+            ChangedLines {
+                added: vec![String::from("fn login() {}")],
+                removed: vec![],
+            },
+        )];
+        let mut checks = DiffChecks::of(&rules, &files);
+        checks.outside_plan = vec!["src/extra.rs".into()];
+
+        let found = blockers(1, &[], &[], &checks, &Landing::default());
+
+        let sensitive_pos = found
+            .iter()
+            .position(|blocker| matches!(blocker, Blocker::SensitiveTouched { .. }));
+        let outside_pos = found
+            .iter()
+            .position(|blocker| matches!(blocker, Blocker::OutsidePlan { .. }));
+        let understanding_pos = found
+            .iter()
+            .position(|blocker| matches!(blocker, Blocker::UnderstandingMissing));
+
+        assert!(sensitive_pos.is_some());
+        assert!(outside_pos.is_some());
+        assert!(understanding_pos.is_some());
+        assert!(outside_pos > sensitive_pos);
+        assert!(understanding_pos > outside_pos);
     }
 
     #[test]

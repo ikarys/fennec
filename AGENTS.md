@@ -161,6 +161,8 @@ agent nodes drop it in).
 Sensitive zones, done (C2, proportionality): `sensitive <pattern>` lines in `.agents/architecture` (gitignore-like) mark
 the paths where the human's review is mandatory; a branch that changes one gets a `sensitiveTouched` blocker the human
 accepts, and those files lead the review map with a "zone sensible" signal (verified; `domain/architecture.rs`).
+Plan deviation, done (C6): the gate reads the `Files:` lines of the run's approved plan; the branch's files no step lists
+get an `outsidePlan` blocker the human accepts and a "hors plan" signal in the review map (verified; `domain/plan_scope.rs`).
 Project deletion, done: a trash button on the project page deletes everything fennec holds for a project (sessions,
 worktrees and branches, rules, ideas); its source folder only when the human ticks the box, never the home, the root or
 fennec's store (`web/project_delete.rs`).
@@ -248,6 +250,7 @@ crates/fennec/src/
     task_proposal.rs   the backlog tasks an agent proposed with propose_task, and which the human accepted
     agent_suggestion.rs the agent switch an agent suggested, since the human last wrote
     understanding.rs   the comprehension dialogue on a branch: its link, held once the human answered on the current head
+    plan_scope.rs      the files the approved plan says it will touch; those a branch changed outside it
     review_map.rs      the review order of a branch's files: per-file signals (gate checks, churn, tests, size)
     workflow/          a workflow: definition (nodes, ports, edges), template ({{…}} names),
                        validate (the graph rules), run (the run folded from its events, the next step)

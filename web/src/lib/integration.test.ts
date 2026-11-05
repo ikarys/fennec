@@ -164,6 +164,12 @@ describe('blocker sentence', () => {
     expect(sentence).toBe(t('fr', 'sensitiveTouched', { paths: 'auth.rs' }));
   });
 
+  it('renders outside plan', () => {
+    const sentence = blockerSentence('fr', blocker({ kind: 'outsidePlan', paths: ['extra.rs'] }));
+
+    expect(sentence).toBe(t('fr', 'outsidePlan', { paths: 'extra.rs' }));
+  });
+
   it('renders understanding missing', () => {
     const sentence = blockerSentence('fr', blocker({ kind: 'understandingMissing' }));
 
