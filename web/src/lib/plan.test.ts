@@ -13,6 +13,14 @@ const plan = (text: string) => contractOf(text, 'plan');
 const report = (text: string) => contractOf(text, 'report');
 
 describe('splitContract', () => {
+  it('reads a plan heading with a qualifier before the colon', () => {
+    for (const heading of ['## Plan révisé : Ship', '## Revised Plan: Ship', '### Plan : Ship']) {
+      const out = plan(`${heading}\n### Step 1: Do\n- Change: it\n### Done when\n- [ ] tests pass`);
+      expect(out.contract.title).toBe('Ship');
+    }
+    expect(split('## Planning: later\n### Step 1: Do\n### Done when\n- [ ] x')).toBeNull();
+  });
+
   it('parses a plan with steps, done when, and risks', () => {
     const text = [
       'Intro',
