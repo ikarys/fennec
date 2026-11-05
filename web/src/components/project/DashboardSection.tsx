@@ -19,6 +19,7 @@ import { formatDateTime, formatRelative } from '../../lib/format';
 import { BudgetTile } from './BudgetTile';
 import { DiskSection } from './DiskSection';
 import { ProjectRulesTile } from '../rules/RulesSection';
+import { PluginsSection } from './PluginsSection';
 import { useT, useLang } from '../../i18n';
 
 const ICONS: Record<DashboardIcon, ReactNode> = {
@@ -96,6 +97,8 @@ export function DashboardSection({
         <ProjectRulesTile projectId={projectId} />
         <BudgetTile projectId={projectId} />
       </div>
+
+      <PluginsSection projectId={projectId} />
 
       <Section
         title={t('recentSessions')}

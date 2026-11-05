@@ -37,12 +37,15 @@ pub fn serve(app: &App, stream: &mut TcpStream) -> Result<(), String> {
     let (mut attention, mut last_seq) = current_attention(app, &store)?;
     let mut budgets = budget_notices(app, &store)?;
     let mut last_budgets = Instant::now();
+    // Plugin blocks move the snapshot too, on their own version, so a tab
+    // sees new plugin data without a session log moving.
+    let mut plugins_version = app.plugins.version();
     stream
         .write_all(
             b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-store\r\nConnection: keep-alive\r\n\r\n",
         )
         .map_err(|e| e.to_string())?;
-    if !write_frame(stream, &snapshot(&attention, &budgets)) {
+    if !write_frame(stream, &snapshot(&attention, &budgets, plugins_version)) {
         return Ok(()); // the browser went away
     }
     let mut last_write = Instant::now();
@@ -58,8 +61,12 @@ pub fn serve(app: &App, stream: &mut TcpStream) -> Result<(), String> {
             }
             last_budgets = Instant::now();
         }
+        if app.plugins.version() != plugins_version {
+            plugins_version = app.plugins.version();
+            changed = true;
+        }
         if changed {
-            if !write_frame(stream, &snapshot(&attention, &budgets)) {
+            if !write_frame(stream, &snapshot(&attention, &budgets, plugins_version)) {
                 return Ok(());
             }
             last_write = Instant::now();
@@ -253,7 +260,9 @@ fn budget_notices(app: &App, store: &SqliteStore) -> Result<Vec<Value>, String> 
 }
 
 /// The snapshot as a `data:` frame, ordered by session so it is stable.
-fn snapshot(set: &HashMap<String, Attention>, budgets: &[Value]) -> String {
+/// `plugins_version` moves on every accepted plugin block.update, so a tab
+/// refreshes on plugin data without a session log moving.
+fn snapshot(set: &HashMap<String, Attention>, budgets: &[Value], plugins_version: u64) -> String {
     let mut items: Vec<&Attention> = set.values().collect();
     items.sort_by(|a, b| a.session_id.cmp(&b.session_id));
     let payload: Vec<Value> = items
@@ -262,7 +271,7 @@ fn snapshot(set: &HashMap<String, Attention>, budgets: &[Value]) -> String {
         .collect();
     format!(
         "data: {}\n\n",
-        json!({ "items": payload, "budgets": budgets })
+        json!({ "items": payload, "budgets": budgets, "pluginsVersion": plugins_version })
     )
 }
 
@@ -306,7 +315,7 @@ mod tests {
             turns: Turns::new(settings.clone(), notifier.clone()),
             settings,
             port: 0,
-            notifier,
+            notifier: notifier.clone(),
             skill_folds: Mutex::new(HashMap::new()),
             idea_reports: Mutex::new(HashMap::new()),
             idea_queues: Mutex::default(),
@@ -316,6 +325,7 @@ mod tests {
                 crate::tools::Sandbox::Off,
                 std::env::temp_dir(),
                 std::env::temp_dir(),
+                notifier.clone(),
             )),
             agents_home: std::env::temp_dir(),
         }
@@ -492,11 +502,12 @@ mod tests {
                 detail: "boom".into(),
             },
         )]);
-        let frame = snapshot(&set, &[]);
+        let frame = snapshot(&set, &[], 7);
         assert!(frame.starts_with("data: "));
         let body = frame.trim_start_matches("data: ").trim_end();
         let value: Value = serde_json::from_str(body).unwrap();
         assert_eq!(value["items"][0]["sessionId"], "s");
         assert_eq!(value["items"][0]["kind"], "error");
+        assert_eq!(value["pluginsVersion"], 7);
     }
 }
