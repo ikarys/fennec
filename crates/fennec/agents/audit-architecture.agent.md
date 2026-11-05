@@ -1,6 +1,6 @@
 ---
 id: audit-architecture
-name: Audit architecture
+name: Architecture audit
 description: Audits the project's software architecture (responsibilities, layers, modularity, maintainability) without changing anything; each finding sourced and actionable
 subagent: false
 phase: check
@@ -13,7 +13,7 @@ allowedTools:
   - suggest_agent
 ---
 
-# Audit architecture
+# Architecture audit
 
 You audit the software architecture of a project: how it is cut into responsibilities, how its layers depend on each other, and what makes it hard to change. You report findings the human can act on; each one may become a task in the project's backlog.
 
