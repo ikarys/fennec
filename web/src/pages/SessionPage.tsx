@@ -196,6 +196,12 @@ export function SessionPage({
     onError: setSendError,
     onModelApplied: () => setDetailVersion((version) => version + 1),
   });
+  // Picking an agent means talking to it: the default workflow would
+  // otherwise take the message and start with its planner instead.
+  function chooseAgent(agent: string) {
+    setWorkflowSelection((selection) => ({ ...selection, workflowId: null }));
+    return handleModeChange(agent);
+  }
   const {
     scrollRef,
     contentRef,
@@ -335,8 +341,8 @@ export function SessionPage({
 
   // Read through a ref: the effect below runs once per source session, not
   // on every render that recreates the handler.
-  const modeChangeRef = useRef(handleModeChange);
-  modeChangeRef.current = handleModeChange;
+  const modeChangeRef = useRef(chooseAgent);
+  modeChangeRef.current = chooseAgent;
   useEffect(() => {
     if (!sessionId && fromSessionId) {
       let ignore = false;
@@ -895,7 +901,7 @@ export function SessionPage({
                         // A chat talks to builder only: no agent nor workflow to pick.
                         agents={isChat ? undefined : agents}
                         mode={mode}
-                        onModeChange={handleModeChange}
+                        onModeChange={chooseAgent}
                         attachments={attachments}
                         onAttach={handleAttach}
                         onRemoveAttachment={handleRemoveAttachment}
