@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { splitContract, type Plan, type Report } from './plan';
+import { planFromProposal, splitContract, type Plan, type Report } from './plan';
 
 const split = (text: string) => splitContract(text);
 
@@ -190,5 +190,42 @@ describe('splitContract', () => {
   it('ignores changed lines without a colon', () => {
     const out = report('## Report: R\n## Steps\n- [x] Step 1: Done\n### Changed\n- no colon here');
     expect(out.contract.changed).toEqual([]);
+  });
+});
+
+describe('planFromProposal', () => {
+  it('builds the recorded plan, numbering the steps and formatting the checks', () => {
+    const plan = planFromProposal({
+      title: 'Ship',
+      goal: 'Goal',
+      steps: [
+        { title: 'Add code', files: ['a.ts'], change: 'implement' },
+        { title: 'Docs', files: [], change: 'update' }
+      ],
+      doneWhen: [
+        { text: 'tests pass', check: 'cargo test' },
+        { text: 'docs updated' }
+      ],
+      risks: ['Risk one']
+    });
+    expect(plan).toEqual({
+      kind: 'plan',
+      title: 'Ship',
+      goal: 'Goal',
+      steps: [
+        { number: 1, title: 'Add code', files: ['a.ts'], change: 'implement', verify: '' },
+        { number: 2, title: 'Docs', files: [], change: 'update', verify: '' }
+      ],
+      doneWhen: ['tests pass — check: `cargo test`', 'docs updated'],
+      risks: ['Risk one']
+    });
+  });
+
+  it('keeps empty arrays when the optional fields are absent', () => {
+    const plan = planFromProposal({ title: 'P', goal: '' });
+    expect(plan.kind).toBe('plan');
+    expect(plan.steps).toEqual([]);
+    expect(plan.doneWhen).toEqual([]);
+    expect(plan.risks).toEqual([]);
   });
 });

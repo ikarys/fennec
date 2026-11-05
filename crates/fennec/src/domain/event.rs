@@ -3,6 +3,7 @@
 
 use super::attachment::Attachment;
 use super::criteria::{Criterion, CriterionStatus};
+use super::plan::Plan;
 use super::preferences::ModelRef;
 use super::preflight::PreflightResult;
 use super::stats::MessageStats;
@@ -458,6 +459,17 @@ pub enum Event {
         title: String,
         text: String,
     },
+    /// A plan agent recorded its plan with propose_plan (fennec's own event);
+    /// fennec renders it as the plan's canonical markdown, and the turn ends.
+    #[serde(rename = "plan.proposed", rename_all = "camelCase")]
+    /// `markdown` is the text fennec rendered when the plan was recorded: the
+    /// workflow's node output and what the human approves, kept as written
+    /// even if the rendering changes later.
+    PlanProposed {
+        call_id: String,
+        plan: Plan,
+        markdown: String,
+    },
     /// The human accepted a proposed task into the backlog (fennec's own event).
     #[serde(rename = "task.accepted", rename_all = "camelCase")]
     TaskAccepted { call_id: String, idea_id: String },
@@ -610,6 +622,7 @@ impl Event {
             Event::IntegrationApplied { .. } => "integration.applied",
             Event::AuditTasksCreated { .. } => "audit.tasks_created",
             Event::TaskProposed { .. } => "task.proposed",
+            Event::PlanProposed { .. } => "plan.proposed",
             Event::TaskAccepted { .. } => "task.accepted",
             Event::AgentSuggested { .. } => "agent.suggested",
             Event::RuleBlocked { .. } => "rule.blocked",
@@ -676,6 +689,61 @@ mod tests {
             } if mode == "builder"
         ));
 
+        assert_eq!(serde_json::to_value(&event).unwrap(), wire);
+    }
+
+    #[test]
+    fn plan_proposed_round_trips() {
+        use crate::domain::plan::{Plan, PlanStep, PlannedCriterion};
+        let wire = json!({
+            "type": "plan.proposed",
+            "data": {
+                "callId": "c1",
+                "plan": {
+                    "title": "Add the plan tool",
+                    "goal": "The plan ends with propose_plan",
+                    "steps": [
+                        {"title": "Write the domain", "files": ["src/plan.rs"], "change": "The vocabulary"}
+                    ],
+                    "doneWhen": [
+                        {"text": "The build passes", "check": "cargo build"},
+                        {"text": "The code stays clean"}
+                    ],
+                    "risks": []
+                },
+                "markdown": "## Plan: Add the plan tool"
+            }
+        });
+
+        let event: Event = serde_json::from_value(wire.clone()).unwrap();
+        assert_eq!(
+            event,
+            Event::PlanProposed {
+                call_id: "c1".into(),
+                plan: Plan {
+                    title: "Add the plan tool".into(),
+                    goal: "The plan ends with propose_plan".into(),
+                    steps: vec![PlanStep {
+                        title: "Write the domain".into(),
+                        files: vec!["src/plan.rs".into()],
+                        change: "The vocabulary".into(),
+                    }],
+                    done_when: vec![
+                        PlannedCriterion {
+                            text: "The build passes".into(),
+                            check: Some("cargo build".into()),
+                        },
+                        PlannedCriterion {
+                            text: "The code stays clean".into(),
+                            check: None,
+                        },
+                    ],
+                    risks: Vec::new(),
+                },
+                markdown: "## Plan: Add the plan tool".into(),
+            }
+        );
+        assert_eq!(event.kind(), "plan.proposed");
         assert_eq!(serde_json::to_value(&event).unwrap(), wire);
     }
 

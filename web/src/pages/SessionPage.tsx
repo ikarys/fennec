@@ -398,15 +398,29 @@ export function SessionPage({
   const planContract = lastTextSegment
     ? splitContract(lastTextSegment.content)
     : null;
+  // The plan a plan agent recorded with propose_plan is a plan segment, not a
+  // text contract: it is the plan's canonical form, and it wins over any text.
+  const planSegment = lastAssistant
+    ? [...lastAssistant.segments].reverse().find(
+        (segment): segment is Extract<Segment, { kind: "plan" }> =>
+          segment.kind === "plan",
+      )
+    : undefined;
+  // The plan the actions point at: the segment's id, and the text sent as the
+  // workflow's plan and saved to the backlog.
+  const planSource = planSegment
+    ? { id: planSegment.id, content: planSegment.markdown }
+    : planContract?.contract.kind === "plan" && lastTextSegment
+      ? { id: lastTextSegment.id, content: lastTextSegment.content }
+      : null;
   const planActions: PlanActions | null =
-    planContract?.contract.kind === "plan" &&
-    lastTextSegment &&
+    planSource &&
     !running &&
     !view.pendingQuestion &&
     (!run || run.finished) &&
     mode === "plan"
       ? {
-          segmentId: lastTextSegment.id,
+          segmentId: planSource.id,
           onBuild: handlePlanBuild,
           onBuildAlone: handlePlanBuildAlone,
           onRevise: handlePlanRevise,
@@ -414,7 +428,7 @@ export function SessionPage({
             ? {
                 onMark: () => void handleIdeaReady(),
                 idea:
-                  backlogSegment === lastTextSegment.id
+                  backlogSegment === planSource.id
                     ? "saved"
                     : detail.idea?.state === "ready"
                       ? "ready"
@@ -572,7 +586,7 @@ export function SessionPage({
       if (
         sessionId &&
         workflows.some((workflow) => workflow.id === DEFAULT_WORKFLOW_ID) &&
-        lastTextSegment
+        planSource
       ) {
         const task =
           [...view.items]
@@ -588,7 +602,7 @@ export function SessionPage({
           false,
           worktree,
           [],
-          lastTextSegment.content,
+          planSource.content,
         );
         // The next message gets the default workflow again.
         setWorkflowSelection(defaultWorkflowSelection(workflows));
@@ -605,15 +619,15 @@ export function SessionPage({
   }
 
   async function handleIdeaReady() {
-    if (!detail || !lastTextSegment) return;
+    if (!detail || !planSource) return;
     setSendError(null);
     try {
       if (detail.idea) {
-        await markIdeaReady(detail.project.id, detail.idea.id, lastTextSegment.content);
+        await markIdeaReady(detail.project.id, detail.idea.id, planSource.content);
       } else {
-        await addPlannedIdea(detail.project.id, detail.title, detail.id, lastTextSegment.content);
+        await addPlannedIdea(detail.project.id, detail.title, detail.id, planSource.content);
       }
-      setBacklogSegment(lastTextSegment.id);
+      setBacklogSegment(planSource.id);
       setDetailVersion((version) => version + 1);
     } catch (err) {
       setSendError(err instanceof Error ? err.message : t('unknownError'));

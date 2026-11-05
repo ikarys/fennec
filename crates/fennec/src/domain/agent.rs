@@ -101,7 +101,7 @@ const READ_ONLY_PREAMBLE: &str = include_str!("../../prompts/read-only.md");
 /// Every tool an agent may list in `allowedTools`: the toolbox's tools (see
 /// `crate::tools`) and the loop's own ones (`crate::agent`). The human's agent
 /// CRUD refuses anything else, so a typo cannot silently disable a tool.
-pub const KNOWN_TOOLS: [&str; 14] = [
+pub const KNOWN_TOOLS: [&str; 15] = [
     "read_file",
     "write_file",
     "edit_file",
@@ -112,6 +112,7 @@ pub const KNOWN_TOOLS: [&str; 14] = [
     "ask_user",
     "record_decision",
     "propose_criteria",
+    "propose_plan",
     "propose_task",
     "request_waiver",
     "suggest_agent",

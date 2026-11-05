@@ -35,6 +35,7 @@ pub mod mcp;
 pub mod model_choice;
 pub mod module_map;
 pub mod open_calls;
+pub mod plan;
 pub mod plan_scope;
 pub mod plugin;
 pub mod preferences;

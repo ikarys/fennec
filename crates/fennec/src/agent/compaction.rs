@@ -161,6 +161,7 @@ mod tests {
             reasoning_effort: None,
             autonomous: false,
             lang: crate::domain::lang::Lang::Fr,
+            preflight_sent_back: false,
 
             stop: &stop,
             on_event: &mut on_event,

@@ -57,7 +57,7 @@ impl<'a> Harness<'a> {
             reasoning_effort: None,
             autonomous: false,
             lang: crate::domain::lang::Lang::Fr,
-
+            preflight_sent_back: false,
             stop: self.stop,
             on_event: &mut self.on_event,
         }

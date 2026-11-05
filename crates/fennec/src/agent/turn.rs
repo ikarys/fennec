@@ -20,6 +20,7 @@ use super::ports::{EventLog, Model, Toolbox};
 use super::preflight;
 use super::prompt::system_prompt;
 use super::propose_criteria;
+use super::propose_plan;
 use super::propose_task;
 use super::record_decision;
 use super::request_waiver;
@@ -30,7 +31,7 @@ use crate::domain::agent::{AgentDefinition, DEFAULT_COLOR, last_reminder, resolv
 use crate::domain::attachment::Attachment;
 use crate::domain::compaction::{context_tokens, should_compact};
 use crate::domain::conversation::frozen_prompt;
-use crate::domain::criteria::accepted_proposal;
+use crate::domain::criteria::{accepted_proposal, parse_done_when};
 use crate::domain::event::{
     DoneReason, Event, MessageMetadata, MetadataSource, ReminderKind, Role, ToolResult,
 };
@@ -81,6 +82,10 @@ pub struct Turn<'a> {
     pub autonomous: bool,
     /// The language the human reads fennec in: the questions the loop builds follow it.
     pub lang: crate::domain::lang::Lang,
+    /// The plan's preflight feedback was already sent back in this turn: it
+    /// is sent once, shared by the turn-end text path and the `propose_plan`
+    /// tool.
+    pub preflight_sent_back: bool,
     /// Set by the human to stop the turn: checked between rounds, while
     /// streaming and while a command runs.
     pub stop: &'a AtomicBool,
@@ -311,10 +316,10 @@ fn round_prompt_parts(turn: &mut Turn) -> Result<(String, Value), String> {
 }
 
 /// The loop owns `ask_user`, `request_waiver`, `propose_criteria`,
-/// `record_decision`, `propose_task` and `suggest_agent`; they are not host
-/// tools, so their definitions are added to the toolbox's. `suggest_agent`
-/// lists the session's agents as of the first turn; definitions are frozen
-/// then.
+/// `record_decision`, `propose_task`, `propose_plan` and `suggest_agent`;
+/// they are not host tools, so their definitions are added to the toolbox's.
+/// `suggest_agent` lists the session's agents as of the first turn;
+/// definitions are frozen then.
 fn tool_definitions(turn: &Turn) -> Value {
     let mut tool_defs = turn.tools.definitions();
     if let Some(arr) = tool_defs.as_array_mut() {
@@ -323,6 +328,7 @@ fn tool_definitions(turn: &Turn) -> Value {
         arr.push(propose_criteria::definition());
         arr.push(record_decision::definition());
         arr.push(propose_task::definition());
+        arr.push(propose_plan::definition());
         arr.push(suggest_agent::definition(turn.agents));
     }
     tool_defs
@@ -398,7 +404,6 @@ pub(super) fn run_top_level_agent_loop(
     // Guards against compacting again before a real round has measured the
     // new window.
     let mut compacted_last_round = false;
-    let mut preflight_sent_back = false;
 
     for _ in 0..MAX_ROUNDS {
         let message_id = new_id();
@@ -480,10 +485,14 @@ pub(super) fn run_top_level_agent_loop(
             partial: false,
         })?;
         if answer.tool_calls.is_empty() {
-            if let Some(feedback) = preflight::run(turn, agent, &message_id, &answer.content)?
-                && !preflight_sent_back
+            // The old free-text path: the plan is the message itself; the
+            // `propose_plan` tool passes its criteria straight to the
+            // preflight.
+            let criteria = parse_done_when(&answer.content);
+            if let Some(feedback) = preflight::run(turn, agent, &message_id, &criteria)?
+                && !turn.preflight_sent_back
             {
-                preflight_sent_back = true;
+                turn.preflight_sent_back = true;
                 turn.append_user(&feedback, true, None, Vec::new())?;
                 continue;
             }
@@ -500,6 +509,15 @@ pub(super) fn run_top_level_agent_loop(
                     turn,
                     message_id,
                     DoneReason::WaitingForUser,
+                    Some(started.elapsed()),
+                );
+            }
+            // `propose_plan` recorded the plan: the human reviews it.
+            Flow::Done => {
+                return finish(
+                    turn,
+                    message_id,
+                    DoneReason::Complete,
                     Some(started.elapsed()),
                 );
             }
@@ -626,6 +644,7 @@ mod tests {
                 reasoning_effort: None,
                 autonomous: false,
                 lang: crate::domain::lang::Lang::Fr,
+                preflight_sent_back: false,
                 stop: self.stop,
                 on_event: &mut self.on_event,
             }
@@ -662,6 +681,7 @@ mod tests {
             reasoning_effort: None,
             autonomous: false,
             lang: crate::domain::lang::Lang::Fr,
+            preflight_sent_back: false,
             stop: &stop,
             on_event: &mut on_event,
         };
@@ -996,6 +1016,7 @@ mod tests {
             reasoning_effort: None,
             autonomous: false,
             lang: crate::domain::lang::Lang::Fr,
+            preflight_sent_back: false,
             stop: &stop,
             on_event: &mut on_event,
         };
@@ -1959,6 +1980,7 @@ mod tests {
             reasoning_effort: None,
             autonomous: false,
             lang: crate::domain::lang::Lang::Fr,
+            preflight_sent_back: false,
             stop: &stop,
             on_event: &mut on_event,
         };

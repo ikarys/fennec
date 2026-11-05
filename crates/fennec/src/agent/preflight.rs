@@ -3,7 +3,7 @@
 
 use super::turn::Turn;
 use crate::domain::agent::{AgentDefinition, CommandAccess};
-use crate::domain::criteria::{Criterion, parse_done_when};
+use crate::domain::criteria::Criterion;
 use crate::domain::event::Event;
 use crate::domain::preflight::{self, PreflightResult};
 use serde_json::json;
@@ -15,7 +15,7 @@ pub(super) fn run(
     turn: &mut Turn,
     agent: &AgentDefinition,
     message_id: &str,
-    content: &str,
+    criteria: &[Criterion],
 ) -> Result<Option<String>, String> {
     // Only the read-only planner writes a plan; its checks cannot change the
     // workdir, so running them now is a fair test of the builder's sandbox.
@@ -23,7 +23,6 @@ pub(super) fn run(
         return Ok(None);
     }
 
-    let criteria = parse_done_when(content);
     let checks: Vec<(&Criterion, &String)> = criteria
         .iter()
         .filter_map(|criterion| criterion.check.as_ref().map(|check| (criterion, check)))
