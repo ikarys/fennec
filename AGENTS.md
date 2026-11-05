@@ -342,7 +342,7 @@ crates/canvas/      the canvas, a crate of its own and fennec-free: artifacts (a
                      versions' bytes, the human's annotations and the message each becomes; SQLite file `canvas.db`
 crates/token-usage/ the usage ledger, a crate of its own and fennec-free (calls, tokens, speed, savings;
                      SQLite file `usage.db`, `FENNEC_USAGE_DB`): outlives sessions, reusable by other products
-llm-providers-connector/ (own repo, github.com/ikarys/llm-providers-connector) talking to models, fennec-free: the OpenAI-compatible client
+llm-providers-connector/ (crates.io crate, github.com/ikarys/llm-providers-connector) talking to models, fennec-free: the OpenAI-compatible client
                      and its SSE parser, the /models listing, providers and their per-model parameters
                      (Provider, ModelRef, ModelPrefs, ReasoningEffort), API keys sealed at rest (MasterKey)
 crates/fennec/build.rs   embeds web/dist (placeholder page when not built)
