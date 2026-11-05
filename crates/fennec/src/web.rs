@@ -36,6 +36,7 @@ mod project_routes;
 mod proposal_routes;
 mod routes;
 mod rule_approval_routes;
+mod rule_bridge_routes;
 mod rule_routes;
 mod servers;
 mod session_delete;

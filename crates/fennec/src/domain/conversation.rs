@@ -66,6 +66,21 @@ pub fn assistant_texts(events: &[Event]) -> Vec<String> {
         .collect()
 }
 
+/// True when an event after the last assistant message start matches: the
+/// human acted on that answer (wrote its draft, added its rules).
+pub fn since_last_answer(events: &[Event], matches: impl Fn(&Event) -> bool) -> bool {
+    let last = events.iter().rposition(|event| {
+        matches!(
+            event,
+            Event::MessageStart {
+                role: Role::Assistant,
+                ..
+            }
+        )
+    });
+    last.is_some_and(|start| events[start + 1..].iter().any(matches))
+}
+
 /// The text of the last assistant message that has any, among `events`
 /// (its start content plus its deltas); "" when none. A workflow node's
 /// output.
