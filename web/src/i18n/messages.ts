@@ -725,7 +725,7 @@ export const en = {
   deleteProjectFolderBtn: 'Delete the project and the folder',
   deleting: 'Deleting…',
   // Project: analyses
-  analyzeTitle: 'Frame the project',
+  analyzeTitle: "Write the project's charter",
   analyzeDescription:
     'Drafts an AGENTS.md, each point sourced; on an empty folder, asks the questions and proposes the first tasks.',
   analyzeConfirm:
@@ -1027,9 +1027,6 @@ export const en = {
   ruleBridgeAddQuestion: 'Add these rules to .agents/architecture?',
   ruleBridgeAddHint: 'Agents cannot write this file: once you add them, the integration gate checks these rules on every branch. Appended without a commit.',
   ruleBridgeAdd: 'Add the rules',
-  ruleBridgeTitle: 'Make guidelines executable',
-  ruleBridgeDescription: 'Proposes architecture rules the gate will check, from your AGENTS.md guidelines. Read-only.',
-  ruleBridgeConfirm: 'A read-only agent reads your guidelines and proposes architecture rules the gate will check. On a large project, the analysis can consume many tokens. You then decide whether to add them to .agents/architecture.',
   // components/session/Thread.tsx
   thinkingHide: 'Thinking · hide',
   thinkingShow: 'Thinking · show',
@@ -2077,7 +2074,7 @@ export const fr: Record<MsgKey, string> = {
   deleteProjectFolderBtn: 'Supprimer le projet et le dossier',
   deleting: 'Suppression…',
   // Project: analyses
-  analyzeTitle: 'Cadrer le projet',
+  analyzeTitle: 'Écrire la charte du projet',
   analyzeDescription:
     "Rédige un brouillon d'AGENTS.md, chaque point sourcé ; sur un dossier vide, te pose les questions et propose les premières tâches.",
   analyzeConfirm:
@@ -2379,9 +2376,6 @@ export const fr: Record<MsgKey, string> = {
   ruleBridgeAddQuestion: 'Ajouter ces règles à .agents/architecture ?',
   ruleBridgeAddHint: 'Les agents ne peuvent pas écrire ce fichier : une fois ajoutées, la porte d\'intégration vérifie ces règles sur chaque branche. Ajoutées sans commit.',
   ruleBridgeAdd: 'Ajouter les règles',
-  ruleBridgeTitle: 'Rendre les consignes exécutables',
-  ruleBridgeDescription: 'Propose des règles d\'architecture que la porte vérifiera, tirées des consignes de ton AGENTS.md. Lecture seule.',
-  ruleBridgeConfirm: 'Un agent en lecture seule lit tes consignes et propose des règles d\'architecture que la porte vérifiera. Sur un gros projet, l\'analyse peut consommer beaucoup de tokens. Tu décideras ensuite de les ajouter à .agents/architecture.',
   // components/session/Thread.tsx
   thinkingHide: 'Réflexion · masquer',
   thinkingShow: 'Réflexion · afficher',

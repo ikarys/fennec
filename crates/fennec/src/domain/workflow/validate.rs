@@ -665,6 +665,7 @@ mod tests {
             name: id.to_string(),
             description: String::new(),
             subagent: false,
+            composer: true,
             allowed_tools: tools.iter().map(|tool| tool.to_string()).collect(),
             commands: crate::domain::agent::CommandAccess::ReadWrite,
             writes: crate::domain::agent::WriteScope::Any,

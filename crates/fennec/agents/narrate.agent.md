@@ -3,6 +3,7 @@ id: narrate
 name: Narrate
 description: Narrates a branch's change file by file in the review order, each claim sourced, without changing anything
 subagent: false
+composer: false
 phase: understand
 commands: read-only
 color: '#a855f7'

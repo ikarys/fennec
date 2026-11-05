@@ -65,6 +65,7 @@ pub fn builder() -> Vec<AgentDefinition> {
         name: "Builder".into(),
         description: String::new(),
         subagent: false,
+        composer: true,
         allowed_tools: vec![
             "read_file".into(),
             "write_file".into(),
@@ -94,6 +95,7 @@ pub fn plan() -> AgentDefinition {
         name: "Plan".into(),
         description: String::new(),
         subagent: false,
+        composer: true,
         allowed_tools: vec!["read_file".into(), "ask_user".into(), "load_skill".into()],
         commands: CommandAccess::ReadOnly,
         writes: crate::domain::agent::WriteScope::Any,
