@@ -143,11 +143,13 @@ pub fn message(artifact: &Artifact, annotation: &Annotation) -> String {
 
     lines.push(String::new());
     lines.push(annotation.note.trim().to_string());
-    // A block has no file to edit: the agent's next block of this format is the next version.
+    // A message canvas has no file to edit: the canvas tool, or the agent's next block of this
+    // format, is the next version.
     if artifact.source == Source::Message {
         lines.push(String::new());
         lines.push(format!(
-            "Answer with the whole revised document in one ```{} block: it becomes the canvas's next version.",
+            "Revise it with the canvas tool (title \"{}\", the whole revised document), or answer with it in one ```{} block: it becomes the canvas's next version.",
+            artifact.title,
             artifact.format.as_str()
         ));
     }
@@ -222,7 +224,7 @@ mod tests {
         };
         assert_eq!(
             message(&artifact(), &annotation),
-            "On the canvas \"Doc\" (version 2):\n\nmake it better\n\nAnswer with the whole revised document in one ```html block: it becomes the canvas's next version."
+            "On the canvas \"Doc\" (version 2):\n\nmake it better\n\nRevise it with the canvas tool (title \"Doc\", the whole revised document), or answer with it in one ```html block: it becomes the canvas's next version."
         );
     }
 
@@ -240,7 +242,7 @@ mod tests {
         };
         assert_eq!(
             message(&artifact(), &annotation),
-            "On the canvas \"Doc\" (version 1):\n> line one\n> line two\n\nnote\n\nAnswer with the whole revised document in one ```html block: it becomes the canvas's next version."
+            "On the canvas \"Doc\" (version 1):\n> line one\n> line two\n\nnote\n\nRevise it with the canvas tool (title \"Doc\", the whole revised document), or answer with it in one ```html block: it becomes the canvas's next version."
         );
     }
 
@@ -261,7 +263,7 @@ mod tests {
         };
         assert_eq!(
             message(&artifact(), &annotation),
-            "On the canvas \"Doc\" (version 3):\nRegion: x 10%–40%, y 20%–60% of the rendered page.\n\nnote\n\nAnswer with the whole revised document in one ```html block: it becomes the canvas's next version."
+            "On the canvas \"Doc\" (version 3):\nRegion: x 10%–40%, y 20%–60% of the rendered page.\n\nnote\n\nRevise it with the canvas tool (title \"Doc\", the whole revised document), or answer with it in one ```html block: it becomes the canvas's next version."
         );
     }
 

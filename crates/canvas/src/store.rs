@@ -212,7 +212,10 @@ impl CanvasStore {
     /// Create an artifact with its first version.
     pub fn create(&self, new: NewArtifact, content: &[u8]) -> Result<Artifact, StoreError> {
         Self::check_content(content)?;
-        let title = title_for(&new.source, new.format, content);
+        let title = new
+            .title
+            .clone()
+            .unwrap_or_else(|| title_for(&new.source, new.format, content));
         let now = Self::now_ms();
         let source_path = match &new.source {
             Source::File { path } => Some(path.clone()),
@@ -252,6 +255,31 @@ impl CanvasStore {
             updated_at: now as u64,
             latest_version: 1,
         })
+    }
+
+    /// Find a session's artifact that came from a message (no source file) by its title; the newest wins.
+    pub fn find_titled(
+        &self,
+        session_id: &str,
+        title: &str,
+    ) -> Result<Option<Artifact>, StoreError> {
+        let conn = self.lock();
+        let sql = "SELECT a.*,
+                 (SELECT MAX(v.number) FROM versions v WHERE v.artifact_id = a.id) AS latest_version
+                 FROM artifacts a
+                 WHERE a.session_id = ?1
+                   AND a.source_path IS NULL
+                   AND a.title = ?2
+                 ORDER BY a.id DESC
+                 LIMIT 1";
+        let mut stmt = conn.prepare(sql)?;
+        let mut rows = stmt.query_map(params![session_id, title], |row| {
+            Self::artifact_from_row(row)
+        })?;
+        match rows.next() {
+            Some(row) => Ok(Some(row?)),
+            None => Ok(None),
+        }
     }
 
     /// Find an artifact by session and source file path.
@@ -512,6 +540,7 @@ mod tests {
             session_id: session.into(),
             format: Format::Html,
             source,
+            title: None,
         }
     }
 

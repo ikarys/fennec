@@ -6,9 +6,11 @@
 //! Commands run in the bwrap world when the human enabled it; the file tools
 //! keep the in-process path guard. Writes to protected paths are refused;
 //! commands see them read-only. A read-only agent's commands see the workdir
-//! read-only.
+//! read-only. `canvas` shows the human a document in fennec's canvas store,
+//! never the project, so read-only agents have it too.
 
 mod args;
+mod canvas;
 mod edit_file;
 mod load_skill;
 mod path_guard;
@@ -22,6 +24,7 @@ mod web_fetch;
 mod web_search;
 mod write_file;
 
+pub use canvas::CanvasTarget;
 pub use sandbox::{Sandbox, SandboxHealth, probe};
 
 use crate::agent::ports::{CommandRun, Commands, RuleCheck, Toolbox};
@@ -51,6 +54,8 @@ pub struct LocalTools {
     // The session's active MCP servers; their tools are offered to the model
     // and run on demand in the sandbox world.
     mcp: Vec<McpServer>,
+    // The session's canvas store; no session, no canvas tool.
+    canvas: Option<canvas::CanvasTarget>,
 }
 
 impl LocalTools {
@@ -72,6 +77,7 @@ impl LocalTools {
             env: Vec::new(),
             project_dir: None,
             mcp: Vec::new(),
+            canvas: None,
         }
     }
 
@@ -110,6 +116,11 @@ impl LocalTools {
     /// model and run on demand.
     pub fn with_mcp(mut self, servers: Vec<McpServer>) -> LocalTools {
         self.mcp = servers;
+        self
+    }
+
+    pub fn with_canvas(mut self, target: canvas::CanvasTarget) -> LocalTools {
+        self.canvas = Some(target);
         self
     }
 
@@ -156,6 +167,9 @@ impl Toolbox for LocalTools {
             web_search::definition(),
             web_fetch::definition(),
         ];
+        if self.canvas.is_some() {
+            tools.push(canvas::definition());
+        }
         // MCP tools come last, in a stable order (server order, then tool
         // order) so the same config yields byte-identical definitions.
         for server in &self.mcp {
@@ -263,6 +277,7 @@ impl LocalTools {
                 },
             },
             "load_skill" => load_skill::run(args, workdir),
+            "canvas" => canvas::run(args, self.canvas.as_ref()),
             "web_search" => web_search::run(args, &self.search),
             "web_fetch" => {
                 if !self.search.web_fetch {
