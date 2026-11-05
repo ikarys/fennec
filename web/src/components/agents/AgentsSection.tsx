@@ -9,10 +9,10 @@
 import { useEffect, useState } from 'react';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { Card } from '../ui/Card';
+import { ListCard } from '../ui/ListCard';
 import { Section } from '../ui/Section';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
-import { ChevronRightIcon, TrashIcon } from '../Icons';
+import { TrashIcon } from '../Icons';
 import { AgentEditor, EMPTY_DRAFT } from './AgentEditor';
 import { useT } from '../../i18n';
 import type { MsgKey } from '../../i18n/messages';
@@ -285,36 +285,17 @@ export function AgentsSection() {
         ? ORIGIN_SECTIONS.map(({ origin, title, description, empty }) => {
             const agents = overview.agents.filter((agent) => agent.origin === origin);
             if (origin === 'project' && agents.length === 0) return null;
-            const head = (
-              <>
-                <div className="min-w-0 grow">
-                  <div className="text-sm font-semibold text-text">{t(title)}</div>
-                  <div className="text-xs text-muted">{t(description)}</div>
-                </div>
-                <Badge tone="neutral" pill>
-                  {agents.length}
-                </Badge>
-              </>
-            );
-            const body = agents.length === 0 ? <p className="px-4 py-3 text-xs text-muted">{t(empty)}</p> : list(agents);
             return (
-              <Card key={origin} className="overflow-hidden">
-                {origin === 'default' ? (
-                  // Fennec's defaults never change: folded, they leave the human's own agents in view.
-                  <details className="group">
-                    <summary className="flex cursor-pointer list-none items-center gap-3 border-border bg-raised px-4 py-2.5 select-none hover:bg-accent-soft group-open:border-b [&::-webkit-details-marker]:hidden">
-                      <ChevronRightIcon className="h-3 w-3 shrink-0 text-muted transition-transform group-open:rotate-90" />
-                      {head}
-                    </summary>
-                    {body}
-                  </details>
-                ) : (
-                  <>
-                    <div className="flex items-center gap-3 border-b border-border bg-raised px-4 py-2.5">{head}</div>
-                    {body}
-                  </>
-                )}
-              </Card>
+              <ListCard
+                key={origin}
+                title={t(title)}
+                description={t(description)}
+                count={agents.length}
+                // Fennec's defaults never change: folded, they leave the human's own agents in view.
+                folded={origin === 'default'}
+              >
+                {agents.length === 0 ? <p className="px-4 py-3 text-xs text-muted">{t(empty)}</p> : list(agents)}
+              </ListCard>
             );
           })
         : null}
