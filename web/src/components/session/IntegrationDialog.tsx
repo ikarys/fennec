@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { IntegrationConflict, IntegrationPreview, IntegrationResult } from '../../lib/api';
-import { createSession, getIntegration, integrate, suggestCommitMessage } from '../../lib/api';
+import { createSession, getIntegration, integrate, startUnderstanding, suggestCommitMessage } from '../../lib/api';
 import { completeIdea } from '../../lib/ideas';
 import { IntegrationReview } from './IntegrationReview';
 import { ServerList } from './ServerList';
@@ -11,6 +11,7 @@ import {
   narrativePrompt,
   scanBadge,
   neverAcknowledged,
+  understandingPrompt,
   type Acknowledged,
   type BlockerKind,
 } from '../../lib/integration';
@@ -29,6 +30,7 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
   const lang = useLang();
   const [tryOpen, setTryOpen] = useState(false);
   const [narrating, setNarrating] = useState(false);
+  const [understandingBusy, setUnderstandingBusy] = useState(false);
   const [preview, setPreview] = useState<IntegrationPreview | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -118,6 +120,27 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setNarrating(false);
+    }
+  };
+
+  const handleUnderstand = async () => {
+    if (!preview) return;
+    if (preview.understanding.state !== 'none') {
+      window.location.hash = '#/s/' + encodeURIComponent(preview.understanding.sessionId);
+      onClose();
+      return;
+    }
+    if (!projectId) return;
+    setUnderstandingBusy(true);
+    try {
+      const created = await createSession(projectId, understandingPrompt(preview), 'understand');
+      await startUnderstanding(sessionId, created.id);
+      window.location.hash = '#/s/' + encodeURIComponent(created.id);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setUnderstandingBusy(false);
     }
   };
 
@@ -227,7 +250,14 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
 
           {preview && !loading && !result && (
             <div className="flex flex-col gap-3">
-              <IntegrationReview preview={preview} projectId={projectId} narrating={narrating} onNarrate={handleNarrate} />
+              <IntegrationReview
+                preview={preview}
+                projectId={projectId}
+                narrating={narrating}
+                onNarrate={handleNarrate}
+                understandingBusy={understandingBusy}
+                onUnderstand={handleUnderstand}
+              />
 
               <FieldRow
                 label={t('commitMessageLabel')}

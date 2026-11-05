@@ -7,6 +7,7 @@ import {
   narrativePrompt,
   neverAcknowledged,
   scanBadge,
+  understandingPrompt,
 } from './integration';
 import { t } from '../i18n/messages';
 
@@ -26,6 +27,7 @@ function preview(overrides: Partial<IntegrationPreview> = {}): IntegrationPrevie
     decisions: [],
     testFiles: [],
     idea: null,
+    understanding: { state: 'none' },
     ...overrides,
   };
 }
@@ -90,6 +92,41 @@ describe('narrative prompt', () => {
   });
 });
 
+describe('understanding prompt', () => {
+  it('names branch and base, lists files in review order, and asks questions', () => {
+    const prompt = understandingPrompt(
+      preview({
+        files: [
+          {
+            path: 'a.rs',
+            added: 3,
+            removed: 1,
+            protected: false,
+            carried: false,
+            signals: ['hot', 'untested'],
+          },
+          {
+            path: 'b.rs',
+            added: 0,
+            removed: 2,
+            protected: false,
+            carried: false,
+            signals: [],
+          },
+        ],
+      }),
+    );
+
+    expect(prompt).toContain('`fennec/x`');
+    expect(prompt).toContain('`develop`');
+    expect(prompt).toContain('1. a.rs (+3 −1) — signals: hot, untested');
+    expect(prompt).toContain('2. b.rs (+0 −2)');
+    expect(prompt).not.toContain('2. b.rs (+0 −2) — signals');
+    expect(prompt).toContain('git diff develop fennec/x -- <path>');
+    expect(prompt).toContain('then ask me your questions');
+  });
+});
+
 describe('blocker sentence', () => {
   it('renders no commits', () => {
     const sentence = blockerSentence('fr', blocker({ kind: 'noCommits' }));
@@ -125,6 +162,12 @@ describe('blocker sentence', () => {
     const sentence = blockerSentence('fr', blocker({ kind: 'sensitiveTouched', paths: ['auth.rs'] }));
 
     expect(sentence).toBe(t('fr', 'sensitiveTouched', { paths: 'auth.rs' }));
+  });
+
+  it('renders understanding missing', () => {
+    const sentence = blockerSentence('fr', blocker({ kind: 'understandingMissing' }));
+
+    expect(sentence).toBe(t('fr', 'understandingMissing'));
   });
 
   it('renders architecture violated', () => {

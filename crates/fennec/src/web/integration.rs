@@ -18,6 +18,7 @@ use crate::domain::preflight;
 use crate::domain::review_map::{self, FileFacts, ReviewSignal};
 use crate::domain::security_scan::ScanStatus;
 use crate::domain::test_files::new_test_patterns;
+use crate::domain::understanding::{self, Understanding};
 use crate::domain::workflow::run;
 use crate::integration::{self, ApplyError, Preview};
 use crate::notifier::NotifyingLog;
@@ -49,6 +50,8 @@ struct Gate {
     blockers: Vec<Blocker>,
     /// Which security scanners ran on the branch, and why the others did not.
     security_scans: Vec<ScanStatus>,
+    /// The comprehension dialogue's state on the branch's current head.
+    understanding: Understanding,
     /// Review map, top-relative: riskiest first, with deterministic signals.
     review: Vec<(String, Vec<ReviewSignal>)>,
     /// Criteria whose check passed before any change (last preflight).
@@ -84,6 +87,7 @@ fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Result<Gate, (u16, S
     let test_files = new_test_patterns(&in_project, &protection);
     let rules = architecture::load(Path::new(&project.workdir));
     let changed = integration::changed_files(&top, &wt, &preview.files, &prefix);
+    let events = store.events(&session.id)?;
     let mut checks = DiffChecks::of(&rules, &changed);
     // The scanners read model-written files: they run in the human's sandbox,
     // read-only, like any command.
@@ -91,6 +95,14 @@ fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Result<Gate, (u16, S
     let scan = security_scan::scan(&top, &wt, &preview.files, &sandbox);
     checks.scanning = scan.running();
     checks.security = scan.findings;
+    let head = preview.commits.last().map(|commit| commit.sha.as_str());
+    let understanding = match head {
+        Some(head) => understanding::understanding(&events, head, |dialogue| {
+            store.events(dialogue).unwrap_or_default()
+        }),
+        None => Understanding::None,
+    };
+    checks.understood = understanding.held();
     let hot = risk::hot_files(&top);
     let tested = risk::tested_on_branch(&top, &wt.branch, &preview.files);
     let facts: Vec<FileFacts> = preview
@@ -120,7 +132,6 @@ fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Result<Gate, (u16, S
     {
         review.push((path.clone(), Vec::new()));
     }
-    let events = store.events(&session.id)?;
     let decisions = decisions_in_force(&events);
     let passed_before = preflight::passed_before(&events);
     let criteria = run::current_run(&events)
@@ -152,6 +163,7 @@ fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Result<Gate, (u16, S
         test_files,
         blockers,
         security_scans: scan.scans,
+        understanding,
         review,
         passed_before,
         idea,
@@ -210,9 +222,61 @@ pub fn get_integration(app: &App, stream: &mut TcpStream, id: &str) -> Result<()
             "decisions": gate.decisions,
             "blockers": gate.blockers,
             "securityScans": gate.security_scans,
+            "understanding": gate.understanding,
             "idea": idea_json(gate.idea.as_ref()),
         }),
     )
+}
+
+/// `POST /api/sessions/{id}/understanding`: link the comprehension dialogue the
+/// UI opened to the reviewed session's branch head.
+pub fn start_understanding(
+    app: &App,
+    req: &Request,
+    stream: &mut TcpStream,
+    id: &str,
+) -> Result<(), String> {
+    let body = req.json()?;
+    let Some(dialogue_id) = body
+        .get("dialogueId")
+        .and_then(Value::as_str)
+        .filter(|id| !id.is_empty())
+    else {
+        return error(stream, 400, "dialogueId is required");
+    };
+    let Some((_, project)) = app.session_and_project(id)? else {
+        return error(stream, 404, "no such session");
+    };
+    let Some((_, dialogue_project)) = app.session_and_project(dialogue_id)? else {
+        return error(stream, 404, "no such dialogue");
+    };
+    if dialogue_project.id != project.id {
+        return error(stream, 400, "the dialogue belongs to another project");
+    }
+    let store = app.store()?;
+    let gate = match gate(&store, app, id)? {
+        Ok(gate) => gate,
+        Err((status, message)) => return error(stream, status, &message),
+    };
+    let Some(head) = gate.preview.commits.last().map(|commit| commit.sha.clone()) else {
+        return error(stream, 409, "nothing to understand");
+    };
+    let log = NotifyingLog {
+        log: &store,
+        notifier: &app.notifier,
+    };
+    log.append(
+        &gate.session_id,
+        &Event::UnderstandingStarted {
+            session_id: dialogue_id.to_string(),
+            head: head.clone(),
+        },
+    )?;
+    let events = store.events(&gate.session_id)?;
+    let understanding = understanding::understanding(&events, &head, |dialogue| {
+        store.events(dialogue).unwrap_or_default()
+    });
+    send_json(stream, 200, &json!({ "understanding": understanding }))
 }
 
 /// `POST /api/sessions/{id}/integration/message`: an English commit subject the

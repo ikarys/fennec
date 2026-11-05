@@ -25,6 +25,9 @@ pub struct DiffChecks {
     pub security: Vec<SecurityFinding>,
     /// A scanner still runs: `security` is not complete yet.
     pub scanning: bool,
+    /// A comprehension dialogue was held on the branch's current head (set by
+    /// the adapter, like `scanning`).
+    pub understood: bool,
 }
 
 impl DiffChecks {
@@ -54,6 +57,7 @@ impl DiffChecks {
             sensitive,
             security: Vec::new(),
             scanning: false,
+            understood: false,
         }
     }
 }
@@ -96,6 +100,10 @@ pub enum Blocker {
     /// Files in the sensitive zones of `.agents/architecture`: the human's
     /// review is mandatory there.
     SensitiveTouched { paths: Vec<String> },
+    /// The branch changes a sensitive zone and the human held no
+    /// comprehension dialogue on its current head: the definition makes it
+    /// mandatory there.
+    UnderstandingMissing,
     /// A security scanner still runs: its findings are unknown, so nothing
     /// may be integrated until it ends.
     SecurityScanRunning,
@@ -126,6 +134,7 @@ impl Blocker {
             Blocker::NoCriteria => "noCriteria",
             Blocker::ProtectedTouched { .. } => "protectedTouched",
             Blocker::SensitiveTouched { .. } => "sensitiveTouched",
+            Blocker::UnderstandingMissing => "understandingMissing",
             Blocker::SecurityScanRunning => "securityScanRunning",
             Blocker::SecurityFindings { .. } => "securityFindings",
             Blocker::ArchitectureViolated { .. } => "architectureViolated",
@@ -156,8 +165,9 @@ pub struct Landing<'a> {
 /// The blockers of an integration, in the order the UI shows them:
 /// `NoCommits` first, then a merge conflict, then the branch, then the
 /// human's uncommitted changes, then the criteria, then the protected files,
-/// then the sensitive zones, then a security scan still running, then its findings, then the architecture rules, then the added
-/// suppressions, then the weakened tests.
+/// then the sensitive zones, then a missing comprehension dialogue, then a
+/// security scan still running, then its findings, then the architecture
+/// rules, then the added suppressions, then the weakened tests.
 pub fn blockers(
     commits: usize,
     criteria: &[CriterionState],
@@ -229,6 +239,9 @@ pub fn blockers(
         out.push(Blocker::SensitiveTouched {
             paths: checks.sensitive.clone(),
         });
+        if !checks.understood {
+            out.push(Blocker::UnderstandingMissing);
+        }
     }
 
     if checks.scanning {
@@ -399,6 +412,7 @@ mod tests {
             .key(),
             "sensitiveTouched"
         );
+        assert_eq!(Blocker::UnderstandingMissing.key(), "understandingMissing");
         assert_eq!(
             Blocker::SuppressionsAdded {
                 suppressions: vec![Suppression {
@@ -479,6 +493,7 @@ mod tests {
             sensitive: vec![],
             security: vec![finding.clone()],
             scanning: true,
+            understood: false,
         };
 
         let found = blockers(1, &[], &[], &checks, &Landing::default());
@@ -549,6 +564,54 @@ mod tests {
         assert!(found.contains(&Blocker::SensitiveTouched {
             paths: vec!["src/auth/login.rs".to_string()],
         }));
+    }
+
+    #[test]
+    fn a_sensitive_branch_without_a_dialogue_blocks() {
+        let rules = Rules::parse("sensitive src/auth/");
+        let files = vec![(
+            "src/auth/login.rs".to_string(),
+            ChangedLines {
+                added: vec![String::from("fn login() {}")],
+                removed: vec![],
+            },
+        )];
+        let checks = DiffChecks::of(&rules, &files);
+
+        let found = blockers(1, &[], &[], &checks, &Landing::default());
+
+        assert!(found.contains(&Blocker::SensitiveTouched {
+            paths: vec!["src/auth/login.rs".to_string()],
+        }));
+        assert!(found.contains(&Blocker::UnderstandingMissing));
+    }
+
+    #[test]
+    fn a_sensitive_branch_with_a_dialogue_does_not_block_for_understanding() {
+        let rules = Rules::parse("sensitive src/auth/");
+        let files = vec![(
+            "src/auth/login.rs".to_string(),
+            ChangedLines {
+                added: vec![String::from("fn login() {}")],
+                removed: vec![],
+            },
+        )];
+        let mut checks = DiffChecks::of(&rules, &files);
+        checks.understood = true;
+
+        let found = blockers(1, &[], &[], &checks, &Landing::default());
+
+        assert!(found.contains(&Blocker::SensitiveTouched {
+            paths: vec!["src/auth/login.rs".to_string()],
+        }));
+        assert!(!found.contains(&Blocker::UnderstandingMissing));
+    }
+
+    #[test]
+    fn a_branch_with_no_sensitive_file_never_blocks_for_understanding() {
+        let found = blockers(1, &[], &[], &DiffChecks::default(), &Landing::default());
+
+        assert!(!found.contains(&Blocker::UnderstandingMissing));
     }
 
     #[test]

@@ -553,6 +553,10 @@ pub enum Event {
     /// The human wrote the agent's AGENTS.md draft to the project (fennec's own event).
     #[serde(rename = "agents_md.written", rename_all = "camelCase")]
     AgentsMdWritten { replaced: bool },
+    /// The human opened a comprehension dialogue on the session's branch (fennec's own event):
+    /// `session_id` is the dialogue's session, `head` the branch's tip commit it is about.
+    #[serde(rename = "understanding.started", rename_all = "camelCase")]
+    UnderstandingStarted { session_id: String, head: String },
     /// The human discarded the session's worktree and branch (fennec's own event).
     #[serde(rename = "worktree.discarded", rename_all = "camelCase")]
     WorktreeDiscarded {
@@ -611,6 +615,7 @@ impl Event {
             Event::QueueDrained { .. } => "queue.drained",
             Event::QueueCancelled { .. } => "queue.cancelled",
             Event::AgentsMdWritten { .. } => "agents_md.written",
+            Event::UnderstandingStarted { .. } => "understanding.started",
             Event::WorktreeDiscarded { .. } => "worktree.discarded",
         }
     }

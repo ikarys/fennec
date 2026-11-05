@@ -62,9 +62,12 @@ interface IntegrationReviewProps {
   projectId: string | null;
   narrating: boolean;
   onNarrate: () => void;
+  /** While a comprehension dialogue is being opened; the Understand button is disabled then. */
+  understandingBusy: boolean;
+  onUnderstand: () => void;
 }
 
-export function IntegrationReview({ preview, projectId, narrating, onNarrate }: IntegrationReviewProps) {
+export function IntegrationReview({ preview, projectId, narrating, onNarrate, understandingBusy, onUnderstand }: IntegrationReviewProps) {
   const t = useT();
   return (
     <>
@@ -118,6 +121,27 @@ export function IntegrationReview({ preview, projectId, narrating, onNarrate }: 
               onClick={onNarrate}
             >
               {t('narrate')}
+            </Button>
+          )}
+          {preview.files.length > 0 && projectId && preview.understanding.state !== 'none' && (
+            <Badge
+              tone={preview.understanding.state === 'held' ? 'ok' : 'attention'}
+              className="ml-1.5"
+              title={t('verifiedFromLog')}
+            >
+              {preview.understanding.state === 'held' ? t('understandingHeld') : t('understandingStarted')}
+            </Badge>
+          )}
+          {preview.files.length > 0 && projectId && (
+            <Button
+              variant="secondary"
+              size="sm"
+              className="ml-1.5"
+              title={t('understandTitle')}
+              disabled={understandingBusy}
+              onClick={onUnderstand}
+            >
+              {preview.understanding.state === 'none' ? t('understand') : t('understandResume')}
             </Button>
           )}
         </SectionLabel>

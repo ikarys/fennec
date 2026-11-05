@@ -203,6 +203,9 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         ("POST", ["api", "sessions", id, "resolve-conflict"]) => {
             integration::resolve_conflict(app, req, stream, id)
         }
+        ("POST", ["api", "sessions", id, "understanding"]) => {
+            integration::start_understanding(app, req, stream, id)
+        }
         ("POST", ["api", "sessions", id, "terminal"]) => terminal::open(app, stream, id),
         ("POST", ["api", "sessions", id, "files"]) => file_manager::open(app, stream, id),
         ("GET", ["api", "sessions", id, "servers"]) => servers::list(app, stream, id),
