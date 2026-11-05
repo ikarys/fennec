@@ -3,6 +3,7 @@ import type { SessionState } from './api';
 import { t, type Lang } from '../i18n/messages';
 import type { NodeKind } from './workflow';
 import { createRunFold, type RunView } from './workflowRun';
+import { planFromProposal, type Plan } from './plan';
 
 export interface FennecEvent {
   type: string;
@@ -40,7 +41,8 @@ export interface ToolCallView {
 export type Segment =
   | { kind: 'thinking'; id: string; content: string }
   | { kind: 'text'; id: string; content: string }
-  | { kind: 'tool'; id: string; tool: ToolCallView };
+  | { kind: 'tool'; id: string; tool: ToolCallView }
+  | { kind: 'plan'; id: string; plan: Plan; markdown: string };
 
 export interface PreflightResultView {
   criterionId: string;
@@ -426,6 +428,21 @@ export function createThreadFold(lang: Lang = 'en'): ThreadFold {
         const metadata = result.metadata as { dataUrl?: string; mimeType?: string } | undefined;
         if (typeof metadata?.dataUrl === 'string' && typeof metadata?.mimeType === 'string' && metadata.mimeType.startsWith('image/')) {
           tool.image = { dataUrl: metadata.dataUrl, mimeType: metadata.mimeType };
+        }
+        break;
+      }
+
+      case 'plan.proposed': {
+        // The plan is the call, not a step of it: the propose_plan tool card
+        // is replaced in place by the plan segment, same id.
+        const callId = String(data.callId ?? '');
+        for (const item of items) {
+          if (item.kind !== 'assistant') continue;
+          const at = item.segments.findIndex((segment) => segment.kind === 'tool' && segment.id === callId);
+          if (at < 0) continue;
+          item.segments[at] = { kind: 'plan', id: callId, plan: planFromProposal(data.plan ?? {}), markdown: String(data.markdown ?? '') };
+          tools.delete(callId);
+          break;
         }
         break;
       }

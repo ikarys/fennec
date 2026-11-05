@@ -1,9 +1,13 @@
 //! Runs the model's tool calls and records their results. `ask_user` is
 //! special: it pauses the turn, so the calls after it in the batch are not
-//! run, and the turn ends waiting for the human.
+//! run, and the turn ends waiting for the human. `propose_plan` ends the
+//! turn the same way: the plan is recorded, the calls after it in the batch
+//! are not run, and the turn ends complete.
 
 use super::ask_user;
+use super::preflight;
 use super::propose_criteria;
+use super::propose_plan;
 use super::propose_task;
 use super::record_decision;
 use super::request_waiver;
@@ -31,6 +35,8 @@ const NOT_RUN_AFTER_ASK: &str = "Not run: the turn paused for the human (a quest
 pub(super) enum Flow {
     Continue,
     WaitingForUser,
+    /// `propose_plan` recorded the plan: the turn ends complete.
+    Done,
 }
 
 pub(super) fn record(
@@ -115,6 +121,7 @@ pub(super) fn execute_tools(
     calls: &[ToolCall],
 ) -> Result<Flow, String> {
     let mut waiting = false;
+    let mut done = false;
     // MCP tools are a human-configured capability, not part of the agent's
     // fixed allowed list: allow them here so a `{server}_{tool}` call runs.
     let mcp_tools = turn.tools.mcp_tool_names();
@@ -130,8 +137,9 @@ pub(super) fn execute_tools(
             )?;
             continue;
         }
-        // An `ask_user` earlier in this batch paused the turn.
-        if waiting {
+        // An `ask_user` earlier in this batch paused the turn, or a
+        // `propose_plan` ended it.
+        if waiting || done {
             record(
                 turn,
                 message_id,
@@ -275,6 +283,37 @@ pub(super) fn execute_tools(
             record(turn, message_id, call, result)?;
             continue;
         }
+        if call.name == propose_plan::NAME {
+            match propose_plan::parse(&call.arguments) {
+                // The model reads the failure and the loop goes on.
+                Err(e) => record(turn, message_id, call, ToolResult::failure(e))?,
+                Ok(plan) => {
+                    // The plan's checks run before the human sees the plan,
+                    // once per turn: sent back as this tool's error when one
+                    // cannot run or already passes, so the model fixes the
+                    // plan and calls the tool again.
+                    if !turn.preflight_sent_back
+                        && let Some(feedback) =
+                            preflight::run(turn, agent, message_id, &plan.criteria())?
+                    {
+                        turn.preflight_sent_back = true;
+                        record(turn, message_id, call, ToolResult::failure(feedback))?;
+                        continue;
+                    }
+                    // While the human is away the plan is still recorded: a
+                    // workflow's plan node must get its output.
+                    turn.append(propose_plan::event(&call.id, plan))?;
+                    record(
+                        turn,
+                        message_id,
+                        call,
+                        ToolResult::success(propose_plan::RECORDED.into(), false),
+                    )?;
+                    done = true;
+                }
+            }
+            continue;
+        }
 
         if call.name == suggest_agent::NAME {
             // Not blocking: the suggestion is recorded and the turn goes on.
@@ -309,6 +348,8 @@ pub(super) fn execute_tools(
     }
     Ok(if waiting {
         Flow::WaitingForUser
+    } else if done {
+        Flow::Done
     } else {
         Flow::Continue
     })
@@ -433,6 +474,7 @@ mod tests {
                 reasoning_effort: None,
                 autonomous,
                 lang: crate::domain::lang::Lang::Fr,
+                preflight_sent_back: false,
                 stop: self.stop,
                 on_event: &mut self.on_event,
             }
@@ -532,6 +574,7 @@ mod tests {
             reasoning_effort: None,
             autonomous: false,
             lang: crate::domain::lang::Lang::Fr,
+            preflight_sent_back: false,
             stop: &stop,
             on_event: &mut on_event,
         };
@@ -970,5 +1013,225 @@ mod tests {
         assert!(results[1].1.success);
         assert!(results[2].1.success);
         assert_eq!(results[2].1.output.as_deref(), Some("ran"));
+    }
+
+    fn plan_args(check: Option<&str>) -> Value {
+        let mut criterion = json!({"text": "The build passes"});
+        if let Some(check) = check {
+            criterion["check"] = json!(check);
+        }
+        json!({
+            "title": "Add the plan tool",
+            "goal": "The plan agent ends its turn with propose_plan",
+            "steps": [
+                {
+                    "title": "Write the domain",
+                    "files": ["src/domain/plan.rs"],
+                    "change": "The plan's vocabulary"
+                }
+            ],
+            "doneWhen": [criterion],
+            "risks": []
+        })
+    }
+
+    #[test]
+    fn an_invalid_propose_plan_is_a_failure_and_the_turn_continues() {
+        let stop = AtomicBool::new(false);
+        let mut agents = vec![plan()];
+        agents[0].allowed_tools.push("propose_plan".into());
+        let mut h = Harness::new(Rules::new(Vec::new()), &stop, agents);
+        let (mut turn, agent) = h.turn_with_agent(false);
+        let mut args = plan_args(None);
+        args.as_object_mut().unwrap().remove("goal");
+        let flow = execute_tools(
+            &mut turn,
+            &agent,
+            "m1",
+            &[
+                call("c1", "propose_plan", args),
+                call("c2", "read_file", json!({})),
+            ],
+        )
+        .unwrap();
+
+        assert!(matches!(flow, super::Flow::Continue));
+        assert_eq!(*h.tools.executed.borrow(), vec!["read_file".to_string()]);
+        let results = results(&h.log);
+        assert_eq!(results.len(), 2);
+        assert!(!results[0].1.success);
+        assert!(results[0].1.error.as_deref().unwrap().contains("'goal'"));
+        assert_eq!(
+            count(&h.log, |e| matches!(e, Event::PlanProposed { .. })),
+            0
+        );
+    }
+
+    #[test]
+    fn a_valid_propose_plan_records_the_plan_and_ends_the_turn() {
+        let stop = AtomicBool::new(false);
+        let mut agents = vec![plan()];
+        agents[0].allowed_tools.push("propose_plan".into());
+        let mut h = Harness::new(Rules::new(Vec::new()), &stop, agents);
+        let (mut turn, agent) = h.turn_with_agent(false);
+        let flow = execute_tools(
+            &mut turn,
+            &agent,
+            "m1",
+            &[
+                call("c1", "propose_plan", plan_args(None)),
+                call("c2", "read_file", json!({})),
+            ],
+        )
+        .unwrap();
+
+        assert!(matches!(flow, super::Flow::Done));
+        assert!(h.tools.executed.borrow().is_empty());
+        let results = results(&h.log);
+        assert_eq!(results.len(), 2);
+        assert!(results[0].1.success);
+        assert_eq!(
+            results[0].1.output.as_deref(),
+            Some(crate::agent::propose_plan::RECORDED)
+        );
+        assert_eq!(
+            results[1],
+            (
+                "c2".to_string(),
+                ToolResult::failure(super::NOT_RUN_AFTER_ASK.into())
+            )
+        );
+        let planned = h
+            .log
+            .0
+            .borrow()
+            .iter()
+            .find_map(|e| match e {
+                Event::PlanProposed { call_id, plan, .. } if call_id == "c1" => Some(plan.clone()),
+                _ => None,
+            })
+            .expect("the plan is recorded");
+        assert_eq!(
+            planned,
+            crate::agent::propose_plan::parse(&plan_args(None)).unwrap()
+        );
+    }
+
+    /// `run_command` answers with a passing exit code, so the preflight
+    /// classifies the check as passing already.
+    struct PassingRunToolbox {
+        executed: Rc<RefCell<Vec<String>>>,
+    }
+
+    impl Toolbox for PassingRunToolbox {
+        fn definitions(&self) -> Value {
+            json!([])
+        }
+
+        fn execute(
+            &self,
+            name: &str,
+            args: &Value,
+            _access: CommandAccess,
+            _stop: &AtomicBool,
+            _on_output: &mut dyn FnMut(OutputStream, &str),
+        ) -> ToolResult {
+            if name == "run_command" {
+                let command = args
+                    .get("command")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default();
+                self.executed.borrow_mut().push(command.to_string());
+                ToolResult::success(format!("$ {command}\n[Exit code: 0]"), false)
+            } else {
+                ToolResult::success("ran".into(), false)
+            }
+        }
+    }
+
+    #[test]
+    fn the_preflight_feedback_is_sent_back_once_from_the_tool() {
+        let stop = AtomicBool::new(false);
+        let executed = Rc::new(RefCell::new(Vec::new()));
+        let tools = PassingRunToolbox {
+            executed: executed.clone(),
+        };
+        let log = MemoryLog::default();
+        let model = Scripted(RefCell::new(vec![]));
+        let mut agents = vec![plan()];
+        agents[0].allowed_tools.push("propose_plan".into());
+        let workdir = PathBuf::from("/tmp");
+        let mut on_event = |_: &Event| {};
+        let mut turn = Turn {
+            model: &model,
+            log: &log,
+            tools: &tools,
+            session_id: "s",
+            workdir: &workdir,
+            instructions: "",
+            skills: &[],
+            always_on: &[],
+            agents: &agents,
+            max_tokens: 100,
+            context_window: 1000,
+            compact_at: 0.0,
+            reasoning_effort: None,
+            autonomous: false,
+            lang: crate::domain::lang::Lang::Fr,
+            preflight_sent_back: false,
+            stop: &stop,
+            on_event: &mut on_event,
+        };
+        let agent = &agents[0];
+
+        // The check passes already: the plan is sent back as the tool's
+        // error, no event, the turn goes on.
+        let flow = execute_tools(
+            &mut turn,
+            agent,
+            "m1",
+            &[call("c1", "propose_plan", plan_args(Some("true")))],
+        )
+        .unwrap();
+        assert!(matches!(flow, super::Flow::Continue));
+        assert_eq!(*executed.borrow(), vec!["true".to_string()]);
+        assert!(
+            log.0
+                .borrow()
+                .iter()
+                .any(|e| matches!(e, Event::CriteriaPreflight { .. }))
+        );
+        assert_eq!(count(&log, |e| matches!(e, Event::PlanProposed { .. })), 0);
+        let logged = results(&log);
+        assert_eq!(logged.len(), 1);
+        assert!(!logged[0].1.success);
+        assert!(
+            logged[0]
+                .1
+                .error
+                .as_deref()
+                .unwrap()
+                .contains("passes already")
+        );
+
+        // The revised plan: the preflight is not run a second time, the plan
+        // is recorded and the turn ends.
+        let flow = execute_tools(
+            &mut turn,
+            agent,
+            "m2",
+            &[call("c2", "propose_plan", plan_args(Some("cargo test")))],
+        )
+        .unwrap();
+        assert!(matches!(flow, super::Flow::Done));
+        assert_eq!(*executed.borrow(), vec!["true".to_string()]);
+        assert_eq!(count(&log, |e| matches!(e, Event::PlanProposed { .. })), 1);
+        let logged = results(&log);
+        assert!(
+            logged
+                .iter()
+                .find(|(id, _)| id == "c2")
+                .is_some_and(|(_, r)| r.success)
+        );
     }
 }

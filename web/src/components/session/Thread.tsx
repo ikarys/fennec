@@ -4,7 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { AssistantItem, PreflightResultView, Segment, ThreadItem } from '../../lib/fold';
 import { useDisplayPrefs } from '../../lib/display';
-import { splitContract } from '../../lib/plan';
+import { splitContract, type Plan } from '../../lib/plan';
 import { BulbIcon, ChevronRightIcon, ReplayIcon } from '../Icons';
 import { buttonClass } from '../ui/Button';
 import { Card } from '../ui/Card';
@@ -87,6 +87,14 @@ const TextSegment = memo(function TextSegment({ content, caret, id, preflight }:
   );
 });
 
+// The plan a plan agent recorded with propose_plan: the same card a text
+// contract renders, the actions and preflight keyed on the segment's id.
+const PlanSegment = memo(function PlanSegment({ id, plan, preflight }: { id: string; plan: Plan; preflight?: PreflightResultView[] }) {
+  const actions = usePlanActions();
+  const planActions = actions && actions.segmentId === id ? actions : null;
+  return <PlanCard plan={plan} actions={planActions} preflight={preflight} />;
+});
+
 // A centered note that carries a detail (a compaction, a replay): the detail
 // opens under it on the text's own surface, never a box inside a box.
 const NoteDetail = memo(function NoteDetail({ text, detail }: { text: string; detail: string }) {
@@ -113,8 +121,8 @@ function AssistantItemView({ item, model, running, showHeader, pendingCallId }: 
   const streaming = running && !item.done;
   const copyText = item.done
     ? item.segments
-        .filter((segment): segment is Extract<Segment, { kind: 'text' }> => segment.kind === 'text')
-        .map((segment) => segment.content)
+        .map((segment) => (segment.kind === 'text' ? segment.content : segment.kind === 'plan' ? segment.markdown : ''))
+        .filter((text) => text.length > 0)
         .join('\n\n')
     : '';
   const showCopy = item.done && copyText.length > 0;
@@ -136,6 +144,9 @@ function AssistantItemView({ item, model, running, showHeader, pendingCallId }: 
         }
         if (segment.kind === 'text') {
           return <TextSegment key={segment.id} id={segment.id} content={segment.content} caret={streaming && segment.id === lastTextId} preflight={segment.id === lastTextId ? item.preflight : undefined} />;
+        }
+        if (segment.kind === 'plan') {
+          return <PlanSegment key={segment.id} id={segment.id} plan={segment.plan} preflight={item.preflight} />;
         }
         return <ToolCard key={segment.id} tool={segment.tool} awaiting={segment.tool.id === pendingCallId} />;
       })}

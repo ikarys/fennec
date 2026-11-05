@@ -23,6 +23,40 @@ export interface Checked {
   detail: string;
 }
 
+/** The `plan` payload of a `plan.proposed` event (docs/api.md). */
+export interface PlanProposal {
+  title?: string;
+  goal?: string;
+  steps?: { title: string; files?: string[]; change?: string }[];
+  doneWhen?: { text: string; check?: string }[];
+  risks?: string[];
+}
+
+/**
+ * The plan a plan agent recorded with `propose_plan`, as the thread shows it:
+ * the steps numbered in order, each criterion one line (the check in backticks).
+ */
+export function planFromProposal(proposal: PlanProposal): Plan {
+  const steps = (proposal.steps ?? []).map((step, i) => ({
+    number: i + 1,
+    title: step.title,
+    files: step.files ?? [],
+    change: step.change ?? '',
+    verify: ''
+  }));
+  const doneWhen = (proposal.doneWhen ?? []).map((criterion) =>
+    criterion.check ? `${criterion.text} — check: \`${criterion.check}\`` : criterion.text
+  );
+  return {
+    kind: 'plan',
+    title: proposal.title ?? '',
+    goal: proposal.goal ?? '',
+    steps,
+    doneWhen,
+    risks: proposal.risks ?? []
+  };
+}
+
 export interface ReportStep extends Checked {
   number: number;
 }

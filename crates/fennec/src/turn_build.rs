@@ -193,6 +193,7 @@ pub fn with_turn<R>(
         reasoning_effort: params.reasoning_effort,
         autonomous: options.autonomous,
         lang: Lang::from_code(&prefs.display.language),
+        preflight_sent_back: false,
         stop,
         on_event: &mut options.on_event,
     };
