@@ -2,6 +2,7 @@ import { useEffect, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { FieldRow, Select, TextInput } from '../ui/Field';
+import { ListCard } from '../ui/ListCard';
 import { Section } from '../ui/Section';
 import { ExternalIcon, PinIcon, TrashIcon } from '../Icons';
 import { Tile } from '../ui/Tile';
@@ -340,7 +341,7 @@ export function RulesSection() {
       </Section>
       {!loading && !error && overview ? (
         <>
-          <Section title={t('rulesGlobalSection')} flush>
+          <ListCard title={t('rulesGlobalSection')} count={overview.global.length}>
             <RuleList
               rules={overview.global}
               editable
@@ -348,9 +349,9 @@ export function RulesSection() {
               onDelete={handleDelete}
               emptyMessage={t('rulesGlobalEmpty')}
             />
-          </Section>
+          </ListCard>
           {overview.projects.map((project) => (
-            <Section
+            <ListCard
               key={project.id}
               title={
                 project.name ?? (
@@ -359,13 +360,16 @@ export function RulesSection() {
                   </span>
                 )
               }
-              flush
+              count={project.rules.length}
             >
               <RuleList rules={project.rules} editable deletingId={deletingId} onDelete={handleDelete} />
-            </Section>
+            </ListCard>
           ))}
           {overview.sessions.length > 0 ? (
-            <Section title={t('rulesSessionGranted')} flush>
+            <ListCard
+              title={t('rulesSessionGranted')}
+              count={overview.sessions.reduce((sum, session) => sum + session.rules.length, 0)}
+            >
               {overview.sessions.map((session, index) => (
                 <div key={session.id}>
                   <div
@@ -389,7 +393,7 @@ export function RulesSection() {
                   <RuleList rules={session.rules} editable deletingId={deletingId} onDelete={handleDelete} />
                 </div>
               ))}
-            </Section>
+            </ListCard>
           ) : null}
         </>
       ) : null}
