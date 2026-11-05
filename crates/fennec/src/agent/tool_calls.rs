@@ -10,9 +10,10 @@ use super::request_waiver;
 use super::rule_check;
 use super::suggest_agent;
 use super::turn::Turn;
-use crate::domain::agent::AgentDefinition;
+use crate::domain::agent::{AgentDefinition, WriteScope};
 use crate::domain::criteria;
 use crate::domain::event::{Event, ToolCall, ToolResult};
+use crate::domain::test_files;
 use crate::domain::workflow::run;
 use std::sync::atomic::Ordering;
 
@@ -70,6 +71,9 @@ pub(super) fn run_tool(
         }
     };
     let (name, args, access) = (&call.name, &call.arguments, agent.commands);
+    if let Some(refusal) = scope_refusal(agent, call) {
+        return Ok(ToolResult::failure(refusal));
+    }
     let result = if approved {
         tools.execute_approved(name, args, access, stop, &mut on_output)
     } else {
@@ -78,6 +82,28 @@ pub(super) fn run_tool(
     match log_error {
         Some(e) => Err(e),
         None => Ok(result),
+    }
+}
+
+/// The refusal for a file write outside an agent's `writes` scope, if any.
+fn scope_refusal(agent: &AgentDefinition, call: &ToolCall) -> Option<String> {
+    if agent.writes != WriteScope::Tests {
+        return None;
+    }
+    if !matches!(call.name.as_str(), "write_file" | "edit_file") {
+        return None;
+    }
+    let path = call
+        .arguments
+        .get("path")
+        .and_then(|value| value.as_str())?;
+    let path = path.strip_prefix("./").unwrap_or(path);
+    if test_files::is_test_path(path) {
+        None
+    } else {
+        Some(format!(
+            "{path} is not a test file: this agent writes only the tests; the code comes after the human validates them."
+        ))
     }
 }
 
@@ -293,7 +319,7 @@ mod tests {
     use super::{Turn, execute_tools};
     use crate::agent::ports::{RuleCheck, Toolbox};
     use crate::agent::test_support::{MemoryLog, Scripted, builder, plan};
-    use crate::domain::agent::{AgentDefinition, CommandAccess};
+    use crate::domain::agent::{AgentDefinition, AgentOrigin, CommandAccess, WriteScope};
     use crate::domain::event::{Event, OutputStream, ToolCall, ToolResult};
     use rules::{Action, Origin, Request, Rule, Rules, Scope, Target, TargetKind};
     use serde_json::{Value, json};
@@ -436,6 +462,24 @@ mod tests {
             arguments: args,
             parse_error: None,
             raw_arguments: None,
+        }
+    }
+
+    fn tests_agent(writes: WriteScope) -> AgentDefinition {
+        AgentDefinition {
+            id: "tests".into(),
+            name: "Tests".into(),
+            description: String::new(),
+            subagent: false,
+            allowed_tools: vec!["read_file".into(), "write_file".into(), "edit_file".into()],
+            commands: CommandAccess::ReadWrite,
+            writes,
+            reasoning_effort: None,
+            color: None,
+            phase: None,
+            prompt: "prompt".into(),
+            origin: AgentOrigin::Default,
+            path: None,
         }
     }
 
@@ -609,6 +653,55 @@ mod tests {
         let error = results[0].1.error.as_deref().unwrap();
         assert!(error.contains("Failed to parse tool call arguments"));
         assert!(error.contains("bad json"));
+    }
+
+    #[test]
+    fn scope_refusal_keeps_tests_agent_to_test_files() {
+        let tests = tests_agent(WriteScope::Tests);
+        assert!(
+            super::scope_refusal(
+                &tests,
+                &call("c1", "write_file", json!({"path": "tests/foo.rs"}))
+            )
+            .is_none()
+        );
+        assert!(
+            super::scope_refusal(
+                &tests,
+                &call("c1", "write_file", json!({"path": "./tests/foo.rs"}))
+            )
+            .is_none()
+        );
+        assert!(
+            super::scope_refusal(
+                &tests,
+                &call("c1", "write_file", json!({"path": "src/lib.rs"}))
+            )
+            .is_some()
+        );
+        assert!(
+            super::scope_refusal(
+                &tests,
+                &call("c1", "edit_file", json!({"path": "src/lib.rs"}))
+            )
+            .is_some()
+        );
+        assert!(
+            super::scope_refusal(
+                &tests,
+                &call("c1", "read_file", json!({"path": "src/lib.rs"}))
+            )
+            .is_none()
+        );
+
+        let any = tests_agent(WriteScope::Any);
+        assert!(
+            super::scope_refusal(
+                &any,
+                &call("c1", "write_file", json!({"path": "src/lib.rs"}))
+            )
+            .is_none()
+        );
     }
 
     #[test]

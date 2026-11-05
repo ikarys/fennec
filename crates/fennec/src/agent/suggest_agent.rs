@@ -128,6 +128,7 @@ mod tests {
             subagent,
             allowed_tools: Vec::new(),
             commands: CommandAccess::ReadOnly,
+            writes: crate::domain::agent::WriteScope::Any,
             reasoning_effort: None,
             color: None,
             phase: None,

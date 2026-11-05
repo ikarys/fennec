@@ -148,7 +148,7 @@ fn broken() -> Vec<Value> {
 mod tests {
     use super::*;
     use crate::agents::crud::CrudError;
-    use crate::domain::agent::{AgentOrigin, AgentParseError};
+    use crate::domain::agent::{AgentOrigin, AgentParseError, WriteScope};
 
     fn agent(origin: AgentOrigin) -> AgentDefinition {
         AgentDefinition {
@@ -158,6 +158,7 @@ mod tests {
             subagent: false,
             allowed_tools: vec!["read_file".into()],
             commands: CommandAccess::ReadOnly,
+            writes: WriteScope::Any,
             reasoning_effort: None,
             color: None,
             phase: None,

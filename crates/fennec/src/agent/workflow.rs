@@ -379,9 +379,31 @@ fn answer_human(turn: &mut Turn, choice: &str, comment: &str) -> Result<Cursor, 
         criteria::record_from_plan(turn, &state)?;
     }
 
+    // The kernel, not the model, decides which tests are protected: at the
+    // human's click, the test files written so far are frozen for the session.
+    if choices.first().is_some_and(|first| first == choice)
+        && fed_by_tests_agent(&state.workflow, &open.node_id)
+    {
+        turn.append(Event::TestsApproved {
+            run_id: state.run_id.clone(),
+            files: crate::domain::test_files::written(&events),
+        })?;
+    }
+
     Ok(Cursor::After {
         from: open.node_id.clone(),
         port: choice.to_string(),
+    })
+}
+
+/// Whether `node_id` is fed by the `done` edge of the `tests` agent node: the
+/// human node that validates the tests written before the code.
+fn fed_by_tests_agent(workflow: &Workflow, node_id: &str) -> bool {
+    workflow.nodes.iter().any(|node| {
+        matches!(&node.kind, NodeKind::Agent { agent, .. } if agent == "tests")
+            && workflow
+                .edge(&node.id, "done")
+                .is_some_and(|edge| edge.to == node_id)
     })
 }
 
