@@ -290,7 +290,7 @@ export interface DashboardTile {
   label: string;
   figure: string;
   detail: string;
-  tone: 'accent' | 'ok' | 'err' | 'neutral';
+  tone: 'accent' | 'info' | 'ok' | 'attention' | 'err' | 'neutral';
   active: boolean;
   href: string | null;
   title: string | null;
@@ -314,5 +314,35 @@ export function getProjectDashboard(
 ): Promise<ProjectDashboard> {
   return request<ProjectDashboard>(
     `/api/projects/${encodeURIComponent(projectId)}/dashboard`,
+  );
+}
+
+/** The project's monthly budget and what it spent this month, display-ready. */
+export interface ProjectBudgetView {
+  limitUsd: number | null;
+  label: string;
+  figure: string;
+  detail: string;
+  tone: DashboardTile['tone'];
+  active: boolean;
+}
+
+export function getProjectBudget(projectId: string): Promise<ProjectBudgetView> {
+  return request<ProjectBudgetView>(
+    `/api/projects/${encodeURIComponent(projectId)}/budget`,
+  );
+}
+
+/** Set the project's monthly budget; `null` removes it. */
+export function setProjectBudget(
+  projectId: string,
+  limitUsd: number | null,
+): Promise<ProjectBudgetView> {
+  return request<ProjectBudgetView>(
+    `/api/projects/${encodeURIComponent(projectId)}/budget`,
+    {
+      method: "POST",
+      body: JSON.stringify({ limitUsd }),
+    },
   );
 }

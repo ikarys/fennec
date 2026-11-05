@@ -1,4 +1,4 @@
-//! Shared model pricing for the web views: turns a usage ledger's model rows
+//! Shared model pricing: turns a usage ledger's model rows
 //! into a dollar estimate, split by token kind, and explains what is priced
 //! and what is not.
 

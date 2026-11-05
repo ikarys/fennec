@@ -204,6 +204,12 @@ a session or a project deletes its artifacts, never the file. A file's versions 
 The agent opens and revises one itself with the `canvas` tool (title, format, the whole document; the same title is the
 same canvas, each call a version, `tools/canvas.rs`): it writes fennec's canvas store, never the project, so the read-only
 agents have it too, and the pane opens on the canvas the agent just changed.
+Budgets, done (C18): a monthly cost budget per project, set from a tile of the project page (`store/budgets.rs`, a
+`budget:<project>` row of the settings table). The month's spend is the usage ledger priced at each model's price
+(`domain/pricing.rs`, indicative); at 80 % the tile turns to attention and `/api/notices` raises a system notification;
+once reached, fennec's kernel refuses to start any turn on the project (`turn_build`, every path: web, CLI, the queue,
+workflow children; the message route answers 409 first so the typed text stays) until the human raises or removes it
+(`domain/budget.rs`, `budget.rs`, `web/budget_routes.rs`).
 Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
 1. To be chosen among the remaining capabilities C* of the Notion definition.
@@ -272,6 +278,8 @@ crates/fennec/src/
     workdir_notice.rs  tells the model its working directory moved; session_name.rs the session name's prompt and cleanup
     agent_file.rs      an agent as the Settings form edits it; session_skills.rs a session's skills folded from the log
     module_map/notes.rs what the map says about a module, read from its leading comment
+    budget.rs          a project's monthly budget: its status (under, alert at 80 %, exceeded), the refusal and alert texts
+    pricing.rs         the ledger's model rows priced at the models' prices, split by token kind
     lang.rs            the language the human reads fennec in (Settings); the server-built texts follow it
     id.rs, clock.rs
     (domain uses `rules::path`, the gitignore-like matcher, as a library: one matcher for rules, protection and architecture)
@@ -328,6 +336,7 @@ crates/fennec/src/
   plugins.rs         the plugin manager: one sandboxed host per active plugin, server-wide; plugins/ config (the
                      definitions in ~/.agents, an activation's validity), host (one plugin's process and its blocks),
                      pump (the new session events fed to the hosts, woken by the notifier)
+  budget.rs          a project's budget against the month's spend read from the ledger; the kernel's check before a turn
   chat.rs            a session with no project: runs in a scratch folder
   turn_build.rs      the composition of a Turn, shared by both adapters (CLI, web): store, model, tools, sandbox
   mcp.rs             the synchronous MCP client (JSON-RPC over stdio); servers.rs the project's servers on disk
@@ -350,9 +359,10 @@ crates/fennec/src/
                      workflow_usage, context_view and insight (display-ready token figures: the UI computes none),
                      notice_stream (the human's attention server-wide, SSE), idea_board (the ideas board, read side),
                      servers (a project's servers started and stopped), terminal, editor, file_manager (the human's own
-                     tools opened on a folder), pricing, model_view, worktree_routes (disk usage), agent_routes,
+                     tools opened on a folder), model_view, worktree_routes (disk usage), agent_routes,
                      audit_routes, backlog_routes, idea_assets, mcp_routes, proposal_routes, session_delete,
-                     agents_md_routes, session_name (background naming), canvas_routes (the canvas crate over HTTP)
+                     agents_md_routes, session_name (background naming), canvas_routes (the canvas crate over HTTP),
+                     budget_routes (a project's budget, read and set)
   cli/               terminal adapter: commands, transcript
 crates/backlog/     the ideas backlog, a crate of its own and fennec-free, no I/O: its events folded, the queue
                      order, the night-mode caps, an idea's status, stage and next action, a run's summary

@@ -11,10 +11,10 @@ use token_usage::{CallRow, Filter, GroupBy, Ledger, Row, Summary, group_rows, su
 use super::App;
 use super::context_view::{CompositionView, composition_view};
 use super::http::{Request, error, send_json};
-use super::pricing::{Pricing, priced, prices};
 use crate::domain::clock::now_ms;
 use crate::domain::context_parts::{PartKind, display_label};
 use crate::domain::lang::Lang;
+use crate::domain::pricing::{Pricing, priced, prices};
 use llm_providers_connector::Price;
 use std::collections::BTreeMap;
 

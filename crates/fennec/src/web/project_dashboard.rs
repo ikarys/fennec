@@ -14,22 +14,23 @@ use super::App;
 use super::http::{error, send_json};
 use super::idea_board::Board;
 use super::insight::Period;
-use super::pricing::{priced, prices};
 use crate::domain::clock::now_ms;
 use crate::domain::lang::Lang;
 use crate::domain::map_doc::MapFileState;
+use crate::domain::pricing::{priced, prices};
 use crate::{adr, doc, module_map};
 use backlog::Stage;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
-/// The UI's `BadgeTone`; no tile is in error yet.
+/// The UI's `BadgeTone`; a budget tile can be in error.
 pub enum Tone {
     Accent,
     Info,
     Ok,
     Attention,
     Neutral,
+    Err,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
