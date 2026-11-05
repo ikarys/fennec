@@ -25,6 +25,7 @@ mod protected;
 mod risk;
 mod scanners;
 mod security_scan;
+mod server_config;
 mod servers;
 mod skills;
 mod store;
@@ -39,7 +40,8 @@ use config::Settings;
 use store::SqliteStore;
 
 const USAGE: &str = "usage:
-  fennec [serve] [--port <n>]              web UI on http://127.0.0.1:7777
+  fennec [serve] [--port <n>]              web UI on http://127.0.0.1:7777 (or the port of
+                                           ~/.config/fennec/settings.yaml, `port: <n>`)
   fennec run [--session <id>] [--agent <id>] [--image <path>]... <prompt>
                                            run the agent loop in the current directory;
                                            agent: plan (default, read-only) or builder
@@ -75,7 +77,7 @@ fn run(args: &[String]) -> Result<(), String> {
                 args
             };
             let port = match rest {
-                [] => 7777,
+                [] => server_config::port()?,
                 [flag, n] if flag == "--port" => n.parse().map_err(|_| USAGE)?,
                 _ => return Err(USAGE.into()),
             };
