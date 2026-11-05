@@ -26,6 +26,7 @@ pub mod drift;
 pub mod event;
 pub mod frontmatter;
 pub mod id;
+pub mod indicators;
 pub mod integration;
 pub mod kernel_rules;
 pub mod lang;

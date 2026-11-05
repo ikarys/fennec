@@ -21,6 +21,7 @@ mod idea_assets;
 mod idea_board;
 mod idea_queue;
 mod idea_routes;
+mod indicator_routes;
 mod insight;
 mod integration;
 mod mcp_routes;

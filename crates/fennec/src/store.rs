@@ -5,6 +5,7 @@ mod budgets;
 pub mod calls;
 mod ideas;
 mod plugins;
+mod project_events;
 mod settings;
 
 use crate::agent::ports::EventLog;
