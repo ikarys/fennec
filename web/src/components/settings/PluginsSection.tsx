@@ -6,63 +6,23 @@ import { useT } from '../../i18n';
 import {
   getGlobalPlugins,
   setGlobalPlugin,
-  type PluginTone,
   type GlobalPlugin,
   type ServedPluginBlock,
 } from '../../lib/api';
-import { Badge, type BadgeTone } from '../ui/Badge';
+import { usePluginsVersion } from '../../hooks/usePluginsVersion';
+import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Section } from '../ui/Section';
 import { GlobeIcon, PlayIcon, PuzzleIcon, StopIcon } from '../Icons';
-
-const TONE_TO_BADGE: Record<PluginTone, BadgeTone> = {
-  none: 'neutral',
-  info: 'info',
-  success: 'ok',
-  warning: 'attention',
-  danger: 'err',
-};
-
-/** One block's typed elements, rendered by the core's primitives. */
-function BlockContent({ block }: { block: ServedPluginBlock }) {
-  return (
-    <div className="flex flex-col gap-1">
-      {block.content.elements.map((element, index) => {
-        if (element.kind === 'text') {
-          return (
-            <span key={index} className="text-xs text-muted">
-              {element.text}
-            </span>
-          );
-        }
-        if (element.kind === 'figure') {
-          return (
-            <div key={index} className="flex items-baseline gap-2">
-              <span className="font-mono text-lg text-text tabular-nums">{element.value}</span>
-              <span className="text-xs text-muted">{element.label}</span>
-              {element.tone && element.tone !== 'none' ? (
-                <Badge tone={TONE_TO_BADGE[element.tone]} pill>
-                  {element.tone}
-                </Badge>
-              ) : null}
-            </div>
-          );
-        }
-        return (
-          <Badge key={index} tone={element.tone ? TONE_TO_BADGE[element.tone] : 'neutral'} pill>
-            {element.label}
-          </Badge>
-        );
-      })}
-    </div>
-  );
-}
+import { PluginBlockCard } from '../plugins/PluginBlockCard';
 
 export function PluginsSection() {
   const t = useT();
+  const pluginsVersion = usePluginsVersion();
   const [plugins, setPlugins] = useState<GlobalPlugin[] | null>(null);
   const [blocks, setBlocks] = useState<ServedPluginBlock[]>([]);
+  const [problems, setProblems] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busyName, setBusyName] = useState<string | null>(null);
   const fetchId = useRef(0);
@@ -74,6 +34,7 @@ export function PluginsSection() {
       if (id === fetchId.current) {
         setPlugins(data.plugins);
         setBlocks(data.blocks);
+        setProblems(data.problems);
         setError(null);
       }
     } catch (loadError) {
@@ -81,7 +42,7 @@ export function PluginsSection() {
         setError(loadError instanceof Error ? loadError.message : String(loadError));
       }
     }
-  }, []);
+  }, [pluginsVersion]);
 
   useEffect(() => {
     setPlugins(null);
@@ -111,7 +72,21 @@ export function PluginsSection() {
       <Section title={t('panelPlugins')} flush description={t('pluginsDescription')}>
         {error ? <div className="px-4 pb-3 text-err text-xs">{error}</div> : null}
         {plugins === null && !error && <div className="px-4 py-3 text-sm text-muted">{t('loading')}</div>}
-        {plugins !== null && plugins.length === 0 && (
+        {problems.length > 0 && (
+          <Card className="mx-4 mb-3 overflow-hidden">
+            <div className="border-b border-border bg-attention/10 px-3 py-1.5 text-xs font-medium text-attention">
+              {t('pluginProblems')}
+            </div>
+            <ul className="space-y-1 px-3 py-2">
+              {problems.map((problem) => (
+                <li key={problem} className="font-mono text-xs text-text">
+                  {problem}
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+        {plugins !== null && plugins.length === 0 && problems.length === 0 && (
           <div className="px-4 py-3 text-sm text-muted">{t('noPluginsDefined')}</div>
         )}
         {plugins !== null && plugins.length > 0 && (
@@ -189,17 +164,7 @@ export function PluginsSection() {
         ) : (
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {blocks.map((block) => (
-              <div key={`${block.plugin}:${block.title}`} className="rounded-md border border-border bg-raised/40 px-3 py-2">
-                <div className="flex items-center gap-1.5">
-                  <span className="min-w-0 truncate text-xs font-medium text-text">{block.title}</span>
-                  <Badge tone="info" pill className="ml-auto shrink-0">
-                    {t('pluginProvenance', { name: block.plugin })}
-                  </Badge>
-                </div>
-                <div className="mt-1.5">
-                  <BlockContent block={block} />
-                </div>
-              </div>
+              <PluginBlockCard key={`${block.plugin}:${block.title}`} block={block} />
             ))}
           </div>
         )}

@@ -1,8 +1,9 @@
 # Writing a plugin
 
 A plugin is the human's own extension: a process that watches session events and shows typed
-blocks (text, figures, badges) in the session's left bar or on Settings' Plugins tab. It never
-touches the prompt, the tools or a log. Plugins are global, never read from a project.
+blocks (text, figures, badges, lists, progress, links, tables) in the session's right-hand context
+panel, a project's dashboard, the app's status bar, or on Settings' Plugins tab. It never touches
+the prompt, the tools or a log. Plugins are global, never read from a project.
 
 ## Files
 
@@ -16,8 +17,20 @@ touches the prompt, the tools or a log. Plugins are global, never read from a pr
 
 - `name`: letters, digits, `-`, `_`; the code lives in `~/.agents/plugins/<name>/`.
 - `command`, `args`: run with that directory as the working directory.
-- `blocks`: what the plugin may show. `global` blocks go to the Plugins tab, `session` blocks
-  to each session's left bar. An update for a block not listed here is never shown.
+- `blocks`: what the plugin may show. Each block has a `scope` — `session` (per session),
+  `project` (one block per project), or `global` (the whole server, the default) — and an optional
+  `placement`, which picks the surface within that scope (its default is the scope's, below). An
+  update for a block not listed here is never shown.
+
+| scope | placement (default first) | where it shows |
+| --- | --- | --- |
+| `session` | `panel` (default) | the session's right-hand context panel, in the shared "Plugins" panel |
+| `session` | `own_panel` | that right-hand panel, in a panel of its own |
+| `session` | `status_bar` | the app's bottom status bar while that session is on screen |
+| `project` | `dashboard` (default) | a section of the project page's dashboard |
+| `project` | `status_bar` | the status bar while a page or session of that project is on screen |
+| `global` | `settings` (default) | Settings' Plugins tab |
+| `global` | `status_bar` | the status bar, everywhere |
 
 Then enable it on Settings → Plugins. Editing the definition or any file in its directory
 deactivates it until the human enables it again (SHA-256 of definition and code).
@@ -41,11 +54,17 @@ JSON-RPC 2.0, one JSON object per line, over stdin/stdout.
    `tool.call`, the tool's name is at `data.toolCall.name`. A session's history before the
    plugin started is not replayed.
 3. The plugin sends blocks whenever it likes:
-   `{"jsonrpc":"2.0","method":"block.update","params":{"block":"tools","session":"<sessionId>","content":{"elements":[...]}}}`
-   (`session` only for a `session` block). Each update replaces the block's content. Elements:
+   `{"jsonrpc":"2.0","method":"block.update","params":{"block":"tools","session":"<sessionId>","project":"<projectId>","content":{"elements":[...]}}}`
+   (`session` for a `session` block, `project` for a `project` block, neither for a `global` one).
+   Each update replaces the block's content. Elements:
    `{"kind":"text","text"}`, `{"kind":"figure","label","value","tone"?}`,
-   `{"kind":"badge","label","tone"?}`; `tone` is `none`, `info`, `success`, `warning` or `danger`.
-   Caps: 200 elements, 32 KiB per block, 16 blocks; an update beyond them is dropped.
+   `{"kind":"badge","label","tone"?}`, `{"kind":"list","items":[{"text","tone"?}]}`,
+   `{"kind":"progress","label","value","max","tone"?}`, `{"kind":"link","label","url"}`,
+   `{"kind":"table","columns":[…],"rows":[[…]]}`; `tone` is `none`, `info`, `success`, `warning`
+   or `danger`. Caps: 200 elements, 32 KiB per block, 16 blocks; an update beyond them is dropped.
+   An update is dropped the same way when it holds a `javascript:` or `data:` link (a link's `url`
+   must start with `http://` or `https://`), a non-finite progress or one with `max <= 0`, or a
+   table with more than 100 rows or a row longer than its `columns`.
 
 ## Example
 

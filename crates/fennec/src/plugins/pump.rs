@@ -166,6 +166,7 @@ for line in sys.stdin:
             ),
             agents_home.clone(),
             base.join("scratch"),
+            Arc::new(crate::notifier::Notifier::default()),
         );
         store
             .save_plugin_activation(&PluginActivation {

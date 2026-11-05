@@ -173,9 +173,11 @@ Plugins, done: the human's own extensions, global only: defined in `~/.agents/pl
 `~/.agents/plugins/<name>/` (never read from a project), activated on Settings' Plugins tab (`#/settings/plugins`); a
 changed definition or file deactivates one (SHA-256 code hash). Each runs out of process in bwrap (refused with the
 sandbox off), its code read-only, no project mounted, the network only if granted; it gets the session events it asked
-for over JSON-RPC on stdio and answers with data-only blocks (text, figures, badges) the core renders in the session's
-left bar or on the Plugins tab (`plugins.rs`, `plugins/`, `domain/plugin.rs`, `store/plugins.rs`); how to write
-one: `docs/plugins.md`.
+for over JSON-RPC on stdio and answers with data-only blocks (text, figures, badges, lists, progress bars, http(s)
+links, tables) the core renders where the definition places them: the session's right-hand panel (shared or a panel
+of its own), the project dashboard, the app's status bar or the Plugins tab, refreshed live through `pluginsVersion`
+on `/api/notices`; Settings says why a definition was left out (`plugins.rs`, `plugins/`, `domain/plugin.rs`,
+`store/plugins.rs`, `web/src/components/plugins/`); how to write one: `docs/plugins.md`.
 Security gate, done (C23, part 1): the integration gate runs the security scanners found on PATH itself, in the
 read-only sandbox without network (gitleaks on the branch's commits, cargo-audit when a Cargo.lock changed, semgrep with
 the human's own `.semgrep.yml` on the changed files); each finding is a `securityFindings` blocker the human accepts, a

@@ -251,6 +251,7 @@ pub fn serve(port: u16, settings: Settings) -> Result<(), String> {
         Sandbox::for_store(&prefs.sandbox, &settings.db_path),
         agents_home.clone(),
         plugins_temp,
+        notifier.clone(),
     ));
     let app = Arc::new(App {
         turns: Turns::new(settings.clone(), notifier.clone()),

@@ -11,14 +11,32 @@ use std::path::{Path, PathBuf};
 /// `<agents_home>/plugins.json` is absent or unreadable; a definition with
 /// problems is left out.
 pub fn read_defs(agents_home: &Path) -> Vec<PluginDef> {
-    let path = agents_home.join("plugins.json");
-    let defs: Vec<PluginDef> = std::fs::read_to_string(path)
-        .ok()
-        .and_then(|text| serde_json::from_str(&text).ok())
-        .unwrap_or_default();
-    defs.into_iter()
-        .filter(|d| d.problems().is_empty())
-        .collect()
+    read_defs_checked(agents_home).0
+}
+
+/// The usable definitions and why the rest were left out: the file's read or
+/// parse error, or a definition's problems. An absent file is no problem.
+/// Settings shows them, so a typo never reads as "no plugin defined".
+pub fn read_defs_checked(agents_home: &Path) -> (Vec<PluginDef>, Vec<String>) {
+    let text = match std::fs::read_to_string(agents_home.join("plugins.json")) {
+        Ok(text) => text,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return (Vec::new(), Vec::new()),
+        Err(e) => return (Vec::new(), vec![format!("plugins.json: {e}")]),
+    };
+    let defs: Vec<PluginDef> = match serde_json::from_str(&text) {
+        Ok(defs) => defs,
+        Err(e) => return (Vec::new(), vec![format!("plugins.json: {e}")]),
+    };
+    let mut problems = Vec::new();
+    let usable = defs
+        .into_iter()
+        .filter(|def| {
+            let found = def.problems();
+            problems.extend(found.iter().map(|p| format!("{}: {p}", def.name)));
+            found.is_empty()
+        })
+        .collect();
+    (usable, problems)
 }
 
 /// The plugin's code directory, `<agents_home>/plugins/<name>/`.
@@ -100,6 +118,25 @@ mod tests {
             std::env::temp_dir().join(format!("fennec-plugin-cfg-{}", crate::domain::id::new_id()));
         std::fs::create_dir_all(&dir).unwrap();
         assert!(read_defs(&dir).is_empty());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_broken_definitions_file_says_why() {
+        let dir =
+            std::env::temp_dir().join(format!("fennec-plugin-cfg-{}", crate::domain::id::new_id()));
+        write(
+            &dir,
+            "plugins.json",
+            r#"[{"name":"x","command":"python3","blocks":[{"id":"b","scope":"nowhere"}]}]"#,
+        );
+        let (defs, problems) = read_defs_checked(&dir);
+        assert!(defs.is_empty());
+        assert_eq!(problems.len(), 1);
+        assert!(
+            problems[0].starts_with("plugins.json: unknown variant `nowhere`"),
+            "{problems:?}"
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 

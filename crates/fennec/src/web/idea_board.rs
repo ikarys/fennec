@@ -492,7 +492,7 @@ mod tests {
             turns: Turns::new(settings.clone(), notifier.clone()),
             settings,
             port: 0,
-            notifier,
+            notifier: notifier.clone(),
             skill_folds: Mutex::new(HashMap::new()),
             idea_reports: Mutex::new(HashMap::new()),
             idea_queues: Mutex::default(),
@@ -502,6 +502,7 @@ mod tests {
                 crate::tools::Sandbox::Off,
                 std::env::temp_dir(),
                 std::env::temp_dir(),
+                notifier,
             )),
             agents_home: std::env::temp_dir(),
         }
