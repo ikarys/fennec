@@ -5,6 +5,7 @@ use std::path::Path;
 use std::process::Command;
 use std::thread::{available_parallelism, scope};
 
+use crate::domain::indicators::Authored;
 use crate::domain::module_map::SourceFile;
 use crate::domain::risk::{self, Authorship, FileFacts, History, RiskReport};
 
@@ -79,6 +80,29 @@ pub fn hot_files(top: &Path) -> HashSet<String> {
         .into_iter()
         .filter_map(|(path, count)| (count >= risk::HOT_CHURN).then_some(path))
         .collect()
+}
+
+/// The commits of the last `days` days by authorship, read from their trailers.
+pub fn recent_authorship(workdir: &Path, days: u32) -> Authored {
+    let since = format!("--since={days}.days");
+    let Some(log) = git_stdout(workdir, &["log", &since, "--format=%x1e%B"]) else {
+        return Authored::default();
+    };
+
+    let mut authored = Authored::default();
+
+    for chunk in log.split('\x1e') {
+        if chunk.trim().is_empty() {
+            continue;
+        }
+        match risk::authorship(chunk) {
+            Authorship::Human => authored.human += 1,
+            Authorship::Integrated => authored.integrated += 1,
+            Authorship::Ai => authored.ai += 1,
+        }
+    }
+
+    authored
 }
 
 /// Of `files` (top-relative), the ones that are tested on `branch`.

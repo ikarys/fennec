@@ -10,6 +10,7 @@ import { RiskSection } from '../components/project/RiskSection';
 import { AnalysesSection } from '../components/project/AnalysesSection';
 import { SessionsSection } from '../components/project/SessionsSection';
 import { DashboardSection } from '../components/project/DashboardSection';
+import { IndicatorsSection } from '../components/project/IndicatorsSection';
 import { CanvasSection } from '../components/project/CanvasSection';
 import {
   createSession,
@@ -22,6 +23,7 @@ import { useT } from '../i18n';
 
 const TABS = [
   { id: 'overview', label: 'tasksTabOverview' },
+  { id: 'indicators', label: 'indicatorsTab' },
   { id: 'tasks', label: 'tasks' },
   { id: 'sessions', label: 'sessionsSectionTitle' },
   { id: 'map', label: 'moduleMapTitle' },
@@ -218,6 +220,7 @@ export default function ProjectPage({
           {activeTab === 'overview' ? (
             <DashboardSection projectId={projectId} onOpenSession={onOpenSession} />
           ) : null}
+          {activeTab === 'indicators' ? <IndicatorsSection projectId={projectId} /> : null}
           {activeTab === 'tasks' ? (
             <TasksSection
               projectId={projectId}
