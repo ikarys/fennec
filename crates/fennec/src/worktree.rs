@@ -75,6 +75,58 @@ pub fn open(root: &Path, project_dir: &Path, session_id: &str) -> Result<Option<
     Ok(Some(wt))
 }
 
+/// Adopts a branch someone else wrote into a session worktree, so it goes
+/// through the same integration gate as an agent's own work.
+pub fn adopt(
+    root: &Path,
+    project_dir: &Path,
+    session_id: &str,
+    source: &str,
+) -> Result<Worktree, String> {
+    let (top, prefix) =
+        repository(project_dir).ok_or_else(|| "not a git repository".to_string())?;
+    if find(root, project_dir, session_id).is_some() {
+        return Err("worktree already exists".to_string());
+    }
+    if source.is_empty() || source.starts_with('-') {
+        return Err("source must not be empty or start with '-'".to_string());
+    }
+    let verify = format!("{source}^{{commit}}");
+    if git(&top, &["rev-parse", "--verify", "--quiet", &verify], None).is_err() {
+        return Err(format!("no such branch: {source}"));
+    }
+    std::fs::create_dir_all(root).map_err(|e| format!("create {}: {e}", root.display()))?;
+    let path = root.join(session_id);
+    let branch = format!("fennec/{session_id}");
+    let path_arg = path.to_string_lossy().into_owned();
+    git(
+        &top,
+        &[
+            "worktree",
+            "add",
+            "--no-track",
+            "-b",
+            &branch,
+            &path_arg,
+            source,
+        ],
+        None,
+    )?;
+    let wt = build(path, &prefix, session_id);
+    // A half-built worktree must not survive: `find` would hand it out.
+    (|| -> Result<(), String> {
+        let base = git(&top, &["merge-base", "HEAD", source], None)?;
+        let base = String::from_utf8_lossy(&base).trim().to_string();
+        git(&wt.path, &["update-ref", &wt.base, &base], None)?;
+        record_origin(&top, &wt)
+    })()
+    .inspect_err(|_| {
+        let _ = git(&top, &["worktree", "remove", "--force", &path_arg], None);
+        let _ = git(&top, &["branch", "-D", &branch], None);
+    })?;
+    Ok(wt)
+}
+
 /// Removes the session's worktree, its branch, and its base and origin refs:
 /// the human's discard. The agent's commits stay in the object store only
 /// until git gc, which is why the route records their shas.
@@ -141,6 +193,12 @@ fn fill(top: &Path, wt: &Worktree) -> Result<(), String> {
         )?;
     }
     git(&wt.path, &["update-ref", &wt.base, "HEAD"], None)?;
+    record_origin(top, wt)
+}
+
+/// Records the human's checked-out branch as the worktree's origin ref, if
+/// the human is on a branch.
+fn record_origin(top: &Path, wt: &Worktree) -> Result<(), String> {
     if let Ok(head) = git(top, &["symbolic-ref", "-q", "HEAD"], None) {
         let head_ref = String::from_utf8_lossy(&head).trim().to_string();
         if !head_ref.is_empty() {
@@ -434,6 +492,47 @@ mod tests {
         git(&repo, &["add", "-A"], None).unwrap();
         git(&repo, &["commit", "-q", "-m", "init"], None).unwrap();
         (base, repo)
+    }
+
+    #[test]
+    fn adopt_brings_a_contribution_branch_into_a_session_worktree() {
+        let (base, repo) = setup();
+        let initial = text(&repo, &["symbolic-ref", "--short", "HEAD"])
+            .trim()
+            .to_string();
+        git(&repo, &["checkout", "-q", "-b", "contrib"], None).unwrap();
+        std::fs::write(repo.join("c.txt"), "contrib\n").unwrap();
+        git(&repo, &["add", "-A"], None).unwrap();
+        git(&repo, &["commit", "-q", "-m", "contrib"], None).unwrap();
+        git(&repo, &["checkout", "-q", initial.as_str()], None).unwrap();
+        std::fs::write(repo.join("a.txt"), "two\n").unwrap();
+        git(&repo, &["add", "-A"], None).unwrap();
+        git(&repo, &["commit", "-q", "-m", "main"], None).unwrap();
+
+        let sid = new_id();
+        let wt = adopt(&base, &repo, &sid, "contrib").unwrap();
+        assert!(wt.path.join("c.txt").is_file());
+        let count = text(
+            &repo,
+            &[
+                "rev-list",
+                "--count",
+                &format!("{}..{}", wt.base, wt.branch),
+            ],
+        );
+        assert_eq!(count.trim(), "1");
+        assert_eq!(
+            text(&repo, &["symbolic-ref", "--short", "HEAD"]).trim(),
+            initial
+        );
+    }
+
+    #[test]
+    fn adopt_rejects_option_injection_and_missing_branches() {
+        let (base, repo) = setup();
+        let sid = new_id();
+        assert!(adopt(&base, &repo, &sid, "-x").is_err());
+        assert!(adopt(&base, &repo, &sid, "nope").is_err());
     }
 
     #[test]
