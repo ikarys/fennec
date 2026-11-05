@@ -51,6 +51,7 @@ mod terminal;
 mod test_support;
 mod thread_view;
 mod turns;
+mod update_routes;
 mod waiver_routes;
 mod workflow_routes;
 mod workflow_usage;
@@ -102,6 +103,9 @@ struct App {
     /// The agents home (`<home>/.agents`): where the global plugin
     /// definitions live.
     agents_home: std::path::PathBuf,
+    /// The last release check and when it ran: GitHub is asked at most every
+    /// few hours (`update_routes`).
+    update_check: Mutex<Option<(std::time::Instant, crate::update::Check)>>,
 }
 
 impl App {
@@ -265,6 +269,7 @@ pub fn serve(port: u16, settings: Settings) -> Result<(), String> {
         server_runs: Arc::new(Mutex::new(HashMap::new())),
         plugins: plugins.clone(),
         agents_home,
+        update_check: Mutex::default(),
     });
     // The event pump feeds the active plugins; it reads the store only.
     app.plugins

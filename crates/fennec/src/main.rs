@@ -30,6 +30,7 @@ mod skills;
 mod store;
 mod tools;
 mod turn_build;
+mod update;
 mod web;
 mod workflows;
 mod worktree;
@@ -45,6 +46,7 @@ const USAGE: &str = "usage:
   fennec compact <session>                 compact a session in the current directory
   fennec sessions                          list sessions
   fennec log <session>                     replay a session from the event store
+  fennec update [--check]                  install the latest release (--check: only report it)
   fennec --version                         print the version
 
 env: FENNEC_LLM_URL (default http://127.0.0.1:8000/v1), FENNEC_MODEL (default: first of /models),
@@ -105,6 +107,7 @@ fn run(args: &[String]) -> Result<(), String> {
             cli::run(&Settings::from_env()?, session, agent, &images, &prompt)
         }
         Some("compact") => cli::compact(&Settings::from_env()?, args.get(1).ok_or(USAGE)?),
+        Some("update") => cli::update::run(&args[1..]),
         Some("sessions") => cli::list_sessions(&open_store()?),
         Some("log") => cli::replay(&open_store()?, args.get(1).ok_or(USAGE)?),
         _ => Err(USAGE.into()),

@@ -264,6 +264,7 @@ mod tests {
                 notifier,
             )),
             agents_home: std::env::temp_dir(),
+            update_check: Default::default(),
         }
     }
 
