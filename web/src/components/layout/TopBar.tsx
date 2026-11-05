@@ -3,7 +3,7 @@ import { useT } from '../../i18n';
 import type { MsgKey } from '../../i18n/messages';
 import type { AttentionItem, SessionState } from '../../lib/api';
 import { SessionStateIcon } from '../session/SessionStateIcon';
-import { BellIcon, CloseIcon, FoxIcon, PlusIcon, SearchIcon, SettingsIcon, SplitIcon } from '../Icons';
+import { BellIcon, ChatIcon, CloseIcon, FoxIcon, PlusIcon, SearchIcon, SettingsIcon, SplitIcon } from '../Icons';
 import { Badge } from '../ui/Badge';
 import { Button, buttonClass } from '../ui/Button';
 import { Menu, MenuItem } from '../ui/Menu';
@@ -174,6 +174,9 @@ function VersionTag() {
 
 import type { PageId } from '../../lib/route';
 export type { PageId };
+
+/** The chat's project id, fixed by the server (`chat::ID`). */
+const CHAT_PROJECT_ID = 'chat';
 
 /** The fixed pages, in the bar's order; `PageIcon` draws each. */
 const PAGES: { page: PageId; title: MsgKey }[] = [
@@ -378,6 +381,17 @@ export function TopBar({
           <SearchIcon className="h-3.5 w-3.5" />
           <span className="hidden text-left md:inline">{t('topBarSearchPlaceholder')}</span>
           <kbd className="rounded-md border border-border px-1.5 py-px text-xs text-muted">⌘K</kbd>
+        </button>
+
+        {/* The chat has no project page to start from: one click from anywhere. */}
+        <button
+          type="button"
+          onClick={() => onNewSession(CHAT_PROJECT_ID)}
+          aria-label={t('paletteNewChat')}
+          title={t('homeNewChatTitle')}
+          className={buttonClass({ variant: 'icon', size: 'sm', iconOnly: true })}
+        >
+          <ChatIcon className="h-4 w-4" />
         </button>
 
         <AttentionBell attention={attention} onOpen={onOpenAttention} />
