@@ -12,6 +12,8 @@ use std::collections::BTreeMap;
 pub const MAX_CONTENT_BYTES: usize = 32 * 1024;
 pub const MAX_ELEMENTS: usize = 200;
 pub const MAX_BLOCKS: usize = 16;
+/// A table element's rows, so a block cannot render a scroll page of its own.
+pub const MAX_TABLE_ROWS: usize = 100;
 
 /// One plugin as the human defined it in `~/.agents/plugins.json`. The code
 /// it runs lives under `~/.agents/plugins/<name>/`; whether it is enabled,
@@ -49,8 +51,90 @@ impl PluginDef {
             if block.id.trim().is_empty() {
                 out.push("a block needs an id".into());
             }
+            let placement = block.placement();
+            if !placement.fits(block.scope) {
+                out.push(format!(
+                    "block {}: placement {} does not fit scope {}",
+                    block.id,
+                    placement.wire_name(),
+                    block.scope.wire_name()
+                ));
+            }
         }
         out
+    }
+}
+
+/// Where a block shows. A session block is per session (the session's
+/// right-hand context panel); a project block is per project (the project
+/// page); a global block is for the whole server (the Settings' Plugins tab).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum BlockScope {
+    Session,
+    Project,
+    #[default]
+    Global,
+}
+
+impl BlockScope {
+    fn wire_name(self) -> &'static str {
+        match self {
+            BlockScope::Session => "session",
+            BlockScope::Project => "project",
+            BlockScope::Global => "global",
+        }
+    }
+}
+
+/// Where within its scope a block shows. The scope's default is used when the
+/// definition leaves the placement out (`PluginBlockDef::placement`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Placement {
+    /// The session's right-hand context panel, in the shared "Plugins" panel.
+    Panel,
+    /// The session's right-hand context panel, in a panel of its own.
+    OwnPanel,
+    /// The app's bottom status bar.
+    StatusBar,
+    /// A section of the project page's dashboard.
+    Dashboard,
+    /// Settings' Plugins tab.
+    Settings,
+}
+
+impl Placement {
+    /// The placement a scope defaults to when the definition leaves it out.
+    pub fn default_for(scope: BlockScope) -> Self {
+        match scope {
+            BlockScope::Session => Self::Panel,
+            BlockScope::Project => Self::Dashboard,
+            BlockScope::Global => Self::Settings,
+        }
+    }
+
+    /// Whether this placement shows anywhere for the scope: a block may only
+    /// be placed where its scope has a surface.
+    pub fn fits(self, scope: BlockScope) -> bool {
+        matches!(
+            (scope, self),
+            (
+                BlockScope::Session,
+                Self::Panel | Self::OwnPanel | Self::StatusBar
+            ) | (BlockScope::Project, Self::Dashboard | Self::StatusBar)
+                | (BlockScope::Global, Self::Settings | Self::StatusBar)
+        )
+    }
+
+    fn wire_name(self) -> &'static str {
+        match self {
+            Placement::Panel => "panel",
+            Placement::OwnPanel => "own_panel",
+            Placement::StatusBar => "status_bar",
+            Placement::Dashboard => "dashboard",
+            Placement::Settings => "settings",
+        }
     }
 }
 
@@ -62,16 +146,16 @@ pub struct PluginBlockDef {
     pub title: String,
     #[serde(default)]
     pub scope: BlockScope,
+    #[serde(default)]
+    pub placement: Option<Placement>,
 }
 
-/// Where a block shows. A session block is per session (the session's left
-/// bar); a global block is for the whole server (the Settings' Plugins tab).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "snake_case")]
-pub enum BlockScope {
-    Session,
-    #[default]
-    Global,
+impl PluginBlockDef {
+    /// The block's placement: what the definition chose, else the scope's
+    /// default.
+    pub fn placement(&self) -> Placement {
+        self.placement.unwrap_or(Placement::default_for(self.scope))
+    }
 }
 
 /// The human's decision to run one plugin, stored in SQLite: the definition's
@@ -98,9 +182,11 @@ pub struct BlockContent {
 
 impl BlockContent {
     /// True when the content is within the caps an untrusted plugin may use:
-    /// not too many elements, and not too large serialised.
+    /// not too many elements, not too large serialised, and no element the
+    /// core refuses (a non-http link, a broken progress, an oversized table).
     pub fn within_caps(&self) -> bool {
         self.elements.len() <= MAX_ELEMENTS
+            && self.elements.iter().all(|element| element.acceptable())
             && serde_json::to_string(self).is_ok_and(|json| json.len() <= MAX_CONTENT_BYTES)
     }
 }
@@ -123,6 +209,54 @@ pub enum BlockElement {
         #[serde(default)]
         tone: Option<Tone>,
     },
+    List {
+        items: Vec<ListItem>,
+    },
+    Progress {
+        label: String,
+        value: f64,
+        max: f64,
+        #[serde(default)]
+        tone: Option<Tone>,
+    },
+    Link {
+        label: String,
+        url: String,
+    },
+    Table {
+        columns: Vec<String>,
+        rows: Vec<Vec<String>>,
+    },
+}
+
+/// One row of a `list` element.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListItem {
+    pub text: String,
+    #[serde(default)]
+    pub tone: Option<Tone>,
+}
+
+impl BlockElement {
+    /// Whether the element is acceptable for an untrusted plugin to emit: a
+    /// link may only point at `http(s)`, so a `javascript:` or `data:` URL
+    /// never reaches an href; a progress needs a finite, positive range; a
+    /// table stays within its shape.
+    fn acceptable(&self) -> bool {
+        match self {
+            BlockElement::Link { url, .. } => {
+                url.starts_with("https://") || url.starts_with("http://")
+            }
+            BlockElement::Progress { value, max, .. } => {
+                value.is_finite() && max.is_finite() && *max > 0.0
+            }
+            BlockElement::Table { columns, rows } => {
+                rows.len() <= MAX_TABLE_ROWS && rows.iter().all(|row| row.len() <= columns.len())
+            }
+            _ => true,
+        }
+    }
 }
 
 /// A tint for a figure or badge, mapped to the core's tone primitives.
@@ -138,21 +272,24 @@ pub enum Tone {
 }
 
 /// Where a block's data is stored in the host: its id, and the session it is
-/// for (a global block has none).
+/// for (a project block has a project id instead; a global block has
+/// neither).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct BlockKey {
     pub block_id: String,
     pub session_id: Option<String>,
+    pub project_id: Option<String>,
 }
 
 /// A block as served to the UI: the plugin's name (the provenance badge), the
-/// block's title and scope, and its data. The core renders it.
+/// block's title, scope and placement, and its data. The core renders it.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ServedPluginBlock {
     pub plugin: String,
     pub title: String,
     pub scope: BlockScope,
+    pub placement: Placement,
     pub content: BlockContent,
 }
 
@@ -163,6 +300,8 @@ pub struct PluginBlockUpdate {
     pub block: String,
     #[serde(default)]
     pub session: Option<String>,
+    #[serde(default)]
+    pub project: Option<String>,
     pub content: BlockContent,
 }
 
@@ -172,6 +311,7 @@ impl PluginBlockUpdate {
         BlockKey {
             block_id: self.block.clone(),
             session_id: self.session.clone(),
+            project_id: self.project.clone(),
         }
     }
 
@@ -240,6 +380,7 @@ mod tests {
                 id: "calls".into(),
                 title: "Tool calls".into(),
                 scope: BlockScope::Global,
+                placement: None,
             }],
         };
         let json = serde_json::to_string(&def).unwrap();
@@ -309,6 +450,233 @@ mod tests {
             }],
         };
         assert!(!too_large.within_caps());
+    }
+
+    #[test]
+    fn each_scope_defaults_to_its_placement() {
+        for (scope, default) in [
+            (BlockScope::Session, Placement::Panel),
+            (BlockScope::Project, Placement::Dashboard),
+            (BlockScope::Global, Placement::Settings),
+        ] {
+            let block = PluginBlockDef {
+                scope,
+                ..Default::default()
+            };
+            assert_eq!(block.placement(), default, "{scope:?}");
+            assert_eq!(Placement::default_for(scope), default);
+        }
+    }
+
+    #[test]
+    fn a_placement_outside_its_scope_is_a_problem() {
+        let def = PluginDef {
+            name: "misfit".into(),
+            command: "python3".into(),
+            blocks: vec![PluginBlockDef {
+                id: "dash".into(),
+                title: "D".into(),
+                scope: BlockScope::Session,
+                placement: Some(Placement::Dashboard),
+            }],
+            ..Default::default()
+        };
+        assert_eq!(
+            def.problems(),
+            vec!["block dash: placement dashboard does not fit scope session".to_string()]
+        );
+
+        // Every placement that fits its scope is a problem-free definition.
+        for scope in [BlockScope::Session, BlockScope::Project, BlockScope::Global] {
+            for placement in [
+                Placement::Panel,
+                Placement::OwnPanel,
+                Placement::StatusBar,
+                Placement::Dashboard,
+                Placement::Settings,
+            ] {
+                if placement.fits(scope) {
+                    let def = PluginDef {
+                        name: "ok".into(),
+                        command: "python3".into(),
+                        blocks: vec![PluginBlockDef {
+                            id: "b".into(),
+                            title: "B".into(),
+                            scope,
+                            placement: Some(placement),
+                        }],
+                        ..Default::default()
+                    };
+                    assert!(def.problems().is_empty(), "{scope:?} {placement:?}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn an_unacceptable_element_drops_the_content() {
+        let one = |element: BlockElement| BlockContent {
+            elements: vec![element],
+        };
+
+        // A link may only point at http(s): a `javascript:` or `data:` URL
+        // must never reach an href.
+        assert!(
+            !one(BlockElement::Link {
+                label: "x".into(),
+                url: "javascript:alert(1)".into(),
+            })
+            .within_caps()
+        );
+        assert!(
+            !one(BlockElement::Link {
+                label: "x".into(),
+                url: "data:text/html,hi".into(),
+            })
+            .within_caps()
+        );
+        assert!(
+            one(BlockElement::Link {
+                label: "x".into(),
+                url: "https://fennec.example".into(),
+            })
+            .within_caps()
+        );
+
+        // A progress needs a finite, positive range.
+        assert!(
+            !one(BlockElement::Progress {
+                label: "p".into(),
+                value: f64::NAN,
+                max: 10.0,
+                tone: None,
+            })
+            .within_caps()
+        );
+        assert!(
+            !one(BlockElement::Progress {
+                label: "p".into(),
+                value: 1.0,
+                max: f64::INFINITY,
+                tone: None,
+            })
+            .within_caps()
+        );
+        assert!(
+            !one(BlockElement::Progress {
+                label: "p".into(),
+                value: 1.0,
+                max: 0.0,
+                tone: None,
+            })
+            .within_caps()
+        );
+        assert!(
+            one(BlockElement::Progress {
+                label: "p".into(),
+                value: 3.0,
+                max: 10.0,
+                tone: Some(Tone::Info),
+            })
+            .within_caps()
+        );
+
+        // A table stays within its shape: at most 100 rows, no row wider
+        // than its columns.
+        assert!(
+            !one(BlockElement::Table {
+                columns: vec!["a".into()],
+                rows: vec![vec!["1".into()]; MAX_TABLE_ROWS + 1],
+            })
+            .within_caps()
+        );
+        assert!(
+            !one(BlockElement::Table {
+                columns: vec!["a".into()],
+                rows: vec![vec!["1".into(), "2".into()]],
+            })
+            .within_caps()
+        );
+        assert!(
+            one(BlockElement::Table {
+                columns: vec!["a".into(), "b".into()],
+                rows: vec![vec!["1".into(), "2".into()]],
+            })
+            .within_caps()
+        );
+
+        // A list element is plain data: acceptable.
+        assert!(
+            one(BlockElement::List {
+                items: vec![ListItem {
+                    text: "one".into(),
+                    tone: None,
+                }],
+            })
+            .within_caps()
+        );
+    }
+
+    #[test]
+    fn a_valid_element_of_each_kind_round_trips() {
+        let content = BlockContent {
+            elements: vec![
+                BlockElement::List {
+                    items: vec![
+                        ListItem {
+                            text: "one".into(),
+                            tone: Some(Tone::Info),
+                        },
+                        ListItem {
+                            text: "two".into(),
+                            tone: None,
+                        },
+                    ],
+                },
+                BlockElement::Progress {
+                    label: "build".into(),
+                    value: 40.0,
+                    max: 100.0,
+                    tone: Some(Tone::Warning),
+                },
+                BlockElement::Link {
+                    label: "docs".into(),
+                    url: "https://example.org".into(),
+                },
+                BlockElement::Table {
+                    columns: vec!["tool".into(), "calls".into()],
+                    rows: vec![vec!["run_command".into(), "3".into()]],
+                },
+            ],
+        };
+        let json = serde_json::to_string(&content).unwrap();
+        assert!(json.contains("\"kind\":\"list\""));
+        assert!(json.contains("\"kind\":\"progress\""));
+        assert!(json.contains("\"kind\":\"link\""));
+        assert!(json.contains("\"kind\":\"table\""));
+        let back: BlockContent = serde_json::from_str(&json).unwrap();
+        assert_eq!(content, back);
+    }
+
+    #[test]
+    fn an_update_carries_its_project() {
+        let update: PluginBlockUpdate = serde_json::from_str(
+            r#"{"block":"b","project":"p1","content":{"elements":[{"kind":"text","text":"x"}]}}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            update.key(),
+            BlockKey {
+                block_id: "b".into(),
+                session_id: None,
+                project_id: Some("p1".into()),
+            }
+        );
+        // A session update has no project; a global one has neither.
+        let global: PluginBlockUpdate =
+            serde_json::from_str(r#"{"block":"b","content":{"elements":[]}}"#).unwrap();
+        assert_eq!(global.key().project_id, None);
+        assert_eq!(global.key().session_id, None);
     }
 
     #[test]

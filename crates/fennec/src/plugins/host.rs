@@ -32,12 +32,15 @@ impl Host {
     /// world has no project: the plugin's code directory is mounted
     /// read-only and is its working directory, and its private scratch
     /// (`temp_root/<name>`) is the only writable place besides `/tmp`.
+    /// `on_update` is called after each accepted `block.update`, so the
+    /// caller can wake the UI.
     pub fn spawn(
         def: &PluginDef,
         network: bool,
         sandbox: &Sandbox,
         code_dir: &Path,
         temp_root: &Path,
+        on_update: Arc<dyn Fn() + Send + Sync>,
     ) -> Result<Host, String> {
         // A plugin is always sandboxed: Off is a refusal, not a bare process.
         let read_only = match sandbox {
@@ -90,8 +93,11 @@ impl Host {
                         && let Some(params) = value.get("params")
                         && let Ok(update) =
                             serde_json::from_value::<PluginBlockUpdate>(params.clone())
+                        && apply_update(&reader_blocks, &update)
                     {
-                        apply_update(&reader_blocks, &update);
+                        // An accepted update moves the block data: wake the
+                        // UI's watchers.
+                        on_update();
                     }
                 } else if value.get("id").is_some() {
                     // A response. After the `init` reply, one is an answer to a
@@ -182,19 +188,25 @@ impl Host {
 }
 
 /// Store one capped `block.update`: too large, too full or too many blocks is
-/// dropped, so an untrusted plugin cannot grow the server's RAM. Frequency is
+/// dropped, so an untrusted plugin cannot grow the server's RAM. Returns
+/// whether the update was stored, so the caller can wake the UI only on a
+/// change. Frequency is
 /// not capped: the line is already parsed, the store is one map insert, and
 /// the UI reads a snapshot, so a burst costs nothing and the latest state wins.
-fn apply_update(blocks: &RwLock<HashMap<BlockKey, BlockContent>>, update: &PluginBlockUpdate) {
+fn apply_update(
+    blocks: &RwLock<HashMap<BlockKey, BlockContent>>,
+    update: &PluginBlockUpdate,
+) -> bool {
     if !update.within_caps() {
-        return;
+        return false;
     }
     let key = update.key();
     let mut map = blocks.write().unwrap();
     if map.len() >= MAX_BLOCKS && !map.contains_key(&key) {
-        return;
+        return false;
     }
     map.insert(key, update.content.clone());
+    true
 }
 
 impl Drop for Host {
@@ -213,6 +225,11 @@ mod tests {
     use crate::domain::preferences::SandboxPrefs;
     use crate::tools::Sandbox;
     use std::collections::BTreeMap;
+
+    /// The `on_update` hook the tests do not watch: a no-op.
+    fn no_update() -> Arc<dyn Fn() + Send + Sync> {
+        Arc::new(|| {})
+    }
 
     fn temp() -> std::path::PathBuf {
         std::env::temp_dir().join(format!(
@@ -264,6 +281,7 @@ for line in sys.stdin:
                 id: "calls".into(),
                 title: "Calls".into(),
                 scope: BlockScope::Global,
+                placement: None,
             }],
         };
         let host = Host::spawn(
@@ -272,6 +290,7 @@ for line in sys.stdin:
             &sandbox(),
             &agents_home.join("plugins/echo"),
             &temp(),
+            no_update(),
         )
         .unwrap();
 
@@ -289,6 +308,7 @@ for line in sys.stdin:
                 .get(&BlockKey {
                     block_id: "calls".into(),
                     session_id: None,
+                    project_id: None,
                 })
                 .and_then(|content| content.elements.first().cloned())
                 .and_then(|element| match element {
@@ -339,6 +359,7 @@ for line in sys.stdin:
             &sandbox(),
             &agents_home.join("plugins/stray"),
             &temp(),
+            no_update(),
         )
         .unwrap();
 
@@ -354,6 +375,7 @@ for line in sys.stdin:
                 .get(&BlockKey {
                     block_id: "calls".into(),
                     session_id: None,
+                    project_id: None,
                 })
                 .and_then(|content| content.elements.first().cloned())
                 .and_then(|element| match element {
@@ -429,6 +451,7 @@ send({"jsonrpc": "2.0", "method": "block.update", "params": {"block": "probe", "
                 id: "probe".into(),
                 title: "Probe".into(),
                 scope: BlockScope::Global,
+                placement: None,
             }],
         };
         let sandbox = Sandbox::from_prefs(
@@ -445,6 +468,7 @@ send({"jsonrpc": "2.0", "method": "block.update", "params": {"block": "probe", "
             &sandbox,
             &agents_home.join("plugins/probe"),
             &base.join("scratch"),
+            no_update(),
         )
         .unwrap();
 
@@ -454,6 +478,7 @@ send({"jsonrpc": "2.0", "method": "block.update", "params": {"block": "probe", "
             if let Some(content) = host.blocks_snapshot().get(&BlockKey {
                 block_id: "probe".into(),
                 session_id: None,
+                project_id: None,
             }) && let Some(BlockElement::Figure { value: v, .. }) = content.elements.first()
             {
                 value = Some(v.clone());
@@ -478,7 +503,7 @@ send({"jsonrpc": "2.0", "method": "block.update", "params": {"block": "probe", "
             blocks: Vec::new(),
         };
         let off = Sandbox::Off;
-        let err = match Host::spawn(&def, false, &off, &code_dir, &temp()) {
+        let err = match Host::spawn(&def, false, &off, &code_dir, &temp(), no_update()) {
             Ok(_) => panic!("a plugin starts with the sandbox off"),
             Err(err) => err,
         };
@@ -493,6 +518,7 @@ send({"jsonrpc": "2.0", "method": "block.update", "params": {"block": "probe", "
         let update = PluginBlockUpdate {
             block: "big".into(),
             session: None,
+            project: None,
             content: BlockContent {
                 elements: vec![
                     BlockElement::Text { text: "x".into() };
@@ -500,27 +526,29 @@ send({"jsonrpc": "2.0", "method": "block.update", "params": {"block": "probe", "
                 ],
             },
         };
-        apply_update(&blocks, &update);
+        assert!(!apply_update(&blocks, &update));
         assert!(blocks.read().unwrap().is_empty());
 
         // Updates in a burst are all stored: the latest wins.
         let text = |value: &str| PluginBlockUpdate {
             block: "calls".into(),
             session: None,
+            project: None,
             content: BlockContent {
                 elements: vec![BlockElement::Text { text: value.into() }],
             },
         };
-        apply_update(&blocks, &text("1"));
-        apply_update(&blocks, &text("2"));
-        apply_update(&blocks, &text("3"));
+        assert!(apply_update(&blocks, &text("1")));
+        assert!(apply_update(&blocks, &text("2")));
+        assert!(apply_update(&blocks, &text("3")));
         assert_eq!(
             blocks
                 .read()
                 .unwrap()
                 .get(&BlockKey {
                     block_id: "calls".into(),
-                    session_id: None
+                    session_id: None,
+                    project_id: None
                 })
                 .unwrap()
                 .elements

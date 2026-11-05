@@ -27,6 +27,8 @@ import { I18nProvider } from './i18n';
 import { t } from './i18n/messages';
 import type { Lang } from './i18n/messages';
 import { useTurnNotices } from './hooks/useTurnNotices';
+import { PluginsVersionContext } from './hooks/usePluginsVersion';
+import { StatusBar } from './components/layout/StatusBar';
 
 const WorkflowsPage = lazy(() => import('./pages/WorkflowsPage'));
 const ProjectPage = lazy(() => import('./pages/ProjectPage'));
@@ -217,7 +219,7 @@ export default function App() {
     },
     [navigate]
   );
-  const { items: attention } = useTurnNotices(openSession);
+  const { items: attention, pluginsVersion } = useTurnNotices(openSession);
 
   const closeTab = useCallback(
     (tabId: string) => {
@@ -281,6 +283,15 @@ export default function App() {
     const project = projects.find((candidate) => candidate.id === currentProjectId);
     return project ? { id: project.id, name: project.name } : null;
   }, [projects, currentProjectId]);
+
+  // The status bar's surfaces: the session on screen and its project, a
+  // project page route its own id; the global blocks come back regardless.
+  const statusBarIds = useMemo(() => {
+    if (route.name === 'session') return { sessionId: route.id, projectId: currentProjectId ?? undefined };
+    if (route.name === 'new') return { sessionId: undefined, projectId: route.id };
+    if (route.name === 'project') return { sessionId: undefined, projectId: route.projectId };
+    return { sessionId: undefined, projectId: undefined };
+  }, [route, currentProjectId]);
 
   const handleSessionCreated = useCallback(
     (newId: string, pseudoId: string | null) => {
@@ -385,6 +396,7 @@ export default function App() {
   return (
     <I18nProvider lang={language}>
     <DisplayPrefsProvider value={displayPrefs}>
+      <PluginsVersionContext.Provider value={pluginsVersion}>
       {/* h-full: the html/body/#root chain is 100%, which no page-level
           scaling can push past the window. */}
       <div className="flex h-full flex-col overflow-hidden bg-bg text-text">
@@ -476,6 +488,11 @@ export default function App() {
           )}
         </div>
 
+        <StatusBar
+          sessionId={statusBarIds.sessionId ?? null}
+          projectId={statusBarIds.projectId ?? null}
+        />
+
         <Palette
           open={paletteOpen}
           projects={projects}
@@ -496,6 +513,7 @@ export default function App() {
           onSubmit={handleCreateProject}
         />
       </div>
+      </PluginsVersionContext.Provider>
     </DisplayPrefsProvider>
     </I18nProvider>
   );

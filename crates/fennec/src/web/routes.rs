@@ -123,8 +123,12 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         }
         ("GET", ["api", "plugins"]) => plugin_routes::list(app, stream),
         ("POST", ["api", "plugins"]) => plugin_routes::set(app, req, stream),
+        ("GET", ["api", "plugins", "status-bar"]) => plugin_routes::status_bar(app, req, stream),
         ("GET", ["api", "sessions", id, "plugins"]) => {
             plugin_routes::session_blocks(app, stream, id)
+        }
+        ("GET", ["api", "projects", id, "plugins"]) => {
+            plugin_routes::project_blocks(app, stream, id)
         }
         ("GET", ["api", "projects", id, "workflows"]) => {
             workflow_routes::list_workflows(app, stream, id)

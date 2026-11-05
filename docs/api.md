@@ -502,21 +502,34 @@ read-only. The human edits them as usual.
 - `POST /api/sessions/{id}/files` → 202 `{path}`: opens the human's own file
   manager in the session's project folder (their repository, not the worktree):
   Explorer under WSL, `open` on macOS, else `xdg-open`. 500 if it cannot start.
-- `GET /api/plugins` → `{plugins: [{name, command, args, env, blocks, enabled, network, active}], blocks}`:
+- `GET /api/plugins` → `{plugins: [{name, command, args, env, blocks, enabled, network, active}], problems, blocks}`: `problems` lists why definitions were left out (the file's parse error, a definition's problems);
   the human's plugin definitions (`~/.agents/plugins.json`, a definition with problems left out; a plugin's code
   lives in `~/.agents/plugins/<name>/`; nothing is read from a project) and the human's global activation of
   each, stored in fennec's store; `active` when enabled and the SHA-256 of its definition and code still matches
-  the one taken at activation (a changed file deactivates it). `blocks` the global-scope blocks served:
-  `[{plugin, title, scope, content: {elements: [{kind: "text"|"figure"|"badge", …}]}}]` (data only, rendered by
-  the UI, indicative).
+  the one taken at activation (a changed file deactivates it). `blocks` the global-scope blocks placed in the
+  Plugins tab (`placement` `settings`), the served-block shape below.
 - `POST /api/plugins` `{name, enabled, network}` → `{name, enabled, network, active}`: the human activates or
   deactivates a plugin, hashing its definition and code now, and restarts the plugin hosts. A plugin always runs
   in the bwrap world (never with the sandbox off), its code directory read-only (and its working directory), a
   private scratch writable, no project mounted, the network only when `network`. 400 on an empty name or an
   invalid definition; 404 if no such plugin.
-- `GET /api/sessions/{id}/plugins` → `{blocks}`: the session-scope blocks of the session's plugins, same shape.
-  404 if no session. The event feed a plugin receives carries the `session` and `project` ids; a session seen
-  for the first time by the pump is not replayed.
+- `GET /api/sessions/{id}/plugins` → `{blocks}`: the session-scope blocks placed in the session's right-hand
+  context panel (`placement` `panel` or `own_panel`). 404 if no session. The event feed a plugin receives
+  carries the `session` and `project` ids; a session seen for the first time by the pump is not replayed.
+- `GET /api/projects/{id}/plugins` → `{blocks}`: the project-scope blocks placed in the project page's
+  dashboard (`placement` `dashboard`). 404 if no project.
+- `GET /api/plugins/status-bar?sessionId=&projectId=` → `{blocks}`: every block placed in the status bar
+  (`placement` `status_bar`), in the order the surfaces stack: the global ones, then the project's, then the
+  session's. Both query params optional; a missing one simply omits that surface's blocks.
+- The served-block shape of the four routes above:
+  `[{plugin, title, scope: "session"|"project"|"global", placement: "panel"|"own_panel"|"status_bar"|"dashboard"|"settings",
+  content: {elements: [...]}}]`. Elements (data only, rendered by the UI, indicative):
+  `{"kind":"text","text"}`, `{"kind":"figure","label","value","tone"?}`, `{"kind":"badge","label","tone"?}`,
+  `{"kind":"list","items":[{"text","tone"?}]}`, `{"kind":"progress","label","value","max","tone"?}` (finite
+  numbers, `max > 0`), `{"kind":"link","label","url"}` (`url` starts with `http://` or `https://`),
+  `{"kind":"table","columns":[…],"rows":[[…]]}` (at most 100 rows, no row longer than `columns`); `tone` is
+  `none`, `info`, `success`, `warning` or `danger`. An update with a non-http link, a non-finite progress or an
+  oversized table is dropped with the rest of its content, as one beyond the caps (200 elements, 32 KiB).
 - `GET /api/sessions/{id}/servers` → `[{name, command, suggested, state, running, url, exitCode, output}]`:
   the project's servers (`.agents/servers.json`) and their state in this session. When the file
   lists none, one `dev` server guessed from the project (a Justfile `dev` recipe, a package.json
@@ -661,9 +674,11 @@ read-only. The human edits them as usual.
 - `POST /api/sessions/{id}/stop` → 202; the turn ends with `chat.done` reason `"stopped"`
 - `GET /api/notices` → Server-Sent Events. A snapshot of what needs the human, sent on connect and
   re-sent when it changes; child sessions stay silent. Each event is
-  `data: {"items": [...], "budgets": [...]}`; `items` are the attention items (`sessionId`, `title`,
+  `data: {"items": [...], "budgets": [...], "pluginsVersion": <n>}`; `items` are the attention items (`sessionId`, `title`,
   `projectId`, `kind`, `detail`), `budgets` one entry per project whose monthly budget is at alert
-  or exceeded (`projectId`, `project`, `status` `alert`|`exceeded`, `detail`); no backlog is sent on connect.
+  or exceeded (`projectId`, `project`, `status` `alert`|`exceeded`, `detail`), `pluginsVersion` a counter that
+  moves on every accepted plugin block.update, so a tab refreshes on new plugin data without a session log
+  changing; no backlog is sent on connect.
 - `GET /api/sessions/{id}/events` → Server-Sent Events. Each stored event is sent as
 
   ```

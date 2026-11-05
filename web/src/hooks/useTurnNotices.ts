@@ -41,9 +41,14 @@ function bodyFor(item: AttentionItem, t: (key: MsgKey, vars?: Record<string, str
   }
 }
 
-export function useTurnNotices(onOpen?: (sessionId: string) => void): { items: AttentionItem[] } {
+export function useTurnNotices(onOpen?: (sessionId: string) => void): {
+  items: AttentionItem[];
+  /** Moves on every accepted plugin block update: the block-fetching components refetch on it. */
+  pluginsVersion: number;
+} {
   const t = useT();
   const [items, setItems] = useState<AttentionItem[]>([]);
+  const [pluginsVersion, setPluginsVersion] = useState(0);
   const previous = useRef<Set<string>>(new Set());
   const previousBudgets = useRef<Set<string>>(new Set());
   const baseline = useRef(true);
@@ -58,9 +63,11 @@ export function useTurnNotices(onOpen?: (sessionId: string) => void): { items: A
       const snapshot = JSON.parse(event.data) as {
         items: AttentionItem[];
         budgets?: BudgetNotice[];
+        pluginsVersion?: number;
       };
       const budgets = snapshot.budgets ?? [];
       setItems(snapshot.items);
+      setPluginsVersion(snapshot.pluginsVersion ?? 0);
       // The first snapshot is the baseline: it populates the badge but does
       // not notify for what was already waiting before the tab opened.
       const first = baseline.current;
@@ -109,5 +116,5 @@ export function useTurnNotices(onOpen?: (sessionId: string) => void): { items: A
     return () => source.close();
   }, []);
 
-  return { items };
+  return { items, pluginsVersion };
 }
