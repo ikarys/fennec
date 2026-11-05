@@ -170,11 +170,13 @@ pub(super) fn content(
         return http::error(stream, 404, "version not found");
     };
 
+    let csp = artifact.format.sandbox_csp(&bytes);
+    let header = csp.map(|csp| ("Content-Security-Policy", csp));
     http::send_with(
         stream,
         200,
         artifact.format.content_type(),
-        &[("Content-Security-Policy", canvas::SANDBOX_CSP)],
+        header.as_slice(),
         &bytes,
     )
 }
@@ -393,6 +395,17 @@ mod tests {
     #[test]
     fn rejects_unknown_language() {
         assert!(create_body_from_value(&json!({ "language": "pdf", "content": "x" })).is_err());
+    }
+
+    #[test]
+    fn parses_mermaid_language() {
+        let body =
+            create_body_from_value(&json!({ "language": "mermaid", "content": "x" })).unwrap();
+        let CreateBody::Block { format, content } = body else {
+            panic!("expected block body");
+        };
+        assert_eq!(format, Format::Mermaid);
+        assert_eq!(content, "x");
     }
 
     #[test]

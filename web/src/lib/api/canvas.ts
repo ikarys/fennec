@@ -1,7 +1,7 @@
 import { request } from './request';
 
-export type CanvasFormat = 'html' | 'markdown' | 'svg' | 'png' | 'jpeg' | 'gif' | 'webp';
-export type CanvasPinLanguage = 'html' | 'markdown' | 'md' | 'svg';
+export type CanvasFormat = 'html' | 'markdown' | 'svg' | 'png' | 'jpeg' | 'gif' | 'webp' | 'pdf' | 'mermaid' | 'json';
+export type CanvasPinLanguage = 'html' | 'markdown' | 'md' | 'svg' | 'mermaid' | 'json';
 
 export type CanvasSource = { kind: 'file'; path: string } | { kind: 'message' };
 
