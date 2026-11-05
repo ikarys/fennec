@@ -193,11 +193,12 @@ body {
   /* GFM task lists (a plan's criteria in the thread): the checkbox leaves the
      text flow so every text line, wrapped ones included, starts in one column,
      and the box centres on its line instead of sitting on the baseline.
-     Without :has() the list renders as before. */
-  li:has(> input[type="checkbox"]) {
+     Scoped to the class the Markdown renderer sets: any other list row with
+     a checkbox (the sessions table) keeps its own layout. */
+  li.task-list-item {
     padding-left: 1.125rem;
   }
-  li:has(> input[type="checkbox"]) > input[type="checkbox"] {
+  li.task-list-item > input[type="checkbox"] {
     margin-left: -1.125rem;
     margin-right: 0.25rem;
     vertical-align: middle;
