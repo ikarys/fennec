@@ -671,49 +671,61 @@ export function SessionPage({
                     {/* A shadow under the title: the thread fades under it instead of meeting a hard edge. */}
                     <div className="relative z-10 flex items-center gap-2 px-4 md:px-6 py-2.5 after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-5 after:bg-linear-to-b after:from-black/45 after:to-transparent">
                       <div className="mx-auto flex w-full max-w-[960px] items-center gap-2">
-                        <h1
-                          className="min-w-0 truncate text-base font-semibold"
-                          title={title}
-                        >
-                          {title}
-                        </h1>
-                        <Badge
-                          tone={status.tone}
-                          dot={status.live}
-                          pulse={status.live}
-                        >
-                          {status.label}
-                        </Badge>
-                        <span
-                          className="shrink-0 text-xs text-muted"
-                          title={isChat ? undefined : detail?.project.workdir}
-                        >
-                          {isChat ? t('sessionPageChat') : projectName}
-                        </span>
-                        {detail && (
-                          <span
-                            className="shrink-0 text-xs text-muted tabular-nums"
-                            title={t('sessionPageCreatedTitle')}
-                          >
-                            {formatDateTime(lang, detail.createdAt)}
-                          </span>
-                        )}
-                        {sessionId && !isChat && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            iconOnly
-                            title={t('tryChange')}
-                            aria-label={t('tryChange')}
-                            onClick={() => setTryOpen(true)}
-                          >
-                            <PlayIcon className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                        {sessionId && (
-                          <SessionCanvasMenu sessionId={sessionId} refreshKey={view} onOpen={setCanvasId} />
-                        )}
-                        <div className="ml-auto">
+                        {/* Title and state first; project and date on a quieter line below: the header stays light. */}
+                        <div className="min-w-0">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <h1
+                              className="min-w-0 truncate text-base font-semibold"
+                              title={title}
+                            >
+                              {title}
+                            </h1>
+                            <Badge
+                              tone={status.tone}
+                              dot={status.live}
+                              pulse={status.live}
+                            >
+                              {status.label}
+                            </Badge>
+                          </div>
+                          <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted">
+                            <span
+                              className="truncate"
+                              title={isChat ? undefined : detail?.project.workdir}
+                            >
+                              {isChat ? t('sessionPageChat') : projectName}
+                            </span>
+                            {detail && (
+                              <>
+                                <span aria-hidden>·</span>
+                                <span
+                                  className="shrink-0 tabular-nums"
+                                  title={t('sessionPageCreatedTitle')}
+                                >
+                                  {formatDateTime(lang, detail.createdAt)}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        <div className="ml-auto flex shrink-0 items-center gap-1">
+                          {sessionId && !isChat && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              iconOnly
+                              title={t('tryChange')}
+                              aria-label={t('tryChange')}
+                              onClick={() => setTryOpen(true)}
+                            >
+                              <PlayIcon className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                          {sessionId && (
+                            <SessionCanvasMenu sessionId={sessionId} refreshKey={view} onOpen={setCanvasId} />
+                          )}
+                        </div>
+                        <div className="ml-2">
                           <ContextGauge
                             context={context}
                             compactDisabled={
