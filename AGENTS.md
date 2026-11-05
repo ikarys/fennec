@@ -74,6 +74,7 @@ crates/fennec/src/
     task_proposal.rs   the backlog tasks an agent proposed with propose_task, and which the human accepted
     agent_suggestion.rs the agent switch an agent suggested, since the human last wrote
     understanding.rs   the comprehension dialogue on a branch: its link, held once the human answered on the current head
+    plan.rs            a plan the agent proposes with propose_plan: steps, criteria, its canonical markdown
     plan_scope.rs      the files the approved plan says it will touch; those a branch changed outside it
     review_map.rs      the review order of a branch's files: per-file signals (gate checks, churn, tests, size)
     workflow/          a workflow: definition (nodes, ports, edges), template ({{…}} names),

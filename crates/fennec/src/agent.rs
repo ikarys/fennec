@@ -8,6 +8,7 @@ pub mod ports;
 mod preflight;
 mod prompt;
 mod propose_criteria;
+mod propose_plan;
 mod propose_task;
 mod queue;
 mod record_decision;
@@ -36,6 +37,7 @@ mod tests {
         assert!(KNOWN_TOOLS.contains(&super::ask_user::NAME));
         assert!(KNOWN_TOOLS.contains(&super::record_decision::NAME));
         assert!(KNOWN_TOOLS.contains(&super::propose_criteria::NAME));
+        assert!(KNOWN_TOOLS.contains(&super::propose_plan::NAME));
         assert!(KNOWN_TOOLS.contains(&super::request_waiver::NAME));
         assert!(!KNOWN_TOOLS.contains(&"rm_rf"));
     }

@@ -44,6 +44,7 @@ with camelCase fields.
 | `tests.approved` | `{runId, files}`: the human validated the tests written before the code at the workflow's test gate; those files are protected for the rest of the session |
 | `audit.tasks_created` | `{findings, ideaIds}`: the human turned audit findings into backlog ideas; `findings` are the report finding numbers, `ideaIds` the created ideas |
 | `task.proposed` | `{callId, title, text}`: a backlog task an agent proposed with `propose_task` (indicative: produced by a model); the turn goes on |
+| `plan.proposed` | `{callId, plan: {title, goal, steps: [{title, files, change}], doneWhen: [{text, check?}], risks}, markdown}`: the plan a plan agent recorded with `propose_plan` (indicative: produced by a model); `markdown` is the canonical text fennec rendered from it when it was recorded (`## Plan: …`, `## Done when`, `## Risks and open questions`): the workflow node's output, what the UI sends back as the approved plan, and the only plan text downstream readers parse; the turn ends `complete` and the human reviews it |
 | `task.accepted` | `{callId, ideaId}`: the human added the proposed task `callId` to the project's backlog as `ideaId` |
 | `agents_md.written` | `{replaced}`: the human wrote the AGENTS.md draft of the last answer to the project's root; `replaced` when a file was there |
 | `architecture.rules_added` | `{count}`: the human appended the rules proposed in the last answer to `.agents/architecture`; `count` rule lines, comments aside |

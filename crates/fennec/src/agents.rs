@@ -157,7 +157,8 @@ mod tests {
                 "web_search",
                 "web_fetch",
                 "suggest_agent",
-                "canvas"
+                "canvas",
+                "propose_plan"
             ]
         );
         assert_eq!(plan.commands, CommandAccess::ReadOnly);

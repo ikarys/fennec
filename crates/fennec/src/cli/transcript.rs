@@ -147,6 +147,7 @@ impl Transcript {
             | Event::DecisionRecorded { .. }
             | Event::TaskProposed { .. }
             | Event::TaskAccepted { .. }
+            | Event::PlanProposed { .. }
             | Event::AgentSuggested { .. }
             | Event::RuleBlocked { .. }
             | Event::RuleApprovalRequested { .. }
