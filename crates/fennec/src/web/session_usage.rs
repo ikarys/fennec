@@ -166,7 +166,7 @@ mod tests {
         let ledger = Ledger::open_in_memory().unwrap();
         let summary = ledger.summary(&Filter::default()).unwrap();
         let pricing = Pricing {
-            cost: llm_providers::Cost::default(),
+            cost: llm_providers_connector::Cost::default(),
             priced: 0,
             unpriced: vec![],
         };
@@ -199,7 +199,7 @@ mod tests {
             generation_speed: 42.5,
         };
         let pricing = Pricing {
-            cost: llm_providers::Cost::default(),
+            cost: llm_providers_connector::Cost::default(),
             priced: 0,
             unpriced: vec![],
         };

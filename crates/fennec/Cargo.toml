@@ -6,7 +6,7 @@ license.workspace = true
 
 [dependencies]
 base64 = "0.23"
-llm-providers = { path = "../llm-providers" }
+llm-providers-connector = { git = "ssh://git@github.com/ikarys/llm-providers-connector.git", tag = "v0.1.0" }
 token-usage = { path = "../token-usage" }
 backlog = { path = "../backlog" }
 rules = { path = "../rules" }

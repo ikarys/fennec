@@ -4,7 +4,7 @@
 
 use crate::domain::lang::Lang;
 use crate::domain::preferences::Preferences;
-use llm_providers::{Cost, Price};
+use llm_providers_connector::{Cost, Price};
 use std::collections::BTreeMap;
 use token_usage::Row;
 use token_usage::display::usd;
