@@ -124,6 +124,11 @@ about the branch, explains what they missed with `path:line` sources and checks 
 `understanding.started` in the reviewed session's log; the dialogue counts as held once the human answered on the branch's
 current head (verified; `domain/understanding.rs`). A branch that changes a sensitive zone without one gets an
 `understandingMissing` blocker the human accepts.
+The same agent holds the dialogue on any part of the project the human names (a module, a flow, a design choice): a
+bulb button next to the Analyses tab's question form, which reads the current code and asks architecture-level questions.
+Learning mode, done (C24): the read-only `mentor` agent (`crates/fennec/agents/mentor.agent.md`, under Construire in the
+composer's menu) splits a task into small steps the human writes themselves, reads their diff after each one, points at
+what goes wrong with a hint rather than a fix, and closes with what they built and learned; it never writes the code.
 Project kickoff, done: the read-only `kickoff` agent ("Démarrer le projet" in the Analyses tab) asks what a new
 project is for, has the human choose its stack and architecture (`record_decision`), drafts its AGENTS.md and
 proposes its first tasks in build order, a walking skeleton first, with `propose_task` (`task.proposed`); the human

@@ -38,6 +38,11 @@ const ANALYSES = [
 
 type Analysis = (typeof ANALYSES)[number];
 
+/** The understand agent's brief on a part of the project (not a branch: the current code). */
+function understandTopicPrompt(topic: string): string {
+  return `Hold a comprehension dialogue with me on this part of the project: ${topic}\nRead the current code (no branch to diff), then ask me your questions.`;
+}
+
 export function AnalysesSection({
   busy,
   error,
@@ -59,7 +64,11 @@ export function AnalysesSection({
 
   return (
     <div className="flex flex-col gap-3">
-      <QuestionForm busy={busy} onAsk={(question) => onStart(question, 'ask')} />
+      <QuestionForm
+        busy={busy}
+        onAsk={(question) => onStart(question, 'ask')}
+        onUnderstand={(topic) => onStart(understandTopicPrompt(topic), 'understand')}
+      />
       <Section
         title={t('analysesTitle')}
         description={t('analysesDescription')}
