@@ -35,6 +35,7 @@ import { Badge } from "../components/ui/Badge";
 import { AuditCard } from "../components/session/AuditCard";
 import { ProposedTasksCard } from "../components/session/ProposedTasksCard";
 import { AgentsMdCard } from "../components/session/AgentsMdCard";
+import { RuleProposalCard } from "../components/session/RuleProposalCard";
 import { AgentSuggestionCard } from "../components/session/AgentSuggestionCard";
 import { ContextPanel } from "../components/session/ContextPanel";
 import { ContextGauge } from "../components/session/ContextGauge";
@@ -764,6 +765,13 @@ export function SessionPage({
                               draft={detail.agentsMdDraft}
                               sessionId={sessionId}
                               onWritten={() => setDetailVersion((version) => version + 1)}
+                            />
+                          ) : null}
+                          {detail && detail.ruleProposal && !running ? (
+                            <RuleProposalCard
+                              proposal={detail.ruleProposal}
+                              sessionId={sessionId}
+                              onAdded={() => setDetailVersion((version) => version + 1)}
                             />
                           ) : null}
                           {detail && detail.agentSuggestion && sessionId && detail.project.id && !running ? (

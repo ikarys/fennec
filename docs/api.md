@@ -45,6 +45,7 @@ with camelCase fields.
 | `task.proposed` | `{callId, title, text}`: a backlog task an agent proposed with `propose_task` (indicative: produced by a model); the turn goes on |
 | `task.accepted` | `{callId, ideaId}`: the human added the proposed task `callId` to the project's backlog as `ideaId` |
 | `agents_md.written` | `{replaced}`: the human wrote the AGENTS.md draft of the last answer to the project's root; `replaced` when a file was there |
+| `architecture.rules_added` | `{count}`: the human appended the rules proposed in the last answer to `.agents/architecture`; `count` rule lines, comments aside |
 | `understanding.started` | `{sessionId, head}`: the human opened a comprehension dialogue (the session `sessionId`, on the `understand` agent) on the branch's tip commit `head`; recorded in the reviewed session's log |
 | `agent.suggested` | `{callId, agent, reason, brief}`: the `suggest_agent` tool: an agent suggests the human go on in a new session with another agent; nothing switches until the human opens it |
 | `rule.blocked` | `{callId, ruleId, kind, pattern, scope, subject}`: fennec refused a tool call by one of the human's rules (fennec's own check, verified), before the call's failed `tool.result`; `kind` `command`/`tool`/`path`, `scope` `global`/`project`/`session`, `subject` the command, tool name or path refused (workdir-relative inside it, absolute outside); a negative `ruleId` is one of the kernel's own rules (`GET /api/rules` `fennec`) |
@@ -412,7 +413,8 @@ read-only. The human edits them as usual.
   `callId` to the session's project backlog (title, blank line, text); 404 when no such proposal; 409 when already
   accepted; records `task.accepted` in the session's log;
 - `POST /api/sessions/{id}/agents-md` `{}` → `{replaced}`: writes the last answer's AGENTS.md draft to the project's root; 400 when the last answer has no draft; 409 when AGENTS.md is a symlink; records `agents_md.written`;
-- `GET /api/sessions/{id}` → `{id, title, state, mode, model, project: {id, name, workdir}, worktree, idea, request, audit, proposedTasks, agentsMdDraft, agentSuggestion}`;
+- `POST /api/sessions/{id}/architecture-rules` `{}` → `{count}`: appends the last answer's proposed rules not yet in `.agents/architecture` (each with its comment), creating the file if needed; 400 when none is new; 409 when `.agents` or the file is a symlink; records `architecture.rules_added`;
+- `GET /api/sessions/{id}` → `{id, title, state, mode, model, project: {id, name, workdir}, worktree, idea, request, audit, proposedTasks, agentsMdDraft, ruleProposal, agentSuggestion}`;
   `idea` is `{id, state}` when the session frames one of the project's ideas, else null;
   `audit` is the session's last answer read as an audit report, `{scope, summary, findings: [{number, title,
   severity: high|medium|low, principle, locations: [string], problem, fix}], taken: [number]}`, or null when it is
@@ -420,6 +422,7 @@ read-only. The human edits them as usual.
   `proposedTasks` is `[{callId, title, text, ideaId}]`, the tasks proposed in the session in order, `ideaId` null
   until the human accepts one;
   `agentsMdDraft` is `{exists, written}` when the last answer holds an AGENTS.md draft (`## AGENTS.md draft` then a ```md block), else null;
+  `ruleProposal` is `{lines, added}` when the last answer proposes rules (`## Executable rules` then a fenced block of rule lines and `#` comments): `lines` those not yet in `.agents/architecture`, `added` once the human appended them; else null;
   `agentSuggestion` is `{callId, agent, name, color, reason, brief}`, the last `agent.suggested` since the human last wrote, while that agent exists as a mode, else null;
   `request` is the first message the human typed in the session, verbatim, or null;
   `model` is `{provider, model, providerName, contextWindow, compactAt, source}`,

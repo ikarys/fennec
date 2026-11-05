@@ -1,7 +1,8 @@
 //! The AGENTS.md draft an agent ends its answer with: parsed from the answer
 //! text, and whether the human already wrote it since that answer.
 
-use crate::domain::event::{Event, Role};
+use crate::domain::conversation;
+use crate::domain::event::Event;
 
 /// The first `## AGENTS.md draft` section's ```md block, if any.
 ///
@@ -54,30 +55,15 @@ pub fn draft(answer: &str) -> Option<String> {
 
 /// True when the human wrote the draft after the last assistant answer.
 pub fn written_since_last_answer(events: &[Event]) -> bool {
-    let mut last_assistant = None;
-    for (index, event) in events.iter().enumerate() {
-        if matches!(
-            event,
-            Event::MessageStart {
-                role: Role::Assistant,
-                ..
-            }
-        ) {
-            last_assistant = Some(index);
-        }
-    }
-    if let Some(start) = last_assistant {
-        events[start + 1..]
-            .iter()
-            .any(|event| matches!(event, Event::AgentsMdWritten { .. }))
-    } else {
-        false
-    }
+    conversation::since_last_answer(events, |event| {
+        matches!(event, Event::AgentsMdWritten { .. })
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::event::Role;
 
     fn assistant_start(message_id: &str) -> Event {
         Event::MessageStart {

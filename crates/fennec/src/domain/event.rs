@@ -553,6 +553,9 @@ pub enum Event {
     /// The human wrote the agent's AGENTS.md draft to the project (fennec's own event).
     #[serde(rename = "agents_md.written", rename_all = "camelCase")]
     AgentsMdWritten { replaced: bool },
+    /// The human appended the agent's proposed rules to .agents/architecture (fennec's own event).
+    #[serde(rename = "architecture.rules_added", rename_all = "camelCase")]
+    ArchitectureRulesAdded { count: usize },
     /// The human opened a comprehension dialogue on the session's branch (fennec's own event):
     /// `session_id` is the dialogue's session, `head` the branch's tip commit it is about.
     #[serde(rename = "understanding.started", rename_all = "camelCase")]
@@ -615,6 +618,7 @@ impl Event {
             Event::QueueDrained { .. } => "queue.drained",
             Event::QueueCancelled { .. } => "queue.cancelled",
             Event::AgentsMdWritten { .. } => "agents_md.written",
+            Event::ArchitectureRulesAdded { .. } => "architecture.rules_added",
             Event::UnderstandingStarted { .. } => "understanding.started",
             Event::WorktreeDiscarded { .. } => "worktree.discarded",
         }

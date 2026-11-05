@@ -12,9 +12,9 @@ use super::proposal_routes;
 use super::{
     assets, backlog_routes, canvas_routes, event_stream, file_manager, folder_routes, idea_routes,
     integration, mcp_routes, model_routes, plugin_routes, project_dashboard, project_delete,
-    project_list_routes, project_routes, rule_approval_routes, rule_routes, servers,
-    session_delete, session_routes, settings_routes, terminal, waiver_routes, workflow_routes,
-    worktree_routes,
+    project_list_routes, project_routes, rule_approval_routes, rule_bridge_routes, rule_routes,
+    servers, session_delete, session_routes, settings_routes, terminal, waiver_routes,
+    workflow_routes, worktree_routes,
 };
 use serde_json::json;
 use std::net::TcpStream;
@@ -175,6 +175,9 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
             proposal_routes::accept(app, stream, id, call_id)
         }
         ("POST", ["api", "sessions", id, "agents-md"]) => agents_md_routes::write(app, stream, id),
+        ("POST", ["api", "sessions", id, "architecture-rules"]) => {
+            rule_bridge_routes::add(app, stream, id)
+        }
         ("POST", ["api", "sessions", id, "mode"]) => {
             session_routes::set_session_mode(app, req, stream, id)
         }

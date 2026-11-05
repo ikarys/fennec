@@ -32,6 +32,7 @@ use crate::domain::preferences::ModelRef;
 use crate::domain::project::SessionSummary;
 use crate::domain::queue;
 use crate::domain::replay::replayable;
+use crate::domain::rule_bridge;
 use crate::domain::session_skills::missed_always_on;
 use crate::domain::slash::{TurnInput, resolve};
 use crate::domain::task_proposal;
@@ -214,6 +215,17 @@ pub(super) fn get_session(app: &App, stream: &mut TcpStream, id: &str) -> Result
             "written": agents_md::written_since_last_answer(&events),
         }),
         None => Value::Null,
+    };
+    // The last answer's proposed architecture rules, if any, and whether the human already added them.
+    let existing_rules =
+        std::fs::read_to_string(Path::new(&p.workdir).join(".agents/architecture"))
+            .unwrap_or_default();
+    v["ruleProposal"] = match rule_bridge::proposed_lines(&last_assistant_text(&events)) {
+        lines if lines.is_empty() => Value::Null,
+        lines => json!({
+            "lines": rule_bridge::new_lines(&lines, &existing_rules),
+            "added": rule_bridge::appended_since_last_answer(&events),
+        }),
     };
     // The agent switch suggested in this turn, with the target's display name; dropped if that agent is gone.
     v["agentSuggestion"] = agent_suggestion::last_suggestion(&events)

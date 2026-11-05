@@ -150,6 +150,10 @@ the turn with the call open (`rule.approval_requested`); the human answers on a 
 on the path and its subdirectories, the command, the tool), always or never (a project rule). fennec then runs the
 recorded call itself or refuses it, and the turn goes on: the model never retries. With the human away (night mode),
 an "ask" is refused.
+Rule bridge, done (C16): the read-only `rules` agent ("Rendre les consignes exécutables" in the Analyses tab) checks which
+guidelines of AGENTS.md a text or import rule can enforce, verifies each against the code, and ends with the rule lines
+for `.agents/architecture`, each under a comment citing its guideline; the human appends the new ones in one click
+(`architecture.rules_added`, `domain/rule_bridge.rs`, `web/rule_bridge_routes.rs`). A guideline is advice; the gate's rule is not.
 Produced architecture, done (C12): `.agents/architecture` also takes module rules (`<A> never imports <B>`), checked on
 every dependency of the project map; the "Carte des modules" tab lists the breaks, draws them red, and counts the dependencies added or
 removed since the committed `docs/map.md` (verified; `domain/drift.rs`).
@@ -252,6 +256,7 @@ crates/fennec/src/
     risk.rs            risk zones: a commit's authorship from its trailers, the signals, the report;
                        risk/test_subject.rs which files need a test of their own (the untested signal skips the rest)
     agents_md.rs       the AGENTS.md draft at the end of an answer, which the human writes in one click
+    rule_bridge.rs     the architecture rules an answer proposes, those not yet in `.agents/architecture`
     task_proposal.rs   the backlog tasks an agent proposed with propose_task, and which the human accepted
     agent_suggestion.rs the agent switch an agent suggested, since the human last wrote
     understanding.rs   the comprehension dialogue on a branch: its link, held once the human answered on the current head

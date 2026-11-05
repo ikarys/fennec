@@ -79,6 +79,8 @@ export interface SessionDetail {
   proposedTasks: ProposedTask[];
   /** The last answer holds an AGENTS.md draft: whether the file exists, and whether the human already wrote this draft. */
   agentsMdDraft: { exists: boolean; written: boolean } | null;
+  /** The last answer proposes architecture rules: the lines to append, and whether the human already added them. */
+  ruleProposal: { lines: string[]; added: boolean } | null;
   /** The agent switch suggested in this turn, if the target agent still exists. */
   agentSuggestion: AgentSuggestion | null;
 }
@@ -136,6 +138,13 @@ export function acceptProposedTask(sessionId: string, callId: string): Promise<{
 
 export function writeAgentsMd(sessionId: string): Promise<{ replaced: boolean }> {
   return request<{ replaced: boolean }>(`/api/sessions/${encodeURIComponent(sessionId)}/agents-md`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+export function addArchitectureRules(sessionId: string): Promise<{ count: number }> {
+  return request<{ count: number }>(`/api/sessions/${encodeURIComponent(sessionId)}/architecture-rules`, {
     method: 'POST',
     body: JSON.stringify({}),
   });
