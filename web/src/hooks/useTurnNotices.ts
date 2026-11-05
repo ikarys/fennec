@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useT } from '../i18n';
 import type { MsgKey } from '../i18n/messages';
 import type { AttentionItem } from '../lib/api';
+import type { BudgetNotice } from '../lib/api/sessions';
 
 /** True when the current hash shows this session: `#/s/<id>` or a split pane `#/split/<a>/<b>`. */
 function hashShowsSession(hash: string, sessionId: string): boolean {
@@ -44,6 +45,7 @@ export function useTurnNotices(onOpen?: (sessionId: string) => void): { items: A
   const t = useT();
   const [items, setItems] = useState<AttentionItem[]>([]);
   const previous = useRef<Set<string>>(new Set());
+  const previousBudgets = useRef<Set<string>>(new Set());
   const baseline = useRef(true);
   // The callback is read through a ref so a notification click always uses the
   // latest `openSession` without re-creating the stream on every render.
@@ -53,7 +55,11 @@ export function useTurnNotices(onOpen?: (sessionId: string) => void): { items: A
   useEffect(() => {
     const source = new EventSource('/api/notices');
     source.onmessage = (event) => {
-      const snapshot = JSON.parse(event.data) as { items: AttentionItem[] };
+      const snapshot = JSON.parse(event.data) as {
+        items: AttentionItem[];
+        budgets?: BudgetNotice[];
+      };
+      const budgets = snapshot.budgets ?? [];
       setItems(snapshot.items);
       // The first snapshot is the baseline: it populates the badge but does
       // not notify for what was already waiting before the tab opened.
@@ -81,8 +87,24 @@ export function useTurnNotices(onOpen?: (sessionId: string) => void): { items: A
             notification.close();
           };
         }
+        for (const budget of budgets) {
+          const key = budget.projectId + ':' + budget.status;
+          if (previousBudgets.current.has(key)) continue;
+          const notification = new Notification(budget.project, {
+            body: budget.detail,
+            tag: 'budget:' + key,
+          });
+          notification.onclick = () => {
+            window.focus();
+            window.location.hash = '#/project/' + encodeURIComponent(budget.projectId);
+            notification.close();
+          };
+        }
       }
       previous.current = new Set(snapshot.items.map((item) => item.sessionId));
+      previousBudgets.current = new Set(
+        budgets.map((budget) => budget.projectId + ':' + budget.status),
+      );
     };
     return () => source.close();
   }, []);

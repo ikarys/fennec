@@ -10,11 +10,11 @@ use super::audit_routes;
 use super::http::{Request, error, send, send_json};
 use super::proposal_routes;
 use super::{
-    assets, backlog_routes, canvas_routes, event_stream, file_manager, folder_routes, idea_routes,
-    integration, mcp_routes, model_routes, plugin_routes, project_dashboard, project_delete,
-    project_list_routes, project_routes, rule_approval_routes, rule_bridge_routes, rule_routes,
-    servers, session_delete, session_routes, settings_routes, terminal, waiver_routes,
-    workflow_routes, worktree_routes,
+    assets, backlog_routes, budget_routes, canvas_routes, event_stream, file_manager,
+    folder_routes, idea_routes, integration, mcp_routes, model_routes, plugin_routes,
+    project_dashboard, project_delete, project_list_routes, project_routes, rule_approval_routes,
+    rule_bridge_routes, rule_routes, servers, session_delete, session_routes, settings_routes,
+    terminal, waiver_routes, workflow_routes, worktree_routes,
 };
 use serde_json::json;
 use std::net::TcpStream;
@@ -112,6 +112,8 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         ("POST", ["api", "projects", id, "favorite"]) => {
             project_list_routes::set_favorite(app, req, stream, id)
         }
+        ("GET", ["api", "projects", id, "budget"]) => budget_routes::get(app, stream, id),
+        ("POST", ["api", "projects", id, "budget"]) => budget_routes::set(app, req, stream, id),
         ("GET", ["api", "plugins"]) => plugin_routes::list(app, stream),
         ("POST", ["api", "plugins"]) => plugin_routes::set(app, req, stream),
         ("GET", ["api", "sessions", id, "plugins"]) => {
