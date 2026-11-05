@@ -89,14 +89,16 @@ pub fn last_assistant_text(events: &[Event]) -> String {
 }
 
 /// A workflow agent node's output among `events`: when the agent recorded a
-/// plan with `propose_plan`, the last one as fennec's canonical markdown;
-/// else the last assistant text holding a plan or report contract (a
-/// `## Plan: …` or `## Report: …` heading, level 2 or 3), else the last
-/// assistant text. A closing line the model writes after its plan must not
-/// replace the plan.
+/// plan with `propose_plan` or a report with `submit_report`, the last of
+/// those as fennec's canonical markdown; else the last assistant text
+/// holding a plan or report contract (a `## Plan: …` or `## Report: …`
+/// heading, level 2 or 3), else the last assistant text. A closing line the
+/// model writes after its plan must not replace the plan.
 pub fn node_output(events: &[Event]) -> String {
     if let Some(markdown) = events.iter().rev().find_map(|event| match event {
-        Event::PlanProposed { markdown, .. } => Some(markdown),
+        Event::PlanProposed { markdown, .. } | Event::ReportSubmitted { markdown, .. } => {
+            Some(markdown)
+        }
         _ => None,
     }) {
         return markdown.clone();
@@ -408,6 +410,60 @@ mod tests {
         );
         // With only the first proposal, its plan is the output.
         assert_eq!(node_output(&events[..2]), first.to_markdown());
+    }
+
+    #[test]
+    fn node_output_prefers_the_report_recorded_after_the_plan() {
+        use crate::domain::plan::{Plan, PlanStep, PlannedCriterion};
+        use crate::domain::report::{Report, ReportCriterion, ReportStep};
+        let plan = Plan {
+            title: "Plan".into(),
+            goal: "goal".into(),
+            steps: vec![PlanStep {
+                title: "s".into(),
+                files: vec![],
+                change: "c".into(),
+            }],
+            done_when: vec![PlannedCriterion {
+                text: "done".into(),
+                check: None,
+            }],
+            risks: vec![],
+        };
+        let report = Report {
+            title: "Plan".into(),
+            summary: "the work is done".into(),
+            steps: vec![ReportStep {
+                title: "s".into(),
+                done: true,
+                note: Some("done".into()),
+            }],
+            done_when: vec![ReportCriterion {
+                text: "done".into(),
+                met: true,
+                how: Some("checked".into()),
+            }],
+            changed: vec![],
+            test: String::new(),
+            todo: String::new(),
+        };
+        let plan_markdown = plan.to_markdown();
+        let report_markdown = report.to_markdown();
+        let events = vec![
+            Event::PlanProposed {
+                call_id: "c1".into(),
+                markdown: plan_markdown.clone(),
+                plan,
+            },
+            Event::ReportSubmitted {
+                call_id: "c2".into(),
+                markdown: report_markdown.clone(),
+                report: report.clone(),
+            },
+        ];
+        assert_eq!(node_output(&events), report_markdown);
+        // With only the plan, its markdown is the output.
+        assert_eq!(node_output(&events[..1]), plan_markdown);
     }
 
     #[test]

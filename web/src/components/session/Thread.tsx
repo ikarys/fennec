@@ -4,7 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { AssistantItem, PreflightResultView, Segment, ThreadItem } from '../../lib/fold';
 import { useDisplayPrefs } from '../../lib/display';
-import { splitContract, type Plan } from '../../lib/plan';
+import { splitContract, type Plan, type Report } from '../../lib/plan';
 import { BulbIcon, ChevronRightIcon, ReplayIcon } from '../Icons';
 import { buttonClass } from '../ui/Button';
 import { Card } from '../ui/Card';
@@ -95,6 +95,12 @@ const PlanSegment = memo(function PlanSegment({ id, plan, preflight }: { id: str
   return <PlanCard plan={plan} actions={planActions} preflight={preflight} />;
 });
 
+// The report a builder recorded with submit_report: the same card a text
+// contract renders.
+const ReportSegment = memo(function ReportSegment({ report }: { report: Report }) {
+  return <ReportCard report={report} />;
+});
+
 // A centered note that carries a detail (a compaction, a replay): the detail
 // opens under it on the text's own surface, never a box inside a box.
 const NoteDetail = memo(function NoteDetail({ text, detail }: { text: string; detail: string }) {
@@ -121,7 +127,7 @@ function AssistantItemView({ item, model, running, showHeader, pendingCallId }: 
   const streaming = running && !item.done;
   const copyText = item.done
     ? item.segments
-        .map((segment) => (segment.kind === 'text' ? segment.content : segment.kind === 'plan' ? segment.markdown : ''))
+        .map((segment) => (segment.kind === 'text' ? segment.content : segment.kind === 'plan' || segment.kind === 'report' ? segment.markdown : ''))
         .filter((text) => text.length > 0)
         .join('\n\n')
     : '';
@@ -147,6 +153,9 @@ function AssistantItemView({ item, model, running, showHeader, pendingCallId }: 
         }
         if (segment.kind === 'plan') {
           return <PlanSegment key={segment.id} id={segment.id} plan={segment.plan} preflight={item.preflight} />;
+        }
+        if (segment.kind === 'report') {
+          return <ReportSegment key={segment.id} report={segment.report} />;
         }
         return <ToolCard key={segment.id} tool={segment.tool} awaiting={segment.tool.id === pendingCallId} />;
       })}

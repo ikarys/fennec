@@ -188,7 +188,8 @@ mod tests {
                 "web_search",
                 "web_fetch",
                 "suggest_agent",
-                "canvas"
+                "canvas",
+                "submit_report"
             ]
         );
         assert_eq!(builder.commands, CommandAccess::ReadWrite);

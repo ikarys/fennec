@@ -32,6 +32,17 @@ export interface PlanProposal {
   risks?: string[];
 }
 
+/** The `report` payload of a `report.submitted` event (docs/api.md). */
+export interface ReportProposal {
+  title?: string;
+  summary?: string;
+  steps?: { title: string; done?: boolean; note?: string }[];
+  doneWhen?: { text: string; met?: boolean; how?: string }[];
+  changed?: { path: string; what: string }[];
+  test?: string;
+  todo?: string;
+}
+
 /**
  * The plan a plan agent recorded with `propose_plan`, as the thread shows it:
  * the steps numbered in order, each criterion one line (the check in backticks).
@@ -70,6 +81,35 @@ export interface Report {
   changed: { path: string; what: string }[];
   test: string;
   todo: string;
+}
+
+/**
+ * The report a builder recorded with `submit_report`, as the thread shows it:
+ * the same shape the legacy text report parses to — the steps numbered from 1,
+ * the note and the "how" in the detail.
+ */
+export function reportFromSubmission(proposal: ReportProposal): Report {
+  const steps = (proposal.steps ?? []).map((step, i) => ({
+    number: i + 1,
+    checked: step.done ?? false,
+    text: step.title,
+    detail: step.note ?? ''
+  }));
+  const doneWhen = (proposal.doneWhen ?? []).map((criterion) => ({
+    checked: criterion.met ?? false,
+    text: criterion.text,
+    detail: criterion.how ?? ''
+  }));
+  return {
+    kind: 'report',
+    title: proposal.title ?? '',
+    summary: proposal.summary ?? '',
+    steps,
+    doneWhen,
+    changed: proposal.changed ?? [],
+    test: proposal.test ?? '',
+    todo: proposal.todo ?? ''
+  };
 }
 
 type Token = { kind: 'heading'; text: string } | { kind: 'field'; text: string };

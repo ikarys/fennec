@@ -6,6 +6,7 @@ use super::criteria::{Criterion, CriterionStatus};
 use super::plan::Plan;
 use super::preferences::ModelRef;
 use super::preflight::PreflightResult;
+use super::report::Report;
 use super::stats::MessageStats;
 use super::workflow::definition::Workflow;
 use super::workflow::run::{RunOutcome, Via};
@@ -470,6 +471,18 @@ pub enum Event {
         plan: Plan,
         markdown: String,
     },
+    /// A builder recorded its report with submit_report (fennec's own event);
+    /// fennec renders it in the builder's "Final report" format, and the turn
+    /// ends.
+    #[serde(rename = "report.submitted", rename_all = "camelCase")]
+    /// `markdown` is the text fennec rendered when the report was recorded:
+    /// the workflow's node output, kept as written even if the rendering
+    /// changes later.
+    ReportSubmitted {
+        call_id: String,
+        report: Report,
+        markdown: String,
+    },
     /// The human accepted a proposed task into the backlog (fennec's own event).
     #[serde(rename = "task.accepted", rename_all = "camelCase")]
     TaskAccepted { call_id: String, idea_id: String },
@@ -623,6 +636,7 @@ impl Event {
             Event::AuditTasksCreated { .. } => "audit.tasks_created",
             Event::TaskProposed { .. } => "task.proposed",
             Event::PlanProposed { .. } => "plan.proposed",
+            Event::ReportSubmitted { .. } => "report.submitted",
             Event::TaskAccepted { .. } => "task.accepted",
             Event::AgentSuggested { .. } => "agent.suggested",
             Event::RuleBlocked { .. } => "rule.blocked",
@@ -744,6 +758,78 @@ mod tests {
             }
         );
         assert_eq!(event.kind(), "plan.proposed");
+        assert_eq!(serde_json::to_value(&event).unwrap(), wire);
+    }
+
+    #[test]
+    fn report_submitted_round_trips() {
+        use crate::domain::report::{ChangedFile, Report, ReportCriterion, ReportStep};
+        let wire = json!({
+            "type": "report.submitted",
+            "data": {
+                "callId": "c1",
+                "report": {
+                    "title": "Add the report tool",
+                    "summary": "The builder ends its turn with submit_report",
+                    "steps": [
+                        {"title": "Write the domain", "done": true, "note": "The vocabulary"},
+                        {"title": "Wire the tool", "done": false}
+                    ],
+                    "doneWhen": [
+                        {"text": "The build passes", "met": true, "how": "cargo build"},
+                        {"text": "The code stays clean", "met": false}
+                    ],
+                    "changed": [{"path": "src/report.rs", "what": "The vocabulary"}],
+                    "test": "",
+                    "todo": ""
+                },
+                "markdown": "## Report: Add the report tool"
+            }
+        });
+
+        let event: Event = serde_json::from_value(wire.clone()).unwrap();
+        assert_eq!(
+            event,
+            Event::ReportSubmitted {
+                call_id: "c1".into(),
+                report: Report {
+                    title: "Add the report tool".into(),
+                    summary: "The builder ends its turn with submit_report".into(),
+                    steps: vec![
+                        ReportStep {
+                            title: "Write the domain".into(),
+                            done: true,
+                            note: Some("The vocabulary".into()),
+                        },
+                        ReportStep {
+                            title: "Wire the tool".into(),
+                            done: false,
+                            note: None,
+                        },
+                    ],
+                    done_when: vec![
+                        ReportCriterion {
+                            text: "The build passes".into(),
+                            met: true,
+                            how: Some("cargo build".into()),
+                        },
+                        ReportCriterion {
+                            text: "The code stays clean".into(),
+                            met: false,
+                            how: None,
+                        },
+                    ],
+                    changed: vec![ChangedFile {
+                        path: "src/report.rs".into(),
+                        what: "The vocabulary".into(),
+                    }],
+                    test: String::new(),
+                    todo: String::new(),
+                },
+                markdown: "## Report: Add the report tool".into(),
+            }
+        );
+        assert_eq!(event.kind(), "report.submitted");
         assert_eq!(serde_json::to_value(&event).unwrap(), wire);
     }
 
