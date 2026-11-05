@@ -184,6 +184,9 @@ preview pane or a message's ```html/```md block, each version kept and browsable
 the whole page, a quote or a drawn region, and the note lands in the composer as text the agent reads. The `canvas`
 crate owns it all (its own `canvas.db`, `FENNEC_CANVAS_DB`); a project's Canvas tab lists and deletes them, and deleting
 a session or a project deletes its artifacts, never the file. A file's versions are taken when the canvas is read; a pinned block's, from the blocks of its format the agent writes after it (`canvas::revisions`).
+The agent opens and revises one itself with the `canvas` tool (title, format, the whole document; the same title is the
+same canvas, each call a version, `tools/canvas.rs`): it writes fennec's canvas store, never the project, so the read-only
+agents have it too, and the pane opens on the canvas the agent just changed.
 Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
 1. To be chosen among the remaining capabilities C* of the Notion definition.
@@ -274,7 +277,7 @@ crates/fennec/src/
                        criteria (the criteria node and the agents' verdicts)
   tools/             Toolbox adapter: one file per tool, path_guard, args; sandbox (the bwrap
                      world of commands); rule_request (a tool call as the rules crate's requests, paths resolved here);
-                     web_search queries the SearXNG instance from the Settings page
+                     web_search queries the SearXNG instance from the Settings page; canvas writes the session's canvas store
   llm/               Model adapter: openai.rs, the Model port over llm-providers (tool-call arguments parsed here)
                      concurrency.rs the local model's gate: one round at a time, the same session kept between
                      its rounds so the server's prompt cache stays warm (`FENNEC_MODEL_AFFINITY_SECS`)

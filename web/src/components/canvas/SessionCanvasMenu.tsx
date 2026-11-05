@@ -20,17 +20,27 @@ export function SessionCanvasMenu({ sessionId, refreshKey, onOpen }: SessionCanv
   const tRef = useRef(t);
   tRef.current = t;
   const firstRefreshRef = useRef(true);
+  const onOpenRef = useRef(onOpen);
+  onOpenRef.current = onOpen;
+  // The newest change seen; a later one (the agent's canvas tool) opens its canvas.
+  const seenRef = useRef<number | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      setArtifacts(await listSessionCanvas(sessionId));
+      const list = await listSessionCanvas(sessionId);
+      // The server lists the most recently changed first.
+      const newest = list[0];
+      if (newest && seenRef.current != null && newest.updatedAt > seenRef.current) onOpenRef.current(newest.id);
+      seenRef.current = Math.max(seenRef.current ?? 0, newest?.updatedAt ?? 0);
+      setArtifacts(list);
     } catch (err) {
       setError(err instanceof Error ? err.message : tRef.current('unknownError'));
     }
   }, [sessionId]);
 
   useEffect(() => {
+    seenRef.current = null;
     void load();
   }, [load]);
 
