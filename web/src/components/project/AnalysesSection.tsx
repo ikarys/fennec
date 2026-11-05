@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Badge } from '../ui/Badge';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Section } from '../ui/Section';
-import { AlertIcon, ExternalIcon, LayersIcon, PlayIcon, WandIcon } from '../Icons';
+import { AlertIcon, CheckIcon, ExternalIcon, LayersIcon, PlayIcon, WandIcon } from '../Icons';
 import { type SessionSummary } from '../../lib/api';
 import { formatDateTime, formatRelative } from '../../lib/format';
 import { QuestionForm } from './QuestionForm';
@@ -33,6 +33,14 @@ const ANALYSES = [
     description: 'auditSecurityDescription',
     confirm: 'auditSecurityConfirm',
     icon: AlertIcon,
+  },
+  {
+    mode: 'rules',
+    prompt: 'Turn this project\'s checkable guidelines into executable architecture rules.',
+    title: 'ruleBridgeTitle',
+    description: 'ruleBridgeDescription',
+    confirm: 'ruleBridgeConfirm',
+    icon: CheckIcon,
   },
 ] as const;
 
@@ -74,7 +82,7 @@ export function AnalysesSection({
         description={t('analysesDescription')}
         flush
       >
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           {ANALYSES.map((analysis) => {
             const running =
               sessions.find((session) => session.mode === analysis.mode && session.state === 'running') ?? null;

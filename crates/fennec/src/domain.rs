@@ -44,6 +44,7 @@ pub mod replay;
 pub mod review_map;
 pub mod risk;
 pub mod rule_approval;
+pub mod rule_bridge;
 pub mod scanner;
 pub mod security_scan;
 pub mod server;

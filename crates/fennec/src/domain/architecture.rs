@@ -54,6 +54,11 @@ impl Rules {
         &self.module_rules
     }
 
+    /// True when no rule of any kind was parsed.
+    pub fn is_empty(&self) -> bool {
+        self.rules.is_empty() && self.module_rules.is_empty() && self.sensitive.is_empty()
+    }
+
     /// Whether `path` is inside one of the sensitive zones.
     ///
     /// `path` is project-relative and `/`-separated.
