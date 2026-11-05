@@ -198,6 +198,11 @@ read-only. The human edits them as usual.
   binary, cached 6 h (`refresh=1` asks again); 502 `{error}` when no release can be read
 - `POST /api/update` `{}` → 202 `{restarting, latest}`: installs the latest release over the binary (`install.sh`,
   checksum verified) and restarts the server on it; 409 while a turn runs, when up to date or on a development build
+- `GET /api/server` → `{port, runningPort, fromFlag, path}`: the port `settings.yaml` sets (default 7777), the one this
+  process listens on, whether `--port` was given (it wins over the file) and the file's path
+- `POST /api/server` `{port}` → the same view: writes the port to `settings.yaml` (1024..=65535, else 400), applied at the
+  next start
+- `POST /api/server/restart` `{}` → 202 `{restarting}`: the server re-executes itself, same arguments; 409 while a turn runs
 - `GET /api/settings` → `{preferences, listings, defaults, skills, optInWorkflows, scanners, sandboxHealth}`
   - `scanners`: `[{id, name, covers, install, url, path}]`, the security scanners the `audit-security`
     agent runs; `path` is where fennec found the executable on PATH, null when absent (verified); fennec

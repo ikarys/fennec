@@ -138,6 +138,9 @@ cd ~/code/my-project && fennec run "add a --verbose flag"   # or the CLI
 Point fennec at a model with `FENNEC_LLM_URL` (or add providers on the Settings page), open a
 project folder from the home page, describe the change and approve the plan.
 
+Port 7777 taken? `fennec --port 7788`, or set it for good in `~/.config/fennec/settings.yaml` (`port: 7788`),
+also editable on Settings > Security.
+
 ## Configuration
 
 | Variable | Default | Notes |
