@@ -46,5 +46,6 @@ pub(super) fn app(db_path: PathBuf) -> App {
             notifier.clone(),
         )),
         agents_home: std::env::temp_dir(),
+        update_check: Mutex::default(),
     }
 }

@@ -328,6 +328,7 @@ mod tests {
                 notifier.clone(),
             )),
             agents_home: std::env::temp_dir(),
+            update_check: Default::default(),
         }
     }
 

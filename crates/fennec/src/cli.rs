@@ -2,6 +2,7 @@
 //! replay one, compact one.
 
 mod transcript;
+pub mod update;
 
 use crate::agent::ports::EventLog;
 use crate::agent::turn::{Turn, compact_session, run_turn};
