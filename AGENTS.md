@@ -179,7 +179,7 @@ its port answers, ready, exited with its code), the URL it printed and its last 
 worktree for CLI projects. With no `.agents/servers.json`, a command guessed from the project (Justfile, package.json,
 Makefile, Cargo) is saved on the human's confirmation; the main checkout's gitignored `.env*` files are linked, never
 copied, and servers share the project's Cargo target (`web/servers.rs`, `domain/server.rs`).
-Canvas, done: a document the human and the agent iterate on (HTML, Markdown, SVG, images), pinned from the
+Canvas, done: a document the human and the agent iterate on (HTML, Markdown, SVG, Mermaid, JSON, images, PDF), pinned from the
 preview pane or a message's ```html/```md block, each version kept and browsable in a side pane; the human annotates
 the whole page, a quote or a drawn region, and the note lands in the composer as text the agent reads. The `canvas`
 crate owns it all (its own `canvas.db`, `FENNEC_CANVAS_DB`); a project's Canvas tab lists and deletes them, and deleting

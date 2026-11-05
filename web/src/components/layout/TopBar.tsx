@@ -3,7 +3,7 @@ import { useT } from '../../i18n';
 import type { MsgKey } from '../../i18n/messages';
 import type { AttentionItem, SessionState } from '../../lib/api';
 import { SessionStateIcon } from '../session/SessionStateIcon';
-import { BellIcon, CloseIcon, FoxIcon, PlusIcon, SearchIcon, SettingsIcon, SplitIcon } from '../Icons';
+import { BellIcon, ChatIcon, CloseIcon, FoxIcon, PlusIcon, SearchIcon, SettingsIcon, SplitIcon } from '../Icons';
 import { Badge } from '../ui/Badge';
 import { Button, buttonClass } from '../ui/Button';
 import { Menu, MenuItem } from '../ui/Menu';
@@ -175,6 +175,9 @@ function VersionTag() {
 import type { PageId } from '../../lib/route';
 export type { PageId };
 
+/** The chat's project id, fixed by the server (`chat::ID`). */
+const CHAT_PROJECT_ID = 'chat';
+
 /** The fixed pages, in the bar's order; `PageIcon` draws each. */
 const PAGES: { page: PageId; title: MsgKey }[] = [
   { page: 'backlog', title: 'tasks' },
@@ -208,11 +211,11 @@ interface TopBarProps {
   onPickTab: (id: string) => void;
   onCloseTab: (id: string) => void;
   onOpenPalette: () => void;
-  /** The project of the open session, when there is one: the "+" targets it. */
+  /** The project of the open session, when there is one: the "+" menu lists it first. */
   currentProject: { id: string; name: string } | null;
-  /** The projects the "+" offers when no session is open. */
+  /** The projects the "+" menu offers. */
   projects: { id: string; name: string }[];
-  onNewSession: (projectId?: string) => void;
+  onNewSession: (projectId: string) => void;
   onOpenPage: (page: PageId) => void;
   splitActive: boolean;
   onToggleSplit: () => void;
@@ -258,38 +261,29 @@ export function TopBar({
         <VersionTag />
       </a>
 
-      {/* The "+" never guesses a project. */}
-      {currentProject ? (
-        <button
-          type="button"
-          onClick={() => onNewSession(currentProject.id)}
-          aria-label={t('newSession')}
-          title={t('paletteNewSessionIn', { name: currentProject.name })}
-          className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true }, 'self-center')}
-        >
-          <PlusIcon className="h-4 w-4" />
-        </button>
-      ) : projects.length > 0 ? (
-        <div className="self-center">
-          <Menu label={t('topBarNewSessionMenuLabel')} icon={<PlusIcon className="h-4 w-4" />}>
-            {projects.map((project) => (
+      {/* The "+" never guesses a project: the open session's comes first, then the chat, then the others. */}
+      <div className="self-center">
+        <Menu label={t('topBarNewSessionMenuLabel')} icon={<PlusIcon className="h-4 w-4" />}>
+          {currentProject && currentProject.id !== CHAT_PROJECT_ID ? (
+            <MenuItem onSelect={() => onNewSession(currentProject.id)}>
+              {t('paletteNewSessionIn', { name: currentProject.name })}
+            </MenuItem>
+          ) : null}
+          <MenuItem onSelect={() => onNewSession(CHAT_PROJECT_ID)}>
+            <span className="flex items-center gap-1.5">
+              <ChatIcon className="h-3.5 w-3.5 text-accent" />
+              {t('paletteNewChat')}
+            </span>
+          </MenuItem>
+          {projects
+            .filter((project) => project.id !== CHAT_PROJECT_ID && project.id !== currentProject?.id)
+            .map((project) => (
               <MenuItem key={project.id} onSelect={() => onNewSession(project.id)}>
                 {project.name}
               </MenuItem>
             ))}
-          </Menu>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => onNewSession()}
-          aria-label={t('newSession')}
-          title={t('newSession')}
-          className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true }, 'self-center')}
-        >
-          <PlusIcon className="h-4 w-4" />
-        </button>
-      )}
+        </Menu>
+      </div>
 
       <div
         role="tablist"
@@ -378,6 +372,17 @@ export function TopBar({
           <SearchIcon className="h-3.5 w-3.5" />
           <span className="hidden text-left md:inline">{t('topBarSearchPlaceholder')}</span>
           <kbd className="rounded-md border border-border px-1.5 py-px text-xs text-muted">⌘K</kbd>
+        </button>
+
+        {/* The chat has no project page to start from: one click from anywhere. */}
+        <button
+          type="button"
+          onClick={() => onNewSession(CHAT_PROJECT_ID)}
+          aria-label={t('paletteNewChat')}
+          title={t('homeNewChatTitle')}
+          className={buttonClass({ variant: 'icon', size: 'sm', iconOnly: true })}
+        >
+          <ChatIcon className="h-4 w-4" />
         </button>
 
         <AttentionBell attention={attention} onOpen={onOpenAttention} />

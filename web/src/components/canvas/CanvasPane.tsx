@@ -1,6 +1,4 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type PointerEvent as ReactPointerEvent } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { Badge } from '../ui/Badge';
 import { Button, buttonClass } from '../ui/Button';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
@@ -16,9 +14,9 @@ import {
   ChevronsLeftIcon,
   ChevronsRightIcon,
 } from '../Icons';
-import { markdownComponents } from '../session/markdownComponents';
+import { DocumentView } from '../preview/DocumentView';
 import { useT } from '../../i18n';
-import { previewUrl } from '../../lib/preview';
+import { previewUrl, type PreviewKind } from '../../lib/preview';
 import {
   canvasVersionUrl,
   deleteCanvas,
@@ -26,9 +24,9 @@ import {
   annotateCanvas,
   type CanvasAnchor,
   type CanvasDetail,
+  type CanvasFormat,
 } from '../../lib/api/canvas';
 
-const REMARK_PLUGINS = [remarkGfm];
 const REFRESH_QUIET_MS = 500;
 
 interface CanvasPaneProps {
@@ -41,6 +39,16 @@ interface CanvasPaneProps {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+function canvasFormatToKind(format: CanvasFormat): PreviewKind {
+  if (format === 'html') return 'html';
+  if (format === 'markdown') return 'markdown';
+  if (format === 'json') return 'json';
+  if (format === 'mermaid') return 'mermaid';
+  if (format === 'svg') return 'svg';
+  if (format === 'pdf') return 'pdf';
+  return 'image';
 }
 
 function RegionOverlay({ onCommit }: { onCommit: (anchor: CanvasAnchor) => void }) {
@@ -130,9 +138,6 @@ export function CanvasPane({ artifactId, refreshKey, onClose, onAnnotate, onDele
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [markdown, setMarkdown] = useState<string | null>(null);
-  const [markdownLoading, setMarkdownLoading] = useState(false);
-  const [markdownError, setMarkdownError] = useState<string | null>(null);
 
   const tRef = useRef(t);
   tRef.current = t;
@@ -209,46 +214,10 @@ export function CanvasPane({ artifactId, refreshKey, onClose, onAnnotate, onDele
 
   const canPrev = viewedVersion != null && viewedVersion > 1;
   const canNext = viewedVersion != null && viewedVersion < latest;
-  const showOverlay = annotateMode && (artifact?.format !== 'markdown' || regionMode);
+  const isTextFormat = artifact?.format === 'markdown' || artifact?.format === 'json';
+  const showOverlay = annotateMode && (!isTextFormat || regionMode);
 
-  useEffect(() => {
-    if (!url || !artifact || artifact.format !== 'markdown') return;
-    let active = true;
-    setMarkdownLoading(true);
-    setMarkdownError(null);
-    setMarkdown(null);
-    fetch(url)
-      .then(async (response) => {
-        if (!response.ok) {
-          let message = response.statusText;
-          try {
-            const body = (await response.json()) as { error?: string };
-            if (body.error) message = body.error;
-          } catch {
-            // Keep the status text when the error body is not JSON.
-          }
-          throw new Error(message);
-        }
-        return response.text();
-      })
-      .then((text) => {
-        if (active) {
-          setMarkdown(text);
-          setMarkdownLoading(false);
-        }
-      })
-      .catch((err: unknown) => {
-        if (active) {
-          setMarkdownError(err instanceof Error ? err.message : tRef.current('unknownError'));
-          setMarkdownLoading(false);
-        }
-      });
-    return () => {
-      active = false;
-    };
-  }, [url, reloadKey, artifact?.id, artifact?.format]);
-
-  const handleMarkdownMouseUp = () => {
+  const handleTextMouseUp = () => {
     if (!annotateMode || regionMode) return;
     const text = window.getSelection()?.toString();
     if (text && text.trim().length > 0) {
@@ -408,44 +377,15 @@ export function CanvasPane({ artifactId, refreshKey, onClose, onAnnotate, onDele
           <div className="p-4 text-sm text-muted">{t('loading')}</div>
         ) : error ? (
           <div className="p-4 text-sm text-err">{error}</div>
-        ) : !artifact || viewedVersion == null ? null : artifact.format === 'html' ? (
-          <div className="relative min-h-0 grow">
-            <iframe
-              key={`${artifact.id}-${viewedVersion}-${reloadKey}`}
-              sandbox="allow-scripts"
-              src={url}
-              title={t('canvasMenu')}
-              className="h-full w-full bg-panel"
-            />
-            {showOverlay ? <RegionOverlay onCommit={setAnchor} /> : null}
-          </div>
-        ) : artifact.format === 'markdown' ? (
-          <div className="min-h-0 grow overflow-y-auto p-6">
-            <div className="relative mx-auto max-w-3xl" onMouseUp={handleMarkdownMouseUp}>
-              {markdownLoading ? (
-                <div className="text-sm text-muted">{t('loading')}</div>
-              ) : markdownError ? (
-                <div className="text-sm text-err">{markdownError}</div>
-              ) : markdown != null ? (
-                <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={markdownComponents}>
-                  {markdown}
-                </ReactMarkdown>
-              ) : null}
-              {showOverlay ? <RegionOverlay onCommit={setAnchor} /> : null}
-            </div>
-          </div>
-        ) : (
-          <div className="flex min-h-0 grow items-center justify-center overflow-auto bg-panel p-6">
-            <div className="relative">
-              <img
-                key={`${artifact.id}-${viewedVersion}-${reloadKey}`}
-                src={url}
-                alt={artifact.title}
-                className="max-w-full"
-              />
-              {showOverlay ? <RegionOverlay onCommit={setAnchor} /> : null}
-            </div>
-          </div>
+        ) : !artifact || viewedVersion == null ? null : (
+          <DocumentView
+            kind={canvasFormatToKind(artifact.format)}
+            url={url}
+            title={artifact.title}
+            reloadKey={`${artifact.id}-${viewedVersion}-${reloadKey}`}
+            overlay={showOverlay ? <RegionOverlay onCommit={setAnchor} /> : null}
+            onTextMouseUp={handleTextMouseUp}
+          />
         )}
       </div>
 
@@ -466,7 +406,7 @@ export function CanvasPane({ artifactId, refreshKey, onClose, onAnnotate, onDele
             >
               <EraserIcon className="h-4 w-4" />
             </Button>
-            {artifact?.format === 'markdown' ? (
+            {isTextFormat ? (
               <Button
                 variant={regionMode ? 'soft' : 'ghost'}
                 size="sm"

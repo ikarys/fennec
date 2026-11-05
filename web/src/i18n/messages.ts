@@ -936,6 +936,9 @@ export const en = {
   previewLoadError: 'Loading error',
   previewReload: 'Reload',
   previewOpenTab: 'Open in a tab',
+  previewSvgTitle: 'SVG preview',
+  mermaidInvalid: 'This diagram does not render',
+  jsonInvalid: 'Invalid JSON, shown as written',
   // hooks/useSessionActions.ts
   sessionCompactError: 'Error while compacting',
   sessionReplayError: 'Error while replaying',
@@ -2240,6 +2243,9 @@ export const fr: Record<MsgKey, string> = {
   previewLoadError: 'Erreur de chargement',
   previewReload: 'Recharger',
   previewOpenTab: 'Ouvrir dans un onglet',
+  previewSvgTitle: 'Aperçu SVG',
+  mermaidInvalid: 'Ce diagramme ne se dessine pas',
+  jsonInvalid: 'JSON invalide, montré tel quel',
   // hooks/useSessionActions.ts
   sessionCompactError: 'Erreur lors de la compaction',
   sessionReplayError: 'Erreur lors de la relance',

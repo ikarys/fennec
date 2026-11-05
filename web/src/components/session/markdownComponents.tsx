@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { CodeBlockWithPreview } from '../preview/CodeBlockWithPreview';
-import { previewKindOfLanguage, type PreviewKind } from '../../lib/preview';
+import { previewKindOfLanguage, type BlockPreviewKind } from '../../lib/preview';
 
 interface HastText {
   type: 'text';
@@ -23,7 +23,7 @@ function isHastElement(node: unknown): node is HastElement {
   return typeof node === 'object' && node !== null && (node as HastElement).type === 'element';
 }
 
-function previewFromPre(node: HastElement | undefined): { kind: PreviewKind; source: string } | undefined {
+function previewFromPre(node: HastElement | undefined): { kind: BlockPreviewKind; source: string } | undefined {
   if (!node) return undefined;
   const child = node.children?.[0];
   if (!isHastElement(child)) return undefined;

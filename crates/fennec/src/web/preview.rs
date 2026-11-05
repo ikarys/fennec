@@ -1,6 +1,7 @@
 //! The files of a session's project, served for the preview. Model-written
 //! HTML must never run with fennec's origin: the `sandbox` CSP gives the page
-//! an opaque origin, whose requests to the API the guard refuses.
+//! an opaque origin, whose requests to the API the guard refuses. Real PDFs
+//! are served without it because browser PDF viewers refuse sandboxed documents.
 
 use super::App;
 use super::http::{error, percent_decode, send_with};
@@ -25,13 +26,11 @@ pub(super) fn serve(
     };
     let content_type = content_type_of(&full);
     let body = std::fs::read(&full).map_err(|e| e.to_string())?;
-    send_with(
-        stream,
-        200,
-        &content_type,
-        &[("Content-Security-Policy", "sandbox allow-scripts")],
-        &body,
-    )
+    let csp = canvas::Format::of_path(&relative).map_or(Some(canvas::SANDBOX_CSP), |format| {
+        format.sandbox_csp(&body)
+    });
+    let header = csp.map(|csp| ("Content-Security-Policy", csp));
+    send_with(stream, 200, &content_type, header.as_slice(), &body)
 }
 
 /// A file of a session's working directory, as the preview and the canvas may read it.
@@ -100,6 +99,8 @@ fn content_type_of(path: &Path) -> String {
         "js" | "mjs" => ("text/javascript", true),
         "json" => ("application/json", true),
         "svg" => ("image/svg+xml", true),
+        "pdf" => ("application/pdf", false),
+        "mmd" | "mermaid" => ("text/plain", true),
         "png" => ("image/png", false),
         "jpg" | "jpeg" => ("image/jpeg", false),
         "gif" => ("image/gif", false),
@@ -170,6 +171,15 @@ mod tests {
         assert_eq!(
             content_type_of(Path::new("icon.svg")),
             "image/svg+xml; charset=utf-8"
+        );
+        assert_eq!(content_type_of(Path::new("doc.pdf")), "application/pdf");
+        assert_eq!(
+            content_type_of(Path::new("diagram.mmd")),
+            "text/plain; charset=utf-8"
+        );
+        assert_eq!(
+            content_type_of(Path::new("diagram.mermaid")),
+            "text/plain; charset=utf-8"
         );
         assert_eq!(content_type_of(Path::new("image.png")), "image/png");
         assert_eq!(content_type_of(Path::new("photo.jpg")), "image/jpeg");
