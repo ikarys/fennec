@@ -69,6 +69,9 @@ pub struct AgentDefinition {
     pub name: String,
     pub description: String,
     pub subagent: bool,
+    /// fennec's own: `composer: false` in the frontmatter. The agent is launched by fennec
+    /// with a brief it builds (a page's tile, the gate, a workflow node), not picked in the composer.
+    pub composer: bool,
     pub allowed_tools: Vec<String>,
     /// fennec's own: `commands: read-only` in the frontmatter.
     pub commands: CommandAccess,
@@ -168,6 +171,7 @@ pub fn parse_agent_md(content: &str) -> Result<AgentDefinition, AgentParseError>
         .unwrap_or(id);
     let description = fields.scalar("description").unwrap_or("");
     let subagent = fields.scalar("subagent") == Some("true");
+    let composer = fields.scalar("composer") != Some("false");
     let allowed_tools = fields
         .list("allowedTools")
         .map(|tools| tools.to_vec())
@@ -198,6 +202,7 @@ pub fn parse_agent_md(content: &str) -> Result<AgentDefinition, AgentParseError>
         name: name.to_string(),
         description: description.to_string(),
         subagent,
+        composer,
         allowed_tools,
         commands,
         writes,
@@ -352,6 +357,7 @@ mod tests {
             name: name.to_string(),
             description: String::new(),
             subagent,
+            composer: true,
             allowed_tools: tools.iter().map(|tool| tool.to_string()).collect(),
             commands: CommandAccess::ReadWrite,
             writes: WriteScope::Any,
@@ -450,6 +456,14 @@ allowedTools:
         let content = "---\nid: plan\nphase: understand\n---\nbody\n";
         let agent = parse_agent_md(content).unwrap();
         assert_eq!(agent.phase, Some(Phase::Understand));
+    }
+
+    #[test]
+    fn composer_false_keeps_an_agent_out_of_the_menu() {
+        let hidden = parse_agent_md("---\nid: narrate\ncomposer: false\n---\nbody\n").unwrap();
+        assert!(!hidden.composer);
+        let shown = parse_agent_md("---\nid: plan\n---\nbody\n").unwrap();
+        assert!(shown.composer);
     }
 
     #[test]

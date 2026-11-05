@@ -67,7 +67,7 @@ export function useProjectOptions({
     let ignore = false;
     listAgents(projectId)
       .then((data) => {
-        if (!ignore) setAgents(data.filter((agent) => !agent.subagent));
+        if (!ignore) setAgents(data.filter((agent) => agent.composer));
       })
       .catch(() => {
         if (!ignore) setAgents([]);

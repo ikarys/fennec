@@ -75,7 +75,7 @@ Project page and map, done: `#/project/<id>` (the "Projet" button of a home card
 modules and their dependencies read from the imports (verified, `domain/module_map.rs`), and
 writes them on the human's click to `docs/map.md` (`domain/map_doc.rs`), stale when the code moved:
 committed, it gives the project's shape to the next developer or agent without reading the code.
-Project analysis, done: an "Analyser le projet" button opens a session on the read-only `analyze`
+Project analysis, done: the "Write the project's charter" tile opens a session on the read-only `analyze`
 agent (`crates/fennec/agents/analyze.agent.md`), which drafts AGENTS.md's philosophy, layers and rules,
 each with its file:line source (indicative); the human reviews it.
 Ideas backlog, done: the project page keeps the human's ideas (`idea.*` events per project,
@@ -137,10 +137,15 @@ the turn with the call open (`rule.approval_requested`); the human answers on a 
 on the path and its subdirectories, the command, the tool), always or never (a project rule). fennec then runs the
 recorded call itself or refuses it, and the turn goes on: the model never retries. With the human away (night mode),
 an "ask" is refused.
-Rule bridge, done (C16): the read-only `rules` agent ("Rendre les consignes exécutables" in the Analyses tab) checks which
-guidelines of AGENTS.md a text or import rule can enforce, verifies each against the code, and ends with the rule lines
-for `.agents/architecture`, each under a comment citing its guideline; the human appends the new ones in one click
-(`architecture.rules_added`, `domain/rule_bridge.rs`, `web/rule_bridge_routes.rs`). A guideline is advice; the gate's rule is not.
+Rule bridge, done (C16): the `analyze` agent (on an existing project) and the `audit-architecture` agent end their answer with
+a `## Executable rules` block of text and import rules for `.agents/architecture`, each line under a comment citing its
+guideline; the human appends the new ones in one click (`architecture.rules_added`, `domain/rule_bridge.rs`,
+`web/rule_bridge_routes.rs`). A guideline is advice; the gate's rule is not.
+
+Composer agents, done: `composer: false` in an agent's frontmatter keeps it out of the composer's menu; it is for agents
+fennec launches itself with a brief it builds (Analyses: `analyze`, `audit-architecture`, `audit-security`; gate: `narrate`,
+`understand`; Risks: `remedy`; test node: `tests`), so the composer offers only agents one talks to freely (`plan`, `mockup`,
+`builder`, `mentor`, `ask`); `subagent: true` marks workflow-only ones (`review`, `verify`) (`domain/agent.rs`, `web/project_list_routes.rs`).
 Produced architecture, done (C12): `.agents/architecture` also takes module rules (`<A> never imports <B>`), checked on
 every dependency of the project map; the "Carte des modules" tab lists the breaks, draws them red, and counts the dependencies added or
 removed since the committed `docs/map.md` (verified; `domain/drift.rs`).

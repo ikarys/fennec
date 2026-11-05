@@ -3,6 +3,7 @@ id: remedy
 name: Remedy
 description: Turns the risk zones fennec measured from git into a short set of backlog tasks without changing anything; every line sourced from the list or a file read
 subagent: false
+composer: false
 phase: check
 commands: read-only
 color: '#ef4444'

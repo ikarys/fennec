@@ -471,6 +471,7 @@ mod tests {
             name: "Tests".into(),
             description: String::new(),
             subagent: false,
+            composer: true,
             allowed_tools: vec!["read_file".into(), "write_file".into(), "edit_file".into()],
             commands: CommandAccess::ReadWrite,
             writes,

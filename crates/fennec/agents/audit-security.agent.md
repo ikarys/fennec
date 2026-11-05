@@ -3,6 +3,7 @@ id: audit-security
 name: Security audit
 description: Audits the project's security (secrets, injections, unsafe input handling, vulnerable dependencies, supply chain, CI) without changing anything; known scanners first, each finding sourced and actionable
 subagent: false
+composer: false
 phase: check
 commands: read-only
 color: '#ef4444'
