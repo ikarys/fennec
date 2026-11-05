@@ -347,6 +347,32 @@ export function setProjectBudget(
   );
 }
 
+export interface Contribution {
+  branch: string;
+  ahead: number;
+  subject: string;
+}
+
+export function getContributions(projectId: string): Promise<Contribution[]> {
+  return request<Contribution[]>(
+    `/api/projects/${encodeURIComponent(projectId)}/contributions`,
+  );
+}
+
+/** Adopt a contribution branch into a new session. */
+export function adoptContribution(
+  projectId: string,
+  branch: string,
+): Promise<{ id: string }> {
+  return request<{ id: string }>(
+    `/api/projects/${encodeURIComponent(projectId)}/contributions`,
+    {
+      method: "POST",
+      body: JSON.stringify({ branch }),
+    },
+  );
+}
+
 export type IndicatorId =
   | 'integrity'
   | 'sensitiveReview'
