@@ -493,27 +493,33 @@ impl SqliteStore {
             .query_map([], |r| r.get::<_, String>(0))?
             .collect::<rusqlite::Result<Vec<String>>>()?;
         for id in &ids {
-            // The cut turn ends like any other, with a done: otherwise the last
-            // done in the log is an earlier one (a workflow's human node waiting
-            // for the user), and the run looks waiting instead of interrupted.
-            let message_id: String = self.db.query_row(
-                "SELECT COALESCE(MAX(json_extract(payload, '$.data.messageId')), '')
-                 FROM events WHERE session_id = ?1 AND seq = (SELECT MAX(seq) FROM events
-                     WHERE session_id = ?1 AND event_type = 'message.start')",
-                params![id],
-                |r| r.get(0),
-            )?;
-            self.insert_event(
-                id,
-                &Event::ChatDone {
-                    message_id,
-                    reason: DoneReason::Error,
-                    duration_ms: None,
-                },
-            )?;
-            self.insert_event(id, &Event::RunningChanged { is_running: false })?;
+            self.end_cut_turn(id)?;
         }
         Ok(ids.len())
+    }
+
+    /// Ends a turn that was cut (a crash, a panic in its thread) like any other.
+    pub fn end_cut_turn(&self, session_id: &str) -> Result<()> {
+        // The cut turn ends like any other, with a done: otherwise the last
+        // done in the log is an earlier one (a workflow's human node waiting
+        // for the user), and the run looks waiting instead of interrupted.
+        let message_id: String = self.db.query_row(
+            "SELECT COALESCE(MAX(json_extract(payload, '$.data.messageId')), '')
+             FROM events WHERE session_id = ?1 AND seq = (SELECT MAX(seq) FROM events
+                 WHERE session_id = ?1 AND event_type = 'message.start')",
+            params![session_id],
+            |r| r.get(0),
+        )?;
+        self.insert_event(
+            session_id,
+            &Event::ChatDone {
+                message_id,
+                reason: DoneReason::Error,
+                duration_ms: None,
+            },
+        )?;
+        self.insert_event(session_id, &Event::RunningChanged { is_running: false })?;
+        Ok(())
     }
 
     fn insert_event(&self, session_id: &str, event: &Event) -> Result<u64> {
