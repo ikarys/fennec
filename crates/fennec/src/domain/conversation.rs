@@ -88,11 +88,19 @@ pub fn last_assistant_text(events: &[Event]) -> String {
     assistant_texts(events).pop().unwrap_or_default()
 }
 
-/// A workflow agent node's output among `events`: the last assistant text
-/// holding a plan or report contract (a `## Plan: …` or `## Report: …`
-/// heading, level 2 or 3), else the last assistant text. A closing line the
-/// model writes after its plan must not replace the plan.
+/// A workflow agent node's output among `events`: when the agent recorded a
+/// plan with `propose_plan`, the last one as fennec's canonical markdown;
+/// else the last assistant text holding a plan or report contract (a
+/// `## Plan: …` or `## Report: …` heading, level 2 or 3), else the last
+/// assistant text. A closing line the model writes after its plan must not
+/// replace the plan.
 pub fn node_output(events: &[Event]) -> String {
+    if let Some(markdown) = events.iter().rev().find_map(|event| match event {
+        Event::PlanProposed { markdown, .. } => Some(markdown),
+        _ => None,
+    }) {
+        return markdown.clone();
+    }
     let texts = assistant_texts(events);
     texts
         .iter()
@@ -355,6 +363,51 @@ mod tests {
             start("r", Role::Assistant, Some("### Report: x"), false),
         ];
         assert_eq!(node_output(&events), "### Report: x");
+    }
+
+    #[test]
+    fn node_output_uses_the_last_proposed_plan_markdown() {
+        use crate::domain::plan::{Plan, PlanStep, PlannedCriterion};
+        let first = Plan {
+            title: "First".into(),
+            goal: "goal".into(),
+            steps: vec![PlanStep {
+                title: "s".into(),
+                files: vec![],
+                change: "c".into(),
+            }],
+            done_when: vec![PlannedCriterion {
+                text: "done".into(),
+                check: None,
+            }],
+            risks: vec![],
+        };
+        let second = Plan {
+            title: "Second".into(),
+            ..first.clone()
+        };
+        let events = vec![
+            start("a", Role::Assistant, Some("Plan ready."), false),
+            Event::PlanProposed {
+                call_id: "c1".into(),
+                markdown: first.to_markdown(),
+                plan: first.clone(),
+            },
+            Event::PlanProposed {
+                call_id: "c2".into(),
+                markdown: second.to_markdown(),
+                plan: second.clone(),
+            },
+            start("c", Role::Assistant, Some("Closing line."), false),
+        ];
+        assert_eq!(node_output(&events), second.to_markdown());
+        // The closing line after the proposal must not replace the plan.
+        assert_eq!(
+            node_output(&events[..events.len() - 1]),
+            second.to_markdown()
+        );
+        // With only the first proposal, its plan is the output.
+        assert_eq!(node_output(&events[..2]), first.to_markdown());
     }
 
     #[test]

@@ -219,6 +219,63 @@ describe('createThreadFold', () => {
     expect(tool?.blockedBy).toEqual({ pattern: 'rm', scope: 'global' });
   });
 
+  it('replaces a propose_plan call by a plan segment on plan.proposed', () => {
+    const fold = createThreadFold();
+    fold.apply(ev('message.start', { messageId: 'a1', role: 'assistant' }));
+    fold.apply(ev('tool.call', {
+      messageId: 'a1',
+      toolCall: { id: 'p1', name: 'propose_plan', arguments: {} }
+    }));
+    fold.apply(ev('plan.proposed', {
+      callId: 'p1',
+      plan: {
+        title: 'Ship',
+        goal: 'Goal',
+        steps: [
+          { title: 'Add code', files: ['a.ts'], change: 'implement' },
+          { title: 'Docs', files: [], change: 'update' }
+        ],
+        doneWhen: [
+          { text: 'tests pass', check: 'cargo test' },
+          { text: 'docs updated' }
+        ],
+        risks: ['Risk one']
+      },
+      markdown: '## Plan: Ship'
+    }));
+    const item = fold.view().items[0];
+    expect(item.kind).toBe('assistant');
+    if (item.kind !== 'assistant') return;
+    expect(item.segments).toEqual([
+      {
+        kind: 'plan',
+        id: 'p1',
+        plan: {
+          kind: 'plan',
+          title: 'Ship',
+          goal: 'Goal',
+          steps: [
+            { number: 1, title: 'Add code', files: ['a.ts'], change: 'implement', verify: '' },
+            { number: 2, title: 'Docs', files: [], change: 'update', verify: '' }
+          ],
+          doneWhen: ['tests pass — check: `cargo test`', 'docs updated'],
+          risks: ['Risk one']
+        },
+        markdown: '## Plan: Ship'
+      }
+    ]);
+    expect(toolOf(fold.view().items, 'p1')).toBeUndefined();
+  });
+
+  it('ignores a plan.proposed whose call is not in the thread', () => {
+    const fold = createThreadFold();
+    fold.apply(ev('plan.proposed', {
+      callId: 'p1',
+      plan: { title: 'Ship', goal: 'Goal', steps: [], doneWhen: [], risks: [] }
+    }));
+    expect(fold.view().items).toHaveLength(0);
+  });
+
   it('folds write_file into modified files and content preview', () => {
     const fold = createThreadFold();
     fold.apply(ev('tool.call', {
