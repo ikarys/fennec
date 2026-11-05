@@ -121,6 +121,7 @@ pub(super) fn list_agents(app: &App, stream: &mut TcpStream, id: &str) -> Result
                 "description": agent.description,
                 "color": agent.color,
                 "subagent": agent.subagent,
+                "composer": agent.composer && !agent.subagent,
                 "phase": agent.phase,
                 "origin": agent.origin,
             })
