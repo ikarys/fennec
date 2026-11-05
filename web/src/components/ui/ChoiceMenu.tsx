@@ -10,6 +10,7 @@ import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { Button } from './Button';
 import { Card } from './Card';
 import { useDismissable } from '../../hooks/useDismissable';
+import { ChevronDownIcon } from '../Icons';
 
 export interface Choice {
   value: string;
@@ -86,6 +87,12 @@ export function ChoiceMenu({
         onClick={() => setOpen((isOpen) => !isOpen)}
       >
         {trigger}
+        {/* The chevron says it opens: without it the trigger reads as a label. */}
+        <ChevronDownIcon
+          className={`h-3.5 w-3.5 shrink-0 text-faint transition-transform ${
+            (direction === 'up') !== open ? 'rotate-180' : ''
+          }`}
+        />
       </Button>
       {open && (
         <Card

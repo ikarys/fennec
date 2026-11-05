@@ -9,7 +9,6 @@ import { Segmented } from '../ui/Segmented';
 import {
   BranchIcon,
   CheckIcon,
-  ChevronDownIcon,
   ChevronsLeftIcon,
   ChevronsRightIcon,
   CloseIcon,
@@ -212,11 +211,8 @@ export function ContextPanel({ view, skills, usage, request, hasSession, worktre
           className="w-full"
           trigger={
             // The trigger fills the panel width so a long page name truncates instead of overflowing.
-            <span className="flex w-full items-center justify-between gap-1.5">
-              <span className="min-w-0 truncate" title={page.name}>
-                {page.name}
-              </span>
-              <ChevronDownIcon className="h-3.5 w-3.5 shrink-0" />
+            <span className="min-w-0 grow truncate text-left" title={page.name}>
+              {page.name}
             </span>
           }
         />
