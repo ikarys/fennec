@@ -11,7 +11,7 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Section } from '../ui/Section';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
-import { TrashIcon } from '../Icons';
+import { ChevronRightIcon, TrashIcon } from '../Icons';
 import { AgentEditor, EMPTY_DRAFT } from './AgentEditor';
 import { useT } from '../../i18n';
 import type { MsgKey } from '../../i18n/messages';
@@ -232,6 +232,21 @@ export function AgentsSection() {
     }
   };
 
+  const list = (agents: AgentView[]) => (
+    <ul className="divide-y divide-border">
+      {agents.map((agent) => (
+        <AgentRow
+          key={agent.id}
+          agent={agent}
+          busy={busy}
+          onEdit={() => void startEdit(agent.id)}
+          onDuplicate={() => startDuplicate(agent)}
+          onDelete={() => setPendingDelete(agent)}
+        />
+      ))}
+    </ul>
+  );
+
   return (
     <>
       <Section
@@ -273,19 +288,17 @@ export function AgentsSection() {
               <Section key={origin} title={t(title)} description={t(description)} flush>
                 {agents.length === 0 ? (
                   <p className="py-3 text-xs text-muted">{t(empty)}</p>
+                ) : origin === 'default' ? (
+                  // Fennec's defaults never change: folded, they leave the human's own agents in view.
+                  <details className="group">
+                    <summary className="-mx-2 flex h-9 cursor-pointer list-none items-center gap-2 rounded px-2 text-sm select-none hover:bg-accent-soft [&::-webkit-details-marker]:hidden">
+                      <ChevronRightIcon className="h-3 w-3 shrink-0 text-muted transition-transform group-open:rotate-90" />
+                      {t('agentsDefaultShow', { count: agents.length })}
+                    </summary>
+                    {list(agents)}
+                  </details>
                 ) : (
-                  <ul className="divide-y divide-border">
-                    {agents.map((agent) => (
-                      <AgentRow
-                        key={agent.id}
-                        agent={agent}
-                        busy={busy}
-                        onEdit={() => void startEdit(agent.id)}
-                        onDuplicate={() => startDuplicate(agent)}
-                        onDelete={() => setPendingDelete(agent)}
-                      />
-                    ))}
-                  </ul>
+                  list(agents)
                 )}
               </Section>
             );
