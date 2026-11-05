@@ -192,7 +192,7 @@ export default function App() {
         const project = projects.find((candidate) => candidate.id === projectId);
         return {
           id,
-          title: t(language, 'newSession'),
+          title: t(language, project?.chat ? 'paletteNewChat' : 'newSession'),
           project: project?.name ?? projectId,
           state: 'idle' as const,
           kind: 'session' as const
