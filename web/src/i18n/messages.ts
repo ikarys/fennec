@@ -22,6 +22,7 @@ export const en = {
   noCriteria: 'No criteria: nothing was verified.',
   protectedTouched: 'Protected files changed: {paths}.',
   sensitiveTouched: 'Sensitive zones changed, your review is mandatory: {paths}.',
+  outsidePlan: 'Changed outside the approved plan, no step lists them: {paths}.',
   understandingMissing: 'A sensitive zone changed and no comprehension dialogue was held on this version of the branch.',
   securityFindings: 'Security scanners flagged: {list}{more}.',
   securityScanRunning: 'The security scanners are still running: their findings are not in yet.',
@@ -184,6 +185,8 @@ export const en = {
   // Integration review (components/session/IntegrationReview.tsx)
   signalSensitiveLabel: 'sensitive zone',
   signalSensitiveTitle: 'File in a sensitive zone of .agents/architecture: your review is mandatory.',
+  signalOutsidePlanLabel: 'outside the plan',
+  signalOutsidePlanTitle: 'No step of the approved plan lists this file (verified)',
   signalBypassLabel: 'bypass',
   signalBypassTitle: 'Added lines silence a lint, a type check or a test.',
   signalArchitectureLabel: 'architecture',
@@ -1331,6 +1334,7 @@ export const fr: Record<MsgKey, string> = {
   noCriteria: "Aucun critère : rien n'a été vérifié.",
   protectedTouched: 'Fichiers protégés modifiés : {paths}.',
   sensitiveTouched: 'Zones sensibles modifiées, ta revue est obligatoire : {paths}.',
+  outsidePlan: 'Modifiés hors du plan validé, aucune étape ne les cite : {paths}.',
   understandingMissing: "Une zone sensible a changé : aucun dialogue de compréhension n'a été mené sur cette version de la branche.",
   securityFindings: 'Les scanners de sécurité signalent : {list}{more}.',
   securityScanRunning: 'Les scanners de sécurité tournent encore : leurs résultats ne sont pas arrivés.',
@@ -1493,6 +1497,8 @@ export const fr: Record<MsgKey, string> = {
   // Integration review (components/session/IntegrationReview.tsx)
   signalSensitiveLabel: 'zone sensible',
   signalSensitiveTitle: 'Fichier dans une zone sensible de .agents/architecture : ta revue est obligatoire.',
+  signalOutsidePlanLabel: 'hors plan',
+  signalOutsidePlanTitle: 'Aucune étape du plan validé ne cite ce fichier (vérifié)',
   signalBypassLabel: 'contournement',
   signalBypassTitle: 'Les lignes ajoutées font taire un lint, un contrôle de types ou un test.',
   signalArchitectureLabel: 'architecture',
