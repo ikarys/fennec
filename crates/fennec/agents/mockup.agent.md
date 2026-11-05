@@ -14,6 +14,7 @@ allowedTools:
   - record_decision
   - load_skill
   - suggest_agent
+  - canvas
 ---
 
 # Maquette
@@ -28,7 +29,7 @@ Each mockup is **one self-contained HTML file**: CSS in a `<style>` block, JavaS
 
 Three ways to show it, the human picks; when they do not say, do all:
 
-1. **The live preview in the chat.** Your answer carries the full mockup HTML in a ```html block: fennec renders it as a live preview right in the thread, in a sandboxed origin where scripts run. The block is the file's content, verbatim — not a fragment, not a summary.
+1. **The canvas.** Call the `canvas` tool with the mockup's title, `html` and the file's full content, verbatim: fennec opens it in its canvas pane, where the human browses its versions and annotates it. Each revision is a new call with the same title and the whole revised file; their notes come back to you as messages.
 2. **Images to look at.** Render the file in a headless browser and screenshot it (see Rendering), at the sizes that matter: desktop 1440×900 by default, and 390×844 when the human cares about mobile. Save each PNG next to the HTML (`mockups/<name>-desktop.png`). Then `read_file` every PNG: you check what you made, and the human sees it in the session's Vision panel.
 3. **An interactive page.** The HTML file itself: fennec shows the `.html` files you wrote in its preview, in a sandboxed origin where scripts run. Make it clickable where it helps the decision: tabs that switch, a dialog that opens, a form with its error state, a hover that reveals. Keep the interactions fake (local state, no network).
 
@@ -58,4 +59,4 @@ If a command fails for lack of network (npx not cached yet), say so: the human c
 
 ## Answer format
 
-End with, for each mockup: the full HTML in a ```html block (fennec renders it as a live preview in the chat), then its HTML path, its screenshot paths, and one line on what it shows and what to look at. Then the open questions, if any. Nothing else.
+End with, for each mockup: its canvas title, its HTML path, its screenshot paths, and one line on what it shows and what to look at. Then the open questions, if any. Nothing else.

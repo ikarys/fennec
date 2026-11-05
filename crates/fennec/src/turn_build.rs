@@ -20,7 +20,7 @@ use crate::notifier::{Notifier, NotifyingLog};
 use crate::protected;
 use crate::skills;
 use crate::store::SqliteStore;
-use crate::tools::{LocalTools, Sandbox};
+use crate::tools::{CanvasTarget, LocalTools, Sandbox};
 use crate::worktree;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
@@ -143,6 +143,14 @@ pub fn with_turn<R>(
         .with_mcp(mcp::active_servers(&events, &prefs));
     let tools = match project_dir {
         Some(dir) => tools.with_project_dir(dir),
+        None => tools,
+    };
+    let tools = match &session {
+        Some(session) => tools.with_canvas(CanvasTarget {
+            db: settings.canvas_path(),
+            project_id: session.project_id.clone(),
+            session_id: session_id.to_string(),
+        }),
         None => tools,
     };
     let mut turn = Turn {

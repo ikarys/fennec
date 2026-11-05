@@ -45,6 +45,8 @@ pub struct NewArtifact {
     pub session_id: String,
     pub format: Format,
     pub source: Source,
+    /// The title to give it; None derives one from the source and content.
+    pub title: Option<String>,
 }
 
 /// Derive a human-readable title from the source and first content.

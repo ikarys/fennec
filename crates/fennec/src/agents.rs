@@ -155,7 +155,8 @@ mod tests {
                 "load_skill",
                 "web_search",
                 "web_fetch",
-                "suggest_agent"
+                "suggest_agent",
+                "canvas"
             ]
         );
         assert_eq!(plan.commands, CommandAccess::ReadOnly);
@@ -184,7 +185,8 @@ mod tests {
                 "load_skill",
                 "web_search",
                 "web_fetch",
-                "suggest_agent"
+                "suggest_agent",
+                "canvas"
             ]
         );
         assert_eq!(builder.commands, CommandAccess::ReadWrite);
