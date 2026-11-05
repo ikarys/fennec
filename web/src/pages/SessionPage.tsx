@@ -368,7 +368,7 @@ export function SessionPage({
   }, [sessionId]);
 
   const title =
-    view.name ?? detail?.title ?? (sessionId ? t('session') : t('newSession'));
+    view.name ?? detail?.title ?? (sessionId ? t('session') : isChat ? t('paletteNewChat') : t('newSession'));
 
   const lastAssistant = [...view.items]
     .reverse()
