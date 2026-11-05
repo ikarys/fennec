@@ -680,7 +680,7 @@ read-only. The human edits them as usual.
 
 ## Canvas
 
-Artifacts the human and the agent iterate on, each version kept (the `canvas` crate, its own `canvas.db`). Deleting a session or a project deletes its artifacts.
+Artifacts the human and the agent iterate on, each version kept (the `canvas` crate, its own `canvas.db`). Deleting a session or a project deletes its artifacts. The agent's `canvas` tool creates a message artifact titled as it asked, and adds a version to it when called again with the same title.
 
 - `GET /api/sessions/{id}/canvas` → the canvas artifacts pinned in the session; 404 when the session is missing.
 - `POST /api/sessions/{id}/canvas` → pin a project-relative file with `{"path": "<path>"}` or promote a message block with `{"language": "html"|"md"|"markdown"|"svg", "content": "<text>"}`; 400 for an unsupported file/language, empty content, or invalid body, 404 for a missing session/file, 413 above 10 MiB; 200 with `{"artifact": Artifact}` when the file was already pinned, 201 with `{"artifact": Artifact}` when a new artifact is created.

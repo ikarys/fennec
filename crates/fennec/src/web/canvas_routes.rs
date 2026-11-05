@@ -266,6 +266,7 @@ fn create_file(
                     source: Source::File {
                         path: path.to_owned(),
                     },
+                    title: None,
                 },
                 &content,
             ) {
@@ -293,6 +294,7 @@ fn create_block(
             session_id: session_id.to_owned(),
             format,
             source: Source::Message,
+            title: None,
         },
         content.as_bytes(),
     ) {
