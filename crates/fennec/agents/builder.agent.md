@@ -20,6 +20,7 @@ allowedTools:
   - web_fetch
   - suggest_agent
   - canvas
+  - submit_report
 ---
 
 # Build Mode
@@ -46,24 +47,8 @@ You may read files, edit files, run commands, and use tools as needed to complet
 
 ## Final report
 
-End with this report, and nothing after it. Check a box only for what you verified; the human reads it to decide what to review and test.
+End by calling `submit_report` with the report, and nothing after it: fennec renders it as the report's markdown and the human reviews it to decide what to review and test.
 
-```
-## Report: <the plan's title>
+Fields: `title` (the plan's title), `summary` (what changed for the user, one or two sentences), `steps` (the plan's steps, each `done` plus a one-line `note`: what was done, or why it is not done), `doneWhen` (the plan's "Done when" criteria, each `met` plus `how` you verified it), `changed` (every changed file and what changed in it), `test` (what the human should try by hand, empty when nothing), `todo` (what remains or was found on the way, empty when nothing).
 
-Summary: <one or two sentences: what changed for the user>
-
-### Steps
-- [x] Step 1: <title> — <what was done, in one line>
-- [ ] Step 2: <title> — <why it is not done>
-
-### Done when
-- [x] <criterion from the plan> — <how you verified it>
-
-### Changed
-- `<path>`: <what changed>
-
-### Next
-- Test: <what the human should try by hand, or "Nothing">
-- To do: <what remains or was found on the way, or "Nothing">
-```
+Check a step or a criterion only for what you verified; the report is your claim, and the human reads it to decide what to review and test.
