@@ -15,7 +15,7 @@ use crate::domain::clock::now_ms;
 use crate::domain::context_parts::{PartKind, display_label};
 use crate::domain::lang::Lang;
 use crate::domain::pricing::{Pricing, priced, prices};
-use llm_providers::Price;
+use llm_providers_connector::Price;
 use std::collections::BTreeMap;
 
 const DAY_MS: u64 = 86_400_000;

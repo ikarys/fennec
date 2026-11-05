@@ -7,7 +7,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 use super::mcp::McpServer;
-pub use llm_providers::{ApiKey, ModelParams, ModelPrefs, ModelRef, Provider, ReasoningEffort};
+pub use llm_providers_connector::{
+    ApiKey, ModelParams, ModelPrefs, ModelRef, Provider, ReasoningEffort,
+};
 
 /// The provider of the environment's endpoint (`FENNEC_LLM_URL`); always there,
 /// even with no stored entry.

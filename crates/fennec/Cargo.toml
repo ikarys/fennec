@@ -6,7 +6,7 @@ license.workspace = true
 
 [dependencies]
 base64 = "0.23"
-llm-providers = { path = "../llm-providers" }
+llm-providers-connector = "0.1.1"
 token-usage = { path = "../token-usage" }
 backlog = { path = "../backlog" }
 rules = { path = "../rules" }
