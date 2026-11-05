@@ -2,6 +2,7 @@
 //! agent ends its turn with it, fennec validates and records the plan, and
 //! renders it as the plan's canonical markdown.
 
+use crate::agent::tool_args;
 use crate::domain::event::Event;
 use crate::domain::plan::{Plan, PlanStep, PlannedCriterion};
 use serde_json::{Value, json};
@@ -85,24 +86,24 @@ pub fn definition() -> Value {
 /// Validates the model's `propose_plan` arguments. The error is a result
 /// the model reads, so it must say what to fix.
 pub fn parse(args: &Value) -> Result<Plan, String> {
-    let title = single_line(&required(args, "title")?, "'title'", 120)?;
-    let goal = single_line(&required(args, "goal")?, "'goal'", 0)?;
+    let title = tool_args::single_line(&tool_args::required(NAME, args, "title")?, "'title'", 120)?;
+    let goal = tool_args::single_line(&tool_args::required(NAME, args, "goal")?, "'goal'", 0)?;
 
-    let steps = required_array(args, "steps")?;
+    let steps = tool_args::required_array(NAME, args, "steps")?;
     let mut plan_steps = Vec::with_capacity(steps.len());
     for (index, step) in steps.iter().enumerate() {
         let what = format!("step {}", index + 1);
-        let step_title = single_line(
-            &required_in(step, "title", &what)?,
+        let step_title = tool_args::single_line(
+            &tool_args::required_in(step, "title", &what)?,
             &format!("{what}'s 'title'"),
             0,
         )?;
-        let change = single_line(
-            &required_in(step, "change", &what)?,
+        let change = tool_args::single_line(
+            &tool_args::required_in(step, "change", &what)?,
             &format!("{what}'s 'change'"),
             0,
         )?;
-        let files = string_list(step, "files", &what)?;
+        let files = tool_args::string_list(step, "files", &what)?;
         plan_steps.push(PlanStep {
             title: step_title,
             files,
@@ -110,12 +111,12 @@ pub fn parse(args: &Value) -> Result<Plan, String> {
         });
     }
 
-    let criteria = required_array(args, "doneWhen")?;
+    let criteria = tool_args::required_array(NAME, args, "doneWhen")?;
     let mut done_when = Vec::with_capacity(criteria.len());
     for (index, item) in criteria.iter().enumerate() {
         let what = format!("criterion {}", index + 1);
-        let text = single_line(
-            &required_in(item, "text", &what)?,
+        let text = tool_args::single_line(
+            &tool_args::required_in(item, "text", &what)?,
             &format!("{what}'s 'text'"),
             0,
         )?;
@@ -124,7 +125,7 @@ pub fn parse(args: &Value) -> Result<Plan, String> {
             None | Some(Value::Null) => None,
             Some(Value::String(s)) if s.trim().is_empty() => None,
             Some(Value::String(s)) => {
-                let check = single_line(s.trim(), &format!("{what}'s 'check'"), 0)?;
+                let check = tool_args::single_line(s.trim(), &format!("{what}'s 'check'"), 0)?;
                 if check.contains('`') {
                     return Err(format!(
                         "{what}'s 'check' must not contain a backtick: it would break the rendered markdown."
@@ -139,7 +140,7 @@ pub fn parse(args: &Value) -> Result<Plan, String> {
         done_when.push(PlannedCriterion { text, check });
     }
 
-    let risks = string_list(args, "risks", "the plan")?;
+    let risks = tool_args::string_list(args, "risks", "the plan")?;
     Ok(Plan {
         title,
         goal,
@@ -154,67 +155,6 @@ pub fn event(call_id: &str, plan: Plan) -> Event {
         call_id: call_id.into(),
         markdown: plan.to_markdown(),
         plan,
-    }
-}
-
-fn required(args: &Value, field: &str) -> Result<String, String> {
-    args.get(field)
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-        .map(str::to_string)
-        .ok_or_else(|| format!("propose_plan requires a non-empty '{field}' string."))
-}
-
-/// A required, non-empty array of objects; the error says what to add.
-fn required_array<'a>(args: &'a Value, field: &str) -> Result<&'a Vec<Value>, String> {
-    match args.get(field) {
-        Some(Value::Array(items)) if !items.is_empty() => Ok(items),
-        _ => Err(format!(
-            "propose_plan requires a non-empty '{field}' array."
-        )),
-    }
-}
-
-fn required_in(value: &Value, field: &str, what: &str) -> Result<String, String> {
-    value
-        .get(field)
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-        .map(str::to_string)
-        .ok_or_else(|| format!("{what} has no non-empty '{field}' string."))
-}
-
-/// Trims, keeps the value one line, and caps its length when `max` is set.
-fn single_line(value: &str, label: &str, max_chars: usize) -> Result<String, String> {
-    if value.chars().count() > max_chars && max_chars > 0 {
-        return Err(format!("{label} must be at most {max_chars} characters."));
-    }
-    if value.contains('\n') {
-        return Err(format!("{label} must be a single line: drop the newline."));
-    }
-    Ok(value.to_string())
-}
-
-/// An optional array of strings: every entry trimmed, empties dropped.
-fn string_list(value: &Value, field: &str, what: &str) -> Result<Vec<String>, String> {
-    match value.get(field) {
-        None => Ok(Vec::new()),
-        Some(Value::Array(items)) => {
-            let mut out = Vec::new();
-            for (index, item) in items.iter().enumerate() {
-                let entry = item
-                    .as_str()
-                    .ok_or_else(|| format!("{what}'s {field}[{index}] is not a string."))?
-                    .trim();
-                if !entry.is_empty() {
-                    out.push(entry.to_string());
-                }
-            }
-            Ok(out)
-        }
-        Some(_) => Err(format!("{what}'s '{field}' must be an array of strings.")),
     }
 }
 

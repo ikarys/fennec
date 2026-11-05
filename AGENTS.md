@@ -75,6 +75,7 @@ crates/fennec/src/
     agent_suggestion.rs the agent switch an agent suggested, since the human last wrote
     understanding.rs   the comprehension dialogue on a branch: its link, held once the human answered on the current head
     plan.rs            a plan the agent proposes with propose_plan: steps, criteria, its canonical markdown
+    report.rs          the report the builder submits with submit_report: steps, criteria, changed files, its canonical markdown
     plan_scope.rs      the files the approved plan says it will touch; those a branch changed outside it
     review_map.rs      the review order of a branch's files: per-file signals (gate checks, churn, tests, size)
     workflow/          a workflow: definition (nodes, ports, edges), template ({{…}} names),
@@ -101,6 +102,9 @@ crates/fennec/src/
     tool_calls.rs      runs and records tool calls
     ask_user.rs        the loop's own tool; the turn ends waiting for the human
     propose_task.rs    the loop's propose_task tool: a backlog task proposed, the turn goes on
+    propose_plan.rs    the loop's propose_plan tool: the plan validated and recorded, the turn ends
+    submit_report.rs   the loop's submit_report tool: the builder's report validated and recorded, the turn ends
+    tool_args.rs       the argument validators those two share; their errors tell the model what to fix
     suggest_agent.rs   the loop's own tool: suggests a new session on another agent (the human opens it)
     rule_check.rs      the rules crate's decision on a tool call: the refusal and its `rule.blocked`, the approval request
     rule_approval.rs   the human's answer to an approval: runs or refuses the recorded call, resumes the loop

@@ -1,8 +1,9 @@
 //! Runs the model's tool calls and records their results. `ask_user` is
 //! special: it pauses the turn, so the calls after it in the batch are not
-//! run, and the turn ends waiting for the human. `propose_plan` ends the
-//! turn the same way: the plan is recorded, the calls after it in the batch
-//! are not run, and the turn ends complete.
+//! run, and the turn ends waiting for the human. `propose_plan` and
+//! `submit_report` end the turn the same way: the plan or report is
+//! recorded, the calls after it in the batch are not run, and the turn ends
+//! complete.
 
 use super::ask_user;
 use super::preflight;
@@ -12,6 +13,7 @@ use super::propose_task;
 use super::record_decision;
 use super::request_waiver;
 use super::rule_check;
+use super::submit_report;
 use super::suggest_agent;
 use super::turn::Turn;
 use crate::domain::agent::{AgentDefinition, WriteScope};
@@ -35,7 +37,8 @@ const NOT_RUN_AFTER_ASK: &str = "Not run: the turn paused for the human (a quest
 pub(super) enum Flow {
     Continue,
     WaitingForUser,
-    /// `propose_plan` recorded the plan: the turn ends complete.
+    /// `propose_plan` recorded the plan, or `submit_report` the report:
+    /// the turn ends complete.
     Done,
 }
 
@@ -138,7 +141,7 @@ pub(super) fn execute_tools(
             continue;
         }
         // An `ask_user` earlier in this batch paused the turn, or a
-        // `propose_plan` ended it.
+        // `propose_plan` / `submit_report` ended it.
         if waiting || done {
             record(
                 turn,
@@ -308,6 +311,25 @@ pub(super) fn execute_tools(
                         message_id,
                         call,
                         ToolResult::success(propose_plan::RECORDED.into(), false),
+                    )?;
+                    done = true;
+                }
+            }
+            continue;
+        }
+        if call.name == submit_report::NAME {
+            match submit_report::parse(&call.arguments) {
+                // The model reads the failure and the loop goes on.
+                Err(e) => record(turn, message_id, call, ToolResult::failure(e))?,
+                Ok(report) => {
+                    // The report is the turn's end: no preflight, no second
+                    // chance — the human reviews what the builder claims.
+                    turn.append(submit_report::event(&call.id, report))?;
+                    record(
+                        turn,
+                        message_id,
+                        call,
+                        ToolResult::success(submit_report::RECORDED.into(), false),
                     )?;
                     done = true;
                 }
@@ -1114,6 +1136,107 @@ mod tests {
         assert_eq!(
             planned,
             crate::agent::propose_plan::parse(&plan_args(None)).unwrap()
+        );
+    }
+
+    fn report_args() -> Value {
+        json!({
+            "title": "Add the report tool",
+            "summary": "The builder ends its turn with submit_report",
+            "steps": [
+                {"title": "Write the domain", "done": true, "note": "The vocabulary"},
+                {"title": "Wire the tool", "done": false, "note": "Not yet"}
+            ],
+            "doneWhen": [
+                {"text": "The build passes", "met": true, "how": "cargo build"}
+            ],
+            "changed": [{"path": "src/domain/report.rs", "what": "The vocabulary"}],
+            "test": "",
+            "todo": ""
+        })
+    }
+
+    #[test]
+    fn an_invalid_submit_report_is_a_failure_and_the_turn_continues() {
+        let stop = AtomicBool::new(false);
+        let mut agents = builder();
+        agents[0].allowed_tools.push("submit_report".into());
+        let mut h = Harness::new(Rules::new(Vec::new()), &stop, agents);
+        let (mut turn, agent) = h.turn_with_agent(false);
+        let mut args = report_args();
+        args.as_object_mut().unwrap().remove("summary");
+        let flow = execute_tools(
+            &mut turn,
+            &agent,
+            "m1",
+            &[
+                call("c1", "submit_report", args),
+                call("c2", "read_file", json!({})),
+            ],
+        )
+        .unwrap();
+
+        assert!(matches!(flow, super::Flow::Continue));
+        assert_eq!(*h.tools.executed.borrow(), vec!["read_file".to_string()]);
+        let results = results(&h.log);
+        assert_eq!(results.len(), 2);
+        assert!(!results[0].1.success);
+        assert!(results[0].1.error.as_deref().unwrap().contains("'summary'"));
+        assert_eq!(
+            count(&h.log, |e| matches!(e, Event::ReportSubmitted { .. })),
+            0
+        );
+    }
+
+    #[test]
+    fn a_valid_submit_report_records_the_report_and_ends_the_turn() {
+        let stop = AtomicBool::new(false);
+        let mut agents = builder();
+        agents[0].allowed_tools.push("submit_report".into());
+        let mut h = Harness::new(Rules::new(Vec::new()), &stop, agents);
+        let (mut turn, agent) = h.turn_with_agent(false);
+        let flow = execute_tools(
+            &mut turn,
+            &agent,
+            "m1",
+            &[
+                call("c1", "submit_report", report_args()),
+                call("c2", "read_file", json!({})),
+            ],
+        )
+        .unwrap();
+
+        assert!(matches!(flow, super::Flow::Done));
+        assert!(h.tools.executed.borrow().is_empty());
+        let results = results(&h.log);
+        assert_eq!(results.len(), 2);
+        assert!(results[0].1.success);
+        assert_eq!(
+            results[0].1.output.as_deref(),
+            Some(crate::agent::submit_report::RECORDED)
+        );
+        assert_eq!(
+            results[1],
+            (
+                "c2".to_string(),
+                ToolResult::failure(super::NOT_RUN_AFTER_ASK.into())
+            )
+        );
+        let submitted = h
+            .log
+            .0
+            .borrow()
+            .iter()
+            .find_map(|e| match e {
+                Event::ReportSubmitted {
+                    call_id, report, ..
+                } if call_id == "c1" => Some(report.clone()),
+                _ => None,
+            })
+            .expect("the report is recorded");
+        assert_eq!(
+            submitted,
+            crate::agent::submit_report::parse(&report_args()).unwrap()
         );
     }
 

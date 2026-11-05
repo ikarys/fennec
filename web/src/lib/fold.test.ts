@@ -276,6 +276,70 @@ describe('createThreadFold', () => {
     expect(fold.view().items).toHaveLength(0);
   });
 
+  it('replaces a submit_report call by a report segment on report.submitted', () => {
+    const fold = createThreadFold();
+    fold.apply(ev('message.start', { messageId: 'a1', role: 'assistant' }));
+    fold.apply(ev('tool.call', {
+      messageId: 'a1',
+      toolCall: { id: 'r1', name: 'submit_report', arguments: {} }
+    }));
+    fold.apply(ev('report.submitted', {
+      callId: 'r1',
+      report: {
+        title: 'Ship',
+        summary: 'What changed',
+        steps: [
+          { title: 'Add code', done: true, note: 'implemented' },
+          { title: 'Docs', done: false }
+        ],
+        doneWhen: [
+          { text: 'tests pass', met: true, how: 'cargo test' },
+          { text: 'docs updated', met: false }
+        ],
+        changed: [{ path: 'a.ts', what: 'the code' }],
+        test: 'Open the UI',
+        todo: ''
+      },
+      markdown: '## Report: Ship'
+    }));
+    const item = fold.view().items[0];
+    expect(item.kind).toBe('assistant');
+    if (item.kind !== 'assistant') return;
+    expect(item.segments).toEqual([
+      {
+        kind: 'report',
+        id: 'r1',
+        report: {
+          kind: 'report',
+          title: 'Ship',
+          summary: 'What changed',
+          steps: [
+            { number: 1, checked: true, text: 'Add code', detail: 'implemented' },
+            { number: 2, checked: false, text: 'Docs', detail: '' }
+          ],
+          doneWhen: [
+            { checked: true, text: 'tests pass', detail: 'cargo test' },
+            { checked: false, text: 'docs updated', detail: '' }
+          ],
+          changed: [{ path: 'a.ts', what: 'the code' }],
+          test: 'Open the UI',
+          todo: ''
+        },
+        markdown: '## Report: Ship'
+      }
+    ]);
+    expect(toolOf(fold.view().items, 'r1')).toBeUndefined();
+  });
+
+  it('ignores a report.submitted whose call is not in the thread', () => {
+    const fold = createThreadFold();
+    fold.apply(ev('report.submitted', {
+      callId: 'r1',
+      report: { title: 'Ship', summary: 's', steps: [], doneWhen: [], changed: [], test: '', todo: '' }
+    }));
+    expect(fold.view().items).toHaveLength(0);
+  });
+
   it('folds write_file into modified files and content preview', () => {
     const fold = createThreadFold();
     fold.apply(ev('tool.call', {

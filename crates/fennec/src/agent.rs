@@ -16,9 +16,11 @@ mod request_waiver;
 mod round;
 pub mod rule_approval;
 mod rule_check;
+mod submit_report;
 mod suggest_agent;
 #[cfg(test)]
 mod test_support;
+mod tool_args;
 mod tool_calls;
 pub mod turn;
 pub mod waiver;
@@ -38,6 +40,7 @@ mod tests {
         assert!(KNOWN_TOOLS.contains(&super::record_decision::NAME));
         assert!(KNOWN_TOOLS.contains(&super::propose_criteria::NAME));
         assert!(KNOWN_TOOLS.contains(&super::propose_plan::NAME));
+        assert!(KNOWN_TOOLS.contains(&super::submit_report::NAME));
         assert!(KNOWN_TOOLS.contains(&super::request_waiver::NAME));
         assert!(!KNOWN_TOOLS.contains(&"rm_rf"));
     }
