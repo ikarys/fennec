@@ -54,6 +54,7 @@ pub mod stats;
 pub mod task_proposal;
 
 pub mod test_files;
+pub mod understanding;
 pub mod vision;
 pub mod waiver;
 pub mod workdir_notice;
