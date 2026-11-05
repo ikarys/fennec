@@ -10,11 +10,28 @@ pub enum TurnInput {
     Compact,
 }
 
+/// What a slash command runs: a built-in of fennec or a skill.
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum SlashKind {
+    Command,
+    Skill,
+}
+
+impl SlashKind {
+    pub fn wire(self) -> &'static str {
+        match self {
+            SlashKind::Command => "command",
+            SlashKind::Skill => "skill",
+        }
+    }
+}
+
 /// A command the composer offers: `/compact` and one per skill.
 #[derive(Debug, PartialEq)]
 pub struct SlashCommand {
     pub name: String,
     pub description: String,
+    pub kind: SlashKind,
 }
 
 /// Parses a slash invocation: (id, rest of the text trimmed); None when
@@ -72,11 +89,13 @@ pub fn commands(skills: &[Skill]) -> Vec<SlashCommand> {
         description:
             "Compact the context: summarize the session and start a new window from the summary."
                 .to_string(),
+        kind: SlashKind::Command,
     }];
     for skill in skills {
         out.push(SlashCommand {
             name: skill.id.clone(),
             description: skill.description.clone(),
+            kind: SlashKind::Skill,
         });
     }
     out
@@ -209,7 +228,9 @@ mod tests {
         let skills = vec![skill("b"), skill("a")];
         let list = commands(&skills);
         assert_eq!(list[0].name, "compact");
+        assert_eq!(list[0].kind, SlashKind::Command);
         assert_eq!(list[1].name, "b");
+        assert_eq!(list[1].kind, SlashKind::Skill);
         assert_eq!(list[2].name, "a");
     }
 

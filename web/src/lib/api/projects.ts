@@ -21,6 +21,8 @@ export interface Project {
 export interface SlashCommand {
   name: string;
   description: string;
+  /** A built-in command (`compact`) or a skill: the menu groups them. */
+  kind: 'command' | 'skill';
 }
 
 /** The step of a project an agent serves; the server sends agents ordered by it. */
