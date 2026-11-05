@@ -140,16 +140,31 @@ impl Turns {
         std::thread::spawn(move || {
             let mut job = job;
             loop {
-                if let Err(e) = run(
-                    &settings,
-                    &notifier,
-                    &session_id,
-                    &place.workdir,
-                    &job,
-                    &stop,
-                    autonomous,
-                ) {
-                    eprintln!("fennec: session {session_id}: {e}");
+                // A panic in the turn (a tool, a parser) must not leave the
+                // session running forever: its turn ends as cut, the loop goes on.
+                let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    run(
+                        &settings,
+                        &notifier,
+                        &session_id,
+                        &place.workdir,
+                        &job,
+                        &stop,
+                        autonomous,
+                    )
+                }));
+                match outcome {
+                    Ok(Ok(())) => {}
+                    Ok(Err(e)) => eprintln!("fennec: session {session_id}: {e}"),
+                    Err(_) => {
+                        eprintln!("fennec: session {session_id}: the turn panicked");
+                        let ended = SqliteStore::open(&settings.db_path)
+                            .and_then(|store| store.end_cut_turn(&session_id));
+                        if let Err(e) = ended {
+                            eprintln!("fennec: session {session_id}: ending the cut turn: {e}");
+                        }
+                        notifier.notify();
+                    }
                 }
                 // Whatever the job did, what the agent wrote is recorded as
                 // fennec's commits for the human to cherry-pick.
