@@ -8,9 +8,9 @@ run: build
 build: web
     cargo build --release -p fennec
 
-# Build the web UI into web/dist (dependencies installed on first use)
+# Build the web UI into web/dist (dependencies installed again when the lockfile changes)
 web:
-    cd web && ([ -d node_modules ] || npm ci) && npm run build
+    cd web && ([ node_modules/.package-lock.json -nt package-lock.json ] || npm ci) && npm run build
 
 # Work on the UI: the server, plus Vite on http://localhost:5173 with live reload
 dev:
@@ -24,7 +24,9 @@ dev:
     if [ "$API_PORT" = "$UI_PORT" ]; then
       API_PORT=$(( UI_PORT + 1 ))
     fi
-    (cd web && ([ -d node_modules ] || npm ci))
+    # npm ci again when package-lock.json changed (a pull added a dependency):
+    # npm stamps node_modules/.package-lock.json at each install.
+    (cd web && ([ node_modules/.package-lock.json -nt package-lock.json ] || npm ci))
     cargo build -p fennec
     target/debug/fennec --port "$API_PORT" & server=$!
     trap 'kill $server' EXIT
