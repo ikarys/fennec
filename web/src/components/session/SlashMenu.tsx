@@ -51,6 +51,8 @@ export function SlashMenu({ commands, selected, onSelect }: SlashMenuProps) {
             <div
               role="option"
               aria-selected={index === selected}
+              // The list scrolls past its max height: keep the keyboard's choice in view.
+              ref={index === selected ? (node) => node?.scrollIntoView({ block: 'nearest' }) : undefined}
               onClick={() => onSelect(index)}
               className={`flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-left text-sm ${
                 index === selected ? 'bg-raised text-accent' : 'text-text'
