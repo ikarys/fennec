@@ -300,7 +300,9 @@ fn strip_wrappers(mut tokens: Vec<String>) -> Vec<String> {
             break;
         }
 
-        tokens.drain(..skip);
+        // A flag that takes a value (`-u`, `-n`, `-I`) may end the line, so the
+        // skip can run past the last token.
+        tokens.drain(..skip.min(tokens.len()));
     }
 
     tokens
@@ -646,6 +648,13 @@ fn scan_backtick(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_wrapper_flag_ending_the_line_does_not_panic() {
+        for line in ["xargs -I", "sudo -u", "nice -n", "ls | xargs -n"] {
+            segments(line);
+        }
+    }
 
     fn pattern(text: &str) -> CommandPattern {
         CommandPattern::parse(text).unwrap()
