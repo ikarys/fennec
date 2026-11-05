@@ -133,6 +133,7 @@ mod tests {
             reasoning_effort: None,
             color: None,
             phase: None,
+            workflow: None,
             prompt: "prompt".into(),
             origin: AgentOrigin::Default,
             path: None,

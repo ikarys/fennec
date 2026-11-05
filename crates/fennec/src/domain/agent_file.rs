@@ -18,6 +18,9 @@ pub struct AgentDraft {
     pub description: String,
     #[serde(default)]
     pub phase: Option<Phase>,
+    /// The workflow a message to this agent starts by default in the composer.
+    #[serde(default)]
+    pub workflow: Option<String>,
     #[serde(default)]
     pub color: Option<String>,
     #[serde(default)]
@@ -45,6 +48,9 @@ impl AgentDraft {
         }
         if let Some(phase) = self.phase {
             out.push_str(&field("phase", &scalar(phase)));
+        }
+        if let Some(workflow) = self.workflow.as_deref().filter(|w| !w.is_empty()) {
+            out.push_str(&field("workflow", workflow));
         }
         if let Some(color) = self.color.as_deref().filter(|c| !c.is_empty()) {
             out.push_str(&field("color", color));
@@ -105,6 +111,7 @@ mod tests {
             name: "Mien".into(),
             description: "Fait une chose".into(),
             phase: Some(Phase::Understand),
+            workflow: Some("plan-build-verify".into()),
             color: Some("#a855f7".into()),
             subagent: false,
             read_only: true,
@@ -123,6 +130,7 @@ mod tests {
         assert_eq!(agent.name, draft.name);
         assert_eq!(agent.description, draft.description);
         assert_eq!(agent.phase, draft.phase);
+        assert_eq!(agent.workflow, draft.workflow);
         // A '#' value must be quoted or the frontmatter loses it.
         assert_eq!(agent.color, draft.color);
         assert!(!agent.subagent);
@@ -137,6 +145,7 @@ mod tests {
         let draft = AgentDraft {
             description: String::new(),
             phase: None,
+            workflow: None,
             color: None,
             read_only: false,
             reasoning_effort: None,
@@ -148,6 +157,7 @@ mod tests {
         for absent in [
             "description:",
             "phase:",
+            "workflow:",
             "color:",
             "commands:",
             "reasoningEffort:",

@@ -82,6 +82,9 @@ pub struct AgentDefinition {
     pub color: Option<String>,
     /// None for sub-agents and agents that name no known phase.
     pub phase: Option<Phase>,
+    /// fennec's own: `workflow` in the frontmatter: the workflow a message to this agent
+    /// starts by default in the composer.
+    pub workflow: Option<String>,
     pub prompt: String,
     /// fennec's own: where this definition was found.
     pub origin: AgentOrigin,
@@ -196,6 +199,10 @@ pub fn parse_agent_md(content: &str) -> Result<AgentDefinition, AgentParseError>
     let phase = fields.scalar("phase").and_then(|value| {
         serde_json::from_value::<Phase>(serde_json::Value::String(value.to_string())).ok()
     });
+    let workflow = fields
+        .scalar("workflow")
+        .filter(|value| !value.is_empty())
+        .map(|value| value.to_string());
 
     Ok(AgentDefinition {
         id: id.to_string(),
@@ -209,6 +216,7 @@ pub fn parse_agent_md(content: &str) -> Result<AgentDefinition, AgentParseError>
         reasoning_effort,
         color,
         phase,
+        workflow,
         prompt: body,
         // The file's content cannot say where the file is: discovery sets it.
         origin: AgentOrigin::Default,
@@ -364,6 +372,7 @@ mod tests {
             reasoning_effort: None,
             color: None,
             phase: None,
+            workflow: None,
             prompt: "prompt".to_string(),
             origin: AgentOrigin::Default,
             path: None,
@@ -473,6 +482,16 @@ allowedTools:
 
         let missing = parse_agent_md("---\nid: plan\n---\nbody\n").unwrap();
         assert_eq!(missing.phase, None);
+    }
+
+    #[test]
+    fn the_default_workflow_is_parsed_and_none_when_absent() {
+        let with =
+            parse_agent_md("---\nid: plan\nworkflow: plan-build-verify\n---\nbody\n").unwrap();
+        assert_eq!(with.workflow.as_deref(), Some("plan-build-verify"));
+
+        let without = parse_agent_md("---\nid: plan\n---\nbody\n").unwrap();
+        assert_eq!(without.workflow, None);
     }
 
     #[test]
