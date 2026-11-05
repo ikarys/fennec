@@ -91,6 +91,7 @@ export const en = {
   panelVision: 'Vision',
   panelPlugins: 'Plugins',
   pluginProvenance: 'plugin {name}',
+  statusBarLabel: 'Status bar',
   noPluginBlocks: 'No block: no active plugin.',
   noProjectBlocks: 'The active plugins emitted no global block.',
   pluginsDescription:
@@ -101,6 +102,7 @@ export const en = {
   pluginEnv: 'env',
   pluginCodeChanged: 'The code changed: enable it again to run this version.',
   noPluginsDefined: 'No plugin is defined in ~/.agents/plugins.json.',
+  pluginProblems: 'Left out of ~/.agents/plugins.json',
   pluginBlocksTitle: 'Global blocks',
   panelPageDecision: 'Decision',
   panelPageContext: 'Context',
@@ -1435,6 +1437,7 @@ export const fr: Record<MsgKey, string> = {
   panelVision: 'Vision',
   panelPlugins: 'Plugins',
   pluginProvenance: 'plugin {name}',
+  statusBarLabel: 'Barre d’état',
   noPluginBlocks: 'Aucun bloc : aucun plugin actif.',
   noProjectBlocks: 'Les plugins actifs n’ont émis aucun bloc global.',
   pluginsDescription:
@@ -1445,6 +1448,7 @@ export const fr: Record<MsgKey, string> = {
   pluginEnv: 'env',
   pluginCodeChanged: 'Le code a changé : réactivez-le pour lancer cette version.',
   noPluginsDefined: 'Aucun plugin n’est défini dans ~/.agents/plugins.json.',
+  pluginProblems: 'Écarté de ~/.agents/plugins.json',
   pluginBlocksTitle: 'Blocs globaux',
   panelPageDecision: 'Décision',
   panelPageContext: 'Contexte',
