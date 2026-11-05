@@ -8,6 +8,7 @@
 #   FENNEC_VERSION       release tag to install (default: latest; edge is supported)
 #   FENNEC_INSTALL_DIR   install directory (default: $HOME/.local/bin)
 #   FENNEC_REPO_URL      repository URL for releases (default: https://github.com/ikarys/fennec)
+#   FENNEC_SERVICE       none: do not manage a systemd user service; keep: do not restart an existing service
 
 set -eu
 
@@ -92,6 +93,56 @@ install_binary() {
         || fail "could not install binary to $2/fennec"
 }
 
+install_service() {
+    dir="$1"
+    if [ "${FENNEC_SERVICE:-}" = "none" ]; then
+        return 0
+    fi
+
+    if ! systemctl --user show-environment >/dev/null 2>&1; then
+        warn "no systemd user session: start fennec by hand (fennec serve)"
+        return 0
+    fi
+
+    case "$dir" in
+        /*)
+            ;;
+        *)
+            dir="$(pwd)/$dir"
+            ;;
+    esac
+
+    unit_dir="${XDG_CONFIG_HOME:-${HOME:-}/.config}/systemd/user"
+    unit="$unit_dir/fennec.service"
+
+    if [ ! -f "$unit" ]; then
+        mkdir -p "$unit_dir" || fail "could not create systemd unit directory: $unit_dir"
+        # A unit owned by the user is never overwritten: if one exists we only
+        # manage its state below.
+        {
+            printf '[Unit]\n'
+            printf 'Description=fennec\n'
+            printf '\n'
+            printf '[Service]\n'
+            printf 'ExecStart=%s/fennec serve\n' "$dir"
+            printf 'Restart=on-failure\n'
+            printf '\n'
+            printf '[Install]\n'
+            printf 'WantedBy=default.target\n'
+        } > "$unit" || fail "could not write systemd unit: $unit"
+        systemctl --user daemon-reload || fail "systemd daemon-reload failed"
+        systemctl --user enable --now fennec || fail "could not enable fennec service"
+        printf 'fennec runs as a systemd user service: journalctl --user -u fennec -f\n'
+    else
+        if [ "${FENNEC_SERVICE:-}" = "keep" ]; then
+            return 0
+        fi
+        if systemctl --user is-active --quiet fennec; then
+            systemctl --user restart fennec || fail "could not restart fennec service"
+        fi
+    fi
+}
+
 path_contains_dir() {
     case ":${PATH:-}:" in
         *":$1:"*)
@@ -156,6 +207,7 @@ main() {
     fi
 
     install_binary "$SOURCE" "$INSTALL_DIR"
+    install_service "$INSTALL_DIR"
 
     warn_glibc
     if ! command -v bwrap >/dev/null 2>&1; then

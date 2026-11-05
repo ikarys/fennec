@@ -11,3 +11,4 @@ export * from "./api/insight";
 export * from "./api/rules";
 export * from "./api/plugins";
 export * from "./api/agents";
+export * from "./api/update";

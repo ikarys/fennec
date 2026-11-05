@@ -14,7 +14,8 @@ use super::{
     file_manager, folder_routes, idea_routes, indicator_routes, integration, mcp_routes,
     model_routes, plugin_routes, project_dashboard, project_delete, project_list_routes,
     project_routes, rule_approval_routes, rule_bridge_routes, rule_routes, servers, session_delete,
-    session_routes, settings_routes, terminal, waiver_routes, workflow_routes, worktree_routes,
+    session_routes, settings_routes, terminal, update_routes, waiver_routes, workflow_routes,
+    worktree_routes,
 };
 use serde_json::json;
 use std::net::TcpStream;
@@ -70,6 +71,8 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         ("GET", ["api", "projects", id, "worktrees"]) => {
             worktree_routes::list(app, req, stream, id)
         }
+        ("GET", ["api", "update"]) => update_routes::check(app, req, stream),
+        ("POST", ["api", "update"]) => update_routes::apply(app, stream),
         ("GET", ["api", "worktrees"]) => worktree_routes::summary(app, stream),
         ("POST", ["api", "worktrees", "clean"]) => worktree_routes::clean(app, req, stream),
         ("POST", ["api", "worktrees", "remove-orphan"]) => {

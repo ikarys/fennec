@@ -1175,6 +1175,11 @@ export const en = {
   topBarSearchPlaceholder: 'Search…',
   topBarSplitAria: 'Split view',
   topBarSplitTitle: 'Split view (⌘\\)',
+  updateAvailableTitle: 'fennec {latest} is available (you run {current}): click to update',
+  updateConfirm: 'Install fennec {latest} and restart the server?',
+  updateInstalling: 'Installing, fennec restarts…',
+  updateRestartTimeout: 'fennec did not come back after the update: check the server.',
+  updateFailed: 'Update failed: {error}',
   // pages/WorkflowsPage.tsx
   workflowOriginProject: 'Project',
   workflowOriginGlobal: 'Global',
@@ -2536,6 +2541,11 @@ export const fr: Record<MsgKey, string> = {
   topBarSearchPlaceholder: 'Rechercher…',
   topBarSplitAria: 'Vue scindée',
   topBarSplitTitle: 'Vue scindée (⌘\\)',
+  updateAvailableTitle: 'fennec {latest} est disponible (vous avez {current}) : cliquez pour mettre à jour',
+  updateConfirm: 'Installer fennec {latest} et redémarrer le serveur ?',
+  updateInstalling: 'Installation, fennec redémarre…',
+  updateRestartTimeout: "fennec n'est pas revenu après la mise à jour : vérifiez le serveur.",
+  updateFailed: 'Échec de la mise à jour : {error}',
   // pages/WorkflowsPage.tsx
   workflowOriginProject: 'Projet',
   workflowOriginGlobal: 'Global',
