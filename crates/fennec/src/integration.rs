@@ -365,7 +365,7 @@ fn ours_with_carried(top: &Path, carried: &[String]) -> Result<String, String> {
 /// behind, and its already merged lines would conflict; after an integration,
 /// which squashes, the fork point is the older of the two and the base ref is
 /// right.
-fn merge_start(top: &Path, wt: &Worktree) -> String {
+pub(crate) fn merge_start(top: &Path, wt: &Worktree) -> String {
     let fork_point = git(top, &["merge-base", "HEAD", &wt.branch], None)
         .map(|out| String::from_utf8_lossy(&out).trim().to_string());
     match fork_point {
@@ -874,6 +874,33 @@ mod tests {
             ),
             "1"
         );
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn work_after_an_integration_starts_from_the_moved_base() {
+        // The squash leaves the fork point (`merge-base HEAD branch`) at the run's start:
+        // the gate must start from the base the integration moved, not from there.
+        let (base, repo) = setup();
+        let wt = open(&base.join("wt"), &repo, "s1").unwrap().unwrap();
+        std::fs::write(wt.workdir.join("agent.txt"), "x\n").unwrap();
+        assert_eq!(commit(&wt, "agent work"), Ok(true));
+        let top = top(&repo).unwrap().0;
+        apply(&top, &wt, "integrate\n\nFennec-Session: s1").unwrap();
+
+        std::fs::write(wt.workdir.join("later.txt"), "y\n").unwrap();
+        assert_eq!(commit(&wt, "later work"), Ok(true));
+        let next = preview(&top, &wt).unwrap();
+
+        assert_eq!(
+            next.commits
+                .iter()
+                .map(|c| c.subject.as_str())
+                .collect::<Vec<_>>(),
+            vec!["later work"]
+        );
+        assert_eq!(next.files, vec!["later.txt".to_string()]);
+        assert_eq!(merge_start(&top, &wt), wt.base);
         let _ = std::fs::remove_dir_all(&base);
     }
 

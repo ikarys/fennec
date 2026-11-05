@@ -188,9 +188,10 @@ fn scan_gitleaks(
 
     let args = vec![
         "git".to_string(),
+        // The gate's own start: after a merge by hand, the commits already in HEAD are not rescanned.
         format!(
-            "--log-opts={base}..{branch}",
-            base = wt.base,
+            "--log-opts={start}..{branch}",
+            start = crate::integration::merge_start(top, wt),
             branch = wt.branch
         ),
         "--report-format".to_string(),
@@ -516,6 +517,8 @@ mod tests {
         .unwrap();
         git(&top, &["add", "."]);
         git(&top, &["commit", "-qm", "secret"]);
+        // The human is back on their branch: the gate starts from where it forks.
+        git(&top, &["switch", "-q", "main"]);
         let wt = Worktree {
             path: top.clone(),
             workdir: top.clone(),
