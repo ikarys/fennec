@@ -110,8 +110,23 @@ fn holds_contract(text: &str) -> bool {
             .or_else(|| trimmed.strip_prefix("## "))
             .map(str::trim)
             .unwrap_or_default();
-        rest.starts_with("Plan:") || rest.starts_with("Report:")
+        is_contract_heading(rest)
     })
+}
+
+/// `Plan: …` or `Report: …`, also with a short qualifier the model adds
+/// ("Plan révisé : …", "Revised Plan: …"); the UI's `splitContract` reads the same.
+fn is_contract_heading(heading: &str) -> bool {
+    let Some((label, _)) = heading.split_once(':') else {
+        return false;
+    };
+    let words: Vec<&str> = label.split_whitespace().collect();
+    let keyword = |word: &&str| *word == "Plan" || *word == "Report";
+    match words.as_slice() {
+        [only] => keyword(only),
+        [first, second] => keyword(first) || keyword(second),
+        _ => false,
+    }
 }
 
 /// The content of the first message the human typed (not system-generated,
@@ -306,6 +321,22 @@ mod tests {
             start("c", Role::Assistant, Some("Plan ready."), false),
         ];
         assert_eq!(node_output(&events), "## Plan: build\n## Done when\n- done");
+    }
+
+    #[test]
+    fn contract_heading_allows_a_short_qualifier() {
+        for heading in [
+            "Plan: x",
+            "Plan : x",
+            "Plan révisé : x",
+            "Revised Plan: x",
+            "Report: x",
+        ] {
+            assert!(is_contract_heading(heading), "{heading}");
+        }
+        for heading in ["Planning: x", "Plan", "Plan of the day for the team: x"] {
+            assert!(!is_contract_heading(heading), "{heading}");
+        }
     }
 
     #[test]
