@@ -41,7 +41,13 @@ commit to the human's branch (rule 1), even when every edge is automatic.
 2. `~/.agents/workflows/`
 3. the defaults embedded in the binary (`crates/fennec/workflows/`)
 
-The embedded defaults are `plan-build-verify` (plan, build, verify), `quick` (small direct build), `write-docs` (project documentation), and `write-training` (a training course).
+The embedded defaults are `plan-build-verify` (plan, tests, build, verify), `quick` (small direct build), `write-docs` (project documentation), and `write-training` (a training course).
+
+`plan-build-verify` has a test gate between the plan and the code: once the human approves the plan, the
+`tests` agent writes the tests derived from its "Done when" criteria (its `writes: tests` frontmatter limits its
+file tools to test files), then a human node asks to validate them. "Validate" records `tests.approved` with the
+test files written so far; from the next turn on they are protected for the rest of the session, like the paths of
+`.agents/protected`, so the builder cannot weaken them. "Rework" sends the human's comment back to the `tests` agent.
 
 `id` matches `^[a-z0-9][a-z0-9-]*$` and equals the file name. The editor
 saves into the project's or the global folder; an embedded default is

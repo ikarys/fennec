@@ -12,6 +12,7 @@ use crate::domain::kernel_rules;
 use crate::domain::lang::Lang;
 use crate::domain::mcp;
 use crate::domain::preferences::ModelRef;
+use crate::domain::test_files;
 use crate::domain::waiver;
 use crate::instructions::all_instructions;
 use crate::llm::OpenAiClient;
@@ -134,6 +135,8 @@ pub fn with_turn<R>(
         protected::load(workdir)
     })
     .with_patterns(&blocked_paths)
+    // Validated at the test gate, protected from the next turn.
+    .with_patterns(&test_files::approved(&events))
     .exempting(&waiver_paths);
     let shared_target = worktree::shared_target(&worktree::root(&settings.db_path), workdir);
     // The model may still name the human's checkout after the session moved
