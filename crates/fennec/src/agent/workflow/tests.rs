@@ -1,9 +1,11 @@
 use super::*;
-use crate::agent::ports::{AgentRun, ChildSessions, CommandRun, Commands, Completion, Model};
+use crate::agent::ports::{
+    AgentRun, ChildSessions, CommandRun, Commands, Completion, EventLog, Model,
+};
 use crate::agent::test_support::{MemoryLog, Scripted, builder, plan, reply};
 use crate::domain::agent::AgentDefinition;
 use crate::domain::criteria::{CriterionStatus, Provenance};
-use crate::domain::event::{DoneReason, Event, ToolCall};
+use crate::domain::event::{DoneReason, Event, ToolCall, ToolResult};
 use crate::domain::workflow::definition::{
     AgentContext, Edge, EndOutcome, Node, NodeKind, Position, Workflow,
 };
@@ -2152,4 +2154,141 @@ fn resume_interrupted_agent_keeps_its_pass_and_prompt() {
             ..
         } if content.contains("retry prompt")
     )));
+}
+
+// The test gate: validating the tests records them, reworking records nothing.
+fn test_gate_workflow() -> Workflow {
+    serde_json::from_value(serde_json::json!({
+        "id": "wf",
+        "name": "wf",
+        "description": "",
+        "maxSteps": 10,
+        "nodes": [
+            { "id": "start", "kind": "start", "position": { "x": 0, "y": 0 } },
+            { "id": "tests", "kind": "agent", "name": "Tests", "agent": "tests",
+              "prompt": "write tests", "position": { "x": 0, "y": 140 } },
+            { "id": "approve-tests", "kind": "human", "name": "Validate",
+              "question": "validate?", "choices": ["Validate", "Rework"],
+              "position": { "x": 0, "y": 280 } }
+        ],
+        "edges": [
+            { "from": "start", "port": "next", "to": "tests" },
+            { "from": "tests", "port": "done", "to": "approve-tests" }
+        ]
+    }))
+    .unwrap()
+}
+
+fn events_with_open_tests_gate(run_id: &str) -> Vec<Event> {
+    vec![
+        Event::WorkflowStarted {
+            run_id: run_id.into(),
+            workflow: test_gate_workflow(),
+            task: "task".into(),
+            step_by_step: false,
+            started_at: None,
+        },
+        Event::WorkflowNodeStarted {
+            run_id: run_id.into(),
+            node_id: "start".into(),
+            pass: 1,
+            via: None,
+            child_session_id: None,
+            started_at: None,
+        },
+        Event::WorkflowNodeFinished {
+            run_id: run_id.into(),
+            node_id: "start".into(),
+            port: "next".into(),
+            output: "task".into(),
+            exit_code: None,
+            comment: None,
+            duration_ms: None,
+        },
+        Event::WorkflowNodeStarted {
+            run_id: run_id.into(),
+            node_id: "tests".into(),
+            pass: 1,
+            via: Some(Via {
+                from: "start".into(),
+                port: "next".into(),
+            }),
+            child_session_id: None,
+            started_at: None,
+        },
+        Event::ToolCall {
+            message_id: "m".into(),
+            tool_call: ToolCall {
+                id: "c1".into(),
+                name: "write_file".into(),
+                arguments: serde_json::json!({"path": "tests/a.rs"}),
+                parse_error: None,
+                raw_arguments: None,
+            },
+        },
+        Event::ToolResult {
+            message_id: "m".into(),
+            tool_call_id: "c1".into(),
+            result: ToolResult::success("ok".into(), false),
+        },
+        Event::WorkflowNodeFinished {
+            run_id: run_id.into(),
+            node_id: "tests".into(),
+            port: "done".into(),
+            output: "## Tests".into(),
+            exit_code: None,
+            comment: None,
+            duration_ms: None,
+        },
+        Event::WorkflowNodeStarted {
+            run_id: run_id.into(),
+            node_id: "approve-tests".into(),
+            pass: 1,
+            via: Some(Via {
+                from: "tests".into(),
+                port: "done".into(),
+            }),
+            child_session_id: None,
+            started_at: None,
+        },
+    ]
+}
+
+fn answer_test_gate(choice: &str) -> Vec<Event> {
+    let stop = AtomicBool::new(false);
+    let mut h = Harness::new(
+        Box::new(Scripted(RefCell::new(vec![]))),
+        PathBuf::from("/tmp"),
+        &stop,
+    );
+    for event in events_with_open_tests_gate("r") {
+        EventLog::append(&h.log, "s", &event).unwrap();
+    }
+    answer_human(&mut h.turn(), choice, "").unwrap();
+    EventLog::events(&h.log, "s").unwrap()
+}
+
+#[test]
+fn validating_the_tests_records_the_written_test_files() {
+    let events = answer_test_gate("Validate");
+    assert!(
+        events.iter().any(|event| {
+            matches!(
+                event,
+                Event::TestsApproved { files, .. }
+                    if files == &vec!["tests/a.rs".to_string()]
+            )
+        }),
+        "{events:?}"
+    );
+}
+
+#[test]
+fn reworking_the_tests_records_nothing() {
+    let events = answer_test_gate("Rework");
+    assert!(
+        !events
+            .iter()
+            .any(|event| matches!(event, Event::TestsApproved { .. }))
+    );
 }

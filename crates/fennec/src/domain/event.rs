@@ -359,6 +359,9 @@ pub enum Event {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         stats: Option<RunStats>,
     },
+    /// The human validated the tests written before the code; they are protected for the rest of the session (fennec's own event).
+    #[serde(rename = "tests.approved", rename_all = "camelCase")]
+    TestsApproved { run_id: String, files: Vec<String> },
     #[serde(rename = "chat.done", rename_all = "camelCase")]
     ChatDone {
         message_id: String,
@@ -621,6 +624,7 @@ impl Event {
             Event::ArchitectureRulesAdded { .. } => "architecture.rules_added",
             Event::UnderstandingStarted { .. } => "understanding.started",
             Event::WorktreeDiscarded { .. } => "worktree.discarded",
+            Event::TestsApproved { .. } => "tests.approved",
         }
     }
 }

@@ -160,6 +160,7 @@ impl Transcript {
             | Event::ArchitectureRulesAdded { .. }
             | Event::UnderstandingStarted { .. }
             | Event::WorktreeDiscarded { .. }
+            | Event::TestsApproved { .. }
             | Event::McpDisabled { .. } => Ok(()),
         };
         let _ = out.flush();
