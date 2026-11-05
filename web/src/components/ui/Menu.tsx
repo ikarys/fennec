@@ -37,7 +37,9 @@ export function Menu({ label, icon, children }: { label: string; icon?: ReactNod
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false);
     };
-    const onScroll = () => setOpen(false);
+    const onScroll = (e: Event) => {
+      if (!panelRef.current?.contains(e.target as Node)) setOpen(false);
+    };
     document.addEventListener('mousedown', onPointer);
     document.addEventListener('keydown', onKey);
     window.addEventListener('scroll', onScroll, true);
@@ -57,13 +59,12 @@ export function Menu({ label, icon, children }: { label: string; icon?: ReactNod
     }
     const rect = rootRef.current?.getBoundingClientRect();
     if (!rect) return;
-    // Open above when the panel would not fit below the button.
+    // Open above when the panel would not fit below the button, and grow
+    // away from the nearest side so it never leaves the screen.
     const above = rect.bottom + PANEL_MAX_HEIGHT > window.innerHeight;
-    setPos(
-      above
-        ? { bottom: window.innerHeight - rect.top + GAP, right: window.innerWidth - rect.right }
-        : { top: rect.bottom + GAP, right: window.innerWidth - rect.right },
-    );
+    const vertical = above ? { bottom: window.innerHeight - rect.top + GAP } : { top: rect.bottom + GAP };
+    const leftHalf = rect.left + rect.width / 2 < window.innerWidth / 2;
+    setPos({ ...vertical, ...(leftHalf ? { left: rect.left } : { right: window.innerWidth - rect.right }) });
     setOpen(true);
   };
 
