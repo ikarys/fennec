@@ -3,6 +3,9 @@
  * human can answer with one click or in the text box.
  */
 import type { PendingQuestion } from '../../lib/fold';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { markdownComponents } from './markdownComponents';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { useT } from '../../i18n';
@@ -25,8 +28,10 @@ export function QuestionCard({
             <span className="text-accent">?</span>
             <span className="text-accent-strong">{t('questionHeader')}</span>
           </div>
-          <div className="max-h-48 overflow-y-auto text-sm leading-snug whitespace-pre-wrap [overflow-wrap:break-word]">
-            {question.question}
+          <div className="min-w-0 max-h-96 overflow-y-auto text-sm leading-relaxed [overflow-wrap:break-word]">
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+              {question.question}
+            </ReactMarkdown>
           </div>
           {question.type === 'choice' && question.options.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
