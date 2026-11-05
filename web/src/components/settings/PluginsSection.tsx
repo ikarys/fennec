@@ -147,11 +147,11 @@ export function PluginsSection() {
                   variant={plugin.enabled ? 'soft' : 'primary'}
                   size="sm"
                   disabled={busyName !== null}
-                  aria-label={plugin.enabled ? t('pluginDisabled') : t('pluginEnabled')}
+                  aria-label={plugin.enabled ? t('pluginDisable') : t('pluginEnable')}
                   onClick={() => void toggle(plugin, { enabled: !plugin.enabled })}
                 >
                   {plugin.enabled ? <StopIcon className="h-3.5 w-3.5" /> : <PlayIcon className="h-3.5 w-3.5" />}
-                  {plugin.enabled ? t('pluginDisabled') : t('pluginEnabled')}
+                  {plugin.enabled ? t('pluginDisable') : t('pluginEnable')}
                 </Button>
               </div>
             ))}
