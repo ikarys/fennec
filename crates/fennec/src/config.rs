@@ -2,7 +2,7 @@
 //! The environment values are defaults; stored preferences override them.
 
 use crate::domain::preferences::{LOCAL_PROVIDER, ModelParams, ModelRef, Preferences};
-use llm_providers::{ApiKey, Endpoint, ListedModel, MasterKey, list_models};
+use llm_providers_connector::{ApiKey, Endpoint, ListedModel, MasterKey, list_models};
 use std::path::PathBuf;
 
 #[derive(Clone)]

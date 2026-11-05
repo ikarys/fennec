@@ -9,7 +9,7 @@ use serde_json::Value;
 use std::sync::atomic::AtomicBool;
 use std::time::Duration;
 
-pub use llm_providers::Delta;
+pub use llm_providers_connector::Delta;
 
 pub struct Request<'a> {
     pub system_prompt: &'a str,
