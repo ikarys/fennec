@@ -11,6 +11,7 @@ mod canvas_routes;
 mod children;
 mod commit_subject;
 mod context_view;
+mod contribution_routes;
 mod editor;
 mod event_stream;
 mod file_manager;

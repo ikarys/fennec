@@ -207,3 +207,8 @@ Test gate, done (C4): the default workflow writes the tests before the code: onc
 from the "Done when" criteria, and a human node asks to validate them. "Validate" records `tests.approved` with the test files
 written so far (the kernel's choice, at the human's click); from the next turn on they are protected for the rest of the session
 like `.agents/protected` (`domain/test_files.rs`, `turn_build.rs`), so the builder makes them pass without weakening them.
+Contributions, done (C17, part 1): a "Contributions" tab on the project page lists the branches, local or remote, with
+commits the human's branch lacks; a click adopts one into a new session's worktree (`worktree::adopt`: the branch's tip,
+its base at the merge-base with the human's HEAD), so a colleague's work goes through the same integration gate as an
+agent's (blockers, scanners, review map, comprehension dialogue). Only a listed branch is adopted; nothing merges on its
+own (`git::contributions`, `web/contribution_routes.rs`).

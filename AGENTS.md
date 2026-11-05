@@ -172,6 +172,7 @@ crates/fennec/src/
                      audit_routes, backlog_routes, idea_assets, mcp_routes, proposal_routes, session_delete,
                      agents_md_routes, session_name (background naming), canvas_routes (the canvas crate over HTTP),
                      budget_routes (a project's budget, read and set),
+                     contribution_routes (branches someone else wrote, adopted into a session for the gate),
                      indicator_routes (a project's indicators from its logs, git and the ledger)
   cli/               terminal adapter: commands, transcript
 crates/backlog/     the ideas backlog, a crate of its own and fennec-free, no I/O: its events folded, the queue

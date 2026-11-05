@@ -1306,7 +1306,14 @@ export const en = {
   budgetPlaceholder: 'Monthly budget in $',
   budgetSave: 'Save the budget',
   budgetRemove: 'Remove the budget',
-  budgetCancel: 'Cancel'
+  budgetCancel: 'Cancel',
+  contributionsTitle: 'Contributions',
+  contributionsDescription: 'Branches with commits your branch lacks: review one through the same gate as an agent’s work.',
+  contributionsEmpty: 'No branch waits to come in.',
+  contributionsBranchCol: 'Branch',
+  contributionsAheadCol: 'Ahead',
+  contributionsAhead: '{count} commit(s)',
+  contributionsReview: 'Review {branch} in a session'
 };
 
 export type MsgKey = keyof typeof en;
@@ -1341,6 +1348,13 @@ export const fr: Record<MsgKey, string> = {
   budgetSave: 'Enregistrer le budget',
   budgetRemove: 'Retirer le budget',
   budgetCancel: 'Annuler',
+  contributionsTitle: 'Contributions',
+  contributionsDescription: 'Les branches dont les commits manquent à la vôtre : relisez-en une avec la même porte que le travail d’un agent.',
+  contributionsEmpty: 'Aucune branche n’attend d’entrer.',
+  contributionsBranchCol: 'Branche',
+  contributionsAheadCol: 'En avance',
+  contributionsAhead: '{count} commit(s)',
+  contributionsReview: 'Relire {branch} dans une session',
   loading: 'Chargement…',
   integrateInto: 'Intégrer dans {branch}',
   displayTitle: 'Affichage',
