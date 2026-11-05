@@ -1,8 +1,14 @@
 import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useT } from '../../i18n';
 import { markdownComponents } from '../session/markdownComponents';
-import type { PreviewKind } from '../../lib/preview';
+import { PinButton } from '../canvas/PinButton';
+import { useCanvasSession } from '../canvas/CanvasContext';
+import { pinCanvasBlock } from '../../lib/api/canvas';
+import type { BlockPreviewKind } from '../../lib/preview';
+import { MermaidDiagram } from './MermaidDiagram';
+import { JsonView } from './JsonView';
 
 const REMARK_PLUGINS = [remarkGfm];
 /** How long the source must stay still before the iframe reloads it. */
@@ -18,16 +24,21 @@ function useSettled(source: string): string {
   return settled;
 }
 
-export function CodeBlockWithPreview({ kind, source }: { kind: PreviewKind; source: string }) {
-  // An HTML block is mostly a page to look at; its source stays one click away.
-  const [showPreview, setShowPreview] = useState(kind === 'html');
+export function CodeBlockWithPreview({ kind, source }: { kind: BlockPreviewKind; source: string }) {
+  const t = useT();
+  const session = useCanvasSession();
+  // Pictures are mostly to look at; text stays one click away.
+  const [showPreview, setShowPreview] = useState(kind === 'html' || kind === 'svg' || kind === 'mermaid');
   const settledSource = useSettled(source);
 
   return (
     <div className="my-2 overflow-hidden rounded-md border border-border">
       <div className="flex items-center justify-between gap-2 border-b border-border bg-raised px-2.5 py-1.5 text-xs">
         <span className="font-mono text-muted">{kind}</span>
-        <div className="flex gap-1">
+        <div className="flex items-center gap-1">
+          {session ? (
+            <PinButton pin={async () => pinCanvasBlock(session, kind, source)} />
+          ) : null}
           <button
             type="button"
             aria-pressed={!showPreview}
@@ -36,7 +47,7 @@ export function CodeBlockWithPreview({ kind, source }: { kind: PreviewKind; sour
               !showPreview ? 'bg-accent-soft text-accent-strong' : 'text-muted hover:text-text'
             }`}
           >
-            Code
+            {t('previewCode')}
           </button>
           <button
             type="button"
@@ -46,7 +57,7 @@ export function CodeBlockWithPreview({ kind, source }: { kind: PreviewKind; sour
               showPreview ? 'bg-accent-soft text-accent-strong' : 'text-muted hover:text-text'
             }`}
           >
-            Aperçu
+            {t('preview')}
           </button>
         </div>
       </div>
@@ -55,9 +66,25 @@ export function CodeBlockWithPreview({ kind, source }: { kind: PreviewKind; sour
           <iframe
             sandbox="allow-scripts"
             srcDoc={settledSource}
-            title="Aperçu HTML"
-            className="block h-[60vh] w-full bg-white"
+            title={t('previewHtmlTitle')}
+            className="block h-[60vh] w-full bg-panel"
           />
+        ) : kind === 'svg' ? (
+          <div className="flex justify-center bg-panel p-4">
+            <img
+              src={'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(settledSource)}
+              alt={t('previewSvgTitle')}
+              className="max-w-full"
+            />
+          </div>
+        ) : kind === 'mermaid' ? (
+          <div className="flex justify-center p-4">
+            <MermaidDiagram source={settledSource} />
+          </div>
+        ) : kind === 'json' ? (
+          <div className="px-4 py-2">
+            <JsonView source={source} />
+          </div>
         ) : (
           <div className="px-4 py-2">
             <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={markdownComponents}>

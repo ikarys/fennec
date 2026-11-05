@@ -1,3 +1,5 @@
+import { ChoiceMenu } from '../../ui/ChoiceMenu';
+import { useT } from '../../../i18n';
 import type { WorkflowSummary } from '../../../lib/workflow';
 
 export interface WorkflowSelection {
@@ -7,6 +9,9 @@ export interface WorkflowSelection {
 }
 
 export const DEFAULT_WORKFLOW_ID = 'plan-build-verify';
+
+/** 'No workflow' is a value of its own, so the menu can select it. */
+const NONE = '';
 
 export function defaultWorkflowSelection(workflows: WorkflowSummary[]): WorkflowSelection {
   return {
@@ -27,43 +32,58 @@ export function WorkflowPicker({
   selection: WorkflowSelection;
   onChange: (selection: WorkflowSelection) => void;
 }) {
+  const t = useT();
   if (workflows.length === 0) {
     return null;
   }
 
+  const selected = workflows.find((workflow) => workflow.id === selection.workflowId);
+
   return (
     <div className="flex items-center gap-1">
-      <select
-        value={selection.workflowId ?? ''}
-        onChange={(e) => {
-          const workflowId = e.target.value || null;
+      <ChoiceMenu
+        label={t('workflowPickerLabel')}
+        value={selection.workflowId ?? NONE}
+        onChange={(value) =>
           onChange({
-            workflowId,
+            workflowId: value === NONE ? null : value,
             stepByStep: false,
             worktree: selection.worktree
-          });
-        }}
-        aria-label="Workflow"
-        title="Le workflow qui prend ta demande ; « Aucun » parle directement à l'agent."
-        className={`h-7 rounded-md bg-transparent px-1.5 text-xs outline-none transition-colors hover:bg-raised ${
-          selection.workflowId ? 'text-accent-strong' : 'text-muted hover:text-text'
-        }`}
-      >
-        <option value="">Aucun workflow</option>
-        {workflows.map((workflow) => (
-          <option key={workflow.id} value={workflow.id}>
-            {workflow.name}
-          </option>
-        ))}
-      </select>
+          })
+        }
+        groups={[
+          {
+            choices: [
+              {
+                value: NONE,
+                label: t('workflowPickerNone'),
+                description: t('workflowPickerNoneDescription')
+              }
+            ]
+          },
+          {
+            label: t('workflows'),
+            choices: workflows.map((workflow) => ({
+              value: workflow.id,
+              label: workflow.name,
+              description: workflow.description
+            }))
+          }
+        ]}
+        trigger={
+          <span className={selection.workflowId ? 'text-accent-strong' : undefined}>
+            {selected?.name ?? t('workflowPickerNone')}
+          </span>
+        }
+      />
       {selection.stepByStep && (
         <button
           type="button"
-          title="Le run s'arrête avant chaque nœud. Clique pour l'enlever."
+          title={t('workflowPickerStepByStepTitle')}
           onClick={() => onChange({ ...selection, stepByStep: false })}
           className="rounded-md border border-accent px-1.5 py-0.5 text-xs text-accent"
         >
-          Pas à pas ✕
+          {t('workflowPickerStepByStep')}
         </button>
       )}
     </div>

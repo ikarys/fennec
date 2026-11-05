@@ -6,7 +6,7 @@
   --panel: #15181D;
   --raised: #20252D;
   --border: #272C34;
-  --border-strong: #363C46;
+  --border-strong: #6E7989;
   --text: #E7E9EC;
   --muted: #9AA2AE;
   --faint: #7D848F;
@@ -17,10 +17,13 @@
   --ok: #4CC38A;
   --ok-soft: rgba(76, 195, 138, 0.14);
   --err: #F2555A;
+  --attention: #E8C547;
+  --info: #6AA6F2;
   --add-bg: rgba(76, 195, 138, 0.10);
   --del-bg: rgba(242, 85, 90, 0.10);
   --code: #0B0D10;
   --scrim: rgba(5, 6, 8, 0.6);
+  --float-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.6);
 }
 
 :root[data-theme="nuit"] {
@@ -29,7 +32,7 @@
   --panel: #15181D;
   --raised: #20252D;
   --border: #272C34;
-  --border-strong: #363C46;
+  --border-strong: #6E7989;
   --text: #E7E9EC;
   --muted: #9AA2AE;
   --faint: #7D848F;
@@ -40,10 +43,13 @@
   --ok: #4CC38A;
   --ok-soft: rgba(76, 195, 138, 0.14);
   --err: #F2555A;
+  --attention: #E8C547;
+  --info: #6AA6F2;
   --add-bg: rgba(76, 195, 138, 0.10);
   --del-bg: rgba(242, 85, 90, 0.10);
   --code: #0B0D10;
   --scrim: rgba(5, 6, 8, 0.6);
+  --float-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.6);
 }
 
 :root[data-theme="jour"] {
@@ -52,44 +58,81 @@
   --panel: #FFFFFF;
   --raised: #EFEFEB;
   --border: #E1E1DB;
-  --border-strong: #CFCFC7;
+  --border-strong: #6E6E64;
   --text: #1A1B1E;
   --muted: #5C6066;
   --faint: #6B6F76;
-  --accent: #C2531A;
-  --accent-strong: #9E4012;
+  --accent: #A8440F;
+  --accent-strong: #8A3609;
   --accent-soft: rgba(194, 83, 26, 0.10);
   --on-accent: #FFFFFF;
   --ok: #17804F;
   --ok-soft: rgba(23, 128, 79, 0.10);
   --err: #C93B3F;
+  --attention: #9A6700;
+  --info: #2F6BC4;
   --add-bg: rgba(23, 128, 79, 0.08);
   --del-bg: rgba(201, 59, 63, 0.10);
   --code: #F7F7F4;
   --scrim: rgba(30, 30, 25, 0.28);
+  --float-shadow: 0 8px 24px -12px rgba(30, 30, 25, 0.35);
 }
 
-:root[data-theme="brume"] {
+/* Ardoise: a blue slate, lighter than Nuit, for long reading without glare.
+   Its own hue family, so it never reads as a faded Nuit: periwinkle accent
+   instead of orange, mint ok, rose err, all three far apart. */
+:root[data-theme="ardoise"] {
   color-scheme: dark;
-  --bg: #0F1420;
-  --panel: #151B29;
-  --raised: #1D2536;
-  --border: #283147;
-  --border-strong: #36415B;
-  --text: #DDE3EE;
-  --muted: #98A3B8;
-  --faint: #7A86A2;
-  --accent: #82A8F9;
-  --accent-strong: #A9C3FB;
-  --accent-soft: rgba(130, 168, 249, 0.14);
-  --on-accent: #0F1420;
-  --ok: #5CC9A7;
-  --ok-soft: rgba(92, 201, 167, 0.14);
-  --err: #F07178;
-  --add-bg: rgba(92, 201, 167, 0.10);
-  --del-bg: rgba(240, 113, 120, 0.10);
-  --code: #0C111B;
-  --scrim: rgba(5, 8, 15, 0.6);
+  --bg: #1E2332;
+  --panel: #252B3C;
+  --raised: #2F3749;
+  --border: #343C50;
+  --border-strong: #8290AC;
+  --text: #DDE3EF;
+  --muted: #A6B0C5;
+  --faint: #929DB5;
+  --accent: #82AAFF;
+  --accent-strong: #A8C3FF;
+  --accent-soft: rgba(130, 170, 255, 0.15);
+  --on-accent: #141826;
+  --ok: #8BD5A0;
+  --ok-soft: rgba(139, 213, 160, 0.14);
+  --err: #F58A9E;
+  --attention: #F2C94C;
+  --info: #8FB8FF;
+  --add-bg: rgba(139, 213, 160, 0.10);
+  --del-bg: rgba(245, 138, 158, 0.11);
+  --code: #1A1E2B;
+  --scrim: rgba(12, 14, 22, 0.55);
+  --float-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+}
+
+/* Cyber: hominfer's terminal green. `ok` is cyan, not green, so a done or
+   integrated badge stays distinct from the accent of a running one. */
+:root[data-theme="cyber"] {
+  color-scheme: dark;
+  --bg: #000300;
+  --panel: #020A03;
+  --raised: #06140A;
+  --border: #0F3D17;
+  --border-strong: #2E9944;
+  --text: #B6FFC4;
+  --muted: #3FBF5A;
+  --faint: #2E9944;
+  --accent: #00FF41;
+  --accent-strong: #8CFF9E;
+  --accent-soft: rgba(0, 255, 65, 0.12);
+  --on-accent: #000300;
+  --ok: #3DE8FF;
+  --ok-soft: rgba(61, 232, 255, 0.12);
+  --err: #FF4D3D;
+  --attention: #FFE24D;
+  --info: #9BE3FF;
+  --add-bg: rgba(0, 255, 65, 0.09);
+  --del-bg: rgba(255, 77, 61, 0.12);
+  --code: #010601;
+  --scrim: rgba(0, 3, 0, 0.7);
+  --float-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.6);
 }
 
 @theme inline {
@@ -116,10 +159,13 @@
   --color-ok: var(--ok);
   --color-ok-soft: var(--ok-soft);
   --color-err: var(--err);
+  --color-attention: var(--attention);
+  --color-info: var(--info);
   --color-add-bg: var(--add-bg);
   --color-del-bg: var(--del-bg);
   --color-code: var(--code);
   --color-scrim: var(--scrim);
+  --shadow-float: var(--float-shadow);
 }
 
 html,
@@ -133,14 +179,30 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: "Inter Variable", Inter, ui-sans-serif, system-ui, sans-serif;
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
   font-feature-settings: "cv11", "ss01";
   -webkit-font-smoothing: antialiased;
   line-height: 1.4;
 }
 
-a {
-  color: inherit;
+/* In the base layer so a link's colour utilities (text-*, hover:text-*) win over it. */
+@layer base {
+  a {
+    color: inherit;
+  }
+  /* GFM task lists (a plan's criteria in the thread): the checkbox leaves the
+     text flow so every text line, wrapped ones included, starts in one column,
+     and the box centres on its line instead of sitting on the baseline.
+     Scoped to the class the Markdown renderer sets: any other list row with
+     a checkbox (the sessions table) keeps its own layout. */
+  li.task-list-item {
+    padding-left: 1.125rem;
+  }
+  li.task-list-item > input[type="checkbox"] {
+    margin-left: -1.125rem;
+    margin-right: 0.25rem;
+    vertical-align: middle;
+  }
 }
 
 /* The browser's own surfaces carry the theme too. */
@@ -208,4 +270,50 @@ html {
   --xy-node-color: var(--panel);
   --xy-edge-label-background-color: var(--panel);
   --xy-edge-label-color: var(--muted);
+}
+
+/* Cyber's look beyond colours: a terminal in mono, square, faint scanlines,
+   a glow on titles and on hover. Radii are inlined by @theme, hence !important. */
+:root[data-theme="cyber"] body {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-feature-settings: normal;
+  background: radial-gradient(ellipse at top, #04200B, var(--bg) 70%) fixed;
+}
+
+:root[data-theme="cyber"] body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  /* Under the palette's scrim (z-50) and the <dialog> top layer: a dialog reads without moiré. */
+  z-index: 40;
+  background: repeating-linear-gradient(to bottom, transparent 0 2px, rgba(0, 0, 0, 0.1) 2px 3px);
+}
+
+:root[data-theme="cyber"] {
+  accent-color: var(--accent);
+}
+
+/* Radii are inlined by @theme, hence !important; 2px keeps the terminal look without breaking anti-aliasing. */
+:root[data-theme="cyber"] *:not(.rounded-full) {
+  border-radius: 2px !important;
+}
+
+:root[data-theme="cyber"] h1 {
+  text-shadow: 0 0 8px rgba(0, 255, 65, 0.45);
+  letter-spacing: 0;
+}
+
+:root[data-theme="cyber"] h1::before {
+  content: "> ";
+  color: var(--accent);
+}
+
+:root[data-theme="cyber"] button:not(:disabled):hover {
+  box-shadow: 0 0 10px rgba(0, 255, 65, 0.25);
+}
+
+:root[data-theme="cyber"] ::selection {
+  background: var(--accent);
+  color: var(--on-accent);
 }

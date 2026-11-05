@@ -1,9 +1,10 @@
-//! The session log's vocabulary: port of openfox `events/types.ts`, the
-//! subset fennec produces. Wire names match openfox.
+//! The session log's vocabulary. Wire names are frozen: stored payloads
+//! depend on them.
 
 use super::attachment::Attachment;
 use super::criteria::{Criterion, CriterionStatus};
 use super::preferences::ModelRef;
+use super::preflight::PreflightResult;
 use super::stats::MessageStats;
 use super::workflow::definition::Workflow;
 use super::workflow::run::{RunOutcome, Via};
@@ -76,7 +77,7 @@ impl ToolResult {
     }
 }
 
-/// openfox tool result `metadata` for an image read_file returned.
+/// Tool result `metadata` for an image `read_file` returned.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ToolResultMetadata {
@@ -100,7 +101,7 @@ pub enum OutputStream {
     Stderr,
 }
 
-/// How a turn ended (openfox `chat.done` reasons fennec produces).
+/// How a turn ended (`chat.done` reasons fennec produces).
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum DoneReason {
@@ -112,7 +113,7 @@ pub enum DoneReason {
     WaitingForUser,
 }
 
-/// The kind of question `ask_user` asks (openfox `type`).
+/// The kind of question `ask_user` asks (`type`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum AskType {
@@ -122,7 +123,14 @@ pub enum AskType {
     Choice,
 }
 
-/// One option of a `choice` question (openfox `ChoiceOption`).
+/// A choice option's visual weight: a destructive option is drawn in red.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum OptionTone {
+    Danger,
+}
+
+/// One option of a `choice` question (`ChoiceOption`).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChoiceOption {
@@ -130,9 +138,11 @@ pub struct ChoiceOption {
     pub label: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tone: Option<OptionTone>,
 }
 
-/// openfox message `metadata` for an agent reminder: `{type: "agent", name, color, kind}`.
+/// Message `metadata` for an agent reminder: `{type: "agent", name, color, kind}`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MessageMetadata {
     #[serde(rename = "type")]
@@ -148,8 +158,8 @@ pub enum MetadataSource {
     Agent,
 }
 
-/// openfox writes `definition` (the full agent prompt) or `reminder` (a short
-/// nudge each turn); fennec only re-sends the definition when the agent changes.
+/// `definition` (the full agent prompt) or `reminder` (a short nudge each turn)
+/// is written; fennec only re-sends the definition when the agent changes.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ReminderKind {
@@ -157,8 +167,16 @@ pub enum ReminderKind {
     Reminder,
 }
 
-/// The subset of openfox's `TurnEvent` union the agent loop needs. Wire
-/// names and field names match openfox so stored payloads stay comparable.
+/// `completion` is not used: an asap message left at the end of the turn
+/// starts the next one anyway.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum QueueMode {
+    Asap,
+}
+
+/// The subset of the `TurnEvent` union the agent loop needs. Wire
+/// names and field names are frozen: stored payloads depend on them.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", content = "data")]
 pub enum Event {
@@ -172,10 +190,10 @@ pub enum Event {
         content: Option<String>,
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         is_system_generated: bool,
-        /// Set on the agent reminders the loop injects (openfox `metadata`).
+        /// Set on the agent reminders the loop injects (`metadata`).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         metadata: Option<MessageMetadata>,
-        /// openfox `attachments`: images the human sent with the message.
+        /// `attachments`: images the human sent with the message.
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         attachments: Vec<Attachment>,
     },
@@ -233,8 +251,8 @@ pub enum Event {
         compact_at: Option<f64>,
     },
     /// Marks the cut where a new context window started from a summary.
-    /// openfox also carries `closedWindowId`/`newWindowId`; fennec has no
-    /// window ids, so the cut is just this event in the log.
+    /// `closedWindowId`/`newWindowId` are not carried; the cut is just this
+    /// event in the log.
     #[serde(rename = "context.compacted", rename_all = "camelCase")]
     ContextCompacted {
         before_tokens: u64,
@@ -243,7 +261,7 @@ pub enum Event {
     },
     #[serde(rename = "running.changed", rename_all = "camelCase")]
     RunningChanged { is_running: bool },
-    /// The human switched the session's agent (openfox `mode.changed`).
+    /// The human switched the session's agent (`mode.changed`).
     #[serde(rename = "mode.changed", rename_all = "camelCase")]
     ModeChanged {
         mode: String,
@@ -251,16 +269,19 @@ pub enum Event {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         reason: Option<String>,
     },
-    /// fennec's own (openfox has none): the human chose the session's model.
+    /// The human chose the session's model.
     #[serde(rename = "model.changed", rename_all = "camelCase")]
     ModelChanged { model: ModelRef },
-    /// fennec's own (openfox deletes the events instead): the human replayed
-    /// `message_id`; the model's view drops that message and everything after
-    /// it, the log keeps them.
+    /// fennec's own: the session's disabled MCP servers, set by the composer.
+    /// Carries the full disabled set (not a delta); the last event wins.
+    #[serde(rename = "mcp.disabled", rename_all = "camelCase")]
+    McpDisabled { servers: Vec<String> },
+    /// The human replayed `message_id`; the model's view drops that message
+    /// and everything after it, the log keeps them.
     #[serde(rename = "session.rewound", rename_all = "camelCase")]
     SessionRewound { message_id: String },
-    /// The model generated a short title for the session (openfox
-    /// `session.name_generated`).
+    /// The model generated a short title for the session
+    /// (`session.name_generated`).
     #[serde(rename = "session.name_generated", rename_all = "camelCase")]
     SessionNameGenerated { name: String },
     /// fennec's own: a workflow run starts; the definition is frozen for the run.
@@ -271,6 +292,10 @@ pub enum Event {
         task: String,
         #[serde(default)]
         step_by_step: bool,
+        /// Unix milliseconds: the run's wall-clock start, so a finished run
+        /// can show its departure. `None` in logs written before it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        started_at: Option<u64>,
     },
     #[serde(rename = "workflow.node.started", rename_all = "camelCase")]
     WorkflowNodeStarted {
@@ -316,6 +341,9 @@ pub enum Event {
         port: String,
         to: String,
     },
+    /// The human asked the running run to pause at its next edge (fennec's own).
+    #[serde(rename = "workflow.pause_requested", rename_all = "camelCase")]
+    WorkflowPauseRequested { run_id: String },
     #[serde(rename = "workflow.resumed", rename_all = "camelCase")]
     WorkflowResumed {
         run_id: String,
@@ -331,6 +359,9 @@ pub enum Event {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         stats: Option<RunStats>,
     },
+    /// The human validated the tests written before the code; they are protected for the rest of the session (fennec's own event).
+    #[serde(rename = "tests.approved", rename_all = "camelCase")]
+    TestsApproved { run_id: String, files: Vec<String> },
     #[serde(rename = "chat.done", rename_all = "camelCase")]
     ChatDone {
         message_id: String,
@@ -353,8 +384,8 @@ pub enum Event {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         options: Option<Vec<ChoiceOption>>,
     },
-    /// openfox keeps more in a snapshot; fennec only needs the system
-    /// prompt, frozen for the session so the server's prompt cache holds.
+    /// Only the system prompt is kept in a snapshot, frozen for the session
+    /// so the server's prompt cache holds.
     #[serde(rename = "turn.snapshot", rename_all = "camelCase")]
     TurnSnapshot {
         cached_system_prompt: String,
@@ -362,6 +393,10 @@ pub enum Event {
         /// before they were frozen too.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         cached_tools: Option<Value>,
+        /// The MCP tool names frozen with it; empty in snapshots stored
+        /// before MCP existed. Re-freezing compares this to the current set.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        mcp_tool_names: Vec<String>,
     },
     #[serde(rename = "criteria.set", rename_all = "camelCase")]
     CriteriaSet { criteria: Vec<Criterion> },
@@ -373,6 +408,13 @@ pub enum Event {
         call_id: String,
         criteria: Vec<Criterion>,
         reason: String,
+    },
+    /// fennec ran the plan's `check:` commands before any change; the planner
+    /// is sent back once when one cannot run or already passes.
+    #[serde(rename = "criteria.preflight", rename_all = "camelCase")]
+    CriteriaPreflight {
+        message_id: String,
+        results: Vec<PreflightResult>,
     },
     /// An agent recorded a design decision (fennec's own event); the turn goes on.
     #[serde(rename = "decision.recorded", rename_all = "camelCase")]
@@ -403,6 +445,124 @@ pub enum Event {
         #[serde(default)]
         protected_tests: Vec<String>,
     },
+    /// The human turned audit findings into backlog ideas (fennec's own event).
+    #[serde(rename = "audit.tasks_created", rename_all = "camelCase")]
+    AuditTasksCreated {
+        findings: Vec<u32>,
+        idea_ids: Vec<String>,
+    },
+    /// An agent proposed a backlog task with propose_task (fennec's own event); the turn goes on.
+    #[serde(rename = "task.proposed", rename_all = "camelCase")]
+    TaskProposed {
+        call_id: String,
+        title: String,
+        text: String,
+    },
+    /// The human accepted a proposed task into the backlog (fennec's own event).
+    #[serde(rename = "task.accepted", rename_all = "camelCase")]
+    TaskAccepted { call_id: String, idea_id: String },
+
+    /// An agent suggested the human go on in a new session with another agent (fennec's own event).
+    #[serde(rename = "agent.suggested", rename_all = "camelCase")]
+    AgentSuggested {
+        call_id: String,
+        agent: String,
+        reason: String,
+        brief: String,
+    },
+
+    /// fennec refused a tool call by a rule the human stored (fennec's own event).
+    #[serde(rename = "rule.blocked", rename_all = "camelCase")]
+    RuleBlocked {
+        call_id: String,
+        rule_id: String,
+        /// "command" | "tool" | "path"
+        kind: String,
+        /// The rule's pattern as the human typed it.
+        pattern: String,
+        /// "global" | "project"
+        scope: String,
+        /// What was refused: the command, the tool name, or the path.
+        subject: String,
+    },
+    /// fennec paused a tool call for the human's approval (an "ask" rule, or a path outside the
+    /// workdir). The call stays open until the answer. `kind`/`pattern`/`access` are the rule the
+    /// "session", "always" and "never" answers would store (the rules crate's proposal).
+    #[serde(rename = "rule.approval_requested", rename_all = "camelCase")]
+    RuleApprovalRequested {
+        call_id: String,
+        /// What is asked: the command, the tool name, or the path.
+        subject: String,
+        /// The explicit rule that asked, None for the default (a path outside the workdir).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        rule_id: Option<String>,
+        /// "command" | "tool" | "path"
+        kind: String,
+        pattern: String,
+        /// "read" | "write" | "readWrite" for a path
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        access: Option<String>,
+        /// The folders the human may grant instead of `pattern`, narrowest first.
+        ///
+        /// Empty unless `kind` is a path.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        folders: Vec<String>,
+    },
+    /// The human's answer to a `rule.approval_requested`.
+    #[serde(rename = "rule.approval_answered", rename_all = "camelCase")]
+    RuleApprovalAnswered {
+        call_id: String,
+        /// "once" | "session" | "always" | "never"
+        choice: String,
+        /// The rule the answer stored, if any.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        rule_id: Option<String>,
+    },
+    /// The agent asked the human to waive the protection of one path (fennec's own event).
+    /// The call stays open until the human answers on the waiver card.
+    #[serde(rename = "waiver.requested", rename_all = "camelCase")]
+    WaiverRequested {
+        call_id: String,
+        path: String,
+        reason: String,
+    },
+    /// The human's answer to a `waiver.requested`.
+    #[serde(rename = "waiver.answered", rename_all = "camelCase")]
+    WaiverAnswered {
+        call_id: String,
+        granted: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        expires_at: Option<u64>,
+        /// The ADR file written for the grant, project-relative.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        adr: Option<String>,
+    },
+    /// A message the human typed while a turn runs; it is queued, not refused.
+    #[serde(rename = "queue.added", rename_all = "camelCase")]
+    QueueAdded {
+        queue_id: String,
+        mode: QueueMode,
+        content: String,
+        /// Epoch milliseconds.
+        queued_at: u64,
+    },
+    /// The queued message was dropped into the running turn or started the
+    /// next one.
+    #[serde(rename = "queue.drained", rename_all = "camelCase")]
+    QueueDrained { queue_id: String },
+    /// The human removed the queued message, or a stop dropped the queue.
+    #[serde(rename = "queue.cancelled", rename_all = "camelCase")]
+    QueueCancelled { queue_id: String },
+    /// The human wrote the agent's AGENTS.md draft to the project (fennec's own event).
+    #[serde(rename = "agents_md.written", rename_all = "camelCase")]
+    AgentsMdWritten { replaced: bool },
+    /// The human appended the agent's proposed rules to .agents/architecture (fennec's own event).
+    #[serde(rename = "architecture.rules_added", rename_all = "camelCase")]
+    ArchitectureRulesAdded { count: usize },
+    /// The human opened a comprehension dialogue on the session's branch (fennec's own event):
+    /// `session_id` is the dialogue's session, `head` the branch's tip commit it is about.
+    #[serde(rename = "understanding.started", rename_all = "camelCase")]
+    UnderstandingStarted { session_id: String, head: String },
     /// The human discarded the session's worktree and branch (fennec's own event).
     #[serde(rename = "worktree.discarded", rename_all = "camelCase")]
     WorktreeDiscarded {
@@ -427,6 +587,7 @@ impl Event {
             Event::RunningChanged { .. } => "running.changed",
             Event::ModeChanged { .. } => "mode.changed",
             Event::ModelChanged { .. } => "model.changed",
+            Event::McpDisabled { .. } => "mcp.disabled",
             Event::SessionRewound { .. } => "session.rewound",
             Event::SessionNameGenerated { .. } => "session.name_generated",
             Event::WorkflowStarted { .. } => "workflow.started",
@@ -434,6 +595,7 @@ impl Event {
             Event::WorkflowNodeFinished { .. } => "workflow.node.finished",
             Event::WorkflowHumanAsked { .. } => "workflow.human.asked",
             Event::WorkflowPaused { .. } => "workflow.paused",
+            Event::WorkflowPauseRequested { .. } => "workflow.pause_requested",
             Event::WorkflowResumed { .. } => "workflow.resumed",
             Event::WorkflowFinished { .. } => "workflow.finished",
             Event::ChatDone { .. } => "chat.done",
@@ -442,10 +604,27 @@ impl Event {
             Event::TurnSnapshot { .. } => "turn.snapshot",
             Event::CriteriaSet { .. } => "criteria.set",
             Event::CriteriaProposed { .. } => "criteria.proposed",
+            Event::CriteriaPreflight { .. } => "criteria.preflight",
             Event::DecisionRecorded { .. } => "decision.recorded",
             Event::CriterionUpdated { .. } => "criterion.updated",
             Event::IntegrationApplied { .. } => "integration.applied",
+            Event::AuditTasksCreated { .. } => "audit.tasks_created",
+            Event::TaskProposed { .. } => "task.proposed",
+            Event::TaskAccepted { .. } => "task.accepted",
+            Event::AgentSuggested { .. } => "agent.suggested",
+            Event::RuleBlocked { .. } => "rule.blocked",
+            Event::RuleApprovalRequested { .. } => "rule.approval_requested",
+            Event::RuleApprovalAnswered { .. } => "rule.approval_answered",
+            Event::WaiverRequested { .. } => "waiver.requested",
+            Event::WaiverAnswered { .. } => "waiver.answered",
+            Event::QueueAdded { .. } => "queue.added",
+            Event::QueueDrained { .. } => "queue.drained",
+            Event::QueueCancelled { .. } => "queue.cancelled",
+            Event::AgentsMdWritten { .. } => "agents_md.written",
+            Event::ArchitectureRulesAdded { .. } => "architecture.rules_added",
+            Event::UnderstandingStarted { .. } => "understanding.started",
             Event::WorktreeDiscarded { .. } => "worktree.discarded",
+            Event::TestsApproved { .. } => "tests.approved",
         }
     }
 }

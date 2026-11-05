@@ -5,6 +5,7 @@
 import type { ContextComposition as Composition, ContextPartKind } from '../../lib/api';
 import { Badge } from '../ui/Badge';
 import { SectionLabel } from '../ui/SectionLabel';
+import { useT } from '../../i18n';
 
 const KIND_CLASS: Record<ContextPartKind, string> = {
   prompt: 'bg-accent',
@@ -16,12 +17,13 @@ function kindClass(kind: ContextPartKind | null): string {
   return kind ? KIND_CLASS[kind] : 'bg-border-strong';
 }
 
-export function ContextComposition({ composition, title = 'Composition' }: { composition: Composition; title?: string }) {
+export function ContextComposition({ composition, title }: { composition: Composition; title?: string }) {
+  const t = useT();
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-2">
-        <SectionLabel>{title}</SectionLabel>
-        <Badge title="Le total est mesuré ; la répartition est estimée au prorata du texte">estimée</Badge>
+        <SectionLabel>{title ?? t('composition')}</SectionLabel>
+        <Badge tone="accent" title={t('compositionIndicativeTitle')}>{t('indicative')}</Badge>
       </div>
 
       <div className="flex h-2 w-full gap-px overflow-hidden rounded-full bg-raised">

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { CodeBlockWithPreview } from '../preview/CodeBlockWithPreview';
-import { previewKindOfLanguage, type PreviewKind } from '../../lib/preview';
+import { previewKindOfLanguage, type BlockPreviewKind } from '../../lib/preview';
 
 interface HastText {
   type: 'text';
@@ -23,7 +23,7 @@ function isHastElement(node: unknown): node is HastElement {
   return typeof node === 'object' && node !== null && (node as HastElement).type === 'element';
 }
 
-function previewFromPre(node: HastElement | undefined): { kind: PreviewKind; source: string } | undefined {
+function previewFromPre(node: HastElement | undefined): { kind: BlockPreviewKind; source: string } | undefined {
   if (!node) return undefined;
   const child = node.children?.[0];
   if (!isHastElement(child)) return undefined;
@@ -55,7 +55,7 @@ export const markdownComponents = {
       return <code className="font-mono text-xs">{children}</code>;
     }
     return (
-      <code className="rounded bg-raised px-1 py-0.5 font-mono text-[0.7812rem] text-text">{children}</code>
+      <code className="rounded bg-raised px-1 py-0.5 font-mono text-xs text-text">{children}</code>
     );
   },
   // Tailwind's preflight unstyles headings; previewed documents rely on them.

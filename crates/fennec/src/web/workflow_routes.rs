@@ -3,15 +3,16 @@
 
 use super::App;
 use super::http::{Request, error, send_json};
-use super::routes::session_and_project;
 use super::turns::{Job, Place};
 use crate::agent::ports::EventLog;
 use crate::agent::workflow::WorkflowJob;
 use crate::agents;
+use crate::domain::event::Event;
 use crate::domain::project::Project;
 use crate::domain::workflow::definition::Workflow;
 use crate::domain::workflow::run::{self as run, Waiting};
 use crate::domain::workflow::validate;
+use crate::notifier::NotifyingLog;
 use crate::workflows::{self, Origin};
 use serde_json::{Value, json};
 use std::net::TcpStream;
@@ -25,7 +26,8 @@ pub fn list_workflows(app: &App, stream: &mut TcpStream, id: &str) -> Result<(),
     let Some(project) = project(app, id)? else {
         return error(stream, 404, "no such project");
     };
-    let found = workflows::discover(Path::new(&project.workdir));
+    let enabled = &app.store()?.preferences()?.enabled_workflows;
+    let found = workflows::discover(Path::new(&project.workdir), enabled);
     let out: Vec<Value> = found
         .iter()
         .map(|f| {
@@ -44,7 +46,8 @@ pub fn get_workflow(app: &App, stream: &mut TcpStream, id: &str, wid: &str) -> R
     let Some(project) = project(app, id)? else {
         return error(stream, 404, "no such project");
     };
-    let Some(found) = workflows::find(Path::new(&project.workdir), wid) else {
+    let enabled = &app.store()?.preferences()?.enabled_workflows;
+    let Some(found) = workflows::find(Path::new(&project.workdir), wid, enabled) else {
         return error(stream, 404, "no such workflow");
     };
     send_json(
@@ -84,7 +87,8 @@ pub fn save_workflow(
         );
     }
     let path = workflows::save(Path::new(&project.workdir), origin, raw)?;
-    let found = workflows::find(Path::new(&project.workdir), wid)
+    let enabled = &app.store()?.preferences()?.enabled_workflows;
+    let found = workflows::find(Path::new(&project.workdir), wid, enabled)
         .ok_or_else(|| format!("saved workflow not found at {}", path.display()))?;
     send_json(
         stream,
@@ -147,14 +151,15 @@ pub fn start_workflow(
 ) -> Result<(), String> {
     let body = req.json()?;
     let store = app.store()?;
-    let Some((session, project)) = session_and_project(&store, id)? else {
+    let Some((session, project)) = app.session_and_project(id)? else {
         return error(stream, 404, "no such session");
     };
     let workflow_id = body["workflowId"].as_str().unwrap_or("");
-    let Some(found) = workflows::find(Path::new(&project.workdir), workflow_id) else {
+    let enabled = &store.preferences()?.enabled_workflows;
+    let Some(found) = workflows::find(Path::new(&project.workdir), workflow_id, enabled) else {
         return error(stream, 404, "no such workflow");
     };
-    let attachments = match super::routes::parse_attachments(&body) {
+    let attachments = match super::session_routes::parse_attachments(&body) {
         Ok(attachments) => attachments,
         Err(e) => return error(stream, 400, &e),
     };
@@ -176,6 +181,7 @@ pub fn start_workflow(
             workflow: found.workflow,
             task,
             plan,
+            attachments,
         }
     };
     // The workflow definition is the human's: found in the project, not the worktree.
@@ -183,7 +189,7 @@ pub fn start_workflow(
     start_job(app, stream, id, place, job)
 }
 
-/// The run controls `/workflow/{answer,continue,resume,stop}`.
+/// The run controls `/workflow/{answer,continue,pause,resume,stop}`.
 pub fn control_workflow(
     app: &App,
     req: &Request,
@@ -193,6 +199,9 @@ pub fn control_workflow(
 ) -> Result<(), String> {
     let body = req.json()?;
     let text = |field: &str| body[field].as_str().unwrap_or("").to_string();
+    if control == "pause" {
+        return request_pause(app, stream, id, &text("runId"));
+    }
     let job = match control {
         "answer" => WorkflowJob::Answer {
             choice: text("choice"),
@@ -206,7 +215,7 @@ pub fn control_workflow(
         _ => return error(stream, 404, "not found"),
     };
     let store = app.store()?;
-    let Some((session, project)) = session_and_project(&store, id)? else {
+    let Some((session, project)) = app.session_and_project(id)? else {
         return error(stream, 404, "no such session");
     };
     if app.turns.is_running(id) {
@@ -218,6 +227,35 @@ pub fn control_workflow(
     }
     let place = app.place(&store, &session, &project)?;
     start_job(app, stream, id, place, job)
+}
+
+/// `pause`: the run goes on to the end of its current node, then waits at the next edge.
+fn request_pause(app: &App, stream: &mut TcpStream, id: &str, run_id: &str) -> Result<(), String> {
+    if !app.turns.is_running(id) {
+        return error(stream, 409, "the run is not running");
+    }
+    let store = app.store()?;
+    let Some(state) = run::current_run(&store.events(id)?).filter(|state| state.run_id == run_id)
+    else {
+        return error(stream, 409, "not the session's current run");
+    };
+    if state.finished.is_some() || state.paused.is_some() {
+        return error(stream, 409, "the run is not running");
+    }
+    if state.pause_requested {
+        return send_json(stream, 202, &json!({}));
+    }
+    let log = NotifyingLog {
+        log: &store,
+        notifier: &app.notifier,
+    };
+    log.append(
+        id,
+        &Event::WorkflowPauseRequested {
+            run_id: run_id.to_string(),
+        },
+    )?;
+    send_json(stream, 202, &json!({}))
 }
 
 fn start_job(

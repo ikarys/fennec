@@ -1,4 +1,5 @@
-//! Port of openfox `tools/shell.ts`: `run_command`.
+//! `run_command`: a shell command run in the working directory, in the
+//! sandbox when the human enabled it; what the model reads back is `report`.
 
 pub(super) mod process;
 mod report;
@@ -8,7 +9,7 @@ use super::path_guard::resolve_in_workdir;
 use super::sandbox::Sandbox;
 use crate::domain::event::{OutputStream, ToolResult};
 use serde_json::{Value, json};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 use std::time::Duration;
 
@@ -46,6 +47,7 @@ pub(super) fn run(
     args: &Value,
     workdir: &Path,
     sandbox: &Sandbox,
+    env: &[(String, PathBuf)],
     stop: &AtomicBool,
     on_output: &mut dyn FnMut(OutputStream, &str),
 ) -> ToolResult {
@@ -54,7 +56,18 @@ pub(super) fn run(
         Err(error) => return ToolResult::failure(error),
     };
     let timeout = Duration::from_millis(timeout_ms);
-    match process::execute(command, workdir, &cwd, timeout, stop, on_output, sandbox) {
+    match process::execute(
+        process::Launch {
+            command,
+            workdir,
+            cwd: &cwd,
+            sandbox,
+            env,
+        },
+        timeout,
+        stop,
+        on_output,
+    ) {
         Ok(execution) => report::report(execution, timeout_ms),
         Err(error) => ToolResult::failure(error),
     }
@@ -170,6 +183,23 @@ mod tests {
         assert!(output.contains("hello"));
         assert!(output.contains("[Exit code: 0]"));
         assert!(!chunks.is_empty());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn execute_creates_the_workdir() {
+        let dir = temp_dir();
+        // A chat session's scratch did not exist: the first command creates it.
+        let workdir = dir.join("scratch");
+        assert!(!workdir.exists());
+        let mut on_output = no_output();
+
+        let args = serde_json::json!({ "command": "echo hello" });
+        let result = run_tool("run_command", &args, &workdir, &mut on_output);
+        assert!(result.success);
+        assert!(result.output.as_deref().unwrap_or("").contains("hello"));
+        assert!(workdir.exists());
 
         let _ = std::fs::remove_dir_all(&dir);
     }

@@ -1,4 +1,5 @@
-export type PreviewKind = 'html' | 'markdown';
+export type PreviewKind = 'html' | 'markdown' | 'svg' | 'mermaid' | 'json' | 'image' | 'pdf';
+export type BlockPreviewKind = Exclude<PreviewKind, 'image' | 'pdf'>;
 
 /** The kind of a file path or a fenced block's language, undefined when it has no preview. */
 export function previewKindOfPath(path: string): PreviewKind | undefined {
@@ -7,14 +8,22 @@ export function previewKindOfPath(path: string): PreviewKind | undefined {
   const extension = path.slice(dot + 1).toLowerCase();
   if (extension === 'html' || extension === 'htm') return 'html';
   if (extension === 'md' || extension === 'markdown') return 'markdown';
+  if (extension === 'svg') return 'svg';
+  if (extension === 'mmd' || extension === 'mermaid') return 'mermaid';
+  if (extension === 'json') return 'json';
+  if (extension === 'png' || extension === 'jpg' || extension === 'jpeg' || extension === 'gif' || extension === 'webp') return 'image';
+  if (extension === 'pdf') return 'pdf';
   return undefined;
 }
 
-export function previewKindOfLanguage(lang: string | undefined): PreviewKind | undefined {
+export function previewKindOfLanguage(lang: string | undefined): BlockPreviewKind | undefined {
   if (!lang) return undefined;
   const normalized = lang.trim().toLowerCase();
   if (normalized === 'html') return 'html';
   if (normalized === 'markdown' || normalized === 'md') return 'markdown';
+  if (normalized === 'svg') return 'svg';
+  if (normalized === 'mermaid') return 'mermaid';
+  if (normalized === 'json') return 'json';
   return undefined;
 }
 

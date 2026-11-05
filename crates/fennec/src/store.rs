@@ -1,11 +1,15 @@
-//! Storage adapter: openfox's SQLite store (`db/index.ts`, `events/store.ts`),
-//! same `projects`/`sessions`/`events` schema minus the columns fennec does
-//! not use yet. Implements the agent's `EventLog`.
+//! Storage adapter: the SQLite store, `projects`/`sessions`/`events`. The
+//! schema is frozen: stored logs depend on it. Implements the agent's `EventLog`.
 
+mod budgets;
 pub mod calls;
+mod ideas;
+mod plugins;
+mod project_events;
 mod settings;
 
 use crate::agent::ports::EventLog;
+use crate::chat;
 use crate::domain::clock::now_ms;
 use crate::domain::event::{DoneReason, Event};
 use crate::domain::id::new_id;
@@ -60,7 +64,8 @@ const SCHEMA: &str = "PRAGMA foreign_keys = ON;
        name TEXT NOT NULL,
        workdir TEXT NOT NULL UNIQUE,
        created_at TEXT NOT NULL,
-       updated_at TEXT NOT NULL
+       updated_at TEXT NOT NULL,
+       favorite INTEGER NOT NULL DEFAULT 0
      );
      CREATE TABLE IF NOT EXISTS sessions (
        id TEXT PRIMARY KEY,
@@ -107,6 +112,8 @@ impl SqliteStore {
 
     fn init(db: Connection) -> Result<SqliteStore> {
         db.execute_batch(SCHEMA)?;
+        db.execute_batch(ideas::SCHEMA)?;
+        db.execute_batch(plugins::SCHEMA)?;
         // Old databases predate child sessions; add the column then.
         let has_parent = db
             .prepare("PRAGMA table_info(sessions)")?
@@ -116,11 +123,22 @@ impl SqliteStore {
         if !has_parent {
             db.execute("ALTER TABLE sessions ADD COLUMN parent_id TEXT", [])?;
         }
+        // Old databases predate favourites; add the column then.
+        let has_favorite = db
+            .prepare("PRAGMA table_info(projects)")?
+            .query_map([], |r| r.get::<_, String>(1))?
+            .into_iter()
+            .any(|name| name.is_ok_and(|n| n == "favorite"));
+        if !has_favorite {
+            db.execute(
+                "ALTER TABLE projects ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0",
+                [],
+            )?;
+        }
         Ok(SqliteStore { db })
     }
 
-    /// The project for `workdir`, created on first use (openfox does the same
-    /// when a directory is opened).
+    /// The project for `workdir`, created on first use.
     pub fn project_for(&self, workdir: &str) -> Result<Project> {
         let name = Path::new(workdir)
             .file_name()
@@ -137,6 +155,21 @@ impl SqliteStore {
         )?)
     }
 
+    /// The chat's scratch project, created on first use: a fixed id and a
+    /// scratch workdir, so a session can run without a repository.
+    pub fn chat_project(&self, workdir: &str) -> Result<Project> {
+        let now = now_ms().to_string();
+        self.db.execute(
+            "INSERT OR IGNORE INTO projects (id, name, workdir, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?4)",
+            params![chat::ID, chat::NAME, workdir, now],
+        )?;
+        Ok(self.db.query_row(
+            "SELECT id, name, workdir FROM projects WHERE id = ?1",
+            [chat::ID],
+            project_row,
+        )?)
+    }
+
     pub fn project(&self, id: &str) -> Result<Option<Project>> {
         Ok(self
             .db
@@ -148,18 +181,37 @@ impl SqliteStore {
             .optional()?)
     }
 
-    /// Most recently active first (the newest event of its top-level
-    /// sessions, else their creation), then by name.
+    /// Favourites first, then most recently active (the newest event of its
+    /// top-level sessions, else their creation), then by name.
     pub fn projects(&self) -> Result<Vec<Project>> {
         let mut stmt = self.db.prepare(
             "SELECT p.id, p.name, p.workdir FROM projects p
-             ORDER BY (SELECT MAX(COALESCE(
+             ORDER BY p.favorite DESC,
+                      (SELECT MAX(COALESCE(
                           (SELECT MAX(e.timestamp) FROM events e WHERE e.session_id = s.id),
                           CAST(s.created_at AS INTEGER)))
                        FROM sessions s WHERE s.project_id = p.id AND s.parent_id IS NULL) DESC,
                       p.name",
         )?;
         let rows = stmt.query_map([], project_row)?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// Pin or unpin a project. Returns whether a row matched.
+    pub fn set_favorite(&self, project_id: &str, favorite: bool) -> Result<bool> {
+        let rows = self.db.execute(
+            "UPDATE projects SET favorite = ?1 WHERE id = ?2",
+            params![favorite as i64, project_id],
+        )?;
+        Ok(rows > 0)
+    }
+
+    /// The ids of pinned projects.
+    pub fn favorite_projects(&self) -> Result<std::collections::HashSet<String>> {
+        let mut stmt = self
+            .db
+            .prepare("SELECT id FROM projects WHERE favorite = 1")?;
+        let rows = stmt.query_map([], |r| r.get::<_, String>(0))?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
@@ -313,6 +365,26 @@ impl SqliteStore {
         )? as u64)
     }
 
+    /// The session's `running.changed` events at/after `since_ms`, in log order.
+    pub fn running_changes(&self, session_id: &str, since_ms: u64) -> Result<Vec<(u64, bool)>> {
+        let mut stmt = self.db.prepare_cached(
+            "SELECT timestamp, payload FROM events WHERE session_id = ?1 AND event_type = 'running.changed' AND timestamp >= ?2 ORDER BY seq",
+        )?;
+        let rows = stmt.query_map(params![session_id, since_ms as i64], |r| {
+            Ok((r.get::<_, i64>(0)? as u64, r.get::<_, String>(1)?))
+        })?;
+        Ok(rows
+            .collect::<rusqlite::Result<Vec<(u64, String)>>>()?
+            .into_iter()
+            .filter_map(|(timestamp, payload)| {
+                serde_json::from_str::<serde_json::Value>(&payload)
+                    .ok()
+                    .and_then(|value| value["data"]["isRunning"].as_bool())
+                    .map(|is_running| (timestamp, is_running))
+            })
+            .collect())
+    }
+
     /// Top-level sessions, newest first; `project_id` filters when given.
     /// Child sessions are hidden from the lists.
     pub fn sessions(&self, project_id: Option<&str>) -> Result<Vec<SessionSummary>> {
@@ -333,6 +405,76 @@ impl SqliteStore {
         Ok(rows.next().transpose()?)
     }
 
+    /// The last agent a session switched to (`mode.changed`), or None. A
+    /// targeted read, not the full log: listing a project must not deserialize
+    /// every session's events.
+    pub fn last_mode(&self, session_id: &str) -> Result<Option<String>> {
+        Ok(self
+            .db
+            .query_row(
+                "SELECT json_extract(payload, '$.data.mode') FROM events
+                 WHERE session_id = ?1 AND event_type = 'mode.changed'
+                 ORDER BY seq DESC LIMIT 1",
+                [session_id],
+                |r| r.get::<_, Option<String>>(0),
+            )
+            .optional()?
+            .flatten())
+    }
+
+    /// The id followed by all its descendants, children of children included.
+    pub fn session_tree(&self, id: &str) -> Result<Vec<String>> {
+        let mut stmt = self.db.prepare_cached(
+            "WITH RECURSIVE tree(id) AS (
+               SELECT id FROM sessions WHERE id = ?1
+               UNION ALL
+               SELECT s.id FROM sessions s JOIN tree t ON s.parent_id = t.id
+             )
+             SELECT id FROM tree",
+        )?;
+        let rows = stmt.query_map(params![id], |r| r.get::<_, String>(0))?;
+        Ok(rows.collect::<rusqlite::Result<Vec<String>>>()?)
+    }
+
+    /// One transaction keeps a batch of deletes atomic with their events.
+    pub fn delete_sessions(&self, ids: &[String]) -> Result<()> {
+        let tx = self.db.unchecked_transaction()?;
+        for id in ids {
+            tx.execute(
+                "DELETE FROM events WHERE session_id = ?1",
+                params![id.as_str()],
+            )?;
+            tx.execute("DELETE FROM sessions WHERE id = ?1", params![id.as_str()])?;
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Deletes a project and everything attached to it: its sessions with
+    /// their events, its ideas backlog events, and the project row.
+    pub fn delete_project(&self, id: &str) -> Result<()> {
+        let tx = self.db.unchecked_transaction()?;
+        tx.execute(
+            "DELETE FROM events WHERE session_id IN (SELECT id FROM sessions WHERE project_id = ?1)",
+            params![id],
+        )?;
+        tx.execute("DELETE FROM sessions WHERE project_id = ?1", params![id])?;
+        // The cascade would do this too, but not if foreign keys are off on
+        // this connection.
+        tx.execute(
+            "DELETE FROM project_events WHERE project_id = ?1",
+            params![id],
+        )?;
+        tx.execute("DELETE FROM projects WHERE id = ?1", params![id])?;
+        // The budget row is a setting keyed by the project id.
+        tx.execute(
+            "DELETE FROM settings WHERE key = 'budget:' || ?1",
+            params![id],
+        )?;
+        tx.commit()?;
+        Ok(())
+    }
+
     /// Ends the turns a crash left open: sessions whose last `running.changed`
     /// says running get `isRunning: false`, so the UI stops waiting on a turn
     /// no process runs. Called at server start, before any turn exists.
@@ -351,6 +493,24 @@ impl SqliteStore {
             .query_map([], |r| r.get::<_, String>(0))?
             .collect::<rusqlite::Result<Vec<String>>>()?;
         for id in &ids {
+            // The cut turn ends like any other, with a done: otherwise the last
+            // done in the log is an earlier one (a workflow's human node waiting
+            // for the user), and the run looks waiting instead of interrupted.
+            let message_id: String = self.db.query_row(
+                "SELECT COALESCE(MAX(json_extract(payload, '$.data.messageId')), '')
+                 FROM events WHERE session_id = ?1 AND seq = (SELECT MAX(seq) FROM events
+                     WHERE session_id = ?1 AND event_type = 'message.start')",
+                params![id],
+                |r| r.get(0),
+            )?;
+            self.insert_event(
+                id,
+                &Event::ChatDone {
+                    message_id,
+                    reason: DoneReason::Error,
+                    duration_ms: None,
+                },
+            )?;
             self.insert_event(id, &Event::RunningChanged { is_running: false })?;
         }
         Ok(ids.len())
@@ -451,6 +611,58 @@ mod tests {
     }
 
     #[test]
+    fn favourite_projects_come_first_and_unpinning_restores_order() {
+        let store = SqliteStore::in_memory().unwrap();
+        let idle = store.project_for("/a").unwrap();
+        let busy = store.project_for("/b").unwrap();
+        store.project_for("/c").unwrap();
+        store.create_session(&idle, "t").unwrap();
+        let sid = store.create_session(&busy, "t").unwrap();
+        let later = store.session(&sid).unwrap().unwrap().updated_at + 1;
+        store
+            .db
+            .execute(
+                "INSERT INTO events (session_id, seq, timestamp, event_type, payload) VALUES (?1, 99, ?2, 'x', '{}')",
+                rusqlite::params![sid, later as i64],
+            )
+            .unwrap();
+
+        assert!(store.set_favorite(&idle.id, true).unwrap());
+        let workdirs: Vec<_> = store
+            .projects()
+            .unwrap()
+            .into_iter()
+            .map(|p| p.workdir)
+            .collect();
+        assert_eq!(workdirs, ["/a", "/b", "/c"]);
+
+        assert!(store.set_favorite(&idle.id, false).unwrap());
+        let workdirs: Vec<_> = store
+            .projects()
+            .unwrap()
+            .into_iter()
+            .map(|p| p.workdir)
+            .collect();
+        assert_eq!(workdirs, ["/b", "/a", "/c"]);
+
+        assert!(!store.set_favorite("nope", true).unwrap());
+    }
+
+    #[test]
+    fn chat_project_creates_a_fixed_row_and_is_idempotent() {
+        let store = SqliteStore::in_memory().unwrap();
+        let chat = store.chat_project("/scratch/chat").unwrap();
+        assert_eq!(chat.id, chat::ID);
+        assert_eq!(chat.name, chat::NAME);
+        assert_eq!(chat.workdir, "/scratch/chat");
+        // A second call returns the same row, not a duplicate.
+        assert_eq!(store.chat_project("/scratch/chat").unwrap().id, chat.id);
+        // It is reachable by id and marked as the chat.
+        let by_id = store.project(chat::ID).unwrap().unwrap();
+        assert!(chat::is_chat(&by_id));
+    }
+
+    #[test]
     fn a_finished_workflow_awaits_integration_until_discarded() {
         let store = SqliteStore::in_memory().unwrap();
         let project = store.project_for("/w").unwrap();
@@ -543,7 +755,9 @@ mod tests {
         }
 
         assert_eq!(store.close_dangling_turns().unwrap(), 1);
-        assert_eq!(store.last_seq(&open).unwrap(), 3);
+        assert_eq!(store.last_seq(&open).unwrap(), 4);
+        let row = store.session(&open).unwrap().unwrap();
+        assert_eq!(row.last_done, Some(DoneReason::Error));
         assert_eq!(store.last_seq(&ended).unwrap(), 3);
         assert_eq!(store.close_dangling_turns().unwrap(), 0);
     }
@@ -620,6 +834,7 @@ mod tests {
                 workflow,
                 task: "task".into(),
                 step_by_step: false,
+                started_at: None,
             }
         }
 
@@ -673,6 +888,88 @@ mod tests {
         assert_eq!(found.project_id, project.id);
 
         assert!(store.create_child_session("missing", "x").is_err());
+    }
+
+    #[test]
+    fn deleting_a_session_tree_removes_its_children_and_events() {
+        let store = SqliteStore::in_memory().unwrap();
+        let project = store.project_for("/w").unwrap();
+        let parent = store.create_session(&project, "parent").unwrap();
+        let child = store.create_child_session(&parent, "child").unwrap();
+        let grandchild = store.create_child_session(&child, "grandchild").unwrap();
+        let unrelated = store.create_session(&project, "unrelated").unwrap();
+
+        let tree = store.session_tree(&parent).unwrap();
+        assert_eq!(tree.len(), 3);
+        assert!(tree.contains(&parent));
+        assert!(tree.contains(&child));
+        assert!(tree.contains(&grandchild));
+
+        store.delete_sessions(&tree).unwrap();
+        assert!(store.session(&parent).unwrap().is_none());
+        assert!(store.session(&child).unwrap().is_none());
+        assert!(store.session(&grandchild).unwrap().is_none());
+        assert!(store.events_after(&child, 0).unwrap().is_empty());
+        assert!(store.session(&unrelated).unwrap().is_some());
+    }
+
+    #[test]
+    fn delete_project_removes_its_sessions_events_and_ideas() {
+        let store = SqliteStore::in_memory().unwrap();
+        let project = store.project_for("/del").unwrap();
+        let other = store.project_for("/other").unwrap();
+        let sid = store.create_session(&project, "s").unwrap();
+        store
+            .append_idea_event(
+                &project.id,
+                &backlog::BacklogEvent::Added {
+                    idea_id: "i".into(),
+                    text: "t".into(),
+                    attachments: Vec::new(),
+                },
+            )
+            .unwrap();
+        let other_sid = store.create_session(&other, "o").unwrap();
+        store
+            .append_idea_event(
+                &other.id,
+                &backlog::BacklogEvent::Added {
+                    idea_id: "i2".into(),
+                    text: "t".into(),
+                    attachments: Vec::new(),
+                },
+            )
+            .unwrap();
+
+        store.delete_project(&project.id).unwrap();
+
+        assert!(store.project(&project.id).unwrap().is_none());
+        assert!(store.session(&sid).unwrap().is_none());
+        assert!(store.events_after(&sid, 0).unwrap().is_empty());
+        assert_eq!(
+            store
+                .db
+                .query_row(
+                    "SELECT COUNT(*) FROM project_events WHERE project_id = ?1",
+                    [project.id.as_str()],
+                    |r| r.get::<_, i64>(0),
+                )
+                .unwrap(),
+            0
+        );
+        assert!(store.project(&other.id).unwrap().is_some());
+        assert!(store.session(&other_sid).unwrap().is_some());
+        assert_eq!(
+            store
+                .db
+                .query_row(
+                    "SELECT COUNT(*) FROM project_events WHERE project_id = ?1",
+                    [other.id.as_str()],
+                    |r| r.get::<_, i64>(0),
+                )
+                .unwrap(),
+            1
+        );
     }
 
     #[test]

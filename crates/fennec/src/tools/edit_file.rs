@@ -1,9 +1,8 @@
-//! Port of openfox `tools/edit.ts`: exact string replacement that keeps the
-//! file's line endings.
-//! The guidance in its errors (where to look, what to run) is fennec's own.
+//! Exact string replacement that keeps the file's line endings; its errors
+//! say where to look and what to run.
 
 use super::args;
-use super::path_guard::resolve_for_writing;
+use super::path_guard::{Outside, not_found, resolve_for_writing};
 use crate::domain::event::ToolResult;
 use crate::domain::protection::Protection;
 use serde_json::{Value, json};
@@ -41,48 +40,31 @@ pub(super) fn definition() -> Value {
     })
 }
 
-pub(super) fn run(args: &Value, workdir: &Path, protection: &Protection) -> ToolResult {
-    let path = match args::string(args, "path") {
-        Ok(value) => value,
-        Err(error) => return ToolResult::failure(error),
-    };
+pub(super) fn run(
+    args: &Value,
+    workdir: &Path,
+    protection: &Protection,
+    outside: &Outside,
+) -> ToolResult {
+    try_run(args, workdir, protection, outside).unwrap_or_else(ToolResult::failure)
+}
 
-    let old_string = match args::string(args, "old_string") {
-        Ok(value) => value,
-        Err(error) => return ToolResult::failure(error),
-    };
-
-    let new_string = match args::string(args, "new_string") {
-        Ok(value) => value,
-        Err(error) => return ToolResult::failure(error),
-    };
-
-    let replace_all = match args::boolean(args, "replace_all") {
-        Ok(value) => value,
-        Err(error) => return ToolResult::failure(error),
-    };
-
-    let full_path = match resolve_for_writing(workdir, protection, path) {
-        Ok(value) => value,
-        Err(error) => return ToolResult::failure(error),
-    };
-
-    let bytes = match std::fs::read(&full_path) {
-        Ok(value) => value,
-        Err(_) => {
-            let name = Path::new(path)
-                .file_name()
-                .map(|name| name.to_string_lossy().into_owned())
-                .unwrap_or_else(|| path.to_string());
-            return ToolResult::failure(format!(
-                "File not found: {path}. Find it with: rg --files | rg '{name}'"
-            ));
-        }
-    };
+fn try_run(
+    args: &Value,
+    workdir: &Path,
+    protection: &Protection,
+    outside: &Outside,
+) -> Result<ToolResult, String> {
+    let path = args::string(args, "path")?;
+    let old_string = args::string(args, "old_string")?;
+    let new_string = args::string(args, "new_string")?;
+    let replace_all = args::boolean(args, "replace_all")?;
+    let full_path = resolve_for_writing(workdir, protection, outside, path)?;
+    let bytes = std::fs::read(&full_path).map_err(|_| not_found(path))?;
 
     let content = match String::from_utf8(bytes) {
         Ok(value) => value,
-        Err(_) => return ToolResult::failure("File is not valid UTF-8".to_string()),
+        Err(_) => return Err("File is not valid UTF-8".to_string()),
     };
 
     let line_ending = detect_line_ending(&content);
@@ -91,7 +73,7 @@ pub(super) fn run(args: &Value, workdir: &Path, protection: &Protection) -> Tool
     let normalized_new = normalize_to_lf(new_string);
 
     if normalized_old.is_empty() {
-        return ToolResult::failure("old_string must not be empty".to_string());
+        return Err("old_string must not be empty".to_string());
     }
 
     let occurrences = normalized_content.split(normalized_old.as_str()).count() - 1;
@@ -115,11 +97,11 @@ pub(super) fn run(args: &Value, workdir: &Path, protection: &Protection) -> Tool
                 "old_string not found in file.\n\nSearched for:\n{preview}\n\nIts first line does not appear in the file either: read the file again (rg -n to locate) before retrying."
             )
         };
-        return ToolResult::failure(message);
+        return Err(message);
     }
 
     if occurrences > 1 && !replace_all {
-        return ToolResult::failure(format!(
+        return Err(format!(
             "Found {occurrences} matches for old_string. Use replace_all: true to replace all, or provide more context to make the match unique."
         ));
     }
@@ -130,9 +112,7 @@ pub(super) fn run(args: &Value, workdir: &Path, protection: &Protection) -> Tool
         match normalized_content.split_once(normalized_old.as_str()) {
             Some((before, after)) => format!("{before}{normalized_new}{after}"),
             None => {
-                return ToolResult::failure(
-                    "old_string not found in file (unexpected)".to_string(),
-                );
+                return Err("old_string not found in file (unexpected)".to_string());
             }
         }
     };
@@ -144,14 +124,14 @@ pub(super) fn run(args: &Value, workdir: &Path, protection: &Protection) -> Tool
     };
 
     if let Err(error) = std::fs::write(&full_path, restored) {
-        return ToolResult::failure(format!("Failed to write file: {error}"));
+        return Err(format!("Failed to write file: {error}"));
     }
 
     let count = if replace_all { occurrences } else { 1 };
-    ToolResult::success(
+    Ok(ToolResult::success(
         format!("Successfully replaced {count} occurrence(s) in {path}"),
         false,
-    )
+    ))
 }
 
 #[derive(Clone, Copy)]
@@ -206,6 +186,7 @@ fn first_line_hits(content: &str, old: &str) -> Vec<usize> {
 mod tests {
     use super::run;
     use crate::domain::protection::Protection;
+    use crate::tools::path_guard::Outside;
     use crate::tools::test_support::{no_output, run_tool, temp_dir};
 
     #[test]
@@ -291,7 +272,7 @@ mod tests {
             "old_string": "original",
             "new_string": "changed"
         });
-        let result = run(&args, &dir, &Protection::new(None));
+        let result = run(&args, &dir, &Protection::new(None), &Outside::none());
 
         assert!(!result.success);
         assert!(result.error.unwrap().contains("is protected"));

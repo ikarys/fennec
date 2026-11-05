@@ -1,5 +1,5 @@
-//! Ports openfox `tasks/slash.ts` `parseSlashInvocation`; openfox resolves
-//! workflows and commands (not ported yet); fennec adds `/compact` and skills.
+//! What a typed `/compact` or `/<skill>` stands for. Workflows and commands are not resolved here.
+//! It adds `/compact` and skills.
 
 use crate::domain::skill::Skill;
 
@@ -17,7 +17,7 @@ pub struct SlashCommand {
     pub description: String,
 }
 
-/// openfox `parseSlashInvocation`: (id, rest of the text trimmed); None when
+/// Parses a slash invocation: (id, rest of the text trimmed); None when
 /// the text does not start with `/` or the id is empty. The id ends at the
 /// first whitespace.
 pub fn parse(text: &str) -> Option<(&str, &str)> {

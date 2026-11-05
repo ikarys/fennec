@@ -16,6 +16,7 @@ pub enum Sandbox {
         hidden_files: Vec<PathBuf>,
         writable: Vec<PathBuf>,
         read_only: Vec<PathBuf>,
+        mounts: Vec<(PathBuf, PathBuf)>,
     },
 }
 
@@ -70,12 +71,23 @@ impl Sandbox {
             hidden_dirs.push(data_dir.to_path_buf());
         }
 
+        // A container daemon's socket is root on the host (`docker run -v /:/host`): unix sockets
+        // ignore the read-only mount and the network namespace, so they are hidden outright.
+        for socket in DAEMON_SOCKETS {
+            if let Ok(path) = Path::new(socket).canonicalize()
+                && !hidden_files.contains(&path)
+            {
+                hidden_files.push(path);
+            }
+        }
+
         Sandbox::Bwrap {
             network: prefs.network,
             hidden_dirs,
             hidden_files,
             writable,
             read_only: vec![],
+            mounts: Vec::new(),
         }
     }
 
@@ -90,7 +102,15 @@ impl Sandbox {
             .and_then(|path| path.parent().map(Path::to_path_buf))
             .filter(|dir| dir.parent().is_some())
             .unwrap_or_default();
-        Sandbox::from_prefs(prefs, home.as_deref(), &data_dir)
+        let mut sandbox = Sandbox::from_prefs(prefs, home.as_deref(), &data_dir);
+        // The session runtime dir holds rootless docker/podman and D-Bus sockets.
+        if let Sandbox::Bwrap { hidden_dirs, .. } = &mut sandbox
+            && let Some(runtime) = std::env::var_os("XDG_RUNTIME_DIR").map(PathBuf::from)
+            && runtime.is_dir()
+        {
+            hidden_dirs.push(runtime);
+        }
+        sandbox
     }
 
     /// The same sandbox with `paths` mounted read-only inside the workdir.
@@ -102,6 +122,7 @@ impl Sandbox {
                 hidden_dirs,
                 hidden_files,
                 writable,
+                mounts,
                 ..
             } => Sandbox::Bwrap {
                 network,
@@ -109,8 +130,53 @@ impl Sandbox {
                 hidden_files,
                 writable,
                 read_only: paths,
+                mounts,
             },
         }
+    }
+
+    /// The same sandbox with `mounts` bound read-only from source to destination.
+    pub fn with_mounts(self, mounts: Vec<(PathBuf, PathBuf)>) -> Sandbox {
+        match self {
+            Sandbox::Off => Sandbox::Off,
+            Sandbox::Bwrap {
+                network,
+                hidden_dirs,
+                hidden_files,
+                writable,
+                read_only,
+                ..
+            } => Sandbox::Bwrap {
+                network,
+                hidden_dirs,
+                hidden_files,
+                writable,
+                read_only,
+                mounts,
+            },
+        }
+    }
+
+    /// The same sandbox with its network flag set (a plugin's network is its
+    /// own choice, independent of the command sandbox's).
+    pub fn with_network(mut self, network: bool) -> Sandbox {
+        if let Sandbox::Bwrap {
+            network: ref mut flag,
+            ..
+        } = self
+        {
+            *flag = network;
+        }
+        self
+    }
+
+    /// The same sandbox with `paths` writable too (bound after the hidden
+    /// dirs, so a path inside fennec's hidden store is reachable).
+    pub fn writing(mut self, paths: Vec<PathBuf>) -> Sandbox {
+        if let Sandbox::Bwrap { writable, .. } = &mut self {
+            writable.extend(paths);
+        }
+        self
     }
 
     /// The same sandbox with `workdir` itself read-only (later mounts win over
@@ -131,6 +197,7 @@ impl Sandbox {
             Sandbox::Off => {
                 let mut sh = Command::new("sh");
                 sh.arg("-c").arg(command).current_dir(cwd);
+                strip_secret_env(&mut sh);
                 sh
             }
             Sandbox::Bwrap { .. } => {
@@ -138,16 +205,105 @@ impl Sandbox {
                 bwrap.args(bwrap_args(self, workdir, cwd, command));
                 // bwrap passes fennec's environment through: the model would
                 // read the endpoint key or a token with `env`.
-                for (name, _) in std::env::vars_os() {
-                    if is_secret_name(&name.to_string_lossy()) {
-                        bwrap.env_remove(name);
-                    }
+                strip_secret_env(&mut bwrap);
+                bwrap
+            }
+        }
+    }
+
+    /// `program args…` in `cwd`, wrapped in bwrap unless Off; `workdir` is the
+    /// writable root. The MCP stdio client uses it to run a server in the same
+    /// world as any command (secrets hidden, no network by default).
+    pub fn spawn(&self, program: &str, args: &[String], workdir: &Path, cwd: &Path) -> Command {
+        match self {
+            Sandbox::Off => {
+                let mut cmd = Command::new(program);
+                cmd.args(args).current_dir(cwd);
+                strip_secret_env(&mut cmd);
+                cmd
+            }
+            Sandbox::Bwrap { .. } => {
+                let mut bwrap = Command::new("bwrap");
+                let mut bargs = bwrap_world_args(self, workdir, cwd);
+                bargs.push(OsString::from("--"));
+                bargs.push(OsString::from(program));
+                for arg in args {
+                    bargs.push(OsString::from(arg));
                 }
+                bwrap.args(bargs);
+                strip_secret_env(&mut bwrap);
                 bwrap
             }
         }
     }
 }
+
+/// bwrap and a bare child both inherit fennec's environment: drop the secret
+/// names so a command (or an MCP server) cannot read the endpoint key.
+fn strip_secret_env(cmd: &mut Command) {
+    for (name, _) in std::env::vars_os() {
+        if is_secret_name(&name.to_string_lossy()) {
+            cmd.env_remove(name);
+        }
+    }
+}
+
+/// Whether bwrap can build the world commands run in, on this machine (verified).
+#[derive(Debug, Clone, PartialEq)]
+pub enum SandboxHealth {
+    Ready,
+    Missing,
+    Blocked(String),
+}
+
+/// Probes bwrap with the minimal world fennec needs, so a kernel setting that
+/// forbids unprivileged user namespaces (Ubuntu 23.10+ AppArmor) surfaces in
+/// the Settings page instead of every sandboxed command failing silently.
+pub fn probe() -> SandboxHealth {
+    let output = Command::new("bwrap")
+        .args([
+            "--ro-bind",
+            "/",
+            "/",
+            "--dev",
+            "/dev",
+            "--proc",
+            "/proc",
+            "--unshare-all",
+            "--die-with-parent",
+            "--",
+            "true",
+        ])
+        .output();
+    health_from(output)
+}
+
+fn health_from(output: std::io::Result<std::process::Output>) -> SandboxHealth {
+    match output {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => SandboxHealth::Missing,
+        Err(error) => SandboxHealth::Blocked(error.to_string()),
+        Ok(output) if output.status.success() => SandboxHealth::Ready,
+        Ok(output) => SandboxHealth::Blocked(
+            String::from_utf8_lossy(&output.stderr)
+                .lines()
+                .map(str::trim)
+                .find(|line| !line.is_empty())
+                .map(ToOwned::to_owned)
+                .unwrap_or_else(|| {
+                    format!("bwrap exited with {}", output.status.code().unwrap_or(-1))
+                }),
+        ),
+    }
+}
+
+/// Container daemons' system sockets; `/var/run` is usually a link to `/run`.
+const DAEMON_SOCKETS: [&str; 5] = [
+    "/run/docker.sock",
+    "/var/run/docker.sock",
+    "/run/containerd/containerd.sock",
+    "/run/podman/podman.sock",
+    "/run/crio/crio.sock",
+];
 
 /// An environment variable that likely holds a credential.
 // ponytail: a name heuristic; an allow-list of variables if one slips through.
@@ -166,13 +322,17 @@ fn is_secret_name(name: &str) -> bool {
 }
 
 /// The bwrap arguments of a `Bwrap` sandbox; empty for `Off`.
-fn bwrap_args(sandbox: &Sandbox, workdir: &Path, cwd: &Path, command: &str) -> Vec<OsString> {
+/// The bwrap world, everything up to (and including) `--chdir cwd`; the
+/// command tail after `--` is added by the caller, so a `sh -c` string and a
+/// bare program+args (the MCP stdio client) share the same world.
+fn bwrap_world_args(sandbox: &Sandbox, workdir: &Path, cwd: &Path) -> Vec<OsString> {
     let Sandbox::Bwrap {
         network,
         hidden_dirs,
         hidden_files,
         writable,
         read_only,
+        mounts,
     } = sandbox
     else {
         return Vec::new();
@@ -211,6 +371,20 @@ fn bwrap_args(sandbox: &Sandbox, workdir: &Path, cwd: &Path, command: &str) -> V
     args.push(workdir.as_os_str().to_os_string());
     args.push(workdir.as_os_str().to_os_string());
 
+    // Dependency directories from the main checkout: read-only, because the
+    // worktree lacks them and the sandbox has no network to install them.
+    for (src, dst) in mounts {
+        // The list is taken when the turn starts; starting a server since then
+        // may have replaced the mount point with a link to the same copy, onto
+        // which bwrap cannot bind.
+        if dst.symlink_metadata().is_ok_and(|m| m.is_symlink()) {
+            continue;
+        }
+        args.push(OsString::from("--ro-bind"));
+        args.push(src.as_os_str().to_os_string());
+        args.push(dst.as_os_str().to_os_string());
+    }
+
     // Later mounts win: protected paths stay read-only inside the writable
     // workdir.
     for path in read_only {
@@ -237,11 +411,15 @@ fn bwrap_args(sandbox: &Sandbox, workdir: &Path, cwd: &Path, command: &str) -> V
 
     args.push(OsString::from("--chdir"));
     args.push(cwd.as_os_str().to_os_string());
+    args
+}
+
+fn bwrap_args(sandbox: &Sandbox, workdir: &Path, cwd: &Path, command: &str) -> Vec<OsString> {
+    let mut args = bwrap_world_args(sandbox, workdir, cwd);
     args.push(OsString::from("--"));
     args.push(OsString::from("sh"));
     args.push(OsString::from("-c"));
     args.push(OsString::from(command));
-
     args
 }
 
@@ -249,7 +427,9 @@ fn bwrap_args(sandbox: &Sandbox, workdir: &Path, cwd: &Path, command: &str) -> V
 mod tests {
     use super::*;
     use crate::tools::test_support::temp_dir;
+    use std::os::unix::process::ExitStatusExt;
     use std::path::Path;
+    use std::process::ExitStatus;
 
     fn args_as_strings(args: &[OsString]) -> Vec<String> {
         args.iter()
@@ -266,6 +446,7 @@ mod tests {
                 hidden_files: vec![PathBuf::from("/home/user/.netrc")],
                 writable: vec![PathBuf::from("/home/user/.npm")],
                 read_only: vec![],
+                mounts: vec![],
             },
             Path::new("/work"),
             Path::new("/cwd"),
@@ -323,6 +504,7 @@ mod tests {
                 hidden_files: vec![],
                 writable: vec![],
                 read_only: vec![],
+                mounts: vec![],
             },
             Path::new("/work"),
             Path::new("/cwd"),
@@ -340,6 +522,7 @@ mod tests {
                 hidden_files: vec![],
                 writable: vec![],
                 read_only: vec![],
+                mounts: vec![],
             },
             Path::new("/work"),
             Path::new("/cwd"),
@@ -360,6 +543,7 @@ mod tests {
                 hidden_files: vec![],
                 writable: vec![],
                 read_only: vec![PathBuf::from("/work/protected")],
+                mounts: vec![],
             },
             Path::new("/work"),
             Path::new("/cwd"),
@@ -404,6 +588,90 @@ mod tests {
     }
 
     #[test]
+    fn bwrap_args_skip_a_mount_point_since_replaced_by_a_link() {
+        let dir = std::env::temp_dir().join(format!("fennec-mount-link-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let link = dir.join("node_modules");
+        let _ = std::fs::remove_file(&link);
+        std::os::unix::fs::symlink("/main/web/node_modules", &link).unwrap();
+        let args = bwrap_args(
+            &Sandbox::Bwrap {
+                network: false,
+                hidden_dirs: vec![],
+                hidden_files: vec![],
+                writable: vec![],
+                read_only: vec![],
+                mounts: vec![(PathBuf::from("/main/web/node_modules"), link)],
+            },
+            &dir,
+            &dir,
+            "echo hi",
+        );
+        std::fs::remove_dir_all(&dir).unwrap();
+
+        assert!(!args_as_strings(&args).contains(&"/main/web/node_modules".to_string()));
+    }
+
+    #[test]
+    fn bwrap_args_put_dependency_mounts_after_the_workdir_bind() {
+        let args = bwrap_args(
+            &Sandbox::Bwrap {
+                network: false,
+                hidden_dirs: vec![],
+                hidden_files: vec![],
+                writable: vec![],
+                read_only: vec![PathBuf::from("/work/protected")],
+                mounts: vec![(
+                    PathBuf::from("/main/web/node_modules"),
+                    PathBuf::from("/work/web/node_modules"),
+                )],
+            },
+            Path::new("/work"),
+            Path::new("/cwd"),
+            "echo hi",
+        );
+
+        assert_eq!(
+            args_as_strings(&args),
+            vec![
+                "--ro-bind",
+                "/",
+                "/",
+                "--dev",
+                "/dev",
+                "--proc",
+                "/proc",
+                "--tmpfs",
+                "/tmp",
+                "--bind",
+                "/work",
+                "/work",
+                "--ro-bind",
+                "/main/web/node_modules",
+                "/work/web/node_modules",
+                "--ro-bind",
+                "/work/protected",
+                "/work/protected",
+                "--unshare-all",
+                "--die-with-parent",
+                "--new-session",
+                "--setenv",
+                "npm_config_offline",
+                "true",
+                "--setenv",
+                "CARGO_NET_OFFLINE",
+                "true",
+                "--chdir",
+                "/cwd",
+                "--",
+                "sh",
+                "-c",
+                "echo hi",
+            ]
+        );
+    }
+
+    #[test]
     fn read_only_puts_the_workdir_read_only_bind_after_the_writable_bind() {
         let workdir = Path::new("/work");
         let sandbox = Sandbox::Bwrap {
@@ -412,6 +680,7 @@ mod tests {
             hidden_files: vec![],
             writable: vec![],
             read_only: vec![],
+            mounts: vec![],
         }
         .read_only(workdir)
         .expect("a bwrap sandbox");
@@ -487,6 +756,7 @@ mod tests {
             hidden_files,
             writable,
             read_only,
+            mounts,
         } = sandbox
         else {
             panic!("expected bwrap sandbox");
@@ -500,6 +770,7 @@ mod tests {
         assert!(!hidden_files.contains(&home.join(".npmrc")));
         assert!(writable.is_empty());
         assert!(read_only.is_empty());
+        assert!(mounts.is_empty());
 
         let _ = std::fs::remove_dir_all(&home);
         let _ = std::fs::remove_dir_all(&data_dir);
@@ -560,6 +831,7 @@ mod tests {
             hidden_files: vec![],
             writable: vec![],
             read_only: vec![],
+            mounts: vec![],
         };
 
         let output = sandbox
@@ -576,6 +848,34 @@ mod tests {
     }
 
     #[test]
+    fn e2e_container_daemon_sockets_are_hidden() {
+        // Needs bwrap and a docker socket on the machine; skipped otherwise.
+        if !bwrap_available() || !Path::new("/run/docker.sock").exists() {
+            return;
+        }
+
+        let workdir = temp_dir();
+        let data_dir = temp_dir();
+        let prefs = SandboxPrefs {
+            enabled: true,
+            network: false,
+        };
+        let sandbox = Sandbox::from_prefs(&prefs, None, &data_dir);
+        let output = sandbox
+            .command(
+                "test -S /run/docker.sock || test -S /var/run/docker.sock",
+                &workdir,
+                &workdir,
+            )
+            .output()
+            .unwrap();
+        assert!(!output.status.success(), "{:?}", output);
+
+        let _ = std::fs::remove_dir_all(&workdir);
+        let _ = std::fs::remove_dir_all(&data_dir);
+    }
+
+    #[test]
     fn e2e_the_root_filesystem_is_read_only() {
         // End-to-end tests need a real bwrap; skip on machines without it.
         if !bwrap_available() {
@@ -589,6 +889,7 @@ mod tests {
             hidden_files: vec![],
             writable: vec![],
             read_only: vec![],
+            mounts: vec![],
         };
 
         let output = sandbox
@@ -627,6 +928,7 @@ mod tests {
             hidden_files: vec![],
             writable: vec![],
             read_only: vec![],
+            mounts: vec![],
         };
 
         let output = sandbox
@@ -657,6 +959,7 @@ mod tests {
             hidden_files: vec![],
             writable: vec![],
             read_only: vec![],
+            mounts: vec![],
         };
 
         let output = sandbox
@@ -692,6 +995,7 @@ mod tests {
             hidden_files: vec![],
             writable: vec![],
             read_only: vec![protected.clone()],
+            mounts: vec![],
         };
 
         let output = sandbox
@@ -718,5 +1022,47 @@ mod tests {
         assert_eq!(std::fs::read_to_string(&sibling).unwrap(), "ok\n");
 
         let _ = std::fs::remove_dir_all(&workdir);
+    }
+
+    #[test]
+    fn health_from_missing_when_bwrap_is_not_found() {
+        let output = Err(std::io::Error::new(std::io::ErrorKind::NotFound, "bwrap"));
+        assert_eq!(health_from(output), SandboxHealth::Missing);
+    }
+
+    #[test]
+    fn health_from_ready_when_probe_succeeds() {
+        let output = Ok(std::process::Output {
+            status: ExitStatus::from_raw(0),
+            stdout: vec![],
+            stderr: vec![],
+        });
+        assert_eq!(health_from(output), SandboxHealth::Ready);
+    }
+
+    #[test]
+    fn health_from_blocked_uses_the_first_stderr_line() {
+        let output = Ok(std::process::Output {
+            status: ExitStatus::from_raw(256),
+            stdout: vec![],
+            stderr: b"bwrap: setting up uid map: Permission denied\n".to_vec(),
+        });
+        assert_eq!(
+            health_from(output),
+            SandboxHealth::Blocked("bwrap: setting up uid map: Permission denied".to_string())
+        );
+    }
+
+    #[test]
+    fn health_from_blocked_reports_the_exit_status_when_stderr_is_empty() {
+        let output = Ok(std::process::Output {
+            status: ExitStatus::from_raw(256),
+            stdout: vec![],
+            stderr: vec![],
+        });
+        assert!(matches!(
+            health_from(output),
+            SandboxHealth::Blocked(detail) if detail.contains("exited")
+        ));
     }
 }

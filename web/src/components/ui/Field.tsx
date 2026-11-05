@@ -5,7 +5,7 @@
 import type { InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
 
 const FIELD =
-  'rounded-md border border-border bg-bg/40 px-2.5 py-1.5 text-[0.8125rem] text-text outline-none transition-colors placeholder:text-faint hover:border-border-strong focus:border-accent focus:ring-1 focus:ring-accent-soft disabled:opacity-60';
+  'rounded-md border border-border bg-bg/40 px-2.5 py-1.5 text-sm text-text outline-none transition-colors placeholder:text-faint hover:border-border-strong focus:border-accent focus:ring-1 focus:ring-accent-soft disabled:opacity-60';
 
 export function TextInput({ className = '', type = 'text', ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return <input type={type} className={`${FIELD} ${className}`.trim()} {...props} />;
@@ -20,7 +20,7 @@ export function TextArea({ className = '', ...props }: TextareaHTMLAttributes<HT
 }
 
 /** A label above its field, with an optional hint below. */
-export function FieldRow({ label, hint, htmlFor, children }: { label: string; hint?: string; htmlFor?: string; children: React.ReactNode }) {
+export function FieldRow({ label, hint, htmlFor, children }: { label: string; hint?: React.ReactNode; htmlFor?: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
       <label htmlFor={htmlFor} className="text-xs font-medium text-muted">

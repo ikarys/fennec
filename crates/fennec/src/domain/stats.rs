@@ -1,5 +1,5 @@
-//! Port of openfox `MessageStats` (shared/types.ts), the subset one model
-//! call gives: what it cost in tokens and how fast it ran.
+//! `MessageStats`: the subset one model call gives: what it cost in tokens
+//! and how fast it ran.
 
 use serde::{Deserialize, Serialize};
 use std::time::Duration;

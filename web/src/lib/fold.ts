@@ -1,4 +1,6 @@
-import { formatTokens } from './format';
+import { formatTokens, stateLabel } from './format';
+import type { SessionState } from './api';
+import { t, type Lang } from '../i18n/messages';
 import type { NodeKind } from './workflow';
 import { createRunFold, type RunView } from './workflowRun';
 
@@ -21,6 +23,8 @@ export interface ToolCallView {
   error?: string;
   truncated?: boolean;
   exitCode?: number;
+  /** The human's rule that refused this call (fennec's own check: verified). */
+  blockedBy?: { pattern: string; scope: string };
   addedLines?: number;
   removedLines?: number;
   contentPreview?: string[];
@@ -38,6 +42,14 @@ export type Segment =
   | { kind: 'text'; id: string; content: string }
   | { kind: 'tool'; id: string; tool: ToolCallView };
 
+export interface PreflightResultView {
+  criterionId: string;
+  command: string;
+  verdict: 'fails' | 'passesAlready' | 'cannotRun';
+  exitCode?: number;
+  output: string;
+}
+
 export interface AssistantItem {
   kind: 'assistant';
   id: string;
@@ -45,6 +57,8 @@ export interface AssistantItem {
   done: boolean;
   /** Tokens per second while the message streams, estimated by the server. */
   liveSpeed?: number;
+  /** The plan's checks run by fennec before any change, from `criteria.preflight`. */
+  preflight?: PreflightResultView[];
 }
 
 export interface WorkflowNodeStat {
@@ -56,6 +70,9 @@ export interface WorkflowNodeStat {
 
 export interface WorkflowStats {
   workingMs: number;
+  /** The run's wall-clock start and end (ms); absent in older logs. */
+  startedAt?: number;
+  finishedAt?: number;
   nodes: WorkflowNodeStat[];
   reruns: number;
   filesChanged: number;
@@ -79,11 +96,6 @@ export interface ModifiedFile {
   removed: number;
 }
 
-export interface ToolCount {
-  name: string;
-  count: number;
-}
-
 export interface PendingQuestion {
   callId: string;
   question: string;
@@ -92,40 +104,19 @@ export interface PendingQuestion {
     value: string;
     label: string;
     description?: string;
+    tone?: string;
   }[];
-}
-
-export type Provenance =
-  | { kind: 'verified'; command: string; exitCode?: number; output: string }
-  | { kind: 'indicative'; agent: string; reason: string };
-
-export interface CriterionView {
-  id: string;
-  description: string;
-  check?: string;
-  status: 'pending' | 'passed' | 'failed';
-  provenance?: Provenance;
-}
-
-export interface DecisionView {
-  callId: string;
-  title: string;
-  choice: string;
-  reason: string;
-  alternatives: string[];
 }
 
 export interface ThreadView {
   items: ThreadItem[];
-  criteria: CriterionView[];
-  decisions: DecisionView[];
   running: boolean;
   /** Reason of the last `chat.done`: the session state once a turn ends. */
   lastDone?: string;
   /** The unanswered `ask_user` question, if any. */
   pendingQuestion?: PendingQuestion;
+  /** The tool call waiting for the human's approval, if any. */
   modifiedFiles: ModifiedFile[];
-  toolCounts: ToolCount[];
   /**
    * The last `mode.changed` value, or null when the session detail should
    * provide the server's resolved mode.
@@ -161,52 +152,6 @@ function parseExitCode(output: string): number | undefined {
   return match ? Number(match[1]) : undefined;
 }
 
-function parseProvenance(value: unknown): Provenance | undefined {
-  if (typeof value !== 'object' || value === null) return undefined;
-  const provenance = value as Record<string, unknown>;
-  if (provenance.kind === 'verified') {
-    const command = typeof provenance.command === 'string' ? provenance.command : undefined;
-    const output = typeof provenance.output === 'string' ? provenance.output : undefined;
-    if (command === undefined || output === undefined) return undefined;
-    return {
-      kind: 'verified',
-      command,
-      exitCode: typeof provenance.exitCode === 'number' ? provenance.exitCode : undefined,
-      output
-    };
-  }
-  if (provenance.kind === 'indicative') {
-    const agent = typeof provenance.agent === 'string' ? provenance.agent : undefined;
-    const reason = typeof provenance.reason === 'string' ? provenance.reason : undefined;
-    if (agent === undefined || reason === undefined) return undefined;
-    return { kind: 'indicative', agent, reason };
-  }
-  return undefined;
-}
-
-function parseCriterionStatus(value: unknown): CriterionView['status'] | undefined {
-  if (typeof value !== 'object' || value === null) return undefined;
-  const status = value as Record<string, unknown>;
-  if (status.type === 'pending') return 'pending';
-  if (status.type === 'passed' || status.type === 'failed') return status.type;
-  return undefined;
-}
-
-function parseCriteria(value: unknown): CriterionView[] | null {
-  if (!Array.isArray(value)) return null;
-  let criteria: CriterionView[] = [];
-  for (const raw of value) {
-    if (typeof raw !== 'object' || raw === null) continue;
-    const criterion = raw as Record<string, unknown>;
-    const id = typeof criterion.id === 'string' ? criterion.id : undefined;
-    const description = typeof criterion.description === 'string' ? criterion.description : undefined;
-    if (id === undefined || description === undefined) continue;
-    const check = typeof criterion.check === 'string' ? criterion.check : undefined;
-    criteria.push({ id, description, check, status: 'pending' });
-  }
-  return criteria;
-}
-
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
@@ -231,6 +176,8 @@ function parseWorkflowStats(value: unknown): WorkflowStats | undefined {
   }
   return {
     workingMs: isFiniteNumber(stats.workingMs) ? stats.workingMs : 0,
+    startedAt: isFiniteNumber(stats.startedAt) ? stats.startedAt : undefined,
+    finishedAt: isFiniteNumber(stats.finishedAt) ? stats.finishedAt : undefined,
     nodes,
     reruns: isFiniteNumber(stats.reruns) ? stats.reruns : 0,
     filesChanged: isFiniteNumber(stats.filesChanged) ? stats.filesChanged : 0,
@@ -240,9 +187,7 @@ function parseWorkflowStats(value: unknown): WorkflowStats | undefined {
   };
 }
 
-function updateToolStats(tool: ToolCallView, modified: Map<string, ModifiedFile>, toolCounts: Map<string, number>): void {
-  toolCounts.set(tool.name, (toolCounts.get(tool.name) ?? 0) + 1);
-
+function updateToolStats(tool: ToolCallView, modified: Map<string, ModifiedFile>): void {
   if (tool.name === 'write_file') {
     const path = String(tool.args.path ?? '');
     const content = String(tool.args.content ?? '');
@@ -293,21 +238,18 @@ export interface ThreadFold {
  * messages and tool calls are found through indexes: a long session costs
  * memory for what is shown, and each event a constant amount of work.
  */
-export function createThreadFold(): ThreadFold {
+export function createThreadFold(lang: Lang = 'en'): ThreadFold {
   const items: ThreadItem[] = [];
   let running = false;
   let lastDone: string | undefined;
   let pendingQuestion: PendingQuestion | undefined;
   const modified = new Map<string, ModifiedFile>();
-  const toolCounts = new Map<string, number>();
   const assistants = new Map<string, AssistantItem>();
   const tools = new Map<string, ToolCallView>();
   let index = 0;
   // Tokens generated since the last `chat.done`, for the turn recap.
   // Null means "no live change yet": the session detail owns the mode.
   let mode: string | null = null;
-  let criteria: CriterionView[] = [];
-  const decisions: DecisionView[] = [];
   let name: string | undefined;
   const runFold = createRunFold();
   type WorkflowNodeItem = Extract<ThreadItem, { kind: 'workflow-node' }>;
@@ -326,6 +268,9 @@ export function createThreadFold(): ThreadFold {
     }
     items.push(item);
   };
+
+  const humanWords = (id: string, content: string) =>
+    pushItem({ kind: 'user', id, content, isSystemGenerated: false, attachments: [] });
 
   const newAssistant = (id: string): AssistantItem => {
     const assistant: AssistantItem = { kind: 'assistant', id, segments: [], done: false };
@@ -440,7 +385,7 @@ export function createThreadFold(): ThreadFold {
         if (name === 'ask_user' && typeof args.question === 'string') {
           tool.question = args.question;
         }
-        updateToolStats(tool, modified, toolCounts);
+        updateToolStats(tool, modified);
 
         const assistant = assistants.get(messageId) ?? newAssistant(messageId);
         assistant.segments.push({ kind: 'tool', id: toolId, tool });
@@ -485,6 +430,12 @@ export function createThreadFold(): ThreadFold {
         break;
       }
 
+      case 'rule.blocked': {
+        const tool = tools.get(String(data.callId ?? ''));
+        if (tool) tool.blockedBy = { pattern: String(data.pattern ?? ''), scope: String(data.scope ?? '') };
+        break;
+      }
+
       case 'chat.ask_user': {
         const callId = String(data.callId ?? `tool-${index}`);
         const question = String(data.question ?? '');
@@ -496,7 +447,8 @@ export function createThreadFold(): ThreadFold {
           return {
             value,
             label: String(option?.label ?? value),
-            description: option?.description != null ? String(option.description) : undefined
+            description: option?.description != null ? String(option.description) : undefined,
+            tone: option?.tone != null ? String(option.tone) : undefined
           };
         });
         pendingQuestion = { callId, question, type, options };
@@ -528,7 +480,10 @@ export function createThreadFold(): ThreadFold {
         pushItem({
           kind: 'note',
           id: `compacted-${index}`,
-          text: `Contexte compacté · ${formatTokens(beforeTokens)} → ~${formatTokens(afterTokens)} tokens`,
+          text: t(lang, 'compactedNote', {
+            before: formatTokens(lang, beforeTokens),
+            after: formatTokens(lang, afterTokens)
+          }),
           detail: summary
         });
         break;
@@ -551,40 +506,28 @@ export function createThreadFold(): ThreadFold {
         break;
       }
 
-      case 'criteria.set': {
-        const parsed = parseCriteria(data.criteria);
-        if (parsed) {
-          criteria = parsed;
+      case 'criteria.preflight': {
+        const assistant = assistants.get(String(data.messageId ?? ''));
+        if (!assistant) break;
+        const rawResults = Array.isArray(data.results) ? data.results : [];
+        const results: PreflightResultView[] = [];
+        for (const raw of rawResults) {
+          if (typeof raw !== 'object' || raw === null) continue;
+          const result = raw as Record<string, unknown>;
+          const criterionId = typeof result.criterionId === 'string' ? result.criterionId : undefined;
+          const command = typeof result.command === 'string' ? result.command : undefined;
+          const verdict = result.verdict;
+          if (criterionId === undefined || command === undefined) continue;
+          if (verdict !== 'fails' && verdict !== 'passesAlready' && verdict !== 'cannotRun') continue;
+          results.push({
+            criterionId,
+            command,
+            verdict,
+            exitCode: isFiniteNumber(result.exitCode) ? result.exitCode : undefined,
+            output: typeof result.output === 'string' ? result.output : ''
+          });
         }
-        break;
-      }
-
-      case 'decision.recorded': {
-        const text = (value: unknown) => (typeof value === 'string' ? value : '');
-        const title = text(data.title);
-        if (!title) break;
-        decisions.push({
-          callId: text(data.callId),
-          title,
-          choice: text(data.choice),
-          reason: text(data.reason),
-          alternatives: Array.isArray(data.alternatives) ? data.alternatives.filter((a: unknown) => typeof a === 'string') : []
-        });
-        break;
-      }
-
-      case 'criterion.updated': {
-        const criterionId = String(data.criterionId ?? '');
-        const status = parseCriterionStatus(data.status);
-        if (!criterionId || !status) break;
-        const criterion = criteria.find((item) => item.id === criterionId);
-        if (!criterion) break;
-        criterion.status = status;
-        if (status === 'pending') {
-          criterion.provenance = undefined;
-        } else {
-          criterion.provenance = parseProvenance(data.status?.provenance);
-        }
+        assistant.preflight = results;
         break;
       }
 
@@ -593,8 +536,7 @@ export function createThreadFold(): ThreadFold {
         lastDone = reason;
         // The question card is the signal for `waiting_for_user`; no note is needed.
         if (reason !== 'complete' && reason !== 'waiting_for_user') {
-          const text =
-            reason === 'stopped' ? 'Arrêtée' : reason === 'truncated' ? 'Tronquée' : reason === 'error' ? 'Erreur' : 'Terminée';
+          const text = stateLabel(lang, reason as SessionState);
           pushItem({ kind: 'note', id: `done-${index}`, text });
         }
         break;
@@ -604,7 +546,7 @@ export function createThreadFold(): ThreadFold {
         pushItem({
           kind: 'error',
           id: `error-${index}`,
-          message: String(data.error ?? 'Erreur inconnue')
+          message: String(data.error ?? t(lang, 'unknownError'))
         });
         break;
       }
@@ -618,12 +560,15 @@ export function createThreadFold(): ThreadFold {
           detailParts.push(commits.join(' '));
         }
         if (acknowledged.length > 0) {
-          detailParts.push(`Accepté malgré : ${acknowledged.join(', ')}`);
+          detailParts.push(t(lang, 'acceptedDespite', { kinds: acknowledged.join(', ') }));
         }
         pushItem({
           kind: 'note',
           id: `integration-applied-${index}`,
-          text: `Intégré par toi · ${commits.length} commit${commits.length === 1 ? '' : 's'} dans HEAD ${head.slice(0, 8)}`,
+          text: t(lang, 'integratedNote', {
+            commits: `${commits.length} ${t(lang, commits.length === 1 ? 'commit' : 'commits')}`,
+            head: head.slice(0, 8)
+          }),
           detail: detailParts.length > 0 ? detailParts.join('\n') : undefined
         });
         break;
@@ -634,7 +579,9 @@ export function createThreadFold(): ThreadFold {
         pushItem({
           kind: 'note',
           id: `worktree-discarded-${index}`,
-          text: `Travail de l'agent abandonné · ${commits.length} commit${commits.length === 1 ? '' : 's'}`,
+          text: t(lang, 'discardedNote', {
+            commits: `${commits.length} ${t(lang, commits.length === 1 ? 'commit' : 'commits')}`
+          }),
           detail: commits.length > 0 ? commits.join(' ') : undefined
         });
         break;
@@ -672,13 +619,15 @@ export function createThreadFold(): ThreadFold {
       case 'workflow.started': {
         const workflow = runFold.view()?.workflow;
         if (workflow) {
-          pushItem({
-            kind: 'note',
-            id: `workflow-started-${index}`,
-            text: `Workflow « ${workflow.name} »`,
-            detail: String(data.task ?? '')
-          });
+          pushItem({ kind: 'note', id: `workflow-started-${index}`, text: `Workflow « ${workflow.name} »` });
         }
+        // The task is what the human typed: their message, not a detail of the note.
+        if (data.task) humanWords(`workflow-task-${index}`, String(data.task));
+        break;
+      }
+
+      case 'workflow.resumed': {
+        if (data.comment) humanWords(`workflow-resumed-${index}`, String(data.comment));
         break;
       }
 
@@ -761,13 +710,10 @@ export function createThreadFold(): ThreadFold {
 
   const view = (): ThreadView => ({
     items: [...items],
-    criteria: [...criteria],
-    decisions: [...decisions],
     running,
     lastDone,
     pendingQuestion,
     modifiedFiles: Array.from(modified.values()),
-    toolCounts: Array.from(toolCounts.entries()).map(([name, count]) => ({ name, count })),
     mode,
     name,
     run: runFold.view()

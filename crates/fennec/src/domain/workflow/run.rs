@@ -2,7 +2,8 @@
 
 use super::definition::{BRANCH, ConditionTest, EXHAUSTED, EndOutcome, Node, NodeKind, Workflow};
 use super::template;
-use crate::domain::criteria::{Criterion, CriterionState, CriterionStatus, render_for_prompt};
+use crate::domain::criteria::{Criterion, CriterionState, render_for_prompt};
+use crate::domain::criteria_fold;
 use crate::domain::event::{DoneReason, Event};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -50,6 +51,8 @@ pub struct RunState {
     pub workflow: Workflow,
     pub task: String,
     pub step_by_step: bool,
+    /// The human asked to pause at the next edge; cleared once paused.
+    pub pause_requested: bool,
     pub results: HashMap<String, NodeResult>,
     pub node_passes: HashMap<String, u32>,
     pub edge_passes: HashMap<(String, String), u32>,
@@ -92,6 +95,7 @@ impl RunState {
             workflow,
             task,
             step_by_step,
+            pause_requested: false,
             results: HashMap::new(),
             node_passes: HashMap::new(),
             edge_passes: HashMap::new(),
@@ -162,6 +166,9 @@ impl RunState {
                     self.comment = comment.clone();
                 }
             }
+            Event::WorkflowPauseRequested { run_id } if run_id == &self.run_id => {
+                self.pause_requested = true;
+            }
             Event::WorkflowPaused {
                 run_id,
                 from,
@@ -173,12 +180,16 @@ impl RunState {
                     port: port.clone(),
                     to: to.clone(),
                 });
+                self.pause_requested = false;
             }
             Event::WorkflowResumed { run_id, comment } if run_id == &self.run_id => {
                 // A resumed interrupted run starts its node afresh (a pause has no
                 // open node): remembered so that start keeps the node's pass.
                 self.interrupted = std::mem::take(&mut self.open);
                 self.paused = None;
+                // A resume after a finish (a run relaunched on its error) is
+                // active again: the next `workflow.finished` ends it.
+                self.finished = None;
                 if !comment.is_empty() {
                     self.comment = comment.clone();
                 }
@@ -190,27 +201,10 @@ impl RunState {
                 ..
             } if run_id == &self.run_id => {
                 self.finished = Some((*outcome, reason.clone()));
+                self.pause_requested = false;
             }
-            Event::CriteriaSet { criteria } => {
-                self.criteria = criteria
-                    .iter()
-                    .map(|criterion| CriterionState {
-                        criterion: criterion.clone(),
-                        status: CriterionStatus::Pending,
-                    })
-                    .collect();
-            }
-            Event::CriterionUpdated {
-                criterion_id,
-                status,
-            } => {
-                if let Some(state) = self
-                    .criteria
-                    .iter_mut()
-                    .find(|state| state.criterion.id == *criterion_id)
-                {
-                    state.status = status.clone();
-                }
+            Event::CriteriaSet { .. } | Event::CriterionUpdated { .. } => {
+                criteria_fold::apply(&mut self.criteria, event);
             }
             _ => {}
         }
@@ -249,6 +243,7 @@ pub fn current_run(events: &[Event]) -> Option<RunState> {
         workflow,
         task,
         step_by_step,
+        ..
     } = &events[start_index]
     else {
         return None;
@@ -266,6 +261,24 @@ pub fn current_run(events: &[Event]) -> Option<RunState> {
     }
 
     Some(state)
+}
+
+/// The plan node's output: the Markdown plan the human approved, read from
+/// the run's results; `None` when the run has no criteria node or it has not
+/// produced output yet.
+pub fn plan_output(state: &RunState) -> Option<&str> {
+    let plan_id = state
+        .workflow
+        .nodes
+        .iter()
+        .find_map(|node| match &node.kind {
+            NodeKind::Criteria { plan, .. } => Some(plan.clone()),
+            _ => None,
+        })?;
+    state
+        .results
+        .get(&plan_id)
+        .map(|result| result.output.as_str())
 }
 
 /// Where an active run waits for the human.
@@ -371,7 +384,8 @@ pub fn next_after(state: &RunState, from: &str, port: &str, in_branch: bool) -> 
         _ => (edge, port),
     };
 
-    if !in_branch && (edge.pause || state.step_by_step) {
+    // Inside parallel branches the request waits for the join, like step-by-step.
+    if !in_branch && (edge.pause || state.step_by_step || state.pause_requested) {
         return Next::Pause(Pause {
             from: from.to_string(),
             port: port.to_string(),
@@ -539,6 +553,7 @@ pub fn evaluate(test: ConditionTest, value: &str, against: Option<&str>) -> bool
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::criteria::CriterionStatus;
     use crate::domain::workflow::definition::{
         AgentContext, Edge, EndOutcome, Node, NodeKind, Position, Workflow,
     };
@@ -659,6 +674,26 @@ mod tests {
     }
 
     #[test]
+    fn a_resume_after_a_finish_reactivates_the_run() {
+        let mut state = state(simple_workflow());
+        state.apply(&Event::WorkflowFinished {
+            run_id: "r".into(),
+            outcome: RunOutcome::Error,
+            reason: Some("an error".into()),
+            stats: None,
+        });
+        assert!(!state.is_active());
+
+        state.apply(&Event::WorkflowResumed {
+            run_id: "r".into(),
+            comment: String::new(),
+        });
+
+        assert!(state.is_active());
+        assert_eq!(state.finished, None);
+    }
+
+    #[test]
     fn apply_folds_a_small_run() {
         let mut state = state(simple_workflow());
 
@@ -775,6 +810,7 @@ mod tests {
             workflow: simple_workflow(),
             task: String::new(),
             step_by_step: false,
+            started_at: None,
         };
         let events = vec![
             started("old"),
@@ -793,12 +829,14 @@ mod tests {
                 workflow: simple_workflow(),
                 task: "old".into(),
                 step_by_step: false,
+                started_at: None,
             },
             Event::WorkflowStarted {
                 run_id: "new".into(),
                 workflow: simple_workflow(),
                 task: "new".into(),
                 step_by_step: true,
+                started_at: None,
             },
         ];
 
@@ -806,6 +844,25 @@ mod tests {
         assert_eq!(run.run_id, "new");
         assert_eq!(run.task, "new");
         assert!(run.step_by_step);
+    }
+
+    #[test]
+    fn plan_output_reads_the_criteria_node_result() {
+        let mut workflow = simple_workflow();
+        workflow.nodes[1].kind = NodeKind::Criteria {
+            plan: "plan".into(),
+        };
+        let mut state = state(workflow);
+        state.results.insert(
+            "plan".to_string(),
+            NodeResult {
+                port: "done".into(),
+                output: "plan text".into(),
+                exit_code: None,
+            },
+        );
+
+        assert_eq!(plan_output(&state), Some("plan text"));
     }
 
     #[test]
@@ -839,6 +896,36 @@ mod tests {
                 to: "end".into(),
             })
         );
+    }
+
+    #[test]
+    fn a_pause_request_pauses_at_the_next_edge() {
+        let mut state = state(simple_workflow());
+        state.apply(&Event::WorkflowPauseRequested { run_id: "r".into() });
+
+        assert!(state.pause_requested);
+        assert_eq!(
+            next_after(&state, "a", "done", false),
+            Next::Pause(Pause {
+                from: "a".into(),
+                port: "done".into(),
+                to: "end".into(),
+            })
+        );
+    }
+
+    #[test]
+    fn a_pause_clears_the_request() {
+        let mut state = state(simple_workflow());
+        state.apply(&Event::WorkflowPauseRequested { run_id: "r".into() });
+        state.apply(&Event::WorkflowPaused {
+            run_id: "r".into(),
+            from: "a".into(),
+            port: "done".into(),
+            to: "end".into(),
+        });
+
+        assert!(!state.pause_requested);
     }
 
     #[test]
@@ -1297,6 +1384,7 @@ mod tests {
                 workflow: human_workflow(),
                 task: "t".into(),
                 step_by_step: false,
+                started_at: None,
             },
             Event::WorkflowNodeStarted {
                 run_id: "r".into(),
@@ -1333,6 +1421,7 @@ mod tests {
                 workflow: simple_workflow(),
                 task: "t".into(),
                 step_by_step: false,
+                started_at: None,
             },
             Event::WorkflowFinished {
                 run_id: "r".into(),

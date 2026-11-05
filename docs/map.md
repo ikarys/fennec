@@ -5,161 +5,209 @@ Each box is a module (a directory); an arrow `A --> B` means code in A imports c
 
 ```mermaid
 graph LR
-  m0["web/src"]
-  m1["web/src/components/layout"]
-  m2["web/src/components/project"]
-  m3["web/src/pages"]
-  m4["web/src/components/preview"]
-  m5["web/src/components/settings"]
-  m6["web/src/components/workflow"]
-  m7["web/src/hooks"]
-  m8["web/src/components/session"]
-  m9["web/src/components/workflow/fields"]
-  m10["web/src/components/workflow/nodes"]
-  m11["web/src/components/workflow/session"]
-  m12["web/src/components"]
-  m13["web/src/components/ui"]
-  m14["web/src/lib"]
-  m15["crates/fennec/src/cli"]
-  m16["crates/fennec/src/tools/run_command"]
-  m17["crates/fennec/src/web"]
-  m18["crates/token-usage/tests"]
-  m19["crates/fennec/src/llm"]
-  m20["crates/fennec/src/agent/workflow"]
-  m21["crates/fennec/src/tools"]
-  m22["crates/fennec/src"]
-  m23["crates/fennec/src/store"]
-  m24["crates/token-usage/src"]
-  m25["crates/fennec/src/agent"]
-  m26["crates/fennec/src/domain/workflow"]
-  m27["crates/fennec/src/domain"]
-  m28["crates/llm-providers/src"]
-  m29["crates/fennec"]
-  m30["web"]
-  m31["web/scripts"]
-  m22 -->|1| m25
-  m22 -->|8| m27
-  m22 -->|1| m26
-  m22 -->|1| m23
-  m22 -->|1| m28
-  m22 -->|1| m24
-  m25 -->|11| m27
-  m25 -->|1| m26
-  m25 -->|1| m28
-  m20 -->|3| m25
-  m20 -->|4| m27
-  m20 -->|4| m26
-  m20 -->|1| m21
-  m15 -->|1| m22
-  m15 -->|1| m25
-  m15 -->|2| m27
-  m15 -->|1| m19
-  m15 -->|1| m23
-  m15 -->|1| m21
-  m15 -->|1| m24
-  m27 -->|1| m28
-  m26 -->|3| m27
-  m19 -->|1| m22
-  m19 -->|1| m25
-  m19 -->|1| m27
-  m19 -->|1| m28
-  m23 -->|1| m25
-  m23 -->|3| m27
-  m21 -->|2| m22
-  m21 -->|1| m25
-  m21 -->|8| m27
-  m16 -->|3| m27
-  m16 -->|1| m21
-  m17 -->|8| m22
-  m17 -->|9| m25
-  m17 -->|3| m20
-  m17 -->|14| m27
-  m17 -->|3| m26
-  m17 -->|2| m19
-  m17 -->|8| m23
-  m17 -->|1| m21
-  m17 -->|2| m28
-  m17 -->|7| m24
-  m18 -->|1| m24
-  m0 -->|1| m12
-  m0 -->|1| m1
-  m0 -->|1| m2
-  m0 -->|2| m14
-  m0 -->|1| m3
-  m12 -->|1| m13
-  m12 -->|1| m14
-  m1 -->|1| m12
-  m1 -->|1| m13
-  m1 -->|1| m14
-  m4 -->|2| m8
+  m0["crates/fennec/src/cli"]
+  m1["crates/fennec/src/tools/run_command"]
+  m2["crates/fennec/src/tools/web_fetch"]
+  m3["crates/fennec/src/web"]
+  m4["crates/fennec/src"]
+  m5["crates/fennec/src/agent/workflow"]
+  m6["crates/fennec/src/store"]
+  m7["crates/fennec/src/tools"]
+  m8["crates/fennec/src/llm"]
+  m9["crates/fennec/src/worktree"]
+  m10["crates/token-usage/src"]
+  m11["crates/fennec/src/agent"]
+  m12["crates/backlog/src"]
+  m13["crates/fennec/src/domain/workflow"]
+  m14["crates/fennec/src/domain"]
+  m15["crates/fennec/src/domain/module_map"]
+  m16["crates/rules/src"]
+  m17["crates/llm-providers/src"]
+  m18["web/src"]
+  m19["web/src/components/layout"]
+  m20["web/src/pages"]
+  m21["web/src/components/project"]
+  m22["web/src/hooks"]
+  m23["web/src/components/project/ideas"]
+  m24["web/src/components/rules"]
+  m25["web/src/components/settings"]
+  m26["web/src/components/workflow"]
+  m27["web/src/components"]
+  m28["web/src/components/workflow/fields"]
+  m29["web/src/components/workflow/nodes"]
+  m30["web/src/components/session"]
+  m31["web/src/components/preview"]
+  m32["web/src/components/workflow/session"]
+  m33["web/src/lib"]
+  m34["web/src/components/ui"]
+  m35["web/src/lib/api"]
+  m36["crates/fennec"]
+  m37["crates/token-usage/tests"]
+  m38["web"]
+  m39["web/scripts"]
+  m4 -->|3| m11
+  m4 -->|14| m14
+  m4 -->|2| m15
   m4 -->|1| m13
-  m4 -->|3| m14
-  m2 -->|2| m12
-  m2 -->|2| m13
-  m2 -->|2| m14
-  m8 -->|6| m12
-  m8 -->|3| m4
-  m8 -->|21| m13
-  m8 -->|2| m11
-  m8 -->|24| m14
-  m5 -->|8| m13
-  m5 -->|6| m14
-  m13 -->|1| m12
-  m6 -->|6| m13
-  m6 -->|1| m9
-  m6 -->|1| m10
-  m6 -->|8| m14
-  m9 -->|5| m13
-  m9 -->|4| m6
-  m9 -->|5| m14
-  m10 -->|2| m14
-  m11 -->|2| m12
-  m11 -->|2| m8
-  m11 -->|4| m13
-  m11 -->|5| m14
-  m7 -->|1| m14
-  m3 -->|2| m12
-  m3 -->|1| m4
-  m3 -->|2| m8
-  m3 -->|1| m5
+  m4 -->|1| m8
+  m4 -->|2| m6
+  m4 -->|1| m7
+  m4 -->|3| m9
+  m4 -->|1| m17
+  m4 -->|1| m16
+  m4 -->|2| m10
+  m11 -->|16| m14
+  m11 -->|1| m13
+  m11 -->|1| m17
+  m11 -->|3| m16
+  m5 -->|2| m11
+  m5 -->|3| m14
+  m5 -->|3| m13
+  m0 -->|1| m4
+  m0 -->|1| m11
+  m0 -->|2| m14
+  m0 -->|1| m6
+  m14 -->|1| m15
+  m14 -->|1| m17
+  m14 -->|1| m16
+  m13 -->|3| m14
+  m8 -->|1| m4
+  m8 -->|1| m11
+  m8 -->|1| m14
+  m8 -->|1| m17
+  m6 -->|1| m12
+  m6 -->|1| m11
+  m6 -->|4| m14
+  m7 -->|2| m4
+  m7 -->|2| m11
+  m7 -->|8| m14
+  m7 -->|2| m16
+  m1 -->|3| m14
+  m1 -->|1| m7
+  m2 -->|1| m14
+  m3 -->|9| m12
+  m3 -->|18| m4
+  m3 -->|14| m11
+  m3 -->|4| m5
+  m3 -->|28| m14
   m3 -->|5| m13
-  m3 -->|1| m6
-  m3 -->|1| m11
-  m3 -->|1| m7
-  m3 -->|5| m14
+  m3 -->|1| m8
+  m3 -->|15| m6
+  m3 -->|2| m7
+  m3 -->|7| m9
+  m3 -->|4| m17
+  m3 -->|4| m16
+  m3 -->|10| m10
+  m18 -->|1| m27
+  m18 -->|1| m19
+  m18 -->|1| m21
+  m18 -->|1| m22
+  m18 -->|2| m33
+  m18 -->|1| m20
+  m27 -->|1| m30
+  m27 -->|1| m34
+  m27 -->|1| m33
+  m19 -->|1| m27
+  m19 -->|1| m30
+  m19 -->|1| m34
+  m19 -->|1| m33
+  m31 -->|1| m27
+  m31 -->|2| m30
+  m31 -->|1| m34
+  m31 -->|3| m33
+  m21 -->|8| m27
+  m21 -->|2| m30
+  m21 -->|13| m34
+  m21 -->|11| m33
+  m21 -->|3| m35
+  m23 -->|8| m27
+  m23 -->|10| m34
+  m23 -->|10| m33
+  m24 -->|1| m27
+  m24 -->|1| m34
+  m24 -->|1| m35
+  m30 -->|13| m27
+  m30 -->|3| m31
+  m30 -->|32| m34
+  m30 -->|2| m32
+  m30 -->|36| m33
+  m30 -->|1| m35
+  m25 -->|4| m27
+  m25 -->|2| m30
+  m25 -->|13| m34
+  m25 -->|11| m33
+  m34 -->|1| m27
+  m26 -->|4| m27
+  m26 -->|6| m34
+  m26 -->|1| m28
+  m26 -->|1| m29
+  m26 -->|8| m33
+  m28 -->|5| m34
+  m28 -->|4| m26
+  m28 -->|5| m33
+  m29 -->|2| m33
+  m32 -->|4| m27
+  m32 -->|3| m30
+  m32 -->|5| m34
+  m32 -->|6| m33
+  m22 -->|1| m32
+  m22 -->|5| m33
+  m33 -->|1| m35
+  m35 -->|3| m33
+  m20 -->|6| m27
+  m20 -->|1| m31
+  m20 -->|2| m21
+  m20 -->|1| m23
+  m20 -->|2| m24
+  m20 -->|3| m30
+  m20 -->|1| m25
+  m20 -->|8| m34
+  m20 -->|1| m26
+  m20 -->|1| m32
+  m20 -->|1| m22
+  m20 -->|8| m33
+  m20 -->|1| m35
 ```
 
-| Module | Files | Tests | Entry point |
-|---|---|---|---|
-| `web/src` | 2 | 0 | yes |
-| `web/src/components/layout` | 1 | 0 |  |
-| `web/src/components/project` | 3 | 0 |  |
-| `web/src/pages` | 5 | 0 |  |
-| `web/src/components/preview` | 3 | 0 |  |
-| `web/src/components/settings` | 8 | 0 |  |
-| `web/src/components/workflow` | 11 | 0 |  |
-| `web/src/hooks` | 1 | 0 |  |
-| `web/src/components/session` | 27 | 0 |  |
-| `web/src/components/workflow/fields` | 5 | 0 |  |
-| `web/src/components/workflow/nodes` | 2 | 0 |  |
-| `web/src/components/workflow/session` | 5 | 0 |  |
-| `web/src/components` | 2 | 0 |  |
-| `web/src/components/ui` | 7 | 0 |  |
-| `web/src/lib` | 12 | 0 |  |
-| `crates/fennec/src/cli` | 2 | 1 |  |
-| `crates/fennec/src/tools/run_command` | 3 | 2 |  |
-| `crates/fennec/src/web` | 22 | 12 |  |
-| `crates/token-usage/tests` | 1 | 1 |  |
-| `crates/fennec/src/llm` | 3 | 2 |  |
-| `crates/fennec/src/agent/workflow` | 6 | 3 |  |
-| `crates/fennec/src/tools` | 10 | 8 |  |
-| `crates/fennec/src` | 14 | 12 | yes |
-| `crates/fennec/src/store` | 3 | 3 |  |
-| `crates/token-usage/src` | 5 | 5 | yes |
-| `crates/fennec/src/agent` | 12 | 8 |  |
-| `crates/fennec/src/domain/workflow` | 6 | 5 |  |
-| `crates/fennec/src/domain` | 29 | 27 |  |
-| `crates/llm-providers/src` | 8 | 6 | yes |
-| `crates/fennec` | 1 | 0 |  |
-| `web` | 1 | 0 |  |
-| `web/scripts` | 1 | 0 |  |
+| Module | Files | Tests | Entry point | What it is |
+|---|---|---|---|---|
+| `crates/fennec/src/cli` | 2 | 1 |  | Terminal adapter: run a turn in the current directory, list sessions, replay one, compact one. |
+| `crates/fennec/src/tools/run_command` | 3 | 2 |  | `run_command`: a shell command run in the working directory, in the sandbox when the human enabled it; what the model reads back is `report`. |
+| `crates/fennec/src/tools/web_fetch` | 5 | 5 |  | `web_fetch`: a web page fetched for the model, by pointer, not by copy: - the page is saved as a file in a cache and the model gets a short, deterministic pointer (path, size, outline, first lines), not the page: it reads the parts it needs with `read_file` or `rg`; - no `format` or `timeout` argument: always Markdown, fixed 30 s timeout; - private, loopback and link-local addresses are refused (SSRF), redirects are followed by hand so each hop is checked. |
+| `crates/fennec/src/web` | 40 | 25 |  | Web adapter: the local server behind the UI. std only, one thread per connection, bound to 127.0.0.1. |
+| `crates/fennec/src` | 20 | 17 | yes | `fennec`: the composition root. Parses the command line, reads the settings and hands them to the web or terminal adapter. |
+| `crates/fennec/src/agent/workflow` | 6 | 4 |  | The workflow engine: walks a run through its graph (docs/workflows.md). The path is decided by domain/workflow/run.rs; this file runs the nodes and records everything in the session's log. |
+| `crates/fennec/src/store` | 4 | 4 |  | Storage adapter: the SQLite store, `projects`/`sessions`/`events`. The schema is frozen: stored logs depend on it. Implements the agent's `EventLog`. |
+| `crates/fennec/src/tools` | 11 | 9 |  | The host toolbox: `read_file`, `write_file`, `edit_file` and `run_command`, plus `load_skill`, run inside one working directory, and `web_search`, which queries the human's SearXNG instance: the model only chooses the query, and `web_fetch`, which saves a page in a cache and returns a pointer to it (the model reads the parts it needs with `read_file`). Commands run in the bwrap world when the human enabled it; the file tools keep the in-process path guard. Writes to protected paths are refused; commands see them read-only. A read-only agent's commands see the workdir read-only. |
+| `crates/fennec/src/llm` | 3 | 2 |  | Model adapter: OpenAI-compatible endpoints (vLLM, llama.cpp, ...). |
+| `crates/fennec/src/worktree` | 2 | 2 |  | A session's own git worktree. |
+| `crates/token-usage/src` | 5 | 5 | yes | Append-only SQLite ledger for LLM calls. |
+| `crates/fennec/src/agent` | 17 | 12 |  | The application layer: the agent loop, written against the ports in `ports` so that storage, model and tools stay replaceable. |
+| `crates/backlog/src` | 8 | 7 | yes | A fennec-free backlog of ideas. |
+| `crates/fennec/src/domain/workflow` | 6 | 5 |  | The workflow domain: definitions, templates, validation, and the run state folded from events. |
+| `crates/fennec/src/domain` | 44 | 42 |  | fennec's vocabulary, free of storage, network and UI: what a session is made of and how its log reads back as a conversation. |
+| `crates/fennec/src/domain/module_map` | 4 | 4 |  | The project map: a project's modules and the dependencies between them, read from the import lines of its source files (Rust and TypeScript or JavaScript). Deterministic: no model involved. |
+| `crates/rules/src` | 7 | 5 | yes | Fennec's rule engine. |
+| `crates/llm-providers/src` | 11 | 7 | yes | Talking to OpenAI-compatible model providers, owning the per-model parameters for a call, and sealing provider API keys at rest. |
+| `web/src` | 2 | 0 | yes |  |
+| `web/src/components/layout` | 1 | 0 |  |  |
+| `web/src/pages` | 8 | 0 |  |  |
+| `web/src/components/project` | 14 | 0 |  |  |
+| `web/src/hooks` | 5 | 0 |  |  |
+| `web/src/components/project/ideas` | 10 | 0 |  |  |
+| `web/src/components/rules` | 1 | 0 |  |  |
+| `web/src/components/settings` | 13 | 0 |  |  |
+| `web/src/components/workflow` | 11 | 0 |  |  |
+| `web/src/components` | 2 | 0 |  |  |
+| `web/src/components/workflow/fields` | 5 | 0 |  |  |
+| `web/src/components/workflow/nodes` | 2 | 0 |  |  |
+| `web/src/components/session` | 39 | 0 |  |  |
+| `web/src/components/preview` | 3 | 0 |  |  |
+| `web/src/components/workflow/session` | 6 | 0 |  |  |
+| `web/src/lib` | 14 | 0 |  |  |
+| `web/src/components/ui` | 14 | 0 |  |  |
+| `web/src/lib/api` | 9 | 0 |  |  |
+| `crates/fennec` | 1 | 0 |  |  |
+| `crates/token-usage/tests` | 1 | 1 |  |  |
+| `web` | 1 | 0 |  |  |
+| `web/scripts` | 1 | 0 |  |  |

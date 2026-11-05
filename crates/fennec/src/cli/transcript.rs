@@ -134,15 +134,34 @@ impl Transcript {
             | Event::WorkflowNodeStarted { .. }
             | Event::WorkflowNodeFinished { .. }
             | Event::WorkflowPaused { .. }
+            | Event::WorkflowPauseRequested { .. }
             | Event::WorkflowResumed { .. }
             | Event::WorkflowHumanAsked { .. }
             | Event::WorkflowFinished { .. }
             | Event::CriteriaSet { .. }
             | Event::CriteriaProposed { .. }
+            | Event::CriteriaPreflight { .. }
             | Event::CriterionUpdated { .. }
             | Event::IntegrationApplied { .. }
+            | Event::AuditTasksCreated { .. }
             | Event::DecisionRecorded { .. }
-            | Event::WorktreeDiscarded { .. } => Ok(()),
+            | Event::TaskProposed { .. }
+            | Event::TaskAccepted { .. }
+            | Event::AgentSuggested { .. }
+            | Event::RuleBlocked { .. }
+            | Event::RuleApprovalRequested { .. }
+            | Event::RuleApprovalAnswered { .. }
+            | Event::WaiverRequested { .. }
+            | Event::WaiverAnswered { .. }
+            | Event::QueueAdded { .. }
+            | Event::QueueDrained { .. }
+            | Event::QueueCancelled { .. }
+            | Event::AgentsMdWritten { .. }
+            | Event::ArchitectureRulesAdded { .. }
+            | Event::UnderstandingStarted { .. }
+            | Event::WorktreeDiscarded { .. }
+            | Event::TestsApproved { .. }
+            | Event::McpDisabled { .. } => Ok(()),
         };
         let _ = out.flush();
     }

@@ -1,29 +1,51 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import type {
-  ApiKey,
+  AutonomyPrefs,
   DisplayPrefs,
-  ModelPrefs,
+  McpServer,
   ModelRef,
   Preferences,
-  Provider,
   ProviderListing,
-  ReasoningEffort,
   SandboxPrefs,
   SettingsResponse
 } from '../lib/api';
 import { listProvider, saveSettings } from '../lib/api';
+import {
+  SAVE_GROUPS,
+  buildPreferences,
+  emptyModelForm,
+  providerFormToApiKey,
+  toForm,
+  type SaveGroup,
+  type SettingsForm,
+} from '../lib/settingsForm';
 import { type ThemeId } from '../lib/theme';
-import { Button } from '../components/ui/Button';
+import { Tabs } from '../components/ui/Tabs';
+import { GroupJumps } from '../components/settings/GroupJumps';
+import { Card } from '../components/ui/Card';
+import type { SectionSave } from '../components/ui/Section';
 import { ModelSection } from '../components/settings/ModelSection';
 import { ProvidersSection, type ProviderForm } from '../components/settings/ProvidersSection';
-import { ModelPrefsSection, percentFromFraction, type ModelForm } from '../components/settings/ModelPrefsSection';
+import { ModelPrefsSection, type ModelForm } from '../components/settings/ModelPrefsSection';
 import { DisplaySection } from '../components/settings/DisplaySection';
 import { PanelPagesSection } from '../components/settings/PanelPagesSection';
 import { InstructionsSection } from '../components/settings/InstructionsSection';
 import { SearchSection, type SearchForm } from '../components/settings/SearchSection';
 import { SandboxSection } from '../components/settings/SandboxSection';
+import { McpSection } from '../components/settings/McpSection';
+import { AgentsSection } from '../components/agents/AgentsSection';
+import { RulesSection } from '../components/rules/RulesSection';
+import { AutonomySection } from '../components/settings/AutonomySection';
+import { ScannersSection } from '../components/settings/ScannersSection';
+import { PluginsSection } from '../components/settings/PluginsSection';
+import { SkillsSection } from '../components/settings/SkillsSection';
+import { WorkflowsSection } from '../components/settings/WorkflowsSection';
+import { useT } from '../i18n';
+import type { MsgKey } from '../i18n/messages';
 
 interface SettingsPageProps {
+  /** The tab named in the address (`#/settings/security`), when it names one. */
+  initialTab?: string | null;
   settings: SettingsResponse | null;
   theme: ThemeId;
   onThemeChange: (theme: ThemeId) => void;
@@ -31,219 +53,43 @@ interface SettingsPageProps {
   onListing: (listing: ProviderListing) => void;
 }
 
-interface SettingsForm {
-  model: string;
-  favorites: ModelRef[];
-  providers: ProviderForm[];
-  models: Record<string, ModelForm>;
-  display: DisplayPrefs;
-  instructions: string;
-  search: SearchForm;
-  sandbox: SandboxPrefs;
-}
+type SettingsTab = 'models' | 'behaviour' | 'security' | 'plugins' | 'library' | 'display';
 
-type SettingsTab = 'models' | 'instructions' | 'search' | 'sandbox' | 'display';
-
-const TABS: { id: SettingsTab; label: string }[] = [
-  { id: 'models', label: 'Modèles' },
-  { id: 'instructions', label: 'Instructions' },
-  { id: 'search', label: 'Recherche web' },
-  { id: 'sandbox', label: 'Bac à sable' },
-  { id: 'display', label: 'Affichage' }
+// Six groups, not twelve tabs: what tunes the model, how an agent behaves, what it is allowed to touch
+// (sandbox, scanners, the human's rules), the human's plugins, the catalogues of content (skills, workflows, agents, MCP) and the display.
+const TABS: { id: SettingsTab; labelKey: MsgKey }[] = [
+  { id: 'models', labelKey: 'settingsTabModels' },
+  { id: 'behaviour', labelKey: 'settingsTabBehaviour' },
+  { id: 'security', labelKey: 'settingsTabSecurity' },
+  { id: 'plugins', labelKey: 'settingsTabPlugins' },
+  { id: 'library', labelKey: 'settingsTabLibrary' },
+  { id: 'display', labelKey: 'settingsTabDisplay' }
 ];
 
-const emptyModelForm: ModelForm = {
-  maxTokens: '',
-  contextWindow: '',
-  compactionThreshold: '',
-  reasoningEffort: ''
+/** The old per-section addresses (`#/settings/skills`) still open the group that holds the section. */
+const LEGACY_TABS: Record<string, SettingsTab> = {
+  instructions: 'behaviour',
+  search: 'behaviour',
+  sandbox: 'security',
+  security: 'security',
+  rules: 'security',
+  autonomy: 'behaviour',
+  skills: 'library',
+  workflows: 'library',
+  agents: 'library',
+  mcp: 'library'
 };
 
-function localProviderForm(): ProviderForm {
-  return {
-    id: 'local',
-    name: '',
-    baseUrl: '',
-    keyKind: 'none',
-    envVar: '',
-    newKey: '',
-    sealed: null
-  };
-}
-
-function providerToForm(provider: Provider): ProviderForm {
-  let keyKind: ProviderForm['keyKind'] = 'none';
-  let envVar = '';
-  let newKey = '';
-  let sealed: string | null = null;
-
-  if (provider.apiKey) {
-    if ('env' in provider.apiKey) {
-      keyKind = 'env';
-      envVar = provider.apiKey.env;
-    } else if ('sealed' in provider.apiKey) {
-      keyKind = 'stored';
-      sealed = provider.apiKey.sealed;
-    } else {
-      // A plain key should not come back from the server; keep it editable if it does.
-      keyKind = 'stored';
-      newKey = provider.apiKey.plain;
-    }
-  }
-
-  return {
-    id: provider.id,
-    name: provider.name,
-    baseUrl: provider.baseUrl,
-    keyKind,
-    envVar,
-    newKey,
-    sealed
-  };
-}
-
-/** The API key a provider form carries, as the wire value (null when none). */
-function providerFormToApiKey(provider: ProviderForm): ApiKey | null {
-  if (provider.keyKind === 'env') {
-    const envVar = provider.envVar.trim();
-    return envVar === '' ? null : { env: envVar };
-  }
-  if (provider.keyKind === 'stored') {
-    const newKey = provider.newKey.trim();
-    if (newKey !== '') return { plain: newKey };
-    return provider.sealed ? { sealed: provider.sealed } : null;
-  }
-  return null;
-}
-
-function toForm(preferences: Preferences, listings: ProviderListing[]): SettingsForm {
-  const providerForms = preferences.providers.map(providerToForm);
-
-  if (!providerForms.some((provider) => provider.id === 'local')) {
-    providerForms.unshift(localProviderForm());
-  } else {
-    const localIndex = providerForms.findIndex((provider) => provider.id === 'local');
-    if (localIndex > 0) {
-      const [local] = providerForms.splice(localIndex, 1);
-      providerForms.unshift(local);
-    }
-  }
-
-  const models: Record<string, ModelForm> = {};
-  for (const listing of listings) {
-    const storedProvider = preferences.providers.find((provider) => provider.id === listing.provider);
-    for (const model of listing.models) {
-      const key = `${listing.provider}/${model.id}`;
-      const prefs = storedProvider?.models[model.id] ?? {};
-      models[key] = {
-        maxTokens: prefs.maxTokens == null ? '' : String(prefs.maxTokens),
-        contextWindow: prefs.contextWindow == null ? '' : String(prefs.contextWindow),
-        compactionThreshold:
-          prefs.compactionThreshold == null ? '' : percentFromFraction(prefs.compactionThreshold),
-        reasoningEffort: prefs.reasoningEffort ?? ''
-      };
-    }
-  }
-  return {
-    model: preferences.selected ? `${preferences.selected.provider}/${preferences.selected.model}` : '',
-    favorites: preferences.favorites ?? [],
-    providers: providerForms,
-    models,
-    display: preferences.display,
-    instructions: preferences.globalInstructions ?? '',
-    search: {
-      url: preferences.search?.searxngUrl ?? '',
-      apiKey: preferences.search?.searxngApiKey ?? '',
-      webFetch: preferences.search?.webFetch ?? true
-    },
-    sandbox: preferences.sandbox ?? { enabled: true, network: false }
-  };
-}
-
-function parseNumber(value: string): number | null {
-  const trimmed = value.trim();
-  if (trimmed === '') return null;
-  const parsed = Number(trimmed);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function parsePercent(value: string): number | null {
-  const trimmed = value.trim();
-  if (trimmed === '') return null;
-  const parsed = Number(trimmed);
-  if (!Number.isFinite(parsed)) return null;
-  return parsed / 100;
-}
-
-function buildPreferences(form: SettingsForm, settings: SettingsResponse): Preferences {
-  const selected: ModelRef | null = form.model === '' ? null : (() => {
-    const slash = form.model.indexOf('/');
-    if (slash === -1) return null;
-    return {
-      provider: form.model.slice(0, slash),
-      model: form.model.slice(slash + 1)
-    };
-  })();
-
-  const providers: Provider[] = form.providers.map((providerForm) => {
-    const listing = settings.listings.find((item) => item.provider === providerForm.id);
-    const listedIds = new Set(listing?.models.map((model) => model.id) ?? []);
-    const models: Record<string, ModelPrefs> = {};
-
-    // Every model of the form is written from the form, listed or added by hand.
-    // A listed one with nothing set is dropped; a hand-added one is kept even
-    // empty: its entry is what makes it exist for the provider.
-    const prefix = `${providerForm.id}/`;
-    for (const [key, entry] of Object.entries(form.models)) {
-      if (!key.startsWith(prefix)) continue;
-      const modelId = key.slice(prefix.length);
-      const maxTokens = parseNumber(entry.maxTokens);
-      const contextWindow = parseNumber(entry.contextWindow);
-      const compactionThreshold = parsePercent(entry.compactionThreshold);
-      const prefs: ModelPrefs = {};
-      if (maxTokens != null) prefs.maxTokens = maxTokens;
-      if (contextWindow != null) prefs.contextWindow = contextWindow;
-      if (compactionThreshold != null) prefs.compactionThreshold = compactionThreshold;
-      if (entry.reasoningEffort !== '') prefs.reasoningEffort = entry.reasoningEffort as ReasoningEffort;
-      if (Object.keys(prefs).length === 0 && listedIds.has(modelId)) continue;
-      models[modelId] = prefs;
-    }
-
-    const apiKey = providerFormToApiKey(providerForm);
-
-    return {
-      id: providerForm.id,
-      name: providerForm.name,
-      baseUrl: providerForm.baseUrl,
-      apiKey,
-      models
-    };
-  });
-
-  const searxngUrl = form.search.url.trim();
-  const searxngApiKey = form.search.apiKey.trim();
-
-  return {
-    selected,
-    favorites: form.favorites,
-    providers,
-    display: form.display,
-    globalInstructions: form.instructions.trim() === '' ? null : form.instructions,
-    search: {
-      searxngUrl: searxngUrl === '' ? null : searxngUrl,
-      searxngApiKey: searxngApiKey === '' ? null : searxngApiKey,
-      webFetch: form.search.webFetch
-    },
-    sandbox: form.sandbox
-  };
-}
-
-export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListing }: SettingsPageProps) {
+export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSaved, onListing }: SettingsPageProps) {
+  const t = useT();
   const [form, setForm] = useState<SettingsForm | null>(null);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<SettingsTab>('models');
+  const formRef = useRef<HTMLFormElement>(null);
+  const [tab, setTab] = useState<SettingsTab>(
+    () => TABS.find((item) => item.id === initialTab)?.id ?? (initialTab ? LEGACY_TABS[initialTab] : undefined) ?? 'models'
+  );
+  const tabs = TABS.map((item) => ({ id: item.id, label: t(item.labelKey) }));
 
   useEffect(() => {
     if (settings && form === null) {
@@ -251,18 +97,11 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
     }
   }, [settings, form]);
 
-  function markDirty() {
-    setSaved(false);
-    setError(null);
-  }
-
   function updateModel(value: string) {
-    markDirty();
     setForm((previous) => (previous ? { ...previous, model: value } : previous));
   }
 
   function toggleFavorite(ref: ModelRef) {
-    markDirty();
     setForm((previous) => {
       if (!previous) return previous;
       const exists = previous.favorites.some(
@@ -278,7 +117,6 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
   }
 
   function updateModelField(key: string, field: keyof ModelForm, value: string) {
-    markDirty();
     setForm((previous) => {
       if (!previous) return previous;
       const current = previous.models[key] ?? emptyModelForm;
@@ -293,7 +131,6 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
   }
 
   function updateProvider(index: number, patch: Partial<ProviderForm>) {
-    markDirty();
     setForm((previous) => {
       if (!previous) return previous;
       return {
@@ -306,7 +143,6 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
   }
 
   function addProvider(provider: ProviderForm) {
-    markDirty();
     setForm((previous) =>
       previous ? { ...previous, providers: [...previous.providers, provider] } : previous
     );
@@ -314,7 +150,6 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
 
   /** Adds a model by hand: an entry with no listed source, saved as an override. */
   function addModel(providerId: string, modelId: string) {
-    markDirty();
     setForm((previous) => {
       if (!previous) return previous;
       const key = `${providerId}/${modelId}`;
@@ -325,7 +160,6 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
 
   /** Removes a hand-added model: its entry and everything that pointed at it. */
   function removeModel(providerId: string, modelId: string) {
-    markDirty();
     setForm((previous) => {
       if (!previous) return previous;
       const key = `${providerId}/${modelId}`;
@@ -341,7 +175,6 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
   }
 
   function removeProvider(index: number) {
-    markDirty();
     setForm((previous) => {
       if (!previous) return previous;
       const provider = previous.providers[index];
@@ -386,86 +219,134 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
   }
 
   function updateDisplay(display: DisplayPrefs) {
-    markDirty();
     setForm((previous) => (previous ? { ...previous, display } : previous));
   }
 
   function updateInstructions(instructions: string) {
-    markDirty();
     setForm((previous) => (previous ? { ...previous, instructions } : previous));
   }
 
   function updateSearch(search: SearchForm) {
-    markDirty();
     setForm((previous) => (previous ? { ...previous, search } : previous));
   }
 
   function updateSandbox(sandbox: SandboxPrefs) {
-    markDirty();
     setForm((previous) => (previous ? { ...previous, sandbox } : previous));
+  }
+
+  function updateMcp(mcp: McpServer[]) {
+    setForm((previous) => (previous ? { ...previous, mcp } : previous));
+  }
+
+  function updateAutonomy(autonomy: AutonomyPrefs) {
+    setForm((previous) => (previous ? { ...previous, autonomy } : previous));
+  }
+
+  function updateAlwaysOnSkills(alwaysOnSkills: string[]) {
+    setForm((previous) => (previous ? { ...previous, alwaysOnSkills } : previous));
+  }
+
+  function updateEnabledWorkflows(enabledWorkflows: string[]) {
+    setForm((previous) => (previous ? { ...previous, enabledWorkflows } : previous));
+  }
+
+  /** Saves one change at once on top of the stored preferences: the form's other unsaved edits stay pending. */
+  async function savePatch(patch: Partial<Preferences>) {
+    if (!settings) return;
+    setError(null);
+    try {
+      onSaved(await saveSettings({ ...settings.preferences, ...patch }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('settingsSaveError'));
+    }
+  }
+
+  function setDefaultModel(key: string) {
+    updateModel(key);
+    const slash = key.indexOf('/');
+    void savePatch({
+      selected: slash === -1 ? null : { provider: key.slice(0, slash), model: key.slice(slash + 1) }
+    });
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!settings || !form || saving) return;
     setSaving(true);
-    setSaved(false);
     setError(null);
     try {
       const response = await saveSettings(buildPreferences(form, settings));
       setForm(toForm(response.preferences, response.listings));
-      setSaved(true);
       onSaved(response);
     } catch (err) {
-      setSaved(false);
-      setError(err instanceof Error ? err.message : 'Impossible d’enregistrer les réglages');
+      setError(err instanceof Error ? err.message : t('settingsSaveError'));
     } finally {
       setSaving(false);
     }
   }
 
+  // Dirty is computed, not tracked: the form as it would be stored against the stored preferences
+  // passed through the same form, so a value the form only normalises never reads as an edit.
+  const baseline = useMemo(
+    () => (settings ? buildPreferences(toForm(settings.preferences, settings.listings), settings) : null),
+    [settings]
+  );
+  const current = useMemo(() => (settings && form ? buildPreferences(form, settings) : null), [settings, form]);
+
+  function groupSave(group: SaveGroup): SectionSave {
+    const { prefs, form: fields } = SAVE_GROUPS[group];
+    return {
+      dirty:
+        baseline !== null &&
+        current !== null &&
+        prefs.some((key) => JSON.stringify(current[key]) !== JSON.stringify(baseline[key])),
+      onSave: async () => {
+        if (!settings || !current) return;
+        const patch = Object.fromEntries(prefs.map((key) => [key, current[key]])) as Partial<Preferences>;
+        const response = await saveSettings({ ...settings.preferences, ...patch });
+        const fresh = toForm(response.preferences, response.listings);
+        setForm((previous) =>
+          previous ? { ...previous, ...Object.fromEntries(fields.map((key) => [key, fresh[key]])) } : previous
+        );
+        onSaved(response);
+      }
+    };
+  }
+
   if (!settings || !form) {
     return (
-      <main className="grow overflow-y-auto px-6 py-8">
-        <div className="mx-auto max-w-[720px]">
-          <h1 className="text-[1.375rem] font-semibold tracking-[-0.02em]">Réglages</h1>
-          <p className="mt-0.5 text-muted">S'applique au prochain tour, sans redémarrage.</p>
-          <div className="mt-6 text-sm text-muted">Chargement…</div>
+      <main className="grow overflow-y-auto px-4 pt-6 md:px-6 md:pt-8">
+        <div className="mx-auto max-w-[960px]">
+          <h1 className="text-2xl font-semibold">{t('settingsTitle')}</h1>
+          <p className="mt-0.5 text-muted">{t('settingsSubtle')}</p>
+          <div className="mt-6 text-sm text-muted">{t('loading')}</div>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="grow overflow-y-auto px-6 py-8">
-      <div className="mx-auto flex max-w-[960px] flex-col gap-6">
+    <main className="grow overflow-y-auto px-4 md:px-6">
+      {/* The top padding sits inside the scroller, so the jump bar sticks at its very top. */}
+      <div className="mx-auto flex max-w-[960px] flex-col gap-6 pt-6 md:pt-8">
         <div>
-          <h1 className="text-[1.375rem] font-semibold tracking-[-0.02em]">Réglages</h1>
-          <p className="mt-0.5 text-muted">S'applique au prochain tour, sans redémarrage.</p>
+          <h1 className="text-2xl font-semibold">{t('settingsTitle')}</h1>
+          <p className="mt-0.5 text-muted">{t('settingsSubtle')}</p>
         </div>
 
-        <div className="flex gap-6">
+        <Card className="flex flex-col md:flex-row">
           {/* One form across the tabs: an edit on one tab is kept when switching. */}
-          <nav aria-label="Sections des réglages" className="flex w-44 shrink-0 flex-col gap-0.5">
-            {TABS.map(({ id, label }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setTab(id)}
-                aria-current={tab === id ? 'page' : undefined}
-                className={`rounded-md px-2 py-1 text-left ${
-                  tab === id ? 'bg-raised text-text' : 'text-muted hover:text-text'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </nav>
+          <div className="shrink-0 border-b border-border p-2 md:border-r md:border-b-0">
+            <Tabs label={t('settingsSectionsLabel')} tabs={tabs} active={tab} onSelect={setTab} />
+          </div>
 
-          <form onSubmit={handleSubmit} className="flex min-w-0 grow flex-col gap-6">
+          <form ref={formRef} onSubmit={handleSubmit} className="flex min-w-0 grow flex-col gap-8 p-5">
+            <GroupJumps container={formRef} deps={tab} />
+            {error && <p className="m-0 text-xs text-err">{error}</p>}
             {tab === 'models' && (
               <>
                 <ModelSection
+                  save={groupSave('model')}
                   value={form.model}
                   listings={settings.listings}
                   stored={settings.preferences.selected}
@@ -473,6 +354,7 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
                   onChange={updateModel}
                 />
                 <ProvidersSection
+                  save={groupSave('providers')}
                   providers={form.providers}
                   listings={settings.listings}
                   values={form.models}
@@ -483,53 +365,81 @@ export function SettingsPage({ settings, theme, onThemeChange, onSaved, onListin
                   onAddModel={addModel}
                 />
                 <ModelPrefsSection
+                  save={groupSave('modelPrefs')}
                   listings={settings.listings}
                   values={form.models}
                   defaults={settings.defaults}
                   favorites={form.favorites}
                   onToggleFavorite={toggleFavorite}
+                  defaultModel={form.model}
+                  onSetDefault={setDefaultModel}
                   onChange={updateModelField}
                   onRemoveModel={removeModel}
                 />
               </>
             )}
 
-            {tab === 'instructions' && (
-              <InstructionsSection value={form.instructions} onChange={updateInstructions} />
+            {tab === 'behaviour' && (
+              <>
+                <InstructionsSection save={groupSave('instructions')} value={form.instructions} onChange={updateInstructions} />
+                <SearchSection save={groupSave('search')} value={form.search} onChange={updateSearch} />
+                <AutonomySection save={groupSave('autonomy')} value={form.autonomy} onChange={updateAutonomy} />
+              </>
             )}
 
-            {tab === 'search' && (
-              <SearchSection value={form.search} onChange={updateSearch} />
+            {tab === 'security' && (
+              <>
+                <SandboxSection save={groupSave('sandbox')} value={form.sandbox} onChange={updateSandbox} health={settings?.sandboxHealth} />
+                <ScannersSection scanners={settings.scanners ?? []} />
+                <RulesSection />
+              </>
             )}
 
-            {tab === 'sandbox' && (
-              <SandboxSection value={form.sandbox} onChange={updateSandbox} />
+            {tab === 'plugins' && <PluginsSection />}
+
+            {tab === 'library' && (
+              <>
+                <SkillsSection
+                  save={groupSave('skills')}
+                  skills={settings.skills}
+                  value={form.alwaysOnSkills}
+                  onChange={updateAlwaysOnSkills}
+                />
+                <WorkflowsSection
+                  save={groupSave('workflows')}
+                  workflows={settings.optInWorkflows}
+                  value={form.enabledWorkflows}
+                  onChange={updateEnabledWorkflows}
+                />
+                <AgentsSection />
+                <McpSection
+                  save={groupSave('mcp')}
+                  value={form.mcp}
+                  onChange={updateMcp}
+                  savedNames={new Set((settings.preferences.mcp ?? []).map((server) => server.name))}
+                />
+              </>
             )}
 
             {tab === 'display' && (
-              <div className="flex flex-col gap-4">
+              <>
                 <DisplaySection
+                  save={groupSave('display')}
                   value={form.display}
                   onChange={updateDisplay}
                   theme={theme}
                   onThemeChange={onThemeChange}
                 />
                 <PanelPagesSection
+                  save={groupSave('display')}
                   value={form.display.panelPages ?? null}
                   onChange={(panelPages) => updateDisplay({ ...form.display, panelPages })}
                 />
-              </div>
+              </>
             )}
 
-            <div className="flex items-center gap-3">
-              <Button type="submit" variant="primary" size="md" disabled={saving}>
-                {saving ? 'Enregistrement…' : 'Enregistrer'}
-              </Button>
-              {saved && <span className="text-xs text-ok">Enregistré</span>}
-              {error && <span className="text-xs text-err">{error}</span>}
-            </div>
           </form>
-        </div>
+        </Card>
       </div>
     </main>
   );

@@ -1,4 +1,4 @@
-//! Port of openfox `tools/web-fetch.ts`, with deliberate divergences:
+//! `web_fetch`: a web page fetched for the model, by pointer, not by copy:
 //! - the page is saved as a file in a cache and the model gets a short,
 //!   deterministic pointer (path, size, outline, first lines), not the page:
 //!   it reads the parts it needs with `read_file` or `rg`;
@@ -6,7 +6,7 @@
 //! - private, loopback and link-local addresses are refused (SSRF), redirects
 //!   are followed by hand so each hop is checked.
 //!
-//! Not ported: PDF, images, the cf-mitigated retry.
+//! This module does not handle PDF, images, or the cf-mitigated retry.
 
 mod address;
 mod cache;
@@ -50,11 +50,12 @@ pub(super) fn definition() -> Value {
 }
 
 pub(super) fn run(args: &Value, cache_dir: &Path) -> ToolResult {
-    let url = match args::string(args, "url") {
-        Ok(value) => value,
-        Err(error) => return ToolResult::failure(error),
-    };
-    fetch(url, cache_dir, address::is_public)
+    try_run(args, cache_dir).unwrap_or_else(ToolResult::failure)
+}
+
+fn try_run(args: &Value, cache_dir: &Path) -> Result<ToolResult, String> {
+    let url = args::string(args, "url")?;
+    Ok(fetch(url, cache_dir, address::is_public))
 }
 
 /// `allow` decides which addresses may be contacted: tests widen it to reach
@@ -366,11 +367,21 @@ mod tests {
         std::fs::write(&file, "# Saved\n").unwrap();
 
         let path = file.display().to_string();
-        let result = super::super::read_file::run(&json!({ "path": path }), &workdir, &cache);
+        let result = super::super::read_file::run(
+            &json!({ "path": path }),
+            &workdir,
+            &cache,
+            &super::super::path_guard::Outside::none(),
+        );
         assert!(result.success, "{:?}", result.error);
         assert!(result.output.unwrap().contains("# Saved"));
 
-        let result = super::super::read_file::run(&json!({ "path": path }), &workdir, &temp_dir());
+        let result = super::super::read_file::run(
+            &json!({ "path": path }),
+            &workdir,
+            &temp_dir(),
+            &super::super::path_guard::Outside::none(),
+        );
         assert!(!result.success);
     }
 }

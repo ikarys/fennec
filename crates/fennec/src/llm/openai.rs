@@ -1,22 +1,23 @@
-//! Adapter from fennec's `Model` port to `llm_providers`.
+//! Adapter from `Model` to `llm_providers_connector`.
 //!
-//! Not ported yet: the provider shims of openfox `requestBody`
-//! (llama.cpp `chat_template_kwargs.thinking`, Qwen3 `enable_thinking`);
-//! the standard `reasoning_effort` field is sent when set.
+//! It sends no provider shims in the request body for llama.cpp
+//! `chat_template_kwargs.thinking` or Qwen3 `enable_thinking`; the standard
+//! `reasoning_effort` field is sent when set.
 
 use super::ModelGate;
 use crate::agent::ports::{Completion, Delta, Model, Request};
 use crate::config;
 use crate::domain::event::ToolCall;
 use crate::domain::id::new_id;
-use llm_providers::{ChatRequest, Endpoint, StreamedToolCall};
+use llm_providers_connector::{ChatRequest, Endpoint, StreamedToolCall};
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::net::IpAddr;
 use std::sync::{Arc, Mutex, OnceLock};
 
 /// One gate per local endpoint: a local GPU serves one round at a time
-/// (`FENNEC_MODEL_CONCURRENCY`, default one). Remote endpoints are not gated;
+/// (`FENNEC_MODEL_CONCURRENCY`, default one) and keeps serving the same
+/// session between its rounds so the server's prompt cache stays warm. Remote endpoints are not gated;
 /// the setting applies to local ones. The gates are keyed by the endpoint's
 /// base URL, not shared process-wide. Tool calls are not gated.
 /// ponytail: host heuristic; a per-provider concurrency setting if a remote
@@ -27,7 +28,12 @@ fn gate_for(base_url: &str) -> Arc<ModelGate> {
     let gates = GATES.get_or_init(|| Mutex::new(HashMap::new()));
     let mut map = gates.lock().unwrap();
     map.entry(base_url.to_string())
-        .or_insert_with(|| Arc::new(ModelGate::new(config::model_concurrency())))
+        .or_insert_with(|| {
+            Arc::new(ModelGate::new(
+                config::model_concurrency(),
+                config::model_affinity(),
+            ))
+        })
         .clone()
 }
 
@@ -94,7 +100,10 @@ impl Model for OpenAiClient {
         // wait behind another session's long local round.
         let gate = is_local(&self.endpoint.base_url).then(|| gate_for(&self.endpoint.base_url));
         let _slot = match &gate {
-            Some(gate) => Some(gate.enter(req.stop).ok_or_else(|| "Aborted".to_string())?),
+            Some(gate) => Some(
+                gate.enter(req.session, req.stop)
+                    .ok_or_else(|| "Aborted".to_string())?,
+            ),
             None => None,
         };
         let chat_request = ChatRequest {
@@ -105,7 +114,8 @@ impl Model for OpenAiClient {
             max_tokens: req.max_tokens,
             reasoning_effort: req.reasoning_effort,
         };
-        let streamed = llm_providers::stream(&self.endpoint, &chat_request, req.stop, on)?;
+        let streamed =
+            llm_providers_connector::stream(&self.endpoint, &chat_request, req.stop, on)?;
         Ok(Completion {
             content: streamed.content,
             thinking: streamed.thinking,
@@ -115,6 +125,12 @@ impl Model for OpenAiClient {
             cached_tokens: streamed.cached_tokens,
             completion_tokens: streamed.completion_tokens,
         })
+    }
+
+    fn release(&self, session: &str) {
+        if is_local(&self.endpoint.base_url) {
+            gate_for(&self.endpoint.base_url).release(session);
+        }
     }
 }
 
@@ -179,11 +195,11 @@ mod tests {
         let b = gate_for("http://gate-test-b.invalid");
 
         // Holding a slot on endpoint A does not block endpoint B.
-        let _a_slot = a.enter(&AtomicBool::new(false)).unwrap();
+        let _a_slot = a.enter("s", &AtomicBool::new(false)).unwrap();
         let (tx, rx) = std::sync::mpsc::channel();
         let b2 = b.clone();
         let worker = std::thread::spawn(move || {
-            let _b_slot = b2.enter(&AtomicBool::new(false)).unwrap();
+            let _b_slot = b2.enter("s", &AtomicBool::new(false)).unwrap();
             let _ = tx.send(());
         });
         assert!(
@@ -197,7 +213,7 @@ mod tests {
         let (tx2, rx2) = std::sync::mpsc::channel();
         let c2 = c.clone();
         let worker2 = std::thread::spawn(move || {
-            let _c_slot = c2.enter(&AtomicBool::new(false)).unwrap();
+            let _c_slot = c2.enter("s", &AtomicBool::new(false)).unwrap();
             let _ = tx2.send(());
         });
         assert!(

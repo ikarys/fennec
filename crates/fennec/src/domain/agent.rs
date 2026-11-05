@@ -1,12 +1,10 @@
-//! Port of openfox `agents/types.ts`, `parseAgentFile` from
-//! `agents/registry.ts`, `buildAgentReminder`/`buildToolPermissionsSection`
-//! from `chat/prompts.ts`, `createPermissionErrorMessage` from
-//! `tools/index.ts`, and the mode fold (`foldMode` of `events/fold-state.ts`).
+//! Agent definitions: the `*.agent.md` file parsed, the reminder and its tool
+//! permissions section, the permission error, and the mode fold.
 //!
-//! Not ported: registry discovery/CRUD (see `crate::agents`), openfox's own
-//! config/`.openfox/agents` dirs, granular `tool:action` permissions, MCP
-//! rules, `results`, sub-agent `return_value`/`step_done` extras, small
-//! reminders, per-agent model overrides, project/DB default agent setting.
+//! This module does not do registry discovery/CRUD (see `crate::agents`),
+//! config `agents` dirs, granular `tool:action` permissions, MCP rules,
+//! `results`, sub-agent `return_value`/`step_done` extras, small reminders,
+//! per-agent model overrides, or project/DB default agent setting.
 
 use super::compaction::model_view;
 use super::event::{Event, MessageMetadata, MetadataSource};
@@ -23,7 +21,48 @@ pub enum CommandAccess {
     ReadOnly,
 }
 
-/// openfox `AgentDefinition` (metadata flattened).
+/// Which files an agent's file tools may write: `writes: tests` in the frontmatter limits them to test files
+/// (the agent that writes the tests before the code may not touch the code).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum WriteScope {
+    #[default]
+    Any,
+    Tests,
+}
+
+/// fennec's own: `phase` in the frontmatter, the step of a project an agent serves; the composer groups its menu by it, in this order.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
+#[serde(rename_all = "lowercase")]
+pub enum Phase {
+    Start,
+    Frame,
+    Build,
+    Understand,
+    Check,
+}
+
+/// fennec's own: where an agent was found, which decides who may edit it.
+/// A default is embedded in the binary, a user agent lives in
+/// `~/.agents/agents` and only the human's CRUD writes it, a project agent
+/// lives in the repository and belongs to the repository.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AgentOrigin {
+    Default,
+    User,
+    Project,
+}
+
+impl AgentOrigin {
+    /// Whether the human's agent CRUD may write or delete this agent.
+    pub fn editable(self) -> bool {
+        self == Self::User
+    }
+}
+
+/// `AgentDefinition` (metadata flattened).
 #[derive(Debug, Clone, PartialEq)]
 pub struct AgentDefinition {
     pub id: String,
@@ -33,25 +72,96 @@ pub struct AgentDefinition {
     pub allowed_tools: Vec<String>,
     /// fennec's own: `commands: read-only` in the frontmatter.
     pub commands: CommandAccess,
+    /// fennec's own: `writes: tests` in the frontmatter.
+    pub writes: WriteScope,
     /// fennec's own: `reasoningEffort` in the frontmatter; overrides the model's default effort for this agent's rounds.
     pub reasoning_effort: Option<ReasoningEffort>,
     pub color: Option<String>,
+    /// None for sub-agents and agents that name no known phase.
+    pub phase: Option<Phase>,
     pub prompt: String,
+    /// fennec's own: where this definition was found.
+    pub origin: AgentOrigin,
+    /// The file it was read from; None for an embedded default.
+    pub path: Option<String>,
 }
 
-/// openfox `resolveDefaultAgentId`'s fallback: a new session plans first,
+/// fennec's own: the rules every read-only agent shares (never write, source
+/// every claim as `path:line`, explore broad to narrow). Kept in one place so
+/// the agents that analyse, answer and audit cannot drift apart on them; the
+/// agent's own prompt follows it and refines it.
+const READ_ONLY_PREAMBLE: &str = include_str!("../../prompts/read-only.md");
+
+/// Every tool an agent may list in `allowedTools`: the toolbox's tools (see
+/// `crate::tools`) and the loop's own ones (`crate::agent`). The human's agent
+/// CRUD refuses anything else, so a typo cannot silently disable a tool.
+pub const KNOWN_TOOLS: [&str; 14] = [
+    "read_file",
+    "write_file",
+    "edit_file",
+    "run_command",
+    "load_skill",
+    "web_search",
+    "web_fetch",
+    "ask_user",
+    "record_decision",
+    "propose_criteria",
+    "propose_task",
+    "request_waiver",
+    "suggest_agent",
+    "canvas",
+];
+
+/// The default agent: a new session plans first,
 /// nothing is written before the human switches to the builder.
 pub const DEFAULT_AGENT: &str = "plan";
-/// openfox's `color ?? '#6b7280'` for the reminder metadata.
+/// `color ?? '#6b7280'` for the reminder metadata.
 pub const DEFAULT_COLOR: &str = "#6b7280";
 
-pub fn parse_agent_md(content: &str) -> Option<AgentDefinition> {
-    let (fields, body) = split(content)?;
+/// Why a `*.agent.md` file is not an agent. Discovery ignores a bad file, but
+/// the human's CRUD must say which field is at fault.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AgentParseError {
+    /// No `---` frontmatter block, or it is never closed.
+    MissingFrontmatter,
+    /// No `id:`, or an empty one: nothing to name the agent by.
+    MissingId,
+    /// Frontmatter but no prompt under it.
+    EmptyBody,
+}
+
+impl AgentParseError {
+    /// The frontmatter field or document part at fault, as the API reports it.
+    pub fn field(self) -> &'static str {
+        match self {
+            Self::MissingFrontmatter => "frontmatter",
+            Self::MissingId => "id",
+            Self::EmptyBody => "prompt",
+        }
+    }
+}
+
+impl std::fmt::Display for AgentParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let message = match self {
+            Self::MissingFrontmatter => "no frontmatter: the file must start with a `---` block",
+            Self::MissingId => "the frontmatter needs a non-empty `id`",
+            Self::EmptyBody => "the prompt under the frontmatter is empty",
+        };
+        f.write_str(message)
+    }
+}
+
+pub fn parse_agent_md(content: &str) -> Result<AgentDefinition, AgentParseError> {
+    let (fields, body) = split(content).ok_or(AgentParseError::MissingFrontmatter)?;
     if body.is_empty() {
-        return None;
+        return Err(AgentParseError::EmptyBody);
     }
 
-    let id = fields.scalar("id").filter(|value| !value.is_empty())?;
+    let id = fields
+        .scalar("id")
+        .filter(|value| !value.is_empty())
+        .ok_or(AgentParseError::MissingId)?;
     let name = fields
         .scalar("name")
         .filter(|value| !value.is_empty())
@@ -67,6 +177,11 @@ pub fn parse_agent_md(content: &str) -> Option<AgentDefinition> {
     } else {
         CommandAccess::ReadWrite
     };
+    let writes = if fields.scalar("writes") == Some("tests") {
+        WriteScope::Tests
+    } else {
+        WriteScope::Any
+    };
     let reasoning_effort = fields.scalar("reasoningEffort").and_then(|value| {
         serde_json::from_value::<ReasoningEffort>(serde_json::Value::String(value.to_string())).ok()
     });
@@ -74,17 +189,25 @@ pub fn parse_agent_md(content: &str) -> Option<AgentDefinition> {
         .scalar("color")
         .filter(|value| !value.is_empty())
         .map(|value| value.to_string());
+    let phase = fields.scalar("phase").and_then(|value| {
+        serde_json::from_value::<Phase>(serde_json::Value::String(value.to_string())).ok()
+    });
 
-    Some(AgentDefinition {
+    Ok(AgentDefinition {
         id: id.to_string(),
         name: name.to_string(),
         description: description.to_string(),
         subagent,
         allowed_tools,
         commands,
+        writes,
         reasoning_effort,
         color,
+        phase,
         prompt: body,
+        // The file's content cannot say where the file is: discovery sets it.
+        origin: AgentOrigin::Default,
+        path: None,
     })
 }
 
@@ -96,9 +219,10 @@ impl AgentDefinition {
         self.allowed_tools.iter().any(|name| name == tool)
     }
 
-    /// openfox `buildAgentReminder`: `<system-reminder>\n{prompt}{tools}\n</system-reminder>`
-    /// where {tools} is "\n\n## AVAILABLE TOOLS\n\nYou have no tools available." when
-    /// allowed_tools is empty, else "\n\n## AVAILABLE TOOLS\n\nYou have access to these tools: a, b, c" (file order).
+    /// The reminder: `<system-reminder>\n{prompt}{tools}\n</system-reminder>`
+    /// where `{tools}` is `"\n\n## AVAILABLE TOOLS\n\nYou have no tools available."`
+    /// when `allowed_tools` is empty, else `"\n\n## AVAILABLE TOOLS\n\nYou have access to
+    /// these tools: a, b, c"` (file order).
     pub fn reminder(&self) -> String {
         let tools = if self.allowed_tools.is_empty() {
             "\n\n## AVAILABLE TOOLS\n\nYou have no tools available.".to_string()
@@ -111,12 +235,24 @@ impl AgentDefinition {
 
         format!(
             "<system-reminder>\n{}{}\n</system-reminder>",
-            self.prompt, tools
+            self.body(),
+            tools
         )
     }
 
-    /// openfox `createPermissionErrorMessage` with an agent id:
-    /// "Tool '{tool}' is not available in '{id}' mode. Available: {sorted allowed tools joined by ', '}".
+    /// The prompt the reminder carries: a read-only agent gets the shared
+    /// preamble first, then its own prompt, which refines it.
+    fn body(&self) -> String {
+        if self.commands == CommandAccess::ReadOnly {
+            format!("{}\n{}", READ_ONLY_PREAMBLE.trim(), self.prompt)
+        } else {
+            self.prompt.clone()
+        }
+    }
+
+    /// The permission error with an agent id:
+    /// `"Tool '{tool}' is not available in '{id}' mode. Available: {sorted allowed tools
+    /// joined by ', '}"`.
     pub fn denied(&self, tool: &str) -> String {
         let mut available = self.allowed_tools.clone();
         available.sort();
@@ -129,7 +265,7 @@ impl AgentDefinition {
     }
 }
 
-/// openfox `foldMode`: the mode of the last `mode.changed`, None if the human never chose one.
+/// The mode of the last `mode.changed`, None if the human never chose one.
 pub fn chosen_mode(events: &[Event]) -> Option<&str> {
     events.iter().rev().find_map(|event| match event {
         Event::ModeChanged { mode, .. } => Some(mode.as_str()),
@@ -141,9 +277,18 @@ pub fn chosen_mode(events: &[Event]) -> Option<&str> {
 /// top-level (non-subagent) agent, else DEFAULT_AGENT, else the first top-level agent.
 /// None only when there is no top-level agent at all.
 pub fn resolve<'a>(agents: &'a [AgentDefinition], events: &[Event]) -> Option<&'a AgentDefinition> {
+    resolve_mode(agents, chosen_mode(events))
+}
+
+/// The top-level agent for a chosen mode: that agent when it is a known
+/// top-level one, else DEFAULT_AGENT, else the first top-level agent. None
+/// only when there is no top-level agent at all.
+pub fn resolve_mode<'a>(
+    agents: &'a [AgentDefinition],
+    mode: Option<&str>,
+) -> Option<&'a AgentDefinition> {
     let top_level = || agents.iter().filter(|agent| !agent.subagent);
-    chosen_mode(events)
-        .and_then(|mode| top_level().find(|agent| agent.id == mode))
+    mode.and_then(|mode| top_level().find(|agent| agent.id == mode))
         .or_else(|| top_level().find(|agent| agent.id == DEFAULT_AGENT))
         .or_else(|| top_level().next())
 }
@@ -175,7 +320,7 @@ pub fn switch_to(
     })
 }
 
-/// openfox `injectAgentReminder`'s scan: the `name` of the last agent reminder in the
+/// The `name` of the last agent reminder in the
 /// model's current view (`compaction::model_view`), None when the window has none.
 pub fn last_reminder(events: &[Event]) -> Option<&str> {
     model_view(events)
@@ -209,9 +354,13 @@ mod tests {
             subagent,
             allowed_tools: tools.iter().map(|tool| tool.to_string()).collect(),
             commands: CommandAccess::ReadWrite,
+            writes: WriteScope::Any,
             reasoning_effort: None,
             color: None,
+            phase: None,
             prompt: "prompt".to_string(),
+            origin: AgentOrigin::Default,
+            path: None,
         }
     }
 
@@ -282,12 +431,34 @@ allowedTools:
 
     #[test]
     fn missing_id_is_none() {
-        assert_eq!(parse_agent_md("---\nname: Plan\n---\nbody\n"), None);
+        assert_eq!(
+            parse_agent_md("---\nname: Plan\n---\nbody\n"),
+            Err(AgentParseError::MissingId)
+        );
     }
 
     #[test]
     fn empty_body_is_none() {
-        assert_eq!(parse_agent_md("---\nid: plan\n---\n"), None);
+        assert_eq!(
+            parse_agent_md("---\nid: plan\n---\n"),
+            Err(AgentParseError::EmptyBody)
+        );
+    }
+
+    #[test]
+    fn phase_is_parsed() {
+        let content = "---\nid: plan\nphase: understand\n---\nbody\n";
+        let agent = parse_agent_md(content).unwrap();
+        assert_eq!(agent.phase, Some(Phase::Understand));
+    }
+
+    #[test]
+    fn unknown_or_missing_phase_is_none() {
+        let unknown = parse_agent_md("---\nid: plan\nphase: later\n---\nbody\n").unwrap();
+        assert_eq!(unknown.phase, None);
+
+        let missing = parse_agent_md("---\nid: plan\n---\nbody\n").unwrap();
+        assert_eq!(missing.phase, None);
     }
 
     #[test]
@@ -329,6 +500,15 @@ body
     }
 
     #[test]
+    fn writes_scope_is_parsed() {
+        let tests = parse_agent_md("---\nid: tests\nwrites: tests\n---\nbody\n").unwrap();
+        assert_eq!(tests.writes, WriteScope::Tests);
+
+        let any = parse_agent_md("---\nid: plan\n---\nbody\n").unwrap();
+        assert_eq!(any.writes, WriteScope::Any);
+    }
+
+    #[test]
     fn parses_reasoning_effort() {
         let xhigh = parse_agent_md("---\nid: plan\nreasoningEffort: xhigh\n---\nbody\n").unwrap();
         assert_eq!(xhigh.reasoning_effort, Some(ReasoningEffort::XHigh));
@@ -338,6 +518,32 @@ body
 
         let bogus = parse_agent_md("---\nid: plan\nreasoningEffort: bogus\n---\nbody\n").unwrap();
         assert_eq!(bogus.reasoning_effort, None);
+    }
+
+    #[test]
+    fn a_read_only_agent_gets_the_shared_preamble_before_its_own_prompt() {
+        let mut agent = agent("ask", "Question", false, &["read_file"]);
+        agent.commands = CommandAccess::ReadOnly;
+        agent.prompt = "Answer.".to_string();
+
+        let reminder = agent.reminder();
+        assert!(reminder.contains("## Read-only agent"), "{reminder}");
+        assert!(reminder.contains("never write a file"), "{reminder}");
+        assert!(reminder.contains("`<path>`:`<line>`") || reminder.contains("<path>:<line>"));
+        // The agent's own prompt follows the preamble, so it can refine it.
+        let preamble = reminder.find("## Read-only agent").unwrap();
+        let own = reminder.find("Answer.").unwrap();
+        assert!(preamble < own);
+    }
+
+    #[test]
+    fn a_read_write_agent_gets_only_its_own_prompt() {
+        let mut agent = agent("builder", "Builder", false, &["write_file"]);
+        agent.prompt = "Build.".to_string();
+
+        let reminder = agent.reminder();
+        assert!(!reminder.contains("## Read-only agent"), "{reminder}");
+        assert!(reminder.contains("Build."));
     }
 
     #[test]

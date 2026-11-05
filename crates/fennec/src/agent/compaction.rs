@@ -1,10 +1,9 @@
 //! Compaction: when the context nears the window, ask the model for a
-//! summary and open a new window from it. Port of openfox
-//! `context/compactor.ts` and the compaction branch of `chat/agent-loop.ts`.
+//! summary and open a new window from it.
 //!
-//! fennec's improvement: the message that opens the new window is built from
-//! checked facts (files changed, the last request) plus the model's summary,
-//! and nothing is deleted — a `context.compacted` event marks the cut.
+//! The message that opens the new window is built from checked facts
+//! (files changed, the last request) plus the model's summary, and nothing
+//! is deleted — a `context.compacted` event marks the cut.
 
 use super::round::{self, Round, RoundPrompt};
 use super::turn::Turn;
@@ -12,24 +11,21 @@ use crate::domain::compaction;
 use crate::domain::event::{DoneReason, Event};
 use crate::domain::id::new_id;
 
-/// openfox `COMPACTION_PROMPT`, verbatim.
+/// What the model is asked to summarise before the window is cut.
 pub const COMPACTION_PROMPT: &str =
-    "You are a helpful AI assistant tasked with summarizing conversations for continuation.
+    "The context window is nearly full. fennec is about to open a new one for you from a summary you write now, to which fennec itself adds the list of files changed so far and the human's last request verbatim: do not repeat those.
 
-Summarize the conversation history concisely, preserving:
-1. What was done and what is currently being worked on
-2. All file modifications made (file paths and what changed)
-3. All errors encountered and how they were resolved
-4. Current progress on each task
-5. Important technical decisions and WHY they were made
-6. Requirements that should persist
-7. Next steps or pending actions that should be continued after compaction
-8. The user's current question, prompt, or active request
+Write what the log cannot give back, so the next window picks up without redoing the work:
+1. The goal of the session and the plan in force, with its \"Done when\" criteria if any
+2. What you learned from the code: the facts that matter, each with its path (and line when it counts)
+3. The decisions taken and why, and the alternatives rejected
+4. What failed, how it was fixed, and what is still broken
+5. What is done, what is in progress, what remains, in order
+6. The human's requirements and preferences that must persist
 
-Do not respond to any questions in the conversation, only output the summary.
-Be thorough but concise. Output as a structured summary.";
+Do not answer any question from the conversation and call no tool: output the summary only, structured with those headings, thorough on facts and short on prose.";
 
-/// openfox's nudge when the model only tried tools instead of summarising.
+/// Nudge when the model only tried tools instead of summarising.
 const NO_TOOLS_PROMPT: &str = "Tool calls are not possible at this stage. STOP and produce a summary for compaction purposes NOW:";
 
 /// How a compaction attempt ended.
@@ -157,11 +153,15 @@ mod tests {
             workdir: Path::new("/tmp"),
             instructions: "",
             skills: &[],
+            always_on: &[],
             agents: &agents,
             max_tokens: 100,
             context_window: 10_000,
             compact_at: 0.85,
             reasoning_effort: None,
+            autonomous: false,
+            lang: crate::domain::lang::Lang::Fr,
+
             stop: &stop,
             on_event: &mut on_event,
         };

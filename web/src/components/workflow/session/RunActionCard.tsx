@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { useT } from '../../../i18n';
 import type { RunWaiting } from '../../../lib/workflowRun';
+import { StopIcon } from '../../Icons';
 import { Button } from '../../ui/Button';
-import { TextInput } from '../../ui/Field';
+import { TextArea } from '../../ui/Field';
 
 export function RunActionCard({
   waiting,
@@ -9,7 +11,9 @@ export function RunActionCard({
   onContinue,
   onResume,
   onStop,
-  disabled
+  disabled,
+  comment,
+  onCommentChange
 }: {
   waiting: RunWaiting;
   onAnswer: (choice: string, comment: string) => Promise<void>;
@@ -17,8 +21,11 @@ export function RunActionCard({
   onResume: () => Promise<void>;
   onStop: () => Promise<void>;
   disabled: boolean;
+  /** Held by the page, so a canvas note can land here while the run waits. */
+  comment: string;
+  onCommentChange: (comment: string) => void;
 }) {
-  const [comment, setComment] = useState('');
+  const t = useT();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -28,9 +35,9 @@ export function RunActionCard({
     setError(null);
     try {
       await action();
-      setComment('');
+      onCommentChange('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur');
+      setError(err instanceof Error ? err.message : t('error'));
     } finally {
       setBusy(false);
     }
@@ -48,11 +55,11 @@ export function RunActionCard({
                 {waiting.question}
               </div>
               <div className="flex flex-wrap items-center gap-1.5">
-                <TextInput
-                  type="text"
+                <TextArea
+                  rows={Math.min(6, comment.split('\n').length)}
                   value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  placeholder="Commentaire (optionnel)…"
+                  onChange={(e) => onCommentChange(e.target.value)}
+                  placeholder={t('runActionCardCommentPlaceholder')}
                   disabled={isBusy}
                   className="min-w-40 flex-1"
                 />
@@ -68,6 +75,18 @@ export function RunActionCard({
                     {choice}
                   </Button>
                 ))}
+                <Button
+                  type="button"
+                  variant="danger"
+                  size="sm"
+                  iconOnly
+                  disabled={isBusy}
+                  onClick={() => handleAction(onStop)}
+                  title={t('runActionCardStopWorkflowTitle')}
+                  aria-label={t('stop')}
+                >
+                  <StopIcon className="h-4 w-4" />
+                </Button>
               </div>
             </>
           )}
@@ -75,14 +94,14 @@ export function RunActionCard({
           {waiting.kind === 'pause' && (
             <>
               <div className="text-sm leading-snug text-muted">
-                En pause avant « {waiting.toLabel} »
+                {t('runActionCardPausedBefore', { toLabel: waiting.toLabel })}
               </div>
               <div className="flex flex-wrap items-center gap-1.5">
-                <TextInput
-                  type="text"
+                <TextArea
+                  rows={Math.min(6, comment.split('\n').length)}
                   value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  placeholder="Commentaire (optionnel)…"
+                  onChange={(e) => onCommentChange(e.target.value)}
+                  placeholder={t('runActionCardCommentPlaceholder')}
                   disabled={isBusy}
                   className="min-w-40 flex-1"
                 />
@@ -93,16 +112,19 @@ export function RunActionCard({
                   disabled={isBusy}
                   onClick={() => handleAction(() => onContinue(comment))}
                 >
-                  Continuer
+                  {t('runActionCardContinue')}
                 </Button>
                 <Button
                   type="button"
                   variant="danger"
                   size="sm"
+                  iconOnly
                   disabled={isBusy}
                   onClick={() => handleAction(onStop)}
+                  title={t('runActionCardStopWorkflowTitle')}
+                  aria-label={t('stop')}
                 >
-                  Arrêter
+                  <StopIcon className="h-4 w-4" />
                 </Button>
               </div>
             </>
@@ -111,7 +133,7 @@ export function RunActionCard({
           {waiting.kind === 'interrupted' && (
             <>
               <div className="text-sm leading-snug text-muted">
-                Le workflow s'est interrompu : reprendre là où il en était ?
+                {t('runActionCardInterruptedQuestion')}
               </div>
               <div className="flex flex-wrap items-center gap-1.5">
                 <Button
@@ -121,16 +143,38 @@ export function RunActionCard({
                   disabled={isBusy}
                   onClick={() => handleAction(onResume)}
                 >
-                  Reprendre
+                  {t('runActionCardResume')}
                 </Button>
                 <Button
                   type="button"
                   variant="danger"
                   size="sm"
+                  iconOnly
                   disabled={isBusy}
                   onClick={() => handleAction(onStop)}
+                  title={t('runActionCardStopWorkflowTitle')}
+                  aria-label={t('stop')}
                 >
-                  Arrêter
+                  <StopIcon className="h-4 w-4" />
+                </Button>
+              </div>
+            </>
+          )}
+
+          {waiting.kind === 'relaunch' && (
+            <>
+              <div className="text-sm leading-snug text-muted">
+                {t('runActionCardRelaunchQuestion')}
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  disabled={isBusy}
+                  onClick={() => handleAction(onResume)}
+                >
+                  {t('runActionCardRelaunch')}
                 </Button>
               </div>
             </>

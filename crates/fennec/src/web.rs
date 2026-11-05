@@ -1,40 +1,77 @@
 //! Web adapter: the local server behind the UI. std only, one thread per
 //! connection, bound to 127.0.0.1.
 
+mod agent_routes;
+mod agents_md_routes;
 mod assets;
+mod audit_routes;
+mod backlog_routes;
+mod budget_routes;
+mod canvas_routes;
 mod children;
+mod commit_subject;
 mod context_view;
+mod contribution_routes;
 mod editor;
 mod event_stream;
+mod file_manager;
+mod folder_routes;
 mod guard;
 mod http;
+mod idea_assets;
+mod idea_board;
+mod idea_queue;
+mod idea_routes;
+mod indicator_routes;
 mod insight;
 mod integration;
+mod mcp_routes;
 mod model_routes;
 mod model_view;
-mod notifier;
+mod notice_stream;
+mod plugin_routes;
 mod preview;
+mod project_dashboard;
+mod project_delete;
+mod project_list_routes;
 mod project_routes;
+mod proposal_routes;
 mod routes;
+mod rule_approval_routes;
+mod rule_bridge_routes;
+mod rule_routes;
+mod servers;
+mod session_delete;
 mod session_name;
+mod session_routes;
 mod session_usage;
 mod settings_routes;
+mod terminal;
+#[cfg(test)]
+mod test_support;
+mod thread_view;
 mod turns;
+mod waiver_routes;
 mod workflow_routes;
 mod workflow_usage;
+mod worktree_routes;
 
 use crate::agent::ports::EventLog;
+use crate::chat;
 use crate::config::Settings;
 use crate::domain::project::{Project, SessionSummary};
 use crate::domain::session_skills::{SessionSkills, fold_skills};
 use crate::domain::skill::Skill;
+use crate::notifier::Notifier;
 use crate::store::SqliteStore;
+use crate::tools::Sandbox;
 use crate::worktree;
-use notifier::Notifier;
 use serde_json::json;
+use servers::RunningServer;
 use std::collections::HashMap;
 use std::net::{TcpListener, TcpStream};
 use std::path::Path;
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use turns::{Place, Turns};
 
@@ -49,6 +86,22 @@ struct App {
     /// is O(log) and the UI refetches it on every relevant event; caching keeps
     /// the steady state to a max-seq lookup.
     skill_folds: Mutex<HashMap<String, (u64, SessionSkills)>>,
+    /// Each idea session's board report, keyed by its log's max seq like
+    /// `skill_folds`: the UI polls the board while a run goes on.
+    idea_reports: Mutex<HashMap<String, (u64, idea_board::IdeaReport)>>,
+    /// Projects whose ideas queue runs, and the flag that stops it after the
+    /// current idea (`idea_queue::start_queue`).
+    idea_queues: Mutex<HashMap<String, Arc<AtomicBool>>>,
+    /// The last worktrees disk scan and when it ran (ms): a scan walks gigabytes,
+    /// so the home page's total reuses it for a while (`worktree_routes`).
+    worktree_scan: Mutex<Option<(u64, Vec<crate::worktree::usage::WorktreeUsage>)>>,
+    /// Servers running per (session, name): the pid of each process group.
+    server_runs: Arc<Mutex<HashMap<String, RunningServer>>>,
+    /// The active plugin hosts and the event pump that feeds them.
+    plugins: Arc<crate::plugins::PluginManager>,
+    /// The agents home (`<home>/.agents`): where the global plugin
+    /// definitions live.
+    agents_home: std::path::PathBuf,
 }
 
 impl App {
@@ -58,8 +111,19 @@ impl App {
         Ok(SqliteStore::open(&self.settings.db_path)?)
     }
 
+    /// The session and its project, or `None` when there is no such session.
+    /// Shared by the route modules, which depend on this, not on `routes`.
+    fn session_and_project(&self, id: &str) -> Result<Option<(SessionSummary, Project)>, String> {
+        let store = self.store()?;
+        let Some(s) = store.session(id)? else {
+            return Ok(None);
+        };
+        Ok(store.project(&s.project_id)?.map(|p| (s, p)))
+    }
+
     /// Where the session's turns run (see `Place`). A child session shares
-    /// its root session's worktree.
+    /// its root session's worktree — or, for the chat, its root session's
+    /// scratch directory.
     fn place(
         &self,
         store: &SqliteStore,
@@ -67,6 +131,14 @@ impl App {
         project: &Project,
     ) -> Result<Place, String> {
         let root = self.root_id(store, session)?;
+        if chat::is_chat(project) {
+            return Ok(Place::new(
+                &chat::session_dir(&self.settings.db_path, &root)
+                    .display()
+                    .to_string(),
+                None,
+            ));
+        }
         let found = worktree::find(&self.worktrees(), Path::new(&project.workdir), &root);
         Ok(Place::new(&project.workdir, found))
     }
@@ -84,6 +156,10 @@ impl App {
         worktree: bool,
     ) -> Result<Place, String> {
         if !worktree {
+            return self.place(store, session, project);
+        }
+        if chat::is_chat(project) {
+            // The chat's scratch is not a git repository: no worktree.
             return self.place(store, session, project);
         }
         let root = self.root_id(store, session)?;
@@ -129,6 +205,24 @@ impl App {
         cache.insert(id.to_string(), (last, folded.clone()));
         Ok(folded)
     }
+
+    /// The session's idea report, cached against the log's max seq (see
+    /// `idea_reports`): the O(log) re-read runs only when a new event has
+    /// followed.
+    pub(crate) fn idea_report(
+        &self,
+        store: &SqliteStore,
+        session_id: &str,
+    ) -> Result<idea_board::IdeaReport, String> {
+        let last = store.last_seq(session_id)?;
+        let mut cache = self.idea_reports.lock().unwrap();
+        if cache.get(session_id).is_some_and(|(seq, _)| *seq == last) {
+            return Ok(cache[session_id].1.clone());
+        }
+        let report = idea_board::idea_report(&store.events(session_id)?);
+        cache.insert(session_id.to_string(), (last, report.clone()));
+        Ok(report)
+    }
 }
 
 pub fn serve(port: u16, settings: Settings) -> Result<(), String> {
@@ -139,16 +233,55 @@ pub fn serve(port: u16, settings: Settings) -> Result<(), String> {
         settings.llm.defaults.model
     );
     let notifier = Arc::new(Notifier::default());
+    // The agents home (`<home>/.agents`), resolved the way skills and agents
+    // resolve it: the plugins live only there, never in a project.
+    let agents_home = std::env::var_os("HOME")
+        .map(|home| std::path::PathBuf::from(home).join(".agents"))
+        .unwrap_or_else(|| std::path::PathBuf::from(".agents"));
+    // The plugin manager's sandbox world and scratch root, from the stored
+    // preferences. A plugin's network is its own choice, set per activation.
+    let boot_store = SqliteStore::open(&settings.db_path)?;
+    let prefs = boot_store.preferences()?;
+    let plugins_temp = settings
+        .db_path
+        .parent()
+        .map(|dir| dir.join("plugins"))
+        .unwrap_or_else(|| std::path::PathBuf::from("plugins"));
+    let plugins = Arc::new(crate::plugins::PluginManager::new(
+        Sandbox::for_store(&prefs.sandbox, &settings.db_path),
+        agents_home.clone(),
+        plugins_temp,
+    ));
     let app = Arc::new(App {
         turns: Turns::new(settings.clone(), notifier.clone()),
         settings,
         port,
-        notifier,
+        notifier: notifier.clone(),
         skill_folds: Mutex::new(HashMap::new()),
+        idea_reports: Mutex::new(HashMap::new()),
+        idea_queues: Mutex::default(),
+        worktree_scan: Mutex::default(),
+        server_runs: Arc::new(Mutex::new(HashMap::new())),
+        plugins: plugins.clone(),
+        agents_home,
     });
+    // The event pump feeds the active plugins; it reads the store only.
+    app.plugins
+        .start_pump(app.plugins.clone(), &app.settings.db_path, &app.notifier);
     // Fail now rather than on the first request. No turn runs yet, so a log
     // still marked running was cut by a crash.
     let store = app.store()?;
+    // The chat's scratch project: a session with no repository. Its
+    // per-session scratch directory is created only when a tool first needs
+    // it, so starting the server creates nothing on disk. Non-fatal: a
+    // machine that cannot register it still serves its projects.
+    let chat_dir = chat::workdir(&app.settings.db_path);
+    let chat_init = store
+        .chat_project(&chat_dir.display().to_string())
+        .map_err(|e| e.to_string());
+    if let Err(e) = chat_init {
+        eprintln!("fennec: chat project: {e}");
+    }
     // Idempotent: calls recorded before the ledger existed join it once.
     let ledger =
         token_usage::Ledger::open(&app.settings.usage_path()).map_err(|e| e.to_string())?;
@@ -162,6 +295,10 @@ pub fn serve(port: u16, settings: Settings) -> Result<(), String> {
     if closed > 0 {
         eprintln!("fennec · closed {closed} turn(s) left open by a crash");
     }
+    let resumed_queues = idea_queue::resume_interrupted_runs(&app)?;
+    if resumed_queues > 0 {
+        eprintln!("fennec · resumed {resumed_queues} ideas queue(s) cut by a restart");
+    }
     for stream in listener.incoming().flatten() {
         let app = app.clone();
         std::thread::spawn(move || {
@@ -174,7 +311,7 @@ pub fn serve(port: u16, settings: Settings) -> Result<(), String> {
     Ok(())
 }
 
-fn handle(app: &App, stream: &mut TcpStream) -> Result<(), String> {
+fn handle(app: &Arc<App>, stream: &mut TcpStream) -> Result<(), String> {
     let req = http::read_request(stream)?;
     if let Err(refusal) = guard::check(&req, app.port) {
         return http::error(stream, refusal.status, refusal.message);
@@ -185,9 +322,7 @@ fn handle(app: &App, stream: &mut TcpStream) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{LlmSettings, Settings};
     use crate::domain::event::{Event, ToolCall};
-    use crate::domain::preferences::ModelParams;
     use crate::domain::skill::Skill;
     use crate::store::SqliteStore;
     use serde_json::json;
@@ -200,30 +335,7 @@ mod tests {
     }
 
     fn app_with_db(db_path: PathBuf) -> App {
-        let settings = Settings {
-            llm: LlmSettings {
-                base_url: "http://localhost".into(),
-                api_key: None,
-                defaults: ModelParams {
-                    provider: "local".into(),
-                    model: "test".into(),
-                    max_tokens: 100,
-                    context_window: 1000,
-                    compact_at: 0.85,
-                    reasoning_effort: None,
-                },
-                listed: Vec::new(),
-            },
-            db_path,
-        };
-        let notifier = Arc::new(Notifier::default());
-        App {
-            turns: Turns::new(settings.clone(), notifier.clone()),
-            settings,
-            port: 0,
-            notifier,
-            skill_folds: Mutex::new(HashMap::new()),
-        }
+        test_support::app(db_path)
     }
 
     fn skill(id: &str) -> Skill {
@@ -325,6 +437,37 @@ mod tests {
         let from_child = app.place(&store, &child, &project).unwrap();
         assert_eq!(from_child.worktree, Some(wt));
         assert_eq!(from_child.workdir, opened.workdir);
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn a_queue_cut_by_a_restart_starts_again() {
+        let base =
+            std::env::temp_dir().join(format!("fennec-requeue-{}", crate::domain::id::new_id()));
+        std::fs::create_dir_all(&base).unwrap();
+        let app = Arc::new(app_with_db(base.join("fennec.db")));
+        let store = app.store().unwrap();
+        let project = store.project_for("/tmp/requeue").unwrap();
+        store
+            .append_idea_event(
+                &project.id,
+                &backlog::BacklogEvent::QueueStarted { autonomous: true },
+            )
+            .unwrap();
+
+        assert_eq!(idea_queue::resume_interrupted_runs(&app).unwrap(), 1);
+        for _ in 0..200 {
+            if !idea_queue::queue_running(&app, &project.id) {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+
+        // The cut run is closed, then a new run in the same mode starts and,
+        // with nothing ready, ends on its own.
+        let run = store.backlog(&project.id).unwrap().last_run.unwrap();
+        assert!(run.autonomous);
+        assert_eq!(run.reason.as_deref(), Some("no idea ready"));
         let _ = std::fs::remove_dir_all(&base);
     }
 }

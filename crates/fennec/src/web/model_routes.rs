@@ -64,15 +64,7 @@ fn choice_value(prefs: &Preferences, model: &ModelRef) -> Value {
 pub(super) fn choices(app: &App, stream: &mut TcpStream) -> Result<(), String> {
     let store = app.store()?;
     let prefs = store.preferences()?;
-    let default = prefs
-        .selected
-        .as_ref()
-        .filter(|m| !m.model.is_empty())
-        .cloned()
-        .unwrap_or_else(|| ModelRef {
-            provider: app.settings.llm.defaults.provider.clone(),
-            model: app.settings.llm.defaults.model.clone(),
-        });
+    let default = prefs.default_model(&app.settings.llm.defaults);
     let favorites: Vec<Value> = prefs
         .favorites
         .iter()
@@ -96,7 +88,7 @@ pub(super) fn set_model(
     let provider = body["provider"].as_str().unwrap_or("").to_string();
     let model_id = body["model"].as_str().unwrap_or("").to_string();
     let store = app.store()?;
-    let Some((_, _)) = super::routes::session_and_project(&store, id)? else {
+    let Some((_, _)) = app.session_and_project(id)? else {
         return error(stream, 404, "no such session");
     };
     if model_id.is_empty() {
@@ -109,7 +101,7 @@ pub(super) fn set_model(
     if super::workflow_routes::waiting_for(app, id)?.is_some() {
         return error(stream, 409, "a workflow is running in this session");
     }
-    super::routes::append_human_event(
+    super::session_routes::append_human_event(
         app,
         &store,
         id,

@@ -1,11 +1,30 @@
-//! Port of openfox `events/fold-messages.ts`: the event log read back as the
-//! OpenAI chat messages sent to the model.
+//! The event log read back as the chat messages sent to the model.
 
 use super::compaction::model_view;
 use super::event::{Event, Role, ToolResult};
+use super::vision::first_kept_image;
 use serde_json::{Value, json};
 
-/// Port of openfox `renderToolResultContent`: the single LLM-facing
+/// Replaces the images the window no longer holds (`vision::first_kept_image`)
+/// by a text part.
+fn cap_images(messages: &mut [Value]) {
+    let is_image = |part: &Value| part["type"] == "image_url";
+    let mut parts: Vec<&mut Value> = messages
+        .iter_mut()
+        .filter_map(|message| message["content"].as_array_mut())
+        .flatten()
+        .filter(|part| is_image(part))
+        .collect();
+    let keep_from = first_kept_image(parts.len());
+    for part in parts.iter_mut().take(keep_from) {
+        **part = json!({
+            "type": "text",
+            "text": "[image dropped from the context: read the file again to see it]",
+        });
+    }
+}
+
+/// `renderToolResultContent`: the single LLM-facing
 /// rendering of a tool result, shared by the live path and the fold.
 pub fn render_tool_result(result: &ToolResult) -> String {
     let error = result.error.as_deref().unwrap_or("");
@@ -17,10 +36,8 @@ pub fn render_tool_result(result: &ToolResult) -> String {
     }
 }
 
-/// The text of the last assistant message that has any, among `events`
-/// (its start content plus its deltas); "" when none. A workflow node's
-/// output.
-pub fn last_assistant_text(events: &[Event]) -> String {
+/// The assistant texts among `events`, in order (start content plus deltas), empty ones skipped.
+pub fn assistant_texts(events: &[Event]) -> Vec<String> {
     let mut texts: Vec<(&str, String)> = Vec::new();
     for event in events {
         match event {
@@ -44,28 +61,99 @@ pub fn last_assistant_text(events: &[Event]) -> String {
     }
     texts
         .into_iter()
-        .rev()
         .map(|(_, text)| text)
-        .find(|text| !text.trim().is_empty())
-        .unwrap_or_default()
+        .filter(|text| !text.trim().is_empty())
+        .collect()
 }
 
-/// The system prompt and tool definitions frozen at the first turn: the first
-/// snapshot's prompt and the first snapshot that carries tools (sessions from
-/// before the tools were frozen got them in a later snapshot).
-pub fn frozen_prompt(events: &[Event]) -> (Option<&str>, Option<&Value>) {
-    let mut snapshots = events.iter().filter_map(|e| match e {
-        Event::TurnSnapshot {
-            cached_system_prompt,
-            cached_tools,
-        } => Some((cached_system_prompt.as_str(), cached_tools.as_ref())),
-        _ => None,
+/// True when an event after the last assistant message start matches: the
+/// human acted on that answer (wrote its draft, added its rules).
+pub fn since_last_answer(events: &[Event], matches: impl Fn(&Event) -> bool) -> bool {
+    let last = events.iter().rposition(|event| {
+        matches!(
+            event,
+            Event::MessageStart {
+                role: Role::Assistant,
+                ..
+            }
+        )
     });
-    let first = snapshots.next();
-    let tools = first
-        .and_then(|(_, tools)| tools)
-        .or_else(|| snapshots.find_map(|(_, tools)| tools));
-    (first.map(|(prompt, _)| prompt), tools)
+    last.is_some_and(|start| events[start + 1..].iter().any(matches))
+}
+
+/// The text of the last assistant message that has any, among `events`
+/// (its start content plus its deltas); "" when none. A workflow node's
+/// output.
+pub fn last_assistant_text(events: &[Event]) -> String {
+    assistant_texts(events).pop().unwrap_or_default()
+}
+
+/// A workflow agent node's output among `events`: the last assistant text
+/// holding a plan or report contract (a `## Plan: …` or `## Report: …`
+/// heading, level 2 or 3), else the last assistant text. A closing line the
+/// model writes after its plan must not replace the plan.
+pub fn node_output(events: &[Event]) -> String {
+    let texts = assistant_texts(events);
+    texts
+        .iter()
+        .rev()
+        .find(|text| holds_contract(text))
+        .cloned()
+        .unwrap_or_else(|| texts.last().cloned().unwrap_or_default())
+}
+
+fn holds_contract(text: &str) -> bool {
+    text.lines().any(|line| {
+        let trimmed = line.trim();
+        let rest = trimmed
+            .strip_prefix("### ")
+            .or_else(|| trimmed.strip_prefix("## "))
+            .map(str::trim)
+            .unwrap_or_default();
+        rest.starts_with("Plan:") || rest.starts_with("Report:")
+    })
+}
+
+/// The content of the first message the human typed (not system-generated,
+/// not a loop reminder): what the session was opened for.
+pub fn first_request(events: &[Event]) -> Option<String> {
+    events.iter().find_map(human_request).map(str::to_string)
+}
+
+/// The text of a message the human typed (not one fennec generated), if it is one.
+pub fn human_request(event: &Event) -> Option<&str> {
+    match event {
+        Event::MessageStart {
+            role: Role::User,
+            is_system_generated: false,
+            metadata: None,
+            content: Some(content),
+            ..
+        } if !content.trim().is_empty() => Some(content),
+        _ => None,
+    }
+}
+
+/// The system prompt and tool definitions for the session: the prompt is the
+/// first snapshot's (byte-stable for the whole session, so the server's prompt
+/// cache holds), the tools are the last snapshot's that carries them (a
+/// re-freeze after an MCP change is picked up; sessions from before the tools
+/// were frozen got them in a later snapshot).
+pub fn frozen_prompt(events: &[Event]) -> (Option<&str>, Option<&Value>) {
+    let snapshots: Vec<(&str, Option<&Value>)> = events
+        .iter()
+        .filter_map(|event| match event {
+            Event::TurnSnapshot {
+                cached_system_prompt,
+                cached_tools,
+                ..
+            } => Some((cached_system_prompt.as_str(), cached_tools.as_ref())),
+            _ => None,
+        })
+        .collect();
+    let prompt = snapshots.first().map(|(prompt, _)| *prompt);
+    let tools = snapshots.iter().rev().find_map(|(_, tools)| *tools);
+    (prompt, tools)
 }
 
 /// Folds the log into OpenAI chat messages (without the system prompt). Only
@@ -176,6 +264,7 @@ pub fn fold_messages(events: &[Event]) -> Vec<Value> {
             _ => {}
         }
     }
+    cap_images(&mut messages);
     messages
 }
 
@@ -204,6 +293,65 @@ mod tests {
         assert_eq!(last_assistant_text(&events[3..]), "");
     }
 
+    #[test]
+    fn node_output_prefers_plan_over_closing_line() {
+        let delta = |id: &str, text: &str| Event::MessageDelta {
+            message_id: id.into(),
+            content: text.into(),
+            tokens_per_second: None,
+        };
+        let events = vec![
+            start("p", Role::Assistant, None, false),
+            delta("p", "## Plan: build\n## Done when\n- done"),
+            start("c", Role::Assistant, Some("Plan ready."), false),
+        ];
+        assert_eq!(node_output(&events), "## Plan: build\n## Done when\n- done");
+    }
+
+    #[test]
+    fn node_output_falls_back_to_last_assistant_text_without_contract() {
+        let events = vec![
+            start("a", Role::Assistant, Some("hello"), false),
+            start("b", Role::Assistant, Some("world"), false),
+        ];
+        assert_eq!(node_output(&events), last_assistant_text(&events));
+    }
+
+    #[test]
+    fn node_output_prefers_later_report_over_plan() {
+        let events = vec![
+            start("p", Role::Assistant, Some("## Plan: y"), false),
+            start("r", Role::Assistant, Some("### Report: x"), false),
+        ];
+        assert_eq!(node_output(&events), "### Report: x");
+    }
+
+    #[test]
+    fn first_request_skips_system_generated_and_assistant_messages() {
+        let events = vec![
+            start("s", Role::User, Some("system"), true),
+            start("a", Role::Assistant, Some("hello"), false),
+            start("u", Role::User, Some("  "), false),
+            start("v", Role::User, Some("do it"), false),
+        ];
+        assert_eq!(first_request(&events), Some("do it".into()));
+    }
+
+    #[test]
+    fn first_request_returns_the_first_user_message() {
+        let events = vec![
+            start("u1", Role::User, Some("first"), false),
+            start("u2", Role::User, Some("second"), false),
+        ];
+        assert_eq!(first_request(&events), Some("first".into()));
+    }
+
+    #[test]
+    fn first_request_is_none_without_user_messages() {
+        let events = vec![start("a", Role::Assistant, Some("hi"), false)];
+        assert_eq!(first_request(&events), None);
+    }
+
     fn start(id: &str, role: Role, content: Option<&str>, system_generated: bool) -> Event {
         Event::MessageStart {
             message_id: id.into(),
@@ -216,25 +364,28 @@ mod tests {
     }
 
     #[test]
-    fn frozen_prompt_reads_the_first_prompt_and_the_first_tools() {
+    fn frozen_prompt_reads_the_first_prompt_and_the_last_tools() {
         let events = vec![
             Event::TurnSnapshot {
                 cached_system_prompt: "first".into(),
                 cached_tools: None,
+                mcp_tool_names: Vec::new(),
             },
             Event::TurnSnapshot {
                 cached_system_prompt: "second".into(),
                 cached_tools: Some(json!([1])),
+                mcp_tool_names: Vec::new(),
             },
             Event::TurnSnapshot {
                 cached_system_prompt: "third".into(),
                 cached_tools: Some(json!([2])),
+                mcp_tool_names: Vec::new(),
             },
         ];
 
         let (prompt, tools) = frozen_prompt(&events);
         assert_eq!(prompt, Some("first"));
-        assert_eq!(tools, Some(&json!([1])));
+        assert_eq!(tools, Some(&json!([2])));
         assert_eq!(frozen_prompt(&[]), (None, None));
     }
 
@@ -414,5 +565,98 @@ mod tests {
         assert_eq!(msgs.len(), 2);
         assert_eq!(msgs[0]["content"], "the resume message");
         assert_eq!(msgs[1]["content"], "new answer");
+    }
+
+    #[test]
+    fn cap_images_leaves_three_images_unchanged() {
+        let mut messages = vec![
+            json!({"role": "user", "content": [image_part("a")]}),
+            json!({"role": "user", "content": [image_part("b")]}),
+            json!({"role": "user", "content": [image_part("c")]}),
+        ];
+        cap_images(&mut messages);
+        for message in &messages {
+            assert_eq!(
+                message["content"][0].get("type").and_then(Value::as_str),
+                Some("image_url")
+            );
+        }
+    }
+
+    #[test]
+    fn cap_images_leaves_six_images_unchanged() {
+        let mut messages: Vec<Value> = (0..6)
+            .map(|i| {
+                json!({
+                    "role": "user",
+                    "content": [image_part(&format!("img{}", i))],
+                })
+            })
+            .collect();
+        cap_images(&mut messages);
+        for message in &messages {
+            assert_eq!(
+                message["content"][0].get("type").and_then(Value::as_str),
+                Some("image_url")
+            );
+        }
+    }
+
+    #[test]
+    fn cap_images_drops_the_first_three_of_seven_images() {
+        let mut messages: Vec<Value> = (0..7)
+            .map(|i| {
+                json!({
+                    "role": "user",
+                    "content": [image_part(&format!("img{}", i))],
+                })
+            })
+            .collect();
+        cap_images(&mut messages);
+        for message in &messages[..3] {
+            assert_eq!(message["content"][0], dropped_part());
+        }
+        for message in &messages[3..] {
+            assert_eq!(
+                message["content"][0].get("type").and_then(Value::as_str),
+                Some("image_url")
+            );
+        }
+    }
+
+    #[test]
+    fn cap_images_drops_the_first_six_of_ten_images() {
+        let mut messages: Vec<Value> = (0..10)
+            .map(|i| {
+                json!({
+                    "role": "user",
+                    "content": [image_part(&format!("img{}", i))],
+                })
+            })
+            .collect();
+        cap_images(&mut messages);
+        for message in &messages[..6] {
+            assert_eq!(message["content"][0], dropped_part());
+        }
+        for message in &messages[6..] {
+            assert_eq!(
+                message["content"][0].get("type").and_then(Value::as_str),
+                Some("image_url")
+            );
+        }
+    }
+
+    fn image_part(url: &str) -> Value {
+        json!({
+            "type": "image_url",
+            "image_url": {"url": url},
+        })
+    }
+
+    fn dropped_part() -> Value {
+        json!({
+            "type": "text",
+            "text": "[image dropped from the context: read the file again to see it]",
+        })
     }
 }

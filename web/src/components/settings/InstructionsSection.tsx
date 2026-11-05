@@ -1,24 +1,29 @@
-import { Section } from '../ui/Section';
+import { Section, type SectionSave } from '../ui/Section';
 import { FieldRow, TextArea } from '../ui/Field';
+import { useT } from '../../i18n';
 
-export function InstructionsSection({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+export function InstructionsSection({
+  value,
+  onChange,
+  save,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  /** The group's own save: its dot and its "Save". */
+  save?: SectionSave;
+}) {
+  const t = useT();
   return (
-    <Section>
-      <div className="flex flex-col gap-4">
-        <h2 className="text-sm font-semibold">Instructions globales</h2>
-        <FieldRow
-          label="Instructions"
-          hint="Ajoutées au prompt système de chaque nouvelle session, avant les fichiers AGENTS.md du projet. Une session en cours garde le prompt de son premier tour."
-        >
-          <TextArea
-            rows={16}
-            value={value}
-            onChange={(event) => onChange(event.target.value)}
-            placeholder="Ex. : Réponds en français, en quelques lignes, sans récapitulatif."
-            className="w-full"
-          />
-        </FieldRow>
-      </div>
+    <Section title={t('globalInstructionsTitle')} save={save}>
+      <FieldRow label={t('instructionsLabel')} hint={t('instructionsHint')}>
+        <TextArea
+          rows={16}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={t('instructionsPlaceholder')}
+          className="w-full"
+        />
+      </FieldRow>
     </Section>
   );
 }

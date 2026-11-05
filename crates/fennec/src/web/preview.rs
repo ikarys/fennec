@@ -1,12 +1,12 @@
 //! The files of a session's project, served for the preview. Model-written
 //! HTML must never run with fennec's origin: the `sandbox` CSP gives the page
-//! an opaque origin, whose requests to the API the guard refuses.
+//! an opaque origin, whose requests to the API the guard refuses. Real PDFs
+//! are served without it because browser PDF viewers refuse sandboxed documents.
 
 use super::App;
 use super::http::{error, percent_decode, send_with};
-use super::routes::session_and_project;
 use std::net::TcpStream;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 const MAX_PREVIEW_BYTES: u64 = 10 * 1024 * 1024;
 
@@ -16,12 +16,41 @@ pub(super) fn serve(
     session_id: &str,
     segments: &[&str],
 ) -> Result<(), String> {
-    let store = app.store()?;
-    let Some((session, project)) = session_and_project(&store, session_id)? else {
-        return error(stream, 404, "no such session");
-    };
     let Some(relative) = relative_path_from_segments(segments) else {
         return error(stream, 404, "not found");
+    };
+    let full = match session_file(app, session_id, &relative)? {
+        SessionFile::Found(full) => full,
+        SessionFile::Missing => return error(stream, 404, "not found"),
+        SessionFile::TooLarge => return error(stream, 413, "file too large"),
+    };
+    let content_type = content_type_of(&full);
+    let body = std::fs::read(&full).map_err(|e| e.to_string())?;
+    let csp = canvas::Format::of_path(&relative).map_or(Some(canvas::SANDBOX_CSP), |format| {
+        format.sandbox_csp(&body)
+    });
+    let header = csp.map(|csp| ("Content-Security-Policy", csp));
+    send_with(stream, 200, &content_type, header.as_slice(), &body)
+}
+
+/// A file of a session's working directory, as the preview and the canvas may read it.
+pub(super) enum SessionFile {
+    Found(PathBuf),
+    /// No such session or file, or outside the working directory.
+    Missing,
+    TooLarge,
+}
+
+/// Resolves a project-relative path in the session's working directory (its
+/// worktree when it has one).
+pub(super) fn session_file(
+    app: &App,
+    session_id: &str,
+    relative: &str,
+) -> Result<SessionFile, String> {
+    let store = app.store()?;
+    let Some((session, project)) = app.session_and_project(session_id)? else {
+        return Ok(SessionFile::Missing);
     };
     // Canonical paths: a symlink out of the place is refused like `..`.
     let workdir = app
@@ -31,23 +60,15 @@ pub(super) fn serve(
     let full = workdir
         .as_ref()
         .ok()
-        .and_then(|workdir| workdir.join(&relative).canonicalize().ok())
+        .and_then(|workdir| workdir.join(relative).canonicalize().ok())
         .filter(|full| workdir.as_ref().is_ok_and(|w| full.starts_with(w)) && full.is_file());
     let Some(full) = full else {
-        return error(stream, 404, "not found");
+        return Ok(SessionFile::Missing);
     };
     if std::fs::metadata(&full).map_err(|e| e.to_string())?.len() > MAX_PREVIEW_BYTES {
-        return error(stream, 413, "file too large");
+        return Ok(SessionFile::TooLarge);
     }
-    let content_type = content_type_of(&full);
-    let body = std::fs::read(&full).map_err(|e| e.to_string())?;
-    send_with(
-        stream,
-        200,
-        &content_type,
-        &[("Content-Security-Policy", "sandbox allow-scripts")],
-        &body,
-    )
+    Ok(SessionFile::Found(full))
 }
 
 fn relative_path_from_segments(segments: &[&str]) -> Option<String> {
@@ -78,6 +99,8 @@ fn content_type_of(path: &Path) -> String {
         "js" | "mjs" => ("text/javascript", true),
         "json" => ("application/json", true),
         "svg" => ("image/svg+xml", true),
+        "pdf" => ("application/pdf", false),
+        "mmd" | "mermaid" => ("text/plain", true),
         "png" => ("image/png", false),
         "jpg" | "jpeg" => ("image/jpeg", false),
         "gif" => ("image/gif", false),
@@ -148,6 +171,15 @@ mod tests {
         assert_eq!(
             content_type_of(Path::new("icon.svg")),
             "image/svg+xml; charset=utf-8"
+        );
+        assert_eq!(content_type_of(Path::new("doc.pdf")), "application/pdf");
+        assert_eq!(
+            content_type_of(Path::new("diagram.mmd")),
+            "text/plain; charset=utf-8"
+        );
+        assert_eq!(
+            content_type_of(Path::new("diagram.mermaid")),
+            "text/plain; charset=utf-8"
         );
         assert_eq!(content_type_of(Path::new("image.png")), "image/png");
         assert_eq!(content_type_of(Path::new("photo.jpg")), "image/jpeg");

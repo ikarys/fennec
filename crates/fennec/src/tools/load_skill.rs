@@ -1,8 +1,8 @@
-//! Port of openfox `tools/load-skill.ts`. Skills are read again at call
-//! time, as in openfox: an edited skill loads fresh while the list in the
-//! frozen system prompt stays as it was.
+//! Skills are read again at call time: an edited
+//! skill loads fresh while the list in the frozen system prompt stays as it
+//! was.
 //!
-//! Not ported: the enabled check (no enable/disable setting yet).
+//! It has no enabled check (no enable/disable setting yet).
 
 use super::args;
 use crate::domain::event::ToolResult;
@@ -31,15 +31,16 @@ pub(super) fn definition() -> Value {
 }
 
 pub(super) fn run(args: &Value, workdir: &Path) -> ToolResult {
-    let id = match args::string(args, "skillId") {
-        Ok(value) => value,
-        Err(error) => return ToolResult::failure(error),
-    };
+    try_run(args, workdir).unwrap_or_else(ToolResult::failure)
+}
+
+fn try_run(args: &Value, workdir: &Path) -> Result<ToolResult, String> {
+    let id = args::string(args, "skillId")?;
 
     let skills = crate::skills::discover(workdir);
 
     if let Some(skill) = skills.iter().find(|skill| skill.id == id) {
-        return ToolResult::success(format_skill_prompt(skill), false);
+        return Ok(ToolResult::success(format_skill_prompt(skill), false));
     }
 
     let available = skills
@@ -47,7 +48,7 @@ pub(super) fn run(args: &Value, workdir: &Path) -> ToolResult {
         .map(|skill| skill.id.as_str())
         .collect::<Vec<_>>()
         .join(", ");
-    ToolResult::failure(format!(
+    Err(format!(
         "Skill \"{id}\" not found. Available skills: {available}"
     ))
 }

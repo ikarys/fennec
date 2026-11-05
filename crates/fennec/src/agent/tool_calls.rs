@@ -4,26 +4,36 @@
 
 use super::ask_user;
 use super::propose_criteria;
+use super::propose_task;
 use super::record_decision;
+use super::request_waiver;
+use super::rule_check;
+use super::suggest_agent;
 use super::turn::Turn;
-use crate::domain::agent::AgentDefinition;
+use crate::domain::agent::{AgentDefinition, WriteScope};
 use crate::domain::criteria;
 use crate::domain::event::{Event, ToolCall, ToolResult};
+use crate::domain::test_files;
 use crate::domain::workflow::run;
 use std::sync::atomic::Ordering;
 
-/// openfox `INTERRUPTED_ERROR`: a call the human stopped before it ran.
+/// `INTERRUPTED_ERROR`: a call the human stopped before it ran.
 pub(super) const INTERRUPTED_ERROR: &str = "Tool execution was interrupted by user";
 /// A call queued after an `ask_user` that paused the turn.
-const NOT_RUN_AFTER_ASK: &str =
-    "Not run: the turn paused at ask_user. Call it again after the answer if it is still needed.";
+/// `ask_user`'s result while the human is away (`Turn::autonomous`).
+const AWAY_ANSWER: &str = "The human is away (autonomous run) and cannot answer. Decide yourself, choosing the safest option that stays within the approved plan, record the question and your choice with record_decision, and continue.";
+/// `propose_criteria`'s result while the human is away.
+const AWAY_CRITERIA: &str = "The human is away (autonomous run): the criteria stay as approved. Record your proposed change with record_decision for the human to review, and continue against the current criteria.";
+/// `request_waiver`'s result while the human is away.
+const AWAY_WAIVER: &str = "The human is away (autonomous run): a protected file cannot be waived. Say in your report what should change there and why, and continue.";
+const NOT_RUN_AFTER_ASK: &str = "Not run: the turn paused for the human (a question or an approval). Call it again after the answer if it is still needed.";
 
 pub(super) enum Flow {
     Continue,
     WaitingForUser,
 }
 
-fn record(
+pub(super) fn record(
     turn: &mut Turn,
     message_id: &str,
     call: &ToolCall,
@@ -36,7 +46,68 @@ fn record(
     })
 }
 
-/// Port of openfox `executeTools`, sequential for now.
+/// Runs one call, streaming its output to the log; `approved` is the human's
+/// "once" for a call fennec paused.
+pub(super) fn run_tool(
+    turn: &mut Turn,
+    agent: &AgentDefinition,
+    message_id: &str,
+    call: &ToolCall,
+    approved: bool,
+) -> Result<ToolResult, String> {
+    let tools = turn.tools;
+    let stop = turn.stop;
+    let mut log_error = None;
+    let mut on_output = |stream, chunk: &str| {
+        if log_error.is_none() {
+            log_error = turn
+                .append(Event::ToolOutput {
+                    message_id: message_id.into(),
+                    tool_call_id: call.id.clone(),
+                    stream,
+                    content: chunk.into(),
+                })
+                .err();
+        }
+    };
+    let (name, args, access) = (&call.name, &call.arguments, agent.commands);
+    if let Some(refusal) = scope_refusal(agent, call) {
+        return Ok(ToolResult::failure(refusal));
+    }
+    let result = if approved {
+        tools.execute_approved(name, args, access, stop, &mut on_output)
+    } else {
+        tools.execute(name, args, access, stop, &mut on_output)
+    };
+    match log_error {
+        Some(e) => Err(e),
+        None => Ok(result),
+    }
+}
+
+/// The refusal for a file write outside an agent's `writes` scope, if any.
+fn scope_refusal(agent: &AgentDefinition, call: &ToolCall) -> Option<String> {
+    if agent.writes != WriteScope::Tests {
+        return None;
+    }
+    if !matches!(call.name.as_str(), "write_file" | "edit_file") {
+        return None;
+    }
+    let path = call
+        .arguments
+        .get("path")
+        .and_then(|value| value.as_str())?;
+    let path = path.strip_prefix("./").unwrap_or(path);
+    if test_files::is_test_path(path) {
+        None
+    } else {
+        Some(format!(
+            "{path} is not a test file: this agent writes only the tests; the code comes after the human validates them."
+        ))
+    }
+}
+
+/// Runs the round's tool calls, sequential for now.
 pub(super) fn execute_tools(
     turn: &mut Turn,
     agent: &AgentDefinition,
@@ -44,6 +115,9 @@ pub(super) fn execute_tools(
     calls: &[ToolCall],
 ) -> Result<Flow, String> {
     let mut waiting = false;
+    // MCP tools are a human-configured capability, not part of the agent's
+    // fixed allowed list: allow them here so a `{server}_{tool}` call runs.
+    let mcp_tools = turn.tools.mcp_tool_names();
     for call in calls {
         // The human pressed stop: a `write_file` queued after the stopped
         // command must not run, so record a failure without running it.
@@ -77,9 +151,9 @@ pub(super) fn execute_tools(
             )?;
             continue;
         }
-        // openfox `createRegistryFromTools` permission check: the mode is
+        // The agent's allow-list check: the mode is
         // enforced here, at execution, so plan stays read-only.
-        if !agent.allows(&call.name) {
+        if !agent.allows(&call.name) && !mcp_tools.contains(&call.name) {
             record(
                 turn,
                 message_id,
@@ -92,6 +166,13 @@ pub(super) fn execute_tools(
             match ask_user::parse(&call.arguments) {
                 // The model reads the failure and the loop goes on.
                 Err(e) => record(turn, message_id, call, ToolResult::failure(e))?,
+                // Nobody would answer before morning: the agent decides.
+                Ok(_) if turn.autonomous => record(
+                    turn,
+                    message_id,
+                    call,
+                    ToolResult::success(AWAY_ANSWER.into(), false),
+                )?,
                 // No result is recorded: the answer will be the result.
                 Ok(q) => {
                     turn.append(Event::ChatAskUser {
@@ -105,10 +186,40 @@ pub(super) fn execute_tools(
             }
             continue;
         }
+        if call.name == request_waiver::NAME {
+            match request_waiver::parse(&call.arguments) {
+                // The model reads the failure and the loop goes on.
+                Err(e) => record(turn, message_id, call, ToolResult::failure(e))?,
+                // A waiver is the human's decision; while they are away it is refused.
+                Ok(_) if turn.autonomous => record(
+                    turn,
+                    message_id,
+                    call,
+                    ToolResult::failure(AWAY_WAIVER.into()),
+                )?,
+                // No result is recorded: the human's answer will be the result.
+                Ok((path, reason)) => {
+                    turn.append(Event::WaiverRequested {
+                        call_id: call.id.clone(),
+                        path,
+                        reason,
+                    })?;
+                    waiting = true;
+                }
+            }
+            continue;
+        }
         if call.name == propose_criteria::NAME {
             match propose_criteria::parse(&call.arguments) {
                 // The model reads the failure and the loop goes on.
                 Err(e) => record(turn, message_id, call, ToolResult::failure(e))?,
+                // The contract is the human's: it never changes while they are away.
+                Ok(_) if turn.autonomous => record(
+                    turn,
+                    message_id,
+                    call,
+                    ToolResult::failure(AWAY_CRITERIA.into()),
+                )?,
                 // The question shows the delta against the criteria in force;
                 // a proposal that changes nothing is accepted without asking.
                 Ok(proposal) => {
@@ -129,7 +240,9 @@ pub(super) fn execute_tools(
                             ),
                         )?;
                     } else {
-                        for event in propose_criteria::events(&call.id, proposal, &in_force) {
+                        for event in
+                            propose_criteria::events(&call.id, proposal, &in_force, turn.lang)
+                        {
                             turn.append(event)?;
                         }
                         waiting = true;
@@ -150,29 +263,48 @@ pub(super) fn execute_tools(
             record(turn, message_id, call, result)?;
             continue;
         }
-        let (tools, stop) = (turn.tools, turn.stop);
-        let mut log_error = None;
-        let r = tools.execute(
-            &call.name,
-            &call.arguments,
-            agent.commands,
-            stop,
-            &mut |stream, chunk| {
-                if log_error.is_none() {
-                    log_error = turn
-                        .append(Event::ToolOutput {
-                            message_id: message_id.into(),
-                            tool_call_id: call.id.clone(),
-                            stream,
-                            content: chunk.into(),
-                        })
-                        .err();
+        if call.name == propose_task::NAME {
+            // Not blocking: the proposal is recorded and the turn goes on.
+            let result = match propose_task::parse(&call.arguments) {
+                Err(e) => ToolResult::failure(e),
+                Ok(proposal) => {
+                    turn.append(propose_task::event(&call.id, proposal))?;
+                    ToolResult::success(propose_task::PROPOSED.into(), false)
                 }
-            },
-        );
-        if let Some(e) = log_error {
-            return Err(e);
+            };
+            record(turn, message_id, call, result)?;
+            continue;
         }
+
+        if call.name == suggest_agent::NAME {
+            // Not blocking: the suggestion is recorded and the turn goes on.
+            let current = agent.id.clone();
+            let result = match suggest_agent::parse(&call.arguments, turn.agents, &current) {
+                Err(e) => ToolResult::failure(e),
+                Ok(suggestion) => {
+                    turn.append(suggest_agent::event(&call.id, suggestion))?;
+                    ToolResult::success(suggest_agent::SUGGESTED.into(), false)
+                }
+            };
+            record(turn, message_id, call, result)?;
+            continue;
+        }
+        // The human's rules run before the tool: the model's call never reaches it.
+        let tools = turn.tools;
+        let check = tools.check_rules(&call.name, &call.arguments);
+        if !turn.autonomous
+            && let rules::Decision::Ask(rule) = check.decision
+        {
+            turn.append(rule_check::approval(&call.id, rule, &check))?;
+            waiting = true; // no result: the human's answer will produce it
+            continue;
+        }
+        if let Some(rule) = rule_check::refusal(&check) {
+            turn.append(rule_check::event(&call.id, rule, &check.subject))?;
+            record(turn, message_id, call, ToolResult::failure(rule.refusal()))?;
+            continue;
+        }
+        let r = run_tool(turn, agent, message_id, call, false)?;
         record(turn, message_id, call, r)?;
     }
     Ok(if waiting {
@@ -180,4 +312,661 @@ pub(super) fn execute_tools(
     } else {
         Flow::Continue
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Turn, execute_tools};
+    use crate::agent::ports::{RuleCheck, Toolbox};
+    use crate::agent::test_support::{MemoryLog, Scripted, builder, plan};
+    use crate::domain::agent::{AgentDefinition, AgentOrigin, CommandAccess, WriteScope};
+    use crate::domain::event::{Event, OutputStream, ToolCall, ToolResult};
+    use rules::{Action, Origin, Request, Rule, Rules, Scope, Target, TargetKind};
+    use serde_json::{Value, json};
+    use std::cell::RefCell;
+    use std::path::PathBuf;
+    use std::rc::Rc;
+    use std::sync::atomic::AtomicBool;
+
+    /// A toolbox that offers one MCP tool and records every call it runs.
+    struct McpToolbox {
+        executed: Rc<RefCell<Vec<String>>>,
+    }
+
+    impl Toolbox for McpToolbox {
+        fn definitions(&self) -> Value {
+            json!([])
+        }
+
+        fn execute(
+            &self,
+            name: &str,
+            _args: &Value,
+            _access: CommandAccess,
+            _stop: &AtomicBool,
+            _on_output: &mut dyn FnMut(OutputStream, &str),
+        ) -> ToolResult {
+            self.executed.borrow_mut().push(name.to_string());
+            ToolResult::success("mcp ran".into(), false)
+        }
+
+        fn mcp_tool_names(&self) -> Vec<String> {
+            vec!["fs_echo".into()]
+        }
+    }
+
+    struct RecordingToolbox {
+        executed: Rc<RefCell<Vec<String>>>,
+        rules: Rules,
+    }
+
+    impl Toolbox for RecordingToolbox {
+        fn definitions(&self) -> Value {
+            json!([])
+        }
+
+        fn execute(
+            &self,
+            name: &str,
+            _args: &Value,
+            _access: CommandAccess,
+            _stop: &AtomicBool,
+            _on_output: &mut dyn FnMut(OutputStream, &str),
+        ) -> ToolResult {
+            self.executed.borrow_mut().push(name.to_string());
+            ToolResult::success("ran".into(), false)
+        }
+
+        fn check_rules(&self, name: &str, _args: &Value) -> RuleCheck<'_> {
+            RuleCheck {
+                decision: self.rules.decide(&Request::Tool(name)),
+                subject: name.to_string(),
+                proposal: None,
+            }
+        }
+
+        fn mcp_tool_names(&self) -> Vec<String> {
+            Vec::new()
+        }
+    }
+
+    struct Harness<'a> {
+        log: MemoryLog,
+        model: Scripted,
+        tools: RecordingToolbox,
+        stop: &'a AtomicBool,
+        workdir: PathBuf,
+        on_event: Box<dyn FnMut(&Event) + 'a>,
+        agents: Vec<AgentDefinition>,
+    }
+
+    impl<'a> Harness<'a> {
+        fn new(rules: Rules, stop: &'a AtomicBool, agents: Vec<AgentDefinition>) -> Self {
+            Harness {
+                log: MemoryLog::default(),
+                model: Scripted(RefCell::new(vec![])),
+                tools: RecordingToolbox {
+                    executed: Rc::new(RefCell::new(Vec::new())),
+                    rules,
+                },
+                stop,
+                workdir: PathBuf::from("/tmp"),
+                on_event: Box::new(|_: &Event| {}),
+                agents,
+            }
+        }
+
+        fn turn(&mut self, autonomous: bool) -> Turn<'_> {
+            Turn {
+                model: &self.model,
+                log: &self.log,
+                tools: &self.tools,
+                session_id: "s",
+                workdir: &self.workdir,
+                instructions: "",
+                skills: &[],
+                always_on: &[],
+                agents: &self.agents,
+                max_tokens: 100,
+                context_window: 1000,
+                compact_at: 0.0,
+                reasoning_effort: None,
+                autonomous,
+                lang: crate::domain::lang::Lang::Fr,
+                stop: self.stop,
+                on_event: &mut self.on_event,
+            }
+        }
+
+        fn turn_with_agent(&mut self, autonomous: bool) -> (Turn<'_>, AgentDefinition) {
+            let agent = self.agents[0].clone();
+            (self.turn(autonomous), agent)
+        }
+    }
+
+    fn rule(id: i64, tool: &str, action: Action) -> Rule {
+        Rule {
+            id,
+            scope: Scope::Global,
+            target: Target::parse(TargetKind::Tool, tool, None).unwrap(),
+            action,
+            note: None,
+            origin: Origin::Human,
+        }
+    }
+
+    fn call(id: &str, name: &str, args: Value) -> ToolCall {
+        ToolCall {
+            id: id.into(),
+            name: name.into(),
+            arguments: args,
+            parse_error: None,
+            raw_arguments: None,
+        }
+    }
+
+    fn tests_agent(writes: WriteScope) -> AgentDefinition {
+        AgentDefinition {
+            id: "tests".into(),
+            name: "Tests".into(),
+            description: String::new(),
+            subagent: false,
+            allowed_tools: vec!["read_file".into(), "write_file".into(), "edit_file".into()],
+            commands: CommandAccess::ReadWrite,
+            writes,
+            reasoning_effort: None,
+            color: None,
+            phase: None,
+            prompt: "prompt".into(),
+            origin: AgentOrigin::Default,
+            path: None,
+        }
+    }
+
+    fn results(log: &MemoryLog) -> Vec<(String, ToolResult)> {
+        log.0
+            .borrow()
+            .iter()
+            .filter_map(|event| match event {
+                Event::ToolResult {
+                    tool_call_id,
+                    result,
+                    ..
+                } => Some((tool_call_id.clone(), result.clone())),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn count(log: &MemoryLog, pred: impl Fn(&Event) -> bool) -> usize {
+        log.0.borrow().iter().filter(|e| pred(e)).count()
+    }
+
+    #[test]
+    fn an_mcp_tool_call_is_allowed_even_if_not_in_the_agents_list() {
+        let executed = Rc::new(RefCell::new(Vec::new()));
+        let tools = McpToolbox {
+            executed: executed.clone(),
+        };
+        let log = MemoryLog::default();
+        let model = Scripted(RefCell::new(vec![]));
+        let stop = AtomicBool::new(false);
+        let agents = builder();
+        let workdir = PathBuf::from("/tmp");
+        let mut on_event = |_: &Event| {};
+        let mut turn = Turn {
+            model: &model,
+            log: &log,
+            tools: &tools,
+            session_id: "s",
+            workdir: &workdir,
+            instructions: "",
+            skills: &[],
+            always_on: &[],
+            agents: &agents,
+            max_tokens: 100,
+            context_window: 1000,
+            compact_at: 0.0,
+            reasoning_effort: None,
+            autonomous: false,
+            lang: crate::domain::lang::Lang::Fr,
+            stop: &stop,
+            on_event: &mut on_event,
+        };
+        let agent = &agents[0];
+        // The builder does not list `fs_echo`; the MCP set is what allows it.
+        assert!(!agent.allows("fs_echo"));
+        let mcp_call = ToolCall {
+            id: "c1".into(),
+            name: "fs_echo".into(),
+            arguments: json!({}),
+            parse_error: None,
+            raw_arguments: None,
+        };
+        execute_tools(&mut turn, agent, "m1", &[mcp_call]).unwrap();
+        assert_eq!(*executed.borrow(), vec!["fs_echo".to_string()]);
+
+        // A non-MCP tool not in the list is still refused and never runs.
+        let refused = ToolCall {
+            id: "c2".into(),
+            name: "web_search".into(),
+            arguments: json!({}),
+            parse_error: None,
+            raw_arguments: None,
+        };
+        execute_tools(&mut turn, agent, "m2", &[refused]).unwrap();
+        assert_eq!(*executed.borrow(), vec!["fs_echo".to_string()]);
+        assert!(
+            log.0
+                .borrow()
+                .iter()
+                .any(|e| matches!(e, Event::ToolResult { result, .. }
+                if !result.success
+                    && result.error.as_deref().is_some_and(|m| m.contains("not available"))))
+        );
+    }
+
+    #[test]
+    fn stop_true_records_interrupted_and_continues() {
+        let stop = AtomicBool::new(true);
+        let mut h = Harness::new(Rules::new(Vec::new()), &stop, builder());
+        let (mut turn, agent) = h.turn_with_agent(false);
+        let flow = execute_tools(
+            &mut turn,
+            &agent,
+            "m1",
+            &[
+                call("c1", "read_file", json!({})),
+                call("c2", "write_file", json!({})),
+            ],
+        )
+        .unwrap();
+
+        assert!(matches!(flow, super::Flow::Continue));
+        assert!(h.tools.executed.borrow().is_empty());
+
+        let results = results(&h.log);
+        let ids = results
+            .iter()
+            .map(|(id, _)| id.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(ids, vec!["c1", "c2"]);
+        for (_, result) in &results {
+            assert!(!result.success);
+            assert_eq!(result.error.as_deref(), Some(super::INTERRUPTED_ERROR));
+        }
+    }
+
+    #[test]
+    fn ask_user_pauses_later_calls_not_run() {
+        let stop = AtomicBool::new(false);
+        let mut h = Harness::new(Rules::new(Vec::new()), &stop, builder());
+        let (mut turn, agent) = h.turn_with_agent(false);
+        let flow = execute_tools(
+            &mut turn,
+            &agent,
+            "m1",
+            &[
+                call("c1", "ask_user", json!({"question": "Which?"})),
+                call("c2", "read_file", json!({})),
+            ],
+        )
+        .unwrap();
+
+        assert!(matches!(flow, super::Flow::WaitingForUser));
+        assert!(h.tools.executed.borrow().is_empty());
+        assert_eq!(
+            results(&h.log),
+            vec![(
+                "c2".to_string(),
+                ToolResult::failure(super::NOT_RUN_AFTER_ASK.into())
+            )]
+        );
+        assert_eq!(
+            count(
+                &h.log,
+                |e| matches!(e, Event::ChatAskUser { call_id, .. } if call_id == "c1")
+            ),
+            1
+        );
+    }
+
+    #[test]
+    fn parse_error_failure_contains_message_and_does_not_run() {
+        let stop = AtomicBool::new(false);
+        let mut h = Harness::new(Rules::new(Vec::new()), &stop, builder());
+        let (mut turn, agent) = h.turn_with_agent(false);
+        let bad_call = ToolCall {
+            id: "c1".into(),
+            name: "read_file".into(),
+            arguments: json!({}),
+            parse_error: Some("bad json".into()),
+            raw_arguments: None,
+        };
+        let flow = execute_tools(&mut turn, &agent, "m1", &[bad_call]).unwrap();
+
+        assert!(matches!(flow, super::Flow::Continue));
+        assert!(h.tools.executed.borrow().is_empty());
+
+        let results = results(&h.log);
+        assert_eq!(results.len(), 1);
+        let error = results[0].1.error.as_deref().unwrap();
+        assert!(error.contains("Failed to parse tool call arguments"));
+        assert!(error.contains("bad json"));
+    }
+
+    #[test]
+    fn scope_refusal_keeps_tests_agent_to_test_files() {
+        let tests = tests_agent(WriteScope::Tests);
+        assert!(
+            super::scope_refusal(
+                &tests,
+                &call("c1", "write_file", json!({"path": "tests/foo.rs"}))
+            )
+            .is_none()
+        );
+        assert!(
+            super::scope_refusal(
+                &tests,
+                &call("c1", "write_file", json!({"path": "./tests/foo.rs"}))
+            )
+            .is_none()
+        );
+        assert!(
+            super::scope_refusal(
+                &tests,
+                &call("c1", "write_file", json!({"path": "src/lib.rs"}))
+            )
+            .is_some()
+        );
+        assert!(
+            super::scope_refusal(
+                &tests,
+                &call("c1", "edit_file", json!({"path": "src/lib.rs"}))
+            )
+            .is_some()
+        );
+        assert!(
+            super::scope_refusal(
+                &tests,
+                &call("c1", "read_file", json!({"path": "src/lib.rs"}))
+            )
+            .is_none()
+        );
+
+        let any = tests_agent(WriteScope::Any);
+        assert!(
+            super::scope_refusal(
+                &any,
+                &call("c1", "write_file", json!({"path": "src/lib.rs"}))
+            )
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn plan_agent_denies_write_file_allows_read_file() {
+        let stop = AtomicBool::new(false);
+        let mut h = Harness::new(Rules::new(Vec::new()), &stop, vec![plan()]);
+        let (mut turn, agent) = h.turn_with_agent(false);
+        let flow = execute_tools(
+            &mut turn,
+            &agent,
+            "m1",
+            &[
+                call("c1", "write_file", json!({})),
+                call("c2", "read_file", json!({})),
+            ],
+        )
+        .unwrap();
+
+        assert!(matches!(flow, super::Flow::Continue));
+        assert_eq!(*h.tools.executed.borrow(), vec!["read_file".to_string()]);
+
+        let results = results(&h.log);
+        assert_eq!(results.len(), 2);
+        let denied = agent.denied("write_file");
+        assert_eq!(results[0].0, "c1");
+        assert!(!results[0].1.success);
+        assert_eq!(results[0].1.error.as_deref(), Some(denied.as_str()));
+        assert_eq!(results[1].0, "c2");
+        assert!(results[1].1.success);
+        assert_eq!(results[1].1.output.as_deref(), Some("ran"));
+    }
+
+    #[test]
+    fn autonomous_away_results_for_special_tools() {
+        let stop = AtomicBool::new(false);
+        let mut h = Harness::new(Rules::new(Vec::new()), &stop, builder());
+        let (mut turn, agent) = h.turn_with_agent(true);
+        let flow = execute_tools(
+            &mut turn,
+            &agent,
+            "m1",
+            &[
+                call("c1", "ask_user", json!({"question": "Which?"})),
+                call(
+                    "c2",
+                    "request_waiver",
+                    json!({"path": "AGENTS.md", "reason": "need it"}),
+                ),
+                call(
+                    "c3",
+                    "propose_criteria",
+                    json!({
+                        "criteria": [{"description": "tests pass"}],
+                        "reason": "needed"
+                    }),
+                ),
+            ],
+        )
+        .unwrap();
+
+        assert!(matches!(flow, super::Flow::Continue));
+        assert!(h.tools.executed.borrow().is_empty());
+        assert_eq!(
+            results(&h.log),
+            vec![
+                (
+                    "c1".to_string(),
+                    ToolResult::success(super::AWAY_ANSWER.into(), false)
+                ),
+                (
+                    "c2".to_string(),
+                    ToolResult::failure(super::AWAY_WAIVER.into())
+                ),
+                (
+                    "c3".to_string(),
+                    ToolResult::failure(super::AWAY_CRITERIA.into())
+                ),
+            ]
+        );
+        assert_eq!(count(&h.log, |e| matches!(e, Event::ChatAskUser { .. })), 0);
+        assert_eq!(
+            count(&h.log, |e| matches!(e, Event::WaiverRequested { .. })),
+            0
+        );
+        assert_eq!(
+            count(&h.log, |e| matches!(e, Event::CriteriaProposed { .. })),
+            0
+        );
+    }
+
+    #[test]
+    fn invalid_ask_user_arguments_are_failure_not_pause() {
+        let stop = AtomicBool::new(false);
+        let mut h = Harness::new(Rules::new(Vec::new()), &stop, builder());
+        let (mut turn, agent) = h.turn_with_agent(false);
+        let flow = execute_tools(
+            &mut turn,
+            &agent,
+            "m1",
+            &[call("c1", "ask_user", json!({}))],
+        )
+        .unwrap();
+
+        assert!(matches!(flow, super::Flow::Continue));
+        assert!(h.tools.executed.borrow().is_empty());
+
+        let results = results(&h.log);
+        assert_eq!(results.len(), 1);
+        assert!(!results[0].1.success);
+        assert!(results[0].1.error.is_some());
+        assert_eq!(count(&h.log, |e| matches!(e, Event::ChatAskUser { .. })), 0);
+    }
+
+    #[test]
+    fn block_rule_records_rule_blocked_and_failure() {
+        let stop = AtomicBool::new(false);
+        let rule = rule(7, "read_file", Action::Block);
+        let refusal = rule.refusal();
+        let mut h = Harness::new(Rules::new(vec![rule]), &stop, builder());
+        let (mut turn, agent) = h.turn_with_agent(false);
+        let flow = execute_tools(
+            &mut turn,
+            &agent,
+            "m1",
+            &[call("c1", "read_file", json!({}))],
+        )
+        .unwrap();
+
+        assert!(matches!(flow, super::Flow::Continue));
+        assert!(h.tools.executed.borrow().is_empty());
+
+        let results = results(&h.log);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0, "c1");
+        assert!(!results[0].1.success);
+        assert_eq!(results[0].1.error.as_deref(), Some(refusal.as_str()));
+
+        let events = h.log.0.borrow();
+        let blocked = events.iter().position(|e| {
+            matches!(e, Event::RuleBlocked { call_id, rule_id, .. }
+                if call_id == "c1" && rule_id == "7")
+        });
+        let result = events.iter().position(|e| {
+            matches!(e, Event::ToolResult { tool_call_id, .. }
+                if tool_call_id == "c1")
+        });
+        assert!(blocked.is_some_and(|b| result.is_some_and(|r| b < r)));
+    }
+
+    #[test]
+    fn ask_rule_with_human_requests_approval_and_not_run_after_ask() {
+        let stop = AtomicBool::new(false);
+        let mut h = Harness::new(
+            Rules::new(vec![rule(7, "read_file", Action::Ask)]),
+            &stop,
+            builder(),
+        );
+        let (mut turn, agent) = h.turn_with_agent(false);
+        let flow = execute_tools(
+            &mut turn,
+            &agent,
+            "m1",
+            &[
+                call("c1", "read_file", json!({})),
+                call("c2", "write_file", json!({})),
+            ],
+        )
+        .unwrap();
+
+        assert!(matches!(flow, super::Flow::WaitingForUser));
+        assert!(h.tools.executed.borrow().is_empty());
+        assert_eq!(
+            results(&h.log),
+            vec![(
+                "c2".to_string(),
+                ToolResult::failure(super::NOT_RUN_AFTER_ASK.into())
+            )]
+        );
+        assert_eq!(
+            count(
+                &h.log,
+                |e| matches!(e, Event::RuleApprovalRequested { call_id, rule_id, .. }
+                    if call_id == "c1" && rule_id.as_deref() == Some("7"))
+            ),
+            1
+        );
+    }
+
+    #[test]
+    fn ask_rule_autonomous_records_rule_blocked_and_failure() {
+        let stop = AtomicBool::new(false);
+        let rule = rule(7, "read_file", Action::Ask);
+        let refusal = rule.refusal();
+        let mut h = Harness::new(Rules::new(vec![rule]), &stop, builder());
+        let (mut turn, agent) = h.turn_with_agent(true);
+        let flow = execute_tools(
+            &mut turn,
+            &agent,
+            "m1",
+            &[call("c1", "read_file", json!({}))],
+        )
+        .unwrap();
+
+        assert!(matches!(flow, super::Flow::Continue));
+        assert!(h.tools.executed.borrow().is_empty());
+
+        let results = results(&h.log);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0, "c1");
+        assert!(!results[0].1.success);
+        assert_eq!(results[0].1.error.as_deref(), Some(refusal.as_str()));
+        assert_eq!(
+            count(&h.log, |e| matches!(e, Event::RuleApprovalRequested { .. })),
+            0
+        );
+        assert_eq!(
+            count(
+                &h.log,
+                |e| matches!(e, Event::RuleBlocked { call_id, rule_id, .. }
+                    if call_id == "c1" && rule_id == "7")
+            ),
+            1
+        );
+    }
+
+    #[test]
+    fn record_decision_and_propose_task_do_not_pause() {
+        let stop = AtomicBool::new(false);
+        let mut agents = builder();
+        agents[0].allowed_tools.push("propose_task".into());
+        let mut h = Harness::new(Rules::new(Vec::new()), &stop, agents);
+        let (mut turn, agent) = h.turn_with_agent(false);
+        let flow = execute_tools(
+            &mut turn,
+            &agent,
+            "m1",
+            &[
+                call(
+                    "c1",
+                    "record_decision",
+                    json!({
+                        "title": "use SQLite",
+                        "choice": "use SQLite",
+                        "reason": "bundled",
+                        "alternatives": ["postgres"]
+                    }),
+                ),
+                call(
+                    "c2",
+                    "propose_task",
+                    json!({"title": "Add tests", "text": "cover the loop"}),
+                ),
+                call("c3", "read_file", json!({})),
+            ],
+        )
+        .unwrap();
+
+        assert!(matches!(flow, super::Flow::Continue));
+        assert_eq!(*h.tools.executed.borrow(), vec!["read_file".to_string()]);
+
+        let results = results(&h.log);
+        assert_eq!(results.len(), 3);
+        assert!(results[0].1.success);
+        assert!(results[1].1.success);
+        assert!(results[2].1.success);
+        assert_eq!(results[2].1.output.as_deref(), Some("ran"));
+    }
 }

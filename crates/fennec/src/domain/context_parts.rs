@@ -9,6 +9,7 @@ use std::path::Path;
 
 use crate::domain::conversation::{fold_messages, frozen_prompt};
 use crate::domain::event::Event;
+use crate::domain::lang::Lang;
 
 /// Which side of the context a part belongs to, so a view can group them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
@@ -42,6 +43,32 @@ impl PartKind {
             _ => return None,
         };
         Some((kind, label))
+    }
+}
+
+/// Labels are stored French in the usage ledger, so they are translated at
+/// display time; file names pass through.
+pub fn display_label(label: &str, lang: Lang) -> String {
+    match lang {
+        Lang::Fr => label.to_string(),
+        Lang::En => match label {
+            "Définitions d'outils" => "Tool definitions".to_string(),
+            "Messages humains" => "Human messages".to_string(),
+            "Réponses du modèle" => "Model answers".to_string(),
+            "Raisonnement" => "Reasoning".to_string(),
+            "Appels d'outils" => "Tool calls".to_string(),
+            "Skills chargés" => "Loaded skills".to_string(),
+            "Liste des skills" => "Skill list".to_string(),
+            "Instructions globales" => "Global instructions".to_string(),
+            "Prompt de base" => "Base prompt".to_string(),
+            _ => {
+                if let Some(name) = label.strip_prefix("Résultat : ") {
+                    format!("Result: {name}")
+                } else {
+                    label.to_string()
+                }
+            }
+        },
     }
 }
 
@@ -397,6 +424,40 @@ mod tests {
     }
 
     #[test]
+    fn display_label_translates_french_labels_for_english() {
+        assert_eq!(
+            display_label("Définitions d'outils", Lang::En),
+            "Tool definitions"
+        );
+        assert_eq!(
+            display_label("Messages humains", Lang::En),
+            "Human messages"
+        );
+        assert_eq!(
+            display_label("Réponses du modèle", Lang::En),
+            "Model answers"
+        );
+        assert_eq!(display_label("Raisonnement", Lang::En), "Reasoning");
+        assert_eq!(display_label("Appels d'outils", Lang::En), "Tool calls");
+        assert_eq!(display_label("Skills chargés", Lang::En), "Loaded skills");
+        assert_eq!(display_label("Liste des skills", Lang::En), "Skill list");
+        assert_eq!(
+            display_label("Instructions globales", Lang::En),
+            "Global instructions"
+        );
+        assert_eq!(display_label("Prompt de base", Lang::En), "Base prompt");
+        assert_eq!(
+            display_label("Résultat : read_file", Lang::En),
+            "Result: read_file"
+        );
+        assert_eq!(display_label("AGENTS.md", Lang::En), "AGENTS.md");
+        assert_eq!(
+            display_label("Messages humains", Lang::Fr),
+            "Messages humains"
+        );
+    }
+
+    #[test]
     fn spread_shares_the_tokens_pro_rata() {
         let parts = [
             ContextPart {
@@ -436,6 +497,7 @@ mod tests {
             Event::TurnSnapshot {
                 cached_system_prompt: "base prompt".into(),
                 cached_tools: None,
+                mcp_tool_names: Vec::new(),
             },
             Event::MessageStart {
                 message_id: "u1".into(),

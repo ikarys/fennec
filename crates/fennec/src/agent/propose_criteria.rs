@@ -3,7 +3,8 @@
 //! ends and the human's answer is the tool result.
 
 use crate::domain::criteria::{ACCEPT_PROPOSAL, Criterion, REFUSE_PROPOSAL, proposal_question};
-use crate::domain::event::{AskType, ChoiceOption, Event};
+use crate::domain::event::{AskType, ChoiceOption, Event, OptionTone};
+use crate::domain::lang::Lang;
 use serde_json::{Value, json};
 
 pub const NAME: &str = "propose_criteria";
@@ -103,12 +104,13 @@ pub fn parse(args: &Value) -> Result<Proposal, String> {
 
 /// The proposal, then the question the human answers: the question compares
 /// the proposal with the criteria in force.
-pub fn events(call_id: &str, proposal: Proposal, current: &[Criterion]) -> [Event; 2] {
-    let question = proposal_question(current, &proposal.criteria, &proposal.reason);
-    let option = |value: &str, label: &str| ChoiceOption {
+pub fn events(call_id: &str, proposal: Proposal, current: &[Criterion], lang: Lang) -> [Event; 2] {
+    let question = proposal_question(current, &proposal.criteria, &proposal.reason, lang);
+    let option = |value: &str, label: &str, tone: Option<OptionTone>| ChoiceOption {
         value: value.into(),
         label: label.into(),
         description: None,
+        tone,
     };
     [
         Event::CriteriaProposed {
@@ -121,8 +123,12 @@ pub fn events(call_id: &str, proposal: Proposal, current: &[Criterion]) -> [Even
             question,
             ask_type: AskType::Choice,
             options: Some(vec![
-                option(ACCEPT_PROPOSAL, "Accepter"),
-                option(REFUSE_PROPOSAL, "Refuser"),
+                option(ACCEPT_PROPOSAL, lang.pick("Accept", "Accepter"), None),
+                option(
+                    REFUSE_PROPOSAL,
+                    lang.pick("Refuse", "Refuser"),
+                    Some(OptionTone::Danger),
+                ),
             ]),
         },
     ]
@@ -180,5 +186,27 @@ mod tests {
         }))
         .unwrap();
         assert_eq!(p.criteria[0].check, None);
+    }
+
+    #[test]
+    fn events_mark_the_refuse_option_danger() {
+        let proposal = Proposal {
+            criteria: vec![Criterion {
+                id: "C1".into(),
+                description: "d".into(),
+                check: None,
+            }],
+            reason: "r".into(),
+        };
+        let [_, ask] = events("call-1", proposal, &[], Lang::Fr);
+        let options = match ask {
+            Event::ChatAskUser {
+                options: Some(options),
+                ..
+            } => options,
+            _ => panic!("expected a chat.ask_user event with options"),
+        };
+        assert_eq!(options[0].tone, None);
+        assert_eq!(options[1].tone, Some(OptionTone::Danger));
     }
 }

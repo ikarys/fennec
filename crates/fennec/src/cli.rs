@@ -13,13 +13,9 @@ use crate::domain::event::{ChoiceOption, DoneReason, Event};
 use crate::domain::id::new_id;
 use crate::domain::open_calls;
 use crate::domain::slash::{TurnInput, resolve};
-use crate::instructions::all_instructions;
-use crate::llm::OpenAiClient;
-use crate::metering::MeteredLog;
-use crate::protected;
 use crate::skills;
 use crate::store::SqliteStore;
-use crate::tools::{LocalTools, Sandbox};
+use crate::turn_build;
 use std::io::{BufRead, Write};
 use std::sync::atomic::AtomicBool;
 use transcript::Transcript;
@@ -129,50 +125,31 @@ fn with_turn(
     let workdir = std::env::current_dir().map_err(|e| e.to_string())?;
     let prefs = store.preferences()?;
     let params = settings.llm.for_turn(&prefs, None);
-    let instructions = all_instructions(prefs.global_instructions.as_deref(), &workdir);
     eprintln!(
         "session {session_id} · {} · {}",
         params.model,
         workdir.display()
     );
-    let skills = skills::discover(&workdir);
-    let agents = agents::discover(&workdir);
-    let model = OpenAiClient::new(settings.endpoint(&prefs, &params.provider)?, &params.model);
-    let protection = protected::load(&workdir);
-    let tools = LocalTools::new(workdir.clone())
-        .with_search(prefs.search.clone())
-        .with_sandbox(
-            Sandbox::for_store(&prefs.sandbox, &settings.db_path)
-                .protecting(protected::existing_paths(&workdir, &protection)),
-        )
-        .with_protection(protection);
     // ponytail: no Ctrl-C handling, the process just dies; a signal handler
     // setting `stop` when an interrupted turn must end cleanly.
     let stop = AtomicBool::new(false);
     let mut transcript = Transcript::default();
     let mut on_event = |e: &Event| transcript.print(e);
-    let ledger = token_usage::Ledger::open(&settings.usage_path()).map_err(|e| e.to_string())?;
-    let metered = MeteredLog {
-        log: store,
-        store,
-        ledger: &ledger,
-    };
-    work(&mut Turn {
-        model: &model,
-        log: &metered,
-        tools: &tools,
-        session_id,
-        workdir: &workdir,
-        instructions: &instructions,
-        skills: &skills,
-        agents: &agents,
-        max_tokens: params.max_tokens,
-        context_window: params.context_window,
-        compact_at: params.compact_at,
-        reasoning_effort: params.reasoning_effort,
-        stop: &stop,
+    let mut options = turn_build::Options {
+        notifier: None,
+        model_choice: None,
+        autonomous: false,
         on_event: &mut on_event,
-    })
+    };
+    turn_build::with_turn(
+        settings,
+        store,
+        session_id,
+        &workdir,
+        &stop,
+        &mut options,
+        |turn, _tools| work(turn),
+    )
 }
 
 /// The human's answer from stdin; `None` on end of input or an empty line.
@@ -237,6 +214,7 @@ mod tests {
             value: value.into(),
             label: label.into(),
             description: None,
+            tone: None,
         }
     }
 

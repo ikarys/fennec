@@ -1,9 +1,11 @@
 use super::*;
-use crate::agent::ports::{AgentRun, ChildSessions, CommandRun, Commands, Completion, Model};
+use crate::agent::ports::{
+    AgentRun, ChildSessions, CommandRun, Commands, Completion, EventLog, Model,
+};
 use crate::agent::test_support::{MemoryLog, Scripted, builder, plan, reply};
 use crate::domain::agent::AgentDefinition;
 use crate::domain::criteria::{CriterionStatus, Provenance};
-use crate::domain::event::{DoneReason, Event, ToolCall};
+use crate::domain::event::{DoneReason, Event, ToolCall, ToolResult};
 use crate::domain::workflow::definition::{
     AgentContext, Edge, EndOutcome, Node, NodeKind, Position, Workflow,
 };
@@ -47,11 +49,15 @@ impl<'a> Harness<'a> {
             workdir: &self.workdir,
             instructions: "",
             skills: &[],
+            always_on: &[],
             agents: &self.agents,
             max_tokens: 100,
             context_window: 1000,
             compact_at: 0.0,
             reasoning_effort: None,
+            autonomous: false,
+            lang: crate::domain::lang::Lang::Fr,
+
             stop: self.stop,
             on_event: &mut self.on_event,
         }
@@ -1550,6 +1556,7 @@ fn start_from_plan_records_the_plan_and_runs_the_criteria() {
             workflow: criteria_workflow(),
             task: "do it".into(),
             plan: "## Done when\n- C1 — check: `true`".into(),
+            attachments: Vec::new(),
         },
     )
     .unwrap();
@@ -1640,6 +1647,7 @@ fn start_from_plan_answers_the_approval_node() {
             workflow,
             task: "do it".into(),
             plan: "## Done when\n- C1 — check: `true`".into(),
+            attachments: Vec::new(),
         },
     )
     .unwrap();
@@ -1719,6 +1727,288 @@ fn start_with_attachments_puts_them_in_the_session_before_the_run() {
 }
 
 #[test]
+fn relaunch_a_run_that_ended_in_error_reruns_the_open_node() {
+    let workflow = simple_workflow();
+    let model = Scripted(RefCell::new(vec![reply("done", vec![])]));
+    let stop = AtomicBool::new(false);
+    let children = FakeChildren::default();
+    let commands = FakeCommands::default();
+    let env = WorkflowEnv {
+        children: &children,
+        commands: &commands,
+    };
+    let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
+    h.agents = vec![plan()];
+
+    h.log.0.borrow_mut().extend([
+        Event::WorkflowStarted {
+            run_id: "r".into(),
+            workflow: workflow.clone(),
+            task: "do it".into(),
+            step_by_step: false,
+            started_at: None,
+        },
+        Event::WorkflowNodeStarted {
+            run_id: "r".into(),
+            node_id: "start".into(),
+            pass: 1,
+            via: None,
+            child_session_id: None,
+            started_at: None,
+        },
+        Event::WorkflowNodeFinished {
+            run_id: "r".into(),
+            node_id: "start".into(),
+            port: "next".into(),
+            output: "do it".into(),
+            exit_code: None,
+            comment: None,
+            duration_ms: None,
+        },
+        Event::WorkflowNodeStarted {
+            run_id: "r".into(),
+            node_id: "a".into(),
+            pass: 1,
+            via: Some(Via {
+                from: "start".into(),
+                port: "next".into(),
+            }),
+            child_session_id: None,
+            started_at: None,
+        },
+        Event::WorkflowFinished {
+            run_id: "r".into(),
+            outcome: RunOutcome::Error,
+            reason: Some("boom".into()),
+            stats: None,
+        },
+    ]);
+
+    let reason = run_workflow(&mut h.turn(), &env, WorkflowJob::Resume).unwrap();
+    assert_eq!(reason, DoneReason::Complete);
+
+    let events = h.log.0.into_inner();
+    let a_started = events
+        .iter()
+        .filter(|e| matches!(e, Event::WorkflowNodeStarted { node_id, .. } if node_id == "a"))
+        .count();
+    assert_eq!(a_started, 2);
+    let finished = events
+        .iter()
+        .filter(|e| matches!(e, Event::WorkflowFinished { .. }))
+        .count();
+    assert_eq!(finished, 2);
+    assert!(events.iter().any(|e| matches!(
+        e,
+        Event::WorkflowFinished {
+            outcome: RunOutcome::Done,
+            ..
+        }
+    )));
+}
+
+#[test]
+fn relaunch_with_no_reopenable_node_is_refused() {
+    let workflow = simple_workflow();
+    let model = Scripted(RefCell::new(vec![]));
+    let stop = AtomicBool::new(false);
+    let children = FakeChildren::default();
+    let commands = FakeCommands::default();
+    let env = WorkflowEnv {
+        children: &children,
+        commands: &commands,
+    };
+    let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
+    h.agents = vec![plan()];
+
+    h.log.0.borrow_mut().extend([
+        Event::WorkflowStarted {
+            run_id: "r".into(),
+            workflow,
+            task: "do it".into(),
+            step_by_step: false,
+            started_at: None,
+        },
+        Event::WorkflowNodeStarted {
+            run_id: "r".into(),
+            node_id: "start".into(),
+            pass: 1,
+            via: None,
+            child_session_id: None,
+            started_at: None,
+        },
+        Event::WorkflowNodeFinished {
+            run_id: "r".into(),
+            node_id: "start".into(),
+            port: "next".into(),
+            output: "do it".into(),
+            exit_code: None,
+            comment: None,
+            duration_ms: None,
+        },
+        Event::WorkflowFinished {
+            run_id: "r".into(),
+            outcome: RunOutcome::Error,
+            reason: Some("boom".into()),
+            stats: None,
+        },
+    ]);
+
+    let err = run_workflow(&mut h.turn(), &env, WorkflowJob::Resume).unwrap_err();
+    assert!(err.contains("no node can be re-run"));
+}
+
+#[test]
+fn in_branch_flags_nodes_deep_in_a_branch() {
+    let workflow = Workflow {
+        id: "w".into(),
+        name: "w".into(),
+        description: String::new(),
+        max_steps: 50,
+        nodes: vec![
+            Node {
+                id: "start".into(),
+                name: None,
+                position: Position::default(),
+                kind: NodeKind::Start,
+            },
+            Node {
+                id: "p".into(),
+                name: None,
+                position: Position::default(),
+                kind: NodeKind::Parallel,
+            },
+            Node {
+                id: "a".into(),
+                name: None,
+                position: Position::default(),
+                kind: NodeKind::Agent {
+                    agent: "plan".into(),
+                    prompt: "a".into(),
+                    retry_prompt: None,
+                    outputs: vec!["done".into()],
+                    context: AgentContext::Fresh,
+                    verdicts: false,
+                },
+            },
+            Node {
+                id: "b".into(),
+                name: None,
+                position: Position::default(),
+                kind: NodeKind::Agent {
+                    agent: "plan".into(),
+                    prompt: "b".into(),
+                    retry_prompt: None,
+                    outputs: vec!["done".into()],
+                    context: AgentContext::Fresh,
+                    verdicts: false,
+                },
+            },
+            Node {
+                id: "j".into(),
+                name: None,
+                position: Position::default(),
+                kind: NodeKind::Join,
+            },
+        ],
+        edges: vec![
+            Edge {
+                from: "start".into(),
+                port: "next".into(),
+                to: "p".into(),
+                max_passes: None,
+                pause: false,
+            },
+            Edge {
+                from: "p".into(),
+                port: "branch".into(),
+                to: "a".into(),
+                max_passes: None,
+                pause: false,
+            },
+            Edge {
+                from: "a".into(),
+                port: "done".into(),
+                to: "b".into(),
+                max_passes: None,
+                pause: false,
+            },
+            Edge {
+                from: "b".into(),
+                port: "done".into(),
+                to: "j".into(),
+                max_passes: None,
+                pause: false,
+            },
+        ],
+    };
+
+    assert!(in_branch(&workflow, "a"));
+    assert!(in_branch(&workflow, "b"));
+    assert!(!in_branch(&workflow, "start"));
+}
+
+#[test]
+fn open_at_finish_finds_the_last_unfinished_node() {
+    let events = vec![
+        Event::WorkflowStarted {
+            run_id: "r".into(),
+            workflow: simple_workflow(),
+            task: "do it".into(),
+            step_by_step: false,
+            started_at: None,
+        },
+        Event::WorkflowNodeStarted {
+            run_id: "r".into(),
+            node_id: "start".into(),
+            pass: 1,
+            via: None,
+            child_session_id: None,
+            started_at: None,
+        },
+        Event::WorkflowNodeFinished {
+            run_id: "r".into(),
+            node_id: "start".into(),
+            port: "next".into(),
+            output: "do it".into(),
+            exit_code: None,
+            comment: None,
+            duration_ms: None,
+        },
+        Event::WorkflowNodeStarted {
+            run_id: "r".into(),
+            node_id: "a".into(),
+            pass: 1,
+            via: Some(Via {
+                from: "start".into(),
+                port: "next".into(),
+            }),
+            child_session_id: None,
+            started_at: None,
+        },
+    ];
+
+    let found = open_at_finish(&events, "r").unwrap();
+    assert_eq!(found.0, "a");
+    assert!(found.1.is_some());
+}
+
+#[test]
+fn default_via_points_at_the_start_node() {
+    let events = vec![Event::WorkflowStarted {
+        run_id: "r".into(),
+        workflow: simple_workflow(),
+        task: "do it".into(),
+        step_by_step: false,
+        started_at: None,
+    }];
+    let state = run::current_run(&events).unwrap();
+    let via = default_via(&state);
+    assert_eq!(via.from, "start");
+    assert_eq!(via.port, "next");
+}
+
+#[test]
 fn resume_interrupted_agent_keeps_its_pass_and_prompt() {
     let workflow = Workflow {
         id: "w".into(),
@@ -1789,6 +2079,7 @@ fn resume_interrupted_agent_keeps_its_pass_and_prompt() {
             workflow,
             task: "do it".into(),
             step_by_step: false,
+            started_at: None,
         },
         Event::WorkflowNodeStarted {
             run_id: "r".into(),
@@ -1863,4 +2154,141 @@ fn resume_interrupted_agent_keeps_its_pass_and_prompt() {
             ..
         } if content.contains("retry prompt")
     )));
+}
+
+// The test gate: validating the tests records them, reworking records nothing.
+fn test_gate_workflow() -> Workflow {
+    serde_json::from_value(serde_json::json!({
+        "id": "wf",
+        "name": "wf",
+        "description": "",
+        "maxSteps": 10,
+        "nodes": [
+            { "id": "start", "kind": "start", "position": { "x": 0, "y": 0 } },
+            { "id": "tests", "kind": "agent", "name": "Tests", "agent": "tests",
+              "prompt": "write tests", "position": { "x": 0, "y": 140 } },
+            { "id": "approve-tests", "kind": "human", "name": "Validate",
+              "question": "validate?", "choices": ["Validate", "Rework"],
+              "position": { "x": 0, "y": 280 } }
+        ],
+        "edges": [
+            { "from": "start", "port": "next", "to": "tests" },
+            { "from": "tests", "port": "done", "to": "approve-tests" }
+        ]
+    }))
+    .unwrap()
+}
+
+fn events_with_open_tests_gate(run_id: &str) -> Vec<Event> {
+    vec![
+        Event::WorkflowStarted {
+            run_id: run_id.into(),
+            workflow: test_gate_workflow(),
+            task: "task".into(),
+            step_by_step: false,
+            started_at: None,
+        },
+        Event::WorkflowNodeStarted {
+            run_id: run_id.into(),
+            node_id: "start".into(),
+            pass: 1,
+            via: None,
+            child_session_id: None,
+            started_at: None,
+        },
+        Event::WorkflowNodeFinished {
+            run_id: run_id.into(),
+            node_id: "start".into(),
+            port: "next".into(),
+            output: "task".into(),
+            exit_code: None,
+            comment: None,
+            duration_ms: None,
+        },
+        Event::WorkflowNodeStarted {
+            run_id: run_id.into(),
+            node_id: "tests".into(),
+            pass: 1,
+            via: Some(Via {
+                from: "start".into(),
+                port: "next".into(),
+            }),
+            child_session_id: None,
+            started_at: None,
+        },
+        Event::ToolCall {
+            message_id: "m".into(),
+            tool_call: ToolCall {
+                id: "c1".into(),
+                name: "write_file".into(),
+                arguments: serde_json::json!({"path": "tests/a.rs"}),
+                parse_error: None,
+                raw_arguments: None,
+            },
+        },
+        Event::ToolResult {
+            message_id: "m".into(),
+            tool_call_id: "c1".into(),
+            result: ToolResult::success("ok".into(), false),
+        },
+        Event::WorkflowNodeFinished {
+            run_id: run_id.into(),
+            node_id: "tests".into(),
+            port: "done".into(),
+            output: "## Tests".into(),
+            exit_code: None,
+            comment: None,
+            duration_ms: None,
+        },
+        Event::WorkflowNodeStarted {
+            run_id: run_id.into(),
+            node_id: "approve-tests".into(),
+            pass: 1,
+            via: Some(Via {
+                from: "tests".into(),
+                port: "done".into(),
+            }),
+            child_session_id: None,
+            started_at: None,
+        },
+    ]
+}
+
+fn answer_test_gate(choice: &str) -> Vec<Event> {
+    let stop = AtomicBool::new(false);
+    let mut h = Harness::new(
+        Box::new(Scripted(RefCell::new(vec![]))),
+        PathBuf::from("/tmp"),
+        &stop,
+    );
+    for event in events_with_open_tests_gate("r") {
+        EventLog::append(&h.log, "s", &event).unwrap();
+    }
+    answer_human(&mut h.turn(), choice, "").unwrap();
+    EventLog::events(&h.log, "s").unwrap()
+}
+
+#[test]
+fn validating_the_tests_records_the_written_test_files() {
+    let events = answer_test_gate("Validate");
+    assert!(
+        events.iter().any(|event| {
+            matches!(
+                event,
+                Event::TestsApproved { files, .. }
+                    if files == &vec!["tests/a.rs".to_string()]
+            )
+        }),
+        "{events:?}"
+    );
+}
+
+#[test]
+fn reworking_the_tests_records_nothing() {
+    let events = answer_test_gate("Rework");
+    assert!(
+        !events
+            .iter()
+            .any(|event| matches!(event, Event::TestsApproved { .. }))
+    );
 }

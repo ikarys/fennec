@@ -1,64 +1,50 @@
-import { DecisionList } from './DecisionList';
-import { useEffect, useRef, useState } from 'react';
-import type { Blocker, IntegrationConflict, IntegrationPreview } from '../../lib/api';
-import type { IntegrationResult } from '../../lib/api';
-import { getIntegration, integrate } from '../../lib/api';
-import { CriterionProvenanceBadge } from './CriteriaSection';
-import { Button } from '../ui/Button';
+import { useEffect, useState } from 'react';
+import type { IntegrationConflict, IntegrationPreview, IntegrationResult } from '../../lib/api';
+import { createSession, getIntegration, integrate, startUnderstanding, suggestCommitMessage } from '../../lib/api';
+import { completeIdea } from '../../lib/ideas';
+import { IntegrationReview } from './IntegrationReview';
+import { ServerList } from './ServerList';
+import {
+  acknowledgedKinds,
+  blockerSentence,
+  gateState,
+  narrativePrompt,
+  scanBadge,
+  neverAcknowledged,
+  understandingPrompt,
+  type Acknowledged,
+  type BlockerKind,
+} from '../../lib/integration';
+import { AlertIcon, BranchIcon, SpinnerIcon } from '../Icons';
 import { Badge } from '../ui/Badge';
+import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
+import { Modal } from '../ui/Modal';
 import { FieldRow, TextArea } from '../ui/Field';
 import { SectionLabel } from '../ui/SectionLabel';
+import { useLang, useT } from '../../i18n';
 
-type BlockerKind = Blocker['kind'];
 
-function blockerSentence(blocker: Blocker): string {
-  switch (blocker.kind) {
-    case 'noCommits':
-      return 'Aucun commit à intégrer.';
-    case 'criteriaNotPassed':
-      return `Critères non passés : ${blocker.criteria.join(', ')}.`;
-    case 'noCriteria':
-      return 'Aucun critère : rien n\'a été vérifié.';
-    case 'protectedTouched':
-      return `Fichiers protégés modifiés : ${blocker.paths.join(', ')}.`;
-    case 'architectureViolated': {
-      const shown = blocker.violations.slice(0, 3).map((v) => `${v.path} : « ${v.line} » (interdit : ${v.forbidden})`);
-      const more = blocker.violations.length - shown.length;
-      return `Règles d'architecture violées : ${shown.join(' ; ')}${more > 0 ? ` (+${more})` : ''}.`;
-    }
-    case 'suppressionsAdded': {
-      const shown = blocker.suppressions.slice(0, 3).map((s) => `${s.path} : « ${s.line} » (${s.marker})`);
-      const more = blocker.suppressions.length - shown.length;
-      return `Vérifications désactivées dans les lignes ajoutées : ${shown.join(' ; ')}${more > 0 ? ` (+${more})` : ''}.`;
-    }
-    case 'testsWeakened':
-      return `Tests affaiblis : ${blocker.testsRemoved} test(s) et ${blocker.assertionsRemoved} assertion(s) en moins (${blocker.paths.join(', ')}).`;
-    case 'branchChanged':
-      return `Le run est parti de ${blocker.from}, tu es maintenant sur ${blocker.to ?? 'un HEAD détaché'} : les commits iraient ailleurs.`;
-    case 'localChanges':
-      return `Changements non commités seraient écrasés : ${blocker.paths.join(', ')} — committe-les ou stash-les avant d'intégrer.`;
-  }
-}
-
-export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: string; open: boolean; onClose: () => void }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
+export function IntegrationDialog({ sessionId, open, onClose, projectId }: { sessionId: string; open: boolean; onClose: () => void; projectId: string | null }) {
+  const t = useT();
+  const lang = useLang();
+  const [tryOpen, setTryOpen] = useState(false);
+  const [narrating, setNarrating] = useState(false);
+  const [understandingBusy, setUnderstandingBusy] = useState(false);
   const [preview, setPreview] = useState<IntegrationPreview | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [conflict, setConflict] = useState<IntegrationConflict | null>(null);
   const [posting, setPosting] = useState(false);
   const [result, setResult] = useState<IntegrationResult | null>(null);
-  const [acknowledged, setAcknowledged] = useState<Partial<Record<BlockerKind, boolean>>>({});
+  const [acknowledged, setAcknowledged] = useState<Acknowledged>({});
   const [message, setMessage] = useState('');
   const [protectTests, setProtectTests] = useState(false);
-  const [removeWorktree, setRemoveWorktree] = useState(false);
+  const [removeWorktree, setRemoveWorktree] = useState(true);
+  const [suggested, setSuggested] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!open) {
-      dialogRef.current?.close();
-      return;
-    }
+    if (!open) return;
     // A fresh open re-reads the worktree: the previous result and accepted
     // blockers belong to the last preview, not to this one.
     setPreview(null);
@@ -69,6 +55,8 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
     setAcknowledged({});
     setMessage('');
     setProtectTests(false);
+    setRemoveWorktree(true);
+    setSuggested(null);
     let active = true;
     getIntegration(sessionId)
       .then((data) => {
@@ -76,39 +64,93 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
         setPreview(data);
         setMessage(data.defaultMessage);
         setLoading(false);
+        // The model's English subject replaces the default only if the human has not edited it yet.
+        suggestCommitMessage(sessionId)
+          .then(({ message: proposal }) => {
+            if (!active || !proposal) return;
+            setSuggested(proposal);
+            setMessage((current) => (current === data.defaultMessage ? proposal : current));
+          })
+          .catch(() => {});
       })
       .catch((fetchError: unknown) => {
         if (!active) return;
-        setError(fetchError instanceof Error ? fetchError.message : 'Erreur');
+        setError(fetchError instanceof Error ? fetchError.message : t('error'));
         setLoading(false);
       });
-    dialogRef.current?.showModal();
     return () => {
       active = false;
     };
   }, [open, sessionId]);
 
+  // The scanners run in the background: re-read the gate each second until they end.
+  useEffect(() => {
+    if (!open || !preview) return;
+    if (!preview.securityScans.some((scan) => scan.state === 'running')) return;
+
+    let active = true;
+    const timer = window.setTimeout(() => {
+      getIntegration(sessionId)
+        .then((data) => {
+          if (active) setPreview(data);
+        })
+        .catch(() => {});
+    }, 1000);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [open, preview, sessionId]);
+
   const closeDialog = () => {
-    dialogRef.current?.close();
     onClose();
   };
 
-  const hasCommits = (preview?.commits.length ?? 0) > 0;
-  const hasUncheckedBlocker =
-    preview?.blockers.some((blocker) => blocker.kind !== 'noCommits' && !acknowledged[blocker.kind]) ?? false;
-  const integrateDisabled =
-    loading || posting || (result === null && (!hasCommits || hasUncheckedBlocker || message.trim() === ''));
+  const { integrateDisabled, canFinish } = gateState({ preview, acknowledged, result, message, busy: loading || posting });
+
+  const handleNarrate = async () => {
+    if (!preview || !projectId) return;
+    setNarrating(true);
+    try {
+      const created = await createSession(projectId, narrativePrompt(preview), 'narrate');
+      window.location.hash = '#/s/' + encodeURIComponent(created.id);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setNarrating(false);
+    }
+  };
+
+  const handleUnderstand = async () => {
+    if (!preview) return;
+    if (preview.understanding.state !== 'none') {
+      window.location.hash = '#/s/' + encodeURIComponent(preview.understanding.sessionId);
+      onClose();
+      return;
+    }
+    if (!projectId) return;
+    setUnderstandingBusy(true);
+    try {
+      const created = await createSession(projectId, understandingPrompt(preview), 'understand');
+      await startUnderstanding(sessionId, created.id);
+      window.location.hash = '#/s/' + encodeURIComponent(created.id);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setUnderstandingBusy(false);
+    }
+  };
 
   const handleIntegrate = async () => {
     if (!preview) return;
     setPosting(true);
     setError(null);
     setConflict(null);
-    const acknowledgedKinds = preview.blockers
-      .filter((blocker) => blocker.kind !== 'noCommits' && acknowledged[blocker.kind])
-      .map((blocker) => blocker.kind);
     try {
-      const response = await integrate(sessionId, acknowledgedKinds, message, protectTests, removeWorktree);
+      const response = await integrate(sessionId, acknowledgedKinds(preview, acknowledged), message, protectTests, removeWorktree);
       setResult(response);
     } catch (integrateError) {
       // A 409 keeps the dialog open: the message says what to do.
@@ -116,211 +158,234 @@ export function IntegrationDialog({ sessionId, open, onClose }: { sessionId: str
       if (conflictValue) {
         setConflict(conflictValue);
       } else {
-        setError(integrateError instanceof Error ? integrateError.message : 'Erreur');
+        setError(integrateError instanceof Error ? integrateError.message : t('error'));
       }
     } finally {
       setPosting(false);
     }
   };
 
-  return (
-    <dialog
-      ref={dialogRef}
-      aria-label="Intégrer"
-      onCancel={() => onClose()}
-      onClick={(event) => {
-        if (event.target === dialogRef.current) {
-          closeDialog();
-        }
-      }}
-      className="m-auto w-[min(92vw,720px)] text-text backdrop:bg-black/60"
-    >
-      <Card className="flex flex-col gap-3 p-4">
-        <div className="flex flex-col gap-1">
-          <h2 className="m-0 text-sm font-semibold">
-            {preview ? `Intégrer dans ${preview.humanBranch ?? 'ta branche'}` : 'Intégrer'}
-          </h2>
-          {preview && (
-            <p className="m-0 text-xs text-muted">
-              Les changements de l'agent deviennent un commit sur ta branche. Rien n'est intégré sans ton clic.
-            </p>
-          )}
-        </div>
+  const handleFinish = async () => {
+    if (!preview || preview.idea === null) return;
+    setPosting(true);
+    setError(null);
+    setConflict(null);
+    try {
+      await completeIdea(preview.idea.projectId, preview.idea.id);
+      closeDialog();
+    } catch (finishError) {
+      setError(finishError instanceof Error ? finishError.message : t('error'));
+    } finally {
+      setPosting(false);
+    }
+  };
 
-        {loading && <div className="text-xs text-muted">Chargement…</div>}
-        {conflict ? (
-          <div className="rounded-lg border border-err/40 bg-err/10 p-3 text-xs flex flex-col gap-2">
-            <div className="font-semibold text-err">Conflit : rien n'a été intégré</div>
-            <div>Ta branche a modifié les mêmes lignes que l'agent depuis le début de son travail. Le cherry-pick a été annulé : ton dossier est tel qu'avant.</div>
-            <div className="flex flex-col gap-1">
-              {conflict.files.map((file) => (
-                <div key={file} className="font-mono">{file}</div>
-              ))}
+  return (
+    <Modal open={open} onClose={onClose} busy={posting} label={t('integrate')} width="w-[min(92vw,720px)]">
+      <Card className="overflow-hidden">
+        {preview ? (
+          <div className="border-b border-border bg-accent-soft px-4 py-3">
+            <div className="flex items-center gap-2.5">
+              <span className="flex shrink-0 items-center gap-1.5 rounded border border-border bg-raised px-2 py-0.5 font-mono text-xs">
+                <BranchIcon className="h-3 w-3 text-accent" />
+                {preview.humanBranch ?? t('yourBranch')}
+              </span>
+              <h2 className="m-0 min-w-0 truncate text-sm font-semibold">
+                {t('integrateInto', { branch: preview.humanBranch ?? t('yourBranch') })}
+              </h2>
+              <span className="ml-auto shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-xs text-muted">
+                {preview.commits.length} {t(preview.commits.length === 1 ? 'commit' : 'commits')}
+              </span>
             </div>
-            <div className="flex flex-col gap-1">
-              <div>Pour résoudre à la main :</div>
-              <button
-                type="button"
-                title="Copier la commande"
-                onClick={() => void navigator.clipboard.writeText(conflict.command)}
-                className="rounded-lg border border-border bg-code px-2 py-1.5 text-left font-mono text-xs break-all text-text hover:border-border-strong"
-              >
-                <code>{conflict.command}</code>
-              </button>
-              <div className="text-muted">Ou abandonne ce travail s'il n'est plus utile.</div>
+            <div className="mt-1 pl-[33px] text-xs text-muted">
+              {t('filesCount', { count: preview.files.length })} ·{' '}
+              <span className="text-ok">+{preview.files.reduce((sum, file) => sum + file.added, 0)}</span>{' '}
+              <span className="text-err">−{preview.files.reduce((sum, file) => sum + file.removed, 0)}</span> ·{' '}
+              {t('becomesCommit')}
             </div>
           </div>
-        ) : error ? (
-          <div className="text-xs text-err">{error}</div>
-        ) : null}
-
-        {result && (
-          <div className="text-xs text-ok">
-            Intégré : {result.commits.length} commits, HEAD {result.head.slice(0, 8)}.
-            {result.protectedTests.length > 0 && ` ${result.protectedTests.length} tests protégés.`}
-            {result.protectError && <span className="text-err"> Tests non protégés : {result.protectError}</span>}
-            {result.worktreeRemoved && ' Dossier de l\'agent supprimé.'}
-            {result.removeError && <span className="text-err"> Dossier non supprimé : {result.removeError}</span>}
+        ) : (
+          <div className="border-b border-border px-4 py-3">
+            <h2 className="m-0 text-sm font-semibold">{t('integrate')}</h2>
           </div>
         )}
+        <div className="flex flex-col gap-3 p-4">
 
-        {preview && !loading && !result && (
-          <div className="flex flex-col gap-3">
-            <section className="flex flex-col gap-1.5">
-              <SectionLabel>
-                Commits{preview.commits.length > 0 && <span className="ml-1 tabular-nums">{preview.commits.length}</span>}
-              </SectionLabel>
-              {preview.commits.length === 0 ? (
-                <div className="text-xs text-muted">Aucun commit.</div>
-              ) : (
-                <div className="flex flex-col">
-                  {preview.commits.map((commit) => (
-                    <div key={commit.sha} className="flex items-start gap-2 py-1 text-xs">
-                      <span className="shrink-0 font-mono text-muted">{commit.sha.slice(0, 8)}</span>
-                      <span className="grow break-words text-text">{commit.subject}</span>
-                    </div>
-                  ))}
-                </div>
+          {loading && <div className="text-xs text-muted">{t('loading')}</div>}
+          {conflict ? (
+            <div className="rounded-lg border border-err/40 bg-err/10 p-3 text-xs flex flex-col gap-2">
+              <div className="font-semibold text-err">{t('conflictNothingIntegrated')}</div>
+              <div>{t('conflictNothingIntegratedBody')}</div>
+              <div className="flex flex-col gap-1">
+                {conflict.files.map((file) => (
+                  <div key={file} className="font-mono">{file}</div>
+                ))}
+              </div>
+              <div className="flex flex-col gap-1">
+                <div>{t('resolveByHand')}</div>
+                <button
+                  type="button"
+                  title={t('copyCommand')}
+                  onClick={() => void navigator.clipboard.writeText(conflict.command)}
+                  className="rounded-lg border border-border bg-code px-2 py-1.5 text-left font-mono text-xs break-all text-text hover:border-border-strong"
+                >
+                  <code>{conflict.command}</code>
+                </button>
+                <div className="text-muted">{t('orDiscardWork')}</div>
+              </div>
+            </div>
+          ) : error ? (
+            <div className="text-xs text-err">{error}</div>
+          ) : null}
+
+          {result && (
+            <div className="text-xs text-ok">
+              {t('integratedResult', { commits: result.commits.length, head: result.head.slice(0, 8) })}
+              {result.protectedTests.length > 0 && ` ${t('testsProtectedResult', { count: result.protectedTests.length })}`}
+              {result.protectError && <span className="text-err"> {t('testsNotProtected', { error: result.protectError })}</span>}
+              {result.worktreeRemoved && ` ${t('worktreeRemovedResult')}`}
+              {result.removeError && <span className="text-err"> {t('worktreeNotRemoved', { error: result.removeError })}</span>}
+            </div>
+          )}
+
+          {preview && !loading && !result && (
+            <div className="flex flex-col gap-3">
+              <IntegrationReview
+                preview={preview}
+                projectId={projectId}
+                narrating={narrating}
+                onNarrate={handleNarrate}
+                understandingBusy={understandingBusy}
+                onUnderstand={handleUnderstand}
+              />
+
+              <FieldRow
+                label={t('commitMessageLabel')}
+                hint={
+                  <>
+                    {suggested !== null && message === suggested && (
+                      <Badge tone="accent" title={t('commitMessageIndicativeTitle')}>
+                        {t('indicative')}
+                      </Badge>
+                    )}
+                    <span>
+                      {suggested !== null && message === suggested ? ` ${t('commitMessageSuggested')} ` : ''}
+                      {t('commitMessageSingle')}
+                    </span>
+                  </>
+                }
+              >
+                <TextArea rows={3} className="w-full font-mono" value={message} onChange={(event) => setMessage(event.target.value)} />
+              </FieldRow>
+
+              {preview.testFiles.length > 0 && (
+                <label
+                  className="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-xs hover:bg-accent-soft"
+                  title={t('protectTestsTitle')}
+                >
+                  <input type="checkbox" className="accent-accent" checked={protectTests} onChange={(event) => setProtectTests(event.target.checked)} />
+                  {t('protectTests', { count: preview.testFiles.length })}
+                </label>
               )}
-            </section>
 
-            <section className="flex flex-col gap-1.5">
-              <SectionLabel>
-                Fichiers{preview.files.length > 0 && <span className="ml-1 tabular-nums">{preview.files.length}</span>}
-              </SectionLabel>
-              {preview.files.length === 0 ? (
-                <div className="text-xs text-muted">Aucun fichier.</div>
-              ) : (
-                <div className="flex flex-col">
-                  {preview.files.map((file) => (
-                    <div key={file.path} className="flex items-center gap-2 py-1 font-mono text-xs">
-                      <span className="grow overflow-hidden text-left text-ellipsis whitespace-nowrap" title={file.path}>
-                        {file.path}
-                      </span>
-                      {file.protected && <Badge tone="err">protégé</Badge>}
-                      <span className="shrink-0 tabular-nums text-ok">+{file.added}</span>
-                      <span className="shrink-0 tabular-nums text-err">−{file.removed}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
+              <label
+                className="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-xs hover:bg-accent-soft"
+                title={t('removeWorktreeTitle')}
+              >
+                <input type="checkbox" className="accent-accent" checked={removeWorktree} onChange={(event) => setRemoveWorktree(event.target.checked)} />
+                {t('removeWorktree')}
+              </label>
 
-            <section className="flex flex-col gap-1.5">
-              <SectionLabel>Critères</SectionLabel>
-              {preview.criteria.length === 0 ? (
-                <div className="text-xs text-muted">Aucun critère.</div>
-              ) : (
-                <div className="flex flex-col">
-                  {preview.criteria.map((criterion) => {
-                    const dotClass =
-                      criterion.status.type === 'passed' ? 'bg-ok' :
-                      criterion.status.type === 'failed' ? 'bg-err' :
-                      'bg-muted';
-                    const provenance = criterion.status.type === 'pending' ? undefined : criterion.status.provenance;
+              {preview.securityScans.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5 px-1.5">
+                  <span className="text-xs text-muted">{t('securityScansLabel')}</span>
+                  {preview.securityScans.map((scan) => {
+                    const b = scanBadge(lang, scan);
                     return (
-                      <div key={criterion.id} className="flex items-start gap-2 py-1.5 text-xs">
-                        <span aria-hidden className={`mt-1 h-2 w-2 shrink-0 rounded-full ${dotClass}`} />
-                        <span className="shrink-0 font-mono text-muted">{criterion.id}</span>
-                        <span className="grow break-words text-text">{criterion.description}</span>
-                        <CriterionProvenanceBadge provenance={provenance} />
-                      </div>
+                      <Badge key={scan.scanner} tone={b.tone} pill>
+                        {b.running && <SpinnerIcon className="h-3 w-3" />}
+                        {b.text}
+                      </Badge>
                     );
                   })}
                 </div>
               )}
-            </section>
 
-            <section className="flex flex-col gap-1.5">
-              <SectionLabel>Décisions</SectionLabel>
-              <DecisionList decisions={preview.decisions} />
-            </section>
 
-            <FieldRow label="Message du commit" hint="Un seul commit, à ton nom, avec la session en provenance (Fennec-Session).">
-              <TextArea rows={3} className="w-full font-mono" value={message} onChange={(event) => setMessage(event.target.value)} />
-            </FieldRow>
+              {preview.blockers.length > 0 && (
+                <section className="flex flex-col gap-1.5 rounded-lg border border-attention/35 bg-attention/10 p-3">
+                  <SectionLabel className="flex items-center">
+                    <span className="flex items-center gap-1.5 text-attention">
+                      <AlertIcon className="h-3.5 w-3.5" />
+                      {t('toAccept')}
+                    </span>
+                  </SectionLabel>
+                  <div className="flex flex-col gap-1.5">
+                    {preview.blockers.map((blocker) => (
+                      <div key={blocker.kind} className="flex items-start justify-between gap-2 text-xs">
+                        <span className="grow break-words text-text">{blockerSentence(lang, blocker)}</span>
+                        {!neverAcknowledged(blocker.kind) && (
+                          <label className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs">
+                            <input
+                              type="checkbox"
+                              className="accent-accent"
+                              checked={Boolean(acknowledged[blocker.kind])}
+                              onChange={(event) => {
+                                setAcknowledged((current) => ({ ...current, [blocker.kind]: event.target.checked } as Record<BlockerKind, boolean>));
+                              }}
+                            />
+                            {t('acceptBlocker')}
+                          </label>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+            </div>
+          )}
 
-            {preview.testFiles.length > 0 && (
-              <label className="flex items-start gap-1.5 text-xs">
-                <input type="checkbox" checked={protectTests} onChange={(event) => setProtectTests(event.target.checked)} />
-                <span>
-                  Protéger les tests intégrés ({preview.testFiles.length}) : l'agent ne pourra plus les modifier.
-                </span>
-              </label>
-            )}
-
-            <label className="flex items-start gap-1.5 text-xs">
-              <input type="checkbox" checked={removeWorktree} onChange={(event) => setRemoveWorktree(event.target.checked)} />
-              <span>Supprimer le dossier et la branche de l'agent après l'intégration (la session n'aura plus de copie de travail).</span>
-            </label>
-
-            {preview.blockers.length > 0 && (
-              <section className="flex flex-col gap-1.5">
-                <SectionLabel>À accepter</SectionLabel>
-                <div className="flex flex-col gap-1.5">
-                  {preview.blockers.map((blocker) => (
-                    <div key={blocker.kind} className="flex items-start justify-between gap-2 text-xs">
-                      <span className="grow break-words text-text">{blockerSentence(blocker)}</span>
-                      {blocker.kind !== 'noCommits' && (
-                        <label className="flex shrink-0 items-center gap-1.5 text-xs">
-                          <input
-                            type="checkbox"
-                            checked={Boolean(acknowledged[blocker.kind])}
-                            onChange={(event) => {
-                              setAcknowledged((current) => ({ ...current, [blocker.kind]: event.target.checked } as Record<BlockerKind, boolean>));
-                            }}
-                          />
-                          Je l'accepte
-                        </label>
-                      )}
-                    </div>
-                  ))}
+          {/* The change runs where it lives, its worktree: tried before it reaches the human's branch. */}
+          <section className="flex flex-col gap-1.5">
+            <SectionLabel>{t('tryBeforeIntegrating')}</SectionLabel>
+            <details onToggle={(event) => setTryOpen(event.currentTarget.open)}>
+              <summary className="cursor-pointer text-xs text-muted">{t('tryBeforeIntegratingHint')}</summary>
+              {tryOpen && (
+                <div className="mt-1.5">
+                  <ServerList sessionId={sessionId} />
                 </div>
-              </section>
-            )}
-          </div>
-        )}
+              )}
+            </details>
+          </section>
 
-        <div className="flex justify-end gap-2">
-          <Button variant="secondary" size="md" onClick={closeDialog}>
-            Annuler
-          </Button>
-          <Button
-            variant="primary"
-            size="md"
-            onClick={() => {
-              if (result) {
-                closeDialog();
-              } else {
-                void handleIntegrate();
-              }
-            }}
-            disabled={integrateDisabled}
-          >
-            {result ? 'Fermer' : 'Intégrer'}
-          </Button>
+          {canFinish && (
+            <p className="text-xs text-muted">
+              {t('nothingToFinishHint')}
+            </p>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" size="md" onClick={closeDialog}>
+              {t('cancel')}
+            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => {
+                if (canFinish) {
+                  void handleFinish();
+                } else if (result) {
+                  closeDialog();
+                } else {
+                  void handleIntegrate();
+                }
+              }}
+              disabled={canFinish ? posting : integrateDisabled}
+            >
+              {canFinish ? t('finishTask') : result ? t('close') : t('integrate')}
+            </Button>
+          </div>
         </div>
       </Card>
-    </dialog>
+    </Modal>
   );
 }

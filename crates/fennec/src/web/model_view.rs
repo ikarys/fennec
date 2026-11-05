@@ -1,11 +1,11 @@
 //! What a model's turn will run with, display-ready for the settings page.
 //!
-//! Mirrors the precedence of `llm_providers::ModelParams::resolve`
+//! Mirrors the precedence of `llm_providers_connector::ModelParams::resolve`
 //! (per-model > listed window > defaults) but annotates each value with its
-//! source and whether it goes on the wire (see `llm_providers::chat::body`).
+//! source and whether it goes on the wire (see `llm_providers_connector::chat::body`).
 //! The UI shows these; it computes none.
 
-use llm_providers::{ModelParams, ModelPrefs, ReasoningEffort};
+use llm_providers_connector::{ModelParams, ModelPrefs, ReasoningEffort};
 use serde::Serialize;
 
 /// Where a resolved value comes from.
@@ -116,7 +116,7 @@ fn pick<T: Copy + Serialize>(per_model: Option<T>, default: T, wire: bool) -> Va
 #[cfg(test)]
 mod tests {
     use super::*;
-    use llm_providers::ModelParams;
+    use llm_providers_connector::ModelParams;
 
     fn defaults() -> ModelParams {
         ModelParams {
@@ -182,6 +182,7 @@ mod tests {
         // The provenance must not drift from what a turn actually runs with.
         let d = defaults();
         let per_model = ModelPrefs {
+            price: None,
             max_tokens: Some(4_000),
             context_window: Some(12_000),
             compaction_threshold: Some(0.7),
@@ -189,7 +190,7 @@ mod tests {
         };
         let concrete = ModelParams::resolve(
             &d,
-            llm_providers::ModelRef {
+            llm_providers_connector::ModelRef {
                 provider: "local".into(),
                 model: "m".into(),
             },
@@ -204,7 +205,7 @@ mod tests {
 
         let concrete = ModelParams::resolve(
             &d,
-            llm_providers::ModelRef {
+            llm_providers_connector::ModelRef {
                 provider: "local".into(),
                 model: "m".into(),
             },

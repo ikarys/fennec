@@ -1,29 +1,45 @@
-//! Port of openfox `agents/registry.ts` discovery (`loadDefaultAgents`,
-//! `loadAllAgents`, `loadProjectAgents`): embedded defaults, then
-//! `~/.agents/agents`, then the project's `.agents/agents`, which overrides
-//! an agent of the same id.
-//!
-//! Not ported: openfox's own config dir and `.openfox/agents`, CRUD
-//! (save/delete), overrides listing, per-agent model overrides, project/DB
-//! default agent setting, granular `tool:action` permissions and MCP rules,
-//! `results`.
+//! Agent discovery: embedded defaults, then `~/.agents/agents`, then
+//! the project's `.agents/agents`, which overrides an agent of the same id.
+//! Each agent carries where it was found (`AgentOrigin`), and the human's
+//! CRUD writes the user ones.
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::domain::agent::{AgentDefinition, parse_agent_md};
+use crate::domain::agent::{AgentDefinition, AgentOrigin, parse_agent_md};
 
-const DEFAULTS: [&str; 4] = [
+pub(crate) const DEFAULTS: [&str; 15] = [
     include_str!("../agents/plan.agent.md"),
     include_str!("../agents/builder.agent.md"),
+    include_str!("../agents/tests.agent.md"),
     include_str!("../agents/verify.agent.md"),
     include_str!("../agents/review.agent.md"),
+    include_str!("../agents/analyze.agent.md"),
+    include_str!("../agents/ask.agent.md"),
+    include_str!("../agents/narrate.agent.md"),
+    include_str!("../agents/understand.agent.md"),
+    include_str!("../agents/audit-architecture.agent.md"),
+    include_str!("../agents/audit-security.agent.md"),
+    include_str!("../agents/mockup.agent.md"),
+    include_str!("../agents/remedy.agent.md"),
+    include_str!("../agents/mentor.agent.md"),
+    include_str!("../agents/rules.agent.md"),
 ];
 
-/// openfox `loadAllAgents`: the agents a session in `workdir` can use.
+pub mod crud;
+
+/// The agents a session in `workdir` can use.
 pub fn discover(workdir: &Path) -> Vec<AgentDefinition> {
-    let home = std::env::var_os("HOME").map(PathBuf::from);
-    discover_in(home.as_deref(), workdir)
+    discover_in(home().as_deref(), workdir)
+}
+
+pub(crate) fn home() -> Option<PathBuf> {
+    std::env::var_os("HOME").map(PathBuf::from)
+}
+
+/// `~/.agents/agents`, where the human's own agents live.
+pub(crate) fn user_dir(home: &Path) -> PathBuf {
+    home.join(".agents").join("agents")
 }
 
 fn discover_in(home: Option<&Path>, workdir: &Path) -> Vec<AgentDefinition> {
@@ -35,54 +51,54 @@ fn discover_in(home: Option<&Path>, workdir: &Path) -> Vec<AgentDefinition> {
     }
 
     if let Some(home) = home {
-        let dir = home.join(".agents").join("agents");
-        for agent in load_agents_directory(&dir) {
+        for agent in load_agents_directory(&user_dir(home), AgentOrigin::User) {
             insert_or_override(&mut agents, agent);
         }
     }
 
     let dir = workdir.join(".agents").join("agents");
-    for agent in load_agents_directory(&dir) {
+    for agent in load_agents_directory(&dir, AgentOrigin::Project) {
         insert_or_override(&mut agents, agent);
     }
 
     agents
 }
 
-/// openfox `loadAgentsFromDir`; missing dir → empty.
-fn load_agents_directory(dir: &Path) -> Vec<AgentDefinition> {
-    let entries = match fs::read_dir(dir) {
-        Ok(entries) => entries,
-        Err(_) => return Vec::new(),
-    };
-
-    let mut entries: Vec<_> = entries.filter_map(|entry| entry.ok()).collect();
-    entries.sort_by_key(|entry| entry.file_name());
-
+/// The agents of one directory; missing dir → empty. A file that does not
+/// parse is skipped here: discovery must never fail a session. The human sees
+/// the reason through `read_user`, when they open the agent in the settings.
+pub(crate) fn load_agents_directory(dir: &Path, origin: AgentOrigin) -> Vec<AgentDefinition> {
     let mut agents = Vec::new();
-    for entry in entries {
-        let path = entry.path();
-        if !path.is_file() {
+    for path in agent_files(dir) {
+        let Ok(content) = fs::read_to_string(&path) else {
             continue;
-        }
-        if !path
-            .file_name()
-            .is_some_and(|name| name.to_string_lossy().ends_with(".agent.md"))
-        {
-            continue;
-        }
-
-        let content = match fs::read_to_string(&path) {
-            Ok(content) => content,
-            Err(_) => continue,
         };
-
-        if let Some(agent) = parse_agent_md(&content) {
+        if let Ok(mut agent) = parse_agent_md(&content) {
+            agent.origin = origin;
+            agent.path = Some(path.to_string_lossy().into_owned());
             agents.push(agent);
         }
     }
-
     agents
+}
+
+/// The `*.agent.md` files of `dir`, in file-name order; empty when missing.
+pub(crate) fn agent_files(dir: &Path) -> Vec<PathBuf> {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    let mut entries: Vec<_> = entries.filter_map(|entry| entry.ok()).collect();
+    entries.sort_by_key(|entry| entry.file_name());
+
+    entries
+        .into_iter()
+        .map(|entry| entry.path())
+        .filter(|path| path.is_file())
+        .filter(|path| {
+            path.file_name()
+                .is_some_and(|name| name.to_string_lossy().ends_with(".agent.md"))
+        })
+        .collect()
 }
 
 fn insert_or_override(agents: &mut Vec<AgentDefinition>, agent: AgentDefinition) {
@@ -142,7 +158,9 @@ mod tests {
                 "record_decision",
                 "load_skill",
                 "web_search",
-                "web_fetch"
+                "web_fetch",
+                "suggest_agent",
+                "canvas"
             ]
         );
         assert_eq!(plan.commands, CommandAccess::ReadOnly);
@@ -165,16 +183,79 @@ mod tests {
                 "edit_file",
                 "run_command",
                 "ask_user",
+                "request_waiver",
                 "propose_criteria",
                 "record_decision",
                 "load_skill",
                 "web_search",
-                "web_fetch"
+                "web_fetch",
+                "suggest_agent",
+                "canvas"
             ]
         );
         assert_eq!(builder.commands, CommandAccess::ReadWrite);
         assert_eq!(builder.color.as_deref(), Some("#3b82f6"));
         assert!(builder.prompt.contains("Build Mode"));
+    }
+
+    #[test]
+    fn every_default_tool_is_a_known_tool() {
+        let (_root, _home, workdir) = fixture();
+        for agent in discover_in(None, &workdir) {
+            for tool in &agent.allowed_tools {
+                assert!(
+                    crate::domain::agent::KNOWN_TOOLS.contains(&tool.as_str()),
+                    "{}: {tool}",
+                    agent.id
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn read_only_analysis_defaults_are_not_subagents() {
+        let (_root, _home, workdir) = fixture();
+        let agents = discover_in(None, &workdir);
+        for id in [
+            "analyze",
+            "ask",
+            "mentor",
+            "narrate",
+            "remedy",
+            "rules",
+            "understand",
+        ] {
+            let agent = agents.iter().find(|agent| agent.id == id).unwrap();
+
+            assert!(!agent.subagent);
+            assert_eq!(agent.commands, CommandAccess::ReadOnly);
+        }
+    }
+
+    #[test]
+    fn the_framing_default_replaces_kickoff_and_keeps_its_tools() {
+        let (_root, _home, workdir) = fixture();
+        let agents = discover_in(None, &workdir);
+        assert!(!agents.iter().any(|agent| agent.id == "kickoff"));
+
+        let analyze = agents.iter().find(|agent| agent.id == "analyze").unwrap();
+        // The merged agent must still be able to frame an empty project.
+        for tool in ["ask_user", "record_decision", "propose_task"] {
+            assert!(analyze.allows(tool), "{tool}");
+        }
+        assert_eq!(analyze.phase, Some(crate::domain::agent::Phase::Start));
+    }
+
+    #[test]
+    fn audit_defaults_are_read_only_and_not_subagents() {
+        let (_root, _home, workdir) = fixture();
+        let agents = discover_in(None, &workdir);
+        for id in ["audit-architecture", "audit-security"] {
+            let audit_agent = agents.iter().find(|agent| agent.id == id).unwrap();
+
+            assert!(!audit_agent.subagent, "{id}");
+            assert_eq!(audit_agent.commands, CommandAccess::ReadOnly, "{id}");
+        }
     }
 
     #[test]
@@ -244,6 +325,50 @@ mod tests {
         assert_eq!(found[0].id, "plan");
         assert_eq!(found[0].name, "Project Plan");
         assert_eq!(found[0].prompt, "Project body");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn origin_and_path_say_where_an_agent_was_found() {
+        let (root, home, workdir) = fixture();
+        write_agent(
+            &agents_dir(&home),
+            "plan.agent.md",
+            "---\nid: plan\nname: User Plan\n---\nUser body\n",
+        );
+        write_agent(
+            &agents_dir(&workdir),
+            "plan.agent.md",
+            "---\nid: plan\nname: Project Plan\n---\nProject body\n",
+        );
+        write_agent(
+            &agents_dir(&home),
+            "mine.agent.md",
+            "---\nid: mine\n---\nMine\n",
+        );
+
+        let found = discover_in(Some(&home), &workdir);
+
+        // The project overrides a default: the winner is marked `project`.
+        let plan = found.iter().find(|agent| agent.id == "plan").unwrap();
+        assert_eq!(plan.origin, AgentOrigin::Project);
+        assert!(
+            plan.path
+                .as_deref()
+                .unwrap()
+                .starts_with(workdir.to_str().unwrap())
+        );
+        assert!(!plan.origin.editable());
+
+        let mine = found.iter().find(|agent| agent.id == "mine").unwrap();
+        assert_eq!(mine.origin, AgentOrigin::User);
+        assert!(mine.origin.editable());
+
+        let builder = found.iter().find(|agent| agent.id == "builder").unwrap();
+        assert_eq!(builder.origin, AgentOrigin::Default);
+        assert_eq!(builder.path, None);
+        assert!(!builder.origin.editable());
+
         let _ = std::fs::remove_dir_all(&root);
     }
 

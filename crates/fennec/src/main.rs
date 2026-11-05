@@ -5,20 +5,31 @@ mod adr;
 mod agent;
 mod agents;
 mod architecture;
+mod budget;
+mod chat;
 mod cli;
 mod config;
+mod doc;
 mod domain;
 mod folders;
 mod git;
 mod instructions;
 mod integration;
 mod llm;
+mod mcp;
 mod metering;
 mod module_map;
+mod notifier;
+mod plugins;
 mod protected;
+mod risk;
+mod scanners;
+mod security_scan;
+mod servers;
 mod skills;
 mod store;
 mod tools;
+mod turn_build;
 mod web;
 mod workflows;
 mod worktree;
@@ -34,6 +45,7 @@ const USAGE: &str = "usage:
   fennec compact <session>                 compact a session in the current directory
   fennec sessions                          list sessions
   fennec log <session>                     replay a session from the event store
+  fennec --version                         print the version
 
 env: FENNEC_LLM_URL (default http://127.0.0.1:8000/v1), FENNEC_MODEL (default: first of /models),
      FENNEC_API_KEY, FENNEC_MAX_TOKENS (default 32000), FENNEC_COMPACT_AT (default 0.85),
@@ -50,6 +62,10 @@ fn main() {
 
 fn run(args: &[String]) -> Result<(), String> {
     match args.first().map(String::as_str) {
+        Some("--version" | "-V") => {
+            println!("fennec {}", env!("CARGO_PKG_VERSION"));
+            Ok(())
+        }
         None | Some("serve") | Some("--port") => {
             let rest = if args.first().is_some_and(|a| a == "serve") {
                 &args[1..]

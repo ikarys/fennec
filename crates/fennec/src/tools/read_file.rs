@@ -1,10 +1,10 @@
-//! Port of openfox `tools/read.ts` (text files and images).
-//! The guidance in its errors (where to look, what to run) is fennec's own.
+//! Reads text files and images; its errors say where to look and what to
+//! run.
 //!
-//! Not ported: PDF files, directories.
+//! It does not read PDF files or directories.
 
 use super::args;
-use super::path_guard::resolve_for_reading;
+use super::path_guard::{Outside, not_found, resolve_for_reading};
 use crate::domain::attachment::{data_url, sniff_image};
 use crate::domain::event::{ToolResult, ToolResultMetadata};
 use serde_json::{Value, json};
@@ -44,21 +44,19 @@ pub(super) fn definition() -> Value {
 }
 
 /// `cache` is readable by absolute path: it holds the pages `web_fetch` saved.
-pub(super) fn run(args: &Value, workdir: &Path, cache: &Path) -> ToolResult {
-    let path = match args::string(args, "path") {
-        Ok(value) => value,
-        Err(error) => return ToolResult::failure(error),
-    };
+pub(super) fn run(args: &Value, workdir: &Path, cache: &Path, outside: &Outside) -> ToolResult {
+    try_run(args, workdir, cache, outside).unwrap_or_else(ToolResult::failure)
+}
 
-    let offset = match args::number(args, "offset", 1) {
-        Ok(value) => value,
-        Err(error) => return ToolResult::failure(error),
-    };
-
-    let limit = match args::number(args, "limit", READ_MAX_LINES) {
-        Ok(value) => value,
-        Err(error) => return ToolResult::failure(error),
-    };
+fn try_run(
+    args: &Value,
+    workdir: &Path,
+    cache: &Path,
+    outside: &Outside,
+) -> Result<ToolResult, String> {
+    let path = args::string(args, "path")?;
+    let offset = args::number(args, "offset", 1)?;
+    let limit = args::number(args, "limit", READ_MAX_LINES)?;
 
     let packages = || {
         crate::skills::discover(workdir)
@@ -67,30 +65,15 @@ pub(super) fn run(args: &Value, workdir: &Path, cache: &Path) -> ToolResult {
             .chain([cache.to_path_buf()])
             .collect()
     };
-    let full_path = match resolve_for_reading(workdir, packages, path) {
-        Ok(value) => value,
-        Err(error) => return ToolResult::failure(error),
-    };
-
-    let metadata = match std::fs::metadata(&full_path) {
-        Ok(value) => value,
-        Err(_) => {
-            let name = Path::new(path)
-                .file_name()
-                .map(|name| name.to_string_lossy().into_owned())
-                .unwrap_or_else(|| path.to_string());
-            return ToolResult::failure(format!(
-                "File not found: {path}. Find it with: rg --files | rg '{name}'"
-            ));
-        }
-    };
+    let full_path = resolve_for_reading(workdir, packages, outside, path)?;
+    let metadata = std::fs::metadata(&full_path).map_err(|_| not_found(path))?;
 
     if metadata.is_dir() {
-        return ToolResult::failure(format!("Path is a directory: {path}"));
+        return Err(format!("Path is a directory: {path}"));
     }
 
     if metadata.len() > READ_MAX_FILE_BYTES {
-        return ToolResult::failure(format!(
+        return Err(format!(
             "File size ({} bytes) exceeds maximum file size (20MB). Use shell command to process large files.",
             metadata.len()
         ));
@@ -98,17 +81,17 @@ pub(super) fn run(args: &Value, workdir: &Path, cache: &Path) -> ToolResult {
 
     let bytes = match std::fs::read(&full_path) {
         Ok(value) => value,
-        Err(error) => return ToolResult::failure(format!("Failed to read file: {error}")),
+        Err(error) => return Err(format!("Failed to read file: {error}")),
     };
 
     if let Some(mime) = sniff_image(&bytes, path) {
         if bytes.len() as u64 > READ_MAX_IMAGE_BYTES {
-            return ToolResult::failure(format!(
+            return Err(format!(
                 "File size ({} bytes) exceeds image size limit (2MB). Use shell command to process large files.",
                 bytes.len()
             ));
         }
-        return ToolResult::image(
+        return Ok(ToolResult::image(
             format!("[Image: {path} ({mime}, {} bytes)]", bytes.len()),
             ToolResultMetadata {
                 mime_type: mime.to_string(),
@@ -116,12 +99,12 @@ pub(super) fn run(args: &Value, workdir: &Path, cache: &Path) -> ToolResult {
                 path: full_path.display().to_string(),
                 size: bytes.len() as u64,
             },
-        );
+        ));
     }
 
     let content = match String::from_utf8(bytes) {
         Ok(value) => value,
-        Err(_) => return ToolResult::failure("File is not valid UTF-8".to_string()),
+        Err(_) => return Err("File is not valid UTF-8".to_string()),
     };
 
     let lines: Vec<&str> = content.split('\n').collect();
@@ -167,7 +150,7 @@ pub(super) fn run(args: &Value, workdir: &Path, cache: &Path) -> ToolResult {
         truncated = true;
     }
 
-    ToolResult::success(output, truncated)
+    Ok(ToolResult::success(output, truncated))
 }
 
 #[cfg(test)]

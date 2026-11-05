@@ -1,7 +1,7 @@
-//! Port of openfox `tools/write.ts`.
+//! `write_file` tool.
 
 use super::args;
-use super::path_guard::resolve_for_writing;
+use super::path_guard::{Outside, resolve_for_writing};
 use crate::domain::event::ToolResult;
 use crate::domain::protection::Protection;
 use serde_json::{Value, json};
@@ -35,46 +35,50 @@ pub(super) fn definition() -> Value {
     })
 }
 
-pub(super) fn run(args: &Value, workdir: &Path, protection: &Protection) -> ToolResult {
-    let path = match args::string(args, "path") {
-        Ok(value) => value,
-        Err(error) => return ToolResult::failure(error),
-    };
+pub(super) fn run(
+    args: &Value,
+    workdir: &Path,
+    protection: &Protection,
+    outside: &Outside,
+) -> ToolResult {
+    try_run(args, workdir, protection, outside).unwrap_or_else(ToolResult::failure)
+}
 
-    let content = match args::string(args, "content") {
-        Ok(value) => value,
-        Err(error) => return ToolResult::failure(error),
-    };
-
-    let full_path = match resolve_for_writing(workdir, protection, path) {
-        Ok(value) => value,
-        Err(error) => return ToolResult::failure(error),
-    };
+fn try_run(
+    args: &Value,
+    workdir: &Path,
+    protection: &Protection,
+    outside: &Outside,
+) -> Result<ToolResult, String> {
+    let path = args::string(args, "path")?;
+    let content = args::string(args, "content")?;
+    let full_path = resolve_for_writing(workdir, protection, outside, path)?;
 
     if let Some(parent) = full_path.parent()
         && !parent.as_os_str().is_empty()
         && let Err(error) = std::fs::create_dir_all(parent)
     {
-        return ToolResult::failure(format!("Failed to create parent directories: {error}"));
+        return Err(format!("Failed to create parent directories: {error}"));
     }
 
     if let Err(error) = std::fs::write(&full_path, content) {
-        return ToolResult::failure(format!("Failed to write file: {error}"));
+        return Err(format!("Failed to write file: {error}"));
     }
 
     let line_count = content.split('\n').count();
     let byte_count = content.len();
 
-    ToolResult::success(
+    Ok(ToolResult::success(
         format!("Successfully wrote {line_count} lines ({byte_count} bytes) to {path}"),
         false,
-    )
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::run;
     use crate::domain::protection::Protection;
+    use crate::tools::path_guard::Outside;
     use crate::tools::test_support::temp_dir;
 
     #[test]
@@ -86,7 +90,7 @@ mod tests {
             "path": "Cargo.lock",
             "content": "changed"
         });
-        let result = run(&args, &dir, &Protection::new(None));
+        let result = run(&args, &dir, &Protection::new(None), &Outside::none());
 
         assert!(!result.success);
         assert!(result.error.unwrap().contains("is protected"));

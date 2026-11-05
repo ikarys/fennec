@@ -2,16 +2,23 @@ import { useState } from 'react';
 import type { ModelRef, ParamSource, ProviderListing, ReasoningEffort, SettingsDefaults } from '../../lib/api';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { Section } from '../ui/Section';
-import { ChevronRightIcon } from '../Icons';
+import { Section, type SectionSave } from '../ui/Section';
+import { SectionLabel } from '../ui/SectionLabel';
+import { ChevronRightIcon, CloseIcon, HeartIcon, PinIcon, StarIcon } from '../Icons';
 import { FieldRow, Select, TextInput } from '../ui/Field';
 import { ModelProbe } from './ModelProbe';
+import { percentFromFraction } from '../../lib/settingsForm';
+import { useLang, useT } from '../../i18n';
+import { t, type Lang, type MsgKey } from '../../i18n/messages';
 
 export interface ModelForm {
   maxTokens: string;
   contextWindow: string;
   compactionThreshold: string;
   reasoningEffort: string;
+  priceInput: string;
+  priceCached: string;
+  priceOutput: string;
 }
 
 interface ModelPrefsSectionProps {
@@ -20,8 +27,13 @@ interface ModelPrefsSectionProps {
   defaults: SettingsDefaults;
   favorites: ModelRef[];
   onToggleFavorite: (ref: ModelRef) => void;
+  /** `provider/model` of the default model, '' when none is chosen. */
+  defaultModel: string;
+  onSetDefault: (key: string) => void;
   onChange: (key: string, field: keyof ModelForm, value: string) => void;
   onRemoveModel: (providerId: string, modelId: string) => void;
+  /** The group's own save: its dot and its "Enregistrer". */
+  save?: SectionSave;
 }
 
 /** The model ids of `provider` edited in the form but absent from its listing: added by hand. */
@@ -37,10 +49,10 @@ export function formOnlyModels(values: Record<string, ModelForm>, providerId: st
 
 const REASONING_EFFORTS: ReasoningEffort[] = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
 
-const SOURCE_LABELS: Record<ParamSource, string> = {
-  perModel: 'par modèle',
-  listed: 'listing',
-  default: 'défaut'
+const SOURCE_LABELS: Record<ParamSource, MsgKey> = {
+  perModel: 'sourcePerModel',
+  listed: 'sourceListed',
+  default: 'sourceDefault'
 };
 
 /** One line of the effective-parameters read-out for a model. */
@@ -53,28 +65,31 @@ function ResolvedRow({
   label: string;
   value: string;
   source: ParamSource;
-  badge: string;
+  badge: MsgKey;
 }) {
+  const t = useT();
   return (
     <div className="flex items-center gap-2 text-xs">
       <span className="w-24 shrink-0 text-muted">{label}</span>
       <span className="font-mono tabular-nums">{value}</span>
-      <span className="text-faint">({SOURCE_LABELS[source]})</span>
-      <span className={`ml-auto ${badge === 'envoyé' ? 'text-ok' : 'text-faint'}`}>{badge}</span>
+      <span className="text-faint">({t(SOURCE_LABELS[source])})</span>
+      <span className={`ml-auto ${badge === 'badgeSent' ? 'text-ok' : 'text-faint'}`}>{t(badge)}</span>
     </div>
   );
 }
 
-export function percentFromFraction(fraction: number): string {
-  return String(Number((fraction * 100).toFixed(2)));
+/** The compact line of a model row: what its turn runs with, at a glance. */
+function priceSuffix(base: string, value: ModelForm): string {
+  if (value.priceInput === '' && value.priceOutput === '') return base;
+  return `${base} · $${value.priceInput || '0'}/$${value.priceOutput || '0'}`;
 }
 
-/** The compact line of a model row: what its turn runs with, at a glance. */
-function summary(value: ModelForm, model: ProviderListing['models'][number] | null, defaults: SettingsDefaults): string {
+function summary(lang: Lang, value: ModelForm, model: ProviderListing['models'][number] | null, defaults: SettingsDefaults): string {
   const parts: string[] = [];
   if (model === null) {
     // A hand-added model: nothing is resolved until it is saved and used.
-    return value.contextWindow !== '' ? `ctx ${value.contextWindow}` : 'paramètres par défaut';
+    const base = value.contextWindow !== '' ? `ctx ${value.contextWindow}` : t(lang, 'modelDefaultParams');
+    return priceSuffix(base, value);
   }
   const window = value.contextWindow !== '' ? value.contextWindow : String(model.resolved.contextWindow.value);
   parts.push(`ctx ${window}`);
@@ -83,9 +98,9 @@ function summary(value: ModelForm, model: ProviderListing['models'][number] | nu
   const effort =
     value.reasoningEffort !== ''
       ? value.reasoningEffort
-      : (model.resolved.reasoningEffort.value ?? `défaut ${defaults.reasoningEffort ?? '—'}`);
+      : (model.resolved.reasoningEffort.value ?? t(lang, 'modelDefaultEffort', { effort: defaults.reasoningEffort ?? '—' }));
   parts.push(`effort ${effort}`);
-  return parts.join(' · ');
+  return priceSuffix(parts.join(' · '), value);
 }
 
 /** One model row: from the listing, or a hand-added one from the form only. */
@@ -97,6 +112,8 @@ function ModelRow({
   defaults,
   favorites,
   onToggleFavorite,
+  isDefault,
+  onSetDefault,
   onChange,
   onRemoveModel,
   open,
@@ -110,18 +127,22 @@ function ModelRow({
   defaults: SettingsDefaults;
   favorites: ModelRef[];
   onToggleFavorite: (ref: ModelRef) => void;
+  isDefault: boolean;
+  onSetDefault: (key: string) => void;
   onChange: (key: string, field: keyof ModelForm, value: string) => void;
   onRemoveModel: (providerId: string, modelId: string) => void;
   open: boolean;
   onToggleOpen: () => void;
 }) {
+  const t = useT();
+  const lang = useLang();
   const key = `${providerId}/${modelId}`;
-  const value = values[key] ?? { maxTokens: '', contextWindow: '', compactionThreshold: '', reasoningEffort: '' };
+  const value = values[key] ?? { maxTokens: '', contextWindow: '', compactionThreshold: '', reasoningEffort: '', priceInput: '', priceCached: '', priceOutput: '' };
   const isFavorite = favorites.some((favorite) => favorite.provider === providerId && favorite.model === modelId);
 
   return (
     <div className="flex flex-col border-t border-border/60 first:border-t-0">
-      <div className="flex h-8 items-center gap-2">
+      <div className="-mx-2 flex h-8 items-center gap-2 rounded px-2 hover:bg-raised">
         <button
           type="button"
           aria-expanded={open}
@@ -129,30 +150,44 @@ function ModelRow({
           className="flex min-w-0 flex-1 items-center gap-2 text-left"
         >
           <ChevronRightIcon className={`h-3 w-3 shrink-0 text-muted transition-transform ${open ? 'rotate-90' : ''}`} />
-          <span className="min-w-0 truncate font-mono text-xs">{modelId}</span>
-          {model === null && <Badge tone="neutral">manuel</Badge>}
-          <span className="shrink-0 text-xs text-faint tabular-nums">{summary(value, model, defaults)}</span>
+          <span className="max-w-[60%] shrink-0 truncate font-mono text-xs">{modelId}</span>
+          {model === null && <Badge tone="neutral">{t('manualBadge')}</Badge>}
+          <span className="min-w-0 truncate text-xs text-faint tabular-nums">{summary(lang, value, model, defaults)}</span>
         </button>
         <Button
           variant="ghost"
           size="sm"
           iconOnly
-          aria-label="Afficher dans le composer"
-          title={isFavorite ? 'Retirer des favoris' : 'Afficher dans le composer'}
-          onClick={() => onToggleFavorite({ provider: providerId, model: modelId })}
+          aria-pressed={isDefault}
+          aria-label={t('defaultModelLabel')}
+          title={isDefault ? t('defaultModelOn') : t('defaultModelOff')}
+          onClick={() => onSetDefault(isDefault ? '' : key)}
+          className={`text-base ${isDefault ? 'text-accent' : 'text-faint'}`}
         >
-          {isFavorite ? '★' : '☆'}
+          <StarIcon className="h-3 w-3" filled={isDefault} />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          iconOnly
+          aria-pressed={isFavorite}
+          aria-label={t('showInComposer')}
+          title={isFavorite ? t('removeFavorite') : t('showInComposer')}
+          onClick={() => onToggleFavorite({ provider: providerId, model: modelId })}
+          className={`text-base ${isFavorite ? 'text-accent' : 'text-faint'}`}
+        >
+          <HeartIcon className="h-3 w-3" filled={isFavorite} />
         </Button>
         {model === null && (
           <Button
             variant="ghost"
             size="sm"
             iconOnly
-            aria-label="Retirer le modèle"
-            title="Retirer ce modèle manuel"
+            aria-label={t('removeModel')}
+            title={t('removeManualModel')}
             onClick={() => onRemoveModel(providerId, modelId)}
           >
-            ×
+            <CloseIcon className="h-3 w-3" />
           </Button>
         )}
       </div>
@@ -169,7 +204,7 @@ function ModelRow({
             }}
           />
           <div className="grid gap-2 md:grid-cols-2">
-            <FieldRow label="Tokens max par réponse">
+            <FieldRow label={t('maxTokensLabel')}>
               <TextInput
                 type="number"
                 min={1}
@@ -180,7 +215,7 @@ function ModelRow({
                 className="w-full"
               />
             </FieldRow>
-            <FieldRow label="Fenêtre de contexte">
+            <FieldRow label={t('contextWindowLabel')}>
               <TextInput
                 type="number"
                 min={1024}
@@ -191,7 +226,7 @@ function ModelRow({
                 className="w-full"
               />
             </FieldRow>
-            <FieldRow label="Compaction à (%)" hint="0 désactive la compaction automatique.">
+            <FieldRow label={t('compactionLabel')} hint={t('compactionHint')}>
               <TextInput
                 type="number"
                 min={0}
@@ -203,13 +238,13 @@ function ModelRow({
                 className="w-full"
               />
             </FieldRow>
-            <FieldRow label="Effort de réflexion">
+            <FieldRow label={t('effortLabel')}>
               <Select
                 value={value.reasoningEffort}
                 onChange={(event) => onChange(key, 'reasoningEffort', event.target.value)}
                 className="w-full"
               >
-                <option value="">Auto (sans effort)</option>
+                <option value="">{t('effortAuto')}</option>
                 {REASONING_EFFORTS.map((effort) => (
                   <option key={effort} value={effort}>
                     {effort}
@@ -218,47 +253,88 @@ function ModelRow({
               </Select>
             </FieldRow>
           </div>
+          <div className="grid gap-2 md:grid-cols-3">
+            <p className="m-0 text-xs font-medium text-muted md:col-span-3">
+              {t('priceHeader')}
+            </p>
+            <FieldRow label={t('inputLabel')}>
+              <TextInput
+                type="number"
+                min={0}
+                step="any"
+                value={value.priceInput}
+                placeholder="—"
+                onChange={(event) => onChange(key, 'priceInput', event.target.value)}
+                className="w-full"
+              />
+            </FieldRow>
+            <FieldRow label={t('cacheLabel')}>
+              <TextInput
+                type="number"
+                min={0}
+                step="any"
+                value={value.priceCached}
+                placeholder="—"
+                onChange={(event) => onChange(key, 'priceCached', event.target.value)}
+                className="w-full"
+              />
+            </FieldRow>
+            <FieldRow label={t('outputLabel')}>
+              <TextInput
+                type="number"
+                min={0}
+                step="any"
+                value={value.priceOutput}
+                placeholder="—"
+                onChange={(event) => onChange(key, 'priceOutput', event.target.value)}
+                className="w-full"
+              />
+            </FieldRow>
+          </div>
 
           {model !== null && (
             <div className="flex flex-col gap-1.5 border-l border-border pl-3">
               <p className="m-0 text-xs font-medium text-muted">
-                Envoyé au modèle{' '}
+                {t('sentToModel')}{' '}
                 <span className="font-normal text-faint">
-                  — valeurs enregistrées, « Enregistrer » pour appliquer
+                  {t('sentToModelSuffix')}
                 </span>
               </p>
               <ResolvedRow
-                label="Tokens max"
+                label={t('resolvedMaxTokens')}
                 value={String(model.resolved.maxTokens.value)}
                 source={model.resolved.maxTokens.source}
-                badge={model.resolved.maxTokens.wire ? 'envoyé' : 'local'}
+                badge={model.resolved.maxTokens.wire ? 'badgeSent' : 'badgeLocal'}
               />
               <ResolvedRow
-                label="Contexte"
+                label={t('resolvedContext')}
                 value={String(model.resolved.contextWindow.value)}
                 source={model.resolved.contextWindow.source}
-                badge="local"
+                badge="badgeLocal"
               />
               <ResolvedRow
-                label="Compaction"
+                label={t('resolvedCompaction')}
                 value={`${percentFromFraction(model.resolved.compactAt.value)} %`}
                 source={model.resolved.compactAt.source}
-                badge="local"
+                badge="badgeLocal"
               />
               <ResolvedRow
-                label="Effort"
+                label={t('resolvedEffort')}
                 value={model.resolved.reasoningEffort.value ?? '—'}
                 source={model.resolved.reasoningEffort.source}
-                badge={model.resolved.reasoningEffort.wire ? 'envoyé' : 'non envoyé'}
+                badge={model.resolved.reasoningEffort.wire ? 'badgeSent' : 'badgeNotSent'}
               />
               {model.resolved.contextWindow.source === 'listed' && (
                 <Button
                   variant="secondary"
                   size="sm"
+                  iconOnly
                   className="mt-1 self-start"
+                  aria-label={t('pin')}
+                  title={t('pinContext')}
                   onClick={() => onChange(key, 'contextWindow', String(model.resolved.contextWindow.value))}
                 >
-                  Figer la fenêtre de contexte
+                  <PinIcon className="h-3 w-3" />
                 </Button>
               )}
             </div>
@@ -269,66 +345,84 @@ function ModelRow({
   );
 }
 
-export function ModelPrefsSection({ listings, values, defaults, favorites, onToggleFavorite, onChange, onRemoveModel }: ModelPrefsSectionProps) {
+export function ModelPrefsSection({
+  listings,
+  values,
+  defaults,
+  favorites,
+  onToggleFavorite,
+  defaultModel,
+  onSetDefault,
+  onChange,
+  save,
+  onRemoveModel
+}: ModelPrefsSectionProps) {
+  const t = useT();
   // A model with saved overrides opens by itself: that is what the human came to edit.
   const hasOverrides = (key: string) => {
     const value = values[key];
-    return value != null && (value.maxTokens !== '' || value.contextWindow !== '' || value.compactionThreshold !== '' || value.reasoningEffort !== '');
+    return value != null && (value.maxTokens !== '' || value.contextWindow !== '' || value.compactionThreshold !== '' || value.reasoningEffort !== '' || value.priceInput !== '' || value.priceCached !== '' || value.priceOutput !== '');
   };
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const isOpen = (key: string) => open[key] ?? hasOverrides(key);
   const toggleOpen = (key: string) => setOpen((previous) => ({ ...previous, [key]: !isOpen(key) }));
 
   return (
-    <Section>
-      <h2 className="text-sm font-semibold">Paramètres par modèle</h2>
-      {listings.length === 0 && <p className="m-0 text-sm text-muted">Aucun modèle listé.</p>}
+    <Section title={t('modelPrefsTitle')} save={save}>
+      {listings.length === 0 && <p className="m-0 text-sm text-muted">{t('noModelsListed')}</p>}
       <div className="flex flex-col">
         {listings.map((listing) => {
           const formOnly = formOnlyModels(values, listing.provider, listing);
+          const count = listing.models.length + formOnly.length;
           return (
-          <div key={listing.provider} className="border-t border-border first:border-t-0">
-            <p className="m-0 py-1 font-mono text-xs font-medium text-muted">{listing.name}</p>
-            {listing.models.length === 0 && formOnly.length === 0 && (
-              <p className="m-0 pb-2 text-xs text-faint">Aucun modèle listé.</p>
-            )}
-            {listing.models.map((model) => (
-              <ModelRow
-                key={`${listing.provider}/${model.id}`}
-                providerId={listing.provider}
-                modelId={model.id}
-                model={model}
-                values={values}
-                defaults={defaults}
-                favorites={favorites}
-                onToggleFavorite={onToggleFavorite}
-                onChange={onChange}
-                onRemoveModel={onRemoveModel}
-                open={isOpen(`${listing.provider}/${model.id}`)}
-                onToggleOpen={() => toggleOpen(`${listing.provider}/${model.id}`)}
-              />
-            ))}
-            {formOnly.map((modelId) => (
-              <ModelRow
-                key={`${listing.provider}/${modelId}`}
-                providerId={listing.provider}
-                modelId={modelId}
-                model={null}
-                values={values}
-                defaults={defaults}
-                favorites={favorites}
-                onToggleFavorite={onToggleFavorite}
-                onChange={onChange}
-                onRemoveModel={onRemoveModel}
-                open={isOpen(`${listing.provider}/${modelId}`)}
-                onToggleOpen={() => toggleOpen(`${listing.provider}/${modelId}`)}
-              />
-            ))}
-          </div>
+            <div key={listing.provider} className="border-t border-border first:border-t-0 pt-3 first:pt-0">
+              <SectionLabel className="pb-1">
+                <span className="font-mono">{listing.name}</span>
+                {count > 0 && <span className="text-faint"> · {count}</span>}
+              </SectionLabel>
+              {listing.models.length === 0 && formOnly.length === 0 && (
+                <p className="m-0 pb-2 text-xs text-faint">{t('noModelsListed')}</p>
+              )}
+              {listing.models.map((model) => (
+                <ModelRow
+                  key={`${listing.provider}/${model.id}`}
+                  providerId={listing.provider}
+                  modelId={model.id}
+                  model={model}
+                  values={values}
+                  defaults={defaults}
+                  favorites={favorites}
+                  onToggleFavorite={onToggleFavorite}
+                  isDefault={defaultModel === `${listing.provider}/${model.id}`}
+                  onSetDefault={onSetDefault}
+                  onChange={onChange}
+                  onRemoveModel={onRemoveModel}
+                  open={isOpen(`${listing.provider}/${model.id}`)}
+                  onToggleOpen={() => toggleOpen(`${listing.provider}/${model.id}`)}
+                />
+              ))}
+              {formOnly.map((modelId) => (
+                <ModelRow
+                  key={`${listing.provider}/${modelId}`}
+                  providerId={listing.provider}
+                  modelId={modelId}
+                  model={null}
+                  values={values}
+                  defaults={defaults}
+                  favorites={favorites}
+                  onToggleFavorite={onToggleFavorite}
+                  isDefault={defaultModel === `${listing.provider}/${modelId}`}
+                  onSetDefault={onSetDefault}
+                  onChange={onChange}
+                  onRemoveModel={onRemoveModel}
+                  open={isOpen(`${listing.provider}/${modelId}`)}
+                  onToggleOpen={() => toggleOpen(`${listing.provider}/${modelId}`)}
+                />
+              ))}
+            </div>
           );
         })}
       </div>
     </Section>
   );
 }
-

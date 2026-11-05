@@ -4,8 +4,14 @@
 use super::App;
 use super::http::{Request, error, send_json};
 use super::model_view;
+use crate::domain::lang::Lang;
 use crate::domain::preferences::{LOCAL_PROVIDER, Preferences, Provider};
-use llm_providers::{
+use crate::domain::scanner::SCANNERS;
+use crate::scanners;
+use crate::skills;
+use crate::tools::{SandboxHealth, probe};
+use crate::workflows;
+use llm_providers_connector::{
     ApiKey, Endpoint, ListedModel, MasterKey, ModelParams, ModelPrefs, list_models,
 };
 use serde_json::{Value, json};
@@ -31,12 +37,53 @@ pub fn get_settings(app: &App, stream: &mut TcpStream) -> Result<(), String> {
             .map(|handle| handle.join().expect("a listing thread panicked"))
             .collect()
     });
+    let skills: Vec<Value> = skills::discover_global()
+        .into_iter()
+        .map(|skill| json!({ "id": skill.id, "description": skill.description }))
+        .collect();
+    let opt_in_workflows: Vec<Value> = workflows::opt_in_defaults()
+        .into_iter()
+        .map(|workflow| {
+            json!({
+                "id": workflow.id,
+                "name": workflow.name,
+                "description": workflow.description,
+            })
+        })
+        .collect();
+    let scanners: Vec<Value> = SCANNERS
+        .iter()
+        .map(|scanner| {
+            json!({
+                "id": scanner.id,
+                "name": scanner.name,
+                "covers": scanner.covers(Lang::from_code(&prefs.display.language)),
+                "install": scanner.install,
+                "url": scanner.url,
+                "path": scanners::find(scanner.binary),
+            })
+        })
+        .collect();
     let body = json!({
         "preferences": prefs,
         "listings": listings,
         "defaults": app.settings.llm.defaults,
+        "skills": skills,
+        "optInWorkflows": opt_in_workflows,
+        "scanners": scanners,
+        "sandboxHealth": sandbox_health(),
     });
     send_json(stream, 200, &body)
+}
+
+/// The sandbox health as JSON, probed on each call so a kernel fix shows up
+/// without a fennec restart.
+fn sandbox_health() -> Value {
+    match probe() {
+        SandboxHealth::Ready => json!({ "status": "ready", "detail": null }),
+        SandboxHealth::Missing => json!({ "status": "missing", "detail": null }),
+        SandboxHealth::Blocked(detail) => json!({ "status": "blocked", "detail": detail }),
+    }
 }
 
 /// What `provider` lists now, at its stored endpoint.
@@ -153,7 +200,7 @@ pub fn probe_model(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(
     else {
         return error(stream, 400, "model must not be empty");
     };
-    match llm_providers::probe_model(&endpoint, model) {
+    match llm_providers_connector::probe_model(&endpoint, model) {
         Ok(probed) => send_json(stream, 200, &json!(probed)),
         Err(e) => error(stream, 502, &e),
     }
@@ -238,7 +285,7 @@ fn reuse_stored_key(requested: &str, stored: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{model_entries, reuse_stored_key};
-    use llm_providers::{ListedModel, ModelParams, ModelPrefs};
+    use llm_providers_connector::{ListedModel, ModelParams, ModelPrefs};
     use std::collections::BTreeMap;
 
     fn defaults() -> ModelParams {
@@ -313,6 +360,7 @@ mod tests {
         stored.insert(
             "hand-added".to_string(),
             ModelPrefs {
+                price: None,
                 context_window: Some(200_000),
                 ..Default::default()
             },

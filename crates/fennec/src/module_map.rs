@@ -15,9 +15,14 @@ pub fn load(workdir: &Path) -> ModuleMap {
     module_map::build(&tracked_files(workdir))
 }
 
+/// The committed map file's text, when present.
+pub fn committed_map_file(workdir: &Path) -> Option<String> {
+    std::fs::read_to_string(workdir.join(MAP_FILE)).ok()
+}
+
 /// How `docs/map.md` compares with the map of the code as it is.
 pub fn map_file_state(workdir: &Path, map: &ModuleMap) -> MapFileState {
-    let on_disk = std::fs::read_to_string(workdir.join(MAP_FILE)).ok();
+    let on_disk = committed_map_file(workdir);
     map_doc::state(on_disk.as_deref(), &map_doc::render(map))
 }
 
@@ -30,7 +35,7 @@ pub fn write_map_file(workdir: &Path, map: &ModuleMap) -> std::io::Result<()> {
     std::fs::write(path, map_doc::render(map))
 }
 
-fn tracked_files(workdir: &Path) -> Vec<SourceFile> {
+pub(crate) fn tracked_files(workdir: &Path) -> Vec<SourceFile> {
     let Ok(out) = Command::new("git")
         .current_dir(workdir)
         .args(["ls-files", "-z"])
@@ -75,6 +80,6 @@ mod tests {
         assert!(has("web/src/pages", "web/src/lib"));
         // Strings in test fixtures are not imports.
         assert!(!has("crates/fennec/src/domain", "crates/fennec/src/web"));
-        assert!(has("crates/fennec/src/llm", "crates/llm-providers/src"));
+        assert!(has("crates/fennec/src/web", "crates/token-usage/src"));
     }
 }

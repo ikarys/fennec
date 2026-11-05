@@ -1,29 +1,30 @@
-//! Port of openfox `chat/agent-loop.ts`: the multi-turn loop. Each round
-//! streams the model (`round`), then runs its tool calls, until it answers
-//! without one.
+//! The multi-turn loop. Each round streams the model (`round`), then runs
+//! its tool calls, until it answers without one.
 //!
-//! Agents/modes are ported: the turn resolves one top-level agent from the
-//! log's last `mode.changed`, injects its reminder when the current window
-//! lacks it, and enforces its tool allow-list at execution.
+//! Agents/modes: the turn resolves one top-level agent from the log's last
+//! `mode.changed`, injects its reminder when the current window lacks it,
+//! and enforces its tool allow-list at execution.
 //!
-//! `ask_user` is ported: the turn ends with `waiting_for_user` and the
-//! answer arrives as the next turn's input, so a pending question survives a
-//! restart.
+//! `ask_user`: the turn ends with `waiting_for_user` and the answer arrives
+//! as the next turn's input, so a pending question survives a restart.
 //!
-//! Compaction is ported: at a threshold the loop asks the model for a
-//! summary and opens a new window from it (`compaction`), and
-//! `compact_session` runs it on demand.
+//! Compaction: at a threshold the loop asks the model for a summary and
+//! opens a new window from it (`compaction`), and `compact_session` runs it
+//! on demand.
 //!
-//! Not ported yet: auto-retry patterns, vision fallback, queue, pause gate,
-//! sub-agents, return_value/step_done, parallel tool batches.
+//! Tool calls run one at a time; sub-agents are not a tool yet.
 
 use super::ask_user;
 use super::compaction::{self, Compacted};
 use super::ports::{EventLog, Model, Toolbox};
+use super::preflight;
 use super::prompt::system_prompt;
 use super::propose_criteria;
+use super::propose_task;
 use super::record_decision;
-use super::round::{self, Round, RoundPrompt};
+use super::request_waiver;
+use super::round::{self, CONTINUE_AFTER_STREAM_ERROR_PROMPT, Round, RoundPrompt};
+use super::suggest_agent;
 use super::tool_calls::{Flow, INTERRUPTED_ERROR, execute_tools};
 use crate::domain::agent::{AgentDefinition, DEFAULT_COLOR, last_reminder, resolve};
 use crate::domain::attachment::Attachment;
@@ -38,6 +39,7 @@ use crate::domain::open_calls;
 use crate::domain::preferences::ReasoningEffort;
 use crate::domain::replay::replayable;
 use crate::domain::skill::Skill;
+use crate::domain::workdir_notice;
 use serde_json::Value;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -46,7 +48,7 @@ use std::time::{Duration, Instant};
 const CONTINUE_AFTER_TRUNCATION_PROMPT: &str =
     "Continue your previous response exactly where you left off.";
 const MAX_TRUNCATION_RETRIES: u32 = 3;
-/// openfox loops until aborted; a cap also keeps a confused model from
+/// The loop runs until aborted; a cap also keeps a confused model from
 /// running forever when nobody watches.
 const MAX_ROUNDS: u32 = 200;
 
@@ -57,11 +59,13 @@ pub struct Turn<'a> {
     pub tools: &'a dyn Toolbox,
     pub session_id: &'a str,
     pub workdir: &'a Path,
-    /// openfox `customInstructions`, assembled by the adapter. Only a
+    /// The custom instructions, assembled by the adapter. Only a
     /// session's first turn uses them: the system prompt is frozen then.
     pub instructions: &'a str,
-    /// openfox `skills`: listed in the system prompt, frozen with it.
+    /// `skills`: listed in the system prompt, frozen with it.
     pub skills: &'a [Skill],
+    /// Skill ids whose bodies the system prompt carries; frozen with it.
+    pub always_on: &'a [String],
     /// The agents the session can run as; the log's last `mode.changed`
     /// picks one.
     pub agents: &'a [AgentDefinition],
@@ -70,8 +74,13 @@ pub struct Turn<'a> {
     pub context_window: u64,
     /// The compaction threshold as a fraction of the window; 0 disables it.
     pub compact_at: f64,
-    /// openfox `reasoningEffort`; `None` sends no `reasoning_effort` field.
+    /// `reasoningEffort`; `None` sends no `reasoning_effort` field.
     pub reasoning_effort: Option<ReasoningEffort>,
+    /// The human is away (the ideas queue's night mode): `ask_user` and
+    /// `propose_criteria` answer themselves instead of pausing the turn.
+    pub autonomous: bool,
+    /// The language the human reads fennec in: the questions the loop builds follow it.
+    pub lang: crate::domain::lang::Lang,
     /// Set by the human to stop the turn: checked between rounds, while
     /// streaming and while a command runs.
     pub stop: &'a AtomicBool,
@@ -135,6 +144,47 @@ pub fn replay_turn(turn: &mut Turn, message_id: &str) -> Result<DoneReason, Stri
     })
 }
 
+/// The human's retry of a turn that ended in an error: a system-generated
+/// continuation prompt re-runs the loop from where it stopped.
+pub fn retry_turn(turn: &mut Turn) -> Result<DoneReason, String> {
+    with_running(turn, |turn| {
+        let events = turn.log.events(turn.session_id)?;
+        if !open_calls::open_calls(&events).is_empty() {
+            return Err("answer the pending question or send a message first".into());
+        }
+        let prompt = retry_prompt(&events)?;
+        let agent = resolve(turn.agents, &events).ok_or("no top-level agent")?;
+        ensure_agent_reminder(turn, agent)?;
+        turn.append_user(&prompt, true, None, Vec::new())?;
+        run_top_level_agent_loop(turn, agent)
+    })
+}
+
+/// The continuation prompt of a retry, with the last error when there is one.
+fn retry_prompt(events: &[Event]) -> Result<String, String> {
+    let last_done = events
+        .iter()
+        .rfind(|e| matches!(e, Event::ChatDone { .. }))
+        .and_then(|e| match e {
+            Event::ChatDone { reason, .. } => Some(*reason),
+            _ => None,
+        })
+        .ok_or("no turn to retry")?;
+    if last_done != DoneReason::Error {
+        return Err("the last turn did not end in an error".into());
+    }
+    let error = events.iter().rev().find_map(|e| match e {
+        Event::ChatError { error, .. } => Some(error.clone()),
+        _ => None,
+    });
+    Ok(match error {
+        Some(error) => format!(
+            "The last turn ended in an error: {error}\n{CONTINUE_AFTER_STREAM_ERROR_PROMPT}"
+        ),
+        None => CONTINUE_AFTER_STREAM_ERROR_PROMPT.to_string(),
+    })
+}
+
 pub(super) fn answer_or_prompt(
     turn: &mut Turn,
     prompt: &str,
@@ -148,6 +198,7 @@ pub(super) fn answer_or_prompt(
     // tool message. When the open call awaits an answer, the human's
     // input *is* that answer, so no user message is appended on top of it.
     let answered = close_open_calls(turn, prompt)?;
+    ensure_workdir_notice(turn)?;
     ensure_agent_reminder(turn, agent)?;
     if !answered {
         turn.append_user(prompt, false, None, attachments.to_vec())?;
@@ -206,14 +257,36 @@ pub(super) fn with_running(
 
 /// The system prompt and tool definitions a round is sent with, built once
 /// so the loop and a manual compaction use an identical cached prefix.
-/// openfox `cachedSystemPrompt`, tools included: frozen at the session's
-/// first turn and read back, so a new day or a new fennec build (a new tool,
-/// a reworded description) does not change the prompt's first bytes and void
-/// the whole session's prompt cache.
+/// The system prompt, tools included: frozen at the session's first turn
+/// and read back, so a new day or a new build (a new tool, a reworded
+/// description) does not change the prompt's first bytes and void the whole
+/// session's prompt cache.
 fn round_prompt_parts(turn: &mut Turn) -> Result<(String, Value), String> {
     let events = turn.log.events(turn.session_id)?;
     let (prompt, tools) = frozen_prompt(&events);
+    let current_mcp = turn.tools.mcp_tool_names();
     if let (Some(prompt), Some(tools)) = (prompt, tools) {
+        // The MCP tool set changed since the last freeze (a global flag, a
+        // Connect refresh, or a per-session toggle): re-freeze the tools,
+        // keeping the prompt byte-identical. One deliberate cache miss.
+        let frozen_mcp = events
+            .iter()
+            .rev()
+            .find_map(|event| match event {
+                Event::TurnSnapshot { mcp_tool_names, .. } => Some(mcp_tool_names),
+                _ => None,
+            })
+            .cloned()
+            .unwrap_or_default();
+        if frozen_mcp != current_mcp {
+            let new_tools = tool_definitions(turn);
+            turn.append(Event::TurnSnapshot {
+                cached_system_prompt: prompt.to_string(),
+                cached_tools: Some(new_tools.clone()),
+                mcp_tool_names: current_mcp,
+            })?;
+            return Ok((prompt.to_string(), new_tools));
+        }
         return Ok((prompt.to_string(), tools.clone()));
     }
 
@@ -225,24 +298,32 @@ fn round_prompt_parts(turn: &mut Turn) -> Result<(String, Value), String> {
             turn.model.name(),
             turn.instructions,
             turn.skills,
+            turn.always_on,
         )
     });
     let tools = tools.cloned().unwrap_or_else(|| tool_definitions(turn));
     turn.append(Event::TurnSnapshot {
         cached_system_prompt: prompt.clone(),
         cached_tools: Some(tools.clone()),
+        mcp_tool_names: current_mcp,
     })?;
     Ok((prompt, tools))
 }
 
-/// The loop owns `ask_user`, `propose_criteria` and `record_decision`; they
-/// are not host tools, so their definitions are added to the toolbox's.
+/// The loop owns `ask_user`, `request_waiver`, `propose_criteria`,
+/// `record_decision`, `propose_task` and `suggest_agent`; they are not host
+/// tools, so their definitions are added to the toolbox's. `suggest_agent`
+/// lists the session's agents as of the first turn; definitions are frozen
+/// then.
 fn tool_definitions(turn: &Turn) -> Value {
     let mut tool_defs = turn.tools.definitions();
     if let Some(arr) = tool_defs.as_array_mut() {
         arr.push(ask_user::definition());
+        arr.push(request_waiver::definition());
         arr.push(propose_criteria::definition());
         arr.push(record_decision::definition());
+        arr.push(propose_task::definition());
+        arr.push(suggest_agent::definition(turn.agents));
     }
     tool_defs
 }
@@ -277,6 +358,15 @@ fn close_open_calls(turn: &mut Turn, prompt: &str) -> Result<bool, String> {
     Ok(answered)
 }
 
+/// Tells the model its working directory moved (a workflow opened the
+/// session's worktree after the prompt was frozen): the prompt only grows.
+fn ensure_workdir_notice(turn: &mut Turn) -> Result<(), String> {
+    match workdir_notice::needed(&turn.log.events(turn.session_id)?, turn.workdir) {
+        Some(notice) => turn.append_user(&notice, true, None, Vec::new()),
+        None => Ok(()),
+    }
+}
+
 /// Injects the agent's definition when the last reminder in the model's
 /// current window is another agent's, or there is none: at the first turn,
 /// after a mode switch, after a compaction. Nothing is re-sent otherwise.
@@ -297,7 +387,7 @@ fn ensure_agent_reminder(turn: &mut Turn, agent: &AgentDefinition) -> Result<(),
     turn.append_user(&agent.reminder(), true, Some(metadata), Vec::new())
 }
 
-fn run_top_level_agent_loop(
+pub(super) fn run_top_level_agent_loop(
     turn: &mut Turn,
     agent: &AgentDefinition,
 ) -> Result<DoneReason, String> {
@@ -308,6 +398,7 @@ fn run_top_level_agent_loop(
     // Guards against compacting again before a real round has measured the
     // new window.
     let mut compacted_last_round = false;
+    let mut preflight_sent_back = false;
 
     for _ in 0..MAX_ROUNDS {
         let message_id = new_id();
@@ -389,6 +480,13 @@ fn run_top_level_agent_loop(
             partial: false,
         })?;
         if answer.tool_calls.is_empty() {
+            if let Some(feedback) = preflight::run(turn, agent, &message_id, &answer.content)?
+                && !preflight_sent_back
+            {
+                preflight_sent_back = true;
+                turn.append_user(&feedback, true, None, Vec::new())?;
+                continue;
+            }
             return finish(
                 turn,
                 message_id,
@@ -405,7 +503,11 @@ fn run_top_level_agent_loop(
                     Some(started.elapsed()),
                 );
             }
-            Flow::Continue => {}
+            Flow::Continue => {
+                // A message typed while the turn ran is dropped in here, after
+                // the tools: append-only, so the prompt cache prefix is kept.
+                super::queue::drain(turn)?;
+            }
         }
     }
 
@@ -428,6 +530,7 @@ fn finish(
         reason,
         duration_ms: duration.map(|d| d.as_millis() as u64),
     })?;
+    turn.model.release(turn.session_id);
     Ok(reason)
 }
 
@@ -462,6 +565,7 @@ pub fn run_agent_node(turn: &mut Turn, agent_id: &str, prompt: &str) -> Result<D
         })?;
     }
 
+    ensure_workdir_notice(turn)?;
     ensure_agent_reminder(turn, agent)?;
     turn.append_user(prompt, true, None, Vec::new())?;
     run_top_level_agent_loop(turn, agent)
@@ -472,7 +576,7 @@ mod tests {
     use super::*;
     use crate::agent::ports::{Completion, Delta, Request};
     use crate::agent::round::CONTINUE_AFTER_STREAM_ERROR_PROMPT;
-    use crate::agent::test_support::{MemoryLog, Scripted, builder, plan, reply};
+    use crate::agent::test_support::{FakeToolbox, MemoryLog, Scripted, builder, plan, reply};
     use crate::domain::conversation::fold_messages;
     use crate::domain::event::ToolCall;
     use crate::tools::LocalTools;
@@ -514,11 +618,14 @@ mod tests {
                 workdir: &self.workdir,
                 instructions: "",
                 skills: &[],
+                always_on: &[],
                 agents: &self.agents,
                 max_tokens: 100,
                 context_window: 1000,
                 compact_at: 0.0,
                 reasoning_effort: None,
+                autonomous: false,
+                lang: crate::domain::lang::Lang::Fr,
                 stop: self.stop,
                 on_event: &mut self.on_event,
             }
@@ -526,8 +633,16 @@ mod tests {
     }
 
     fn run(model: &dyn Model, workdir: &Path) -> (DoneReason, Vec<Event>) {
+        run_with_rules(model, workdir, rules::Rules::default())
+    }
+
+    fn run_with_rules(
+        model: &dyn Model,
+        workdir: &Path,
+        rules: rules::Rules,
+    ) -> (DoneReason, Vec<Event>) {
         let log = MemoryLog::default();
-        let tools = LocalTools::new(workdir.to_path_buf());
+        let tools = LocalTools::new(workdir.to_path_buf()).with_rules(rules);
         let stop = AtomicBool::new(false);
         let mut on_event = |_: &Event| {};
         let agents = builder();
@@ -539,11 +654,14 @@ mod tests {
             workdir,
             instructions: "",
             skills: &[],
+            always_on: &[],
             agents: &agents,
             max_tokens: 100,
             context_window: 1000,
             compact_at: 0.0,
             reasoning_effort: None,
+            autonomous: false,
+            lang: crate::domain::lang::Lang::Fr,
             stop: &stop,
             on_event: &mut on_event,
         };
@@ -555,6 +673,41 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("fennec-turn-{}", new_id()));
         std::fs::create_dir_all(&dir).unwrap();
         dir
+    }
+
+    #[test]
+    fn a_command_matching_a_rule_is_refused_and_logged() {
+        let dir = scratch_dir();
+        std::fs::create_dir_all(dir.join("target")).unwrap();
+        let call = ToolCall {
+            id: "c1".into(),
+            name: "run_command".into(),
+            arguments: json!({"command": "rm -fr target"}),
+            parse_error: None,
+            raw_arguments: None,
+        };
+        let model = Scripted(RefCell::new(vec![
+            reply("", vec![call]),
+            reply("done", vec![]),
+        ]));
+        let rules = rules::Rules::new(vec![rules::Rule {
+            id: 1,
+            scope: rules::Scope::Global,
+            target: rules::Target::parse(rules::TargetKind::Command, "rm -rf", None).unwrap(),
+            action: rules::Action::Block,
+            note: None,
+            origin: rules::Origin::Human,
+        }]);
+        let (_, events) = run_with_rules(&model, &dir, rules);
+        assert!(events.iter().any(
+            |e| matches!(e, Event::RuleBlocked { subject, .. } if subject == "rm -fr target")
+        ));
+        assert!(events.iter().any(|e| matches!(
+            e,
+            Event::ToolResult { result, .. } if !result.success && result.error.as_deref().is_some_and(|m| m.contains("rm -rf"))
+        )));
+        assert!(dir.join("target").exists(), "the command never ran");
+        std::fs::remove_dir_all(dir).ok();
     }
 
     #[test]
@@ -603,6 +756,75 @@ mod tests {
         let msgs = fold_messages(&events);
         assert_eq!(msgs.last().unwrap()["content"], "done");
         assert_eq!(msgs[3]["role"], "tool");
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn queued_message_is_drained_between_tool_rounds() {
+        let dir = scratch_dir();
+        let call = ToolCall {
+            id: "c1".into(),
+            name: "write_file".into(),
+            arguments: json!({"path": "hello.txt", "content": "hi"}),
+            parse_error: None,
+            raw_arguments: None,
+        };
+        let model = Scripted(RefCell::new(vec![
+            reply("", vec![call]),
+            reply("done", vec![]),
+        ]));
+        let stop = AtomicBool::new(false);
+        let mut harness = Harness::new(Box::new(model), dir.clone(), &stop);
+        let queue_id = new_id();
+        harness
+            .log
+            .append(
+                "s",
+                &Event::QueueAdded {
+                    queue_id: queue_id.clone(),
+                    mode: crate::domain::event::QueueMode::Asap,
+                    content: "queued".into(),
+                    queued_at: 1,
+                },
+            )
+            .unwrap();
+
+        let reason = run_turn(&mut harness.turn(), "prompt", &[]).unwrap();
+        let events = harness.log.events("s").unwrap();
+        assert_eq!(reason, DoneReason::Complete);
+
+        let tool_result = events
+            .iter()
+            .position(|e| matches!(e, Event::ToolResult { .. }))
+            .unwrap();
+        let queued_start = events
+            .iter()
+            .position(|e| {
+                matches!(
+                    e,
+                    Event::MessageStart {
+                        role: Role::User,
+                        content: Some(content),
+                        ..
+                    } if content == "queued"
+                )
+            })
+            .unwrap();
+        let drained = events
+            .iter()
+            .position(|e| matches!(e, Event::QueueDrained { queue_id: id } if id == &queue_id))
+            .unwrap();
+        // The next round's answer comes after the queued message.
+        assert!(events[drained..].iter().any(|e| matches!(
+            e,
+            Event::MessageStart {
+                role: Role::Assistant,
+                ..
+            }
+        )));
+
+        assert!(tool_result < queued_start);
+        assert!(queued_start < drained);
         std::fs::remove_dir_all(dir).ok();
     }
 
@@ -712,6 +934,19 @@ mod tests {
         );
     }
 
+    #[test]
+    fn a_failed_request_is_reported_before_it_is_retried() {
+        let model = Scripted(RefCell::new(vec![
+            Err("connection refused".into()),
+            reply("done", vec![]),
+        ]));
+        let (reason, events) = run(&model, Path::new("/tmp"));
+        assert_eq!(reason, DoneReason::Complete);
+        assert!(events.iter().any(|e| matches!(e,
+            Event::ChatError { error, recoverable: true }
+                if error == "connection refused (retry 1/3 in 1s)")));
+    }
+
     /// Answers at once and keeps the system prompt of each call.
     #[derive(Default)]
     struct Recording(RefCell<Vec<String>>);
@@ -735,6 +970,7 @@ mod tests {
             &Event::TurnSnapshot {
                 cached_system_prompt: "frozen".into(),
                 cached_tools: Some(json!([])),
+                mcp_tool_names: Vec::new(),
             },
         )
         .unwrap();
@@ -752,11 +988,14 @@ mod tests {
             workdir: &workdir,
             instructions: "",
             skills: &[],
+            always_on: &[],
             agents: &agents,
             max_tokens: 100,
             context_window: 1000,
             compact_at: 0.0,
             reasoning_effort: None,
+            autonomous: false,
+            lang: crate::domain::lang::Lang::Fr,
             stop: &stop,
             on_event: &mut on_event,
         };
@@ -822,6 +1061,51 @@ mod tests {
         assert_eq!(msgs[tool_idx]["content"], "blue");
         assert_eq!(msgs[tool_idx - 1]["role"], "assistant");
         assert_eq!(msgs[tool_idx - 1]["tool_calls"][0]["id"], "c1");
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn while_the_human_is_away_ask_user_and_propose_criteria_answer_themselves() {
+        let dir = scratch_dir();
+        let ask = ToolCall {
+            id: "c1".into(),
+            name: "ask_user".into(),
+            arguments: json!({"question": "Which color?"}),
+            parse_error: None,
+            raw_arguments: None,
+        };
+        let propose = ToolCall {
+            id: "c2".into(),
+            name: "propose_criteria".into(),
+            arguments: json!({"criteria":[{"description":"builds","check":"true"}],"reason":"r"}),
+            parse_error: None,
+            raw_arguments: None,
+        };
+        let model = Scripted(RefCell::new(vec![
+            reply("", vec![ask, propose]),
+            reply("done", vec![]),
+        ]));
+        let stop = AtomicBool::new(false);
+        let mut h = Harness::new(Box::new(model), dir.clone(), &stop);
+        let mut turn = h.turn();
+        turn.autonomous = true;
+        assert_eq!(
+            run_turn(&mut turn, "go", &[]).unwrap(),
+            DoneReason::Complete
+        );
+        let events = h.log.0.borrow().clone();
+        assert!(
+            !events
+                .iter()
+                .any(|e| matches!(e, Event::ChatAskUser { .. }))
+        );
+        assert!(
+            !events
+                .iter()
+                .any(|e| matches!(e, Event::CriteriaProposed { .. }))
+        );
+        assert!(events.iter().any(|e| matches!(e, Event::ToolResult { tool_call_id, result, .. } if tool_call_id == "c1" && result.success)));
+        assert!(events.iter().any(|e| matches!(e, Event::ToolResult { tool_call_id, result, .. } if tool_call_id == "c2" && !result.success)));
         std::fs::remove_dir_all(dir).ok();
     }
 
@@ -957,6 +1241,7 @@ mod tests {
                 workflow,
                 task: "t".into(),
                 step_by_step: false,
+                started_at: None,
             },
             Event::CriteriaSet {
                 criteria: vec![Criterion {
@@ -1332,6 +1617,7 @@ mod tests {
         let snapshot = |tools: Option<Value>| Event::TurnSnapshot {
             cached_system_prompt: "frozen".into(),
             cached_tools: tools,
+            mcp_tool_names: Vec::new(),
         };
         let snapshots = |log: &MemoryLog| {
             log.0
@@ -1360,6 +1646,76 @@ mod tests {
         let seen = model.0.borrow();
         assert_eq!(seen.len(), 2);
         assert_eq!(seen[0], seen[1]);
+        assert_eq!(snapshots(&h.log), 2);
+    }
+
+    #[test]
+    fn an_mcp_tool_set_change_refreezes_the_snapshot_once() {
+        use crate::domain::mcp::{McpServer, McpTool, McpTransport};
+
+        let stop = AtomicBool::new(false);
+        let snapshots = |log: &MemoryLog| {
+            log.0
+                .borrow()
+                .iter()
+                .filter(|e| matches!(e, Event::TurnSnapshot { .. }))
+                .count()
+        };
+        let prompts = |log: &MemoryLog| {
+            log.0
+                .borrow()
+                .iter()
+                .filter_map(|e| match e {
+                    Event::TurnSnapshot {
+                        cached_system_prompt,
+                        ..
+                    } => Some(cached_system_prompt.clone()),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+        };
+        let server = |tools: &[&str]| {
+            let mut server = McpServer {
+                name: "fs".into(),
+                transport: McpTransport::Stdio,
+                command: Some("x".into()),
+                ..Default::default()
+            };
+            server.cached_tools = tools
+                .iter()
+                .map(|tool| McpTool {
+                    name: (*tool).into(),
+                    description: None,
+                    input_schema: json!({ "type": "object" }),
+                })
+                .collect();
+            server
+        };
+
+        let model = RecordingTools::default();
+        let mut h = Harness::new(Box::new(model.clone()), PathBuf::from("/tmp"), &stop);
+        h.tools = LocalTools::new(PathBuf::from("/tmp")).with_mcp(vec![server(&["read", "write"])]);
+        run_turn(&mut h.turn(), "one", &[]).unwrap();
+        assert_eq!(snapshots(&h.log), 1);
+        let first_tools = model.0.borrow()[0].clone();
+
+        // The set is unchanged: no re-freeze, same tools sent.
+        run_turn(&mut h.turn(), "two", &[]).unwrap();
+        assert_eq!(snapshots(&h.log), 1);
+        assert_eq!(model.0.borrow()[1], first_tools);
+
+        // A tool is added: one re-freeze, and the prompt stays byte-identical.
+        h.tools = LocalTools::new(PathBuf::from("/tmp"))
+            .with_mcp(vec![server(&["read", "write", "delete"])]);
+        run_turn(&mut h.turn(), "three", &[]).unwrap();
+        assert_eq!(snapshots(&h.log), 2);
+        assert_ne!(model.0.borrow()[2], first_tools);
+        let prompts = prompts(&h.log);
+        assert_eq!(prompts.len(), 2);
+        assert_eq!(prompts[0], prompts[1]);
+
+        // The set is stable again: no further re-freeze.
+        run_turn(&mut h.turn(), "four", &[]).unwrap();
         assert_eq!(snapshots(&h.log), 2);
     }
 
@@ -1447,6 +1803,84 @@ mod tests {
         );
     }
 
+    /// Fails its first four requests before any content, then answers.
+    struct FailsThenAnswers(RefCell<u32>);
+
+    impl Model for FailsThenAnswers {
+        fn name(&self) -> &str {
+            "fails-then-answers"
+        }
+
+        fn stream(&self, _: &Request, _: &mut dyn FnMut(Delta)) -> Result<Completion, String> {
+            if *self.0.borrow() < 4 {
+                *self.0.borrow_mut() += 1;
+                return Err("LLM HTTP 400".into());
+            }
+            reply("done", vec![])
+        }
+    }
+
+    #[test]
+    fn a_turn_ended_in_error_is_retried_with_a_continuation_prompt() {
+        let model = FailsThenAnswers(RefCell::new(0));
+        let stop = AtomicBool::new(false);
+        let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
+        assert_eq!(
+            run_turn(&mut h.turn(), "go", &[]).unwrap(),
+            DoneReason::Error
+        );
+        assert_eq!(retry_turn(&mut h.turn()).unwrap(), DoneReason::Complete);
+        let events = h.log.0.borrow().clone();
+        let prompts: Vec<String> = events
+            .iter()
+            .filter_map(|e| match e {
+                Event::MessageStart {
+                    role: Role::User,
+                    content: Some(c),
+                    is_system_generated: true,
+                    ..
+                } => Some(c.clone()),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            prompts
+                .iter()
+                .any(|p| p.contains("The last turn ended in an error: LLM HTTP 400"))
+        );
+    }
+
+    #[test]
+    fn retry_is_refused_when_the_last_turn_did_not_fail() {
+        let model = Scripted(RefCell::new(vec![reply("done", vec![])]));
+        let stop = AtomicBool::new(false);
+        let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
+        run_turn(&mut h.turn(), "go", &[]).unwrap();
+        assert_eq!(
+            retry_turn(&mut h.turn()).unwrap_err(),
+            "the last turn did not end in an error"
+        );
+    }
+
+    #[test]
+    fn retry_prompt_carries_the_last_error() {
+        let events = vec![
+            Event::ChatError {
+                error: "boom".into(),
+                recoverable: false,
+            },
+            Event::ChatDone {
+                message_id: "m".into(),
+                reason: DoneReason::Error,
+                duration_ms: None,
+            },
+        ];
+        let prompt = retry_prompt(&events).unwrap();
+        assert!(prompt.contains("boom"));
+        assert!(prompt.contains(CONTINUE_AFTER_STREAM_ERROR_PROMPT));
+        assert_eq!(retry_prompt(&[]).unwrap_err(), "no turn to retry");
+    }
+
     #[test]
     fn a_prompt_with_an_attachment_sends_text_and_image_parts() {
         let model = Scripted(RefCell::new(vec![reply("done", vec![])]));
@@ -1479,8 +1913,10 @@ mod tests {
         let builder_model = RecordingTools::default();
         let stop = AtomicBool::new(false);
 
+        // One session's agents in both modes: suggest_agent's definition lists them.
+        let agents = [builder(), vec![plan()]].concat();
         let mut plan_h = Harness::new(Box::new(plan_model.clone()), PathBuf::from("/tmp"), &stop);
-        plan_h.agents = vec![plan()];
+        plan_h.agents = agents.clone();
         run_turn(&mut plan_h.turn(), "go", &[]).unwrap();
 
         let mut builder_h = Harness::new(
@@ -1488,8 +1924,84 @@ mod tests {
             PathBuf::from("/tmp"),
             &stop,
         );
+        builder_h.agents = agents;
+        builder_h.log.0.borrow_mut().push(Event::ModeChanged {
+            mode: "builder".into(),
+            auto: false,
+            reason: None,
+        });
         run_turn(&mut builder_h.turn(), "go", &[]).unwrap();
 
         assert_eq!(*plan_model.0.borrow(), *builder_model.0.borrow());
+    }
+
+    fn run_with_fake_tools(
+        model: Box<dyn Model>,
+        agents: Vec<AgentDefinition>,
+    ) -> (DoneReason, Vec<Event>) {
+        let log = MemoryLog::default();
+        let tools = FakeToolbox;
+        let stop = AtomicBool::new(false);
+        let mut on_event = |_: &Event| {};
+        let mut turn = Turn {
+            model: &*model,
+            log: &log,
+            tools: &tools,
+            session_id: "s",
+            workdir: Path::new("/tmp"),
+            instructions: "",
+            skills: &[],
+            always_on: &[],
+            agents: &agents,
+            max_tokens: 100,
+            context_window: 1000,
+            compact_at: 0.0,
+            reasoning_effort: None,
+            autonomous: false,
+            lang: crate::domain::lang::Lang::Fr,
+            stop: &stop,
+            on_event: &mut on_event,
+        };
+        let reason = run_turn(&mut turn, "go", &[]).unwrap();
+        (reason, log.0.into_inner())
+    }
+
+    #[test]
+    fn a_plan_with_a_check_that_passes_already_is_sent_back_once() {
+        let plan_text = "## Done when\n- [ ] builds — check: `true`\n";
+        let model = Box::new(Scripted(RefCell::new(vec![
+            reply(plan_text, vec![]),
+            reply(plan_text, vec![]),
+        ])));
+        let (reason, events) = run_with_fake_tools(model, vec![plan()]);
+        assert_eq!(reason, DoneReason::Complete);
+        assert_eq!(
+            events
+                .iter()
+                .filter(|e| matches!(e, Event::CriteriaPreflight { .. }))
+                .count(),
+            2
+        );
+        assert!(events.iter().any(|e| matches!(
+            e,
+            Event::MessageStart {
+                role: Role::User,
+                is_system_generated: true,
+                content: Some(c),
+                ..
+            } if c.contains("passes already")
+        )));
+    }
+
+    #[test]
+    fn a_builder_plan_with_a_check_is_not_preflighted() {
+        let plan_text = "## Done when\n- [ ] builds — check: `true`\n";
+        let model = Box::new(Scripted(RefCell::new(vec![reply(plan_text, vec![])])));
+        let (_, events) = run_with_fake_tools(model, builder());
+        assert!(
+            !events
+                .iter()
+                .any(|e| matches!(e, Event::CriteriaPreflight { .. }))
+        );
     }
 }

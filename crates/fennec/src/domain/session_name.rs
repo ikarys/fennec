@@ -1,9 +1,10 @@
-//! Ports openfox session/name-generator: the prompt and the name's cleanup.
-//! Not ported: the disableAutoSessionTitle switch, the 'Session N' default check.
+//! Session name cleanup. The prompt asks for the specific subject of the task.
+//! There is no switch to turn it off.
 
-/// openfox `SESSION_NAME_PROMPT`: the only context sent to the model.
+/// The naming prompt: the only context sent to the model.
 pub const SESSION_NAME_PROMPT: &str =
     "Generate a concise, descriptive session name (max 50 characters) based on the user's message.
+Name the specific subject (the feature, file, bug or question), not the kind of step: never a generic name such as \"Next step\", \"Continue\" or \"Follow-up\". Write it in the language of the message.
 Return ONLY the name, nothing else.
 
 Example inputs and outputs:
@@ -37,6 +38,29 @@ pub fn clean(raw: &str) -> Option<String> {
         return Some(format!("{truncated}..."));
     }
     Some(name.to_string())
+}
+
+/// Returns a title that is unique among `taken` sibling titles.
+///
+/// Comparison is trimmed and case-insensitive. When the name is taken, the
+/// smallest `#n` suffix (starting at 2) that is not taken is appended.
+pub fn disambiguate(name: &str, taken: &[String]) -> String {
+    let name = name.trim();
+    if !taken.iter().any(|t| t.trim().eq_ignore_ascii_case(name)) {
+        return name.to_string();
+    }
+
+    let mut n = 2;
+    loop {
+        let candidate = format!("{name} #{n}");
+        if !taken
+            .iter()
+            .any(|t| t.trim().eq_ignore_ascii_case(&candidate))
+        {
+            return candidate;
+        }
+        n += 1;
+    }
 }
 
 /// Strips matching surrounding quotes or backticks, one layer at a time.
@@ -91,5 +115,29 @@ mod tests {
         let name = clean(&long).unwrap();
         assert_eq!(name.chars().count(), 50);
         assert!(name.ends_with("..."));
+    }
+
+    #[test]
+    fn disambiguate_keeps_free_name() {
+        let taken = vec!["Other".to_string()];
+        assert_eq!(disambiguate("Fix auth", &taken), "Fix auth");
+    }
+
+    #[test]
+    fn disambiguate_appends_smallest_suffix() {
+        let taken = vec!["Fix auth".to_string()];
+        assert_eq!(disambiguate("Fix auth", &taken), "Fix auth #2");
+    }
+
+    #[test]
+    fn disambiguate_skips_taken_suffixes() {
+        let taken = vec!["Fix auth".to_string(), "Fix auth #2".to_string()];
+        assert_eq!(disambiguate("Fix auth", &taken), "Fix auth #3");
+    }
+
+    #[test]
+    fn disambiguate_matches_case_insensitively_and_trims() {
+        let taken = vec!["  fix auth  ".to_string(), "fix auth #2".to_string()];
+        assert_eq!(disambiguate("FIX AUTH", &taken), "FIX AUTH #3");
     }
 }

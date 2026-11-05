@@ -5,26 +5,31 @@
  */
 import type { ButtonHTMLAttributes } from 'react';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
+export type ButtonVariant = 'primary' | 'soft' | 'secondary' | 'ghost' | 'danger' | 'icon';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
+// Disabled is faint text on the raised surface, never an opacity: a 50 % muted text fell to 2:1 in Jour.
 const BASE =
-  'inline-flex items-center gap-1.5 rounded-md font-medium transition-colors disabled:pointer-events-none disabled:opacity-50';
+  'inline-flex items-center gap-1.5 rounded-md font-medium transition-colors disabled:pointer-events-none disabled:text-faint';
 /** One line that never shrinks (the default), or a choice whose text wraps. */
 const SINGLE_LINE = 'shrink-0 justify-center whitespace-nowrap';
 const MULTILINE = 'min-w-0 justify-start py-1 text-left whitespace-normal';
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  primary: 'bg-accent text-on-accent hover:bg-accent-strong',
+  primary: 'bg-accent text-on-accent hover:bg-accent-strong disabled:bg-raised',
+  /** A row's own action: coloured, quieter than the screen's primary. */
+  soft: 'bg-accent-soft text-accent-strong hover:bg-accent hover:text-on-accent disabled:bg-raised',
   secondary: 'bg-raised text-text hover:bg-border',
   ghost: 'text-muted hover:bg-raised hover:text-text',
-  danger: 'bg-raised text-text hover:bg-del-bg hover:text-err'
+  /** A quiet icon button that lights up in the accent on hover (tile and nav icons). */
+  icon: 'text-muted hover:bg-raised hover:text-accent',
+  danger: 'border border-err/40 text-err hover:bg-del-bg disabled:border-border'
 };
 
 /** `wrap` is `text` whose height is a minimum: a wrapping choice grows with its text. */
 const SIZES: Record<ButtonSize, { text: string; wrap: string; square: string }> = {
   sm: { text: 'h-7 px-2.5 text-xs', wrap: 'min-h-7 px-2.5 text-xs', square: 'size-7 text-xs' },
-  md: { text: 'h-8 px-3 text-[0.8125rem]', wrap: 'min-h-8 px-3 text-[0.8125rem]', square: 'size-8 text-[0.8125rem]' },
+  md: { text: 'h-8 px-3 text-sm', wrap: 'min-h-8 px-3 text-sm', square: 'size-8 text-sm' },
   /** The composer's send button: the one action of the screen. */
   lg: { text: 'h-10 rounded-lg px-4 text-sm', wrap: 'min-h-10 rounded-lg px-4 text-sm', square: 'size-10 rounded-lg text-sm' }
 };

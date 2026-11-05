@@ -1,7 +1,8 @@
-//! Port of openfox `tools/web-search.ts`: SearXNG only.
+//! `web_search`: SearXNG only.
 //!
-//! Not ported: Tavily, the engine choice, the SEARXNG_* environment variables
-//! (the Settings page holds the instance), web_fetch.
+//! This module does not support Tavily, engine choice, `SEARXNG_*`
+//! environment variables (the Settings page holds the instance), or
+//! `web_fetch`.
 
 use super::args;
 use crate::domain::event::ToolResult;
@@ -37,15 +38,12 @@ pub(super) fn definition() -> Value {
 }
 
 pub(super) fn run(args: &Value, search: &SearchPrefs) -> ToolResult {
-    let query = match args::string(args, "query") {
-        Ok(value) => value,
-        Err(error) => return ToolResult::failure(error),
-    };
+    try_run(args, search).unwrap_or_else(ToolResult::failure)
+}
 
-    let max_results = match args::number(args, "max_results", DEFAULT_MAX_RESULTS) {
-        Ok(value) => value,
-        Err(error) => return ToolResult::failure(error),
-    };
+fn try_run(args: &Value, search: &SearchPrefs) -> Result<ToolResult, String> {
+    let query = args::string(args, "query")?;
+    let max_results = args::number(args, "max_results", DEFAULT_MAX_RESULTS)?;
     let max = clamp_max_results(max_results);
 
     let url =
@@ -56,8 +54,8 @@ pub(super) fn run(args: &Value, search: &SearchPrefs) -> ToolResult {
             .filter(|value| !value.is_empty())
         {
             Some(value) => value,
-            None => return ToolResult::failure(
-                "web_search requires a SearXNG instance. Set its URL in Settings > Recherche web."
+            None => return Err(
+                "web_search requires a SearXNG instance. Set its URL in Settings > Behaviour > Web search."
                     .into(),
             ),
         };
@@ -85,30 +83,31 @@ pub(super) fn run(args: &Value, search: &SearchPrefs) -> ToolResult {
     let response = match request.call() {
         Ok(response) => response,
         Err(ureq::Error::Timeout(_)) => {
-            return ToolResult::failure(
-                "Search request timed out (15s). Try a more specific query.".into(),
-            );
+            return Err("Search request timed out (15s). Try a more specific query.".into());
         }
-        Err(error) => return ToolResult::failure(error.to_string()),
+        Err(error) => return Err(error.to_string()),
     };
 
     let status = response.status();
     if !status.is_success() {
         let body = response.into_body().read_to_string().unwrap_or_default();
-        return ToolResult::failure(format!("SearXNG search failed ({status}): {body}"));
+        return Err(format!("SearXNG search failed ({status}): {body}"));
     }
 
     let body: Value = match response.into_body().read_json() {
         Ok(value) => value,
-        Err(error) => return ToolResult::failure(error.to_string()),
+        Err(error) => return Err(error.to_string()),
     };
 
     let results = parse_results(&body, max);
     if results.is_empty() {
-        return ToolResult::success("No search results found.".into(), false);
+        return Ok(ToolResult::success(
+            "No search results found.".into(),
+            false,
+        ));
     }
 
-    ToolResult::success(format_results(&results), false)
+    Ok(ToolResult::success(format_results(&results), false))
 }
 
 fn clamp_max_results(value: i64) -> usize {
@@ -194,7 +193,7 @@ mod tests {
         assert_eq!(
             result.error.as_deref(),
             Some(
-                "web_search requires a SearXNG instance. Set its URL in Settings > Recherche web."
+                "web_search requires a SearXNG instance. Set its URL in Settings > Behaviour > Web search."
             )
         );
     }
@@ -212,13 +211,13 @@ mod tests {
         assert_eq!(
             result.error.as_deref(),
             Some(
-                "web_search requires a SearXNG instance. Set its URL in Settings > Recherche web."
+                "web_search requires a SearXNG instance. Set its URL in Settings > Behaviour > Web search."
             )
         );
     }
 
     #[test]
-    fn format_results_matches_openfox() {
+    fn format_results_is_stable() {
         let results = vec![
             SearchResult {
                 title: "A".into(),

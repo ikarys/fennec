@@ -1,12 +1,14 @@
 //! Test doubles shared by the agent's test modules: a scripted model and an
 //! in-memory log, so each test module keeps one copy.
 
-use crate::agent::ports::{Completion, Delta, EventLog, Model, Request};
-use crate::domain::agent::{AgentDefinition, CommandAccess};
-use crate::domain::event::{Event, ToolCall};
+use crate::agent::ports::{Completion, Delta, EventLog, Model, Request, Toolbox};
+use crate::domain::agent::{AgentDefinition, AgentOrigin, CommandAccess};
+use crate::domain::event::{Event, OutputStream, ToolCall, ToolResult};
+use serde_json::{Value, json};
 use std::cell::RefCell;
+use std::sync::atomic::AtomicBool;
 
-/// Plays back one scripted reply per call, like openfox's mock LLM.
+/// Plays back one scripted reply per call.
 pub struct Scripted(pub RefCell<Vec<Result<Completion, String>>>);
 
 impl Model for Scripted {
@@ -59,6 +61,7 @@ pub fn reply(content: &str, calls: Vec<ToolCall>) -> Result<Completion, String> 
 pub fn builder() -> Vec<AgentDefinition> {
     vec![AgentDefinition {
         id: "builder".into(),
+        phase: None,
         name: "Builder".into(),
         description: String::new(),
         subagent: false,
@@ -68,14 +71,18 @@ pub fn builder() -> Vec<AgentDefinition> {
             "edit_file".into(),
             "run_command".into(),
             "ask_user".into(),
+            "request_waiver".into(),
             "propose_criteria".into(),
             "record_decision".into(),
             "load_skill".into(),
         ],
         commands: CommandAccess::ReadWrite,
+        writes: crate::domain::agent::WriteScope::Any,
         reasoning_effort: None,
         color: None,
         prompt: "Build.".into(),
+        origin: AgentOrigin::Default,
+        path: None,
     }]
 }
 
@@ -83,13 +90,46 @@ pub fn builder() -> Vec<AgentDefinition> {
 pub fn plan() -> AgentDefinition {
     AgentDefinition {
         id: "plan".into(),
+        phase: None,
         name: "Plan".into(),
         description: String::new(),
         subagent: false,
         allowed_tools: vec!["read_file".into(), "ask_user".into(), "load_skill".into()],
         commands: CommandAccess::ReadOnly,
+        writes: crate::domain::agent::WriteScope::Any,
         reasoning_effort: None,
         color: None,
         prompt: "Plan.".into(),
+        origin: AgentOrigin::Default,
+        path: None,
+    }
+}
+
+/// A toolbox for the agent loop tests: `run_command` always succeeds with the
+/// marker `run_command` prints, so preflight can classify it without a shell.
+pub struct FakeToolbox;
+
+impl Toolbox for FakeToolbox {
+    fn definitions(&self) -> Value {
+        json!([])
+    }
+
+    fn execute(
+        &self,
+        name: &str,
+        args: &Value,
+        _access: CommandAccess,
+        _stop: &AtomicBool,
+        _on_output: &mut dyn FnMut(OutputStream, &str),
+    ) -> ToolResult {
+        if name == "run_command" {
+            let command = args
+                .get("command")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            ToolResult::success(format!("$ {command}\n[Exit code: 0]"), false)
+        } else {
+            ToolResult::success("ok".into(), false)
+        }
     }
 }

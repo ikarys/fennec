@@ -667,9 +667,13 @@ mod tests {
             subagent: false,
             allowed_tools: tools.iter().map(|tool| tool.to_string()).collect(),
             commands: crate::domain::agent::CommandAccess::ReadWrite,
+            writes: crate::domain::agent::WriteScope::Any,
             reasoning_effort: None,
             color: None,
+            phase: None,
             prompt: "prompt".to_string(),
+            origin: crate::domain::agent::AgentOrigin::Default,
+            path: None,
         }
     }
 

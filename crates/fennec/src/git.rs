@@ -20,6 +20,130 @@ pub fn current_branch(workdir: &Path) -> Option<String> {
         .map(String::from)
 }
 
+/// The remote a human opens in a browser: `origin` when set, else the first
+/// remote; `None` when the repository has no remote.
+pub fn remote_url(workdir: &Path) -> Option<String> {
+    let name = preferred_remote(workdir)?;
+    let out = Command::new("git")
+        .current_dir(workdir)
+        .args(["remote", "get-url", &name])
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .next()
+        .map(str::trim)
+        .filter(|u| !u.is_empty())
+        .map(String::from)
+}
+
+/// `origin` when present, else the first configured remote; `None` when there
+/// is none.
+fn preferred_remote(workdir: &Path) -> Option<String> {
+    let out = Command::new("git")
+        .current_dir(workdir)
+        .args(["remote"])
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let output = String::from_utf8_lossy(&out.stdout);
+    let remotes: Vec<&str> = output
+        .lines()
+        .map(str::trim)
+        .filter(|r| !r.is_empty())
+        .collect();
+    remotes
+        .iter()
+        .find(|r| **r == "origin")
+        .or_else(|| remotes.first())
+        .copied()
+        .map(String::from)
+}
+
+/// A git remote as a web URL a browser opens; `None` for a local path.
+/// `git@github.com:o/r.git` → `https://github.com/o/r`; `ssh://` and `https://`
+/// are kept, a trailing `.git` is dropped.
+pub fn web_url(remote: &str) -> Option<String> {
+    // The SCP form `git@host:path` splits on `:`; every scheme splits on `/`.
+    let rest = remote
+        .strip_prefix("ssh://")
+        .map(|r| r.strip_prefix("git@").unwrap_or(r))
+        .or_else(|| remote.strip_prefix("https://"))
+        .or_else(|| remote.strip_prefix("http://"))
+        .or_else(|| remote.strip_prefix("git@"))?;
+    let sep = if remote.starts_with("git@") { ':' } else { '/' };
+    let (host, path) = rest.split_once(sep)?;
+    if host.is_empty() || path.is_empty() {
+        return None;
+    }
+    Some(format!(
+        "https://{}/{}",
+        host,
+        path.trim_end_matches(".git")
+    ))
+}
+
+/// The number of uncommitted entries in the human's tree, for a quick glance.
+pub fn dirty_count(workdir: &Path) -> usize {
+    let Ok(output) = Command::new("git")
+        .current_dir(workdir)
+        .args(["status", "--porcelain", "-z"])
+        .output()
+    else {
+        return 0;
+    };
+    if !output.status.success() {
+        return 0;
+    }
+
+    let mut count = 0;
+    let mut skip_next = false;
+    for field in output.stdout.split(|byte| *byte == 0) {
+        if skip_next {
+            skip_next = false;
+            continue;
+        }
+        if field.is_empty() {
+            continue;
+        }
+        count += 1;
+        if field[0] == b'R' || field[0] == b'C' {
+            skip_next = true;
+        }
+    }
+    count
+}
+
+/// The sessions whose work reached the checked-out branch: the `Fennec-Session` trailers an
+/// integration writes, read from HEAD's history in one `git log`. Survives the session's deletion.
+pub fn integrated_sessions(workdir: &Path) -> HashSet<String> {
+    let Ok(out) = Command::new("git")
+        .current_dir(workdir)
+        .args([
+            "log",
+            "HEAD",
+            "--format=%(trailers:key=Fennec-Session,valueonly)",
+        ])
+        .output()
+    else {
+        return HashSet::new();
+    };
+    session_trailers(&String::from_utf8_lossy(&out.stdout))
+}
+
+fn session_trailers(log: &str) -> HashSet<String> {
+    log.lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(String::from)
+        .collect()
+}
+
 /// The sessions whose worktree branch holds commits past their base ref: work
 /// still waiting for the human. One `git for-each-ref` per project; sessions
 /// whose branch or base is gone (discarded, never opened) are not listed.
@@ -37,6 +161,135 @@ pub fn sessions_with_unintegrated_work(workdir: &Path) -> HashSet<String> {
         return HashSet::new();
     };
     unintegrated(&String::from_utf8_lossy(&out.stdout))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BranchStats {
+    pub commits: usize,
+    pub files: usize,
+}
+
+/// What a session's worktree branch holds past its base ref; None when either ref is gone.
+pub fn branch_stats(workdir: &Path, session_id: &str) -> Option<BranchStats> {
+    let base = format!("refs/fennec/base/{session_id}");
+    let head = format!("refs/heads/fennec/{session_id}");
+    let range = format!("{base}..{head}");
+
+    let count_out = Command::new("git")
+        .current_dir(workdir)
+        .args(["rev-list", "--count"])
+        .arg(&range)
+        .output()
+        .ok()?;
+    if !count_out.status.success() {
+        return None;
+    }
+    let commits = String::from_utf8_lossy(&count_out.stdout)
+        .trim()
+        .parse::<usize>()
+        .ok()?;
+
+    let diff_out = Command::new("git")
+        .current_dir(workdir)
+        .args(["diff", "--name-only"])
+        .arg(&base)
+        .arg(&head)
+        .output()
+        .ok()?;
+    if !diff_out.status.success() {
+        return None;
+    }
+    let files = String::from_utf8_lossy(&diff_out.stdout)
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .count();
+
+    Some(BranchStats { commits, files })
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Contribution {
+    pub branch: String,
+    pub ahead: usize,
+    pub subject: String,
+}
+
+/// The branches, local and remote, holding commits the human's HEAD lacks: what
+/// could come in as a contribution.
+pub fn contributions(workdir: &Path) -> Vec<Contribution> {
+    let out = Command::new("git")
+        .current_dir(workdir)
+        .args([
+            "for-each-ref",
+            "--no-merged",
+            "HEAD",
+            "--sort=-committerdate",
+            // lstrip=2, not :short: `refs/remotes/origin/HEAD` stays `origin/HEAD`
+            // (short gives a bare `origin`), so the filter can drop it.
+            "--format=%(refname:lstrip=2)%09%(subject)",
+            "refs/heads",
+            "refs/remotes",
+        ])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
+        .unwrap_or_default();
+    let current = current_branch(workdir);
+    let mut contributions = Vec::new();
+    for (branch, subject) in parse_contributions(&out, current.as_deref()) {
+        let Some(ahead) = Command::new("git")
+            .current_dir(workdir)
+            .args(["rev-list", "--count"])
+            .arg(format!("HEAD..{branch}"))
+            .output()
+            .ok()
+            .filter(|o| o.status.success())
+            .and_then(|o| {
+                String::from_utf8_lossy(&o.stdout)
+                    .trim()
+                    .parse::<usize>()
+                    .ok()
+            })
+        else {
+            continue;
+        };
+        contributions.push(Contribution {
+            branch,
+            ahead,
+            subject,
+        });
+        if contributions.len() == 50 {
+            // ponytail: one rev-list per branch, capped at 50; a single
+            // `for-each-ref %(ahead-behind:HEAD)` (git 2.41+) if it ever matters.
+            break;
+        }
+    }
+    contributions
+}
+
+/// Drops the session branches (fennec's own), remote HEADs and the branch the human is on.
+fn parse_contributions(out: &str, current: Option<&str>) -> Vec<(String, String)> {
+    out.lines()
+        .filter_map(|line| {
+            let (branch, subject) = line.split_once('\t')?;
+            let branch = branch.trim();
+            let subject = subject.trim();
+            if branch.is_empty() {
+                return None;
+            }
+            if branch.starts_with("fennec/") || branch.contains("/fennec/") {
+                return None;
+            }
+            if branch.ends_with("/HEAD") {
+                return None;
+            }
+            if current.is_some_and(|c| c == branch) {
+                return None;
+            }
+            Some((branch.to_string(), subject.to_string()))
+        })
+        .collect()
 }
 
 /// Parses `for-each-ref` lines: a session is pending when its branch and base
@@ -63,7 +316,30 @@ fn unintegrated(refs: &str) -> HashSet<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::unintegrated;
+    use super::{
+        dirty_count, parse_contributions, remote_url, session_trailers, unintegrated, web_url,
+    };
+    use std::collections::HashSet;
+    use std::process::Command;
+
+    #[test]
+    fn session_trailers_lists_each_integrated_session() {
+        let ids = session_trailers("s1\n\n\n  s2 \n\n");
+        assert_eq!(ids, HashSet::from(["s1".to_string(), "s2".to_string()]));
+    }
+
+    #[test]
+    fn parse_contributions_drops_session_heads_and_current() {
+        let out = "main\tsubject\ncontrib\tcontrib subject\nfennec/s1\tsession\norigin/fennec/s1\tremote session\norigin/HEAD\tremote head\nfeature\tfeature subject\n";
+        let parsed = parse_contributions(out, Some("main"));
+        assert_eq!(
+            parsed,
+            vec![
+                ("contrib".to_string(), "contrib subject".to_string()),
+                ("feature".to_string(), "feature subject".to_string()),
+            ]
+        );
+    }
 
     #[test]
     fn pending_only_when_branch_moved_past_base() {
@@ -73,5 +349,124 @@ mod tests {
         let pending = unintegrated(refs);
         assert_eq!(pending.len(), 1);
         assert!(pending.contains("a"));
+    }
+
+    #[test]
+    fn web_url_normalizes_remotes_to_web_links() {
+        assert_eq!(
+            web_url("git@github.com:owner/repo.git"),
+            Some("https://github.com/owner/repo".to_string())
+        );
+        assert_eq!(
+            web_url("https://github.com/owner/repo.git"),
+            Some("https://github.com/owner/repo".to_string())
+        );
+        assert_eq!(
+            web_url("https://gitlab.com/team/proj"),
+            Some("https://gitlab.com/team/proj".to_string())
+        );
+        assert_eq!(
+            web_url("ssh://git@gitea.io/owner/repo.git"),
+            Some("https://gitea.io/owner/repo".to_string())
+        );
+        assert_eq!(
+            web_url("git@gitlab.mycompany.io:team/app.git"),
+            Some("https://gitlab.mycompany.io/team/app".to_string())
+        );
+        assert_eq!(web_url("/home/user/repo"), None);
+        assert_eq!(web_url("file:///home/user/repo"), None);
+    }
+
+    #[test]
+    fn remote_url_reads_origin_then_first_remote() {
+        let dir = std::env::temp_dir().join(format!(
+            "fennec-remote-url-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let git = |args: &[&str]| {
+            let output = Command::new("git")
+                .current_dir(&dir)
+                .args(args)
+                .output()
+                .expect("git");
+            assert!(
+                output.status.success(),
+                "git {:?} failed: {}",
+                args,
+                String::from_utf8_lossy(&output.stderr)
+            );
+            output
+        };
+
+        git(&["init"]);
+        assert_eq!(remote_url(&dir), None);
+
+        git(&["remote", "add", "upstream", "git@example.com:team/proj.git"]);
+        assert_eq!(
+            remote_url(&dir),
+            Some("git@example.com:team/proj.git".to_string())
+        );
+
+        git(&[
+            "remote",
+            "add",
+            "origin",
+            "https://github.com/owner/repo.git",
+        ]);
+        assert_eq!(
+            remote_url(&dir),
+            Some("https://github.com/owner/repo.git".to_string())
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn dirty_count_counts_modified_and_untracked_entries() {
+        let dir = std::env::temp_dir().join(format!(
+            "fennec-dirty-count-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let git = |args: &[&str]| {
+            let output = Command::new("git")
+                .current_dir(&dir)
+                .args(args)
+                .output()
+                .expect("git");
+            assert!(
+                output.status.success(),
+                "git {:?} failed: {}",
+                args,
+                String::from_utf8_lossy(&output.stderr)
+            );
+            output
+        };
+
+        git(&["init"]);
+        git(&["config", "user.email", "test@example.com"]);
+        git(&["config", "user.name", "Test"]);
+        std::fs::write(dir.join("a.txt"), "a\n").unwrap();
+        git(&["add", "a.txt"]);
+        git(&["commit", "-m", "a"]);
+
+        assert_eq!(dirty_count(&dir), 0);
+
+        std::fs::write(dir.join("a.txt"), "b\n").unwrap();
+        std::fs::write(dir.join("untracked.txt"), "u\n").unwrap();
+        assert_eq!(dirty_count(&dir), 2);
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

@@ -1,13 +1,17 @@
 [package]
 name = "fennec"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
 base64 = "0.23"
-llm-providers = { path = "../llm-providers" }
+llm-providers-connector = "0.1.1"
 token-usage = { path = "../token-usage" }
+backlog = { path = "../backlog" }
+rules = { path = "../rules" }
+canvas = { path = "../canvas" }
+ring = "0.17"
 rusqlite = { version = "0.41", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

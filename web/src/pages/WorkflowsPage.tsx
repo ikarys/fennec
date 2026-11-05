@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useT } from '../i18n';
+import type { MsgKey } from '../i18n/messages';
 import type { Project } from '../lib/api';
 import { getWorkflow, listWorkflows } from '../lib/api';
 import type { Origin, WorkflowDef, WorkflowSummary } from '../lib/workflow';
@@ -18,17 +20,19 @@ interface WorkflowsPageProps {
 
 const ID_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 
-const ORIGIN_LABELS: Record<Origin, string> = {
-  project: 'Projet',
-  global: 'Global',
-  default: 'Par défaut'
+const ORIGIN_LABELS: Record<Origin, MsgKey> = {
+  project: 'workflowOriginProject',
+  global: 'workflowOriginGlobal',
+  default: 'workflowOriginDefault'
 };
 
 function OriginBadge({ origin }: { origin: Origin }) {
-  return <Badge tone="neutral">{ORIGIN_LABELS[origin]}</Badge>;
+  const t = useT();
+  return <Badge tone="neutral">{t(ORIGIN_LABELS[origin])}</Badge>;
 }
 
 function WorkflowEditorView({ projectId, workflowId, isNew }: { projectId: string | null; workflowId: string; isNew: boolean }) {
+  const t = useT();
   const [initial, setInitial] = useState<{ def: WorkflowDef; origin: Origin } | null>(
     isNew ? { def: blankWorkflow(workflowId), origin: 'project' } : null
   );
@@ -42,19 +46,20 @@ function WorkflowEditorView({ projectId, workflowId, isNew }: { projectId: strin
         if (!cancelled) setInitial({ def: data.workflow, origin: data.origin });
       })
       .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Impossible de charger le workflow');
+        if (!cancelled) setError(err instanceof Error ? err.message : t('workflowLoadError'));
       });
     return () => {
       cancelled = true;
     };
-  }, [projectId, workflowId, isNew]);
+  }, [projectId, workflowId, isNew, t]);
 
   if (error) return <div className="p-6 text-err">{error}</div>;
-  if (!initial) return <div className="p-6 text-muted">Chargement…</div>;
+  if (!initial) return <div className="p-6 text-muted">{t('loading')}</div>;
   return <WorkflowEditor initialDef={initial.def} initialOrigin={initial.origin} projectId={projectId} />;
 }
 
 export default function WorkflowsPage({ projects, projectId, workflowId, isNew }: WorkflowsPageProps) {
+  const t = useT();
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(projectId ?? projects[0]?.id ?? null);
   const [workflows, setWorkflows] = useState<WorkflowSummary[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
@@ -80,25 +85,25 @@ export default function WorkflowsPage({ projects, projectId, workflowId, isNew }
         if (!cancelled) setWorkflows(data);
       })
       .catch((error) => {
-        if (!cancelled) setListError(error instanceof Error ? error.message : 'Impossible de charger les workflows');
+        if (!cancelled) setListError(error instanceof Error ? error.message : t('workflowListError'));
       });
     return () => {
       cancelled = true;
     };
-  }, [selectedProjectId]);
+  }, [selectedProjectId, t]);
 
   const handleNewWorkflow = useCallback(
     (event: React.FormEvent) => {
       event.preventDefault();
       const id = newId.trim();
       if (!ID_PATTERN.test(id)) {
-        setNewIdError("L'identifiant doit correspondre à ^[a-z0-9][a-z0-9-]*$");
+        setNewIdError(t('workflowIdPatternError'));
         return;
       }
       if (!selectedProjectId) return;
       window.location.hash = `#/workflows/${encodeURIComponent(selectedProjectId)}/${encodeURIComponent(id)}?new`;
     },
-    [newId, selectedProjectId]
+    [newId, selectedProjectId, t]
   );
 
   if (workflowId) {
@@ -106,14 +111,14 @@ export default function WorkflowsPage({ projects, projectId, workflowId, isNew }
   }
 
   return (
-    <main className="grow overflow-y-auto px-6 py-8">
+    <main className="grow overflow-y-auto px-4 py-6 md:px-6 md:py-8">
       <div className="mx-auto max-w-[720px]">
-        <h1 className="text-[1.375rem] font-semibold tracking-[-0.02em]">Workflows</h1>
-        <p className="mt-0.5 text-muted">Dessinez un graphe, reliez ses ports, enregistrez-le dans le projet ou en global.</p>
+        <h1 className="text-2xl font-semibold">{t('workflows')}</h1>
+        <p className="mt-0.5 text-muted">{t('workflowsPageDescription')}</p>
 
         <div className="mt-6 flex items-center gap-3">
           <label htmlFor="wf-project" className="text-xs text-muted">
-            Projet
+            {t('workflowProjectLabel')}
           </label>
           <Select
             id="wf-project"
@@ -129,11 +134,28 @@ export default function WorkflowsPage({ projects, projectId, workflowId, isNew }
           </Select>
         </div>
 
+        <form onSubmit={handleNewWorkflow} className="mt-6 flex items-center gap-2">
+          <TextInput
+            type="text"
+            value={newId}
+            onChange={(event) => {
+              setNewId(event.target.value);
+              setNewIdError(null);
+            }}
+            placeholder={t('workflowNewIdPlaceholder')}
+            className="min-w-0 flex-1 sm:max-w-xs"
+          />
+          <Button variant="primary" size="md" type="submit" disabled={!selectedProjectId} className="shrink-0">
+            {t('workflowNewButton')}
+          </Button>
+        </form>
+        {newIdError && <div className="mt-1 text-xs text-err">{newIdError}</div>}
+
         {selectedProjectId && (
           <div className="mt-4">
             {listError && <div className="text-err">{listError}</div>}
-            {workflows === null && !listError && <div className="text-muted">Chargement…</div>}
-            {workflows && workflows.length === 0 && <div className="text-muted">Aucun workflow pour l’instant.</div>}
+            {workflows === null && !listError && <div className="text-muted">{t('loading')}</div>}
+            {workflows && workflows.length === 0 && <div className="text-muted">{t('workflowNoneYet')}</div>}
             {workflows && workflows.length > 0 && selectedProjectId && (
               <Card>
                 {workflows.map((wf, index) => (
@@ -156,22 +178,6 @@ export default function WorkflowsPage({ projects, projectId, workflowId, isNew }
             )}
           </div>
         )}
-
-        <form onSubmit={handleNewWorkflow} className="mt-6 flex items-center gap-2">
-          <TextInput
-            type="text"
-            value={newId}
-            onChange={(event) => {
-              setNewId(event.target.value);
-              setNewIdError(null);
-            }}
-            placeholder="nouveau-workflow"
-          />
-          <Button variant="primary" size="md" type="submit" disabled={!selectedProjectId}>
-            Nouveau workflow
-          </Button>
-        </form>
-        {newIdError && <div className="mt-1 text-xs text-err">{newIdError}</div>}
       </div>
     </main>
   );

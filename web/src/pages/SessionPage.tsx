@@ -1,69 +1,92 @@
-import type { WorkflowSummary } from '../lib/workflow';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from "react";
+import { addPlannedIdea, frameIdea, framingPrefill, listIdeas, markIdeaReady } from "../lib/ideas";
 import type {
-  Agent,
   AttachmentInput,
-  ModelChoice,
-  ModelChoices,
-  ModelRef,
+  McpSessionView,
   Project,
   SessionDetail,
   SessionState,
-  SlashCommand
-} from '../lib/api';
-import type { AssistantItem, Segment } from '../lib/fold';
-import { splitContract } from '../lib/plan';
+} from "../lib/api";
+import type { AssistantItem, Segment } from "../lib/fold";
+import { splitContract } from "../lib/plan";
 import {
-  answerWorkflow,
-  compactSession,
-  continueWorkflow,
   createSession,
   getSession,
-  getModelChoices,
-  listAgents,
-  listCommands,
-  listWorkflows,
-  replayMessage,
-  resumeWorkflow,
+  getSessionMcp,
   sendMessage,
-  setSessionMode,
-  setSessionModel,
+  setSessionMcp,
   startWorkflow,
-  stopSession,
-  stopWorkflow
-} from '../lib/api';
-import { readImages } from '../lib/attachments';
-import { sessionStatus } from '../lib/sessionStatus';
-import { runWaiting } from '../lib/workflowRun';
-import { useSessionThread } from '../hooks/useSessionThread';
-import { Composer } from '../components/session/Composer';
-import { modelShortName } from '../components/session/ModelPicker';
-import { Badge } from '../components/ui/Badge';
-import { ContextPanel } from '../components/session/ContextPanel';
-import { ContextGauge } from '../components/session/ContextGauge';
-import { QuestionCard } from '../components/session/QuestionCard';
-import { ThreadItemView } from '../components/session/Thread';
-import { PlanActionsContext } from '../components/session/PlanActions';
-import { CallUsageContext, WorkflowUsageContext } from '../components/session/CallUsage';
-import { IntegrationInviteContext, type IntegrationInvite } from '../components/session/IntegrationInvite';
-import { IntegrationDialog } from '../components/session/IntegrationDialog';
-import { PreviewContext, PreviewWorkdirContext, type PreviewTarget } from '../components/preview/PreviewContext';
-import { PreviewPane } from '../components/preview/PreviewPane';
-import { RunRail } from '../components/workflow/session/RunRail';
-import { RunActionCard } from '../components/workflow/session/RunActionCard';
-import { Button, buttonClass } from '../components/ui/Button';
-import { ChevronDownIcon } from '../components/Icons';
+} from "../lib/api";
+import { readImages } from "../lib/attachments";
+import { formatDateTime } from "../lib/format";
+import { sessionStatus } from "../lib/sessionStatus";
+import { runWaiting } from "../lib/workflowRun";
+import { useLang, useT } from "../i18n";
+import { useSessionThread } from "../hooks/useSessionThread";
+import { useProjectOptions } from "../hooks/useProjectOptions";
+import { useModeAndModel } from "../hooks/useModeAndModel";
+import { useScrollFollow } from "../hooks/useScrollFollow";
+import { useSessionActions } from "../hooks/useSessionActions";
+import { useWorkflowActions } from "../hooks/useWorkflowActions";
+import { Composer } from "../components/session/Composer";
+import { RunningStrip } from "../components/session/RunningStrip";
+import { modelShortName } from "../components/session/ModelPicker";
+import { Badge } from "../components/ui/Badge";
+import { AuditCard } from "../components/session/AuditCard";
+import { ProposedTasksCard } from "../components/session/ProposedTasksCard";
+import { AgentsMdCard } from "../components/session/AgentsMdCard";
+import { RuleProposalCard } from "../components/session/RuleProposalCard";
+import { AgentSuggestionCard } from "../components/session/AgentSuggestionCard";
+import { ContextPanel } from "../components/session/ContextPanel";
+import { ContextGauge } from "../components/session/ContextGauge";
+import { QuestionCard } from "../components/session/QuestionCard";
+import { RuleApprovalCard } from "../components/session/RuleApprovalCard";
+import { WaiverCard } from "../components/session/WaiverCard";
+import { QueuedMessages } from "../components/session/QueuedMessages";
+import { RetryCard } from "../components/session/RetryCard";
+import { ThreadItemView } from "../components/session/Thread";
+import { PlanActionsContext, type PlanActions } from "../components/session/PlanActions";
+import {
+  CallUsageContext,
+  WorkflowUsageContext,
+} from "../components/session/CallUsage";
+import {
+  IntegrationInviteContext,
+  type IntegrationInvite,
+} from "../components/session/IntegrationInvite";
+import { IntegrationDialog } from "../components/session/IntegrationDialog";
+import { TryDialog } from "../components/session/TryDialog";
+import { PlayIcon } from "../components/Icons";
+import {
+  PreviewContext,
+  PreviewWorkdirContext,
+  type PreviewTarget,
+} from "../components/preview/PreviewContext";
+import { PreviewPane } from "../components/preview/PreviewPane";
+import { CanvasPane } from "../components/canvas/CanvasPane";
+import { SessionCanvasMenu } from "../components/canvas/SessionCanvasMenu";
+import { CanvasOpenerContext, CanvasSessionContext } from "../components/canvas/CanvasContext";
+import { RunRail } from "../components/workflow/session/RunRail";
+import { RunActionCard } from "../components/workflow/session/RunActionCard";
+import { Button, buttonClass } from "../components/ui/Button";
 import {
   DEFAULT_WORKFLOW_ID,
   defaultWorkflowSelection,
-  type WorkflowSelection
-} from '../components/workflow/session/WorkflowPicker';
+} from "../components/workflow/session/WorkflowPicker";
+
+// One unsent draft per session, kept while the app lives: switching tabs must
+// never carry a draft to another agent, and coming back must find it again.
+const drafts = new Map<string, string>();
 
 interface SessionPageProps {
   sessionId: string | null;
   projectId: string | null;
   /** A workflow opened from the editor's test button: preselected, step by step. */
   testWorkflowId: string | null;
+  /** A backlog idea framed from the project page: its text prefills the composer, the first send links the session to it. */
+  frameIdeaId: string | null;
+  /** A session whose agent suggested this one: its brief prefills the composer and its agent is preselected. */
+  fromSessionId: string | null;
   pseudoTabId: string | null;
   projects: Project[];
   onSessionCreated: (newId: string, pseudoId: string | null) => void;
@@ -73,47 +96,136 @@ interface SessionPageProps {
   onRenamed: () => void;
 }
 
-
-export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId, projects, onSessionCreated, onRunningChanged, onRenamed }: SessionPageProps) {
+export function SessionPage({
+  sessionId,
+  projectId,
+  testWorkflowId,
+  frameIdeaId,
+  fromSessionId,
+  pseudoTabId,
+  projects,
+  onSessionCreated,
+  onRunningChanged,
+  onRenamed,
+}: SessionPageProps) {
   const [detail, setDetail] = useState<SessionDetail | null>(null);
-  const [text, setText] = useState('');
+  const [text, setText] = useState("");
+  const draftKey = sessionId ?? `new:${projectId ?? ""}`;
+  const textRef = useRef(text);
+  textRef.current = text;
+  useEffect(() => {
+    setText(drafts.get(draftKey) ?? "");
+    // Saved when the key changes: the cleanup still sees the old key.
+    return () => {
+      drafts.set(draftKey, textRef.current);
+    };
+  }, [draftKey]);
   const [attachments, setAttachments] = useState<AttachmentInput[]>([]);
   const [sendError, setSendError] = useState<string | null>(null);
-  const [compactError, setCompactError] = useState<string | null>(null);
-  const [commands, setCommands] = useState<SlashCommand[]>([]);
-  const [agents, setAgents] = useState<Agent[]>([]);
-  const [workflows, setWorkflows] = useState<WorkflowSummary[]>([]);
-  const [workflowSelection, setWorkflowSelection] = useState<WorkflowSelection>({ workflowId: null, stepByStep: false, worktree: true });
-  // Optimistic mode while `setSessionMode` is in flight; cleared once the
-  // server's mode (event stream or detail) matches it.
-  const [pendingMode, setPendingMode] = useState<string | null>(null);
-  const [modelChoices, setModelChoices] = useState<ModelChoices | null>(null);
-  const [pendingModel, setPendingModel] = useState<ModelRef | null>(null);
-  const modelRequestRef = useRef(0);
+  // A session framing a backlog idea only talks: its messages must not start
+  // the default build workflow (a "go on" there once ran a whole build).
+  const framingIdea = detail?.idea?.state === "framing";
   const [planBuildInFlight, setPlanBuildInFlight] = useState(false);
   const [preview, setPreview] = useState<PreviewTarget | null>(null);
+  const [canvasId, setCanvasId] = useState<number | null>(null);
+  const [runComment, setRunComment] = useState("");
   const [detailVersion, setDetailVersion] = useState(0);
+  // The plan last put in the backlog: its button says so until a new plan comes.
+  const [backlogSegment, setBacklogSegment] = useState<string | null>(null);
   const [integrationOpen, setIntegrationOpen] = useState(false);
+  const [tryOpen, setTryOpen] = useState(false);
   const [integrationVersion, setIntegrationVersion] = useState(0);
-  const { view, hasMore, loadingOlder, loadOlder, skills, usage, calls, workflowUsage, context } = useSessionThread(sessionId);
+  const [mcpView, setMcpView] = useState<McpSessionView | null>(null);
+  const {
+    view,
+    hasMore,
+    loadingOlder,
+    loadOlder,
+    skills,
+    usage,
+    calls,
+    workflowUsage,
+    context,
+    vision,
+    served,
+  } = useSessionThread(sessionId);
+  const lang = useLang();
+  const t = useT();
   const running = view.running;
+  const pendingCallId =
+    served.pendingApproval?.callId ?? served.pendingWaiver?.callId;
   const run = view.run;
   const waiting = runWaiting(run, running, view.lastDone);
   // The detail is fetched once; the event stream says how a turn ended.
-  const state: SessionState = running ? 'running' : ((view.lastDone as SessionState | undefined) ?? detail?.state ?? 'idle');
-  const status = sessionStatus(state, run, waiting);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const stickToBottom = useRef(true);
-  // Mirrors stickToBottom for rendering: the button that resumes it.
-  const [awayFromBottom, setAwayFromBottom] = useState(false);
-  // Set by `handleLoadOlder`: the distance from the bottom when the older
-  // page is requested. Prepending changes scrollHeight but not this
-  // distance, so restoring it keeps the same messages in view.
-  const restoreScroll = useRef<number | null>(null);
+  const state: SessionState = running
+    ? "running"
+    : ((view.lastDone as SessionState | undefined) ?? detail?.state ?? "idle");
+  const status = sessionStatus(lang, state, run, waiting);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const modeRequestRef = useRef(0);
   const previousRunning = useRef(running);
+  const {
+    commands,
+    agents,
+    workflows,
+    workflowSelection,
+    setWorkflowSelection,
+  } = useProjectOptions({
+    projectId: detail?.project.id ?? projectId,
+    testWorkflowId,
+    frameIdeaId,
+    framingIdea,
+  });
+  // A chat has no folder: it starts in `builder` (talk, act on request), not
+  // in the project's framing agent, and the header shows "Chat".
+  const isChat = detail?.project.chat ?? projectId === "chat";
+  const {
+    modelChoices,
+    mode,
+    currentModel,
+    pendingModel,
+    handleModeChange,
+    handleModelChange,
+  } = useModeAndModel({
+    sessionId,
+    viewMode: view.mode,
+    detailMode: detail?.mode ?? null,
+    fallbackMode: isChat
+      ? (agents.find((agent) => agent.id === "builder")?.id ?? agents[0]?.id ?? null)
+      : (agents[0]?.id ?? null),
+    detailModel: detail?.model ?? null,
+    onError: setSendError,
+    onModelApplied: () => setDetailVersion((version) => version + 1),
+  });
+  const {
+    scrollRef,
+    contentRef,
+    awayFromBottom,
+    setFollow,
+    onScroll,
+    handleLoadOlder,
+  } = useScrollFollow({ sessionId, view, detail, loadOlder });
+  const {
+    compactError,
+    handleStop,
+    handleCompact,
+    handleReplay,
+    handleApproval,
+    handleCancelQueued,
+    handleWaiver,
+    handleRetry,
+  } = useSessionActions({
+    sessionId,
+    pendingApproval: served.pendingApproval,
+    pendingWaiver: served.pendingWaiver,
+    onError: setSendError,
+  });
+  const {
+    handleStopWorkflow,
+    handlePauseWorkflow,
+    handleAnswerWorkflow,
+    handleContinueWorkflow,
+    handleResumeWorkflow,
+  } = useWorkflowActions({ sessionId, run });
 
   useEffect(() => {
     onRunningChanged();
@@ -146,19 +258,40 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
     };
   }, [sessionId, detailVersion]);
 
+  // The composer's MCP dropdown: the session's effective MCP state, refetched
+  // when the session changes or a turn ends (a global flip on the Settings
+  // page shows up on the next turn), the toggle handler updates it directly.
   useEffect(() => {
+    if (!sessionId) {
+      setMcpView(null);
+      return;
+    }
     let active = true;
-    getModelChoices()
+    getSessionMcp(sessionId)
       .then((data) => {
-        if (active) setModelChoices(data);
+        if (active) setMcpView(data);
       })
       .catch(() => {
-        // The composer falls back to the session's model or '…'.
+        if (active) setMcpView(null);
       });
     return () => {
       active = false;
     };
-  }, []);
+  }, [sessionId, detailVersion]);
+
+  function handleMcpToggle(name: string, active: boolean) {
+    if (!sessionId || !mcpView) return;
+    // The disabled set is the full set (last wins), so it must include hidden
+    // servers too: a hidden server left out would silently turn on.
+    const disabled = mcpView.servers
+      .filter((server) => (server.name === name ? !active : !server.active))
+      .map((server) => server.name);
+    setSessionMcp(sessionId, disabled)
+      .then(setMcpView)
+      .catch(() => {
+        // Keep the optimistic view; the next fetch corrects it.
+      });
+  }
 
   useEffect(() => {
     // A workflow's first turn creates the worktree: re-read the detail when
@@ -176,202 +309,164 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
   }, [sessionId]);
 
   useEffect(() => {
+    if (!sessionId && projectId && frameIdeaId) {
+      const ideaId = frameIdeaId;
+      let ignore = false;
+      listIdeas(projectId)
+        .then((board) => {
+          if (ignore) return;
+          const idea = board.groups
+            .flatMap((group) => group.ideas)
+            .find((candidate) => candidate.id === ideaId);
+          if (idea) {
+            const prefill = framingPrefill(idea);
+            setText(prefill.text);
+            setAttachments(prefill.attachments);
+          }
+        })
+        .catch(() => {
+          // Ignore: the composer stays editable with an empty message.
+        });
+      return () => {
+        ignore = true;
+      };
+    }
+  }, [projectId, frameIdeaId, sessionId]);
+
+  // Read through a ref: the effect below runs once per source session, not
+  // on every render that recreates the handler.
+  const modeChangeRef = useRef(handleModeChange);
+  modeChangeRef.current = handleModeChange;
+  useEffect(() => {
+    if (!sessionId && fromSessionId) {
+      let ignore = false;
+      getSession(fromSessionId)
+        .then((source) => {
+          if (ignore || !source.agentSuggestion) return;
+          setText(source.agentSuggestion.brief);
+          void modeChangeRef.current(source.agentSuggestion.agent);
+        })
+        .catch(() => {
+          // Ignore: the composer stays editable with an empty message.
+        });
+      return () => {
+        ignore = true;
+      };
+    }
+  }, [fromSessionId, sessionId]);
+
+  useEffect(() => {
     if (view.pendingQuestion && !running) {
       textareaRef.current?.focus();
     }
   }, [view.pendingQuestion, running]);
 
+  // A preview belongs to one session; do not leak it across tabs.
   useEffect(() => {
-    const element = scrollRef.current;
-    if (element && stickToBottom.current) {
-      element.scrollTop = element.scrollHeight;
-    }
-  }, [view, detail]);
-
-  useEffect(() => {
-    // Content that grows after a render (images, re-wrap) widens the distance
-    // from the bottom with no view change, so the pin above never fires:
-    // watch the content and re-pin while following.
-    const element = scrollRef.current;
-    const content = contentRef.current;
-    if (!element || !content) return;
-    const observer = new ResizeObserver(() => {
-      if (stickToBottom.current) {
-        element.scrollTop = element.scrollHeight;
-      }
-    });
-    observer.observe(content);
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
-    const element = scrollRef.current;
-    const previous = restoreScroll.current;
-    if (element && previous != null) {
-      element.scrollTop = element.scrollHeight - previous;
-      restoreScroll.current = null;
-    }
-  }, [view]);
-
-  const commandProjectId = detail?.project.id ?? projectId;
-
-  useEffect(() => {
-    if (!commandProjectId) {
-      setCommands([]);
-      return;
-    }
-    let ignore = false;
-    listCommands(commandProjectId)
-      .then((data) => {
-        if (!ignore) setCommands(data);
-      })
-      .catch(() => {
-        if (!ignore) setCommands([]);
-      });
-    return () => {
-      ignore = true;
-    };
-  }, [commandProjectId]);
-
-  useEffect(() => {
-    if (!commandProjectId) {
-      setAgents([]);
-      return;
-    }
-    let ignore = false;
-    listAgents(commandProjectId)
-      .then((data) => {
-        if (!ignore) setAgents(data.filter((agent) => !agent.subagent));
-      })
-      .catch(() => {
-        if (!ignore) setAgents([]);
-      });
-    return () => {
-      ignore = true;
-    };
-  }, [commandProjectId]);
-
-  useEffect(() => {
-    if (!commandProjectId) {
-      setWorkflows([]);
-      return;
-    }
-    let ignore = false;
-    listWorkflows(commandProjectId)
-      .then((data) => {
-        if (!ignore) {
-          setWorkflows(data);
-          if (testWorkflowId && data.some((workflow) => workflow.id === testWorkflowId)) {
-            setWorkflowSelection({ workflowId: testWorkflowId, stepByStep: true, worktree: true });
-          } else {
-            setWorkflowSelection(defaultWorkflowSelection(data));
-          }
-        }
-      })
-      .catch(() => {
-        if (!ignore) setWorkflows([]);
-      });
-    return () => {
-      ignore = true;
-    };
-  }, [commandProjectId, testWorkflowId]);
-
-  // A pending choice and preview belong to one session; do not leak them
-  // across tabs.
-  useEffect(() => {
-    setPendingMode(null);
-    setPendingModel(null);
     setPreview(null);
+    setCanvasId(null);
+    setRunComment("");
   }, [sessionId]);
 
-  // A new-session tab has no detail yet: the server lists its default agent
-  // first (the embedded defaults come before any file).
-  const serverMode = view.mode ?? detail?.mode ?? agents[0]?.id ?? null;
-  const mode = pendingMode ?? serverMode;
+  const title =
+    view.name ?? detail?.title ?? (sessionId ? t('session') : isChat ? t('paletteNewChat') : t('newSession'));
 
-  useEffect(() => {
-    // The pending value is only for the request gap; the server's mode is the
-    // source of truth once it catches up.
-    if (pendingMode && serverMode === pendingMode) {
-      setPendingMode(null);
-    }
-  }, [pendingMode, serverMode]);
-
-  const serverModel = detail?.model ?? modelChoices?.default ?? null;
-  const currentModel: ModelChoice | null = pendingModel
-    ? {
-        provider: pendingModel.provider,
-        model: pendingModel.model,
-        providerName:
-          modelChoices?.favorites.find((favorite) => sameModelRef(favorite, pendingModel))?.providerName ??
-          (modelChoices && sameModelRef(modelChoices.default, pendingModel)
-            ? modelChoices.default.providerName
-            : pendingModel.provider)
-      }
-    : serverModel;
-
-  useEffect(() => {
-    if (
-      pendingModel &&
-      serverModel &&
-      serverModel.provider === pendingModel.provider &&
-      serverModel.model === pendingModel.model
-    ) {
-      setPendingModel(null);
-    }
-  }, [pendingModel, serverModel]);
-
-  const title = view.name ?? detail?.title ?? (sessionId ? 'Session' : 'Nouvelle session');
-
-  const lastAssistant = [...view.items].reverse().find((item): item is AssistantItem => item.kind === 'assistant');
+  const lastAssistant = [...view.items]
+    .reverse()
+    .find((item): item is AssistantItem => item.kind === "assistant");
   const lastTextSegment = lastAssistant
-    ? [...lastAssistant.segments].reverse().find((segment): segment is Extract<Segment, { kind: 'text' }> => segment.kind === 'text')
+    ? [...lastAssistant.segments]
+        .reverse()
+        .find(
+          (segment): segment is Extract<Segment, { kind: "text" }> =>
+            segment.kind === "text",
+        )
     : undefined;
-  const planContract = lastTextSegment ? splitContract(lastTextSegment.content) : null;
-  const planActions =
-    planContract?.contract.kind === 'plan' &&
+  const planContract = lastTextSegment
+    ? splitContract(lastTextSegment.content)
+    : null;
+  const planActions: PlanActions | null =
+    planContract?.contract.kind === "plan" &&
     lastTextSegment &&
     !running &&
     !view.pendingQuestion &&
     (!run || run.finished) &&
-    mode === 'plan'
+    mode === "plan"
       ? {
           segmentId: lastTextSegment.id,
           onBuild: handlePlanBuild,
           onBuildAlone: handlePlanBuildAlone,
           onRevise: handlePlanRevise,
-          disabled: running || planBuildInFlight
+          ideaReady: detail
+            ? {
+                onMark: () => void handleIdeaReady(),
+                idea:
+                  backlogSegment === lastTextSegment.id
+                    ? "saved"
+                    : detail.idea?.state === "ready"
+                      ? "ready"
+                      : detail.idea
+                        ? "framing"
+                        : "none",
+              }
+            : undefined,
+          disabled: running || planBuildInFlight,
         }
       : null;
   const lastRunEndId = useMemo(() => {
     for (let i = view.items.length - 1; i >= 0; i -= 1) {
       const item = view.items[i];
       // Once integrated, the run's work is in the human's branch: no invite left.
-      if (item?.id.startsWith('integration-applied-')) return null;
-      if (item && item.kind === 'workflow-end') return item.id;
+      if (item?.id.startsWith("integration-applied-")) return null;
+      if (item && item.kind === "workflow-end") return item.id;
     }
     return null;
   }, [view.items]);
   const integrationInvite = useMemo<IntegrationInvite | null>(() => {
-    if (!sessionId || !detail?.worktree) return null;
+    // No commit on the agent's branch: nothing to review, no invitation.
+    if (!sessionId || !detail?.worktree?.commits) return null;
     return { lastRunEndId, open: () => setIntegrationOpen(true) };
-  }, [sessionId, detail?.worktree, lastRunEndId]);
+  }, [sessionId, detail?.worktree?.commits, lastRunEndId]);
   const projectName =
-    detail?.project.name ?? projects.find((project) => project.id === projectId)?.name ?? projectId ?? '—';
+    detail?.project.name ??
+    projects.find((project) => project.id === projectId)?.name ??
+    projectId ??
+    "—";
+
+  // A send in flight: a second Enter or click before the server answers would
+  // create a second session (or send the message twice).
+  const sending = useRef(false);
 
   async function handleSend(content?: string) {
+    if (sending.current) return;
+    sending.current = true;
+    try {
+      await send(content);
+    } finally {
+      sending.current = false;
+    }
+  }
+
+  async function send(content?: string) {
     // Attachments belong to the composer; a quick answer (`content`) sends none.
     const fromComposer = content === undefined;
     const value = (content ?? text).trim();
     const images = fromComposer ? attachments : [];
-    if ((!value && images.length === 0) || running) return;
+    if (!value && images.length === 0) return;
     setSendError(null);
+
+    // Ask for notification permission in the user gesture that starts a turn.
+    if ('Notification' in window && Notification.permission === 'default') {
+      void Notification.requestPermission();
+    }
 
     // A quick answer or a message to a running/waiting run is an ordinary
     // message, not a workflow start.
     const workflowId =
       fromComposer &&
+      !isChat &&
       workflowSelection.workflowId &&
+      !running &&
       (!run || run.finished) &&
       !view.pendingQuestion
         ? workflowSelection.workflowId
@@ -386,7 +481,7 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
             value,
             workflowSelection.stepByStep,
             workflowSelection.worktree,
-            images
+            images,
           );
         } else if (projectId) {
           const created = await createSession(
@@ -397,9 +492,9 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
             {
               workflowId,
               stepByStep: workflowSelection.stepByStep,
-              worktree: workflowSelection.worktree
+              worktree: workflowSelection.worktree,
             },
-            pendingModel ?? undefined
+            pendingModel ?? undefined,
           );
           onSessionCreated(created.id, pseudoTabId);
         }
@@ -409,20 +504,36 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
         await sendMessage(sessionId, value, images);
       } else if (projectId) {
         // A mode chosen before creation is applied to the first turn.
-        const created = await createSession(projectId, value, mode ?? undefined, images, undefined, pendingModel ?? undefined);
+        const created = await createSession(
+          projectId,
+          value,
+          frameIdeaId ? "plan" : (mode ?? undefined),
+          images,
+          undefined,
+          pendingModel ?? undefined,
+        );
+        if (frameIdeaId) {
+          await frameIdea(projectId, frameIdeaId, created.id);
+        }
         onSessionCreated(created.id, pseudoTabId);
       }
       if (fromComposer) {
-        setText('');
+        setText("");
         setAttachments([]);
       }
     } catch (error) {
-      setSendError(error instanceof Error ? error.message : 'Erreur lors de l’envoi');
+      setSendError(
+        error instanceof Error ? error.message : t('sessionPageSendError'),
+      );
     }
   }
 
   async function handleAttach(files: File[]) {
-    const { attachments: read, error } = await readImages(files, attachments.length);
+    const { attachments: read, error } = await readImages(
+      lang,
+      files,
+      attachments.length,
+    );
     setAttachments((current) => [...current, ...read]);
     setSendError(error);
   }
@@ -431,66 +542,12 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
     setAttachments((current) => current.filter((_, i) => i !== index));
   }
 
-  function sameModelRef(a: ModelRef, b: ModelRef): boolean {
-    return a.provider === b.provider && a.model === b.model;
-  }
-
-  async function handleModeChange(id: string): Promise<boolean> {
-    // A not-yet-created session keeps the choice locally; `handleSend` passes
-    // it to `createSession`.
-    if (!sessionId) {
-      setPendingMode(id);
-      return true;
-    }
-
-    const request = ++modeRequestRef.current;
-    setPendingMode(id);
-    setSendError(null);
-
-    try {
-      await setSessionMode(sessionId, id);
-      return true;
-    } catch (error) {
-      // A newer request supersedes this one; only the latest may revert.
-      if (request !== modeRequestRef.current) return true;
-      setPendingMode(null);
-      setSendError(error instanceof Error ? error.message : 'Erreur lors du changement de mode');
-      return false;
-    }
-  }
-
-  async function handleModelChange(ref: ModelRef): Promise<boolean> {
-    // A not-yet-created session keeps the choice locally; `handleSend` passes
-    // it to `createSession`.
-    if (!sessionId) {
-      setPendingModel(ref);
-      return true;
-    }
-
-    const request = ++modelRequestRef.current;
-    setPendingModel(ref);
-    setSendError(null);
-
-    try {
-      await setSessionModel(sessionId, ref);
-      setDetailVersion((version) => version + 1);
-      setPendingModel(null);
-      return true;
-    } catch (error) {
-      // A newer request supersedes this one; only the latest may revert.
-      if (request !== modelRequestRef.current) return true;
-      setPendingModel(null);
-      setSendError(error instanceof Error ? error.message : 'Erreur lors du changement de modèle');
-      return false;
-    }
-  }
-
   async function runPlanBuildAlone() {
-    const modeChanged = await handleModeChange('builder');
+    const modeChanged = await handleModeChange("builder");
     // Sent directly, not through handleSend: a workflow picked in the
     // composer would otherwise take this message as its task.
     if (modeChanged && sessionId) {
-      await sendMessage(sessionId, 'Exécute le plan ci-dessus.');
+      await sendMessage(sessionId, t('sessionPageExecutePlanAbove'));
     }
   }
 
@@ -507,8 +564,10 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
         const task =
           [...view.items]
             .reverse()
-            .find((item): item is Extract<typeof item, { kind: 'user' }> => item.kind === 'user' && !item.isSystemGenerated)
-            ?.content ?? 'Exécute le plan approuvé.';
+            .find(
+              (item): item is Extract<typeof item, { kind: "user" }> =>
+                item.kind === "user" && !item.isSystemGenerated,
+            )?.content ?? t('sessionPageExecuteApprovedPlan');
         await startWorkflow(
           sessionId,
           DEFAULT_WORKFLOW_ID,
@@ -516,7 +575,7 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
           false,
           worktree,
           [],
-          lastTextSegment.content
+          lastTextSegment.content,
         );
         // The next message gets the default workflow again.
         setWorkflowSelection(defaultWorkflowSelection(workflows));
@@ -524,9 +583,27 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
         await runPlanBuildAlone();
       }
     } catch (err) {
-      setSendError(err instanceof Error ? err.message : 'Impossible d’envoyer le message');
+      setSendError(
+        err instanceof Error ? err.message : t('sessionPageSendMessageError'),
+      );
     } finally {
       setPlanBuildInFlight(false);
+    }
+  }
+
+  async function handleIdeaReady() {
+    if (!detail || !lastTextSegment) return;
+    setSendError(null);
+    try {
+      if (detail.idea) {
+        await markIdeaReady(detail.project.id, detail.idea.id, lastTextSegment.content);
+      } else {
+        await addPlannedIdea(detail.project.id, detail.title, detail.id, lastTextSegment.content);
+      }
+      setBacklogSegment(lastTextSegment.id);
+      setDetailVersion((version) => version + 1);
+    } catch (err) {
+      setSendError(err instanceof Error ? err.message : t('unknownError'));
     }
   }
 
@@ -537,7 +614,9 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
     try {
       await runPlanBuildAlone();
     } catch (err) {
-      setSendError(err instanceof Error ? err.message : 'Impossible d’envoyer le message');
+      setSendError(
+        err instanceof Error ? err.message : t('sessionPageSendMessageError'),
+      );
     } finally {
       setPlanBuildInFlight(false);
     }
@@ -549,256 +628,344 @@ export function SessionPage({ sessionId, projectId, testWorkflowId, pseudoTabId,
     textareaRef.current?.focus();
   }
 
-  async function handleStop() {
-    if (!sessionId) return;
-    try {
-      await stopSession(sessionId);
-    } catch {
-      // Stop is best-effort; the event stream reports the final state.
-    }
-  }
-
-  async function handleStopWorkflow() {
-    if (!sessionId || !run) return;
-    try {
-      await stopWorkflow(sessionId, run.runId);
-    } catch {
-      // Stop is best-effort; the event stream reports the final state.
-    }
-  }
-
-  async function handleAnswerWorkflow(choice: string, comment: string) {
-    if (!sessionId || !run) return;
-    await answerWorkflow(sessionId, run.runId, choice, comment);
-  }
-
-  async function handleContinueWorkflow(comment: string) {
-    if (!sessionId || !run) return;
-    await continueWorkflow(sessionId, run.runId, comment);
-  }
-
-  async function handleResumeWorkflow() {
-    if (!sessionId || !run) return;
-    await resumeWorkflow(sessionId, run.runId);
-  }
-
-  async function handleCompact() {
-    if (!sessionId) return;
-    setCompactError(null);
-    try {
-      await compactSession(sessionId);
-    } catch (error) {
-      setCompactError(error instanceof Error ? error.message : 'Erreur lors de la compaction');
-    }
-  }
-
-  async function handleReplay(messageId: string) {
-    if (!sessionId) return;
-    setSendError(null);
-    try {
-      await replayMessage(sessionId, messageId);
-    } catch (error) {
-      setSendError(error instanceof Error ? error.message : 'Erreur lors de la relance');
-    }
-  }
-
-  async function handleLoadOlder() {
-    const element = scrollRef.current;
-    if (!element) return;
-    restoreScroll.current = element.scrollHeight - element.scrollTop;
-    // Clear the armed restore when the view did not change (failed or empty
-    // page), so a later unrelated view change cannot apply a stale distance.
-    if (!(await loadOlder())) restoreScroll.current = null;
-  }
-
   return (
     <PreviewContext.Provider value={setPreview}>
-      <PreviewWorkdirContext.Provider value={detail?.project.workdir}>
+     <CanvasOpenerContext.Provider value={setCanvasId}>
+      <CanvasSessionContext.Provider value={sessionId ?? undefined}>
+      {/* The agent writes in its worktree when it has one: paths are relative to it, and the preview route resolves them there too. */}
+      <PreviewWorkdirContext.Provider value={detail?.worktree?.path ?? detail?.project.workdir}>
         <PlanActionsContext.Provider value={planActions}>
           <IntegrationInviteContext.Provider value={integrationInvite}>
             <CallUsageContext.Provider value={calls}>
-            <WorkflowUsageContext.Provider value={workflowUsage}>
-        <div className="flex min-h-0 min-w-0 grow">
-          {run && <RunRail run={run} />}
-          <main className="flex min-h-0 min-w-0 flex-[999_1_560px] flex-col">
-        <div className="flex items-center gap-2 px-6 py-2.5">
-          <div className="mx-auto flex w-full max-w-[960px] items-center gap-2">
-            <h1 className="min-w-0 truncate text-[0.9375rem] font-semibold" title={title}>{title}</h1>
-            <Badge tone={status.tone} dot={status.live} pulse={status.live}>{status.label}</Badge>
-            <span className="shrink-0 text-xs text-muted" title={detail?.project.workdir}>{projectName}</span>
-            <div className="ml-auto">
-              <ContextGauge
-                context={context}
-                compactDisabled={!sessionId || state === 'running' || state === 'waiting_for_user'}
-                onCompact={handleCompact}
-                compactError={compactError}
-              />
-            </div>
-          </div>
-        </div>
+              <WorkflowUsageContext.Provider value={workflowUsage}>
+                <div className="flex min-h-0 min-w-0 grow">
+                  {run && <RunRail run={run} />}
+                  <main className="flex min-h-0 min-w-0 flex-[999_1_560px] flex-col">
+                    {/* A shadow under the title: the thread fades under it instead of meeting a hard edge. */}
+                    <div className="relative z-10 flex items-center gap-2 px-4 md:px-6 py-2.5 after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-5 after:bg-linear-to-b after:from-black/45 after:to-transparent">
+                      <div className="mx-auto flex w-full max-w-[960px] items-center gap-2">
+                        <h1
+                          className="min-w-0 truncate text-base font-semibold"
+                          title={title}
+                        >
+                          {title}
+                        </h1>
+                        <Badge
+                          tone={status.tone}
+                          dot={status.live}
+                          pulse={status.live}
+                        >
+                          {status.label}
+                        </Badge>
+                        <span
+                          className="shrink-0 text-xs text-muted"
+                          title={isChat ? undefined : detail?.project.workdir}
+                        >
+                          {isChat ? t('sessionPageChat') : projectName}
+                        </span>
+                        {detail && (
+                          <span
+                            className="shrink-0 text-xs text-muted tabular-nums"
+                            title={t('sessionPageCreatedTitle')}
+                          >
+                            {formatDateTime(lang, detail.createdAt)}
+                          </span>
+                        )}
+                        {sessionId && !isChat && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            iconOnly
+                            title={t('tryChange')}
+                            aria-label={t('tryChange')}
+                            onClick={() => setTryOpen(true)}
+                          >
+                            <PlayIcon className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                        {sessionId && (
+                          <SessionCanvasMenu sessionId={sessionId} refreshKey={view} onOpen={setCanvasId} />
+                        )}
+                        <div className="ml-auto">
+                          <ContextGauge
+                            context={context}
+                            compactDisabled={
+                              !sessionId ||
+                              state === "running" ||
+                              state === "waiting_for_user"
+                            }
+                            onCompact={handleCompact}
+                            compactError={compactError}
+                          />
+                        </div>
+                      </div>
+                    </div>
 
-        <div className="relative min-h-0 grow">
-          <div
-            ref={scrollRef}
-            onScroll={(event) => {
-              const element = event.currentTarget;
-              const distance = element.scrollHeight - element.scrollTop - element.clientHeight;
-              // Hysteresis: disengage beyond 120px, re-engage within 40px, so a
-              // small move does not toggle follow.
-              if (stickToBottom.current) {
-                if (distance > 120) {
-                  stickToBottom.current = false;
-                  setAwayFromBottom(true);
-                }
-              } else if (distance <= 40) {
-                stickToBottom.current = true;
-                setAwayFromBottom(false);
-              }
-            }}
-            className="h-full overflow-y-auto p-6"
-          >
-            <div ref={contentRef} className="mx-auto flex max-w-[960px] flex-col gap-4.5">
-              {sessionId && hasMore && (
-                <Button className="mx-auto" onClick={handleLoadOlder} disabled={loadingOlder}>
-                  {loadingOlder ? 'Chargement…' : 'Charger les messages précédents'}
-                </Button>
-              )}
-              {view.items.length === 0 && !sessionId && (
-                <div className="py-10 text-center text-sm text-muted">Nouvelle session · écris ton premier message.</div>
-              )}
-              {view.items.map((item, index) => (
-                <ThreadItemView
-                  key={item.id}
-                  item={item}
-                  model={currentModel ? modelShortName(currentModel.model) : 'modèle'}
-                  running={running}
-                  showHeader={view.items[index - 1]?.kind !== 'assistant'}
-                  onReplay={sessionId ? handleReplay : undefined}
-                />
-              ))}
-            </div>
-          </div>
-          {awayFromBottom && (
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              iconOnly
-              title="Aller en bas et suivre la suite"
-              onClick={() => {
-                const element = scrollRef.current;
-                if (element) element.scrollTo({ top: element.scrollHeight, behavior: 'smooth' });
-              }}
-              aria-label="Aller en bas"
-              className="absolute bottom-4 right-6 rounded-full shadow-md backdrop-blur"
-            >
-              <ChevronDownIcon className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
+                    <div className="relative min-h-0 grow">
+                      <div
+                        ref={scrollRef}
+                        onScroll={onScroll}
+                        className="h-full overflow-y-auto p-4 md:p-6"
+                      >
+                        <div
+                          ref={contentRef}
+                          className="mx-auto flex max-w-[960px] flex-col gap-4.5"
+                        >
+                          {sessionId && hasMore && (
+                            <Button
+                              className="mx-auto"
+                              onClick={handleLoadOlder}
+                              disabled={loadingOlder}
+                            >
+                              {loadingOlder
+                                ? t('loading')
+                                : t('sessionPageLoadOlderMessages')}
+                            </Button>
+                          )}
+                          {view.items.length === 0 && !sessionId && (
+                            <div className="py-10 text-center text-sm text-muted">
+                              {t('sessionPageNewSessionHint')}
+                            </div>
+                          )}
+                          {view.items.map((item, index) => (
+                            <ThreadItemView
+                              key={item.id}
+                              item={item}
+                              pendingCallId={pendingCallId}
+                              model={
+                                currentModel
+                                  ? modelShortName(currentModel.model)
+                                  : t('sessionPageModelFallback')
+                              }
+                              running={running}
+                              showHeader={
+                                view.items[index - 1]?.kind !== "assistant"
+                              }
+                              onReplay={sessionId && served.replayable.includes(item.id) ? handleReplay : undefined}
+                            />
+                          ))}
+                          {detail && detail.audit && detail.audit.findings.length > 0 && !running ? (
+                            <AuditCard
+                              audit={detail.audit}
+                              sessionId={sessionId}
+                              projectId={detail.project.id ?? null}
+                              onCreated={() => setDetailVersion((version) => version + 1)}
+                            />
+                          ) : null}
+                          {detail && detail.proposedTasks.length > 0 && !running ? (
+                            <ProposedTasksCard
+                              tasks={detail.proposedTasks}
+                              sessionId={sessionId}
+                              projectId={detail.project.id ?? null}
+                              onAccepted={() => setDetailVersion((version) => version + 1)}
+                            />
+                          ) : null}
+                          {detail && detail.agentsMdDraft && !running ? (
+                            <AgentsMdCard
+                              draft={detail.agentsMdDraft}
+                              sessionId={sessionId}
+                              onWritten={() => setDetailVersion((version) => version + 1)}
+                            />
+                          ) : null}
+                          {detail && detail.ruleProposal && !running ? (
+                            <RuleProposalCard
+                              proposal={detail.ruleProposal}
+                              sessionId={sessionId}
+                              onAdded={() => setDetailVersion((version) => version + 1)}
+                            />
+                          ) : null}
+                          {detail && detail.agentSuggestion && sessionId && detail.project.id && !running ? (
+                            <AgentSuggestionCard
+                              suggestion={detail.agentSuggestion}
+                              sessionId={sessionId}
+                              projectId={detail.project.id}
+                            />
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
 
-        {view.pendingQuestion && !running && !waiting && !detail?.parentId && (
-          <QuestionCard
-            question={view.pendingQuestion}
-            onAnswer={(answer) => handleSend(answer)}
-            disabled={running}
-          />
-        )}
-        {waiting && !detail?.parentId && (
-          <RunActionCard
-            waiting={waiting}
-            onAnswer={handleAnswerWorkflow}
-            onContinue={handleContinueWorkflow}
-            onResume={handleResumeWorkflow}
-            onStop={handleStopWorkflow}
-            disabled={running}
-          />
-        )}
-        {/* A node's session is driven by its workflow: the human answers in the parent. */}
-        {detail?.parentId && (
-          <div className="mx-auto flex max-w-[960px] items-center gap-3 border-t border-border px-1 py-2">
-            <span
-              className={`h-2 w-2 shrink-0 rounded-full ${running ? 'bg-accent' : 'bg-ok'}`}
-            />
-            <div className="min-w-0 grow">
-              <div className="text-sm font-medium text-text">
-                {running ? 'Ce nœud du workflow tourne…' : 'Ce nœud du workflow est terminé.'}
-              </div>
-              <div className="text-xs text-muted">
-                Session pilotée par le workflow, en lecture seule : la suite se passe dans la session parente.
-              </div>
-            </div>
-            <a
-              href={`#/s/${detail.parentId}`}
-              className={buttonClass({ variant: 'primary', size: 'sm' }, 'shrink-0')}
-            >
-              ← Retour au workflow
-            </a>
-          </div>
-        )}
-        {!detail?.parentId && (
-          <Composer
-            text={text}
-            onTextChange={setText}
-            onSend={() => handleSend()}
-            onStop={handleStop}
-            running={running}
-            currentModel={currentModel}
-            modelChoices={modelChoices}
-            onModelChange={handleModelChange}
-            error={sendError}
-            textareaRef={textareaRef}
-            placeholder={
-              workflowSelection.workflowId
-                ? 'Décris la tâche du workflow…'
-                : view.pendingQuestion && !running
-                  ? 'Ta réponse…'
-                  : undefined
-            }
-            commands={commands}
-            agents={agents}
-            mode={mode}
-            onModeChange={handleModeChange}
-            attachments={attachments}
-            onAttach={handleAttach}
-            onRemoveAttachment={handleRemoveAttachment}
-            workflows={workflows}
-            workflowSelection={workflowSelection}
-            onWorkflowSelectionChange={setWorkflowSelection}
-          />
-        )}
-      </main>
+                    {served.pendingApproval &&
+                      !running &&
+                      !waiting &&
+                      !detail?.parentId && (
+                        <RuleApprovalCard
+                          approval={served.pendingApproval}
+                          onAnswer={handleApproval}
+                          disabled={running}
+                        />
+                      )}
+                    {served.pendingWaiver &&
+                      !running &&
+                      !waiting &&
+                      !detail?.parentId && (
+                        <WaiverCard
+                          waiver={served.pendingWaiver}
+                          onAnswer={handleWaiver}
+                          disabled={running}
+                        />
+                      )}
+                    {view.pendingQuestion &&
+                      !running &&
+                      !waiting &&
+                      !detail?.parentId && (
+                        <QuestionCard
+                          question={view.pendingQuestion}
+                          onAnswer={(answer) => handleSend(answer)}
+                          disabled={running}
+                        />
+                      )}
+                    {waiting && !detail?.parentId && (
+                      <RunActionCard
+                        waiting={waiting}
+                        onAnswer={handleAnswerWorkflow}
+                        onContinue={handleContinueWorkflow}
+                        onResume={handleResumeWorkflow}
+                        onStop={handleStopWorkflow}
+                        disabled={running}
+                        comment={runComment}
+                        onCommentChange={setRunComment}
+                      />
+                    )}
+                    {view.lastDone === "error" &&
+                      !running &&
+                      !view.pendingQuestion &&
+                      !waiting &&
+                      !detail?.parentId && (
+                        <RetryCard onRetry={handleRetry} disabled={running} />
+                      )}
+                    {/* A node's session is driven by its workflow: the human answers in the parent. */}
+                    {detail?.parentId && (
+                      <div className="mx-auto flex max-w-[960px] items-center gap-3 border-t border-border px-1 py-2">
+                        <span
+                          className={`h-2 w-2 shrink-0 rounded-full ${running ? "bg-accent" : "bg-ok"}`}
+                        />
+                        <div className="min-w-0 grow">
+                          <div className="text-sm font-medium text-text">
+                            {running
+                              ? t('sessionPageWorkflowNodeRunning')
+                              : t('sessionPageWorkflowNodeFinished')}
+                          </div>
+                          <div className="text-xs text-muted">
+                            {t('sessionPageWorkflowDrivenSessionHint')}
+                          </div>
+                        </div>
+                        <a
+                          href={`#/s/${detail.parentId}`}
+                          className={buttonClass(
+                            { variant: "primary", size: "sm" },
+                            "shrink-0",
+                          )}
+                        >
+                          {t('sessionPageBackToWorkflow')}
+                        </a>
+                      </div>
+                    )}
+                    <RunningStrip
+                      running={running}
+                      run={run}
+                      following={!awayFromBottom}
+                      onFollowChange={setFollow}
+                    />
+                    {!detail?.parentId && (
+                      <QueuedMessages queued={served.queued} onCancel={handleCancelQueued} />
+                    )}
+                    {!detail?.parentId && (
+                      <Composer
+                        text={text}
+                        onTextChange={setText}
+                        onSend={() => handleSend()}
+                        onStop={handleStop}
+                        onPause={run && !run.finished && !run.paused ? handlePauseWorkflow : undefined}
+                        pauseRequested={run?.pauseRequested}
+                        running={running}
+                        currentModel={currentModel}
+                        modelChoices={modelChoices}
+                        onModelChange={handleModelChange}
+                        error={sendError}
+                        textareaRef={textareaRef}
+                        placeholder={
+                          workflowSelection.workflowId && !isChat
+                            ? t('sessionPageWorkflowTaskPlaceholder')
+                            : view.pendingQuestion && !running
+                              ? t('sessionPageAnswerPlaceholder')
+                              : undefined
+                        }
+                        commands={commands}
+                        // A chat talks to builder only: no agent nor workflow to pick.
+                        agents={isChat ? undefined : agents}
+                        mode={mode}
+                        onModeChange={handleModeChange}
+                        attachments={attachments}
+                        onAttach={handleAttach}
+                        onRemoveAttachment={handleRemoveAttachment}
+                        workflows={isChat ? undefined : workflows}
+                        workflowSelection={workflowSelection}
+                        onWorkflowSelectionChange={setWorkflowSelection}
+                        mcpView={mcpView}
+                        onMcpToggle={handleMcpToggle}
+                      />
+                    )}
+                  </main>
 
-          <ContextPanel
-            view={view}
-            skills={skills}
-            usage={usage}
-            hasSession={sessionId !== null}
-            partial={hasMore}
-            worktree={detail?.worktree ?? null}
-            sessionId={sessionId}
-            onWorktreeChanged={() => setDetailVersion((version) => version + 1)}
-            integrationVersion={integrationVersion}
-          />
-          {sessionId && integrationOpen && (
-            <IntegrationDialog
-              sessionId={sessionId}
-              open
-              onClose={() => {
-                setIntegrationOpen(false);
-                setIntegrationVersion((version) => version + 1);
-              }}
-            />
-          )}
-          {preview && sessionId && (
-            <PreviewPane sessionId={sessionId} target={preview} onClose={() => setPreview(null)} />
-          )}
-        </div>
-            </WorkflowUsageContext.Provider>
+                  <ContextPanel
+                    view={view}
+                    skills={skills}
+                    usage={usage}
+                    request={detail?.request ?? null}
+                    hasSession={sessionId !== null}
+                    worktree={detail?.worktree ?? null}
+                    sessionId={sessionId}
+                    onWorktreeChanged={() =>
+                      setDetailVersion((version) => version + 1)
+                    }
+                    integrationVersion={integrationVersion}
+                    vision={vision}
+                    served={served}
+                  />
+                  {sessionId && integrationOpen && (
+                    <IntegrationDialog
+                      sessionId={sessionId}
+                      projectId={detail?.project.id ?? projectId}
+                      open
+                      onClose={() => {
+                        setIntegrationOpen(false);
+                        setIntegrationVersion((version) => version + 1);
+                      }}
+                    />
+                  )}
+                  {sessionId && tryOpen && (
+                    <TryDialog sessionId={sessionId} open onClose={() => setTryOpen(false)} />
+                  )}
+                  {preview && sessionId && (
+                    <PreviewPane
+                      sessionId={sessionId}
+                      target={preview}
+                      onClose={() => setPreview(null)}
+                    />
+                  )}
+                  {canvasId != null && (
+                    <CanvasPane
+                      artifactId={canvasId}
+                      refreshKey={view}
+                      onClose={() => setCanvasId(null)}
+                      onAnnotate={(message) => {
+                        // The run waiting on a choice or a pause refuses the composer: the note goes to its comment.
+                        const append = (current: string) =>
+                          current.trim() ? `${current}\n\n${message}` : message;
+                        if (waiting?.kind === "human" || waiting?.kind === "pause") setRunComment(append);
+                        else setText(append);
+                      }}
+                    />
+                  )}
+                </div>
+              </WorkflowUsageContext.Provider>
             </CallUsageContext.Provider>
           </IntegrationInviteContext.Provider>
         </PlanActionsContext.Provider>
       </PreviewWorkdirContext.Provider>
+      </CanvasSessionContext.Provider>
+     </CanvasOpenerContext.Provider>
     </PreviewContext.Provider>
   );
 }

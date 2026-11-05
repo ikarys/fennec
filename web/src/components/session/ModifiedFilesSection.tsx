@@ -2,9 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ThreadView } from '../../lib/fold';
 import { previewKindOfPath, relativeToWorkdir, type PreviewKind } from '../../lib/preview';
 import { usePreviewOpener, usePreviewWorkdir } from '../preview/PreviewContext';
-import { panelBlock } from '../../lib/panelBlocks';
+import { EyeIcon, FileIcon } from '../Icons';
 import { Button } from '../ui/Button';
 import { Panel } from '../ui/Panel';
+import { useT } from '../../i18n';
 
 interface ModifiedFilesSectionProps {
   modifiedFiles: ThreadView['modifiedFiles'];
@@ -12,6 +13,7 @@ interface ModifiedFilesSectionProps {
 }
 
 export function ModifiedFilesSection({ modifiedFiles, sessionId }: ModifiedFilesSectionProps) {
+  const t = useT();
   const opener = usePreviewOpener();
   const workdir = usePreviewWorkdir();
   const [filesExpanded, setFilesExpanded] = useState(false);
@@ -43,34 +45,49 @@ export function ModifiedFilesSection({ modifiedFiles, sessionId }: ModifiedFiles
   return (
     <Panel
       id="modifiedFiles"
-      title={panelBlock('modifiedFiles').title}
+      title={t('panelModifiedFiles')}
+      icon={<FileIcon className="h-3.5 w-3.5" />}
       summary={mergedFiles.length > 0 ? mergedFiles.length : undefined}
     >
-      {mergedFiles.length === 0 && <div className="text-xs text-muted">Aucun fichier modifié.</div>}
+      {mergedFiles.length === 0 && <div className="text-xs text-muted">{t('noModifiedFiles')}</div>}
       {visibleModifiedFiles.map((file) => {
         const relative = workdir ? file.key : undefined;
         const kind = file.kind;
-        return (
-          <div key={file.key} className="flex items-center gap-2 py-1.5 font-mono text-xs">
+        const previewable = kind !== undefined && relative !== undefined && opener !== undefined;
+        // A previewable file is a whole-row button: the accent wash is the only hover cue.
+        const rowClass = `flex w-full items-center gap-2 py-1.5 font-mono text-xs text-left${
+          previewable ? ' cursor-pointer rounded-md hover:bg-accent-soft' : ''
+        }`;
+        const pathClass = `grow overflow-hidden text-left text-ellipsis whitespace-nowrap${
+          previewable ? ' group-hover:text-accent-strong' : ''
+        }`;
+        const row = (
+          <>
             {/* Cut on the left: the file name is what tells files apart. */}
-            <span
-              dir="rtl"
-              title={file.key}
-              className="grow overflow-hidden text-left text-ellipsis whitespace-nowrap"
-            >
+            <span dir="rtl" title={file.key} className={pathClass}>
               <bdi>{file.key}</bdi>
             </span>
             <span className="text-ok tabular-nums">+{file.added}</span>
             <span className="text-muted tabular-nums">−{file.removed}</span>
-            {kind && relative && opener && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => opener({ path: relative, kind })}
-              >
-                Aperçu
-              </Button>
+            {previewable && (
+              <EyeIcon className="h-3.5 w-3.5 shrink-0 text-muted opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100" />
             )}
+          </>
+        );
+        return previewable ? (
+          <button
+            key={file.key}
+            type="button"
+            className={`group ${rowClass}`}
+            onClick={() => opener({ path: relative, kind })}
+            title={t('preview')}
+            aria-label={t('previewOf', { name: file.key })}
+          >
+            {row}
+          </button>
+        ) : (
+          <div key={file.key} className={rowClass}>
+            {row}
           </div>
         );
       })}
@@ -81,7 +98,7 @@ export function ModifiedFilesSection({ modifiedFiles, sessionId }: ModifiedFiles
           onClick={() => setFilesExpanded((value) => !value)}
           className="self-start"
         >
-          {filesExpanded ? 'Réduire' : `+ ${hiddenModifiedCount} autres`}
+          {filesExpanded ? t('collapse') : t('moreFiles', { count: hiddenModifiedCount })}
         </Button>
       )}
     </Panel>

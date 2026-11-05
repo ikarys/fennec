@@ -1,53 +1,56 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import { Badge } from '../components/ui/Badge';
-import { Button } from '../components/ui/Button';
-import { Card } from '../components/ui/Card';
-import { SectionLabel } from '../components/ui/SectionLabel';
-import { markdownComponents } from '../components/session/markdownComponents';
-import { ProjectMap } from '../components/project/ProjectMap';
-import { getProjectOverview, writeMapFile, type Adr, type Project, type ProjectOverview } from '../lib/api';
+import { Tabs } from '../components/ui/Tabs';
+import { Button, buttonClass } from '../components/ui/Button';
+import { ExternalIcon, PlusIcon, TrashIcon } from '../components/Icons';
+import { DeleteProjectDialog } from '../components/project/DeleteProjectDialog';
+import { TasksSection } from '../components/project/ideas/TasksSection';
+import { MapSection } from '../components/project/MapSection';
+import { DocSection } from '../components/project/DocSection';
+import { RiskSection } from '../components/project/RiskSection';
+import { AnalysesSection } from '../components/project/AnalysesSection';
+import { SessionsSection } from '../components/project/SessionsSection';
+import { ContributionsSection } from '../components/project/ContributionsSection';
+import { DashboardSection } from '../components/project/DashboardSection';
+import { IndicatorsSection } from '../components/project/IndicatorsSection';
+import { CanvasSection } from '../components/project/CanvasSection';
+import {
+  createSession,
+  getProjectOverview,
+  type Project,
+  type ProjectOverview,
+} from '../lib/api';
+import { type IdeaView } from '../lib/ideas';
+import { useT } from '../i18n';
 
-const REMARK_PLUGINS = [remarkGfm];
+const TABS = [
+  { id: 'overview', label: 'tasksTabOverview' },
+  { id: 'indicators', label: 'indicatorsTab' },
+  { id: 'tasks', label: 'tasks' },
+  { id: 'sessions', label: 'sessionsSectionTitle' },
+  { id: 'contributions', label: 'contributionsTitle' },
+  { id: 'map', label: 'moduleMapTitle' },
+  { id: 'risks', label: 'risksLabel' },
+  { id: 'doc', label: 'projectPageDoc' },
+  { id: 'canvas', label: 'canvasLibraryTab' },
+  { id: 'analyses', label: 'analysesTitle' },
+] as const;
 
-function statusTone(status: string) {
-  if (status === 'accepted') return 'ok' as const;
-  if (status === 'rejected' || status === 'deprecated' || status.startsWith('superseded')) return 'err' as const;
-  return 'neutral' as const;
-}
+type TabId = (typeof TABS)[number]['id'];
 
-function AdrRow({ adr, first }: { adr: Adr; first: boolean }) {
-  return (
-    <details className={first ? undefined : 'border-t border-border'}>
-      <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 text-sm hover:bg-raised select-none">
-        <span className="tabular-nums text-xs text-muted">{String(adr.number).padStart(4, '0')}</span>
-        <span className="grow truncate">{adr.title}</span>
-        {adr.date ? <span className="text-xs text-muted">{adr.date}</span> : null}
-        {adr.status ? <Badge tone={statusTone(adr.status)}>{adr.status}</Badge> : null}
-        <Badge tone="neutral" title="Lu depuis le fichier">vérifié</Badge>
-      </summary>
-      <div className="border-t border-border px-4 py-3 text-sm">
-        <p className="text-xs text-muted">{adr.file}</p>
-        <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={markdownComponents}>{adr.body}</ReactMarkdown>
-      </div>
-    </details>
-  );
-}
-
-export default function ProjectPage({ projects, projectId }: { projects: Project[]; projectId: string }) {
-  const project = projects.find((p) => p.id === projectId) ?? null;
+/**
+ * The map tab fetches the project overview on its own so the tasks and doc
+ * tabs do not wait for it.
+ */
+function MapTab({ projectId }: { projectId: string }) {
+  const t = useT();
   const [data, setData] = useState<ProjectOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [writing, setWriting] = useState(false);
-  const [writeError, setWriteError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    setWriteError(null);
     setData(null);
     getProjectOverview(projectId)
       .then((overview) => {
@@ -58,7 +61,7 @@ export default function ProjectPage({ projects, projectId }: { projects: Project
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Erreur inconnue');
+          setError(err instanceof Error ? err.message : t('unknownError'));
           setLoading(false);
         }
       });
@@ -67,95 +70,187 @@ export default function ProjectPage({ projects, projectId }: { projects: Project
     };
   }, [projectId]);
 
-  const handleWrite = async () => {
-    setWriting(true);
-    setWriteError(null);
+  if (loading) return <p className="text-muted">{t('loading')}</p>;
+  if (error) return <p className="text-err">{error}</p>;
+  if (!data) return <p className="text-muted">{t('loading')}</p>;
+
+  return (
+    <MapSection
+      projectId={projectId}
+      map={data.map}
+      mapFile={data.mapFile}
+      drift={data.drift}
+      onWritten={(state) =>
+        setData((prev) => (prev ? { ...prev, mapFile: state } : prev))
+      }
+    />
+  );
+}
+
+export default function ProjectPage({
+  projects,
+  projectId,
+  tab,
+  sub,
+  onOpenSession,
+  onNewSession,
+  onDeleted,
+  onSessionsDeleted,
+}: {
+  projects: Project[];
+  projectId: string;
+  tab: string | null;
+  sub: string | null;
+  onOpenSession: (sessionId: string) => void;
+  onNewSession: (projectId: string) => void;
+  /** Home and project pages both show the list, so going home does not refresh it. */
+  onDeleted: () => void;
+  onSessionsDeleted: (ids: string[]) => void;
+}) {
+  const t = useT();
+  const project = projects.find((p) => p.id === projectId) ?? null;
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  // Unknown or null tab defaults to 'overview'.
+  const activeTab: TabId = TABS.find((t) => t.id === tab)?.id ?? 'overview';
+
+  const handleTabSelect = (id: TabId) => {
+    window.location.hash = `#/project/${encodeURIComponent(projectId)}/${id}`;
+  };
+
+  const startSession = async (prompt: string, mode: string) => {
+    setAnalyzing(true);
+    setAnalyzeError(null);
     try {
-      const result = await writeMapFile(projectId);
-      setData((prev) => (prev ? { ...prev, mapFile: result.mapFile } : prev));
+      const created = await createSession(projectId, prompt, mode);
+      onOpenSession(created.id);
     } catch (err) {
-      setWriteError(err instanceof Error ? err.message : 'Erreur inconnue');
+      setAnalyzeError(err instanceof Error ? err.message : t('unknownError'));
     } finally {
-      setWriting(false);
+      setAnalyzing(false);
     }
   };
 
+  // Opens a new plan session with the idea in the composer: the human edits it, then sends.
+  const handleFrame = async (idea: IdeaView) => {
+    window.location.hash = `#/new/${encodeURIComponent(projectId)}?frame=${encodeURIComponent(idea.id)}`;
+  };
+
   const shell = (children: ReactNode) => (
-    <main className="grow overflow-y-auto px-6 py-8">
+    <main className="grow overflow-y-auto px-4 py-6 md:px-6 md:py-8">
       <div className="mx-auto max-w-[1100px]">{children}</div>
     </main>
   );
 
   if (!project) {
-    return shell(<p className="text-muted">Projet introuvable.</p>);
+    return shell(<p className="text-muted">{t('projectPageNotFound')}</p>);
   }
 
   const header = (
     <>
-      <h1 className="text-[1.375rem] font-semibold tracking-[-0.02em]">{project.name}</h1>
-      <p className="mt-0.5 font-mono text-xs text-muted">
-        {project.workdir} · ⎇ {project.branch ?? 'sans branche'}
+      <div className="flex items-center gap-3">
+        <h1 className="text-2xl font-semibold">
+          {project.name}
+        </h1>
+        <Button variant="primary" size="sm" onClick={() => onNewSession(projectId)} title={t('newSessionInProject')}>
+          <PlusIcon className="h-4 w-4" />
+          {t('newSession')}
+        </Button>
+        <a
+          href={project.editorUrl}
+          title={t('openInVsCode')}
+          aria-label={t('openInVsCode')}
+          className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
+        >
+          <ExternalIcon className="h-4 w-4" />
+        </a>
+        <Button
+          variant="ghost"
+          size="sm"
+          iconOnly
+          title={t('deleteProjectBtn')}
+          aria-label={t('deleteProjectBtn')}
+          onClick={() => setDeleting(true)}
+        >
+          <TrashIcon className="h-4 w-4" />
+        </Button>
+      </div>
+      <p className="mt-0.5 break-all font-mono text-xs text-muted">
+        {project.workdir} · ⎇ {project.branch ?? t('noBranch')}
+        {project.remote ? (
+          <>
+            {' · '}
+            <a
+              href={project.remote}
+              target="_blank"
+              rel="noreferrer"
+              className="text-accent-strong underline"
+              title={project.remote}
+            >
+              {project.remote.replace(/^https?:\/\//, '')}
+            </a>
+          </>
+        ) : null}
       </p>
     </>
   );
 
-  if (loading) {
-    return shell(<>{header}<p className="mt-6 text-muted">Chargement…</p></>);
-  }
-
-  if (error) {
-    return shell(<>{header}<p className="mt-6 text-err">{error}</p></>);
-  }
-
-  if (!data) {
-    return shell(<>{header}<p className="mt-6 text-muted">Chargement…</p></>);
-  }
-
-  const mapFile = data.mapFile;
-
   return shell(
     <>
       {header}
-      <div className="mt-6 flex flex-col gap-8">
-        <section>
-          <div className="flex items-center gap-2">
-            <SectionLabel>Carte des modules</SectionLabel>
-            <Badge tone="neutral" title="Extraite des imports du code, sans modèle">vérifié</Badge>
-            <div className="grow" />
-            {mapFile === 'current' ? (
-              <Badge tone="ok">docs/map.md à jour</Badge>
-            ) : mapFile === 'stale' ? (
-              <Badge tone="accent">docs/map.md périmé</Badge>
-            ) : (
-              <Badge tone="neutral">docs/map.md absent</Badge>
-            )}
-            {mapFile !== 'current' ? (
-              <Button variant="secondary" size="sm" disabled={writing} onClick={handleWrite}>
-                {writing ? 'Écriture…' : mapFile === 'missing' ? 'Écrire docs/map.md' : 'Mettre à jour docs/map.md'}
-              </Button>
-            ) : null}
-          </div>
-          {writeError ? <p className="mt-1 text-xs text-err">{writeError}</p> : null}
-          <p className="mt-2 text-xs text-muted">
-            Une flèche A → B : du code de A importe du code de B (nombre de fichiers). docs/map.md, commité, donne cette carte aux agents et aux développeurs qui arrivent sur le projet.
-          </p>
-          <div className="mt-3">
-            <ProjectMap map={data.map} />
-          </div>
-        </section>
-        <section>
-          <SectionLabel>ADR ({data.adrs.length})</SectionLabel>
-          {data.adrs.length === 0 ? (
-            <p className="mt-3 text-xs text-muted">Aucun ADR dans docs/adr/.</p>
-          ) : (
-            <Card className="mt-3">
-              {data.adrs.map((adr, index) => (
-                <AdrRow key={adr.file} adr={adr} first={index === 0} />
-              ))}
-            </Card>
-          )}
-        </section>
+      {deleting && (
+        <DeleteProjectDialog
+          project={project}
+          onClose={() => setDeleting(false)}
+          onDeleted={() => {
+            setDeleting(false);
+            onDeleted();
+            window.location.hash = '#/';
+          }}
+        />
+      )}
+      <div className="mt-6 flex flex-col gap-6 md:flex-row">
+        <Tabs
+          label={t('projectPageSectionsLabel')}
+          tabs={TABS.map((item) => ({ ...item, label: t(item.label) }))}
+          active={activeTab}
+          onSelect={handleTabSelect}
+        />
+        <div className="min-w-0 grow">
+          {activeTab === 'overview' ? (
+            <DashboardSection projectId={projectId} onOpenSession={onOpenSession} />
+          ) : null}
+          {activeTab === 'indicators' ? <IndicatorsSection projectId={projectId} /> : null}
+          {activeTab === 'tasks' ? (
+            <TasksSection
+              projectId={projectId}
+              sub={sub}
+              onFrame={handleFrame}
+              onOpenSession={onOpenSession}
+              onSelectSub={(s) => {
+                window.location.hash = `#/project/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(s)}`;
+              }}
+            />
+          ) : null}
+          {activeTab === 'sessions' ? <SessionsSection projectName={project.name} sessions={project.sessions} onOpenSession={onOpenSession} onSessionsDeleted={onSessionsDeleted} /> : null}
+          {activeTab === 'contributions' ? <ContributionsSection projectId={projectId} onOpenSession={onOpenSession} /> : null}
+          {activeTab === 'map' ? <MapTab projectId={projectId} /> : null}
+          {activeTab === 'risks' ? <RiskSection projectId={projectId} busy={analyzing} onStart={(prompt, mode) => void startSession(prompt, mode)} /> : null}
+          {activeTab === 'doc' ? <DocSection projectId={projectId} /> : null}
+          {activeTab === 'canvas' ? <CanvasSection projectId={projectId} /> : null}
+          {activeTab === 'analyses' ? (
+            <AnalysesSection
+              busy={analyzing}
+              error={analyzeError}
+              sessions={project.sessions}
+              onStart={(prompt, mode) => void startSession(prompt, mode)}
+              onOpenSession={onOpenSession}
+            />
+          ) : null}
+        </div>
       </div>
-    </>
+    </>,
   );
 }

@@ -6,7 +6,10 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-pub use llm_providers::{ApiKey, ModelParams, ModelPrefs, ModelRef, Provider, ReasoningEffort};
+use super::mcp::McpServer;
+pub use llm_providers_connector::{
+    ApiKey, ModelParams, ModelPrefs, ModelRef, Provider, ReasoningEffort,
+};
 
 /// The provider of the environment's endpoint (`FENNEC_LLM_URL`); always there,
 /// even with no stored entry.
@@ -23,13 +26,21 @@ pub struct Preferences {
     /// `local` overrides only what it sets of the environment's endpoint.
     pub providers: Vec<Provider>,
     pub display: Display,
-    /// openfox `globalInstructions`: the human's instructions for every new
+    /// `globalInstructions`: the human's instructions for every new
     /// session; `None` or blank adds nothing.
     pub global_instructions: Option<String>,
     /// The web_search tool's SearXNG instance.
     pub search: SearchPrefs,
     /// How commands run: in bwrap or on the host.
     pub sandbox: SandboxPrefs,
+    /// The ideas queue's caps when it runs with the human away.
+    pub autonomy: AutonomyPrefs,
+    /// Skill ids whose instructions every new session gets in its system prompt.
+    pub always_on_skills: Vec<String>,
+    /// Opt-in embedded workflows (`workflows::opt_in_defaults`) the human enabled.
+    pub enabled_workflows: Vec<String>,
+    /// MCP servers, configured on the Settings page.
+    pub mcp: Vec<McpServer>,
     /// Before providers (one endpoint): read, moved by `migrate`, never written.
     #[serde(rename = "model", skip_serializing)]
     pub(crate) legacy_model: Option<String>,
@@ -37,7 +48,7 @@ pub struct Preferences {
     pub(crate) legacy_models: BTreeMap<String, ModelPrefs>,
 }
 
-/// openfox `search.searxngUrl` / `search.searxngApiKey`; fennec's own `webFetch`.
+/// `search.searxngUrl` / `search.searxngApiKey`; `webFetch`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct SearchPrefs {
@@ -57,11 +68,11 @@ impl Default for SearchPrefs {
     }
 }
 
-/// fennec's own (openfox runs commands on the host): the bwrap world of commands.
+/// The bwrap world of commands.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct SandboxPrefs {
-    /// Off runs commands on the host, as openfox does: the human's call.
+    /// Off runs commands on the host: the human's call.
     pub enabled: bool,
     /// Lets commands reach the network (package installs, a dev server on the host).
     pub network: bool,
@@ -76,6 +87,25 @@ impl Default for SandboxPrefs {
     }
 }
 
+/// fennec's own: what one idea may spend in the ideas queue's night mode
+/// before fennec stops it and goes on with the next. 0 means no cap.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct AutonomyPrefs {
+    pub max_minutes_per_idea: u32,
+    /// Uncached prompt tokens plus completion tokens: what a paid model bills.
+    pub max_tokens_per_idea: u64,
+}
+
+impl Default for AutonomyPrefs {
+    fn default() -> Self {
+        AutonomyPrefs {
+            max_minutes_per_idea: 120,
+            max_tokens_per_idea: 2_000_000,
+        }
+    }
+}
+
 /// The UI's base font size in pixels (the CSS body size); the page zooms around it.
 pub const DEFAULT_FONT_SIZE: u16 = 14;
 /// The sizes the Settings page offers.
@@ -84,9 +114,15 @@ pub const FONT_SIZE_RANGE: std::ops::RangeInclusive<u16> = 13..=16;
 pub const MAX_PANEL_PAGES: usize = 12;
 /// The longest panel page name, in characters.
 pub const MAX_PANEL_PAGE_NAME: usize = 40;
+/// The UI's display language when none is stored.
+pub const DEFAULT_LANGUAGE: &str = "en";
 
 fn default_font_size() -> u16 {
     DEFAULT_FONT_SIZE
+}
+
+fn default_language() -> String {
+    DEFAULT_LANGUAGE.to_string()
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -98,6 +134,9 @@ pub struct Display {
     pub font_size: u16,
     /// `None` means the UI's default pages.
     pub panel_pages: Option<Vec<PanelPage>>,
+    /// The UI's display language: `en` (default) or `fr`.
+    #[serde(default = "default_language")]
+    pub language: String,
 }
 
 /// fennec's own: a named list of the context panel's blocks; the UI owns the block ids.
@@ -115,6 +154,7 @@ impl Default for Display {
             tool_results_open: false,
             font_size: DEFAULT_FONT_SIZE,
             panel_pages: None,
+            language: DEFAULT_LANGUAGE.to_string(),
         }
     }
 }
@@ -229,6 +269,9 @@ impl Preferences {
         if !FONT_SIZE_RANGE.contains(&self.display.font_size) {
             return Err(format!("font_size must be in {FONT_SIZE_RANGE:?}"));
         }
+        if !matches!(self.display.language.as_str(), "en" | "fr") {
+            return Err("display.language must be \"en\" or \"fr\"".to_string());
+        }
         if let Some(pages) = &self.display.panel_pages {
             Self::validate_panel_pages(pages)?;
         }
@@ -238,6 +281,16 @@ impl Preferences {
             && !url.starts_with("https://")
         {
             return Err("searxng_url must start with http:// or https://".into());
+        }
+        let mut seen_mcp = Vec::new();
+        for server in &self.mcp {
+            if seen_mcp.contains(&server.name) {
+                return Err(format!("duplicate mcp server {}", server.name));
+            }
+            seen_mcp.push(server.name.clone());
+            if let Some(problem) = server.problems().into_iter().next() {
+                return Err(problem);
+            }
         }
         Ok(())
     }
@@ -275,9 +328,22 @@ impl Preferences {
         Ok(())
     }
 
+    /// The model a session runs on until the human picks one: `selected`,
+    /// else the environment's default. An empty `selected` is ignored.
+    /// Favourites only fill the composer's menu: they are not a default.
+    pub fn default_model(&self, defaults: &ModelParams) -> ModelRef {
+        self.selected
+            .as_ref()
+            .filter(|m| !m.model.is_empty())
+            .cloned()
+            .unwrap_or_else(|| ModelRef {
+                provider: defaults.provider.clone(),
+                model: defaults.model.clone(),
+            })
+    }
+
     /// The parameters of the model a turn runs on: a session's chosen model
-    /// wins over `selected`, which wins over the environment's default. An
-    /// empty chosen model is ignored. Per model: Settings page > environment >
+    /// wins over the default model. An empty chosen model is ignored. Per model: Settings page > environment >
     /// built-in default; the context window falls back to the endpoint's
     /// current listing before the built-in default.
     pub fn resolve(
@@ -288,13 +354,7 @@ impl Preferences {
     ) -> ModelParams {
         let selected = match chosen {
             Some(chosen) if !chosen.model.is_empty() => chosen.clone(),
-            _ => match &self.selected {
-                Some(selected) if !selected.model.is_empty() => selected.clone(),
-                _ => ModelRef {
-                    provider: defaults.provider.clone(),
-                    model: defaults.model.clone(),
-                },
-            },
+            _ => self.default_model(defaults),
         };
         let prefs = self
             .provider(&selected.provider)
@@ -307,6 +367,7 @@ impl Preferences {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::mcp::McpTool;
 
     #[test]
     fn search_prefs_stored_before_web_fetch_allow_it() {
@@ -346,6 +407,7 @@ mod tests {
             providers: vec![local_provider(
                 "m",
                 ModelPrefs {
+                    price: None,
                     max_tokens: Some(100),
                     context_window: Some(2048),
                     compaction_threshold: Some(0.5),
@@ -431,6 +493,7 @@ mod tests {
         p.providers.push(local_provider(
             "a",
             ModelPrefs {
+                price: None,
                 max_tokens: Some(100),
                 context_window: Some(2048),
                 compaction_threshold: Some(0.5),
@@ -488,6 +551,7 @@ mod tests {
         p.providers[0].models.insert(
             "other".into(),
             ModelPrefs {
+                price: None,
                 max_tokens: Some(200),
                 context_window: Some(4096),
                 compaction_threshold: Some(0.75),
@@ -598,6 +662,10 @@ mod tests {
         assert!(p.validate().unwrap_err().contains("font_size"));
 
         let mut p = valid();
+        p.display.language = "de".into();
+        assert!(p.validate().unwrap_err().contains("display.language"));
+
+        let mut p = valid();
         p.search.searxng_url = Some("ftp://example.com".into());
         assert!(p.validate().unwrap_err().contains("searxng_url"));
     }
@@ -643,11 +711,61 @@ mod tests {
     }
 
     #[test]
+    fn validate_rejects_duplicate_mcp_server_names() {
+        let mut p = valid();
+        p.mcp = vec![
+            McpServer {
+                name: "fs".into(),
+                command: Some("fs-mcp".into()),
+                ..Default::default()
+            },
+            McpServer {
+                name: "fs".into(),
+                command: Some("fs-mcp".into()),
+                ..Default::default()
+            },
+        ];
+        assert!(p.validate().unwrap_err().contains("duplicate mcp server"));
+    }
+
+    #[test]
+    fn validate_rejects_an_mcp_tool_that_collides_with_a_builtin() {
+        let mut p = valid();
+        p.mcp = vec![McpServer {
+            name: "read".into(),
+            command: Some("read-mcp".into()),
+            cached_tools: vec![McpTool {
+                name: "file".into(),
+                description: None,
+                input_schema: serde_json::json!({}),
+            }],
+            ..Default::default()
+        }];
+        assert!(
+            p.validate()
+                .unwrap_err()
+                .contains("collides with a built-in tool")
+        );
+    }
+
+    #[test]
+    fn validate_accepts_a_well_formed_mcp_server() {
+        let mut p = valid();
+        p.mcp = vec![McpServer {
+            name: "fs".into(),
+            command: Some("fs-mcp".into()),
+            ..Default::default()
+        }];
+        assert!(p.validate().is_ok());
+    }
+
+    #[test]
     fn preferences_round_trip_and_empty_json_loads() {
         let mut models = BTreeMap::new();
         models.insert(
             "m".into(),
             ModelPrefs {
+                price: None,
                 max_tokens: Some(100),
                 context_window: Some(2048),
                 compaction_threshold: Some(0.25),
@@ -670,6 +788,7 @@ mod tests {
         };
         p.display.reasoning_open = false;
         p.display.font_size = 15;
+        p.display.language = "fr".into();
         p.global_instructions = Some("Be terse.".into());
         p.sandbox = SandboxPrefs {
             enabled: false,
@@ -682,6 +801,7 @@ mod tests {
         assert!(json.contains("\"maxTokens\""));
         assert!(json.contains("\"reasoningEffort\""));
         assert!(json.contains("\"fontSize\""));
+        assert!(json.contains("\"language\""));
         assert!(json.contains("\"globalInstructions\""));
         assert!(json.contains("\"sandbox\""));
         assert_eq!(serde_json::from_str::<Preferences>(&json).unwrap(), p);
@@ -699,6 +819,7 @@ mod tests {
         .unwrap();
         p.migrate();
         assert_eq!(p.display.font_size, DEFAULT_FONT_SIZE);
+        assert_eq!(p.display.language, DEFAULT_LANGUAGE);
         assert_eq!(
             p.provider(LOCAL_PROVIDER)
                 .unwrap()
@@ -936,5 +1057,11 @@ mod tests {
             Some(ApiKey::Sealed("sealed:plain".into()))
         );
         assert_eq!(p.providers[1].api_key, Some(ApiKey::Env("B_KEY".into())));
+    }
+
+    #[test]
+    fn an_old_stored_tariff_is_ignored() {
+        let p: Preferences = serde_json::from_str(r#"{"tariff":{"inputPerM":1}}"#).unwrap();
+        assert!(p.providers.is_empty());
     }
 }

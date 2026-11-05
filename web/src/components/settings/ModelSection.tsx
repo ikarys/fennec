@@ -1,6 +1,7 @@
 import type { ModelRef, ProviderListing } from '../../lib/api';
-import { Section } from '../ui/Section';
+import { Section, type SectionSave } from '../ui/Section';
 import { FieldRow, Select } from '../ui/Field';
+import { useT } from '../../i18n';
 
 interface ModelSectionProps {
   value: string;
@@ -8,9 +9,12 @@ interface ModelSectionProps {
   stored: ModelRef | null;
   defaultModel: string;
   onChange: (value: string) => void;
+  /** The group's own save: its dot and its "Enregistrer". */
+  save?: SectionSave;
 }
 
-export function ModelSection({ value, listings, stored, defaultModel, onChange }: ModelSectionProps) {
+export function ModelSection({ value, listings, stored, defaultModel, onChange, save }: ModelSectionProps) {
+  const t = useT();
   const listedValues = new Set<string>();
   for (const listing of listings) {
     for (const model of listing.models) {
@@ -25,32 +29,29 @@ export function ModelSection({ value, listings, stored, defaultModel, onChange }
     : '';
 
   return (
-    <Section>
-      <div className="flex flex-col gap-4">
-        <h2 className="text-sm font-semibold">Modèle</h2>
-        <FieldRow label="Modèle par défaut">
-          <Select value={value} onChange={(event) => onChange(event.target.value)} className="w-full">
-            <option value="">Défaut de l'environnement ({defaultModel})</option>
-            {listings.map((listing) => (
-              <optgroup key={listing.provider} label={listing.name}>
-                {listing.models.map((model) => (
-                  <option key={`${listing.provider}/${model.id}`} value={`${listing.provider}/${model.id}`}>
-                    {model.id}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-            {unlistedStored && (
-              <option value={`${unlistedStored.provider}/${unlistedStored.model}`}>
-                {unlistedStored.model} — {unlistedProviderName} (non listé)
-              </option>
-            )}
-          </Select>
-        </FieldRow>
-        <p className="m-0 text-xs text-muted">
-          Les nouvelles sessions l'utilisent ; le composer change celui d'une session. Les favoris (★) sont proposés dans le composer.
-        </p>
-      </div>
+    <Section title={t('modelSectionTitle')} save={save}>
+      <FieldRow label={t('defaultModelLabel')}>
+        <Select value={value} onChange={(event) => onChange(event.target.value)} className="w-full">
+          <option value="">{t('envDefaultOption', { model: defaultModel })}</option>
+          {listings.map((listing) => (
+            <optgroup key={listing.provider} label={listing.name}>
+              {listing.models.map((model) => (
+                <option key={`${listing.provider}/${model.id}`} value={`${listing.provider}/${model.id}`}>
+                  {model.id}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+          {unlistedStored && (
+            <option value={`${unlistedStored.provider}/${unlistedStored.model}`}>
+              {t('unlistedModelOption', { model: unlistedStored.model, provider: unlistedProviderName })}
+            </option>
+          )}
+        </Select>
+      </FieldRow>
+      <p className="m-0 text-xs text-muted">
+        {t('modelSectionHint')}
+      </p>
     </Section>
   );
 }

@@ -2,7 +2,7 @@
 //! The environment values are defaults; stored preferences override them.
 
 use crate::domain::preferences::{LOCAL_PROVIDER, ModelParams, ModelRef, Preferences};
-use llm_providers::{ApiKey, Endpoint, ListedModel, MasterKey, list_models};
+use llm_providers_connector::{ApiKey, Endpoint, ListedModel, MasterKey, list_models};
 use std::path::PathBuf;
 
 #[derive(Clone)]
@@ -76,6 +76,24 @@ impl Settings {
         match std::env::var_os("FENNEC_USAGE_DB") {
             Some(p) => PathBuf::from(p),
             None => self.db_path.with_file_name("usage.db"),
+        }
+    }
+
+    /// `FENNEC_RULES_DB`, default `rules.db` next to the store. A file of its
+    /// own: the human's rules are owned by the `rules` crate, not fennec's store.
+    pub fn rules_path(&self) -> PathBuf {
+        match std::env::var_os("FENNEC_RULES_DB") {
+            Some(p) => PathBuf::from(p),
+            None => self.db_path.with_file_name("rules.db"),
+        }
+    }
+
+    /// `FENNEC_CANVAS_DB`, default `canvas.db` next to the store. A file of its
+    /// own: the artifacts are owned by the `canvas` crate, not fennec's store.
+    pub fn canvas_path(&self) -> PathBuf {
+        match std::env::var_os("FENNEC_CANVAS_DB") {
+            Some(p) => PathBuf::from(p),
+            None => self.db_path.with_file_name("canvas.db"),
         }
     }
 }
@@ -156,6 +174,18 @@ pub fn model_concurrency() -> usize {
         .unwrap_or(1)
 }
 
+/// `FENNEC_MODEL_AFFINITY_SECS`: how long a local gate waits for the session
+/// it just served to come back between its rounds before another session
+/// may take the model. Default ten seconds: most tool rounds are shorter,
+/// and re-prefilling a prompt the cache lost costs about that much.
+pub fn model_affinity() -> std::time::Duration {
+    let secs = std::env::var("FENNEC_MODEL_AFFINITY_SECS")
+        .ok()
+        .and_then(|v| v.trim().parse::<u64>().ok())
+        .unwrap_or(10);
+    std::time::Duration::from_secs(secs)
+}
+
 /// A valid concurrency is a positive integer; anything else is rejected so
 /// `model_concurrency` falls back to its default.
 fn parse_concurrency(value: &str) -> Option<usize> {
@@ -232,6 +262,12 @@ mod tests {
         assert_eq!(parse_concurrency("0"), None);
         assert_eq!(parse_concurrency("abc"), None);
         assert!(model_concurrency() >= 1);
+    }
+
+    #[test]
+    fn model_affinity_defaults_to_ten_seconds() {
+        // ponytail: reads the real environment; the variable is not set in CI.
+        assert_eq!(model_affinity(), std::time::Duration::from_secs(10));
     }
 
     /// Same server and key as before providers, so the same prompt cache.

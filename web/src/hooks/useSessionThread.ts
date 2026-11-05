@@ -1,8 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getContext, type ContextView, getEventPage, getRunEventsBefore, getSkills, getUsage, getUsageCalls, getUsageWorkflow, type WorkflowUsage, type EventPageEntry, type SessionSkills, type CallUsage, type SessionUsage } from '../lib/api';
+import { getContext, getThread, getVision, type ContextView, type ServedThread, getEventPage, getRunEventsBefore, getSkills, getUsage, getUsageCalls, getUsageWorkflow, type WorkflowUsage, type EventPageEntry, type SessionSkills, type CallUsage, type SessionUsage, type SeenImage } from '../lib/api';
 import { createThreadFold, type FennecEvent, type ThreadFold, type ThreadView } from '../lib/fold';
+import { useLang } from '../i18n';
 
 const PAGE_SIZE = 200;
+
+const PENDING_CUES = new Set([
+  'rule.approval_requested',
+  'rule.approval_answered',
+  'waiver.requested',
+  'waiver.answered',
+  'queue.added',
+  'queue.drained',
+  'queue.cancelled',
+  'criteria.set',
+  'criteria.preflight',
+  'criterion.updated',
+  'decision.recorded',
+  'running.changed',
+  'context.compacted',
+  'session.rewound',
+]);
 
 const EMPTY: ThreadView = createThreadFold().view();
 
@@ -33,7 +51,13 @@ export interface SessionThread {
   workflowUsage: WorkflowUsage;
   /** The header's context gauge; null until the first fetch. */
   context: ContextView | null;
+  /** The images the model received, computed server-side; [] until the first fetch. */
+  vision: SeenImage[];
+  /** The pending approval, waiver, queue, criteria and decisions, folded server-side; empty until the first fetch. */
+  served: ServedThread;
 }
+
+const EMPTY_SERVED: ServedThread = { pendingApproval: null, pendingWaiver: null, queued: [], criteria: [], decisions: [], replayable: [] };
 
 /**
  * The live thread of a session: the last page of the log (at least 200 events,
@@ -44,6 +68,7 @@ export interface SessionThread {
  * strip: its `workflow.*` events are fetched once and fed to the run fold only.
  */
 export function useSessionThread(sessionId: string | null): SessionThread {
+  const lang = useLang();
   const [view, setView] = useState<ThreadView>(EMPTY);
   const [hasMore, setHasMore] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
@@ -52,8 +77,10 @@ export function useSessionThread(sessionId: string | null): SessionThread {
   const [calls, setCalls] = useState<ReadonlyMap<string, CallUsage>>(new Map());
   const [workflowUsage, setWorkflowUsage] = useState<WorkflowUsage>({ nodes: [], runs: [] });
   const [context, setContext] = useState<ContextView | null>(null);
+  const [vision, setVision] = useState<SeenImage[]>([]);
+  const [served, setServed] = useState<ServedThread>(EMPTY_SERVED);
   const eventsRef = useRef<FennecEvent[]>([]);
-  const foldRef = useRef<ThreadFold>(createThreadFold());
+  const foldRef = useRef<ThreadFold>(createThreadFold(lang));
   const firstSeqRef = useRef(0);
   const lastSeqRef = useRef(0);
   const runPrefixRef = useRef<EventPageEntry[]>([]);
@@ -63,6 +90,8 @@ export function useSessionThread(sessionId: string | null): SessionThread {
   const skillsReqRef = useRef(0);
   const usageReqRef = useRef(0);
   const contextReqRef = useRef(0);
+  const visionReqRef = useRef(0);
+  const threadReqRef = useRef(0);
 
   const refreshSkills = useCallback(() => {
     if (!sessionId) return;
@@ -76,7 +105,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
         // fall back to the empty state instead of a perpetual spinner; with
         // data, keep the last skills.
         if (request === skillsReqRef.current) {
-          setSkills((prev) => prev ?? { loaded: [], active: [] });
+          setSkills((prev) => prev ?? { loaded: [], active: [], alwaysOn: [], missedAlwaysOn: [] });
         }
       });
   }, [sessionId]);
@@ -108,8 +137,32 @@ export function useSessionThread(sessionId: string | null): SessionThread {
       });
   }, [sessionId]);
 
+  const refreshVision = useCallback(() => {
+    if (!sessionId) return;
+    const request = ++visionReqRef.current;
+    getVision(sessionId)
+      .then((images) => {
+        if (request === visionReqRef.current) setVision(images);
+      })
+      .catch(() => {
+        // Keep the last images: the next image or cut refetches.
+      });
+  }, [sessionId]);
+
+  const refreshThread = useCallback(() => {
+    if (!sessionId) return;
+    const request = ++threadReqRef.current;
+    getThread(sessionId)
+      .then((blocks) => {
+        if (request === threadReqRef.current) setServed(blocks);
+      })
+      .catch(() => {
+        // Keep the last blocks: the next request, answer or queue event refetches.
+      });
+  }, [sessionId]);
+
   const foldAll = useCallback(() => {
-    const fresh = createThreadFold();
+    const fresh = createThreadFold(lang);
     const firstSeq = firstSeqRef.current;
     for (const entry of runPrefixRef.current) {
       if (entry.seq < firstSeq) {
@@ -121,11 +174,11 @@ export function useSessionThread(sessionId: string | null): SessionThread {
     }
     foldRef.current = fresh;
     setView(fresh.view());
-  }, []);
+  }, [lang]);
 
   useEffect(() => {
     eventsRef.current = [];
-    foldRef.current = createThreadFold();
+    foldRef.current = createThreadFold(lang);
     firstSeqRef.current = 0;
     lastSeqRef.current = 0;
     runPrefixRef.current = [];
@@ -133,6 +186,8 @@ export function useSessionThread(sessionId: string | null): SessionThread {
     skillsReqRef.current += 1; // a fetch of the previous session may not answer
     usageReqRef.current += 1;
     contextReqRef.current += 1;
+    visionReqRef.current += 1;
+    threadReqRef.current += 1;
     setView(EMPTY);
     setHasMore(false);
     setSkills(null);
@@ -140,6 +195,8 @@ export function useSessionThread(sessionId: string | null): SessionThread {
     setCalls(new Map());
     setWorkflowUsage({ nodes: [], runs: [] });
     setContext(null);
+    setVision([]);
+    setServed(EMPTY_SERVED);
     if (!sessionId) return;
 
     let cancelled = false;
@@ -162,6 +219,18 @@ export function useSessionThread(sessionId: string | null): SessionThread {
         || event.type === 'workflow.finished') refreshUsage();
       // A round measures the context; a replay cuts the model's view.
       if (event.type === 'context.state' || event.type === 'session.rewound') refreshContext();
+      // An image came in, or the model's view was cut: the Vision block's
+      // inContext flags can only change then.
+      if ((event.type === 'tool.result'
+        && String(data.result?.metadata?.mimeType ?? '').startsWith('image/'))
+        || (event.type === 'message.start' && data.attachments?.length)
+        || event.type === 'context.compacted'
+        || event.type === 'session.rewound') {
+        refreshVision();
+      }
+      // The pending blocks change on their own events, when a turn starts or
+      // ends (an open call closed), and when the model's view is cut.
+      if (PENDING_CUES.has(event.type)) refreshThread();
       if ((event.type === 'message.start' && data.role === 'user')
         || event.type === 'context.compacted'
         || event.type === 'session.rewound') {
@@ -211,6 +280,8 @@ export function useSessionThread(sessionId: string | null): SessionThread {
         refreshSkills();
         refreshUsage();
         refreshContext();
+        refreshVision();
+        refreshThread();
         setHasMore(page.length > 0 && page[0].seq > 1);
         openStream(lastSeqRef.current);
         if (page.length > 0 && page[0].seq > 1) {
@@ -235,7 +306,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
       source?.close();
       cancelAnimationFrame(frame);
     };
-  }, [sessionId, foldAll, refreshSkills, refreshUsage, refreshContext]);
+  }, [sessionId, lang, foldAll, refreshSkills, refreshUsage, refreshContext, refreshVision, refreshThread]);
 
   // Returns true when the view was updated, so the caller knows whether a
   // scroll restore is armed for the upcoming view change.
@@ -264,5 +335,5 @@ export function useSessionThread(sessionId: string | null): SessionThread {
     }
   }, [sessionId, loadingOlder, foldAll, refreshSkills]);
 
-  return { view, hasMore, loadingOlder, loadOlder, skills, usage, calls, workflowUsage, context };
+  return { view, hasMore, loadingOlder, loadOlder, skills, usage, calls, workflowUsage, context, vision, served };
 }

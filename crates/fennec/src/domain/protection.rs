@@ -1,12 +1,24 @@
-//! fennec's own protected files (openfox has no protected files): what the
-//! human protects from the model, the guardian of fennec's definition, first
-//! part. Patterns are gitignore-like.
+//! Protected files: what the human protects from the model, the guardian of
+//! fennec's definition, first part. Patterns are gitignore-like.
 
-/// Always protected, whatever the project lists: fennec's own definitions
-/// (agents, skills, workflows, this list), the instructions, the lockfiles
-/// (a new dependency is the human's decision), the CI and the accepted ADRs
+/// Lockfiles: protected by default in the human's directory, writable in a
+/// session worktree so an agent can add a dependency; the integration gate
+/// still shows them because it loads the project's protection.
+pub const LOCKFILES: [&str; 4] = [
+    "Cargo.lock",
+    "package-lock.json",
+    "yarn.lock",
+    "pnpm-lock.yaml",
+];
+
+/// Always protected in the human's own directory, whatever the project lists:
+/// fennec's own definitions (agents, skills, workflows, this list), the
+/// instructions, the lockfiles (a new dependency is the human's decision; in
+/// a session worktree they are writable and the integration gate still shows
+/// them), the CI and the release configuration, the git hooks (they run
+/// outside the sandbox on the human's next push), and the accepted ADRs
 /// (`docs/adr`: an agent proposes a decision, it never rewrites one).
-pub const DEFAULT_PATTERNS: [&str; 10] = [
+pub const DEFAULT_PATTERNS: [&str; 13] = [
     ".agents",
     "AGENTS.md",
     "CLAUDE.md",
@@ -16,21 +28,42 @@ pub const DEFAULT_PATTERNS: [&str; 10] = [
     "pnpm-lock.yaml",
     ".github",
     ".gitlab-ci.yml",
+    "release-please-config.json",
+    ".release-please-manifest.json",
+    ".githooks",
     "docs/adr",
 ];
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Protection {
     patterns: Vec<String>,
+    exempt: Vec<String>,
 }
 
 impl Protection {
     /// The defaults plus the lines of the project's `.agents/protected`
     /// (`content`; None when absent).
     pub fn new(content: Option<&str>) -> Protection {
-        let mut patterns = DEFAULT_PATTERNS
+        Self::build(&DEFAULT_PATTERNS, content)
+    }
+
+    /// The defaults without the lockfiles, plus the lines of the project's
+    /// `.agents/protected` (`content`; None when absent). Used in a session
+    /// worktree, where a new dependency may change a lockfile; the integration
+    /// gate still shows it because it loads the project's protection.
+    pub fn for_worktree(content: Option<&str>) -> Protection {
+        let defaults: Vec<&str> = DEFAULT_PATTERNS
             .iter()
-            .filter_map(|pattern| normalize_pattern(pattern))
+            .filter(|pattern| !LOCKFILES.contains(pattern))
+            .copied()
+            .collect();
+        Self::build(&defaults, content)
+    }
+
+    fn build(defaults: &[&str], content: Option<&str>) -> Protection {
+        let mut patterns = defaults
+            .iter()
+            .filter_map(|pattern| rules::path::normalize(pattern))
             .collect::<Vec<_>>();
 
         if let Some(content) = content {
@@ -47,13 +80,48 @@ impl Protection {
                     continue;
                 }
 
-                if let Some(pattern) = normalize_pattern(line) {
+                if let Some(pattern) = rules::path::normalize(line) {
                     patterns.push(pattern);
                 }
             }
         }
 
-        Protection { patterns }
+        Protection {
+            patterns,
+            exempt: Vec::new(),
+        }
+    }
+
+    /// Only these patterns, no defaults.
+    #[cfg(test)]
+    pub fn only(patterns: &[String]) -> Protection {
+        let patterns = patterns
+            .iter()
+            .filter_map(|pattern| rules::path::normalize(pattern))
+            .collect();
+        Protection {
+            patterns,
+            exempt: Vec::new(),
+        }
+    }
+
+    /// These patterns on top: the human's blocking path rules, so the file tools refuse
+    /// them and the sandbox mounts them read-only like any protected file.
+    pub fn with_patterns(mut self, patterns: &[String]) -> Protection {
+        self.patterns.extend(
+            patterns
+                .iter()
+                .filter_map(|pattern| rules::path::normalize(pattern)),
+        );
+        self
+    }
+
+    /// These exact paths are exempt from protection for the session (a granted
+    /// waiver). The sandbox's read-only mounts come from the same `Protection`,
+    /// so commands can write them too.
+    pub fn exempting(mut self, paths: &[String]) -> Protection {
+        self.exempt.extend(paths.iter().cloned());
+        self
     }
 
     /// `relative`: a path relative to the project root, `/`-separated, no
@@ -63,130 +131,34 @@ impl Protection {
             return false;
         }
 
-        let path_segments = split_segments(relative);
-        for pattern in &self.patterns {
-            // A directory pattern protects everything under it: match the path
-            // itself and every ancestor directory.
-            for length in 1..=path_segments.len() {
-                if pattern_matches(pattern, &path_segments[..length]) {
-                    return true;
-                }
-            }
-        }
-
-        false
-    }
-}
-
-fn normalize_pattern(pattern: &str) -> Option<String> {
-    let pattern = pattern.trim();
-    if pattern.is_empty() || pattern.starts_with('#') || pattern.starts_with('!') {
-        return None;
-    }
-
-    // A trailing `/` is dropped: a directory pattern protects everything under
-    // it anyway. A leading `/` is kept because it anchors the pattern.
-    let pattern = pattern.strip_suffix('/').unwrap_or(pattern);
-    if pattern.is_empty() {
-        None
-    } else {
-        Some(pattern.to_string())
-    }
-}
-
-fn split_segments(path: &str) -> Vec<&str> {
-    path.split('/')
-        .filter(|segment| !segment.is_empty())
-        .collect()
-}
-
-fn pattern_matches(pattern: &str, path_segments: &[&str]) -> bool {
-    let anchored = pattern.starts_with('/') || pattern.contains('/');
-    let body = pattern.strip_prefix('/').unwrap_or(pattern);
-    let pattern_segments = split_segments(body);
-    if pattern_segments.is_empty() {
-        return false;
-    }
-
-    let full_segments: Vec<&str> = if anchored {
-        pattern_segments
-    } else {
-        let mut full_segments = Vec::with_capacity(pattern_segments.len() + 1);
-        full_segments.push("**");
-        full_segments.extend(pattern_segments);
-        full_segments
-    };
-
-    match_segments(&full_segments, path_segments)
-}
-
-fn match_segments(pattern: &[&str], path: &[&str]) -> bool {
-    if pattern.is_empty() {
-        return path.is_empty();
-    }
-
-    if pattern[0] == "**" {
-        // `**` as a whole segment matches zero or more path segments.
-        if match_segments(&pattern[1..], path) {
-            return true;
-        }
-        if !path.is_empty() && match_segments(pattern, &path[1..]) {
-            return true;
-        }
-        return false;
-    }
-
-    if path.is_empty() {
-        return false;
-    }
-
-    if segment_matches(pattern[0], path[0]) {
-        match_segments(&pattern[1..], &path[1..])
-    } else {
-        false
-    }
-}
-
-fn segment_matches(pattern: &str, text: &str) -> bool {
-    let pattern: Vec<char> = pattern.chars().collect();
-    let text: Vec<char> = text.chars().collect();
-    glob_match(&pattern, &text)
-}
-
-fn glob_match(pattern: &[char], text: &[char]) -> bool {
-    let mut pattern_index = 0;
-    let mut text_index = 0;
-    let mut star_pattern_index = None;
-    let mut star_text_index = 0;
-
-    while text_index < text.len() {
-        if pattern_index < pattern.len()
-            && (pattern[pattern_index] == '?' || pattern[pattern_index] == text[text_index])
-        {
-            pattern_index += 1;
-            text_index += 1;
-        } else if pattern_index < pattern.len() && pattern[pattern_index] == '*' {
-            star_pattern_index = Some(pattern_index);
-            star_text_index = text_index;
-            pattern_index += 1;
-        } else if let Some(star) = star_pattern_index {
-            pattern_index = star + 1;
-            star_text_index += 1;
-            text_index = star_text_index;
-        } else {
+        if self.exempt.iter().any(|path| path == relative) {
             return false;
         }
-    }
 
-    while pattern_index < pattern.len() && pattern[pattern_index] == '*' {
-        pattern_index += 1;
+        self.patterns
+            .iter()
+            .any(|pattern| rules::path::covers(pattern, relative))
     }
-
-    pattern_index == pattern.len()
 }
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn only_uses_only_the_given_patterns() {
+        let protection = Protection::only(&["secrets/".to_string()]);
+        assert!(protection.is_protected("secrets/a.txt"));
+        assert!(!protection.is_protected("src/a.rs"));
+    }
+
+    #[test]
+    fn with_patterns_adds_patterns_to_existing_protection() {
+        let protection =
+            Protection::only(&["base/".to_string()]).with_patterns(&["extra/".to_string()]);
+        assert!(protection.is_protected("base/a.txt"));
+        assert!(protection.is_protected("extra/a.txt"));
+        assert!(!protection.is_protected("other/a.txt"));
+    }
+
     use super::*;
 
     #[test]
@@ -200,6 +172,8 @@ mod tests {
             "Cargo.lock",
             "crates/x/Cargo.lock",
             ".github/workflows/ci.yml",
+            ".githooks/pre-push",
+            "release-please-config.json",
             "AGENTS.md",
             "sub/AGENTS.md",
         ] {
@@ -269,5 +243,35 @@ mod tests {
         let protection = Protection::new(Some("!Cargo.lock\n"));
 
         assert!(protection.is_protected("Cargo.lock"));
+    }
+
+    #[test]
+    fn worktree_allows_lockfiles_but_keeps_other_defaults() {
+        let protection = Protection::for_worktree(None);
+
+        assert!(!protection.is_protected("Cargo.lock"));
+        assert!(!protection.is_protected("web/package-lock.json"));
+        assert!(!protection.is_protected("yarn.lock"));
+        assert!(!protection.is_protected("pnpm-lock.yaml"));
+
+        for protected in [".agents/x", "AGENTS.md", ".github/workflows/ci.yml"] {
+            assert!(protection.is_protected(protected), "{protected}");
+        }
+    }
+
+    #[test]
+    fn worktree_keeps_a_lockfile_listed_by_the_project() {
+        let protection = Protection::for_worktree(Some("Cargo.lock\n"));
+
+        assert!(protection.is_protected("Cargo.lock"));
+    }
+
+    #[test]
+    fn exempting_exempts_the_exact_path_only() {
+        let protection = Protection::new(None).exempting(&["AGENTS.md".to_string()]);
+
+        assert!(!protection.is_protected("AGENTS.md"));
+        assert!(protection.is_protected("sub/AGENTS.md"));
+        assert!(protection.is_protected(".agents/agents/builder.agent.md"));
     }
 }

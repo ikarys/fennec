@@ -6,13 +6,15 @@ import {
   type ChangeEvent,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
-import { listFolders, type FolderListing } from '../../lib/api';
+import { useT } from '../../i18n';
+import { createFolder, listFolders, type FolderListing } from '../../lib/api';
 import { CloseIcon } from '../Icons';
 import { FolderList } from './FolderList';
 import { PathBreadcrumb } from './PathBreadcrumb';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { TextInput } from '../ui/Field';
+import { Modal } from '../ui/Modal';
 
 interface ProjectDialogProps {
   open: boolean;
@@ -23,12 +25,16 @@ interface ProjectDialogProps {
 }
 
 export function ProjectDialog({ open, submitting, error, onClose, onSubmit }: ProjectDialogProps) {
+  const t = useT();
   const [listing, setListing] = useState<FolderListing | null>(null);
   const [pathInput, setPathInput] = useState('');
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [showHidden, setShowHidden] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [newName, setNewName] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const requestRef = useRef(0);
 
   const load = useCallback(async (target?: string) => {
@@ -45,7 +51,7 @@ export function ProjectDialog({ open, submitting, error, onClose, onSubmit }: Pr
       setSelectedPath(null);
     } catch (err) {
       if (requestId !== requestRef.current) return;
-      setLoadError(err instanceof Error ? err.message : 'Impossible de lire le dossier');
+      setLoadError(err instanceof Error ? err.message : t('cannotReadFolder'));
     } finally {
       if (requestId === requestRef.current) setLoading(false);
     }
@@ -59,23 +65,15 @@ export function ProjectDialog({ open, submitting, error, onClose, onSubmit }: Pr
     setSelectedPath(null);
     setShowHidden(false);
     setLoadError(null);
+    setNewName('');
+    setCreateError(null);
+    setCreating(false);
     setLoading(true);
     load();
 
     const timer = window.setTimeout(() => document.getElementById('project-dialog-path')?.focus(), 0);
     return () => window.clearTimeout(timer);
   }, [open, load]);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const handleWindowKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-
-    window.addEventListener('keydown', handleWindowKeyDown);
-    return () => window.removeEventListener('keydown', handleWindowKeyDown);
-  }, [open, onClose]);
 
   if (!open) return null;
 
@@ -89,6 +87,25 @@ export function ProjectDialog({ open, submitting, error, onClose, onSubmit }: Pr
 
   const navigateTo = (path: string) => {
     load(path);
+  };
+
+  const handleCreate = async () => {
+    if (creating) return;
+    const name = newName.trim();
+    if (!currentPath || !name) return;
+    setCreating(true);
+    setCreateError(null);
+    try {
+      const created = await createFolder(currentPath, name);
+      // onSubmit never throws (it owns its error state): awaiting it keeps
+      // `creating` true through the open, so a failure there re-enables the
+      // button instead of a stray double-create.
+      await onSubmit(created.path);
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : t('cannotCreateFolder'));
+    } finally {
+      setCreating(false);
+    }
   };
 
   const handlePathKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
@@ -110,22 +127,14 @@ export function ProjectDialog({ open, submitting, error, onClose, onSubmit }: Pr
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Ouvrir un projet"
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <Card className="flex max-h-[85vh] w-full max-w-2xl flex-col shadow-2xl">
+    <Modal open={open} onClose={onClose} busy={submitting} label={t('openProject')} width="w-[min(92vw,672px)]">
+      <Card className="flex max-h-[85vh] w-full flex-col">
         <header className="flex shrink-0 items-start justify-between gap-3 border-b border-border p-4">
           <div className="flex min-w-0 flex-col gap-1">
-            <h2 className="truncate text-base font-semibold text-text">Ouvrir un projet</h2>
-            <p className="truncate text-sm text-muted">Choisissez le dossier du projet.</p>
+            <h2 className="truncate text-base font-semibold text-text">{t('openProject')}</h2>
+            <p className="truncate text-sm text-muted">{t('chooseFolder')}</p>
           </div>
-          <Button variant="secondary" size="sm" iconOnly onClick={onClose} aria-label="Fermer">
+          <Button variant="secondary" size="sm" iconOnly onClick={onClose} aria-label={t('close')}>
             <CloseIcon className="h-4 w-4" />
           </Button>
         </header>
@@ -133,7 +142,7 @@ export function ProjectDialog({ open, submitting, error, onClose, onSubmit }: Pr
         <div className="flex shrink-0 flex-col gap-3 border-b border-border p-4">
           <div className="flex items-center gap-2">
             <label htmlFor="project-dialog-path" className="sr-only">
-              Chemin du dossier
+              {t('folderPathAria')}
             </label>
             <TextInput
               id="project-dialog-path"
@@ -147,7 +156,7 @@ export function ProjectDialog({ open, submitting, error, onClose, onSubmit }: Pr
               variant="secondary"
               size="sm"
               iconOnly
-              aria-label="Dossier parent"
+              aria-label={t('parentFolderAria')}
               disabled={!listing?.parent}
               onClick={() => {
                 if (listing?.parent) navigateTo(listing.parent);
@@ -166,7 +175,7 @@ export function ProjectDialog({ open, submitting, error, onClose, onSubmit }: Pr
               onChange={handleShowHiddenChange}
               className="h-4 w-4 rounded border-border bg-raised text-accent"
             />
-            Afficher les dossiers cachés
+            {t('showHiddenFolders')}
           </label>
         </div>
 
@@ -180,19 +189,46 @@ export function ProjectDialog({ open, submitting, error, onClose, onSubmit }: Pr
             onSelect={setSelectedPath}
             onOpen={navigateTo}
           />
+
+          <div className="mt-3 flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <label htmlFor="project-dialog-new-name" className="shrink-0 text-sm text-muted">
+                {t('newProject')}
+              </label>
+              <TextInput
+                id="project-dialog-new-name"
+                value={newName}
+                onChange={(event) => setNewName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') handleCreate();
+                }}
+                placeholder={t('folderNamePlaceholder')}
+                className="min-w-0 flex-1"
+              />
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={creating || !currentPath || newName.trim().length === 0}
+                onClick={handleCreate}
+              >
+                {creating ? t('creating') : t('createAndOpen')}
+              </Button>
+            </div>
+            {createError && <div className="text-sm text-err">{createError}</div>}
+          </div>
         </div>
 
         <footer className="flex shrink-0 flex-col gap-3 border-t border-border p-4">
           {error && <div className="text-sm text-err">{error}</div>}
           <div className="flex items-center gap-2 text-sm text-muted">
-            <span className="shrink-0">Dossier :</span>
+            <span className="shrink-0">{t('folderLabel')}</span>
             <span className="min-w-0 truncate font-mono text-text" title={targetPath}>
               {targetPath || '—'}
             </span>
           </div>
           <div className="flex flex-wrap justify-end gap-2">
             <Button variant="secondary" size="sm" onClick={onClose}>
-              Annuler
+              {t('cancel')}
             </Button>
             <Button
               variant="primary"
@@ -202,11 +238,11 @@ export function ProjectDialog({ open, submitting, error, onClose, onSubmit }: Pr
                 if (targetPath) onSubmit(targetPath);
               }}
             >
-              {submitting ? 'Ouverture…' : 'Ouvrir ce dossier'}
+              {submitting ? t('opening') : t('openThisFolder')}
             </Button>
           </div>
         </footer>
       </Card>
-    </div>
+    </Modal>
   );
 }

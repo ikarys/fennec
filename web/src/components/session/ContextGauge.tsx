@@ -1,6 +1,8 @@
 import type { ContextView } from '../../lib/api';
+import { CompressIcon } from '../Icons';
 import { Button } from '../ui/Button';
 import { ContextComposition } from './ContextComposition';
+import { useT } from '../../i18n';
 
 interface ContextGaugeProps {
   /** Computed by the server; null until the first fetch. */
@@ -17,11 +19,12 @@ const TONE_CLASS: Record<ContextView['tone'], string> = {
 };
 
 export function ContextGauge({ context, compactDisabled, onCompact, compactError }: ContextGaugeProps) {
+  const t = useT();
   const percent = context?.percent ?? 0;
   return (
     <div
       role="meter"
-      aria-label="Contexte du modèle"
+      aria-label={t('contextOfModel')}
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={percent}
@@ -35,11 +38,11 @@ export function ContextGauge({ context, compactDisabled, onCompact, compactError
             <span aria-hidden className="absolute inset-y-0 w-px bg-text/60" style={{ left: `${context.compactMark}%` }} />
           )}
         </div>
-        <span className="text-xs text-muted tabular-nums whitespace-nowrap">{context?.line ?? '…'}</span>
+        <span className="text-xs text-muted tabular-nums whitespace-nowrap" title={context?.title}>{context?.line ?? '…'}</span>
         {context && (
           <div
             role="tooltip"
-            className="invisible absolute top-full left-0 z-30 mt-2 flex w-96 flex-col gap-3 rounded-xl border border-border-strong bg-panel p-4 opacity-0 shadow-2xl transition-opacity duration-150 group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100"
+            className="invisible absolute top-full left-0 z-30 mt-2 flex w-96 flex-col gap-3 rounded-lg border border-border-strong bg-panel p-4 opacity-0 shadow-float transition-opacity duration-150 group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100"
           >
             <p className="m-0 text-xs text-muted">{context.title}</p>
             {context.composition && <ContextComposition composition={context.composition} />}
@@ -49,13 +52,15 @@ export function ContextGauge({ context, compactDisabled, onCompact, compactError
       <Button
         variant="secondary"
         size="sm"
+        iconOnly
         disabled={compactDisabled}
         onClick={onCompact}
-        title="Résumer la conversation pour libérer le contexte"
+        title={t('compactTitle')}
+        aria-label={t('compact')}
       >
-        Compacter
+        <CompressIcon className="h-4 w-4" />
       </Button>
-      {compactError && <span className="text-xs text-err" title={compactError}>échec</span>}
+      {compactError && <span className="text-xs text-err" title={compactError}>{t('failure')}</span>}
     </div>
   );
 }

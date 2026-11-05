@@ -1,15 +1,14 @@
 //! The `ask_user` tool, owned by the loop: it pauses the turn to ask the
-//! human a question. Port of openfox `tools/ask.ts` and
-//! `shared/ask-options.ts`. The in-memory promise machinery is not ported —
-//! fennec ends the turn with `waiting_for_user` and the answer arrives as
-//! the next turn's input, so a pending question survives a restart.
+//! human a question. It has no in-memory promise machinery: fennec ends
+//! the turn with `waiting_for_user` and the answer arrives as the next
+//! turn's input, so a pending question survives a restart.
 
-use crate::domain::event::{AskType, ChoiceOption};
+use crate::domain::event::{AskType, ChoiceOption, OptionTone};
 use serde_json::{Value, json};
 
 pub const NAME: &str = "ask_user";
 
-/// The OpenAI tool definition, copied from openfox `tools/ask.ts`.
+/// The OpenAI tool definition.
 pub fn definition() -> Value {
     json!({
         "type": "function",
@@ -30,7 +29,7 @@ pub fn definition() -> Value {
                     },
                     "options": {
                         "type": "array",
-                        "description": "Options for choice-type questions. Each entry may be a plain string or an object {value, label, description?} (or legacy {label, description?}). The server normalizes everything to {value, label, description?}.",
+                        "description": "Options for choice-type questions. Each entry may be a plain string or an object {value, label, description?, tone?} (or legacy {label, description?}). Mark the refuse/cancel option with tone \"danger\" so it is shown in red. The server normalizes everything to {value, label, description?, tone?}.",
                         "items": {
                             "oneOf": [
                                 { "type": "string" },
@@ -40,6 +39,11 @@ pub fn definition() -> Value {
                                         "value": { "type": "string" },
                                         "label": { "type": "string" },
                                         "description": { "type": "string" },
+                                        "tone": {
+                                            "type": "string",
+                                            "enum": ["danger"],
+                                            "description": "Render this option as a danger (red) action. Use it for the refuse/cancel option.",
+                                        },
                                     },
                                     "required": ["label"],
                                 },
@@ -93,11 +97,11 @@ fn parse_ask_type(s: &str) -> AskType {
     }
 }
 
-/// Port of openfox `normalizeAskOptions`: coerce whatever the model handed
-/// us into the canonical `ChoiceOption[]` shape. A string entry becomes
-/// `{value: s, label: s}`; an object requires a non-empty string `label`
-/// (else it is skipped), `value` defaults to `label`, `description` is kept
-/// when present. An empty or missing list is `None`.
+/// Coerce the model's input into the canonical `ChoiceOption[]` shape.
+/// A string entry becomes `{value: s, label: s}`; an object requires a
+/// non-empty string `label` (else it is skipped), `value` defaults to
+/// `label`, `description` is kept when present. An empty or missing list
+/// is `None`.
 fn normalize_options(raw: &Value) -> Option<Vec<ChoiceOption>> {
     match raw {
         Value::Null => None,
@@ -127,6 +131,7 @@ fn option_from_string(s: &str) -> ChoiceOption {
         value: trimmed.to_string(),
         label: trimmed.to_string(),
         description: None,
+        tone: None,
     }
 }
 
@@ -147,10 +152,16 @@ fn option_from_object(obj: &serde_json::Map<String, Value>) -> Option<ChoiceOpti
         .and_then(Value::as_str)
         .filter(|d| !d.is_empty())
         .map(str::to_string);
+    let tone = obj
+        .get("tone")
+        .and_then(Value::as_str)
+        .filter(|t| *t == "danger")
+        .map(|_| OptionTone::Danger);
     Some(ChoiceOption {
         value,
         label: label.to_string(),
         description,
+        tone,
     })
 }
 
@@ -210,11 +221,13 @@ mod tests {
                     value: "A".into(),
                     label: "A".into(),
                     description: None,
+                    tone: None,
                 },
                 ChoiceOption {
                     value: "B".into(),
                     label: "B".into(),
                     description: None,
+                    tone: None,
                 },
             ])
         );
@@ -238,11 +251,50 @@ mod tests {
                     value: "Continuer".into(),
                     label: "Continuer".into(),
                     description: Some("Reprendre".into()),
+                    tone: None,
                 },
                 ChoiceOption {
                     value: "stop".into(),
                     label: "Annuler".into(),
                     description: Some("Stopper".into()),
+                    tone: None,
+                },
+            ])
+        );
+    }
+
+    #[test]
+    fn parse_reads_danger_tone_on_options() {
+        let q = parse(&json!({
+            "question": "Pick:",
+            "type": "choice",
+            "options": [
+                {"label": "Accepter"},
+                {"label": "Refuser", "tone": "danger"},
+                {"label": "Indifferent", "tone": "loud"},
+            ],
+        }))
+        .unwrap();
+        assert_eq!(
+            q.options,
+            Some(vec![
+                ChoiceOption {
+                    value: "Accepter".into(),
+                    label: "Accepter".into(),
+                    description: None,
+                    tone: None,
+                },
+                ChoiceOption {
+                    value: "Refuser".into(),
+                    label: "Refuser".into(),
+                    description: None,
+                    tone: Some(OptionTone::Danger),
+                },
+                ChoiceOption {
+                    value: "Indifferent".into(),
+                    label: "Indifferent".into(),
+                    description: None,
+                    tone: None,
                 },
             ])
         );
@@ -263,11 +315,13 @@ mod tests {
                     value: "OK".into(),
                     label: "OK".into(),
                     description: None,
+                    tone: None,
                 },
                 ChoiceOption {
                     value: "legacy".into(),
                     label: "legacy".into(),
                     description: None,
+                    tone: None,
                 },
             ])
         );
@@ -291,7 +345,7 @@ mod tests {
     }
 
     #[test]
-    fn definition_matches_openfox() {
+    fn definition_is_stable() {
         let d = definition();
         assert_eq!(d["function"]["name"], "ask_user");
         assert_eq!(d["function"]["parameters"]["required"], json!(["question"]));

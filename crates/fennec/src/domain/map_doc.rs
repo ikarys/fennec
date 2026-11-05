@@ -3,6 +3,7 @@
 //! never edited by hand: a file that differs from a fresh render is stale.
 
 use serde::Serialize;
+use std::collections::{BTreeMap, BTreeSet};
 
 use super::module_map::ModuleMap;
 
@@ -23,6 +24,64 @@ pub fn state(on_disk: Option<&str>, rendered: &str) -> MapFileState {
         Some(text) if text == rendered => MapFileState::Current,
         Some(_) => MapFileState::Stale,
     }
+}
+
+/// The dependency edges a rendered `docs/map.md` declares, by module id.
+///
+/// Only the Mermaid node and edge lines are read; anything else is ignored,
+/// so a hand-edited file can be compared without parsing Markdown.
+pub fn edges(text: &str) -> BTreeSet<(String, String)> {
+    let mut nodes: BTreeMap<usize, String> = BTreeMap::new();
+    let mut raw_edges: BTreeSet<(usize, usize)> = BTreeSet::new();
+
+    for line in text.lines() {
+        let line = line.trim_end();
+        let Some(rest) = line.strip_prefix("  m") else {
+            continue;
+        };
+
+        if let Some((index, label)) = rest.split_once('[') {
+            let Ok(index) = index.parse::<usize>() else {
+                continue;
+            };
+            let Some(label) = label
+                .strip_prefix('"')
+                .and_then(|label| label.strip_suffix("\"]"))
+            else {
+                continue;
+            };
+            nodes.insert(index, label.replace("#quot;", "\""));
+            continue;
+        }
+
+        let Some(separator) = rest.find(" -->|") else {
+            continue;
+        };
+        let Ok(from) = rest[..separator].parse::<usize>() else {
+            continue;
+        };
+        let after_label = &rest[separator + " -->|".len()..];
+        let Some(pipe) = after_label.find('|') else {
+            continue;
+        };
+        let target = after_label[pipe + 1..].trim_start();
+        let Some(target) = target.strip_prefix('m') else {
+            continue;
+        };
+        let Ok(to) = target.parse::<usize>() else {
+            continue;
+        };
+        raw_edges.insert((from, to));
+    }
+
+    raw_edges
+        .into_iter()
+        .filter_map(|(from, to)| {
+            let from = nodes.get(&from)?;
+            let to = nodes.get(&to)?;
+            Some((from.clone(), to.clone()))
+        })
+        .collect()
 }
 
 pub fn render(map: &ModuleMap) -> String {
@@ -62,8 +121,9 @@ pub fn render(map: &ModuleMap) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::render;
+    use super::{edges, render};
     use crate::domain::module_map::{Dependency, Module, ModuleMap};
+    use std::collections::BTreeSet;
 
     fn module(id: &str, files: usize, tests: usize, entry: bool) -> Module {
         Module {
@@ -152,5 +212,33 @@ graph LR
 | `a` | 1 | 0 |  |  |
 "#
         );
+    }
+
+    #[test]
+    fn reads_edges_from_rendered_map() {
+        let map = ModuleMap {
+            modules: vec![
+                module("crates/fennec/src", 14, 12, true),
+                module("crates/fennec/src/domain", 29, 27, false),
+            ],
+            dependencies: vec![Dependency {
+                from: "crates/fennec/src".into(),
+                to: "crates/fennec/src/domain".into(),
+                imports: 12,
+                ..Default::default()
+            }],
+            groups: vec![],
+        };
+        let expected = BTreeSet::from([(
+            "crates/fennec/src".to_string(),
+            "crates/fennec/src/domain".to_string(),
+        )]);
+
+        assert_eq!(edges(&render(&map)), expected);
+    }
+
+    #[test]
+    fn reads_no_edges_from_empty_map() {
+        assert!(edges("# Project map\n\nNo source files found.\n").is_empty());
     }
 }

@@ -1,38 +1,26 @@
 //! The JSON API (contract: `docs/api.md`) and the UI's pages.
+//!
+//! A thin dispatcher: each route points at the module that owns it. The
+//! session, project and folder handlers live in `session_routes`.
 
 use super::App;
-use super::editor;
+use super::agent_routes;
+use super::agents_md_routes;
+use super::audit_routes;
 use super::http::{Request, error, send, send_json};
-use super::notifier::NotifyingLog;
+use super::proposal_routes;
 use super::{
-    assets,
-    context_view::context_view,
-    event_stream, integration, model_routes, project_routes, session_name,
-    session_usage::{SessionUsageView, call_views},
-    settings_routes,
-    turns::Job,
-    workflow_routes, workflow_usage,
+    assets, backlog_routes, budget_routes, canvas_routes, contribution_routes, event_stream,
+    file_manager, folder_routes, idea_routes, indicator_routes, integration, mcp_routes,
+    model_routes, plugin_routes, project_dashboard, project_delete, project_list_routes,
+    project_routes, rule_approval_routes, rule_bridge_routes, rule_routes, servers, session_delete,
+    session_routes, settings_routes, terminal, waiver_routes, workflow_routes, worktree_routes,
 };
-use crate::agent::ports::EventLog;
-use crate::agent::workflow::WorkflowJob;
-use crate::agents;
-use crate::domain::agent::{resolve as agent_resolve, switch_to};
-use crate::domain::attachment::{Attachment, from_data_url};
-use crate::domain::event::Event;
-use crate::domain::id::new_id;
-use crate::domain::preferences::ModelRef;
-use crate::domain::project::{Project, SessionSummary};
-use crate::domain::replay::replayable;
-use crate::domain::slash::{TurnInput, commands, resolve};
-use crate::domain::workflow::run::Waiting;
-use crate::skills;
-use crate::store::SqliteStore;
-use crate::{folders, git, workflows};
-use serde_json::{Value, json};
+use serde_json::json;
 use std::net::TcpStream;
-use std::path::Path;
+use std::sync::Arc;
 
-pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
+pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
     let segments: Vec<&str> = req.path.trim_matches('/').split('/').collect();
     match (req.method.as_str(), segments.as_slice()) {
         ("GET", ["api", "config"]) => {
@@ -45,8 +33,14 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
                 &json!({ "model": params.model, "contextWindow": params.context_window, "compactAt": params.compact_at }),
             )
         }
+        ("GET", ["api", "version"]) => send_json(
+            stream,
+            200,
+            &json!({ "version": env!("CARGO_PKG_VERSION") }),
+        ),
         ("GET", ["api", "settings"]) => settings_routes::get_settings(app, stream),
         ("GET", ["api", "insight"]) => super::insight::serve(app, req, stream),
+        ("GET", ["api", "notices"]) => super::notice_stream::serve(app, stream),
         ("POST", ["api", "settings"]) => settings_routes::save_settings(app, req, stream),
         ("POST", ["api", "settings", "providers", "list"]) => {
             settings_routes::list_provider(app, req, stream)
@@ -54,17 +48,83 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
         ("POST", ["api", "settings", "models", "probe"]) => {
             settings_routes::probe_model(app, req, stream)
         }
+        ("POST", ["api", "settings", "mcp", "connect"]) => mcp_routes::connect(app, req, stream),
         ("GET", ["api", "models", "choices"]) => model_routes::choices(app, stream),
-        ("GET", ["api", "folders"]) => list_folders(req, stream),
-        ("GET", ["api", "projects"]) => list_projects(app, stream),
-        ("POST", ["api", "projects"]) => open_project(app, req, stream),
-        ("GET", ["api", "projects", id, "commands"]) => list_commands(app, stream, id),
-        ("GET", ["api", "projects", id, "agents"]) => list_agents(app, stream, id),
+        ("GET", ["api", "folders"]) => folder_routes::list_folders(app, req, stream),
+        ("POST", ["api", "folders", "create"]) => folder_routes::create_folder(req, stream),
+        ("GET", ["api", "projects"]) => project_list_routes::list_projects(app, stream),
+        ("GET", ["api", "backlog"]) => backlog_routes::list_backlog(app, stream),
+        ("POST", ["api", "projects"]) => project_list_routes::open_project(app, req, stream),
+        ("GET", ["api", "projects", id, "commands"]) => {
+            project_list_routes::list_commands(app, stream, id)
+        }
+        ("GET", ["api", "projects", id, "agents"]) => {
+            project_list_routes::list_agents(app, stream, id)
+        }
         ("GET", ["api", "projects", id, "overview"]) => {
             project_routes::get_overview(app, stream, id)
         }
+        ("GET", ["api", "projects", id, "dashboard"]) => project_dashboard::serve(app, stream, id),
+        ("GET", ["api", "projects", id, "docs"]) => project_routes::get_docs(app, stream, id),
+        ("GET", ["api", "projects", id, "risks"]) => project_routes::get_risks(app, stream, id),
+        ("GET", ["api", "projects", id, "worktrees"]) => {
+            worktree_routes::list(app, req, stream, id)
+        }
+        ("GET", ["api", "worktrees"]) => worktree_routes::summary(app, stream),
+        ("POST", ["api", "worktrees", "clean"]) => worktree_routes::clean(app, req, stream),
+        ("POST", ["api", "worktrees", "remove-orphan"]) => {
+            worktree_routes::remove_orphan(app, req, stream)
+        }
+        ("GET", ["api", "agents"]) => agent_routes::list(app, req, stream),
+        ("POST", ["api", "agents"]) => agent_routes::save(app, req, stream),
+        ("GET", ["api", "agents", id]) => agent_routes::get(stream, id),
+        ("POST", ["api", "agents", id, "delete"]) => agent_routes::delete(app, req, stream, id),
+        ("GET", ["api", "rules"]) => rule_routes::list(app, stream),
+        ("POST", ["api", "rules"]) => rule_routes::add(app, req, stream),
+        ("POST", ["api", "rules", id, "delete"]) => rule_routes::delete(app, stream, id),
+        ("GET", ["api", "projects", id, "rules"]) => rule_routes::list_project(app, stream, id),
+        ("GET", ["api", "projects", id, "ideas"]) => idea_routes::list_ideas(app, stream, id),
+        ("POST", ["api", "projects", id, "ideas"]) => idea_routes::add_idea(app, req, stream, id),
+        ("POST", ["api", "projects", id, "ideas", "queue", "start"]) => {
+            idea_routes::start_queue(app, req, stream, id)
+        }
+        ("POST", ["api", "projects", id, "ideas", "queue", "stop"]) => {
+            idea_routes::stop_queue(app, stream, id)
+        }
+        ("POST", ["api", "projects", id, "ideas", "reorder"]) => {
+            idea_routes::reorder(app, req, stream, id)
+        }
+        ("POST", ["api", "projects", id, "ideas", "report", "read"]) => {
+            idea_routes::report_read(app, stream, id)
+        }
+        ("POST", ["api", "projects", id, "ideas", iid, "start"]) => {
+            idea_routes::start_one(app, stream, id, iid)
+        }
+        ("POST", ["api", "projects", id, "ideas", iid, action]) => {
+            idea_routes::update_idea(app, req, stream, id, iid, action)
+        }
         ("POST", ["api", "projects", id, "map-file"]) => {
             project_routes::write_map_file(app, stream, id)
+        }
+        ("POST", ["api", "projects", id, "delete"]) => {
+            project_delete::delete_project(app, req, stream, id)
+        }
+        ("POST", ["api", "projects", id, "favorite"]) => {
+            project_list_routes::set_favorite(app, req, stream, id)
+        }
+        ("GET", ["api", "projects", id, "budget"]) => budget_routes::get(app, stream, id),
+        ("POST", ["api", "projects", id, "budget"]) => budget_routes::set(app, req, stream, id),
+        ("GET", ["api", "projects", id, "indicators"]) => indicator_routes::serve(app, stream, id),
+        ("GET", ["api", "projects", id, "contributions"]) => {
+            contribution_routes::list(app, stream, id)
+        }
+        ("POST", ["api", "projects", id, "contributions"]) => {
+            contribution_routes::adopt(app, req, stream, id)
+        }
+        ("GET", ["api", "plugins"]) => plugin_routes::list(app, stream),
+        ("POST", ["api", "plugins"]) => plugin_routes::set(app, req, stream),
+        ("GET", ["api", "sessions", id, "plugins"]) => {
+            plugin_routes::session_blocks(app, stream, id)
         }
         ("GET", ["api", "projects", id, "workflows"]) => {
             workflow_routes::list_workflows(app, stream, id)
@@ -78,20 +138,63 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
         ("POST", ["api", "workflows", "validate"]) => {
             workflow_routes::validate_workflow_route(app, req, stream)
         }
-        ("POST", ["api", "sessions"]) => create_session(app, req, stream),
-        ("GET", ["api", "sessions", id]) => get_session(app, stream, id),
-        ("GET", ["api", "sessions", id, "skills"]) => serve_skills(app, stream, id),
-        ("GET", ["api", "sessions", id, "usage"]) => serve_usage(app, stream, id),
-        ("GET", ["api", "sessions", id, "context"]) => serve_context(app, stream, id),
-        ("GET", ["api", "sessions", id, "usage", "workflow"]) => {
-            serve_usage_workflow(app, stream, id)
+        ("POST", ["api", "sessions"]) => session_routes::create_session(app, req, stream),
+        ("POST", ["api", "sessions", "delete"]) => {
+            session_delete::delete_sessions(app, req, stream)
         }
-        ("GET", ["api", "sessions", id, "usage", "calls"]) => serve_usage_calls(app, stream, id),
-        ("POST", ["api", "sessions", id, "messages"]) => send_message(app, req, stream, id),
-        ("POST", ["api", "sessions", id, "replay"]) => replay_message(app, req, stream, id),
-        ("POST", ["api", "sessions", id, "compact"]) => compact_session(app, stream, id),
-        ("POST", ["api", "sessions", id, "mode"]) => set_session_mode(app, req, stream, id),
+        ("GET", ["api", "sessions", id]) => session_routes::get_session(app, stream, id),
+        ("GET", ["api", "sessions", id, "skills"]) => session_routes::serve_skills(app, stream, id),
+        ("GET", ["api", "sessions", id, "usage"]) => session_routes::serve_usage(app, stream, id),
+        ("GET", ["api", "sessions", id, "context"]) => {
+            session_routes::serve_context(app, stream, id)
+        }
+        ("GET", ["api", "sessions", id, "vision"]) => session_routes::serve_vision(app, stream, id),
+        ("GET", ["api", "sessions", id, "thread"]) => session_routes::serve_thread(app, stream, id),
+        ("GET", ["api", "sessions", id, "usage", "workflow"]) => {
+            session_routes::serve_usage_workflow(app, stream, id)
+        }
+        ("GET", ["api", "sessions", id, "usage", "calls"]) => {
+            session_routes::serve_usage_calls(app, stream, id)
+        }
+        ("POST", ["api", "sessions", id, "messages"]) => {
+            session_routes::send_message(app, req, stream, id)
+        }
+        ("POST", ["api", "sessions", id, "queue", queue_id, "cancel"]) => {
+            session_routes::cancel_queued(app, stream, id, queue_id)
+        }
+        ("POST", ["api", "sessions", id, "rule-approval"]) => {
+            rule_approval_routes::answer_rule_approval(app, req, stream, id)
+        }
+        ("POST", ["api", "sessions", id, "waiver"]) => {
+            waiver_routes::answer_waiver(app, req, stream, id)
+        }
+        ("POST", ["api", "sessions", id, "replay"]) => {
+            session_routes::replay_message(app, req, stream, id)
+        }
+        ("POST", ["api", "sessions", id, "retry"]) => {
+            session_routes::retry_session(app, stream, id)
+        }
+        ("POST", ["api", "sessions", id, "compact"]) => {
+            session_routes::compact_session(app, stream, id)
+        }
+        ("POST", ["api", "sessions", id, "audit", "tasks"]) => {
+            audit_routes::create_tasks(app, req, stream, id)
+        }
+        ("POST", ["api", "sessions", id, "proposals", call_id, "accept"]) => {
+            proposal_routes::accept(app, stream, id, call_id)
+        }
+        ("POST", ["api", "sessions", id, "agents-md"]) => agents_md_routes::write(app, stream, id),
+        ("POST", ["api", "sessions", id, "architecture-rules"]) => {
+            rule_bridge_routes::add(app, stream, id)
+        }
+        ("POST", ["api", "sessions", id, "mode"]) => {
+            session_routes::set_session_mode(app, req, stream, id)
+        }
         ("POST", ["api", "sessions", id, "model"]) => model_routes::set_model(app, req, stream, id),
+        ("GET", ["api", "sessions", id, "mcp"]) => mcp_routes::session_mcp(app, stream, id),
+        ("POST", ["api", "sessions", id, "mcp"]) => {
+            mcp_routes::set_session_mcp(app, req, stream, id)
+        }
         ("POST", ["api", "sessions", id, "workflow"]) => {
             workflow_routes::start_workflow(app, req, stream, id)
         }
@@ -101,23 +204,50 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
         ("GET", ["api", "sessions", id, "integration"]) => {
             integration::get_integration(app, stream, id)
         }
+        ("POST", ["api", "sessions", id, "integration", "message"]) => {
+            integration::suggest_message(app, stream, id)
+        }
+        ("GET", ["api", "sessions", id, "repo"]) => integration::get_repo(app, stream, id),
         ("POST", ["api", "sessions", id, "integrate"]) => {
             integration::integrate(app, req, stream, id)
         }
         ("POST", ["api", "sessions", id, "discard"]) => integration::discard(app, req, stream, id),
+        ("POST", ["api", "sessions", id, "resolve-conflict"]) => {
+            integration::resolve_conflict(app, req, stream, id)
+        }
+        ("POST", ["api", "sessions", id, "understanding"]) => {
+            integration::start_understanding(app, req, stream, id)
+        }
+        ("POST", ["api", "sessions", id, "terminal"]) => terminal::open(app, stream, id),
+        ("POST", ["api", "sessions", id, "files"]) => file_manager::open(app, stream, id),
+        ("GET", ["api", "sessions", id, "servers"]) => servers::list(app, stream, id),
+        ("POST", ["api", "sessions", id, "servers"]) => servers::save(app, req, stream, id),
+        ("POST", ["api", "sessions", id, "servers", "start"]) => {
+            servers::start(app, req, stream, id)
+        }
+        ("POST", ["api", "sessions", id, "servers", "stop"]) => servers::stop(app, req, stream, id),
         ("POST", ["api", "sessions", id, "stop"]) => {
             app.turns.stop(id);
             send_json(stream, 202, &json!({}))
         }
         ("GET", ["api", "sessions", id, "events"]) => {
             if req.query_param("limit").is_some() {
-                serve_events_page(app, req, stream, id)
+                session_routes::serve_events_page(app, req, stream, id)
             } else {
                 event_stream::serve(&app.store()?, &app.notifier, req, stream, id)
             }
         }
         ("GET", ["api", "sessions", id, "workflow", "run"]) => {
-            serve_run_events(app, req, stream, id)
+            session_routes::serve_run_events(app, req, stream, id)
+        }
+        ("GET", ["api", "sessions", id, "canvas"]) => canvas_routes::list_session(app, stream, id),
+        ("POST", ["api", "sessions", id, "canvas"]) => canvas_routes::create(app, req, stream, id),
+        ("GET", ["api", "projects", id, "canvas"]) => canvas_routes::list_project(app, stream, id),
+        ("GET", ["api", "canvas", id]) => canvas_routes::detail(app, stream, id),
+        ("GET", ["api", "canvas", id, "versions", n]) => canvas_routes::content(app, stream, id, n),
+        ("POST", ["api", "canvas", id, "delete"]) => canvas_routes::delete(app, stream, id),
+        ("POST", ["api", "canvas", id, "annotations"]) => {
+            canvas_routes::annotate(app, req, stream, id)
         }
         ("GET", ["api", "sessions", id, "preview", rest @ ..]) => {
             super::preview::serve(app, stream, id, rest)
@@ -129,540 +259,4 @@ pub fn handle(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), St
         }
         _ => error(stream, 404, "not found"),
     }
-}
-
-fn list_folders(req: &Request, stream: &mut TcpStream) -> Result<(), String> {
-    let dir = req
-        .query_param("path")
-        .filter(|p| !p.is_empty())
-        .map_or_else(folders::home, Into::into);
-    match folders::list(&dir) {
-        Ok(listing) => send_json(stream, 200, &json!(listing)),
-        Err(e) => error(stream, 400, &e),
-    }
-}
-
-fn list_projects(app: &App, stream: &mut TcpStream) -> Result<(), String> {
-    let store = app.store()?;
-    let mut out = Vec::new();
-    for p in store.projects()? {
-        // The log says a workflow ended; git says whether its work still waits.
-        let pending = git::sessions_with_unintegrated_work(Path::new(&p.workdir));
-        let sessions: Vec<Value> = store
-            .sessions(Some(&p.id))?
-            .iter()
-            .map(|s| {
-                let mut v = session_json(app, s);
-                v["awaitingIntegration"] = json!(s.awaiting_integration && pending.contains(&s.id));
-                v
-            })
-            .collect();
-        let mut v = project_json(&p);
-        v["branch"] = json!(git::current_branch(Path::new(&p.workdir)));
-        v["sessions"] = Value::Array(sessions);
-        out.push(v);
-    }
-    send_json(stream, 200, &Value::Array(out))
-}
-
-fn open_project(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
-    let body = req.json()?;
-    let dir = Path::new(body["workdir"].as_str().unwrap_or(""));
-    let Some(dir) = dir.canonicalize().ok().filter(|d| d.is_dir()) else {
-        return error(stream, 400, "not a directory");
-    };
-    let p = app.store()?.project_for(&dir.display().to_string())?;
-    send_json(stream, 200, &project_json(&p))
-}
-
-fn list_commands(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
-    let store = app.store()?;
-    let Some(project) = store.project(id)? else {
-        return error(stream, 404, "no such project");
-    };
-    let list = commands(&skills::discover(Path::new(&project.workdir)));
-    let out: Vec<Value> = list
-        .into_iter()
-        .map(|command| json!({ "name": command.name, "description": command.description }))
-        .collect();
-    send_json(stream, 200, &Value::Array(out))
-}
-
-fn list_agents(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
-    let store = app.store()?;
-    let Some(project) = store.project(id)? else {
-        return error(stream, 404, "no such project");
-    };
-    let list = agents::discover(Path::new(&project.workdir));
-    let out: Vec<Value> = list
-        .iter()
-        .map(|agent| {
-            json!({
-                "id": agent.id,
-                "name": agent.name,
-                "description": agent.description,
-                "color": agent.color,
-                "subagent": agent.subagent,
-            })
-        })
-        .collect();
-    send_json(stream, 200, &Value::Array(out))
-}
-
-pub(super) fn parse_attachments(body: &Value) -> Result<Vec<Attachment>, String> {
-    let Some(attachments) = body.get("attachments").filter(|v| !v.is_null()) else {
-        return Ok(Vec::new());
-    };
-    let Some(items) = attachments.as_array() else {
-        return Err("attachments must be an array".into());
-    };
-    if items.len() > 10 {
-        return Err("at most 10 attachments".into());
-    }
-    let mut out = Vec::new();
-    for item in items {
-        let filename = item["filename"].as_str().unwrap_or("").to_string();
-        let data = item["data"].as_str().unwrap_or("");
-        out.push(from_data_url(new_id(), filename, data)?);
-    }
-    Ok(out)
-}
-
-fn create_session(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
-    let body = req.json()?;
-    let prompt = body["prompt"].as_str().unwrap_or("").trim().to_string();
-    let attachments = match parse_attachments(&body) {
-        Ok(attachments) => attachments,
-        Err(e) => return error(stream, 400, &e),
-    };
-    let workflow_id = body
-        .get("workflowId")
-        .and_then(Value::as_str)
-        .map(str::to_string);
-    let step_by_step = body["stepByStep"].as_bool().unwrap_or(false);
-    let worktree = body["worktree"].as_bool().unwrap_or(true);
-    if prompt.is_empty() && attachments.is_empty() && workflow_id.is_none() {
-        return error(stream, 400, "empty prompt");
-    }
-    let store = app.store()?;
-    let Some(project) = store.project(body["projectId"].as_str().unwrap_or(""))? else {
-        return error(stream, 404, "no such project");
-    };
-    // A workflow start is validated before the session is created.
-    let workflow = match &workflow_id {
-        Some(id) => {
-            let Some(found) = workflows::find(Path::new(&project.workdir), id) else {
-                return error(stream, 404, "no such workflow");
-            };
-            Some(found)
-        }
-        None => None,
-    };
-    let prefs = store.preferences()?;
-    let model_ref = match body.get("model") {
-        Some(v) if !v.is_null() => {
-            let provider = v["provider"].as_str().unwrap_or("").to_string();
-            let model = v["model"].as_str().unwrap_or("").to_string();
-            if model.is_empty() {
-                return error(stream, 400, "model is empty");
-            }
-            if app.settings.endpoint(&prefs, &provider).is_err() {
-                return error(stream, 400, "unknown provider");
-            }
-            Some(ModelRef { provider, model })
-        }
-        _ => None,
-    };
-    let mode = body.get("mode").and_then(Value::as_str).map(str::to_string);
-    let mode_event = match &mode {
-        Some(mode) => {
-            let list = agents::discover(Path::new(&project.workdir));
-            match switch_to(&list, &[], mode) {
-                Ok(event) => event,
-                Err(e) => return error(stream, 400, &e),
-            }
-        }
-        None => None,
-    };
-    let title: String = if prompt.is_empty() {
-        attachments
-            .first()
-            .map(|attachment| attachment.filename.clone())
-            .unwrap_or_default()
-    } else {
-        prompt.chars().take(80).collect()
-    };
-    let id = store.create_session(&project, &title)?;
-    if !prompt.is_empty() {
-        session_name::spawn(
-            app.settings.clone(),
-            app.notifier.clone(),
-            id.clone(),
-            prompt.clone(),
-        );
-    }
-    append_human_event(app, &store, &id, mode_event)?;
-    if let Some(model) = model_ref {
-        append_human_event(app, &store, &id, Some(Event::ModelChanged { model }))?;
-    }
-    let session = store.session(&id)?.ok_or("the new session vanished")?;
-    match workflow {
-        Some(found) => {
-            let job = Job::Workflow(WorkflowJob::Start {
-                workflow: found.workflow,
-                task: prompt,
-                step_by_step,
-                attachments,
-            });
-            let place = app.open_place(&store, &session, &project, worktree)?;
-            app.turns.start(&id, place, job)?;
-        }
-        None => {
-            let input = resolve(&prompt, &skills::discover(Path::new(&project.workdir)));
-            if matches!(input, TurnInput::Compact) && !attachments.is_empty() {
-                return error(stream, 400, "/compact takes no attachments");
-            }
-            let place = app.place(&store, &session, &project)?;
-            app.turns
-                .start(&id, place, Job::Input(input, attachments))?;
-        }
-    }
-    send_json(stream, 200, &json!({ "id": id }))
-}
-
-fn get_session(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
-    let store = app.store()?;
-    let Some((s, p)) = session_and_project(&store, id)? else {
-        return error(stream, 404, "no such session");
-    };
-    let events = store.events(&s.id)?;
-    let list = agents::discover(Path::new(&p.workdir));
-    let mode = agent_resolve(&list, &events).map(|agent| agent.id.clone());
-    let mut v = session_json(app, &s);
-    v["project"] = project_json(&p);
-    v["mode"] = json!(mode);
-    v["model"] = model_routes::session_model(app, &store, &s.id)?;
-    v["worktree"] = match app.place(&store, &s, &p)?.worktree {
-        Some(wt) => json!({
-            "path": wt.path, "branch": wt.branch, "base": wt.base,
-            "editorUrl": editor::vscode_link(
-                &wt.path.to_string_lossy(),
-                std::env::var("WSL_DISTRO_NAME").ok().as_deref(),
-            ),
-        }),
-        None => Value::Null,
-    };
-    send_json(stream, 200, &v)
-}
-
-/// The session's skills folded from its log: loaded so far, and those
-/// still in the model's view (not dropped by a compaction, not cut by a
-/// replay). `GET /api/sessions/{id}/skills`.
-fn serve_skills(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
-    let store = app.store()?;
-    let Some((_, p)) = session_and_project(&store, id)? else {
-        return error(stream, 404, "no such session");
-    };
-    let skills = skills::discover(Path::new(&p.workdir));
-    let folded = app.folded_skills(&store, id, &skills)?;
-    send_json(
-        stream,
-        200,
-        &json!({ "loaded": folded.loaded, "active": folded.active }),
-    )
-}
-
-/// The session's model calls from the usage ledger, which outlives the log.
-/// `GET /api/sessions/{id}/usage`.
-/// The header's gauge; events from before `compactAt` was recorded fall back
-/// to the current settings.
-fn serve_context(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
-    let store = app.store()?;
-    if store.session(id)?.is_none() {
-        return error(stream, 404, "no such session");
-    }
-    let (chosen, _) = model_routes::session_choice(&store, id)?;
-    let params = app
-        .settings
-        .llm
-        .for_turn(&store.preferences()?, chosen.as_ref());
-    let view = context_view(&store.events(id)?, params.context_window, params.compact_at);
-    send_json(stream, 200, &json!(view))
-}
-
-fn serve_usage(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
-    let store = app.store()?;
-    if store.session(id)?.is_none() {
-        return error(stream, 404, "no such session");
-    }
-    let ledger =
-        token_usage::Ledger::open(&app.settings.usage_path()).map_err(|e| e.to_string())?;
-    let filter = token_usage::Filter {
-        run_id: Some(id.to_string()),
-        ..Default::default()
-    };
-    let summary = ledger.summary(&filter).map_err(|e| e.to_string())?;
-    let latest = ledger.latest(&filter).map_err(|e| e.to_string())?;
-    send_json(
-        stream,
-        200,
-        &json!(SessionUsageView::new(&summary, latest.as_ref())),
-    )
-}
-
-fn serve_usage_calls(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
-    let store = app.store()?;
-    if store.session(id)?.is_none() {
-        return error(stream, 404, "no such session");
-    }
-    let events = store.events(id)?;
-    let ledger =
-        token_usage::Ledger::open(&app.settings.usage_path()).map_err(|e| e.to_string())?;
-    let filter = token_usage::Filter {
-        run_id: Some(id.to_string()),
-        ..Default::default()
-    };
-    let calls = ledger.calls(&filter).map_err(|e| e.to_string())?;
-    send_json(stream, 200, &json!(call_views(&events, &calls)))
-}
-
-fn serve_usage_workflow(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
-    let store = app.store()?;
-    if store.session(id)?.is_none() {
-        return error(stream, 404, "no such session");
-    }
-    let events = store.events(id)?;
-    let ledger =
-        token_usage::Ledger::open(&app.settings.usage_path()).map_err(|e| e.to_string())?;
-    let mut calls = std::collections::HashMap::new();
-    for session in std::iter::once(id.to_string()).chain(workflow_usage::child_ids(&events)) {
-        let filter = token_usage::Filter {
-            run_id: Some(session.clone()),
-            ..Default::default()
-        };
-        calls.insert(session, ledger.calls(&filter).map_err(|e| e.to_string())?);
-    }
-    send_json(
-        stream,
-        200,
-        &json!(workflow_usage::workflow_usage(id, &events, &calls)),
-    )
-}
-
-fn set_session_mode(
-    app: &App,
-    req: &Request,
-    stream: &mut TcpStream,
-    id: &str,
-) -> Result<(), String> {
-    let body = req.json()?;
-    let mode = body["mode"].as_str().unwrap_or("").to_string();
-    let store = app.store()?;
-    let Some((_, p)) = session_and_project(&store, id)? else {
-        return error(stream, 404, "no such session");
-    };
-    if workflow_routes::waiting_for(app, id)?.is_some() {
-        return error(stream, 409, "a workflow is running in this session");
-    }
-    let list = agents::discover(Path::new(&p.workdir));
-    let events = store.events(id)?;
-    let event = match switch_to(&list, &events, &mode) {
-        Ok(event) => event,
-        Err(e) => return error(stream, 400, &e),
-    };
-    append_human_event(app, &store, id, event)?;
-    send_json(stream, 200, &json!({ "mode": mode }))
-}
-
-fn send_message(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Result<(), String> {
-    let body = req.json()?;
-    let content = body["content"].as_str().unwrap_or("").trim().to_string();
-    let attachments = match parse_attachments(&body) {
-        Ok(attachments) => attachments,
-        Err(e) => return error(stream, 400, &e),
-    };
-    if content.is_empty() && attachments.is_empty() {
-        return error(stream, 400, "empty message");
-    }
-    let store = app.store()?;
-    let Some((session, p)) = session_and_project(&store, id)? else {
-        return error(stream, 404, "no such session");
-    };
-    if app.turns.is_running(id) {
-        return error(stream, 409, "a turn is already running");
-    }
-    let place = app.place(&store, &session, &p)?;
-    // While a run is active the typed message answers where it waits.
-    if let Some(waiting) = workflow_routes::waiting_for(app, id)? {
-        return match waiting {
-            Waiting::AgentQuestion => {
-                let job = Job::Workflow(WorkflowJob::AgentInput {
-                    prompt: content,
-                    attachments,
-                });
-                match app.turns.start(id, place, job) {
-                    Ok(()) => send_json(stream, 202, &json!({})),
-                    Err(e) => error(stream, 409, &e),
-                }
-            }
-            Waiting::Human => error(stream, 409, "the workflow waits for a choice"),
-            Waiting::Pause => error(stream, 409, "the workflow is paused: continue or stop it"),
-            Waiting::Interrupted => error(
-                stream,
-                409,
-                "the workflow was interrupted: resume or stop it",
-            ),
-        };
-    }
-    let input = resolve(&content, &skills::discover(Path::new(&p.workdir)));
-    if matches!(input, TurnInput::Compact) && !attachments.is_empty() {
-        return error(stream, 400, "/compact takes no attachments");
-    }
-    match app.turns.start(id, place, Job::Input(input, attachments)) {
-        Ok(()) => send_json(stream, 202, &json!({})),
-        Err(e) => error(stream, 409, &e),
-    }
-}
-
-fn replay_message(
-    app: &App,
-    req: &Request,
-    stream: &mut TcpStream,
-    id: &str,
-) -> Result<(), String> {
-    let body = req.json()?;
-    let message_id = body["messageId"].as_str().unwrap_or("").to_string();
-    let store = app.store()?;
-    let Some((session, p)) = session_and_project(&store, id)? else {
-        return error(stream, 404, "no such session");
-    };
-    if app.turns.is_running(id) {
-        return error(stream, 409, "a turn is already running");
-    }
-    let events = store.events(id)?;
-    if replayable(&events, &message_id).is_none() {
-        return error(
-            stream,
-            400,
-            "only a message you typed in the current window can be replayed",
-        );
-    }
-    let place = app.place(&store, &session, &p)?;
-    match app.turns.start(id, place, Job::Replay(message_id)) {
-        Ok(()) => send_json(stream, 202, &json!({})),
-        Err(e) => error(stream, 409, &e),
-    }
-}
-
-fn compact_session(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
-    let store = app.store()?;
-    let Some((session, p)) = session_and_project(&store, id)? else {
-        return error(stream, 404, "no such session");
-    };
-    if workflow_routes::waiting_for(app, id)?.is_some() {
-        return error(stream, 409, "a workflow is running in this session");
-    }
-    let place = app.place(&store, &session, &p)?;
-    match app
-        .turns
-        .start(id, place, Job::Input(TurnInput::Compact, Vec::new()))
-    {
-        Ok(()) => send_json(stream, 202, &json!({})),
-        Err(e) => error(stream, 409, &e),
-    }
-}
-
-/// One page of a session's log as JSON, newest-first boundary: the last
-/// `limit` events before `before` (the log's end when omitted), ascending.
-/// `GET /api/sessions/{id}/events?limit=N&before=M`.
-fn serve_events_page(
-    app: &App,
-    req: &Request,
-    stream: &mut TcpStream,
-    id: &str,
-) -> Result<(), String> {
-    let Some(limit) = req.query_param("limit").and_then(|v| v.parse::<u64>().ok()) else {
-        return error(stream, 400, "limit is not a number");
-    };
-    if !(1..=10_000).contains(&limit) {
-        return error(stream, 400, "limit must be in 1..=10000");
-    }
-    let before = req
-        .query_param("before")
-        .and_then(|v| v.parse::<u64>().ok())
-        .unwrap_or(u64::MAX);
-    let store = app.store()?;
-    if store.session(id)?.is_none() {
-        return error(stream, 404, "no such session");
-    }
-    let page = store.events_before(id, before, limit)?;
-    let out: Vec<Value> = page
-        .into_iter()
-        .map(|(seq, event)| json!({ "seq": seq, "event": event }))
-        .collect();
-    send_json(stream, 200, &Value::Array(out))
-}
-
-/// The `workflow.*` events of the latest run started before `before`
-/// (the log's end when omitted), ascending.
-/// `GET /api/sessions/{id}/workflow/run?before=<seq>`.
-fn serve_run_events(
-    app: &App,
-    req: &Request,
-    stream: &mut TcpStream,
-    id: &str,
-) -> Result<(), String> {
-    let before = req
-        .query_param("before")
-        .and_then(|v| v.parse::<u64>().ok())
-        .unwrap_or(u64::MAX);
-    let store = app.store()?;
-    if store.session(id)?.is_none() {
-        return error(stream, 404, "no such session");
-    }
-    let page = store.workflow_run_before(id, before)?;
-    let out: Vec<Value> = page
-        .into_iter()
-        .map(|(seq, event)| json!({ "seq": seq, "event": event }))
-        .collect();
-    send_json(stream, 200, &Value::Array(out))
-}
-
-pub(super) fn session_and_project(
-    store: &SqliteStore,
-    id: &str,
-) -> Result<Option<(SessionSummary, Project)>, String> {
-    let Some(s) = store.session(id)? else {
-        return Ok(None);
-    };
-    Ok(store.project(&s.project_id)?.map(|p| (s, p)))
-}
-
-fn session_json(app: &App, s: &SessionSummary) -> Value {
-    json!({
-        "id": s.id, "title": s.title, "state": s.state(app.turns.is_running(&s.id)),
-        "createdAt": s.created_at, "updatedAt": s.updated_at, "parentId": s.parent_id,
-        "awaitingIntegration": s.awaiting_integration,
-    })
-}
-
-fn project_json(p: &Project) -> Value {
-    json!({ "id": p.id, "name": p.name, "workdir": p.workdir })
-}
-
-/// Appends a choice the human made (mode, model) and wakes the session's streams.
-pub(super) fn append_human_event(
-    app: &App,
-    store: &SqliteStore,
-    session_id: &str,
-    event: Option<Event>,
-) -> Result<(), String> {
-    if let Some(event) = event {
-        let log = NotifyingLog {
-            log: store,
-            notifier: &app.notifier,
-        };
-        log.append(session_id, &event)?;
-    }
-    Ok(())
 }

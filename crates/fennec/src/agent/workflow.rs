@@ -15,7 +15,7 @@ use super::turn::{self, Turn};
 use crate::domain::attachment::Attachment;
 use crate::domain::clock::now_ms;
 use crate::domain::compaction::files_changed;
-use crate::domain::conversation::last_assistant_text;
+use crate::domain::conversation::node_output;
 use crate::domain::event::{DoneReason, Event};
 use crate::domain::id::new_id;
 use crate::domain::workflow::definition::{AgentContext, NodeKind, Workflow};
@@ -48,6 +48,7 @@ pub enum WorkflowJob {
         workflow: Workflow,
         task: String,
         plan: String,
+        attachments: Vec<Attachment>,
     },
     /// The choice at a human node, with an optional comment.
     Answer { choice: String, comment: String },
@@ -96,7 +97,8 @@ fn walk(turn: &mut Turn, env: &WorkflowEnv, job: WorkflowJob) -> Result<DoneReas
             workflow,
             task,
             plan,
-        } => start_from_plan(turn, &workflow, &task, &plan)?,
+            attachments,
+        } => start_from_plan(turn, &workflow, &task, &plan, &attachments)?,
         WorkflowJob::Answer { choice, comment } => answer_human(turn, &choice, &comment)?,
         WorkflowJob::Continue { comment } => continue_paused(turn, &comment)?,
         WorkflowJob::AgentInput {
@@ -198,6 +200,7 @@ fn start_run(
         workflow: workflow.clone(),
         task: task.to_string(),
         step_by_step,
+        started_at: Some(now_ms()),
     })?;
 
     let start_node = workflow.start().ok_or("no start node")?;
@@ -230,6 +233,7 @@ fn start_from_plan(
     workflow: &Workflow,
     task: &str,
     plan: &str,
+    attachments: &[Attachment],
 ) -> Result<Cursor, String> {
     // Checked before the run starts: a refusal leaves no half-recorded run.
     let plan_id = workflow
@@ -245,7 +249,7 @@ fn start_from_plan(
         return Err("the workflow does not start with its plan node".into());
     }
 
-    start_run(turn, workflow, task, false, &[])?;
+    start_run(turn, workflow, task, false, attachments)?;
     let events = turn.log.events(turn.session_id)?;
     let run_id = run::current_run(&events)
         .ok_or("no active workflow run")?
@@ -375,9 +379,31 @@ fn answer_human(turn: &mut Turn, choice: &str, comment: &str) -> Result<Cursor, 
         criteria::record_from_plan(turn, &state)?;
     }
 
+    // The kernel, not the model, decides which tests are protected: at the
+    // human's click, the test files written so far are frozen for the session.
+    if choices.first().is_some_and(|first| first == choice)
+        && fed_by_tests_agent(&state.workflow, &open.node_id)
+    {
+        turn.append(Event::TestsApproved {
+            run_id: state.run_id.clone(),
+            files: crate::domain::test_files::written(&events),
+        })?;
+    }
+
     Ok(Cursor::After {
         from: open.node_id.clone(),
         port: choice.to_string(),
+    })
+}
+
+/// Whether `node_id` is fed by the `done` edge of the `tests` agent node: the
+/// human node that validates the tests written before the code.
+fn fed_by_tests_agent(workflow: &Workflow, node_id: &str) -> bool {
+    workflow.nodes.iter().any(|node| {
+        matches!(&node.kind, NodeKind::Agent { agent, .. } if agent == "tests")
+            && workflow
+                .edge(&node.id, "done")
+                .is_some_and(|edge| edge.to == node_id)
     })
 }
 
@@ -409,35 +435,94 @@ fn resume_interrupted(turn: &mut Turn) -> Result<Cursor, String> {
         return Err("the run is paused, not interrupted".into());
     }
 
-    let open = state.open.first().ok_or("no open node to resume")?;
+    let (node_id, via) = if let Some(open) = state.open.first() {
+        // An interrupted run: re-enter the open node on its own pass.
+        let via = events
+            .iter()
+            .rev()
+            .find_map(|e| match e {
+                Event::WorkflowNodeStarted { node_id, via, .. } if node_id == &open.node_id => {
+                    via.clone()
+                }
+                _ => None,
+            })
+            .unwrap_or_else(|| default_via(&state));
+        (open.node_id.clone(), via)
+    } else {
+        // A run that ended in error: re-enter the node that was open when it
+        // ended, on a new pass.
+        match state.finished {
+            Some((RunOutcome::Error, _)) => {
+                let (node_id, via) = open_at_finish(&events, &state.run_id)
+                    .ok_or("the run ended in error but no node can be re-run")?;
+                if in_branch(&state.workflow, &node_id) {
+                    return Err(
+                        "the failed node is in a branch, it cannot be relaunched alone".into(),
+                    );
+                }
+                (node_id, via.unwrap_or_else(|| default_via(&state)))
+            }
+            Some(_) => {
+                return Err("the run is finished, it can only be relaunched on an error".into());
+            }
+            None => return Err("no open node to resume".into()),
+        }
+    };
 
     turn.append(Event::WorkflowResumed {
         run_id: state.run_id.clone(),
         comment: String::new(),
     })?;
 
-    let via = events
-        .iter()
-        .rev()
-        .find_map(|e| match e {
-            Event::WorkflowNodeStarted { node_id, via, .. } if node_id == &open.node_id => {
-                via.clone()
-            }
-            _ => None,
-        })
-        .unwrap_or_else(|| Via {
-            from: state
-                .workflow
-                .start()
-                .map(|n| n.id.clone())
-                .unwrap_or_default(),
-            port: "next".into(),
-        });
+    Ok(Cursor::Enter { via, to: node_id })
+}
 
-    Ok(Cursor::Enter {
-        via,
-        to: open.node_id.clone(),
-    })
+fn default_via(state: &RunState) -> Via {
+    Via {
+        from: state
+            .workflow
+            .start()
+            .map(|n| n.id.clone())
+            .unwrap_or_default(),
+        port: "next".into(),
+    }
+}
+
+/// The node that was open when a finished run ended: from the run's start on,
+/// the last node started with no finish after it, and the via that entered it.
+fn open_at_finish(events: &[Event], run_id: &str) -> Option<(String, Option<Via>)> {
+    let start = events
+        .iter()
+        .rposition(|e| matches!(e, Event::WorkflowStarted { run_id: r, .. } if r == run_id))?;
+    let mut open: Option<(String, Option<Via>)> = None;
+    for event in &events[start + 1..] {
+        match event {
+            Event::WorkflowNodeStarted {
+                run_id: r,
+                node_id,
+                via,
+                ..
+            } if r == run_id => {
+                open = Some((node_id.clone(), via.clone()));
+            }
+            Event::WorkflowNodeFinished {
+                run_id: r, node_id, ..
+            } if r == run_id && open.as_ref().is_some_and(|(id, _)| id == node_id) => {
+                open = None;
+            }
+            _ => {}
+        }
+    }
+    open
+}
+
+/// A node that runs inside a parallel's fork region cannot be relaunched alone.
+fn in_branch(workflow: &Workflow, node_id: &str) -> bool {
+    workflow
+        .nodes
+        .iter()
+        .filter(|n| matches!(n.kind, NodeKind::Parallel))
+        .any(|p| workflow.branch_region(&p.id).contains(node_id))
 }
 
 fn stop_run(turn: &mut Turn) -> Result<DoneReason, String> {
@@ -479,7 +564,7 @@ fn agent_input(
     let before = events.len();
     let reason = turn::answer_or_prompt(turn, prompt, attachments)?;
     let events = turn.log.events(turn.session_id)?;
-    let text = last_assistant_text(&events[before..]);
+    let text = node_output(&events[before..]);
     let label = node.label();
 
     let end = nodes::agent_end(label, outputs, reason, text, |reminder| {
@@ -586,7 +671,7 @@ fn session_agent(
     let before = turn.log.events(turn.session_id)?.len();
     let reason = turn::run_agent_node(turn, agent, &prompt)?;
     let events = turn.log.events(turn.session_id)?;
-    let text = last_assistant_text(&events[before..]);
+    let text = node_output(&events[before..]);
     let label = input.node.label();
 
     nodes::agent_end(label, outputs, reason, text, |reminder| {
@@ -602,7 +687,7 @@ fn session_send(
     let before = turn.log.events(turn.session_id)?.len();
     let reason = turn::run_agent_node(turn, agent, prompt)?;
     let events = turn.log.events(turn.session_id)?;
-    let text = last_assistant_text(&events[before..]);
+    let text = node_output(&events[before..]);
     Ok((reason, text))
 }
 
@@ -661,6 +746,9 @@ fn record(
         nodes::NodeEnd::EndRun { outcome, reason } => {
             finish_run(turn, state, outcome, reason).map(Step::Exit)
         }
+        // A model error leaves the node open; the run exits interrupted so the
+        // human can resume it or stop it.
+        nodes::NodeEnd::Halted { .. } => Ok(Step::Exit(DoneReason::Error)),
         nodes::NodeEnd::AgentAsked => Ok(Step::Exit(DoneReason::WaitingForUser)),
     }
 }
@@ -674,7 +762,9 @@ fn finished_run_stats(turn: &Turn) -> Result<RunStats, String> {
         .map(|state| state.criteria)
         .unwrap_or_default();
     let files = files_changed(run_events);
-    Ok(run_stats(run_events, &criteria, files.len()))
+    let mut stats = run_stats(run_events, &criteria, files.len());
+    stats.finished_at = Some(now_ms());
+    Ok(stats)
 }
 
 fn finish_run(

@@ -2,6 +2,8 @@
 //! a session's totals from the usage ledger (`GET /api/sessions/{id}/usage`).
 
 use crate::domain::event::Event;
+use crate::domain::lang::Lang;
+use crate::domain::pricing::Pricing;
 use serde::Serialize;
 use std::collections::HashMap;
 use token_usage::{CallRecord, LatestCall, Summary, display};
@@ -15,18 +17,39 @@ pub struct SessionUsageView {
     pub completion_tokens: u64,
     /// Share of the prompts the server took from its cache, 0 to 100.
     pub cache_percent: u64,
+    /// Estimated cost at each model's price, "—" when no model has one: indicative.
+    pub cost: String,
+    /// How the cost was reached, or why there is none (models without a price).
+    pub cost_detail: String,
+    /// The cost of all the prompt tokens (the cached ones included, as `prompt_tokens`),
+    /// none when no model has a price.
+    pub input_cost: Option<String>,
+    /// The share of the cost of cached tokens, none when no model has a price.
+    pub cached_cost: Option<String>,
+    /// The share of the cost of generated tokens, none when no model has a price.
+    pub output_cost: Option<String>,
     /// Generated tokens per second of the last call; none before any call.
     pub last_generation_speed: Option<f64>,
 }
 
 impl SessionUsageView {
-    pub fn new(summary: &Summary, latest: Option<&LatestCall>) -> SessionUsageView {
+    pub fn new(
+        summary: &Summary,
+        latest: Option<&LatestCall>,
+        pricing: &Pricing,
+        lang: Lang,
+    ) -> SessionUsageView {
         SessionUsageView {
             calls: summary.calls,
             prompt_tokens: summary.prompt_tokens,
             cached_tokens: summary.cached_tokens,
             completion_tokens: summary.completion_tokens,
             cache_percent: (summary.cache_hit_rate * 100.0).round() as u64,
+            cost: pricing.value(lang.locale()),
+            cost_detail: pricing.detail(lang),
+            input_cost: pricing.part(pricing.cost.input + pricing.cost.cached, lang.locale()),
+            cached_cost: pricing.part(pricing.cost.cached, lang.locale()),
+            output_cost: pricing.part(pricing.cost.output, lang.locale()),
             last_generation_speed: latest.map(|call| call.generation_speed),
         }
     }
@@ -51,7 +74,7 @@ pub struct CallView {
 /// of a turn sits under its last call: the turn's wall clock (`chat.done`,
 /// tools included: the speed the human feels) and the tokens its calls
 /// generated, from the ledger.
-pub fn call_views(events: &[Event], calls: &[CallRecord]) -> Vec<CallView> {
+pub fn call_views(events: &[Event], calls: &[CallRecord], lang: Lang) -> Vec<CallView> {
     let by_message: HashMap<&str, &CallRecord> = calls
         .iter()
         .filter_map(|c| Some((c.labels.get("messageId")?.as_str(), c)))
@@ -72,7 +95,7 @@ pub fn call_views(events: &[Event], calls: &[CallRecord]) -> Vec<CallView> {
                 };
                 turn_tokens += call.usage.completion_tokens;
                 last = Some(views.len());
-                views.push(view(message_id, call));
+                views.push(view(message_id, call, lang));
             }
             Event::ChatDone { duration_ms, .. } => {
                 if let (Some(ms), Some(i)) = (duration_ms, last)
@@ -82,8 +105,8 @@ pub fn call_views(events: &[Event], calls: &[CallRecord]) -> Vec<CallView> {
                     let secs = *ms as f64 / 1000.0;
                     views[i].turn_recap = Some(format!(
                         "{} · ↓ {} tokens · {}",
-                        display::duration(secs),
-                        display::tokens(turn_tokens),
+                        display::duration(secs, lang.locale()),
+                        display::tokens(turn_tokens, lang.locale()),
                         display::speed(turn_tokens as f64 / secs)
                     ));
                 }
@@ -96,7 +119,7 @@ pub fn call_views(events: &[Event], calls: &[CallRecord]) -> Vec<CallView> {
     views
 }
 
-fn view(message_id: &str, call: &CallRecord) -> CallView {
+fn view(message_id: &str, call: &CallRecord, lang: Lang) -> CallView {
     let usage = &call.usage;
     let fresh = usage.prompt_tokens.saturating_sub(usage.cached_tokens);
     CallView {
@@ -104,19 +127,29 @@ fn view(message_id: &str, call: &CallRecord) -> CallView {
         model: call.model.clone(),
         line: format!(
             "↑ {} · cache {} % · ↓ {} · {}",
-            display::tokens(usage.prompt_tokens),
+            display::tokens(usage.prompt_tokens, lang.locale()),
             display::percent(usage.cached_tokens, usage.prompt_tokens),
-            display::tokens(usage.completion_tokens),
-            display::duration(call.total_secs)
+            display::tokens(usage.completion_tokens, lang.locale()),
+            display::duration(call.total_secs, lang.locale())
         ),
-        detail: format!(
-            "Entrée {} tokens dont {} en cache, {fresh} nouveaux à {} · sortie {} tokens à {}",
-            usage.prompt_tokens,
-            usage.cached_tokens,
-            display::speed(call.prefill_speed),
-            usage.completion_tokens,
-            display::speed(call.generation_speed)
-        ),
+        detail: match lang {
+            Lang::En => format!(
+                "Input {} tokens, {} cached, {fresh} new at {} · output {} tokens at {}",
+                usage.prompt_tokens,
+                usage.cached_tokens,
+                display::speed(call.prefill_speed),
+                usage.completion_tokens,
+                display::speed(call.generation_speed)
+            ),
+            Lang::Fr => format!(
+                "Entrée {} tokens dont {} en cache, {fresh} nouveaux à {} · sortie {} tokens à {}",
+                usage.prompt_tokens,
+                usage.cached_tokens,
+                display::speed(call.prefill_speed),
+                usage.completion_tokens,
+                display::speed(call.generation_speed)
+            ),
+        },
         turn_recap: None,
     }
 }
@@ -132,10 +165,17 @@ mod tests {
     fn an_empty_ledger_gives_zeroes_and_no_speed() {
         let ledger = Ledger::open_in_memory().unwrap();
         let summary = ledger.summary(&Filter::default()).unwrap();
-        let view = SessionUsageView::new(&summary, None);
+        let pricing = Pricing {
+            cost: llm_providers_connector::Cost::default(),
+            priced: 0,
+            unpriced: vec![],
+        };
+        let view = SessionUsageView::new(&summary, None, &pricing, Lang::Fr);
         assert_eq!(view.calls, 0);
         assert_eq!(view.cache_percent, 0);
         assert_eq!(view.last_generation_speed, None);
+        assert_eq!(view.cost, "—");
+        assert_eq!(view.input_cost, None);
     }
 
     #[test]
@@ -158,10 +198,16 @@ mod tests {
             prefill_speed: 5.0,
             generation_speed: 42.5,
         };
-        let view = SessionUsageView::new(&summary, Some(&latest));
+        let pricing = Pricing {
+            cost: llm_providers_connector::Cost::default(),
+            priced: 0,
+            unpriced: vec![],
+        };
+        let view = SessionUsageView::new(&summary, Some(&latest), &pricing, Lang::Fr);
         assert_eq!(view.cache_percent, 67);
         assert_eq!(view.last_generation_speed, Some(42.5));
         assert_eq!(view.prompt_tokens, 300);
+        assert_eq!(view.cost, "—");
     }
 
     fn record(message: &str, completion: u64) -> CallRecord {
@@ -216,7 +262,7 @@ mod tests {
             chat_done(None),
         ];
         let calls = [record("a", 100), record("b", 100), record("c", 10)];
-        let views = call_views(&events, &calls);
+        let views = call_views(&events, &calls, Lang::Fr);
         assert_eq!(views[0].turn_recap, None);
         // 200 tokens over the 8 s the human waited, tools included.
         assert_eq!(
@@ -231,6 +277,16 @@ mod tests {
     fn a_message_the_ledger_does_not_know_has_no_view() {
         let mut call = record("a", 1);
         call.labels.remove("messageId");
-        assert!(call_views(&[done("a"), chat_done(Some(1000))], &[call]).is_empty());
+        assert!(call_views(&[done("a"), chat_done(Some(1000))], &[call], Lang::Fr).is_empty());
+    }
+
+    #[test]
+    fn a_call_view_detail_is_english_when_the_language_is_english() {
+        let call = record("a", 100);
+        let views = call_views(&[done("a")], &[call], Lang::En);
+        assert_eq!(
+            views[0].detail,
+            "Input 1000 tokens, 800 cached, 200 new at 100 tok/s · output 100 tokens at 20 tok/s"
+        );
     }
 }

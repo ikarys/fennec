@@ -9,7 +9,7 @@ use serde_json::Value;
 use std::sync::atomic::AtomicBool;
 use std::time::Duration;
 
-pub use llm_providers::Delta;
+pub use llm_providers_connector::Delta;
 
 pub struct Request<'a> {
     pub system_prompt: &'a str,
@@ -20,6 +20,10 @@ pub struct Request<'a> {
     pub reasoning_effort: Option<ReasoningEffort>,
     /// Checked on every streamed line: the stream ends with "Aborted".
     pub stop: &'a AtomicBool,
+    /// The session this prompt belongs to, empty for a one-off call: a local
+    /// endpoint serves a session's rounds back to back so its prefix stays
+    /// cached (`llm::ModelGate`).
+    pub session: &'a str,
 }
 
 #[derive(Debug, Default, PartialEq)]
@@ -39,6 +43,9 @@ pub struct Completion {
 pub trait Model {
     fn name(&self) -> &str;
     fn stream(&self, req: &Request, on: &mut dyn FnMut(Delta)) -> Result<Completion, String>;
+    /// `session`'s turn ended: an adapter keeping the model for it lets the
+    /// other sessions in.
+    fn release(&self, _session: &str) {}
 }
 
 /// The session's append-only event log (adapter: `store::SqliteStore`).
@@ -46,6 +53,14 @@ pub trait EventLog {
     /// Appends `event`, returns its sequence number in the session.
     fn append(&self, session_id: &str, event: &Event) -> Result<u64, String>;
     fn events(&self, session_id: &str) -> Result<Vec<Event>, String>;
+}
+
+/// What the human's rules say about one tool call, and what it was about (the command,
+/// the path, the tool name) for the log.
+pub struct RuleCheck<'r> {
+    pub decision: rules::Decision<'r>,
+    pub subject: String,
+    pub proposal: Option<rules::Proposal>,
 }
 
 /// The tools a model can call (adapter: `tools::LocalTools`, on the host).
@@ -62,6 +77,31 @@ pub trait Toolbox {
         stop: &AtomicBool,
         on_output: &mut dyn FnMut(OutputStream, &str),
     ) -> ToolResult;
+    /// Runs a call the human approved once: the rules' path guard lets this one call reach
+    /// outside the workdir. The default runs it as `execute` does.
+    fn execute_approved(
+        &self,
+        name: &str,
+        args: &Value,
+        access: CommandAccess,
+        stop: &AtomicBool,
+        on_output: &mut dyn FnMut(OutputStream, &str),
+    ) -> ToolResult {
+        self.execute(name, args, access, stop, on_output)
+    }
+    /// The human's rules on this call, decided before it runs; the default allows.
+    fn check_rules(&self, _name: &str, _args: &Value) -> RuleCheck<'_> {
+        RuleCheck {
+            decision: rules::Decision::Allow(None),
+            subject: String::new(),
+            proposal: None,
+        }
+    }
+    /// The MCP tool names offered; empty when the toolbox has no MCP servers.
+    /// The snapshot re-freezes when this set changes.
+    fn mcp_tool_names(&self) -> Vec<String> {
+        Vec::new()
+    }
 }
 
 /// What an agent node run in a child session reports back.

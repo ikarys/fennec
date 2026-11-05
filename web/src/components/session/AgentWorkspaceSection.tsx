@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { IntegrationPreview, SessionDetail } from '../../lib/api';
-import { discardWorktree, getIntegration } from '../../lib/api';
-import { BranchIcon, CheckIcon, CopyIcon, EditIcon, FolderIcon, SpinnerIcon } from '../Icons';
+import type { Blocker, IntegrationPreview, RepoState, SessionDetail } from '../../lib/api';
+import { discardWorktree, getIntegration, getRepoState, openFileManager, openTerminal, resolveConflict } from '../../lib/api';
+import { BranchIcon, CheckIcon, CopyIcon, ExternalIcon, FolderIcon, SpinnerIcon, TerminalIcon } from '../Icons';
 import { useIntegrationInvite } from './IntegrationInvite';
 import { Button, buttonClass } from '../ui/Button';
 import { Badge } from '../ui/Badge';
-import { panelBlock } from '../../lib/panelBlocks';
+import { Card } from '../ui/Card';
+import { SectionLabel } from '../ui/SectionLabel';
 import { Panel } from '../ui/Panel';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
+import { useT } from '../../i18n';
 
 function shortFolderName(path: string): string {
   const name = path.split(/[\\/]/).filter(Boolean).pop() ?? path;
@@ -22,19 +25,31 @@ function shortAgentBranch(branch: string): string {
   return sessionPart.length > 8 ? `${prefix}${sessionPart.slice(0, 8)}…` : branch;
 }
 
-export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarded, integrationVersion }: { sessionId: string | null; worktree: NonNullable<SessionDetail['worktree']>; running: boolean; onDiscarded: () => void; integrationVersion: number }) {
+export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarded, integrationVersion }: { sessionId: string | null; worktree: NonNullable<SessionDetail['worktree']> | null; running: boolean; onDiscarded: () => void; integrationVersion: number }) {
+  const t = useT();
   const [preview, setPreview] = useState<IntegrationPreview | null>(null);
+  const [repo, setRepo] = useState<RepoState | null>(null);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const invite = useIntegrationInvite();
   const [discarding, setDiscarding] = useState(false);
   const [discardError, setDiscardError] = useState<string | null>(null);
+  const [pendingDiscard, setPendingDiscard] = useState(false);
+  const [resolvingConflict, setResolvingConflict] = useState(false);
+  const [conflictError, setConflictError] = useState<string | null>(null);
   const previousRunning = useRef(running);
   const fetchId = useRef(0);
+  const repoFetchId = useRef(0);
   const copiedTimer = useRef<number | null>(null);
+  const hasWorktree = worktree !== null;
 
   const fetchPreview = useCallback(async () => {
-    if (!sessionId) return;
+    if (!sessionId || !hasWorktree) {
+      fetchId.current += 1;
+      setPreview(null);
+      setLoading(false);
+      return;
+    }
     // A stale response must not overwrite a newer session's preview.
     const id = ++fetchId.current;
     setLoading(true);
@@ -47,19 +62,43 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
     } finally {
       if (id === fetchId.current) setLoading(false);
     }
+  }, [sessionId, hasWorktree]);
+
+  const fetchRepo = useCallback(async () => {
+    if (!sessionId) {
+      repoFetchId.current += 1;
+      setRepo(null);
+      return;
+    }
+    // A stale response must not overwrite a newer session's repository.
+    const id = ++repoFetchId.current;
+    try {
+      const data = await getRepoState(sessionId);
+      if (id === repoFetchId.current) setRepo(data);
+    } catch {
+      if (id === repoFetchId.current) setRepo(null);
+    }
   }, [sessionId]);
 
   useEffect(() => {
     void fetchPreview();
-  }, [fetchPreview, integrationVersion]);
+    void fetchRepo();
+  }, [fetchPreview, fetchRepo, integrationVersion]);
 
   useEffect(() => {
     // The preview is only meaningful once the agent's turn has finished.
     if (previousRunning.current && !running) {
       void fetchPreview();
+      void fetchRepo();
     }
     previousRunning.current = running;
-  }, [running, fetchPreview]);
+  }, [running, fetchPreview, fetchRepo]);
+
+  useEffect(() => {
+    const onFocus = () => void fetchRepo();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [fetchRepo]);
 
   useEffect(() => {
     return () => {
@@ -68,135 +107,275 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
   }, []);
 
   const handleCopyPath = () => {
+    if (worktree === null) return;
     void navigator.clipboard.writeText(worktree.path);
     setCopied(true);
     if (copiedTimer.current !== null) window.clearTimeout(copiedTimer.current);
     copiedTimer.current = window.setTimeout(() => setCopied(false), 1500);
   };
 
-  const handleDiscard = async () => {
+  const [terminalError, setTerminalError] = useState<string | null>(null);
+  const handleOpenTerminal = () => {
     if (!sessionId) return;
-    const commits = preview?.commits.length ?? 0;
-    const confirmed = window.confirm(
-      `Abandonner ce travail ? Le dossier et la branche de l'agent seront supprimés, ses ${commits} commits perdus. Ton dossier et ta branche ne sont pas touchés.`
-    );
-    if (!confirmed) return;
+    setTerminalError(null);
+    openTerminal(sessionId).catch((failure) => setTerminalError(failure instanceof Error ? failure.message : t('error')));
+  };
+  const [filesError, setFilesError] = useState<string | null>(null);
+  const handleOpenFiles = () => {
+    if (!sessionId) return;
+    setFilesError(null);
+    openFileManager(sessionId).catch((failure) => setFilesError(failure instanceof Error ? failure.message : t('error')));
+  };
+  const terminalButton = (
+    <Button
+      variant="ghost"
+      size="sm"
+      iconOnly
+      onClick={handleOpenTerminal}
+      disabled={!sessionId}
+      title={t('openTerminalHere')}
+      aria-label={t('openTerminalHere')}
+    >
+      <TerminalIcon className="h-3.5 w-3.5" />
+    </Button>
+  );
+
+  const openDiscard = () => {
+    if (!sessionId || worktree === null) return;
+    setPendingDiscard(true);
+  };
+
+  const confirmDiscard = async () => {
+    if (!sessionId) return;
+    setPendingDiscard(false);
     setDiscarding(true);
     setDiscardError(null);
     try {
       await discardWorktree(sessionId);
       onDiscarded();
     } catch (discardFailure) {
-      setDiscardError(discardFailure instanceof Error ? discardFailure.message : 'Erreur');
+      setDiscardError(discardFailure instanceof Error ? discardFailure.message : t('error'));
     } finally {
       setDiscarding(false);
     }
   };
 
-  const humanBranch = preview?.humanBranch ?? 'ta branche';
+  const humanBranch = repo?.branch ?? preview?.humanBranch ?? t('yourBranch');
   const hasCommits = (preview?.commits.length ?? 0) > 0;
-  // The file list lives in the Fichiers modifiés block; here only what blocks the review.
+  // The file list lives in the Modified files block; here only what blocks the review.
   const protectedCount = preview?.files.filter((file) => file.protected).length ?? 0;
-  const integrateDisabled = sessionId === null || running || !hasCommits || invite === null;
+  const integrateDisabled = sessionId === null || running || invite === null;
+  const conflictFiles =
+    preview?.blockers.find(
+      (blocker): blocker is Extract<Blocker, { kind: 'conflict' }> => blocker.kind === 'conflict',
+    )?.files ?? [];
+
+  const handleResolveConflict = async () => {
+    if (!sessionId) return;
+    setResolvingConflict(true);
+    setConflictError(null);
+    try {
+      await resolveConflict(sessionId);
+      void fetchPreview();
+    } catch (failure) {
+      setConflictError(failure instanceof Error ? failure.message : t('error'));
+    } finally {
+      setResolvingConflict(false);
+    }
+  };
 
   return (
-    <Panel id="workspace" title={panelBlock('workspace').title}>
-      <div className="flex flex-col gap-1.5">
-        <div className="flex items-center gap-2">
-          <FolderIcon className="h-4 w-4 shrink-0 text-muted" />
-          <span title={worktree.path} className="grow overflow-hidden text-left font-mono text-xs text-ellipsis whitespace-nowrap">
-            {shortFolderName(worktree.path)}
-          </span>
-          <div className="flex shrink-0 items-center gap-1">
-            <a
-              href={worktree.editorUrl}
-              title="Ouvrir dans VS Code"
-              aria-label="Ouvrir dans VS Code"
-              className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
-            >
-              <EditIcon className="h-3.5 w-3.5" />
-            </a>
-            <Button
-              variant="ghost"
-              size="sm"
-              iconOnly
-              onClick={handleCopyPath}
-              title="Copier le chemin"
-              aria-label="Copier le chemin"
-            >
-              {copied ? <CheckIcon className="h-3.5 w-3.5 text-ok" /> : <CopyIcon className="h-3.5 w-3.5" />}
-            </Button>
+    <Panel
+      id="workspace"
+      title={t('panelWorkspace')}
+      icon={<BranchIcon className="h-3.5 w-3.5" />}
+      iconTone={conflictFiles.length > 0 ? 'err' : 'neutral'}
+    >
+      <div className="flex flex-col gap-3">
+        {/* One inset card per zone: the header carries the zone's state, the body its rows. */}
+        <Card variant="inset" className="group">
+          <div className="flex items-center gap-2">
+            <FolderIcon className="h-4 w-4 shrink-0 text-muted" />
+            <SectionLabel>{t('agentZone')}</SectionLabel>
+            <span className="ml-auto flex min-w-0 items-center gap-1.5 text-xs">
+              {loading && preview === null ? (
+                <span className="flex items-center gap-1 text-muted">
+                  <SpinnerIcon className="h-3.5 w-3.5" />
+                  {t('reading')}
+                </span>
+              ) : hasCommits ? (
+                <Badge tone="neutral" pill>
+                  {t('commitsFiles', { commits: preview?.commits.length ?? 0, files: preview?.files.length ?? 0 })}
+                </Badge>
+              ) : (
+                <span className="truncate text-faint">{t('nothingToIntegrate')}</span>
+              )}
+              {protectedCount > 0 && (
+                <Badge tone="err" pill>
+                  {t('protectedCount', { count: protectedCount })}
+                </Badge>
+              )}
+            </span>
           </div>
-        </div>
-
-        <div className="flex items-center gap-2 text-xs">
-          <BranchIcon className="h-4 w-4 shrink-0 text-muted" />
-          <span title={worktree.branch} className="grow overflow-hidden font-mono text-muted text-ellipsis whitespace-nowrap">
-            {shortAgentBranch(worktree.branch)}
-          </span>
-          <span aria-hidden className="shrink-0 text-muted">→</span>
-          <span title={preview?.humanBranch ?? undefined} className="grow overflow-hidden font-mono text-text text-ellipsis whitespace-nowrap">
-            {humanBranch}
-          </span>
-        </div>
-
-        {(loading || preview !== null) && (
-          <div className="flex flex-col gap-1.5">
-            {loading && preview === null ? (
-              <div className="flex items-center gap-2 text-xs text-muted">
-                <SpinnerIcon className="h-3.5 w-3.5" />
-                Lecture des changements…
+          {worktree !== null ? (
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <span title={worktree.path} className="grow overflow-hidden text-left font-mono text-xs text-ellipsis whitespace-nowrap">
+                  {shortFolderName(worktree.path)}
+                </span>
+                <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                  <a
+                    href={worktree.editorUrl}
+                    title={t('openInVsCode')}
+                    aria-label={t('openInVsCode')}
+                    className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
+                  >
+                    <ExternalIcon className="h-3.5 w-3.5" />
+                  </a>
+                  {terminalButton}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
+                    onClick={handleCopyPath}
+                    title={t('copyPath')}
+                    aria-label={t('copyPath')}
+                  >
+                    {copied ? <CheckIcon className="h-3.5 w-3.5 text-ok" /> : <CopyIcon className="h-3.5 w-3.5" />}
+                  </Button>
+                </div>
               </div>
-            ) : (
-              preview && (
-                <>
-                  <div className="text-xs text-muted">
-                    {hasCommits ? `${preview.commits.length} commits · ${preview.files.length} fichiers` : "Rien à intégrer pour l'instant."}
-                    {protectedCount > 0 && <Badge tone="err" className="ml-2">{protectedCount} protégé{protectedCount > 1 ? 's' : ''}</Badge>}
-                  </div>
-                </>
-              )
-            )}
-          </div>
-        )}
 
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => invite?.open()}
-          disabled={integrateDisabled}
-          title={running ? 'Attends la fin du tour' : undefined}
-          className="w-full"
-        >
-          Intégrer dans {humanBranch}
-        </Button>
+              <div className="flex items-center gap-2 text-xs">
+                <BranchIcon className="h-4 w-4 shrink-0 text-muted" />
+                <span title={worktree.branch} className="grow overflow-hidden font-mono text-muted text-ellipsis whitespace-nowrap">
+                  {shortAgentBranch(worktree.branch)}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-xs text-muted">
+              <span className="grow">{t('worksInYourFolder')}</span>
+              {terminalButton}
+            </div>
+          )}
+          {terminalError !== null && <div className="text-xs text-err">{terminalError}</div>}
+        </Card>
 
-        <Button
-          variant="danger"
-          size="sm"
-          onClick={() => void handleDiscard()}
-          disabled={sessionId === null || running || discarding}
-          className="w-full"
-        >
-          Abandonner ce travail
-        </Button>
-        {discardError && <div className="text-xs text-err">{discardError}</div>}
-
-        <details className="text-xs">
-          <summary className="cursor-pointer select-none text-muted hover:text-text">Le faire à la main</summary>
-          <div className="mt-1.5">
+        {repo !== null && (
+          <Card variant="inset">
+            <div className="flex items-center gap-2">
+              <FolderIcon className="h-4 w-4 shrink-0 text-muted" />
+              <SectionLabel>{t('yourRepo')}</SectionLabel>
+              <span className="ml-auto inline-flex shrink-0">
+                {repo.dirty > 0 && (
+                  <Badge tone="accent" pill title={t('dirtyTitle')}>
+                    {t('dirtyCount', { count: repo.dirty })}
+                  </Badge>
+                )}
+              </span>
+            </div>
             <button
               type="button"
-              title="Copier la commande"
-              onClick={() => void navigator.clipboard.writeText(`git cherry-pick ${worktree.base}..${worktree.branch}`)}
-              className="rounded-lg border border-border bg-code px-2 py-1.5 text-left font-mono text-xs break-all text-text hover:border-border-strong"
+              onClick={handleOpenFiles}
+              disabled={!sessionId}
+              title={t('openInExplorer', { dir: repo.dir })}
+              className="flex w-full cursor-pointer items-center gap-2 rounded-md px-1 py-0.5 text-left hover:bg-accent-soft"
             >
-              <code>git cherry-pick {worktree.base}..{worktree.branch}</code>
+              <span className="grow overflow-hidden font-mono text-xs text-ellipsis whitespace-nowrap">
+                {repo.dir.split(/[\\/]/).filter(Boolean).pop() ?? repo.dir}
+              </span>
             </button>
-          </div>
-        </details>
-      </div>
+            {filesError !== null && <div className="text-xs text-err">{filesError}</div>}
+            <div className="flex items-center gap-2 text-xs">
+              <BranchIcon className="h-4 w-4 shrink-0 text-muted" />
+              <span title={repo.branch ?? undefined} className="grow overflow-hidden font-mono text-text text-ellipsis whitespace-nowrap">
+                {repo.branch ?? t('detachedHeadBranch')}
+              </span>
+            </div>
+            {repo.branchChanged && (
+              <div className="text-xs text-err">
+                {t('branchChangedSince', { branch: repo.originBranch ?? '' })}
+              </div>
+            )}
+          </Card>
+        )}
 
+        {worktree !== null && (
+          <div className="flex flex-col gap-1.5">
+            {conflictFiles.length > 0 && (
+              <div className="rounded-lg border border-err/40 bg-err/10 px-2.5 py-2 text-xs flex flex-col gap-1.5">
+                <div>
+                  {t('conflictBlocked', { branch: humanBranch, count: conflictFiles.length })}
+                </div>
+                <div className="flex flex-col gap-0.5 font-mono">
+                  {conflictFiles.map((file) => (
+                    <div key={file}>{file}</div>
+                  ))}
+                </div>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => void handleResolveConflict()}
+                  disabled={running || resolvingConflict || sessionId === null}
+                  title={t('resolveConflictTitle')}
+                >
+                  {t('resolveWithAgent')}
+                </Button>
+                {conflictError && <div className="text-xs text-err">{conflictError}</div>}
+              </div>
+            )}
+            {/* A branch with no commit (a read-only agent, or already integrated) has nothing to integrate. */}
+            {hasCommits && (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => invite?.open()}
+                disabled={integrateDisabled}
+                title={running ? t('waitTurnEnd') : undefined}
+                className="w-full"
+              >
+                {t('reviewAndIntegrate')}
+              </Button>
+            )}
+
+            {/* The destructive choice sits with the manual one: one primary action per block (docs/ui.md). */}
+            <details className="text-xs">
+              <summary className="cursor-pointer select-none text-muted hover:text-text">{t('manualOrDiscard')}</summary>
+              <div className="mt-1.5">
+                <button
+                  type="button"
+                  title={t('copyCommand')}
+                  onClick={() => void navigator.clipboard.writeText(`git cherry-pick ${worktree.base}..${worktree.branch}`)}
+                  className="rounded-lg border border-border bg-code px-2 py-1.5 text-left font-mono text-xs break-all text-text hover:border-border-strong"
+                >
+                  <code>git cherry-pick {worktree.base}..{worktree.branch}</code>
+                </button>
+              </div>
+              <div className="mt-2 flex flex-col gap-1">
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={openDiscard}
+                  disabled={sessionId === null || running || discarding}
+                >
+                  {t('discardWork')}
+                </Button>
+                {discardError && <div className="text-xs text-err">{discardError}</div>}
+              </div>
+            </details>
+          </div>
+        )}
+      </div>
+      <ConfirmDialog
+        open={pendingDiscard}
+        title={t('discardWorkTitle')}
+        body={t('discardWorkBody', { count: preview?.commits.length ?? 0 })}
+        confirmLabel={t('discard')}
+        onConfirm={() => void confirmDiscard()}
+        onCancel={() => setPendingDiscard(false)}
+      />
     </Panel>
   );
 }

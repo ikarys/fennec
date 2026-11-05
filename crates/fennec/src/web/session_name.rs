@@ -1,14 +1,14 @@
-//! Background session-name generation, ported from openfox's
-//! `generateSessionNameForSession`: one model call, no project context, no
-//! thinking, and the result is stored as a `session.name_generated` event.
+//! Background session-name generation:
+//! one model call, no project context, no thinking, and the result is
+//! stored as a `session.name_generated` event.
 
-use super::notifier::{Notifier, NotifyingLog};
 use crate::agent::ports::{Delta, EventLog, Model, Request};
 use crate::config::Settings;
 use crate::domain::event::Event;
 use crate::domain::preferences::ReasoningEffort;
 use crate::domain::session_name;
 use crate::llm::OpenAiClient;
+use crate::notifier::{Notifier, NotifyingLog};
 use crate::store::SqliteStore;
 use serde_json::json;
 use std::sync::Arc;
@@ -48,6 +48,7 @@ fn generate(
         max_tokens: 4096,
         reasoning_effort: Some(ReasoningEffort::None),
         stop: &stop,
+        session: "",
     };
 
     let mut on_delta = |_: Delta| {};
@@ -55,6 +56,22 @@ fn generate(
     let Some(name) = session_name::clean(&completion.content) else {
         eprintln!("fennec: session {session_id}: session name: no usable name");
         return Ok(());
+    };
+
+    // Disambiguate against sibling sessions in the same project so the UI can
+    // tell repeated tasks apart.
+    let project_id = store.session(session_id)?.map(|s| s.project_id);
+    let name = match project_id {
+        Some(project_id) => {
+            let taken: Vec<String> = store
+                .sessions(Some(project_id.as_str()))?
+                .into_iter()
+                .filter(|s| s.id != session_id)
+                .map(|s| s.title)
+                .collect();
+            session_name::disambiguate(&name, &taken)
+        }
+        None => name,
     };
 
     store.rename_session(session_id, &name)?;

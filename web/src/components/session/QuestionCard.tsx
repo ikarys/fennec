@@ -5,6 +5,7 @@
 import type { PendingQuestion } from '../../lib/fold';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
+import { useT } from '../../i18n';
 
 export function QuestionCard({
   question,
@@ -15,24 +16,25 @@ export function QuestionCard({
   onAnswer: (answer: string) => void;
   disabled: boolean;
 }) {
+  const t = useT();
   return (
     <div className="px-6 py-2">
       <Card className="mx-auto max-w-[820px] px-3 py-2">
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-1.5 text-xs font-semibold">
             <span className="text-accent">?</span>
-            <span className="text-accent-strong">Question</span>
+            <span className="text-accent-strong">{t('questionHeader')}</span>
           </div>
           <div className="max-h-48 overflow-y-auto text-sm leading-snug whitespace-pre-wrap [overflow-wrap:break-word]">
             {question.question}
           </div>
           {question.type === 'choice' && question.options.length > 0 && (
-            <div className="flex flex-col items-start gap-1.5">
+            <div className="flex flex-wrap gap-1.5">
               {question.options.map((option, index) => (
                 <Button
                   key={option.value || index}
                   type="button"
-                  variant={index === 0 ? 'primary' : 'secondary'}
+                  variant={option.tone === 'danger' ? 'danger' : index === 0 ? 'primary' : 'secondary'}
                   size="sm"
                   multiline
                   disabled={disabled}
@@ -57,20 +59,20 @@ export function QuestionCard({
                 disabled={disabled}
                 onClick={() => onAnswer('yes')}
               >
-                Oui
+                {t('yes')}
               </Button>
               <Button
                 type="button"
-                variant="secondary"
+                variant="danger"
                 size="sm"
                 disabled={disabled}
                 onClick={() => onAnswer('no')}
               >
-                Non
+                {t('no')}
               </Button>
             </div>
           )}
-          <div className="text-xs text-faint">Ou réponds librement dans la zone de saisie.</div>
+          <div className="text-xs text-faint">{t('answerFreely')}</div>
         </div>
       </Card>
     </div>

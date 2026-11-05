@@ -13,6 +13,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "backlog"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "base64"
 version = "0.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -29,6 +37,15 @@ name = "bytes"
 version = "1.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
+
+[[package]]
+name = "canvas"
+version = "0.1.0"
+dependencies = [
+ "rusqlite",
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "cc"
@@ -178,8 +195,12 @@ checksum = "7360491ce676a36bf9bb3c56c1aa791658183a54d2744120f27285738d90465a"
 name = "fennec"
 version = "0.1.0"
 dependencies = [
+ "backlog",
  "base64",
- "llm-providers",
+ "canvas",
+ "llm-providers-connector",
+ "ring",
+ "rules",
  "rusqlite",
  "serde",
  "serde_json",
@@ -422,8 +443,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4744e383959f0db86ede514b809b1c53251889093803c05267acc7d4e7030d70"
 
 [[package]]
-name = "llm-providers"
-version = "0.1.0"
+name = "llm-providers-connector"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fd2cb05569ac7cd64c3aa2cbc8f3cf9d1238c0d25888cc17134acb228b0d2dc7"
 dependencies = [
  "chacha20poly1305",
  "serde",
@@ -547,6 +570,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "353b74f9810d5b085b6c42c9d86a5f0fdb795553235cdd48753b32e3809d18a7"
 dependencies = [
  "thiserror",
+]
+
+[[package]]
+name = "rules"
+version = "0.1.0"
+dependencies = [
+ "rusqlite",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

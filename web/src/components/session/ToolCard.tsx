@@ -4,13 +4,43 @@ import { useDisplayPrefs } from '../../lib/display';
 import { formatDuration } from '../../lib/format';
 import { previewKindOfPath, relativeToWorkdir } from '../../lib/preview';
 import { usePreviewOpener, usePreviewWorkdir } from '../preview/PreviewContext';
-import { EditIcon, FileIcon, SearchIcon, SpinnerIcon, TerminalIcon } from '../Icons';
+import { EditIcon, EyeIcon, FileIcon, SearchIcon, SpinnerIcon, TerminalIcon } from '../Icons';
 import { toolAnchorId } from '../../lib/vision';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
+import { useLang, useT } from '../../i18n';
 
-export function ToolCard({ tool }: { tool: ToolCallView }) {
+/** The action family's hue, per docs/ui.md's thread tone map: blue reads, orange writes, amber executes. */
+function toolTone(name: string): string {
+  if (name === 'read_file' || name === 'web_search') return 'text-info';
+  if (name === 'write_file' || name === 'edit_file') return 'text-accent';
+  if (name === 'run_command' || name === 'ask_user') return 'text-attention';
+  return 'text-muted';
+}
+
+/** A silent command still shows it is alive: the time since the card appeared. */
+// ponytail: counts from mount, so a reload restarts it; the events carry no timestamp.
+function RunningSince() {
+  const t = useT();
+  const lang = useLang();
+  const [start] = useState(() => Date.now());
+  const [now, setNow] = useState(start);
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  return (
+    <div className="text-muted">
+      {t('runningNoOutput', { duration: formatDuration(lang, now - start) })}
+    </div>
+  );
+}
+
+/** `awaiting`: fennec paused this call for the human's approval (served by the thread view). */
+export function ToolCard({ tool, awaiting = false }: { tool: ToolCallView; awaiting?: boolean }) {
+  const t = useT();
+  const lang = useLang();
   const display = useDisplayPrefs();
   const [open, setOpen] = useState(display.toolResultsOpen);
 
@@ -37,15 +67,16 @@ export function ToolCard({ tool }: { tool: ToolCallView }) {
   const previewRelative =
     previewKind && workdir ? relativeToWorkdir(previewPath, workdir) : undefined;
 
+  const tone = toolTone(tool.name);
   const icon =
     tool.name === 'run_command' ? (
-      <TerminalIcon className="h-[15px] w-[15px] text-muted" />
+      <TerminalIcon className={`h-[15px] w-[15px] ${tone}`} />
     ) : tool.name === 'edit_file' ? (
-      <EditIcon className="h-[15px] w-[15px] text-muted" />
+      <EditIcon className={`h-[15px] w-[15px] ${tone}`} />
     ) : tool.name === 'web_search' ? (
-      <SearchIcon className="h-[15px] w-[15px] text-muted" />
+      <SearchIcon className={`h-[15px] w-[15px] ${tone}`} />
     ) : (
-      <FileIcon className="h-[15px] w-[15px] text-muted" />
+      <FileIcon className={`h-[15px] w-[15px] ${tone}`} />
     );
 
   return (
@@ -58,8 +89,8 @@ export function ToolCard({ tool }: { tool: ToolCallView }) {
           className="flex min-w-0 grow items-center gap-2.5"
         >
           {icon}
-          <span className="shrink-0 font-mono text-[0.7812rem] font-medium">{tool.name}</span>
-          <span title={arg} className="min-w-0 truncate font-mono text-[0.7812rem] text-muted">
+          <span className={`shrink-0 font-mono text-xs font-medium ${tone}`}>{tool.name}</span>
+          <span title={arg} className="min-w-0 truncate font-mono text-xs text-muted">
             {arg}
           </span>
           <span className="grow" />
@@ -69,13 +100,16 @@ export function ToolCard({ tool }: { tool: ToolCallView }) {
             type="button"
             variant="ghost"
             size="sm"
+            iconOnly
             onClick={(event) => {
               event.stopPropagation();
               opener({ path: previewRelative, kind: previewKind });
             }}
             className="shrink-0"
+            title={t('preview')}
+            aria-label={t('preview')}
           >
-            Aperçu
+            <EyeIcon className="h-4 w-4" />
           </Button>
         )}
         {tool.name === 'edit_file' && (
@@ -85,19 +119,29 @@ export function ToolCard({ tool }: { tool: ToolCallView }) {
           </>
         )}
         {tool.name === 'read_file' && lineCount > 0 && (
-          <span className="shrink-0 text-xs whitespace-nowrap text-muted">{lineCount} lignes</span>
+          <span className="shrink-0 text-xs whitespace-nowrap text-muted">{t('linesCount', { count: lineCount })}</span>
+        )}
+        {tool.blockedBy && (
+          <Badge tone="err" className="shrink-0" title={t('ruleRefusedTitle', { scope: tool.blockedBy.scope === 'global' ? t('ruleScopeGlobal') : t('ruleScopeProject'), pattern: tool.blockedBy.pattern })}>
+            {t('verifiedRule')}
+          </Badge>
+        )}
+        {awaiting && (
+          <Badge tone="accent" className="shrink-0" title={t('awaitingApproval')}>
+            {t('awaiting')}
+          </Badge>
         )}
         {tool.name === 'run_command' && tool.status !== 'running' && tool.exitCode != null && (
           <Badge tone={tool.exitCode === 0 ? 'ok' : 'err'} className="shrink-0">
-            vérifié · exit {tool.exitCode}
+            {t('verifiedExit', { code: tool.exitCode })}
           </Badge>
         )}
         {tool.durationMs != null && (
-          <span className="shrink-0 text-xs whitespace-nowrap text-muted">{formatDuration(tool.durationMs)}</span>
+          <span className="shrink-0 text-xs whitespace-nowrap text-muted">{formatDuration(lang, tool.durationMs)}</span>
         )}
         {tool.status === 'running' && tool.name !== 'ask_user' && <SpinnerIcon className="h-4 w-4 text-accent" />}
         {tool.status === 'running' && tool.name === 'ask_user' && (
-          <span className="shrink-0 text-xs whitespace-nowrap text-muted">en attente</span>
+          <span className="shrink-0 text-xs whitespace-nowrap text-muted">{t('awaiting')}</span>
         )}
         {tool.status === 'success' && <span className="text-xs font-semibold text-ok">✓</span>}
         {tool.status === 'error' && <span className="text-xs font-semibold text-err">✗</span>}
@@ -110,7 +154,7 @@ export function ToolCard({ tool }: { tool: ToolCallView }) {
               <img src={tool.image.dataUrl} alt={tool.output} className="max-h-80 p-2.5" />
             ) : (
               <pre className="overflow-x-auto bg-code p-2.5 font-mono text-xs text-muted whitespace-pre">
-                {tool.output || 'Aucune sortie'}
+                {tool.output || t('noOutput')}
               </pre>
             )
           )}
@@ -120,7 +164,7 @@ export function ToolCard({ tool }: { tool: ToolCallView }) {
               {/* w-max: line backgrounds span the longest line when scrolled. */}
               <div className="w-max min-w-full">
                 {(tool.diff?.removed.length ?? 0) === 0 && (tool.diff?.added.length ?? 0) === 0 && (
-                  <div className="px-3.5 py-1 text-muted">Aucun changement</div>
+                  <div className="px-3.5 py-1 text-muted">{t('noChange')}</div>
                 )}
                 {tool.diff?.removed.map((line, index) => (
                   <div key={`removed-${index}`} className="bg-del-bg px-3.5 py-px whitespace-pre text-text">
@@ -140,7 +184,7 @@ export function ToolCard({ tool }: { tool: ToolCallView }) {
 
           {tool.name === 'write_file' && (
             <pre className="overflow-x-auto bg-code p-2.5 font-mono text-xs text-muted whitespace-pre">
-              {(tool.contentPreview ?? []).join('\n') || 'Aucun contenu'}
+              {(tool.contentPreview ?? []).join('\n') || t('noContent')}
             </pre>
           )}
 
@@ -150,16 +194,17 @@ export function ToolCard({ tool }: { tool: ToolCallView }) {
                 <>
                   {tool.stdout && <div>{tool.stdout}</div>}
                   {tool.stderr && <div className="text-err">{tool.stderr}</div>}
+                  {!tool.stdout && !tool.stderr && <RunningSince />}
                 </>
               ) : (
-                <div>{tool.output || tool.error || 'Aucune sortie'}</div>
+                <div>{tool.output || tool.error || t('noOutput')}</div>
               )}
             </div>
           )}
 
           {tool.name === 'ask_user' && (
             <pre className="overflow-x-auto bg-code p-2.5 font-mono text-xs text-muted whitespace-pre">
-              {tool.output || tool.error || 'En attente de réponse'}
+              {tool.output || tool.error || t('awaitingAnswer')}
             </pre>
           )}
         </div>

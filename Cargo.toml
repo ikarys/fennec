@@ -1,8 +1,9 @@
 [workspace]
 resolver = "3"
-members = ["crates/fennec", "crates/llm-providers", "crates/token-usage"]
+members = ["crates/backlog", "crates/canvas", "crates/fennec", "crates/rules", "crates/token-usage"]
 
 [workspace.package]
+version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-only"
 
