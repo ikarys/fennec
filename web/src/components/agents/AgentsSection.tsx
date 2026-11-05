@@ -9,6 +9,7 @@
 import { useEffect, useState } from 'react';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
+import { Card } from '../ui/Card';
 import { Section } from '../ui/Section';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { ChevronRightIcon, TrashIcon } from '../Icons';
@@ -89,7 +90,7 @@ function AgentRow({
 }) {
   const t = useT();
   return (
-    <li className="flex items-center gap-3 py-2.5 transition-colors hover:bg-accent-soft">
+    <li className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-accent-soft">
       <div className="min-w-0 grow">
         <div className="flex items-baseline gap-2">
           <span className="truncate text-sm font-medium">{agent.name}</span>
@@ -284,23 +285,36 @@ export function AgentsSection() {
         ? ORIGIN_SECTIONS.map(({ origin, title, description, empty }) => {
             const agents = overview.agents.filter((agent) => agent.origin === origin);
             if (origin === 'project' && agents.length === 0) return null;
+            const head = (
+              <>
+                <div className="min-w-0 grow">
+                  <div className="text-sm font-semibold text-text">{t(title)}</div>
+                  <div className="text-xs text-muted">{t(description)}</div>
+                </div>
+                <Badge tone="neutral" pill>
+                  {agents.length}
+                </Badge>
+              </>
+            );
+            const body = agents.length === 0 ? <p className="px-4 py-3 text-xs text-muted">{t(empty)}</p> : list(agents);
             return (
-              <Section key={origin} title={t(title)} description={t(description)} flush>
-                {agents.length === 0 ? (
-                  <p className="py-3 text-xs text-muted">{t(empty)}</p>
-                ) : origin === 'default' ? (
+              <Card key={origin} className="overflow-hidden">
+                {origin === 'default' ? (
                   // Fennec's defaults never change: folded, they leave the human's own agents in view.
                   <details className="group">
-                    <summary className="-mx-2 flex h-9 cursor-pointer list-none items-center gap-2 rounded px-2 text-sm select-none hover:bg-accent-soft [&::-webkit-details-marker]:hidden">
+                    <summary className="flex cursor-pointer list-none items-center gap-3 border-border bg-raised px-4 py-2.5 select-none hover:bg-accent-soft group-open:border-b [&::-webkit-details-marker]:hidden">
                       <ChevronRightIcon className="h-3 w-3 shrink-0 text-muted transition-transform group-open:rotate-90" />
-                      {t('agentsDefaultShow', { count: agents.length })}
+                      {head}
                     </summary>
-                    {list(agents)}
+                    {body}
                   </details>
                 ) : (
-                  list(agents)
+                  <>
+                    <div className="flex items-center gap-3 border-b border-border bg-raised px-4 py-2.5">{head}</div>
+                    {body}
+                  </>
                 )}
-              </Section>
+              </Card>
             );
           })
         : null}
