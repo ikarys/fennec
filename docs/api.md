@@ -253,7 +253,7 @@ read-only. The human edits them as usual.
   - `projects` `[{project, yours, running, ready, drafts, done, queue}]`: the projects with at least one idea or a
     running queue; `project` `{id, name}`, the counts are its board's stages, `queue` `{running, autonomous, next}`
     (`next` `{id, text, title} | null`); a running queue first, then most `yours`, most `ready`, then by name
-- `GET /api/projects/{id}/commands` → `[{name, description}]`: the slash commands the composer offers (`compact`, then the project's skills); 404 if no project
+- `GET /api/projects/{id}/commands` → `[{name, description, kind}]`: the slash commands the composer offers (`compact`, then the project's skills); `kind` is `command` or `skill`; 404 if no project
 - `GET /api/projects/{id}/agents` → `[{id, name, description, color, subagent, composer, phase, workflow, origin}]`: the
   project's agents ordered by `phase` (`start`, `frame`, `build`, `understand`, `check`; null last, for
   sub-agents and agents without one), discovery order within a phase (`color` null when unset; `workflow` the

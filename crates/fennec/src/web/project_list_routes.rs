@@ -99,7 +99,7 @@ pub(super) fn list_commands(app: &App, stream: &mut TcpStream, id: &str) -> Resu
     let list = commands(&skills::discover(Path::new(&project.workdir)));
     let out: Vec<Value> = list
         .into_iter()
-        .map(|command| json!({ "name": command.name, "description": command.description }))
+        .map(|command| json!({ "name": command.name, "description": command.description, "kind": command.kind.wire() }))
         .collect();
     send_json(stream, 200, &Value::Array(out))
 }
