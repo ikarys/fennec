@@ -240,6 +240,8 @@ read-only. The human edits them as usual.
 - `POST /api/projects` `{workdir}` → the project (400 if not a directory, or inside fennec's store)
 - `POST /api/projects/{id}/delete` `{deleteFolder?}` → `{deleted: true, folderDeleted, folderError}`: deletes the project with every top-level session as `POST /api/sessions/delete` does (logs, children, worktrees, branches, session rules), then its project rules, its ideas backlog and the project. With `deleteFolder: true` the source folder is removed from disk afterwards; a failure there comes back as `folderError` (the project is already gone). 404 for an unknown project; 409 `{error}` while its queue runs, `{error, running}` while one of its sessions runs a turn, `{error, sessionId}` when a worktree cannot be removed (the project and the sessions not yet removed stay); 400 when the folder is the filesystem root, the home directory or an ancestor of it, or holds fennec's store (nothing is deleted then). The usage ledger keeps the calls.
 - `POST /api/projects/{id}/favorite` `{favorite}` → `{ok: true}`: pins or unpins the project (400 if `favorite` is missing or not a boolean; 404 for an unknown project)
+- `GET /api/projects/{id}/budget` → `{limitUsd, label, figure, detail, tone, active}`: the project's monthly budget and what it spent this month, display-ready; 404 if no project. `limitUsd` is null when none is set; `tone` is `ok`, `attention`, `err` or `neutral`; `active` is true when a budget is set
+- `POST /api/projects/{id}/budget` `{limitUsd: number | null}` → the same as `GET`; 400 when `limitUsd` is not a finite number > 0 (null removes the budget); 404 if no project
 - `GET /api/backlog` → `{total, projects}`: the cross-project Backlog page, one row per project (the idea lists
   live in each project's Tasks tab):
   - `total` `{yours, running, ready, drafts, done, projects}`: counts across all projects; `ready` sums each
@@ -651,9 +653,11 @@ read-only. The human edits them as usual.
   as `GET`; appends `mcp.disabled` (the full disabled set, last wins); 404 if
   no session
 - `POST /api/sessions/{id}/stop` → 202; the turn ends with `chat.done` reason `"stopped"`
-- `GET /api/notices` → Server-Sent Events. One event when a top-level session's turn ends, so the UI can
-  notify the human wherever they are in fennec; child sessions stay silent. Each event is
-  `data: {"sessionId": ..., "title": ..., "projectId": ...}`; no backlog is sent on connect.
+- `GET /api/notices` → Server-Sent Events. A snapshot of what needs the human, sent on connect and
+  re-sent when it changes; child sessions stay silent. Each event is
+  `data: {"items": [...], "budgets": [...]}`; `items` are the attention items (`sessionId`, `title`,
+  `projectId`, `kind`, `detail`), `budgets` one entry per project whose monthly budget is at alert
+  or exceeded (`projectId`, `project`, `status` `alert`|`exceeded`, `detail`); no backlog is sent on connect.
 - `GET /api/sessions/{id}/events` → Server-Sent Events. Each stored event is sent as
 
   ```

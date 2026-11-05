@@ -7,7 +7,7 @@ use crate::agent::turn::Turn;
 use crate::agents;
 use crate::config::Settings;
 use crate::domain::clock;
-use crate::domain::event::Event;
+use crate::domain::event::{DoneReason, Event};
 use crate::domain::kernel_rules;
 use crate::domain::lang::Lang;
 use crate::domain::mcp;
@@ -77,6 +77,27 @@ pub fn with_turn<R>(
     // loaded per turn so a rule changed in the UI applies from the next turn.
     let rule_store = rules::RuleStore::open(&settings.rules_path()).map_err(|e| e.to_string())?;
     let session = store.session(session_id)?;
+    // The budget is a human decision the kernel enforces before any turn starts:
+    // every path that starts a turn (web, CLI, the ideas queue, workflow children)
+    // goes through `with_turn`.
+    if let Some(session) = &session
+        && let Err(refusal) = crate::budget::check(settings, store, &session.project_id)
+    {
+        let error = Event::ChatError {
+            error: refusal.clone(),
+            recoverable: false,
+        };
+        log.append(session_id, &error)?;
+        (options.on_event)(&error);
+        let done = Event::ChatDone {
+            message_id: String::new(),
+            reason: DoneReason::Error,
+            duration_ms: None,
+        };
+        log.append(session_id, &done)?;
+        (options.on_event)(&done);
+        return Err(refusal);
+    }
     // The kernel's own rules come with them, CLI and workflow shell nodes included.
     let rules = kernel_rules::with_kernel(match &session {
         Some(session) => rule_store

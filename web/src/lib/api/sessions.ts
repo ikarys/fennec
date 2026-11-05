@@ -10,6 +10,13 @@ export type SessionState =
   | "idle"
   | "waiting_for_user";
 
+export interface BudgetNotice {
+  projectId: string;
+  project: string;
+  status: 'alert' | 'exceeded';
+  detail: string;
+}
+
 export interface SessionSummary {
   id: string;
   title: string;
