@@ -304,7 +304,7 @@ sealed with `secret.key`, next to the store (lose it and the stored keys are los
 5. **Storage is SQLite** (`rusqlite`, bundled). No other new
    dependency without a stated reason in the commit body. Stdlib first.
 6. Licence: AGPL-3.0-only; the MIT notice of the code fennec started from is kept in THIRD_PARTY.md.
-   The repository stays private until contribution terms are decided.
+   Contributions come in under the same licence (inbound = outbound, no CLA): `CONTRIBUTING.md`.
 
 ## Style
 
