@@ -263,6 +263,16 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
   }
 
   /** A connect stores the server's tools on the server side: the page's copy is read again. */
+  /** Stores one server's tool switches only: the group's other edits stay unsaved. */
+  async function saveMcpTools(name: string, disabledTools: string[]) {
+    if (!settings) return;
+    const stored = settings.preferences.mcp ?? [];
+    // A server renamed but not saved yet is not in the store: its switches wait for Save.
+    if (!stored.some((server) => server.name === name)) return;
+    const mcp = stored.map((server) => (server.name === name ? { ...server, disabledTools } : server));
+    onSaved(await saveSettings({ ...settings.preferences, mcp }));
+  }
+
   async function reloadMcp() {
     const response = await getSettings();
     onSaved(response);
@@ -428,6 +438,7 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
                   onChange={updateMcp}
                   toolViews={settings.mcpTools ?? {}}
                   onConnected={reloadMcp}
+                  onToolsChange={saveMcpTools}
                 />
               </>
             )}
