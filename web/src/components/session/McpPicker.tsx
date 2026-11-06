@@ -3,6 +3,7 @@ import type { McpSessionView, McpServerView } from '../../lib/api';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { SectionLabel } from '../ui/SectionLabel';
+import { Switch } from '../ui/Switch';
 import { useLang, useT } from '../../i18n';
 import { formatTokens } from '../../lib/format';
 
@@ -54,26 +55,20 @@ export function McpPicker({ view, onToggle, disabled }: McpPickerProps) {
 
   function row(server: McpServerView) {
     return (
-      <label key={server.name} className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm text-text hover:bg-bg">
-        <span
-          className="h-2 w-2 shrink-0 rounded-full"
-          style={{ backgroundColor: server.active ? 'var(--ok)' : 'var(--border)' }}
-          aria-hidden
-        />
-        <input
-          type="checkbox"
+      <div key={server.name} className="flex items-center gap-2 rounded px-1.5 py-1 text-sm text-text hover:bg-bg">
+        <Switch
           checked={server.active}
-          onChange={() => onToggle(server.name, !server.active)}
-          className="h-4 w-4 accent-[var(--accent)]"
+          onChange={(on) => onToggle(server.name, on)}
+          label={server.name}
         />
         <span className="min-w-0 grow truncate">{server.name}</span>
         <span className="shrink-0 text-xs text-muted">
           {t('toolsCount', { count: server.toolCount })}
         </span>
-        {server.active && server.tokens > 0 && (
-          <span className="shrink-0 text-xs text-muted">{formatTokens(lang, server.tokens)}</span>
-        )}
-      </label>
+        <span className={`shrink-0 text-xs tabular-nums ${server.active ? 'text-accent' : 'text-faint'}`}>
+          {t('mcpTokens', { count: formatTokens(lang, server.enabledToolTokens) })}
+        </span>
+      </div>
     );
   }
 
@@ -96,7 +91,7 @@ export function McpPicker({ view, onToggle, disabled }: McpPickerProps) {
         </span>
       </Button>
       {open && (
-        <Card className="absolute bottom-full right-0 z-10 mb-1 w-72 max-h-80 overflow-y-auto p-2">
+        <Card className="absolute bottom-full right-0 z-10 mb-1 w-80 max-h-80 overflow-y-auto p-2">
           <SectionLabel>{t('mcpServersLabel')}</SectionLabel>
           {visible.length === 0 ? (
             <p className="m-0 px-1.5 text-xs text-muted">
