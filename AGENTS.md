@@ -50,6 +50,7 @@ crates/fennec/src/
     agent.rs           an agent (mode) and its reminder; frontmatter.rs the shared YAML header
     attachment.rs      images sent to the model: sniffing, data URLs, limits
     replay.rs          which message the human may replay
+    named_paths.rs     paths the human wrote in their messages or answers: a read there needs no approval
     rule_approval.rs   the call paused for the human's approval, folded from the log; the four answers
     kernel_rules.rs    the rules fennec's kernel enforces itself: the git commands that push or move a branch, blocked
     waiver.rs          a protected file's waiver: the pending request, the active grants, the ADR a grant writes
@@ -243,7 +244,7 @@ tests.
    pattern where none existed (the review gate is to catch it). The human's rules are
    kernel code too; command rules match parsed tokens, so `eval`, a variable (`$X -rf`) or
    a script written then run slips past them: a guard rail, the sandbox stays the wall. A file
-   tool outside the workdir needs an allow rule or the human's approval; the sandbox does not read the rules (it still hides
+   tool outside the workdir needs an allow rule or the human's approval (a read of a path the human wrote in the session needs neither); the sandbox does not read the rules (it still hides
    `~/.ssh` from commands). A session's worktree shares its `.git/worktrees/<id>`, so its refs, with the human's
    repository: with the sandbox off a command could push, move or delete a branch, and `git push` reaches the remote
    even sandboxed when the network is on. The kernel's own block rules (`domain/kernel_rules.rs`: `git push`,

@@ -241,3 +241,8 @@ cut or not) is rendered as a Seatbelt profile run by `/usr/bin/sandbox-exec`, ev
 the main checkout's dependency directories are linked into a worktree instead of mounted. Commands write their own
 TMPDIR, not /tmp. Known gap: a protected file's parent directory can be renamed (`tools/sandbox/seatbelt.rs`,
 `tools/sandbox.rs`, `turn_build.rs`).
+
+Paths the human named, done: a file tool reading outside the project runs without an approval when the human
+already wrote that path, or a folder above it, in a message or an answer of the session (`~/`, Windows
+`\\wsl.localhost\<distro>\` paths included); writes, commands and the human's own Ask rules still ask
+(`domain/named_paths.rs`, `agent/tool_calls.rs`).
