@@ -3,7 +3,8 @@ import type { McpSessionView, McpServerView } from '../../lib/api';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { SectionLabel } from '../ui/SectionLabel';
-import { useT } from '../../i18n';
+import { useLang, useT } from '../../i18n';
+import { formatTokens } from '../../lib/format';
 
 interface McpPickerProps {
   view: McpSessionView | null;
@@ -18,6 +19,7 @@ interface McpPickerProps {
  */
 export function McpPicker({ view, onToggle, disabled }: McpPickerProps) {
   const t = useT();
+  const lang = useLang();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -47,7 +49,7 @@ export function McpPicker({ view, onToggle, disabled }: McpPickerProps) {
   const anyActive = activeCount > 0;
   const label =
     view && visible.length > 0
-      ? `${activeCount} MCP${view.totalTokens > 0 ? ` (${view.totalTokens})` : ''}`
+      ? `${activeCount} MCP${view.totalTokens > 0 ? ` (${formatTokens(lang, view.totalTokens)})` : ''}`
       : 'MCP';
 
   function row(server: McpServerView) {
@@ -69,7 +71,7 @@ export function McpPicker({ view, onToggle, disabled }: McpPickerProps) {
           {t('toolsCount', { count: server.toolCount })}
         </span>
         {server.active && server.tokens > 0 && (
-          <span className="shrink-0 text-xs text-muted">{server.tokens}</span>
+          <span className="shrink-0 text-xs text-muted">{formatTokens(lang, server.tokens)}</span>
         )}
       </label>
     );
