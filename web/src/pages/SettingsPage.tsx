@@ -44,6 +44,9 @@ import { WorkflowsSection } from '../components/settings/WorkflowsSection';
 import { useT } from '../i18n';
 import type { MsgKey } from '../i18n/messages';
 
+/** The pause after the last edit before the page stores it. */
+const AUTOSAVE_DELAY_MS = 800;
+
 interface SettingsPageProps {
   /** The tab named in the address (`#/settings/security`), when it names one. */
   initialTab?: string | null;
@@ -87,6 +90,9 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const [autoSave, setAutoSave] = useState<{ saving: boolean; error: string | null }>({ saving: false, error: null });
+  const latestForm = useRef(form);
+  latestForm.current = form;
   const [tab, setTab] = useState<SettingsTab>(
     () => TABS.find((item) => item.id === initialTab)?.id ?? (initialTab ? LEGACY_TABS[initialTab] : undefined) ?? 'models'
   );
@@ -263,16 +269,6 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
   }
 
   /** A connect stores the server's tools on the server side: the page's copy is read again. */
-  /** Stores one server's tool switches only: the group's other edits stay unsaved. */
-  async function saveMcpTools(name: string, disabledTools: string[]) {
-    if (!settings) return;
-    const stored = settings.preferences.mcp ?? [];
-    // A server renamed but not saved yet is not in the store: its switches wait for Save.
-    if (!stored.some((server) => server.name === name)) return;
-    const mcp = stored.map((server) => (server.name === name ? { ...server, disabledTools } : server));
-    onSaved(await saveSettings({ ...settings.preferences, mcp }));
-  }
-
   async function reloadMcp() {
     const response = await getSettings();
     onSaved(response);
@@ -312,24 +308,51 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
   );
   const current = useMemo(() => (settings && form ? buildPreferences(form, settings) : null), [settings, form]);
 
-  function groupSave(group: SaveGroup): SectionSave {
-    const { prefs, form: fields } = SAVE_GROUPS[group];
-    return {
-      dirty:
-        baseline !== null &&
-        current !== null &&
-        prefs.some((key) => JSON.stringify(current[key]) !== JSON.stringify(baseline[key])),
-      onSave: async () => {
-        if (!settings || !current) return;
-        const patch = Object.fromEntries(prefs.map((key) => [key, current[key]])) as Partial<Preferences>;
-        const response = await saveSettings({ ...settings.preferences, ...patch });
-        const fresh = toForm(response.preferences, response.listings);
-        setForm((previous) =>
-          previous ? { ...previous, ...Object.fromEntries(fields.map((key) => [key, fresh[key]])) } : previous
+  function isDirty(group: SaveGroup): boolean {
+    return (
+      baseline !== null &&
+      current !== null &&
+      SAVE_GROUPS[group].prefs.some((key) => JSON.stringify(current[key]) !== JSON.stringify(baseline[key]))
+    );
+  }
+
+  /** Stores the groups' preferences; the form takes the stored values back unless edited meanwhile. */
+  async function saveGroups(groups: SaveGroup[]) {
+    if (!settings || !current) return;
+    const prefs = groups.flatMap((group) => SAVE_GROUPS[group].prefs);
+    const fields = groups.flatMap((group) => SAVE_GROUPS[group].form);
+    const patch = Object.fromEntries(prefs.map((key) => [key, current[key]])) as Partial<Preferences>;
+    const sent = latestForm.current;
+    const response = await saveSettings({ ...settings.preferences, ...patch });
+    const fresh = toForm(response.preferences, response.listings);
+    // A keystroke typed during the request wins: the next autosave stores it.
+    setForm((previous) =>
+      previous && previous === sent
+        ? { ...previous, ...Object.fromEntries(fields.map((key) => [key, fresh[key]])) }
+        : previous
+    );
+    onSaved(response);
+  }
+
+  // Autosave: every dirty group in one request, once the human pauses typing. One request
+  // at a time; the stored copy it returns re-runs this effect if edits came in meanwhile.
+  useEffect(() => {
+    const groups = (Object.keys(SAVE_GROUPS) as SaveGroup[]).filter(isDirty);
+    if (groups.length === 0 || autoSave.saving) return;
+    const timer = window.setTimeout(() => {
+      setAutoSave({ saving: true, error: null });
+      saveGroups(groups)
+        .then(() => setAutoSave({ saving: false, error: null }))
+        .catch((err) =>
+          setAutoSave({ saving: false, error: err instanceof Error ? err.message : t('settingsSaveError') })
         );
-        onSaved(response);
-      }
-    };
+    }, AUTOSAVE_DELAY_MS);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `current` and `baseline` carry every edit
+  }, [current, baseline, autoSave.saving]);
+
+  function groupSave(group: SaveGroup): SectionSave {
+    return { dirty: isDirty(group), onSave: () => saveGroups([group]), auto: autoSave };
   }
 
   if (!settings || !form) {
@@ -438,7 +461,6 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
                   onChange={updateMcp}
                   toolViews={settings.mcpTools ?? {}}
                   onConnected={reloadMcp}
-                  onToolsChange={saveMcpTools}
                 />
               </>
             )}
