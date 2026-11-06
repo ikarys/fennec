@@ -277,6 +277,7 @@ mod tests {
 read line
 echo '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2.0","capabilities":{},"serverInfo":{"name":"read","version":"0"}}}'
 read line
+read line
 echo '{"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"file","description":"f","inputSchema":{"type":"object"}}]}}'
 "#;
         let mut prefs = Preferences {
@@ -322,6 +323,7 @@ echo '{"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"file","description":"f
         let script = r#"
 read line
 echo '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2.0","capabilities":{},"serverInfo":{"name":"a","version":"0"}}}'
+read line
 read line
 echo '{"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"b_tool","description":"t","inputSchema":{"type":"object"}}]}}'
 "#;
