@@ -2,6 +2,9 @@
 
 pub const REPO_URL: &str = "https://github.com/ikarys/fennec";
 
+/// The changelog release-please keeps on main.
+pub const CHANGELOG_URL: &str = "https://github.com/ikarys/fennec/blob/main/CHANGELOG.md";
+
 const INSTALL_SCRIPT: &str = include_str!("../../../install.sh");
 
 use std::io::Write;
