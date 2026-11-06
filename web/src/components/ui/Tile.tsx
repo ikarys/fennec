@@ -92,6 +92,17 @@ export function Tile({
 
   const className = `${SHELL} ${s.shell} ${stateClass}${onClick ? ` ${INTERACTIVE}` : ''}`;
 
+  const inline = size === 'sm';
+  const figureNode = (
+    <span
+      className={`font-semibold leading-none tabular-nums ${s.figure} ${active ? ACTIVE_FIGURES[tone] : 'text-text'}${
+        inline ? ' ml-auto' : ''
+      }`}
+    >
+      {figure}
+    </span>
+  );
+
   const content = (
     <>
       {active ? (
@@ -106,18 +117,18 @@ export function Tile({
         </span>
         <span className={`${s.label} font-medium text-text`}>{label}</span>
         {pulse ? <span className="ml-auto h-2 w-2 rounded-full animate-pulse bg-accent" /> : null}
+        {/* A small tile keeps its figure on the label's line: a row of them stays one line high. */}
+        {inline ? figureNode : null}
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <span
-          className={`font-semibold leading-none tabular-nums ${s.figure} ${
-            active ? ACTIVE_FIGURES[tone] : 'text-text'
-          }`}
-        >
-          {figure}
-        </span>
-        {detail ? <span className="max-w-full truncate text-xs text-muted">{detail}</span> : null}
-      </div>
+      {inline ? (
+        detail ? <span className="max-w-full truncate text-right text-xs text-muted">{detail}</span> : null
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          {figureNode}
+          {detail ? <span className="max-w-full truncate text-xs text-muted">{detail}</span> : null}
+        </div>
+      )}
     </>
   );
 
