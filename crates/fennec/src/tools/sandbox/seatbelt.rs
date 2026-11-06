@@ -67,17 +67,22 @@ pub(super) fn probe() -> std::io::Result<std::process::Output> {
 
 /// The workdir's own temp dir, the only one its commands may write (`TMPDIR` points there): bwrap
 /// gives each command a fresh /tmp, Seatbelt cannot, and the host's temp dir holds other files.
-/// ponytail: kept across commands of the same workdir and never removed (macOS purges old temp
-/// files); a fresh dir per command if a stale file ever matters.
+/// Kept across the workdir's commands, removed with its worktree (`remove_private_tmp`).
 pub(super) fn private_tmp(workdir: &Path) -> PathBuf {
+    let dir = private_tmp_path(workdir);
+    let _ = std::fs::create_dir_all(&dir);
+    dir
+}
+
+/// Where `private_tmp` lives, without creating it. The workdir must still exist: its canonical
+/// path is the key.
+pub(super) fn private_tmp_path(workdir: &Path) -> PathBuf {
     use std::hash::{Hash, Hasher};
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     canonicalize(workdir).hash(&mut hasher);
-    let dir = std::env::temp_dir()
+    std::env::temp_dir()
         .join("fennec-sandbox")
-        .join(format!("{:016x}", hasher.finish()));
-    let _ = std::fs::create_dir_all(&dir);
-    dir
+        .join(format!("{:016x}", hasher.finish()))
 }
 
 fn canonicalize(path: impl AsRef<Path>) -> PathBuf {
@@ -311,6 +316,17 @@ mod tests {
             .expect("writable rule");
 
         assert!(hidden_pos < writable_pos);
+    }
+
+    #[test]
+    fn remove_private_tmp_removes_the_workdirs_temp_dir() {
+        let workdir = temp_dir();
+        let tmp = private_tmp(&workdir);
+        std::fs::write(tmp.join("left.o"), "build").unwrap();
+
+        super::super::remove_private_tmp(&workdir);
+
+        assert!(!tmp.exists());
     }
 
     #[test]

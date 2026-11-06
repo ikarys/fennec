@@ -136,6 +136,7 @@ pub fn remove_orphan(root: &Path, name: &str) -> Result<(), String> {
 
     let path = root.join(name);
     let (repo_top, _) = repository(&path);
+    crate::tools::remove_private_tmp(&path);
 
     match fs::remove_dir_all(&path) {
         Ok(()) => {}
