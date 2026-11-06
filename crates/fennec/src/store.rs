@@ -184,7 +184,8 @@ impl SqliteStore {
 
     /// A project's last activity: the newest event of its top-level sessions, else their creation.
     const RECENT_ACTIVITY: &str = "(SELECT MAX(COALESCE(
-        (SELECT MAX(e.timestamp) FROM events e WHERE e.session_id = s.id),
+        (SELECT e.timestamp FROM events e WHERE e.session_id = s.id
+            ORDER BY e.seq DESC LIMIT 1),
         CAST(s.created_at AS INTEGER)))
      FROM sessions s WHERE s.project_id = p.id AND s.parent_id IS NULL)";
 
