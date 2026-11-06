@@ -18,3 +18,14 @@ export function applyUpdate(): Promise<{ restarting: boolean; latest: string }> 
     body: JSON.stringify({}),
   });
 }
+
+export interface VersionInfo {
+  version: string;
+  /** The local build's number (`<commits>.<sha>[-dirty]`), null for a release. */
+  build: string | null;
+  changelogUrl: string;
+}
+
+export function getVersion(): Promise<VersionInfo> {
+  return request<VersionInfo>('/api/version');
+}

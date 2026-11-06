@@ -157,7 +157,7 @@ function AttentionBell({ attention, onOpen }: { attention: AttentionItem[]; onOp
   );
 }
 
-/** The binary's version and local build number, fetched once; muted next to the wordmark, hidden when the fetch fails. */
+/** The binary's version and local build number, fetched once; a link to Settings' About tab, hidden when the fetch fails. */
 function VersionTag() {
   const [version, setVersion] = useState<string | null>(null);
   const [build, setBuild] = useState<string | null>(null);
@@ -175,9 +175,13 @@ function VersionTag() {
   if (!version) return null;
   const label = build ? `${version} · #${build.split('.')[0]}` : version;
   return (
-    <span className="text-xs font-normal text-muted" title={build ? `build ${build}` : undefined}>
+    <a
+      href="#/settings/about"
+      className="self-center text-xs font-normal text-muted hover:text-accent"
+      title={build ? `build ${build}` : undefined}
+    >
       {label}
-    </span>
+    </a>
   );
 }
 
@@ -267,8 +271,8 @@ export function TopBar({
       >
         <FoxIcon className="h-5 w-5 text-accent" />
         <span>fennec</span>
-        <VersionTag />
       </a>
+      <VersionTag />
 
       {/* The "+" never guesses a project: the open session's comes first, then the others by recent use (the chat has its own button). */}
       <div className="self-center">
