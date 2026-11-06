@@ -257,6 +257,7 @@ just                # build the UI and run the release server on :7777
 just check          # the gate before any commit: fmt, clippy -D warnings, tests, UI lint, UI tests, UI build
 just test-web       # the Vitest tests of the UI's pure modules (folds, plan contract)
 just dev            # server + Vite dev server on :5173
+just install        # release build with a local build number (<commits>.<sha>) into ~/.local/bin, service restarted
 just setup          # once per clone: the git hooks (Conventional Commits, no direct push to main/develop)
 just promote        # open the PR develop → main; release-please then prepares the release
 ```

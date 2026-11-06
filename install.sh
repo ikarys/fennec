@@ -1,5 +1,5 @@
 #!/bin/sh
-# Installs the fennec Linux binary from GitHub Releases.
+# Installs the fennec Linux binary from GitHub Releases, or a local build.
 #
 # One-liner:
 #   curl -fsSL https://raw.githubusercontent.com/ikarys/fennec/main/install.sh | sh
@@ -9,6 +9,7 @@
 #   FENNEC_INSTALL_DIR   install directory (default: $HOME/.local/bin)
 #   FENNEC_REPO_URL      repository URL for releases (default: https://github.com/ikarys/fennec)
 #   FENNEC_SERVICE       none: do not manage a systemd user service; keep: do not restart an existing service
+#   FENNEC_LOCAL_BINARY  install this local binary instead of downloading a release (just install)
 
 set -eu
 
@@ -173,6 +174,14 @@ main() {
         INSTALL_DIR="$FENNEC_INSTALL_DIR"
     else
         INSTALL_DIR="${HOME:-}/.local/bin"
+    fi
+
+    if [ -n "${FENNEC_LOCAL_BINARY:-}" ]; then
+        [ -f "$FENNEC_LOCAL_BINARY" ] || fail "local binary not found: $FENNEC_LOCAL_BINARY"
+        install_binary "$FENNEC_LOCAL_BINARY" "$INSTALL_DIR"
+        install_service "$INSTALL_DIR"
+        printf 'fennec %s installed to %s\n' "$("$INSTALL_DIR/fennec" --version | sed 's/^fennec //')" "$INSTALL_DIR/fennec"
+        return 0
     fi
 
     REPO_URL="${FENNEC_REPO_URL:-https://github.com/ikarys/fennec}"
