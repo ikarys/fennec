@@ -190,7 +190,8 @@ These are defaults: the Settings page adds providers and overrides parameters pe
 
 ## Documentation
 
-- [AGENTS.md](AGENTS.md): architecture, conventions, contributor guide
+- [CONTRIBUTING.md](CONTRIBUTING.md): how to contribute, licence of contributions
+- [AGENTS.md](AGENTS.md): architecture, conventions
 - [docs/api.md](docs/api.md): HTTP API and event format
 - [docs/workflows.md](docs/workflows.md): workflow format and run semantics
 - [docs/ui.md](docs/ui.md): UI design rules
