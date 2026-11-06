@@ -33,6 +33,7 @@ import { StatusBar } from './components/layout/StatusBar';
 const WorkflowsPage = lazy(() => import('./pages/WorkflowsPage'));
 const ProjectPage = lazy(() => import('./pages/ProjectPage'));
 const BacklogPage = lazy(() => import('./pages/BacklogPage'));
+const ChangesPage = lazy(() => import('./pages/ChangesPage'));
 
 export default function App() {
   const [route, setRoute] = useState<Route>(() => parseRoute(window.location.hash));
@@ -273,7 +274,7 @@ export default function App() {
 
   // The `+` of the bar: the project of the session on screen, else the most recent one.
   const currentProjectId = useMemo(() => {
-    const sessionId = route.name === 'session' ? route.id : route.name === 'new' ? route.id : null;
+    const sessionId = route.name === 'session' || route.name === 'changes' ? route.id : route.name === 'new' ? route.id : null;
     if (!sessionId) return undefined;
     if (route.name === 'new') return sessionId;
     return projects.find((project) => project.sessions.some((session) => session.id === sessionId))?.id;
@@ -287,7 +288,7 @@ export default function App() {
   // The status bar's surfaces: the session on screen and its project, a
   // project page route its own id; the global blocks come back regardless.
   const statusBarIds = useMemo(() => {
-    if (route.name === 'session') return { sessionId: route.id, projectId: currentProjectId ?? undefined };
+    if (route.name === 'session' || route.name === 'changes') return { sessionId: route.id, projectId: currentProjectId ?? undefined };
     if (route.name === 'new') return { sessionId: undefined, projectId: route.id };
     if (route.name === 'project') return { sessionId: undefined, projectId: route.projectId };
     return { sessionId: undefined, projectId: undefined };
@@ -472,6 +473,10 @@ export default function App() {
               onOpenPage={(page) => navigate(PAGE_TABS.find((candidate) => candidate.page === page)?.path ?? '#/')}
               onOpenProject={(projectId) => navigate(`#/project/${encodeURIComponent(projectId)}`)}
             />
+          ) : route.name === 'changes' ? (
+            <Suspense fallback={<div className="flex grow items-center justify-center text-muted">{t(language, 'loading')}</div>}>
+              <ChangesPage sessionId={route.id} />
+            </Suspense>
           ) : (
             <SessionPage
               sessionId={route.name === 'session' ? route.id : null}

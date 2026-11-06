@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import type { ThreadView } from '../../lib/fold';
-import { previewKindOfPath, relativeToWorkdir, type PreviewKind } from '../../lib/preview';
-import { usePreviewOpener, usePreviewWorkdir } from '../preview/PreviewContext';
-import { EyeIcon, FileIcon } from '../Icons';
-import { Button } from '../ui/Button';
+import { relativeToWorkdir } from '../../lib/preview';
+import { usePreviewWorkdir } from '../preview/PreviewContext';
+import { ChevronRightIcon, FileIcon } from '../Icons';
 import { Panel } from '../ui/Panel';
 import { useT } from '../../i18n';
+import { changesPath } from '../../lib/route';
 
 interface ModifiedFilesSectionProps {
   modifiedFiles: ThreadView['modifiedFiles'];
@@ -14,92 +14,43 @@ interface ModifiedFilesSectionProps {
 
 export function ModifiedFilesSection({ modifiedFiles, sessionId }: ModifiedFilesSectionProps) {
   const t = useT();
-  const opener = usePreviewOpener();
   const workdir = usePreviewWorkdir();
-  const [filesExpanded, setFilesExpanded] = useState(false);
 
-  useEffect(() => {
-    // A tab change collapses the file list.
-    setFilesExpanded(false);
-  }, [sessionId]);
-
-  const mergedFiles = useMemo(() => {
-    const merged = new Map<string, { key: string; added: number; removed: number; kind?: PreviewKind }>();
+  const totals = useMemo(() => {
+    const merged = new Map<string, { added: number; removed: number }>();
     for (const file of modifiedFiles) {
-      // The same file arrives absolute and relative: one entry per project path.
       const key = (workdir ? relativeToWorkdir(file.path, workdir) : undefined) ?? file.path;
-      const entry: { key: string; added: number; removed: number; kind?: PreviewKind } = merged.get(key) ?? { key, added: 0, removed: 0 };
+      const entry = merged.get(key) ?? { added: 0, removed: 0 };
       entry.added += file.added;
       entry.removed += file.removed;
-      if (!entry.kind) {
-        entry.kind = previewKindOfPath(file.path);
-      }
       merged.set(key, entry);
     }
-    return Array.from(merged.values()).sort((a, b) => a.key.localeCompare(b.key));
+    const added = Array.from(merged.values()).reduce((sum, entry) => sum + entry.added, 0);
+    const removed = Array.from(merged.values()).reduce((sum, entry) => sum + entry.removed, 0);
+    return { count: merged.size, added, removed };
   }, [modifiedFiles, workdir]);
-
-  const visibleModifiedFiles = filesExpanded ? mergedFiles : mergedFiles.slice(0, 6);
-  const hiddenModifiedCount = mergedFiles.length - 6;
 
   return (
     <Panel
       id="modifiedFiles"
       title={t('panelModifiedFiles')}
       icon={<FileIcon className="h-3.5 w-3.5" />}
-      summary={mergedFiles.length > 0 ? mergedFiles.length : undefined}
+      summary={totals.count > 0 ? totals.count : undefined}
     >
-      {mergedFiles.length === 0 && <div className="text-xs text-muted">{t('noModifiedFiles')}</div>}
-      {visibleModifiedFiles.map((file) => {
-        const relative = workdir ? file.key : undefined;
-        const kind = file.kind;
-        const previewable = kind !== undefined && relative !== undefined && opener !== undefined;
-        // A previewable file is a whole-row button: the accent wash is the only hover cue.
-        const rowClass = `flex w-full items-center gap-2 py-1.5 font-mono text-xs text-left${
-          previewable ? ' cursor-pointer rounded-md hover:bg-accent-soft' : ''
-        }`;
-        const pathClass = `grow overflow-hidden text-left text-ellipsis whitespace-nowrap${
-          previewable ? ' group-hover:text-accent-strong' : ''
-        }`;
-        const row = (
-          <>
-            {/* Cut on the left: the file name is what tells files apart. */}
-            <span dir="rtl" title={file.key} className={pathClass}>
-              <bdi>{file.key}</bdi>
-            </span>
-            <span className="text-ok tabular-nums">+{file.added}</span>
-            <span className="text-muted tabular-nums">−{file.removed}</span>
-            {previewable && (
-              <EyeIcon className="h-3.5 w-3.5 shrink-0 text-muted opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100" />
-            )}
-          </>
-        );
-        return previewable ? (
-          <button
-            key={file.key}
-            type="button"
-            className={`group ${rowClass}`}
-            onClick={() => opener({ path: relative, kind })}
-            title={t('preview')}
-            aria-label={t('previewOf', { name: file.key })}
-          >
-            {row}
-          </button>
-        ) : (
-          <div key={file.key} className={rowClass}>
-            {row}
-          </div>
-        );
-      })}
-      {hiddenModifiedCount > 0 && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setFilesExpanded((value) => !value)}
-          className="self-start"
+      {totals.count === 0 && <div className="text-xs text-muted">{t('noModifiedFiles')}</div>}
+      {totals.count > 0 && sessionId && (
+        <button
+          type="button"
+          onClick={() => {
+            window.location.hash = changesPath(sessionId);
+          }}
+          className="group flex w-full items-center gap-2 rounded-md py-1.5 text-left text-xs hover:bg-accent-soft"
         >
-          {filesExpanded ? t('collapse') : t('moreFiles', { count: hiddenModifiedCount })}
-        </Button>
+          <span className="grow group-hover:text-accent-strong">{t('seeChanges')}</span>
+          <span className="text-ok tabular-nums">+{totals.added}</span>
+          <span className="text-err tabular-nums">−{totals.removed}</span>
+          <ChevronRightIcon className="h-3.5 w-3.5 text-muted" />
+        </button>
       )}
     </Panel>
   );
