@@ -9,9 +9,6 @@ feat/x
   -> PR to develop (CI once, title checked; squash merge, Conventional Commits title)
   -> develop (no CI again: it is what the PR tested)
 
-gh workflow run edge --ref develop
-  -> rolling edge prerelease of develop, on demand
-
 just promote
   -> PR develop -> main (merge commit, never squash)
   -> push to main
@@ -68,7 +65,7 @@ Today this is unavailable because the repo is private on a Free plan.
 curl -fsSL https://raw.githubusercontent.com/ikarys/fennec/main/install.sh | sh
 ```
 
-`install.sh` resolves the latest release (or `FENNEC_VERSION`, a tag or `edge`), checks the
+`install.sh` resolves the latest release (or `FENNEC_VERSION`, a tag), checks the
 `.sha256`, and installs `fennec` into `FENNEC_INSTALL_DIR` (default `~/.local/bin`). It only needs
 `curl`, `tar` and `sha256sum`, and warns when glibc is too old, `bwrap` is missing or the directory
 is not in `PATH`. The repo's `.agents/protected` keeps it out of fennec's agents' reach.
@@ -80,7 +77,7 @@ By hand: download the tarball and its `.sha256` from the release, run
 `sha256sum -c fennec-<label>-<target>.tar.gz.sha256`, extract, run `./fennec --version`.
 
 It needs glibc 2.35 or later (built on Ubuntu 22.04) and `bwrap` for the command sandbox.
-The `edge` prerelease is a develop build made on demand (`gh workflow run edge --ref develop`), the same way: not a release.
+Binaries are built from main only, when release-please cuts a release: never from develop.
 
 On Ubuntu 23.10 and later, AppArmor forbids unprivileged user namespaces, so every
 sandboxed command fails (`bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted`
