@@ -51,6 +51,7 @@ export interface PreflightResultView {
   verdict: 'fails' | 'passesAlready' | 'cannotRun';
   exitCode?: number;
   output: string;
+  existenceOnly?: boolean;
 }
 
 export interface AssistantItem {

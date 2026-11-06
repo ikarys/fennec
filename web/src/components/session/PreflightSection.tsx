@@ -2,6 +2,7 @@
  * The inset block and its ok edge mark provenance: fennec ran these, the model did not. */
 import type { PreflightResultView } from '../../lib/fold';
 import { Badge } from '../ui/Badge';
+import { ExistenceOnlyBadge } from './CriteriaSection';
 import { Card } from '../ui/Card';
 import { SectionLabel } from '../ui/SectionLabel';
 import { useT } from '../../i18n';
@@ -51,6 +52,7 @@ export function PreflightSection({ results }: { results: PreflightResultView[] }
                 <Badge tone={verdict.tone} title={t(verdict.title)}>
                   {label}
                 </Badge>
+                <ExistenceOnlyBadge existenceOnly={result.existenceOnly} />
               </div>
               {result.output && (
                 <details>

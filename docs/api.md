@@ -36,7 +36,7 @@ with camelCase fields.
 | `workflow.human.asked` | `{runId, nodeId, question}`: a human node's question with its `{{…}}` names filled in, right after the node starts |
 | `workflow.node.finished` | `{runId, nodeId, port, output, exitCode?, durationMs?}`: `durationMs` is the node's working time measured by fennec (none for a human node); its tokens are in the usage ledger (`GET …/usage/workflow`) |
 | `criteria.set` | `{criteria: [{id, description, check?}]}`: the criteria, all pending: the approved plan's, or a proposal the human accepted |
-| `criteria.preflight` | `{messageId, results: [{criterionId, command, verdict, exitCode?, output}]}`: the plan's checks, run by fennec before any change at the end of the planner's turn (verified); `verdict` is `fails` (expected), `passesAlready` or `cannotRun`; the last two send the plan back to the planner once |
+| `criteria.preflight` | `{messageId, results: [{criterionId, command, verdict, exitCode?, output, existenceOnly}]}`: the plan's checks, run by fennec before any change at the end of the planner's turn (verified); `verdict` is `fails` (expected), `passesAlready` or `cannotRun`; `existenceOnly` is true when the check only searches the code (rg, grep, test -f...): it proves the code exists, not that it works; the last two send the plan back to the planner once |
 | `criteria.proposed` | `{callId, criteria: [{id, description, check?}], reason}`: an agent's corrected criteria (`propose_criteria`), shown with a `chat.ask_user` of the same `callId` whose question lists only what changes against the criteria in force (modified, added, removed, then the unchanged ids); the human's `Accept` answer records them as `criteria.set` |
 | `decision.recorded` | `{callId, title, choice, reason, alternatives}`: a design decision an agent recorded with `record_decision` (indicative: produced by a model); the turn goes on |
 | `criterion.updated` | `{criterionId, status}`; `status` is `{type: "pending"}` or `{type: "passed" \| "failed", provenance}`, `provenance` `{kind: "verified", command, exitCode?, output}` (fennec ran the check) or `{kind: "indicative", agent, reason}` (an agent's verdict) |
@@ -613,8 +613,8 @@ read-only. The human edits them as usual.
   blocks, folded by the server (the UI computes none): `pendingApproval` `{callId, subject, kind, pattern, access,
   folders}` or null, the tool call waiting for the human's answer; `pendingWaiver` `{callId, path, reason}` or null;
   `queued` `[{queueId, content}]` the messages queued for the next rounds, in order; `criteria`
-  `[{id, description, check?, status, passedBefore}]` the criteria in force (the last `criteria.set` and the
-  `criterion.updated` since; `status` as in the integration preview, `passedBefore` from the last preflight);
+  `[{id, description, check?, status, passedBefore, existenceOnly}]` the criteria in force (the last `criteria.set` and the
+  `criterion.updated` since; `status` as in the integration preview, `passedBefore` from the last preflight, `existenceOnly` true when the check only searches the code: it proves the code exists, not that it works);
   `decisions` `[{callId, title, choice, reason, alternatives}]` those recorded, oldest first; `replayable` the ids
   of the messages the human may replay (typed, in the model's current view: the UI offers the action on those only);
   deterministic (the decisions and the indicative statuses record what a model said); 404 if no session.
