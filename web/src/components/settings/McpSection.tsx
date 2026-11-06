@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { Section, type SectionSave } from '../ui/Section';
 import { TextInput, Select } from '../ui/Field';
 import { Button } from '../ui/Button';
+import { Badge } from '../ui/Badge';
 import { Card } from '../ui/Card';
 import { ListCard } from '../ui/ListCard';
 import { Tabs } from '../ui/Tabs';
 import { authorizeMcp, connectMcp, type McpServer } from '../../lib/api';
 import type { McpToolSummary, ToolAccess } from '../../lib/api/settings';
-import { KeyIcon } from '../Icons';
+import { ChevronRightIcon, KeyIcon } from '../Icons';
 import { useLang, useT } from '../../i18n';
 import { formatTokens } from '../../lib/format';
 
@@ -126,199 +127,220 @@ function ServerCard({
   }
   return (
     <Card variant="inset">
-      <div className="flex items-center gap-2">
-        <TextInput
-          value={server.name}
-          onChange={(event) => onPatch({ name: event.target.value })}
-          placeholder={t('mcpNamePlaceholder')}
-          className="w-40"
-          aria-label={t('mcpNameLabel')}
-        />
-        <Select
-          value={server.transport}
-          onChange={(event) => onPatch({ transport: event.target.value as McpServer['transport'] })}
-          className="w-28"
-          aria-label={t('mcpTransportLabel')}
-        >
-          <option value="stdio">stdio</option>
-          <option value="http">http</option>
-        </Select>
-        {server.transport === 'stdio' ? (
-          <>
-            <TextInput
-              value={server.command ?? ''}
-              onChange={(event) => onPatch({ command: event.target.value })}
-              placeholder={t('mcpCommandPlaceholder')}
-              className="w-40"
-              aria-label={t('mcpCommandLabel')}
-            />
-            <TextInput
-              value={server.args.join(' ')}
-              onChange={(event) =>
-                onPatch({ args: event.target.value.split(/\s+/).filter((part) => part !== '') })
-              }
-              placeholder={t('mcpArgsPlaceholder')}
-              className="w-40"
-              aria-label={t('mcpArgsLabel')}
-            />
-          </>
-        ) : (
-          <TextInput
-            value={server.url ?? ''}
-            onChange={(event) => onPatch({ url: event.target.value })}
-            placeholder={t('mcpUrlPlaceholder')}
-            className="w-64"
-            aria-label={t('mcpUrlLabel')}
-          />
-        )}
-        <div className="ml-auto flex items-center gap-2">
-          {server.transport === 'http' ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              iconOnly
-              onClick={onAuthorize}
-              disabled={connecting || server.name === ''}
-              title={t('mcpAuthorize')}
-              aria-label={t('mcpAuthorize')}
-            >
-              <KeyIcon className="h-4 w-4" />
-            </Button>
-          ) : null}
-          <Button
-            variant="soft"
-            size="sm"
-            onClick={onConnect}
-            disabled={connecting || server.name === ''}
-          >
-            {connecting ? t('mcpConnecting') : t('mcpConnect')}
-          </Button>
-          <Button variant="ghost" size="sm" iconOnly onClick={onRemove} aria-label={t('mcpRemove')}>
-            ×
-          </Button>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-4">
-        <label className="flex items-center gap-2 text-sm text-text">
-          <input
-            type="checkbox"
-            checked={!server.disabled}
-            onChange={(event) => onPatch({ disabled: !event.target.checked })}
-            className="h-4 w-4 accent-[var(--accent)]"
-          />
-          {t('mcpActive')}
-        </label>
-        <label className="flex items-center gap-2 text-sm text-text">
-          <input
-            type="checkbox"
-            checked={server.visible}
-            onChange={(event) => onPatch({ visible: event.target.checked })}
-            className="h-4 w-4 accent-[var(--accent)]"
-          />
-          {t('mcpShown')}
-        </label>
-        {server.cachedTools.length > 0 && (
-          <span className="text-xs text-muted">
-            {t('mcpToolCount', { count: server.cachedTools.length, s: server.cachedTools.length > 1 ? 's' : '' })}
+      {/* Folded by default: a list of servers stays one line each; a new one opens to be filled. */}
+      <details className="group" open={server.name === '' ? true : undefined}>
+        <summary className="flex cursor-pointer list-none select-none items-center gap-2 hover:text-accent [&::-webkit-details-marker]:hidden">
+          <ChevronRightIcon className="h-3 w-3 shrink-0 text-muted transition-transform group-open:rotate-90" />
+          <span className="shrink-0 font-mono text-sm text-text">{server.name || t('newServer')}</span>
+          <Badge tone="neutral" pill>
+            {server.transport}
+          </Badge>
+          <span className="min-w-0 flex-1 truncate text-xs text-faint">
+            {server.transport === 'http' ? server.url : [server.command, ...server.args].join(' ')}
           </span>
-        )}
-      </div>
-
-      <div className="flex items-center gap-2">
-        <label className="text-sm text-text" htmlFor={`mcp-auth-${index}`}>
-          {t('mcpAuthTokenLabel')}
-        </label>
-        <TextInput
-          id={`mcp-auth-${index}`}
-          type="password"
-          value={server.authToken ?? ''}
-          onChange={(event) => onPatch({ authToken: event.target.value || null })}
-          placeholder={t('mcpAuthTokenPlaceholder')}
-          className="w-64"
-          aria-label={t('mcpAuthTokenLabel')}
-        />
-        <span className="text-xs text-muted">
-          {server.transport === 'http' ? t('mcpAuthTokenBearer') : t('mcpAuthTokenEnv')}
-        </span>
-      </div>
-
-      {server.cachedTools.length > 0 && (
-        <ListCard
-          folded
-          title={t('mcpTools')}
-          count={`${enabled}/${server.cachedTools.length} · ${t('mcpTokens', { count: formatTokens(lang, enabledTokens) })}`}
-        >
-          {activeTab ? (
-            <div
-              className="border-b border-border px-3 pt-1"
-              title={t('mcpAccessDeclared')}
-            >
-              <Tabs
-                label={t('mcpToolsByAccess')}
-                orientation="horizontal"
-                tabs={present.map((access) => ({
-                  id: access,
-                  label: t(LABEL[access]),
-                  count: toolsOf(access).length
-                }))}
-                active={activeTab}
-                onSelect={setTab}
-                trailing={
-                  <label className="flex items-center gap-2 text-xs text-muted">
-                    <input
-                      type="checkbox"
-                      checked={allTabEnabled}
-                      onChange={() => toggleTab(activeTab)}
-                      ref={(el) => {
-                        if (el) el.indeterminate = someTabEnabled && !allTabEnabled;
-                      }}
-                      className="h-4 w-4 accent-[var(--accent)]"
-                      aria-label={t('mcpToggleTab')}
-                    />
-                    <span className="tabular-nums">{t('mcpTokens', { count: formatTokens(lang, tabEnabledTokens) })}</span>
-                  </label>
-                }
-              />
-            </div>
+          {server.disabled ? <Badge tone="attention">{t('mcpInactive')}</Badge> : null}
+          {server.cachedTools.length > 0 ? (
+            <Badge tone="accent" pill>
+              {t('mcpToolCount', { count: server.cachedTools.length, s: server.cachedTools.length > 1 ? 's' : '' })}
+            </Badge>
           ) : null}
-          {activeTools.map((entry, toolIndex) => {
-            const disabled = server.disabledTools.includes(entry.tool.name);
-            return (
-              <details key={entry.tool.name} className={toolIndex > 0 ? 'border-t border-border' : undefined}>
-                <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-1.5 hover:bg-accent/5">
-                  <input
-                    type="checkbox"
-                    checked={!disabled}
-                    onChange={() => toggleTool(entry.tool.name)}
-                    onClick={(event) => event.stopPropagation()}
-                    className="h-4 w-4 accent-[var(--accent)]"
-                    aria-label={entry.tool.name}
-                  />
-                  <span
-                    className={
-                      disabled
-                        ? 'shrink-0 font-mono text-xs text-faint line-through'
-                        : 'shrink-0 font-mono text-xs text-text'
+        </summary>
+        <div className="mt-3 flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <TextInput
+              value={server.name}
+              onChange={(event) => onPatch({ name: event.target.value })}
+              placeholder={t('mcpNamePlaceholder')}
+              className="w-40"
+              aria-label={t('mcpNameLabel')}
+            />
+            <Select
+              value={server.transport}
+              onChange={(event) => onPatch({ transport: event.target.value as McpServer['transport'] })}
+              className="w-28"
+              aria-label={t('mcpTransportLabel')}
+            >
+              <option value="stdio">stdio</option>
+              <option value="http">http</option>
+            </Select>
+            {server.transport === 'stdio' ? (
+              <>
+                <TextInput
+                  value={server.command ?? ''}
+                  onChange={(event) => onPatch({ command: event.target.value })}
+                  placeholder={t('mcpCommandPlaceholder')}
+                  className="w-40"
+                  aria-label={t('mcpCommandLabel')}
+                />
+                <TextInput
+                  value={server.args.join(' ')}
+                  onChange={(event) =>
+                    onPatch({ args: event.target.value.split(/\s+/).filter((part) => part !== '') })
+                  }
+                  placeholder={t('mcpArgsPlaceholder')}
+                  className="w-40"
+                  aria-label={t('mcpArgsLabel')}
+                />
+              </>
+            ) : (
+              <TextInput
+                value={server.url ?? ''}
+                onChange={(event) => onPatch({ url: event.target.value })}
+                placeholder={t('mcpUrlPlaceholder')}
+                className="w-64"
+                aria-label={t('mcpUrlLabel')}
+              />
+            )}
+            <div className="ml-auto flex items-center gap-2">
+              {server.transport === 'http' ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
+                  onClick={onAuthorize}
+                  disabled={connecting || server.name === ''}
+                  title={t('mcpAuthorize')}
+                  aria-label={t('mcpAuthorize')}
+                >
+                  <KeyIcon className="h-4 w-4" />
+                </Button>
+              ) : null}
+              <Button
+                variant="soft"
+                size="sm"
+                onClick={onConnect}
+                disabled={connecting || server.name === ''}
+              >
+                {connecting ? t('mcpConnecting') : t('mcpConnect')}
+              </Button>
+              <Button variant="ghost" size="sm" iconOnly onClick={onRemove} aria-label={t('mcpRemove')}>
+                ×
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-2 text-sm text-text">
+              <input
+                type="checkbox"
+                checked={!server.disabled}
+                onChange={(event) => onPatch({ disabled: !event.target.checked })}
+                className="h-4 w-4 accent-[var(--accent)]"
+              />
+              {t('mcpActive')}
+            </label>
+            <label className="flex items-center gap-2 text-sm text-text">
+              <input
+                type="checkbox"
+                checked={server.visible}
+                onChange={(event) => onPatch({ visible: event.target.checked })}
+                className="h-4 w-4 accent-[var(--accent)]"
+              />
+              {t('mcpShown')}
+            </label>
+            {server.cachedTools.length > 0 && (
+              <span className="text-xs text-muted">
+                {t('mcpToolCount', { count: server.cachedTools.length, s: server.cachedTools.length > 1 ? 's' : '' })}
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-text" htmlFor={`mcp-auth-${index}`}>
+              {t('mcpAuthTokenLabel')}
+            </label>
+            <TextInput
+              id={`mcp-auth-${index}`}
+              type="password"
+              value={server.authToken ?? ''}
+              onChange={(event) => onPatch({ authToken: event.target.value || null })}
+              placeholder={t('mcpAuthTokenPlaceholder')}
+              className="w-64"
+              aria-label={t('mcpAuthTokenLabel')}
+            />
+            <span className="text-xs text-muted">
+              {server.transport === 'http' ? t('mcpAuthTokenBearer') : t('mcpAuthTokenEnv')}
+            </span>
+          </div>
+
+          {server.cachedTools.length > 0 && (
+            <ListCard
+              folded
+              title={t('mcpTools')}
+              count={`${enabled}/${server.cachedTools.length} · ${t('mcpTokens', { count: formatTokens(lang, enabledTokens) })}`}
+            >
+              {activeTab ? (
+                <div
+                  className="border-b border-border px-3 pt-1"
+                  title={t('mcpAccessDeclared')}
+                >
+                  <Tabs
+                    label={t('mcpToolsByAccess')}
+                    orientation="horizontal"
+                    tabs={present.map((access) => ({
+                      id: access,
+                      label: t(LABEL[access]),
+                      count: toolsOf(access).length
+                    }))}
+                    active={activeTab}
+                    onSelect={setTab}
+                    trailing={
+                      <label className="flex items-center gap-2 text-xs text-muted">
+                        <input
+                          type="checkbox"
+                          checked={allTabEnabled}
+                          onChange={() => toggleTab(activeTab)}
+                          ref={(el) => {
+                            if (el) el.indeterminate = someTabEnabled && !allTabEnabled;
+                          }}
+                          className="h-4 w-4 accent-[var(--accent)]"
+                          aria-label={t('mcpToggleTab')}
+                        />
+                        <span className="tabular-nums">{t('mcpTokens', { count: formatTokens(lang, tabEnabledTokens) })}</span>
+                      </label>
                     }
-                  >
-                    {entry.tool.name}
-                  </span>
-                  {entry.tool.description ? (
-                    <span className="min-w-0 flex-1 truncate text-xs text-faint">
-                      {firstSentence(entry.tool.description)}
-                    </span>
-                  ) : null}
-                  <span className="shrink-0 text-xs tabular-nums text-faint">~{formatTokens(lang, entry.tokens)}</span>
-                </summary>
-                {entry.tool.description ? (
-                  <p className="whitespace-pre-wrap px-3 pb-2 pl-9 text-xs text-muted">{entry.tool.description}</p>
-                ) : null}
-              </details>
-            );
-          })}
-        </ListCard>
-      )}
+                  />
+                </div>
+              ) : null}
+              {activeTools.map((entry, toolIndex) => {
+                const disabled = server.disabledTools.includes(entry.tool.name);
+                return (
+                  <details key={entry.tool.name} className={toolIndex > 0 ? 'border-t border-border' : undefined}>
+                    <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-1.5 hover:bg-accent/5">
+                      <input
+                        type="checkbox"
+                        checked={!disabled}
+                        onChange={() => toggleTool(entry.tool.name)}
+                        onClick={(event) => event.stopPropagation()}
+                        className="h-4 w-4 accent-[var(--accent)]"
+                        aria-label={entry.tool.name}
+                      />
+                      <span
+                        className={
+                          disabled
+                            ? 'shrink-0 font-mono text-xs text-faint line-through'
+                            : 'shrink-0 font-mono text-xs text-text'
+                        }
+                      >
+                        {entry.tool.name}
+                      </span>
+                      {entry.tool.description ? (
+                        <span className="min-w-0 flex-1 truncate text-xs text-faint">
+                          {firstSentence(entry.tool.description)}
+                        </span>
+                      ) : null}
+                      <span className="shrink-0 text-xs tabular-nums text-faint">~{formatTokens(lang, entry.tokens)}</span>
+                    </summary>
+                    {entry.tool.description ? (
+                      <p className="whitespace-pre-wrap px-3 pb-2 pl-9 text-xs text-muted">{entry.tool.description}</p>
+                    ) : null}
+                  </details>
+                );
+              })}
+            </ListCard>
+          )}
+        </div>
+      </details>
     </Card>
   );
 }
