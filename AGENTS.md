@@ -118,7 +118,7 @@ crates/fennec/src/
                        workflow/ nodes (one node run), fork (parallel branches), outcome (`Outcome:` line),
                        criteria (the criteria node and the agents' verdicts)
   tools/             Toolbox adapter: one file per tool, path_guard, args; sandbox (the bwrap
-                     world of commands); rule_request (a tool call as the rules crate's requests, paths resolved here);
+                     world of commands; sandbox/seatbelt.rs the same world as a macOS Seatbelt profile); rule_request (a tool call as the rules crate's requests, paths resolved here);
                      web_search queries the SearXNG instance from the Settings page; canvas writes the session's canvas store
   llm/               Model adapter: openai.rs, the Model port over llm-providers-connector (tool-call arguments parsed here)
                      concurrency.rs the local model's gate: one round at a time, the same session kept between
@@ -236,7 +236,7 @@ tests.
 2. **The trusted kernel**: code that decides (integration, plugin activation).
    It never runs what a model wrote.
 3. **The untrusted zone**: everything a model outputs. Commands run in the
-   bwrap world (`tools/sandbox.rs`) unless the human turns it off. Protected
+   sandbox world (`tools/sandbox.rs`: bwrap on Linux, Seatbelt on macOS) unless the human turns it off. Protected
    files are refused to the file tools and read-only in the sandbox. **Known
    gaps**: the file tools run in fennec's process with a working-directory
    path guard; a command can still create a new file matching a protected
@@ -248,7 +248,8 @@ tests.
    repository: with the sandbox off a command could push, move or delete a branch, and `git push` reaches the remote
    even sandboxed when the network is on. The kernel's own block rules (`domain/kernel_rules.rs`: `git push`,
    `update-ref`, `branch -D`, `worktree`, `gh pr merge`…) refuse those commands before they run, with the same
-   token-matching limits as the human's rules.
+   token-matching limits as the human's rules. On macOS (Seatbelt) commands write their own TMPDIR, never /tmp,
+   and renaming a protected file's parent directory is not refused (the review gate sees the change).
 
 ## Build, test, run
 

@@ -148,6 +148,12 @@ pub fn with_turn<R>(
             .map(|p| PathBuf::from(p.workdir)),
         None => None,
     };
+    // macOS cannot bind-mount the main checkout's dependency directories as bwrap does: link them,
+    // and Seatbelt refuses writes through the links (their targets are outside the workdir).
+    #[cfg(target_os = "macos")]
+    if let Err(e) = worktree::link_dependencies(workdir) {
+        eprintln!("fennec: link the dependencies: {e}");
+    }
     let tools = LocalTools::new(workdir.to_path_buf())
         .with_search(prefs.search.clone())
         .with_sandbox(
