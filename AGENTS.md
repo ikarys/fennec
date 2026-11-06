@@ -60,7 +60,7 @@ crates/fennec/src/
     protection.rs      protected files: the defaults, the gitignore-like patterns, the matcher
     test_files.rs      which paths are tests; the lines an integration appends to `.agents/protected`; the tests validated at the gate
     integration.rs     the review gate: what blocks an integration until the human accepts it
-    diff.rs            the lines a unified diff adds and removes
+    diff.rs            the lines a unified diff adds and removes; one file's diff as numbered hunks
     commit_subject.rs  the integration's commit subject the model proposes: its prompt, its answer checked
     bypass.rs          what silences a gate: suppression markers added, tests or assertions removed
     adr.rs             architecture decision records: a MADR file read (number, title, status, date)
@@ -178,7 +178,8 @@ crates/fennec/src/
                      agents_md_routes, session_name (background naming), canvas_routes (the canvas crate over HTTP),
                      budget_routes (a project's budget, read and set),
                      contribution_routes (branches someone else wrote, adopted into a session for the gate),
-                     indicator_routes (a project's indicators from its logs, git and the ledger)
+                     indicator_routes (a project's indicators from its logs, git and the ledger),
+                     diff_routes (one changed file of a session's branch as diff lines, for the Changes page)
   cli/               terminal adapter: commands, transcript
 crates/backlog/     the ideas backlog, a crate of its own and fennec-free, no I/O: its events folded, the queue
                      order, the night-mode caps, an idea's status, stage and next action, a run's summary
@@ -194,7 +195,7 @@ llm-providers-connector/ (crates.io crate, github.com/ikarys/llm-providers-conne
 crates/fennec/build.rs   embeds web/dist (placeholder page when not built)
 web/src/           React + Vite + Tailwind v4 UI
   pages/             one component per route: HomePage, SessionPage, SettingsPage, InsightPage,
-                     ProjectPage, WorkflowsPage (lazy)
+                     ProjectPage, WorkflowsPage, ChangesPage (lazy)
   components/        ui/ the primitives every screen uses (Button, Badge, SectionLabel, Card, Panel, fields);
                      shared UI; session/ the thread, tool cards, question card, message stats, composer,
                      context panel; project/ the folder browser, the dashboard, the project map and ideas/
