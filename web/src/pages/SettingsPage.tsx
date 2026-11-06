@@ -426,6 +426,7 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
                   save={groupSave('mcp')}
                   value={form.mcp}
                   onChange={updateMcp}
+                  toolViews={settings.mcpTools ?? {}}
                   onConnected={reloadMcp}
                 />
               </>
