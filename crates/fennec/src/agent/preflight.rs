@@ -65,6 +65,7 @@ pub(super) fn run(
             verdict: preflight::classify(exit_code, &output),
             exit_code,
             output: last_two_kib(&output),
+            existence_only: crate::domain::check_kind::is_existence_only(check),
         });
     }
 

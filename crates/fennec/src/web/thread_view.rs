@@ -1,5 +1,6 @@
 //! The session's blocks served ready to display: the call waiting for the human's approval, the waiver waiting for an answer, the messages queued for the next rounds, the criteria in force, the decisions recorded and the messages the human may replay. Folded by the domain, the UI computes none.
 
+use crate::domain::check_kind;
 use crate::domain::criteria::{CriterionState, CriterionStatus};
 use crate::domain::criteria_fold;
 use crate::domain::decision::{Decision, decisions_in_force};
@@ -46,6 +47,7 @@ pub struct CriterionView {
     pub check: Option<String>,
     pub status: CriterionStatus,
     pub passed_before: bool,
+    pub existence_only: bool,
 }
 
 #[derive(Debug, PartialEq, Serialize)]
@@ -101,6 +103,11 @@ impl CriterionView {
             check: state.criterion.check.clone(),
             status: state.status.clone(),
             passed_before: passed_before.contains(&state.criterion.id),
+            existence_only: state
+                .criterion
+                .check
+                .as_deref()
+                .is_some_and(check_kind::is_existence_only),
         }
     }
 }
@@ -310,6 +317,7 @@ mod tests {
                     verdict: PreflightVerdict::PassesAlready,
                     exit_code: Some(0),
                     output: String::new(),
+                    existence_only: false,
                 }],
             },
             Event::CriterionUpdated {
@@ -334,6 +342,7 @@ mod tests {
                     check: Some("true".into()),
                     status: CriterionStatus::Pending,
                     passed_before: true,
+                    existence_only: false,
                 },
                 CriterionView {
                     id: "C2".into(),
@@ -346,6 +355,7 @@ mod tests {
                         },
                     },
                     passed_before: false,
+                    existence_only: false,
                 },
             ]
         );
@@ -455,8 +465,32 @@ mod tests {
                         "output": "boom"
                     }
                 },
-                "passedBefore": false
+                "passedBefore": false,
+                "existenceOnly": false
             })
         );
+    }
+
+    #[test]
+    fn serves_existence_only_for_search_checks_only() {
+        let grep_state = CriterionState {
+            criterion: Criterion {
+                id: "C1".into(),
+                description: "d".into(),
+                check: Some("rg -q 'x' src".into()),
+            },
+            status: CriterionStatus::Pending,
+        };
+        let cargo_state = CriterionState {
+            criterion: Criterion {
+                id: "C2".into(),
+                description: "d".into(),
+                check: Some("cargo test".into()),
+            },
+            status: CriterionStatus::Pending,
+        };
+
+        assert!(CriterionView::new(&grep_state, &[]).existence_only);
+        assert!(!CriterionView::new(&cargo_state, &[]).existence_only);
     }
 }

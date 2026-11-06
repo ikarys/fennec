@@ -2,7 +2,7 @@
 // files signal, its criteria and the decisions the agent recorded.
 import type { IntegrationPreview, ReviewSignal } from '../../lib/api';
 import { DecisionList } from './DecisionList';
-import { CriterionProvenanceBadge, PassedBeforeBadge, criterionDotClass } from './CriteriaSection';
+import { CriterionProvenanceBadge, ExistenceOnlyBadge, PassedBeforeBadge, criterionDotClass } from './CriteriaSection';
 import { ChevronRightIcon } from '../Icons';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -190,6 +190,7 @@ export function IntegrationReview({ preview, projectId, narrating, onNarrate, un
                   <span className="shrink-0 font-mono text-muted">{criterion.id}</span>
                   <span className="grow break-words text-text">{criterion.description}</span>
                   <PassedBeforeBadge passedBefore={criterion.passedBefore} />
+                  <ExistenceOnlyBadge existenceOnly={criterion.existenceOnly} />
                   <CriterionProvenanceBadge provenance={provenance} />
                 </div>
               );
