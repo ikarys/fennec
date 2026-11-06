@@ -270,9 +270,14 @@ export function ReportCard({ report }: { report: Report }) {
         </div>
       )}
       {report.changed.length > 0 && (
-        <div className="flex flex-col gap-1.5">
-          <SectionLabel>{t('panelModifiedFiles')}</SectionLabel>
-          <ul className="m-0 flex flex-col gap-1.5">
+        // Folded: on a large change the file list would outgrow the rest of the report.
+        <details className="group flex flex-col gap-1.5">
+          <summary className="flex cursor-pointer list-none items-center gap-1.5 select-none">
+            <ChevronRightIcon className="h-3 w-3 shrink-0 text-muted transition-transform group-hover:text-text group-open:rotate-90" />
+            <SectionLabel>{t('panelModifiedFiles')}</SectionLabel>
+            <Badge tone="neutral">{report.changed.length}</Badge>
+          </summary>
+          <ul className="m-0 mt-1.5 flex flex-col gap-1.5">
             {report.changed.map((c, i) => (
               <li key={i} className="flex items-start gap-2 text-sm">
                 <PathChip path={c.path} />
@@ -284,7 +289,7 @@ export function ReportCard({ report }: { report: Report }) {
               </li>
             ))}
           </ul>
-        </div>
+        </details>
       )}
       {report.test && (
         <div className="flex flex-col gap-1.5">
