@@ -53,9 +53,14 @@ lint:
     cargo fmt --all --check
     cargo clippy --all-targets -- -D warnings
 
-# The unit tests of every crate
+# The unit tests of every crate. Their temp dirs go to one folder per checkout, emptied
+# at each run: tests that forget to clean up no longer pile up in /tmp.
 test:
-    cargo test
+    #!/usr/bin/env bash
+    set -euo pipefail
+    dir="${TMPDIR:-/tmp}/fennec-tests/$(basename "{{justfile_directory()}}")"
+    rm -rf "$dir" && mkdir -p "$dir"
+    TMPDIR="$dir" cargo test
 
 # The unit tests of the UI's pure modules (the folds, the plan contract)
 test-web:
