@@ -516,6 +516,7 @@ echo '{"jsonrpc":"2.0","id":3,"result":{"content":[{"type":"text","text":"hello 
 read line
 echo '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18","capabilities":{},"serverInfo":{"name":"t","version":"0"}}}'
 read line
+read line
 echo "{\"jsonrpc\":\"2.0\",\"id\":2,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"$MCP_AUTH_TOKEN\"}]}}"
 "#;
         let server = McpServer {
