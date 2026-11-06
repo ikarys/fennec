@@ -269,7 +269,7 @@ export function TopBar({
         aria-label={t('topBarHomeAria')}
         className="flex items-center gap-2 py-2 pl-1 pr-3 text-base font-semibold tracking-[-0.01em] text-text"
       >
-        <img src="/fennec.png" alt="" className="h-6 w-6" />
+        <img src="/logo.png" alt="" className="h-6 w-6" />
         <span>fennec</span>
       </a>
       <VersionTag />
