@@ -341,9 +341,6 @@ main() {
                 warn "the command sandbox needs bubblewrap: install the bubblewrap package"
             fi
             ;;
-        Darwin)
-            warn "the command sandbox (Seatbelt) is not available on macOS yet; see README, Platforms"
-            ;;
     esac
 
     if ! path_contains_dir "$INSTALL_DIR"; then

@@ -107,7 +107,7 @@ An idea is framed in a read-only plan session, then the human approves the plan 
 ## Platforms
 
 - Linux x86_64 and aarch64: full support; the command sandbox is bubblewrap.
-- macOS Apple Silicon and Intel: binaries and launchd service; the command sandbox (Seatbelt, `sandbox-exec`) is in progress: until it lands, keep the sandbox setting off knowingly, commands then run on the host.
+- macOS Apple Silicon and Intel: binaries and launchd service; the command sandbox is Seatbelt (`sandbox-exec`, part of macOS). It hides the same secrets and cuts the same network; commands write their own `TMPDIR`, not `/tmp`, and a protected file's parent directory can be renamed (the review gate still sees the file changed).
 - Windows: through WSL2 only, with the same `install.sh`, the browser on Windows opens http://127.0.0.1:7777.
 
 Why not native Windows: fennec's security model rests on the command sandbox: what a model writes runs with the system read-only, the human's secrets (`~/.ssh`, cloud credentials) hidden and no network by default. Linux has bubblewrap and macOS has Seatbelt for that; Windows has no equivalent that an unprivileged program can set up as simply (AppContainer and job objects cover only part of it). Shipping fennec on Windows without that wall would break the promise the review gate relies on; WSL2 gives Windows users the Linux sandbox today. Native Windows can come back if a sound sandbox does.
@@ -183,7 +183,7 @@ These are defaults: the Settings page adds providers and overrides parameters pe
 
 - The human owns the CLI/UI and configuration; fennec never blocks them.
 - The code that decides, such as integration, never runs what a model wrote.
-- Model output is untrusted. Commands run in a bwrap world unless the human turns it off; protected files are refused to file tools and read-only in the sandbox.
+- Model output is untrusted. Commands run in a sandbox (bubblewrap on Linux, Seatbelt on macOS) unless the human turns it off; protected files are refused to file tools and read-only in the sandbox.
 - The server only answers local pages: `Host` and `Origin` must be `127.0.0.1` or `localhost` and POST bodies must be JSON, so no web page can drive the agent.
 - Known gap: the file tools run in fennec's process behind a working-directory guard, and a command can create a new file matching a protected pattern where none existed; the review gate is there to catch it.
 

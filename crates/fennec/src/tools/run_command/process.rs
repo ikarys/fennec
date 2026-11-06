@@ -55,7 +55,7 @@ pub fn execute(
     // directory is created, on the first command.
     std::fs::create_dir_all(cwd).map_err(|e| format!("create {}: {e}", cwd.display()))?;
     let started = Instant::now();
-    let sandbox_on = matches!(sandbox, Sandbox::Bwrap { .. });
+    let sandbox_on = matches!(sandbox, Sandbox::On { .. });
     let mut child = sandbox
         .command(command, workdir, cwd)
         .envs(env.iter().map(|(name, value)| (name, value)))
@@ -70,7 +70,7 @@ pub fn execute(
         .spawn()
         .map_err(|e| {
             if e.kind() == std::io::ErrorKind::NotFound && sandbox_on {
-                "bwrap is not installed: install bubblewrap, or turn the sandbox off in Settings > Security > Sandbox."
+                "the sandbox program is missing (bwrap on Linux: install bubblewrap), or turn the sandbox off in Settings > Security > Sandbox."
                     .to_string()
             } else {
                 format!("Failed to start command: {e}")
