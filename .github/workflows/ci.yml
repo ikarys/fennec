@@ -71,11 +71,3 @@ jobs:
       - uses: extractions/setup-just@v4
       - name: Unit tests
         run: just test
-
-  # TEMPORARY: the Seatbelt runtime tests, removed before merge.
-  macos-sandbox:
-    runs-on: macos-15
-    steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
-      - run: mkdir -p web/dist && cargo test -p fennec sandbox
