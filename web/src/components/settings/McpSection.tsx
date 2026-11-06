@@ -5,6 +5,7 @@ import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Card } from '../ui/Card';
 import { ListCard } from '../ui/ListCard';
+import { Switch } from '../ui/Switch';
 import { Tabs } from '../ui/Tabs';
 import { authorizeMcp, connectMcp, type McpServer } from '../../lib/api';
 import type { McpToolSummary, ToolAccess } from '../../lib/api/settings';
@@ -54,7 +55,6 @@ function ServerCard({
   connecting,
   views,
   onPatch,
-  onTools,
   onRemove,
   onConnect,
   onAuthorize
@@ -64,8 +64,6 @@ function ServerCard({
   connecting: boolean;
   views: McpToolSummary[];
   onPatch: (patch: Partial<McpServer>) => void;
-  /** A tool switched on or off: stored at once, no Save needed. */
-  onTools: (disabledTools: string[]) => void;
   onRemove: () => void;
   onConnect: () => void;
   onAuthorize: () => void;
@@ -74,7 +72,7 @@ function ServerCard({
     const disabled = server.disabledTools.includes(name)
       ? server.disabledTools.filter((tool) => tool !== name)
       : [...server.disabledTools, name];
-    onTools(disabled);
+    onPatch({ disabledTools: disabled });
   }
 
   const t = useT();
@@ -119,10 +117,10 @@ function ServerCard({
       // Disable every tool in the tab: keep the existing disabled order, then
       // append the tools that were still enabled.
       const missing = names.filter((name) => !server.disabledTools.includes(name));
-      onTools([...server.disabledTools, ...missing]);
+      onPatch({ disabledTools: [...server.disabledTools, ...missing] });
     } else {
       // Enable every tool in the tab: remove only those names, keeping order.
-      onTools(server.disabledTools.filter((name) => !names.includes(name)));
+      onPatch({ disabledTools: server.disabledTools.filter((name) => !names.includes(name)) });
     }
   }
   return (
@@ -138,12 +136,16 @@ function ServerCard({
           <span className="min-w-0 flex-1 truncate text-xs text-faint">
             {server.transport === 'http' ? server.url : [server.command, ...server.args].join(' ')}
           </span>
-          {server.disabled ? <Badge tone="attention">{t('mcpInactive')}</Badge> : null}
           {server.cachedTools.length > 0 ? (
             <Badge tone="accent" pill>
               {t('mcpToolCount', { count: server.cachedTools.length, s: server.cachedTools.length > 1 ? 's' : '' })}
             </Badge>
           ) : null}
+          <Switch
+            checked={!server.disabled}
+            onChange={(on) => onPatch({ disabled: !on })}
+            label={t('mcpActive')}
+          />
         </summary>
         <div className="mt-3 flex flex-col gap-2">
           <div className="flex items-center gap-2">
@@ -220,15 +222,6 @@ function ServerCard({
           </div>
 
           <div className="flex items-center gap-4">
-            <label className="flex items-center gap-2 text-sm text-text">
-              <input
-                type="checkbox"
-                checked={!server.disabled}
-                onChange={(event) => onPatch({ disabled: !event.target.checked })}
-                className="h-4 w-4 accent-[var(--accent)]"
-              />
-              {t('mcpActive')}
-            </label>
             <label className="flex items-center gap-2 text-sm text-text">
               <input
                 type="checkbox"
@@ -350,8 +343,7 @@ export function McpSection({
   onChange,
   toolViews,
   save,
-  onConnected,
-  onToolsChange
+  onConnected
 }: {
   value: McpServer[];
   onChange: (value: McpServer[]) => void;
@@ -361,8 +353,6 @@ export function McpSection({
   save?: SectionSave;
   /** After a connect: the server stored the tools, the page reads them back. */
   onConnected: () => Promise<void>;
-  /** A server's tools switched on or off, stored at once: a toggle is a decision, not a draft. */
-  onToolsChange: (name: string, disabledTools: string[]) => Promise<void>;
 }) {
   const t = useT();
   const [connecting, setConnecting] = useState<number | null>(null);
@@ -435,12 +425,6 @@ export function McpSection({
             connecting={connecting === index}
             views={toolViews[server.name] ?? []}
             onPatch={(p) => patch(index, p)}
-            onTools={(disabledTools) => {
-              patch(index, { disabledTools });
-              onToolsChange(server.name, disabledTools).catch((e) =>
-                setError(e instanceof Error ? e.message : String(e))
-              );
-            }}
             onRemove={() => onChange(value.filter((_, i) => i !== index))}
             onConnect={() => connect(index)}
             onAuthorize={() => authorize(index)}
