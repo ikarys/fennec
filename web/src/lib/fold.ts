@@ -64,11 +64,17 @@ export interface AssistantItem {
   preflight?: PreflightResultView[];
 }
 
+export interface WorkflowNodeSpan {
+  offsetMs: number;
+  durationMs: number;
+}
+
 export interface WorkflowNodeStat {
   nodeId: string;
   label: string;
   runs: number;
   workingMs: number;
+  spans: WorkflowNodeSpan[];
 }
 
 export interface WorkflowStats {
@@ -159,6 +165,18 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
+function parseWorkflowNodeSpans(value: unknown): WorkflowNodeSpan[] {
+  if (!Array.isArray(value)) return [];
+  const spans: WorkflowNodeSpan[] = [];
+  for (const raw of value) {
+    if (typeof raw !== 'object' || raw === null) continue;
+    const span = raw as Record<string, unknown>;
+    if (!isFiniteNumber(span.offsetMs) || !isFiniteNumber(span.durationMs)) continue;
+    spans.push({ offsetMs: span.offsetMs, durationMs: span.durationMs });
+  }
+  return spans;
+}
+
 function parseWorkflowStats(value: unknown): WorkflowStats | undefined {
   if (typeof value !== 'object' || value === null) return undefined;
   const stats = value as Record<string, unknown>;
@@ -174,7 +192,8 @@ function parseWorkflowStats(value: unknown): WorkflowStats | undefined {
       nodeId,
       label,
       runs: isFiniteNumber(node.runs) ? node.runs : 0,
-      workingMs: isFiniteNumber(node.workingMs) ? node.workingMs : 0
+      workingMs: isFiniteNumber(node.workingMs) ? node.workingMs : 0,
+      spans: parseWorkflowNodeSpans(node.spans)
     });
   }
   return {

@@ -28,6 +28,14 @@ pub struct RunStats {
     pub criteria_verified: u32,
 }
 
+/// One pass of a node on the run's timeline, offset from the run's start.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NodeSpan {
+    pub offset_ms: u64,
+    pub duration_ms: u64,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NodeStats {
@@ -35,6 +43,9 @@ pub struct NodeStats {
     pub label: String,
     pub runs: u32,
     pub working_ms: u64,
+    /// Passes on the run's timeline; empty in logs written before the field.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub spans: Vec<NodeSpan>,
 }
 
 /// `run`: the run's events in the session (from its `workflow.started`); `criteria`: the
@@ -53,10 +64,22 @@ pub fn run_stats(run: &[Event], criteria: &[CriterionState], files_changed: usiz
 
     let mut nodes: Vec<NodeStats> = Vec::new();
     let mut index: HashMap<String, usize> = HashMap::new();
+    let mut pending_offsets: HashMap<String, u64> = HashMap::new();
 
     for event in run {
         match event {
-            Event::WorkflowNodeStarted { node_id, .. } => {
+            Event::WorkflowNodeStarted {
+                node_id,
+                started_at: node_started_at,
+                ..
+            } => {
+                if let Some(run_started) = started_at
+                    && let Some(node_started) = *node_started_at
+                {
+                    pending_offsets
+                        .insert(node_id.clone(), node_started.saturating_sub(run_started));
+                }
+
                 if let Some(i) = index.get(node_id) {
                     nodes[*i].runs += 1;
                 } else {
@@ -70,6 +93,7 @@ pub fn run_stats(run: &[Event], criteria: &[CriterionState], files_changed: usiz
                         label,
                         runs: 1,
                         working_ms: 0,
+                        spans: Vec::new(),
                     });
                 }
             }
@@ -78,10 +102,16 @@ pub fn run_stats(run: &[Event], criteria: &[CriterionState], files_changed: usiz
                 duration_ms,
                 ..
             } => {
-                if let Some(ms) = duration_ms
-                    && let Some(i) = index.get(node_id)
-                {
-                    nodes[*i].working_ms += ms;
+                if let Some(i) = index.get(node_id) {
+                    if let Some(ms) = duration_ms {
+                        nodes[*i].working_ms += ms;
+                    }
+                    if let Some(offset_ms) = pending_offsets.remove(node_id) {
+                        nodes[*i].spans.push(NodeSpan {
+                            offset_ms,
+                            duration_ms: duration_ms.unwrap_or(0),
+                        });
+                    }
                 }
             }
             _ => {}
@@ -232,12 +262,14 @@ mod tests {
                     label: "a".into(),
                     runs: 2,
                     working_ms: 150,
+                    spans: vec![],
                 },
                 NodeStats {
                     node_id: "b".into(),
                     label: "b".into(),
                     runs: 1,
                     working_ms: 0,
+                    spans: vec![],
                 }
             ]
         );
@@ -269,5 +301,76 @@ mod tests {
         // at finish time, not by the fold.
         assert_eq!(stats.started_at, Some(1_000));
         assert_eq!(stats.finished_at, None);
+    }
+
+    #[test]
+    fn run_stats_places_node_passes_on_the_timeline() {
+        let run = vec![
+            Event::WorkflowStarted {
+                run_id: "r".into(),
+                workflow: crate::domain::workflow::definition::Workflow {
+                    id: "w".into(),
+                    name: "w".into(),
+                    description: String::new(),
+                    max_steps: 2,
+                    nodes: vec![],
+                    edges: vec![],
+                },
+                task: String::new(),
+                step_by_step: false,
+                started_at: Some(1_000),
+            },
+            Event::WorkflowNodeStarted {
+                run_id: "r".into(),
+                node_id: "a".into(),
+                pass: 1,
+                via: None,
+                child_session_id: None,
+                started_at: Some(1_100),
+            },
+            Event::WorkflowNodeFinished {
+                run_id: "r".into(),
+                node_id: "a".into(),
+                port: "done".into(),
+                output: String::new(),
+                exit_code: None,
+                comment: None,
+                duration_ms: Some(200),
+            },
+            Event::WorkflowNodeStarted {
+                run_id: "r".into(),
+                node_id: "a".into(),
+                pass: 2,
+                via: None,
+                child_session_id: None,
+                started_at: Some(2_000),
+            },
+            Event::WorkflowNodeFinished {
+                run_id: "r".into(),
+                node_id: "a".into(),
+                port: "done".into(),
+                output: String::new(),
+                exit_code: None,
+                comment: None,
+                duration_ms: Some(50),
+            },
+        ];
+
+        let stats = run_stats(&run, &[], 0);
+
+        assert_eq!(stats.nodes.len(), 1);
+        assert_eq!(
+            stats.nodes[0].spans,
+            vec![
+                NodeSpan {
+                    offset_ms: 100,
+                    duration_ms: 200
+                },
+                NodeSpan {
+                    offset_ms: 1_000,
+                    duration_ms: 50
+                }
+            ]
+        );
     }
 }
