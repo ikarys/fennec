@@ -241,3 +241,8 @@ cut or not) is rendered as a Seatbelt profile run by `/usr/bin/sandbox-exec`, ev
 the main checkout's dependency directories are linked into a worktree instead of mounted. Commands write their own
 TMPDIR, not /tmp. Known gap: a protected file's parent directory can be renamed (`tools/sandbox/seatbelt.rs`,
 `tools/sandbox.rs`, `turn_build.rs`).
+
+First-run checklist, done: the home page shows what a first run still misses (a reachable model, the sandbox, git,
+a project, the security scanners), each line with its fix, and hides once all is ready; `fennec doctor` prints the
+same lines and exits 1 while one is to do. The facts are gathered by an adapter, the verdicts are pure domain code
+(`domain/setup.rs`, `setup.rs`, `web/setup_routes.rs`, `cli/doctor.rs`, `SetupChecklist.tsx`).

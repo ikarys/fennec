@@ -1,6 +1,7 @@
 //! Terminal adapter: run a turn in the current directory, list sessions,
 //! replay one, compact one.
 
+pub mod doctor;
 mod transcript;
 pub mod update;
 

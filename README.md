@@ -155,6 +155,7 @@ The top bar shows an arrow when a newer release is out; a click installs it and 
 ## Quick start
 
 ```bash
+fennec doctor                   # what is missing: model, sandbox, git, a project, scanners
 fennec                          # web UI on http://127.0.0.1:7777
 cd ~/code/my-project && fennec run "add a --verbose flag"   # or the CLI
 ```
