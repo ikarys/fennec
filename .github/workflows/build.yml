@@ -6,6 +6,12 @@ on:
       label:
         required: true
         type: string
+  # By hand, to try a branch's binaries (the macOS ones cannot be built anywhere else).
+  workflow_dispatch:
+    inputs:
+      label:
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -15,9 +21,12 @@ jobs:
     strategy:
       matrix:
         # Ubuntu 22.04 links against glibc 2.35, so the binary runs on older hosts too.
+        # Both macOS targets build on the Apple Silicon runner: its SDK cross-compiles to Intel.
         include:
           - { target: x86_64-unknown-linux-gnu, os: ubuntu-22.04 }
           - { target: aarch64-unknown-linux-gnu, os: ubuntu-22.04-arm }
+          - { target: aarch64-apple-darwin, os: macos-15 }
+          - { target: x86_64-apple-darwin, os: macos-15 }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -32,6 +41,8 @@ jobs:
           npm ci
           npm run build
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.target }}
@@ -45,7 +56,7 @@ jobs:
           cp "target/${{ matrix.target }}/release/fennec" "$name/fennec"
           cp LICENSE README.md THIRD_PARTY.md "$name/"
           tar -czf "$name.tar.gz" "$name"
-          sha256sum "$name.tar.gz" > "$name.tar.gz.sha256"
+          shasum -a 256 "$name.tar.gz" > "$name.tar.gz.sha256"
       - uses: actions/upload-artifact@v7
         with:
           name: fennec-${{ matrix.target }}
