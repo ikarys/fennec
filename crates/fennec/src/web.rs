@@ -50,6 +50,7 @@ mod session_name;
 mod session_routes;
 mod session_usage;
 mod settings_routes;
+mod setup_routes;
 mod terminal;
 #[cfg(test)]
 mod test_support;

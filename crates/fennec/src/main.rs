@@ -27,6 +27,7 @@ mod scanners;
 mod security_scan;
 mod server_config;
 mod servers;
+mod setup;
 mod skills;
 mod store;
 mod tools;
@@ -46,6 +47,7 @@ const USAGE: &str = "usage:
                                            run the agent loop in the current directory;
                                            agent: plan (default, read-only) or builder
   fennec compact <session>                 compact a session in the current directory
+  fennec doctor                            check what fennec needs: model, sandbox, git, a project
   fennec sessions                          list sessions
   fennec log <session>                     replay a session from the event store
   fennec update [--check]                  install the latest release (--check: only report it)
@@ -113,6 +115,7 @@ fn run(args: &[String]) -> Result<(), String> {
         }
         Some("compact") => cli::compact(&Settings::from_env()?, args.get(1).ok_or(USAGE)?),
         Some("update") => cli::update::run(&args[1..]),
+        Some("doctor") => cli::doctor::run(&Settings::from_env()?, &open_store()?),
         Some("sessions") => cli::list_sessions(&open_store()?),
         Some("log") => cli::replay(&open_store()?, args.get(1).ok_or(USAGE)?),
         _ => Err(USAGE.into()),
