@@ -8,6 +8,16 @@ run: build
 build: web
     cargo build --release -p fennec
 
+# Build fennec with a local build number and install it to ~/.local/bin (systemd user service restarted)
+install: web
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # <commits>.<sha>, -dirty when uncommitted changes went into the build.
+    build="$(git rev-list --count HEAD).$(git rev-parse --short HEAD)"
+    [ -z "$(git status --porcelain)" ] || build="$build-dirty"
+    FENNEC_BUILD="$build" cargo build --release -p fennec
+    FENNEC_LOCAL_BINARY=target/release/fennec sh install.sh
+
 # Build the web UI into web/dist (dependencies installed again when the lockfile changes)
 web:
     cd web && ([ node_modules/.package-lock.json -nt package-lock.json ] || npm ci) && npm run build

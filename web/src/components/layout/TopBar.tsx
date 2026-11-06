@@ -157,20 +157,28 @@ function AttentionBell({ attention, onOpen }: { attention: AttentionItem[]; onOp
   );
 }
 
-/** The binary's version, fetched once; muted next to the wordmark, hidden when the fetch fails. */
+/** The binary's version and local build number, fetched once; muted next to the wordmark, hidden when the fetch fails. */
 function VersionTag() {
   const [version, setVersion] = useState<string | null>(null);
+  const [build, setBuild] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/version')
       .then((response) => (response.ok ? response.json() : null))
-      .then((body: { version?: string } | null) => {
+      .then((body: { version?: string; build?: string | null } | null) => {
         if (body?.version) setVersion(body.version);
+        if (body?.build) setBuild(body.build);
       })
       .catch(() => undefined);
   }, []);
 
-  return version ? <span className="text-xs font-normal text-muted">{version}</span> : null;
+  if (!version) return null;
+  const label = build ? `${version} · #${build.split('.')[0]}` : version;
+  return (
+    <span className="text-xs font-normal text-muted" title={build ? `build ${build}` : undefined}>
+      {label}
+    </span>
+  );
 }
 
 import type { PageId } from '../../lib/route';
