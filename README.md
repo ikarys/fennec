@@ -1,8 +1,24 @@
-# fennec
+<p align="center">
+  <img src="docs/images/brand/emblem.png" width="180" alt="fennec">
+</p>
 
-**AI-assisted development that keeps you the author of your software.**
+<h1 align="center">fennec</h1>
 
-Most coding agents optimise for writing code fast. fennec's thesis is that AI-written code is abundant, while understanding, mastery and responsibility are rare; it tools what is rare. You frame the work, the agent loop runs the steps, then waits for your review; nothing is integrated without a human decision.
+<p align="center">
+  <strong>AI-assisted development that keeps you the author of your software.</strong>
+</p>
+
+<p align="center">
+  <em>AI-written code is abundant. Understanding, mastery and responsibility are rare.<br>fennec tools what is rare.</em>
+</p>
+
+<p align="center">
+  Linux &nbsp;·&nbsp; one Rust binary &nbsp;·&nbsp; local models first &nbsp;·&nbsp; AGPL-3.0
+</p>
+
+---
+
+Most coding agents optimise for writing code fast. fennec is for professional developers who work with AI and want to stay the authors of their software: you frame the work, the agent loop runs the steps, then waits for your review. Nothing is integrated without a human decision.
 
 Status: early, Linux only.
 
