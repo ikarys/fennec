@@ -8,6 +8,7 @@ import { Badge } from '../ui/Badge';
 import { Button, buttonClass } from '../ui/Button';
 import { Menu, MenuItem } from '../ui/Menu';
 import { UpdateNotice } from './UpdateNotice';
+import { WhatsNewNotice } from './WhatsNewNotice';
 
 function InsightIcon({ className }: { className?: string }) {
   return (
@@ -392,6 +393,7 @@ export function TopBar({
           <ChatIcon className="h-4 w-4" />
         </button>
 
+        <WhatsNewNotice />
         <UpdateNotice />
 
         <AttentionBell attention={attention} onOpen={onOpenAttention} />

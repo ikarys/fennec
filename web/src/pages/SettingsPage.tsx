@@ -42,6 +42,7 @@ import { PluginsSection } from '../components/settings/PluginsSection';
 import { SkillsSection } from '../components/settings/SkillsSection';
 import { WorkflowsSection } from '../components/settings/WorkflowsSection';
 import { VersionSection } from '../components/settings/VersionSection';
+import { WhatsNewSection } from '../components/settings/WhatsNewSection';
 import { AboutBrand } from '../components/settings/AboutBrand';
 import { useT } from '../i18n';
 import type { MsgKey } from '../i18n/messages';
@@ -489,6 +490,7 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
               <>
                 <AboutBrand />
                 <VersionSection />
+                <WhatsNewSection />
               </>
             )}
 
