@@ -147,6 +147,25 @@ pub fn run_stats(run: &[Event], criteria: &[CriterionState], files_changed: usiz
     }
 }
 
+/// Fills the node spans of stats recorded before they existed, from the run's
+/// events; stats that already carry spans are left as they are.
+pub fn fill_missing_spans(stats: &mut RunStats, run: &[Event]) {
+    if stats.nodes.iter().any(|node| !node.spans.is_empty()) {
+        return;
+    }
+
+    let rebuilt = run_stats(run, &[], 0);
+    for node in rebuilt.nodes {
+        if let Some(existing) = stats
+            .nodes
+            .iter_mut()
+            .find(|existing| existing.node_id == node.node_id)
+        {
+            existing.spans = node.spans;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -372,5 +391,119 @@ mod tests {
                 }
             ]
         );
+    }
+
+    #[test]
+    fn fill_missing_spans_rebuilds_the_timeline_of_an_old_run() {
+        let run = vec![
+            Event::WorkflowStarted {
+                run_id: "r".into(),
+                workflow: crate::domain::workflow::definition::Workflow {
+                    id: "w".into(),
+                    name: "w".into(),
+                    description: String::new(),
+                    max_steps: 2,
+                    nodes: vec![],
+                    edges: vec![],
+                },
+                task: String::new(),
+                step_by_step: false,
+                started_at: Some(1_000),
+            },
+            Event::WorkflowNodeStarted {
+                run_id: "r".into(),
+                node_id: "a".into(),
+                pass: 1,
+                via: None,
+                child_session_id: None,
+                started_at: Some(1_100),
+            },
+            Event::WorkflowNodeFinished {
+                run_id: "r".into(),
+                node_id: "a".into(),
+                port: "done".into(),
+                output: String::new(),
+                exit_code: None,
+                comment: None,
+                duration_ms: Some(200),
+            },
+            Event::WorkflowNodeStarted {
+                run_id: "r".into(),
+                node_id: "a".into(),
+                pass: 2,
+                via: None,
+                child_session_id: None,
+                started_at: Some(2_000),
+            },
+            Event::WorkflowNodeFinished {
+                run_id: "r".into(),
+                node_id: "a".into(),
+                port: "done".into(),
+                output: String::new(),
+                exit_code: None,
+                comment: None,
+                duration_ms: Some(50),
+            },
+        ];
+
+        let mut stats = RunStats {
+            working_ms: 250,
+            started_at: Some(1_000),
+            finished_at: Some(2_050),
+            nodes: vec![NodeStats {
+                node_id: "a".into(),
+                label: "a".into(),
+                runs: 2,
+                working_ms: 250,
+                spans: vec![],
+            }],
+            reruns: 1,
+            files_changed: 0,
+            criteria_total: 0,
+            criteria_passed: 0,
+            criteria_verified: 0,
+        };
+
+        fill_missing_spans(&mut stats, &run);
+
+        assert_eq!(
+            stats.nodes[0].spans,
+            vec![
+                NodeSpan {
+                    offset_ms: 100,
+                    duration_ms: 200
+                },
+                NodeSpan {
+                    offset_ms: 1_000,
+                    duration_ms: 50
+                }
+            ]
+        );
+
+        let existing = NodeSpan {
+            offset_ms: 7,
+            duration_ms: 8,
+        };
+        let mut old = RunStats {
+            working_ms: 8,
+            started_at: Some(1_000),
+            finished_at: Some(1_008),
+            nodes: vec![NodeStats {
+                node_id: "a".into(),
+                label: "a".into(),
+                runs: 1,
+                working_ms: 8,
+                spans: vec![existing.clone()],
+            }],
+            reruns: 0,
+            files_changed: 0,
+            criteria_total: 0,
+            criteria_passed: 0,
+            criteria_verified: 0,
+        };
+
+        fill_missing_spans(&mut old, &run);
+
+        assert_eq!(old.nodes[0].spans, vec![existing]);
     }
 }
