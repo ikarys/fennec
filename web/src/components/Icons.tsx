@@ -2,23 +2,6 @@ interface IconProps {
   className?: string;
 }
 
-export function FoxIcon({ className }: IconProps) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M4 4l4 6-2 8 6-3 6 3-2-8 4-6-6 3z" />
-    </svg>
-  );
-}
-
 export function SearchIcon({ className }: IconProps) {
   return (
     <svg

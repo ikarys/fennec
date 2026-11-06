@@ -3,7 +3,7 @@ import { useT } from '../../i18n';
 import type { MsgKey } from '../../i18n/messages';
 import type { AttentionItem, SessionState } from '../../lib/api';
 import { SessionStateIcon } from '../session/SessionStateIcon';
-import { BellIcon, ChatIcon, CloseIcon, FoxIcon, PlusIcon, SearchIcon, SettingsIcon, SplitIcon } from '../Icons';
+import { BellIcon, ChatIcon, CloseIcon, PlusIcon, SearchIcon, SettingsIcon, SplitIcon } from '../Icons';
 import { Badge } from '../ui/Badge';
 import { Button, buttonClass } from '../ui/Button';
 import { Menu, MenuItem } from '../ui/Menu';
@@ -269,7 +269,7 @@ export function TopBar({
         aria-label={t('topBarHomeAria')}
         className="flex items-center gap-2 py-2 pl-1 pr-3 text-base font-semibold tracking-[-0.01em] text-text"
       >
-        <FoxIcon className="h-5 w-5 text-accent" />
+        <img src="/fennec.png" alt="" className="h-6 w-6" />
         <span>fennec</span>
       </a>
       <VersionTag />
