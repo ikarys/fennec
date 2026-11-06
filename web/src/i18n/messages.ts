@@ -433,7 +433,7 @@ export const en = {
     "bwrap is not installed: the model's commands will fail. Install the bubblewrap package, then reload this page.",
   bwrapBlockedHint:
     "bwrap cannot create its isolated space: the model's commands will fail. On Ubuntu 23.10 and later, AppArmor forbids user namespaces; run the command below then reload this page (details: docs/releasing.md).",
-  sandboxEnabledLabel: 'Run commands in bwrap',
+  sandboxEnabledLabel: 'Run commands in the sandbox',
   sandboxEnabledHint:
     "The model's commands and the workflow's shell nodes see the system read-only, their work folder writable, without your secrets (~/.ssh, ~/.aws, …) nor fennec's database. Disabled: they run on your machine.",
   sandboxNetworkLabel: 'Network for commands',
@@ -1830,7 +1830,7 @@ export const fr: Record<MsgKey, string> = {
     "bwrap n'est pas installé : les commandes du modèle échoueront. Installe le paquet bubblewrap, puis recharge cette page.",
   bwrapBlockedHint:
     "bwrap ne peut pas créer son espace isolé : les commandes du modèle échoueront. Sur Ubuntu 23.10 et suivants, AppArmor interdit les user namespaces ; lance la commande ci-dessous puis recharge cette page (détails : docs/releasing.md).",
-  sandboxEnabledLabel: 'Exécuter les commandes dans bwrap',
+  sandboxEnabledLabel: 'Exécuter les commandes dans le sandbox',
   sandboxEnabledHint:
     "Les commandes du modèle et les nœuds shell des workflows voient le système en lecture seule, leur dossier de travail en écriture, sans tes secrets (~/.ssh, ~/.aws, …) ni la base de fennec. Désactivé : elles tournent sur ta machine.",
   sandboxNetworkLabel: 'Réseau pour les commandes',

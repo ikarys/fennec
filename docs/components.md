@@ -235,3 +235,9 @@ which lists the branch's files in the gate's review order with their signals and
 the session's base (the range the integration takes), colored and numbered on both sides, cut at 5,000 lines; an icon
 opens the whole file in VS Code. The server parses the hunks and only diffs a path the branch changed
 (`domain/diff.rs`, `integration::file_diff`, `web/diff_routes.rs`, `pages/ChangesPage.tsx`).
+
+macOS sandbox, done: on macOS the commands' sandbox world (secrets hidden, protected files read-only, network
+cut or not) is rendered as a Seatbelt profile run by `/usr/bin/sandbox-exec`, every path passed as a parameter;
+the main checkout's dependency directories are linked into a worktree instead of mounted. Known gaps: the host's
+temp dirs stay shared, a protected file's parent directory can be renamed (`tools/sandbox/seatbelt.rs`,
+`tools/sandbox.rs`, `turn_build.rs`).

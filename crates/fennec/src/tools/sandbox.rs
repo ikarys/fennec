@@ -1,4 +1,4 @@
-//! fennec's bwrap world for commands: what a model runs sees the system read-only, its workdir writable, the human's secrets hidden and, by default, no network.
+//! fennec's sandbox world for commands (bwrap on Linux, Seatbelt on macOS): what a model runs sees the system read-only, its workdir writable, the human's secrets hidden and, by default, no network.
 //! The file tools keep the in-process path guard; this only wraps commands.
 
 use crate::domain::preferences::SandboxPrefs;
@@ -6,11 +6,15 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+// Each renderer is compiled everywhere so its pure tests run on any machine; only one is used.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+mod seatbelt;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Sandbox {
     /// Commands run on the host (the human turned the sandbox off).
     Off,
-    Bwrap {
+    On {
         network: bool,
         hidden_dirs: Vec<PathBuf>,
         hidden_files: Vec<PathBuf>,
@@ -82,7 +86,7 @@ impl Sandbox {
             }
         }
 
-        Sandbox::Bwrap {
+        Sandbox::On {
             network: prefs.network,
             hidden_dirs,
             hidden_files,
@@ -105,7 +109,7 @@ impl Sandbox {
             .unwrap_or_default();
         let mut sandbox = Sandbox::from_prefs(prefs, home.as_deref(), &data_dir);
         // The session runtime dir holds rootless docker/podman and D-Bus sockets.
-        if let Sandbox::Bwrap { hidden_dirs, .. } = &mut sandbox
+        if let Sandbox::On { hidden_dirs, .. } = &mut sandbox
             && let Some(runtime) = std::env::var_os("XDG_RUNTIME_DIR").map(PathBuf::from)
             && runtime.is_dir()
         {
@@ -118,14 +122,14 @@ impl Sandbox {
     pub fn protecting(self, paths: Vec<PathBuf>) -> Sandbox {
         match self {
             Sandbox::Off => Sandbox::Off,
-            Sandbox::Bwrap {
+            Sandbox::On {
                 network,
                 hidden_dirs,
                 hidden_files,
                 writable,
                 mounts,
                 ..
-            } => Sandbox::Bwrap {
+            } => Sandbox::On {
                 network,
                 hidden_dirs,
                 hidden_files,
@@ -140,14 +144,14 @@ impl Sandbox {
     pub fn with_mounts(self, mounts: Vec<(PathBuf, PathBuf)>) -> Sandbox {
         match self {
             Sandbox::Off => Sandbox::Off,
-            Sandbox::Bwrap {
+            Sandbox::On {
                 network,
                 hidden_dirs,
                 hidden_files,
                 writable,
                 read_only,
                 ..
-            } => Sandbox::Bwrap {
+            } => Sandbox::On {
                 network,
                 hidden_dirs,
                 hidden_files,
@@ -161,7 +165,7 @@ impl Sandbox {
     /// The same sandbox with its network flag set (a plugin's network is its
     /// own choice, independent of the command sandbox's).
     pub fn with_network(mut self, network: bool) -> Sandbox {
-        if let Sandbox::Bwrap {
+        if let Sandbox::On {
             network: ref mut flag,
             ..
         } = self
@@ -174,7 +178,7 @@ impl Sandbox {
     /// The same sandbox with `paths` writable too (bound after the hidden
     /// dirs, so a path inside fennec's hidden store is reachable).
     pub fn writing(mut self, paths: Vec<PathBuf>) -> Sandbox {
-        if let Sandbox::Bwrap { writable, .. } = &mut self {
+        if let Sandbox::On { writable, .. } = &mut self {
             writable.extend(paths);
         }
         self
@@ -187,7 +191,7 @@ impl Sandbox {
         let mut sandbox = self.clone();
         match &mut sandbox {
             Sandbox::Off => return None,
-            Sandbox::Bwrap { read_only, .. } => read_only.push(workdir.to_path_buf()),
+            Sandbox::On { read_only, .. } => read_only.push(workdir.to_path_buf()),
         }
         Some(sandbox)
     }
@@ -201,13 +205,13 @@ impl Sandbox {
                 strip_secret_env(&mut sh);
                 sh
             }
-            Sandbox::Bwrap { .. } => {
-                let mut bwrap = Command::new("bwrap");
-                bwrap.args(bwrap_args(self, workdir, cwd, command));
-                // bwrap passes fennec's environment through: the model would
+            Sandbox::On { .. } => {
+                let mut wrapped = self.wrapper(workdir, cwd);
+                wrapped.args(["sh", "-c", command]);
+                // The sandbox passes fennec's environment through: the model would
                 // read the endpoint key or a token with `env`.
-                strip_secret_env(&mut bwrap);
-                bwrap
+                strip_secret_env(&mut wrapped);
+                wrapped
             }
         }
     }
@@ -223,19 +227,37 @@ impl Sandbox {
                 strip_secret_env(&mut cmd);
                 cmd
             }
-            Sandbox::Bwrap { .. } => {
-                let mut bwrap = Command::new("bwrap");
-                let mut bargs = bwrap_world_args(self, workdir, cwd);
-                bargs.push(OsString::from("--"));
-                bargs.push(OsString::from(program));
-                for arg in args {
-                    bargs.push(OsString::from(arg));
-                }
-                bwrap.args(bargs);
-                strip_secret_env(&mut bwrap);
-                bwrap
+            Sandbox::On { .. } => {
+                let mut wrapped = self.wrapper(workdir, cwd);
+                wrapped.arg(program).args(args);
+                strip_secret_env(&mut wrapped);
+                wrapped
             }
         }
+    }
+
+    /// The sandbox program with this world's arguments, the command's tail still to add.
+    #[cfg(not(target_os = "macos"))]
+    fn wrapper(&self, workdir: &Path, cwd: &Path) -> Command {
+        let mut bwrap = Command::new("bwrap");
+        bwrap.args(bwrap_world_args(self, workdir, cwd)).arg("--");
+        bwrap
+    }
+
+    /// The sandbox program with this world's arguments, the command's tail still to add.
+    #[cfg(target_os = "macos")]
+    fn wrapper(&self, workdir: &Path, cwd: &Path) -> Command {
+        let mut sandbox_exec = Command::new(seatbelt::SANDBOX_EXEC);
+        sandbox_exec
+            .args(seatbelt::seatbelt_args(self, workdir))
+            .current_dir(cwd);
+        // bwrap sets these with --setenv; Seatbelt has no such flag.
+        if let Sandbox::On { network: false, .. } = self {
+            sandbox_exec
+                .env("npm_config_offline", "true")
+                .env("CARGO_NET_OFFLINE", "true");
+        }
+        sandbox_exec
     }
 }
 
@@ -249,7 +271,7 @@ fn strip_secret_env(cmd: &mut Command) {
     }
 }
 
-/// Whether bwrap can build the world commands run in, on this machine (verified).
+/// Whether the sandbox (bwrap, Seatbelt) can build the world commands run in, on this machine (verified).
 #[derive(Debug, Clone, PartialEq)]
 pub enum SandboxHealth {
     Ready,
@@ -261,6 +283,9 @@ pub enum SandboxHealth {
 /// forbids unprivileged user namespaces (Ubuntu 23.10+ AppArmor) surfaces in
 /// the Settings page instead of every sandboxed command failing silently.
 pub fn probe() -> SandboxHealth {
+    if cfg!(target_os = "macos") {
+        return health_from(seatbelt::probe());
+    }
     let output = Command::new("bwrap")
         .args([
             "--ro-bind",
@@ -291,7 +316,10 @@ fn health_from(output: std::io::Result<std::process::Output>) -> SandboxHealth {
                 .find(|line| !line.is_empty())
                 .map(ToOwned::to_owned)
                 .unwrap_or_else(|| {
-                    format!("bwrap exited with {}", output.status.code().unwrap_or(-1))
+                    format!(
+                        "the sandbox exited with {}",
+                        output.status.code().unwrap_or(-1)
+                    )
                 }),
         ),
     }
@@ -322,12 +350,12 @@ fn is_secret_name(name: &str) -> bool {
     MARKERS.iter().any(|marker| upper.contains(marker)) || upper.starts_with("AWS_")
 }
 
-/// The bwrap arguments of a `Bwrap` sandbox; empty for `Off`.
 /// The bwrap world, everything up to (and including) `--chdir cwd`; the
 /// command tail after `--` is added by the caller, so a `sh -c` string and a
 /// bare program+args (the MCP stdio client) share the same world.
+#[cfg_attr(target_os = "macos", allow(dead_code))]
 fn bwrap_world_args(sandbox: &Sandbox, workdir: &Path, cwd: &Path) -> Vec<OsString> {
-    let Sandbox::Bwrap {
+    let Sandbox::On {
         network,
         hidden_dirs,
         hidden_files,
@@ -415,6 +443,7 @@ fn bwrap_world_args(sandbox: &Sandbox, workdir: &Path, cwd: &Path) -> Vec<OsStri
     args
 }
 
+#[cfg(test)]
 fn bwrap_args(sandbox: &Sandbox, workdir: &Path, cwd: &Path, command: &str) -> Vec<OsString> {
     let mut args = bwrap_world_args(sandbox, workdir, cwd);
     args.push(OsString::from("--"));
@@ -441,7 +470,7 @@ mod tests {
     #[test]
     fn bwrap_args_keep_the_mount_order_and_offline_env() {
         let args = bwrap_args(
-            &Sandbox::Bwrap {
+            &Sandbox::On {
                 network: false,
                 hidden_dirs: vec![PathBuf::from("/home/user/.ssh")],
                 hidden_files: vec![PathBuf::from("/home/user/.netrc")],
@@ -499,7 +528,7 @@ mod tests {
     #[test]
     fn bwrap_args_share_net_only_when_network_is_on() {
         let offline = bwrap_args(
-            &Sandbox::Bwrap {
+            &Sandbox::On {
                 network: false,
                 hidden_dirs: vec![],
                 hidden_files: vec![],
@@ -517,7 +546,7 @@ mod tests {
         assert!(offline.contains(&"CARGO_NET_OFFLINE".to_string()));
 
         let online = bwrap_args(
-            &Sandbox::Bwrap {
+            &Sandbox::On {
                 network: true,
                 hidden_dirs: vec![],
                 hidden_files: vec![],
@@ -538,7 +567,7 @@ mod tests {
     #[test]
     fn bwrap_args_put_read_only_binds_after_the_workdir_bind() {
         let args = bwrap_args(
-            &Sandbox::Bwrap {
+            &Sandbox::On {
                 network: false,
                 hidden_dirs: vec![],
                 hidden_files: vec![],
@@ -596,7 +625,7 @@ mod tests {
         let _ = std::fs::remove_file(&link);
         std::os::unix::fs::symlink("/main/web/node_modules", &link).unwrap();
         let args = bwrap_args(
-            &Sandbox::Bwrap {
+            &Sandbox::On {
                 network: false,
                 hidden_dirs: vec![],
                 hidden_files: vec![],
@@ -616,7 +645,7 @@ mod tests {
     #[test]
     fn bwrap_args_put_dependency_mounts_after_the_workdir_bind() {
         let args = bwrap_args(
-            &Sandbox::Bwrap {
+            &Sandbox::On {
                 network: false,
                 hidden_dirs: vec![],
                 hidden_files: vec![],
@@ -675,7 +704,7 @@ mod tests {
     #[test]
     fn read_only_puts_the_workdir_read_only_bind_after_the_writable_bind() {
         let workdir = Path::new("/work");
-        let sandbox = Sandbox::Bwrap {
+        let sandbox = Sandbox::On {
             network: false,
             hidden_dirs: vec![],
             hidden_files: vec![],
@@ -752,7 +781,7 @@ mod tests {
         };
         let sandbox = Sandbox::from_prefs(&prefs, Some(&home), &data_dir);
 
-        let Sandbox::Bwrap {
+        let Sandbox::On {
             network,
             hidden_dirs,
             hidden_files,
@@ -827,7 +856,7 @@ mod tests {
         }
 
         let workdir = temp_dir();
-        let sandbox = Sandbox::Bwrap {
+        let sandbox = Sandbox::On {
             network: false,
             hidden_dirs: vec![],
             hidden_files: vec![],
@@ -885,7 +914,7 @@ mod tests {
         }
 
         let workdir = temp_dir();
-        let sandbox = Sandbox::Bwrap {
+        let sandbox = Sandbox::On {
             network: false,
             hidden_dirs: vec![],
             hidden_files: vec![],
@@ -924,7 +953,7 @@ mod tests {
         std::fs::write(hidden.join("secret"), "top secret").unwrap();
 
         let workdir = temp_dir();
-        let sandbox = Sandbox::Bwrap {
+        let sandbox = Sandbox::On {
             network: false,
             hidden_dirs: vec![hidden.clone()],
             hidden_files: vec![],
@@ -955,7 +984,7 @@ mod tests {
         }
 
         let workdir = temp_dir();
-        let sandbox = Sandbox::Bwrap {
+        let sandbox = Sandbox::On {
             network: false,
             hidden_dirs: vec![],
             hidden_files: vec![],
@@ -991,7 +1020,7 @@ mod tests {
         let protected = workdir.join("protected.txt");
         std::fs::write(&protected, "original").unwrap();
 
-        let sandbox = Sandbox::Bwrap {
+        let sandbox = Sandbox::On {
             network: false,
             hidden_dirs: vec![],
             hidden_files: vec![],
