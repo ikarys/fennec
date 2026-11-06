@@ -3,11 +3,13 @@ import { Section, type SectionSave } from '../ui/Section';
 import { TextInput, Select } from '../ui/Field';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
+import { ListCard } from '../ui/ListCard';
 import { Tabs } from '../ui/Tabs';
 import { authorizeMcp, connectMcp, type McpServer } from '../../lib/api';
 import type { McpToolSummary, ToolAccess } from '../../lib/api/settings';
 import { KeyIcon } from '../Icons';
-import { useT } from '../../i18n';
+import { useLang, useT } from '../../i18n';
+import { formatTokens } from '../../lib/format';
 
 function emptyServer(): McpServer {
   return {
@@ -51,6 +53,7 @@ function ServerCard({
   connecting,
   views,
   onPatch,
+  onTools,
   onRemove,
   onConnect,
   onAuthorize
@@ -60,6 +63,8 @@ function ServerCard({
   connecting: boolean;
   views: McpToolSummary[];
   onPatch: (patch: Partial<McpServer>) => void;
+  /** A tool switched on or off: stored at once, no Save needed. */
+  onTools: (disabledTools: string[]) => void;
   onRemove: () => void;
   onConnect: () => void;
   onAuthorize: () => void;
@@ -68,10 +73,11 @@ function ServerCard({
     const disabled = server.disabledTools.includes(name)
       ? server.disabledTools.filter((tool) => tool !== name)
       : [...server.disabledTools, name];
-    onPatch({ disabledTools: disabled });
+    onTools(disabled);
   }
 
   const t = useT();
+  const lang = useLang();
   const [tab, setTab] = useState<ToolAccess | null>(null);
 
   // The backend view is the source for access and token cost; a missing entry
@@ -112,10 +118,10 @@ function ServerCard({
       // Disable every tool in the tab: keep the existing disabled order, then
       // append the tools that were still enabled.
       const missing = names.filter((name) => !server.disabledTools.includes(name));
-      onPatch({ disabledTools: [...server.disabledTools, ...missing] });
+      onTools([...server.disabledTools, ...missing]);
     } else {
       // Enable every tool in the tab: remove only those names, keeping order.
-      onPatch({ disabledTools: server.disabledTools.filter((name) => !names.includes(name)) });
+      onTools(server.disabledTools.filter((name) => !names.includes(name)));
     }
   }
   return (
@@ -238,13 +244,11 @@ function ServerCard({
       </div>
 
       {server.cachedTools.length > 0 && (
-        <Card className="overflow-hidden">
-          <div className="flex items-center justify-between border-b border-border bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent">
-            <span>{t('mcpTools')}</span>
-            <span className="tabular-nums">
-              {enabled}/{server.cachedTools.length} · {t('mcpTokens', { count: enabledTokens })}
-            </span>
-          </div>
+        <ListCard
+          folded
+          title={t('mcpTools')}
+          count={`${enabled}/${server.cachedTools.length} · ${t('mcpTokens', { count: formatTokens(lang, enabledTokens) })}`}
+        >
           {activeTab ? (
             <div
               className="border-b border-border px-3 pt-1"
@@ -272,7 +276,7 @@ function ServerCard({
                       className="h-4 w-4 accent-[var(--accent)]"
                       aria-label={t('mcpToggleTab')}
                     />
-                    <span className="tabular-nums">{t('mcpTokens', { count: tabEnabledTokens })}</span>
+                    <span className="tabular-nums">{t('mcpTokens', { count: formatTokens(lang, tabEnabledTokens) })}</span>
                   </label>
                 }
               />
@@ -305,7 +309,7 @@ function ServerCard({
                       {firstSentence(entry.tool.description)}
                     </span>
                   ) : null}
-                  <span className="shrink-0 text-xs tabular-nums text-faint">~{entry.tokens}</span>
+                  <span className="shrink-0 text-xs tabular-nums text-faint">~{formatTokens(lang, entry.tokens)}</span>
                 </summary>
                 {entry.tool.description ? (
                   <p className="whitespace-pre-wrap px-3 pb-2 pl-9 text-xs text-muted">{entry.tool.description}</p>
@@ -313,7 +317,7 @@ function ServerCard({
               </details>
             );
           })}
-        </Card>
+        </ListCard>
       )}
     </Card>
   );
@@ -324,7 +328,8 @@ export function McpSection({
   onChange,
   toolViews,
   save,
-  onConnected
+  onConnected,
+  onToolsChange
 }: {
   value: McpServer[];
   onChange: (value: McpServer[]) => void;
@@ -334,6 +339,8 @@ export function McpSection({
   save?: SectionSave;
   /** After a connect: the server stored the tools, the page reads them back. */
   onConnected: () => Promise<void>;
+  /** A server's tools switched on or off, stored at once: a toggle is a decision, not a draft. */
+  onToolsChange: (name: string, disabledTools: string[]) => Promise<void>;
 }) {
   const t = useT();
   const [connecting, setConnecting] = useState<number | null>(null);
@@ -406,6 +413,12 @@ export function McpSection({
             connecting={connecting === index}
             views={toolViews[server.name] ?? []}
             onPatch={(p) => patch(index, p)}
+            onTools={(disabledTools) => {
+              patch(index, { disabledTools });
+              onToolsChange(server.name, disabledTools).catch((e) =>
+                setError(e instanceof Error ? e.message : String(e))
+              );
+            }}
             onRemove={() => onChange(value.filter((_, i) => i !== index))}
             onConnect={() => connect(index)}
             onAuthorize={() => authorize(index)}
