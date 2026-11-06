@@ -401,6 +401,7 @@ export const en = {
   // Search, sandbox, instructions (components/settings)
   serverTitle: 'Server',
   serverDescription: 'Where fennec listens. Change it on a port conflict.',
+  aboutTagline: 'AI-assisted development that keeps you the author of your software.',
   versionTitle: 'Version',
   versionDescription: 'The fennec running here. A local build (just install) updates from the repository, not from GitHub.',
   versionCheckTitle: 'Check for updates',
@@ -1797,6 +1798,7 @@ export const fr: Record<MsgKey, string> = {
   // Search, sandbox, instructions (components/settings)
   serverTitle: 'Serveur',
   serverDescription: 'Où fennec écoute. À changer en cas de conflit de port.',
+  aboutTagline: 'Le développement assisté par IA qui vous laisse l’auteur de votre logiciel.',
   versionTitle: 'Version',
   versionDescription: 'Le fennec qui tourne ici. Un build local (just install) se met à jour depuis le dépôt, pas depuis GitHub.',
   versionCheckTitle: 'Vérifier les mises à jour',
