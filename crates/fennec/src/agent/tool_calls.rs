@@ -16,9 +16,11 @@ use super::rule_check;
 use super::submit_report;
 use super::suggest_agent;
 use super::turn::Turn;
+use crate::agent::ports::RuleCheck;
 use crate::domain::agent::{AgentDefinition, WriteScope};
 use crate::domain::criteria;
 use crate::domain::event::{Event, ToolCall, ToolResult};
+use crate::domain::named_paths::{human_texts, named_by_human};
 use crate::domain::test_files;
 use crate::domain::workflow::run;
 use std::sync::atomic::Ordering;
@@ -33,6 +35,19 @@ const AWAY_CRITERIA: &str = "The human is away (autonomous run): the criteria st
 /// `request_waiver`'s result while the human is away.
 const AWAY_WAIVER: &str = "The human is away (autonomous run): a protected file cannot be waived. Say in your report what should change there and why, and continue.";
 const NOT_RUN_AFTER_ASK: &str = "Not run: the turn paused for the human (a question or an approval). Call it again after the answer if it is still needed.";
+
+/// A default read ask can be skipped only when the human already named the path.
+fn named_by_the_human(turn: &Turn, check: &RuleCheck) -> Result<bool, String> {
+    let Some(path) = rule_check::named_read(check) else {
+        return Ok(false);
+    };
+
+    let events = turn.log.events(turn.session_id)?;
+    let texts = human_texts(&events);
+    let home = std::env::var_os("HOME").map(std::path::PathBuf::from);
+
+    Ok(named_by_human(path, &texts, home.as_deref()))
+}
 
 pub(super) enum Flow {
     Continue,
@@ -356,6 +371,12 @@ pub(super) fn execute_tools(
         if !turn.autonomous
             && let rules::Decision::Ask(rule) = check.decision
         {
+            if rule.is_none() && named_by_the_human(turn, &check)? {
+                let r = run_tool(turn, agent, message_id, call, true)?;
+                record(turn, message_id, call, r)?;
+                continue;
+            }
+
             turn.append(rule_check::approval(&call.id, rule, &check))?;
             waiting = true; // no result: the human's answer will produce it
             continue;
