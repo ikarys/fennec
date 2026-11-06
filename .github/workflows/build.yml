@@ -1,6 +1,7 @@
 name: build
 
 on:
+  pull_request: # TEMP: try the macOS build, removed before merge
   workflow_call:
     inputs:
       label:
