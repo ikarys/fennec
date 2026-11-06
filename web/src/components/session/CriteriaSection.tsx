@@ -78,11 +78,14 @@ export function CriteriaSection({ criteria }: { criteria: CriterionView[] }) {
             const dotClass = criterionDotClass(criterion.status.type, provenance);
 
             return (
-              <details key={criterion.id}>
+              <details key={criterion.id} className="group/criterion">
                 <summary className="group flex cursor-pointer list-none items-start gap-2 rounded-md px-1 py-1.5 text-xs select-none hover:bg-accent-soft">
                   <span aria-hidden className={`mt-1 h-2 w-2 shrink-0 rounded-full ${dotClass}`} />
                   <span className="shrink-0 font-mono text-muted">{criterion.id}</span>
-                  <span className="grow break-words text-text group-hover:text-accent-strong">{criterion.description}</span>
+                  {/* One line closed; the click that opens the details shows the whole text. */}
+                  <span className="min-w-0 grow truncate text-text group-hover:text-accent-strong group-open/criterion:whitespace-normal group-open/criterion:break-words">
+                    {criterion.description}
+                  </span>
                   <PassedBeforeBadge passedBefore={criterion.passedBefore} />
                   <CriterionProvenanceBadge provenance={provenance} />
                 </summary>

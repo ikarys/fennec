@@ -55,7 +55,8 @@ export function VersionSection() {
       title={t('versionTitle')}
       description={t('versionDescription')}
       actions={
-        <Button
+        // A local build updates from its checkout: the releases do not concern it.
+        !info.build && <Button
           variant="ghost"
           size="sm"
           iconOnly
@@ -68,6 +69,7 @@ export function VersionSection() {
         </Button>
       }
     >
+      {info.build && <p className="mb-2 text-xs text-muted">{t('versionLocalHint')}</p>}
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-mono text-sm">{info.version}</span>
         {info.build && (
