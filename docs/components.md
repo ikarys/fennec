@@ -251,3 +251,10 @@ Paths the human named, done: a file tool reading outside the project runs withou
 already wrote that path, or a folder above it, in a message or an answer of the session (`~/`, Windows
 `\\wsl.localhost\<distro>\` paths included); writes, commands and the human's own Ask rules still ask
 (`domain/named_paths.rs`, `agent/tool_calls.rs`).
+
+**Changelog, done**: release-please writes `CHANGELOG.md` from the Conventional Commits (features, fixes,
+performance, reverts; docs, refactors, tests and chores hidden); the binary embeds it and serves it parsed
+(`GET /api/changelog`). The About tab lists the releases under "What's new" and marks them seen; the top bar
+shows a star with the count of releases since the human last looked, a fresh install starting at zero
+(`domain/changelog.rs`, `store/settings.rs`, `web/changelog_routes.rs`, `WhatsNewSection.tsx`,
+`WhatsNewNotice.tsx`).

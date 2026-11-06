@@ -64,6 +64,7 @@ crates/fennec/src/
     diff.rs            the lines a unified diff adds and removes; one file's diff as numbered hunks
     commit_subject.rs  the integration's commit subject the model proposes: its prompt, its answer checked
     bypass.rs          what silences a gate: suppression markers added, tests or assertions removed
+    changelog.rs       the release-please CHANGELOG.md read back as releases; those newer than the version last seen
     adr.rs             architecture decision records: a MADR file read (number, title, status, date)
     module_map.rs      the project map: modules, their dependencies from the imports, their layout
     map_doc.rs         docs/map.md: the map as Markdown (Mermaid, table), stale or current; its edges read back
@@ -179,7 +180,7 @@ crates/fennec/src/
                      tools opened on a folder), model_view, worktree_routes (disk usage), agent_routes,
                      audit_routes, backlog_routes, idea_assets, mcp_routes, proposal_routes, session_delete,
                      agents_md_routes, session_name (background naming), canvas_routes (the canvas crate over HTTP),
-                     budget_routes (a project's budget, read and set), setup_routes (the first-run checklist),
+                     budget_routes (a project's budget, read and set), changelog_routes (the embedded changelog, what is new since the human last looked), setup_routes (the first-run checklist),
                      contribution_routes (branches someone else wrote, adopted into a session for the gate),
                      indicator_routes (a project's indicators from its logs, git and the ledger),
                      diff_routes (one changed file of a session's branch as diff lines, for the Changes page)
