@@ -24,6 +24,11 @@ function emptyServer(): McpServer {
   };
 }
 
+/** The description's first sentence, for the one-line summary of a tool row. */
+function firstSentence(text: string): string {
+  return text.split(/(?<=\.) |\n/)[0].trim();
+}
+
 function ServerCard({
   index,
   server,
@@ -169,22 +174,49 @@ function ServerCard({
       </div>
 
       {server.cachedTools.length > 0 && (
-        <div className="flex flex-col gap-1">
-          {server.cachedTools.map((tool) => (
-            <label key={tool.name} className="flex items-center gap-2 text-sm text-text">
-              <input
-                type="checkbox"
-                checked={!server.disabledTools.includes(tool.name)}
-                onChange={() => toggleTool(tool.name)}
-                className="h-4 w-4 accent-[var(--accent)]"
-              />
-              {server.name}_{tool.name}
-              {tool.description ? (
-                <span className="text-xs text-muted">— {tool.description}</span>
-              ) : null}
-            </label>
-          ))}
-        </div>
+        <Card className="overflow-hidden">
+          <div className="flex items-center justify-between border-b border-border bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent">
+            <span>{t('mcpTools')}</span>
+            <span className="tabular-nums">
+              {server.cachedTools.filter((tool) => !server.disabledTools.includes(tool.name)).length}/
+              {server.cachedTools.length}
+            </span>
+          </div>
+          {server.cachedTools.map((tool, toolIndex) => {
+            const disabled = server.disabledTools.includes(tool.name);
+            return (
+              <details key={tool.name} className={toolIndex > 0 ? 'border-t border-border' : undefined}>
+                <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-1.5 hover:bg-accent/5">
+                  <input
+                    type="checkbox"
+                    checked={!disabled}
+                    onChange={() => toggleTool(tool.name)}
+                    onClick={(event) => event.stopPropagation()}
+                    className="h-4 w-4 accent-[var(--accent)]"
+                    aria-label={tool.name}
+                  />
+                  <span
+                    className={
+                      disabled
+                        ? 'shrink-0 font-mono text-xs text-faint line-through'
+                        : 'shrink-0 font-mono text-xs text-text'
+                    }
+                  >
+                    {tool.name}
+                  </span>
+                  {tool.description ? (
+                    <span className="min-w-0 flex-1 truncate text-xs text-faint">
+                      {firstSentence(tool.description)}
+                    </span>
+                  ) : null}
+                </summary>
+                {tool.description ? (
+                  <p className="whitespace-pre-wrap px-3 pb-2 pl-9 text-xs text-muted">{tool.description}</p>
+                ) : null}
+              </details>
+            );
+          })}
+        </Card>
       )}
     </Card>
   );
