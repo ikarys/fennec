@@ -418,7 +418,6 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
                   save={groupSave('mcp')}
                   value={form.mcp}
                   onChange={updateMcp}
-                  savedNames={new Set((settings.preferences.mcp ?? []).map((server) => server.name))}
                 />
               </>
             )}
