@@ -9,7 +9,11 @@
 use std::path::Path;
 
 fn main() {
-    let dist = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../web/dist");
+    // Read at run time: `env!` would bake the path the script was compiled in,
+    // and a script reused from another worktree sharing the target dir would
+    // embed that worktree's UI (or the placeholder).
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+    let dist = Path::new(&manifest_dir).join("../../web/dist");
     let out_dir = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap());
     let out = out_dir.join("web");
     std::fs::create_dir_all(&out).unwrap();
