@@ -8,6 +8,7 @@ mod audit_routes;
 mod backlog_routes;
 mod budget_routes;
 mod canvas_routes;
+mod changelog_routes;
 mod children;
 mod commit_subject;
 mod context_view;
