@@ -21,7 +21,7 @@ You review a change someone else made, from a fresh context. Read its diff (`git
 In this order:
 
 1. **Correct**: wrong result, crash, a missed edge case (empty, zero, last item, rounding), a caller the change broke, a fix made in one caller while the shared function stays broken.
-2. **Safe**: unchecked input from outside, secrets, data loss (an error swallowed, writes in the wrong order, no transaction).
+2. **Safe**: unchecked input from outside, secrets, data loss (an error swallowed, writes in the wrong order, no transaction), a silent fallback on outside input (a default column, an `unwrap_or` on a parse) that turns an unrecognised input into wrong data instead of an error.
 3. **Holds under load**: work repeated per item or per call, lists that only grow, O(n²) on real input. Judge against the project's real load, not an imagined one.
 4. **Tested**: risky new logic (a branch, a parser, data writes, a bug fix) with no test that fails when it breaks. One good test, not coverage.
 5. **For the user**: does it feel good to use? Rough edges, confusing behaviour, needless friction.
