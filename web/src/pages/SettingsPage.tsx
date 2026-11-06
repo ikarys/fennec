@@ -9,7 +9,7 @@ import type {
   SandboxPrefs,
   SettingsResponse
 } from '../lib/api';
-import { listProvider, saveSettings } from '../lib/api';
+import { getSettings, listProvider, saveSettings } from '../lib/api';
 import {
   SAVE_GROUPS,
   buildPreferences,
@@ -262,6 +262,14 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
     }
   }
 
+  /** A connect stores the server's tools on the server side: the page's copy is read again. */
+  async function reloadMcp() {
+    const response = await getSettings();
+    onSaved(response);
+    const fresh = toForm(response.preferences, response.listings);
+    setForm((previous) => (previous ? { ...previous, mcp: fresh.mcp } : previous));
+  }
+
   function setDefaultModel(key: string) {
     updateModel(key);
     const slash = key.indexOf('/');
@@ -418,6 +426,7 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
                   save={groupSave('mcp')}
                   value={form.mcp}
                   onChange={updateMcp}
+                  onConnected={reloadMcp}
                 />
               </>
             )}
