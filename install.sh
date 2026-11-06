@@ -5,7 +5,7 @@
 #   curl -fsSL https://raw.githubusercontent.com/ikarys/fennec/main/install.sh | sh
 #
 # Environment:
-#   FENNEC_VERSION       release tag to install (default: latest; edge is supported)
+#   FENNEC_VERSION       release tag to install (default: latest)
 #   FENNEC_INSTALL_DIR   install directory (default: $HOME/.local/bin)
 #   FENNEC_REPO_URL      repository URL for releases (default: https://github.com/ikarys/fennec)
 #   FENNEC_SERVICE       none: do not manage a systemd user service; keep: do not restart an existing service
