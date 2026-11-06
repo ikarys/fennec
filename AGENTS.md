@@ -83,6 +83,7 @@ crates/fennec/src/
     doc.rs             the project's documentation: markdown files and ADRs, as the Doc tab lists them
     mcp.rs             MCP servers as the human configured them; server.rs the project's servers (`.agents/servers.json`)
     scanner.rs         the security scanners fennec knows (the gate, the audit-security agent);
+    setup.rs           the first-run checklist: model, sandbox, git, a project, scanners, from gathered facts
     security_scan.rs   the scanners' JSON reports parsed into findings; which lockfiles a branch changed; attention.rs what a finished turn leaves for the human's eye
     audit.rs           an audit report parsed from the model's answer, and the backlog task each finding becomes
     workdir_notice.rs  tells the model its working directory moved; session_name.rs the session name's prompt and cleanup
@@ -155,6 +156,7 @@ crates/fennec/src/
   turn_build.rs      the composition of a Turn, shared by both adapters (CLI, web): store, model, tools, sandbox
   mcp.rs             the synchronous MCP client (JSON-RPC over stdio); servers.rs the project's servers on disk
   scanners.rs        the security scanners found on PATH
+  setup.rs           the first-run checklist's facts gathered (model listed, sandbox probed, git, projects, scanners)
   security_scan.rs   the gate's scanners run in the read-only sandbox, cached per (base, branch)
   notifier.rs        wakes event streams when a turn appends to a log, so an open tab costs nothing idle
   architecture.rs    `.agents/architecture` read from disk
@@ -176,11 +178,11 @@ crates/fennec/src/
                      tools opened on a folder), model_view, worktree_routes (disk usage), agent_routes,
                      audit_routes, backlog_routes, idea_assets, mcp_routes, proposal_routes, session_delete,
                      agents_md_routes, session_name (background naming), canvas_routes (the canvas crate over HTTP),
-                     budget_routes (a project's budget, read and set),
+                     budget_routes (a project's budget, read and set), setup_routes (the first-run checklist),
                      contribution_routes (branches someone else wrote, adopted into a session for the gate),
                      indicator_routes (a project's indicators from its logs, git and the ledger),
                      diff_routes (one changed file of a session's branch as diff lines, for the Changes page)
-  cli/               terminal adapter: commands, transcript
+  cli/               terminal adapter: commands, transcript, doctor (the first-run checklist in the terminal)
 crates/backlog/     the ideas backlog, a crate of its own and fennec-free, no I/O: its events folded, the queue
                      order, the night-mode caps, an idea's status, stage and next action, a run's summary
 crates/rules/       the human's rules, a crate of its own and fennec-free: the model, the command and path matchers,

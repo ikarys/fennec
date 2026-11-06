@@ -13,3 +13,4 @@ export * from "./api/plugins";
 export * from "./api/agents";
 export * from "./api/update";
 export * from "./api/server";
+export * from "./api/setup";
