@@ -164,7 +164,8 @@ pub fn with_turn<R>(
                 .collect(),
         )
         .with_rules(rules)
-        .with_mcp(mcp::active_servers(&events, &prefs));
+        .with_mcp(mcp::active_servers(&events, &prefs))
+        .with_mcp_vault(crate::mcp::oauth::Vault::for_settings(settings));
     let tools = match project_dir {
         Some(dir) => tools.with_project_dir(dir),
         None => tools,

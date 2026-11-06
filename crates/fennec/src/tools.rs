@@ -56,6 +56,8 @@ pub struct LocalTools {
     mcp: Vec<McpServer>,
     // The session's canvas store; no session, no canvas tool.
     canvas: Option<canvas::CanvasTarget>,
+    // Sealed MCP OAuth credentials for HTTP servers; applied before connect.
+    mcp_vault: Option<crate::mcp::oauth::Vault>,
 }
 
 impl LocalTools {
@@ -78,6 +80,7 @@ impl LocalTools {
             project_dir: None,
             mcp: Vec::new(),
             canvas: None,
+            mcp_vault: None,
         }
     }
 
@@ -121,6 +124,11 @@ impl LocalTools {
 
     pub fn with_canvas(mut self, target: canvas::CanvasTarget) -> LocalTools {
         self.canvas = Some(target);
+        self
+    }
+
+    pub fn with_mcp_vault(mut self, vault: crate::mcp::oauth::Vault) -> LocalTools {
+        self.mcp_vault = Some(vault);
         self
     }
 
@@ -254,7 +262,14 @@ impl LocalTools {
                     }
                 },
             };
-            let mut result = call_mcp(server, sandbox, workdir, &tool, args);
+            let mut result = call_mcp(
+                server,
+                sandbox,
+                workdir,
+                &tool,
+                args,
+                self.mcp_vault.as_ref(),
+            );
             result.duration_ms = start.elapsed().as_millis() as u64;
             return result;
         }
@@ -340,8 +355,16 @@ fn call_mcp(
     workdir: &Path,
     tool: &str,
     args: &Value,
+    vault: Option<&crate::mcp::oauth::Vault>,
 ) -> ToolResult {
-    match crate::mcp::Client::connect(server, sandbox, workdir) {
+    let server = match vault {
+        Some(vault) => match vault.authorize(server) {
+            Ok(server) => server,
+            Err(error) => return ToolResult::failure(error),
+        },
+        None => server.clone(),
+    };
+    match crate::mcp::Client::connect(&server, sandbox, workdir) {
         Ok(mut client) => match client.call_tool(tool, args.clone()) {
             Ok(text) => ToolResult::success(text, false),
             Err(error) => ToolResult::failure(error),

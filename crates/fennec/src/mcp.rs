@@ -3,6 +3,8 @@
 //! and `tools/call`. No async runtime: fennec is std::thread, so a hanging
 //! server is bounded by a per-call timeout that kills the child.
 
+pub mod oauth;
+
 use std::collections::BTreeMap;
 use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
@@ -15,6 +17,7 @@ use std::time::{Duration, Instant};
 use serde_json::{Value, json};
 
 use crate::domain::mcp::{McpServer, McpTool, McpTransport};
+use crate::store::SqliteStore;
 use crate::tools::Sandbox;
 
 const PROTOCOL_VERSION: &str = "2025-06-18";
@@ -23,6 +26,8 @@ const PROTOCOL_VERSION: &str = "2025-06-18";
 pub struct Client {
     transport: Transport,
     timeout: Duration,
+    /// The `Mcp-Session-Id` a streamable-HTTP server assigned at `initialize`.
+    session_id: Option<String>,
 }
 
 enum Transport {
@@ -101,7 +106,11 @@ impl Client {
                 headers: http_headers(server),
             },
         };
-        let mut client = Client { transport, timeout };
+        let mut client = Client {
+            transport,
+            timeout,
+            session_id: None,
+        };
         client.request(
             "initialize",
             json!({
@@ -110,6 +119,7 @@ impl Client {
                 "clientInfo": { "name": "fennec", "version": env!("CARGO_PKG_VERSION") },
             }),
         )?;
+        client.send_initialized()?;
         Ok(client)
     }
 
@@ -139,7 +149,27 @@ impl Client {
                 stdio_request(child, stdin, rx, method, params, self.timeout)
             }
             Transport::Http { url, headers } => {
-                http_request(url, headers, method, params, self.timeout)
+                let id = NEXT_ID.fetch_add(1, Ordering::SeqCst);
+                let body =
+                    json!({ "jsonrpc": "2.0", "id": id, "method": method, "params": params });
+                let reply = http_post(url, headers, &mut self.session_id, &body, self.timeout)?;
+                reply_response(&reply)
+            }
+        }
+    }
+
+    /// The MCP `notifications/initialized` notification after `initialize`.
+    fn send_initialized(&mut self) -> Result<(), String> {
+        match &mut self.transport {
+            Transport::Stdio { stdin, .. } => {
+                let message = json!({ "jsonrpc": "2.0", "method": "notifications/initialized" });
+                writeln!(stdin, "{message}")
+                    .and_then(|()| stdin.flush())
+                    .map_err(|error| format!("mcp write failed: {error}"))
+            }
+            Transport::Http { url, headers } => {
+                let body = json!({ "jsonrpc": "2.0", "method": "notifications/initialized" });
+                http_post(url, headers, &mut self.session_id, &body, self.timeout).map(|_| ())
             }
         }
     }
@@ -152,6 +182,48 @@ impl Drop for Client {
             let _ = child.wait();
         }
     }
+}
+
+/// The shared "Connect" logic: open the server, list tools, cache them in the
+/// preferences, and run the collision checks.
+pub fn connect_and_cache(
+    store: &SqliteStore,
+    prefs: &mut crate::domain::preferences::Preferences,
+    index: usize,
+    sandbox: &Sandbox,
+    vault: &oauth::Vault,
+) -> Result<McpServer, (u16, String)> {
+    let server = prefs.mcp[index].clone();
+    if !server.problems().is_empty() {
+        return Err((400, server.problems().join("; ")));
+    }
+    // An OAuth-authorized server gets its (refreshed) bearer here.
+    let authorized = vault.authorize(&server).map_err(|e| (401, e))?;
+    let mut client = Client::connect(&authorized, sandbox, std::path::Path::new("."))
+        .map_err(|e| (502, format!("connect failed: {e}")))?;
+    let tools = client
+        .list_tools()
+        .map_err(|e| (502, format!("tools/list failed: {e}")))?;
+    prefs.mcp[index].cached_tools = tools;
+
+    // Re-check now that the tool list is known: a `{server}_{tool}` name must
+    // not collide with a built-in or with another server's tool.
+    if let Some(problem) = prefs.mcp[index].problems().into_iter().next() {
+        return Err((400, problem));
+    }
+    if let Some(name) = crate::domain::mcp::duplicate_tool_names(&prefs.mcp)
+        .into_iter()
+        .next()
+    {
+        return Err((
+            400,
+            format!("tool {name} is offered by more than one mcp server"),
+        ));
+    }
+    store
+        .save_preferences(prefs)
+        .map_err(|e| (500, e.to_string()))?;
+    Ok(prefs.mcp[index].clone())
 }
 
 fn stdio_request(
@@ -218,15 +290,23 @@ fn http_headers(server: &McpServer) -> BTreeMap<String, String> {
     headers
 }
 
-fn http_request(
+/// A server's HTTP reply: its status, content type and body.
+struct HttpReply {
+    status: u16,
+    content_type: String,
+    text: String,
+}
+
+/// POST one JSON-RPC message. The session id the server assigns (at
+/// `initialize`) is kept and sent back on every later message, with the
+/// negotiated protocol version, as streamable HTTP requires.
+fn http_post(
     url: &str,
     headers: &BTreeMap<String, String>,
-    method: &str,
-    params: Value,
+    session_id: &mut Option<String>,
+    body: &Value,
     timeout: Duration,
-) -> Result<Value, String> {
-    let id = NEXT_ID.fetch_add(1, Ordering::SeqCst);
-    let body = json!({ "jsonrpc": "2.0", "id": id, "method": method, "params": params });
+) -> Result<HttpReply, String> {
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .timeout_global(Some(timeout))
         .http_status_as_error(false)
@@ -236,12 +316,30 @@ fn http_request(
         .post(url)
         .header("content-type", "application/json")
         .header("accept", "application/json, text/event-stream");
+    if let Some(session) = session_id.as_deref() {
+        request = request
+            .header("Mcp-Session-Id", session)
+            .header("MCP-Protocol-Version", PROTOCOL_VERSION);
+    }
     for (key, value) in headers {
         request = request.header(key, value);
     }
     let response = request
-        .send_json(&body)
+        .send_json(body)
         .map_err(|error| format!("mcp http: {error}"))?;
+    let status = response.status().as_u16();
+    if status == 401 {
+        return Err(
+            "mcp http: 401 unauthorized: authorize this server on the Settings page".into(),
+        );
+    }
+    if let Some(session) = response
+        .headers()
+        .get("mcp-session-id")
+        .and_then(|value| value.to_str().ok())
+    {
+        *session_id = Some(session.to_string());
+    }
     let content_type = response
         .headers()
         .get("content-type")
@@ -252,17 +350,30 @@ fn http_request(
         .into_body()
         .read_to_string()
         .map_err(|error| format!("mcp http body: {error}"))?;
-    if content_type.contains("text/event-stream") {
-        let mut last = None;
-        for line in text.lines() {
-            if let Some(data) = line.trim().strip_prefix("data:") {
-                last = parse_response(data.trim());
-            }
-        }
-        last.ok_or("mcp http: no response in stream")?
-    } else {
-        parse_response(&text).ok_or("mcp http: no response")?
+    if !(200..300).contains(&status) && !text.contains("\"jsonrpc\"") {
+        return Err(format!("mcp http: status {status}"));
     }
+    Ok(HttpReply {
+        status,
+        content_type,
+        text,
+    })
+}
+
+/// The JSON-RPC response in a reply: a JSON body, or the last `data:` line of
+/// an event stream.
+fn reply_response(reply: &HttpReply) -> Result<Value, String> {
+    let parsed = if reply.content_type.contains("text/event-stream") {
+        reply
+            .text
+            .lines()
+            .rev()
+            .filter_map(|line| line.trim().strip_prefix("data:"))
+            .find_map(|data| parse_response(data.trim()))
+    } else {
+        parse_response(&reply.text)
+    };
+    parsed.unwrap_or_else(|| Err(format!("mcp http: no response (status {})", reply.status)))
 }
 
 fn value_to_tool(value: &Value) -> Result<McpTool, String> {
@@ -298,11 +409,13 @@ fn tool_text(result: &Value) -> Option<String> {
 mod tests {
     use super::*;
 
-    /// A minimal MCP server in a shell script: answers initialize, tools/list
-    /// and tools/call in order, matching the ids the client sends.
+    /// A minimal MCP server in a shell script: answers initialize, reads the
+    /// `initialized` notification, then answers tools/list and tools/call in
+    /// order, matching the ids the client sends.
     const STDIO_SCRIPT: &str = r#"
 read line
 echo '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18","capabilities":{},"serverInfo":{"name":"t","version":"0"}}}'
+read line
 read line
 echo '{"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"echo","description":"echoes","inputSchema":{"type":"object","properties":{"msg":{"type":"string"}}}}]}}'
 read line
