@@ -1,7 +1,9 @@
 name: ci
 
-# Documentation alone builds nothing and changes no test: skip the gate. Not
-# `**.md`: the agents and skills under crates/ are embedded in the binary.
+# Actions minutes are a budget: the gate runs once per PR, not again on the
+# push its squash makes (develop gets exactly what the PR tested). Documentation
+# alone builds nothing and changes no test: skip the gate. Not `**.md`: the
+# agents and skills under crates/ are embedded in the binary.
 on:
   pull_request:
     branches: [develop, main]
@@ -13,16 +15,13 @@ on:
       - CHANGELOG.md
       - LICENSE
       - docs/**
-  push:
-    branches: [develop, main]
-    paths-ignore: *docs
 
 permissions:
   contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 jobs:
   # The conventions: the UI compiles and keeps its primitives, rustfmt, clippy.
@@ -30,6 +29,15 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
+      # The squash title becomes the commit release-please reads. Checked here,
+      # not in a workflow of its own: each job is billed at least a minute.
+      # The title goes through a file, never into the script: no injection.
+      - name: PR title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          printf '%s\n' "$PR_TITLE" > "$RUNNER_TEMP/title"
+          .githooks/commit-msg "$RUNNER_TEMP/title"
       - uses: actions/setup-node@v7
         with:
           node-version: 24
@@ -63,29 +71,3 @@ jobs:
       - uses: extractions/setup-just@v4
       - name: Unit tests
         run: just test
-
-  edge-build:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
-    needs: [check, tests]
-    uses: ./.github/workflows/build.yml
-    with:
-      label: edge
-
-  edge-publish:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
-    needs: edge-build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@v8
-        with:
-          merge-multiple: true
-      - name: Publish edge release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          gh release delete edge --cleanup-tag -y || true
-          gh release create edge --prerelease --target "$GITHUB_SHA" --title "edge (develop)" --notes "Rolling build of develop at $GITHUB_SHA. Not a release." ./*
