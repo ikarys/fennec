@@ -352,6 +352,8 @@ export interface McpServerView {
   active: boolean;
   tokens: number;
   toolCount: number;
+  /** The enabled tools' tokens, active or not: what switching the server on adds. */
+  enabledToolTokens: number;
   tools: McpToolView[];
 }
 

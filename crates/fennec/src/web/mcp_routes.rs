@@ -47,6 +47,8 @@ fn mcp_view(prefs: &Preferences, events: &[Event]) -> Value {
                 "disabled": server.disabled,
                 "active": is_active,
                 "tokens": if is_active { tokens } else { 0 },
+                // What switching it on would add: shown on an inactive server too.
+                "enabledToolTokens": tokens,
                 "toolCount": server.cached_tools.len(),
                 "tools": tools,
             })

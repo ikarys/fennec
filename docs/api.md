@@ -692,10 +692,10 @@ read-only. The human edits them as usual.
   the model is empty or the provider unknown; 409 while a workflow runs;
   appends `model.changed`
 - `GET /api/sessions/{id}/mcp` → `{servers, totalTokens}`: each server with
-  `name, visible, disabled, active, tokens, toolCount, tools` (each tool with
+  `name, visible, disabled, active, tokens, enabledToolTokens, toolCount, tools` (each tool with
   `name, enabled, tokens`); `active` is the session's effective state (the
   global flag, or the session's last `mcp.disabled`); `totalTokens` is the cost
-  of the active tools
+  of the active tools; `enabledToolTokens` the enabled tools' cost, active or not
 - `POST /api/sessions/{id}/mcp` `{disabled: [name…]}` → 200 with the same body
   as `GET`; appends `mcp.disabled` (the full disabled set, last wins); 404 if
   no session
