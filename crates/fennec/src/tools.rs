@@ -25,7 +25,7 @@ mod web_search;
 mod write_file;
 
 pub use canvas::CanvasTarget;
-pub use sandbox::{Sandbox, SandboxHealth, probe};
+pub use sandbox::{Sandbox, SandboxHealth, probe, remove_private_tmp};
 
 use crate::agent::ports::{CommandRun, Commands, RuleCheck, Toolbox};
 use crate::domain::agent::CommandAccess;
