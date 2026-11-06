@@ -6,9 +6,11 @@ How a change reaches `main` and becomes a versioned release with Linux binaries.
 
 ```text
 feat/x
-  -> PR to develop (CI, squash merge, Conventional Commits title)
-  -> develop
-  -> push to develop (CI + rolling edge prerelease)
+  -> PR to develop (CI once, title checked; squash merge, Conventional Commits title)
+  -> develop (no CI again: it is what the PR tested)
+
+gh workflow run edge --ref develop
+  -> rolling edge prerelease of develop, on demand
 
 just promote
   -> PR develop -> main (merge commit, never squash)
@@ -78,7 +80,7 @@ By hand: download the tarball and its `.sha256` from the release, run
 `sha256sum -c fennec-<label>-<target>.tar.gz.sha256`, extract, run `./fennec --version`.
 
 It needs glibc 2.35 or later (built on Ubuntu 22.04) and `bwrap` for the command sandbox.
-The `edge` prerelease is the latest develop build, the same way: not a release.
+The `edge` prerelease is a develop build made on demand (`gh workflow run edge --ref develop`), the same way: not a release.
 
 On Ubuntu 23.10 and later, AppArmor forbids unprivileged user namespaces, so every
 sandboxed command fails (`bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted`
