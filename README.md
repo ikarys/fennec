@@ -20,7 +20,7 @@
 
 Most coding agents optimise for writing code fast. fennec is for professional developers who work with AI and want to stay the authors of their software: you frame the work, the agent loop runs the steps, then waits for your review. Nothing is integrated without a human decision.
 
-Status: early, Linux only.
+Status: early. Linux and macOS; on Windows, through WSL2.
 
 ## Why fennec
 
@@ -104,18 +104,26 @@ An idea is framed in a read-only plan session, then the human approves the plan 
 - A usage ledger: calls, tokens and speeds per model, kept beyond sessions.
 - API keys are sealed at rest with `secret.key` next to the store.
 
+## Platforms
+
+- Linux x86_64 and aarch64: full support; the command sandbox is bubblewrap.
+- macOS Apple Silicon and Intel: binaries and launchd service; the command sandbox (Seatbelt, `sandbox-exec`) is in progress: until it lands, keep the sandbox setting off knowingly, commands then run on the host.
+- Windows: through WSL2 only, with the same `install.sh`, the browser on Windows opens http://127.0.0.1:7777.
+
+Why not native Windows: fennec's security model rests on the command sandbox: what a model writes runs with the system read-only, the human's secrets (`~/.ssh`, cloud credentials) hidden and no network by default. Linux has bubblewrap and macOS has Seatbelt for that; Windows has no equivalent that an unprivileged program can set up as simply (AppContainer and job objects cover only part of it). Shipping fennec on Windows without that wall would break the promise the review gate relies on; WSL2 gives Windows users the Linux sandbox today. Native Windows can come back if a sound sandbox does.
+
 ## Install
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ikarys/fennec/main/install.sh | sh
 ```
 
-The script installs the latest release (`x86_64` or `aarch64` Linux) into `~/.local/bin` after
+The script installs the latest release (`x86_64`/`aarch64` Linux, Apple Silicon/Intel macOS) into `~/.local/bin` after
 checking its checksum; `FENNEC_VERSION` picks a tag, `FENNEC_INSTALL_DIR` the directory. With
 [mise](https://mise.jdx.dev): `mise use -g github:ikarys/fennec`. Or download a tarball from the
 [releases](../../releases) by hand.
 
-Requirements: glibc 2.35 or later (Ubuntu 22.04, Debian 12 and newer) and `bwrap` (package `bubblewrap`) for the command sandbox. On Ubuntu 23.10 and later, AppArmor forbids the user namespaces bwrap needs; the Settings page says so and [docs/releasing.md](docs/releasing.md#installing-a-binary) gives the fix.
+Linux requirements: glibc 2.35 or later (Ubuntu 22.04, Debian 12 and newer) and `bwrap` (package `bubblewrap`) for the command sandbox. On Ubuntu 23.10 and later, AppArmor forbids the user namespaces bwrap needs; the Settings page says so and [docs/releasing.md](docs/releasing.md#installing-a-binary) gives the fix.
 
 ### From source
 
@@ -126,7 +134,7 @@ just            # build the UI, then run the release server on http://127.0.0.1:
 just check      # the contributor gate: formatting, clippy, tests, UI build
 ```
 
-### Run as a service, update (Linux)
+### Run as a service, update
 
 `install.sh` also writes a systemd user service (`~/.config/systemd/user/fennec.service`, never overwritten
 once there) and starts it; `FENNEC_SERVICE=none` skips that. Without a systemd user session, run `fennec serve`
@@ -138,6 +146,8 @@ sudo loginctl enable-linger "$USER"    # start at boot, before any login
 fennec update --check                  # is a newer release out?
 fennec update                          # install it (the service restarts on it)
 ```
+
+On macOS, `install.sh` writes a launchd user agent (`~/Library/LaunchAgents/dev.fennec.plist`, never overwritten, with the PATH of the shell that ran the installer) and starts it; `FENNEC_SERVICE=none` skips it. Logs go to `~/Library/Logs/fennec.log`; `launchctl kickstart -k gui/$(id -u)/dev.fennec` restarts it.
 
 The top bar shows an arrow when a newer release is out; a click installs it and the server restarts on it
 (refused while a turn runs). Under WSL, systemd must be on (`[boot]` `systemd=true` in `/etc/wsl.conf`).
