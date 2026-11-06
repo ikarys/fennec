@@ -20,6 +20,8 @@ pub struct PreflightResult {
     pub verdict: PreflightVerdict,
     pub exit_code: Option<i32>,
     pub output: String,
+    #[serde(default)]
+    pub existence_only: bool,
 }
 
 // ponytail: heuristic; extend it when a new environment failure shows up.
@@ -152,6 +154,7 @@ mod tests {
             verdict,
             exit_code,
             output: output.into(),
+            existence_only: false,
         }
     }
 

@@ -23,6 +23,12 @@ export function PassedBeforeBadge({ passedBefore }: { passedBefore: boolean | un
   return <Badge tone="neutral" title={t('passedBeforeTitle')}>{t('passedAlready')}</Badge>;
 }
 
+export function ExistenceOnlyBadge({ existenceOnly }: { existenceOnly: boolean | undefined }) {
+  const t = useT();
+  if (!existenceOnly) return null;
+  return <Badge tone="attention" title={t('existenceOnlyTitle')}>{t('existenceOnly')}</Badge>;
+}
+
 export function CriterionProvenanceBadge({ provenance }: { provenance: Provenance | undefined }) {
   const t = useT();
   if (!provenance) return null;
@@ -87,6 +93,7 @@ export function CriteriaSection({ criteria }: { criteria: CriterionView[] }) {
                     {criterion.description}
                   </span>
                   <PassedBeforeBadge passedBefore={criterion.passedBefore} />
+                  <ExistenceOnlyBadge existenceOnly={criterion.existenceOnly} />
                   <CriterionProvenanceBadge provenance={provenance} />
                 </summary>
                 {(provenance || (criterion.status.type === 'pending' && criterion.check)) && (
