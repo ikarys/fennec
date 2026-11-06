@@ -2,7 +2,8 @@
  * A group of a page: a small capitals label (an optional one-line description under it,
  * actions on the right) then the body, with no frame of its own: the page's card holds
  * its groups. A group whose edits are saved on their own takes `save`: a dot before the
- * label while it has unsaved edits, and its own "Enregistrer" under the body.
+ * label while it has unsaved edits. An auto-saved group says it is saving in its header;
+ * the others (a change that needs a restart) keep their own "Enregistrer" under the body.
  */
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import { useT } from '../../i18n';
@@ -17,6 +18,8 @@ const Nested = createContext(false);
 export interface SectionSave {
   dirty: boolean;
   onSave: () => Promise<void>;
+  /** Saved by the page shortly after an edit: no button, a status in the header. */
+  auto?: { saving: boolean; error: string | null };
 }
 
 export interface SectionProps {
@@ -60,6 +63,11 @@ export function Section({ title, description, actions, className = '', flush = f
           </SectionLabel>
           {description && <p className="m-0 text-xs text-muted">{description}</p>}
         </div>
+        {save?.auto && (save.auto.saving || save.auto.error) && (
+          <span className={`text-xs ${save.auto.error ? 'text-err' : 'text-muted'}`}>
+            {save.auto.error ?? t('sectionSaving')}
+          </span>
+        )}
         {actions && <div className="ml-auto flex shrink-0 items-center gap-1">{actions}</div>}
       </header>
       {children && (
@@ -67,7 +75,7 @@ export function Section({ title, description, actions, className = '', flush = f
           <div className={flush ? 'flex flex-col' : 'flex flex-col gap-4'}>{children}</div>
         </Nested.Provider>
       )}
-      {save?.dirty && (
+      {save?.dirty && !save.auto && (
         <div className="flex items-center gap-3 pt-1">
           <Button type="button" variant="primary" size="sm" disabled={saving} onClick={() => void handleSave()}>
             {saving ? t('sectionSaving') : t('agentSave')}

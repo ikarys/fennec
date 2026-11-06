@@ -8,7 +8,7 @@ look lives in two places only, so a screen can never drift from the others:
    never a literal colour.
 2. **The primitives** (`web/src/components/ui/`): `Button`, `Badge`,
    `SectionLabel`, `Stat` (a run metric chip: icon, figure, the detail in its tooltip), `Tile` (a dashboard figure: tinted icon, label, figure, detail; a tone bar when it counts something), `Card`, `Modal`, `ConfirmDialog`, `Section`, `Panel`,
-   `Segmented`, `Tabs` (a page's sections, vertical or horizontal), `Menu`,
+   `Segmented`, `Switch` (an on/off that applies at once), `Tabs` (a page's sections, vertical or horizontal), `Menu`,
    `ChoiceMenu` (one value among grouped choices, each group under a tinted
    band; never a native `<select>` for a list of choices: the browser draws
    its list itself and ignores the theme tokens), and the
