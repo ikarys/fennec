@@ -65,6 +65,14 @@ pub fn apply(app: &App, stream: &mut TcpStream) -> Result<(), String> {
             "a development build updates with git, not the installer",
         );
     }
+    // A local build is installed by `just install`; the GitHub installer would replace it.
+    if crate::update::BUILD.is_some() {
+        return error(
+            stream,
+            409,
+            "a local build updates with just install, not the installer",
+        );
+    }
     if !app.turns.running_ids().is_empty() {
         return error(stream, 409, "a turn is running: update when it ends");
     }
