@@ -112,6 +112,16 @@ export interface McpTool {
   inputSchema: unknown;
 }
 
+/** The access class a server declares for a tool; provenance is declared, not verified. */
+export type ToolAccess = 'read' | 'write' | 'destructive' | 'undeclared';
+
+/** One cached tool's access and estimated token cost, as computed by the settings route. */
+export interface McpToolSummary {
+  name: string;
+  access: ToolAccess;
+  tokens: number;
+}
+
 /** One MCP server as the human configured it on the Settings page. */
 export interface McpServer {
   name: string;
@@ -225,6 +235,8 @@ export interface SettingsResponse {
   optInWorkflows: WorkflowOptIn[];
   scanners: ScannerStatus[];
   sandboxHealth: SandboxHealth;
+  /** Per server, each cached tool's access and estimated token cost. */
+  mcpTools: Record<string, McpToolSummary[]>;
 }
 
 export function getSettings(): Promise<SettingsResponse> {

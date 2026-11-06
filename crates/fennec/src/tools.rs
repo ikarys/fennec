@@ -505,6 +505,7 @@ mod mcp_dispatch_tests {
             url: Some("http://127.0.0.1:1/mcp".into()),
             timeout: 2,
             cached_tools: vec![McpTool {
+                annotations: None,
                 name: "create_issue".into(),
                 description: None,
                 input_schema: json!({ "type": "object" }),

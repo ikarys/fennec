@@ -5,6 +5,7 @@ use super::App;
 use super::http::{Request, error, send_json};
 use super::model_view;
 use crate::domain::lang::Lang;
+use crate::domain::mcp;
 use crate::domain::preferences::{LOCAL_PROVIDER, Preferences, Provider};
 use crate::domain::scanner::SCANNERS;
 use crate::scanners;
@@ -14,9 +15,31 @@ use crate::workflows;
 use llm_providers_connector::{
     ApiKey, Endpoint, ListedModel, MasterKey, ModelParams, ModelPrefs, list_models,
 };
-use serde_json::{Value, json};
+use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
 use std::net::TcpStream;
+
+/// Per server, each cached tool's access and estimated token cost: the UI groups and sums, computes none.
+fn mcp_tools(prefs: &Preferences) -> Map<String, Value> {
+    prefs
+        .mcp
+        .iter()
+        .map(|server| {
+            let tools = server
+                .cached_tools
+                .iter()
+                .map(|tool| {
+                    json!({
+                        "name": tool.name,
+                        "access": tool.access(),
+                        "tokens": mcp::estimate_tokens(&mcp::tool_definition(server, tool)),
+                    })
+                })
+                .collect::<Vec<Value>>();
+            (server.name.clone(), Value::Array(tools))
+        })
+        .collect()
+}
 
 pub fn get_settings(app: &App, stream: &mut TcpStream) -> Result<(), String> {
     let prefs = app.store()?.preferences()?;
@@ -72,6 +95,7 @@ pub fn get_settings(app: &App, stream: &mut TcpStream) -> Result<(), String> {
         "optInWorkflows": opt_in_workflows,
         "scanners": scanners,
         "sandboxHealth": sandbox_health(),
+        "mcpTools": mcp_tools(&prefs),
     });
     send_json(stream, 200, &body)
 }

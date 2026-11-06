@@ -3,7 +3,9 @@ import { Section, type SectionSave } from '../ui/Section';
 import { TextInput, Select } from '../ui/Field';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
+import { Tabs } from '../ui/Tabs';
 import { authorizeMcp, connectMcp, type McpServer } from '../../lib/api';
+import type { McpToolSummary, ToolAccess } from '../../lib/api/settings';
 import { KeyIcon } from '../Icons';
 import { useT } from '../../i18n';
 
@@ -29,10 +31,25 @@ function firstSentence(text: string): string {
   return text.split(/(?<=\.) |\n/)[0].trim();
 }
 
+/** The tab order: the access classes a server's tools can declare. */
+const ACCESS_ORDER: ToolAccess[] = ['read', 'write', 'destructive', 'undeclared'];
+
+/** i18n label key per access tab. */
+const LABEL: Record<
+  ToolAccess,
+  'mcpAccessRead' | 'mcpAccessWrite' | 'mcpAccessDestructive' | 'mcpAccessUndeclared'
+> = {
+  read: 'mcpAccessRead',
+  write: 'mcpAccessWrite',
+  destructive: 'mcpAccessDestructive',
+  undeclared: 'mcpAccessUndeclared'
+};
+
 function ServerCard({
   index,
   server,
   connecting,
+  views,
   onPatch,
   onRemove,
   onConnect,
@@ -41,6 +58,7 @@ function ServerCard({
   index: number;
   server: McpServer;
   connecting: boolean;
+  views: McpToolSummary[];
   onPatch: (patch: Partial<McpServer>) => void;
   onRemove: () => void;
   onConnect: () => void;
@@ -54,6 +72,52 @@ function ServerCard({
   }
 
   const t = useT();
+  const [tab, setTab] = useState<ToolAccess | null>(null);
+
+  // The backend view is the source for access and token cost; a missing entry
+  // means the tool was not listed by the settings route, so it is undeclared.
+  const viewByName = new Map(views.map((view) => [view.name, view] as [string, McpToolSummary]));
+  const tools = server.cachedTools.map((tool) => {
+    const view = viewByName.get(tool.name);
+    return {
+      tool,
+      access: view?.access ?? 'undeclared',
+      tokens: view?.tokens ?? 0
+    };
+  });
+  const present = ACCESS_ORDER.filter((access) => tools.some((entry) => entry.access === access));
+  const activeTab = tab && present.includes(tab) ? tab : present[0] ?? null;
+  const toolsOf = (access: ToolAccess) => tools.filter((entry) => entry.access === access);
+  const enabled = tools.filter((entry) => !server.disabledTools.includes(entry.tool.name)).length;
+  const enabledTokens = tools.reduce(
+    (sum, entry) => (server.disabledTools.includes(entry.tool.name) ? sum : sum + entry.tokens),
+    0
+  );
+  const activeTools = activeTab ? toolsOf(activeTab) : [];
+  const tabEnabledTokens = activeTools.reduce(
+    (sum, entry) => (server.disabledTools.includes(entry.tool.name) ? sum : sum + entry.tokens),
+    0
+  );
+  const allTabEnabled =
+    activeTools.length > 0 &&
+    activeTools.every((entry) => !server.disabledTools.includes(entry.tool.name));
+  const someTabEnabled = activeTools.some(
+    (entry) => !server.disabledTools.includes(entry.tool.name)
+  );
+
+  function toggleTab(access: ToolAccess) {
+    const names = toolsOf(access).map((entry) => entry.tool.name);
+    const allEnabled = names.every((name) => !server.disabledTools.includes(name));
+    if (allEnabled) {
+      // Disable every tool in the tab: keep the existing disabled order, then
+      // append the tools that were still enabled.
+      const missing = names.filter((name) => !server.disabledTools.includes(name));
+      onPatch({ disabledTools: [...server.disabledTools, ...missing] });
+    } else {
+      // Enable every tool in the tab: remove only those names, keeping order.
+      onPatch({ disabledTools: server.disabledTools.filter((name) => !names.includes(name)) });
+    }
+  }
   return (
     <Card variant="inset">
       <div className="flex items-center gap-2">
@@ -178,22 +242,54 @@ function ServerCard({
           <div className="flex items-center justify-between border-b border-border bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent">
             <span>{t('mcpTools')}</span>
             <span className="tabular-nums">
-              {server.cachedTools.filter((tool) => !server.disabledTools.includes(tool.name)).length}/
-              {server.cachedTools.length}
+              {enabled}/{server.cachedTools.length} · {t('mcpTokens', { count: enabledTokens })}
             </span>
           </div>
-          {server.cachedTools.map((tool, toolIndex) => {
-            const disabled = server.disabledTools.includes(tool.name);
+          {activeTab ? (
+            <div
+              className="border-b border-border px-3 pt-1"
+              title={t('mcpAccessDeclared')}
+            >
+              <Tabs
+                label={t('mcpToolsByAccess')}
+                orientation="horizontal"
+                tabs={present.map((access) => ({
+                  id: access,
+                  label: t(LABEL[access]),
+                  count: toolsOf(access).length
+                }))}
+                active={activeTab}
+                onSelect={setTab}
+                trailing={
+                  <label className="flex items-center gap-2 text-xs text-muted">
+                    <input
+                      type="checkbox"
+                      checked={allTabEnabled}
+                      onChange={() => toggleTab(activeTab)}
+                      ref={(el) => {
+                        if (el) el.indeterminate = someTabEnabled && !allTabEnabled;
+                      }}
+                      className="h-4 w-4 accent-[var(--accent)]"
+                      aria-label={t('mcpToggleTab')}
+                    />
+                    <span className="tabular-nums">{t('mcpTokens', { count: tabEnabledTokens })}</span>
+                  </label>
+                }
+              />
+            </div>
+          ) : null}
+          {activeTools.map((entry, toolIndex) => {
+            const disabled = server.disabledTools.includes(entry.tool.name);
             return (
-              <details key={tool.name} className={toolIndex > 0 ? 'border-t border-border' : undefined}>
+              <details key={entry.tool.name} className={toolIndex > 0 ? 'border-t border-border' : undefined}>
                 <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-1.5 hover:bg-accent/5">
                   <input
                     type="checkbox"
                     checked={!disabled}
-                    onChange={() => toggleTool(tool.name)}
+                    onChange={() => toggleTool(entry.tool.name)}
                     onClick={(event) => event.stopPropagation()}
                     className="h-4 w-4 accent-[var(--accent)]"
-                    aria-label={tool.name}
+                    aria-label={entry.tool.name}
                   />
                   <span
                     className={
@@ -202,16 +298,17 @@ function ServerCard({
                         : 'shrink-0 font-mono text-xs text-text'
                     }
                   >
-                    {tool.name}
+                    {entry.tool.name}
                   </span>
-                  {tool.description ? (
+                  {entry.tool.description ? (
                     <span className="min-w-0 flex-1 truncate text-xs text-faint">
-                      {firstSentence(tool.description)}
+                      {firstSentence(entry.tool.description)}
                     </span>
                   ) : null}
+                  <span className="shrink-0 text-xs tabular-nums text-faint">~{entry.tokens}</span>
                 </summary>
-                {tool.description ? (
-                  <p className="whitespace-pre-wrap px-3 pb-2 pl-9 text-xs text-muted">{tool.description}</p>
+                {entry.tool.description ? (
+                  <p className="whitespace-pre-wrap px-3 pb-2 pl-9 text-xs text-muted">{entry.tool.description}</p>
                 ) : null}
               </details>
             );
@@ -225,11 +322,14 @@ function ServerCard({
 export function McpSection({
   value,
   onChange,
+  toolViews,
   save,
   onConnected
 }: {
   value: McpServer[];
   onChange: (value: McpServer[]) => void;
+  /** Per server, the settings route's tool access and token estimates. */
+  toolViews: Record<string, McpToolSummary[]>;
   /** The group's own save: its dot and its "Save". */
   save?: SectionSave;
   /** After a connect: the server stored the tools, the page reads them back. */
@@ -304,6 +404,7 @@ export function McpSection({
             index={index}
             server={server}
             connecting={connecting === index}
+            views={toolViews[server.name] ?? []}
             onPatch={(p) => patch(index, p)}
             onRemove={() => onChange(value.filter((_, i) => i !== index))}
             onConnect={() => connect(index)}

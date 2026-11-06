@@ -92,6 +92,15 @@ impl Default for McpServer {
     }
 }
 
+/// The per-tool hints an MCP server declares. Only the two hints fennec uses
+/// are kept; the others are not part of the access grouping.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct McpToolAnnotations {
+    pub read_only_hint: Option<bool>,
+    pub destructive_hint: Option<bool>,
+}
+
 /// One tool of a server, as listed by `tools/list`.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -99,6 +108,32 @@ pub struct McpTool {
     pub name: String,
     pub description: Option<String>,
     pub input_schema: Value,
+    pub annotations: Option<McpToolAnnotations>,
+}
+
+/// The access class a server declares for a tool. Provenance is declared, not
+/// verified: the hints are indicative, not a guarantee of runtime behavior.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ToolAccess {
+    Read,
+    Write,
+    Destructive,
+    Undeclared,
+}
+
+impl McpTool {
+    /// The access class the server declares for this tool, using the MCP
+    /// default: a tool that is not read-only is destructive unless the server
+    /// explicitly says `destructiveHint` is false.
+    pub fn access(&self) -> ToolAccess {
+        match &self.annotations {
+            None => ToolAccess::Undeclared,
+            Some(annotations) if annotations.read_only_hint == Some(true) => ToolAccess::Read,
+            Some(annotations) if annotations.destructive_hint == Some(false) => ToolAccess::Write,
+            Some(_) => ToolAccess::Destructive,
+        }
+    }
 }
 
 impl McpServer {
@@ -227,6 +262,7 @@ mod tests {
                 name: (*name).into(),
                 description: None,
                 input_schema: json!({"type": "object"}),
+                annotations: None,
             })
             .collect();
         server.disabled_tools = disabled_tools.iter().map(|s| (*s).into()).collect();
@@ -357,5 +393,65 @@ mod tests {
     fn distinct_tools_have_no_duplicate_names() {
         let servers = vec![server("a", &["p"], &[]), server("b", &["q"], &[])];
         assert!(duplicate_tool_names(&servers).is_empty());
+    }
+
+    #[test]
+    fn access_is_undeclared_without_annotations() {
+        let tool = McpTool {
+            name: "x".into(),
+            description: None,
+            input_schema: json!({}),
+            annotations: None,
+        };
+        assert_eq!(tool.access(), ToolAccess::Undeclared);
+    }
+
+    #[test]
+    fn access_is_read_when_read_only_hint_is_true() {
+        let tool = McpTool {
+            name: "x".into(),
+            description: None,
+            input_schema: json!({}),
+            annotations: Some(McpToolAnnotations {
+                read_only_hint: Some(true),
+                destructive_hint: None,
+            }),
+        };
+        assert_eq!(tool.access(), ToolAccess::Read);
+    }
+
+    #[test]
+    fn access_is_write_when_destructive_hint_is_false() {
+        let tool = McpTool {
+            name: "x".into(),
+            description: None,
+            input_schema: json!({}),
+            annotations: Some(McpToolAnnotations {
+                read_only_hint: None,
+                destructive_hint: Some(false),
+            }),
+        };
+        assert_eq!(tool.access(), ToolAccess::Write);
+    }
+
+    #[test]
+    fn access_is_destructive_by_default_when_not_read_only_and_not_explicitly_non_destructive() {
+        let tool = McpTool {
+            name: "x".into(),
+            description: None,
+            input_schema: json!({}),
+            annotations: Some(McpToolAnnotations {
+                read_only_hint: None,
+                destructive_hint: None,
+            }),
+        };
+        assert_eq!(tool.access(), ToolAccess::Destructive);
+    }
+
+    #[test]
+    fn a_tool_json_without_annotations_deserializes_with_none() {
+        let tool: McpTool =
+            serde_json::from_value(json!({ "name": "x", "inputSchema": {} })).unwrap();
+        assert_eq!(tool.annotations, None);
     }
 }
