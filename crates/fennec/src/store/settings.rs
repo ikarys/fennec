@@ -6,6 +6,7 @@ use crate::domain::preferences::Preferences;
 use rusqlite::{OptionalExtension, params};
 
 const KEY: &str = "preferences";
+const SEEN_VERSION: &str = "seen_version";
 
 impl SqliteStore {
     /// The stored preferences, or the defaults when none are stored yet.
@@ -42,6 +43,30 @@ impl SqliteStore {
             "INSERT INTO settings (key, value, updated_at) VALUES (?1, ?2, ?3)
              ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
             params![KEY, json, now],
+        )?;
+        Ok(())
+    }
+
+    /// The fennec version whose changelog the human last saw; `None` before the first look.
+    pub fn seen_version(&self) -> std::result::Result<Option<String>, StoreError> {
+        let value: Option<String> = self
+            .db
+            .query_row(
+                "SELECT value FROM settings WHERE key = ?1",
+                params![SEEN_VERSION],
+                |r| r.get(0),
+            )
+            .optional()?;
+        Ok(value)
+    }
+
+    /// Records the version whose changelog the human saw.
+    pub fn set_seen_version(&self, version: &str) -> std::result::Result<(), StoreError> {
+        let now = now_ms().to_string();
+        self.db.execute(
+            "INSERT INTO settings (key, value, updated_at) VALUES (?1, ?2, ?3)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+            params![SEEN_VERSION, version, now],
         )?;
         Ok(())
     }
@@ -159,5 +184,15 @@ mod tests {
             _ => panic!("expected PlainSecret"),
         }
         assert_eq!(store.preferences().unwrap(), before);
+    }
+
+    #[test]
+    fn seen_version_absent_round_trip_and_overwrite() {
+        let store = SqliteStore::in_memory().unwrap();
+        assert_eq!(store.seen_version().unwrap(), None);
+        store.set_seen_version("0.1.0").unwrap();
+        assert_eq!(store.seen_version().unwrap(), Some("0.1.0".to_string()));
+        store.set_seen_version("0.2.0").unwrap();
+        assert_eq!(store.seen_version().unwrap(), Some("0.2.0".to_string()));
     }
 }
