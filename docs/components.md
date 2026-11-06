@@ -246,3 +246,8 @@ First-run checklist, done: the home page shows what a first run still misses (a 
 a project, the security scanners), each line with its fix, and hides once all is ready; `fennec doctor` prints the
 same lines and exits 1 while one is to do. The facts are gathered by an adapter, the verdicts are pure domain code
 (`domain/setup.rs`, `setup.rs`, `web/setup_routes.rs`, `cli/doctor.rs`, `SetupChecklist.tsx`).
+
+Paths the human named, done: a file tool reading outside the project runs without an approval when the human
+already wrote that path, or a folder above it, in a message or an answer of the session (`~/`, Windows
+`\\wsl.localhost\<distro>\` paths included); writes, commands and the human's own Ask rules still ask
+(`domain/named_paths.rs`, `agent/tool_calls.rs`).
