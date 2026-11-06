@@ -280,6 +280,12 @@ pub enum SandboxHealth {
     Blocked(String),
 }
 
+/// Removes the temp dir the workdir's sandboxed commands wrote (only macOS makes one; elsewhere
+/// there is nothing to remove). Call it before the workdir itself is removed.
+pub fn remove_private_tmp(workdir: &Path) {
+    let _ = std::fs::remove_dir_all(seatbelt::private_tmp_path(workdir));
+}
+
 /// Probes bwrap with the minimal world fennec needs, so a kernel setting that
 /// forbids unprivileged user namespaces (Ubuntu 23.10+ AppArmor) surfaces in
 /// the Settings page instead of every sandboxed command failing silently.
