@@ -225,12 +225,15 @@ function ServerCard({
 export function McpSection({
   value,
   onChange,
-  save
+  save,
+  onConnected
 }: {
   value: McpServer[];
   onChange: (value: McpServer[]) => void;
   /** The group's own save: its dot and its "Save". */
   save?: SectionSave;
+  /** After a connect: the server stored the tools, the page reads them back. */
+  onConnected: () => Promise<void>;
 }) {
   const t = useT();
   const [connecting, setConnecting] = useState<number | null>(null);
@@ -252,8 +255,8 @@ export function McpSection({
     setError(null);
     try {
       await saveFirst();
-      const { server } = await connectMcp(name);
-      patch(index, { cachedTools: server.cachedTools });
+      await connectMcp(name);
+      await onConnected();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
