@@ -19,6 +19,7 @@ use std::path::Path;
 pub(super) fn list_projects(app: &App, stream: &mut TcpStream) -> Result<(), String> {
     let store = app.store()?;
     let favorites = store.favorite_projects()?;
+    let recent = store.recent_project_ids()?;
     let mut out = Vec::new();
     for p in store.projects()? {
         // The log says a workflow ended; git says whether its work still waits.
@@ -40,6 +41,7 @@ pub(super) fn list_projects(app: &App, stream: &mut TcpStream) -> Result<(), Str
             .collect();
         let mut v = project_json(&p, store_dir(app));
         v["favorite"] = json!(favorites.contains(&p.id));
+        v["recentRank"] = json!(recent.iter().position(|id| *id == p.id));
         v["branch"] = json!(git::current_branch(Path::new(&p.workdir)));
         v["remote"] = json!(
             git::remote_url(Path::new(&p.workdir))

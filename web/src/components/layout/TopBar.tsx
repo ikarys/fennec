@@ -214,7 +214,7 @@ interface TopBarProps {
   onOpenPalette: () => void;
   /** The project of the open session, when there is one: the "+" menu lists it first. */
   currentProject: { id: string; name: string } | null;
-  /** The projects the "+" menu offers. */
+  /** The projects the "+" menu offers, most recently used first. */
   projects: { id: string; name: string }[];
   onNewSession: (projectId: string) => void;
   onOpenPage: (page: PageId) => void;
@@ -262,7 +262,7 @@ export function TopBar({
         <VersionTag />
       </a>
 
-      {/* The "+" never guesses a project: the open session's comes first, then the chat, then the others. */}
+      {/* The "+" never guesses a project: the open session's comes first, then the others by recent use (the chat has its own button). */}
       <div className="self-center">
         <Menu label={t('topBarNewSessionMenuLabel')} icon={<PlusIcon className="h-4 w-4" />}>
           {currentProject && currentProject.id !== CHAT_PROJECT_ID ? (
@@ -270,12 +270,6 @@ export function TopBar({
               {t('paletteNewSessionIn', { name: currentProject.name })}
             </MenuItem>
           ) : null}
-          <MenuItem onSelect={() => onNewSession(CHAT_PROJECT_ID)}>
-            <span className="flex items-center gap-1.5">
-              <ChatIcon className="h-3.5 w-3.5 text-accent" />
-              {t('paletteNewChat')}
-            </span>
-          </MenuItem>
           {projects
             .filter((project) => project.id !== CHAT_PROJECT_ID && project.id !== currentProject?.id)
             .map((project) => (

@@ -182,18 +182,22 @@ impl SqliteStore {
             .optional()?)
     }
 
+    /// A project's last activity: the newest event of its top-level sessions, else their creation.
+    const RECENT_ACTIVITY: &str = "(SELECT MAX(COALESCE(
+        (SELECT MAX(e.timestamp) FROM events e WHERE e.session_id = s.id),
+        CAST(s.created_at AS INTEGER)))
+     FROM sessions s WHERE s.project_id = p.id AND s.parent_id IS NULL)";
+
     /// Favourites first, then most recently active (the newest event of its
     /// top-level sessions, else their creation), then by name.
     pub fn projects(&self) -> Result<Vec<Project>> {
-        let mut stmt = self.db.prepare(
+        let recent_activity = Self::RECENT_ACTIVITY;
+        let mut stmt = self.db.prepare(&format!(
             "SELECT p.id, p.name, p.workdir FROM projects p
              ORDER BY p.favorite DESC,
-                      (SELECT MAX(COALESCE(
-                          (SELECT MAX(e.timestamp) FROM events e WHERE e.session_id = s.id),
-                          CAST(s.created_at AS INTEGER)))
-                       FROM sessions s WHERE s.project_id = p.id AND s.parent_id IS NULL) DESC,
-                      p.name",
-        )?;
+                      {recent_activity} DESC,
+                      p.name"
+        ))?;
         let rows = stmt.query_map([], project_row)?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
@@ -212,6 +216,17 @@ impl SqliteStore {
         let mut stmt = self
             .db
             .prepare("SELECT id FROM projects WHERE favorite = 1")?;
+        let rows = stmt.query_map([], |r| r.get::<_, String>(0))?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// Project ids by recent activity alone, favourites ignored: the "+" menu's order.
+    pub fn recent_project_ids(&self) -> Result<Vec<String>> {
+        let recent_activity = Self::RECENT_ACTIVITY;
+        let mut stmt = self.db.prepare(&format!(
+            "SELECT p.id FROM projects p
+             ORDER BY {recent_activity} DESC, p.name"
+        ))?;
         let rows = stmt.query_map([], |r| r.get::<_, String>(0))?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
@@ -653,6 +668,30 @@ mod tests {
         assert_eq!(workdirs, ["/b", "/a", "/c"]);
 
         assert!(!store.set_favorite("nope", true).unwrap());
+    }
+
+    #[test]
+    fn recent_project_ids_ignore_favourites() {
+        let store = SqliteStore::in_memory().unwrap();
+        let idle = store.project_for("/a").unwrap();
+        let busy = store.project_for("/b").unwrap();
+        let none = store.project_for("/c").unwrap();
+        store.create_session(&idle, "t").unwrap();
+        let sid = store.create_session(&busy, "t").unwrap();
+        let later = store.session(&sid).unwrap().unwrap().updated_at + 1;
+        store
+            .db
+            .execute(
+                "INSERT INTO events (session_id, seq, timestamp, event_type, payload) VALUES (?1, 99, ?2, 'x', '{}')",
+                rusqlite::params![sid, later as i64],
+            )
+            .unwrap();
+
+        assert!(store.set_favorite(&idle.id, true).unwrap());
+        assert_eq!(
+            store.recent_project_ids().unwrap(),
+            [busy.id, idle.id, none.id]
+        );
     }
 
     #[test]

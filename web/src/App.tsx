@@ -410,7 +410,10 @@ export default function App() {
           onCloseTab={closeTab}
           onOpenPalette={() => setPaletteOpen(true)}
           currentProject={currentProject}
-          projects={projects.filter((project) => !project.sessionWorktree).map((project) => ({ id: project.id, name: project.name }))}
+          projects={projects
+            .filter((project) => !project.sessionWorktree)
+            .sort((a, b) => a.recentRank - b.recentRank)
+            .map((project) => ({ id: project.id, name: project.name }))}
           onNewSession={(projectId) => startNewSession(projectId)}
           onOpenPage={(page) => navigate(PAGE_TABS.find((candidate) => candidate.page === page)?.path ?? '#/')}
           splitActive={route.name === 'split'}
