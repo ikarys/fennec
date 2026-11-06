@@ -18,6 +18,18 @@ pub(super) fn refusal<'r>(check: &RuleCheck<'r>) -> Option<&'r Rule> {
     }
 }
 
+/// The path a default ask is about when it only reads: the one case a path the human
+/// named answers without asking.
+pub(super) fn named_read<'c>(check: &'c RuleCheck) -> Option<&'c str> {
+    let proposal = check.proposal.as_ref()?;
+
+    if proposal.kind == rules::TargetKind::Path && proposal.access == Some(Access::Read) {
+        Some(check.subject.as_str())
+    } else {
+        None
+    }
+}
+
 /// The pause for the human: what is asked, and the rule each answer would store.
 pub(super) fn approval(call_id: &str, rule: Option<&Rule>, check: &RuleCheck) -> Event {
     let (kind, pattern, access) = match &check.proposal {
@@ -57,7 +69,7 @@ pub(super) fn event(call_id: &str, rule: &Rule, subject: &str) -> Event {
 
 #[cfg(test)]
 mod tests {
-    use super::{approval, event, refusal};
+    use super::{approval, event, named_read, refusal};
     use crate::agent::ports::RuleCheck;
     use crate::domain::event::Event;
     use rules::{Action, Origin, Proposal, Rule, Rules, Scope, Target, TargetKind};
@@ -175,6 +187,38 @@ mod tests {
                 && pattern == "/outside/file"
                 && access.is_none()
         ));
+    }
+
+    #[test]
+    fn named_read_is_some_only_for_read_path_proposals() {
+        let read_check = RuleCheck {
+            decision: rules::Decision::Ask(None),
+            subject: "/outside/file".into(),
+            proposal: Some(Proposal {
+                kind: TargetKind::Path,
+                pattern: "/outside/file".into(),
+                access: Some(rules::Access::Read),
+            }),
+        };
+        assert_eq!(named_read(&read_check), Some("/outside/file"));
+
+        let write_check = RuleCheck {
+            decision: rules::Decision::Ask(None),
+            subject: "/outside/file".into(),
+            proposal: Some(Proposal {
+                kind: TargetKind::Path,
+                pattern: "/outside/file".into(),
+                access: Some(rules::Access::Write),
+            }),
+        };
+        assert!(named_read(&write_check).is_none());
+
+        let no_proposal = RuleCheck {
+            decision: rules::Decision::Ask(None),
+            subject: "/outside/file".into(),
+            proposal: None,
+        };
+        assert!(named_read(&no_proposal).is_none());
     }
 
     #[test]
