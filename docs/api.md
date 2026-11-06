@@ -193,11 +193,11 @@ read-only. The human edits them as usual.
 
 - `GET /api/config` → `{model, contextWindow, compactAt}`: the resolved parameters of the
   stored preferences; `compactAt` is the fraction at which the session compacts (0 disables)
-- `GET /api/version` → `{version}`: the binary's version, the same string `fennec --version` prints
+- `GET /api/version` → `{version, build}`: the binary's version, the same string `fennec --version` prints; `build` is the local build's number (`<commits>.<sha>[-dirty]`, set by `just install`), `null` for a release
 - `GET /api/update[?refresh=1]` → `{current, latest, newer, releaseUrl}`: the latest GitHub release against this
   binary, cached 6 h (`refresh=1` asks again); 502 `{error}` when no release can be read
 - `POST /api/update` `{}` → 202 `{restarting, latest}`: installs the latest release over the binary (`install.sh`,
-  checksum verified) and restarts the server on it; 409 while a turn runs, when up to date or on a development build
+  checksum verified) and restarts the server on it; 409 while a turn runs, when up to date or on a development or local build
 - `GET /api/server` → `{port, runningPort, fromFlag, path}`: the port `settings.yaml` sets (default 7777), the one this
   process listens on, whether `--port` was given (it wins over the file) and the file's path
 - `POST /api/server` `{port}` → the same view: writes the port to `settings.yaml` (1024..=65535, else 400), applied at the

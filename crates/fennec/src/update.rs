@@ -11,6 +11,10 @@ use std::process::Stdio;
 
 use crate::domain::release;
 
+/// The local build's number (`<commits>.<sha>[-dirty]`), set by `just install`;
+/// `None` for a release or CI build.
+pub const BUILD: Option<&str> = option_env!("FENNEC_BUILD");
+
 #[derive(Clone)]
 pub struct Check {
     pub current: &'static str,

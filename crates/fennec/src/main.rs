@@ -67,7 +67,10 @@ fn main() {
 fn run(args: &[String]) -> Result<(), String> {
     match args.first().map(String::as_str) {
         Some("--version" | "-V") => {
-            println!("fennec {}", env!("CARGO_PKG_VERSION"));
+            match update::BUILD {
+                Some(build) => println!("fennec {} (build {})", env!("CARGO_PKG_VERSION"), build),
+                None => println!("fennec {}", env!("CARGO_PKG_VERSION")),
+            }
             Ok(())
         }
         None | Some("serve") | Some("--port") => {
