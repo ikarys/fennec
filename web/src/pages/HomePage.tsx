@@ -7,6 +7,7 @@ import { useLang, useT } from '../i18n';
 import { BulbIcon, ChevronRightIcon, GlobeIcon, PlusIcon, SearchIcon, TrashIcon } from '../components/Icons';
 import { Button, buttonClass } from '../components/ui/Button';
 import { WorktreeAlert } from '../components/project/WorktreeAlert';
+import { SetupChecklist } from '../components/project/SetupChecklist';
 import { Badge } from '../components/ui/Badge';
 import { SectionLabel } from '../components/ui/SectionLabel';
 import { TextInput } from '../components/ui/Field';
@@ -484,6 +485,8 @@ export function HomePage({
             </Button>
           </div>
         )}
+
+        <SetupChecklist projectCount={regularProjects.length} onOpenProject={onOpenProjectDialog} />
 
         {error && <p className="m-0 text-err">{error}</p>}
 
