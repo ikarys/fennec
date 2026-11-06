@@ -26,6 +26,7 @@ mod idea_routes;
 mod indicator_routes;
 mod insight;
 mod integration;
+mod mcp_oauth_routes;
 mod mcp_routes;
 mod model_routes;
 mod model_view;

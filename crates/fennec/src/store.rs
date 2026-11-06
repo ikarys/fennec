@@ -4,6 +4,7 @@
 mod budgets;
 pub mod calls;
 mod ideas;
+mod mcp_credentials;
 mod plugins;
 mod project_events;
 mod settings;

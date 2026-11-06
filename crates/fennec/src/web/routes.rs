@@ -12,7 +12,7 @@ use super::proposal_routes;
 use super::{
     assets, backlog_routes, budget_routes, canvas_routes, contribution_routes, diff_routes,
     event_stream, file_manager, folder_routes, idea_routes, indicator_routes, integration,
-    mcp_routes, model_routes, plugin_routes, project_dashboard, project_delete,
+    mcp_oauth_routes, mcp_routes, model_routes, plugin_routes, project_dashboard, project_delete,
     project_list_routes, project_routes, rule_approval_routes, rule_bridge_routes, rule_routes,
     server_routes, servers, session_delete, session_routes, settings_routes, terminal,
     update_routes, waiver_routes, workflow_routes, worktree_routes,
@@ -50,6 +50,12 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
             settings_routes::probe_model(app, req, stream)
         }
         ("POST", ["api", "settings", "mcp", "connect"]) => mcp_routes::connect(app, req, stream),
+        ("POST", ["api", "settings", "mcp", "authorize"]) => {
+            mcp_oauth_routes::authorize(app, req, stream)
+        }
+        ("GET", ["api", "mcp", "oauth", "callback"]) => {
+            mcp_oauth_routes::callback(app, req, stream)
+        }
         ("GET", ["api", "models", "choices"]) => model_routes::choices(app, stream),
         ("GET", ["api", "folders"]) => folder_routes::list_folders(app, req, stream),
         ("POST", ["api", "folders", "create"]) => folder_routes::create_folder(req, stream),
