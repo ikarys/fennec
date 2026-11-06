@@ -193,7 +193,7 @@ read-only. The human edits them as usual.
 
 - `GET /api/config` → `{model, contextWindow, compactAt}`: the resolved parameters of the
   stored preferences; `compactAt` is the fraction at which the session compacts (0 disables)
-- `GET /api/version` → `{version, build}`: the binary's version, the same string `fennec --version` prints; `build` is the local build's number (`<commits>.<sha>[-dirty]`, set by `just install`), `null` for a release
+- `GET /api/version` → `{version, build, changelogUrl}`: the binary's version, the same string `fennec --version` prints; `build` is the local build's number (`<commits>.<sha>[-dirty]`, set by `just install`), `null` for a release; `changelogUrl` is the changelog on GitHub
 - `GET /api/update[?refresh=1]` → `{current, latest, newer, releaseUrl}`: the latest GitHub release against this
   binary, cached 6 h (`refresh=1` asks again); 502 `{error}` when no release can be read
 - `POST /api/update` `{}` → 202 `{restarting, latest}`: installs the latest release over the binary (`install.sh`,

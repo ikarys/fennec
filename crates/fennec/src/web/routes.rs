@@ -37,7 +37,11 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         ("GET", ["api", "version"]) => send_json(
             stream,
             200,
-            &json!({ "version": env!("CARGO_PKG_VERSION"), "build": crate::update::BUILD }),
+            &json!({
+                "version": env!("CARGO_PKG_VERSION"),
+                "build": crate::update::BUILD,
+                "changelogUrl": crate::update::CHANGELOG_URL,
+            }),
         ),
         ("GET", ["api", "settings"]) => settings_routes::get_settings(app, stream),
         ("GET", ["api", "insight"]) => super::insight::serve(app, req, stream),
