@@ -1,5 +1,5 @@
 #!/bin/sh
-# Installs the fennec Linux binary from GitHub Releases, or a local build.
+# Installs the fennec binary (Linux, macOS) from GitHub Releases, or a local build.
 #
 # One-liner:
 #   curl -fsSL https://raw.githubusercontent.com/ikarys/fennec/main/install.sh | sh
@@ -8,7 +8,7 @@
 #   FENNEC_VERSION       release tag to install (default: latest)
 #   FENNEC_INSTALL_DIR   install directory (default: $HOME/.local/bin)
 #   FENNEC_REPO_URL      repository URL for releases (default: https://github.com/ikarys/fennec)
-#   FENNEC_SERVICE       none: do not manage a systemd user service; keep: do not restart an existing service
+#   FENNEC_SERVICE       none: do not manage a systemd user service or launchd agent; keep: do not restart an existing service
 #   FENNEC_LOCAL_BINARY  install this local binary instead of downloading a release (just install)
 
 set -eu
@@ -30,19 +30,35 @@ require_command() {
 
 detect_platform() {
     OS_NAME="$(uname -s)"
-    if [ "$OS_NAME" != "Linux" ]; then
-        fail "not a Linux system: $OS_NAME"
-    fi
-
-    case "$(uname -m)" in
-        x86_64|amd64)
-            TARGET="x86_64-unknown-linux-gnu"
+    case "$OS_NAME" in
+        Linux)
+            case "$(uname -m)" in
+                x86_64|amd64)
+                    TARGET="x86_64-unknown-linux-gnu"
+                    ;;
+                aarch64|arm64)
+                    TARGET="aarch64-unknown-linux-gnu"
+                    ;;
+                *)
+                    fail "unsupported architecture: $(uname -m)"
+                    ;;
+            esac
             ;;
-        aarch64|arm64)
-            TARGET="aarch64-unknown-linux-gnu"
+        Darwin)
+            case "$(uname -m)" in
+                arm64)
+                    TARGET="aarch64-apple-darwin"
+                    ;;
+                x86_64)
+                    TARGET="x86_64-apple-darwin"
+                    ;;
+                *)
+                    fail "unsupported architecture: $(uname -m)"
+                    ;;
+            esac
             ;;
         *)
-            fail "unsupported architecture: $(uname -m)"
+            fail "unsupported system: $OS_NAME (on Windows, run fennec inside WSL2)"
             ;;
     esac
 }
@@ -73,9 +89,21 @@ download_asset() {
     fi
 }
 
+require_checksum_command() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        CHECKSUM_CMD="sha256sum"
+    elif command -v shasum >/dev/null 2>&1; then
+        CHECKSUM_CMD="shasum -a 256"
+    else
+        fail "required command not found: sha256sum or shasum"
+    fi
+}
+
 verify_checksum() {
     # The checksum file names the asset relative to the temp directory.
-    if ! (cd "$1" && sha256sum -c "$2" >/dev/null 2>&1); then
+    # CHECKSUM_CMD is unquoted on purpose: "shasum -a 256" is a command and its arguments.
+    # shellcheck disable=SC2086
+    if ! (cd "$1" && $CHECKSUM_CMD -c "$2" >/dev/null 2>&1); then
         fail "checksum mismatch for $2"
     fi
 }
@@ -94,11 +122,8 @@ install_binary() {
         || fail "could not install binary to $2/fennec"
 }
 
-install_service() {
+install_systemd_service() {
     dir="$1"
-    if [ "${FENNEC_SERVICE:-}" = "none" ]; then
-        return 0
-    fi
 
     if ! systemctl --user show-environment >/dev/null 2>&1; then
         warn "no systemd user session: start fennec by hand (fennec serve)"
@@ -142,6 +167,97 @@ install_service() {
             systemctl --user restart fennec || fail "could not restart fennec service"
         fi
     fi
+}
+
+install_launchd_service() {
+    dir="$1"
+
+    if ! command -v launchctl >/dev/null 2>&1; then
+        warn "no launchctl: start fennec by hand (fennec serve)"
+        return 0
+    fi
+
+    case "$dir" in
+        /*)
+            ;;
+        *)
+            dir="$(pwd)/$dir"
+            ;;
+    esac
+
+    agent_dir="${HOME:-}/Library/LaunchAgents"
+    agent="$agent_dir/dev.fennec.plist"
+    log_dir="${HOME:-}/Library/Logs"
+    log="$log_dir/fennec.log"
+
+    if [ ! -f "$agent" ]; then
+        mkdir -p "$agent_dir" || fail "could not create LaunchAgents directory: $agent_dir"
+        mkdir -p "$log_dir" || fail "could not create log directory: $log_dir"
+        # A plist owned by the user is never overwritten: if one exists we only
+        # manage its state below.
+        {
+            printf '<?xml version="1.0" encoding="UTF-8"?>\n'
+            printf '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n'
+            printf '<plist version="1.0">\n'
+            printf '<dict>\n'
+            printf '    <key>Label</key>\n'
+            printf '    <string>dev.fennec</string>\n'
+            printf '    <key>ProgramArguments</key>\n'
+            printf '    <array>\n'
+            printf '        <string>%s/fennec</string>\n' "$dir"
+            printf '        <string>serve</string>\n'
+            printf '    </array>\n'
+            # launchd starts agents with a bare PATH: keep the installer's, so commands find
+            # Homebrew's tools (git, cargo, node) as in the human's shell.
+            printf '    <key>EnvironmentVariables</key>\n'
+            printf '    <dict>\n'
+            printf '        <key>PATH</key>\n'
+            printf '        <string>%s</string>\n' "${PATH:-/usr/bin:/bin}"
+            printf '    </dict>\n'
+            printf '    <key>RunAtLoad</key>\n'
+            printf '    <true/>\n'
+            printf '    <key>KeepAlive</key>\n'
+            printf '    <dict>\n'
+            printf '        <key>SuccessfulExit</key>\n'
+            printf '        <false/>\n'
+            printf '    </dict>\n'
+            printf '    <key>StandardOutPath</key>\n'
+            printf '    <string>%s</string>\n' "$log"
+            printf '    <key>StandardErrorPath</key>\n'
+            printf '    <string>%s</string>\n' "$log"
+            printf '</dict>\n'
+            printf '</plist>\n'
+        } > "$agent" || fail "could not write launchd agent: $agent"
+        launchctl bootstrap "gui/$(id -u)" "$agent" || fail "could not bootstrap fennec launchd agent"
+        printf 'fennec runs as a launchd user agent: tail -f ~/Library/Logs/fennec.log\n'
+    else
+        if [ "${FENNEC_SERVICE:-}" = "keep" ]; then
+            return 0
+        fi
+        if ! launchctl kickstart -k "gui/$(id -u)/dev.fennec" 2>/dev/null; then
+            warn "fennec launchd agent is not loaded: launchctl bootstrap gui/$(id -u) $agent"
+        fi
+    fi
+}
+
+install_service() {
+    dir="$1"
+    if [ "${FENNEC_SERVICE:-}" = "none" ]; then
+        return 0
+    fi
+
+    OS_NAME="${OS_NAME:-$(uname -s)}"
+    case "$OS_NAME" in
+        Linux)
+            install_systemd_service "$dir"
+            ;;
+        Darwin)
+            install_launchd_service "$dir"
+            ;;
+        *)
+            fail "unsupported system: $OS_NAME (on Windows, run fennec inside WSL2)"
+            ;;
+    esac
 }
 
 path_contains_dir() {
@@ -190,7 +306,7 @@ main() {
     detect_platform
     require_command "curl"
     require_command "tar"
-    require_command "sha256sum"
+    require_checksum_command
 
     if [ "$VERSION" = "latest" ]; then
         resolve_latest_tag
@@ -218,10 +334,18 @@ main() {
     install_binary "$SOURCE" "$INSTALL_DIR"
     install_service "$INSTALL_DIR"
 
-    warn_glibc
-    if ! command -v bwrap >/dev/null 2>&1; then
-        warn "the command sandbox needs bubblewrap: install the bubblewrap package"
-    fi
+    case "$OS_NAME" in
+        Linux)
+            warn_glibc
+            if ! command -v bwrap >/dev/null 2>&1; then
+                warn "the command sandbox needs bubblewrap: install the bubblewrap package"
+            fi
+            ;;
+        Darwin)
+            warn "the command sandbox (Seatbelt) is not available on macOS yet; see README, Platforms"
+            ;;
+    esac
+
     if ! path_contains_dir "$INSTALL_DIR"; then
         printf 'fennec-install: warning: %s is not in PATH; add it with:\n' "$INSTALL_DIR" >&2
         printf '  export PATH="%s:$PATH"\n' "$INSTALL_DIR" >&2
