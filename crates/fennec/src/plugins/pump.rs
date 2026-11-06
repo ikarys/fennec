@@ -24,14 +24,25 @@ pub fn run(
         return;
     };
     let mut high_water = HashMap::new();
+    // The first pass starts the active plugins; later ones wait for an append.
+    let mut seen = None;
     loop {
         if stop.load(Ordering::Relaxed) {
             break;
         }
-        notifier.wait_past(notifier.generation(), Duration::from_secs(1));
+        if let Some(generation) = seen {
+            notifier.wait_past(generation, Duration::from_secs(1));
+        }
         if stop.load(Ordering::Relaxed) {
             break;
         }
+        // The timeout only checks `stop`: scanning every session each second
+        // with nothing appended cost an idle server a few percent of a core.
+        let generation = notifier.generation();
+        if seen == Some(generation) {
+            continue;
+        }
+        seen = Some(generation);
         step(&manager, &store, &mut high_water);
     }
 }
