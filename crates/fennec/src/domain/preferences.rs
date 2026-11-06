@@ -735,6 +735,7 @@ mod tests {
             name: "read".into(),
             command: Some("read-mcp".into()),
             cached_tools: vec![McpTool {
+                annotations: None,
                 name: "file".into(),
                 description: None,
                 input_schema: serde_json::json!({}),

@@ -1709,6 +1709,7 @@ mod tests {
             server.cached_tools = tools
                 .iter()
                 .map(|tool| McpTool {
+                    annotations: None,
                     name: (*tool).into(),
                     description: None,
                     input_schema: json!({ "type": "object" }),

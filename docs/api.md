@@ -203,7 +203,10 @@ read-only. The human edits them as usual.
 - `POST /api/server` `{port}` → the same view: writes the port to `settings.yaml` (1024..=65535, else 400), applied at the
   next start
 - `POST /api/server/restart` `{}` → 202 `{restarting}`: the server re-executes itself, same arguments; 409 while a turn runs
-- `GET /api/settings` → `{preferences, listings, defaults, skills, optInWorkflows, scanners, sandboxHealth}`
+- `GET /api/settings` → `{preferences, listings, defaults, skills, optInWorkflows, scanners, sandboxHealth, mcpTools}`
+  - `mcpTools`: `{<server name>: [{name, access: read|write|destructive|undeclared, tokens}]}`, each cached
+    MCP tool's access as its server declares it in its annotations (indicative, not verified;
+    `undeclared` without annotations) and its definition's estimated token cost
   - `scanners`: `[{id, name, covers, install, url, path}]`, the security scanners the `audit-security`
     agent runs; `path` is where fennec found the executable on PATH, null when absent (verified); fennec
     never installs one, `install` is the command shown to the human
