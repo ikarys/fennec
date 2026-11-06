@@ -244,6 +244,17 @@ read-only. The human edits them as usual.
   config's problems; 404 for an unknown server; 502 when the server cannot be
   reached or `tools/list` fails. The cache is what the model's tool definitions
   come from, so a frozen prompt stays byte-stable
+- `POST /api/settings/mcp/authorize` with `{name}` → 200 `{url}`: starts the
+  OAuth authorization (MCP authorization spec) of a stored http server:
+  discovery from its 401, dynamic client registration, PKCE S256; `url` is the
+  server's consent page, opened by the UI in a new tab. 400 for a stdio server
+  or a config problem; 404 for an unknown server; 502 when discovery or
+  registration fails
+- `GET /api/mcp/oauth/callback?code&state` → an HTML page: the redirect target
+  of the consent page. Exchanges the code, stores the tokens sealed with
+  `secret.key` (`settings` row `mcp_oauth:{name}`), then connects as
+  `mcp/connect` does. Later calls send the access token as a Bearer header and
+  refresh it when it expires
 - `GET /api/models/choices` → `{default, favorites}`, each a
   `{provider, model, providerName}`: what the composer's model picker offers;
   read from the stored preferences, no provider is called

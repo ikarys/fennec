@@ -907,3 +907,21 @@ export function CpuIcon({ className }: IconProps) {
     </svg>
   );
 }
+
+export function KeyIcon({ className }: IconProps) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="8" cy="15" r="4" />
+      <path d="M10.8 12.2L20 3M17 6l3 3M14.5 8.5l2 2" />
+    </svg>
+  );
+}
