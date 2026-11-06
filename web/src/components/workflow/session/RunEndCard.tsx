@@ -33,16 +33,16 @@ function outcomeView(
 function NodeTrack({
   node,
   lang,
-  totalMs,
+  axisMs,
   nodeTotalMs,
 }: {
   node: WorkflowNodeStat;
   lang: Lang;
-  totalMs: number | null;
+  axisMs: number;
   nodeTotalMs: number;
 }) {
   // Older logs have no wall-clock timeline: fall back to the share bar.
-  if (totalMs == null || totalMs <= 0 || node.spans.length === 0) {
+  if (axisMs <= 0 || node.spans.length === 0) {
     return (
       <span className="relative h-1 w-full overflow-hidden rounded-full bg-faint/20">
         <span
@@ -62,8 +62,8 @@ function NodeTrack({
     <span className="relative h-1 w-full overflow-hidden rounded-full bg-faint/20">
       {node.spans.map((span, index) => {
         // Keep the segment inside the track even if its duration overshoots the end.
-        const left = Math.min(Math.max((span.offsetMs / totalMs) * 100, 0), 100);
-        const width = Math.min(Math.max((span.durationMs / totalMs) * 100, 0.5), Math.max(0, 100 - left));
+        const left = Math.min(Math.max((span.offsetMs / axisMs) * 100, 0), 100);
+        const width = Math.min(Math.max((span.durationMs / axisMs) * 100, 0.5), Math.max(0, 100 - left));
         return (
           <span
             key={index}
@@ -106,6 +106,11 @@ export function RunEndCard({ item }: { item: WorkflowEndItem }) {
     : undefined;
 
   const nodeTotalMs = stats ? stats.nodes.reduce((sum, node) => sum + node.workingMs, 0) : 0;
+  // The timeline ends with the last pass: the wait for the human's final decision would
+  // flatten the work into slivers; the header's start and end still show it.
+  const axisMs = stats
+    ? Math.max(0, ...stats.nodes.flatMap((node) => node.spans.map((span) => span.offsetMs + span.durationMs)))
+    : 0;
 
   return (
     <Card className="overflow-hidden">
@@ -175,7 +180,7 @@ export function RunEndCard({ item }: { item: WorkflowEndItem }) {
                       {node.label}
                       {node.runs > 1 && <span className="ml-1.5 text-muted tabular-nums">×{node.runs}</span>}
                     </span>
-                    <NodeTrack node={node} lang={lang} totalMs={totalMs} nodeTotalMs={nodeTotalMs} />
+                    <NodeTrack node={node} lang={lang} axisMs={axisMs} nodeTotalMs={nodeTotalMs} />
                     <span className="whitespace-nowrap text-right text-muted tabular-nums">
                       {formatDuration(lang, node.workingMs)}
                     </span>
