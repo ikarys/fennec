@@ -229,3 +229,9 @@ Server port, done: `~/.config/fennec/settings.yaml` (`$XDG_CONFIG_HOME`) holds `
 otherwise. Settings > Security edits it (the line replaced in place, other lines kept) and restarts the server, the page
 following it to the new port (`domain/server_config.rs`, `server_config.rs`, `web/server_routes.rs`,
 `components/settings/ServerSection.tsx`).
+
+Changes page, done: the side panel's "Modified files" block keeps only the count and a link to `#/s/<id>/changes`,
+which lists the branch's files in the gate's review order with their signals and shows the selected file's diff against
+the session's base (the range the integration takes), colored and numbered on both sides, cut at 5,000 lines; an icon
+opens the whole file in VS Code. The server parses the hunks and only diffs a path the branch changed
+(`domain/diff.rs`, `integration::file_diff`, `web/diff_routes.rs`, `pages/ChangesPage.tsx`).

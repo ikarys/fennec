@@ -136,6 +136,32 @@ pub fn update_branch(top: &Path, wt: &Worktree) -> Result<Vec<String>, String> {
     Ok(conflicted)
 }
 
+/// One file's diff over the range the integration takes, raw; `None` when the
+/// branch did not change that path (the only paths a page may ask for).
+pub fn file_diff(top: &Path, wt: &Worktree, path: &str) -> Result<Option<String>, String> {
+    let start = merge_start(top, wt);
+    let touched = touched_files(top, wt, &start)?;
+    if !touched.iter().any(|p| p == path) {
+        return Ok(None);
+    }
+    let out = git(
+        top,
+        &[
+            "diff",
+            "--no-color",
+            "--no-ext-diff",
+            "--no-renames",
+            "--unified=3",
+            &start,
+            &wt.branch,
+            "--",
+            path,
+        ],
+        None,
+    )?;
+    Ok(Some(String::from_utf8_lossy(&out).into_owned()))
+}
+
 /// The agent's touched files: `git diff --name-only --no-renames start branch`.
 fn touched_files(top: &Path, wt: &Worktree, start: &str) -> Result<Vec<String>, String> {
     let out = git(
@@ -615,6 +641,21 @@ mod tests {
         git(&repo, &["add", "-A"], None).unwrap();
         git(&repo, &["commit", "-q", "-m", "init"], None).unwrap();
         (base, repo)
+    }
+
+    #[test]
+    fn file_diff_returns_a_changed_file_and_none_for_an_unchanged_one() {
+        let (base, repo) = setup();
+        let wt = open(&base.join("wt"), &repo, "s1").unwrap().unwrap();
+        std::fs::write(wt.workdir.join("a.txt"), "two\n").unwrap();
+        assert_eq!(commit(&wt, "agent work"), Ok(true));
+
+        let top = top(&repo).unwrap().0;
+        let raw = file_diff(&top, &wt, "a.txt").unwrap().unwrap();
+
+        assert!(raw.contains("-one\n+two"));
+        assert_eq!(file_diff(&top, &wt, "other.txt").unwrap(), None);
+        let _ = std::fs::remove_dir_all(&base);
     }
 
     #[test]

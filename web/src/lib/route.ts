@@ -8,6 +8,7 @@ export type PageId = 'settings' | 'insight' | 'workflows' | 'backlog';
 export type Route =
   | { name: 'home' }
   | { name: 'session'; id: string }
+  | { name: 'changes'; id: string }
   | { name: 'new'; id: string; testWorkflowId: string | null; frameIdeaId: string | null; fromSessionId: string | null }
   | { name: 'settings'; tab: string | null }
   | { name: 'insight' }
@@ -59,7 +60,11 @@ export function parseRoute(hash: string): Route {
     return { name: 'split', left: parsePaneToken(parts[0] ?? null), right: parsePaneToken(parts[1] ?? null) };
   }
   if (hash.startsWith('#/s/')) {
-    const id = decodeURIComponent(hash.slice(4));
+    const [rawId, sub] = hash.slice('#/s/'.length).split('/');
+    if (sub === 'changes') {
+      return { name: 'changes', id: decodeURIComponent(rawId) };
+    }
+    const id = decodeURIComponent(rawId);
     if (id.startsWith('new:')) {
       return { name: 'new', id: id.slice(4), testWorkflowId: null, frameIdeaId: null, fromSessionId: null };
     }
@@ -86,10 +91,16 @@ export function tabPath(tabId: string): string {
   return `#/s/${encodeURIComponent(tabId)}`;
 }
 
+/** The changes page of a session. */
+export function changesPath(sessionId: string): string {
+  return `#/s/${encodeURIComponent(sessionId)}/changes`;
+}
+
 /** The tab id on screen, from the route; null on pages that have no tab (home, project, split). */
 export function tabIdForRoute(route: Route): string | null {
   switch (route.name) {
     case 'session':
+    case 'changes':
       return route.id;
     case 'new':
       return `new:${route.id}`;

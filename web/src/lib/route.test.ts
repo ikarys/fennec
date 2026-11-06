@@ -16,9 +16,29 @@ import {
   PAGE_TABS,
   loadTabs,
   loadActiveTab,
+  changesPath,
   TABS_KEY,
   ACTIVE_TAB_KEY,
 } from './route';
+
+describe('changes', () => {
+  it('parses the changes page of a session', () => {
+    expect(parseRoute('#/s/abc-1/changes')).toEqual({ name: 'changes', id: 'abc-1' });
+  });
+
+  it('round trips changesPath', () => {
+    const sessionId = 'abc-1/slash';
+    expect(parseRoute(changesPath(sessionId))).toEqual({ name: 'changes', id: sessionId });
+  });
+
+  it('keeps the session tab active on the changes page', () => {
+    expect(tabIdForRoute(parseRoute(changesPath('abc-1')))).toBe('abc-1');
+  });
+
+  it('still parses a plain session route', () => {
+    expect(parseRoute('#/s/abc-1')).toEqual({ name: 'session', id: 'abc-1' });
+  });
+});
 
 beforeEach(() => {
   const store = new Map<string, string>();

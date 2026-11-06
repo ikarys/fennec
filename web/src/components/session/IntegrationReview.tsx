@@ -12,7 +12,7 @@ import { useT } from '../../i18n';
 import type { MsgKey } from '../../i18n/messages';
 
 // `protected` has its own badge, shown before these.
-const SIGNAL_KEYS: Record<Exclude<ReviewSignal, 'protected'>, { label: MsgKey; tone: BadgeTone; title: MsgKey }> = {
+export const SIGNAL_KEYS: Record<Exclude<ReviewSignal, 'protected'>, { label: MsgKey; tone: BadgeTone; title: MsgKey }> = {
   sensitive: {
     label: 'signalSensitiveLabel',
     tone: 'err',

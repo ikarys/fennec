@@ -498,6 +498,33 @@ export function getIntegration(sessionId: string): Promise<IntegrationPreview> {
   );
 }
 
+export type DiffLineKind = 'context' | 'added' | 'removed';
+
+export interface DiffLine {
+  kind: DiffLineKind;
+  /** The line's number on each side; null on the side it is absent from. */
+  old: number | null;
+  new: number | null;
+  text: string;
+}
+
+/** One file the session's branch changed, as numbered hunks (verified: read from git). */
+export interface FileDiff {
+  path: string;
+  binary: boolean;
+  /** Past 5000 lines the server drops the rest. */
+  truncated: boolean;
+  hunks: { header: string; lines: DiffLine[] }[];
+  /** Opens the worktree's file in VS Code. */
+  editorUrl: string;
+}
+
+export function getFileDiff(sessionId: string, path: string): Promise<FileDiff> {
+  return request<FileDiff>(
+    `/api/sessions/${encodeURIComponent(sessionId)}/diff?path=${encodeURIComponent(path)}`,
+  );
+}
+
 /** Records that `dialogueId` is the comprehension dialogue of the reviewed session. */
 export function startUnderstanding(sessionId: string, dialogueId: string): Promise<{ understanding: Understanding }> {
   return request<{ understanding: Understanding }>(
