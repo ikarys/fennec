@@ -112,6 +112,7 @@ function response(preferencesValue: Preferences, listings: ProviderListing[]): S
     skills: [],
     scanners: [],
     optInWorkflows: [],
+    mcpTools: {},
     sandboxHealth: {
       status: 'ready',
       detail: null,

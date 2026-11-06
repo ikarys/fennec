@@ -391,6 +391,9 @@ fn value_to_tool(value: &Value) -> Result<McpTool, String> {
             .get("inputSchema")
             .cloned()
             .unwrap_or_else(|| json!({ "type": "object" })),
+        annotations: value
+            .get("annotations")
+            .and_then(|a| serde_json::from_value(a.clone()).ok()),
     })
 }
 
