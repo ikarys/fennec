@@ -248,6 +248,14 @@ export function connectMcp(name: string): Promise<McpConnectResponse> {
   });
 }
 
+/** Start an MCP server's OAuth authorization: the URL of its consent page. */
+export function authorizeMcp(name: string): Promise<{ url: string }> {
+  return request<{ url: string }>("/api/settings/mcp/authorize", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+}
+
 /** Re-list one provider's models now (its baseUrl/key may not be stored yet). */
 export function listProvider(body: {
   provider: string;

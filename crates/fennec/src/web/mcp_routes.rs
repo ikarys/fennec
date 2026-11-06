@@ -8,7 +8,6 @@ use crate::agent::ports::EventLog;
 use crate::domain::event::Event;
 use crate::domain::mcp;
 use crate::domain::preferences::Preferences;
-use crate::mcp::Client;
 use crate::tools::Sandbox;
 use serde_json::{Value, json};
 use std::net::TcpStream;
@@ -114,34 +113,12 @@ pub(super) fn connect(app: &App, req: &Request, stream: &mut TcpStream) -> Resul
     let Some(index) = prefs.mcp.iter().position(|server| server.name == name) else {
         return error(stream, 404, "no such mcp server");
     };
-    let server = prefs.mcp[index].clone();
-    if !server.problems().is_empty() {
-        return error(stream, 400, &server.problems().join("; "));
-    }
     let sandbox = Sandbox::for_store(&prefs.sandbox, &app.settings.db_path);
-    let mut client = match Client::connect(&server, &sandbox, std::path::Path::new(".")) {
-        Ok(client) => client,
-        Err(e) => return error(stream, 502, &format!("connect failed: {e}")),
-    };
-    let tools = match client.list_tools() {
-        Ok(tools) => tools,
-        Err(e) => return error(stream, 502, &format!("tools/list failed: {e}")),
-    };
-    prefs.mcp[index].cached_tools = tools;
-    // Re-check now that the tool list is known: a `{server}_{tool}` name must
-    // not collide with a built-in or with another server's tool.
-    if let Some(problem) = prefs.mcp[index].problems().into_iter().next() {
-        return error(stream, 400, &problem);
+    let vault = crate::mcp::oauth::Vault::for_settings(&app.settings);
+    match crate::mcp::connect_and_cache(&store, &mut prefs, index, &sandbox, &vault) {
+        Ok(server) => send_json(stream, 200, &json!({ "server": server })),
+        Err((status, message)) => error(stream, status, &message),
     }
-    if let Some(name) = mcp::duplicate_tool_names(&prefs.mcp).into_iter().next() {
-        return error(
-            stream,
-            400,
-            &format!("tool {name} is offered by more than one mcp server"),
-        );
-    }
-    store.save_preferences(&prefs)?;
-    send_json(stream, 200, &json!({ "server": prefs.mcp[index] }))
 }
 
 #[cfg(test)]

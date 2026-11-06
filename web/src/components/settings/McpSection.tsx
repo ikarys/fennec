@@ -3,7 +3,8 @@ import { Section, type SectionSave } from '../ui/Section';
 import { TextInput, Select } from '../ui/Field';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
-import { connectMcp, type McpServer } from '../../lib/api';
+import { authorizeMcp, connectMcp, type McpServer } from '../../lib/api';
+import { KeyIcon } from '../Icons';
 import { useT } from '../../i18n';
 
 function emptyServer(): McpServer {
@@ -30,7 +31,8 @@ function ServerCard({
   saved,
   onPatch,
   onRemove,
-  onConnect
+  onConnect,
+  onAuthorize
 }: {
   index: number;
   server: McpServer;
@@ -39,6 +41,7 @@ function ServerCard({
   onPatch: (patch: Partial<McpServer>) => void;
   onRemove: () => void;
   onConnect: () => void;
+  onAuthorize: () => void;
 }) {
   function toggleTool(name: string) {
     const disabled = server.disabledTools.includes(name)
@@ -96,6 +99,19 @@ function ServerCard({
           />
         )}
         <div className="ml-auto flex items-center gap-2">
+          {server.transport === 'http' ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              iconOnly
+              onClick={onAuthorize}
+              disabled={connecting || server.name === '' || !saved}
+              title={!saved ? t('mcpSaveFirst') : t('mcpAuthorize')}
+              aria-label={t('mcpAuthorize')}
+            >
+              <KeyIcon className="h-4 w-4" />
+            </Button>
+          ) : null}
           <Button
             variant="soft"
             size="sm"
@@ -212,6 +228,19 @@ export function McpSection({
     }
   }
 
+  async function authorize(index: number) {
+    setError(null);
+    try {
+      const { url } = await authorizeMcp(value[index].name);
+      // The consent happens in another tab; when the human comes back, the
+      // tokens are stored and a connect loads the tools into this form.
+      window.addEventListener('focus', () => void connect(index), { once: true });
+      window.open(url, '_blank', 'noopener');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   return (
     <Section
       title={t('mcpTitle')}
@@ -237,6 +266,7 @@ export function McpSection({
             onPatch={(p) => patch(index, p)}
             onRemove={() => onChange(value.filter((_, i) => i !== index))}
             onConnect={() => connect(index)}
+            onAuthorize={() => authorize(index)}
           />
         ))
       )}
