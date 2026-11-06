@@ -58,8 +58,9 @@ impl Sandbox {
             }
 
             // ponytail: a writable cache can be poisoned for the human's later runs; per-session
-            // overlays (bwrap >= 0.10 `--overlay`) when that matters.
-            for name in [".npm", ".cache"] {
+            // overlays (bwrap >= 0.10 `--overlay`) when that matters. Read-only, cargo cannot
+            // download a crate and the agent falls back to committing `cargo vendor` copies.
+            for name in [".npm", ".cache", ".cargo/registry", ".cargo/git"] {
                 let path = home.join(name);
                 if path.is_dir() {
                     writable.push(path);
@@ -743,6 +744,7 @@ mod tests {
         let data_dir = temp_dir();
         std::fs::create_dir_all(home.join(".ssh")).unwrap();
         std::fs::write(home.join(".netrc"), "token").unwrap();
+        std::fs::create_dir_all(home.join(".cargo/registry")).unwrap();
 
         let prefs = SandboxPrefs {
             enabled: true,
@@ -768,7 +770,7 @@ mod tests {
         assert!(!hidden_dirs.contains(&home.join(".aws")));
         assert!(hidden_files.contains(&home.join(".netrc")));
         assert!(!hidden_files.contains(&home.join(".npmrc")));
-        assert!(writable.is_empty());
+        assert_eq!(writable, vec![home.join(".cargo/registry")]);
         assert!(read_only.is_empty());
         assert!(mounts.is_empty());
 
