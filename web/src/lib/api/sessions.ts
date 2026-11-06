@@ -307,6 +307,8 @@ export interface CriterionView {
   status: CriterionStatus;
   /** Its check passed before any change (last preflight, verified). */
   passedBefore: boolean;
+  /** Its check only searches the code: it proves the code exists, not that it works (verified). */
+  existenceOnly: boolean;
 }
 
 /** A choice an agent recorded with record_decision: indicative. */
