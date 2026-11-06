@@ -41,6 +41,7 @@ import { ScannersSection } from '../components/settings/ScannersSection';
 import { PluginsSection } from '../components/settings/PluginsSection';
 import { SkillsSection } from '../components/settings/SkillsSection';
 import { WorkflowsSection } from '../components/settings/WorkflowsSection';
+import { VersionSection } from '../components/settings/VersionSection';
 import { useT } from '../i18n';
 import type { MsgKey } from '../i18n/messages';
 
@@ -57,7 +58,7 @@ interface SettingsPageProps {
   onListing: (listing: ProviderListing) => void;
 }
 
-type SettingsTab = 'models' | 'behaviour' | 'security' | 'plugins' | 'library' | 'display';
+type SettingsTab = 'models' | 'behaviour' | 'security' | 'plugins' | 'library' | 'display' | 'about';
 
 // Six groups, not twelve tabs: what tunes the model, how an agent behaves, what it is allowed to touch
 // (sandbox, scanners, the human's rules), the human's plugins, the catalogues of content (skills, workflows, agents, MCP) and the display.
@@ -67,7 +68,8 @@ const TABS: { id: SettingsTab; labelKey: MsgKey }[] = [
   { id: 'security', labelKey: 'settingsTabSecurity' },
   { id: 'plugins', labelKey: 'settingsTabPlugins' },
   { id: 'library', labelKey: 'settingsTabLibrary' },
-  { id: 'display', labelKey: 'settingsTabDisplay' }
+  { id: 'display', labelKey: 'settingsTabDisplay' },
+  { id: 'about', labelKey: 'settingsTabAbout' }
 ];
 
 /** The old per-section addresses (`#/settings/skills`) still open the group that holds the section. */
@@ -481,6 +483,8 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
                 />
               </>
             )}
+
+            {tab === 'about' && <VersionSection />}
 
           </form>
         </Card>
