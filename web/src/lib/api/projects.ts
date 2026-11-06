@@ -11,6 +11,8 @@ export interface Project {
   sessionWorktree?: boolean;
   /** Pinned by the human: the server lists favourites first. */
   favorite: boolean;
+  /** Place by recent activity alone, favourites ignored (0 = most recent): the "+" menu's order. */
+  recentRank: number;
   branch: string | null;
   remote: string | null;
   /** Opens the project in VS Code (through the WSL remote under WSL). */
