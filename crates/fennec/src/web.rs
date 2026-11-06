@@ -40,6 +40,7 @@ mod routes;
 mod rule_approval_routes;
 mod rule_bridge_routes;
 mod rule_routes;
+mod run_stats_backfill;
 mod server_routes;
 mod servers;
 mod session_delete;

@@ -34,6 +34,7 @@ pub fn serve(
         let seen = notifier.generation();
         let mut out = String::new();
         for (seq, payload) in store.events_after(id, last)? {
+            let payload = super::run_stats_backfill::backfilled(store, id, seq, payload);
             // Payloads are single-line JSON: serde_json never emits raw newlines.
             out.push_str(&format!("id: {seq}\ndata: {payload}\n\n"));
             last = seq;
