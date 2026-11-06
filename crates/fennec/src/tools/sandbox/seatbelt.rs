@@ -32,7 +32,7 @@ pub(super) fn seatbelt_args(sandbox: &Sandbox, workdir: &Path) -> Vec<OsString> 
             args.push(OsString::from("-D"));
             args.push(param("WORKDIR", &workdir));
             args.push(OsString::from("-D"));
-            args.push(param("TMPDIR", &canonicalize(std::env::temp_dir())));
+            args.push(param("TMPDIR", &canonicalize(private_tmp(&workdir))));
 
             for (i, path) in hidden_dirs.iter().enumerate() {
                 args.push(OsString::from("-D"));
@@ -65,6 +65,21 @@ pub(super) fn probe() -> std::io::Result<std::process::Output> {
         .output()
 }
 
+/// The workdir's own temp dir, the only one its commands may write (`TMPDIR` points there): bwrap
+/// gives each command a fresh /tmp, Seatbelt cannot, and the host's temp dir holds other files.
+/// ponytail: kept across commands of the same workdir and never removed (macOS purges old temp
+/// files); a fresh dir per command if a stale file ever matters.
+pub(super) fn private_tmp(workdir: &Path) -> PathBuf {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    canonicalize(workdir).hash(&mut hasher);
+    let dir = std::env::temp_dir()
+        .join("fennec-sandbox")
+        .join(format!("{:016x}", hasher.finish()));
+    let _ = std::fs::create_dir_all(&dir);
+    dir
+}
+
 fn canonicalize(path: impl AsRef<Path>) -> PathBuf {
     let path = path.as_ref();
     std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
@@ -94,8 +109,8 @@ fn build_profile(
         "  (literal \"/dev/null\") (literal \"/dev/zero\") (literal \"/dev/tty\") (literal \"/dev/dtracehelper\")\n",
     );
     profile.push_str("  (regex #\"^/dev/fd/\")\n");
-    // ponytail: unlike bwrap's private /tmp, the temp dirs are the host's, shared with other processes; a per-session TMPDIR if that matters.
-    profile.push_str("  (subpath \"/private/tmp\") (subpath (param \"TMPDIR\")))\n");
+    // Not /tmp: it is the host's, shared with every process. Commands get their own TMPDIR.
+    profile.push_str("  (subpath (param \"TMPDIR\")))\n");
     profile.push_str("(allow file-write* (subpath (param \"WORKDIR\")))\n");
 
     for i in 0..hidden_dirs.len() {

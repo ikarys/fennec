@@ -238,6 +238,6 @@ opens the whole file in VS Code. The server parses the hunks and only diffs a pa
 
 macOS sandbox, done: on macOS the commands' sandbox world (secrets hidden, protected files read-only, network
 cut or not) is rendered as a Seatbelt profile run by `/usr/bin/sandbox-exec`, every path passed as a parameter;
-the main checkout's dependency directories are linked into a worktree instead of mounted. Known gaps: the host's
-temp dirs stay shared, a protected file's parent directory can be renamed (`tools/sandbox/seatbelt.rs`,
+the main checkout's dependency directories are linked into a worktree instead of mounted. Commands write their own
+TMPDIR, not /tmp. Known gap: a protected file's parent directory can be renamed (`tools/sandbox/seatbelt.rs`,
 `tools/sandbox.rs`, `turn_build.rs`).

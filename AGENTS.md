@@ -248,7 +248,7 @@ tests.
    repository: with the sandbox off a command could push, move or delete a branch, and `git push` reaches the remote
    even sandboxed when the network is on. The kernel's own block rules (`domain/kernel_rules.rs`: `git push`,
    `update-ref`, `branch -D`, `worktree`, `gh pr merge`…) refuse those commands before they run, with the same
-   token-matching limits as the human's rules. On macOS (Seatbelt) the host's temp dirs stay shared with commands,
+   token-matching limits as the human's rules. On macOS (Seatbelt) commands write their own TMPDIR, never /tmp,
    and renaming a protected file's parent directory is not refused (the review gate sees the change).
 
 ## Build, test, run

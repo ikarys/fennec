@@ -107,7 +107,7 @@ An idea is framed in a read-only plan session, then the human approves the plan 
 ## Platforms
 
 - Linux x86_64 and aarch64: full support; the command sandbox is bubblewrap.
-- macOS Apple Silicon and Intel: binaries and launchd service; the command sandbox is Seatbelt (`sandbox-exec`, part of macOS). It hides the same secrets and cuts the same network; the host's temp dirs stay shared, and a protected file's parent directory can be renamed (the review gate still sees the file changed).
+- macOS Apple Silicon and Intel: binaries and launchd service; the command sandbox is Seatbelt (`sandbox-exec`, part of macOS). It hides the same secrets and cuts the same network; commands write their own `TMPDIR`, not `/tmp`, and a protected file's parent directory can be renamed (the review gate still sees the file changed).
 - Windows: through WSL2 only, with the same `install.sh`, the browser on Windows opens http://127.0.0.1:7777.
 
 Why not native Windows: fennec's security model rests on the command sandbox: what a model writes runs with the system read-only, the human's secrets (`~/.ssh`, cloud credentials) hidden and no network by default. Linux has bubblewrap and macOS has Seatbelt for that; Windows has no equivalent that an unprivileged program can set up as simply (AppContainer and job objects cover only part of it). Shipping fennec on Windows without that wall would break the promise the review gate relies on; WSL2 gives Windows users the Linux sandbox today. Native Windows can come back if a sound sandbox does.

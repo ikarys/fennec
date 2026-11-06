@@ -250,6 +250,7 @@ impl Sandbox {
         let mut sandbox_exec = Command::new(seatbelt::SANDBOX_EXEC);
         sandbox_exec
             .args(seatbelt::seatbelt_args(self, workdir))
+            .env("TMPDIR", seatbelt::private_tmp(workdir))
             .current_dir(cwd);
         // bwrap sets these with --setenv; Seatbelt has no such flag.
         if let Sandbox::On { network: false, .. } = self {
