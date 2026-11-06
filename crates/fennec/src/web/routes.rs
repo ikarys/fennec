@@ -14,8 +14,8 @@ use super::{
     event_stream, file_manager, folder_routes, idea_routes, indicator_routes, integration,
     mcp_oauth_routes, mcp_routes, model_routes, plugin_routes, project_dashboard, project_delete,
     project_list_routes, project_routes, rule_approval_routes, rule_bridge_routes, rule_routes,
-    server_routes, servers, session_delete, session_routes, settings_routes, terminal,
-    update_routes, waiver_routes, workflow_routes, worktree_routes,
+    server_routes, servers, session_delete, session_routes, settings_routes, setup_routes,
+    terminal, update_routes, waiver_routes, workflow_routes, worktree_routes,
 };
 use serde_json::json;
 use std::net::TcpStream;
@@ -44,6 +44,7 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
             }),
         ),
         ("GET", ["api", "settings"]) => settings_routes::get_settings(app, stream),
+        ("GET", ["api", "setup"]) => setup_routes::serve(app, stream),
         ("GET", ["api", "insight"]) => super::insight::serve(app, req, stream),
         ("GET", ["api", "notices"]) => super::notice_stream::serve(app, stream),
         ("POST", ["api", "settings"]) => settings_routes::save_settings(app, req, stream),

@@ -59,6 +59,7 @@ pub mod server;
 pub mod server_config;
 pub mod session_name;
 pub mod session_skills;
+pub mod setup;
 pub mod skill;
 pub mod slash;
 pub mod stats;

@@ -203,6 +203,7 @@ read-only. The human edits them as usual.
 - `POST /api/server` `{port}` → the same view: writes the port to `settings.yaml` (1024..=65535, else 400), applied at the
   next start
 - `POST /api/server/restart` `{}` → 202 `{restarting}`: the server re-executes itself, same arguments; 409 while a turn runs
+- `GET /api/setup` → `{checks: [{id: model|sandbox|git|project|scanners, status: ok|todo|warn, detail}], complete}`: the first-run checklist, probed on each call (verified); `todo` is required and missing, `warn` works but deserves a look (sandbox off, scanners missing); `complete` when no check is `todo`. `fennec doctor` prints the same checks.
 - `GET /api/settings` → `{preferences, listings, defaults, skills, optInWorkflows, scanners, sandboxHealth, mcpTools}`
   - `mcpTools`: `{<server name>: [{name, access: read|write|destructive|undeclared, tokens}]}`, each cached
     MCP tool's access as its server declares it in its annotations (indicative, not verified;
