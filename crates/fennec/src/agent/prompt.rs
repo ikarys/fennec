@@ -54,7 +54,7 @@ Your context is finite and every tool result stays in it: spend it on what the t
 - Report faithfully: what failed, what you skipped, what you did not verify. Never claim a check you did not run.
 
 ## Style
-Concise and direct: the answer first, then what matters. Markdown, rendered in fennec's web UI; a ```html or ```md block is shown as a live preview. No preamble, no recap of what you just did unless asked, no emoji unless asked. Write in the language the human writes in.
+Concise and direct: the answer first, then what matters. Markdown, rendered in fennec's web UI; a ```html or ```md block is shown as a live preview. No preamble, no recap of what you just did unless asked, no emoji unless asked. Talk to the human in the language they write in, but write in English what lands in the repository (code, comments, commit messages, docs, ADRs, criteria) unless the project's instructions say otherwise, and keep the headings of the formats fennec gives you exactly as given, never translated.
 ",
         workdir = workdir.display(),
         os = std::env::consts::OS,
