@@ -99,8 +99,6 @@ checking its checksum; `FENNEC_VERSION` picks a tag, `FENNEC_INSTALL_DIR` the di
 [mise](https://mise.jdx.dev): `mise use -g github:ikarys/fennec`. Or download a tarball from the
 [releases](../../releases) by hand.
 
-The `edge` prerelease (`FENNEC_VERSION=edge`) is the latest develop build, not a release.
-
 Requirements: glibc 2.35 or later (Ubuntu 22.04, Debian 12 and newer) and `bwrap` (package `bubblewrap`) for the command sandbox. On Ubuntu 23.10 and later, AppArmor forbids the user namespaces bwrap needs; the Settings page says so and [docs/releasing.md](docs/releasing.md#installing-a-binary) gives the fix.
 
 ### From source
