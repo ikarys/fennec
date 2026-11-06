@@ -28,7 +28,6 @@ function ServerCard({
   index,
   server,
   connecting,
-  saved,
   onPatch,
   onRemove,
   onConnect,
@@ -37,7 +36,6 @@ function ServerCard({
   index: number;
   server: McpServer;
   connecting: boolean;
-  saved: boolean;
   onPatch: (patch: Partial<McpServer>) => void;
   onRemove: () => void;
   onConnect: () => void;
@@ -105,8 +103,8 @@ function ServerCard({
               size="sm"
               iconOnly
               onClick={onAuthorize}
-              disabled={connecting || server.name === '' || !saved}
-              title={!saved ? t('mcpSaveFirst') : t('mcpAuthorize')}
+              disabled={connecting || server.name === ''}
+              title={t('mcpAuthorize')}
               aria-label={t('mcpAuthorize')}
             >
               <KeyIcon className="h-4 w-4" />
@@ -116,8 +114,7 @@ function ServerCard({
             variant="soft"
             size="sm"
             onClick={onConnect}
-            disabled={connecting || server.name === '' || !saved}
-            title={!saved ? t('mcpSaveFirst') : undefined}
+            disabled={connecting || server.name === ''}
           >
             {connecting ? t('mcpConnecting') : t('mcpConnect')}
           </Button>
@@ -196,12 +193,10 @@ function ServerCard({
 export function McpSection({
   value,
   onChange,
-  savedNames,
   save
 }: {
   value: McpServer[];
   onChange: (value: McpServer[]) => void;
-  savedNames: Set<string>;
   /** The group's own save: its dot and its "Save". */
   save?: SectionSave;
 }) {
@@ -213,12 +208,18 @@ export function McpSection({
     onChange(value.map((server, i) => (i === index ? { ...server, ...p } : server)));
   }
 
+  /** The server's form, saved first if edited: the server reads it from the store. */
+  async function saveFirst() {
+    if (save?.dirty) await save.onSave();
+  }
+
   async function connect(index: number) {
     const name = value[index].name;
     if (name === '') return;
     setConnecting(index);
     setError(null);
     try {
+      await saveFirst();
       const { server } = await connectMcp(name);
       patch(index, { cachedTools: server.cachedTools });
     } catch (e) {
@@ -230,13 +231,19 @@ export function McpSection({
 
   async function authorize(index: number) {
     setError(null);
+    // Opened during the click: a tab opened after the awaits would be blocked.
+    const tab = window.open('', '_blank');
+    if (tab) tab.opener = null;
     try {
+      await saveFirst();
       const { url } = await authorizeMcp(value[index].name);
       // The consent happens in another tab; when the human comes back, the
       // tokens are stored and a connect loads the tools into this form.
       window.addEventListener('focus', () => void connect(index), { once: true });
-      window.open(url, '_blank', 'noopener');
+      if (tab) tab.location.href = url;
+      else window.open(url, '_blank', 'noopener');
     } catch (e) {
+      tab?.close();
       setError(e instanceof Error ? e.message : String(e));
     }
   }
@@ -262,7 +269,6 @@ export function McpSection({
             index={index}
             server={server}
             connecting={connecting === index}
-            saved={savedNames.has(server.name)}
             onPatch={(p) => patch(index, p)}
             onRemove={() => onChange(value.filter((_, i) => i !== index))}
             onConnect={() => connect(index)}
