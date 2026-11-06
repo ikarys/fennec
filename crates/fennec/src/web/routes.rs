@@ -10,12 +10,12 @@ use super::audit_routes;
 use super::http::{Request, error, send, send_json};
 use super::proposal_routes;
 use super::{
-    assets, backlog_routes, budget_routes, canvas_routes, contribution_routes, event_stream,
-    file_manager, folder_routes, idea_routes, indicator_routes, integration, mcp_routes,
-    model_routes, plugin_routes, project_dashboard, project_delete, project_list_routes,
-    project_routes, rule_approval_routes, rule_bridge_routes, rule_routes, server_routes, servers,
-    session_delete, session_routes, settings_routes, terminal, update_routes, waiver_routes,
-    workflow_routes, worktree_routes,
+    assets, backlog_routes, budget_routes, canvas_routes, contribution_routes, diff_routes,
+    event_stream, file_manager, folder_routes, idea_routes, indicator_routes, integration,
+    mcp_routes, model_routes, plugin_routes, project_dashboard, project_delete,
+    project_list_routes, project_routes, rule_approval_routes, rule_bridge_routes, rule_routes,
+    server_routes, servers, session_delete, session_routes, settings_routes, terminal,
+    update_routes, waiver_routes, workflow_routes, worktree_routes,
 };
 use serde_json::json;
 use std::net::TcpStream;
@@ -214,6 +214,7 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         ("GET", ["api", "sessions", id, "integration"]) => {
             integration::get_integration(app, stream, id)
         }
+        ("GET", ["api", "sessions", id, "diff"]) => diff_routes::get_diff(app, req, stream, id),
         ("POST", ["api", "sessions", id, "integration", "message"]) => {
             integration::suggest_message(app, stream, id)
         }
