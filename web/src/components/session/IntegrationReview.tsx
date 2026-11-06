@@ -1,5 +1,5 @@
-// What the integration dialog shows of a branch before the human decides: its commits, its files in
-// the review order with their signals, its criteria and the decisions the agent recorded.
+// What the integration dialog shows of a branch before the human decides: its commits, what its
+// files signal, its criteria and the decisions the agent recorded.
 import type { IntegrationPreview, ReviewSignal } from '../../lib/api';
 import { DecisionList } from './DecisionList';
 import { CriterionProvenanceBadge, PassedBeforeBadge, criterionDotClass } from './CriteriaSection';
@@ -74,6 +74,10 @@ interface IntegrationReviewProps {
 
 export function IntegrationReview({ preview, projectId, narrating, onNarrate, understandingBusy, onUnderstand }: IntegrationReviewProps) {
   const t = useT();
+  const signals = [...new Set(preview.files.flatMap((file) => file.signals))].filter(
+    (signal): signal is Exclude<ReviewSignal, 'protected'> => signal !== 'protected',
+  );
+  const carried = preview.files.some((file) => file.carried);
   return (
     <>
       <section className="flex flex-col gap-1.5">
@@ -110,7 +114,6 @@ export function IntegrationReview({ preview, projectId, narrating, onNarrate, un
           )}
           {preview.files.length > 0 && (
             <>
-              <span className="ml-2 text-xs text-muted">{t('reviewOrder')}</span>
               <Badge tone="ok" className="ml-1.5" title={t('verifiedFromLog')}>
                 {t('verified')}
               </Badge>
@@ -153,50 +156,22 @@ export function IntegrationReview({ preview, projectId, narrating, onNarrate, un
         {preview.files.length === 0 ? (
           <div className="text-xs text-muted">{t('noFilesPlain')}</div>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-border bg-raised">
-            {preview.commonSignals.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-3 py-1.5 text-xs text-muted">
-                <span>{t('allFiles')}</span>
-                {preview.commonSignals.map((signal) =>
-                  signal === 'protected' ? null : (
-                    <Badge key={signal} tone={SIGNAL_KEYS[signal].tone} title={t(SIGNAL_KEYS[signal].title)}>
-                      {t(SIGNAL_KEYS[signal].label)}
-                    </Badge>
-                  ),
-                )}
-              </div>
-            )}
-            <div className="divide-y divide-border">
-              {preview.files.map((file) => (
-                <div key={file.path} className="group flex items-center gap-2 px-3 py-2 font-mono text-xs transition-colors hover:bg-accent-soft">
-                  <span
-                    className="min-w-0 grow overflow-hidden text-left text-ellipsis whitespace-nowrap text-text group-hover:text-accent-strong"
-                    title={file.path}
-                  >
-                    {file.path}
-                  </span>
-                  {file.protected && <Badge tone="err">{t('protectedBadge')}</Badge>}
-                  {file.carried && (
-                    <Badge
-                      tone="accent"
-                      title={t('carriedTitle')}
-                    >
-                      {t('carriedBadge')}
-                    </Badge>
-                  )}
-                  {file.signals.map((signal) =>
-                    signal === 'protected' || preview.commonSignals.includes(signal) ? null : (
-                      <Badge key={signal} tone={SIGNAL_KEYS[signal].tone} title={t(SIGNAL_KEYS[signal].title)}>
-                        {t(SIGNAL_KEYS[signal].label)}
-                      </Badge>
-                    ),
-                  )}
-                  <span className="shrink-0 tabular-nums text-ok">+{file.added}</span>
-                  <span className="shrink-0 tabular-nums text-err">−{file.removed}</span>
-                </div>
+          // The files themselves are listed in the side panel; the dialog keeps what the branch's
+          // files signal, so the review's warnings are seen before the decision.
+          (signals.length > 0 || carried) && (
+            <div className="flex flex-wrap items-center gap-1.5 text-xs">
+              {carried && (
+                <Badge tone="accent" title={t('carriedTitle')}>
+                  {t('carriedBadge')}
+                </Badge>
+              )}
+              {signals.map((signal) => (
+                <Badge key={signal} tone={SIGNAL_KEYS[signal].tone} title={t(SIGNAL_KEYS[signal].title)}>
+                  {t(SIGNAL_KEYS[signal].label)}
+                </Badge>
               ))}
             </div>
-          </div>
+          )
         )}
       </section>
 
