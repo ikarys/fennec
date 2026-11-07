@@ -4,12 +4,15 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Section, type SectionSave } from '../ui/Section';
 import { SectionLabel } from '../ui/SectionLabel';
-import { ChevronRightIcon, CloseIcon, HeartIcon, PinIcon, StarIcon } from '../ui/Icons';
+import { ChevronRightIcon, CloseIcon, HeartIcon, InfoIcon, PinIcon, StarIcon } from '../ui/Icons';
 import { FieldRow, Select, TextInput } from '../ui/Field';
 import { ModelProbe } from './ModelProbe';
 import { billedByDefault, percentFromFraction } from '../../lib/settingsForm';
 import { useLang, useT } from '../../i18n';
 import { t, type Lang, type MsgKey } from '../../i18n/messages';
+
+// The README section a billed flag's info icon opens.
+const BILLING_DOC_URL = 'https://github.com/ikarys/fennec#budgets-and-billed-models';
 
 export interface ModelForm {
   maxTokens: string;
@@ -296,17 +299,26 @@ function ModelRow({
                 className="w-full"
               />
             </FieldRow>
-            <label className="flex items-center gap-2 text-sm col-span-full">
-              <input
-                type="checkbox"
-                checked={billing[key] ?? billedByDefault(providerId)}
-                onChange={(event) => onToggleBilled(key, event.target.checked)}
-              />
-              <span>
+            <div className="col-span-full flex items-center gap-1.5 text-sm">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={billing[key] ?? billedByDefault(providerId)}
+                  onChange={(event) => onToggleBilled(key, event.target.checked)}
+                />
                 {t('billedLabel')}
-                <span className="block text-xs text-faint">{t('billedHint')}</span>
-              </span>
-            </label>
+              </label>
+              <a
+                href={BILLING_DOC_URL}
+                target="_blank"
+                rel="noreferrer"
+                title={t('billedHint')}
+                aria-label={t('billedHint')}
+                className="text-faint hover:text-accent"
+              >
+                <InfoIcon className="h-3.5 w-3.5" />
+              </a>
+            </div>
           </div>
 
           {model !== null && (
