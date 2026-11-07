@@ -320,6 +320,13 @@ export interface DecisionView {
   alternatives: string[];
 }
 
+export interface CriteriaTally {
+  total: number;
+  passed: number;
+  failed: number;
+  indicative: number;
+}
+
 /** The session's blocks folded by the server: the UI computes none. */
 export interface ServedThread {
   pendingApproval: PendingApproval | null;
@@ -328,6 +335,8 @@ export interface ServedThread {
   queued: QueuedMessage[];
   /** The criteria in force: the last criteria.set and the updates since. */
   criteria: CriterionView[];
+  /** How the criteria stand, counted by the server; `indicative` counts the passes an agent judged. */
+  criteriaTally: CriteriaTally;
   decisions: DecisionView[];
   /** The ids of the messages the human may replay: typed, in the model's current view. */
   replayable: string[];
