@@ -1,21 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { addPlannedIdea, frameIdea, framingPrefill, listIdeas, markIdeaReady } from "../lib/ideas";
+import { addPlannedIdea, frameIdea, markIdeaReady } from "../lib/ideas";
 import type {
   AttachmentInput,
-  McpSessionView,
   Project,
   SessionDetail,
   SessionState,
 } from "../lib/api";
-import type { AssistantItem, Segment } from "../lib/fold";
-import { splitContract } from "../lib/plan";
+import { lastHumanMessage, planSourceOf } from "../lib/plan";
 import {
   createSession,
-  getDraftMcp,
   getSession,
-  getSessionMcp,
   sendMessage,
-  setSessionMcp,
   startWorkflow,
 } from "../lib/api";
 import { readImages } from "../lib/attachments";
@@ -29,6 +24,8 @@ import { useModeAndModel } from "../hooks/useModeAndModel";
 import { useScrollFollow } from "../hooks/useScrollFollow";
 import { useSessionActions } from "../hooks/useSessionActions";
 import { useWorkflowActions } from "../hooks/useWorkflowActions";
+import { useSessionMcp } from "../hooks/useSessionMcp";
+import { useComposerPrefill } from "../hooks/useComposerPrefill";
 import { Composer } from "../components/session/Composer";
 import { RunningStrip } from "../components/session/RunningStrip";
 import { modelShortName } from "../components/session/ModelPicker";
@@ -136,8 +133,6 @@ export function SessionPage({
   const [integrationOpen, setIntegrationOpen] = useState(false);
   const [tryOpen, setTryOpen] = useState(false);
   const [integrationVersion, setIntegrationVersion] = useState(0);
-  const [mcpView, setMcpView] = useState<McpSessionView | null>(null);
-  const [draftMcpDisabled, setDraftMcpDisabled] = useState<string[] | null>(null);
   const {
     view,
     hasMore,
@@ -273,60 +268,7 @@ export function SessionPage({
     };
   }, [sessionId, detailVersion]);
 
-  // The composer's MCP dropdown: the session's effective MCP state, refetched
-  // when the session changes or a turn ends (a global flip on the Settings
-  // page shows up on the next turn), the toggle handler updates it directly.
-  // A draft asks for the view the first turn would get, so the picker is not
-  // empty before the session exists.
-  useEffect(() => {
-    let active = true;
-    if (!sessionId) {
-      setDraftMcpDisabled(null);
-      getDraftMcp(null)
-        .then((data) => {
-          if (active) setMcpView(data);
-        })
-        .catch(() => {
-          if (active) setMcpView(null);
-        });
-      return () => {
-        active = false;
-      };
-    }
-    getSessionMcp(sessionId)
-      .then((data) => {
-        if (active) setMcpView(data);
-      })
-      .catch(() => {
-        if (active) setMcpView(null);
-      });
-    return () => {
-      active = false;
-    };
-  }, [sessionId, detailVersion]);
-
-  function handleMcpToggle(name: string, active: boolean) {
-    if (!mcpView) return;
-    // The disabled set is the full set (last wins), so it must include hidden
-    // servers too: a hidden server left out would silently turn on.
-    const disabled = mcpView.servers
-      .filter((server) => (server.name === name ? !active : !server.active))
-      .map((server) => server.name);
-    if (sessionId) {
-      setSessionMcp(sessionId, disabled)
-        .then(setMcpView)
-        .catch(() => {
-          // Keep the optimistic view; the next fetch corrects it.
-        });
-    } else {
-      setDraftMcpDisabled(disabled);
-      getDraftMcp(disabled)
-        .then(setMcpView)
-        .catch(() => {
-          // Keep the optimistic view; the next fetch corrects it.
-        });
-    }
-  }
+  const { mcpView, draftMcpDisabled, toggleMcp } = useSessionMcp(sessionId, detailVersion);
 
   useEffect(() => {
     // A workflow's first turn creates the worktree: re-read the detail when
@@ -343,52 +285,15 @@ export function SessionPage({
     }
   }, [sessionId]);
 
-  useEffect(() => {
-    if (!sessionId && projectId && frameIdeaId) {
-      const ideaId = frameIdeaId;
-      let ignore = false;
-      listIdeas(projectId)
-        .then((board) => {
-          if (ignore) return;
-          const idea = board.groups
-            .flatMap((group) => group.ideas)
-            .find((candidate) => candidate.id === ideaId);
-          if (idea) {
-            const prefill = framingPrefill(idea);
-            setText(prefill.text);
-            setAttachments(prefill.attachments);
-          }
-        })
-        .catch(() => {
-          // Ignore: the composer stays editable with an empty message.
-        });
-      return () => {
-        ignore = true;
-      };
-    }
-  }, [projectId, frameIdeaId, sessionId]);
-
-  // Read through a ref: the effect below runs once per source session, not
-  // on every render that recreates the handler.
-  const modeChangeRef = useRef(chooseAgent);
-  modeChangeRef.current = chooseAgent;
-  useEffect(() => {
-    if (!sessionId && fromSessionId) {
-      let ignore = false;
-      getSession(fromSessionId)
-        .then((source) => {
-          if (ignore || !source.agentSuggestion) return;
-          setText(source.agentSuggestion.brief);
-          void modeChangeRef.current(source.agentSuggestion.agent);
-        })
-        .catch(() => {
-          // Ignore: the composer stays editable with an empty message.
-        });
-      return () => {
-        ignore = true;
-      };
-    }
-  }, [fromSessionId, sessionId]);
+  useComposerPrefill({
+    sessionId,
+    projectId,
+    frameIdeaId,
+    fromSessionId,
+    chooseAgent,
+    setText,
+    setAttachments,
+  });
 
   useEffect(() => {
     if (view.pendingQuestion && !running) {
@@ -406,35 +311,7 @@ export function SessionPage({
   const title =
     view.name ?? detail?.title ?? (sessionId ? t('session') : isChat ? t('paletteNewChat') : t('newSession'));
 
-  const lastAssistant = [...view.items]
-    .reverse()
-    .find((item): item is AssistantItem => item.kind === "assistant");
-  const lastTextSegment = lastAssistant
-    ? [...lastAssistant.segments]
-        .reverse()
-        .find(
-          (segment): segment is Extract<Segment, { kind: "text" }> =>
-            segment.kind === "text",
-        )
-    : undefined;
-  const planContract = lastTextSegment
-    ? splitContract(lastTextSegment.content)
-    : null;
-  // The plan a plan agent recorded with propose_plan is a plan segment, not a
-  // text contract: it is the plan's canonical form, and it wins over any text.
-  const planSegment = lastAssistant
-    ? [...lastAssistant.segments].reverse().find(
-        (segment): segment is Extract<Segment, { kind: "plan" }> =>
-          segment.kind === "plan",
-      )
-    : undefined;
-  // The plan the actions point at: the segment's id, and the text sent as the
-  // workflow's plan and saved to the backlog.
-  const planSource = planSegment
-    ? { id: planSegment.id, content: planSegment.markdown }
-    : planContract?.contract.kind === "plan" && lastTextSegment
-      ? { id: lastTextSegment.id, content: lastTextSegment.content }
-      : null;
+  const planSource = planSourceOf(view.items);
   const planActions: PlanActions | null =
     planSource &&
     !running &&
@@ -612,13 +489,7 @@ export function SessionPage({
         workflows.some((workflow) => workflow.id === DEFAULT_WORKFLOW_ID) &&
         planSource
       ) {
-        const task =
-          [...view.items]
-            .reverse()
-            .find(
-              (item): item is Extract<typeof item, { kind: "user" }> =>
-                item.kind === "user" && !item.isSystemGenerated,
-            )?.content ?? t('sessionPageExecuteApprovedPlan');
+        const task = lastHumanMessage(view.items) ?? t('sessionPageExecuteApprovedPlan');
         await startWorkflow(
           sessionId,
           DEFAULT_WORKFLOW_ID,
@@ -966,7 +837,7 @@ export function SessionPage({
                         workflowSelection={workflowSelection}
                         onWorkflowSelectionChange={setWorkflowSelection}
                         mcpView={mcpView}
-                        onMcpToggle={handleMcpToggle}
+                        onMcpToggle={toggleMcp}
                       />
                     )}
                   </main>

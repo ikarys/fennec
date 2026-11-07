@@ -1,3 +1,5 @@
+import type { AssistantItem, Segment, ThreadItem } from './threadView';
+
 /** The plan and report contracts of the plan and builder agents (crates/fennec/agents/*.agent.md), read back for display. */
 
 export interface PlanStep {
@@ -345,4 +347,47 @@ export function splitContract(text: string): { before: string; contract: Plan | 
   const contract = kind === 'plan' ? parsePlan(title, lines.slice(start + 1)) : parseReport(title, lines.slice(start + 1));
   if (!contract) return null;
   return { before, contract };
+}
+
+/** The plan the session's actions point at: the last answer's plan segment, else its text plan contract. */
+export function planSourceOf(items: ThreadItem[]): { id: string; content: string } | null {
+  const lastAssistant = [...items]
+    .reverse()
+    .find((item): item is AssistantItem => item.kind === 'assistant');
+  const lastTextSegment = lastAssistant
+    ? [...lastAssistant.segments]
+        .reverse()
+        .find(
+          (segment): segment is Extract<Segment, { kind: 'text' }> =>
+            segment.kind === 'text'
+        )
+    : undefined;
+  const planContract = lastTextSegment
+    ? splitContract(lastTextSegment.content)
+    : null;
+  // The plan a plan agent recorded with propose_plan is a plan segment, not a
+  // text contract: it is the plan's canonical form, and it wins over any text.
+  const planSegment = lastAssistant
+    ? [...lastAssistant.segments].reverse().find(
+        (segment): segment is Extract<Segment, { kind: 'plan' }> =>
+          segment.kind === 'plan'
+      )
+    : undefined;
+  // The plan the actions point at: the segment's id, and the text sent as the
+  // workflow's plan and saved to the backlog.
+  return planSegment
+    ? { id: planSegment.id, content: planSegment.markdown }
+    : planContract?.contract.kind === 'plan' && lastTextSegment
+      ? { id: lastTextSegment.id, content: lastTextSegment.content }
+      : null;
+}
+
+/** The last message the human typed (not one fennec sent on their behalf). */
+export function lastHumanMessage(items: ThreadItem[]): string | undefined {
+  return [...items]
+    .reverse()
+    .find(
+      (item): item is Extract<typeof item, { kind: 'user' }> =>
+        item.kind === 'user' && !item.isSystemGenerated
+    )?.content;
 }
