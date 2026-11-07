@@ -504,7 +504,8 @@ read-only. The human edits them as usual.
   `carried` files' uncommitted content) with `git merge-tree`, makes one
   commit with `message` plus a `Fennec-Session: <session id>` trailer and one
   `Co-Authored-By: <model> <noreply@fennec.local>` per model that answered in the session or its child
-  sessions (`stats.model` of `message.done`, in order of first use), under
+  sessions (`stats.model` of `message.done`, in order of first use; none when the Settings preference
+  `integration.modelTrailers`, default true, is off), under
   the human's git identity, and moves the human's branch and tree to it with
   `git reset --keep` (other uncommitted work stays). A conflict leaves the
   repository untouched and answers 409

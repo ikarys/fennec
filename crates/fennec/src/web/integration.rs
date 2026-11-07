@@ -385,11 +385,14 @@ pub fn integrate(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> 
         Ok(gate) => gate,
         Err((status, message)) => return error(stream, status, &message),
     };
+    // The human may keep their commits free of model trailers (Settings).
     let mut models = Vec::new();
-    for session in store.session_tree(&gate.session_id)? {
-        for model in models_used(&store.events(&session)?) {
-            if !models.contains(&model) {
-                models.push(model);
+    if store.preferences()?.integration.model_trailers {
+        for session in store.session_tree(&gate.session_id)? {
+            for model in models_used(&store.events(&session)?) {
+                if !models.contains(&model) {
+                    models.push(model);
+                }
             }
         }
     }

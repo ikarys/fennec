@@ -35,6 +35,8 @@ pub struct Preferences {
     pub sandbox: SandboxPrefs,
     /// The ideas queue's caps when it runs with the human away.
     pub autonomy: AutonomyPrefs,
+    /// What fennec writes in the integration commit.
+    pub integration: IntegrationPrefs,
     /// Skill ids whose instructions every new session gets in its system prompt.
     pub always_on_skills: Vec<String>,
     /// Opt-in embedded workflows (`workflows::opt_in_defaults`) the human enabled.
@@ -83,6 +85,22 @@ impl Default for SandboxPrefs {
         SandboxPrefs {
             enabled: true,
             network: false,
+        }
+    }
+}
+
+/// `integration.modelTrailers`: one `Co-Authored-By` trailer per model that wrote the work; on by
+/// default, the human may keep their commits free of it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct IntegrationPrefs {
+    pub model_trailers: bool,
+}
+
+impl Default for IntegrationPrefs {
+    fn default() -> Self {
+        Self {
+            model_trailers: true,
         }
     }
 }
@@ -373,6 +391,12 @@ mod tests {
     fn search_prefs_stored_before_web_fetch_allow_it() {
         let search: SearchPrefs = serde_json::from_str(r#"{"searxngUrl":"http://s"}"#).unwrap();
         assert!(search.web_fetch);
+    }
+
+    #[test]
+    fn preferences_stored_before_model_trailers_keep_them_on() {
+        let prefs: Preferences = serde_json::from_str("{}").unwrap();
+        assert!(prefs.integration.model_trailers);
     }
 
     fn defaults() -> ModelParams {
