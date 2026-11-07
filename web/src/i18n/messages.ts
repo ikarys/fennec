@@ -392,6 +392,12 @@ export const en = {
   maxMinutesPerIdeaHint: '0: no limit.',
   maxTokensPerIdeaLabel: 'Max tokens per idea',
   maxTokensPerIdeaHint: 'Non-cached + generated tokens. 0: no limit.',
+  delegationTitle: 'Delegation',
+  delegationHint:
+    'An agent may hand a self-contained task to a read-only agent in a hidden child session and get back only its answer: its context stays small. Each delegation is a model run of its own.',
+  allowDelegation: 'Allow delegation',
+  maxDelegationsPerTurnLabel: 'Max delegations per turn',
+  maxDelegationsPerTurnHint: '0: no limit.',
   securityTitle: 'Security',
   scannersHint:
     'The "Security audit" agent runs the scanners it finds on your machine, then reads the code. fennec does not install them: copy the command and run it in your terminal, then reload this page. Those that query an online database (cargo audit, OSV-Scanner, Semgrep) need the network in the sandbox.',
@@ -1821,6 +1827,12 @@ export const fr: Record<MsgKey, string> = {
   maxMinutesPerIdeaHint: '0 : pas de limite.',
   maxTokensPerIdeaLabel: 'Tokens max par idée',
   maxTokensPerIdeaHint: 'Tokens non cachés + générés. 0 : pas de limite.',
+  delegationTitle: 'Délégation',
+  delegationHint:
+    "Un agent peut confier une tâche autonome à un agent en lecture seule dans une session enfant cachée et n'en recevoir que la réponse : son contexte reste petit. Chaque délégation est un passage modèle de plus.",
+  allowDelegation: 'Autoriser la délégation',
+  maxDelegationsPerTurnLabel: 'Délégations max par tour',
+  maxDelegationsPerTurnHint: '0 : pas de limite.',
   securityTitle: 'Sécurité',
   scannersHint:
     "L'agent « Security audit » lance les scanners qu'il trouve sur ta machine, puis lit le code. fennec ne les installe pas : copie la commande et lance-la dans ton terminal, puis recharge cette page. Ceux qui interrogent une base en ligne (cargo audit, OSV-Scanner, Semgrep) ont besoin du réseau dans le bac à sable.",

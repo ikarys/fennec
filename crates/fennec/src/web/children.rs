@@ -9,7 +9,7 @@ use crate::notifier::Notifier;
 use crate::store::SqliteStore;
 use crate::web::turns::with_turn;
 use std::path::Path;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 #[derive(Clone, Copy)]
 pub(super) struct Children<'a> {
@@ -20,11 +20,25 @@ pub(super) struct Children<'a> {
     pub(super) autonomous: bool,
     /// The turn is a `delegate` call's child: what it leaves for the human goes in its answer.
     pub(super) delegated: bool,
+    /// The delegations this turn started, counted against the Settings cap; None for a
+    /// workflow's children, which have no cap.
+    pub(super) delegations: Option<&'a AtomicU32>,
 }
 
 impl ChildSessions for Children<'_> {
     fn create(&self, parent_session_id: &str, title: &str) -> Result<String, String> {
         let store = SqliteStore::open(&self.settings.db_path)?;
+        // Count only the delegations a turn starts against the human's cap; workflow
+        // children have no counter.
+        if let Some(count) = self.delegations {
+            let max = store.preferences()?.delegation.max_per_turn;
+            if max > 0 && count.load(Ordering::Relaxed) >= max {
+                return Err(format!(
+                    "The human allows at most {max} delegations per turn (Settings). Do the rest of the task yourself."
+                ));
+            }
+            count.fetch_add(1, Ordering::Relaxed);
+        }
         Ok(store.create_child_session(parent_session_id, title)?)
     }
 

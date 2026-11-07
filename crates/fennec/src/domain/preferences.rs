@@ -35,6 +35,8 @@ pub struct Preferences {
     pub sandbox: SandboxPrefs,
     /// The ideas queue's caps when it runs with the human away.
     pub autonomy: AutonomyPrefs,
+    /// Whether agents may hand a task to another agent (`delegate`), and how often per turn.
+    pub delegation: DelegationPrefs,
     /// What fennec writes in the integration commit.
     pub integration: IntegrationPrefs,
     /// Skill ids whose instructions every new session gets in its system prompt.
@@ -120,6 +122,24 @@ impl Default for AutonomyPrefs {
         AutonomyPrefs {
             max_minutes_per_idea: 120,
             max_tokens_per_idea: 2_000_000,
+        }
+    }
+}
+
+/// `delegation.enabled` / `delegation.maxPerTurn`: the `delegate` tool, on by default.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct DelegationPrefs {
+    pub enabled: bool,
+    /// The delegations one turn may start; 0: no limit.
+    pub max_per_turn: u32,
+}
+
+impl Default for DelegationPrefs {
+    fn default() -> Self {
+        DelegationPrefs {
+            enabled: true,
+            max_per_turn: 5,
         }
     }
 }
@@ -391,6 +411,13 @@ mod tests {
     fn search_prefs_stored_before_web_fetch_allow_it() {
         let search: SearchPrefs = serde_json::from_str(r#"{"searxngUrl":"http://s"}"#).unwrap();
         assert!(search.web_fetch);
+    }
+
+    #[test]
+    fn preferences_stored_before_delegation_allow_it() {
+        let prefs: Preferences = serde_json::from_str("{}").unwrap();
+        assert!(prefs.delegation.enabled);
+        assert_eq!(prefs.delegation.max_per_turn, 5);
     }
 
     #[test]

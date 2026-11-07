@@ -3,6 +3,7 @@
 import type {
   ApiKey,
   AutonomyPrefs,
+  DelegationPrefs,
   IntegrationPrefs,
   DisplayPrefs,
   McpServer,
@@ -34,6 +35,7 @@ export interface SettingsForm {
   search: SearchForm;
   sandbox: SandboxPrefs;
   autonomy: AutonomyPrefs;
+  delegation: DelegationPrefs;
   integration: IntegrationPrefs;
   alwaysOnSkills: string[];
   enabledWorkflows: string[];
@@ -50,6 +52,7 @@ export type SaveGroup =
   | 'search'
   | 'sandbox'
   | 'autonomy'
+  | 'delegation'
   | 'integration'
   | 'skills'
   | 'workflows'
@@ -69,6 +72,7 @@ export const SAVE_GROUPS: Record<SaveGroup, { prefs: (keyof Preferences)[]; form
   search: { prefs: ['search'], form: ['search'] },
   sandbox: { prefs: ['sandbox'], form: ['sandbox'] },
   autonomy: { prefs: ['autonomy'], form: ['autonomy'] },
+  delegation: { prefs: ['delegation'], form: ['delegation'] },
   integration: { prefs: ['integration'], form: ['integration'] },
   skills: { prefs: ['alwaysOnSkills'], form: ['alwaysOnSkills'] },
   workflows: { prefs: ['enabledWorkflows'], form: ['enabledWorkflows'] },
@@ -188,6 +192,7 @@ export function toForm(preferences: Preferences, listings: ProviderListing[]): S
     },
     sandbox: preferences.sandbox ?? { enabled: true, network: false },
     autonomy: preferences.autonomy ?? { maxMinutesPerIdea: 120, maxTokensPerIdea: 2_000_000 },
+    delegation: preferences.delegation ?? { enabled: true, maxPerTurn: 5 },
     integration: preferences.integration ?? { modelTrailers: true },
     alwaysOnSkills: preferences.alwaysOnSkills ?? [],
     enabledWorkflows: preferences.enabledWorkflows ?? [],
@@ -281,6 +286,7 @@ export function buildPreferences(form: SettingsForm, settings: SettingsResponse)
     },
     sandbox: form.sandbox,
     autonomy: form.autonomy,
+    delegation: form.delegation,
     integration: form.integration,
     alwaysOnSkills: form.alwaysOnSkills,
     enabledWorkflows: form.enabledWorkflows,

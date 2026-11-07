@@ -52,6 +52,12 @@ export interface AutonomyPrefs {
   maxTokensPerIdea: number;
 }
 
+/** `delegation.enabled` / `delegation.maxPerTurn`: the `delegate` tool, on by default. */
+export interface DelegationPrefs {
+  enabled: boolean;
+  maxPerTurn: number;
+}
+
 export type ApiKey = { env: string } | { sealed: string } | { plain: string };
 
 export interface Provider {
@@ -103,6 +109,7 @@ export interface Preferences {
   /** fennec's bwrap world: how commands run. */
   sandbox?: SandboxPrefs;
   autonomy?: AutonomyPrefs;
+  delegation?: DelegationPrefs;
   integration?: IntegrationPrefs;
   /** Skill ids every new session gets in its system prompt. */
   alwaysOnSkills?: string[];
