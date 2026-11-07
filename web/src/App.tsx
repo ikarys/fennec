@@ -1,14 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react';
-import type { Project, ProviderListing, SettingsResponse } from './lib/api';
-import { createProject, getProjects, getSettings, setProjectFavorite } from './lib/api';
+import { createProject, setProjectFavorite } from './lib/api';
 import { applyTheme, getStoredTheme, type ThemeId } from './lib/theme';
 import { TopBar, type TabInfo } from './components/layout/TopBar';
 import {
-  ACTIVE_TAB_KEY,
   PAGE_TABS,
-  TABS_KEY,
-  loadActiveTab,
-  loadTabs,
   parseRoute,
   splitPath,
   tabIdForRoute,
@@ -26,6 +21,9 @@ import { DisplayPrefsProvider, defaultDisplayPrefs } from './lib/display';
 import { I18nProvider } from './i18n';
 import { t } from './i18n/messages';
 import type { Lang } from './i18n/messages';
+import { useSettings } from './hooks/useSettings';
+import { useProjects } from './hooks/useProjects';
+import { useTabs } from './hooks/useTabs';
 import { useTurnNotices } from './hooks/useTurnNotices';
 import { PluginsVersionContext } from './hooks/usePluginsVersion';
 import { StatusBar } from './components/layout/StatusBar';
@@ -37,12 +35,8 @@ const ChangesPage = lazy(() => import('./pages/ChangesPage'));
 
 export default function App() {
   const [route, setRoute] = useState<Route>(() => parseRoute(window.location.hash));
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [projectsLoading, setProjectsLoading] = useState(true);
-  const [projectsError, setProjectsError] = useState<string | null>(null);
-  const [settings, setSettings] = useState<SettingsResponse | null>(null);
-  const [tabs, setTabs] = useState<string[]>(() => loadTabs());
-  const [activeTabId, setActiveTabId] = useState<string | null>(() => loadActiveTab());
+  const { settings, handleSettingsSaved, handleListing } = useSettings();
+  const { tabs, setTabs, activeTabId, setActiveTabId, openTab } = useTabs();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [projectDialogOpen, setProjectDialogOpen] = useState(false);
   const [projectSubmitting, setProjectSubmitting] = useState(false);
@@ -61,29 +55,6 @@ export default function App() {
     applyTheme(theme);
   }, [theme]);
 
-  useEffect(() => {
-    // Only session tabs are persisted: page tabs are re-created by the
-    // route-sync effect from the URL on load, so a one-time visit to a page
-    // must not leave a permanent tab in the bar.
-    try {
-      localStorage.setItem(TABS_KEY, JSON.stringify(tabs.filter((id) => !id.startsWith('page:'))));
-    } catch {
-      // Ignore storage errors.
-    }
-  }, [tabs]);
-
-  useEffect(() => {
-    try {
-      if (activeTabId) {
-        localStorage.setItem(ACTIVE_TAB_KEY, activeTabId);
-      } else {
-        localStorage.removeItem(ACTIVE_TAB_KEY);
-      }
-    } catch {
-      // Ignore storage errors.
-    }
-  }, [activeTabId]);
-
   // A page route (settings, insight, workflows, backlog) gets its tab in the
   // bar the moment it is on screen, so the active page is never unlisted.
   const pageTabIdForRoute =
@@ -95,53 +66,13 @@ export default function App() {
       : null;
   useEffect(() => {
     if (!pageTabIdForRoute) return;
-    setTabs((previous) => (previous.includes(pageTabIdForRoute) ? previous : [...previous, pageTabIdForRoute]));
-    setActiveTabId(pageTabIdForRoute);
-  }, [pageTabIdForRoute]);
+    openTab(pageTabIdForRoute);
+  }, [pageTabIdForRoute, openTab]);
 
-  // `projectsLoading` is only the first load: a refresh keeps the list on
-  // screen instead of flashing a loading state.
   const displayPrefs = settings?.preferences.display ?? defaultDisplayPrefs;
   // The UI's language: the stored choice, else English (the default).
   const language: Lang = displayPrefs.language ?? 'en';
-  const refreshProjects = useCallback(async () => {
-    try {
-      const data = await getProjects();
-      setProjects(data);
-      setProjectsError(null);
-    } catch (error) {
-      setProjectsError(error instanceof Error ? error.message : t(language, 'projectsLoadError'));
-    } finally {
-      setProjectsLoading(false);
-    }
-  }, [language]);
-
-  useEffect(() => {
-    refreshProjects();
-  }, [refreshProjects]);
-
-  useEffect(() => {
-    getSettings()
-      .then(setSettings)
-      .catch(() => setSettings(null));
-  }, []);
-
-  const handleSettingsSaved = useCallback((next: SettingsResponse) => {
-    setSettings(next);
-  }, []);
-
-  // A provider listing refreshed on demand (the fetch button) replaces that
-  // provider's entry, or appends it when the provider was not listed yet.
-  const handleListing = useCallback((listing: ProviderListing) => {
-    setSettings((previous) => {
-      if (!previous) return previous;
-      const exists = previous.listings.some((item) => item.provider === listing.provider);
-      const listings = exists
-        ? previous.listings.map((item) => (item.provider === listing.provider ? listing : item))
-        : [...previous.listings, listing];
-      return { ...previous, listings };
-    });
-  }, []);
+  const { projects, projectsLoading, projectsError, refreshProjects } = useProjects(language);
 
   // No polling: the list refreshes when the human looks at it (home, project,
   // palette) and when a turn starts or ends; F5 does the rest.
@@ -214,11 +145,10 @@ export default function App() {
 
   const openSession = useCallback(
     (sessionId: string) => {
-      setTabs((previous) => (previous.includes(sessionId) ? previous : [...previous, sessionId]));
-      setActiveTabId(sessionId);
+      openTab(sessionId);
       navigate(`#/s/${encodeURIComponent(sessionId)}`);
     },
-    [navigate]
+    [navigate, openTab]
   );
   const { items: attention, pluginsVersion } = useTurnNotices(openSession);
 
@@ -265,11 +195,10 @@ export default function App() {
         return;
       }
       const pseudoId = `new:${targetProjectId}`;
-      setTabs((previous) => (previous.includes(pseudoId) ? previous : [...previous, pseudoId]));
-      setActiveTabId(pseudoId);
+      openTab(pseudoId);
       navigate(`#/new/${encodeURIComponent(targetProjectId)}`);
     },
-    [navigate, projects]
+    [navigate, projects, openTab]
   );
 
   // The `+` of the bar: the project of the session on screen, else the most recent one.
