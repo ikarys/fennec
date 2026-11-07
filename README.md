@@ -72,7 +72,7 @@ An idea is framed in a read-only plan session, then the human approves the plan 
 
 - Criteria: the approved plan's "Done when" list is the run's contract; a `criteria` node runs each `check:` command itself, and agent nodes with `verdicts` judge the others.
 - Protected files: fennec defaults and project `.agents/protected` are refused to file tools and mounted read-only in the sandbox.
-- Integration: the "Intégrer" button runs a cherry-pick of a session's worktree branch into the human's repository after a review gate.
+- Integration: the "Intégrer" button runs a cherry-pick of a session's worktree branch into the human's repository after a review gate. Git hooks do not run on it (see "Security model").
 - Review gate blockers include commits, files, criteria, protected files touched, architecture violations, and bypass detection.
 - Bypass detection flags added lines that silence a lint, type check, or test, and tests or assertions removed on balance.
 - Architecture guard: `.agents/architecture` rules are checked on lines an integration adds; a violation is a blocker.
@@ -184,6 +184,8 @@ These are defaults: the Settings page adds providers and overrides parameters pe
 
 - The human owns the CLI/UI and configuration; fennec never blocks them.
 - The code that decides, such as integration, never runs what a model wrote.
+- **Git hooks do not run on fennec's own git commands.** Every git command fennec runs itself (the commit that saves each turn's work in its worktree, the integration's cherry-pick and commit, status and diffs) passes `-c core.hooksPath=/dev/null -c core.fsmonitor=false`: a hook or fsmonitor in a repository may have been written by a model, and fennec's kernel never executes one. Your hooks still run on your own `git commit`; if a check matters (a commit-message format, a linter), run it in your own workflow after integrating, or make it a criterion's `check:` command.
+- Git's metadata (`.git`) is read-only inside the command sandbox and refused to the file tools, with no waiver: an agent cannot change the repository's config, hooks or refs through them.
 - Model output is untrusted. Commands run in a sandbox (bubblewrap on Linux, Seatbelt on macOS) unless the human turns it off; protected files are refused to file tools and read-only in the sandbox.
 - The server only answers local pages: `Host` and `Origin` must be `127.0.0.1` or `localhost` and POST bodies must be JSON, so no web page can drive the agent.
 - Known gap: the file tools run in fennec's process behind a working-directory guard, and a command can create a new file matching a protected pattern where none existed; the review gate is there to catch it.

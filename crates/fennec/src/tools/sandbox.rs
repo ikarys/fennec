@@ -357,6 +357,13 @@ fn is_secret_name(name: &str) -> bool {
     MARKERS.iter().any(|marker| upper.contains(marker)) || upper.starts_with("AWS_")
 }
 
+/// The workdir's git metadata (`.git` directory in a checkout, `gitdir:` file
+/// in a worktree); `None` when the workdir has no git metadata.
+pub(super) fn git_metadata(workdir: &Path) -> Option<PathBuf> {
+    let dot_git = workdir.join(".git");
+    dot_git.symlink_metadata().ok().map(|_| dot_git)
+}
+
 /// The bwrap world, everything up to (and including) `--chdir cwd`; the
 /// command tail after `--` is added by the caller, so a `sh -c` string and a
 /// bare program+args (the MCP stdio client) share the same world.
@@ -419,6 +426,14 @@ fn bwrap_world_args(sandbox: &Sandbox, workdir: &Path, cwd: &Path) -> Vec<OsStri
         args.push(OsString::from("--ro-bind"));
         args.push(src.as_os_str().to_os_string());
         args.push(dst.as_os_str().to_os_string());
+    }
+
+    // Git's own metadata is read-only inside the sandbox: a model must not be
+    // able to plant hooks or an fsmonitor that the host's git later runs.
+    if let Some(dot_git) = git_metadata(workdir) {
+        args.push(OsString::from("--ro-bind"));
+        args.push(dot_git.as_os_str().to_os_string());
+        args.push(dot_git.as_os_str().to_os_string());
     }
 
     // Later mounts win: protected paths stay read-only inside the writable
@@ -706,6 +721,40 @@ mod tests {
                 "echo hi",
             ]
         );
+    }
+
+    #[test]
+    fn bwrap_args_ro_bind_git_metadata_after_the_workdir_bind() {
+        let workdir = temp_dir();
+        std::fs::create_dir_all(workdir.join(".git")).unwrap();
+        let args = bwrap_args(
+            &Sandbox::On {
+                network: false,
+                hidden_dirs: vec![],
+                hidden_files: vec![],
+                writable: vec![],
+                read_only: vec![],
+                mounts: vec![],
+            },
+            &workdir,
+            &workdir,
+            "echo hi",
+        );
+        let args = args_as_strings(&args);
+        let workdir_str = workdir.to_string_lossy().into_owned();
+        let dot_git = format!("{workdir_str}/.git");
+
+        let expected = [
+            "--bind".to_string(),
+            workdir_str.clone(),
+            workdir_str,
+            "--ro-bind".to_string(),
+            dot_git.clone(),
+            dot_git,
+        ];
+        assert!(args.windows(6).any(|window| window == expected), "{args:?}");
+
+        let _ = std::fs::remove_dir_all(&workdir);
     }
 
     #[test]
@@ -1058,6 +1107,45 @@ mod tests {
             .unwrap();
         assert!(output.status.success(), "{:?}", output);
         assert_eq!(std::fs::read_to_string(&sibling).unwrap(), "ok\n");
+
+        let _ = std::fs::remove_dir_all(&workdir);
+    }
+
+    #[test]
+    fn e2e_git_metadata_is_read_only_in_the_workdir() {
+        // End-to-end tests need a real bwrap; skip on machines without it.
+        if !bwrap_available() {
+            return;
+        }
+
+        let workdir = temp_dir();
+        let dot_git = workdir.join(".git");
+        std::fs::create_dir_all(&dot_git).unwrap();
+        std::fs::write(dot_git.join("config"), "original").unwrap();
+
+        let sandbox = Sandbox::On {
+            network: false,
+            hidden_dirs: vec![],
+            hidden_files: vec![],
+            writable: vec![],
+            read_only: vec![],
+            mounts: vec![],
+        };
+
+        let output = sandbox
+            .command(
+                "echo evil > .git/config; mkdir -p .git/hooks; echo x > .git/hooks/post-commit",
+                &workdir,
+                &workdir,
+            )
+            .output()
+            .unwrap();
+        assert!(!output.status.success(), "{:?}", output);
+        assert_eq!(
+            std::fs::read_to_string(dot_git.join("config")).unwrap(),
+            "original"
+        );
+        assert!(!dot_git.join("hooks").join("post-commit").exists());
 
         let _ = std::fs::remove_dir_all(&workdir);
     }
