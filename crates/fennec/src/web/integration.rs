@@ -14,6 +14,7 @@ use crate::domain::integration::{
     Blocker, DiffChecks, Landing, blockers, branch_changed, commit_message, conflict_prompt,
     default_message, unacknowledged,
 };
+use crate::domain::model_choice::models_used;
 use crate::domain::plan_scope;
 use crate::domain::preflight;
 use crate::domain::review_map::{self, FileFacts, ReviewSignal};
@@ -384,9 +385,21 @@ pub fn integrate(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> 
         Ok(gate) => gate,
         Err((status, message)) => return error(stream, status, &message),
     };
+    // The human may keep their commits free of model trailers (Settings).
+    let mut models = Vec::new();
+    if store.preferences()?.integration.model_trailers {
+        for session in store.session_tree(&gate.session_id)? {
+            for model in models_used(&store.events(&session)?) {
+                if !models.contains(&model) {
+                    models.push(model);
+                }
+            }
+        }
+    }
     let message = match commit_message(
         body.get("message").and_then(Value::as_str).unwrap_or(""),
         &gate.session_id,
+        &models,
     ) {
         Ok(message) => message,
         Err(e) => return error(stream, 400, &e),

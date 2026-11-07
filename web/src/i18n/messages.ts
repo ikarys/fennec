@@ -380,6 +380,10 @@ export const en = {
   modelIdPlaceholder: 'Model id (endpoint without /models)',
   addModelBtnTitle: 'Add the model',
   // Autonomy, scanners, skills, workflows (components/settings)
+  integrationCommitTitle: 'Integration commit',
+  modelTrailersLabel: 'Name the AI models in the commit',
+  modelTrailersHint:
+    'Adds one Co-Authored-By line per model that answered in the session, so the history says which models wrote the code. Off, the commit keeps only the Fennec-Session line.',
   nightModeTitle: 'Night mode',
   nightModeHint:
     'When the queue runs in autonomous mode, the agent does not wait for your answer: it decides its own questions and records them as decisions. An idea that exceeds a cap is stopped and the queue moves to the next.',
@@ -1796,6 +1800,10 @@ export const fr: Record<MsgKey, string> = {
   modelIdPlaceholder: 'Id du modèle (endpoint sans /models)',
   addModelBtnTitle: 'Ajouter le modèle',
   // Autonomy, scanners, skills, workflows (components/settings)
+  integrationCommitTitle: "Commit d'intégration",
+  modelTrailersLabel: 'Nommer les modèles IA dans le commit',
+  modelTrailersHint:
+    "Ajoute une ligne Co-Authored-By par modèle qui a répondu dans la session : l'historique dit quels modèles ont écrit le code. Désactivé, le commit ne garde que la ligne Fennec-Session.",
   nightModeTitle: 'Mode nuit',
   nightModeHint:
     "Lorsque la file tourne en mode autonome, l'agent n'attend pas ta réponse : il tranche ses questions lui-même et les note comme décisions. Une idée qui dépasse un plafond est arrêtée et la file passe à la suivante.",
