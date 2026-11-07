@@ -82,12 +82,13 @@ If a check you rely on lives in a hook, such as commit message format or a linte
 
 ## macOS
 
-Seatbelt gives the same world with three differences: commands get their own `TMPDIR`, not `/tmp`; dependency folders are linked into the worktree rather than mounted, and writes through the links are refused; renaming a protected file's parent folder is not refused, though the review gate still sees the change.
+Seatbelt gives the same world with three differences: commands get their own `TMPDIR`, not `/tmp`; dependency folders are linked into the worktree rather than mounted, and writes through the links are refused; renaming a protected file's parent folder is not refused, even at the top of the folder.
 
 ## What the sandbox does not promise
 
 - The file tools, read/write/edit, run in fennec's process behind a path guard, not in bwrap.
 - A command can create a new file matching a protected pattern where none existed.
+- A protected file below the top of the folder (`docs/adr/…`, `src/auth/**`) can be replaced by renaming its parent folder (`mv docs docs2`, then a new `docs/adr`). The read-only mount only holds at the top level (`.agents`, `.github`, a root lockfile). Either way, the review gate blocks the integration on any change to a protected path, so you see and decide.
 - Command rules match parsed tokens, so `eval` or a script can slip past them. The sandbox is the wall; rules are guard rails.
 - With the network on, a command can reach the internet, and fennec's own server on `127.0.0.1:7777` too: it could drive fennec (answer an approval, start a turn). Turn the network on for the step that needs it, then off again.
 - The servers the play button starts run outside the sandbox, as you, with your environment: they run the project's code, so start them on a branch you have read.
