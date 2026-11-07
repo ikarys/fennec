@@ -33,6 +33,7 @@ pub(super) fn app(db_path: PathBuf) -> App {
         turns: Turns::new(settings.clone(), notifier.clone()),
         settings,
         port: 0,
+        logins: super::login::Logins::default(),
         notifier: notifier.clone(),
         skill_folds: Mutex::new(HashMap::new()),
         idea_reports: Mutex::new(HashMap::new()),

@@ -1,5 +1,5 @@
-//! Web adapter: the local server behind the UI. std only, one thread per
-//! connection, bound to 127.0.0.1.
+//! Web adapter: the server behind the UI. std only, one thread per connection,
+//! bound to the configured address.
 
 mod agent_routes;
 mod agents_md_routes;
@@ -27,6 +27,7 @@ mod idea_routes;
 mod indicator_routes;
 mod insight;
 mod integration;
+mod login;
 mod mcp_oauth_routes;
 mod mcp_routes;
 mod model_routes;
@@ -100,6 +101,7 @@ impl Drop for ConnectionSlot {
 struct App {
     settings: Settings,
     port: u16,
+    logins: login::Logins,
     turns: Turns,
     notifier: Arc<Notifier>,
     /// The skills fold per session, keyed by the log's max seq: the log is
@@ -249,12 +251,23 @@ impl App {
     }
 }
 
-pub fn serve(port: u16, settings: Settings) -> Result<(), String> {
-    let listener =
-        TcpListener::bind(("127.0.0.1", port)).map_err(|e| format!("127.0.0.1:{port}: {e}"))?;
+pub fn serve(
+    port: u16,
+    listen: std::net::IpAddr,
+    password: Option<String>,
+    settings: Settings,
+) -> Result<(), String> {
+    if !listen.is_loopback() && password.is_none() {
+        return Err(format!(
+            "settings.yaml: listen {listen} is not a loopback address; set a password first with `fennec password`"
+        ));
+    }
+    let listener = TcpListener::bind((listen, port))
+        .map_err(|e| format!("{}: {e}", std::net::SocketAddr::new(listen, port)))?;
     eprintln!(
-        "fennec · {} · http://127.0.0.1:{port}",
-        settings.llm.defaults.model
+        "fennec · {} · http://{}",
+        settings.llm.defaults.model,
+        std::net::SocketAddr::new(listen, port)
     );
     let notifier = Arc::new(Notifier::default());
     // The agents home (`<home>/.agents`), resolved the way skills and agents
@@ -277,10 +290,12 @@ pub fn serve(port: u16, settings: Settings) -> Result<(), String> {
         plugins_temp,
         notifier.clone(),
     ));
+    let logins = login::Logins::new(password);
     let app = Arc::new(App {
         turns: Turns::new(settings.clone(), notifier.clone()),
         settings,
         port,
+        logins,
         notifier: notifier.clone(),
         skill_folds: Mutex::new(HashMap::new()),
         idea_reports: Mutex::new(HashMap::new()),
@@ -351,10 +366,17 @@ pub fn serve(port: u16, settings: Settings) -> Result<(), String> {
 
 fn handle(app: &Arc<App>, stream: &mut TcpStream) -> Result<(), String> {
     let req = http::read_request(stream)?;
-    if let Err(refusal) = guard::check(&req, app.port) {
-        return http::error(stream, refusal.status, refusal.message);
+    let peer_is_loopback = stream
+        .peer_addr()
+        .is_ok_and(|address| address.ip().is_loopback());
+    let caller = match guard::check(&req, app.port, peer_is_loopback, app.logins.enabled()) {
+        Ok(caller) => caller,
+        Err(refusal) => return http::error(stream, refusal.status, refusal.message),
+    };
+    match caller {
+        guard::Caller::Local => routes::handle(app, &req, stream),
+        guard::Caller::Remote => login::gate(app, &req, stream),
     }
-    routes::handle(app, &req, stream)
 }
 
 #[cfg(test)]
