@@ -55,6 +55,7 @@ jobs:
           mkdir -p "$name"
           cp "target/${{ matrix.target }}/release/fennec" "$name/fennec"
           cp LICENSE README.md THIRD_PARTY.md "$name/"
+          python3 scripts/licenses.py notices "$name/THIRD_PARTY_LICENSES.md"
           tar -czf "$name.tar.gz" "$name"
           shasum -a 256 "$name.tar.gz" > "$name.tar.gz.sha256"
       - uses: actions/upload-artifact@v7

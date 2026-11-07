@@ -22,6 +22,12 @@ If an AI model wrote or changed part of your contribution, name it, with its ver
 This is not a judgement on the contribution: reviewers read model-written code differently, and fennec's own
 risk view uses these trailers to find the code no human has reviewed yet.
 
+## Dependencies
+
+A new dependency, Rust or npm, must come under a licence the AGPL can absorb (MIT, Apache-2.0, BSD,
+ISC, MPL-2.0…). `just licenses` checks it, and so does CI on every pull request; the list lives
+in `scripts/licenses.py`. Say why the dependency is needed in the commit body (stdlib first).
+
 ## Before opening a pull request
 
 - Run `just setup` once per clone (git hooks), then `just check`: formatting, clippy, tests, UI lint,
