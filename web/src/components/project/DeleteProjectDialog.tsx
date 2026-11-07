@@ -67,7 +67,7 @@ export function DeleteProjectDialog({
               type="checkbox"
               checked={deleteFolder}
               onChange={(event) => setDeleteFolder(event.target.checked)}
-              className="h-4 w-4 accent-[var(--accent)]"
+              className="h-4 w-4"
             />
             {t("deleteProjectFolder")}
           </label>

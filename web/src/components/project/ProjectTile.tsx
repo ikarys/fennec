@@ -32,7 +32,7 @@ export function ProjectTile({
           {project.name}
         </a>
         {runningCount > 0 && (
-          <Badge tone="accent" solid dot pulse>
+          <Badge tone="accent" appearance="solid" dot pulse>
             {t('runningCount', { count: runningCount })}
           </Badge>
         )}

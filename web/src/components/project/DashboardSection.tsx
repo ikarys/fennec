@@ -142,7 +142,7 @@ export function DashboardSection({
                       {session.running ? (
                         <Badge tone="accent" dot pulse>{t('running')}</Badge>
                       ) : session.awaiting ? (
-                        <Badge tone="accent" solid>{t('toIntegrateBadge')}</Badge>
+                        <Badge tone="accent" appearance="solid">{t('toIntegrateBadge')}</Badge>
                       ) : null}
                     </span>
                     <span

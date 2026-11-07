@@ -53,7 +53,7 @@ export function DisplaySection({ value, onChange, theme, onThemeChange, save }: 
           type="checkbox"
           checked={value.reasoningOpen}
           onChange={(event) => onChange({ ...value, reasoningOpen: event.target.checked })}
-          className="h-4 w-4 accent-[var(--accent)]"
+          className="h-4 w-4"
         />
         {t('reasoningOpen')}
       </label>
@@ -62,7 +62,7 @@ export function DisplaySection({ value, onChange, theme, onThemeChange, save }: 
           type="checkbox"
           checked={value.toolResultsOpen}
           onChange={(event) => onChange({ ...value, toolResultsOpen: event.target.checked })}
-          className="h-4 w-4 accent-[var(--accent)]"
+          className="h-4 w-4"
         />
         {t('toolResultsOpen')}
       </label>

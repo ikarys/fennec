@@ -90,7 +90,7 @@ export function SessionsSection({
               {selecting ? (
                 <input
                   type="checkbox"
-                  className="h-3.5 w-3.5 shrink-0 accent-[var(--color-accent)]"
+                  className="h-3.5 w-3.5 shrink-0"
                   aria-label={t('selectAllAria')}
                   checked={allChosen}
                   onChange={() => setSelected(allChosen ? new Set() : new Set(deletable.map((s) => s.id)))}
@@ -118,7 +118,7 @@ export function SessionsSection({
                     {selecting ? (
                       <input
                         type="checkbox"
-                        className="h-3.5 w-3.5 shrink-0 accent-[var(--color-accent)]"
+                        className="h-3.5 w-3.5 shrink-0"
                         aria-label={t('selectSessionAria', { title: s.title })}
                         checked={isSelected}
                         disabled={running}
@@ -132,14 +132,14 @@ export function SessionsSection({
                       {s.title}
                     </span>
                     <span className="w-28 shrink-0">
-                      {s.mode ? <Badge tone="accent" pill>{s.mode}</Badge> : null}
+                      {s.mode ? <Badge tone="accent" appearance="pill">{s.mode}</Badge> : null}
                     </span>
                     <span className="flex w-32 shrink-0 flex-col gap-1">
                       <span className="flex items-center gap-1.5 text-xs text-muted">
                         <SessionStateIcon state={s.state} />
                         {stateLabel(lang, s.state)}
                       </span>
-                      {s.awaitingIntegration ? <Badge tone="accent" solid>{t('toIntegrateBadge')}</Badge> : null}
+                      {s.awaitingIntegration ? <Badge tone="accent" appearance="solid">{t('toIntegrateBadge')}</Badge> : null}
                     </span>
                     <span
                       className="w-24 shrink-0 text-right font-mono text-xs text-faint tabular-nums"

@@ -47,7 +47,7 @@ export function RunActionCard({
 
   return (
     <div className="border-t border-border bg-panel px-6 py-2">
-      <div className="mx-auto flex max-w-[960px] flex-col gap-2">
+      <div className="mx-auto flex max-w-page flex-col gap-2">
 
           {waiting.kind === 'human' && (
             <>

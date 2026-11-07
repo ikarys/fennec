@@ -77,7 +77,7 @@ function Element({ element, compact }: { element: PluginBlockElement; compact: b
           </span>
           <span className="text-xs text-muted">{element.label}</span>
           {!compact && element.tone && element.tone !== 'none' ? (
-            <Badge tone={TONE_TO_BADGE[element.tone]} pill>
+            <Badge tone={TONE_TO_BADGE[element.tone]} appearance="pill">
               {element.tone}
             </Badge>
           ) : null}
@@ -85,7 +85,7 @@ function Element({ element, compact }: { element: PluginBlockElement; compact: b
       );
     case 'badge':
       return (
-        <Badge tone={element.tone ? TONE_TO_BADGE[element.tone] : 'neutral'} pill>
+        <Badge tone={element.tone ? TONE_TO_BADGE[element.tone] : 'neutral'} appearance="pill">
           {element.label}
         </Badge>
       );

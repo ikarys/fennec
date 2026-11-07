@@ -71,7 +71,7 @@ export function SetupChecklist({
       <ul className="m-0 list-none divide-y divide-border p-0">
         {setup.checks.map((check) => (
           <li key={check.id} className="flex items-center gap-3 px-4 py-2.5">
-            <Badge tone={TONES[check.status]} pill>
+            <Badge tone={TONES[check.status]} appearance="pill">
               {t(STATUS_KEYS[check.status])}
             </Badge>
             <div className="min-w-0 grow">

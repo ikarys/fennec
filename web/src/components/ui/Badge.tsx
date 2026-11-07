@@ -6,6 +6,13 @@ import type { ReactNode } from 'react';
 
 export type BadgeTone = 'neutral' | 'accent' | 'ok' | 'err' | 'attention' | 'info';
 
+/**
+ * How the badge reads: `text` coloured text; `pill` outlined and rounded, a tag rather
+ * than text; `solid` an accent fill, for what the eye must catch in a long list (a live
+ * count, a branch to integrate).
+ */
+export type BadgeAppearance = 'text' | 'pill' | 'solid';
+
 /** Colour says the state; only what needs the human (accent) gets a background. */
 const TONES: Record<BadgeTone, string> = {
   neutral: 'text-muted',
@@ -21,9 +28,15 @@ const PILLS: Record<BadgeTone, string> = {
   neutral: 'border-border bg-raised text-muted',
   accent: 'border-accent/40 bg-accent-soft text-accent-strong',
   ok: 'border-ok/40 bg-ok-soft text-ok',
-  err: 'border-err/40 bg-err/10 text-err',
-  attention: 'border-attention/40 bg-attention/10 text-attention',
-  info: 'border-info/40 bg-info/10 text-info'
+  err: 'border-err/40 bg-err-soft text-err',
+  attention: 'border-attention/40 bg-attention-soft text-attention',
+  info: 'border-info/40 bg-info-soft text-info'
+};
+
+const SHAPES: Record<BadgeAppearance, (tone: BadgeTone) => string> = {
+  text: (tone) => `rounded-sm px-1.5 ${TONES[tone]}`,
+  pill: (tone) => `rounded-full border px-2 ${PILLS[tone]}`,
+  solid: () => 'rounded-sm bg-accent px-1.5 text-on-accent'
 };
 
 const DOTS: Record<BadgeTone, string> = {
@@ -39,8 +52,7 @@ export function Badge({
   tone = 'neutral',
   dot = false,
   pulse = false,
-  pill = false,
-  solid = false,
+  appearance = 'text',
   title,
   className = '',
   children
@@ -50,10 +62,7 @@ export function Badge({
   dot?: boolean;
   /** The dot pulses while something runs. */
   pulse?: boolean;
-  /** Outlined and rounded, for a label that must read as a tag, not as text. */
-  pill?: boolean;
-  /** A solid accent fill, for what the eye must catch in a long list (a live count, a branch to integrate). */
-  solid?: boolean;
+  appearance?: BadgeAppearance;
   title?: string;
   className?: string;
   children: ReactNode;
@@ -61,9 +70,9 @@ export function Badge({
   return (
     <span
       title={title}
-      className={`inline-flex shrink-0 items-center gap-1.5 py-0.5 text-xs font-medium whitespace-nowrap ${solid ? 'rounded-sm bg-accent px-1.5 text-on-accent' : pill ? `rounded-full border px-2 ${PILLS[tone]}` : `rounded-sm px-1.5 ${TONES[tone]}`} ${className}`.trim()}
+      className={`inline-flex shrink-0 items-center gap-1.5 py-0.5 text-xs font-medium whitespace-nowrap ${SHAPES[appearance](tone)} ${className}`.trim()}
     >
-      {dot && <span className={`h-1.5 w-1.5 rounded-full ${solid ? 'bg-on-accent' : DOTS[tone]} ${pulse ? 'animate-pulse' : ''}`} />}
+      {dot && <span className={`h-1.5 w-1.5 rounded-full ${appearance === 'solid' ? 'bg-on-accent' : DOTS[tone]} ${pulse ? 'animate-pulse' : ''}`} />}
       {children}
     </span>
   );

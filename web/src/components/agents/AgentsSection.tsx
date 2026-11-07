@@ -111,7 +111,7 @@ function AgentRow({
       </span>
       <span className="w-24 shrink-0">{agent.readOnly ? <Badge tone="ok">{t('agentsReadOnly')}</Badge> : null}</span>
       <span className="w-20 shrink-0">
-        {agent.subagent ? <Badge tone="accent" pill>{t('agentsSubagent')}</Badge> : <Badge tone="neutral" pill>{t('agentsAgent')}</Badge>}
+        {agent.subagent ? <Badge tone="accent" appearance="pill">{t('agentsSubagent')}</Badge> : <Badge tone="neutral" appearance="pill">{t('agentsAgent')}</Badge>}
       </span>
       {agent.editable ? (
         <Button variant="ghost" onClick={onEdit} disabled={busy}>

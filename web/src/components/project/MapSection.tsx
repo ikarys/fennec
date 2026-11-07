@@ -68,19 +68,19 @@ export function MapSection({
       description={t('moduleMapDescription')}
       actions={
         <div className="flex items-center gap-2">
-          <Badge tone="ok" pill title={t('mapVerifiedTitle')}>
+          <Badge tone="ok" appearance="pill" title={t('mapVerifiedTitle')}>
             {t('verified')}
           </Badge>
           {mapFile === 'current' ? (
-            <Badge tone="ok" pill>
+            <Badge tone="ok" appearance="pill">
               {t('mapCurrent')}
             </Badge>
           ) : mapFile === 'stale' ? (
-            <Badge tone="attention" pill>
+            <Badge tone="attention" appearance="pill">
               {t('mapStale')}
             </Badge>
           ) : (
-            <Badge tone="neutral" pill>
+            <Badge tone="neutral" appearance="pill">
               {t('mapMissing')}
             </Badge>
           )}
@@ -218,10 +218,10 @@ export function MapSection({
           <Card className="overflow-hidden">
             <div className="flex items-center gap-3 border-b border-border bg-raised px-4 py-2 text-xs uppercase tracking-wide text-faint">
               <span className="grow">{t('driftSinceMap')}</span>
-              <Badge tone="ok" pill>
+              <Badge tone="ok" appearance="pill">
                 +{added}
               </Badge>
-              <Badge tone="err" pill>
+              <Badge tone="err" appearance="pill">
                 −{removed}
               </Badge>
             </div>

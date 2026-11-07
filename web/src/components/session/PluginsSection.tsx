@@ -70,7 +70,7 @@ export function PluginsSection({ sessionId }: { sessionId: string | null }) {
           title={block.title}
         >
           <div className="flex flex-col gap-1.5">
-            <Badge tone="info" pill title={t('pluginProvenance', { name: block.plugin })}>
+            <Badge tone="info" appearance="pill" title={t('pluginProvenance', { name: block.plugin })}>
               {t('pluginProvenance', { name: block.plugin })}
             </Badge>
             <BlockElements elements={block.content.elements} />

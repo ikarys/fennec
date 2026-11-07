@@ -47,7 +47,7 @@ export function QuestionForm({
         <ReplyIcon className="h-3.5 w-3.5 text-accent" />
         <span>{t('askQuestion')}</span>
         <span className="ml-auto">
-          <Badge tone="info" pill title={t('indicativeSourced')}>
+          <Badge tone="info" appearance="pill" title={t('indicativeSourced')}>
             {t('indicative')}
           </Badge>
         </span>
