@@ -1,5 +1,6 @@
 //! The `delegate` tool, owned by the agent loop: it hands a self-contained, read-only task to an agent in a fresh child session and returns only that agent's final answer.
-//! The child has its own context, so broad exploration does not fill the parent's context; it cannot write, ask the human, or delegate further, so delegations do not nest.
+//! The child has its own context, so broad exploration does not fill the parent's context; it cannot write or delegate further, so delegations do not nest.
+//! The child's agent loses the tools that leave something for the human, so all of that comes back in its answer.
 
 use crate::agent::ports::AgentRun;
 use crate::domain::agent::AgentDefinition;
@@ -10,6 +11,28 @@ use super::tool_args::required;
 use super::turn::Turn;
 
 pub const NAME: &str = "delegate";
+
+/// The tools whose output waits for the human (a question, a decision, a proposal): withheld in a child.
+pub const FOR_THE_HUMAN: [&str; 9] = [
+    "record_decision",
+    "propose_task",
+    "propose_plan",
+    "submit_report",
+    "suggest_agent",
+    "propose_criteria",
+    "request_waiver",
+    "ask_user",
+    "canvas",
+];
+
+/// Prefixed to the task: the child knows from its first round that nobody answers it.
+pub(super) const CHILD_BRIEF: &str = "You run as a delegated agent for another agent, hidden from the human: nobody answers questions here. Put any question, decision, task idea or plan in your final answer; the agent that delegated to you decides.\n\n";
+
+/// A tool the turn's agents lose, so their reminder omits it and a call is refused: `delegate`
+/// without child sessions to run it in; in a hidden child, the tools of `FOR_THE_HUMAN`.
+pub fn withheld(tool: &str, can_delegate: bool, delegated: bool) -> bool {
+    (tool == NAME && !can_delegate) || (delegated && FOR_THE_HUMAN.contains(&tool))
+}
 
 /// The OpenAI tool definition; the `agent` enum lists the delegable agents (`a.delegable()`), in the given order.
 pub fn definition(agents: &[AgentDefinition]) -> Value {
@@ -142,17 +165,25 @@ pub(super) fn run(turn: &Turn, args: &Value) -> ToolResult {
     // The child is another session: the model gate must not keep it waiting
     // behind its own parent, which is blocked on this call.
     turn.model.release(turn.session_id);
+    let started = std::time::Instant::now();
     let ran = children
         .create(turn.session_id, &child_title(&delegation))
         .and_then(|child| {
             children
-                .send(&child, &delegation.agent, &delegation.task, turn.stop)
+                .send(
+                    &child,
+                    &delegation.agent,
+                    &format!("{CHILD_BRIEF}{}", delegation.task),
+                    turn.stop,
+                )
                 .map(|run| (child, run))
         });
-    match ran {
+    let mut outcome = match ran {
         Ok((child, run)) => result(&child, run),
         Err(e) => ToolResult::failure(format!("delegate failed: {e}")),
-    }
+    };
+    outcome.duration_ms = started.elapsed().as_millis() as u64;
+    outcome
 }
 
 #[cfg(test)]
@@ -343,5 +374,21 @@ mod tests {
         assert!(output.starts_with(&"a".repeat(20_000)));
         assert!(output.contains("[answer cut at 20000 characters]"));
         assert!(output.ends_with("(Delegated session: session-1)"));
+    }
+
+    #[test]
+    fn delegate_is_withheld_without_children_and_human_tools_in_a_child() {
+        assert!(withheld(NAME, false, false));
+        assert!(!withheld(NAME, true, false));
+        assert!(!withheld("record_decision", true, false));
+        assert!(withheld("record_decision", false, true));
+        assert!(!withheld("read_file", false, true));
+    }
+
+    #[test]
+    fn for_the_human_lists_known_tools() {
+        for name in FOR_THE_HUMAN {
+            assert!(crate::domain::agent::KNOWN_TOOLS.contains(&name));
+        }
     }
 }

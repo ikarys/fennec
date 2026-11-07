@@ -2,6 +2,7 @@
 //! the same set of adapters. The adapters keep only their orchestration; a new
 //! `Turn` field or a tools default is added here, once.
 
+use crate::agent::delegate;
 use crate::agent::ports::{ChildSessions, EventLog};
 use crate::agent::turn::Turn;
 use crate::agents;
@@ -35,6 +36,8 @@ pub struct Options<'a> {
     pub model_choice: Option<ModelRef>,
     /// The human is away (the ideas queue's night mode).
     pub autonomous: bool,
+    /// The turn runs a `delegate` call's child, hidden from the human: its agents lose the tools that leave something for them.
+    pub delegated: bool,
     /// Called for every event right after it is stored (the CLI prints them).
     pub on_event: &'a mut dyn FnMut(&Event),
     /// Where `delegate` runs its agents (the web's top-level turns only).
@@ -71,7 +74,16 @@ pub fn with_turn<R>(
     let params = settings.llm.for_turn(&prefs, options.model_choice.as_ref());
     let instructions = all_instructions(prefs.global_instructions.as_deref(), workdir);
     let skills = skills::discover(workdir);
-    let agents = agents::discover(workdir);
+    let mut agents = agents::discover(workdir);
+    // The agents are told of (their reminder), and may call, only the tools this turn
+    // can run. The definitions stay whole: one prefix for every session, so a new one
+    // (a delegate's child included) starts from the server's cache.
+    let can_delegate = options.children.is_some();
+    for agent in &mut agents {
+        agent
+            .allowed_tools
+            .retain(|tool| !delegate::withheld(tool, can_delegate, options.delegated));
+    }
     let model = OpenAiClient::new(settings.endpoint(&prefs, &params.provider)?, &params.model);
     // A session worktree is the agent's own copy: a new dependency's lockfile
     // may change there, and the integration gate shows it to the human. Outside
@@ -247,6 +259,7 @@ mod tests {
             notifier: None,
             model_choice: None,
             autonomous: true,
+            delegated: false,
             on_event: &mut on_event,
             children: None,
         };

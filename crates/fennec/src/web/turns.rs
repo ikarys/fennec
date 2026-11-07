@@ -223,6 +223,7 @@ pub(super) fn with_turn<R>(
         notifier,
         workdir,
         autonomous,
+        delegated,
     } = *at;
     let store = SqliteStore::open(&settings.db_path)?;
     // A workflow's child sessions run on the model the human chose for the session.
@@ -232,6 +233,7 @@ pub(super) fn with_turn<R>(
         notifier: Some(notifier),
         model_choice: chosen,
         autonomous,
+        delegated,
         on_event: &mut on_event,
         children: delegates,
     };
@@ -260,11 +262,13 @@ fn run(
         notifier,
         workdir,
         autonomous,
+        delegated: false,
     };
     // A delegated agent runs with the human away: nobody answers its
     // questions or approvals, so it decides or is refused, never pauses.
     let delegates = Children {
         autonomous: true,
+        delegated: true,
         ..here
     };
     with_turn(

@@ -3,7 +3,7 @@
 
 mod ask_user;
 mod compaction;
-mod delegate;
+pub mod delegate;
 mod delta_buffer;
 pub mod ports;
 mod preflight;

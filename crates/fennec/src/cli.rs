@@ -141,6 +141,7 @@ fn with_turn(
         notifier: None,
         model_choice: None,
         autonomous: false,
+        delegated: false,
         on_event: &mut on_event,
         children: None,
     };
