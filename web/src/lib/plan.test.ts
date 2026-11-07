@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { planFromProposal, reportFromSubmission, splitContract, type Plan, type Report } from './plan';
+import {
+  planFromProposal,
+  reportFromSubmission,
+  splitContract,
+  planSourceOf,
+  lastHumanMessage,
+  type Plan,
+  type Report
+} from './plan';
+import type { ThreadItem } from './threadView';
 
 const split = (text: string) => splitContract(text);
 
@@ -273,5 +282,64 @@ describe('reportFromSubmission', () => {
     expect(report.changed).toEqual([]);
     expect(report.test).toBe('');
     expect(report.todo).toBe('');
+  });
+});
+
+describe('planSourceOf', () => {
+  it('returns null when there is no assistant', () => {
+    const items: ThreadItem[] = [
+      { kind: 'user', id: 'u1', content: 'hello', isSystemGenerated: false, attachments: [] },
+    ];
+    expect(planSourceOf(items)).toBeNull();
+  });
+
+  it('lets a plan segment win over a text plan contract', () => {
+    const planObject: Plan = {
+      kind: 'plan',
+      title: 'P',
+      goal: 'G',
+      steps: [],
+      doneWhen: [],
+      risks: []
+    };
+    const items: ThreadItem[] = [
+      {
+        kind: 'assistant',
+        id: 'a1',
+        done: true,
+        segments: [
+          { kind: 'text', id: 't1', content: '## Plan: Text\n## Step 1: A\n- Change: a' },
+          { kind: 'plan', id: 'p1', plan: planObject, markdown: 'plan markdown' }
+        ],
+      },
+    ];
+    expect(planSourceOf(items)).toEqual({ id: 'p1', content: 'plan markdown' });
+  });
+
+  it('uses the text segment id and content for a text-only plan contract', () => {
+    const items: ThreadItem[] = [
+      {
+        kind: 'assistant',
+        id: 'a1',
+        done: true,
+        segments: [
+          { kind: 'text', id: 't1', content: '## Plan: Text\n## Step 1: A\n- Change: a' },
+        ],
+      },
+    ];
+    expect(planSourceOf(items)).toEqual({
+      id: 't1',
+      content: '## Plan: Text\n## Step 1: A\n- Change: a',
+    });
+  });
+});
+
+describe('lastHumanMessage', () => {
+  it('skips system-generated user items', () => {
+    const items: ThreadItem[] = [
+      { kind: 'user', id: 'u1', content: 'system', isSystemGenerated: true, attachments: [] },
+      { kind: 'user', id: 'u2', content: 'human', isSystemGenerated: false, attachments: [] },
+    ];
+    expect(lastHumanMessage(items)).toBe('human');
   });
 });
