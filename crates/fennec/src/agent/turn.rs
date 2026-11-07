@@ -16,7 +16,8 @@
 
 use super::ask_user;
 use super::compaction::{self, Compacted};
-use super::ports::{EventLog, Model, Toolbox};
+use super::delegate;
+use super::ports::{ChildSessions, EventLog, Model, Toolbox};
 use super::preflight;
 use super::prompt::system_prompt;
 use super::propose_criteria;
@@ -92,6 +93,9 @@ pub struct Turn<'a> {
     pub stop: &'a AtomicBool,
     /// Called for every event right after it is stored (the CLI prints them).
     pub on_event: &'a mut dyn FnMut(&Event),
+    /// Where `delegate` runs its agents; None in the CLI and inside a
+    /// delegated agent's own session, which cannot delegate further.
+    pub children: Option<&'a dyn ChildSessions>,
 }
 
 impl Turn<'_> {
@@ -318,9 +322,9 @@ fn round_prompt_parts(turn: &mut Turn) -> Result<(String, Value), String> {
 
 /// The loop owns `ask_user`, `request_waiver`, `propose_criteria`,
 /// `record_decision`, `propose_task`, `propose_plan`, `submit_report` and
-/// `suggest_agent`;
+/// `suggest_agent` and `delegate`;
 /// they are not host tools, so their definitions are added to the toolbox's.
-/// `suggest_agent` lists the session's agents as of the first turn;
+/// `suggest_agent` and `delegate` list the session's agents as of the first turn;
 /// definitions are frozen then.
 fn tool_definitions(turn: &Turn) -> Value {
     let mut tool_defs = turn.tools.definitions();
@@ -333,6 +337,7 @@ fn tool_definitions(turn: &Turn) -> Value {
         arr.push(propose_plan::definition());
         arr.push(submit_report::definition());
         arr.push(suggest_agent::definition(turn.agents));
+        arr.push(delegate::definition(turn.agents));
     }
     tool_defs
 }
@@ -651,6 +656,7 @@ mod tests {
                 preflight_sent_back: false,
                 stop: self.stop,
                 on_event: &mut self.on_event,
+                children: None,
             }
         }
     }
@@ -688,6 +694,7 @@ mod tests {
             preflight_sent_back: false,
             stop: &stop,
             on_event: &mut on_event,
+            children: None,
         };
         let reason = run_turn(&mut turn, "go", &[]).unwrap();
         (reason, log.0.into_inner())
@@ -1023,6 +1030,7 @@ mod tests {
             preflight_sent_back: false,
             stop: &stop,
             on_event: &mut on_event,
+            children: None,
         };
         run_turn(&mut turn, "one", &[]).unwrap();
         run_turn(&mut turn, "two", &[]).unwrap();
@@ -1988,6 +1996,7 @@ mod tests {
             preflight_sent_back: false,
             stop: &stop,
             on_event: &mut on_event,
+            children: None,
         };
         let reason = run_turn(&mut turn, "go", &[]).unwrap();
         (reason, log.0.into_inner())

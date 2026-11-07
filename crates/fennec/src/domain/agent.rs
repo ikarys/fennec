@@ -101,7 +101,7 @@ const READ_ONLY_PREAMBLE: &str = include_str!("../../prompts/read-only.md");
 /// Every tool an agent may list in `allowedTools`: the toolbox's tools (see
 /// `crate::tools`) and the loop's own ones (`crate::agent`). The human's agent
 /// CRUD refuses anything else, so a typo cannot silently disable a tool.
-pub const KNOWN_TOOLS: [&str; 16] = [
+pub const KNOWN_TOOLS: [&str; 17] = [
     "read_file",
     "write_file",
     "edit_file",
@@ -117,6 +117,7 @@ pub const KNOWN_TOOLS: [&str; 16] = [
     "propose_task",
     "request_waiver",
     "suggest_agent",
+    "delegate",
     "canvas",
 ];
 
@@ -232,6 +233,14 @@ impl AgentDefinition {
     /// mode is enforced here, at execution.
     pub fn allows(&self, tool: &str) -> bool {
         self.allowed_tools.iter().any(|name| name == tool)
+    }
+
+    /// Whether another agent may hand it a task with `delegate`: the child runs
+    /// in the same worktree while its parent waits, so it must change nothing.
+    pub fn delegable(&self) -> bool {
+        self.commands == CommandAccess::ReadOnly
+            && !self.allows("write_file")
+            && !self.allows("edit_file")
     }
 
     /// The reminder: `<system-reminder>\n{prompt}{tools}\n</system-reminder>`

@@ -21,7 +21,6 @@ What is done: `docs/components.md`; add a paragraph there when a component lands
 Next, one PR each: fennec's own layer, the tools that keep the human the author
 (capabilities C* of the Notion definition):
 1. To be chosen among the remaining capabilities C* of the Notion definition.
-Later: sub-agents as tools, when dogfooding shows sessions saturating their context.
 
 ## Layout
 
@@ -110,6 +109,7 @@ crates/fennec/src/
     submit_report.rs   the loop's submit_report tool: the builder's report validated and recorded, the turn ends
     tool_args.rs       the argument validators those two share; their errors tell the model what to fix
     suggest_agent.rs   the loop's own tool: suggests a new session on another agent (the human opens it)
+    delegate.rs        the loop's own tool: a read-only agent runs a task in a child session, its answer is the result
     rule_check.rs      the rules crate's decision on a tool call: the refusal and its `rule.blocked`, the approval request
     rule_approval.rs   the human's answer to an approval: runs or refuses the recorded call, resumes the loop
     request_waiver.rs  the loop's own tool: asks the human to waive one protected file; the turn pauses
