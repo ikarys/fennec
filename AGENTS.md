@@ -241,7 +241,10 @@ tests.
    It never runs what a model wrote.
 3. **The untrusted zone**: everything a model outputs. Commands run in the
    sandbox world (`tools/sandbox.rs`: bwrap on Linux, Seatbelt on macOS) unless the human turns it off. Protected
-   files are refused to the file tools and read-only in the sandbox. **Known
+   files are refused to the file tools and read-only in the sandbox; so is the workdir's `.git`
+   (no waiver). Every git command the kernel runs (`git.rs`, the one runner) disables hooks and
+   fsmonitor (`-c core.hooksPath=/dev/null -c core.fsmonitor=false`), the human's own hooks
+   included: the kernel never executes a repository's hooks. **Known
    gaps**: the file tools run in fennec's process with a working-directory
    path guard; a command can still create a new file matching a protected
    pattern where none existed (the review gate is to catch it). The human's rules are
@@ -254,6 +257,9 @@ tests.
    `update-ref`, `branch -D`, `worktree`, `gh pr merge`…) refuse those commands before they run, with the same
    token-matching limits as the human's rules. On macOS (Seatbelt) commands write their own TMPDIR, never /tmp,
    and renaming a protected file's parent directory is not refused (the review gate sees the change).
+   A `.git` a command creates where none existed (a non-git folder, a monorepo subdirectory) is not
+   read-only, and its config can still name filter, textconv or merge drivers that a kernel git
+   command in that directory would run; hooks and fsmonitor are off there too.
 
 ## Build, test, run
 

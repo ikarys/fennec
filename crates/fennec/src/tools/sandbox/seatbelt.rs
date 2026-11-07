@@ -23,7 +23,12 @@ pub(super) fn seatbelt_args(sandbox: &Sandbox, workdir: &Path) -> Vec<OsString> 
             let hidden_dirs = hidden_dirs.iter().map(canonicalize).collect::<Vec<_>>();
             let hidden_files = hidden_files.iter().map(canonicalize).collect::<Vec<_>>();
             let writable = writable.iter().map(canonicalize).collect::<Vec<_>>();
-            let read_only = read_only.iter().map(canonicalize).collect::<Vec<_>>();
+            let read_only = read_only
+                .iter()
+                .cloned()
+                .chain(super::git_metadata(&workdir))
+                .map(canonicalize)
+                .collect::<Vec<_>>();
 
             let profile =
                 build_profile(*network, &hidden_dirs, &hidden_files, &writable, &read_only);

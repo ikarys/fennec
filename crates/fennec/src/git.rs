@@ -63,6 +63,15 @@ fn execute(
     let mut cmd = Command::new("git");
     cmd.arg("-C")
         .arg(dir)
+        // The kernel never runs what a model wrote, and a repository's config, hooks or
+        // fsmonitor may have been written by one; these two run on their own during
+        // status/add/commit.
+        .args([
+            "-c",
+            "core.fsmonitor=false",
+            "-c",
+            "core.hooksPath=/dev/null",
+        ])
         .args(args)
         // A git that asks for credentials must not hang a request.
         .env("GIT_TERMINAL_PROMPT", "0")
@@ -501,6 +510,62 @@ mod tests {
         std::fs::write(dir.join("a.txt"), "b\n").unwrap();
         std::fs::write(dir.join("untracked.txt"), "u\n").unwrap();
         assert_eq!(dirty_count(&dir), 2);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn host_git_does_not_run_model_written_hooks_or_fsmonitor() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = std::env::temp_dir().join(format!(
+            "fennec-git-hooks-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let git = |args: &[&str]| {
+            let output = Command::new("git")
+                .current_dir(&dir)
+                .args(args)
+                .output()
+                .expect("git");
+            assert!(
+                output.status.success(),
+                "git {:?} failed: {}",
+                args,
+                String::from_utf8_lossy(&output.stderr)
+            );
+            output
+        };
+
+        git(&["init"]);
+        git(&["config", "user.email", "test@example.com"]);
+        git(&["config", "user.name", "Test"]);
+
+        let marker = dir.join("hook-marker");
+        let fsmonitor = dir.join("fsmonitor.sh");
+        std::fs::write(&fsmonitor, format!("touch {}\n", marker.display())).unwrap();
+        std::fs::set_permissions(&fsmonitor, std::fs::Permissions::from_mode(0o755)).unwrap();
+        git(&["config", "core.fsmonitor", fsmonitor.to_str().unwrap()]);
+
+        for hook in ["pre-commit", "post-commit"] {
+            let path = dir.join(".git").join("hooks").join(hook);
+            std::fs::write(&path, format!("touch {}\n", marker.display())).unwrap();
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+
+        std::fs::write(dir.join("file.txt"), "x\n").unwrap();
+        assert!(super::run(&dir, &["add", "-A"], None).is_ok());
+        assert!(super::run(&dir, &["commit", "-q", "-m", "x"], None).is_ok());
+        assert!(super::stdout(&dir, &["status"]).is_some());
+
+        assert!(!marker.exists());
 
         let _ = std::fs::remove_dir_all(&dir);
     }
