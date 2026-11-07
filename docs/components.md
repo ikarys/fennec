@@ -170,7 +170,7 @@ whose `fr` is typed against `en`'s keys (a missing translation is a compile erro
 lib functions take a `lang`. The server's display texts follow the same choice through `domain/lang.rs`; the context part labels, stored
 French in the usage ledger, are translated at display time (`context_parts::display_label`).
 Plugins, done: the human's own extensions, global only: defined in `~/.agents/plugins.json`, code in
-`~/.agents/plugins/<name>/` (never read from a project), activated on Settings' Plugins tab (`#/settings/plugins`); a
+`~/.agents/plugins/<name>/` (never read from a project), activated on Settings' Extensions tab (`#/settings/extensions`); a
 changed definition or file deactivates one (SHA-256 code hash). Each runs out of process in bwrap (refused with the
 sandbox off), its code read-only, no project mounted, the network only if granted; it gets the session events it asked
 for over JSON-RPC on stdio and answers with data-only blocks (text, figures, badges, lists, progress bars, http(s)
