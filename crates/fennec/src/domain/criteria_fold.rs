@@ -1,7 +1,19 @@
 //! The criteria in force, folded from the log: the last `criteria.set` and the status updates since. Shared by a workflow run's state and the served thread view, so both read the same contract.
 
-use super::criteria::{CriterionState, CriterionStatus};
+use super::criteria::{CriterionState, CriterionStatus, Provenance};
 use super::event::Event;
+use serde::Serialize;
+
+/// How the criteria in force stand: the header's figure and its colour.
+/// `indicative` counts the passes an agent judged rather than fennec checked.
+#[derive(Debug, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Tally {
+    pub total: usize,
+    pub passed: usize,
+    pub failed: usize,
+    pub indicative: usize,
+}
 
 pub fn apply(criteria: &mut Vec<CriterionState>, event: &Event) {
     match event {
@@ -39,9 +51,26 @@ pub fn in_force(events: &[Event]) -> Vec<CriterionState> {
     })
 }
 
+pub fn tally(criteria: &[CriterionState]) -> Tally {
+    criteria.iter().fold(Tally::default(), |mut tally, state| {
+        tally.total += 1;
+        match &state.status {
+            CriterionStatus::Pending => {}
+            CriterionStatus::Passed { provenance } => {
+                tally.passed += 1;
+                if matches!(provenance, Provenance::Indicative { .. }) {
+                    tally.indicative += 1;
+                }
+            }
+            CriterionStatus::Failed { .. } => tally.failed += 1,
+        }
+        tally
+    })
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{apply, in_force};
+    use super::{Tally, apply, in_force, tally};
     use crate::domain::criteria::{Criterion, CriterionState, CriterionStatus, Provenance};
     use crate::domain::event::Event;
 
@@ -171,6 +200,53 @@ mod tests {
                     agent: "verify".into(),
                     reason: "ok".into(),
                 },
+            }
+        );
+    }
+
+    #[test]
+    fn tally_counts_passes_failures_and_indicative_passes() {
+        let state = |id: &str, status: CriterionStatus| CriterionState {
+            criterion: Criterion {
+                id: id.into(),
+                description: "d".into(),
+                check: None,
+            },
+            status,
+        };
+        let verified = Provenance::Verified {
+            command: "true".into(),
+            exit_code: Some(0),
+            output: String::new(),
+        };
+        let judged = Provenance::Indicative {
+            agent: "verify".into(),
+            reason: "ok".into(),
+        };
+        let criteria = vec![
+            state("C1", CriterionStatus::Pending),
+            state(
+                "C2",
+                CriterionStatus::Passed {
+                    provenance: verified.clone(),
+                },
+            ),
+            state("C3", CriterionStatus::Passed { provenance: judged }),
+            state(
+                "C4",
+                CriterionStatus::Failed {
+                    provenance: verified,
+                },
+            ),
+        ];
+
+        assert_eq!(
+            tally(&criteria),
+            Tally {
+                total: 4,
+                passed: 2,
+                failed: 1,
+                indicative: 1,
             }
         );
     }

@@ -1,4 +1,4 @@
-import type { CriterionStatus, CriterionView, Provenance } from '../../lib/api';
+import type { CriteriaTally, CriterionStatus, CriterionView, Provenance } from '../../lib/api';
 import { CheckIcon } from '../Icons';
 import type { BadgeTone } from '../ui/Badge';
 import { Badge } from '../ui/Badge';
@@ -47,13 +47,11 @@ export function CriterionProvenanceBadge({ provenance }: { provenance: Provenanc
   return <Badge tone={badge.tone} title={badge.title}>{badge.label}</Badge>;
 }
 
-export function CriteriaSection({ criteria }: { criteria: CriterionView[] }) {
+export function CriteriaSection({ criteria, tally }: { criteria: CriterionView[]; tally: CriteriaTally }) {
   const t = useT();
-  const passed = criteria.filter((criterion) => criterion.status.type === 'passed').length;
-  const failed = criteria.filter((criterion) => criterion.status.type === 'failed').length;
-  const indicative = criteria.filter((criterion) => criterion.status.type === 'passed' && criterion.status.provenance.kind === 'indicative').length;
+  const { total, passed, failed, indicative } = tally;
   // The header's icon reports the block's state: red when a check failed, green when all pass.
-  const iconTone: BadgeTone = failed > 0 ? 'err' : criteria.length > 0 && passed === criteria.length ? 'ok' : 'neutral';
+  const iconTone: BadgeTone = failed > 0 ? 'err' : total > 0 && passed === total ? 'ok' : 'neutral';
 
   return (
     <Panel
@@ -62,12 +60,12 @@ export function CriteriaSection({ criteria }: { criteria: CriterionView[] }) {
       icon={<CheckIcon className="h-3.5 w-3.5" />}
       iconTone={iconTone}
       summary={
-        criteria.length > 0 ? (
+        total > 0 ? (
           <span
-            className={failed > 0 ? 'text-err' : passed === criteria.length ? 'text-ok' : undefined}
-            title={indicative > 0 ? t('indicativeCount', { passed, total: criteria.length, indicative }) : undefined}
+            className={failed > 0 ? 'text-err' : passed === total ? 'text-ok' : undefined}
+            title={indicative > 0 ? t('indicativeCount', { passed, total, indicative }) : undefined}
           >
-            {passed}/{criteria.length}
+            {passed}/{total}
           </span>
         ) : undefined
       }
@@ -77,7 +75,7 @@ export function CriteriaSection({ criteria }: { criteria: CriterionView[] }) {
       ) : (
         <div className="flex flex-col">
           <div className="h-1 w-full overflow-hidden rounded-full bg-raised">
-            <div className="h-full rounded-full bg-ok" style={{ width: `${(passed / criteria.length) * 100}%` }} />
+            <div className="h-full rounded-full bg-ok" style={{ width: `${(passed / total) * 100}%` }} />
           </div>
           {criteria.map((criterion) => {
             const provenance = criterion.status.type === 'pending' ? undefined : criterion.status.provenance;

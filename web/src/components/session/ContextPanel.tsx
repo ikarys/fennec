@@ -62,7 +62,7 @@ function railCount(id: PanelBlockId, view: ThreadView, served: ServedThread, vis
 
 /** The rail's count badge is tinted only when it signals a state worth seeing. */
 function railCountClass(id: PanelBlockId, served: ServedThread): string {
-  if (id === 'criteria' && served.criteria.some((criterion) => criterion.status.type === 'failed')) {
+  if (id === 'criteria' && served.criteriaTally.failed > 0) {
     return 'text-err';
   }
   return 'text-muted';
@@ -233,7 +233,7 @@ export function ContextPanel({ view, skills, usage, request, hasSession, worktre
       case 'request':
         return <RequestSection key={id} request={request} />;
       case 'criteria':
-        return <CriteriaSection key={id} criteria={served.criteria} />;
+        return <CriteriaSection key={id} criteria={served.criteria} tally={served.criteriaTally} />;
       case 'modifiedFiles':
         return <ModifiedFilesSection key={id} modifiedFiles={view.modifiedFiles} sessionId={sessionId} />;
       case 'workspace':
