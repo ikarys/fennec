@@ -92,6 +92,6 @@ Seatbelt gives the same world with three differences: commands get their own `TM
 - With the network on, a command can reach the internet, and fennec's own server on `127.0.0.1:7777` too: it could drive fennec (answer an approval, start a turn). Turn the network on for the step that needs it, then off again.
 - The servers the play button starts run outside the sandbox, as you, with your environment: they run the project's code, so start them on a branch you have read.
 - `~/.cargo/registry`, `~/.cargo/git`, `~/.cache` and `~/.npm` stay writable so builds and installs work; a command could leave a tampered file there that a later build on your machine reuses.
-- The rest of your home stays readable to commands, except the secrets fennec hides (`~/.ssh`, cloud and token files, its own store).
+- The rest of your home stays readable to commands, except the secrets fennec hides (`~/.ssh`, cloud and token files, its own store and `~/.config/fennec`).
 - `web_fetch` and `web_search` run in fennec's process, not in the sandbox: they reach the web even with the network off.
 - The review gate is the last line: nothing lands on your branch without your click.

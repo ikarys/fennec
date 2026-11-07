@@ -95,6 +95,7 @@ crates/fennec/src/
     pricing.rs         the ledger's model rows priced at the models' prices, split by token kind
     indicators.rs      the project's indicators counted from the integrations the gate recorded
     lang.rs            the language the human reads fennec in (Settings); the server-built texts follow it
+    password.rs        the remote-access password's PBKDF2 hash, made and checked
     id.rs, clock.rs
     (domain uses `rules::path`, the gitignore-like matcher, as a library: one matcher for rules, protection and architecture)
   agent/             application layer: the agent loop
@@ -166,7 +167,7 @@ crates/fennec/src/
   worktree/usage.rs  the disk the worktrees take, measured and freed on the human's click
   llm/concurrency.rs the model's concurrency gate (a process-wide counting semaphore)
   web/               HTTP adapter: http, guard (who may call), routes, settings_routes, event_stream (SSE),
-                     notifier (wakes streams on append, no polling), turns, assets,
+                     notifier (wakes streams on append, no polling), turns, assets, login (a remote caller's password and session cookie),
                      session_routes (one session: created, read, written to, replayed, compacted, streamed),
                      folder_routes (the folders browsed), project_list_routes (the home's projects, favorites, a project's commands and agents),
                      test_support (the App the web tests build), thread_view (the pending approval, waiver, queue, criteria, decisions and replayable messages, served), workflow_routes, project_routes (the project page), project_delete (a project deleted, its folder on request), project_dashboard (its overview tiles), idea_routes (its ideas board, HTTP only),
@@ -307,7 +308,10 @@ sealed with `secret.key`, next to the store (lose it and the stored keys are los
    (deterministic) or produced by a model (indicative).
 4. **The server only answers local pages**: `Host` and `Origin` must be
    127.0.0.1/localhost (DNS rebinding, CSRF) and POST bodies must be JSON.
-   Never relax this: any web page could otherwise drive the agent.
+   Never relax this: any web page could otherwise drive the agent. The one
+   exception is opt-in remote access (`listen:` in settings.yaml), which the
+   server refuses to start without a password hash; a remote caller then needs
+   its session cookie and an `Origin` equal to its `Host` (`web/guard.rs`, `web/login.rs`).
 5. **Storage is SQLite** (`rusqlite`, bundled). No other new
    dependency without a stated reason in the commit body. Stdlib first.
 6. Licence: AGPL-3.0-only; the MIT notice of the code fennec started from is kept in THIRD_PARTY.md.

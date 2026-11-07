@@ -1,8 +1,11 @@
-//! The server's settings file (`settings.yaml`): its port, read and written back. No I/O here.
+//! The server's settings file (`settings.yaml`): its port, listen address and
+//! password hash, read and written back. No I/O here.
 
 use super::frontmatter;
+use std::net::IpAddr;
 
 pub const DEFAULT_PORT: u16 = 7777;
+pub const DEFAULT_LISTEN: IpAddr = IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1));
 
 /// The port the file sets; None when it sets none. Err names the bad value.
 pub fn port(content: &str) -> Result<Option<u16>, String> {
@@ -19,6 +22,35 @@ pub fn port(content: &str) -> Result<Option<u16>, String> {
     valid_port(number).map(Some)
 }
 
+/// The listen address the file sets; None when it sets none. Err names the bad value.
+pub fn listen(content: &str) -> Result<Option<IpAddr>, String> {
+    let fields = frontmatter::parse(content);
+    let Some(value) = fields.scalar("listen") else {
+        return Ok(None);
+    };
+
+    let value = value.trim();
+    value
+        .parse::<IpAddr>()
+        .map(Some)
+        .map_err(|_| format!("listen: {value:?} is not an IP address"))
+}
+
+/// The stored password hash; None when absent. Err names a malformed value.
+pub fn password(content: &str) -> Result<Option<String>, String> {
+    let fields = frontmatter::parse(content);
+    let Some(value) = fields.scalar("password") else {
+        return Ok(None);
+    };
+
+    let value = value.trim();
+    if super::password::is_valid(value) {
+        Ok(Some(value.to_string()))
+    } else {
+        Err(format!("password: {value:?} is not a valid hash"))
+    }
+}
+
 /// A port the human may choose: 1024..=65535 (below 1024 needs root).
 pub fn valid_port(port: u64) -> Result<u16, String> {
     if !(1024..=65535).contains(&port) {
@@ -27,27 +59,28 @@ pub fn valid_port(port: u64) -> Result<u16, String> {
     Ok(port as u16)
 }
 
-/// `content` with its port set to `port`: a top-level `port:` line is replaced in place (other lines
-/// and comments kept byte for byte), else `port: <n>` is appended (with a newline before it if
+/// `content` with `key` set to `value`: a top-level `key:` line is replaced in place (other lines
+/// and comments kept byte for byte), else `key: <value>` is appended (with a newline before it if
 /// `content` does not end with one). An empty (or whitespace-only) content becomes a short header
 /// comment `# fennec's server settings. The --port flag wins over this file.\n` followed by
-/// `port: <n>\n`.
-pub fn with_port(content: &str, port: u16) -> String {
-    let port_line = format!("port: {port}");
+/// `key: <value>\n`.
+pub fn with_field(content: &str, key: &str, value: &str) -> String {
+    let field_line = format!("{key}: {value}");
 
     // An empty file has no previous bytes worth preserving; give it a useful header.
     if content.trim().is_empty() {
         return format!(
-            "# fennec's server settings. The --port flag wins over this file.\n{port_line}\n"
+            "# fennec's server settings. The --port flag wins over this file.\n{field_line}\n"
         );
     }
 
     let mut out = String::new();
     let mut replaced = false;
+    let prefix = format!("{key}:");
 
     // split_inclusive keeps each line's terminator, so untouched lines survive byte for byte.
     for line in content.split_inclusive('\n') {
-        if !replaced && line.starts_with("port:") {
+        if !replaced && line.starts_with(&prefix) {
             replaced = true;
             let ending = if line.ends_with("\r\n") {
                 "\r\n"
@@ -56,7 +89,7 @@ pub fn with_port(content: &str, port: u16) -> String {
             } else {
                 ""
             };
-            out.push_str(&format!("port: {port}{ending}"));
+            out.push_str(&format!("{key}: {value}{ending}"));
         } else {
             out.push_str(line);
         }
@@ -66,10 +99,14 @@ pub fn with_port(content: &str, port: u16) -> String {
         if !content.ends_with('\n') {
             out.push('\n');
         }
-        out.push_str(&format!("{port_line}\n"));
+        out.push_str(&format!("{field_line}\n"));
     }
 
     out
+}
+
+pub fn with_port(content: &str, port: u16) -> String {
+    with_field(content, "port", &port.to_string())
 }
 
 #[cfg(test)]

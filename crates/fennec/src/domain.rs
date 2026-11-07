@@ -39,6 +39,7 @@ pub mod model_choice;
 pub mod module_map;
 pub mod named_paths;
 pub mod open_calls;
+pub mod password;
 pub mod plan;
 pub mod plan_scope;
 pub mod plugin;

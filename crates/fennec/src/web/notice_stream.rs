@@ -328,6 +328,7 @@ mod tests {
                 notifier.clone(),
             )),
             agents_home: std::env::temp_dir(),
+            logins: crate::web::login::Logins::default(),
             update_check: Default::default(),
         }
     }

@@ -44,6 +44,8 @@ impl Sandbox {
                 ".azure",
                 ".config/gcloud",
                 ".config/gh",
+                // the server settings, which hold the remote password's hash
+                ".config/fennec",
                 ".docker",
                 ".kube",
                 ".password-store",
