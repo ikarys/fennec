@@ -52,6 +52,9 @@ jobs:
         run: just web
       - name: Lint
         run: just lint
+      # A new dependency must come under a licence the AGPL can absorb.
+      - name: Licenses
+        run: just licenses
       - name: UI tests
         run: just test-web
 
