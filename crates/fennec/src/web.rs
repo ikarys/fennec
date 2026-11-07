@@ -101,6 +101,8 @@ impl Drop for ConnectionSlot {
 struct App {
     settings: Settings,
     port: u16,
+    /// The address this process bound, to tell the human when a changed `listen` needs a restart.
+    pub listen: std::net::IpAddr,
     logins: login::Logins,
     turns: Turns,
     notifier: Arc<Notifier>,
@@ -295,6 +297,7 @@ pub fn serve(
         turns: Turns::new(settings.clone(), notifier.clone()),
         settings,
         port,
+        listen,
         logins,
         notifier: notifier.clone(),
         skill_folds: Mutex::new(HashMap::new()),

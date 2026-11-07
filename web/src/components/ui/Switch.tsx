@@ -6,11 +6,13 @@
 export function Switch({
   checked,
   onChange,
-  label
+  label,
+  disabled = false
 }: {
   checked: boolean;
   onChange: (checked: boolean) => void;
   label: string;
+  disabled?: boolean;
 }) {
   return (
     <button
@@ -19,12 +21,13 @@ export function Switch({
       aria-checked={checked}
       aria-label={label}
       title={label}
+      disabled={disabled}
       onClick={(event) => {
         event.preventDefault();
         event.stopPropagation();
         onChange(!checked);
       }}
-      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
         checked ? 'bg-accent' : 'bg-border-strong'
       }`}
     >

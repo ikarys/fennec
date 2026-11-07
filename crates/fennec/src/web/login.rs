@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 pub struct Logins {
-    password: Option<String>,
+    password: Mutex<Option<String>>,
     // ponytail: in-memory sessions, persist them if re-login after a restart annoys
     sessions: Mutex<HashSet<String>>,
     attempts: Mutex<()>,
@@ -19,14 +19,18 @@ pub struct Logins {
 impl Logins {
     pub fn new(password: Option<String>) -> Self {
         Self {
-            password,
+            password: Mutex::new(password),
             sessions: Mutex::new(HashSet::new()),
             attempts: Mutex::new(()),
         }
     }
 
     pub fn enabled(&self) -> bool {
-        self.password.is_some()
+        crate::locks::lock(&self.password).is_some()
+    }
+
+    pub fn set_password(&self, hash: String) {
+        *crate::locks::lock(&self.password) = Some(hash);
     }
 
     pub fn has_session(&self, token: &str) -> bool {
@@ -38,7 +42,7 @@ impl Logins {
     }
 
     pub fn verify_password(&self, candidate: &str) -> bool {
-        self.password
+        crate::locks::lock(&self.password)
             .as_deref()
             .is_some_and(|stored| crate::domain::password::verify(stored, candidate))
     }

@@ -164,12 +164,13 @@ Point fennec at a model with `FENNEC_LLM_URL` (or add providers on the Settings 
 project folder from the home page, describe the change and approve the plan.
 
 Port 7777 taken? `fennec --port 7788`, or set it for good in `~/.config/fennec/settings.yaml` (`port: 7788`),
-also editable on Settings > Security.
+also editable on Settings > Security > Network.
 
 ### Remote access
 
 fennec listens on 127.0.0.1 only, and needs no password there. To use it from another machine
-(fennec on a NAS, say):
+(fennec on a NAS, say), set a password and allow remote connections on Settings > Security > Network,
+then restart from there. Or, from a shell:
 
 ```bash
 fennec password                                       # stores a PBKDF2 hash in ~/.config/fennec/settings.yaml

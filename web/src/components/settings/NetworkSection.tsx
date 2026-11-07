@@ -3,14 +3,19 @@ import { Section, type SectionSave } from '../ui/Section';
 import { FieldRow, TextInput } from '../ui/Field';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
-import { RefreshIcon, SpinnerIcon } from '../Icons';
+import { Switch } from '../ui/Switch';
+import { CheckIcon, RefreshIcon, SpinnerIcon } from '../Icons';
 import { useT } from '../../i18n';
-import { getServer, setServerPort, restartServer, type ServerSettings } from '../../lib/api';
+import { getServer, setServer, setServerPassword, restartServer, type ServerSettings } from '../../lib/api';
 
-export function ServerSection() {
+export function NetworkSection() {
   const t = useT();
   const [view, setView] = useState<ServerSettings | null>(null);
-  const [draft, setDraft] = useState('');
+  const [portDraft, setPortDraft] = useState('');
+  const [remoteDraft, setRemoteDraft] = useState(false);
+  const [passwordDraft, setPasswordDraft] = useState('');
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [savingPassword, setSavingPassword] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [restarting, setRestarting] = useState(false);
   const intervalRef = useRef<number | null>(null);
@@ -21,7 +26,8 @@ export function ServerSection() {
       .then((result) => {
         if (!cancelled) {
           setView(result);
-          setDraft(String(result.port));
+          setPortDraft(String(result.port));
+          setRemoteDraft(result.remote);
         }
       })
       .catch((error: unknown) => {
@@ -51,14 +57,18 @@ export function ServerSection() {
     return null;
   }
 
-  const dirty = draft !== String(view.port);
+  const dirty = portDraft !== String(view.port) || remoteDraft !== view.remote;
   const save: SectionSave = {
     dirty,
     onSave: async () => {
-      const next = await setServerPort(Number(draft));
+      const next = await setServer(Number(portDraft), remoteDraft);
       setView(next);
+      setPortDraft(String(next.port));
+      setRemoteDraft(next.remote);
     },
   };
+
+  const remoteDisabled = !view.passwordSet && !remoteDraft;
 
   const stopPolling = () => {
     if (intervalRef.current !== null) {
@@ -119,10 +129,28 @@ export function ServerSection() {
     }, 1000);
   };
 
+  const onSavePassword = async () => {
+    if (!passwordDraft || savingPassword) {
+      return;
+    }
+
+    setSavingPassword(true);
+    setPasswordError(null);
+    try {
+      const next = await setServerPassword(passwordDraft);
+      setView(next);
+      setPasswordDraft('');
+    } catch (error) {
+      setPasswordError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSavingPassword(false);
+    }
+  };
+
   return (
     <Section
-      title={t('serverTitle')}
-      description={t('serverDescription')}
+      title={t('networkTitle')}
+      description={t('networkDescription')}
       actions={
         <Button
           variant="ghost"
@@ -144,14 +172,61 @@ export function ServerSection() {
           min={1024}
           max={65535}
           className="w-32"
-          value={draft}
-          onChange={(event) => setDraft(event.currentTarget.value)}
+          value={portDraft}
+          onChange={(event) => setPortDraft(event.currentTarget.value)}
         />
       </FieldRow>
+      <FieldRow
+        label={t('networkRemoteLabel')}
+        hint={remoteDisabled ? t('networkRemoteNeedsPassword') : t('networkRemoteHint')}
+      >
+        <Switch
+          checked={remoteDraft}
+          onChange={setRemoteDraft}
+          label={t('networkRemoteLabel')}
+          disabled={remoteDisabled}
+        />
+      </FieldRow>
+      <FieldRow
+        label={t('networkPasswordLabel')}
+        hint={
+          view.passwordSet ? (
+            <Badge tone="ok">{t('networkPasswordSet')}</Badge>
+          ) : (
+            <Badge tone="attention">{t('networkPasswordNone')}</Badge>
+          )
+        }
+      >
+        <div className="flex items-center gap-2">
+          <TextInput
+            type="password"
+            className="w-48"
+            value={passwordDraft}
+            onChange={(event) => setPasswordDraft(event.currentTarget.value)}
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            title={t('networkPasswordSave')}
+            aria-label={t('networkPasswordSave')}
+            onClick={onSavePassword}
+            disabled={savingPassword || passwordDraft.length === 0}
+          >
+            {savingPassword ? (
+              <SpinnerIcon className="h-4 w-4 animate-spin" />
+            ) : (
+              <CheckIcon className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+      </FieldRow>
+      {passwordError ? <p className="m-0 text-xs text-danger">{passwordError}</p> : null}
       <div className="flex items-center gap-2 text-xs text-muted">
         {t('serverRunningOn')}
         <Badge tone="accent">{view.runningPort}</Badge>
-        {view.port !== view.runningPort ? <Badge tone="attention">{t('serverRestartNeeded')}</Badge> : null}
+        {view.runningRemote ? <Badge tone="info">{t('networkRemoteOn')}</Badge> : null}
+        {view.restartNeeded ? <Badge tone="attention">{t('serverRestartNeeded')}</Badge> : null}
       </div>
       {view.fromFlag ? <p className="m-0 text-xs text-faint">{t('serverFromFlag')}</p> : null}
     </Section>
