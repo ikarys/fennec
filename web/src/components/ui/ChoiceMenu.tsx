@@ -10,7 +10,7 @@ import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { Button } from './Button';
 import { Card } from './Card';
 import { useDismissable } from '../../hooks/useDismissable';
-import { ChevronDownIcon } from '../Icons';
+import { ChevronDownIcon } from './Icons';
 
 export interface Choice {
   value: string;

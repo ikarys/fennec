@@ -8,7 +8,7 @@ import {
 } from 'react';
 import { useT } from '../../i18n';
 import { createFolder, listFolders, type FolderListing } from '../../lib/api';
-import { CloseIcon } from '../Icons';
+import { CloseIcon } from '../ui/Icons';
 import { FolderList } from './FolderList';
 import { PathBreadcrumb } from './PathBreadcrumb';
 import { Button } from '../ui/Button';

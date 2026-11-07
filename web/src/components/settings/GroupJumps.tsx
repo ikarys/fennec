@@ -1,10 +1,12 @@
 /** Long tabs are hard to scan; read groups from the DOM because many components render them. */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
+import { useT } from '../../i18n';
 
 type Group = { label: string; element: HTMLElement };
 
 export function GroupJumps({ container, deps }: { container: RefObject<HTMLElement | null>; deps: unknown }) {
+  const t = useT();
   const [groups, setGroups] = useState<Group[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const navRef = useRef<HTMLElement | null>(null);
@@ -103,7 +105,7 @@ export function GroupJumps({ container, deps }: { container: RefObject<HTMLEleme
   return (
     <nav
       ref={navRef}
-      aria-label="Groupes de cet onglet"
+      aria-label={t('settingsTabGroups')}
       className="sticky top-0 z-10 -mx-5 -mt-5 border-b border-border bg-panel px-5 pb-2 pt-3"
     >
       <div className="flex flex-wrap gap-1">

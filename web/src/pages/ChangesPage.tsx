@@ -7,7 +7,7 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { ListCard } from '../components/ui/ListCard';
-import { ChevronsLeftIcon, ExternalIcon } from '../components/Icons';
+import { ChevronsLeftIcon, ExternalIcon } from '../components/ui/Icons';
 import { SIGNAL_KEYS } from '../components/session/IntegrationReview';
 
 export default function ChangesPage({ sessionId }: { sessionId: string }) {

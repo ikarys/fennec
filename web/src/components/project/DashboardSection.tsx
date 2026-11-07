@@ -13,7 +13,7 @@ import {
   ProjectIcon,
   ReviewIcon,
   TokensIcon,
-} from '../Icons';
+} from '../ui/Icons';
 import { getProjectDashboard, type DashboardIcon } from '../../lib/api';
 import { formatDateTime, formatRelative } from '../../lib/format';
 import { BudgetTile } from './BudgetTile';

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Badge } from '../ui/Badge';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Section } from '../ui/Section';
-import { AlertIcon, ExternalIcon, LayersIcon, PlayIcon, WandIcon } from '../Icons';
+import { AlertIcon, ExternalIcon, LayersIcon, PlayIcon, WandIcon } from '../ui/Icons';
 import { type SessionSummary } from '../../lib/api';
 import { formatDateTime, formatRelative } from '../../lib/format';
 import { QuestionForm } from './QuestionForm';

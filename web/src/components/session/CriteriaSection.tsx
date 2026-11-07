@@ -1,5 +1,5 @@
 import type { CriteriaTally, CriterionStatus, CriterionView, Provenance } from '../../lib/api';
-import { CheckIcon } from '../Icons';
+import { CheckIcon } from '../ui/Icons';
 import type { BadgeTone } from '../ui/Badge';
 import { Badge } from '../ui/Badge';
 import { Panel } from '../ui/Panel';

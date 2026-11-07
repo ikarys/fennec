@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { Badge } from '../../ui/Badge';
 import { Button } from '../../ui/Button';
-import { CheckIcon, ChevronDownIcon, ChevronRightIcon, MoonIcon, ReviewIcon } from '../../Icons';
+import { CheckIcon, ChevronDownIcon, ChevronRightIcon, MoonIcon, ReviewIcon } from '../../ui/Icons';
 import { Card } from '../../ui/Card';
 import { formatRelative } from '../../../lib/format';
 import { IdeaStatusBadge } from './IdeaStatusBadge';

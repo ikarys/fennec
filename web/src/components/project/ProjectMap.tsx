@@ -12,7 +12,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { Segmented } from '../ui/Segmented';
-import { EyeIcon } from '../Icons';
+import { EyeIcon } from '../ui/Icons';
 import { useT } from '../../i18n';
 import { ModuleDetails } from './ModuleDetails';
 import type { ModuleMap } from '../../lib/api';

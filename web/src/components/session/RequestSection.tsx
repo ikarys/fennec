@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { panelBlock } from '../../lib/panelBlocks';
-import { SendIcon } from '../Icons';
+import { SendIcon } from '../ui/Icons';
 import { Button } from '../ui/Button';
 import { Panel } from '../ui/Panel';
 import { useT } from '../../i18n';

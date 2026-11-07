@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useT } from '../../i18n';
 import type { ServerDef } from '../../lib/api';
 import { saveServers } from '../../lib/api';
-import { CloseIcon, PlusIcon, SpinnerIcon, TrashIcon } from '../Icons';
+import { CloseIcon, PlusIcon, SpinnerIcon, TrashIcon } from '../ui/Icons';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { TextInput } from '../ui/Field';

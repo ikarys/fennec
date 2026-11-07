@@ -2,7 +2,7 @@
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
-import { PlayIcon } from '../Icons';
+import { PlayIcon } from '../ui/Icons';
 import { ServerList } from './ServerList';
 import { useT } from '../../i18n';
 

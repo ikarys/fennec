@@ -3,7 +3,7 @@ import type { MsgKey } from '../../i18n/messages';
 import { useT } from '../../i18n';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { PlayIcon } from '../Icons';
+import { PlayIcon } from '../ui/Icons';
 import { Select, TextInput } from '../ui/Field';
 
 interface EditorHeaderProps {

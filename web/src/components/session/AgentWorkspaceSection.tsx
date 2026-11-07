@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Blocker, IntegrationPreview, RepoState, SessionDetail } from '../../lib/api';
 import { discardWorktree, getIntegration, getRepoState, openFileManager, openTerminal, resolveConflict } from '../../lib/api';
-import { BranchIcon, CheckIcon, CopyIcon, ExternalIcon, FolderIcon, SpinnerIcon, TerminalIcon } from '../Icons';
+import { BranchIcon, CheckIcon, CopyIcon, ExternalIcon, FolderIcon, SpinnerIcon, TerminalIcon } from '../ui/Icons';
 import { useIntegrationInvite } from './IntegrationInvite';
 import { Button, buttonClass } from '../ui/Button';
 import { Badge } from '../ui/Badge';

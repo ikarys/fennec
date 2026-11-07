@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import type { SessionUsage } from '../../lib/api';
 import { formatSpeed, formatTokens } from '../../lib/format';
-import { CoinIcon } from '../Icons';
+import { CoinIcon } from '../ui/Icons';
 import { Panel } from '../ui/Panel';
 import { Tile } from '../ui/Tile';
 import { useLang, useT } from '../../i18n';

@@ -7,7 +7,7 @@ import { Tile } from '../../ui/Tile';
 import { QueueBar } from './QueueBar';
 import { NightReport } from './NightReport';
 import { StageGroup } from './StageGroup';
-import { ReviewIcon, PlayIcon, BulbIcon, CheckIcon } from '../../Icons';
+import { ReviewIcon, PlayIcon, BulbIcon, CheckIcon } from '../../ui/Icons';
 import type { TasksSub } from './TasksSection';
 import type { IdeaBoard, IdeaView } from '../../../lib/ideas';
 import { useT } from '../../../i18n';

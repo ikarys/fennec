@@ -6,7 +6,7 @@ import { useRef, useState } from 'react';
 import { Button } from '../../ui/Button';
 import { Modal } from '../../ui/Modal';
 import { TextArea } from '../../ui/Field';
-import { CloseIcon, FileIcon, PaperclipIcon } from '../../Icons';
+import { CloseIcon, FileIcon, PaperclipIcon } from '../../ui/Icons';
 import { addIdea, type IdeaBoard } from '../../../lib/ideas';
 import { readFiles, type FileAttachmentInput } from '../../../lib/attachments';
 import { useT, useLang } from '../../../i18n';

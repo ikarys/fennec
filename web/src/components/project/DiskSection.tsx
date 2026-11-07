@@ -7,7 +7,7 @@ import { Section } from '../ui/Section';
 import { Tile } from '../ui/Tile';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { CopyButton } from '../session/CopyButton';
-import { EraserIcon, HardDriveIcon, RefreshIcon, SpinnerIcon, TrashIcon } from '../Icons';
+import { EraserIcon, HardDriveIcon, RefreshIcon, SpinnerIcon, TrashIcon } from '../ui/Icons';
 import {
   cleanWorktree,
   getProjectWorktrees,

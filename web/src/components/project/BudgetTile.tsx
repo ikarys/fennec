@@ -4,7 +4,7 @@ import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { TextInput } from '../ui/Field';
 import { Tile } from '../ui/Tile';
-import { CheckIcon, CloseIcon, CoinIcon, TrashIcon } from '../Icons';
+import { CheckIcon, CloseIcon, CoinIcon, TrashIcon } from '../ui/Icons';
 import {
   getProjectBudget,
   setProjectBudget,

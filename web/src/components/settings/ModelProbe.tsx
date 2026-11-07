@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { probeModel, type LimitSource, type ProbedModel } from '../../lib/api';
 import { Button } from '../ui/Button';
-import { SpinnerIcon, WandIcon } from '../Icons';
+import { SpinnerIcon, WandIcon } from '../ui/Icons';
 import type { ModelForm } from './ModelPrefsSection';
 import { useLang, useT } from '../../i18n';
 import { t, type Lang } from '../../i18n/messages';

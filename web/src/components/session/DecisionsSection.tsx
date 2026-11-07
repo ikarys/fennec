@@ -1,5 +1,5 @@
 import type { DecisionView } from '../../lib/api';
-import { DecisionIcon } from '../Icons';
+import { DecisionIcon } from '../ui/Icons';
 import { Panel } from '../ui/Panel';
 import { DecisionList } from './DecisionList';
 import { useT } from '../../i18n';

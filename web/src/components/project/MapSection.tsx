@@ -13,7 +13,7 @@ import {
   PinIcon,
   RefreshIcon,
   SpinnerIcon,
-} from '../Icons';
+} from '../ui/Icons';
 import {
   writeMapFile,
   type ArchitectureDrift,

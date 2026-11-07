@@ -3,7 +3,7 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { TextArea } from '../ui/Field';
-import { BulbIcon, ReplyIcon, SendIcon } from '../Icons';
+import { BulbIcon, ReplyIcon, SendIcon } from '../ui/Icons';
 import { useT } from '../../i18n';
 
 export function QuestionForm({

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Section } from '../ui/Section';
 import { Badge } from '../ui/Badge';
 import { Button, buttonClass } from '../ui/Button';
-import { ExternalIcon, RefreshIcon, SpinnerIcon } from '../Icons';
+import { ExternalIcon, RefreshIcon, SpinnerIcon } from '../ui/Icons';
 import { useT } from '../../i18n';
 import { getVersion, getUpdate, type UpdateCheck } from '../../lib/api';
 import { useLoaded } from '../../hooks/useLoaded';

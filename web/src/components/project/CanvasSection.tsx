@@ -3,7 +3,7 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
-import { TrashIcon } from '../Icons';
+import { TrashIcon } from '../ui/Icons';
 import { useT } from '../../i18n';
 import { CanvasPane } from '../canvas/CanvasPane';
 import { deleteCanvas, listProjectCanvas, type CanvasArtifact } from '../../lib/api/canvas';

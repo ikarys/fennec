@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { portTone, runRounds, upcomingSteps, type NodeRun, type RunView, type UpcomingStep } from '../../../lib/workflowRun';
 import { formatClock, formatDuration } from '../../../lib/format';
-import { ChevronDownIcon, ChevronRightIcon, ChevronsLeftIcon, ChevronsRightIcon } from '../../Icons';
+import { ChevronDownIcon, ChevronRightIcon, ChevronsLeftIcon, ChevronsRightIcon } from '../../ui/Icons';
 import { useLang, useT } from '../../../i18n';
 import { Button } from '../../ui/Button';
 import { NodeOutputModal } from './NodeOutputModal';

@@ -3,7 +3,7 @@
  * can see what will be dropped into the turn, and remove one.
  */
 import type { QueuedMessage } from '../../lib/api/sessions';
-import { CloseIcon } from '../Icons';
+import { CloseIcon } from '../ui/Icons';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { useT } from '../../i18n';

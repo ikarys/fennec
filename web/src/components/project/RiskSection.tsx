@@ -9,7 +9,7 @@ import { Card } from '../ui/Card';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Section } from '../ui/Section';
 import { Tile } from '../ui/Tile';
-import { ActivityIcon, AlertIcon, ChevronRightIcon, RefreshIcon, ReviewIcon, SpinnerIcon, WandIcon } from '../Icons';
+import { ActivityIcon, AlertIcon, ChevronRightIcon, RefreshIcon, ReviewIcon, SpinnerIcon, WandIcon } from '../ui/Icons';
 import { TableHeader } from '../ui/TableHeader';
 import { useLoaded } from '../../hooks/useLoaded';
 

@@ -2,10 +2,10 @@ import { useEffect, useRef, useState, type PointerEvent, type KeyboardEvent } fr
 import { useT } from '../i18n';
 import type { Project } from '../lib/api';
 import { SessionPage } from './SessionPage';
-import { Palette } from '../components/Palette';
+import { Palette } from '../components/layout/Palette';
 import type { PageId } from '../components/layout/TopBar';
 import { Button } from '../components/ui/Button';
-import { PlusIcon } from '../components/Icons';
+import { PlusIcon } from '../components/ui/Icons';
 
 const RATIO_KEY = 'fennec.split.ratio';
 const MIN_PCT = 25;

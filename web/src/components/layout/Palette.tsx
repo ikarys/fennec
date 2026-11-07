@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Project, SessionState } from '../lib/api';
-import { stateLabel } from '../lib/format';
-import { SessionStateIcon } from './session/SessionStateIcon';
-import { useLang, useT } from '../i18n';
-import { SearchIcon } from './Icons';
-import { SectionLabel } from './ui/SectionLabel';
-import type { PageId } from './layout/TopBar';
+import type { Project, SessionState } from '../../lib/api';
+import { stateLabel } from '../../lib/format';
+import { SessionStateIcon } from '../session/SessionStateIcon';
+import { useLang, useT } from '../../i18n';
+import { SearchIcon } from '../ui/Icons';
+import { SectionLabel } from '../ui/SectionLabel';
+import type { PageId } from './TopBar';
 
 interface PaletteItem {
   id: string;

@@ -10,7 +10,7 @@ import { QueueBar } from './QueueBar';
 import { StageGroup } from './StageGroup';
 import { NewIdeaDialog } from './NewIdeaDialog';
 import { Button } from '../../ui/Button';
-import { CloseIcon, PlusIcon } from '../../Icons';
+import { CloseIcon, PlusIcon } from '../../ui/Icons';
 import {
   listIdeas,
   markReportRead,

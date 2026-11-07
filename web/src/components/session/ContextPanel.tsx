@@ -16,7 +16,7 @@ import {
   EyeIcon,
   FileIcon,
   PuzzleIcon,
-} from '../Icons';
+} from '../ui/Icons';
 import { AgentWorkspaceSection } from './AgentWorkspaceSection';
 import { CriteriaSection } from './CriteriaSection';
 import { DecisionsSection } from './DecisionsSection';

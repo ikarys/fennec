@@ -9,7 +9,7 @@ import { Switch } from '../ui/Switch';
 import { Tabs } from '../ui/Tabs';
 import { authorizeMcp, connectMcp, type McpServer } from '../../lib/api';
 import type { McpToolSummary, ToolAccess } from '../../lib/api/settings';
-import { ChevronRightIcon, KeyIcon } from '../Icons';
+import { ChevronRightIcon, KeyIcon } from '../ui/Icons';
 import { useLang, useT } from '../../i18n';
 import { formatTokens } from '../../lib/format';
 

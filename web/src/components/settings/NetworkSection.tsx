@@ -4,7 +4,7 @@ import { FieldRow, TextInput } from '../ui/Field';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Switch } from '../ui/Switch';
-import { CheckIcon, RefreshIcon, SpinnerIcon } from '../Icons';
+import { CheckIcon, RefreshIcon, SpinnerIcon } from '../ui/Icons';
 import { useT } from '../../i18n';
 import { getServer, setServer, setServerPassword, restartServer, type ServerSettings } from '../../lib/api';
 

@@ -13,7 +13,7 @@ import {
   FileIcon,
   ProjectIcon,
   ReviewIcon,
-} from '../Icons';
+} from '../ui/Icons';
 import {
   getProjectIndicators,
   type IndicatorId,

@@ -6,7 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { NodeRun } from '../../../lib/workflowRun';
 import { portTone } from '../../../lib/workflowRun';
-import { ExternalIcon } from '../../Icons';
+import { ExternalIcon } from '../../ui/Icons';
 import { markdownComponents } from '../../session/markdownComponents';
 import { Badge } from '../../ui/Badge';
 import { buttonClass } from '../../ui/Button';

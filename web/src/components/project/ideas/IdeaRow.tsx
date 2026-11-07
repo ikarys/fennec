@@ -12,7 +12,7 @@ import {
   GripIcon,
   PlayIcon,
   ReplyIcon,
-} from "../../Icons";
+} from "../../ui/Icons";
 import { IdeaStatusBadge } from "./IdeaStatusBadge";
 import { IdeaMeta } from "./IdeaMeta";
 import { IdeaAttachments } from "./IdeaAttachments";
