@@ -20,7 +20,7 @@ use crate::web::routes::model_routes;
 use crate::worktree::{self, Worktree};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
 /// Where a session's turns run: its worktree when it has one, the project's
@@ -224,6 +224,7 @@ pub(super) fn with_turn<R>(
         workdir,
         autonomous,
         delegated,
+        delegations: _,
     } = *at;
     let store = SqliteStore::open(&settings.db_path)?;
     // A workflow's child sessions run on the model the human chose for the session.
@@ -257,18 +258,21 @@ fn run(
     stop: &AtomicBool,
     autonomous: bool,
 ) -> Result<(), String> {
+    let delegations = AtomicU32::new(0);
     let here = Children {
         settings,
         notifier,
         workdir,
         autonomous,
         delegated: false,
+        delegations: None,
     };
     // A delegated agent runs with the human away: nobody answers its
     // questions or approvals, so it decides or is refused, never pauses.
     let delegates = Children {
         autonomous: true,
         delegated: true,
+        delegations: Some(&delegations),
         ..here
     };
     with_turn(

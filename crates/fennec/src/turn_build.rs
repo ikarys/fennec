@@ -76,9 +76,10 @@ pub fn with_turn<R>(
     let skills = skills::discover(workdir);
     let mut agents = agents::discover(workdir);
     // The agents are told of (their reminder), and may call, only the tools this turn
-    // can run. The definitions stay whole: one prefix for every session, so a new one
-    // (a delegate's child included) starts from the server's cache.
-    let can_delegate = options.children.is_some();
+    // can run. Delegation also needs the setting on. The definitions stay whole: one
+    // prefix for every session, so a new one (a delegate's child included) starts from
+    // the server's cache.
+    let can_delegate = options.children.is_some() && prefs.delegation.enabled;
     for agent in &mut agents {
         agent
             .allowed_tools
