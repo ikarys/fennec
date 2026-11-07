@@ -129,25 +129,18 @@ fn run(args: &[String]) -> Result<(), String> {
 }
 
 fn password_command() -> Result<(), String> {
-    use ring::rand::SecureRandom;
     let first = read_password_line("New password: ")?;
     let second = read_password_line("Again: ")?;
-    if first.chars().count() < 12 {
-        return Err("password must be at least 12 characters".into());
-    }
     if first != second {
         return Err("passwords do not match".into());
     }
 
-    let mut salt = [0u8; 16];
-    ring::rand::SystemRandom::new()
-        .fill(&mut salt)
-        .map_err(|e| e.to_string())?;
-    let hash = domain::password::hash(&first, &salt, domain::password::ITERATIONS);
-    server_config::set_password(&hash)?;
+    server_config::set_password(&server_config::new_hash(&first)?)?;
 
     println!("wrote password to {}", server_config::path().display());
-    println!("set `listen: 0.0.0.0` in that file to accept remote connections");
+    println!(
+        "allow remote connections in Settings → Network, or set `listen: 0.0.0.0` in that file"
+    );
     Ok(())
 }
 

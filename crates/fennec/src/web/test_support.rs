@@ -33,6 +33,7 @@ pub(super) fn app(db_path: PathBuf) -> App {
         turns: Turns::new(settings.clone(), notifier.clone()),
         settings,
         port: 0,
+        listen: std::net::Ipv4Addr::LOCALHOST.into(),
         logins: super::login::Logins::default(),
         notifier: notifier.clone(),
         skill_folds: Mutex::new(HashMap::new()),

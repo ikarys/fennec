@@ -86,6 +86,7 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         }
         ("GET", ["api", "server"]) => server_routes::show(app, stream),
         ("POST", ["api", "server"]) => server_routes::set(app, req, stream),
+        ("POST", ["api", "server", "password"]) => server_routes::set_password(app, req, stream),
         ("POST", ["api", "server", "restart"]) => server_routes::restart(app, stream),
         ("GET", ["api", "update"]) => update_routes::check(app, req, stream),
         ("POST", ["api", "update"]) => update_routes::apply(app, stream),
