@@ -40,6 +40,12 @@ export interface SandboxPrefs {
   network: boolean;
 }
 
+/** What fennec writes in the integration commit. */
+export interface IntegrationPrefs {
+  /** One `Co-Authored-By` trailer per model that wrote the work (server default true). */
+  modelTrailers: boolean;
+}
+
 /** The ideas queue's caps in night mode, per idea; 0 means no cap. */
 export interface AutonomyPrefs {
   maxMinutesPerIdea: number;
@@ -97,6 +103,7 @@ export interface Preferences {
   /** fennec's bwrap world: how commands run. */
   sandbox?: SandboxPrefs;
   autonomy?: AutonomyPrefs;
+  integration?: IntegrationPrefs;
   /** Skill ids every new session gets in its system prompt. */
   alwaysOnSkills?: string[];
   /** Opt-in embedded workflows the human enabled. */
