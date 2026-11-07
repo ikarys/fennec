@@ -1,6 +1,6 @@
 // A session's changes: its branch's files in review order, the selected one's diff.
 import { Fragment, useEffect, useRef, useState } from 'react';
-import { getFileDiff, getIntegration, type FileDiff, type IntegrationPreview, type ReviewSignal } from '../lib/api/sessions';
+import { getFileDiff, getIntegration, type FileDiff, type IntegrationPreview, type ReviewSignal } from '../lib/api/integration';
 import { tabPath } from '../lib/route';
 import { useT } from '../i18n';
 import { Badge } from '../components/ui/Badge';
