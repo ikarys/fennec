@@ -1,5 +1,6 @@
 //! The `delegate` tool, owned by the agent loop: it hands a self-contained, read-only task to an agent in a fresh child session and returns only that agent's final answer.
-//! The child has its own context, so broad exploration does not fill the parent's context; it cannot write, ask the human, or delegate further, so delegations do not nest.
+//! The child has its own context, so broad exploration does not fill the parent's context; it cannot write or delegate further, so delegations do not nest.
+//! The child's loop tools that leave something for the human are refused, so all of that comes back in its answer.
 
 use crate::agent::ports::AgentRun;
 use crate::domain::agent::AgentDefinition;
@@ -10,6 +11,27 @@ use super::tool_args::required;
 use super::turn::Turn;
 
 pub const NAME: &str = "delegate";
+
+/// The loop tools whose output waits for the human (a question, a decision, a proposal): refused in a child.
+pub const FOR_THE_HUMAN: [&str; 9] = [
+    "record_decision",
+    "propose_task",
+    "propose_plan",
+    "submit_report",
+    "suggest_agent",
+    "propose_criteria",
+    "request_waiver",
+    "ask_user",
+    "canvas",
+];
+
+/// What a delegated child reads when it calls one of `FOR_THE_HUMAN`.
+pub const CHILD_REFUSAL: &str = "You are running as a delegated agent in a hidden child session; the human does not see this tool's output. This tool is not available here. Put the question, decision, task idea, plan, or suggestion in your final answer instead; the agent that delegated to you will decide.";
+
+/// The call is refused because the turn is a hidden child (`Turn::delegated`).
+pub(super) fn refused_in_child(turn: &Turn, name: &str) -> bool {
+    turn.delegated && FOR_THE_HUMAN.contains(&name)
+}
 
 /// The OpenAI tool definition; the `agent` enum lists the delegable agents (`a.delegable()`), in the given order.
 pub fn definition(agents: &[AgentDefinition]) -> Value {
@@ -142,6 +164,7 @@ pub(super) fn run(turn: &Turn, args: &Value) -> ToolResult {
     // The child is another session: the model gate must not keep it waiting
     // behind its own parent, which is blocked on this call.
     turn.model.release(turn.session_id);
+    let started = std::time::Instant::now();
     let ran = children
         .create(turn.session_id, &child_title(&delegation))
         .and_then(|child| {
@@ -149,10 +172,12 @@ pub(super) fn run(turn: &Turn, args: &Value) -> ToolResult {
                 .send(&child, &delegation.agent, &delegation.task, turn.stop)
                 .map(|run| (child, run))
         });
-    match ran {
+    let mut outcome = match ran {
         Ok((child, run)) => result(&child, run),
         Err(e) => ToolResult::failure(format!("delegate failed: {e}")),
-    }
+    };
+    outcome.duration_ms = started.elapsed().as_millis() as u64;
+    outcome
 }
 
 #[cfg(test)]
@@ -343,5 +368,12 @@ mod tests {
         assert!(output.starts_with(&"a".repeat(20_000)));
         assert!(output.contains("[answer cut at 20000 characters]"));
         assert!(output.ends_with("(Delegated session: session-1)"));
+    }
+
+    #[test]
+    fn for_the_human_lists_known_tools() {
+        for name in FOR_THE_HUMAN {
+            assert!(crate::domain::agent::KNOWN_TOOLS.contains(&name));
+        }
     }
 }

@@ -35,6 +35,8 @@ pub struct Options<'a> {
     pub model_choice: Option<ModelRef>,
     /// The human is away (the ideas queue's night mode).
     pub autonomous: bool,
+    /// The turn runs a `delegate` call's child (`Turn::delegated`).
+    pub delegated: bool,
     /// Called for every event right after it is stored (the CLI prints them).
     pub on_event: &'a mut dyn FnMut(&Event),
     /// Where `delegate` runs its agents (the web's top-level turns only).
@@ -201,6 +203,7 @@ pub fn with_turn<R>(
         compact_at: params.compact_at,
         reasoning_effort: params.reasoning_effort,
         autonomous: options.autonomous,
+        delegated: options.delegated,
         lang: Lang::from_code(&prefs.display.language),
         preflight_sent_back: false,
         stop,
@@ -247,6 +250,7 @@ mod tests {
             notifier: None,
             model_choice: None,
             autonomous: true,
+            delegated: false,
             on_event: &mut on_event,
             children: None,
         };

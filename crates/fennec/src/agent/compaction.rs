@@ -160,6 +160,7 @@ mod tests {
             compact_at: 0.85,
             reasoning_effort: None,
             autonomous: false,
+            delegated: false,
             lang: crate::domain::lang::Lang::Fr,
             preflight_sent_back: false,
 
