@@ -103,7 +103,6 @@ mod tests {
                 compact_at: 0.0,
                 reasoning_effort: None,
                 autonomous,
-                delegated: false,
                 lang: crate::domain::lang::Lang::Fr,
                 preflight_sent_back: false,
                 stop: self.stop,

@@ -82,9 +82,6 @@ pub struct Turn<'a> {
     /// The human is away (the ideas queue's night mode): `ask_user` and
     /// `propose_criteria` answer themselves instead of pausing the turn.
     pub autonomous: bool,
-    /// The turn runs a `delegate` call's child, hidden from the human: the
-    /// loop tools that leave something for them are refused (implies `autonomous`).
-    pub delegated: bool,
     /// The language the human reads fennec in: the questions the loop builds follow it.
     pub lang: crate::domain::lang::Lang,
     /// The plan's preflight feedback was already sent back in this turn: it
@@ -655,7 +652,6 @@ mod tests {
                 compact_at: 0.0,
                 reasoning_effort: None,
                 autonomous: false,
-                delegated: false,
                 lang: crate::domain::lang::Lang::Fr,
                 preflight_sent_back: false,
                 stop: self.stop,
@@ -694,7 +690,6 @@ mod tests {
             compact_at: 0.0,
             reasoning_effort: None,
             autonomous: false,
-            delegated: false,
             lang: crate::domain::lang::Lang::Fr,
             preflight_sent_back: false,
             stop: &stop,
@@ -1031,7 +1026,6 @@ mod tests {
             compact_at: 0.0,
             reasoning_effort: None,
             autonomous: false,
-            delegated: false,
             lang: crate::domain::lang::Lang::Fr,
             preflight_sent_back: false,
             stop: &stop,
@@ -1998,7 +1992,6 @@ mod tests {
             compact_at: 0.0,
             reasoning_effort: None,
             autonomous: false,
-            delegated: false,
             lang: crate::domain::lang::Lang::Fr,
             preflight_sent_back: false,
             stop: &stop,

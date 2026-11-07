@@ -189,17 +189,6 @@ pub(super) fn execute_tools(
             )?;
             continue;
         }
-        // A delegated child is hidden from the human: what it would leave
-        // for them comes back in its answer, for the parent to decide.
-        if delegate::refused_in_child(turn, &call.name) {
-            record(
-                turn,
-                message_id,
-                call,
-                ToolResult::failure(delegate::CHILD_REFUSAL.into()),
-            )?;
-            continue;
-        }
         if call.name == ask_user::NAME {
             match ask_user::parse(&call.arguments) {
                 // The model reads the failure and the loop goes on.
@@ -534,7 +523,6 @@ mod tests {
                 compact_at: 0.0,
                 reasoning_effort: None,
                 autonomous,
-                delegated: false,
                 lang: crate::domain::lang::Lang::Fr,
                 preflight_sent_back: false,
                 stop: self.stop,
@@ -636,7 +624,6 @@ mod tests {
             compact_at: 0.0,
             reasoning_effort: None,
             autonomous: false,
-            delegated: false,
             lang: crate::domain::lang::Lang::Fr,
             preflight_sent_back: false,
             stop: &stop,
@@ -1343,7 +1330,6 @@ mod tests {
             compact_at: 0.0,
             reasoning_effort: None,
             autonomous: false,
-            delegated: false,
             lang: crate::domain::lang::Lang::Fr,
             preflight_sent_back: false,
             stop: &stop,
@@ -1453,7 +1439,7 @@ mod tests {
             vec![(
                 "child".to_string(),
                 "plan".to_string(),
-                "Where are sessions stored?".to_string()
+                format!("{}Where are sessions stored?", super::delegate::CHILD_BRIEF)
             )]
         );
         let (id, result) = &results(&h.log)[0];
@@ -1485,77 +1471,6 @@ mod tests {
                 .error
                 .as_deref()
                 .is_some_and(|e| e.contains("not available"))
-        );
-    }
-
-    #[test]
-    fn a_delegated_child_cannot_record_a_decision() {
-        let stop = AtomicBool::new(false);
-        let mut agents = builder();
-        agents[0].allowed_tools.push("record_decision".into());
-        let mut h = Harness::new(Rules::new(Vec::new()), &stop, agents);
-        let (mut turn, agent) = h.turn_with_agent(true);
-        turn.delegated = true;
-        let flow = execute_tools(
-            &mut turn,
-            &agent,
-            "m1",
-            &[call(
-                "c1",
-                "record_decision",
-                json!({
-                    "title": "use SQLite",
-                    "choice": "use SQLite",
-                    "reason": "bundled"
-                }),
-            )],
-        )
-        .unwrap();
-
-        assert!(matches!(flow, super::Flow::Continue));
-        let results = results(&h.log);
-        assert_eq!(results.len(), 1);
-        assert!(!results[0].1.success);
-        assert_eq!(
-            results[0].1.error.as_deref(),
-            Some(crate::agent::delegate::CHILD_REFUSAL)
-        );
-        assert_eq!(
-            count(&h.log, |e| matches!(e, Event::DecisionRecorded { .. })),
-            0
-        );
-    }
-
-    #[test]
-    fn a_top_level_turn_records_a_decision() {
-        let stop = AtomicBool::new(false);
-        let mut agents = builder();
-        agents[0].allowed_tools.push("record_decision".into());
-        let mut h = Harness::new(Rules::new(Vec::new()), &stop, agents);
-        let (mut turn, agent) = h.turn_with_agent(false);
-        let flow = execute_tools(
-            &mut turn,
-            &agent,
-            "m1",
-            &[call(
-                "c1",
-                "record_decision",
-                json!({
-                    "title": "use SQLite",
-                    "choice": "use SQLite",
-                    "reason": "bundled"
-                }),
-            )],
-        )
-        .unwrap();
-
-        assert!(matches!(flow, super::Flow::Continue));
-        let results = results(&h.log);
-        assert_eq!(results.len(), 1);
-        assert!(results[0].1.success);
-        assert_eq!(
-            results[0].1.output.as_deref(),
-            Some(crate::agent::record_decision::RECORDED)
         );
     }
 }
