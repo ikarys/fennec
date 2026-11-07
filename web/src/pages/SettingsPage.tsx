@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import type {
   AutonomyPrefs,
+  DelegationPrefs,
   IntegrationPrefs,
   DisplayPrefs,
   McpServer,
@@ -38,6 +39,7 @@ import { McpSection } from '../components/settings/McpSection';
 import { AgentsSection } from '../components/agents/AgentsSection';
 import { RulesSection } from '../components/rules/RulesSection';
 import { AutonomySection } from '../components/settings/AutonomySection';
+import { DelegationSection } from '../components/settings/DelegationSection';
 import { IntegrationSection } from '../components/settings/IntegrationSection';
 import { ScannersSection } from '../components/settings/ScannersSection';
 import { PluginsSection } from '../components/settings/PluginsSection';
@@ -257,6 +259,10 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
     setForm((previous) => (previous ? { ...previous, autonomy } : previous));
   }
 
+  function updateDelegation(delegation: DelegationPrefs) {
+    setForm((previous) => (previous ? { ...previous, delegation } : previous));
+  }
+
   function updateIntegration(integration: IntegrationPrefs) {
     setForm((previous) => (previous ? { ...previous, integration } : previous));
   }
@@ -454,6 +460,11 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
             {tab === 'agents' && (
               <>
                 <AgentsSection />
+                <DelegationSection
+                  save={groupSave('delegation')}
+                  value={form.delegation}
+                  onChange={updateDelegation}
+                />
                 <SkillsSection
                   save={groupSave('skills')}
                   skills={settings.skills}
