@@ -377,6 +377,14 @@ export function setSessionMcp(id: string, disabled: string[]): Promise<McpSessio
   });
 }
 
+/** The MCP view a new session would get (`POST /api/mcp`). */
+export function getDraftMcp(disabled: string[] | null): Promise<McpSessionView> {
+  return request<McpSessionView>("/api/mcp", {
+    method: "POST",
+    body: JSON.stringify({ disabled }),
+  });
+}
+
 export interface ArchitectureViolation {
   path: string;
   line: string;
@@ -620,6 +628,7 @@ export function createSession(
   attachments?: AttachmentInput[],
   workflow?: { workflowId: string; stepByStep: boolean; worktree: boolean },
   model?: ModelRef,
+  mcpDisabled?: string[],
 ): Promise<{ id: string }> {
   // `mode` is optional: omit it so the server applies its default resolution.
   const body: {
@@ -631,6 +640,7 @@ export function createSession(
     stepByStep?: boolean;
     worktree?: boolean;
     model?: ModelRef;
+    mcpDisabled?: string[];
   } = { projectId, prompt };
   if (mode != null) {
     body.mode = mode;
@@ -645,6 +655,9 @@ export function createSession(
   }
   if (model) {
     body.model = model;
+  }
+  if (mcpDisabled !== undefined) {
+    body.mcpDisabled = mcpDisabled;
   }
   return request<{ id: string }>("/api/sessions", {
     method: "POST",
