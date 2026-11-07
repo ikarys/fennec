@@ -57,6 +57,7 @@ pub struct ThreadView {
     pub pending_waiver: Option<WaiverView>,
     pub queued: Vec<QueuedView>,
     pub criteria: Vec<CriterionView>,
+    pub criteria_tally: criteria_fold::Tally,
     pub decisions: Vec<Decision>,
     /// The messages the human may replay: typed, in the model's current view.
     pub replayable: Vec<String>,
@@ -115,6 +116,7 @@ impl CriterionView {
 pub fn thread_view(events: &[Event]) -> ThreadView {
     // The domain folds each block; the view only shapes it for the UI.
     let passed_before = preflight::passed_before(events);
+    let criteria = criteria_fold::in_force(events);
     ThreadView {
         pending_approval: rule_approval::pending(events).map(ApprovalView::from),
         pending_waiver: waiver::pending(events).map(WaiverView::from),
@@ -122,7 +124,8 @@ pub fn thread_view(events: &[Event]) -> ThreadView {
             .into_iter()
             .map(QueuedView::from)
             .collect(),
-        criteria: criteria_fold::in_force(events)
+        criteria_tally: criteria_fold::tally(&criteria),
+        criteria: criteria
             .iter()
             .map(|state| CriterionView::new(state, &passed_before))
             .collect(),
@@ -426,6 +429,7 @@ mod tests {
                 "pendingWaiver": null,
                 "queued": [],
                 "criteria": [],
+                "criteriaTally": {"total": 0, "passed": 0, "failed": 0, "indicative": 0},
                 "decisions": [],
                 "replayable": []
             })
