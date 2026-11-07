@@ -209,7 +209,7 @@ function ModelRow({
               }
             }}
           />
-          <div className="grid gap-2 md:grid-cols-2">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,11rem))] gap-2">
             <FieldRow label={t('maxTokensLabel')}>
               <TextInput
                 type="number"
@@ -259,8 +259,8 @@ function ModelRow({
               </Select>
             </FieldRow>
           </div>
-          <div className="grid gap-2 md:grid-cols-3">
-            <p className="m-0 text-xs font-medium text-muted md:col-span-3">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,11rem))] gap-2">
+            <p className="m-0 text-xs font-medium text-muted col-span-full">
               {t('priceHeader')}
             </p>
             <FieldRow label={t('inputLabel')}>
@@ -296,7 +296,7 @@ function ModelRow({
                 className="w-full"
               />
             </FieldRow>
-            <label className="flex items-center gap-2 text-sm md:col-span-3">
+            <label className="flex items-center gap-2 text-sm col-span-full">
               <input
                 type="checkbox"
                 checked={billing[key] ?? billedByDefault(providerId)}
