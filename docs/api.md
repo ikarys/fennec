@@ -653,9 +653,10 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   `consumers` (null before any call was broken down) has the shape of `/context`'s `composition`: each call's input
   tokens spread pro rata of its prompt's text over its parts (ledger breakdown keys `<kind>/<label>`), summed over
   the period; indicative.
-- `POST /api/sessions` `{projectId, prompt, mode?, model?, attachments?}` → `{id}`;
+- `POST /api/sessions` `{projectId, prompt, mode?, model?, attachments?, mcpDisabled?}` → `{id}`;
   `model` is `{provider, model}` (400 if empty or the provider is unknown),
-  recorded as `model.changed` before the first turn;
+  recorded as `model.changed` before the first turn; `mcpDisabled` is an array
+  of MCP server names recorded as `mcp.disabled` before the first turn;
   the turn starts at once; `mode` is optional, validated against the
   project's agents before the session is created (400 if unknown) and applied
   before the first turn; `attachments` is `[{filename, data}]` (data a
@@ -720,6 +721,10 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
 - `POST /api/sessions/{id}/mcp` `{disabled: [name…]}` → 200 with the same body
   as `GET`; appends `mcp.disabled` (the full disabled set, last wins); 404 if
   no session
+- `POST /api/mcp` `{disabled: [name…] | null}` → 200 with the same body as
+  `GET /api/sessions/{id}/mcp`: the view a new session would get, with the
+  global flags when `disabled` is absent/null and the given disabled set when
+  it is an array
 - `POST /api/sessions/{id}/stop` → 202; the turn ends with `chat.done` reason `"stopped"`
 - `GET /api/notices` → Server-Sent Events. A snapshot of what needs the human, sent on connect and
   re-sent when it changes; child sessions stay silent. Each event is

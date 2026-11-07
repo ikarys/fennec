@@ -62,6 +62,17 @@ fn mcp_view(prefs: &Preferences, events: &[Event]) -> Value {
     json!({ "servers": servers, "totalTokens": total })
 }
 
+/// The disabled array a request carries, as server names; `None` when absent or null.
+pub(super) fn disabled_servers(value: &Value) -> Option<Vec<String>> {
+    let items = value.as_array()?;
+    Some(
+        items
+            .iter()
+            .filter_map(|item| item.as_str().map(str::to_string))
+            .collect(),
+    )
+}
+
 /// `GET /api/sessions/{id}/mcp`: the session's MCP state and token totals.
 pub(super) fn session_mcp(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
@@ -81,13 +92,7 @@ pub(super) fn set_session_mcp(
     id: &str,
 ) -> Result<(), HttpError> {
     let body = req.json()?;
-    let disabled = body["disabled"]
-        .as_array()
-        .cloned()
-        .unwrap_or_default()
-        .iter()
-        .filter_map(|value| value.as_str().map(str::to_string))
-        .collect::<Vec<_>>();
+    let disabled = disabled_servers(&body["disabled"]).unwrap_or_default();
     let store = app.store()?;
     if app.session_and_project(id)?.is_none() {
         return error(stream, 404, "no such session");
@@ -101,6 +106,19 @@ pub(super) fn set_session_mcp(
     let events = store.events(id)?;
     let prefs = store.preferences()?;
     send_json(stream, 200, &mcp_view(&prefs, &events))
+}
+
+/// `POST /api/mcp`: the MCP view a new session would get, so the draft's
+/// composer can show it before the first message creates the session.
+pub(super) fn draft_mcp(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), HttpError> {
+    let body = req.json()?;
+    let store = app.store()?;
+    let prefs = store.preferences()?;
+    let view = match disabled_servers(&body["disabled"]) {
+        None => mcp_view(&prefs, &[]),
+        Some(servers) => mcp_view(&prefs, &[Event::McpDisabled { servers }]),
+    };
+    send_json(stream, 200, &view)
 }
 
 /// `POST /api/settings/mcp/connect`: open one server, list its tools, and cache
@@ -187,6 +205,23 @@ mod tests {
             servers: vec!["a".into()],
         }];
         let view = mcp_view(&prefs, &events);
+        let servers = view["servers"].as_array().unwrap();
+        assert_eq!(servers[0]["active"], false);
+        assert_eq!(servers[1]["active"], true);
+    }
+
+    #[test]
+    fn a_draft_disabled_server_is_inactive() {
+        let prefs = Preferences {
+            mcp: vec![server("a", &["p"]), server("b", &["q"])],
+            ..Default::default()
+        };
+        let view = mcp_view(
+            &prefs,
+            &[Event::McpDisabled {
+                servers: vec!["a".into()],
+            }],
+        );
         let servers = view["servers"].as_array().unwrap();
         assert_eq!(servers[0]["active"], false);
         assert_eq!(servers[1]["active"], true);

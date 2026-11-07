@@ -136,6 +136,7 @@ pub(super) fn create_session(
         }
         None => None,
     };
+    let mcp_disabled = super::mcp_routes::disabled_servers(&body["mcpDisabled"]);
     let title: String = if prompt.is_empty() {
         attachments
             .first()
@@ -156,6 +157,9 @@ pub(super) fn create_session(
     append_human_event(app, &store, &id, mode_event)?;
     if let Some(model) = model_ref {
         append_human_event(app, &store, &id, Some(Event::ModelChanged { model }))?;
+    }
+    if let Some(servers) = mcp_disabled {
+        append_human_event(app, &store, &id, Some(Event::McpDisabled { servers }))?;
     }
     let session = store.session(&id)?.ok_or("the new session vanished")?;
     match workflow {
