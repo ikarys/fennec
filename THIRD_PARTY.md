@@ -1,11 +1,14 @@
 # Third-party notices
 
+The dependencies the binary ships (Rust crates, the web UI's npm packages) and their
+licence texts are listed in `THIRD_PARTY_LICENSES.md`, generated into each release archive
+by `scripts/licenses.py`.
+
 ## openfox
 
 Parts of fennec are ports to Rust of openfox
 (https://github.com/co-l/openfox, ported from commit
-`0694574dc1b1cf432ef5fa63c5429cbc89797b2c`, version 2.0.161). Each ported
-module names the openfox files it comes from in its header comment.
+`0694574dc1b1cf432ef5fa63c5429cbc89797b2c`, version 2.0.161).
 
 openfox declares the MIT licence (`package.json`, README) without shipping a
 licence file; the standard MIT terms follow.

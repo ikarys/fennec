@@ -45,7 +45,11 @@ dev:
     cd web && FENNEC_API="http://127.0.0.1:$API_PORT" npm run dev -- --port "$UI_PORT" --strictPort
 
 # Everything CI checks: the conventions (web, lint) and the tests
-check: web lint test test-web
+check: web lint test test-web licenses
+
+# Every dependency the binary ships has a licence the AGPL can absorb (needs web/node_modules)
+licenses:
+    python3 scripts/licenses.py check
 
 # The UI primitives rule, formatting, clippy
 lint:
