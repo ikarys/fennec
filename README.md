@@ -198,6 +198,22 @@ These are defaults: the Settings page adds providers and overrides parameters pe
 - [docs/releasing.md](docs/releasing.md): branches, versions, binaries
 - [docs/dogfooding.md](docs/dogfooding.md): what fennec building fennec taught us
 
+## How fennec is written
+
+fennec is built with AI, under a human's direction and review: the human frames each change,
+reviews it and decides what is merged. The models that wrote code:
+
+- Claude (Anthropic): Opus 5.5, Fable 5.1, Sonnet 5.5;
+- Qwen3.8-27B, run locally, both through fennec itself and as an executor Claude delegated to.
+
+Each commit names the models that wrote it in `Co-Authored-By:` trailers. That record is
+incomplete before 2026-11-07: Claude's trailers are missing on part of the commits, and the
+local Qwen's on most of the work delegated to it. On 2026-11-07 the history was rewritten once
+to add the trailers that could be proven: each commit fennec integrated (`Fennec-Session:`) got
+the models its session log or usage ledger recorded; twenty sessions deleted before the ledger
+existed were credited to Qwen3.8-27B, the only model fennec had ever been configured with.
+Contributors follow the same rule (`CONTRIBUTING.md`).
+
 ## License
 
 fennec is licensed under [AGPL-3.0-only](LICENSE).
