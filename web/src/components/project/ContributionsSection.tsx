@@ -7,6 +7,7 @@ import { Card } from '../ui/Card';
 import { Section } from '../ui/Section';
 import { ReviewIcon } from '../Icons';
 import { useT } from '../../i18n';
+import { TableHeader } from '../ui/TableHeader';
 
 export function ContributionsSection({
   projectId,
@@ -69,11 +70,11 @@ export function ContributionsSection({
         <p className='py-3 text-xs text-muted'>{t('contributionsEmpty')}</p>
       ) : (
         <Card className='overflow-hidden'>
-          <div className='flex items-center gap-3 border-b border-border bg-raised px-4 py-2 text-xs uppercase tracking-wide text-faint'>
+          <TableHeader>
             <span className='min-w-0 grow'>{t('contributionsBranchCol')}</span>
             <span className='w-24 shrink-0 text-right'>{t('contributionsAheadCol')}</span>
             <span className='w-10 shrink-0' />
-          </div>
+          </TableHeader>
           <ul className='divide-y divide-border'>
             {contributions.map((c) => (
               <li
