@@ -258,3 +258,12 @@ performance, reverts; docs, refactors, tests and chores hidden); the binary embe
 shows a star with the count of releases since the human last looked, a fresh install starting at zero
 (`domain/changelog.rs`, `store/settings.rs`, `web/routes/changelog_routes.rs`, `WhatsNewSection.tsx`,
 `WhatsNewNotice.tsx`).
+
+Delegation, done: `delegate` lets plan, builder and ask hand a self-contained task to a read-only agent
+(`commands: read-only`, no file write tool) that runs in a fresh child session, in the same workdir; the parent
+waits and gets back only the child's final answer (capped at 20,000 characters, with the child's id), so a broad
+exploration no longer fills its context. The child runs with the human away (its questions answer themselves,
+an approval-needing call is refused), cannot delegate further, and the parent releases the model gate first so the
+child is not kept behind it. Only the web's top-level turns delegate; the CLI answers that it cannot. The tool
+card shows the agent and the task, and marks the answer indicative (`agent/delegate.rs`, `web/children.rs`,
+`web/turns.rs`, `ToolCard.tsx`).

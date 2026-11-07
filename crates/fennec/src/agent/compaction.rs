@@ -165,6 +165,7 @@ mod tests {
 
             stop: &stop,
             on_event: &mut on_event,
+            children: None,
         };
         let tools = json!([]);
         let prompt = RoundPrompt {

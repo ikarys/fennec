@@ -60,6 +60,7 @@ impl<'a> Harness<'a> {
             preflight_sent_back: false,
             stop: self.stop,
             on_event: &mut self.on_event,
+            children: None,
         }
     }
 }

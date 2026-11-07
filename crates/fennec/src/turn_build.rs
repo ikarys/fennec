@@ -2,7 +2,7 @@
 //! the same set of adapters. The adapters keep only their orchestration; a new
 //! `Turn` field or a tools default is added here, once.
 
-use crate::agent::ports::EventLog;
+use crate::agent::ports::{ChildSessions, EventLog};
 use crate::agent::turn::Turn;
 use crate::agents;
 use crate::config::Settings;
@@ -37,6 +37,8 @@ pub struct Options<'a> {
     pub autonomous: bool,
     /// Called for every event right after it is stored (the CLI prints them).
     pub on_event: &'a mut dyn FnMut(&Event),
+    /// Where `delegate` runs its agents (the web's top-level turns only).
+    pub children: Option<&'a dyn ChildSessions>,
 }
 
 /// Builds the turn's dependencies and hands the turn (and its tools) to
@@ -203,6 +205,7 @@ pub fn with_turn<R>(
         preflight_sent_back: false,
         stop,
         on_event: &mut options.on_event,
+        children: options.children,
     };
     body(&mut turn, &tools)
 }
@@ -245,6 +248,7 @@ mod tests {
             model_choice: None,
             autonomous: true,
             on_event: &mut on_event,
+            children: None,
         };
         with_turn(
             &settings,

@@ -11,6 +11,7 @@ use crate::web::turns::with_turn;
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
 
+#[derive(Clone, Copy)]
 pub(super) struct Children<'a> {
     pub(super) settings: &'a Settings,
     pub(super) notifier: &'a Notifier,
@@ -35,12 +36,11 @@ impl ChildSessions for Children<'_> {
         // Each call opens its own store connection: SQLite connections are
         // per thread.
         with_turn(
-            self.settings,
-            self.notifier,
+            self,
             child_session_id,
-            self.workdir,
             stop,
-            self.autonomous,
+            // A child session never delegates: one level, no recursion.
+            None,
             |turn, _| {
                 let before = turn.log.events(child_session_id)?.len();
                 let reason = run_child_agent_node(turn, agent_id, prompt)?;

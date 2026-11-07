@@ -6,6 +6,7 @@
 //! complete.
 
 use super::ask_user;
+use super::delegate;
 use super::preflight;
 use super::propose_criteria;
 use super::propose_plan;
@@ -365,6 +366,12 @@ pub(super) fn execute_tools(
             record(turn, message_id, call, result)?;
             continue;
         }
+        if call.name == delegate::NAME {
+            // Blocking: the child runs to its turn's end, then the loop goes on.
+            let result = delegate::run(turn, &call.arguments);
+            record(turn, message_id, call, result)?;
+            continue;
+        }
         // The human's rules run before the tool: the model's call never reaches it.
         let tools = turn.tools;
         let check = tools.check_rules(&call.name, &call.arguments);
@@ -520,6 +527,7 @@ mod tests {
                 preflight_sent_back: false,
                 stop: self.stop,
                 on_event: &mut self.on_event,
+                children: None,
             }
         }
 
@@ -620,6 +628,7 @@ mod tests {
             preflight_sent_back: false,
             stop: &stop,
             on_event: &mut on_event,
+            children: None,
         };
         let agent = &agents[0];
         // The builder does not list `fs_echo`; the MCP set is what allows it.
@@ -1325,6 +1334,7 @@ mod tests {
             preflight_sent_back: false,
             stop: &stop,
             on_event: &mut on_event,
+            children: None,
         };
         let agent = &agents[0];
 
@@ -1376,6 +1386,91 @@ mod tests {
                 .iter()
                 .find(|(id, _)| id == "c2")
                 .is_some_and(|(_, r)| r.success)
+        );
+    }
+    /// Child sessions that record what they were asked and answer one text.
+    struct FakeChildren {
+        sent: std::sync::Mutex<Vec<(String, String, String)>>,
+    }
+
+    impl crate::agent::ports::ChildSessions for FakeChildren {
+        fn create(&self, parent: &str, title: &str) -> Result<String, String> {
+            assert_eq!(parent, "s");
+            assert!(title.starts_with("plan: "), "{title}");
+            Ok("child".into())
+        }
+
+        fn send(
+            &self,
+            child: &str,
+            agent: &str,
+            prompt: &str,
+            _stop: &AtomicBool,
+        ) -> Result<crate::agent::ports::AgentRun, String> {
+            self.sent
+                .lock()
+                .unwrap()
+                .push((child.into(), agent.into(), prompt.into()));
+            Ok(crate::agent::ports::AgentRun {
+                reason: crate::domain::event::DoneReason::Complete,
+                text: "found it in store.rs:12".into(),
+            })
+        }
+    }
+
+    #[test]
+    fn delegate_runs_a_read_only_agent_in_a_child_and_returns_its_answer() {
+        let stop = AtomicBool::new(false);
+        let children = FakeChildren {
+            sent: std::sync::Mutex::new(Vec::new()),
+        };
+        let mut agents = builder();
+        agents[0].allowed_tools.push("delegate".into());
+        agents.push(plan());
+        let mut h = Harness::new(Rules::new(Vec::new()), &stop, agents);
+        let (mut turn, agent) = h.turn_with_agent(false);
+        turn.children = Some(&children);
+        let args = json!({"agent": "plan", "task": "Where are sessions stored?"});
+        let flow = execute_tools(&mut turn, &agent, "m1", &[call("c1", "delegate", args)]).unwrap();
+
+        assert!(matches!(flow, super::Flow::Continue));
+        assert_eq!(
+            *children.sent.lock().unwrap(),
+            vec![(
+                "child".to_string(),
+                "plan".to_string(),
+                "Where are sessions stored?".to_string()
+            )]
+        );
+        let (id, result) = &results(&h.log)[0];
+        assert_eq!(id, "c1");
+        assert!(result.success);
+        assert!(
+            result
+                .output
+                .as_deref()
+                .is_some_and(|o| o.starts_with("found it in store.rs:12"))
+        );
+    }
+
+    #[test]
+    fn delegate_without_child_sessions_is_a_failure() {
+        let stop = AtomicBool::new(false);
+        let mut agents = builder();
+        agents[0].allowed_tools.push("delegate".into());
+        agents.push(plan());
+        let mut h = Harness::new(Rules::new(Vec::new()), &stop, agents);
+        let (mut turn, agent) = h.turn_with_agent(false);
+        let args = json!({"agent": "plan", "task": "Where are sessions stored?"});
+        execute_tools(&mut turn, &agent, "m1", &[call("c1", "delegate", args)]).unwrap();
+
+        let (_, result) = &results(&h.log)[0];
+        assert!(!result.success);
+        assert!(
+            result
+                .error
+                .as_deref()
+                .is_some_and(|e| e.contains("not available"))
         );
     }
 }

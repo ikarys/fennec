@@ -57,7 +57,9 @@ export function ToolCard({ tool, awaiting = false }: { tool: ToolCallView; await
         ? String(tool.args.command ?? '')
         : tool.name === 'web_search'
           ? String(tool.args.query ?? '')
-          : String(tool.args.path ?? '');
+          : tool.name === 'delegate'
+            ? `${String(tool.args.agent ?? '')} · ${String(tool.args.task ?? '')}`
+            : String(tool.args.path ?? '');
   const lineCount = tool.output ? tool.output.split('\n').length : 0;
   const opener = usePreviewOpener();
   const workdir = usePreviewWorkdir();
@@ -124,6 +126,11 @@ export function ToolCard({ tool, awaiting = false }: { tool: ToolCallView; await
         {tool.blockedBy && (
           <Badge tone="err" className="shrink-0" title={t('ruleRefusedTitle', { scope: tool.blockedBy.scope === 'global' ? t('ruleScopeGlobal') : t('ruleScopeProject'), pattern: tool.blockedBy.pattern })}>
             {t('verifiedRule')}
+          </Badge>
+        )}
+        {tool.name === 'delegate' && tool.status === 'success' && (
+          <Badge tone="attention" className="shrink-0" title={t('indicativeTitle')}>
+            {t('indicative')}
           </Badge>
         )}
         {awaiting && (
