@@ -135,11 +135,25 @@ pub(super) fn resolve_for_writing(
         .unwrap_or_else(|_| workdir.to_path_buf());
 
     // `resolved` is canonical: a symlink to a protected file is caught too.
-    if let Some(relative) = resolved
+    let relative = resolved
         .strip_prefix(&canonical_workdir)
         .ok()
-        .map(|relative| relative.to_string_lossy().into_owned().replace('\\', "/"))
-        && protection.is_protected(&relative)
+        .map(|relative| relative.to_string_lossy().into_owned().replace('\\', "/"));
+
+    // Git's own metadata is never writable by the file tools, and no waiver
+    // applies: the host's git would run what a model wrote there.
+    if let Some(relative) = &relative
+        && relative
+            .split('/')
+            .any(|component| component.eq_ignore_ascii_case(".git"))
+    {
+        return Err(format!(
+            "{p} is git's own metadata (.git): neither the file tools nor commands may change it, and no waiver applies."
+        ));
+    }
+
+    if let Some(relative) = &relative
+        && protection.is_protected(relative)
     {
         return Err(format!(
             "{p} is protected by the human (.agents/protected, or a default: fennec's definitions, AGENTS.md, lockfiles, CI). Do not work around it. If the change is required, call request_waiver with this path and why; otherwise say in your report what should change there and why."
@@ -281,6 +295,32 @@ mod tests {
         for path in ["Cargo.lock", ".agents/protected", "./sub/../Cargo.lock"] {
             let error = resolve_for_writing(&dir, &protection, &outside, path).unwrap_err();
             assert!(error.contains("is protected"), "{path}: {error}");
+        }
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn git_metadata_paths_are_refused_for_writing() {
+        let dir = temp_dir();
+        let protection = Protection::new(None);
+        let outside = Outside::none();
+
+        for path in [
+            ".git/config",
+            ".git/hooks/pre-commit",
+            ".GIT/config",
+            "sub/.git/config",
+        ] {
+            let error = resolve_for_writing(&dir, &protection, &outside, path).unwrap_err();
+            assert!(error.contains("git's own metadata"), "{path}: {error}");
+        }
+
+        for path in [".gitignore", "src/.gitkeep"] {
+            assert!(
+                resolve_for_writing(&dir, &protection, &outside, path).is_ok(),
+                "{path}"
+            );
         }
 
         let _ = std::fs::remove_dir_all(&dir);
