@@ -139,18 +139,18 @@ an "ask" is refused.
 Rule bridge, done (C16): the `analyze` agent (on an existing project) and the `audit-architecture` agent end their answer with
 a `## Executable rules` block of text and import rules for `.agents/architecture`, each line under a comment citing its
 guideline; the human appends the new ones in one click (`architecture.rules_added`, `domain/rule_bridge.rs`,
-`web/rule_bridge_routes.rs`). A guideline is advice; the gate's rule is not.
+`web/routes/rule_bridge_routes.rs`). A guideline is advice; the gate's rule is not.
 
 Composer agents, done: `composer: false` in an agent's frontmatter keeps it out of the composer's menu; it is for agents
 fennec launches itself with a brief it builds (Analyses: `analyze`, `audit-architecture`, `audit-security`; gate: `narrate`,
-`understand`; Risks: `remedy`; test node: `tests`), so the composer offers only agents one talks to freely (`plan`, `builder`, `ask`); `subagent: true` marks workflow-only ones (`review`, `verify`) (`domain/agent.rs`, `web/project_list_routes.rs`).
+`understand`; Risks: `remedy`; test node: `tests`), so the composer offers only agents one talks to freely (`plan`, `builder`, `ask`); `subagent: true` marks workflow-only ones (`review`, `verify`) (`domain/agent.rs`, `web/routes/project_list_routes.rs`).
 Produced architecture, done (C12): `.agents/architecture` also takes module rules (`<A> never imports <B>`), checked on
 every dependency of the project map; the "Carte des modules" tab lists the breaks, draws them red, and counts the dependencies added or
 removed since the committed `docs/map.md` (verified; `domain/drift.rs`).
 Waivers, done (C7): an agent that needs a protected file calls `request_waiver` (path, reason); the turn pauses on
 a card where only the human grants it, for 1, 8 or 24 hours, or refuses. A grant exempts exactly that path, in that
 session, until it expires (the file tools and the sandbox), and writes a MADR file to the session's `docs/adr/`, which
-goes with the branch to the integration gate (`domain/waiver.rs`, `agent/waiver.rs`, `web/waiver_routes.rs`). With the
+goes with the branch to the integration gate (`domain/waiver.rs`, `agent/waiver.rs`, `web/routes/waiver_routes.rs`). With the
 human away, a request is refused.
 Prompt queue, done: a message typed while a turn runs is queued (`queue.added`, asap mode) and shown above the
 composer, each removable; the loop drops the queued messages into the turn between tool rounds (a slash command waits),
@@ -164,7 +164,7 @@ Plan deviation, done (C6): the gate reads the `Files:` lines of the run's approv
 get an `outsidePlan` blocker the human accepts and a "hors plan" signal in the review map (verified; `domain/plan_scope.rs`).
 Project deletion, done: a trash button on the project page deletes everything fennec holds for a project (sessions,
 worktrees and branches, rules, ideas); its source folder only when the human ticks the box, never the home, the root or
-fennec's store (`web/project_delete.rs`).
+fennec's store (`web/routes/project_delete.rs`).
 UI languages, done: English by default, French on the Settings page; every UI string comes from `web/src/i18n/messages.ts`,
 whose `fr` is typed against `en`'s keys (a missing translation is a compile error); components call `useT()`, pure
 lib functions take a `lang`. The server's display texts follow the same choice through `domain/lang.rs`; the context part labels, stored
@@ -188,7 +188,7 @@ the project's servers in the session's worktree, with no git step for the human.
 its port answers, ready, exited with its code), the URL it printed and its last output lines; a terminal opens in the
 worktree for CLI projects. With no `.agents/servers.json`, a command guessed from the project (Justfile, package.json,
 Makefile, Cargo) is saved on the human's confirmation; the main checkout's gitignored `.env*` files are linked, never
-copied, and servers share the project's Cargo target (`web/servers.rs`, `domain/server.rs`).
+copied, and servers share the project's Cargo target (`web/os/servers.rs`, `domain/server.rs`).
 Canvas, done: a document the human and the agent iterate on (HTML, Markdown, SVG, Mermaid, JSON, images, PDF), pinned from the
 preview pane or a message's ```html/```md block, each version kept and browsable in a side pane; the human annotates
 the whole page, a quote or a drawn region, and the note lands in the composer as text the agent reads. The `canvas`
@@ -202,12 +202,12 @@ Budgets, done (C18): a monthly cost budget per project, set from a tile of the p
 (`domain/pricing.rs`, indicative); at 80 % the tile turns to attention and `/api/notices` raises a system notification;
 once reached, fennec's kernel refuses to start any turn on the project (`turn_build`, every path: web, CLI, the queue,
 workflow children; the message route answers 409 first so the typed text stays) until the human raises or removes it
-(`domain/budget.rs`, `budget.rs`, `web/budget_routes.rs`).
+(`domain/budget.rs`, `budget.rs`, `web/routes/budget_routes.rs`).
 Indicators, done (C19): an "Indicators" tab on the project page measures the project from recorded facts only (verified):
 AI commits outside fennec, sensitive integrations without a comprehension dialogue, dialogues held, module rule breaks with
 the violations accepted and the active waivers, scanner findings accepted, the month's cost per integration, the map and
 ADRs, integrations tied to an approved plan, the blockers accepted per integration (`domain/indicators.rs`,
-`web/indicator_routes.rs`, `store/project_events.rs`).
+`web/routes/indicator_routes.rs`, `store/project_events.rs`).
 Test gate, done (C4): the default workflow writes the tests before the code: once the plan is approved, the `tests` agent
 (`crates/fennec/agents/tests.agent.md`, `writes: tests`: its file tools refuse anything but test files) writes the tests derived
 from the "Done when" criteria, and a human node asks to validate them. "Validate" records `tests.approved` with the test files
@@ -217,24 +217,24 @@ Contributions, done (C17, part 1): a "Contributions" tab on the project page lis
 commits the human's branch lacks; a click adopts one into a new session's worktree (`worktree::adopt`: the branch's tip,
 its base at the merge-base with the human's HEAD), so a colleague's work goes through the same integration gate as an
 agent's (blockers, scanners, review map, comprehension dialogue). Only a listed branch is adopted; nothing merges on its
-own (`git::contributions`, `web/contribution_routes.rs`).
+own (`git::contributions`, `web/routes/contribution_routes.rs`).
 
 Update, done: `fennec update [--check]` and the top bar's arrow read the latest GitHub release (`/releases/latest`'s
 redirect, cached 6 h for the UI), compare versions (`domain/release.rs`) and, on the human's click only, run the
 embedded `install.sh` over the binary (checksum verified, atomic rename); the server then re-executes itself, same PID,
 so a systemd service keeps tracking it. Refused while a turn runs. `install.sh` writes and starts a systemd user service
-(`update.rs`, `cli/update.rs`, `web/update_routes.rs`, `components/layout/UpdateNotice.tsx`).
+(`update.rs`, `cli/update.rs`, `web/routes/update_routes.rs`, `components/layout/UpdateNotice.tsx`).
 
 Server port, done: `~/.config/fennec/settings.yaml` (`$XDG_CONFIG_HOME`) holds `port:`; `--port` wins over it, 7777
 otherwise. Settings > Security edits it (the line replaced in place, other lines kept) and restarts the server, the page
-following it to the new port (`domain/server_config.rs`, `server_config.rs`, `web/server_routes.rs`,
+following it to the new port (`domain/server_config.rs`, `server_config.rs`, `web/routes/server_routes.rs`,
 `components/settings/ServerSection.tsx`).
 
 Changes page, done: the side panel's "Modified files" block keeps only the count and a link to `#/s/<id>/changes`,
 which lists the branch's files in the gate's review order with their signals and shows the selected file's diff against
 the session's base (the range the integration takes), colored and numbered on both sides, cut at 5,000 lines; an icon
 opens the whole file in VS Code. The server parses the hunks and only diffs a path the branch changed
-(`domain/diff.rs`, `integration::file_diff`, `web/diff_routes.rs`, `pages/ChangesPage.tsx`).
+(`domain/diff.rs`, `integration::file_diff`, `web/routes/diff_routes.rs`, `pages/ChangesPage.tsx`).
 
 macOS sandbox, done: on macOS the commands' sandbox world (secrets hidden, protected files read-only, network
 cut or not) is rendered as a Seatbelt profile run by `/usr/bin/sandbox-exec`, every path passed as a parameter;
@@ -245,7 +245,7 @@ TMPDIR, not /tmp. Known gap: a protected file's parent directory can be renamed 
 First-run checklist, done: the home page shows what a first run still misses (a reachable model, the sandbox, git,
 a project, the security scanners), each line with its fix, and hides once all is ready; `fennec doctor` prints the
 same lines and exits 1 while one is to do. The facts are gathered by an adapter, the verdicts are pure domain code
-(`domain/setup.rs`, `setup.rs`, `web/setup_routes.rs`, `cli/doctor.rs`, `SetupChecklist.tsx`).
+(`domain/setup.rs`, `setup.rs`, `web/routes/setup_routes.rs`, `cli/doctor.rs`, `SetupChecklist.tsx`).
 
 Paths the human named, done: a file tool reading outside the project runs without an approval when the human
 already wrote that path, or a folder above it, in a message or an answer of the session (`~/`, Windows
@@ -256,5 +256,5 @@ already wrote that path, or a folder above it, in a message or an answer of the 
 performance, reverts; docs, refactors, tests and chores hidden); the binary embeds it and serves it parsed
 (`GET /api/changelog`). The About tab lists the releases under "What's new" and marks them seen; the top bar
 shows a star with the count of releases since the human last looked, a fresh install starting at zero
-(`domain/changelog.rs`, `store/settings.rs`, `web/changelog_routes.rs`, `WhatsNewSection.tsx`,
+(`domain/changelog.rs`, `store/settings.rs`, `web/routes/changelog_routes.rs`, `WhatsNewSection.tsx`,
 `WhatsNewNotice.tsx`).

@@ -166,25 +166,14 @@ crates/fennec/src/
   agents/crud.rs     the human's own agents read, written, deleted (Settings)
   worktree/usage.rs  the disk the worktrees take, measured and freed on the human's click
   llm/concurrency.rs the model's concurrency gate (a process-wide counting semaphore)
-  web/               HTTP adapter: http, guard (who may call), routes, settings_routes, event_stream (SSE),
-                     notifier (wakes streams on append, no polling), turns, assets, login (a remote caller's password and session cookie),
-                     session_routes (one session: created, read, written to, replayed, compacted, streamed),
-                     folder_routes (the folders browsed), project_list_routes (the home's projects, favorites, a project's commands and agents),
-                     test_support (the App the web tests build), thread_view (the pending approval, waiver, queue, criteria, decisions and replayable messages, served), workflow_routes, project_routes (the project page), project_delete (a project deleted, its folder on request), project_dashboard (its overview tiles), idea_routes (its ideas board, HTTP only),
-                     idea_queue (the queue's thread: starts ready ideas, night-mode caps, queue runs recorded),
-                     model_routes (the composer's model choices, a session's model), rule_routes (the human's rules), rule_approval_routes (an approval answered, its rule stored), waiver_routes (a waiver answered, its ADR written),
-                     children (child sessions for workflow nodes),
-                     preview (a project's files in a sandboxed origin), session_usage,
-                     workflow_usage, context_view and insight (display-ready token figures: the UI computes none),
-                     notice_stream (the human's attention server-wide, SSE), idea_board (the ideas board, read side),
-                     servers (a project's servers started and stopped), terminal, editor, file_manager (the human's own
-                     tools opened on a folder), model_view, worktree_routes (disk usage), agent_routes,
-                     audit_routes, backlog_routes, idea_assets, mcp_routes, proposal_routes, session_delete,
-                     agents_md_routes, session_name (background naming), canvas_routes (the canvas crate over HTTP),
-                     budget_routes (a project's budget, read and set), changelog_routes (the embedded changelog, what is new since the human last looked), setup_routes (the first-run checklist),
-                     contribution_routes (branches someone else wrote, adopted into a session for the gate),
-                     indicator_routes (a project's indicators from its logs, git and the ledger),
-                     diff_routes (one changed file of a session's branch as diff lines, for the Changes page)
+  web/               HTTP adapter. At its root the server's own parts: http (requests, HttpError), guard (who may
+                     call), login (a remote caller's password and session cookie), routes (the dispatch; routes/ one
+                     file per resource: sessions, projects, settings, rules, ideas, integration, preview, mcp…),
+                     turns (the running turns), children (child sessions for workflow nodes), assets, test_support;
+                     views/ display-ready figures and folds (thread, context, insight, usage, dashboard, ideas board:
+                     the UI computes none); streams/ the SSE streams (a session's events, the human's notices);
+                     os/ the human's own tools opened on a folder (terminal, editor, file manager) and the project's
+                     servers; jobs/ background work (the idea queue, session naming, backfills, commit subjects)
   cli/               terminal adapter: commands, transcript, doctor (the first-run checklist in the terminal)
 crates/backlog/     the ideas backlog, a crate of its own and fennec-free, no I/O: its events folded, the queue
                      order, the night-mode caps, an idea's status, stage and next action, a run's summary

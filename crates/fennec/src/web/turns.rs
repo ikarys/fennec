@@ -1,8 +1,6 @@
 //! Turns started from the UI: each runs on its own thread, reports through
 //! the event log, and can be stopped. One turn at a time per session.
 
-use super::children::Children;
-use super::model_routes;
 use crate::agent::ports::EventLog;
 use crate::agent::turn::{Turn, compact_session, replay_turn, retry_turn, run_turn};
 use crate::agent::workflow::{WorkflowEnv, WorkflowJob, run_workflow};
@@ -17,6 +15,8 @@ use crate::skills;
 use crate::store::SqliteStore;
 use crate::tools::LocalTools;
 use crate::turn_build;
+use crate::web::children::Children;
+use crate::web::routes::model_routes;
 use crate::worktree::{self, Worktree};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
