@@ -16,6 +16,7 @@ allowedTools:
   - web_search
   - web_fetch
   - suggest_agent
+  - delegate
   - canvas
   - propose_plan
 ---

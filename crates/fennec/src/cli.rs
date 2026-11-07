@@ -142,6 +142,7 @@ fn with_turn(
         model_choice: None,
         autonomous: false,
         on_event: &mut on_event,
+        children: None,
     };
     turn_build::with_turn(
         settings,

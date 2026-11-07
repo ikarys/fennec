@@ -3,6 +3,7 @@
 
 mod ask_user;
 mod compaction;
+mod delegate;
 mod delta_buffer;
 pub mod ports;
 mod preflight;
@@ -36,6 +37,7 @@ mod tests {
         assert!(KNOWN_TOOLS.contains(&"read_file"));
         assert!(KNOWN_TOOLS.contains(&super::propose_task::NAME));
         assert!(KNOWN_TOOLS.contains(&super::suggest_agent::NAME));
+        assert!(KNOWN_TOOLS.contains(&super::delegate::NAME));
         assert!(KNOWN_TOOLS.contains(&super::ask_user::NAME));
         assert!(KNOWN_TOOLS.contains(&super::record_decision::NAME));
         assert!(KNOWN_TOOLS.contains(&super::propose_criteria::NAME));

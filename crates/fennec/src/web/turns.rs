@@ -1,7 +1,7 @@
 //! Turns started from the UI: each runs on its own thread, reports through
 //! the event log, and can be stopped. One turn at a time per session.
 
-use crate::agent::ports::EventLog;
+use crate::agent::ports::{ChildSessions, EventLog};
 use crate::agent::turn::{Turn, compact_session, replay_turn, retry_turn, run_turn};
 use crate::agent::workflow::{WorkflowEnv, WorkflowJob, run_workflow};
 use crate::config::Settings;
@@ -208,16 +208,22 @@ impl Turns {
 }
 
 /// Opens the session's store, resolves its model choice and hands the turn
-/// (and its tools) to `body`; the shared wiring lives in `turn_build`.
+/// (and its tools) to `body`; the shared wiring lives in `turn_build`. `at`
+/// is where the turn runs: its settings, notifier, workdir and autonomy;
+/// `delegates` where its `delegate` calls run, None for no delegation.
 pub(super) fn with_turn<R>(
-    settings: &Settings,
-    notifier: &Notifier,
+    at: &Children,
     session_id: &str,
-    workdir: &Path,
     stop: &AtomicBool,
-    autonomous: bool,
+    delegates: Option<&dyn ChildSessions>,
     body: impl FnOnce(&mut Turn, &LocalTools) -> Result<R, String>,
 ) -> Result<R, String> {
+    let Children {
+        settings,
+        notifier,
+        workdir,
+        autonomous,
+    } = *at;
     let store = SqliteStore::open(&settings.db_path)?;
     // A workflow's child sessions run on the model the human chose for the session.
     let (chosen, _) = model_routes::session_choice(&store, session_id)?;
@@ -227,6 +233,7 @@ pub(super) fn with_turn<R>(
         model_choice: chosen,
         autonomous,
         on_event: &mut on_event,
+        children: delegates,
     };
     turn_build::with_turn(
         settings,
@@ -248,13 +255,23 @@ fn run(
     stop: &AtomicBool,
     autonomous: bool,
 ) -> Result<(), String> {
-    with_turn(
+    let here = Children {
         settings,
         notifier,
-        session_id,
         workdir,
-        stop,
         autonomous,
+    };
+    // A delegated agent runs with the human away: nobody answers its
+    // questions or approvals, so it decides or is refused, never pauses.
+    let delegates = Children {
+        autonomous: true,
+        ..here
+    };
+    with_turn(
+        &here,
+        session_id,
+        stop,
+        Some(&delegates),
         |turn, tools| match job {
             Job::Input(TurnInput::Prompt(prompt), attachments) => {
                 run_turn(turn, prompt, attachments).map(|_| ())
@@ -262,23 +279,15 @@ fn run(
             Job::Input(TurnInput::Compact, _) => compact_session(turn).map(|_| ()),
             Job::Replay(message_id) => replay_turn(turn, message_id).map(|_| ()),
             Job::Retry => retry_turn(turn).map(|_| ()),
-            Job::Workflow(workflow_job) => {
-                let children = Children {
-                    settings,
-                    notifier,
-                    workdir,
-                    autonomous,
-                };
-                run_workflow(
-                    turn,
-                    &WorkflowEnv {
-                        children: &children,
-                        commands: tools,
-                    },
-                    workflow_job.clone(),
-                )
-                .map(|_| ())
-            }
+            Job::Workflow(workflow_job) => run_workflow(
+                turn,
+                &WorkflowEnv {
+                    children: &here,
+                    commands: tools,
+                },
+                workflow_job.clone(),
+            )
+            .map(|_| ()),
             Job::Approval {
                 call_id,
                 choice,

@@ -11,6 +11,7 @@ allowedTools:
   - run_command
   - load_skill
   - suggest_agent
+  - delegate
 ---
 
 # Question
