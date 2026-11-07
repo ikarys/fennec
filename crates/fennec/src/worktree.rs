@@ -5,9 +5,9 @@
 //! its own worktree, on its own branch: the human's tree and branch are never
 //! written, and the human later cherry-picks the agent's commits.
 
-use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+
+use crate::git;
 
 pub mod usage;
 
@@ -61,7 +61,7 @@ pub fn open(root: &Path, project_dir: &Path, session_id: &str) -> Result<Option<
     let path = root.join(session_id);
     let branch = format!("fennec/{session_id}");
     let path_arg = path.to_string_lossy().into_owned();
-    git(
+    git::run(
         &top,
         &["worktree", "add", "-b", &branch, &path_arg, "HEAD"],
         None,
@@ -69,8 +69,8 @@ pub fn open(root: &Path, project_dir: &Path, session_id: &str) -> Result<Option<
     let wt = build(path, &prefix, session_id);
     // A half-built worktree must not survive: `find` would hand it out.
     fill(&top, &wt).inspect_err(|_| {
-        let _ = git(&top, &["worktree", "remove", "--force", &path_arg], None);
-        let _ = git(&top, &["branch", "-D", &branch], None);
+        let _ = git::run(&top, &["worktree", "remove", "--force", &path_arg], None);
+        let _ = git::run(&top, &["branch", "-D", &branch], None);
     })?;
     Ok(Some(wt))
 }
@@ -92,14 +92,14 @@ pub fn adopt(
         return Err("source must not be empty or start with '-'".to_string());
     }
     let verify = format!("{source}^{{commit}}");
-    if git(&top, &["rev-parse", "--verify", "--quiet", &verify], None).is_err() {
+    if git::run(&top, &["rev-parse", "--verify", "--quiet", &verify], None).is_err() {
         return Err(format!("no such branch: {source}"));
     }
     std::fs::create_dir_all(root).map_err(|e| format!("create {}: {e}", root.display()))?;
     let path = root.join(session_id);
     let branch = format!("fennec/{session_id}");
     let path_arg = path.to_string_lossy().into_owned();
-    git(
+    git::run(
         &top,
         &[
             "worktree",
@@ -115,14 +115,14 @@ pub fn adopt(
     let wt = build(path, &prefix, session_id);
     // A half-built worktree must not survive: `find` would hand it out.
     (|| -> Result<(), String> {
-        let base = git(&top, &["merge-base", "HEAD", source], None)?;
+        let base = git::run(&top, &["merge-base", "HEAD", source], None)?;
         let base = String::from_utf8_lossy(&base).trim().to_string();
-        git(&wt.path, &["update-ref", &wt.base, &base], None)?;
+        git::run(&wt.path, &["update-ref", &wt.base, &base], None)?;
         record_origin(&top, &wt)
     })()
     .inspect_err(|_| {
-        let _ = git(&top, &["worktree", "remove", "--force", &path_arg], None);
-        let _ = git(&top, &["branch", "-D", &branch], None);
+        let _ = git::run(&top, &["worktree", "remove", "--force", &path_arg], None);
+        let _ = git::run(&top, &["branch", "-D", &branch], None);
     })?;
     Ok(wt)
 }
@@ -133,7 +133,7 @@ pub fn adopt(
 pub fn remove(top: &Path, wt: &Worktree) -> Result<(), String> {
     let path_arg = wt.path.to_string_lossy().into_owned();
     crate::tools::remove_private_tmp(&wt.path);
-    let removed = git(top, &["worktree", "remove", "--force", &path_arg], None);
+    let removed = git::run(top, &["worktree", "remove", "--force", &path_arg], None);
     if let Err(e) = &removed
         && !e.contains("Permission denied")
     {
@@ -141,11 +141,11 @@ pub fn remove(top: &Path, wt: &Worktree) -> Result<(), String> {
     }
     // A directory git could not empty (files a container wrote as root through a bind mount)
     // is no longer a worktree: drop its registration, branch and refs all the same.
-    let _ = git(top, &["worktree", "prune"], None);
-    git(top, &["branch", "-D", &wt.branch], None)?;
-    git(top, &["update-ref", "-d", &wt.base], None)?;
+    let _ = git::run(top, &["worktree", "prune"], None);
+    git::run(top, &["branch", "-D", &wt.branch], None)?;
+    git::run(top, &["update-ref", "-d", &wt.base], None)?;
     // Older worktrees have no origin ref; deleting it is optional.
-    let _ = git(top, &["symbolic-ref", "--delete", &wt.origin], None);
+    let _ = git::run(top, &["symbolic-ref", "--delete", &wt.origin], None);
     if let Err(e) = removed {
         return Err(format!(
             "{e}\nThe branch is removed; some files are not yours (owned by root?): `sudo rm -rf {path_arg}`."
@@ -157,7 +157,7 @@ pub fn remove(top: &Path, wt: &Worktree) -> Result<(), String> {
 /// The branch the human had checked out when the worktree was made; `None`
 /// for a detached HEAD or worktrees made before this ref existed.
 pub fn origin_branch(top: &Path, wt: &Worktree) -> Option<String> {
-    let out = git(top, &["symbolic-ref", "--short", &wt.origin], None).ok()?;
+    let out = git::run(top, &["symbolic-ref", "--short", &wt.origin], None).ok()?;
     let branch = String::from_utf8_lossy(&out).trim().to_string();
     (!branch.is_empty()).then_some(branch)
 }
@@ -167,12 +167,12 @@ pub fn origin_branch(top: &Path, wt: &Worktree) -> Option<String> {
 fn fill(top: &Path, wt: &Worktree) -> Result<(), String> {
     // The human's uncommitted work is copied, never moved: their tree stays as is.
     let mut copied = false;
-    let diff = git(top, &["diff", "HEAD", "--binary"], None)?;
+    let diff = git::run(top, &["diff", "HEAD", "--binary"], None)?;
     if !diff.is_empty() {
-        git(&wt.path, &["apply", "--binary"], Some(&diff))?;
+        git::run(&wt.path, &["apply", "--binary"], Some(&diff))?;
         copied = true;
     }
-    let untracked = git(
+    let untracked = git::run(
         top,
         &["ls-files", "--others", "--exclude-standard", "-z"],
         None,
@@ -193,17 +193,17 @@ fn fill(top: &Path, wt: &Worktree) -> Result<(), String> {
             "fennec: the human's uncommitted work at the run's start",
         )?;
     }
-    git(&wt.path, &["update-ref", &wt.base, "HEAD"], None)?;
+    git::run(&wt.path, &["update-ref", &wt.base, "HEAD"], None)?;
     record_origin(top, wt)
 }
 
 /// Records the human's checked-out branch as the worktree's origin ref, if
 /// the human is on a branch.
 fn record_origin(top: &Path, wt: &Worktree) -> Result<(), String> {
-    if let Ok(head) = git(top, &["symbolic-ref", "-q", "HEAD"], None) {
+    if let Ok(head) = git::run(top, &["symbolic-ref", "-q", "HEAD"], None) {
         let head_ref = String::from_utf8_lossy(&head).trim().to_string();
         if !head_ref.is_empty() {
-            git(top, &["symbolic-ref", &wt.origin, &head_ref], None)?;
+            git::run(top, &["symbolic-ref", &wt.origin, &head_ref], None)?;
         }
     }
     Ok(())
@@ -231,15 +231,15 @@ pub fn commit(worktree: &Worktree, message: &str) -> Result<bool, String> {
     // otherwise.
     let mut args: Vec<&str> = vec!["add", "-A", "--", "."];
     args.extend_from_slice(EXCLUDED_INPUTS);
-    git(dir, &args, None)?;
+    git::run(dir, &args, None)?;
     // The staged changes, not `git status`: the excluded captures stay untracked.
-    if git(dir, &["diff", "--cached", "--name-only"], None)?.is_empty() {
+    if git::run(dir, &["diff", "--cached", "--name-only"], None)?.is_empty() {
         return Ok(false);
     }
     // The human's git identity: fennec is the harness, not an author.
     // Provenance stays in the `fennec/<session>` branch and the integration's
     // `Fennec-Session` trailer.
-    git(dir, &["commit", "-q", "-m", message], None)?;
+    git::run(dir, &["commit", "-q", "-m", message], None)?;
     Ok(true)
 }
 
@@ -330,7 +330,7 @@ pub fn link_dependencies(workdir: &Path) -> Result<(), String> {
 fn main_checkout(workdir: &Path) -> Option<PathBuf> {
     let (_, prefix) = repository(workdir)?;
     // `--path-format` applies to the options after it.
-    let out = git(
+    let out = git::run(
         workdir,
         &[
             "rev-parse",
@@ -387,45 +387,12 @@ fn collect_dependency_mounts(
 /// The repository's top directory and the project's prefix inside it.
 fn repository(project_dir: &Path) -> Option<(PathBuf, String)> {
     let text = |args: &[&str]| {
-        let out = git(project_dir, args, None).ok()?;
+        let out = git::run(project_dir, args, None).ok()?;
         Some(String::from_utf8_lossy(&out).trim().to_string())
     };
     let top = text(&["rev-parse", "--show-toplevel"])?;
     let prefix = text(&["rev-parse", "--show-prefix"])?;
     Some((PathBuf::from(top), prefix))
-}
-
-/// Runs `git -C dir args...`; a non-zero exit is an `Err` with the command
-/// and its trimmed stderr.
-/// `integration.rs` reuses it to run the cherry-pick in the human's repository.
-pub(crate) fn git(dir: &Path, args: &[&str], stdin: Option<&[u8]>) -> Result<Vec<u8>, String> {
-    let command = format!("git -C {} {}", dir.display(), args.join(" "));
-    let mut child = Command::new("git")
-        .arg("-C")
-        .arg(dir)
-        .args(args)
-        .stdin(if stdin.is_some() {
-            Stdio::piped()
-        } else {
-            Stdio::null()
-        })
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|e| format!("{command}: {e}"))?;
-    if let (Some(input), Some(mut pipe)) = (stdin, child.stdin.take()) {
-        pipe.write_all(input)
-            .map_err(|e| format!("{command}: {e}"))?;
-    }
-    let out = child
-        .wait_with_output()
-        .map_err(|e| format!("{command}: {e}"))?;
-    if out.status.success() {
-        Ok(out.stdout)
-    } else {
-        let stderr = String::from_utf8_lossy(&out.stderr);
-        Err(format!("{command}: {}", stderr.trim()))
-    }
 }
 
 /// A worktree lacks the gitignored `.env` files a dev server reads; a link,
@@ -457,7 +424,7 @@ pub fn link_env_files(workdir: &Path) -> Result<(), String> {
             continue;
         }
 
-        if git(&main, &["check-ignore", "-q", name], None).is_err() {
+        if git::run(&main, &["check-ignore", "-q", name], None).is_err() {
             continue;
         }
 
@@ -476,6 +443,10 @@ pub fn link_env_files(workdir: &Path) -> Result<(), String> {
 mod tests {
     use super::*;
     use crate::domain::id::new_id;
+
+    fn git(dir: &Path, args: &[&str], stdin: Option<&[u8]>) -> Result<Vec<u8>, String> {
+        git::run(dir, args, stdin)
+    }
 
     fn text(dir: &Path, args: &[&str]) -> String {
         String::from_utf8_lossy(&git(dir, args, None).unwrap()).into_owned()

@@ -2,7 +2,6 @@
 
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
-use std::process::Command;
 use std::thread::{available_parallelism, scope};
 
 use crate::domain::indicators::Authored;
@@ -12,7 +11,7 @@ use crate::domain::risk::{self, Authorship, FileFacts, History, RiskReport};
 pub fn load(workdir: &Path) -> RiskReport {
     let sources = crate::module_map::tracked_files(workdir);
 
-    let Some(ai_log) = git_stdout(workdir, &["log", "--format=%x1e%H%x1f%B"]) else {
+    let Some(ai_log) = crate::git::stdout(workdir, &["log", "--format=%x1e%H%x1f%B"]) else {
         return risk::report(Vec::new(), History::default());
     };
     let (ai_hashes, commit_count) = ai_commits(&ai_log);
@@ -22,7 +21,8 @@ pub fn load(workdir: &Path) -> RiskReport {
     };
 
     let since = churn_since();
-    let Some(churn_log) = git_stdout(workdir, &["log", &since, "--format=%x1e", "--name-only"])
+    let Some(churn_log) =
+        crate::git::stdout(workdir, &["log", &since, "--format=%x1e", "--name-only"])
     else {
         return risk::report(Vec::new(), History::default());
     };
@@ -72,7 +72,8 @@ fn churn_since() -> String {
 /// the last `risk::CHURN_DAYS` days; empty when git cannot answer.
 pub fn hot_files(top: &Path) -> HashSet<String> {
     let since = churn_since();
-    let Some(log) = git_stdout(top, &["log", &since, "--format=%x1e", "--name-only"]) else {
+    let Some(log) = crate::git::stdout(top, &["log", &since, "--format=%x1e", "--name-only"])
+    else {
         return HashSet::new();
     };
 
@@ -85,7 +86,7 @@ pub fn hot_files(top: &Path) -> HashSet<String> {
 /// The commits of the last `days` days by authorship, read from their trailers.
 pub fn recent_authorship(workdir: &Path, days: u32) -> Authored {
     let since = format!("--since={days}.days");
-    let Some(log) = git_stdout(workdir, &["log", &since, "--format=%x1e%B"]) else {
+    let Some(log) = crate::git::stdout(workdir, &["log", &since, "--format=%x1e%B"]) else {
         return Authored::default();
     };
 
@@ -110,7 +111,8 @@ pub fn recent_authorship(workdir: &Path, days: u32) -> Authored {
 /// A file whose content cannot be read from the branch is treated as tested:
 /// it is then out of the way and cannot carry an `Untested` review signal.
 pub fn tested_on_branch(top: &Path, branch: &str, files: &[String]) -> HashSet<String> {
-    let tree = git_stdout(top, &["ls-tree", "-r", "--name-only", branch]).unwrap_or_default();
+    let tree =
+        crate::git::stdout(top, &["ls-tree", "-r", "--name-only", branch]).unwrap_or_default();
     let test_paths: Vec<String> = tree
         .lines()
         .map(str::trim)
@@ -123,7 +125,7 @@ pub fn tested_on_branch(top: &Path, branch: &str, files: &[String]) -> HashSet<S
 
     for file in files {
         let show = format!("{branch}:{file}");
-        let Some(content) = git_stdout(top, &["show", &show]) else {
+        let Some(content) = crate::git::stdout(top, &["show", &show]) else {
             tested.insert(file.clone());
             continue;
         };
@@ -237,32 +239,11 @@ fn git_blame_counts(
     path: &str,
     ai_hashes: &HashSet<String>,
 ) -> Option<(usize, usize)> {
-    let output = Command::new("git")
-        .current_dir(workdir)
-        .args(["blame", "--line-porcelain", "-w", "HEAD", "--", path])
-        .output()
-        .ok()?;
-
-    if !output.status.success() {
-        return None;
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stdout = crate::git::stdout(
+        workdir,
+        &["blame", "--line-porcelain", "-w", "HEAD", "--", path],
+    )?;
     Some(blame_counts(&stdout, ai_hashes))
-}
-
-fn git_stdout(workdir: &Path, args: &[&str]) -> Option<String> {
-    let output = Command::new("git")
-        .current_dir(workdir)
-        .args(args)
-        .output()
-        .ok()?;
-
-    if !output.status.success() {
-        return None;
-    }
-
-    Some(String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
 fn is_commit_hash(token: &str) -> bool {

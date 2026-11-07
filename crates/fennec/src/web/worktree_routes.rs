@@ -140,7 +140,7 @@ pub fn remove_orphan(app: &App, req: &Request, stream: &mut TcpStream) -> Result
 
 fn cached_scan(app: &App, fresh: bool) -> (u64, Vec<WorktreeUsage>) {
     let now = clock::now_ms();
-    let mut scan = app.worktree_scan.lock().unwrap();
+    let mut scan = crate::locks::lock(&app.worktree_scan);
 
     if !fresh
         && let Some((scanned_at, entries)) = scan.as_ref()
@@ -157,7 +157,7 @@ fn cached_scan(app: &App, fresh: bool) -> (u64, Vec<WorktreeUsage>) {
 }
 
 fn drop_scan_cache(app: &App) {
-    *app.worktree_scan.lock().unwrap() = None;
+    *crate::locks::lock(&app.worktree_scan) = None;
 }
 
 fn body_name(req: &Request) -> Option<String> {
