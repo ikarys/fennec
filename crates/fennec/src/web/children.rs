@@ -18,6 +18,8 @@ pub(super) struct Children<'a> {
     pub(super) workdir: &'a Path,
     /// The parent's turn runs with the human away: so do its children.
     pub(super) autonomous: bool,
+    /// The turn is a `delegate` call's child: what it leaves for the human goes in its answer.
+    pub(super) delegated: bool,
 }
 
 impl ChildSessions for Children<'_> {

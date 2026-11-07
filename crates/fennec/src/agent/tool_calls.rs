@@ -1439,7 +1439,7 @@ mod tests {
             vec![(
                 "child".to_string(),
                 "plan".to_string(),
-                "Where are sessions stored?".to_string()
+                format!("{}Where are sessions stored?", super::delegate::CHILD_BRIEF)
             )]
         );
         let (id, result) = &results(&h.log)[0];

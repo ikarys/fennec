@@ -262,8 +262,10 @@ shows a star with the count of releases since the human last looked, a fresh ins
 Delegation, done: `delegate` lets plan, builder and ask hand a self-contained task to a read-only agent
 (`commands: read-only`, no file write tool) that runs in a fresh child session, in the same workdir; the parent
 waits and gets back only the child's final answer (capped at 20,000 characters, with the child's id), so a broad
-exploration no longer fills its context. The child runs with the human away (its questions answer themselves,
-an approval-needing call is refused), cannot delegate further, and the parent releases the model gate first so the
-child is not kept behind it. Only the web's top-level turns delegate; the CLI answers that it cannot. The tool
-card shows the agent and the task, and marks the answer indicative (`agent/delegate.rs`, `web/children.rs`,
+exploration no longer fills its context. The child is hidden from the human, so the loop tools that would leave
+something for them (`ask_user`, `record_decision`, `propose_task`, `propose_plan`, `suggest_agent`…) are withheld from
+its agent (its reminder omits them, a call is refused; the definitions stay whole, so the child starts from the cached prefix every session shares), and its task opens with a kernel sentence saying so: all of that comes back in its answer, for the parent to decide; an approval-needing call is refused too. It cannot
+delegate further, and the parent releases the model gate first so the
+child is not kept behind it. Only the web's top-level turns delegate; elsewhere `delegate` is withheld the same way. The tool
+card shows the agent and the task, and marks the answer indicative, with the time the child ran (`agent/delegate.rs`, `web/children.rs`,
 `web/turns.rs`, `ToolCard.tsx`).
