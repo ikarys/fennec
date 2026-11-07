@@ -21,6 +21,7 @@ import { DiskSection } from './DiskSection';
 import { ProjectRulesTile } from '../rules/RulesSection';
 import { PluginsSection } from './PluginsSection';
 import { useT, useLang } from '../../i18n';
+import { TableHeader } from '../ui/TableHeader';
 
 const ICONS: Record<DashboardIcon, ReactNode> = {
   sessions: <LayersIcon />,
@@ -119,11 +120,11 @@ export function DashboardSection({
           <Card className="px-4 py-6 text-center text-sm text-muted">{t('noSessions')}</Card>
         ) : (
           <Card className="overflow-hidden">
-            <div className="flex items-center gap-3 border-b border-border bg-raised px-4 py-2 text-xs uppercase tracking-wide text-faint">
+            <TableHeader>
               <span className="min-w-0 grow">{t('titleCol')}</span>
               <span className="w-28 shrink-0">{t('statusCol')}</span>
               <span className="w-24 shrink-0 text-right">{t('modifiedCol')}</span>
-            </div>
+            </TableHeader>
             <ul className="divide-y divide-border">
               {data.recent.map((session) => (
                 <li key={session.id}>

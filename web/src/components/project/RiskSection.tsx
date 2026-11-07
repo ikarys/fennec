@@ -10,6 +10,7 @@ import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Section } from '../ui/Section';
 import { Tile } from '../ui/Tile';
 import { ActivityIcon, AlertIcon, ChevronRightIcon, RefreshIcon, ReviewIcon, SpinnerIcon, WandIcon } from '../Icons';
+import { TableHeader } from '../ui/TableHeader';
 
 type T = (key: MsgKey, vars?: Record<string, string | number>) => string;
 
@@ -145,7 +146,7 @@ export function RiskSection({
         {data ? (
           data.modules.length > 0 ? (
             <Card className="overflow-hidden">
-              <div className="flex items-center gap-3 border-b border-border bg-raised px-4 py-2 text-xs uppercase tracking-wide text-faint">
+              <TableHeader>
                 <span className="w-3.5 shrink-0" />
                 <span className="min-w-0 grow">{t('moduleCol')}</span>
                 <span className="w-28 shrink-0 text-right">{t('filesNeverReviewed')}</span>
@@ -153,7 +154,7 @@ export function RiskSection({
                 <span className="w-28 shrink-0 text-right">{t('filesOftenModified')}</span>
                 <span className="w-20 shrink-0 text-right">{t('filesCol')}</span>
                 <span className="w-7 shrink-0" />
-              </div>
+              </TableHeader>
               {data.modules.map((module, index) => (
                 <details key={module.path} className={`group ${index > 0 ? 'border-t border-border' : ''}`}>
                   {/* An open module keeps the accent edge, so its files read as its own. */}

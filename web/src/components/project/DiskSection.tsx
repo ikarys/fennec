@@ -18,6 +18,7 @@ import {
 import { discardWorktree } from '../../lib/api';
 import { formatBytes, formatRelative } from '../../lib/format';
 import { useLang, useT } from '../../i18n';
+import { TableHeader } from '../ui/TableHeader';
 
 export function DiskSection({
   projectId,
@@ -192,11 +193,11 @@ export function DiskSection({
           <Card className="px-4 py-6 text-center text-sm text-muted">{t('noWorktrees')}</Card>
         ) : (
           <Card className="overflow-hidden">
-            <div className="flex items-center gap-3 border-b border-border bg-raised px-4 py-2 text-xs uppercase tracking-wide text-faint">
+            <TableHeader>
               <span className="min-w-0 grow">{t('worktreeCol')}</span>
               <span className="w-32 shrink-0 text-right">{t('sizeCol')}</span>
               <span className="w-16 shrink-0" />
-            </div>
+            </TableHeader>
             <ul className="divide-y divide-border">
               {sessions.map((entry) => (
                 <SessionRow
@@ -221,11 +222,11 @@ export function DiskSection({
           flush
         >
           <Card className="overflow-hidden">
-            <div className="flex items-center gap-3 border-b border-border bg-raised px-4 py-2 text-xs uppercase tracking-wide text-faint">
+            <TableHeader>
               <span className="min-w-0 grow">{t('folderCol')}</span>
               <span className="w-32 shrink-0 text-right">{t('sizeCol')}</span>
               <span className="w-16 shrink-0" />
-            </div>
+            </TableHeader>
             <ul className="divide-y divide-border">
               {orphans.map((entry) => (
                 <OrphanRow
