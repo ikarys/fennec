@@ -194,15 +194,27 @@ fn parse_concurrency(value: &str) -> Option<usize> {
 
 /// `FENNEC_DB`, default `~/.local/share/fennec/fennec.db`; its directory is created.
 pub fn db_path() -> Result<PathBuf, String> {
-    let path = match std::env::var_os("FENNEC_DB") {
-        Some(p) => PathBuf::from(p),
+    let (path, default) = match std::env::var_os("FENNEC_DB") {
+        Some(p) => (PathBuf::from(p), false),
         None => {
             let home = std::env::var_os("HOME").ok_or("HOME is not set")?;
-            PathBuf::from(home).join(".local/share/fennec/fennec.db")
+            (
+                PathBuf::from(home).join(".local/share/fennec/fennec.db"),
+                true,
+            )
         }
     };
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+        // The store holds the sessions, the sealed keys' master key and the rules: owner-only,
+        // set on every start so older installs are fixed too. A custom FENNEC_DB folder may be
+        // shared, so its mode is the human's.
+        #[cfg(unix)]
+        if default {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))
+                .map_err(|e| format!("{}: {e}", dir.display()))?;
+        }
     }
     Ok(path)
 }
