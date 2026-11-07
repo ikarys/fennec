@@ -89,5 +89,9 @@ Seatbelt gives the same world with three differences: commands get their own `TM
 - The file tools, read/write/edit, run in fennec's process behind a path guard, not in bwrap.
 - A command can create a new file matching a protected pattern where none existed.
 - Command rules match parsed tokens, so `eval` or a script can slip past them. The sandbox is the wall; rules are guard rails.
-- With the network on, a command can reach the internet.
+- With the network on, a command can reach the internet, and fennec's own server on `127.0.0.1:7777` too: it could drive fennec (answer an approval, start a turn). Turn the network on for the step that needs it, then off again.
+- The servers the play button starts run outside the sandbox, as you, with your environment: they run the project's code, so start them on a branch you have read.
+- `~/.cargo/registry`, `~/.cargo/git`, `~/.cache` and `~/.npm` stay writable so builds and installs work; a command could leave a tampered file there that a later build on your machine reuses.
+- The rest of your home stays readable to commands, except the secrets fennec hides (`~/.ssh`, cloud and token files, its own store).
+- `web_fetch` and `web_search` run in fennec's process, not in the sandbox: they reach the web even with the network off.
 - The review gate is the last line: nothing lands on your branch without your click.
