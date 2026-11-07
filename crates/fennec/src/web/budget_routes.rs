@@ -1,6 +1,7 @@
 //! The project's monthly budget: the human sets it, the server answers
 //! display-ready figures and the kernel's status.
 
+use crate::web::http::HttpError;
 use serde::Serialize;
 use serde_json::json;
 use std::net::TcpStream;
@@ -25,7 +26,7 @@ pub struct BudgetView {
 }
 
 /// `GET /api/projects/{id}/budget`.
-pub fn get(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub fn get(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
     if store.project(id)?.is_none() {
         return error(stream, 404, "no such project");
@@ -37,7 +38,7 @@ pub fn get(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
 }
 
 /// `POST /api/projects/{id}/budget` with `{"limitUsd": number | null}`.
-pub fn set(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub fn set(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
     if store.project(id)?.is_none() {
         return error(stream, 404, "no such project");

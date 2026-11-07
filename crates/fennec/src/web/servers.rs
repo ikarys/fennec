@@ -7,6 +7,7 @@ use super::App;
 use super::http::{Request, error, send_json};
 use crate::domain::server::{ServerDef, announced_url, strip_ansi, url_port, validate};
 use crate::servers;
+use crate::web::http::HttpError;
 use crate::worktree;
 use serde_json::{Value, json};
 use std::collections::VecDeque;
@@ -43,7 +44,7 @@ fn key(session_id: &str, name: &str) -> String {
 
 /// The project's servers with their running state in this session.
 /// `GET /api/sessions/{id}/servers`.
-pub fn list(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub fn list(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let Some((_, project)) = app.session_and_project(id)? else {
         return error(stream, 404, "no such session");
     };
@@ -125,7 +126,7 @@ impl Snapshot {
 
 /// Saves the project's servers to `.agents/servers.json`.
 /// `POST /api/sessions/{id}/servers` with `{servers: [{name, command}]}`.
-pub fn save(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub fn save(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let Some((_, project)) = app.session_and_project(id)? else {
         return error(stream, 404, "no such session");
     };
@@ -151,7 +152,7 @@ pub fn save(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Resul
 
 /// Starts a server in the session's place.
 /// `POST /api/sessions/{id}/servers/start` with `{name}`.
-pub fn start(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub fn start(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let Some((session, project)) = app.session_and_project(id)? else {
         return error(stream, 404, "no such session");
     };
@@ -237,7 +238,7 @@ pub fn start(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Resu
 }
 
 /// Stops a server in this session. `POST /api/sessions/{id}/servers/stop` with `{name}`.
-pub fn stop(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub fn stop(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let name = req_name(req)?;
     let k = key(id, &name);
 
@@ -262,11 +263,11 @@ pub fn stop(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Resul
 }
 
 /// The `name` of a start/stop request.
-fn req_name(req: &Request) -> Result<String, String> {
+fn req_name(req: &Request) -> Result<String, HttpError> {
     let body = req.json()?;
     let name = body["name"].as_str().unwrap_or("").trim().to_string();
     if name.is_empty() {
-        return Err("name must not be empty".into());
+        return Err(HttpError::new(400, "name must not be empty"));
     }
     Ok(name)
 }

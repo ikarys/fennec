@@ -2,6 +2,7 @@
 //! the usage ledger over a period, for every project or one. The ledger
 //! outlives the sessions, so a deleted session still counts.
 
+use crate::web::http::HttpError;
 use serde::Serialize;
 use serde_json::json;
 use std::net::TcpStream;
@@ -217,7 +218,7 @@ impl InsightData {
 }
 
 /// `GET /api/insight?project=<id>&days=<7|30|90|all>`.
-pub fn serve(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
+pub fn serve(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), HttpError> {
     let period = match Period::parse(req.query_param("days").as_deref()) {
         Some(period) => period,
         None => return error(stream, 400, "days must be 7, 30, 90 or all"),

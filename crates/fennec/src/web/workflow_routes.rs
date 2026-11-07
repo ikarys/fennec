@@ -13,6 +13,7 @@ use crate::domain::workflow::definition::Workflow;
 use crate::domain::workflow::run::{self as run, Waiting};
 use crate::domain::workflow::validate;
 use crate::notifier::NotifyingLog;
+use crate::web::http::HttpError;
 use crate::workflows::{self, Origin};
 use serde_json::{Value, json};
 use std::net::TcpStream;
@@ -22,7 +23,7 @@ fn project(app: &App, id: &str) -> Result<Option<Project>, String> {
     Ok(app.store()?.project(id)?)
 }
 
-pub fn list_workflows(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub fn list_workflows(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let Some(project) = project(app, id)? else {
         return error(stream, 404, "no such project");
     };
@@ -42,7 +43,12 @@ pub fn list_workflows(app: &App, stream: &mut TcpStream, id: &str) -> Result<(),
     send_json(stream, 200, &Value::Array(out))
 }
 
-pub fn get_workflow(app: &App, stream: &mut TcpStream, id: &str, wid: &str) -> Result<(), String> {
+pub fn get_workflow(
+    app: &App,
+    stream: &mut TcpStream,
+    id: &str,
+    wid: &str,
+) -> Result<(), HttpError> {
     let Some(project) = project(app, id)? else {
         return error(stream, 404, "no such project");
     };
@@ -63,7 +69,7 @@ pub fn save_workflow(
     stream: &mut TcpStream,
     id: &str,
     wid: &str,
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     let body = req.json()?;
     let Some(project) = project(app, id)? else {
         return error(stream, 404, "no such project");
@@ -101,7 +107,7 @@ pub fn validate_workflow_route(
     app: &App,
     req: &Request,
     stream: &mut TcpStream,
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     let body = req.json()?;
     let Some(project) = project(app, body["projectId"].as_str().unwrap_or(""))? else {
         return error(stream, 404, "no such project");
@@ -148,7 +154,7 @@ pub fn start_workflow(
     req: &Request,
     stream: &mut TcpStream,
     id: &str,
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     let body = req.json()?;
     let store = app.store()?;
     let Some((session, project)) = app.session_and_project(id)? else {
@@ -196,7 +202,7 @@ pub fn control_workflow(
     stream: &mut TcpStream,
     id: &str,
     control: &str,
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     let body = req.json()?;
     let text = |field: &str| body[field].as_str().unwrap_or("").to_string();
     if control == "pause" {
@@ -230,7 +236,12 @@ pub fn control_workflow(
 }
 
 /// `pause`: the run goes on to the end of its current node, then waits at the next edge.
-fn request_pause(app: &App, stream: &mut TcpStream, id: &str, run_id: &str) -> Result<(), String> {
+fn request_pause(
+    app: &App,
+    stream: &mut TcpStream,
+    id: &str,
+    run_id: &str,
+) -> Result<(), HttpError> {
     if !app.turns.is_running(id) {
         return error(stream, 409, "the run is not running");
     }
@@ -264,7 +275,7 @@ fn start_job(
     id: &str,
     place: Place,
     job: WorkflowJob,
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     match app.turns.start(id, place, Job::Workflow(job)) {
         Ok(()) => send_json(stream, 202, &json!({})),
         Err(e) => error(stream, 409, &e),

@@ -8,6 +8,31 @@ use std::time::Duration;
 // Images travel as base64 data URLs in JSON bodies (10 × 5 MB, plus base64 overhead).
 const MAX_BODY: usize = 32 << 20;
 
+/// A handler's failure as the client sees it. A `String` error (an I/O, store or git failure the
+/// handler passed up with `?`) is the server's fault: 500, never a 400 that blames the caller.
+#[derive(Debug)]
+pub struct HttpError {
+    pub status: u16,
+    pub message: String,
+}
+
+impl HttpError {
+    pub fn new(status: u16, message: impl Into<String>) -> Self {
+        Self {
+            status,
+            message: message.into(),
+        }
+    }
+}
+
+// Any displayable error converts, as `String` did; HttpError itself is not Display, so this
+// blanket impl never overlaps `From<HttpError> for HttpError`.
+impl<E: std::fmt::Display> From<E> for HttpError {
+    fn from(error: E) -> Self {
+        Self::new(500, error.to_string())
+    }
+}
+
 pub struct Request {
     pub method: String,
     pub path: String,
@@ -24,8 +49,9 @@ impl Request {
             .map(|(_, v)| v.as_str())
     }
 
-    pub fn json(&self) -> Result<Value, String> {
-        serde_json::from_slice(&self.body).map_err(|e| format!("invalid JSON body: {e}"))
+    pub fn json(&self) -> Result<Value, HttpError> {
+        serde_json::from_slice(&self.body)
+            .map_err(|e| HttpError::new(400, format!("invalid JSON body: {e}")))
     }
 
     /// A query parameter, percent-decoded (`+` is a space, as browsers send).
@@ -115,7 +141,7 @@ pub fn send(
     status: u16,
     content_type: &str,
     body: &[u8],
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     send_with(stream, status, content_type, &[], body)
 }
 
@@ -125,7 +151,7 @@ pub fn send_with(
     content_type: &str,
     extra_headers: &[(&str, &str)],
     body: &[u8],
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     let reason = match status {
         200 => "OK",
         202 => "Accepted",
@@ -151,10 +177,10 @@ pub fn send_with(
     stream
         .write_all(head.as_bytes())
         .and_then(|()| stream.write_all(body))
-        .map_err(|e| e.to_string())
+        .map_err(HttpError::from)
 }
 
-pub fn send_json(stream: &mut TcpStream, status: u16, value: &Value) -> Result<(), String> {
+pub fn send_json(stream: &mut TcpStream, status: u16, value: &Value) -> Result<(), HttpError> {
     send(
         stream,
         status,
@@ -163,7 +189,7 @@ pub fn send_json(stream: &mut TcpStream, status: u16, value: &Value) -> Result<(
     )
 }
 
-pub fn error(stream: &mut TcpStream, status: u16, message: &str) -> Result<(), String> {
+pub fn error(stream: &mut TcpStream, status: u16, message: &str) -> Result<(), HttpError> {
     send_json(stream, status, &json!({ "error": message }))
 }
 

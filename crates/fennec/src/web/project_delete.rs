@@ -4,6 +4,7 @@
 use super::App;
 use super::http::{Request, error, send_json};
 use super::session_delete;
+use crate::web::http::HttpError;
 use serde_json::{Value, json};
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
@@ -15,7 +16,7 @@ pub(super) fn delete_project(
     req: &Request,
     stream: &mut TcpStream,
     id: &str,
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     let body = req.json()?;
     let delete_folder = body
         .get("deleteFolder")
@@ -82,7 +83,7 @@ pub(super) fn delete_project(
                     }),
                 );
             }
-            Err(e) => return Err(e),
+            Err(e) => return Err(e.into()),
         }
     }
     store.delete_project(id).map_err(|e| e.to_string())?;

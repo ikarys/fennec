@@ -3,12 +3,13 @@
 use super::App;
 use super::http::send_json;
 use crate::domain::changelog;
+use crate::web::http::HttpError;
 use serde_json::json;
 use std::net::TcpStream;
 
 const CHANGELOG: &str = include_str!("../../../../CHANGELOG.md");
 
-pub(super) fn serve(app: &App, stream: &mut TcpStream) -> Result<(), String> {
+pub(super) fn serve(app: &App, stream: &mut TcpStream) -> Result<(), HttpError> {
     let store = app.store()?;
     let releases = changelog::parse(CHANGELOG);
     let current = env!("CARGO_PKG_VERSION");
@@ -34,7 +35,7 @@ pub(super) fn serve(app: &App, stream: &mut TcpStream) -> Result<(), String> {
     )
 }
 
-pub(super) fn mark_seen(app: &App, stream: &mut TcpStream) -> Result<(), String> {
+pub(super) fn mark_seen(app: &App, stream: &mut TcpStream) -> Result<(), HttpError> {
     let store = app.store()?;
     let current = env!("CARGO_PKG_VERSION");
 

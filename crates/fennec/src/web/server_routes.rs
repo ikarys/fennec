@@ -1,6 +1,7 @@
 //! The server's own settings over HTTP: its port, listen address, password and
 //! a restart to apply them.
 
+use crate::web::http::HttpError;
 use std::net::{IpAddr, Ipv4Addr, TcpStream};
 use std::path::PathBuf;
 use std::thread;
@@ -26,18 +27,15 @@ struct ServerView {
     restart_needed: bool,
 }
 
-pub fn show(app: &App, stream: &mut TcpStream) -> Result<(), String> {
+pub fn show(app: &App, stream: &mut TcpStream) -> Result<(), HttpError> {
     match view(app) {
         Ok(view) => send_json(stream, 200, &serde_json::json!(view)),
         Err(message) => error(stream, 500, &message),
     }
 }
 
-pub fn set(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
-    let value = match req.json() {
-        Ok(value) => value,
-        Err(message) => return error(stream, 400, &message),
-    };
+pub fn set(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), HttpError> {
+    let value = req.json()?;
 
     let port = match value.get("port").and_then(serde_json::Value::as_u64) {
         Some(port) => match domain::valid_port(port) {
@@ -77,11 +75,8 @@ pub fn set(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), Strin
     }
 }
 
-pub fn set_password(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
-    let value = match req.json() {
-        Ok(value) => value,
-        Err(message) => return error(stream, 400, &message),
-    };
+pub fn set_password(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), HttpError> {
+    let value = req.json()?;
 
     let password = match value.get("password").and_then(serde_json::Value::as_str) {
         Some(password) => password.to_string(),
@@ -105,7 +100,7 @@ pub fn set_password(app: &App, req: &Request, stream: &mut TcpStream) -> Result<
     }
 }
 
-pub fn restart(app: &App, stream: &mut TcpStream) -> Result<(), String> {
+pub fn restart(app: &App, stream: &mut TcpStream) -> Result<(), HttpError> {
     if !app.turns.running_ids().is_empty() {
         return error(stream, 409, "a turn is running: restart when it ends");
     }

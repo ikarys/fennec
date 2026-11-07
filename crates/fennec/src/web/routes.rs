@@ -17,11 +17,12 @@ use super::{
     rule_routes, server_routes, servers, session_delete, session_routes, settings_routes,
     setup_routes, terminal, update_routes, waiver_routes, workflow_routes, worktree_routes,
 };
+use crate::web::http::HttpError;
 use serde_json::json;
 use std::net::TcpStream;
 use std::sync::Arc;
 
-pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
+pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(), HttpError> {
     let segments: Vec<&str> = req.path.trim_matches('/').split('/').collect();
     match (req.method.as_str(), segments.as_slice()) {
         ("GET", ["api", "config"]) => {

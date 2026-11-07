@@ -3,11 +3,16 @@
 use super::App;
 use super::http::{Request, error, send_json};
 use crate::folders;
+use crate::web::http::HttpError;
 use serde_json::json;
 use std::net::TcpStream;
 use std::path::Path;
 
-pub(super) fn list_folders(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
+pub(super) fn list_folders(
+    app: &App,
+    req: &Request,
+    stream: &mut TcpStream,
+) -> Result<(), HttpError> {
     let dir = req
         .query_param("path")
         .filter(|p| !p.is_empty())
@@ -30,7 +35,7 @@ pub(super) fn store_dir(app: &App) -> &Path {
     app.settings.db_path.parent().unwrap_or(Path::new("/"))
 }
 
-pub(super) fn create_folder(req: &Request, stream: &mut TcpStream) -> Result<(), String> {
+pub(super) fn create_folder(req: &Request, stream: &mut TcpStream) -> Result<(), HttpError> {
     let body = req.json()?;
     let base = body["path"].as_str().unwrap_or("");
     let name = body["name"].as_str().unwrap_or("");

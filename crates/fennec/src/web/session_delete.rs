@@ -5,13 +5,14 @@ use super::http::{Request, error, send_json};
 use crate::chat;
 use crate::domain::project::SessionSummary;
 use crate::store::SqliteStore;
+use crate::web::http::HttpError;
 use crate::worktree;
 use serde_json::{Value, json};
 use std::net::TcpStream;
 use std::path::Path;
 
 /// `POST /api/sessions/delete`: the human's deletion of top-level sessions.
-pub fn delete_sessions(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
+pub fn delete_sessions(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), HttpError> {
     let body = req.json()?;
     let Some(items) = body.get("ids").and_then(Value::as_array) else {
         return error(stream, 400, "ids must be a non-empty list of session ids");
@@ -59,7 +60,7 @@ pub fn delete_sessions(app: &App, req: &Request, stream: &mut TcpStream) -> Resu
         match remove_tree(app, &store, &rule_store, &session, &tree) {
             Ok(None) => deleted.push(id),
             Ok(Some(e)) => failed.push(json!({ "id": id, "error": e })),
-            Err(e) => return Err(e),
+            Err(e) => return Err(e.into()),
         }
     }
     send_json(

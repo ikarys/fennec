@@ -9,6 +9,7 @@ use crate::domain::event::Event;
 use crate::domain::mcp;
 use crate::domain::preferences::Preferences;
 use crate::tools::Sandbox;
+use crate::web::http::HttpError;
 use serde_json::{Value, json};
 use std::net::TcpStream;
 
@@ -62,7 +63,7 @@ fn mcp_view(prefs: &Preferences, events: &[Event]) -> Value {
 }
 
 /// `GET /api/sessions/{id}/mcp`: the session's MCP state and token totals.
-pub(super) fn session_mcp(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub(super) fn session_mcp(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
     if app.session_and_project(id)?.is_none() {
         return error(stream, 404, "no such session");
@@ -78,7 +79,7 @@ pub(super) fn set_session_mcp(
     req: &Request,
     stream: &mut TcpStream,
     id: &str,
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     let body = req.json()?;
     let disabled = body["disabled"]
         .as_array()
@@ -104,7 +105,7 @@ pub(super) fn set_session_mcp(
 
 /// `POST /api/settings/mcp/connect`: open one server, list its tools, and cache
 /// the list in the preferences.
-pub(super) fn connect(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
+pub(super) fn connect(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), HttpError> {
     let body = req.json()?;
     let name = body["name"].as_str().unwrap_or("").to_string();
     if name.is_empty() {

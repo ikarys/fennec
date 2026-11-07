@@ -1,6 +1,7 @@
 //! A proposed task turned into a backlog idea on the human's click only: the
 //! server reads the proposal from the session log and records the acceptance.
 
+use crate::web::http::HttpError;
 use std::net::TcpStream;
 
 use serde_json::json;
@@ -20,7 +21,7 @@ pub fn accept(
     stream: &mut TcpStream,
     session_id: &str,
     call_id: &str,
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     let store = app.store()?;
     let Some((session, project)) = app.session_and_project(session_id)? else {
         return error(stream, 404, "no such session");

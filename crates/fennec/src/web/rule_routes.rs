@@ -2,6 +2,7 @@
 //! agent tool reaches them. The `rules` crate owns the rules; this module only
 //! translates HTTP to its calls.
 
+use crate::web::http::HttpError;
 use std::collections::HashMap;
 use std::net::TcpStream;
 
@@ -16,7 +17,7 @@ const MAX_PATTERN_CHARS: usize = 500;
 const MAX_NOTE_CHARS: usize = 1_000;
 
 /// `GET /api/rules`: every rule, grouped for the human's management screen.
-pub fn list(app: &App, stream: &mut TcpStream) -> Result<(), String> {
+pub fn list(app: &App, stream: &mut TcpStream) -> Result<(), HttpError> {
     let rules = rule_store(app)?.list().map_err(|e| e.to_string())?;
     let store = app.store()?;
 
@@ -112,7 +113,7 @@ pub fn list(app: &App, stream: &mut TcpStream) -> Result<(), String> {
 }
 
 /// `POST /api/rules`: add a human rule.
-pub fn add(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
+pub fn add(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), HttpError> {
     let store = app.store()?;
     let body = req.json()?;
     let rule = match parse_new_rule(&body, |id| {
@@ -122,7 +123,7 @@ pub fn add(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), Strin
             .map_err(|e| e.to_string())
     }) {
         Ok(rule) => rule,
-        Err(AddError::Store(message)) => return Err(message),
+        Err(AddError::Store(message)) => return Err(message.into()),
         Err(AddError::ProjectNotFound) => return error(stream, 404, "project not found"),
         Err(AddError::Bad(message)) => return error(stream, 400, &message),
     };
@@ -134,7 +135,7 @@ pub fn add(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), Strin
 }
 
 /// `POST /api/rules/{id}/delete`: delete a rule by its numeric id.
-pub fn delete(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub fn delete(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let Ok(id) = id.parse::<i64>() else {
         return error(stream, 404, "rule not found");
     };
@@ -146,7 +147,7 @@ pub fn delete(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String>
 }
 
 /// `GET /api/projects/{id}/rules`: the project page's read-only summary.
-pub fn list_project(app: &App, stream: &mut TcpStream, project_id: &str) -> Result<(), String> {
+pub fn list_project(app: &App, stream: &mut TcpStream, project_id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
     if store.project(project_id)?.is_none() {
         return error(stream, 404, "project not found");
