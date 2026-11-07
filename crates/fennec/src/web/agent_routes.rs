@@ -6,6 +6,7 @@
 //! request may name a project: its agents are then listed, and shown as the
 //! repository's, not the human's.
 
+use crate::web::http::HttpError;
 use std::net::TcpStream;
 use std::path::PathBuf;
 
@@ -20,7 +21,7 @@ use crate::domain::agent_file::AgentDraft;
 
 /// `GET /api/agents[?projectId=…]`: every agent, with where it came from and
 /// whether the human may edit it, plus the tools an agent may be given.
-pub fn list(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
+pub fn list(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), HttpError> {
     let workdir = project_workdir(app, req)?;
     let mut agents = agents::discover(&workdir);
     // The same order as the composer's menu, so the two screens agree.
@@ -38,7 +39,7 @@ pub fn list(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), Stri
 /// parsed into fields. The form fills itself from `fields` rather than
 /// re-implementing the frontmatter parser in the browser, and still shows the
 /// file as it is when it does not parse (`fields` null then).
-pub fn get(stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub fn get(stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     match crud::read(id) {
         Ok(content) => {
             let fields = crate::domain::agent::parse_agent_md(&content)
@@ -74,7 +75,7 @@ fn fields(agent: &AgentDefinition) -> Value {
 /// `POST /api/agents`: write the human's `<id>.agent.md`, new or replaced.
 /// The form sends fields and the domain renders the file, so the frontmatter
 /// format lives in one place.
-pub fn save(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
+pub fn save(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), HttpError> {
     let draft = match serde_json::from_value::<AgentDraft>(req.json()?) {
         Ok(draft) => draft,
         Err(e) => return error(stream, 400, &format!("the agent fields do not read: {e}")),
@@ -88,7 +89,7 @@ pub fn save(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), Stri
 }
 
 /// `POST /api/agents/{id}/delete`: drop the human's `<id>.agent.md`.
-pub fn delete(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub fn delete(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let workdir = project_workdir(app, req)?;
     match crud::delete(&workdir, id) {
         Ok(()) => send_json(stream, 200, &json!({ "ok": true })),
@@ -97,7 +98,7 @@ pub fn delete(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Res
 }
 
 /// The CRUD's refusal, with the field at fault so the form can point at it.
-fn refuse(stream: &mut TcpStream, e: &crud::CrudError) -> Result<(), String> {
+fn refuse(stream: &mut TcpStream, e: &crud::CrudError) -> Result<(), HttpError> {
     let field = e.field();
     super::http::send_json(
         stream,

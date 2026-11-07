@@ -5,6 +5,7 @@
 
 use super::App;
 use super::http::{error, percent_decode, send_with};
+use crate::web::http::HttpError;
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 
@@ -15,7 +16,7 @@ pub(super) fn serve(
     stream: &mut TcpStream,
     session_id: &str,
     segments: &[&str],
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     let Some(relative) = relative_path_from_segments(segments) else {
         return error(stream, 404, "not found");
     };

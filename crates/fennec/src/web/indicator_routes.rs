@@ -1,5 +1,6 @@
 //! The project's indicators: read-only figures drawn only from recorded facts.
 
+use crate::web::http::HttpError;
 use std::collections::BTreeMap;
 use std::net::TcpStream;
 use std::path::Path;
@@ -49,7 +50,7 @@ pub struct IndicatorView {
 }
 
 /// `GET /api/projects/{id}/indicators`.
-pub fn serve(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub fn serve(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
     let Some(project) = store.project(id)? else {
         return error(stream, 404, "no such project");

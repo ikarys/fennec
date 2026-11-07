@@ -4,11 +4,12 @@
 use super::App;
 use super::http::{Request, error, send, send_json};
 use crate::mcp::oauth::Vault;
+use crate::web::http::HttpError;
 use serde_json::json;
 use std::net::TcpStream;
 
 /// `POST /api/settings/mcp/authorize`: return the URL the human opens.
-pub(super) fn authorize(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
+pub(super) fn authorize(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), HttpError> {
     let body = req.json()?;
     let name = body["name"].as_str().unwrap_or("").to_string();
     if name.is_empty() {
@@ -30,7 +31,7 @@ pub(super) fn authorize(app: &App, req: &Request, stream: &mut TcpStream) -> Res
 }
 
 /// `GET /api/mcp/oauth/callback`: the browser lands here after authorization.
-pub(super) fn callback(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
+pub(super) fn callback(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), HttpError> {
     let state = req.query_param("state").unwrap_or_default();
     if state.is_empty() {
         return html_page(stream, 400, "fennec: OAuth failed: missing state");
@@ -65,7 +66,7 @@ pub(super) fn callback(app: &App, req: &Request, stream: &mut TcpStream) -> Resu
     }
 }
 
-fn html_page(stream: &mut TcpStream, status: u16, body: &str) -> Result<(), String> {
+fn html_page(stream: &mut TcpStream, status: u16, body: &str) -> Result<(), HttpError> {
     let html = format!(
         "<!doctype html><html><head><meta charset=\"utf-8\"></head><body><p>{body}</p></body></html>"
     );

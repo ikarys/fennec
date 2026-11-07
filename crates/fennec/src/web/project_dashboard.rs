@@ -2,6 +2,7 @@
 //! recent sessions the project page draws, computed here so the UI only draws
 //! them. Every string is final French display text.
 
+use crate::web::http::HttpError;
 use std::net::TcpStream;
 use std::path::Path;
 
@@ -98,7 +99,7 @@ struct Facts {
 }
 
 /// `GET /api/projects/{id}/dashboard`.
-pub fn serve(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub fn serve(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
     let Some(project) = store.project(id)? else {
         return error(stream, 404, "no such project");

@@ -6,6 +6,7 @@ use super::http::{Request, error, send_json};
 use super::turns::Job;
 use crate::agent::ports::EventLog;
 use crate::domain::rule_approval::{Choice, pending};
+use crate::web::http::HttpError;
 use rules::{Access, Action, NewRule, Origin, RuleStore, Scope, TargetKind};
 use serde_json::json;
 use std::net::TcpStream;
@@ -15,7 +16,7 @@ pub(super) fn answer_rule_approval(
     req: &Request,
     stream: &mut TcpStream,
     id: &str,
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     let body = req.json()?;
     let call_id = body["callId"].as_str().unwrap_or("").to_string();
     let store = app.store()?;

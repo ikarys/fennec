@@ -2,6 +2,7 @@
 //! project (its map, its ADRs) and the map written to `docs/map.md`.
 //! `routes.rs` only dispatches here.
 
+use crate::web::http::HttpError;
 use std::net::TcpStream;
 use std::path::Path;
 
@@ -13,7 +14,7 @@ use crate::domain::drift;
 use crate::{adr, architecture, doc, module_map, risk};
 
 /// `GET /api/projects/{id}/overview`.
-pub fn get_overview(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub fn get_overview(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let Some(project) = app.store()?.project(id)? else {
         return error(stream, 404, "no such project");
     };
@@ -36,7 +37,7 @@ pub fn get_overview(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), S
 /// `GET /api/projects/{id}/docs`: the project's documentation, read from disk
 /// (verified) — its markdown files (`AGENTS.md`, `README.md`, `docs/`) and its
 /// ADRs, for the project page's Doc tab.
-pub fn get_docs(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub fn get_docs(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let Some(project) = app.store()?.project(id)? else {
         return error(stream, 404, "no such project");
     };
@@ -50,7 +51,7 @@ pub fn get_docs(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), Strin
 
 /// `POST /api/projects/{id}/map-file`: the human's click writes `docs/map.md`
 /// in their tree; committing it stays theirs.
-pub fn write_map_file(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub fn write_map_file(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let Some(project) = app.store()?.project(id)? else {
         return error(stream, 404, "no such project");
     };
@@ -62,7 +63,7 @@ pub fn write_map_file(app: &App, stream: &mut TcpStream, id: &str) -> Result<(),
 }
 
 /// `GET /api/projects/{id}/risks`: risk zones for a project workdir.
-pub fn get_risks(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub fn get_risks(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let Some(project) = app.store()?.project(id)? else {
         return error(stream, 404, "no such project");
     };

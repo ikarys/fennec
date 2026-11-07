@@ -9,6 +9,7 @@ use crate::domain::clock;
 use crate::domain::event::Event;
 use crate::domain::waiver::{self, MAX_HOURS};
 use crate::notifier::NotifyingLog;
+use crate::web::http::HttpError;
 use serde_json::json;
 use std::net::TcpStream;
 
@@ -17,7 +18,7 @@ pub(super) fn answer_waiver(
     req: &Request,
     stream: &mut TcpStream,
     id: &str,
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     let body = req.json()?;
     let call_id = body["callId"].as_str().unwrap_or("").to_string();
     let grant = body["grant"].as_bool().unwrap_or(false);

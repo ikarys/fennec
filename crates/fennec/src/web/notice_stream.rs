@@ -12,6 +12,7 @@ use crate::domain::lang::Lang;
 use crate::domain::project::SessionSummary;
 use crate::git;
 use crate::store::SqliteStore;
+use crate::web::http::HttpError;
 use serde_json::{Value, json};
 use std::collections::{HashMap, HashSet};
 use std::io::Write;
@@ -29,7 +30,7 @@ const BUDGET_REFRESH: Duration = Duration::from_secs(30);
 /// The attention set and the last log seq read per session.
 type AttentionSet = (HashMap<String, Attention>, HashMap<String, u64>);
 
-pub fn serve(app: &App, stream: &mut TcpStream) -> Result<(), String> {
+pub fn serve(app: &App, stream: &mut TcpStream) -> Result<(), HttpError> {
     let store = app.store()?;
     // What needs the human right now. Sent on connect, then re-sent only when
     // it changes; a running turn is recomputed when it stops, dropped when it

@@ -2,10 +2,11 @@
 
 use super::App;
 use super::http::send_json;
+use crate::web::http::HttpError;
 use serde_json::json;
 use std::net::TcpStream;
 
-pub(super) fn serve(app: &App, stream: &mut TcpStream) -> Result<(), String> {
+pub(super) fn serve(app: &App, stream: &mut TcpStream) -> Result<(), HttpError> {
     let store = app.store()?;
     let checks = crate::domain::setup::checks(&crate::setup::facts(&app.settings, &store)?);
     send_json(

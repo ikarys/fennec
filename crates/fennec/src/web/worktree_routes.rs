@@ -2,6 +2,7 @@
 //! A scan walks gigabytes: the home page's total reuses one for ten minutes; the project tab and
 //! the human's actions measure again.
 
+use crate::web::http::HttpError;
 use std::collections::HashMap;
 use std::net::TcpStream;
 use std::path::Path;
@@ -17,7 +18,7 @@ use serde_json::{Value, json};
 const CACHE_MS: u64 = 10 * 60 * 1000;
 pub(super) const ALERT_BYTES: u64 = 5 * 1024 * 1024 * 1024;
 
-pub fn summary(app: &App, stream: &mut TcpStream) -> Result<(), String> {
+pub fn summary(app: &App, stream: &mut TcpStream) -> Result<(), HttpError> {
     let (_, entries) = cached_scan(app, false);
     let total_bytes = entries.iter().map(|entry| entry.bytes).sum::<u64>();
     let generated_bytes = entries
@@ -38,7 +39,7 @@ pub fn summary(app: &App, stream: &mut TcpStream) -> Result<(), String> {
     )
 }
 
-pub fn list(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub fn list(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
     let Some(project) = store.project(id)? else {
         return error(stream, 404, "no such project");
@@ -78,7 +79,7 @@ pub fn list(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Resul
     )
 }
 
-pub fn clean(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
+pub fn clean(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), HttpError> {
     let Some(name) = body_name(req) else {
         return error(stream, 400, "invalid worktree name");
     };
@@ -106,7 +107,7 @@ pub fn clean(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), Str
     }
 }
 
-pub fn remove_orphan(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
+pub fn remove_orphan(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), HttpError> {
     let Some(name) = body_name(req) else {
         return error(stream, 400, "invalid worktree name");
     };

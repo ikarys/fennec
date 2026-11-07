@@ -3,6 +3,7 @@
 use super::App;
 use super::http::{self, Request};
 use super::routes;
+use crate::web::http::HttpError;
 use ring::rand::SecureRandom;
 use std::collections::HashSet;
 use std::net::TcpStream;
@@ -54,7 +55,7 @@ impl Default for Logins {
     }
 }
 
-pub fn gate(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
+pub fn gate(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(), HttpError> {
     if session_cookie(req).is_some_and(|token| app.logins.has_session(token)) {
         return routes::handle(app, req, stream);
     }
@@ -74,7 +75,7 @@ pub fn gate(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(),
     login_page(stream)
 }
 
-fn login_attempt(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
+fn login_attempt(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(), HttpError> {
     let _attempts = crate::locks::lock(&app.logins.attempts);
     let candidate = req
         .json()
@@ -119,7 +120,7 @@ fn session_cookie(req: &Request) -> Option<&str> {
     })
 }
 
-fn login_page(stream: &mut TcpStream) -> Result<(), String> {
+fn login_page(stream: &mut TcpStream) -> Result<(), HttpError> {
     let html = r#"<!doctype html>
 <html lang="en">
 <head>

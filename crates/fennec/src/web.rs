@@ -73,6 +73,7 @@ use crate::domain::skill::Skill;
 use crate::notifier::Notifier;
 use crate::store::SqliteStore;
 use crate::tools::Sandbox;
+use crate::web::http::HttpError;
 use crate::worktree;
 use serde_json::json;
 use servers::RunningServer;
@@ -360,15 +361,19 @@ pub fn serve(
             let _slot = slot;
             let mut stream = stream;
             if let Err(e) = handle(&app, &mut stream) {
-                let _ = http::send_json(&mut stream, 400, &json!({ "error": e }));
+                if e.status >= 500 {
+                    eprintln!("fennec: {} {}", e.status, e.message);
+                }
+                let _ = http::error(&mut stream, e.status, &e.message);
             }
         });
     }
     Ok(())
 }
 
-fn handle(app: &Arc<App>, stream: &mut TcpStream) -> Result<(), String> {
-    let req = http::read_request(stream)?;
+fn handle(app: &Arc<App>, stream: &mut TcpStream) -> Result<(), HttpError> {
+    // A request that cannot be read is the client's fault, not the server's.
+    let req = http::read_request(stream).map_err(|e| HttpError::new(400, e))?;
     let peer_is_loopback = stream
         .peer_addr()
         .is_ok_and(|address| address.ip().is_loopback());
