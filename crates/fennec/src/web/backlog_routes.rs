@@ -149,6 +149,7 @@ mod tests {
             turns: Turns::new(settings.clone(), notifier.clone()),
             settings,
             port: 0,
+            listen: std::net::Ipv4Addr::LOCALHOST.into(),
             notifier: notifier.clone(),
             skill_folds: Mutex::new(HashMap::new()),
             idea_reports: Mutex::new(HashMap::new()),

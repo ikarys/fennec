@@ -205,10 +205,15 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   binary, cached 6 h (`refresh=1` asks again); 502 `{error}` when no release can be read
 - `POST /api/update` `{}` → 202 `{restarting, latest}`: installs the latest release over the binary (`install.sh`,
   checksum verified) and restarts the server on it; 409 while a turn runs, when up to date or on a development or local build
-- `GET /api/server` → `{port, runningPort, fromFlag, path}`: the port `settings.yaml` sets (default 7777), the one this
-  process listens on, whether `--port` was given (it wins over the file) and the file's path
-- `POST /api/server` `{port}` → the same view: writes the port to `settings.yaml` (1024..=65535, else 400), applied at the
-  next start
+- `GET /api/server` → `{port, runningPort, fromFlag, path, remote, runningRemote, passwordSet, restartNeeded}`: the port
+  `settings.yaml` sets (default 7777), the one this process listens on, whether `--port` was given (it wins over the file),
+  the file's path, whether its `listen` is non-loopback and whether this process's is, whether a password hash is stored,
+  and whether a restart would change the port or the listen address
+- `POST /api/server` `{port, remote}` → the same view: writes the port (1024..=65535, else 400) and `listen` (`0.0.0.0` when
+  `remote` and the file's address is loopback, `127.0.0.1` when not `remote` and it is not) to `settings.yaml`, applied at
+  the next start; `remote` with no password stored → 400, nothing written
+- `POST /api/server/password` `{password}` → the same view: stores a new PBKDF2 hash (12 characters or more, else 400),
+  in force for remote logins at once; existing login sessions stay valid
 - `POST /api/server/restart` `{}` → 202 `{restarting}`: the server re-executes itself, same arguments; 409 while a turn runs
 - `GET /api/setup` → `{checks: [{id: model|sandbox|git|project|scanners, status: ok|todo|warn, detail}], complete}`: the first-run checklist, probed on each call (verified); `todo` is required and missing, `warn` works but deserves a look (sandbox off, scanners missing); `complete` when no check is `todo`. `fennec doctor` prints the same checks.
 - `GET /api/changelog` → `{current, releases: [{version, date, sections: [{title, items}]}], unseen}`: the

@@ -3,6 +3,8 @@
 use std::net::IpAddr;
 use std::path::PathBuf;
 
+use ring::rand::SecureRandom;
+
 use crate::domain::server_config as domain;
 
 /// Where the file lives; it need not exist.
@@ -58,6 +60,28 @@ pub fn set_port(port: u16) -> Result<(), String> {
 /// Writes the password hash into the file, its other lines kept.
 pub fn set_password(hash: &str) -> Result<(), String> {
     write(&domain::with_field(&read()?, "password", hash))
+}
+
+/// Writes the listen address into the file, its other lines kept.
+pub fn set_listen(ip: IpAddr) -> Result<(), String> {
+    write(&domain::with_listen(&read()?, ip))
+}
+
+/// A fresh PBKDF2 hash for `password`, with a new 16-byte salt; the one length rule the CLI and
+/// the Settings page share.
+pub fn new_hash(password: &str) -> Result<String, String> {
+    if password.chars().count() < 12 {
+        return Err("the password needs at least 12 characters".into());
+    }
+    let mut salt = [0u8; 16];
+    ring::rand::SystemRandom::new()
+        .fill(&mut salt)
+        .map_err(|err| err.to_string())?;
+    Ok(crate::domain::password::hash(
+        password,
+        &salt,
+        crate::domain::password::ITERATIONS,
+    ))
 }
 
 /// Renamed into place, never half written; owner-only, since it may hold the password hash.

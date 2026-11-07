@@ -109,6 +109,11 @@ pub fn with_port(content: &str, port: u16) -> String {
     with_field(content, "port", &port.to_string())
 }
 
+/// `content` with `listen` set to `ip`: a thin wrapper over `with_field`.
+pub fn with_listen(content: &str, ip: IpAddr) -> String {
+    with_field(content, "listen", &ip.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -159,5 +164,14 @@ mod tests {
     fn with_port_output_reads_back() {
         let content = with_port("port: 8080\n", 9000);
         assert_eq!(port(&content), Ok(Some(9000)));
+    }
+
+    #[test]
+    fn with_listen_replaces_in_place() {
+        let content = "# comment\nlisten: 127.0.0.1\nother: x\n";
+        assert_eq!(
+            with_listen(content, IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED)),
+            "# comment\nlisten: 0.0.0.0\nother: x\n"
+        );
     }
 }
