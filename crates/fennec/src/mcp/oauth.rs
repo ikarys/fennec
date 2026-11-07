@@ -183,7 +183,7 @@ pub fn begin(server: &McpServer, redirect: &str) -> Result<String, String> {
         token_endpoint: as_metadata.token_endpoint.clone(),
         resource: resource_metadata.resource.clone(),
     };
-    PENDING.lock().unwrap().insert(state.clone(), pending);
+    crate::locks::lock(&PENDING).insert(state.clone(), pending);
 
     let mut params: Vec<(&str, &str)> = vec![
         ("response_type", "code"),
@@ -244,7 +244,7 @@ pub fn finish(state: &str, code: &str, vault: &Vault) -> Result<McpServer, Strin
 }
 
 fn take_pending(state: &str) -> Option<Pending> {
-    PENDING.lock().unwrap().remove(state)
+    crate::locks::lock(&PENDING).remove(state)
 }
 
 fn discover_challenge(server: &McpServer, url: &str) -> Result<domain::Challenge, String> {

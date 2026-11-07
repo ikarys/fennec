@@ -106,7 +106,7 @@ pub(super) fn remove_tree(
         rule_store.delete_session(sid).map_err(|e| e.to_string())?;
         canvas.delete_session(sid).map_err(|e| e.to_string())?;
     }
-    let mut folds = app.skill_folds.lock().unwrap();
+    let mut folds = crate::locks::lock(&app.skill_folds);
     for sid in tree {
         folds.remove(sid);
     }

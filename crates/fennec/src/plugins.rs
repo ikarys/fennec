@@ -62,7 +62,7 @@ impl PluginManager {
     /// hosts are already up is left alone.
     pub fn ensure_started(&self, store: &SqliteStore) -> Result<(), String> {
         {
-            let hosts = self.hosts.lock().unwrap();
+            let hosts = crate::locks::lock(&self.hosts);
             if hosts.is_some() {
                 return Ok(());
             }
@@ -102,7 +102,7 @@ impl PluginManager {
                 Err(e) => eprintln!("fennec: {e}"),
             }
         }
-        *self.hosts.lock().unwrap() = Some(managed);
+        *crate::locks::lock(&self.hosts) = Some(managed);
         Ok(())
     }
 
@@ -121,7 +121,7 @@ impl PluginManager {
     /// spawned it ends, so a host started from a request's thread would die
     /// with the response.
     pub fn shutdown(&self) {
-        *self.hosts.lock().unwrap() = None;
+        *crate::locks::lock(&self.hosts) = None;
     }
 
     /// Feed one event to every host; each host keeps only the types it asked
@@ -135,7 +135,7 @@ impl PluginManager {
         event_type: &str,
         payload: &str,
     ) {
-        let hosts = self.hosts.lock().unwrap();
+        let hosts = crate::locks::lock(&self.hosts);
         if let Some(managed) = hosts.as_ref() {
             for managed in managed {
                 managed
@@ -194,7 +194,7 @@ impl PluginManager {
         project_id: Option<&str>,
         keep: impl Fn(&Placement) -> bool,
     ) -> Vec<ServedPluginBlock> {
-        let hosts = self.hosts.lock().unwrap();
+        let hosts = crate::locks::lock(&self.hosts);
         let Some(managed) = hosts.as_ref() else {
             return Vec::new();
         };

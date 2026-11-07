@@ -26,7 +26,7 @@ static GATES: OnceLock<Mutex<HashMap<String, Arc<ModelGate>>>> = OnceLock::new()
 
 fn gate_for(base_url: &str) -> Arc<ModelGate> {
     let gates = GATES.get_or_init(|| Mutex::new(HashMap::new()));
-    let mut map = gates.lock().unwrap();
+    let mut map = crate::locks::lock(gates);
     map.entry(base_url.to_string())
         .or_insert_with(|| {
             Arc::new(ModelGate::new(

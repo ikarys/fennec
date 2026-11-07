@@ -16,21 +16,21 @@ pub struct Notifier {
 
 impl Notifier {
     pub fn generation(&self) -> u64 {
-        *self.generation.lock().unwrap()
+        *crate::locks::lock(&self.generation)
     }
 
     pub fn notify(&self) {
-        *self.generation.lock().unwrap() += 1;
+        *crate::locks::lock(&self.generation) += 1;
         self.changed.notify_all();
     }
 
     /// Blocks until the generation moves past `seen`, or `timeout`.
     pub fn wait_past(&self, seen: u64, timeout: Duration) {
-        let guard = self.generation.lock().unwrap();
+        let guard = crate::locks::lock(&self.generation);
         let _ = self
             .changed
             .wait_timeout_while(guard, timeout, |g| *g == seen)
-            .unwrap();
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
     }
 }
 

@@ -60,7 +60,7 @@ pub fn list(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
         defs.into_iter().map(|def| (def, false)).collect()
     };
     let snapshots: Vec<Option<Snapshot>> = {
-        let runs = app.server_runs.lock().unwrap();
+        let runs = crate::locks::lock(&app.server_runs);
         defs.iter()
             .map(|(def, _)| runs.get(&key(id, def.name.trim())).map(Snapshot::of))
             .collect()
@@ -113,7 +113,7 @@ struct Snapshot {
 
 impl Snapshot {
     fn of(run: &RunningServer) -> Self {
-        let out = run.output.lock().unwrap();
+        let out = crate::locks::lock(&run.output);
         let skip = out.lines.len().saturating_sub(SHOWN_LINES);
         Snapshot {
             port: run.port,
@@ -163,9 +163,9 @@ pub fn start(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Resu
 
     let k = key(id, &name);
     {
-        let running = app.server_runs.lock().unwrap();
+        let running = crate::locks::lock(&app.server_runs);
         if let Some(run) = running.get(&k)
-            && run.output.lock().unwrap().exit.is_none()
+            && crate::locks::lock(&run.output).exit.is_none()
         {
             return error(stream, 409, "already running");
         }
@@ -211,7 +211,7 @@ pub fn start(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Resu
     let out_stderr = output.clone();
     std::thread::spawn(move || read_pipe(stderr, out_stderr));
 
-    app.server_runs.lock().unwrap().insert(
+    crate::locks::lock(&app.server_runs).insert(
         k.clone(),
         RunningServer {
             pid,
@@ -225,11 +225,11 @@ pub fn start(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Resu
     let runs = app.server_runs.clone();
     std::thread::spawn(move || {
         let code = child.wait().ok().and_then(|status| status.code());
-        let mut runs = runs.lock().unwrap();
+        let mut runs = crate::locks::lock(&runs);
         if let Some(run) = runs.get_mut(&k)
             && run.pid == pid
         {
-            run.output.lock().unwrap().exit = Some(code);
+            crate::locks::lock(&run.output).exit = Some(code);
         }
     });
 
@@ -242,13 +242,13 @@ pub fn stop(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Resul
     let k = key(id, &name);
 
     let pid = {
-        let running = app.server_runs.lock().unwrap();
+        let running = crate::locks::lock(&app.server_runs);
         match running.get(&k) {
             None => return error(stream, 404, "not running"),
             Some(run) => {
-                if run.output.lock().unwrap().exit.is_some() {
+                if crate::locks::lock(&run.output).exit.is_some() {
                     drop(running);
-                    app.server_runs.lock().unwrap().remove(&k);
+                    crate::locks::lock(&app.server_runs).remove(&k);
                     return send_json(stream, 200, &json!({}));
                 }
                 run.pid
@@ -257,7 +257,7 @@ pub fn stop(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Resul
     };
 
     stop_process(pid);
-    app.server_runs.lock().unwrap().remove(&k);
+    crate::locks::lock(&app.server_runs).remove(&k);
     send_json(stream, 200, &json!({}))
 }
 
@@ -322,7 +322,7 @@ fn read_pipe<R: std::io::Read + Send + 'static>(reader: R, output: Arc<Mutex<Out
                 continue;
             }
 
-            let mut out = output.lock().unwrap();
+            let mut out = crate::locks::lock(&output);
             if out.lines.len() >= MAX_LINES {
                 out.lines.pop_front();
             }
