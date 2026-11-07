@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Badge } from '../ui/Badge';
 import { Menu, MenuItem } from '../ui/Menu';
-import { LayersIcon } from '../Icons';
+import { LayersIcon } from '../ui/Icons';
 import { useT } from '../../i18n';
 import { listSessionCanvas, type CanvasArtifact } from '../../lib/api/canvas';
 

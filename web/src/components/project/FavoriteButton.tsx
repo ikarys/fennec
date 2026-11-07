@@ -1,6 +1,6 @@
 /** The star that pins a project; the server lists favourites first. */
 import type { Project } from '../../lib/api';
-import { StarIcon } from '../Icons';
+import { StarIcon } from '../ui/Icons';
 import { Button } from '../ui/Button';
 import { useT } from '../../i18n';
 

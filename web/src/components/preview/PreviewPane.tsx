@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button, buttonClass } from '../ui/Button';
-import { CloseIcon, RefreshIcon } from '../Icons';
+import { CloseIcon, RefreshIcon } from '../ui/Icons';
 import { useT } from '../../i18n';
 import { previewUrl } from '../../lib/preview';
 import { pinCanvasFile } from '../../lib/api/canvas';

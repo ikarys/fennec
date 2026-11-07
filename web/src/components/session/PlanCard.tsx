@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Plan, Report } from '../../lib/plan';
 import type { PreflightResultView } from '../../lib/fold';
-import { CheckIcon, ChevronRightIcon, CloseIcon, EditIcon } from '../Icons';
+import { CheckIcon, ChevronRightIcon, CloseIcon, EditIcon } from '../ui/Icons';
 import type { PlanActions } from './PlanActions';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';

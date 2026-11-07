@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useT } from '../../i18n';
-import { ArrowUpIcon, SpinnerIcon } from '../Icons';
+import { ArrowUpIcon, SpinnerIcon } from '../ui/Icons';
 import { Badge } from '../ui/Badge';
 import { buttonClass } from '../ui/Button';
 import { getUpdate, applyUpdate, type UpdateCheck } from '../../lib/api';

@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import type { Lang, MsgKey } from '../../../i18n/messages';
 import type { ThreadItem, WorkflowNodeStat } from '../../../lib/fold';
 import { formatClockTime, formatDuration } from '../../../lib/format';
-import { AlertIcon, CheckIcon, ChevronRightIcon, ClockIcon, CloseIcon, CpuIcon, FileIcon, PauseIcon, TokensIcon, WandIcon } from '../../Icons';
+import { AlertIcon, CheckIcon, ChevronRightIcon, ClockIcon, CloseIcon, CpuIcon, FileIcon, PauseIcon, TokensIcon, WandIcon } from '../../ui/Icons';
 import { Badge } from '../../ui/Badge';
 import { Button } from '../../ui/Button';
 import { Card } from '../../ui/Card';

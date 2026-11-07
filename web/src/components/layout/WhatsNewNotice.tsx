@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useT } from '../../i18n';
-import { StarIcon } from '../Icons';
+import { StarIcon } from '../ui/Icons';
 import { Badge } from '../ui/Badge';
 import { buttonClass } from '../ui/Button';
 import { getChangelog, CHANGELOG_SEEN_EVENT } from '../../lib/api';

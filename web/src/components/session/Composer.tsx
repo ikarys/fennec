@@ -17,7 +17,7 @@ import {
   PaperclipIcon,
   SendIcon,
   StopIcon,
-} from "../Icons";
+} from "../ui/Icons";
 import { matchCommands, SlashMenu } from "./SlashMenu";
 import { ModePicker } from "./ModePicker";
 import { McpPicker } from "./McpPicker";

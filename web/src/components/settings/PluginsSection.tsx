@@ -14,7 +14,7 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Section } from '../ui/Section';
-import { GlobeIcon, PlayIcon, PuzzleIcon, StopIcon } from '../Icons';
+import { GlobeIcon, PlayIcon, PuzzleIcon, StopIcon } from '../ui/Icons';
 import { PluginBlockCard } from '../plugins/PluginBlockCard';
 
 export function PluginsSection() {

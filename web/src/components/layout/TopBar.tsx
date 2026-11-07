@@ -3,7 +3,7 @@ import { useT } from '../../i18n';
 import type { MsgKey } from '../../i18n/messages';
 import type { AttentionItem, SessionState } from '../../lib/api';
 import { SessionStateIcon } from '../session/SessionStateIcon';
-import { BellIcon, ChatIcon, CloseIcon, PlusIcon, SearchIcon, SettingsIcon, SplitIcon } from '../Icons';
+import { BellIcon, ChatIcon, CloseIcon, PlusIcon, SearchIcon, SettingsIcon, SplitIcon } from '../ui/Icons';
 import { Badge } from '../ui/Badge';
 import { Button, buttonClass } from '../ui/Button';
 import { Menu, MenuItem } from '../ui/Menu';

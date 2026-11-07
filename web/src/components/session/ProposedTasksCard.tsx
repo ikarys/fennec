@@ -7,7 +7,7 @@
 import { useState } from 'react';
 
 import { acceptProposedTask, type ProposedTask } from '../../lib/api';
-import { PlusIcon } from '../Icons';
+import { PlusIcon } from '../ui/Icons';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';

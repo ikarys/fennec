@@ -3,7 +3,7 @@
  * its sessions are on that page and in the list view.
  */
 import type { Project } from '../../lib/api';
-import { BulbIcon, PlusIcon } from '../Icons';
+import { BulbIcon, PlusIcon } from '../ui/Icons';
 import { FavoriteButton } from './FavoriteButton';
 import { Badge } from '../ui/Badge';
 import { Button, buttonClass } from '../ui/Button';

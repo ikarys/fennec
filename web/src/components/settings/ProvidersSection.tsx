@@ -4,7 +4,7 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Section, type SectionSave } from '../ui/Section';
-import { ChevronRightIcon, CloseIcon, PlusIcon, RefreshIcon, SpinnerIcon, TrashIcon } from '../Icons';
+import { ChevronRightIcon, CloseIcon, PlusIcon, RefreshIcon, SpinnerIcon, TrashIcon } from '../ui/Icons';
 import { FieldRow, Select, TextInput } from '../ui/Field';
 import { formOnlyModels, type ModelForm } from './ModelPrefsSection';
 import { useT } from '../../i18n';

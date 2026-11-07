@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '../ui/Button';
-import { PinIcon, SpinnerIcon } from '../Icons';
+import { PinIcon, SpinnerIcon } from '../ui/Icons';
 import { useT } from '../../i18n';
 import { useCanvasOpener } from './CanvasContext';
 import type { CanvasArtifact } from '../../lib/api/canvas';

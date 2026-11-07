@@ -4,7 +4,7 @@
  * is readable at a glance; open state is remembered per section in localStorage.
  */
 import { useState, type ReactNode } from 'react';
-import { ChevronRightIcon } from '../Icons';
+import { ChevronRightIcon } from './Icons';
 import type { BadgeTone } from './Badge';
 import { SectionLabel } from './SectionLabel';
 

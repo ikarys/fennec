@@ -4,7 +4,7 @@ import { DeleteSessionsDialog, type DeletionTarget } from '../components/session
 import { formatRelative, formatDateTime } from '../lib/format';
 import { SessionStateIcon } from '../components/session/SessionStateIcon';
 import { useLang, useT } from '../i18n';
-import { BulbIcon, ChevronRightIcon, GlobeIcon, PlusIcon, SearchIcon, TrashIcon } from '../components/Icons';
+import { BulbIcon, ChevronRightIcon, GlobeIcon, PlusIcon, SearchIcon, TrashIcon } from '../components/ui/Icons';
 import { Button, buttonClass } from '../components/ui/Button';
 import { WorktreeAlert } from '../components/project/WorktreeAlert';
 import { SetupChecklist } from '../components/project/SetupChecklist';

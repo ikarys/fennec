@@ -1,5 +1,5 @@
 import type { ContextView } from '../../lib/api';
-import { CompressIcon } from '../Icons';
+import { CompressIcon } from '../ui/Icons';
 import { Button } from '../ui/Button';
 import { ContextComposition } from './ContextComposition';
 import { useT } from '../../i18n';

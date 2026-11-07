@@ -4,7 +4,7 @@ import { useDisplayPrefs } from '../../lib/display';
 import { formatDuration } from '../../lib/format';
 import { previewKindOfPath, relativeToWorkdir } from '../../lib/preview';
 import { usePreviewOpener, usePreviewWorkdir } from '../preview/PreviewContext';
-import { EditIcon, EyeIcon, FileIcon, SearchIcon, SpinnerIcon, TerminalIcon } from '../Icons';
+import { EditIcon, EyeIcon, FileIcon, SearchIcon, SpinnerIcon, TerminalIcon } from '../ui/Icons';
 import { toolAnchorId } from '../../lib/vision';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';

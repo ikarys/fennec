@@ -7,7 +7,7 @@
 import type { ReactNode } from 'react';
 import { Badge } from './Badge';
 import { Card } from './Card';
-import { ChevronRightIcon } from '../Icons';
+import { ChevronRightIcon } from './Icons';
 
 const HEAD = 'flex items-center gap-3 border-border bg-raised px-4 py-2.5';
 

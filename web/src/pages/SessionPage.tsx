@@ -57,7 +57,7 @@ import {
 } from "../components/session/IntegrationInvite";
 import { IntegrationDialog } from "../components/session/IntegrationDialog";
 import { TryDialog } from "../components/session/TryDialog";
-import { PlayIcon } from "../components/Icons";
+import { PlayIcon } from "../components/ui/Icons";
 import {
   PreviewContext,
   PreviewWorkdirContext,

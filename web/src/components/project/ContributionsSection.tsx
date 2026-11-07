@@ -5,7 +5,7 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Section } from '../ui/Section';
-import { ReviewIcon } from '../Icons';
+import { ReviewIcon } from '../ui/Icons';
 import { useT } from '../../i18n';
 import { TableHeader } from '../ui/TableHeader';
 

@@ -1,6 +1,6 @@
 import type { WorkflowEdge, WorkflowIssue } from '../../lib/workflow';
 import { Button } from '../ui/Button';
-import { TrashIcon } from '../Icons';
+import { TrashIcon } from '../ui/Icons';
 import { FieldRow, TextInput } from '../ui/Field';
 import { useT } from '../../i18n';
 

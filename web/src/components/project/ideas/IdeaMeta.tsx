@@ -3,7 +3,7 @@
  */
 import { formatDuration, formatTokens } from '../../../lib/format';
 import type { IdeaBoard, IdeaView } from '../../../lib/ideas';
-import { CheckIcon, ClockIcon, CommitIcon, DecisionIcon, FileIcon, TokensIcon } from '../../Icons';
+import { CheckIcon, ClockIcon, CommitIcon, DecisionIcon, FileIcon, TokensIcon } from '../../ui/Icons';
 import { Stat } from '../../ui/Stat';
 import { useT, useLang } from '../../../i18n';
 
