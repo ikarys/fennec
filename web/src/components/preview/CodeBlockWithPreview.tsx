@@ -43,7 +43,7 @@ export function CodeBlockWithPreview({ kind, source }: { kind: BlockPreviewKind;
             type="button"
             aria-pressed={!showPreview}
             onClick={() => setShowPreview(false)}
-            className={`rounded px-1.5 py-0.5 ${
+            className={`rounded-md px-1.5 py-0.5 ${
               !showPreview ? 'bg-accent-soft text-accent-strong' : 'text-muted hover:text-text'
             }`}
           >
@@ -53,7 +53,7 @@ export function CodeBlockWithPreview({ kind, source }: { kind: BlockPreviewKind;
             type="button"
             aria-pressed={showPreview}
             onClick={() => setShowPreview(true)}
-            className={`rounded px-1.5 py-0.5 ${
+            className={`rounded-md px-1.5 py-0.5 ${
               showPreview ? 'bg-accent-soft text-accent-strong' : 'text-muted hover:text-text'
             }`}
           >

@@ -160,7 +160,7 @@ export function ProvidersSection({
                 open={error ? true : undefined}
                 className="group"
               >
-                <summary className="-mx-2 flex h-9 cursor-pointer list-none items-center gap-2 rounded px-2 select-none hover:bg-raised [&::-webkit-details-marker]:hidden">
+                <summary className="-mx-2 flex h-9 cursor-pointer list-none items-center gap-2 rounded-md px-2 select-none hover:bg-raised [&::-webkit-details-marker]:hidden">
                   <ChevronRightIcon className="h-3 w-3 shrink-0 text-muted transition-transform group-open:rotate-90" />
                   <span className="min-w-0 truncate font-mono text-sm font-medium">
                     {provider.name || provider.id}

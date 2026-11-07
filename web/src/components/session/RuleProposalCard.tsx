@@ -69,7 +69,7 @@ export function RuleProposalCard({
           {t('ruleBridgeAddHint')}
         </p>
       </div>
-      <pre className="m-0 overflow-x-auto rounded bg-code p-2.5 font-mono text-xs text-text whitespace-pre">
+      <pre className="m-0 overflow-x-auto rounded-md bg-code p-2.5 font-mono text-xs text-text whitespace-pre">
         {proposal.lines.join('\n')}
       </pre>
       <div className="flex items-center gap-2">

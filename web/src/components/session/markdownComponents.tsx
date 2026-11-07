@@ -55,7 +55,7 @@ export const markdownComponents = {
       return <code className="font-mono text-xs">{children}</code>;
     }
     return (
-      <code className="rounded bg-raised px-1 py-0.5 font-mono text-xs text-text">{children}</code>
+      <code className="rounded-md bg-raised px-1 py-0.5 font-mono text-xs text-text">{children}</code>
     );
   },
   // Tailwind's preflight unstyles headings; previewed documents rely on them.
