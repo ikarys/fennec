@@ -218,6 +218,7 @@ web/src/           React + Vite + Tailwind v4 UI
   styles/app.css     theme tokens: one CSS variable block per theme, mapped into Tailwind
 docs/api.md        the HTTP API and event wire format, shared by server and UI
 docs/workflows.md  the workflow format, run semantics and editor
+docs/sandbox.md    the command sandbox for users: what it blocks, how to run, test and see the work anyway
 docs/plugins.md    how to write a plugin: its files, its sandbox, the JSON-RPC protocol
 docs/ui.md         the UI's design rules: tokens and primitives, never per-file styles
 docs/dogfooding.md the frictions met while fennec builds fennec, and their status
