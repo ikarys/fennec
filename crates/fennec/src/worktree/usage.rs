@@ -145,16 +145,16 @@ pub fn remove_orphan(root: &Path, name: &str) -> Result<(), String> {
     }
 
     if let Some(repo) = repo_top.filter(|repo| repo.is_dir()) {
-        let _ = super::git(&repo, &["worktree", "prune"], None);
+        let _ = crate::git::run(&repo, &["worktree", "prune"], None);
 
         let branch = format!("fennec/{name}");
-        let _ = super::git(&repo, &["branch", "-D", &branch], None);
+        let _ = crate::git::run(&repo, &["branch", "-D", &branch], None);
 
         let base_ref = format!("refs/fennec/base/{name}");
-        let _ = super::git(&repo, &["update-ref", "-d", &base_ref], None);
+        let _ = crate::git::run(&repo, &["update-ref", "-d", &base_ref], None);
 
         let origin_ref = format!("refs/fennec/origin/{name}");
-        let _ = super::git(&repo, &["symbolic-ref", "--delete", &origin_ref], None);
+        let _ = crate::git::run(&repo, &["symbolic-ref", "--delete", &origin_ref], None);
     }
 
     Ok(())
@@ -381,13 +381,13 @@ mod tests {
         let repo = base.join("repo");
         std::fs::create_dir_all(&repo).unwrap();
 
-        super::super::git(&repo, &["init", "-q"], None).unwrap();
-        super::super::git(&repo, &["config", "user.name", "Fennec"], None).unwrap();
-        super::super::git(&repo, &["config", "user.email", "fennec@example.com"], None).unwrap();
+        crate::git::run(&repo, &["init", "-q"], None).unwrap();
+        crate::git::run(&repo, &["config", "user.name", "Fennec"], None).unwrap();
+        crate::git::run(&repo, &["config", "user.email", "fennec@example.com"], None).unwrap();
 
         write_file(&repo, "file.txt", 8192);
-        super::super::git(&repo, &["add", "file.txt"], None).unwrap();
-        super::super::git(&repo, &["commit", "-q", "-m", "init"], None).unwrap();
+        crate::git::run(&repo, &["add", "file.txt"], None).unwrap();
+        crate::git::run(&repo, &["commit", "-q", "-m", "init"], None).unwrap();
 
         let root = base.join("worktrees");
         std::fs::create_dir_all(&root).unwrap();
@@ -396,7 +396,7 @@ mod tests {
         let worktree = root.join(name);
         let branch = format!("fennec/{name}");
 
-        super::super::git(
+        crate::git::run(
             &repo,
             &[
                 "worktree",
@@ -417,7 +417,7 @@ mod tests {
         remove_orphan(&root, name).unwrap();
 
         assert!(!worktree.exists());
-        let branches = super::super::git(&repo, &["branch", "--list", &branch], None).unwrap();
+        let branches = crate::git::run(&repo, &["branch", "--list", &branch], None).unwrap();
         assert!(branches.is_empty());
 
         let _ = std::fs::remove_dir_all(&base);

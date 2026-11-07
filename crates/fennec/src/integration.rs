@@ -4,13 +4,13 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
 
 use serde::Serialize;
 
 use crate::domain::diff::{ChangedLines, changed_lines};
 use crate::domain::protection::Protection;
-use crate::worktree::{Worktree, git, origin_branch};
+use crate::git;
+use crate::worktree::{Worktree, origin_branch};
 
 /// One agent commit to integrate.
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -58,7 +58,7 @@ pub enum ApplyError {
 pub fn preview(top: &Path, wt: &Worktree) -> Result<Preview, String> {
     let start = merge_start(top, wt);
     let range = format!("{}..{}", start, wt.branch);
-    let log = git(
+    let log = git::run(
         top,
         &["log", "--reverse", "--format=%H%x09%s", &range],
         None,
@@ -74,7 +74,7 @@ pub fn preview(top: &Path, wt: &Worktree) -> Result<Preview, String> {
         .collect();
 
     let files = touched_files(top, wt, &start)?;
-    let numstat = git(
+    let numstat = git::run(
         top,
         &["diff", "--numstat", "--no-renames", &start, &wt.branch],
         None,
@@ -121,18 +121,18 @@ pub fn conflicts(top: &Path, wt: &Worktree) -> Vec<String> {
 /// conflict markers in the files for the agent to resolve; returns the
 /// conflicted files.
 pub fn update_branch(top: &Path, wt: &Worktree) -> Result<Vec<String>, String> {
-    let ours = git(top, &["rev-parse", "HEAD"], None)
+    let ours = git::run(top, &["rev-parse", "HEAD"], None)
         .map(|out| String::from_utf8_lossy(&out).trim().to_string())?;
     let (tree, conflicted) = merge_tree(top, &ours, wt.branch.as_str(), &merge_start(top, wt))?;
     let message = format!("fennec: bring {} up to date with HEAD", wt.branch);
-    let commit = git(
+    let commit = git::run(
         top,
         &["commit-tree", &tree, "-p", &ours, "-m", &message],
         None,
     )
     .map(|out| String::from_utf8_lossy(&out).trim().to_string())?;
-    git(&wt.path, &["reset", "-q", "--hard", &commit], None)?;
-    git(top, &["update-ref", &wt.base, &ours], None)?;
+    git::run(&wt.path, &["reset", "-q", "--hard", &commit], None)?;
+    git::run(top, &["update-ref", &wt.base, &ours], None)?;
     Ok(conflicted)
 }
 
@@ -144,7 +144,7 @@ pub fn file_diff(top: &Path, wt: &Worktree, path: &str) -> Result<Option<String>
     if !touched.iter().any(|p| p == path) {
         return Ok(None);
     }
-    let out = git(
+    let out = git::run(
         top,
         &[
             "diff",
@@ -164,7 +164,7 @@ pub fn file_diff(top: &Path, wt: &Worktree, path: &str) -> Result<Option<String>
 
 /// The agent's touched files: `git diff --name-only --no-renames start branch`.
 fn touched_files(top: &Path, wt: &Worktree, start: &str) -> Result<Vec<String>, String> {
-    let out = git(
+    let out = git::run(
         top,
         &["diff", "--name-only", "--no-renames", start, &wt.branch],
         None,
@@ -213,8 +213,8 @@ fn uncommitted_split(
 
 /// The output lines of a git command, one set entry per non-empty line.
 fn git_names(top: &Path, args: &[&str]) -> std::collections::HashSet<String> {
-    git(top, args, None)
-        .map(|out| String::from(String::from_utf8_lossy(&out)))
+    git::run(top, args, None)
+        .map(|out| String::from_utf8_lossy(&out).into_owned())
         .unwrap_or_default()
         .lines()
         .filter(|line| !line.is_empty())
@@ -229,8 +229,8 @@ fn git_names(top: &Path, args: &[&str]) -> std::collections::HashSet<String> {
 /// tree equals the ref only when the ref has no file there either. Hashes,
 /// not `git diff <ref> -- <file>`, which does not see untracked files.
 fn content_equals(top: &Path, ref_name: &str, file: &str) -> bool {
-    let working = git(top, &["hash-object", "--", file], None);
-    let at_ref = git(
+    let working = git::run(top, &["hash-object", "--", file], None);
+    let at_ref = git::run(
         top,
         &["rev-parse", "-q", "--verify", &format!("{ref_name}:{file}")],
         None,
@@ -290,7 +290,7 @@ pub fn changed_files(
         .iter()
         .filter_map(|file| Some((file, file.strip_prefix(prefix)?)))
         .map(|(file, relative)| {
-            let diff = git(
+            let diff = git::run(
                 top,
                 &["diff", "--unified=0", &start, &wt.branch, "--", file],
                 None,
@@ -304,31 +304,8 @@ pub fn changed_files(
 
 /// Git's record of a cherry-pick under way; it exists while one is.
 fn sequencer_dir(top: &Path) -> PathBuf {
-    let out = git(top, &["rev-parse", "--git-path", "sequencer"], None).unwrap_or_default();
+    let out = git::run(top, &["rev-parse", "--git-path", "sequencer"], None).unwrap_or_default();
     top.join(String::from_utf8_lossy(&out).trim())
-}
-
-/// Like `worktree::git`, but with `GIT_INDEX_FILE` set to `index`, so the
-/// command works on that index instead of the human's (which the integration
-/// must not touch). `worktree::git` cannot set environment variables.
-fn git_with_index(dir: &Path, index: &Path, args: &[&str]) -> Result<Vec<u8>, String> {
-    let command = format!("git -C {} {}", dir.display(), args.join(" "));
-    let out = Command::new("git")
-        .arg("-C")
-        .arg(dir)
-        .args(args)
-        .env("GIT_INDEX_FILE", index)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .output()
-        .map_err(|e| format!("{command}: {e}"))?;
-    if out.status.success() {
-        Ok(out.stdout)
-    } else {
-        let stderr = String::from_utf8_lossy(&out.stderr);
-        Err(format!("{command}: {}", stderr.trim()))
-    }
 }
 
 /// A temporary commit of `HEAD` plus the carried files' working content,
@@ -338,7 +315,7 @@ fn git_with_index(dir: &Path, index: &Path, args: &[&str]) -> Result<Vec<u8>, St
 /// commit's tree is what matters; the index file is dropped once the commit
 /// is in the object store.
 fn temp_commit_with_carried(top: &Path, carried: &[String]) -> Result<String, String> {
-    let index_out = git(
+    let index_out = git::run(
         top,
         &["rev-parse", "--git-path", "fennec-integration.index"],
         None,
@@ -348,7 +325,7 @@ fn temp_commit_with_carried(top: &Path, carried: &[String]) -> Result<String, St
     let _ = std::fs::remove_file(&index);
 
     // HEAD's tree, with the carried files taken from the working tree.
-    git_with_index(top, &index, &["read-tree", "HEAD"])?;
+    git::run_with_index(top, &index, &["read-tree", "HEAD"])?;
     let mut update = vec![
         "update-index".to_string(),
         "--add".to_string(),
@@ -357,10 +334,10 @@ fn temp_commit_with_carried(top: &Path, carried: &[String]) -> Result<String, St
     ];
     update.extend(carried.iter().cloned());
     let update_refs: Vec<&str> = update.iter().map(String::as_str).collect();
-    git_with_index(top, &index, &update_refs)?;
-    let tree_out = git_with_index(top, &index, &["write-tree"])?;
+    git::run_with_index(top, &index, &update_refs)?;
+    let tree_out = git::run_with_index(top, &index, &["write-tree"])?;
     let tree = String::from_utf8_lossy(&tree_out).trim().to_string();
-    let commit_out = git_with_index(
+    let commit_out = git::run_with_index(
         top,
         &index,
         &[
@@ -392,11 +369,11 @@ fn ours_with_carried(top: &Path, carried: &[String]) -> Result<String, String> {
 /// which squashes, the fork point is the older of the two and the base ref is
 /// right.
 pub(crate) fn merge_start(top: &Path, wt: &Worktree) -> String {
-    let fork_point = git(top, &["merge-base", "HEAD", &wt.branch], None)
+    let fork_point = git::run(top, &["merge-base", "HEAD", &wt.branch], None)
         .map(|out| String::from_utf8_lossy(&out).trim().to_string());
     match fork_point {
         Ok(fork_point)
-            if git(
+            if git::run(
                 top,
                 &["merge-base", "--is-ancestor", &wt.base, &fork_point],
                 None,
@@ -424,21 +401,18 @@ fn merge_tree(
         "git -C {} merge-tree --write-tree --name-only --no-messages {merge_base} {ours} {branch}",
         top.display()
     );
-    let out = Command::new("git")
-        .arg("-C")
-        .arg(top)
-        .arg("merge-tree")
-        .arg("--write-tree")
-        .arg("--name-only")
-        .arg("--no-messages")
-        .arg(&merge_base)
-        .arg(ours)
-        .arg(branch)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .output()
-        .map_err(|e| format!("{command}: {e}"))?;
+    let out = git::run_output(
+        top,
+        &[
+            "merge-tree",
+            "--write-tree",
+            "--name-only",
+            "--no-messages",
+            &merge_base,
+            ours,
+            branch,
+        ],
+    )?;
 
     match out.status.code() {
         // No conflicts: the first line is the merged tree.
@@ -478,7 +452,7 @@ fn git_files(top: &Path, args: &[&str], files: &[String]) -> Result<Vec<u8>, Str
     all.push("--".to_string());
     all.extend_from_slice(files);
     let refs: Vec<&str> = all.iter().map(String::as_str).collect();
-    git(top, &refs, None)
+    git::run(top, &refs, None)
 }
 
 /// Commits the agent's work as one commit on the human's branch, then moves
@@ -495,7 +469,7 @@ fn git_files(top: &Path, args: &[&str], files: &[String]) -> Result<Vec<u8>, Str
 /// (content equal to neither the base's nor the branch's) is a blocker.
 pub fn apply(top: &Path, wt: &Worktree, message: &str) -> Result<String, ApplyError> {
     // A commit made from the index would also take whatever the human staged.
-    if git(top, &["diff", "--cached", "--quiet"], None).is_err() {
+    if git::run(top, &["diff", "--cached", "--quiet"], None).is_err() {
         return Err(ApplyError::Git {
             message: "you have staged changes: commit or unstage them first, they would go into the integration commit"
                 .into(),
@@ -530,7 +504,7 @@ pub fn apply(top: &Path, wt: &Worktree, message: &str) -> Result<String, ApplyEr
 
     // The branch is already merged when the range is empty; refuse before
     // making a commit.
-    let count = git(top, &["rev-list", "--count", &range], None)
+    let count = git::run(top, &["rev-list", "--count", &range], None)
         .map(|out| String::from_utf8_lossy(&out).trim().to_string())
         .map_err(|message| ApplyError::Git { message })?;
     if count == "0" {
@@ -562,7 +536,7 @@ pub fn apply(top: &Path, wt: &Worktree, message: &str) -> Result<String, ApplyEr
     }
 
     // The integration commit, on the human's HEAD.
-    let commit = git(
+    let commit = git::run(
         top,
         &["commit-tree", &tree, "-p", "HEAD", "-F", "-"],
         Some(message.as_bytes()),
@@ -578,19 +552,19 @@ pub fn apply(top: &Path, wt: &Worktree, message: &str) -> Result<String, ApplyEr
     // branch and update the working tree, keeping the human's other uncommitted
     // work.
     for file in &carried {
-        if git(
+        if git::run(
             top,
             &["rev-parse", "-q", "--verify", &format!("HEAD:{file}")],
             None,
         )
         .is_ok()
         {
-            let _ = git(top, &["checkout", "HEAD", "--", file], None);
+            let _ = git::run(top, &["checkout", "HEAD", "--", file], None);
         } else {
             let _ = std::fs::remove_file(top.join(file));
         }
     }
-    if let Err(message) = git(top, &["reset", "-q", "--keep", &commit], None) {
+    if let Err(message) = git::run(top, &["reset", "-q", "--keep", &commit], None) {
         // Restore the carried files from `ours` and unstage them, so the
         // human's tree is back to what it was.
         if !carried.is_empty() {
@@ -600,10 +574,10 @@ pub fn apply(top: &Path, wt: &Worktree, message: &str) -> Result<String, ApplyEr
         return Err(ApplyError::Git { message });
     }
 
-    git(top, &["update-ref", &wt.base, &wt.branch], None)
+    git::run(top, &["update-ref", &wt.base, &wt.branch], None)
         .map_err(|message| ApplyError::Git { message })?;
-    let head =
-        git(top, &["rev-parse", "HEAD"], None).map_err(|message| ApplyError::Git { message })?;
+    let head = git::run(top, &["rev-parse", "HEAD"], None)
+        .map_err(|message| ApplyError::Git { message })?;
     Ok(String::from_utf8_lossy(&head).trim().to_string())
 }
 
@@ -622,6 +596,10 @@ mod tests {
     use crate::domain::id::new_id;
     use crate::worktree::{commit, open, remove, top};
     use std::path::PathBuf;
+
+    fn git(dir: &Path, args: &[&str], stdin: Option<&[u8]>) -> Result<Vec<u8>, String> {
+        git::run(dir, args, stdin)
+    }
 
     fn text(dir: &Path, args: &[&str]) -> String {
         String::from_utf8_lossy(&git(dir, args, None).unwrap())

@@ -2,7 +2,6 @@
 //! and its committed copy, `docs/map.md`.
 
 use std::path::Path;
-use std::process::Command;
 
 use crate::domain::map_doc::{self, MAP_FILE, MapFileState};
 use crate::domain::module_map::{self, ModuleMap, SourceFile};
@@ -36,18 +35,10 @@ pub fn write_map_file(workdir: &Path, map: &ModuleMap) -> std::io::Result<()> {
 }
 
 pub(crate) fn tracked_files(workdir: &Path) -> Vec<SourceFile> {
-    let Ok(out) = Command::new("git")
-        .current_dir(workdir)
-        .args(["ls-files", "-z"])
-        .output()
-    else {
+    let Some(out) = crate::git::stdout(workdir, &["ls-files", "-z"]) else {
         return Vec::new();
     };
-    if !out.status.success() {
-        return Vec::new();
-    }
-    String::from_utf8_lossy(&out.stdout)
-        .split('\0')
+    out.split('\0')
         .filter(|path| module_map::is_source_path(path))
         .filter_map(|path| {
             let full = workdir.join(path);

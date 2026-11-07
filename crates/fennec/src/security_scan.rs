@@ -6,7 +6,7 @@ use crate::worktree::Worktree;
 
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::sync::Mutex;
 use std::thread;
 use std::time::{Duration, Instant};
@@ -130,17 +130,10 @@ fn cache_key(top: &Path, wt: &Worktree) -> Option<String> {
 }
 
 fn resolve_sha(top: &Path, r: &str) -> Option<String> {
-    let out = Command::new("git")
-        .args(["rev-parse", &format!("{r}^{{commit}}")])
-        .current_dir(top)
-        .output()
-        .ok()?;
-
-    if !out.status.success() {
-        return None;
-    }
-
-    let sha = String::from_utf8(out.stdout).ok()?.trim().to_string();
+    let ref_arg = format!("{r}^{{commit}}");
+    let sha = crate::git::stdout(top, &["rev-parse", &ref_arg])?
+        .trim()
+        .to_string();
     if sha.is_empty() { None } else { Some(sha) }
 }
 
@@ -429,6 +422,7 @@ fn run(
 mod tests {
     use super::*;
     use std::fs;
+    use std::process::Command;
 
     fn temp_dir(tag: &str) -> PathBuf {
         let nanos = std::time::SystemTime::now()

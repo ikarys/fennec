@@ -1,8 +1,90 @@
 //! What fennec reads from a project's git repository.
 
 use std::collections::{HashMap, HashSet};
+use std::io::Write;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Output, Stdio};
+
+/// Runs `git -C dir args…`; a non-zero exit is an `Err` with the command and
+/// its trimmed stderr.
+pub(crate) fn run(dir: &Path, args: &[&str], stdin: Option<&[u8]>) -> Result<Vec<u8>, String> {
+    run_bytes(dir, None, args, stdin)
+}
+
+/// Like `run`, but with `GIT_INDEX_FILE` set to `index`, so the command works
+/// on that index instead of the human's.
+pub(crate) fn run_with_index(dir: &Path, index: &Path, args: &[&str]) -> Result<Vec<u8>, String> {
+    run_bytes(dir, Some(index), args, None)
+}
+
+/// The stdout of a read-only git command; `None` when git cannot answer.
+pub(crate) fn stdout(dir: &Path, args: &[&str]) -> Option<String> {
+    execute(dir, None, args, None)
+        .ok()
+        .filter(|out| out.status.success())
+        .map(|out| String::from_utf8_lossy(&out.stdout).into_owned())
+}
+
+/// The raw output of a git command whose non-zero exit is an answer, not a
+/// failure (`git merge-tree` reports conflicts this way).
+pub(crate) fn run_output(dir: &Path, args: &[&str]) -> Result<Output, String> {
+    execute(dir, None, args, None)
+}
+
+fn run_bytes(
+    dir: &Path,
+    index: Option<&Path>,
+    args: &[&str],
+    stdin: Option<&[u8]>,
+) -> Result<Vec<u8>, String> {
+    let out = execute(dir, index, args, stdin)?;
+    if out.status.success() {
+        Ok(out.stdout)
+    } else {
+        Err(failure(&out, &command_label(dir, args)))
+    }
+}
+
+fn command_label(dir: &Path, args: &[&str]) -> String {
+    format!("git -C {} {}", dir.display(), args.join(" "))
+}
+
+fn failure(out: &Output, command: &str) -> String {
+    format!("{command}: {}", String::from_utf8_lossy(&out.stderr).trim())
+}
+
+fn execute(
+    dir: &Path,
+    index: Option<&Path>,
+    args: &[&str],
+    stdin: Option<&[u8]>,
+) -> Result<Output, String> {
+    let command = command_label(dir, args);
+    let mut cmd = Command::new("git");
+    cmd.arg("-C")
+        .arg(dir)
+        .args(args)
+        // A git that asks for credentials must not hang a request.
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .stdin(if stdin.is_some() {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        })
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    if let Some(index) = index {
+        cmd.env("GIT_INDEX_FILE", index);
+    }
+    let mut child = cmd.spawn().map_err(|e| format!("{command}: {e}"))?;
+    if let (Some(input), Some(mut pipe)) = (stdin, child.stdin.take()) {
+        pipe.write_all(input)
+            .map_err(|e| format!("{command}: {e}"))?;
+    }
+    child
+        .wait_with_output()
+        .map_err(|e| format!("{command}: {e}"))
+}
 
 /// The checked-out branch, read from `.git/HEAD` (worktrees: the `gitdir:`
 /// file); `None` when detached or not a repository.
@@ -24,15 +106,8 @@ pub fn current_branch(workdir: &Path) -> Option<String> {
 /// remote; `None` when the repository has no remote.
 pub fn remote_url(workdir: &Path) -> Option<String> {
     let name = preferred_remote(workdir)?;
-    let out = Command::new("git")
-        .current_dir(workdir)
-        .args(["remote", "get-url", &name])
-        .output()
-        .ok()?;
-    if !out.status.success() {
-        return None;
-    }
-    String::from_utf8_lossy(&out.stdout)
+    let out = run(workdir, &["remote", "get-url", &name], None).ok()?;
+    String::from_utf8_lossy(&out)
         .lines()
         .next()
         .map(str::trim)
@@ -43,15 +118,8 @@ pub fn remote_url(workdir: &Path) -> Option<String> {
 /// `origin` when present, else the first configured remote; `None` when there
 /// is none.
 fn preferred_remote(workdir: &Path) -> Option<String> {
-    let out = Command::new("git")
-        .current_dir(workdir)
-        .args(["remote"])
-        .output()
-        .ok()?;
-    if !out.status.success() {
-        return None;
-    }
-    let output = String::from_utf8_lossy(&out.stdout);
+    let out = run(workdir, &["remote"], None).ok()?;
+    let output = String::from_utf8_lossy(&out);
     let remotes: Vec<&str> = output
         .lines()
         .map(str::trim)
@@ -90,20 +158,13 @@ pub fn web_url(remote: &str) -> Option<String> {
 
 /// The number of uncommitted entries in the human's tree, for a quick glance.
 pub fn dirty_count(workdir: &Path) -> usize {
-    let Ok(output) = Command::new("git")
-        .current_dir(workdir)
-        .args(["status", "--porcelain", "-z"])
-        .output()
-    else {
+    let Ok(output) = run(workdir, &["status", "--porcelain", "-z"], None) else {
         return 0;
     };
-    if !output.status.success() {
-        return 0;
-    }
 
     let mut count = 0;
     let mut skip_next = false;
-    for field in output.stdout.split(|byte| *byte == 0) {
+    for field in output.split(|byte| *byte == 0) {
         if skip_next {
             skip_next = false;
             continue;
@@ -122,18 +183,18 @@ pub fn dirty_count(workdir: &Path) -> usize {
 /// The sessions whose work reached the checked-out branch: the `Fennec-Session` trailers an
 /// integration writes, read from HEAD's history in one `git log`. Survives the session's deletion.
 pub fn integrated_sessions(workdir: &Path) -> HashSet<String> {
-    let Ok(out) = Command::new("git")
-        .current_dir(workdir)
-        .args([
+    let Ok(out) = run(
+        workdir,
+        &[
             "log",
             "HEAD",
             "--format=%(trailers:key=Fennec-Session,valueonly)",
-        ])
-        .output()
-    else {
+        ],
+        None,
+    ) else {
         return HashSet::new();
     };
-    session_trailers(&String::from_utf8_lossy(&out.stdout))
+    session_trailers(&String::from_utf8_lossy(&out))
 }
 
 fn session_trailers(log: &str) -> HashSet<String> {
@@ -148,19 +209,19 @@ fn session_trailers(log: &str) -> HashSet<String> {
 /// still waiting for the human. One `git for-each-ref` per project; sessions
 /// whose branch or base is gone (discarded, never opened) are not listed.
 pub fn sessions_with_unintegrated_work(workdir: &Path) -> HashSet<String> {
-    let Ok(out) = Command::new("git")
-        .current_dir(workdir)
-        .args([
+    let Ok(out) = run(
+        workdir,
+        &[
             "for-each-ref",
             "--format=%(refname) %(objectname)",
             "refs/heads/fennec",
             "refs/fennec/base",
-        ])
-        .output()
-    else {
+        ],
+        None,
+    ) else {
         return HashSet::new();
     };
-    unintegrated(&String::from_utf8_lossy(&out.stdout))
+    unintegrated(&String::from_utf8_lossy(&out))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -175,31 +236,14 @@ pub fn branch_stats(workdir: &Path, session_id: &str) -> Option<BranchStats> {
     let head = format!("refs/heads/fennec/{session_id}");
     let range = format!("{base}..{head}");
 
-    let count_out = Command::new("git")
-        .current_dir(workdir)
-        .args(["rev-list", "--count"])
-        .arg(&range)
-        .output()
-        .ok()?;
-    if !count_out.status.success() {
-        return None;
-    }
-    let commits = String::from_utf8_lossy(&count_out.stdout)
+    let count_out = run(workdir, &["rev-list", "--count", &range], None).ok()?;
+    let commits = String::from_utf8_lossy(&count_out)
         .trim()
         .parse::<usize>()
         .ok()?;
 
-    let diff_out = Command::new("git")
-        .current_dir(workdir)
-        .args(["diff", "--name-only"])
-        .arg(&base)
-        .arg(&head)
-        .output()
-        .ok()?;
-    if !diff_out.status.success() {
-        return None;
-    }
-    let files = String::from_utf8_lossy(&diff_out.stdout)
+    let diff_out = run(workdir, &["diff", "--name-only", &base, &head], None).ok()?;
+    let files = String::from_utf8_lossy(&diff_out)
         .lines()
         .filter(|line| !line.trim().is_empty())
         .count();
@@ -217,9 +261,9 @@ pub struct Contribution {
 /// The branches, local and remote, holding commits the human's HEAD lacks: what
 /// could come in as a contribution.
 pub fn contributions(workdir: &Path) -> Vec<Contribution> {
-    let out = Command::new("git")
-        .current_dir(workdir)
-        .args([
+    let out = run(
+        workdir,
+        &[
             "for-each-ref",
             "--no-merged",
             "HEAD",
@@ -229,28 +273,19 @@ pub fn contributions(workdir: &Path) -> Vec<Contribution> {
             "--format=%(refname:lstrip=2)%09%(subject)",
             "refs/heads",
             "refs/remotes",
-        ])
-        .output()
-        .ok()
-        .filter(|o| o.status.success())
-        .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
-        .unwrap_or_default();
+        ],
+        None,
+    )
+    .ok()
+    .map(|o| String::from_utf8_lossy(&o).into_owned())
+    .unwrap_or_default();
     let current = current_branch(workdir);
     let mut contributions = Vec::new();
     for (branch, subject) in parse_contributions(&out, current.as_deref()) {
-        let Some(ahead) = Command::new("git")
-            .current_dir(workdir)
-            .args(["rev-list", "--count"])
-            .arg(format!("HEAD..{branch}"))
-            .output()
+        let range = format!("HEAD..{branch}");
+        let Some(ahead) = run(workdir, &["rev-list", "--count", &range], None)
             .ok()
-            .filter(|o| o.status.success())
-            .and_then(|o| {
-                String::from_utf8_lossy(&o.stdout)
-                    .trim()
-                    .parse::<usize>()
-                    .ok()
-            })
+            .and_then(|o| String::from_utf8_lossy(&o).trim().parse::<usize>().ok())
         else {
             continue;
         };
