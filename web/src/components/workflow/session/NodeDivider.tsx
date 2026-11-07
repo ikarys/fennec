@@ -4,7 +4,7 @@ import { formatClock, formatDuration } from '../../../lib/format';
 import type { NodeKind } from '../../../lib/workflow';
 import { useLang, useT } from '../../../i18n';
 import { portTone } from '../../../lib/workflowRun';
-import { CheckIcon, ChevronRightIcon, CloseIcon, ExternalIcon, SpinnerIcon } from '../../Icons';
+import { CheckIcon, ChevronRightIcon, CloseIcon, ExternalIcon, SpinnerIcon } from '../../ui/Icons';
 import { useNodeUsage } from '../../session/CallUsage';
 import { Badge } from '../../ui/Badge';
 import { buttonClass } from '../../ui/Button';

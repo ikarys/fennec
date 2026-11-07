@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ServerView } from '../../lib/api';
 import { getServers, openTerminal, saveServers, startServer, stopServer } from '../../lib/api';
 import { serverBadge, serversPollMs } from '../../lib/servers';
-import { ExternalIcon, PlayIcon, SettingsIcon, SpinnerIcon, StopIcon, TerminalIcon } from '../Icons';
+import { ExternalIcon, PlayIcon, SettingsIcon, SpinnerIcon, StopIcon, TerminalIcon } from '../ui/Icons';
 import { Badge } from '../ui/Badge';
 import { Button, buttonClass } from '../ui/Button';
 import { useLang, useT } from '../../i18n';

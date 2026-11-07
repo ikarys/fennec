@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { SeenImage } from '../../lib/api';
 import { panelBlock } from '../../lib/panelBlocks';
-import { CloseIcon, EyeIcon, LocateIcon } from '../Icons';
+import { CloseIcon, EyeIcon, LocateIcon } from '../ui/Icons';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Modal } from '../ui/Modal';

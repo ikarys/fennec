@@ -12,7 +12,7 @@ import { Button } from '../ui/Button';
 import { ListCard } from '../ui/ListCard';
 import { Section } from '../ui/Section';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
-import { TrashIcon } from '../Icons';
+import { TrashIcon } from '../ui/Icons';
 import { AgentEditor, EMPTY_DRAFT } from './AgentEditor';
 import { useT } from '../../i18n';
 import type { MsgKey } from '../../i18n/messages';

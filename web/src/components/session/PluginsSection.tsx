@@ -8,7 +8,7 @@ import { usePluginsVersion } from '../../hooks/usePluginsVersion';
 import { Badge } from '../ui/Badge';
 import { Panel } from '../ui/Panel';
 import { panelBlock } from '../../lib/panelBlocks';
-import { PuzzleIcon } from '../Icons';
+import { PuzzleIcon } from '../ui/Icons';
 import { BlockElements } from '../plugins/BlockElements';
 import { PluginBlockCard } from '../plugins/PluginBlockCard';
 

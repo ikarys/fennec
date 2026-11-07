@@ -1,6 +1,6 @@
 import type { SessionSkills } from '../../lib/api';
 import { panelBlock } from '../../lib/panelBlocks';
-import { WandIcon } from '../Icons';
+import { WandIcon } from '../ui/Icons';
 import { Panel } from '../ui/Panel';
 import { useT } from '../../i18n';
 

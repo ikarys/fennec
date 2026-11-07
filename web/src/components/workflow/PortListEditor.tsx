@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '../ui/Button';
-import { CloseIcon, PlusIcon } from '../Icons';
+import { CloseIcon, PlusIcon } from '../ui/Icons';
 import { FieldRow, TextInput } from '../ui/Field';
 import { useT } from '../../i18n';
 

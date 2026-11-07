@@ -5,7 +5,7 @@ import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Section, type SectionSave } from '../ui/Section';
 import { Badge } from '../ui/Badge';
-import { CloseIcon, GripIcon, PlusIcon, TrashIcon } from '../Icons';
+import { CloseIcon, GripIcon, PlusIcon, TrashIcon } from '../ui/Icons';
 import { useLang, useT } from '../../i18n';
 
 const MAX_PAGES = 12;

@@ -1,7 +1,7 @@
 /**
  * An idea's attached images and files, as thumbnails and chips.
  */
-import { FileIcon } from "../../Icons";
+import { FileIcon } from "../../ui/Icons";
 import type { IdeaView } from "../../../lib/ideas";
 
 export function IdeaAttachments({

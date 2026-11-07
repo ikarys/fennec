@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm';
 import type { AssistantItem, PreflightResultView, Segment, ThreadItem } from '../../lib/fold';
 import { useDisplayPrefs } from '../../lib/display';
 import { splitContract, type Plan, type Report } from '../../lib/plan';
-import { BulbIcon, ChevronRightIcon, ReplayIcon } from '../Icons';
+import { BulbIcon, ChevronRightIcon, ReplayIcon } from '../ui/Icons';
 import { buttonClass } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { CopyButton } from './CopyButton';

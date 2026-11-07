@@ -4,7 +4,7 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Section, type SectionSave } from '../ui/Section';
 import { SectionLabel } from '../ui/SectionLabel';
-import { ChevronRightIcon, CloseIcon, HeartIcon, PinIcon, StarIcon } from '../Icons';
+import { ChevronRightIcon, CloseIcon, HeartIcon, PinIcon, StarIcon } from '../ui/Icons';
 import { FieldRow, Select, TextInput } from '../ui/Field';
 import { ModelProbe } from './ModelProbe';
 import { percentFromFraction } from '../../lib/settingsForm';

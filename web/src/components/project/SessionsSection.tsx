@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { type SessionSummary } from '../../lib/api';
 import { DeleteSessionsDialog } from '../session/DeleteSessionsDialog';
-import { EyeIcon, TrashIcon } from '../Icons';
+import { EyeIcon, TrashIcon } from '../ui/Icons';
 import { SessionStateIcon } from '../session/SessionStateIcon';
 import { formatRelative, formatDateTime, stateLabel } from '../../lib/format';
 import { Badge } from '../ui/Badge';

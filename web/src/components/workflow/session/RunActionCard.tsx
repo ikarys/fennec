@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useT } from '../../../i18n';
 import type { RunWaiting } from '../../../lib/workflowRun';
-import { StopIcon } from '../../Icons';
+import { StopIcon } from '../../ui/Icons';
 import { Button } from '../../ui/Button';
 import { TextArea } from '../../ui/Field';
 

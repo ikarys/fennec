@@ -13,7 +13,7 @@ import {
   TrashIcon,
   ChevronsLeftIcon,
   ChevronsRightIcon,
-} from '../Icons';
+} from '../ui/Icons';
 import { DocumentView } from '../preview/DocumentView';
 import { useT } from '../../i18n';
 import { previewUrl, type PreviewKind } from '../../lib/preview';

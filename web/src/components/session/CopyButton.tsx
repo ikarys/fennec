@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useT } from '../../i18n';
-import { CheckIcon, CopyIcon } from '../Icons';
+import { CheckIcon, CopyIcon } from '../ui/Icons';
 import { Button } from '../ui/Button';
 
 export function CopyButton({ text }: { text: string }) {

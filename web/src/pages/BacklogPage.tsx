@@ -4,7 +4,7 @@ import { startQueue, stopQueue } from '../lib/ideas';
 import { Badge } from '../components/ui/Badge';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { MoonIcon, PlayIcon, StopIcon } from '../components/Icons';
+import { MoonIcon, PlayIcon, StopIcon } from '../components/ui/Icons';
 import { useT } from '../i18n';
 import type { MsgKey } from '../i18n/messages';
 

@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { Button } from '../../ui/Button';
 import { Card } from '../../ui/Card';
 import { Badge } from '../../ui/Badge';
-import { EditIcon, MoonIcon, PlayIcon, SettingsIcon, StopIcon } from '../../Icons';
+import { EditIcon, MoonIcon, PlayIcon, SettingsIcon, StopIcon } from '../../ui/Icons';
 import { formatTokens } from '../../../lib/format';
 import { startQueue, stopQueue, type IdeaBoard } from '../../../lib/ideas';
 import { useT, useLang } from '../../../i18n';

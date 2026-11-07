@@ -9,7 +9,7 @@ import {
   InboxIcon,
   LayersIcon,
   ProjectIcon
-} from '../components/Icons';
+} from '../components/ui/Icons';
 import { type BadgeTone } from '../components/ui/Badge';
 import { Card } from '../components/ui/Card';
 import { Tile } from '../components/ui/Tile';

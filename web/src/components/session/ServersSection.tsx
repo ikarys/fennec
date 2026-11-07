@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { ServerView } from '../../lib/api';
-import { ServerIcon } from '../Icons';
+import { ServerIcon } from '../ui/Icons';
 import { Panel } from '../ui/Panel';
 import { panelBlock } from '../../lib/panelBlocks';
 import { ServerEditor } from './ServerEditor';

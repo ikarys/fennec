@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { TrashIcon } from '../Icons';
+import { TrashIcon } from '../ui/Icons';
 import { FieldRow, Select, TextInput } from '../ui/Field';
 import { useT } from '../../i18n';
 import type { Agent } from '../../lib/api';

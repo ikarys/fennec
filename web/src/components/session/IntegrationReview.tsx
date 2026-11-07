@@ -3,7 +3,7 @@
 import type { IntegrationPreview, ReviewSignal } from '../../lib/api';
 import { DecisionList } from './DecisionList';
 import { CriterionProvenanceBadge, ExistenceOnlyBadge, PassedBeforeBadge, criterionDotClass } from './CriteriaSection';
-import { ChevronRightIcon } from '../Icons';
+import { ChevronRightIcon } from '../ui/Icons';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import type { BadgeTone } from '../ui/Badge';

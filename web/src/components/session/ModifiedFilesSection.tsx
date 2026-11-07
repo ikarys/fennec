@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import type { ThreadView } from '../../lib/fold';
 import { relativeToWorkdir } from '../../lib/preview';
 import { usePreviewWorkdir } from '../preview/PreviewContext';
-import { ChevronRightIcon, FileIcon } from '../Icons';
+import { ChevronRightIcon, FileIcon } from '../ui/Icons';
 import { Panel } from '../ui/Panel';
 import { useT } from '../../i18n';
 import { changesPath } from '../../lib/route';

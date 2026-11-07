@@ -15,7 +15,7 @@ import {
   type Acknowledged,
   type BlockerKind,
 } from '../../lib/integration';
-import { AlertIcon, BranchIcon, SpinnerIcon } from '../Icons';
+import { AlertIcon, BranchIcon, SpinnerIcon } from '../ui/Icons';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';

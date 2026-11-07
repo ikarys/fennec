@@ -1,5 +1,5 @@
 import { buttonClass } from '../ui/Button';
-import { HardDriveIcon } from '../Icons';
+import { HardDriveIcon } from '../ui/Icons';
 import { getWorktreeSummary } from '../../lib/api/worktrees';
 import { formatBytes } from '../../lib/format';
 import { useT, useLang } from '../../i18n';

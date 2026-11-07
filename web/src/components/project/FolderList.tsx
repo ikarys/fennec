@@ -1,6 +1,6 @@
 import { useRef, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { Folder } from '../../lib/api';
-import { FolderIcon, RepoIcon, SpinnerIcon } from '../Icons';
+import { FolderIcon, RepoIcon, SpinnerIcon } from '../ui/Icons';
 import { Badge } from '../ui/Badge';
 import { useT } from '../../i18n';
 

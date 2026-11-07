@@ -20,7 +20,7 @@ import { SessionPage } from './pages/SessionPage';
 import { SplitPage } from './pages/SplitPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { InsightPage } from './pages/InsightPage';
-import { Palette } from './components/Palette';
+import { Palette } from './components/layout/Palette';
 import { ProjectDialog } from './components/project/ProjectDialog';
 import { DisplayPrefsProvider, defaultDisplayPrefs } from './lib/display';
 import { I18nProvider } from './i18n';

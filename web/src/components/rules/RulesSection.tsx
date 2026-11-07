@@ -4,7 +4,7 @@ import { Button } from '../ui/Button';
 import { FieldRow, Select, TextInput } from '../ui/Field';
 import { ListCard } from '../ui/ListCard';
 import { Section } from '../ui/Section';
-import { ExternalIcon, PinIcon, TrashIcon } from '../Icons';
+import { ExternalIcon, PinIcon, TrashIcon } from '../ui/Icons';
 import { Tile } from '../ui/Tile';
 import { useT } from '../../i18n';
 import type { MsgKey } from '../../i18n/messages';
